@@ -1,0 +1,501 @@
+<template>
+
+  <div class="standard-view">
+
+    <!-- header bar -->
+    <HeaderBar />
+
+    <!-- scroll container - app util class -->
+    <div class="scroll-y-container h-100">
+
+      <!-- bootstrap container -->
+      <div class="container">
+
+        <!-- bootstrap row -->
+        <div class="row">
+
+          <!-- otc title -->
+          <TacoTitle level="h2" emoji="📌" title="More Information" class="mt-4" style="padding-left: 1rem !important;"/>
+
+          <!-- flex container -->
+          <div class="info d-flex gap-4 mt-4 p-0">
+
+            <!-- taco token -->
+            <div class="info__area 
+                        pe-0 pe-lg-4">
+
+              <ul class="taco-list info__area__ul
+                         list-group border-0 pt-0">
+
+                  <!-- title -->
+                  <li class="taco-list__item 
+                            taco-list__item--title
+                            taco-list__item--no-hover           
+                            list-group-item">
+
+                    <!-- test title -->
+                    <TacoTitle level="h2" emoji="🌮" title="Taco Token" style="margin-bottom: 0 !important; padding: 0 !important;" />
+
+                  </li>
+
+                  <!-- list item -->
+                  <li class="taco-list__item          
+                            list-group-item d-none">
+
+                      <!-- key value pair -->
+                      <div class="taco-list__kvp">
+
+                          <!-- title -->
+                          <span class="taco-text-black-to-white">Current Price:</span>
+
+                          <!-- data -->
+                          <span class="taco-text-black-to-white"> 0.00 ICP ($0.00 USD)</span>
+
+                      </div>
+
+                  </li>
+
+                  <!-- list item -->
+                  <li class="taco-list__item          
+                            list-group-item">
+
+                      <!-- key value pair -->
+                      <div class="taco-list__kvp">
+
+                          <!-- title -->
+                          <span class="taco-text-black-to-white">Circulating Supply:</span>
+
+                          <!-- data -->
+                          <span class="taco-text-black-to-white">7,777,777 TACO</span>
+
+                      </div>
+
+                  </li>
+
+                  <!-- list item -->
+                  <li class="taco-list__item          
+                            list-group-item">
+
+                      <!-- key value pair -->
+                      <div class="taco-list__kvp ps-3">
+
+                          <!-- down-over icon -->
+                          <i class="fa-solid fa-corner fa-rotate-180 me-2 taco-text-black-to-white"
+                            style="opacity: 0.5;"></i>
+
+                          <!-- title -->
+                          <span class="taco-text-black-to-white">SNS Swap:</span>
+
+                          <!-- data -->
+                          <span class="taco-text-black-to-white">3,690,000 TACO (47.442%)</span>
+
+                      </div>
+
+                  </li>
+
+                  <!-- list item -->
+                  <li class="taco-list__item          
+                            list-group-item">
+
+                      <!-- key value pair -->
+                      <div class="taco-list__kvp ps-3">
+
+                          <!-- down-over icon -->
+                          <i class="fa-solid fa-corner fa-rotate-180 me-2 taco-text-black-to-white"
+                            style="opacity: 0.5;"></i>
+
+                          <!-- title -->
+                          <span class="taco-text-black-to-white">Founders' Presale:</span>
+
+                          <!-- data -->
+                          <span class="taco-text-black-to-white">999,999 TACO (12.857%)</span>
+
+                      </div>
+
+                  </li>
+
+                  <!-- list item -->
+                  <li class="taco-list__item          
+                            list-group-item">
+
+                      <!-- key value pair -->
+                      <div class="taco-list__kvp ps-3">
+
+                          <!-- down-over icon -->
+                          <i class="fa-solid fa-corner fa-rotate-180 me-2 taco-text-black-to-white"
+                            style="opacity: 0.5;"></i>
+
+                          <!-- title -->
+                          <span class="taco-text-black-to-white">Front End Dev Allocation:</span>
+
+                          <!-- data -->
+                          <span class="taco-text-black-to-white">155,555 TACO  (2%)</span>
+
+                      </div>
+
+                  </li>
+
+                  <!-- list item -->
+                  <li class="taco-list__item          
+                            list-group-item">
+
+                      <!-- key value pair -->
+                      <div class="taco-list__kvp ps-3">
+
+                          <!-- down-over icon -->
+                          <i class="fa-solid fa-corner fa-rotate-180 me-2 taco-text-black-to-white"
+                            style="opacity: 0.5;"></i>
+
+                          <!-- title -->
+                          <span class="taco-text-black-to-white">Advisors' Allocation:</span>
+
+                          <!-- data -->
+                          <span class="taco-text-black-to-white">115,077 TACO (1.479%)</span>
+
+                      </div>
+
+                  </li>
+
+                  <!-- list item -->
+                  <li class="taco-list__item          
+                            list-group-item">
+
+                      <!-- key value pair -->
+                      <div class="taco-list__kvp ps-3">
+
+                          <!-- down-over icon -->
+                          <i class="fa-solid fa-corner fa-rotate-180 me-2 taco-text-black-to-white"
+                            style="opacity: 0.5;"></i>
+
+                          <!-- title -->
+                          <span class="taco-text-black-to-white">Visual Design Allocation:</span>
+
+                          <!-- data -->
+                          <span class="taco-text-black-to-white">77,777 TACO (1%)</span>
+
+                      </div>
+
+                  </li>
+
+                  <!-- list item -->
+                  <li class="taco-list__item          
+                            list-group-item">
+
+                      <!-- key value pair -->
+                      <div class="taco-list__kvp ps-3">
+
+                          <!-- down-over icon -->
+                          <i class="fa-solid fa-corner fa-rotate-180 me-2 taco-text-black-to-white"
+                            style="opacity: 0.5;"></i>
+
+                          <!-- title -->
+                          <span class="taco-text-black-to-white">Liquidity Pools:</span>
+
+                          <!-- data -->
+                          <span class="taco-text-black-to-white">639,369 TACO (8.22%)</span>
+
+                      </div>
+
+                  </li>
+
+                  <!-- list item -->
+                  <li class="taco-list__item          
+                            list-group-item">
+
+                      <!-- key value pair -->
+                      <div class="taco-list__kvp ps-3">
+
+                          <!-- down-over icon -->
+                          <i class="fa-solid fa-corner fa-rotate-180 me-2 taco-text-black-to-white"
+                            style="opacity: 0.5;"></i>
+
+                          <!-- title -->
+                          <span class="taco-text-black-to-white">Initial 3 Trusted Token Swaps:</span>
+
+                          <!-- data -->
+                          <span class="taco-text-black-to-white">2,100,000 TACO (27%)</span>
+
+                      </div>
+
+                  </li>
+
+                  <!-- list item -->
+                  <li class="taco-list__item          
+                            list-group-item">
+
+                      <!-- key value pair -->
+                      <div class="taco-list__kvp ps-3">
+
+                          <!-- down-over icon -->
+                          <i class="fa-solid fa-corner fa-rotate-180 me-2 taco-text-black-to-white"
+                            style="opacity: 0.5;"></i>
+
+                          <!-- title -->
+                          <span class="taco-text-black-to-white">Adjustment:</span>
+
+                          <!-- data -->
+                          <span class="taco-text-black-to-white">- TACO (0.002%)</span>
+
+                      </div>
+
+                  </li>
+
+              </ul>
+
+            </div>
+
+            <!-- taco team -->
+            <div class="info__area 
+                        d-flex flex-column gap-2 pe-0 pe-sm-4">
+
+              <!-- team title -->
+              <TacoTitle level="h2" emoji="🙌" title="Taco Team"/>
+
+              <!--  -->
+              <ul class="taco-bs-list 
+                        list-group">
+
+                <!-- list item -->
+                <li class="standard-focus standard-focus--negative-offset
+                          list-group-item d-flex flex-nowrap py-3 gap-3"
+                    tabindex="0">
+
+                  <span class="taco-text-black-to-white"><span class="fw-bold taco-text-black-to-white">biketaco</span> - Executive</span>
+
+                </li>
+
+                <!-- list item -->
+                <li class="standard-focus standard-focus--negative-offset
+                          list-group-item d-flex flex-nowrap py-3 gap-3"
+                    tabindex="0">
+
+                  <span class="taco-text-black-to-white"><span class="fw-bold taco-text-black-to-white">TrickyVik</span> - Theory & Outreach</span>
+
+                </li>                
+
+                <!-- list item -->
+                <li class="standard-focus standard-focus--negative-offset
+                          list-group-item d-flex flex-nowrap py-3 gap-3"
+                    tabindex="0">
+
+                  <span class="taco-text-black-to-white"><a class="taco-text-blue-to-light-blue fw-bold" href="https://egidoval.com/" target="_blank">EgidoVal</a> - Art & Design</span>
+
+                </li>  
+                
+                <!-- list item -->
+                <li class="standard-focus standard-focus--negative-offset
+                          list-group-item d-flex flex-nowrap py-3 gap-3"
+                    tabindex="0">
+
+                  <span class="taco-text-black-to-white"><a class="taco-text-blue-to-light-blue fw-bold" href="https://x.com/SnassyIcp" target="_blank">Snassy</a> - Backend Development</span>
+
+                </li>                
+
+                <!-- list item -->
+                <li class="standard-focus standard-focus--negative-offset
+                          list-group-item d-flex flex-nowrap py-3 gap-3"
+                    tabindex="0">
+
+                  <span class="taco-text-black-to-white"><a class="taco-text-blue-to-light-blue fw-bold" href="http://ericrose.dev" target="_blank">ericrosedev</a> - Frontend Design & Development</span>
+
+                </li>
+
+              </ul>
+
+            </div>
+
+            <!-- links -->
+            <div class="info__area 
+                        d-flex flex-column gap-2 pb-5">
+
+              <!-- links title -->
+              <TacoTitle level="h2" emoji="🔗" title="Links"/>
+
+              <ul class="taco-bs-list 
+                        list-group">
+
+                <!-- list item -->
+                <li class="standard-focus standard-focus--negative-offset
+                          list-group-item d-flex flex-nowrap py-3 gap-3"
+                    tabindex="0">
+
+                  <span class="taco-text-black-to-white text-nowrap">📝 <a class="taco-text-blue-to-light-blue" href="/Taco_Dao_Whitepaper_v7.77_latest.pdf" target="_blank">Whitepaper</a></span>
+
+                </li>
+
+              </ul>
+
+            </div>            
+
+          </div>
+
+        </div>
+
+      </div>
+
+    </div>
+
+    <!-- footer bar -->
+    <FooterBar />
+
+  </div>
+
+</template>
+
+<style scoped lang="scss">
+
+  /////////////////////
+  // component style //
+  /////////////////////
+
+  // 
+  h2 {
+    padding-left: 0.75rem !important;
+    margin-bottom: 0.5rem !important;
+  }
+
+  // 
+  .taco-bs-list {
+    border: none;
+
+    // 
+    li {
+      border: none;
+    }
+  }
+
+  // info
+  .info {
+    flex-direction: row;
+
+    // info area
+    &__area {
+      border-right: 1px solid var(--dark-orange) !important;
+
+      //
+      &:last-child {
+        border-right: none !important;
+      }
+
+      // ul
+      &__ul {
+        width: fit-content
+      }
+
+    }
+
+  }
+
+  ///////////////////
+  // media queries //
+  ///////////////////
+
+  // phone protrait
+  @media (max-width: 575.98px) {
+    
+    // info
+    .info {
+      flex-direction: column;
+    }
+
+    // info area
+    .info__area {
+      border-right: none !important;
+      border-bottom: 1px solid var(--dark-orange);
+    }
+
+    // last info area
+    .info__area:last-child {
+      border-bottom: none;
+    }
+
+    // info area ul
+    .info__area__ul {
+      width: 100%;
+    }    
+    
+  }
+  
+  // phone landscape
+  @media (min-width: 576px) and (max-width: 767.98px) {
+
+    // info
+    .info {
+      flex-direction: column;
+    }
+
+    // info area
+    .info__area {
+      border-right: none !important;
+      border-bottom: 1px solid var(--dark-orange);
+    }
+
+    // last info area
+    .info__area:last-child {
+      border-bottom: none;
+    }
+
+    // info area ul
+    .info__area__ul {
+      width: 100%;
+    }    
+
+  }
+
+  // tablet
+  @media (min-width: 767px) and (max-width: 991.98px) {
+
+    // info
+    .info {
+      flex-direction: column;
+    }
+
+    // info area
+    .info__area {
+      border-right: none !important;
+      border-bottom: 1px solid var(--dark-orange);
+    }
+
+    // last info area
+    .info__area:last-child {
+      border-bottom: none;
+    }
+
+    // info area ul
+    .info__area__ul {
+      width: 100%;
+    }
+    
+  }
+
+  // // small daktop
+  // @media (min-width: 992px) and (max-width: 1199.98px) {
+    
+  // }
+
+  // // medium desktop
+  // @media (min-width: 1200px) and (max-width: 1399.98px) {
+    
+  // }
+
+</style>
+
+<script setup lang="ts">
+
+  /////////////
+  // Imports //
+  /////////////
+
+  import HeaderBar from "../components/HeaderBar.vue";
+  import FooterBar from "../components/FooterBar.vue";
+  import { ref } from "vue";
+  import TacoTitle from '../components/ui/TacoTitle.vue';
+
+  /////////////////////
+  // local variables //
+  /////////////////////
+
+  // has proposals
+  // const test = ref(false);
+
+</script>

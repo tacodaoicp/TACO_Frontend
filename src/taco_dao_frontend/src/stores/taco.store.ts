@@ -1,0 +1,2260 @@
+/////////////
+// Imports //
+/////////////
+
+// vue
+import { ref, computed } from 'vue'
+import { defineStore } from 'pinia'
+import { useRouter } from 'vue-router'
+import { useStorage } from "@vueuse/core"
+import { useBigNumber } from '../composables/useBigNumber'
+
+// dfinity
+import { AuthClient } from "@dfinity/auth-client"
+import { Actor, HttpAgent, Identity, AnonymousIdentity } from "@dfinity/agent"
+import { createAgent } from '@dfinity/utils'
+import { idlFactory } from "../../../declarations/ledger_canister/ledger_canister.did.js"
+import { idlFactory as daoBackendIDL } from "../../../declarations/dao_backend/DAO_backend.did.js"
+import { Result_4, idlFactory as treasuryIDL, UpdateConfig, RebalanceConfig, _SERVICE as TreasuryService, Result, RebalanceError } from "../../../declarations/treasury/treasury.did.js"
+import { Principal } from '@dfinity/principal'
+import { AccountIdentifier } from '@dfinity/ledger-icp'
+import { canisterId as iiCanisterId } from "../../../declarations/internet_identity/index.js"
+import type { Result_1, UserState } from "../../../declarations/dao_backend/DAO_backend.did.d"
+
+// utils
+import { formatUSD } from '../utils'
+
+// Types
+interface SnapshotInfo {
+    lastSnapshotId: bigint;
+    lastSnapshotTime: bigint;
+    totalVotingPower: bigint;
+}
+
+interface TradingMetrics {
+    lastUpdate: bigint;
+    totalTradesExecuted: bigint;
+    totalTradesFailed: bigint;
+    avgSlippage: number;
+    successRate: number;
+}
+
+interface Trade {
+    tokenSold: Principal;
+    tokenBought: Principal;
+    amountSold: bigint;
+    amountBought: bigint;
+    exchange: 'ICPSwap' | 'KongSwap';
+    timestamp: bigint;
+    success: boolean;
+    error?: string;
+}
+
+interface TimerHealth {
+    snapshot: {
+        active: boolean;
+        lastSnapshotTime: bigint | null;
+        nextExpectedSnapshot: bigint | null;
+        inProgress: boolean;
+    };
+    treasury: {
+        shortSync: {
+            active: boolean;
+            lastSync: bigint | null;
+        };
+        rebalanceStatus: 'Idle' | 'Trading' | 'Failed';
+        rebalanceError?: string;
+        tradingMetrics?: {
+            lastRebalanceAttempt: bigint;
+            totalTradesExecuted: bigint;
+            totalTradesFailed: bigint;
+            avgSlippage: number;
+            successRate: number;
+        };
+        recentTrades?: Trade[];
+    };
+}
+
+// Add this interface for the rebalance status
+interface RebalanceStatus {
+    Idle?: null;
+    Trading?: null;
+    Failed?: string;
+}
+
+// Add this with other interfaces
+interface SystemLog {
+    timestamp: bigint;
+    level: string;
+    message: string;
+}
+
+interface TradingLog {
+    timestamp: bigint;
+    message: string;
+}
+
+interface TokenMetadata {
+    symbol: string;
+    decimals: number;
+}
+
+interface MetadataEntry {
+    [key: string]: { Text?: string; Nat?: string };
+}
+
+interface TradingStatusResult {
+    ok?: {
+        metrics: TradingMetrics;
+        executedTrades?: Trade[];
+        rebalanceStatus: { Idle: null } | { Trading: null } | { Failed: string };
+    };
+    err?: string;
+}
+
+// Add these interfaces with the other interfaces at the top
+interface TrustedToken {
+    tokenId: Principal;
+    tokenSymbol: string;
+    tokenDecimals: number;
+    balance: bigint;
+    priceInUSD: string;
+}
+
+interface TrustedTokenEntry {
+    0: Principal;
+    1: {
+        tokenSymbol: string;
+        tokenDecimals: bigint;
+        balance: bigint;
+        priceInUSD: string;
+        Active: boolean;
+        isPaused: boolean;
+        pausedDueToSyncFailure: boolean;
+        lastTimeSynced: bigint;
+        epochAdded: bigint;
+        priceInICP: bigint;
+        tokenName: string;
+        tokenTransferFee: bigint;
+        tokenType: { ICRC3: null };
+        pastPrices: any[];
+    };
+}
+
+interface RebalanceResult {
+    ok?: { Text: string };
+    err?: { ConfigError: string } | { LiquidityError: string } | { PriceError: string } | { SystemError: string } | { TradeError: string };
+}
+
+interface UpdateSlippageConfig {
+    maxSlippageBasisPoints?: bigint[];
+    rebalanceIntervalNS?: bigint[];
+    maxTradeAttemptsPerInterval?: bigint[];
+    minTradeValueICP?: bigint[];
+    maxTradeValueICP?: bigint[];
+    portfolioRebalancePeriodNS?: bigint[];
+    maxTradesStored?: bigint[];
+    maxKongswapAttempts?: bigint[];
+    shortSyncIntervalNS?: bigint[];
+    longSyncIntervalNS?: bigint[];
+    maxPriceHistoryEntries?: bigint[];
+    priceUpdateIntervalNS?: bigint[];
+    tokenSyncTimeoutNS?: bigint[];
+}
+
+// Add this interface with other interfaces at the top
+interface VotingMetricsResponse {
+    ok: {
+        totalVotingPower: bigint;
+        totalVotingPowerByHotkeySetters: bigint;
+        allocatedVotingPower: bigint;
+        principalCount: bigint;
+        neuronCount: bigint;
+    };
+}
+
+// Add these interfaces with other interfaces at the top
+interface VoterDetails {
+    principal: Principal;
+    state: UserState;
+}
+
+// Add this interface with other interfaces at the top
+interface NeuronAllocation {
+    neuronId: Uint8Array;
+    votingPower: bigint;
+    lastUpdate: bigint;
+    lastAllocationMaker: Principal;
+    allocations: [Principal, bigint][];
+}
+
+interface ProcessedNeuronAllocation {
+    neuronId: Uint8Array;
+    votingPower: bigint;
+    lastUpdate: bigint;
+    lastAllocationMaker: Principal;
+    allocations: [string, bigint][];
+}
+
+interface NeuronAllocationResponse {
+    ok?: [Uint8Array, NeuronAllocation][];
+    err?: string;
+}
+
+interface Allocation {
+    token: Principal;
+    basisPoints: number;
+}
+
+/////////////
+// Exports //
+/////////////
+
+export const useTacoStore = defineStore('taco', () => {
+
+    // # STATE #
+
+    // app
+    const router = useRouter()
+    const darkModeToggled = useStorage('darkMode', false)
+    const appLoading = ref(false)
+    const backendError = ref(false)
+    const backendErrorIcon = ref('fa-solid fa-circle-exclamation')
+    const backendErrorIconColor = ref('var(--red)')
+    const backendErrorText = ref('backend error')
+    const toasts = ref<{ 
+        id: number; 
+        code: string; 
+        title: string; 
+        icon: string; 
+        message: string;
+        tradeAmount?: string;
+        tokenSellIdentifier?: string; 
+        tradeLimit?: string;
+        tokenInitIdentifier?: string;
+    }[]>([])
+
+    // Timer monitoring state
+    const timerHealth = ref({
+        snapshot: {
+            active: false,
+            lastSnapshotTime: null,
+            nextExpectedSnapshot: null,
+            inProgress: false
+        },
+        treasury: {
+            shortSync: {
+                active: false,
+                lastSync: null
+            },
+            rebalanceStatus: 'Idle',
+            rebalanceError: undefined
+        }
+    } as TimerHealth)
+
+    // user
+    const userLoggedIn = ref(false)
+    const userPrincipal = ref('')
+    const truncatedPrincipal = computed(() => {
+
+        // get full principal
+        const fullPrincipal = userPrincipal.value
+
+        // remove dashes
+        const cleanedPrincipal = fullPrincipal.replace(/-/g, '')
+
+        // get last five characters
+        const lastFiveChars = cleanedPrincipal.slice(-5)
+
+        // return truncated principal
+        return `${lastFiveChars}`
+
+    })
+    const userLedgerAccountId = ref('')
+    const userAcceptedHotkeyTutorial = useStorage('userAcceptedHotkeyTutorial', false)
+
+    // crypto prices
+    const icpPriceUsd = useStorage('icpPriceUsd', 0)
+    const btcPriceUsd = useStorage('btcPriceUsd', 0)
+    const ethPriceUsd = useStorage('ethPriceUsd', 0)
+    const lastPriceUpdate = useStorage('lastPriceUpdate', 0)
+
+    // dao
+    const fetchedTokenDetails = ref<TrustedTokenEntry[]>([])
+    const fetchedAggregateAllocation = ref<[Principal, bigint][]>([])
+    const fetchedVotingPowerMetrics = ref<VotingMetricsResponse | null>(null)
+    const fetchedUserAllocation = ref([])
+
+    // Add this with other state declarations
+    const systemLogs = ref<SystemLog[]>([])
+    const tradingLogs = ref<TradingLog[]>([])
+
+    // Add a helper function to format token amounts
+    const formatTokenAmount = (amount: bigint, decimals: number): string => {
+        const amountStr = amount.toString();
+        const padded = amountStr.padStart(decimals + 1, '0');
+        const integerPart = padded.slice(0, -decimals) || '0';
+        const decimalPart = padded.slice(-decimals);
+        return `${integerPart}.${decimalPart}`;
+    }
+
+    // Add a cache for token metadata to avoid repeated fetches
+    const tokenMetadataCache = new Map<string, TokenMetadata>();
+
+    // Add a function to get token metadata
+    const getTokenMetadata = async (canisterId: string): Promise<TokenMetadata> => {
+        if (tokenMetadataCache.has(canisterId)) {
+            return tokenMetadataCache.get(canisterId)!;
+        }
+
+        const metadata = await icrc1Metadata(canisterId) as [string, MetadataEntry][];
+        if (!metadata) {
+            return { symbol: 'UNKNOWN', decimals: 8 }; // Default fallback
+        }
+
+        const symbolEntry = metadata.find(m => m[0] === 'symbol')?.[1];
+        const decimalsEntry = metadata.find(m => m[0] === 'decimals')?.[1];
+        
+        const symbol = typeof symbolEntry?.Text === 'string' ? symbolEntry.Text : 'UNKNOWN';
+        const decimals = Number(decimalsEntry?.Nat || '8');
+        
+        const tokenMetadata: TokenMetadata = { symbol, decimals };
+        tokenMetadataCache.set(canisterId, tokenMetadata);
+        return tokenMetadata;
+    }
+
+    // Timer monitoring methods
+    const refreshTimerStatus = async () => {
+        console.log('refreshTimerStatus: Starting refresh...');
+        try {
+            // get host
+            const host = process.env.DFX_NETWORK === "local"
+                ? `http://localhost:54612`
+                : "https://ic0.app"
+            //console.log('refreshTimerStatus: Using host:', host);
+
+            // create agent
+            const agent = await createAgent({
+                identity: new AnonymousIdentity(),
+                host,
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            })
+            //console.log('refreshTimerStatus: Agent created');
+
+            // Create DAO actor for snapshot info
+            const daoCanisterId = process.env.DFX_NETWORK === "ic"
+                ? 'vxqw7-iqaaa-aaaan-qzziq-cai'
+                : 'ywhqf-eyaaa-aaaad-qg6tq-cai';
+            //console.log('refreshTimerStatus: Using DAO canisterId:', daoCanisterId);
+
+            const daoActor = Actor.createActor(daoBackendIDL, {
+                agent,
+                canisterId: daoCanisterId,
+            })
+            //console.log('refreshTimerStatus: DAO Actor created');
+
+            // Get snapshot info
+            const snapshotInfo = await daoActor.getSnapshotInfo() as SnapshotInfo[];
+            //console.log('refreshTimerStatus: Raw snapshot info:', snapshotInfo);
+            
+            if (snapshotInfo && snapshotInfo.length > 0) {
+                const info = snapshotInfo[0];
+                const snapshotInterval = BigInt(15 * 60 * 1_000_000_000); // 15m in nanoseconds
+                const nextExpected = info.lastSnapshotTime + snapshotInterval;
+                
+                snapshotStatus.value = {
+                    active: true,
+                    lastSnapshotTime: info.lastSnapshotTime,
+                    nextExpectedSnapshot: nextExpected,
+                    inProgress: false
+                };
+                //console.log('refreshTimerStatus: Updated snapshotStatus:', snapshotStatus.value);
+            }
+
+            // Create Treasury actor for sync info
+            const treasuryCanisterId = process.env.DFX_NETWORK === "ic"
+                ? 'v6t5d-6yaaa-aaaan-qzzja-cai'
+                : 'z4is7-giaaa-aaaad-qg6uq-cai';
+
+            //console.log('refreshTimerStatus: Using Treasury canisterId:', treasuryCanisterId);
+
+            const treasuryActor = Actor.createActor(treasuryIDL, {
+                agent,
+                canisterId: treasuryCanisterId,
+            })
+            //console.log('refreshTimerStatus: Treasury Actor created');
+
+            // Get treasury status and token details in parallel
+            const [tradingStatusResult, tokenDetailsResult] = await Promise.all([
+                treasuryActor.getTradingStatus() as Promise<TradingStatusResult>,
+                daoActor.getTokenDetails() as Promise<TrustedTokenEntry[]>
+            ]);
+            //console.log('refreshTimerStatus: Received trading status:', tradingStatusResult);
+            //console.log('refreshTimerStatus: Received token details:', tokenDetailsResult);
+
+            // Update token details
+            fetchedTokenDetails.value = tokenDetailsResult;
+
+            if ('ok' in tradingStatusResult && tradingStatusResult.ok) {
+                const { metrics, executedTrades, rebalanceStatus } = tradingStatusResult.ok;
+                timerHealth.value.treasury = {
+                    shortSync: {
+                        active: true,
+                        lastSync: BigInt(metrics.lastUpdate)
+                    },
+                    rebalanceStatus: 'Idle' in rebalanceStatus ? 'Idle' 
+                        : 'Trading' in rebalanceStatus ? 'Trading'
+                        : 'Failed',
+                    rebalanceError: 'Failed' in rebalanceStatus ? rebalanceStatus.Failed : undefined,
+                    tradingMetrics: {
+                        lastRebalanceAttempt: BigInt(metrics.lastUpdate),
+                        totalTradesExecuted: metrics.totalTradesExecuted,
+                        totalTradesFailed: metrics.totalTradesFailed,
+                        avgSlippage: metrics.avgSlippage,
+                        successRate: metrics.successRate
+                    },
+                    recentTrades: executedTrades
+                };
+                
+                // Update trading logs from executed trades
+                if (executedTrades) {
+                    console.log('refreshTimerStatus: Processing trades with token details:', 
+                        fetchedTokenDetails.value.map(t => ({
+                            id: (t[0] as Principal).toText(),
+                            symbol: t[1]?.tokenSymbol,
+                            decimals: t[1]?.tokenDecimals?.toString()
+                        }))
+                    );
+                    tradingLogs.value = executedTrades.map((trade: Trade) => {
+                        if (trade.error && trade.error.length > 0) {
+                            return {
+                                timestamp: trade.timestamp,
+                                message: `Failed: ${trade.error[0]}`
+                            };
+                        }
+                        
+                        // Find token details from our trusted tokens list
+                        const soldToken = fetchedTokenDetails.value.find(t => {
+                            try {
+                                const tradeTokenId = (trade.tokenSold as Principal).toText();
+                                const listTokenId = (t[0] as Principal).toText();
+                                return tradeTokenId === listTokenId;
+                            } catch (error) {
+                                console.error('Error comparing sold token IDs:', error);
+                                return false;
+                            }
+                        })?.[1];
+
+                        const boughtToken = fetchedTokenDetails.value.find(t => {
+                            try {
+                                const tradeTokenId = (trade.tokenBought as Principal).toText();
+                                const listTokenId = (t[0] as Principal).toText();
+                                return tradeTokenId === listTokenId;
+                            } catch (error) {
+                                console.error('Error comparing bought token IDs:', error);
+                                return false;
+                            }
+                        })?.[1];
+
+                        if (!soldToken || !boughtToken) {
+                            return {
+                                timestamp: trade.timestamp,
+                                message: `Trade with unknown tokens: ${(trade.tokenSold as Principal).toText()} -> ${(trade.tokenBought as Principal).toText()}`
+                            };
+                        }
+
+                        // Format amounts using token decimals from our trusted tokens
+                        const formattedSoldAmount = Number(trade.amountSold) / Math.pow(10, Number(soldToken.tokenDecimals));
+                        const formattedBoughtAmount = Number(trade.amountBought) / Math.pow(10, Number(boughtToken.tokenDecimals));
+
+                        // Extract exchange name from the variant
+                        const exchangeName = Object.keys(trade.exchange)[0];
+
+                        return {
+                            timestamp: trade.timestamp,
+                            message: `${formattedSoldAmount} ${soldToken.tokenSymbol} → ${formattedBoughtAmount} ${boughtToken.tokenSymbol} on ${exchangeName}`
+                        };
+                    });
+                }
+                
+                //console.log('refreshTimerStatus: Updated treasuryStatus:', timerHealth.value.treasury.shortSync);
+                //console.log('refreshTimerStatus: Updated tradingLogs:', tradingLogs.value);
+            } else if (tradingStatusResult.err) {
+                console.error('refreshTimerStatus: Error getting trading status:', tradingStatusResult.err);
+            }
+        } catch (error) {
+            console.error('refreshTimerStatus: Error refreshing timer status:', error);
+        }
+    }
+
+    const triggerManualSnapshot = async () => {
+        try {
+            // get host
+            const host = process.env.DFX_NETWORK === "local"
+                ? `http://localhost:54612`
+                : "https://ic0.app"
+
+            // create agent
+            const agent = await createAgent({
+                identity: new AnonymousIdentity(),
+                host,
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            })
+
+            // determine canisterId based on network
+            const canisterId = process.env.DFX_NETWORK === "ic"
+                ? 'vxqw7-iqaaa-aaaan-qzziq-cai'
+                : 'ywhqf-eyaaa-aaaad-qg6tq-cai';
+
+            // create actor
+            const actor = Actor.createActor(daoBackendIDL, {
+                agent,
+                canisterId,
+            })
+
+            timerHealth.value.snapshot.inProgress = true;
+            await actor.triggerSnapshot();
+            await refreshTimerStatus();
+        } catch (error) {
+            console.error('Error triggering manual snapshot:', error);
+        } finally {
+            timerHealth.value.snapshot.inProgress = false;
+        }
+    }
+
+    const restartSnapshotTimer = async () => {
+        try {
+            // get host
+            const host = process.env.DFX_NETWORK === "local"
+                ? `http://localhost:54612`
+                : "https://ic0.app"
+
+            // create agent
+            const agent = await createAgent({
+                identity: new AnonymousIdentity(),
+                host,
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            })
+
+            // determine canisterId based on network
+            const canisterId = process.env.DFX_NETWORK === "ic"
+                ? 'vxqw7-iqaaa-aaaan-qzziq-cai'
+                : 'ywhqf-eyaaa-aaaad-qg6tq-cai';
+
+            // create actor
+            const actor = Actor.createActor(daoBackendIDL, {
+                agent,
+                canisterId,
+            })
+
+            await actor.startSnapshotTimer();
+            await refreshTimerStatus();
+        } catch (error) {
+            console.error('Error restarting snapshot timer:', error);
+        }
+    }
+
+    const restartTreasurySyncs = async () => {
+        console.log('TacoStore: restartTreasurySyncs called');
+        try {
+            // get host
+            const host = process.env.DFX_NETWORK === "local"
+                ? `http://localhost:54612`
+                : "https://ic0.app"
+
+            // create agent
+            const agent = await createAgent({
+                identity: new AnonymousIdentity(),
+                host,
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            });
+
+            // determine canisterId based on network
+            const treasuryCanisterId = process.env.DFX_NETWORK === "ic"
+                ? 'vxqw7-iqaaa-aaaan-qzziq-cai'
+                : 'ywhqf-eyaaa-aaaad-qg6uq-cai';
+
+            const actor = Actor.createActor(treasuryIDL, {
+                agent,
+                canisterId: treasuryCanisterId,
+            });
+
+            await actor.admin_restartSyncs();
+            await refreshTimerStatus();
+            console.log('TacoStore: Treasury syncs restarted');
+        } catch (error) {
+            console.error('TacoStore: Error restarting treasury syncs:', error);
+            throw error;
+        }
+    };
+
+    const recoverPoolBalances = async () => {
+        console.log('TacoStore: recoverPoolBalances called');
+        try {
+            // Create auth client
+            const authClient = await AuthClient.create();
+            
+            // Check if user is authenticated
+            if (!await authClient.isAuthenticated()) {
+                console.error('User not authenticated');
+                throw new Error('User not authenticated');
+            }
+
+            // Get authenticated identity
+            const identity = await authClient.getIdentity();
+
+            // Create agent with authenticated identity
+            const agent = await createAgent({
+                identity,
+                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            });
+
+            const treasuryCanisterId = process.env.DFX_NETWORK === "ic"
+                ? 'v6t5d-6yaaa-aaaan-qzzja-cai'
+                : 'z4is7-giaaa-aaaad-qg6uq-cai';
+
+            const actor = Actor.createActor(treasuryIDL, {
+                agent,
+                canisterId: treasuryCanisterId,
+            });
+
+            const result = await actor.admin_recoverPoolBalances() as Result_4;
+            if ('err' in result) {
+                throw new Error(result.err);
+            }
+            await refreshTimerStatus();
+            console.log('TacoStore: Pool balances recovered:', result.ok);
+        } catch (error) {
+            console.error('TacoStore: Error recovering pool balances:', error);
+            throw error;
+        }
+    };
+
+    // Add state for timer status
+    const snapshotStatus = ref({
+        active: false,
+        lastSnapshotTime: null as bigint | null,
+        nextExpectedSnapshot: null as bigint | null,
+        inProgress: false
+    });
+
+    const rebalanceConfig = ref<RebalanceConfig | null>(null);
+
+    // Add this to the state declarations
+    const fetchedVoterDetails = ref<VoterDetails[]>([]);
+
+    // Add this ref with other refs
+    const fetchedNeuronAllocations = ref<ProcessedNeuronAllocation[]>([]);
+
+    // # ACTIONS #
+
+    // local methods
+    const convertBigIntToString = (obj: any): any => {
+        if (Array.isArray(obj)) {
+            return obj.map(item => convertBigIntToString(item))
+        } else if (typeof obj === 'object' && obj !== null) {
+            const newObj: any = {}
+            for (const key in obj) {
+                if (typeof obj[key] === 'bigint') {
+                    newObj[key] = obj[key].toString()
+                } else {
+                    newObj[key] = convertBigIntToString(obj[key])
+                }
+            }
+            return newObj
+        } else {
+            return obj
+        }
+    }
+    const getNanosecondTimestamp = (): bigint => {
+        // Get the current time in milliseconds
+        const milliseconds = BigInt(Date.now());
+
+        // Convert milliseconds to nanoseconds
+        const nanoseconds = milliseconds * BigInt(1000000);
+
+        // Add a random number between 0 and 999999 to simulate nanosecond precision
+        const randomNanoseconds = BigInt(Math.floor(Math.random() * 1000000));
+
+        return nanoseconds + randomNanoseconds;
+    }
+
+    // app
+    const changeRoute = (destination: string) => {
+        router.push('/' + destination);
+    }
+    const toggleDarkMode = (skipCounter: boolean) => {
+
+        // get document root
+        const root = document.documentElement
+
+        // color pallet
+        root.style.setProperty("--light-red", "#FF7575")
+        root.style.setProperty("--red", "#EB0000")
+        root.style.setProperty("--red-hover", "#D40000")
+        root.style.setProperty("--light-orange", "#FEEAC1")
+        root.style.setProperty("--light-orange-hover", "#ffdd81")
+        root.style.setProperty("--orange", "#FED66C")
+        root.style.setProperty("--dark-orange", "#DA8D28")
+        root.style.setProperty("--light-brown", "#C16D33")
+        root.style.setProperty("--light-brown-hover", "#b96428")
+        root.style.setProperty("--brown", "#934A17")
+        root.style.setProperty("--dark-brown", "#512100")
+        root.style.setProperty("--yellow", "#FEC800")
+        root.style.setProperty("--yellow-hover", "#F1BE00")
+        root.style.setProperty("--light-green", "#7CDC86")
+        root.style.setProperty("--success-green", "#19B229")
+        root.style.setProperty("--success-green-hover", "#179F25")
+        root.style.setProperty("--green", "#B7CD02")
+        root.style.setProperty("--green-hover", "#A3B700")
+        root.style.setProperty("--dark-green", "#7D8828")
+        root.style.setProperty("--light-blue", "#B4C2E9")
+        root.style.setProperty("--light-blue-hover", "#9DAFE1")
+        root.style.setProperty("--blue", "#546595")
+        root.style.setProperty("--blue-hover", "#46547D")
+        root.style.setProperty("--white", "#FFFFFF")
+        root.style.setProperty("--light-gray", "#F4F3EC")
+        root.style.setProperty("--gray", "#ACACA8")
+        root.style.setProperty("--dark-gray", "#777777")
+        root.style.setProperty("--black", "#2D2D2D")
+
+        // toggleable colors
+
+        // in light mode
+        if (!darkModeToggled.value) {
+            root.style.setProperty("--white-to-black", "#2D2D2D") // black
+            root.style.setProperty("--white-to-light-orange", "#FEEAC1") // light orange
+            root.style.setProperty("--dark-gray-to-light-gray", "#F4F3EC") // light gray
+            root.style.setProperty("--dark-gray-to-gray", "#777777") // dark gray
+            root.style.setProperty("--black-to-white", "#FFFFFF") // white
+            root.style.setProperty("--light-orange-hover-to-light-brown-hover", "#b96428") // light brown hover
+            root.style.setProperty("--light-orange-to-orange", "#FED66C") // orange
+            root.style.setProperty("--light-orange-to-dark-orange", "#DA8D28") // dark orange
+            root.style.setProperty("--light-orange-to-light-brown", "#C16D33") // light brown
+            root.style.setProperty("--light-orange-to-brown", "#934A17") // brown
+            root.style.setProperty("--light-orange-to-dark-brown", "#512100") // dark brown
+            root.style.setProperty("--orange-to-brown", "#934a17") // brown
+            root.style.setProperty("--orange-to-dark-brown", "#512100") // dark brown
+            root.style.setProperty("--orange-to-light-brown", "#c16d33") // light brown
+            root.style.setProperty("--light-brown-to-white", "#ffffff") // white
+            root.style.setProperty("--light-brown-to-yellow", "#FEC800") // yellow
+            root.style.setProperty("--light-brown-to-orange", "#FED66C") // orange
+            root.style.setProperty("--light-brown-to-dark-orange", "#DA8D28") // dark orange
+            root.style.setProperty("--light-brown-to-dark-brown", "#512100") // dark brown
+            root.style.setProperty("--dark-brown-to-light-orange", "#feeac1") // light orange
+            root.style.setProperty("--dark-brown-to-dark-orange", "#DA8D28") // dark orange
+            root.style.setProperty("--dark-orange-to-transparent", "transparent") // transparent
+            root.style.setProperty("--transparent-to-dark-orange", "#DA8D28") // dark orange
+            root.style.setProperty("--dark-orange-to-light-orange", "#feeac1") // light orange
+            root.style.setProperty("--dark-orange-to-orange", "#FED66C") // orange
+            root.style.setProperty("--dark-orange-to-brown", "#934a17") // brown
+            root.style.setProperty("--dark-orange-to-light-brown", "#c16d33") // light brown
+            root.style.setProperty("--dark-orange-to-dark-brown", "#512100") // dark brown
+            root.style.setProperty("--dark-orange-to-yellow", "#FEC800") // yellow
+            root.style.setProperty("--yellow-to-brown", "#934a17") // brown
+            root.style.setProperty("--yellow-to-dark-brown", "#512100") // dark brown
+            root.style.setProperty("--yellow-to-orange", "#FED66C") // orange
+            root.style.setProperty("--yellow-to-dark-orange", "#DA8D28") // dark orange
+            root.style.setProperty("--yellow-to-black", "#2D2D2D") // black
+            root.style.setProperty("--brown-to-light-orange", "#934a17") // brown
+            root.style.setProperty("--light-green-to-success-green-hover", "#7CDC86") // light green
+            root.style.setProperty("--light-green-to-success-green", "#7CDC86") // light green
+            root.style.setProperty("--green-to-orange", "#FED66C") // orange
+            root.style.setProperty("--green-to-brown", "#934a17") // green
+            root.style.setProperty("--green-to-yellow", "#FEC800") // yellow
+            root.style.setProperty("--success-green-to-success-green-hover", "#19B229") // success green hover
+            root.style.setProperty("--success-green-hover-to-success-green", "#179F25") // success green
+            root.style.setProperty("--dark-green-to-dark-brown", "#512100") // dark brown
+            root.style.setProperty("--blue-to-light-blue", "#B4C2E9") // light blue
+            root.style.setProperty("--brown-to-white", "#ffffff") // white
+            root.style.setProperty("--brown-to-orange", "#FED66C") // orange
+            root.style.setProperty("--brown-to-dark-orange", "#DA8D28") // dark orange
+            root.style.setProperty("--brown-to-green", "#934a17") // brown
+            root.style.setProperty("--dark-brown-to-white", "#ffffff") // white
+            root.style.setProperty("--red-to-light-red", "#FF7575") // light red
+            root.style.setProperty("--light-red-to-red", "#EB0000") // red
+            root.style.setProperty("--red-to-red-hover", "#EB0000") // error red hover
+            root.style.setProperty("--black-to-white", "#ffffff") // white
+            root.style.setProperty("--gray-to-light-gray", "#F4F3EC") // light gray
+            root.style.setProperty("--gray-to-dark-gray", "#777777") // dark gray
+            root.style.setProperty("--dark-gray-to-gray", "#ACACA8") // gray
+            root.style.setProperty("--dark-gray-to-yellow", "#FEC800") // yellow
+            root.style.setProperty("--curtain-bg", "rgba(0,0,0,0.75)") // darker curtain bg
+            // toggle logic
+            if (skipCounter === false) {
+                darkModeToggled.value = true
+                toggleDarkMode(true)
+            }
+        }
+
+        // in dark mode
+        else {
+            root.style.setProperty("--white-to-black", "#ffffff") // white
+            root.style.setProperty("--white-to-light-orange", "#ffffff") // white
+            root.style.setProperty("--dark-gray-to-light-gray", "#777777") // dark gray
+            root.style.setProperty("--dark-gray-to-gray", "#ACACA8") // dark
+            root.style.setProperty("--black-to-white", "#2D2D2D") // black
+            root.style.setProperty("--light-orange-hover-to-light-brown-hover", "#ffdd81") // light orange hover
+            root.style.setProperty("--light-orange-to-orange", "#FEEAC1") // light orange
+            root.style.setProperty("--light-orange-to-dark-orange", "#FEEAC1") // light orange
+            root.style.setProperty("--light-orange-to-light-brown", "#feeac1") // light orange
+            root.style.setProperty("--light-orange-to-brown", "#feeac1") // light orange
+            root.style.setProperty("--light-orange-to-dark-brown", "#feeac1") // light orange
+            root.style.setProperty("--orange-to-brown", "#FEd66c") // orange
+            root.style.setProperty("--orange-to-dark-brown", "#FEd66c") // orange
+            root.style.setProperty("--orange-to-light-brown", "#FEd66c") // orange
+            root.style.setProperty("--light-brown-to-white", "#C16D33") // light brown
+            root.style.setProperty("--light-brown-to-yellow", "#C16D33") // light brown
+            root.style.setProperty("--light-brown-to-orange", "#c16d33") // light brown
+            root.style.setProperty("--light-brown-to-dark-orange", "#c16d33") // light brown
+            root.style.setProperty("--light-brown-to-dark-brown", "#c16d33") // light brown
+            root.style.setProperty("--dark-brown-to-light-orange", "#512100") // dark brown
+            root.style.setProperty("--dark-brown-to-dark-orange", "#512100") // dark brown
+            root.style.setProperty("--dark-orange-to-transparent", "#DA8D28") // dark orange
+            root.style.setProperty("--transparent-to-dark-orange", "transparent") // transparent
+            root.style.setProperty("--dark-orange-to-light-orange", "#DA8D28") // dark orange
+            root.style.setProperty("--dark-orange-to-orange", "#DA8D28") // dark orange
+            root.style.setProperty("--dark-orange-to-brown", "#DA8D28") // dark orange
+            root.style.setProperty("--dark-orange-to-light-brown", "#DA8D28") // dark orange
+            root.style.setProperty("--dark-orange-to-dark-brown", "#DA8D28") // dark orange
+            root.style.setProperty("--dark-orange-to-yellow", "#DA8D28") // dark orange
+            root.style.setProperty("--yellow-to-brown", "#FEC800") // yellow
+            root.style.setProperty("--yellow-to-dark-brown", "#FEC800") // yellow
+            root.style.setProperty("--yellow-to-orange", "#FEC800") // yellow
+            root.style.setProperty("--yellow-to-dark-orange", "#FEC800") // yellow
+            root.style.setProperty("--yellow-to-black", "#FEC800") // yellow
+            root.style.setProperty("--brown-to-light-orange", "#934a17") // brown
+            root.style.setProperty("--light-green-to-success-green-hover", "#179F25") // success green hover
+            root.style.setProperty("--light-green-to-success-green", "#19B229") // success green
+            root.style.setProperty("--green-to-orange", "#B7CD02") // green
+            root.style.setProperty("--green-to-yellow", "#B7CD02") // green
+            root.style.setProperty("--success-green-to-success-green-hover", "#179F25") // success green hover
+            root.style.setProperty("--success-green-hover-to-success-green", "#19B229") // success green
+            root.style.setProperty("--dark-green-to-dark-brown", "#7D8828") // dark green
+            root.style.setProperty("--green-to-brown", "#B7CD02") // brown
+            root.style.setProperty("--blue-to-light-blue", "#546595") // blue
+            root.style.setProperty("--brown-to-white", "#934a17") // brown
+            root.style.setProperty("--brown-to-orange", "#934a17") // brown
+            root.style.setProperty("--brown-to-dark-orange", "#934a17") // brown
+            root.style.setProperty("--brown-to-green", "#B7CD02") // green
+            root.style.setProperty("--dark-brown-to-white", "#512100") // dark brown
+            root.style.setProperty("--red-to-light-red", "#EB0000") // red
+            root.style.setProperty("--light-red-to-red", "#FF7575") // light red
+            root.style.setProperty("--red-to-red-hover", "#D40000") // error red hover
+            root.style.setProperty("--black-to-white", "#2D2D2D") // black
+            root.style.setProperty("--gray-to-light-gray", "#ACACA8") // gray
+            root.style.setProperty("--gray-to-dark-gray", "#ACACA8") // gray
+            root.style.setProperty("--dark-gray-to-gray", "#777777") // dark gray
+            root.style.setProperty("--dark-gray-to-yellow", "#777777") // darkk gray
+            root.style.setProperty("--curtain-bg", "rgba(0,0,0,0.5)") // lighter curtain bg
+            // toggle logic
+            if (skipCounter === false) {
+                darkModeToggled.value = false
+                toggleDarkMode(true)
+            }
+        }
+    }
+    const appLoadingOn = () => {
+        appLoading.value = true
+        // if (hmFee.value === null || revokeFee.value === null) {
+        //     Promise.all([getHmFee(), getRevokeFee()])
+        // .catch(error => console.error('Error initializing fees:', error))
+        // }
+    }
+    const appLoadingOff = () => {
+        appLoading.value = false
+        // if (hmFee.value === null || revokeFee.value === null) {
+        //     Promise.all([getHmFee(), getRevokeFee()])
+        // .catch(error => console.error('Error initializing fees:', error))
+        // }
+    }
+    const addToast = (toast: { id: number; 
+        code: string; 
+        title: string; 
+        icon: string; 
+        message: string;
+        tradeAmount?: string;
+        tokenSellIdentifier?: string;
+        tradeLimit?: string;
+        tokenInitIdentifier?: string; }) => {
+        // add the toast to the array
+        toasts.value.push(toast)
+        
+        // remove the toast after 5 seconds (5000ms)
+        setTimeout(() => {
+            removeToast(toast.id)
+        }, 5000)
+    }
+    const removeToast = (id: number) => {
+        toasts.value = toasts.value.filter((toast) => toast.id !== id)
+    }
+
+    // user
+    const checkIfLoggedIn = async () => {
+
+        // log
+        // // console.log('checking if user is logged in')
+
+        // create auth client
+        const authClient = await AuthClient.create()
+
+        // if user is logged in
+        if (await authClient.isAuthenticated()) {
+
+            // log
+            // // console.log('user is logged in')
+
+            // set user principal
+            setUserPrincipal(authClient.getIdentity().getPrincipal().toString())
+
+            // set user ledger account ID
+            setUserLedgerAccountId(calculateAccountId(userPrincipal.value))
+
+            // set user logged in to true
+            userLoggedIn.value = true
+
+
+        } else {
+
+            // log
+            // // console.log('user is not logged in')
+
+            // set user principal to empty string
+            setUserPrincipal('')
+
+            // set user logged in to false
+            userLoggedIn.value = false
+
+            // clear user ledger account ID
+            userLedgerAccountId.value = ''
+
+        }
+
+    }
+    const setUserPrincipal = (principal: string) => {
+        
+        // log
+        // // console.log('user principal:', principal)
+
+        // set user principal
+        userPrincipal.value = principal
+
+    }
+    const setUserLedgerAccountId = (accountId: string) => {
+
+        // log
+        // // console.log('user ledger account ID:', accountId)
+
+        // set user ledger account ID
+        userLedgerAccountId.value = accountId
+
+    }
+    const calculateAccountId = (principal: string) => {
+
+        // 
+        const principalObj = Principal.fromText(principal)
+
+        // 
+        const accountId = AccountIdentifier.fromPrincipal({
+            principal: principalObj,
+            subAccount: undefined
+        })
+
+        // return
+        return accountId.toHex()
+
+    }
+    const iidLogIn = async () => {
+
+        // turn app loading on
+        appLoadingOn()
+
+        try {
+
+            // create auth client
+            let authClient = await AuthClient.create()
+
+            // if already logged in
+            if (await authClient.isAuthenticated()) {
+
+                // set user principal
+                setUserPrincipal(authClient.getIdentity().getPrincipal().toString())
+
+                // set user logged in to true
+                userLoggedIn.value = true
+
+                // calculate and set user ledger account ID
+                userLedgerAccountId.value = calculateAccountId(userPrincipal.value)
+
+                // turn app loading off
+                appLoadingOff()
+
+                // return true to indicate success
+                return true
+
+            }
+
+            // login
+            await new Promise((resolve, reject) => {
+                authClient.login({
+                    identityProvider:
+                        process.env.DFX_NETWORK === "ic"
+                            ? "https://identity.ic0.app"
+                            // : `http://${iiCanisterId}.localhost:4943/`, // this works on tirexs machine
+                            : `http://${iiCanisterId}.localhost:8080/`, // this works on erics machine
+                    onSuccess: resolve,
+                    onError: reject,
+                })
+            })
+
+            // // get identity
+            // const identity = authClient.getIdentity()
+
+            // // create agent
+            // const agent = new HttpAgent({ identity })
+
+            // // create actor
+            // const actor = createActor(process.env.CANISTER_ID_TACO_DAO_BACKEND as string, {
+            //     agent,
+            // })
+
+            // set user principal
+            setUserPrincipal(authClient.getIdentity().getPrincipal().toString())
+
+            // calculate and set user ledger account ID
+            userLedgerAccountId.value = calculateAccountId(userPrincipal.value)
+
+            // // console.log('setting user logged in to true')
+
+            // set user logged in to true
+            userLoggedIn.value = true
+
+            // calculate and set user ledger account ID
+            userLedgerAccountId.value = calculateAccountId(userPrincipal.value)
+
+            // turn app loading off
+            appLoadingOff()
+
+            // return true to indicate success
+            return true
+
+        } catch (error) {
+
+            // turn app loading off
+            appLoadingOff()
+
+            // log error
+            console.error('There was a problem logging in with iid:', error)
+
+            // set user principal to empty string
+            setUserPrincipal('')
+
+            // set user logged in to false
+            userLoggedIn.value = false
+
+            // clear user ledger account ID
+            userLedgerAccountId.value = ''
+
+            // return false to indicate failure
+            return false
+
+        }
+
+    }
+    const iidLogOut = async () => {
+
+        // turn app loading on
+        appLoadingOn()
+
+        try {
+
+            // create auth client
+            const authClient = await AuthClient.create()
+
+            // logout
+            await authClient.logout()
+
+            // set user principal to empty string
+            setUserPrincipal('')
+
+            // set user logged in to false
+            userLoggedIn.value = false
+
+            // clear user ledger account ID
+            userLedgerAccountId.value = ''
+
+            // turn app loading off
+            appLoadingOff()
+
+            // return true to indicate success
+            return true
+
+        } catch (error) {
+
+            // turn app loading off
+            appLoadingOff()
+
+            // log error
+            console.error('There was a problem logging out of iid:', error)
+
+            // return false to indicate failure
+            return false
+
+        }
+
+    }
+    const acceptHotkeyTutorial = () => {
+
+        // log
+        // console.log('taco.store: accepting hotkey tutorial')
+
+        // accept hotkey tutorial
+        userAcceptedHotkeyTutorial.value = true
+
+    }
+
+    // crypto prices
+    const fetchCryptoPrices = async () => {
+
+        // log
+        // console.log('taco.store: fetchCryptoPrices()')
+
+        // get current time
+        const now = Date.now()
+
+        // set one hour in milliseconds
+        const oneHour = 60 * 60 * 1000 // 1 hour in milliseconds
+
+        // Only fetch if more than an hour has passed since last update
+        // temp removed if statement: now - lastPriceUpdate.value > oneHour
+        if (now - lastPriceUpdate.value > oneHour) {
+
+            // log
+            // // console.log('fetching new crypto prices')
+
+            try {
+
+                const response = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=internet-computer,bitcoin&vs_currencies=usd')
+                const data = await response.json()
+                icpPriceUsd.value = data['internet-computer'].usd
+                btcPriceUsd.value = data['bitcoin'].usd
+                lastPriceUpdate.value = now
+
+                // console.log('taco.store: fetchCryptoPrices() - fetching new prices')
+                // console.log('taco.store: fetchCryptoPrices() - ICP: ' + icpPriceUsd.value)
+                // console.log('taco.store: fetchCryptoPrices() - BTC: ' + btcPriceUsd.value)
+
+            } catch (error) {
+
+                console.error('error fetching crypto prices:', error)
+
+            }
+
+        } else {
+
+            // // console.log('using saved crypto prices')
+            // // console.log('saved ICP price:', icpPriceUsd.value)
+            // // console.log('saved BTC price:', btcPriceUsd.value)
+
+        }
+
+    }
+
+    // ledger canisters
+    const icrc1Metadata = async (passedCanisterId: string) => {
+
+        // log
+        // console.log('taco.store: icrc1Metadata() - calling for metadata...')
+
+        try {
+
+            // get host
+            const host = process.env.DFX_NETWORK === "local"
+                ? `http://localhost:51527`
+                : "https://ic0.app";
+
+            // create agent
+            const agent = await createAgent({
+                identity: new AnonymousIdentity(),
+                host,
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            })         
+
+            // create actor
+            const actor = Actor.createActor(idlFactory, {
+                agent,
+                canisterId: passedCanisterId,
+            })
+
+            // get metadata
+            const metadata = await actor.icrc1_metadata()
+
+            // log
+            // console.log('taco.store: icrc1Metadata() - returned metadata:', metadata)
+
+            // return metadata
+            return metadata
+
+        } catch (error) {
+
+            console.error('error fetching metadata from icrc1 canister:', error)
+
+        }
+
+    }
+
+    // dao backend
+    const fetchTokenDetails = async () => {
+
+        // log
+        // console.log('taco.store: fetchTokenDetails()')
+
+        try {
+
+            // get host
+            const host = process.env.DFX_NETWORK === "local"
+                ? `http://localhost:51527`
+                : "https://ic0.app"
+
+            // create agent
+            const agent = await createAgent({
+                identity: new AnonymousIdentity(),
+                host,
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            })
+
+            // determine canisterId based on network
+            const canisterId = process.env.DFX_NETWORK === "ic"
+                ? 'vxqw7-iqaaa-aaaan-qzziq-cai' // same on local and mainnet
+                : 'ywhqf-eyaaa-aaaad-qg6tq-cai';
+
+            // create actor
+            const actor = Actor.createActor(daoBackendIDL, {
+                agent,
+                canisterId,
+            })
+            
+            //////////////////////
+            // post actor logic //
+
+            // get token details
+            const tokenDetails = await actor.getTokenDetails()
+
+            // set fetched token details
+            // @ts-ignore
+            fetchedTokenDetails.value = tokenDetails
+
+            // log
+            // console.log('taco.store: fetchTokenDetails() - returned info:', tokenDetails) 
+            // console.log('taco.store: DAO backend - actor.getTokenDetails() - fetchedTokenDetails.value:', fetchedTokenDetails.value)            
+
+            return            
+
+        } catch (error) {
+
+            console.error('error fetching token details from dao backend:', error)
+
+        }
+    }
+    const fetchAggregateAllocation = async () => {
+        console.log('taco.store: fetchAggregateAllocation() - Starting fetch...');
+        try {
+            const host = process.env.DFX_NETWORK === "local"
+                ? `http://localhost:51527`
+                : "https://ic0.app"
+            console.log('taco.store: fetchAggregateAllocation() - Using host:', host);
+
+            const agent = await createAgent({
+                identity: new AnonymousIdentity(),
+                host,
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            })
+            console.log('taco.store: fetchAggregateAllocation() - Agent created');
+
+            const canisterId = process.env.DFX_NETWORK === "ic"
+                ? 'vxqw7-iqaaa-aaaan-qzziq-cai'
+                : 'ywhqf-eyaaa-aaaad-qg6tq-cai';
+            console.log('taco.store: fetchAggregateAllocation() - Using canisterId:', canisterId);
+
+            const actor = Actor.createActor(daoBackendIDL, {
+                agent,
+                canisterId,
+            })
+            console.log('taco.store: fetchAggregateAllocation() - Actor created');
+
+            const aggregateAllocation = await actor.getAggregateAllocation();
+            console.log('taco.store: fetchAggregateAllocation() - Raw response:', aggregateAllocation);
+
+            if (!aggregateAllocation || !Array.isArray(aggregateAllocation)) {
+                console.error('taco.store: fetchAggregateAllocation() - Invalid response format:', aggregateAllocation);
+                return;
+            }
+
+            fetchedAggregateAllocation.value = aggregateAllocation;
+            console.log('taco.store: fetchAggregateAllocation() - Updated state:', fetchedAggregateAllocation.value);
+            return;
+        } catch (error) {
+            console.error('taco.store: fetchAggregateAllocation() - Error:', error);
+            throw error;
+        }
+    }    
+    const fetchVotingPowerMetrics = async () => {
+        console.log('taco.store: fetchVotingPowerMetrics() - Starting fetch...');
+        try {
+            const host = process.env.DFX_NETWORK === "local"
+                ? `http://localhost:51527`
+                : "https://ic0.app"
+            console.log('taco.store: fetchVotingPowerMetrics() - Using host:', host);
+
+            const agent = await createAgent({
+                identity: new AnonymousIdentity(),
+                host,
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            })
+            console.log('taco.store: fetchVotingPowerMetrics() - Agent created');
+
+            const canisterId = process.env.DFX_NETWORK === "ic"
+                ? 'vxqw7-iqaaa-aaaan-qzziq-cai'
+                : 'ywhqf-eyaaa-aaaad-qg6tq-cai';
+            console.log('taco.store: fetchVotingPowerMetrics() - Using canisterId:', canisterId);
+
+            const actor = Actor.createActor(daoBackendIDL, {
+                agent,
+                canisterId,
+            })
+            console.log('taco.store: fetchVotingPowerMetrics() - Actor created');
+
+            const response = await actor.votingPowerMetrics() as VotingMetricsResponse;
+            console.log('taco.store: fetchVotingPowerMetrics() - Raw response:', response);
+
+            if (!response || !('ok' in response)) {
+                console.error('taco.store: fetchVotingPowerMetrics() - Invalid response format:', response);
+                return;
+            }
+
+            // Store the response directly instead of wrapping it in an array
+            fetchedVotingPowerMetrics.value = response;
+            console.log('taco.store: fetchVotingPowerMetrics() - Updated state:', fetchedVotingPowerMetrics.value);
+            return;
+        } catch (error) {
+            console.error('taco.store: fetchVotingPowerMetrics() - Error:', error);
+            throw error;
+        }
+    }
+    const fetchUserAllocation = async () => {
+
+        // log
+        // console.log('taco.store: fetchUserAllocation()')
+
+        // turn on loading
+        // appLoadingOn()        
+
+        try {
+
+            // create auth client
+            const authClient = await AuthClient.create()
+
+            // if user is logged in
+            if (await authClient.isAuthenticated()) {
+
+                // get identity
+                const identity = await authClient.getIdentity()
+
+                // Create an agent with the user's identity
+                const agent = await createAgent({
+                    identity,
+                    // host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+                    host: process.env.DFX_NETWORK === "local" ? `http://localhost:51527` : "https://ic0.app",
+                    fetchRootKey: process.env.DFX_NETWORK === "local",
+                })
+
+                // determine canisterId based on network
+                const canisterId = process.env.DFX_NETWORK === "ic"
+                    ? 'vxqw7-iqaaa-aaaan-qzziq-cai' // same on local and mainnet
+                    : 'ywhqf-eyaaa-aaaad-qg6tq-cai';
+
+                // create actor
+                const actor = Actor.createActor(daoBackendIDL, {
+                    agent,
+                    canisterId,
+                })
+
+                // call the userState function
+                const userState = await actor.getUserAllocation()
+
+                // set fetched user state
+                // @ts-ignore
+                fetchedUserAllocation.value = userState
+
+                // log
+                // console.log('taco.store: DAO backend - actor.getUserAllocation() - fetchedUserAllocation.value:', fetchedUserAllocation.value)                  
+
+                // turn off loading
+                // appLoadingOff()
+
+            } else {
+
+                // console.log('cannot fetch user state, user not logged in')
+
+                // turn off loading
+                // appLoadingOff()
+
+            }
+
+        } catch (error) {
+
+            console.error('error fetching user allocation:', error)
+
+        }
+    }
+    const updateAllocation = async (allocations: any) => {
+
+        // log
+        // console.log('taco.store: updateAllocation()')
+
+        // turn on loading
+        appLoadingOn()        
+
+        try {
+
+            // create auth client
+            const authClient = await AuthClient.create()
+
+            // if user is logged in
+            if (await authClient.isAuthenticated()) {
+
+                // get identity
+                const identity = await authClient.getIdentity()
+
+                // create an agent with the user's identity
+                const agent = await createAgent({
+                    identity,
+                    // host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+                    host: process.env.DFX_NETWORK === "local" ? `http://localhost:51527` : "https://ic0.app",
+                    fetchRootKey: process.env.DFX_NETWORK === "local",
+                })
+
+                // determine canisterId based on network
+                const canisterId = process.env.DFX_NETWORK === "ic"
+                    ? 'vxqw7-iqaaa-aaaan-qzziq-cai' // same on local and mainnet
+                    : 'ywhqf-eyaaa-aaaad-qg6tq-cai';
+
+                // create actor
+                const actor = Actor.createActor(daoBackendIDL, {
+                    agent,
+                    canisterId,
+                })
+
+                // call the updateAllocation function
+                await actor.updateAllocation(allocations)
+
+                // log
+                // console.log('taco.store: DAO backend - actor.updateAllocation() - updated allocation')                  
+
+                // turn off loading
+                appLoadingOff()
+
+            } else {
+
+                // console.log('cannot update allocation, user not logged in')
+
+                // turn off loading
+                appLoadingOff()
+
+            }
+
+        } catch (error) {
+
+            console.error('error updating allocation:', error)
+
+        }
+    }
+    const followAllocation = async (principal: Principal) => {
+
+        // log
+        // console.log('taco.store: followAllocation()')
+
+        // turn on loading
+        appLoadingOn()        
+
+        try {
+
+            // create auth client
+            const authClient = await AuthClient.create()
+
+            // if user is logged in
+            if (await authClient.isAuthenticated()) {
+
+                // get identity
+                const identity = await authClient.getIdentity()
+
+                // Create an agent with the user's identity
+                const agent = await createAgent({
+                    identity,
+                    // host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+                    host: process.env.DFX_NETWORK === "local" ? `http://localhost:51527` : "https://ic0.app",
+                    fetchRootKey: process.env.DFX_NETWORK === "local",
+                })
+
+                // determine canisterId based on network
+                const canisterId = process.env.DFX_NETWORK === "ic"
+                    ? 'vxqw7-iqaaa-aaaan-qzziq-cai' // same on local and mainnet
+                    : 'ywhqf-eyaaa-aaaad-qg6tq-cai';
+
+                // create actor
+                const actor = Actor.createActor(daoBackendIDL, {
+                    agent,
+                    canisterId,
+                })
+
+                // call the followAllocation function
+                await actor.followAllocation(principal)
+
+                // log
+                // console.log('taco.store: DAO backend - actor.followAllocation() - followed allocation')                  
+
+                // turn off loading
+                appLoadingOff()
+
+                // return
+                return true
+
+            } else {
+
+                // console.log('cannot follow allocation, user not logged in')
+
+                // turn off loading
+                appLoadingOff()
+
+                // return
+                return false
+
+            }
+
+        } catch (error) {
+
+            // log
+            console.error('error following allocation:', error)
+
+            // turn off loading
+            appLoadingOff()
+
+            // return
+            return false
+
+        }
+    }
+    const unfollowAllocation = async (principal: Principal) => {
+
+        // log
+        // console.log('taco.store: unfollowAllocation()')
+
+        // turn on loading
+        appLoadingOn()        
+
+        try {
+
+            // create auth client
+            const authClient = await AuthClient.create()
+
+            // if user is logged in
+            if (await authClient.isAuthenticated()) {
+
+                // get identity
+                const identity = await authClient.getIdentity()
+
+                // Create an agent with the user's identity
+                const agent = await createAgent({
+                    identity,
+                    // host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+                    host: process.env.DFX_NETWORK === "local" ? `http://localhost:51527` : "https://ic0.app",
+                    fetchRootKey: process.env.DFX_NETWORK === "local",
+                })
+
+                // determine canisterId based on network
+                const canisterId = process.env.DFX_NETWORK === "ic"
+                    ? 'vxqw7-iqaaa-aaaan-qzziq-cai' // same on local and mainnet
+                    : 'ywhqf-eyaaa-aaaad-qg6tq-cai';
+
+                // create actor
+                const actor = Actor.createActor(daoBackendIDL, {
+                    agent,
+                    canisterId,
+                })
+
+                // log
+                // console.log('taco.store: DAO backend - actor.unfollowAllocation() - unfollowing allocation:', principal)                  
+
+                // call the unfollowAllocation function
+                await actor.unfollowAllocation(principal)
+
+                // log
+                // console.log('taco.store: DAO backend - actor.unfollowAllocation() - unfollowed allocation')
+
+                // turn off loading
+                appLoadingOff()
+
+                // return
+                return true
+
+            } else {
+
+                // console.log('cannot follow allocation, user not logged in')
+
+                // turn off loading
+                appLoadingOff()
+
+                // return
+                return false
+
+            }
+
+        } catch (error) {
+
+            // log
+            console.error('error unfollowing allocation:', error)
+
+            // turn off loading
+            appLoadingOff()
+
+            // return
+            return false
+
+        }
+    }
+
+    // Add this with other timer monitoring methods
+    const triggerManualSync = async () => {
+        try {
+            // get host
+            // create auth client
+            const authClient = await AuthClient.create();
+            
+            // Check if user is authenticated
+            if (!await authClient.isAuthenticated()) {
+                console.error('User not authenticated');
+                return false;
+            }
+
+            // get identity
+            const identity = await authClient.getIdentity();
+
+            // get host
+            const host = process.env.DFX_NETWORK === "local"
+                ? `http://localhost:54612`
+                : "https://ic0.app"
+
+            // create agent with authenticated identity
+            const agent = await createAgent({
+                identity,
+                host,
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            })
+
+            // determine canisterId based on network
+            const canisterId = process.env.DFX_NETWORK === "ic"
+                ? 'v6t5d-6yaaa-aaaan-qzzja-cai'
+                : 'z4is7-giaaa-aaaad-qg6uq-cai';
+
+            // create actor
+            const actor = Actor.createActor(treasuryIDL, {
+                agent,
+                canisterId,
+            })
+
+            await actor.admin_syncWithDao();
+            await refreshTimerStatus();
+        } catch (error) {
+            console.error('Error triggering manual sync:', error);
+        }
+    }
+
+    // Add this with other methods
+    const fetchSystemLogs = async () => {
+        console.log('fetchSystemLogs: Starting to fetch logs...');
+        try {
+            // create auth client
+            const authClient = await AuthClient.create();
+            
+            // Check if user is authenticated
+            if (!await authClient.isAuthenticated()) {
+                console.log('fetchSystemLogs: User not authenticated');
+                return;
+            }
+
+            // get identity
+            const identity = await authClient.getIdentity();
+            console.log('fetchSystemLogs: Got authenticated identity');
+
+            // get host
+            const host = process.env.DFX_NETWORK === "local"
+                ? `http://localhost:54612`
+                : "https://ic0.app"
+            console.log('fetchSystemLogs: Using host:', host);
+
+            // create agent with authenticated identity
+            const agent = await createAgent({
+                identity,
+                host,
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            })
+            console.log('fetchSystemLogs: Agent created with authenticated identity');
+
+            // determine canisterId based on network
+            const canisterId = process.env.DFX_NETWORK === "ic"
+                ? 'vxqw7-iqaaa-aaaan-qzziq-cai'
+                : 'ywhqf-eyaaa-aaaad-qg6tq-cai';
+            console.log('fetchSystemLogs: Using canisterId:', canisterId);
+
+            // create actor
+            const actor = Actor.createActor(daoBackendIDL, {
+                agent,
+                canisterId,
+            })
+            console.log('fetchSystemLogs: Actor created');
+
+            const logs = await actor.getLogs(100) as SystemLog[];
+            console.log('fetchSystemLogs: Received logs:', logs);
+            systemLogs.value = logs;
+            console.log('fetchSystemLogs: Updated systemLogs.value:', systemLogs.value);
+        } catch (error) {
+            console.error('fetchSystemLogs: Error fetching system logs:', error);
+        }
+    }
+
+    const startRebalancing = async () => {
+        try {
+            // create auth client
+            const authClient = await AuthClient.create();
+            
+            // Check if user is authenticated
+            if (!await authClient.isAuthenticated()) {
+                console.error('User not authenticated');
+                return false;
+            }
+
+            // get identity
+            const identity = await authClient.getIdentity();
+
+            // get host
+            const host = process.env.DFX_NETWORK === "local"
+                ? `http://localhost:54612`
+                : "https://ic0.app"
+
+            // create agent with authenticated identity
+            const agent = await createAgent({
+                identity,
+                host,
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            })
+
+            // determine canisterId based on network
+            const canisterId = process.env.DFX_NETWORK === "ic"
+                ? 'v6t5d-6yaaa-aaaan-qzzja-cai'
+                : 'z4is7-giaaa-aaaad-qg6uq-cai';
+
+            // create actor
+            const actor = Actor.createActor(treasuryIDL, {
+                agent,
+                canisterId,
+            })
+
+            const result = await actor.startRebalancing() as RebalanceResult;
+            if ('err' in result) {
+                console.error('Error starting rebalancing:', result.err);
+                return false;
+            }
+            return true;
+        } catch (error) {
+            console.error('Error starting rebalancing:', error);
+            return false;
+        }
+    }
+
+    const stopRebalancing = async () => {
+        try {
+            // create auth client
+            const authClient = await AuthClient.create();
+            
+            // Check if user is authenticated
+            if (!await authClient.isAuthenticated()) {
+                console.error('User not authenticated');
+                return false;
+            }
+
+            // get identity
+            const identity = await authClient.getIdentity();
+
+            // get host
+            const host = process.env.DFX_NETWORK === "local"
+                ? `http://localhost:54612`
+                : "https://ic0.app"
+
+            // create agent with authenticated identity
+            const agent = await createAgent({
+                identity,
+                host,
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            })
+
+            // determine canisterId based on network
+            const canisterId = process.env.DFX_NETWORK === "ic"
+                ? 'v6t5d-6yaaa-aaaan-qzzja-cai'
+                : 'z4is7-giaaa-aaaad-qg6uq-cai';
+
+            // create actor
+            const actor = Actor.createActor(treasuryIDL, {
+                agent,
+                canisterId,
+            })
+
+            const result = await actor.stopRebalancing() as RebalanceResult;
+            if ('err' in result) {
+                console.error('Error stopping rebalancing:', result.err);
+                return false;
+            }
+            return true;
+        } catch (error) {
+            console.error('Error stopping rebalancing:', error);
+            return false;
+        }
+    }
+
+    const updateRebalanceConfig = async (updates: UpdateConfig) => {
+        console.log('TacoStore: updateRebalanceConfig called with', updates);
+        try {
+            appLoadingOn();
+
+            // NOTE TO AI: DO NOT CHANGE THIS PATTERN FOR OTHER FUNCTIONS
+            // DO NOT INTRODUCE A getTreasuryActor method !!
+            // JUST LEAVE THIS CODE HERE AS IS !!
+            // create auth client
+            const authClient = await AuthClient.create();
+            
+            // Check if user is authenticated
+            if (!await authClient.isAuthenticated()) {
+                throw new Error('User not authenticated');
+            }
+
+            // Get the identity
+            const identity = await authClient.getIdentity();
+            
+            // Create an agent with the identity
+            const agent = await createAgent({
+                identity,
+                host: import.meta.env.VITE_IC_HOST
+            });
+
+            // Create treasury actor with authenticated identity
+            const treasury = Actor.createActor<TreasuryService>(treasuryIDL, {
+                agent,
+                canisterId: getTreasuryCanisterId()
+            });
+            // END OF NOTE TO AI!
+
+            const result = await treasury.updateRebalanceConfig(updates, []);
+            console.log('TacoStore: updateRebalanceConfig result:', result);
+
+            if ('ok' in result) {
+                addToast({
+                    id: Date.now(),
+                    code: 'success',
+                    title: 'Success',
+                    icon: 'fa-solid fa-check',
+                    message: 'Configuration updated successfully'
+                });
+                await refreshTimerStatus();
+            } else {
+                // Convert the error variant to a string
+                let errorMessage = 'Unknown error';
+                if (typeof result.err === 'object') {
+                    // Extract the error message from the variant
+                    const errorVariant = result.err;
+                    const errorType = Object.keys(errorVariant)[0];
+                    const errorDetail = Object.values(errorVariant)[0];
+                    errorMessage = `${errorType}: ${errorDetail}`;
+                } else {
+                    errorMessage = String(result.err);
+                }
+                console.error('Failed to update configuration:', errorMessage);
+                addToast({
+                    id: Date.now(),
+                    code: 'error',
+                    title: 'Error',
+                    icon: 'fa-solid fa-triangle-exclamation',
+                    message: 'Failed to update configuration: ' + errorMessage
+                });
+                throw new Error(errorMessage);
+            }
+        } catch (error: any) {
+            console.error('Error updating configuration:', error);
+            addToast({
+                id: Date.now(),
+                code: 'error',
+                title: 'Error',
+                icon: 'fa-solid fa-triangle-exclamation',
+                message: 'Error updating configuration: ' + (error.message || String(error))
+            });
+            throw error;
+        } finally {
+            appLoadingOff();
+        }
+    };
+
+    const getSystemParameters = async () => {
+        try {
+            appLoadingOn();
+
+            // NOTE TO AI: DO NOT CHANGE THIS PATTERN FOR OTHER FUNCTIONS
+            // DO NOT INTRODUCE A getTreasuryActor method !!
+            // JUST LEAVE THIS CODE HERE AS IS !!
+
+            // create auth client
+            const authClient = await AuthClient.create();
+            
+            // Check if user is authenticated
+            if (!await authClient.isAuthenticated()) {
+                throw new Error('User not authenticated');
+            }
+
+            // Get the identity
+            const identity = await authClient.getIdentity();
+            
+            // Create an agent with the identity
+            const agent = await createAgent({
+                identity,
+                host: import.meta.env.VITE_IC_HOST
+            });
+
+            // Create treasury actor with authenticated identity
+            const treasury = Actor.createActor<TreasuryService>(treasuryIDL, {
+                agent,
+                canisterId: getTreasuryCanisterId()
+            });
+
+            // END OF NOTE TO AI!
+
+            // Get the current config using getSystemParameters
+            const config = await treasury.getSystemParameters();
+            if (!config) {
+                throw new Error('Failed to get system parameters');
+            }
+            rebalanceConfig.value = config;
+            return config;
+
+        } catch (error) {
+            console.error('Error getting system parameters:', error);
+            throw error;
+        } finally {
+            appLoadingOff();
+        }
+    };
+
+    const executeTradingCycle = async () => {
+        appLoadingOn();
+        try {
+            // create auth client
+            const authClient = await AuthClient.create();
+            
+            // Check if user is authenticated
+            if (!await authClient.isAuthenticated()) {
+                throw new Error('User not authenticated');
+            }
+
+            // Get the identity
+            const identity = await authClient.getIdentity();
+            
+            // Create an agent with the identity
+            const agent = await createAgent({
+                identity,
+                host: import.meta.env.VITE_IC_HOST
+            });
+
+            // Create treasury actor with authenticated identity
+            const treasury = Actor.createActor<TreasuryService>(treasuryIDL, {
+                agent,
+                canisterId: getTreasuryCanisterId()
+            });
+
+            await treasury.admin_executeTradingCycle();
+        } catch (error) {
+            console.error('Error executing trading cycle:', error);
+            throw error;
+        } finally {
+            appLoadingOff();
+        }
+    };
+
+    const pauseToken = async (principal: Principal): Promise<boolean> => {
+        console.log('TacoStore: pauseToken called for', principal.toText());
+        try {
+            // Create auth client
+            const authClient = await AuthClient.create();
+            
+            // Check if user is authenticated
+            if (!await authClient.isAuthenticated()) {
+                console.error('User not authenticated');
+                return false;
+            }
+
+            // Get authenticated identity
+            const identity = await authClient.getIdentity();
+
+            // Create agent with authenticated identity
+            const agent = await createAgent({
+                identity,
+                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            });
+
+            const canisterId = process.env.DFX_NETWORK === "ic"
+                ? 'vxqw7-iqaaa-aaaan-qzziq-cai'
+                : 'ywhqf-eyaaa-aaaad-qg6tq-cai';
+
+            const actor = Actor.createActor(daoBackendIDL, {
+                agent,
+                canisterId,
+            });
+
+            const result = await actor.pauseToken(principal) as Result_1;
+            if ('err' in result) {
+                console.error('Error pausing token:', result.err);
+                return false;
+            }
+            console.log('TacoStore: Token paused successfully');
+            return true;
+        } catch (error) {
+            console.error('TacoStore: Error pausing token:', error);
+            return false;
+        }
+    };
+
+    const unpauseToken = async (principal: Principal): Promise<boolean> => {
+        console.log('TacoStore: unpauseToken called for', principal.toText());
+        try {
+            // Create auth client
+            const authClient = await AuthClient.create();
+            
+            // Check if user is authenticated
+            if (!await authClient.isAuthenticated()) {
+                console.error('User not authenticated');
+                return false;
+            }
+
+            // Get authenticated identity
+            const identity = await authClient.getIdentity();
+
+            // Create agent with authenticated identity
+            const agent = await createAgent({
+                identity,
+                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            });
+
+            const canisterId = process.env.DFX_NETWORK === "ic"
+                ? 'vxqw7-iqaaa-aaaan-qzziq-cai'
+                : 'ywhqf-eyaaa-aaaad-qg6tq-cai';
+
+            const actor = Actor.createActor(daoBackendIDL, {
+                agent,
+                canisterId,
+            });
+
+            const result = await actor.unpauseToken(principal) as Result_1;
+            if ('err' in result) {
+                console.error('Error unpausing token:', result.err);
+                return false;
+            }
+            console.log('TacoStore: Token unpaused successfully');
+            return true;
+        } catch (error) {
+            console.error('TacoStore: Error unpausing token:', error);
+            return false;
+        }
+    };
+
+    // Add this with other exported methods
+    const fetchVoterDetails = async () => {
+        console.log('taco.store: fetchVoterDetails() - Starting fetch...');
+        try {
+            // Create auth client
+            const authClient = await AuthClient.create();
+            
+            // Check if user is authenticated
+            if (!await authClient.isAuthenticated()) {
+                console.error('User not authenticated');
+                return false;
+            }
+
+            // Get authenticated identity
+            const identity = await authClient.getIdentity();
+
+
+            const agent = await createAgent({
+                identity,
+                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            })
+            console.log('taco.store: fetchVoterDetails() - Agent created');
+
+            const canisterId = process.env.DFX_NETWORK === "ic"
+                ? 'vxqw7-iqaaa-aaaan-qzziq-cai'
+                : 'ywhqf-eyaaa-aaaad-qg6tq-cai';
+            console.log('taco.store: fetchVoterDetails() - Using canisterId:', canisterId);
+
+            const actor = Actor.createActor(daoBackendIDL, {
+                agent,
+                canisterId,
+            })
+            console.log('taco.store: fetchVoterDetails() - Actor created');
+
+            const voterDetails = await actor.admin_getUserAllocations();
+            console.log('taco.store: fetchVoterDetails() - Raw response:', voterDetails);
+
+            if (!voterDetails || !Array.isArray(voterDetails)) {
+                console.error('taco.store: fetchVoterDetails() - Invalid response format:', voterDetails);
+                return;
+            }
+
+            fetchedVoterDetails.value = voterDetails.map(([principal, state]) => ({
+                principal,
+                state
+            }));
+            console.log('taco.store: fetchVoterDetails() - Updated state:', fetchedVoterDetails.value);
+            return;
+        } catch (error) {
+            console.error('taco.store: fetchVoterDetails() - Error:', error);
+            throw error;
+        }
+    };
+
+    // Add this function with other functions
+    const fetchNeuronAllocations = async () => {
+        try {
+            // Create auth client
+            const authClient = await AuthClient.create();
+
+            // Check if user is authenticated
+            if (!await authClient.isAuthenticated()) {
+                console.error('User not authenticated');
+                return false;
+            }
+
+            // Get authenticated identity
+            const identity = await authClient.getIdentity();
+
+            const agent = await createAgent({
+                identity,
+                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            });
+
+            const canisterId = process.env.DFX_NETWORK === "ic"
+                ? 'vxqw7-iqaaa-aaaan-qzziq-cai'
+                : 'ywhqf-eyaaa-aaaad-qg6tq-cai';
+
+            const actor = Actor.createActor(daoBackendIDL, {
+                agent,
+                canisterId,
+            });
+
+            const result = await actor.admin_getNeuronAllocations();
+            console.log('Raw neuron allocations:', result);
+
+            if (!Array.isArray(result)) {
+                console.error('Expected array response from admin_getNeuronAllocations, got:', typeof result);
+                fetchedNeuronAllocations.value = [];
+                return;
+            }
+
+            fetchedNeuronAllocations.value = result.map(([neuronId, allocation]) => ({
+                neuronId,
+                votingPower: allocation.votingPower,
+                lastUpdate: allocation.lastUpdate,
+                lastAllocationMaker: allocation.lastAllocationMaker,
+                allocations: allocation.allocations.map((alloc: Allocation) => [alloc.token.toText(), BigInt(alloc.basisPoints)])
+            }));
+
+            console.log('Processed neuron allocations:', fetchedNeuronAllocations.value);
+        } catch (error) {
+            console.error('Error fetching neuron allocations:', error);
+            fetchedNeuronAllocations.value = [];
+        }
+    };
+
+    // # RETURN #
+    return {
+        // state
+        darkModeToggled,
+        appLoading,
+        userLoggedIn,
+        userPrincipal,
+        userLedgerAccountId,
+        icpPriceUsd,
+        btcPriceUsd,
+        ethPriceUsd,
+        lastPriceUpdate,
+        truncatedPrincipal,
+        fetchedTokenDetails,
+        fetchedAggregateAllocation,
+        fetchedVotingPowerMetrics,
+        fetchedUserAllocation,
+        backendError,
+        backendErrorIcon,
+        backendErrorIconColor,
+        backendErrorText,
+        toasts,
+        userAcceptedHotkeyTutorial,
+        timerHealth,
+        snapshotStatus,
+        systemLogs,
+        tradingLogs,
+        rebalanceConfig,
+        fetchedVoterDetails,
+        fetchedNeuronAllocations,
+        // actions
+        changeRoute,
+        toggleDarkMode,
+        appLoadingOn,
+        appLoadingOff,
+        iidLogIn,
+        iidLogOut,
+        fetchCryptoPrices,
+        checkIfLoggedIn,
+        icrc1Metadata,
+        fetchTokenDetails,
+        fetchAggregateAllocation,
+        fetchVotingPowerMetrics,
+        fetchUserAllocation,
+        updateAllocation,
+        followAllocation,
+        unfollowAllocation,
+        addToast,
+        acceptHotkeyTutorial,
+        removeToast,
+        refreshTimerStatus,
+        triggerManualSnapshot,
+        restartSnapshotTimer,
+        restartTreasurySyncs,
+        recoverPoolBalances,
+        triggerManualSync,
+        fetchSystemLogs,
+        startRebalancing,
+        stopRebalancing,
+        getSystemParameters,
+        updateRebalanceConfig,
+        executeTradingCycle,
+        pauseToken,
+        unpauseToken,
+        fetchVoterDetails,
+        fetchNeuronAllocations,
+    }
+})
+
+function getTreasuryCanisterId(): Principal {
+    const canisterId = process.env.DFX_NETWORK === "ic"
+        ? 'v6t5d-6yaaa-aaaan-qzzja-cai'
+        : 'z4is7-giaaa-aaaad-qg6uq-cai';
+    return Principal.fromText(canisterId);
+}

@@ -1,0 +1,244 @@
+type UpdateConfig = 
+ record {
+   longSyncIntervalNS: opt nat;
+   maxKongswapAttempts: opt nat;
+   maxPriceHistoryEntries: opt nat;
+   maxSlippageBasisPoints: opt nat;
+   maxTradeAttemptsPerInterval: opt nat;
+   maxTradeValueICP: opt nat;
+   maxTradesStored: opt nat;
+   minTradeValueICP: opt nat;
+   portfolioRebalancePeriodNS: opt nat;
+   priceUpdateIntervalNS: opt nat;
+   rebalanceIntervalNS: opt nat;
+   shortSyncIntervalNS: opt nat;
+   tokenSyncTimeoutNS: opt nat;
+ };
+type TransferRecipient = 
+ variant {
+   accountId: record {
+                owner: principal;
+                subaccount: opt Subaccount;
+              };
+   "principal": principal;
+ };
+type TradeRecord = 
+ record {
+   amountBought: nat;
+   amountSold: nat;
+   error: opt text;
+   exchange: ExchangeType;
+   slippage: float64;
+   success: bool;
+   timestamp: int;
+   tokenBought: principal;
+   tokenSold: principal;
+ };
+type TokenType = 
+ variant {
+   ICP;
+   ICRC12;
+   ICRC3;
+ };
+type TokenDetails = 
+ record {
+   Active: bool;
+   balance: nat;
+   epochAdded: int;
+   isPaused: bool;
+   lastTimeSynced: int;
+   pastPrices: vec PricePoint;
+   pausedDueToSyncFailure: bool;
+   priceInICP: nat;
+   priceInUSD: float64;
+   tokenDecimals: nat;
+   tokenName: text;
+   tokenSymbol: text;
+   tokenTransferFee: nat;
+   tokenType: TokenType;
+ };
+type SyncErrorTreasury = 
+ variant {
+   NotDAO;
+   UnexpectedError: text;
+ };
+type Subaccount = blob;
+type Result_4 = 
+ variant {
+   err: text;
+   ok: text;
+ };
+type Result_3 = 
+ variant {
+   err: text;
+   ok: vec record {
+             principal;
+             vec PricePoint__1;
+           };
+ };
+type Result_2 = 
+ variant {
+   err: text;
+   ok:
+    record {
+      executedTrades: vec TradeRecord;
+      metrics:
+       record {
+         avgSlippage: float64;
+         lastUpdate: int;
+         successRate: float64;
+         totalTradesExecuted: nat;
+         totalTradesFailed: nat;
+       };
+      portfolioState:
+       record {
+         currentAllocations: vec record {
+                                   principal;
+                                   nat;
+                                 };
+         targetAllocations: vec record {
+                                  principal;
+                                  nat;
+                                };
+         totalValueICP: nat;
+         totalValueUSD: float64;
+       };
+      rebalanceStatus: RebalanceStatus;
+    };
+ };
+type Result_1 = 
+ variant {
+   err: SyncErrorTreasury;
+   ok: text;
+ };
+type Result = 
+ variant {
+   err: RebalanceError;
+   ok: text;
+ };
+type RebalanceStatus = 
+ variant {
+   Failed: text;
+   Idle;
+   Trading;
+ };
+type RebalanceError = 
+ variant {
+   ConfigError: text;
+   LiquidityError: text;
+   PriceError: text;
+   SystemError: text;
+   TradeError: text;
+ };
+type RebalanceConfig = 
+ record {
+   longSyncIntervalNS: nat;
+   maxKongswapAttempts: nat;
+   maxSlippageBasisPoints: nat;
+   maxTradeAttemptsPerInterval: nat;
+   maxTradeValueICP: nat;
+   maxTradesStored: nat;
+   minTradeValueICP: nat;
+   portfolioRebalancePeriodNS: nat;
+   rebalanceIntervalNS: nat;
+   shortSyncIntervalNS: nat;
+   tokenSyncTimeoutNS: nat;
+ };
+type PricePoint__1 = 
+ record {
+   icpPrice: nat;
+   time: int;
+   usdPrice: float64;
+ };
+type PricePoint = 
+ record {
+   icpPrice: nat;
+   time: int;
+   usdPrice: float64;
+ };
+type ExchangeType = 
+ variant {
+   ICPSwap;
+   KongSwap;
+ };
+service : {
+  admin_executeTradingCycle: () -> (Result);
+  admin_recoverPoolBalances: () -> (Result_4);
+  admin_syncWithDao: () -> (Result_4);
+  /// * Get current token allocations in basis points
+  getCurrentAllocations: () -> (vec record {
+                                      principal;
+                                      nat;
+                                    }) query;
+  /// * Get system rebalance parameters
+  ///  *
+  ///  * Returns all rebalancing configuration parameters that control the behavior
+  ///  * of the Treasury including trading intervals, size limits, slippage tolerance, etc.
+  ///  *
+  ///  * Accessible by any user with query access.
+  getSystemParameters: () -> (RebalanceConfig) query;
+  /// * Get all token details including balances and prices
+  getTokenDetails: () -> (vec record {
+                                principal;
+                                TokenDetails;
+                              }) query;
+  getTokenPriceHistory: (vec principal) -> (Result_3) query;
+  /// * Get detailed rebalancing status information
+  ///    *
+  ///    * Returns:
+  ///    * - Current system status
+  ///    * - Recent trade history
+  ///    * - Portfolio valuation
+  ///    * - Current vs target allocations
+  ///    * - Performance metrics
+  getTradingStatus: () -> (Result_2) query;
+  /// * Process batch transfers from the DAO
+  ///    *
+  ///    * Handles both immediate and queued transfers of various token types.
+  ///    * Only callable by DAO.
+  ///    *
+  ///    * tempTransferQueue - Array of transfer instructions
+  ///    * Immediate - If true, process immediately and return block IDs
+  ///    *
+  receiveTransferTasks: (vec record {
+                               TransferRecipient;
+                               nat;
+                               principal;
+                               nat8;
+                             }, bool) -> (bool,
+   opt vec record {
+             principal;
+             nat64;
+           });
+  /// * Set test mode (modifies safety parameters)
+  ///    * Only callable by DAO.
+  setTest: (bool) -> ();
+  /// * Start the automatic rebalancing process
+  ///    *
+  ///    * Initializes the rebalancing engine, which will periodically:
+  ///    * 1. Check current vs target allocations
+  ///    * 2. Select tokens to trade
+  ///    * 3. Execute trades on the best exchange
+  ///    *
+  ///    * Only callable by DAO or controller.
+  startRebalancing: () -> (Result);
+  /// * Stop the automatic rebalancing process
+  ///    *
+  ///    * Cancels all timers and sets the system to idle state
+  ///    * Only callable by DAO or controller.
+  stopRebalancing: () -> (Result);
+  /// * Synchronize token details with DAO
+  ///    *
+  ///    * Updates token status from the DAO including:
+  ///    * - Active/Inactive status
+  ///    * - Paused/Unpaused state
+  syncTokenDetailsFromDAO: (vec record {
+                                  principal;
+                                  TokenDetails;
+                                }) -> (Result_1);
+  /// * Update the rebalancing configuration parameters
+  ///    *
+  ///    * Allows adjustment of trading intervals, sizes, and safety limits
+  ///    * Only callable by DAO or controller.
+  updateRebalanceConfig: (UpdateConfig, opt bool) -> (Result);
+}

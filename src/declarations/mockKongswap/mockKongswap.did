@@ -1,0 +1,225 @@
+type TxId = 
+ variant {
+   BlockIndex: nat;
+   TransactionId: text;
+ };
+type TransferReply = variant {IC: ICTransferReply;};
+type TransferIdReply = 
+ record {
+   transfer: TransferReply;
+   transfer_id: nat64;
+ };
+type TokenReply = 
+ variant {
+   IC: ICTokenReply;
+   LP: LPTokenReply;
+ };
+type SwapTxReply = 
+ record {
+   gas_fee: nat;
+   lp_fee: nat;
+   pay_address: text;
+   pay_amount: nat;
+   pay_chain: text;
+   pay_symbol: text;
+   pool_symbol: text;
+   price: float64;
+   receive_address: text;
+   receive_amount: nat;
+   receive_chain: text;
+   receive_symbol: text;
+   ts: nat64;
+ };
+type SwapReply = 
+ record {
+   claim_ids: vec nat64;
+   mid_price: float64;
+   pay_address: text;
+   pay_amount: nat;
+   pay_chain: text;
+   pay_symbol: text;
+   price: float64;
+   receive_address: text;
+   receive_amount: nat;
+   receive_chain: text;
+   receive_symbol: text;
+   request_id: nat64;
+   slippage: float64;
+   status: text;
+   transfer_ids: vec TransferIdReply;
+   ts: nat64;
+   tx_id: nat64;
+   txs: vec SwapTxReply;
+ };
+type SwapAmountsTxReply = 
+ record {
+   gas_fee: nat;
+   lp_fee: nat;
+   pay_address: text;
+   pay_amount: nat;
+   pay_chain: text;
+   pay_symbol: text;
+   pool_symbol: text;
+   price: float64;
+   receive_address: text;
+   receive_amount: nat;
+   receive_chain: text;
+   receive_symbol: text;
+ };
+type SwapAmountsReply = 
+ record {
+   mid_price: float64;
+   pay_address: text;
+   pay_amount: nat;
+   pay_chain: text;
+   pay_symbol: text;
+   price: float64;
+   receive_address: text;
+   receive_amount: nat;
+   receive_chain: text;
+   receive_symbol: text;
+   slippage: float64;
+   txs: vec SwapAmountsTxReply;
+ };
+type RequestsReply = 
+ record {
+   reply: RequestReply;
+   request: RequestRequest;
+   request_id: nat64;
+   statuses: vec text;
+   ts: nat64;
+ };
+type RequestRequest = 
+ variant {
+   AddLiquidity;
+   AddPool;
+   RemoveLiquidity;
+   Swap: KongSwapArgs__1;
+ };
+type RequestReply = 
+ variant {
+   AddLiquidity;
+   AddPool;
+   Pending;
+   RemoveLiquidity;
+   Swap: SwapReply;
+ };
+type PoolsReply = 
+ record {
+   pools: vec PoolReply;
+   total_24h_lp_fee: nat;
+   total_24h_num_swaps: nat;
+   total_24h_volume: nat;
+   total_tvl: nat;
+ };
+type PoolReply = 
+ record {
+   address_0: text;
+   address_1: text;
+   balance_0: nat;
+   balance_1: nat;
+   chain_0: text;
+   chain_1: text;
+   is_removed: bool;
+   lp_fee_0: nat;
+   lp_fee_1: nat;
+   lp_fee_bps: nat8;
+   lp_token_symbol: text;
+   name: text;
+   pool_id: nat32;
+   price: float64;
+   rolling_24h_apy: float64;
+   rolling_24h_lp_fee: nat;
+   rolling_24h_num_swaps: nat;
+   rolling_24h_volume: nat;
+   symbol: text;
+   symbol_0: text;
+   symbol_1: text;
+   tvl: nat;
+ };
+type LPTokenReply = 
+ record {
+   address: text;
+   chain: text;
+   decimals: nat8;
+   fee: nat;
+   is_removed: bool;
+   name: text;
+   pool_id_of: nat32;
+   symbol: text;
+   token_id: nat32;
+   total_supply: nat;
+ };
+type KongSwapArgs__1 = 
+ record {
+   max_slippage: opt float64;
+   pay_amount: nat;
+   pay_token: text;
+   pay_tx_id: opt TxId;
+   receive_address: opt principal;
+   receive_amount: opt nat;
+   receive_token: text;
+   referred_by: opt principal;
+ };
+type KongSwapArgs = 
+ record {
+   max_slippage: opt float64;
+   pay_amount: nat;
+   pay_token: text;
+   pay_tx_id: opt TxId;
+   receive_address: opt principal;
+   receive_amount: opt nat;
+   receive_token: text;
+   referred_by: opt principal;
+ };
+type ICTransferReply = 
+ record {
+   amount: nat;
+   block_index: nat;
+   canister_id: text;
+   chain: text;
+   is_send: bool;
+   symbol: text;
+ };
+type ICTokenReply = 
+ record {
+   canister_id: text;
+   chain: text;
+   decimals: nat8;
+   fee: nat;
+   icrc1: bool;
+   icrc2: bool;
+   icrc3: bool;
+   is_removed: bool;
+   name: text;
+   symbol: text;
+   token_id: nat32;
+ };
+service : {
+  initializeMockData: () -> ();
+  pools: (opt text) -> (variant {
+                          Err: text;
+                          Ok: PoolsReply;
+                        }) query;
+  requests: (opt nat64) -> (variant {
+                              Err: text;
+                              Ok: vec RequestsReply;
+                            }) query;
+  swap: (KongSwapArgs__1) -> (variant {
+                                Err: text;
+                                Ok: SwapReply;
+                              });
+  swap_amounts: (text, nat, text) ->
+   (variant {
+      Err: text;
+      Ok: SwapAmountsReply;
+    }) query;
+  swap_async: (KongSwapArgs) -> (variant {
+                                   Err: text;
+                                   Ok: nat64;
+                                 });
+  tokens: (opt text) -> (variant {
+                           Err: text;
+                           Ok: vec TokenReply;
+                         }) query;
+}

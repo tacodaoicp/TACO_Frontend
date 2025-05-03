@@ -1,0 +1,106 @@
+type WithdrawArgs = 
+ record {
+   amount: nat;
+   fee: nat;
+   token: text;
+ };
+type Token = 
+ record {
+   address: text;
+   standard: text;
+ };
+type SwapArgs = 
+ record {
+   amountIn: text;
+   amountOutMinimum: text;
+   zeroForOne: bool;
+ };
+type Result_4 = 
+ variant {
+   err: text;
+   ok: PoolData;
+ };
+type Result_3 = 
+ variant {
+   err: text;
+   ok: vec PoolData;
+ };
+type Result_2 = 
+ variant {
+   err: text;
+   ok: ICPSwapBalance;
+ };
+type Result_1 = 
+ variant {
+   err: text;
+   ok: PoolMetadata;
+ };
+type Result = 
+ variant {
+   err: text;
+   ok: nat;
+ };
+type PoolMetadata = 
+ record {
+   fee: nat;
+   key: text;
+   liquidity: nat;
+   maxLiquidityPerTick: nat;
+   nextPositionId: nat;
+   sqrtPriceX96: nat;
+   tick: int;
+   token0: Token;
+   token1: Token;
+ };
+type PoolData = 
+ record {
+   canisterId: principal;
+   fee: nat;
+   key: text;
+   tickSpacing: int;
+   token0: Token;
+   token1: Token;
+ };
+type ICPSwapBalance = 
+ record {
+   balance0: nat;
+   balance1: nat;
+ };
+type GetPoolArgs = 
+ record {
+   fee: nat;
+   token0: Token;
+   token1: Token;
+ };
+type DepositArgs = 
+ record {
+   amount: nat;
+   fee: nat;
+   token: text;
+ };
+service : {
+  addPool: (principal, principal, principal, float64, nat) -> ();
+  deposit2: (principal, DepositArgs) -> (Result);
+  getAllPoolMetadata: () -> (vec record {
+                                   principal;
+                                   PoolMetadata;
+                                 }) query;
+  getPool: (GetPoolArgs) -> (Result_4) query;
+  getPoolByPair: (principal, principal) -> (opt principal) query;
+  getPools: () -> (variant {
+                     err: text;
+                     ok: vec PoolData;
+                   }) query;
+  getPoolsByCanister: (principal) -> (Result_3) query;
+  getUserUnusedBalance: (principal) -> (Result_2) query;
+  initializeMockPools: () -> ();
+  metadata: () -> (Result_1) query;
+  metadata2: (principal) -> (Result_1) query;
+  quote: (SwapArgs) -> (Result) query;
+  quote2: (SwapArgs, principal) -> (Result) query;
+  swap: (SwapArgs) -> (Result);
+  swap2: (principal, SwapArgs) -> (Result);
+  updatePoolMetadata: (principal, nat, nat) -> ();
+  withdraw: (WithdrawArgs) -> (Result);
+  withdraw2: (principal, WithdrawArgs) -> (Result);
+}

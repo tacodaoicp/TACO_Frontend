@@ -1,0 +1,139 @@
+type Timestamp = nat64;
+type TakeNeuronSnapshotResult = 
+ variant {
+   Err: TakeNeuronSnapshotError;
+   Ok: SnapshotId;
+ };
+type TakeNeuronSnapshotError = 
+ variant {
+   AlreadyTakingSnapshot;
+   SnsGovernanceCanisterIdNotSet;
+ };
+type Subaccount = blob;
+type SnapshotId = nat;
+type NeuronVP = 
+ record {
+   neuronId: blob;
+   votingPower: nat;
+ };
+type NeuronSnapshotStatus = 
+ variant {
+   Ready;
+   StoringSnapshot;
+   TakingSnapshot;
+ };
+type NeuronSnapshotResult = 
+ variant {
+   Err: NeuronSnapshotError;
+   Ok;
+ };
+type NeuronSnapshotInfo = 
+ record {
+   id: SnapshotId;
+   result: NeuronSnapshotResult;
+   timestamp: Timestamp;
+ };
+type NeuronSnapshotError = 
+ variant {
+   Cancelled;
+   Timeout;
+ };
+type NeuronPermission = 
+ record {
+   permission_type: vec int32;
+   "principal": opt principal;
+ };
+type NeuronId = record {id: blob;};
+type Neuron = 
+ record {
+   aging_since_timestamp_seconds: nat64;
+   auto_stake_maturity: opt bool;
+   cached_neuron_stake_e8s: nat64;
+   created_timestamp_seconds: nat64;
+   disburse_maturity_in_progress: vec DisburseMaturityInProgress;
+   dissolve_state: opt DissolveState;
+   followees: vec record {
+                    nat64;
+                    Followees;
+                  };
+   id: opt NeuronId;
+   maturity_e8s_equivalent: nat64;
+   neuron_fees_e8s: nat64;
+   permissions: vec NeuronPermission;
+   source_nns_neuron_id: opt nat64;
+   staked_maturity_e8s_equivalent: opt nat64;
+   vesting_period_seconds: opt nat64;
+   voting_power_percentage_multiplier: nat64;
+ };
+type LogLevel = 
+ variant {
+   ERROR;
+   INFO;
+   WARN;
+ };
+type LogEntry = 
+ record {
+   component: text;
+   context: text;
+   level: LogLevel;
+   message: text;
+   timestamp: int;
+ };
+type Followees = record {followees: vec NeuronId;};
+type DissolveState = 
+ variant {
+   DissolveDelaySeconds: nat64;
+   WhenDissolvedTimestampSeconds: nat64;
+ };
+type DisburseMaturityInProgress = 
+ record {
+   account_to_disburse_to: opt Account;
+   amount_e8s: nat64;
+   finalize_disbursement_timestamp_seconds: opt nat64;
+   timestamp_of_disbursement_seconds: nat64;
+ };
+type CumulativeVP = 
+ record {
+   total_staked_vp: nat;
+   total_staked_vp_by_hotkey_setters: nat;
+ };
+type CancelNeuronSnapshotResult = 
+ variant {
+   Err: CancelNeuronSnapshotError;
+   Ok: SnapshotId;
+ };
+type CancelNeuronSnapshotError = variant {NotTakingSnapshot;};
+type Account = 
+ record {
+   owner: principal;
+   subaccount: opt Subaccount;
+ };
+service : {
+  cancel_neuron_snapshot: () -> (CancelNeuronSnapshotResult);
+  clearLogs: () -> ();
+  getCumulativeValuesAtSnapshot: (opt SnapshotId) -> (opt CumulativeVP) query;
+  getLogs: (nat) -> (vec LogEntry) query;
+  getLogsByContext: (text, nat) -> (vec LogEntry) query;
+  getLogsByLevel: (LogLevel, nat) -> (vec LogEntry) query;
+  getNeuronDataForDAO: (SnapshotId, nat, nat) ->
+   (opt
+     record {
+       entries: vec record {
+                      principal;
+                      vec NeuronVP;
+                    };
+       stopped_at: opt nat;
+       total_entries: nat;
+     }) query;
+  get_neuron_snapshot_curr_neuron_id: () -> (opt NeuronId) query;
+  get_neuron_snapshot_head_id: () -> (SnapshotId) query;
+  get_neuron_snapshot_importing_count: () -> (nat) query;
+  get_neuron_snapshot_info: (SnapshotId) -> (opt NeuronSnapshotInfo) query;
+  get_neuron_snapshot_neurons: (SnapshotId, nat, nat) -> (vec Neuron) query;
+  get_neuron_snapshot_status: () -> (NeuronSnapshotStatus) query;
+  get_neuron_snapshots_info: (nat, nat) -> (vec NeuronSnapshotInfo) query;
+  setLogAdmin: (principal) -> ();
+  setSnsGovernanceCanisterId: (principal) -> ();
+  setTest: (bool) -> ();
+  take_neuron_snapshot: () -> (TakeNeuronSnapshotResult);
+}

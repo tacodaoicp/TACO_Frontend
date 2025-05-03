@@ -1,0 +1,93 @@
+type UserState = 
+ record {
+   allocationFollowedBy: vec record {
+                               follow: principal;
+                               since: int;
+                             };
+   allocationFollows: vec record {
+                            follow: principal;
+                            since: int;
+                          };
+   allocations: vec Allocation;
+   followUnfollowActions: vec int;
+   lastAllocationMaker: principal;
+   lastAllocationUpdate: int;
+   lastVotingPowerUpdate: int;
+   neurons: vec NeuronVP;
+   pastAllocations:
+    vec
+     record {
+       allocation: vec Allocation;
+       allocationMaker: principal;
+       from: int;
+       to: int;
+     };
+   votingPower: nat;
+ };
+type UpdateError = 
+ variant {
+   InvalidAllocation;
+   NoVotingPower;
+   NotAllowed;
+   SystemInactive;
+   UnexpectedError: text;
+ };
+type UnfollowError = 
+ variant {
+   AlreadyUnfollowing;
+   FollowUnfollowLimitReached;
+   FolloweeIsSelf;
+   FolloweeNotFound;
+   FollowerNotFound;
+   NotAdmin;
+   NotAllowed;
+   SystemInactive;
+   UnexpectedError: text;
+ };
+type Result_2 = 
+ variant {
+   err: FollowError;
+   ok: text;
+ };
+type Result_1 = 
+ variant {
+   err: UnfollowError;
+   ok: text;
+ };
+type Result = 
+ variant {
+   err: UpdateError;
+   ok: text;
+ };
+type NeuronVP = 
+ record {
+   neuronId: blob;
+   votingPower: nat;
+ };
+type FollowError = 
+ variant {
+   AlreadyFollowing;
+   FollowLimitReached;
+   FollowUnfollowLimitReached;
+   FolloweeIsSelf;
+   FolloweeLimitReached;
+   FolloweeNoAllocationYetMade;
+   FolloweeNotFound;
+   FollowerNoAllocationYetMade;
+   FollowerNotFound;
+   NotAdmin;
+   NotAllowed;
+   SystemInactive;
+   UnexpectedError: text;
+ };
+type Allocation = 
+ record {
+   basisPoints: nat;
+   token: principal;
+ };
+service : {
+  followAllocation: (principal) -> (Result_2);
+  getUserAllocation: () -> (opt UserState);
+  unfollowAllocation: (principal) -> (Result_1);
+  updateAllocation: (vec Allocation) -> (Result);
+}

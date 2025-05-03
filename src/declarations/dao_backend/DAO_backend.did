@@ -1,0 +1,356 @@
+type UserState = 
+ record {
+   allocationFollowedBy: vec record {
+                               follow: principal;
+                               since: int;
+                             };
+   allocationFollows: vec record {
+                            follow: principal;
+                            since: int;
+                          };
+   allocations: vec Allocation__1;
+   followUnfollowActions: vec int;
+   lastAllocationMaker: principal;
+   lastAllocationUpdate: int;
+   lastVotingPowerUpdate: int;
+   neurons: vec NeuronVP;
+   pastAllocations:
+    vec
+     record {
+       allocation: vec Allocation__1;
+       allocationMaker: principal;
+       from: int;
+       to: int;
+     };
+   votingPower: nat;
+ };
+type UpdateError = 
+ variant {
+   InvalidAllocation;
+   NoVotingPower;
+   NotAllowed;
+   SystemInactive;
+   UnexpectedError: text;
+ };
+type UpdateConfig__1 = 
+ record {
+   PRICE_HISTORY_WINDOW: opt int;
+   balanceUpdateInterval: opt int;
+   blockCleanupInterval: opt int;
+   maxPremium: opt float64;
+   maxSlippageBasisPoints: opt nat;
+   minPremium: opt float64;
+   minSwapValueUSD: opt float64;
+   swappingEnabled: opt bool;
+ };
+type UpdateConfig = 
+ record {
+   longSyncIntervalNS: opt nat;
+   maxKongswapAttempts: opt nat;
+   maxPriceHistoryEntries: opt nat;
+   maxSlippageBasisPoints: opt nat;
+   maxTradeAttemptsPerInterval: opt nat;
+   maxTradeValueICP: opt nat;
+   maxTradesStored: opt nat;
+   minTradeValueICP: opt nat;
+   portfolioRebalancePeriodNS: opt nat;
+   priceUpdateIntervalNS: opt nat;
+   rebalanceIntervalNS: opt nat;
+   shortSyncIntervalNS: opt nat;
+   tokenSyncTimeoutNS: opt nat;
+ };
+type UnfollowError = 
+ variant {
+   AlreadyUnfollowing;
+   FollowUnfollowLimitReached;
+   FolloweeIsSelf;
+   FolloweeNotFound;
+   FollowerNotFound;
+   NotAdmin;
+   NotAllowed;
+   SystemInactive;
+   UnexpectedError: text;
+ };
+type TokenType__1 = 
+ variant {
+   ICP;
+   ICRC12;
+   ICRC3;
+ };
+type TokenType = 
+ variant {
+   ICP;
+   ICRC12;
+   ICRC3;
+ };
+type TokenDetails = 
+ record {
+   Active: bool;
+   balance: nat;
+   epochAdded: int;
+   isPaused: bool;
+   lastTimeSynced: int;
+   pastPrices: vec PricePoint;
+   pausedDueToSyncFailure: bool;
+   priceInICP: nat;
+   priceInUSD: float64;
+   tokenDecimals: nat;
+   tokenName: text;
+   tokenSymbol: text;
+   tokenTransferFee: nat;
+   tokenType: TokenType;
+ };
+type SystemState = 
+ variant {
+   Active;
+   Emergency;
+   Paused;
+ };
+type SystemParameter = 
+ variant {
+   AllocationWindow: nat;
+   FollowDepth: nat;
+   LogAdmin: principal;
+   MaxAllocationsPerDay: int;
+   MaxFollowUnfollowActionsPerDay: nat;
+   MaxFollowed: nat;
+   MaxFollowers: nat;
+   MaxPastAllocations: nat;
+   MaxTotalUpdates: nat;
+   SnapshotInterval: nat;
+ };
+type SyncError = 
+ variant {
+   NotTreasury;
+   UnexpectedError: text;
+ };
+type Result_5 = 
+ variant {
+   err: FollowError;
+   ok: text;
+ };
+type Result_4 = 
+ variant {
+   err: SyncError;
+   ok: text;
+ };
+type Result_3 = 
+ variant {
+   err: UnfollowError;
+   ok: text;
+ };
+type Result_2 = 
+ variant {
+   err: UpdateError;
+   ok: text;
+ };
+type Result_1 = 
+ variant {
+   err: AuthorizationError;
+   ok: text;
+ };
+type Result = 
+ variant {
+   err: AuthorizationError;
+   ok:
+    record {
+      allocatedVotingPower: nat;
+      neuronCount: nat;
+      principalCount: nat;
+      totalVotingPower: nat;
+      totalVotingPowerByHotkeySetters: nat;
+    };
+ };
+type PricePoint = 
+ record {
+   icpPrice: nat;
+   time: int;
+   usdPrice: float64;
+ };
+type NeuronVP = 
+ record {
+   neuronId: blob;
+   votingPower: nat;
+ };
+type NeuronAllocation = 
+ record {
+   allocations: vec Allocation__1;
+   lastAllocationMaker: principal;
+   lastUpdate: int;
+   votingPower: nat;
+ };
+type LogLevel = 
+ variant {
+   ERROR;
+   INFO;
+   WARN;
+ };
+type LogEntry = 
+ record {
+   component: text;
+   context: text;
+   level: LogLevel;
+   message: text;
+   timestamp: int;
+ };
+type HistoricBalanceAllocation = 
+ record {
+   allocations: vec record {
+                      principal;
+                      nat;
+                    };
+   balances: vec record {
+                   principal;
+                   nat;
+                 };
+   totalWorthInICP: nat;
+   totalWorthInUSD: float64;
+ };
+type FollowError = 
+ variant {
+   AlreadyFollowing;
+   FollowLimitReached;
+   FollowUnfollowLimitReached;
+   FolloweeIsSelf;
+   FolloweeLimitReached;
+   FolloweeNoAllocationYetMade;
+   FolloweeNotFound;
+   FollowerNoAllocationYetMade;
+   FollowerNotFound;
+   NotAdmin;
+   NotAllowed;
+   SystemInactive;
+   UnexpectedError: text;
+ };
+type AuthorizationError = 
+ variant {
+   NotAdmin;
+   NotAllowed;
+   UnexpectedError: text;
+ };
+type Allocation__1 = 
+ record {
+   basisPoints: nat;
+   token: principal;
+ };
+type Allocation = 
+ record {
+   basisPoints: nat;
+   token: principal;
+ };
+type AdminPermission = 
+ record {
+   expiresAt: int;
+   function: AdminFunction;
+   grantedBy: principal;
+ };
+type AdminFunction = 
+ variant {
+   addAdmin;
+   addToken;
+   clearLogs;
+   createAuction;
+   endAuctionPanic;
+   getLogs;
+   pauseToken;
+   recoverPoolBalances;
+   removeAdmin;
+   removeToken;
+   setTacoAddress;
+   setTest;
+   startRebalancing;
+   stopRebalancing;
+   stopToken;
+   unpauseToken;
+   updateMintingVaultConfig;
+   updateSpamParameters;
+   updateSystemParameter;
+   updateSystemState;
+   updateTreasuryConfig;
+ };
+service : {
+  addAdmin: (principal) -> (Result_1);
+  addToken: (principal, TokenType__1) -> (Result_1);
+  admin_getNeuronAllocations: () ->
+   (vec record {
+          blob;
+          NeuronAllocation;
+        }) query;
+  admin_getUserAllocation: (principal) -> (opt UserState) query;
+  admin_getUserAllocations: () -> (vec record {
+                                         principal;
+                                         UserState;
+                                       }) query;
+  admin_recalculateAllVotingPower: (nat) -> ();
+  clearLogs: () -> ();
+  followAllocation: (principal) -> (Result_5);
+  getAdminPermissions: () ->
+   (vec record {
+          principal;
+          vec AdminPermission;
+        }) query;
+  getAggregateAllocation: () -> (vec record {
+                                       principal;
+                                       nat;
+                                     }) query;
+  getFollowersWithNeuronCounts: () -> (vec record {
+                                             principal;
+                                             nat;
+                                           }) query;
+  getHistoricBalanceAndAllocation: (nat) ->
+   (vec record {
+          int;
+          HistoricBalanceAllocation;
+        }) query;
+  getLogs: (nat) -> (vec LogEntry) query;
+  getLogsByContext: (text, nat) -> (vec LogEntry) query;
+  getLogsByLevel: (LogLevel, nat) -> (vec LogEntry) query;
+  getNeuronAllocation: (blob) -> (opt NeuronAllocation) query;
+  getSnapshotInfo: () ->
+   (opt
+     record {
+       lastSnapshotId: nat;
+       lastSnapshotTime: int;
+       totalVotingPower: nat;
+     }) query;
+  getSystemParameters: () -> (vec SystemParameter) query;
+  getTokenDetails: () -> (vec record {
+                                principal;
+                                TokenDetails;
+                              }) query;
+  getUserAllocation: () -> (opt UserState) query;
+  grantAdminPermission: (principal, AdminFunction, nat) -> (Result_1);
+  hasAdminPermission: (principal, AdminFunction) -> (bool) query;
+  pauseToken: (principal) -> (Result_1);
+  removeAdmin: (principal) -> (Result_1);
+  removeFollower: (principal) -> (Result_5);
+  removeToken: (principal) -> (Result_1);
+  setTacoAddress: (principal) -> ();
+  set_sns_governance_canister_id: (principal) -> ();
+  syncTokenDetailsFromTreasury: (vec record {
+                                       principal;
+                                       TokenDetails;
+                                     }) -> (Result_4);
+  unfollowAllocation: (principal) -> (Result_3);
+  unpauseToken: (principal) -> (Result_1);
+  updateAllocation: (vec Allocation) -> (Result_2);
+  /// * Update Minting Vault configuration
+  ///  *
+  ///  * Allows configuration of premium rates, update intervals, and enabling/disabling swapping
+  ///  * Only callable by admins with the updateMintingVaultConfig permission.
+  updateMintingVaultConfig: (UpdateConfig__1) -> (Result_1);
+  updateSpamParameters:
+   (record {
+      allowedCalls: opt nat;
+      allowedSilentWarnings: opt nat;
+      timeWindowSpamCheck: opt int;
+    }) -> (Result_1);
+  updateSystemParameter: (SystemParameter) -> (Result_1);
+  updateSystemState: (SystemState) -> (Result_1);
+  /// * Update treasury rebalance configuration
+  ///  *
+  ///  * Allows configuration of trading intervals, sizes, and safety limits
+  ///  * Only callable by admins with the updateTreasuryConfig permission.
+  updateTreasuryConfig: (UpdateConfig, opt bool) -> (Result_1);
+  votingPowerMetrics: () -> (Result) query;
+}

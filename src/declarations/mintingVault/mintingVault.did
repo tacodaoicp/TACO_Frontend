@@ -1,0 +1,172 @@
+type UpdateConfig = 
+ record {
+   PRICE_HISTORY_WINDOW: opt int;
+   balanceUpdateInterval: opt int;
+   blockCleanupInterval: opt int;
+   maxPremium: opt float64;
+   maxSlippageBasisPoints: opt nat;
+   minPremium: opt float64;
+   minSwapValueUSD: opt float64;
+   swappingEnabled: opt bool;
+ };
+type TokenType = 
+ variant {
+   ICP;
+   ICRC12;
+   ICRC3;
+ };
+type TokenDetails = 
+ record {
+   Active: bool;
+   balance: nat;
+   epochAdded: int;
+   isPaused: bool;
+   lastTimeSynced: int;
+   pastPrices: vec PricePoint;
+   pausedDueToSyncFailure: bool;
+   priceInICP: nat;
+   priceInUSD: float64;
+   tokenDecimals: nat;
+   tokenName: text;
+   tokenSymbol: text;
+   tokenTransferFee: nat;
+   tokenType: TokenType;
+ };
+type SyncError = 
+ variant {
+   NotDAO;
+   UnexpectedError: text;
+ };
+type SwapResult = 
+ record {
+   blockNumber: nat;
+   error: opt SwapError;
+   returnedSentAmount: nat;
+   returnedWantedAmount: nat;
+   sentTokenAddress: text;
+   success: bool;
+   swappedAmount: nat;
+   usedSentAmount: nat;
+   wantedTokenAddress: text;
+ };
+type SwapError = 
+ variant {
+   BlockAlreadyProcessed;
+   InsufficientBalance;
+   InvalidAmount;
+   InvalidBlock;
+   InvalidPrice;
+   SwapAlreadyRunning;
+   TokenNotTrusted;
+   TransferError;
+   UnexpectedError: text;
+ };
+type Result_4 = 
+ variant {
+   err: text;
+   ok:
+    record {
+      estimatedTacoAmount: nat;
+      maxAcceptedAmount: nat;
+      premium: float64;
+      tacoPrice: nat;
+      tokenPrice: nat;
+    };
+ };
+type Result_3 = 
+ variant {
+   err: text;
+   ok: text;
+ };
+type Result_2 = 
+ variant {
+   err: text;
+   ok: SwapResult;
+ };
+type Result_1 = 
+ variant {
+   err: SyncError;
+   ok: text;
+ };
+type Result = 
+ variant {
+   err: text;
+   ok;
+ };
+type PricePoint = 
+ record {
+   icpPrice: nat;
+   time: int;
+   usdPrice: float64;
+ };
+type LogLevel = 
+ variant {
+   ERROR;
+   INFO;
+   WARN;
+ };
+type LogEntry = 
+ record {
+   component: text;
+   context: text;
+   level: LogLevel;
+   message: text;
+   timestamp: int;
+ };
+service : {
+  clearLogs: () -> ();
+  estimateSwapAmount: (principal, nat) -> (Result_4) query;
+  getLogs: (nat) -> (vec LogEntry) query;
+  getLogsByContext: (text, nat) -> (vec LogEntry) query;
+  getLogsByLevel: (LogLevel, nat) -> (vec LogEntry) query;
+  getVaultStatus: () ->
+   (record {
+      currentAllocations: vec record {
+                                principal;
+                                nat;
+                              };
+      exchangeRates: vec record {
+                           principal;
+                           float64;
+                         };
+      premiumRange: record {
+                      max: float64;
+                      min: float64;
+                    };
+      targetAllocations: vec record {
+                               principal;
+                               nat;
+                             };
+      tokenDetails: vec record {
+                          principal;
+                          TokenDetails;
+                        };
+      totalValueICP: nat;
+    }) query;
+  /// * Allows users to recover tokens they sent to the vault by mistake
+  ///  *
+  ///  * This function checks a transaction block that was sent to the vault and
+  ///  * returns the tokens to the sender minus 3x the token's transfer fee.
+  ///  *
+  ///  * The function:
+  ///  * 1. Verifies the block exists and was sent by the caller
+  ///  * 2. Ensures the block isn't already processed for a swap
+  ///  * 3. Returns tokens to the sender (minus 3x transfer fee) via treasury
+  ///  * 4. Marks the block as processed to prevent double recovery
+  ///  *
+  recoverWronglySentTokens: (principal, nat) -> (Result_3);
+  setLogAdmin: (principal) -> ();
+  setSnsGovernanceCanisterId: (principal) -> ();
+  setTest: (bool) -> ();
+  swapTokenForTaco: (principal, nat, nat) -> (Result_2);
+  /// * Synchronize token details with DAO
+  ///    *
+  ///    * Updates token status from the DAO including:
+  ///    * - Active/Inactive status
+  ///    * - Paused/Unpaused state
+  syncTokenDetailsFromDAO: (vec record {
+                                  principal;
+                                  TokenDetails;
+                                }) -> (Result_1);
+  updateConfiguration: (UpdateConfig) -> (Result);
+}
