@@ -87,7 +87,7 @@
                           <span class="taco-text-black-to-white">SNS Swap:</span>
 
                           <!-- data -->
-                          <span class="taco-text-black-to-white">3,690,000 TACO (47.442%)</span>
+                          <span class="taco-text-black-to-white">2,049,666 TACO (26.353%)</span>
 
                       </div>
 
@@ -189,10 +189,31 @@
                             style="opacity: 0.5;"></i>
 
                           <!-- title -->
+                          <span class="taco-text-black-to-white">DKP Swap:</span>
+
+                          <!-- data -->
+                          <span class="taco-text-black-to-white">700,000 TACO (9%)</span>
+
+                      </div>
+
+                  </li>                  
+
+                  <!-- list item -->
+                  <li class="taco-list__item          
+                            list-group-item">
+
+                      <!-- key value pair -->
+                      <div class="taco-list__kvp ps-3">
+
+                          <!-- down-over icon -->
+                          <i class="fa-solid fa-corner fa-rotate-180 me-2 taco-text-black-to-white"
+                            style="opacity: 0.5;"></i>
+
+                          <!-- title -->
                           <span class="taco-text-black-to-white">Liquidity Pools:</span>
 
                           <!-- data -->
-                          <span class="taco-text-black-to-white">639,369 TACO (8.22%)</span>
+                          <span class="taco-text-black-to-white">395,975 TACO (5.091%)</span>
 
                       </div>
 
@@ -210,15 +231,15 @@
                             style="opacity: 0.5;"></i>
 
                           <!-- title -->
-                          <span class="taco-text-black-to-white">Initial 3 Trusted Token Swaps:</span>
+                          <span class="taco-text-black-to-white">Future Dev Allocation:</span>
 
                           <!-- data -->
-                          <span class="taco-text-black-to-white">2,100,000 TACO (27%)</span>
+                          <span class="taco-text-black-to-white">930,975 TACO (11.97%)</span>
 
                       </div>
 
-                  </li>
-
+                  </li>  
+                  
                   <!-- list item -->
                   <li class="taco-list__item          
                             list-group-item">
@@ -231,14 +252,14 @@
                             style="opacity: 0.5;"></i>
 
                           <!-- title -->
-                          <span class="taco-text-black-to-white">Adjustment:</span>
+                          <span class="taco-text-black-to-white">TACO Mint Vault:</span>
 
                           <!-- data -->
-                          <span class="taco-text-black-to-white">- TACO (0.002%)</span>
+                          <span class="taco-text-black-to-white">2,352,753 TACO (30.25%)</span>
 
                       </div>
 
-                  </li>
+                  </li>                     
 
               </ul>
 
