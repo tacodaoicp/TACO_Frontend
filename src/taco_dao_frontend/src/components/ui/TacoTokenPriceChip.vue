@@ -91,7 +91,7 @@
     /////////////
 
     import TacoCoinIcon from "../../assets/tokens/tacoCoinIcon.vue"
-    import { ref, watch, onMounted, onBeforeUnmount, computed, nextTick } from 'vue'
+    import { ref, onMounted } from 'vue'
     import { useTacoStore } from "../../stores/taco.store"
     import { storeToRefs } from "pinia"
 
@@ -106,41 +106,5 @@
 
     // crypto prices
     const { sneedPriceUsd, sneedPriceIcp } = storeToRefs(tacoStore)
-
-    // # ACTIONS #
-    
-    // 
-
-    /////////////////////
-    // local variables //
-    /////////////////////
-
-    // reference variables
-    const fetchedBasePrice = ref(0)
-    const fetchedBaseTokenPriceQuoteToken = ref(0)
-
-    ///////////////////
-    // Local Methods //
-    ///////////////////
-
-    // 
-
-
-    ///////////////
-    // Computed //
-    //////////////
-
-    // 
-
-
-    /////////////////////
-    // Lifecycle Hooks //
-    /////////////////////
-
-    onMounted(async () => {
-        
-        // 
-        
-    })
 
 </script>

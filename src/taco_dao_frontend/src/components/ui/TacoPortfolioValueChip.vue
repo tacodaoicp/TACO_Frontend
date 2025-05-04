@@ -90,7 +90,7 @@
     /////////////
 
     import TacoDaoTacoT from "../../assets/images/tacoDaoTacoT.vue"
-    import { ref, onMounted, computed } from 'vue'
+    import { ref, onMounted } from 'vue'
     import { useTacoStore } from "../../stores/taco.store"
     import { storeToRefs } from "pinia"
 
@@ -104,46 +104,6 @@
     // # STATE #
 
     // dao
-    const { fetchedTokenDetails } = storeToRefs(tacoStore)
     const { totalPortfolioValueInUsd, totalPortfolioValueInIcp } = storeToRefs(tacoStore)
-
-    // # ACTIONS #
-
-    // dao
-    const { fetchTokenDetails } = tacoStore
-
-    //////////////
-    // Mounted //
-    /////////////
-
-    // on mounted
-    onMounted(async () => {
-
-        try { 
-
-        // log
-        // console.log('TacoPortfolioValueChip mounted')            
-
-        // fetch token details from dao backend
-        await fetchTokenDetails()
-
-        // log
-        // console.log('TacoPortfolioValueChip fetchedTokenDetails: ', fetchedTokenDetails.value)
-
-        // 
-
-        } catch (error) {
-
-        // log
-        // console.error('TacoPortfolioValueChip error fetching token details:', error)
-
-        } finally {
-
-            // log
-            // console.log('TacoPortfolioValueChip mounted finally')
-
-        }
-
-    })
 
 </script>
