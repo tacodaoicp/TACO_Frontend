@@ -121,25 +121,25 @@
         try { 
 
         // log
-        console.log('TacoPortfolioValueChip mounted')            
+        // console.log('TacoPortfolioValueChip mounted')            
 
         // fetch token details from dao backend
         await fetchTokenDetails()
 
         // log
-        console.log('TacoPortfolioValueChip fetchedTokenDetails: ', fetchedTokenDetails.value)
+        // console.log('TacoPortfolioValueChip fetchedTokenDetails: ', fetchedTokenDetails.value)
 
         // 
 
         } catch (error) {
 
         // log
-        console.error('TacoPortfolioValueChip error fetching token details:', error)
+        // console.error('TacoPortfolioValueChip error fetching token details:', error)
 
         } finally {
 
             // log
-            console.log('TacoPortfolioValueChip mounted finally')
+            // console.log('TacoPortfolioValueChip mounted finally')
 
         }
 

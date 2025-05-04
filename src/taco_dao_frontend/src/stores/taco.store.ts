@@ -234,24 +234,6 @@ export const useTacoStore = defineStore('taco', () => {
         tokenInitIdentifier?: string;
     }[]>([])
 
-    // Timer monitoring state
-    const timerHealth = ref({
-        snapshot: {
-            active: false,
-            lastSnapshotTime: null,
-            nextExpectedSnapshot: null,
-            inProgress: false
-        },
-        treasury: {
-            shortSync: {
-                active: false,
-                lastSync: null
-            },
-            rebalanceStatus: 'Idle',
-            rebalanceError: undefined
-        }
-    } as TimerHealth)
-
     // user
     const userLoggedIn = ref(false)
     const userPrincipal = ref('')
@@ -276,8 +258,13 @@ export const useTacoStore = defineStore('taco', () => {
     // crypto prices
     const icpPriceUsd = useStorage('icpPriceUsd', 0)
     const btcPriceUsd = useStorage('btcPriceUsd', 0)
-    const ethPriceUsd = useStorage('ethPriceUsd', 0)
+    const sneedPriceUsd = useStorage('sneedPriceUsd', 0)
+    const sneedPriceIcp = useStorage('sneedPriceIcp', 0)
+    const tacoPriceUsd = useStorage('tacoPriceUsd', 0)
+    const tacoPriceIcp = useStorage('tacoPriceIcp', 0)
     const lastPriceUpdate = useStorage('lastPriceUpdate', 0)
+    const portfolioTokensPriceInUsd = useStorage('portfolioTokensPriceInUsd', [])
+    const portfolioTokensPriceInIcp = useStorage('portfolioTokensPriceInIcp', [])
 
     // dao
     const fetchedTokenDetails = ref<TrustedTokenEntry[]>([])
@@ -285,11 +272,25 @@ export const useTacoStore = defineStore('taco', () => {
     const fetchedVotingPowerMetrics = ref<VotingMetricsResponse | null>(null)
     const fetchedUserAllocation = ref([])
 
-    // Add this with other state declarations
+    // snassy's (off limits don't touch!)    
+    const timerHealth = ref({
+        snapshot: {
+            active: false,
+            lastSnapshotTime: null,
+            nextExpectedSnapshot: null,
+            inProgress: false
+        },
+        treasury: {
+            shortSync: {
+                active: false,
+                lastSync: null
+            },
+            rebalanceStatus: 'Idle',
+            rebalanceError: undefined
+        }
+    } as TimerHealth)    
     const systemLogs = ref<SystemLog[]>([])
     const tradingLogs = ref<TradingLog[]>([])
-
-    // Add a helper function to format token amounts
     const formatTokenAmount = (amount: bigint, decimals: number): string => {
         const amountStr = amount.toString();
         const padded = amountStr.padStart(decimals + 1, '0');
@@ -297,355 +298,10 @@ export const useTacoStore = defineStore('taco', () => {
         const decimalPart = padded.slice(-decimals);
         return `${integerPart}.${decimalPart}`;
     }
-
-    // Add a cache for token metadata to avoid repeated fetches
     const tokenMetadataCache = new Map<string, TokenMetadata>();
-
-    // Add a function to get token metadata
-    const getTokenMetadata = async (canisterId: string): Promise<TokenMetadata> => {
-        if (tokenMetadataCache.has(canisterId)) {
-            return tokenMetadataCache.get(canisterId)!;
-        }
-
-        const metadata = await icrc1Metadata(canisterId) as [string, MetadataEntry][];
-        if (!metadata) {
-            return { symbol: 'UNKNOWN', decimals: 8 }; // Default fallback
-        }
-
-        const symbolEntry = metadata.find(m => m[0] === 'symbol')?.[1];
-        const decimalsEntry = metadata.find(m => m[0] === 'decimals')?.[1];
-        
-        const symbol = typeof symbolEntry?.Text === 'string' ? symbolEntry.Text : 'UNKNOWN';
-        const decimals = Number(decimalsEntry?.Nat || '8');
-        
-        const tokenMetadata: TokenMetadata = { symbol, decimals };
-        tokenMetadataCache.set(canisterId, tokenMetadata);
-        return tokenMetadata;
-    }
-
-    // Timer monitoring methods
-    const refreshTimerStatus = async () => {
-        console.log('refreshTimerStatus: Starting refresh...');
-        try {
-            // get host
-            const host = process.env.DFX_NETWORK === "local"
-                ? `http://localhost:54612`
-                : "https://ic0.app"
-            //console.log('refreshTimerStatus: Using host:', host);
-
-            // create agent
-            const agent = await createAgent({
-                identity: new AnonymousIdentity(),
-                host,
-                fetchRootKey: process.env.DFX_NETWORK === "local",
-            })
-            //console.log('refreshTimerStatus: Agent created');
-
-            // Create DAO actor for snapshot info
-            const daoCanisterId = process.env.DFX_NETWORK === "ic"
-                ? 'vxqw7-iqaaa-aaaan-qzziq-cai'
-                : 'ywhqf-eyaaa-aaaad-qg6tq-cai';
-            //console.log('refreshTimerStatus: Using DAO canisterId:', daoCanisterId);
-
-            const daoActor = Actor.createActor(daoBackendIDL, {
-                agent,
-                canisterId: daoCanisterId,
-            })
-            //console.log('refreshTimerStatus: DAO Actor created');
-
-            // Get snapshot info
-            const snapshotInfo = await daoActor.getSnapshotInfo() as SnapshotInfo[];
-            //console.log('refreshTimerStatus: Raw snapshot info:', snapshotInfo);
-            
-            if (snapshotInfo && snapshotInfo.length > 0) {
-                const info = snapshotInfo[0];
-                const snapshotInterval = BigInt(15 * 60 * 1_000_000_000); // 15m in nanoseconds
-                const nextExpected = info.lastSnapshotTime + snapshotInterval;
-                
-                snapshotStatus.value = {
-                    active: true,
-                    lastSnapshotTime: info.lastSnapshotTime,
-                    nextExpectedSnapshot: nextExpected,
-                    inProgress: false
-                };
-                //console.log('refreshTimerStatus: Updated snapshotStatus:', snapshotStatus.value);
-            }
-
-            // Create Treasury actor for sync info
-            const treasuryCanisterId = process.env.DFX_NETWORK === "ic"
-                ? 'v6t5d-6yaaa-aaaan-qzzja-cai'
-                : 'z4is7-giaaa-aaaad-qg6uq-cai';
-
-            //console.log('refreshTimerStatus: Using Treasury canisterId:', treasuryCanisterId);
-
-            const treasuryActor = Actor.createActor(treasuryIDL, {
-                agent,
-                canisterId: treasuryCanisterId,
-            })
-            //console.log('refreshTimerStatus: Treasury Actor created');
-
-            // Get treasury status and token details in parallel
-            const [tradingStatusResult, tokenDetailsResult] = await Promise.all([
-                treasuryActor.getTradingStatus() as Promise<TradingStatusResult>,
-                daoActor.getTokenDetails() as Promise<TrustedTokenEntry[]>
-            ]);
-            //console.log('refreshTimerStatus: Received trading status:', tradingStatusResult);
-            //console.log('refreshTimerStatus: Received token details:', tokenDetailsResult);
-
-            // Update token details
-            fetchedTokenDetails.value = tokenDetailsResult;
-
-            if ('ok' in tradingStatusResult && tradingStatusResult.ok) {
-                const { metrics, executedTrades, rebalanceStatus } = tradingStatusResult.ok;
-                timerHealth.value.treasury = {
-                    shortSync: {
-                        active: true,
-                        lastSync: BigInt(metrics.lastUpdate)
-                    },
-                    rebalanceStatus: 'Idle' in rebalanceStatus ? 'Idle' 
-                        : 'Trading' in rebalanceStatus ? 'Trading'
-                        : 'Failed',
-                    rebalanceError: 'Failed' in rebalanceStatus ? rebalanceStatus.Failed : undefined,
-                    tradingMetrics: {
-                        lastRebalanceAttempt: BigInt(metrics.lastUpdate),
-                        totalTradesExecuted: metrics.totalTradesExecuted,
-                        totalTradesFailed: metrics.totalTradesFailed,
-                        avgSlippage: metrics.avgSlippage,
-                        successRate: metrics.successRate
-                    },
-                    recentTrades: executedTrades
-                };
-                
-                // Update trading logs from executed trades
-                if (executedTrades) {
-                    console.log('refreshTimerStatus: Processing trades with token details:', 
-                        fetchedTokenDetails.value.map(t => ({
-                            id: (t[0] as Principal).toText(),
-                            symbol: t[1]?.tokenSymbol,
-                            decimals: t[1]?.tokenDecimals?.toString()
-                        }))
-                    );
-                    tradingLogs.value = executedTrades.map((trade: Trade) => {
-                        if (trade.error && trade.error.length > 0) {
-                            return {
-                                timestamp: trade.timestamp,
-                                message: `Failed: ${trade.error[0]}`
-                            };
-                        }
-                        
-                        // Find token details from our trusted tokens list
-                        const soldToken = fetchedTokenDetails.value.find(t => {
-                            try {
-                                const tradeTokenId = (trade.tokenSold as Principal).toText();
-                                const listTokenId = (t[0] as Principal).toText();
-                                return tradeTokenId === listTokenId;
-                            } catch (error) {
-                                console.error('Error comparing sold token IDs:', error);
-                                return false;
-                            }
-                        })?.[1];
-
-                        const boughtToken = fetchedTokenDetails.value.find(t => {
-                            try {
-                                const tradeTokenId = (trade.tokenBought as Principal).toText();
-                                const listTokenId = (t[0] as Principal).toText();
-                                return tradeTokenId === listTokenId;
-                            } catch (error) {
-                                console.error('Error comparing bought token IDs:', error);
-                                return false;
-                            }
-                        })?.[1];
-
-                        if (!soldToken || !boughtToken) {
-                            return {
-                                timestamp: trade.timestamp,
-                                message: `Trade with unknown tokens: ${(trade.tokenSold as Principal).toText()} -> ${(trade.tokenBought as Principal).toText()}`
-                            };
-                        }
-
-                        // Format amounts using token decimals from our trusted tokens
-                        const formattedSoldAmount = Number(trade.amountSold) / Math.pow(10, Number(soldToken.tokenDecimals));
-                        const formattedBoughtAmount = Number(trade.amountBought) / Math.pow(10, Number(boughtToken.tokenDecimals));
-
-                        // Extract exchange name from the variant
-                        const exchangeName = Object.keys(trade.exchange)[0];
-
-                        return {
-                            timestamp: trade.timestamp,
-                            message: `${formattedSoldAmount} ${soldToken.tokenSymbol} → ${formattedBoughtAmount} ${boughtToken.tokenSymbol} on ${exchangeName}`
-                        };
-                    });
-                }
-                
-                //console.log('refreshTimerStatus: Updated treasuryStatus:', timerHealth.value.treasury.shortSync);
-                //console.log('refreshTimerStatus: Updated tradingLogs:', tradingLogs.value);
-            } else if (tradingStatusResult.err) {
-                console.error('refreshTimerStatus: Error getting trading status:', tradingStatusResult.err);
-            }
-        } catch (error) {
-            console.error('refreshTimerStatus: Error refreshing timer status:', error);
-        }
-    }
-
-    const triggerManualSnapshot = async () => {
-        try {
-            // get host
-            const host = process.env.DFX_NETWORK === "local"
-                ? `http://localhost:54612`
-                : "https://ic0.app"
-
-            // create agent
-            const agent = await createAgent({
-                identity: new AnonymousIdentity(),
-                host,
-                fetchRootKey: process.env.DFX_NETWORK === "local",
-            })
-
-            // determine canisterId based on network
-            const canisterId = process.env.DFX_NETWORK === "ic"
-                ? 'vxqw7-iqaaa-aaaan-qzziq-cai'
-                : 'ywhqf-eyaaa-aaaad-qg6tq-cai';
-
-            // create actor
-            const actor = Actor.createActor(daoBackendIDL, {
-                agent,
-                canisterId,
-            })
-
-            timerHealth.value.snapshot.inProgress = true;
-            await actor.triggerSnapshot();
-            await refreshTimerStatus();
-        } catch (error) {
-            console.error('Error triggering manual snapshot:', error);
-        } finally {
-            timerHealth.value.snapshot.inProgress = false;
-        }
-    }
-
-    const restartSnapshotTimer = async () => {
-        try {
-            // get host
-            const host = process.env.DFX_NETWORK === "local"
-                ? `http://localhost:54612`
-                : "https://ic0.app"
-
-            // create agent
-            const agent = await createAgent({
-                identity: new AnonymousIdentity(),
-                host,
-                fetchRootKey: process.env.DFX_NETWORK === "local",
-            })
-
-            // determine canisterId based on network
-            const canisterId = process.env.DFX_NETWORK === "ic"
-                ? 'vxqw7-iqaaa-aaaan-qzziq-cai'
-                : 'ywhqf-eyaaa-aaaad-qg6tq-cai';
-
-            // create actor
-            const actor = Actor.createActor(daoBackendIDL, {
-                agent,
-                canisterId,
-            })
-
-            await actor.startSnapshotTimer();
-            await refreshTimerStatus();
-        } catch (error) {
-            console.error('Error restarting snapshot timer:', error);
-        }
-    }
-
-    const restartTreasurySyncs = async () => {
-        console.log('TacoStore: restartTreasurySyncs called');
-        try {
-            // get host
-            const host = process.env.DFX_NETWORK === "local"
-                ? `http://localhost:54612`
-                : "https://ic0.app"
-
-            // create agent
-            const agent = await createAgent({
-                identity: new AnonymousIdentity(),
-                host,
-                fetchRootKey: process.env.DFX_NETWORK === "local",
-            });
-
-            // determine canisterId based on network
-            const treasuryCanisterId = process.env.DFX_NETWORK === "ic"
-                ? 'vxqw7-iqaaa-aaaan-qzziq-cai'
-                : 'ywhqf-eyaaa-aaaad-qg6uq-cai';
-
-            const actor = Actor.createActor(treasuryIDL, {
-                agent,
-                canisterId: treasuryCanisterId,
-            });
-
-            await actor.admin_restartSyncs();
-            await refreshTimerStatus();
-            console.log('TacoStore: Treasury syncs restarted');
-        } catch (error) {
-            console.error('TacoStore: Error restarting treasury syncs:', error);
-            throw error;
-        }
-    };
-
-    const recoverPoolBalances = async () => {
-        console.log('TacoStore: recoverPoolBalances called');
-        try {
-            // Create auth client
-            const authClient = await AuthClient.create();
-            
-            // Check if user is authenticated
-            if (!await authClient.isAuthenticated()) {
-                console.error('User not authenticated');
-                throw new Error('User not authenticated');
-            }
-
-            // Get authenticated identity
-            const identity = await authClient.getIdentity();
-
-            // Create agent with authenticated identity
-            const agent = await createAgent({
-                identity,
-                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-                fetchRootKey: process.env.DFX_NETWORK === "local",
-            });
-
-            const treasuryCanisterId = process.env.DFX_NETWORK === "ic"
-                ? 'v6t5d-6yaaa-aaaan-qzzja-cai'
-                : 'z4is7-giaaa-aaaad-qg6uq-cai';
-
-            const actor = Actor.createActor(treasuryIDL, {
-                agent,
-                canisterId: treasuryCanisterId,
-            });
-
-            const result = await actor.admin_recoverPoolBalances() as Result_4;
-            if ('err' in result) {
-                throw new Error(result.err);
-            }
-            await refreshTimerStatus();
-            console.log('TacoStore: Pool balances recovered:', result.ok);
-        } catch (error) {
-            console.error('TacoStore: Error recovering pool balances:', error);
-            throw error;
-        }
-    };
-
-    // Add state for timer status
-    const snapshotStatus = ref({
-        active: false,
-        lastSnapshotTime: null as bigint | null,
-        nextExpectedSnapshot: null as bigint | null,
-        inProgress: false
-    });
-
-    const rebalanceConfig = ref<RebalanceConfig | null>(null);
-
-    // Add this to the state declarations
-    const fetchedVoterDetails = ref<VoterDetails[]>([]);
-
-    // Add this ref with other refs
-    const fetchedNeuronAllocations = ref<ProcessedNeuronAllocation[]>([]);
+    const rebalanceConfig = ref<RebalanceConfig | null>(null)
+    const fetchedVoterDetails = ref<VoterDetails[]>([])
+    const fetchedNeuronAllocations = ref<ProcessedNeuronAllocation[]>([])
 
     // # ACTIONS #
 
@@ -1115,52 +771,201 @@ export const useTacoStore = defineStore('taco', () => {
     }
 
     // crypto prices
+    // we always fetch specific crypto prices, btc, icp, and taco (sneed for now)
     const fetchCryptoPrices = async () => {
 
         // log
-        // console.log('taco.store: fetchCryptoPrices()')
+        console.log('taco.store: fetchCryptoPrices()')
 
         // get current time
         const now = Date.now()
 
         // set one hour in milliseconds
-        const oneHour = 60 * 60 * 1000 // 1 hour in milliseconds
+        const timeToUpdate = 30 * 1000 // 30 seconds
 
-        // Only fetch if more than an hour has passed since last update
-        // temp removed if statement: now - lastPriceUpdate.value > oneHour
-        if (now - lastPriceUpdate.value > oneHour) {
+        // if time to update has passed, fetch new prices
+        if (now - lastPriceUpdate.value > timeToUpdate) {
 
             // log
-            // // console.log('fetching new crypto prices')
+            // console.log('fetching new crypto prices')
 
+            // log
+            console.log('taco.store: fetching new crypto prices')
+
+            // try coingecko standard endpoint
             try {
 
-                const response = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=internet-computer,bitcoin&vs_currencies=usd')
-                const data = await response.json()
-                icpPriceUsd.value = data['internet-computer'].usd
-                btcPriceUsd.value = data['bitcoin'].usd
-                lastPriceUpdate.value = now
+                // log
+                // console.log('taco.store: fetching new crypto prices - coingecko standard endpoint')
 
-                // console.log('taco.store: fetchCryptoPrices() - fetching new prices')
-                // console.log('taco.store: fetchCryptoPrices() - ICP: ' + icpPriceUsd.value)
-                // console.log('taco.store: fetchCryptoPrices() - BTC: ' + btcPriceUsd.value)
+                // fetch
+                // https://api.coingecko.com/api/v3/simple/price?ids=internet-computer,bitcoin&vs_currencies=usd
+                const response = await fetch('https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=internet-computer,bitcoin&price_change_percentage=1h,24h')
+                
+                // if not ok, throw error
+                if (!response.ok) throw new Error(`HTTP ${response.status}`)
+
+                // parse response
+                const data = await response.json()
+                
+                // log
+                console.log('taco.store: fetchCryptoPrices() - coingecko standard endpoint data:', data)
+
+                // detailed logging
+                data.forEach((coin: any) => {
+                    console.log(`\n=== ${coin.name} (${coin.symbol.toUpperCase()}) ===`)
+                    console.log(`Current Price: $${coin.current_price}`) // current price in usd
+                    console.log(`24h Change: ${coin.price_change_percentage_24h}%`) // percentage change over last 24 hours
+                    console.log(`Market Cap: $${coin.market_cap}`) // market cap in usd
+                    console.log(`24h Volume: $${coin.total_volume}`) // 24 hour volume in usd
+                    console.log(`Circulating Supply: ${coin.circulating_supply}`) // circulating supply in token
+                    console.log(`Last Updated: ${coin.last_updated}`) // last updated timestamp
+                })
+
+                // // set prices
+                // icpPriceUsd.value = data['internet-computer'].usd
+                // btcPriceUsd.value = data['bitcoin'].usd
+
+                // // log
+                // console.log('✨ ICP price: ' + icpPriceUsd.value)
+                // console.log('✨ BTC price: ' + btcPriceUsd.value)
+
+                // // set last price update
+                // lastPriceUpdate.value = now
 
             } catch (error) {
 
-                console.error('error fetching crypto prices:', error)
+                // log error
+                console.error('error fetching crypto prices from coingecko standard endpoint:', error)
 
             }
 
-        } else {
+            // try gecko terminal pool endpoint
+            try {
 
-            // // console.log('using saved crypto prices')
-            // // console.log('saved ICP price:', icpPriceUsd.value)
-            // // console.log('saved BTC price:', btcPriceUsd.value)
+                // log
+                // console.log('taco.store: fetching new crypto prices - gecko terminal pool endpoint')
+
+                // use pool endpoint instead of token endpoint (previous version caused 500)
+                const resp = await fetch(
+                    `https://api.geckoterminal.com/api/v2/networks/icp/pools/osyzs-xiaaa-aaaag-qc76q-cai`,
+                    { mode: 'cors' }
+                )
+
+                // if not ok, throw error
+                if (!resp.ok) throw new Error(`HTTP ${resp.status}`)
+
+                // parse response
+                const body = await resp.json()
+
+                // log
+                // console.log('taco.store: fetchCryptoPrices() - gecko terminal pool endpoint - body:', body)
+
+                // pull both token prices from the pool
+                const address = body.data.attributes.address
+                const baseTokenPriceNativeCurrency = body.data.attributes.base_token_price_native_currency
+                const baseTokenPriceQuoteToken = body.data.attributes.base_token_price_quote_token
+                const baseTokenPriceUsd = body.data.attributes.base_token_price_usd
+                const fdvUsd = body.data.attributes.fdv_usd
+                const marketCapUsd = body.data.attributes.market_cap_usd
+                const name = body.data.attributes.name
+                const priceChangePercentageH1 = body.data.attributes.price_change_percentage.h1
+                const priceChangePercentageH24 = body.data.attributes.price_change_percentage.h24
+                const priceChangePercentageH6 = body.data.attributes.price_change_percentage.h6
+                const priceChangePercentageM15 = body.data.attributes.price_change_percentage.m15
+                const priceChangePercentageM30 = body.data.attributes.price_change_percentage.m30
+                const priceChangePercentageM5 = body.data.attributes.price_change_percentage.m5
+                const quoteTokenPriceNativeCurrency = body.data.attributes.quote_token_price_native_currency
+                const quoteTokenPriceBaseToken = body.data.attributes.quote_token_price_base_token
+                const quoteTokenPriceUsd = body.data.attributes.quote_token_price_usd
+                const reserveInUsd = body.data.attributes.reserve_in_usd
+                const basePrice  = Number(body.data.attributes.base_token_price_usd)
+                const quotePrice = Number(body.data.attributes.quote_token_price_usd)
+
+                // log
+                // console.log('address', address)
+                // console.log('baseTokenPriceNativeCurrency', baseTokenPriceNativeCurrency)
+                // console.log('baseTokenPriceQuoteToken', baseTokenPriceQuoteToken)
+                // console.log('baseTokenPriceUsd', baseTokenPriceUsd)
+                // console.log('fdvUsd', fdvUsd)
+                // console.log('marketCapUsd', marketCapUsd)
+                // console.log('name', name)
+                // console.log('priceChangePercentageH1', priceChangePercentageH1)
+                // console.log('priceChangePercentageH24', priceChangePercentageH24)
+                // console.log('priceChangePercentageH6', priceChangePercentageH6)
+                // console.log('priceChangePercentageM15', priceChangePercentageM15)
+                // console.log('priceChangePercentageM30', priceChangePercentageM30)
+                // console.log('priceChangePercentageM5', priceChangePercentageM5)
+                // console.log('quoteTokenPriceNativeCurrency', quoteTokenPriceNativeCurrency)
+                // console.log('quoteTokenPriceBaseToken', quoteTokenPriceBaseToken)
+                // console.log('quoteTokenPriceUsd', quoteTokenPriceUsd)
+                // console.log('reserveInUsd', reserveInUsd)
+                // console.log('basePrice', basePrice)
+                // console.log('quotePrice', quotePrice)
+                
+                // set the base price
+                sneedPriceUsd.value = basePrice || 0
+
+                // set the base token price quote token
+                sneedPriceIcp.value = baseTokenPriceQuoteToken || 0
+
+                // log
+                console.log('✨ Sneed price:', sneedPriceUsd.value)
+                console.log('✨ Sneed ICP price:', sneedPriceIcp.value)
+
+                // set last price update
+                lastPriceUpdate.value = now                
+
+            } catch (error) {
+
+                // log error
+                console.log('error fetching crypto prices from gecko terminal pool endpoint:', error)
+
+            }
+
+        }
+        
+        // else, use saved prices
+        else {
+
+            console.log('taco.store: using saved crypto prices')
+            console.log('💾 ICP price:', icpPriceUsd.value)
+            console.log('💾 BTC price:', btcPriceUsd.value)
+            console.log('💾 Sneed price:', sneedPriceUsd.value)
+            console.log('💾 Sneed ICP price:', sneedPriceIcp.value)
 
         }
 
     }
 
+    // we fetch the remaining tokens in the portfolio dynamically
+    // takes in an array of canister ids or principal ids or whatever, tbd
+    const fetchPortfolioTokenPrices = async (tokens: string[]) => {
+
+        // log
+        console.log('taco.store: fetchPortfolioTokenPrices() for tokens:', tokens)
+        
+        // fetch prices for each token
+        for (const token of tokens) {
+
+            // log
+            console.log('taco.store: fetchPortfolioTokenPrices() - fetching price for token:', token)
+
+            // try
+            try {
+
+                // fetch price
+                // code
+
+            } catch (error) {
+
+                // log error
+                console.error('error fetching price for token:', token, error)
+
+            }
+        }
+
+    }
     // ledger canisters
     const icrc1Metadata = async (passedCanisterId: string) => {
 
@@ -1171,7 +976,7 @@ export const useTacoStore = defineStore('taco', () => {
 
             // get host
             const host = process.env.DFX_NETWORK === "local"
-                ? `http://localhost:58119`
+                ? `http://localhost:63803`
                 : "https://ic0.app";
 
             // create agent
@@ -1214,7 +1019,7 @@ export const useTacoStore = defineStore('taco', () => {
 
             // get host
             const host = process.env.DFX_NETWORK === "local"
-                ? `http://localhost:58119`
+                ? `http://localhost:63803`
                 : "https://ic0.app"
 
             // create agent
@@ -1261,7 +1066,7 @@ export const useTacoStore = defineStore('taco', () => {
         console.log('taco.store: fetchAggregateAllocation() - Starting fetch...');
         try {
             const host = process.env.DFX_NETWORK === "local"
-                ? `http://localhost:58119`
+                ? `http://localhost:63803`
                 : "https://ic0.app"
             console.log('taco.store: fetchAggregateAllocation() - Using host:', host);
 
@@ -1303,7 +1108,7 @@ export const useTacoStore = defineStore('taco', () => {
         console.log('taco.store: fetchVotingPowerMetrics() - Starting fetch...');
         try {
             const host = process.env.DFX_NETWORK === "local"
-                ? `http://localhost:58119`
+                ? `http://localhost:63803`
                 : "https://ic0.app"
             console.log('taco.store: fetchVotingPowerMetrics() - Using host:', host);
 
@@ -1365,7 +1170,7 @@ export const useTacoStore = defineStore('taco', () => {
                 const agent = await createAgent({
                     identity,
                     // host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-                    host: process.env.DFX_NETWORK === "local" ? `http://localhost:58119` : "https://ic0.app",
+                    host: process.env.DFX_NETWORK === "local" ? `http://localhost:63803` : "https://ic0.app",
                     fetchRootKey: process.env.DFX_NETWORK === "local",
                 })
 
@@ -1431,7 +1236,7 @@ export const useTacoStore = defineStore('taco', () => {
                 const agent = await createAgent({
                     identity,
                     // host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-                    host: process.env.DFX_NETWORK === "local" ? `http://localhost:58119` : "https://ic0.app",
+                    host: process.env.DFX_NETWORK === "local" ? `http://localhost:63803` : "https://ic0.app",
                     fetchRootKey: process.env.DFX_NETWORK === "local",
                 })
 
@@ -1493,7 +1298,7 @@ export const useTacoStore = defineStore('taco', () => {
                 const agent = await createAgent({
                     identity,
                     // host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-                    host: process.env.DFX_NETWORK === "local" ? `http://localhost:58119` : "https://ic0.app",
+                    host: process.env.DFX_NETWORK === "local" ? `http://localhost:63803` : "https://ic0.app",
                     fetchRootKey: process.env.DFX_NETWORK === "local",
                 })
 
@@ -1568,7 +1373,7 @@ export const useTacoStore = defineStore('taco', () => {
                 const agent = await createAgent({
                     identity,
                     // host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-                    host: process.env.DFX_NETWORK === "local" ? `http://localhost:58119` : "https://ic0.app",
+                    host: process.env.DFX_NETWORK === "local" ? `http://localhost:63803` : "https://ic0.app",
                     fetchRootKey: process.env.DFX_NETWORK === "local",
                 })
 
@@ -1624,7 +1429,335 @@ export const useTacoStore = defineStore('taco', () => {
         }
     }
 
-    // Add this with other timer monitoring methods
+    // snassy's (off limits don't touch!)
+    const getTokenMetadata = async (canisterId: string): Promise<TokenMetadata> => {
+        if (tokenMetadataCache.has(canisterId)) {
+            return tokenMetadataCache.get(canisterId)!;
+        }
+
+        const metadata = await icrc1Metadata(canisterId) as [string, MetadataEntry][];
+        if (!metadata) {
+            return { symbol: 'UNKNOWN', decimals: 8 }; // Default fallback
+        }
+
+        const symbolEntry = metadata.find(m => m[0] === 'symbol')?.[1];
+        const decimalsEntry = metadata.find(m => m[0] === 'decimals')?.[1];
+        
+        const symbol = typeof symbolEntry?.Text === 'string' ? symbolEntry.Text : 'UNKNOWN';
+        const decimals = Number(decimalsEntry?.Nat || '8');
+        
+        const tokenMetadata: TokenMetadata = { symbol, decimals };
+        tokenMetadataCache.set(canisterId, tokenMetadata);
+        return tokenMetadata;
+    }
+    const refreshTimerStatus = async () => {
+        console.log('refreshTimerStatus: Starting refresh...');
+        try {
+            // get host
+            const host = process.env.DFX_NETWORK === "local"
+                ? `http://localhost:54612`
+                : "https://ic0.app"
+            //console.log('refreshTimerStatus: Using host:', host);
+
+            // create agent
+            const agent = await createAgent({
+                identity: new AnonymousIdentity(),
+                host,
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            })
+            //console.log('refreshTimerStatus: Agent created');
+
+            // Create DAO actor for snapshot info
+            const daoCanisterId = process.env.DFX_NETWORK === "ic"
+                ? 'vxqw7-iqaaa-aaaan-qzziq-cai'
+                : 'ywhqf-eyaaa-aaaad-qg6tq-cai';
+            //console.log('refreshTimerStatus: Using DAO canisterId:', daoCanisterId);
+
+            const daoActor = Actor.createActor(daoBackendIDL, {
+                agent,
+                canisterId: daoCanisterId,
+            })
+            //console.log('refreshTimerStatus: DAO Actor created');
+
+            // Get snapshot info
+            const snapshotInfo = await daoActor.getSnapshotInfo() as SnapshotInfo[];
+            //console.log('refreshTimerStatus: Raw snapshot info:', snapshotInfo);
+            
+            if (snapshotInfo && snapshotInfo.length > 0) {
+                const info = snapshotInfo[0];
+                const snapshotInterval = BigInt(15 * 60 * 1_000_000_000); // 15m in nanoseconds
+                const nextExpected = info.lastSnapshotTime + snapshotInterval;
+                
+                snapshotStatus.value = {
+                    active: true,
+                    lastSnapshotTime: info.lastSnapshotTime,
+                    nextExpectedSnapshot: nextExpected,
+                    inProgress: false
+                };
+                //console.log('refreshTimerStatus: Updated snapshotStatus:', snapshotStatus.value);
+            }
+
+            // Create Treasury actor for sync info
+            const treasuryCanisterId = process.env.DFX_NETWORK === "ic"
+                ? 'v6t5d-6yaaa-aaaan-qzzja-cai'
+                : 'z4is7-giaaa-aaaad-qg6uq-cai';
+
+            //console.log('refreshTimerStatus: Using Treasury canisterId:', treasuryCanisterId);
+
+            const treasuryActor = Actor.createActor(treasuryIDL, {
+                agent,
+                canisterId: treasuryCanisterId,
+            })
+            //console.log('refreshTimerStatus: Treasury Actor created');
+
+            // Get treasury status and token details in parallel
+            const [tradingStatusResult, tokenDetailsResult] = await Promise.all([
+                treasuryActor.getTradingStatus() as Promise<TradingStatusResult>,
+                daoActor.getTokenDetails() as Promise<TrustedTokenEntry[]>
+            ]);
+            //console.log('refreshTimerStatus: Received trading status:', tradingStatusResult);
+            //console.log('refreshTimerStatus: Received token details:', tokenDetailsResult);
+
+            // Update token details
+            fetchedTokenDetails.value = tokenDetailsResult;
+
+            if ('ok' in tradingStatusResult && tradingStatusResult.ok) {
+                const { metrics, executedTrades, rebalanceStatus } = tradingStatusResult.ok;
+                timerHealth.value.treasury = {
+                    shortSync: {
+                        active: true,
+                        lastSync: BigInt(metrics.lastUpdate)
+                    },
+                    rebalanceStatus: 'Idle' in rebalanceStatus ? 'Idle' 
+                        : 'Trading' in rebalanceStatus ? 'Trading'
+                        : 'Failed',
+                    rebalanceError: 'Failed' in rebalanceStatus ? rebalanceStatus.Failed : undefined,
+                    tradingMetrics: {
+                        lastRebalanceAttempt: BigInt(metrics.lastUpdate),
+                        totalTradesExecuted: metrics.totalTradesExecuted,
+                        totalTradesFailed: metrics.totalTradesFailed,
+                        avgSlippage: metrics.avgSlippage,
+                        successRate: metrics.successRate
+                    },
+                    recentTrades: executedTrades
+                };
+                
+                // Update trading logs from executed trades
+                if (executedTrades) {
+                    console.log('refreshTimerStatus: Processing trades with token details:', 
+                        fetchedTokenDetails.value.map(t => ({
+                            id: (t[0] as Principal).toText(),
+                            symbol: t[1]?.tokenSymbol,
+                            decimals: t[1]?.tokenDecimals?.toString()
+                        }))
+                    );
+                    tradingLogs.value = executedTrades.map((trade: Trade) => {
+                        if (trade.error && trade.error.length > 0) {
+                            return {
+                                timestamp: trade.timestamp,
+                                message: `Failed: ${trade.error[0]}`
+                            };
+                        }
+                        
+                        // Find token details from our trusted tokens list
+                        const soldToken = fetchedTokenDetails.value.find(t => {
+                            try {
+                                const tradeTokenId = (trade.tokenSold as Principal).toText();
+                                const listTokenId = (t[0] as Principal).toText();
+                                return tradeTokenId === listTokenId;
+                            } catch (error) {
+                                console.error('Error comparing sold token IDs:', error);
+                                return false;
+                            }
+                        })?.[1];
+
+                        const boughtToken = fetchedTokenDetails.value.find(t => {
+                            try {
+                                const tradeTokenId = (trade.tokenBought as Principal).toText();
+                                const listTokenId = (t[0] as Principal).toText();
+                                return tradeTokenId === listTokenId;
+                            } catch (error) {
+                                console.error('Error comparing bought token IDs:', error);
+                                return false;
+                            }
+                        })?.[1];
+
+                        if (!soldToken || !boughtToken) {
+                            return {
+                                timestamp: trade.timestamp,
+                                message: `Trade with unknown tokens: ${(trade.tokenSold as Principal).toText()} -> ${(trade.tokenBought as Principal).toText()}`
+                            };
+                        }
+
+                        // Format amounts using token decimals from our trusted tokens
+                        const formattedSoldAmount = Number(trade.amountSold) / Math.pow(10, Number(soldToken.tokenDecimals));
+                        const formattedBoughtAmount = Number(trade.amountBought) / Math.pow(10, Number(boughtToken.tokenDecimals));
+
+                        // Extract exchange name from the variant
+                        const exchangeName = Object.keys(trade.exchange)[0];
+
+                        return {
+                            timestamp: trade.timestamp,
+                            message: `${formattedSoldAmount} ${soldToken.tokenSymbol} → ${formattedBoughtAmount} ${boughtToken.tokenSymbol} on ${exchangeName}`
+                        };
+                    });
+                }
+                
+                //console.log('refreshTimerStatus: Updated treasuryStatus:', timerHealth.value.treasury.shortSync);
+                //console.log('refreshTimerStatus: Updated tradingLogs:', tradingLogs.value);
+            } else if (tradingStatusResult.err) {
+                console.error('refreshTimerStatus: Error getting trading status:', tradingStatusResult.err);
+            }
+        } catch (error) {
+            console.error('refreshTimerStatus: Error refreshing timer status:', error);
+        }
+    }
+    const triggerManualSnapshot = async () => {
+        try {
+            // get host
+            const host = process.env.DFX_NETWORK === "local"
+                ? `http://localhost:54612`
+                : "https://ic0.app"
+
+            // create agent
+            const agent = await createAgent({
+                identity: new AnonymousIdentity(),
+                host,
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            })
+
+            // determine canisterId based on network
+            const canisterId = process.env.DFX_NETWORK === "ic"
+                ? 'vxqw7-iqaaa-aaaan-qzziq-cai'
+                : 'ywhqf-eyaaa-aaaad-qg6tq-cai';
+
+            // create actor
+            const actor = Actor.createActor(daoBackendIDL, {
+                agent,
+                canisterId,
+            })
+
+            timerHealth.value.snapshot.inProgress = true;
+            await actor.triggerSnapshot();
+            await refreshTimerStatus();
+        } catch (error) {
+            console.error('Error triggering manual snapshot:', error);
+        } finally {
+            timerHealth.value.snapshot.inProgress = false;
+        }
+    }
+    const restartSnapshotTimer = async () => {
+        try {
+            // get host
+            const host = process.env.DFX_NETWORK === "local"
+                ? `http://localhost:54612`
+                : "https://ic0.app"
+
+            // create agent
+            const agent = await createAgent({
+                identity: new AnonymousIdentity(),
+                host,
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            })
+
+            // determine canisterId based on network
+            const canisterId = process.env.DFX_NETWORK === "ic"
+                ? 'vxqw7-iqaaa-aaaan-qzziq-cai'
+                : 'ywhqf-eyaaa-aaaad-qg6tq-cai';
+
+            // create actor
+            const actor = Actor.createActor(daoBackendIDL, {
+                agent,
+                canisterId,
+            })
+
+            await actor.startSnapshotTimer();
+            await refreshTimerStatus();
+        } catch (error) {
+            console.error('Error restarting snapshot timer:', error);
+        }
+    }
+    const restartTreasurySyncs = async () => {
+        console.log('TacoStore: restartTreasurySyncs called');
+        try {
+            // get host
+            const host = process.env.DFX_NETWORK === "local"
+                ? `http://localhost:54612`
+                : "https://ic0.app"
+
+            // create agent
+            const agent = await createAgent({
+                identity: new AnonymousIdentity(),
+                host,
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            });
+
+            // determine canisterId based on network
+            const treasuryCanisterId = process.env.DFX_NETWORK === "ic"
+                ? 'vxqw7-iqaaa-aaaan-qzziq-cai'
+                : 'ywhqf-eyaaa-aaaad-qg6uq-cai';
+
+            const actor = Actor.createActor(treasuryIDL, {
+                agent,
+                canisterId: treasuryCanisterId,
+            });
+
+            await actor.admin_restartSyncs();
+            await refreshTimerStatus();
+            console.log('TacoStore: Treasury syncs restarted');
+        } catch (error) {
+            console.error('TacoStore: Error restarting treasury syncs:', error);
+            throw error;
+        }
+    }
+    const recoverPoolBalances = async () => {
+        console.log('TacoStore: recoverPoolBalances called');
+        try {
+            // Create auth client
+            const authClient = await AuthClient.create();
+            
+            // Check if user is authenticated
+            if (!await authClient.isAuthenticated()) {
+                console.error('User not authenticated');
+                throw new Error('User not authenticated');
+            }
+
+            // Get authenticated identity
+            const identity = await authClient.getIdentity();
+
+            // Create agent with authenticated identity
+            const agent = await createAgent({
+                identity,
+                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            });
+
+            const treasuryCanisterId = process.env.DFX_NETWORK === "ic"
+                ? 'v6t5d-6yaaa-aaaan-qzzja-cai'
+                : 'z4is7-giaaa-aaaad-qg6uq-cai';
+
+            const actor = Actor.createActor(treasuryIDL, {
+                agent,
+                canisterId: treasuryCanisterId,
+            });
+
+            const result = await actor.admin_recoverPoolBalances() as Result_4;
+            if ('err' in result) {
+                throw new Error(result.err);
+            }
+            await refreshTimerStatus();
+            console.log('TacoStore: Pool balances recovered:', result.ok);
+        } catch (error) {
+            console.error('TacoStore: Error recovering pool balances:', error);
+            throw error;
+        }
+    }
+    const snapshotStatus = ref({
+        active: false,
+        lastSnapshotTime: null as bigint | null,
+        nextExpectedSnapshot: null as bigint | null,
+        inProgress: false
+    })    
     const triggerManualSync = async () => {
         try {
             // get host
@@ -1669,8 +1802,6 @@ export const useTacoStore = defineStore('taco', () => {
             console.error('Error triggering manual sync:', error);
         }
     }
-
-    // Add this with other methods
     const fetchSystemLogs = async () => {
         console.log('fetchSystemLogs: Starting to fetch logs...');
         try {
@@ -1722,7 +1853,6 @@ export const useTacoStore = defineStore('taco', () => {
             console.error('fetchSystemLogs: Error fetching system logs:', error);
         }
     }
-
     const startRebalancing = async () => {
         try {
             // create auth client
@@ -1771,7 +1901,6 @@ export const useTacoStore = defineStore('taco', () => {
             return false;
         }
     }
-
     const stopRebalancing = async () => {
         try {
             // create auth client
@@ -1820,7 +1949,6 @@ export const useTacoStore = defineStore('taco', () => {
             return false;
         }
     }
-
     const updateRebalanceConfig = async (updates: UpdateConfig) => {
         console.log('TacoStore: updateRebalanceConfig called with', updates);
         try {
@@ -1900,8 +2028,7 @@ export const useTacoStore = defineStore('taco', () => {
         } finally {
             appLoadingOff();
         }
-    };
-
+    }
     const getSystemParameters = async () => {
         try {
             appLoadingOn();
@@ -1949,8 +2076,7 @@ export const useTacoStore = defineStore('taco', () => {
         } finally {
             appLoadingOff();
         }
-    };
-
+    }
     const executeTradingCycle = async () => {
         appLoadingOn();
         try {
@@ -1984,8 +2110,7 @@ export const useTacoStore = defineStore('taco', () => {
         } finally {
             appLoadingOff();
         }
-    };
-
+    }
     const pauseToken = async (principal: Principal): Promise<boolean> => {
         console.log('TacoStore: pauseToken called for', principal.toText());
         try {
@@ -2028,8 +2153,7 @@ export const useTacoStore = defineStore('taco', () => {
             console.error('TacoStore: Error pausing token:', error);
             return false;
         }
-    };
-
+    }
     const unpauseToken = async (principal: Principal): Promise<boolean> => {
         console.log('TacoStore: unpauseToken called for', principal.toText());
         try {
@@ -2072,9 +2196,7 @@ export const useTacoStore = defineStore('taco', () => {
             console.error('TacoStore: Error unpausing token:', error);
             return false;
         }
-    };
-
-    // Add this with other exported methods
+    }
     const fetchVoterDetails = async () => {
         console.log('taco.store: fetchVoterDetails() - Starting fetch...');
         try {
@@ -2127,9 +2249,7 @@ export const useTacoStore = defineStore('taco', () => {
             console.error('taco.store: fetchVoterDetails() - Error:', error);
             throw error;
         }
-    };
-
-    // Add this function with other functions
+    }
     const fetchNeuronAllocations = async () => {
         try {
             // Create auth client
@@ -2181,7 +2301,7 @@ export const useTacoStore = defineStore('taco', () => {
             console.error('Error fetching neuron allocations:', error);
             fetchedNeuronAllocations.value = [];
         }
-    };
+    }
 
     // # RETURN #
     return {
@@ -2193,7 +2313,12 @@ export const useTacoStore = defineStore('taco', () => {
         userLedgerAccountId,
         icpPriceUsd,
         btcPriceUsd,
-        ethPriceUsd,
+        sneedPriceUsd,
+        sneedPriceIcp,
+        tacoPriceUsd,
+        tacoPriceIcp,
+        portfolioTokensPriceInUsd,
+        portfolioTokensPriceInIcp,
         lastPriceUpdate,
         truncatedPrincipal,
         fetchedTokenDetails,
@@ -2221,6 +2346,7 @@ export const useTacoStore = defineStore('taco', () => {
         iidLogIn,
         iidLogOut,
         fetchCryptoPrices,
+        fetchPortfolioTokenPrices,
         checkIfLoggedIn,
         icrc1Metadata,
         fetchTokenDetails,
