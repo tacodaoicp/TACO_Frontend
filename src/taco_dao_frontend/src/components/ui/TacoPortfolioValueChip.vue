@@ -90,7 +90,7 @@
     /////////////
 
     import TacoDaoTacoT from "../../assets/images/tacoDaoTacoT.vue"
-    import { ref, onMounted } from 'vue'
+    import { ref, onMounted, onUnmounted } from 'vue'
     import { useTacoStore } from "../../stores/taco.store"
     import { storeToRefs } from "pinia"
 
@@ -101,9 +101,24 @@
     // # SETUP #
     const tacoStore = useTacoStore()
 
+    // # ACTIONS #
+    const { fetchTokenDetails } = tacoStore
+
     // # STATE #
 
     // dao
     const { totalPortfolioValueInUsd, totalPortfolioValueInIcp } = storeToRefs(tacoStore)
+
+    /////////////////////
+    // lifecycle hooks //
+    /////////////////////
+
+    // on mount
+    onMounted(async () => {
+
+        // fetch token details from dao backend
+        await fetchTokenDetails()
+
+    })
 
 </script>
