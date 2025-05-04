@@ -515,6 +515,7 @@ LOCAL METHODS
     import { storeToRefs } from "pinia"
     import { tokenData } from "../components/data/TokenData"
     import astronautLoader from '../assets/images/astonautLoader.webp'
+    import placeholder52x52 from '../assets/images/placeholder-52x52.png'
     import { Tooltip } from 'bootstrap'
 
     ///////////
@@ -565,8 +566,8 @@ LOCAL METHODS
     // element references
     const currentTokenTitle = ref<string>('No Token Selected')
     const currentTokenSymbol = ref<string>('n/a')
-    const currentTokenLink = ref<string>('https://placehold.co/')
-    const currentTokenIcon = ref<string>('https://placehold.co/52x52/')
+    const currentTokenLink = ref<string>('#')
+    const currentTokenIcon = ref<string>(placeholder52x52)
     const currentTokenDescription = ref<string>('No token selected')
     const currentTokenColor = ref<string>('#ccc')
     const currentTokenHoldings = ref<number>(0)
