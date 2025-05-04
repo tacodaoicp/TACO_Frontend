@@ -276,7 +276,7 @@
     if (!formattedUserAllocation.value) return 0
 
     // return formatted voting power
-    return Number(formattedUserAllocation.value.votingPower)
+    return (Number(formattedUserAllocation.value.votingPower) / Math.pow(10, 8)).toFixed(2)
 
   })  
 
