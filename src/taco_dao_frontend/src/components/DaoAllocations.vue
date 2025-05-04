@@ -547,6 +547,9 @@ LOCAL METHODS
     // component
     const componentLoading = ref(false)
 
+    // refresh timer
+    const refreshTimer = ref<number | null>(null)
+
     // images
     const astronautLoaderUrl =  astronautLoader    
 
@@ -1003,6 +1006,38 @@ LOCAL METHODS
             selector: "[data-bs-toggle='tooltip']",
         })        
 
+        // refresh every minute
+        refreshTimer.value = window.setInterval(async () => {
+
+            // log
+            console.log('refreshing allocations tile...')
+
+            // turn on component loading
+            componentLoading.value = true
+
+            // try
+            try {
+
+                // trigger the appropriate watcher based on current view
+                if (showCurrentAllocations.value) {
+                    await fetchAggregateAllocation()
+                } else if (showCurrentHoldings.value) {
+                    await fetchTokenDetails()
+                }
+
+            } catch (error) {
+
+                // log
+                console.error('error refreshing data:', error)
+
+            } finally {
+
+                componentLoading.value = false
+
+            }
+            
+        }, 60000) // 60000ms = 1 minute
+
     })
 
     // on before unmounted
@@ -1010,6 +1045,12 @@ LOCAL METHODS
 
         // remove event listener for resize
         window.removeEventListener('resize', handleSetTacoChartMaxHeight)
+
+        // clear refresh timer
+        if (refreshTimer.value) {
+            clearInterval(refreshTimer.value)
+            refreshTimer.value = null
+        }
 
         // dismiss tooltips
         const tooltipElements = document.querySelectorAll('[data-bs-toggle="tooltip"]')

@@ -515,7 +515,7 @@ LOCAL METHODS
   // Imports //
   /////////////
 
-  import { ref, onMounted, computed } from "vue"
+  import { ref, onMounted, computed, onBeforeUnmount } from "vue"
   import { useTacoStore } from "../stores/taco.store"
   import { storeToRefs } from "pinia"
   import astronautLoader from '../assets/images/astonautLoader.webp'
@@ -544,6 +544,9 @@ LOCAL METHODS
 
   // component
   const componentLoading = ref(false)  
+
+  // refresh timer
+  const refreshTimer = ref<number | null>(null)  
 
   // images
   const astronautLoaderUrl =  astronautLoader  
@@ -660,6 +663,7 @@ LOCAL METHODS
     // turn on loading
     componentLoading.value = true
 
+    // try
     try { 
 
       // fetch token details from dao backend
@@ -691,6 +695,49 @@ LOCAL METHODS
 
     }
 
+    // refresh every minute
+    refreshTimer.value = window.setInterval(async () => {
+
+      // log
+      console.log('refreshing trusted tokens tile...')
+
+      // turn on loading
+      componentLoading.value = true
+
+      // try
+      try { 
+
+        // fetch token details from dao backend
+        await fetchTokenDetails()
+
+        // handle fetched token details
+        handleFetchedTokenDetails(fetchedTokenDetails.value)
+
+      } catch (error) {
+
+        // log
+        console.error('error refreshing token details:', error)
+
+      } finally {
+
+        // turn off loading
+        componentLoading.value = false
+
+      }
+
+    }, 60000) // 60000ms = 1 minute    
+
   })
+
+  // on before unmounted
+  onBeforeUnmount(() => {
+
+    // clear refresh timer
+    if (refreshTimer.value) {
+        clearInterval(refreshTimer.value)
+        refreshTimer.value = null
+    }
+
+  }) 
   
 </script>
