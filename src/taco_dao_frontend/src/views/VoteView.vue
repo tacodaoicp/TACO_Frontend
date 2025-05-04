@@ -1727,9 +1727,13 @@
     &__kvps {
       display: flex;
       flex-direction: column;
+      gap: 0.5rem;
     }
     
     &__kvp {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
       font-family: 'Merchant Copy Double';
       font-size: 1rem;
       color: #434343;
