@@ -206,6 +206,11 @@ interface Allocation {
     basisPoints: number;
 }
 
+interface SystemParameterResult {
+    ok?: null;
+    err?: string;
+}
+
 /////////////
 // Exports //
 /////////////
@@ -2342,8 +2347,10 @@ export const useTacoStore = defineStore('taco', () => {
             // Create an agent with the identity
             const agent = await createAgent({
                 identity,
-                host: import.meta.env.VITE_IC_HOST
+                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+                fetchRootKey: process.env.DFX_NETWORK === "local",
             });
+
 
             const canisterId = process.env.DFX_NETWORK === "ic"
             ? 'vxqw7-iqaaa-aaaan-qzziq-cai'
@@ -2355,7 +2362,7 @@ export const useTacoStore = defineStore('taco', () => {
                 canisterId
             });
 
-            const result = await backend.updateSystemParameter(paramName, value);
+            const result = await backend.updateSystemParameter(paramName, value) as SystemParameterResult;
             
             if ('ok' in result) {
                 addToast({
@@ -2411,23 +2418,31 @@ export const useTacoStore = defineStore('taco', () => {
             const identity = await authClient.getIdentity();
             
             // Create an agent with the identity
+            
+            // Create an agent with the identity
             const agent = await createAgent({
                 identity,
-                host: import.meta.env.VITE_IC_HOST
+                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+                fetchRootKey: process.env.DFX_NETWORK === "local",
             });
 
+
+            const canisterId = process.env.DFX_NETWORK === "ic"
+            ? 'vxqw7-iqaaa-aaaan-qzziq-cai'
+            : 'ywhqf-eyaaa-aaaad-qg6tq-cai';
+
             // Create treasury actor with authenticated identity
-            const treasury = Actor.createActor<TreasuryService>(treasuryIDL, {
+            const backend = Actor.createActor(daoBackendIDL, {
                 agent,
-                canisterId: getTreasuryCanisterId()
+                canisterId
             });
 
             // Create update config with just the snapshot interval
-            const updateConfig: UpdateConfig = {
-                snapshotIntervalNS: [intervalNS]
-            };
+            //const updateConfig: UpdateConfig = {
+            //    snapshotIntervalNS: [intervalNS]
+            //};
 
-            const result = await treasury.updateRebalanceConfig(updateConfig, []);
+            const result = await backend.updateSystemParameter("snapshotIntervalNS", intervalNS) as SystemParameterResult;
             
             if ('ok' in result) {
                 addToast({

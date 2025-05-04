@@ -26,6 +26,24 @@
                   <span>Last Snapshot: {{ formatTime(snapshotStatus.lastSnapshotTime) }}</span>
                   <span>Next Expected: {{ formatTime(snapshotStatus.nextExpectedSnapshot) }}</span>
                 </div>
+                <!-- Add Snapshot Interval Control -->
+                <div class="d-flex gap-3 align-items-center mb-2">
+                  <label>Snapshot Interval (minutes):</label>
+                  <input 
+                    type="number" 
+                    v-model="snapshotIntervalMinutes" 
+                    class="form-control" 
+                    style="width: 100px;"
+                    min="1"
+                  />
+                  <button 
+                    class="btn btn-primary" 
+                    @click="updateSnapshotInterval"
+                    :disabled="!snapshotIntervalMinutes || snapshotIntervalMinutes < 1"
+                  >
+                    Update Interval
+                  </button>
+                </div>
                 <div class="d-flex gap-2">
                   <button 
                     class="btn btn-warning" 
@@ -949,6 +967,7 @@ onMounted(async () => {
     console.log('AdminView: Component mounted');
     await Promise.all([
         refreshTimerStatus(),
+        loadConfig(),
         refreshLogs(),
         refreshVotingMetrics(),
         refreshVoterDetails(),
@@ -1421,5 +1440,21 @@ function uint8ArrayToHex(array: Uint8Array): string {
   return Array.from(array)
     .map(b => b.toString(16).padStart(2, '0'))
     .join('');
+}
+
+// Add new function for updating snapshot interval
+const snapshotIntervalMinutes = ref(15); // Default to 15 minutes
+
+async function updateSnapshotInterval() {
+  if (!snapshotIntervalMinutes.value || snapshotIntervalMinutes.value < 1) return;
+  
+  try {
+    // Convert minutes to nanoseconds
+    const intervalNS = BigInt(snapshotIntervalMinutes.value) * 60n * 1_000_000_000n;
+    await tacoStore.updateSystemParameter('snapshot_interval', intervalNS);
+    await refreshTimerStatus();
+  } catch (error) {
+    console.error('Error updating snapshot interval:', error);
+  }
 }
 </script>
