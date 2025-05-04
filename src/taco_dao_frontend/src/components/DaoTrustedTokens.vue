@@ -20,9 +20,9 @@
             <div class="btn-group">
 
                 <!-- best performance -->
-                <button @click="navSelected = 'best-performance'" 
+                <!-- <button @click="navSelected = 'best-performance'" 
                         class="btn taco-nav-btn"
-                        :class="{'taco-nav-btn--active': isBestPerformance}">Performance</button>
+                        :class="{'taco-nav-btn--active': isBestPerformance}">Performance</button> -->
 
                 <!-- amount held -->
                 <button @click="navSelected = 'amount-held'" 
@@ -552,7 +552,7 @@ LOCAL METHODS
   const astronautLoaderUrl =  astronautLoader  
 
   // dao trusted tokens stuff
-  const navSelected = ref('best-performance')
+  const navSelected = ref('amount-held')
   const isBestPerformance = computed(() => navSelected.value === 'best-performance')
   const isAmountHeld = computed(() => navSelected.value === 'amount-held')
 
