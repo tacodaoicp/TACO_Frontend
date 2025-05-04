@@ -817,7 +817,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue';
 import { Actor } from '@dfinity/agent';
-import { useTacoStore } from "../stores/taco.store"
+import { useTacoStore, type GetSystemParameterResult } from '../stores/taco.store';
 import { storeToRefs } from "pinia"  
 import HeaderBar from "../components/HeaderBar.vue";
 import FooterBar from "../components/FooterBar.vue";
@@ -965,6 +965,12 @@ function formatTime(timestamp: number | bigint | null): string {
 // Lifecycle hooks
 onMounted(async () => {
     console.log('AdminView: Component mounted');
+    const params = await tacoStore.getSystemParameters() as GetSystemParameterResult;
+    //console.log('AdminView: params HERE XXXXXXXXXXXXX:', params);
+    if (params?.SnapshotInterval) {
+      //console.log('SET INTERVAL HERE XXXXXXXXXXXXX:', Number(params.SnapshotInterval) / (60 * 1_000_000_000));
+      snapshotIntervalMinutes.value = Number(params.SnapshotInterval) / (60 * 1_000_000_000);
+    }
     await Promise.all([
         refreshTimerStatus(),
         loadConfig(),
@@ -973,12 +979,6 @@ onMounted(async () => {
         refreshVoterDetails(),
         refreshNeuronAllocations()
     ]);
-    
-    // Initialize snapshot interval from timer health data
-    if (tacoStore.timerHealth?.snapshot?.intervalNS) {
-        snapshotIntervalMinutes.value = Number(tacoStore.timerHealth.snapshot.intervalNS) / (60 * 1_000_000_000);
-    }
-    
     console.log('AdminView: Initial data loaded');
 });
 
@@ -1166,7 +1166,8 @@ const loadConfig = async () => {
   configLoading.value = true;
   configError.value = null;
   try {
-    await tacoStore.getSystemParameters();
+    await tacoStore.getRebalanceConfig();
+    //await tacoStore.getSystemParameters();
     if (!tacoStore.rebalanceConfig) {
       throw new Error('Failed to load configuration');
     }
@@ -1181,19 +1182,6 @@ const loadConfig = async () => {
 const retryLoadConfig = () => {
   loadConfig();
 };
-
-onMounted(async () => {
-  console.log('AdminView: Component mounted');
-  await Promise.all([
-    refreshTimerStatus(),
-    loadConfig(),
-    refreshLogs(),
-    refreshVotingMetrics(),
-    refreshVoterDetails(),
-    refreshNeuronAllocations()
-  ]);
-  console.log('AdminView: Initial data loaded');
-});
 
 // New function for refreshing trading logs
 async function refreshTradingLogs() {

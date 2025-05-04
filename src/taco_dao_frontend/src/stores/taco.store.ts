@@ -211,6 +211,19 @@ interface SystemParameterResult {
     err?: string;
 }
 
+export interface GetSystemParameterResult {
+    FollowDepth?: bigint;
+    MaxFollowers?: bigint;
+    MaxPastAllocations?: bigint;
+    SnapshotInterval?: bigint;
+    MaxTotalUpdates?: bigint;
+    MaxAllocationsPerDay?: bigint;
+    AllocationWindow?: bigint;
+    MaxFollowUnfollowActionsPerDay?: bigint;
+    MaxFollowed?: bigint;
+    LogAdmin?: Principal;
+}
+
 /////////////
 // Exports //
 /////////////
@@ -307,6 +320,7 @@ export const useTacoStore = defineStore('taco', () => {
     }
     const tokenMetadataCache = new Map<string, TokenMetadata>();
     const rebalanceConfig = ref<RebalanceConfig | null>(null)
+    const systemParameters = ref<GetSystemParameterResult | null>(null)
     const fetchedVoterDetails = ref<VoterDetails[]>([])
     const fetchedNeuronAllocations = ref<ProcessedNeuronAllocation[]>([])
     const snapshotStatus = ref({
@@ -2053,7 +2067,7 @@ export const useTacoStore = defineStore('taco', () => {
             appLoadingOff();
         }
     }
-    const getSystemParameters = async () => {
+    const getRebalanceConfig = async () => {
         try {
             appLoadingOn();
 
@@ -2092,6 +2106,59 @@ export const useTacoStore = defineStore('taco', () => {
                 throw new Error('Failed to get system parameters');
             }
             rebalanceConfig.value = config;
+            return config;
+
+        } catch (error) {
+            console.error('Error getting system parameters:', error);
+            throw error;
+        } finally {
+            appLoadingOff();
+        }
+    }
+
+    const getSystemParameters = async () => {
+        try {
+            appLoadingOn();
+
+            // NOTE TO AI: DO NOT CHANGE THIS PATTERN FOR OTHER FUNCTIONS
+            // DO NOT INTRODUCE A getTreasuryActor method !!
+            // JUST LEAVE THIS CODE HERE AS IS !!
+
+            // create auth client
+            const authClient = await AuthClient.create();
+            
+            // Check if user is authenticated
+            if (!await authClient.isAuthenticated()) {
+                throw new Error('User not authenticated');
+            }
+
+            // Get the identity
+            const identity = await authClient.getIdentity();
+            
+            // Create an agent with the identity
+            const agent = await createAgent({
+                identity,
+                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            });
+
+            const canisterId = process.env.DFX_NETWORK === "ic"
+                ? 'vxqw7-iqaaa-aaaan-qzziq-cai'
+                : 'ywhqf-eyaaa-aaaad-qg6tq-cai';
+
+            const actor = Actor.createActor(daoBackendIDL, {
+                agent,
+                canisterId,
+            });
+
+            // END OF NOTE TO AI!
+
+            // Get the current config using getSystemParameters
+            const config = await actor.getSystemParameters();
+            if (!config) {
+                throw new Error('Failed to get system parameters');
+            }
+            systemParameters.value = config as GetSystemParameterResult;
             return config;
 
         } catch (error) {
@@ -2549,6 +2616,7 @@ export const useTacoStore = defineStore('taco', () => {
         startRebalancing,
         stopRebalancing,
         getSystemParameters,
+        getRebalanceConfig,
         updateRebalanceConfig,
         executeTradingCycle,
         pauseToken,
