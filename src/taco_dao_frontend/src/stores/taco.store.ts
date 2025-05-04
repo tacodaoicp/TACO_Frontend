@@ -1091,7 +1091,7 @@ export const useTacoStore = defineStore('taco', () => {
             // calculate total portfolio value in ICP
             totalPortfolioValueInIcp.value = fetchedTokenDetails.value.reduce((acc, tokenEntry) => {
                 const tokenDetails = tokenEntry[1]
-                return acc + Number(tokenDetails.priceInICP)
+                return acc + (Number(tokenDetails.priceInICP) / Math.pow(10, 8))
             }, 0)
 
             // log
