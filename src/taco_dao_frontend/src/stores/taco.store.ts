@@ -2442,7 +2442,7 @@ export const useTacoStore = defineStore('taco', () => {
             //    snapshotIntervalNS: [intervalNS]
             //};
 
-            const result = await backend.updateSystemParameter("snapshotIntervalNS", intervalNS) as SystemParameterResult;
+            const result = await backend.updateSystemParameter({ SnapshotInterval: intervalNS }) as SystemParameterResult;
             
             if ('ok' in result) {
                 addToast({

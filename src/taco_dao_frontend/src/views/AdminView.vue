@@ -973,6 +973,12 @@ onMounted(async () => {
         refreshVoterDetails(),
         refreshNeuronAllocations()
     ]);
+    
+    // Initialize snapshot interval from timer health data
+    if (tacoStore.timerHealth?.snapshot?.intervalNS) {
+        snapshotIntervalMinutes.value = Number(tacoStore.timerHealth.snapshot.intervalNS) / (60 * 1_000_000_000);
+    }
+    
     console.log('AdminView: Initial data loaded');
 });
 
@@ -1451,7 +1457,7 @@ async function updateSnapshotInterval() {
   try {
     // Convert minutes to nanoseconds
     const intervalNS = BigInt(snapshotIntervalMinutes.value) * 60n * 1_000_000_000n;
-    await tacoStore.updateSystemParameter('snapshot_interval', intervalNS);
+    await tacoStore.updateSnapshotInterval(intervalNS);
     await refreshTimerStatus();
   } catch (error) {
     console.error('Error updating snapshot interval:', error);
