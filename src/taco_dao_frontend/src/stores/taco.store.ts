@@ -2322,6 +2322,150 @@ export const useTacoStore = defineStore('taco', () => {
         }
     }
 
+    // Add this with the other methods in the store
+    const updateSystemParameter = async (paramName: string, value: bigint): Promise<boolean> => {
+        console.log('TacoStore: updateSystemParameter called with', paramName, value);
+        try {
+            appLoadingOn();
+
+            // create auth client
+            const authClient = await AuthClient.create();
+            
+            // Check if user is authenticated
+            if (!await authClient.isAuthenticated()) {
+                throw new Error('User not authenticated');
+            }
+
+            // Get the identity
+            const identity = await authClient.getIdentity();
+            
+            // Create an agent with the identity
+            const agent = await createAgent({
+                identity,
+                host: import.meta.env.VITE_IC_HOST
+            });
+
+            const canisterId = process.env.DFX_NETWORK === "ic"
+            ? 'vxqw7-iqaaa-aaaan-qzziq-cai'
+            : 'ywhqf-eyaaa-aaaad-qg6tq-cai';
+
+            // Create treasury actor with authenticated identity
+            const backend = Actor.createActor(daoBackendIDL, {
+                agent,
+                canisterId
+            });
+
+            const result = await backend.updateSystemParameter(paramName, value);
+            
+            if ('ok' in result) {
+                addToast({
+                    id: Date.now(),
+                    code: 'success',
+                    title: 'Success',
+                    icon: 'fa-solid fa-check',
+                    message: 'System parameter updated successfully'
+                });
+                await refreshTimerStatus();
+                return true;
+            } else {
+                const errorMessage = 'Failed to update system parameter: ' + JSON.stringify(result.err);
+                console.error(errorMessage);
+                addToast({
+                    id: Date.now(),
+                    code: 'error',
+                    title: 'Error',
+                    icon: 'fa-solid fa-triangle-exclamation',
+                    message: errorMessage
+                });
+                return false;
+            }
+        } catch (error: any) {
+            console.error('Error updating system parameter:', error);
+            addToast({
+                id: Date.now(),
+                code: 'error',
+                title: 'Error',
+                icon: 'fa-solid fa-triangle-exclamation',
+                message: 'Error updating system parameter: ' + (error.message || String(error))
+            });
+            return false;
+        } finally {
+            appLoadingOff();
+        }
+    }
+
+    const updateSnapshotInterval = async (intervalNS: bigint): Promise<boolean> => {
+        console.log('TacoStore: updateSnapshotInterval called with', intervalNS);
+        try {
+            appLoadingOn();
+
+            // create auth client
+            const authClient = await AuthClient.create();
+            
+            // Check if user is authenticated
+            if (!await authClient.isAuthenticated()) {
+                throw new Error('User not authenticated');
+            }
+
+            // Get the identity
+            const identity = await authClient.getIdentity();
+            
+            // Create an agent with the identity
+            const agent = await createAgent({
+                identity,
+                host: import.meta.env.VITE_IC_HOST
+            });
+
+            // Create treasury actor with authenticated identity
+            const treasury = Actor.createActor<TreasuryService>(treasuryIDL, {
+                agent,
+                canisterId: getTreasuryCanisterId()
+            });
+
+            // Create update config with just the snapshot interval
+            const updateConfig: UpdateConfig = {
+                snapshotIntervalNS: [intervalNS]
+            };
+
+            const result = await treasury.updateRebalanceConfig(updateConfig, []);
+            
+            if ('ok' in result) {
+                addToast({
+                    id: Date.now(),
+                    code: 'success',
+                    title: 'Success',
+                    icon: 'fa-solid fa-check',
+                    message: 'Snapshot interval updated successfully'
+                });
+                await refreshTimerStatus();
+                return true;
+            } else {
+                const errorMessage = 'Failed to update snapshot interval: ' + JSON.stringify(result.err);
+                console.error(errorMessage);
+                addToast({
+                    id: Date.now(),
+                    code: 'error',
+                    title: 'Error',
+                    icon: 'fa-solid fa-triangle-exclamation',
+                    message: errorMessage
+                });
+                return false;
+            }
+        } catch (error: any) {
+            console.error('Error updating snapshot interval:', error);
+            addToast({
+                id: Date.now(),
+                code: 'error',
+                title: 'Error',
+                icon: 'fa-solid fa-triangle-exclamation',
+                message: 'Error updating snapshot interval: ' + (error.message || String(error))
+            });
+            return false;
+        } finally {
+            appLoadingOff();
+        }
+    }
+
     // # RETURN #
     return {
         // state
@@ -2396,6 +2540,8 @@ export const useTacoStore = defineStore('taco', () => {
         unpauseToken,
         fetchVoterDetails,
         fetchNeuronAllocations,
+        updateSystemParameter,
+        updateSnapshotInterval,
     }
 })
 
