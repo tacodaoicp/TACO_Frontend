@@ -465,11 +465,11 @@
                     <span class="taco-text-black-to-white d-inline-flex align-items-center gap-1
                                  d-flex w-100 justify-content-end text-end mt-2" style="font-size: 0.75rem;">
                       {{
-                        Number(fetchedVotingPowerMetrics?.ok?.allocatedVotingPower) || 0
+                        (Number(fetchedVotingPowerMetrics?.ok?.allocatedVotingPower) / Math.pow(10, 8)).toFixed(2)
                       }}
                       of
                       {{
-                        Number(fetchedVotingPowerMetrics?.ok?.totalVotingPowerByHotkeySetters) || 0
+                        (Number(fetchedVotingPowerMetrics?.ok?.totalVotingPowerByHotkeySetters) / Math.pow(10, 8)).toFixed(2)
                       }} VP
 
                       <!-- info hover tooltip -->
@@ -2883,7 +2883,10 @@
     if (!formattedUserAllocation.value) return 0
 
     // return formatted voting power
-    return Number(formattedUserAllocation.value.votingPower)
+    return (Number(formattedUserAllocation.value.votingPower) / Math.pow(10, 8)).toFixed(2)
+
+    // log
+    // console.log('VoteView.vue: vote power:', votePower.value)
 
   })  
 
