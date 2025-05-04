@@ -476,7 +476,7 @@
                       <i class="fa-solid fa-circle-info m-0 p-0"
                         data-bs-toggle="tooltip"
                         data-bs-placement="top"
-                        title="Allocated Voting Power out of Total Voting Power attached to a hotkey"
+                        title="Voting power cast out of total voting power attached to hotkeys"
                         style="opacity: 0.5;"></i>
 
                     </span>
