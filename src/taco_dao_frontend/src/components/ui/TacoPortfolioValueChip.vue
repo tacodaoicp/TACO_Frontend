@@ -14,10 +14,10 @@
 
             <!-- price in icp -->
             <span class="taco-text-black-to-white"
-                  title="Value of TACO portfolio in ICP"
+                  title="Value of TACO portfolio in USD"
                   data-bs-toggle="tooltip"
                   data-bs-placement="right"
-                  data-bs-custom-class="taco-tooltip">{{ totalPortfolioValueInIcp.toFixed(2) }} ICP</span>
+                  data-bs-custom-class="taco-tooltip">${{ totalPortfolioValueInUsd.toFixed(2) }}</span>
 
         </span>
 
@@ -26,10 +26,10 @@
 
             <!-- price in usd -->
             <span class="taco-text-black-to-white"
-                  title="Value of TACO portfolio in USD"
+                  title="Value of TACO portfolio in ICP"
                   data-bs-toggle="tooltip"
                   data-bs-placement="bottom"
-                  data-bs-custom-class="taco-tooltip">${{ totalPortfolioValueInUsd.toFixed(2) }}</span>
+                  data-bs-custom-class="taco-tooltip">{{ totalPortfolioValueInIcp.toFixed(2) }} <img :src="icpLogo" alt="ICP" class="taco-token-price-chip__icp-logo" style="width: 0.75rem;"></span>
 
         </span>
 
@@ -93,6 +93,7 @@
     import { ref, onMounted, onUnmounted } from 'vue'
     import { useTacoStore } from "../../stores/taco.store"
     import { storeToRefs } from "pinia"
+    import icpLogo from "../../assets/tokens/snspng/icp.png"
 
     ///////////
     // Store //
