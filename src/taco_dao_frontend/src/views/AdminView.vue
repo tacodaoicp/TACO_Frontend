@@ -24,7 +24,7 @@
                 <div class="d-flex gap-3 align-items-center mb-2">
                   <div class="status-indicator" :class="snapshotStatus.active ? 'active' : 'inactive'"></div>
                   <span>Last Snapshot: {{ formatTime(snapshotStatus.lastSnapshotTime) }}</span>
-                  <span>Next Expected: {{ formatTime(snapshotStatus.nextExpectedSnapshot) }}</span>
+                  <span>Next Expected: {{ formatTime(calculateNextExpectedSnapshot()) }}</span>
                 </div>
                 <!-- Add Snapshot Interval Control -->
                 <div class="d-flex gap-3 align-items-center mb-2">
@@ -1449,5 +1449,11 @@ async function updateSnapshotInterval() {
   } catch (error) {
     console.error('Error updating snapshot interval:', error);
   }
+}
+
+function calculateNextExpectedSnapshot(): bigint | null {
+  if (!snapshotStatus.value.lastSnapshotTime) return null;
+  const intervalNS = BigInt(snapshotIntervalMinutes.value) * 60n * 1_000_000_000n;
+  return snapshotStatus.value.lastSnapshotTime + intervalNS;
 }
 </script>
