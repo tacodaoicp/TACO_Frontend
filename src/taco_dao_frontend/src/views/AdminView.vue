@@ -965,11 +965,10 @@ function formatTime(timestamp: number | bigint | null): string {
 // Lifecycle hooks
 onMounted(async () => {
     console.log('AdminView: Component mounted');
-    const params = await tacoStore.getSystemParameters() as GetSystemParameterResult;
-    //console.log('AdminView: params HERE XXXXXXXXXXXXX:', params);
-    if (params?.SnapshotInterval) {
-      //console.log('SET INTERVAL HERE XXXXXXXXXXXXX:', Number(params.SnapshotInterval) / (60 * 1_000_000_000));
-      snapshotIntervalMinutes.value = Number(params.SnapshotInterval) / (60 * 1_000_000_000);
+    const params = await tacoStore.getSystemParameters() as any[];
+    const snapshotParam = params.find(p => 'SnapshotInterval' in p);
+    if (snapshotParam?.SnapshotInterval) {
+        snapshotIntervalMinutes.value = Number(snapshotParam.SnapshotInterval) / (60 * 1_000_000_000);
     }
     await Promise.all([
         refreshTimerStatus(),
