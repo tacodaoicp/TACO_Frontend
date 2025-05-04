@@ -17,7 +17,7 @@
                   title="Value of TACO portfolio in ICP"
                   data-bs-toggle="tooltip"
                   data-bs-placement="right"
-                  data-bs-custom-class="taco-tooltip">- ICP</span>
+                  data-bs-custom-class="taco-tooltip">{{ totalPortfolioValueInIcp.toFixed(2) }} ICP</span>
 
         </span>
 
@@ -29,7 +29,7 @@
                   title="Value of TACO portfolio in USD"
                   data-bs-toggle="tooltip"
                   data-bs-placement="bottom"
-                  data-bs-custom-class="taco-tooltip">$0.00</span>
+                  data-bs-custom-class="taco-tooltip">${{ totalPortfolioValueInUsd.toFixed(2) }}</span>
 
         </span>
 
@@ -103,12 +103,13 @@
 
     // # STATE #
 
-    // otc backend
+    // dao
     const { fetchedTokenDetails } = storeToRefs(tacoStore)
+    const { totalPortfolioValueInUsd, totalPortfolioValueInIcp } = storeToRefs(tacoStore)
 
     // # ACTIONS #
 
-    // otc backend
+    // dao
     const { fetchTokenDetails } = tacoStore
 
     //////////////

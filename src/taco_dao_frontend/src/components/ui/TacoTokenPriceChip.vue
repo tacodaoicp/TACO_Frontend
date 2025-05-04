@@ -17,7 +17,7 @@
                   title="Value of TACO token in ICP"
                   data-bs-toggle="tooltip"
                   data-bs-placement="right"
-                  data-bs-custom-class="taco-tooltip">{{ Number(sneedPriceIcp).toFixed(3) }} ICP</span>
+                  data-bs-custom-class="taco-tooltip">{{ Number(sneedPriceIcp).toFixed(2) }} ICP</span>
 
         </span>
 
@@ -109,8 +109,7 @@
 
     // # ACTIONS #
     
-    // crypto prices
-    const { fetchCryptoPrices } = tacoStore
+    // 
 
     /////////////////////
     // local variables //
@@ -140,8 +139,7 @@
 
     onMounted(async () => {
         
-        // fetch token details from dao backend
-        await fetchCryptoPrices()
+        // 
         
     })
 

@@ -263,14 +263,16 @@ export const useTacoStore = defineStore('taco', () => {
     const tacoPriceUsd = useStorage('tacoPriceUsd', 0)
     const tacoPriceIcp = useStorage('tacoPriceIcp', 0)
     const lastPriceUpdate = useStorage('lastPriceUpdate', 0)
-    const portfolioTokensPriceInUsd = useStorage('portfolioTokensPriceInUsd', [])
-    const portfolioTokensPriceInIcp = useStorage('portfolioTokensPriceInIcp', [])
 
     // dao
     const fetchedTokenDetails = ref<TrustedTokenEntry[]>([])
     const fetchedAggregateAllocation = ref<[Principal, bigint][]>([])
     const fetchedVotingPowerMetrics = ref<VotingMetricsResponse | null>(null)
     const fetchedUserAllocation = ref([])
+    const totalPortfolioValueInUsd = ref(0)
+    const totalPortfolioValueInIcp = ref(0)
+    const portfolioTokenPricesInUsd = useStorage('portfolioTokenPricesInUsd', [])
+    const portfolioTokenPricesInIcp = useStorage('portfolioTokenPricesInIcp', [])
 
     // snassy's (off limits don't touch!)    
     const timerHealth = ref({
@@ -302,6 +304,12 @@ export const useTacoStore = defineStore('taco', () => {
     const rebalanceConfig = ref<RebalanceConfig | null>(null)
     const fetchedVoterDetails = ref<VoterDetails[]>([])
     const fetchedNeuronAllocations = ref<ProcessedNeuronAllocation[]>([])
+    const snapshotStatus = ref({
+        active: false,
+        lastSnapshotTime: null as bigint | null,
+        nextExpectedSnapshot: null as bigint | null,
+        inProgress: false
+    })      
 
     // # ACTIONS #
 
@@ -771,8 +779,9 @@ export const useTacoStore = defineStore('taco', () => {
     }
 
     // crypto prices
-    // we always fetch specific crypto prices, btc, icp, and taco (sneed for now)
     const fetchCryptoPrices = async () => {
+
+        // we always fetch specific crypto prices, btc, icp, and taco (sneed for now)
 
         // log
         console.log('taco.store: fetchCryptoPrices()')
@@ -811,16 +820,16 @@ export const useTacoStore = defineStore('taco', () => {
                 // log
                 console.log('taco.store: fetchCryptoPrices() - coingecko standard endpoint data:', data)
 
-                // detailed logging
-                data.forEach((coin: any) => {
-                    console.log(`\n=== ${coin.name} (${coin.symbol.toUpperCase()}) ===`)
-                    console.log(`Current Price: $${coin.current_price}`) // current price in usd
-                    console.log(`24h Change: ${coin.price_change_percentage_24h}%`) // percentage change over last 24 hours
-                    console.log(`Market Cap: $${coin.market_cap}`) // market cap in usd
-                    console.log(`24h Volume: $${coin.total_volume}`) // 24 hour volume in usd
-                    console.log(`Circulating Supply: ${coin.circulating_supply}`) // circulating supply in token
-                    console.log(`Last Updated: ${coin.last_updated}`) // last updated timestamp
-                })
+                // // detailed logging
+                // data.forEach((coin: any) => {
+                //     console.log(`\n=== ${coin.name} (${coin.symbol.toUpperCase()}) ===`)
+                //     console.log(`Current Price: $${coin.current_price}`) // current price in usd
+                //     console.log(`24h Change: ${coin.price_change_percentage_24h}%`) // percentage change over last 24 hours
+                //     console.log(`Market Cap: $${coin.market_cap}`) // market cap in usd
+                //     console.log(`24h Volume: $${coin.total_volume}`) // 24 hour volume in usd
+                //     console.log(`Circulating Supply: ${coin.circulating_supply}`) // circulating supply in token
+                //     console.log(`Last Updated: ${coin.last_updated}`) // last updated timestamp
+                // })
 
                 // // set prices
                 // icpPriceUsd.value = data['internet-computer'].usd
@@ -937,10 +946,10 @@ export const useTacoStore = defineStore('taco', () => {
         }
 
     }
-
-    // we fetch the remaining tokens in the portfolio dynamically
-    // takes in an array of canister ids or principal ids or whatever, tbd
     const fetchPortfolioTokenPrices = async (tokens: string[]) => {
+
+        // we fetch the remaining tokens in the portfolio dynamically
+        // takes in an array of canister ids or principal ids or whatever, tbd    
 
         // log
         console.log('taco.store: fetchPortfolioTokenPrices() for tokens:', tokens)
@@ -966,6 +975,7 @@ export const useTacoStore = defineStore('taco', () => {
         }
 
     }
+
     // ledger canisters
     const icrc1Metadata = async (passedCanisterId: string) => {
 
@@ -1051,8 +1061,23 @@ export const useTacoStore = defineStore('taco', () => {
             fetchedTokenDetails.value = tokenDetails
 
             // log
-            // console.log('taco.store: fetchTokenDetails() - returned info:', tokenDetails) 
-            // console.log('taco.store: DAO backend - actor.getTokenDetails() - fetchedTokenDetails.value:', fetchedTokenDetails.value)            
+            // console.log('taco.store: fetchTokenDetails() - returned info:', tokenDetails)
+
+            // calculate total portfolio value in USD
+            totalPortfolioValueInUsd.value = fetchedTokenDetails.value.reduce((acc, tokenEntry) => {
+                const tokenDetails = tokenEntry[1]
+                return acc + Number(tokenDetails.priceInUSD)
+            }, 0)
+
+            // calculate total portfolio value in ICP
+            totalPortfolioValueInIcp.value = fetchedTokenDetails.value.reduce((acc, tokenEntry) => {
+                const tokenDetails = tokenEntry[1]
+                return acc + Number(tokenDetails.priceInICP)
+            }, 0)
+
+            // log
+            // console.log("totalPortfolioValueInUsd.value:", totalPortfolioValueInUsd.value)
+            // console.log("totalPortfolioValueInIcp.value:", totalPortfolioValueInIcp.value)
 
             return            
 
@@ -1751,13 +1776,7 @@ export const useTacoStore = defineStore('taco', () => {
             console.error('TacoStore: Error recovering pool balances:', error);
             throw error;
         }
-    }
-    const snapshotStatus = ref({
-        active: false,
-        lastSnapshotTime: null as bigint | null,
-        nextExpectedSnapshot: null as bigint | null,
-        inProgress: false
-    })    
+    }  
     const triggerManualSync = async () => {
         try {
             // get host
@@ -2317,8 +2336,10 @@ export const useTacoStore = defineStore('taco', () => {
         sneedPriceIcp,
         tacoPriceUsd,
         tacoPriceIcp,
-        portfolioTokensPriceInUsd,
-        portfolioTokensPriceInIcp,
+        portfolioTokenPricesInUsd,
+        portfolioTokenPricesInIcp,
+        totalPortfolioValueInUsd,
+        totalPortfolioValueInIcp,
         lastPriceUpdate,
         truncatedPrincipal,
         fetchedTokenDetails,
