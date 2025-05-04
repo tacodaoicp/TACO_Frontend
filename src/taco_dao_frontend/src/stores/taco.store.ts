@@ -800,7 +800,9 @@ export const useTacoStore = defineStore('taco', () => {
     // crypto prices
     const fetchCryptoPrices = async () => {
 
-        // we always fetch specific crypto prices, btc, icp, and taco (sneed for now)
+        // we always fetch specific crypto prices,
+        // btc, icp, and taco (sneed for now) 
+        // from coingecko standard endpoint
 
         // log
         console.log('taco.store: fetchCryptoPrices()')
@@ -820,14 +822,13 @@ export const useTacoStore = defineStore('taco', () => {
             // log
             console.log('taco.store: fetching new crypto prices')
 
-            // try coingecko standard endpoint
+            // try coingecko standard endpoint for icp and btc
             try {
 
                 // log
                 // console.log('taco.store: fetching new crypto prices - coingecko standard endpoint')
 
                 // fetch
-                // https://api.coingecko.com/api/v3/simple/price?ids=internet-computer,bitcoin&vs_currencies=usd
                 const response = await fetch('https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=internet-computer,bitcoin&price_change_percentage=1h,24h')
                 
                 // if not ok, throw error
@@ -850,16 +851,20 @@ export const useTacoStore = defineStore('taco', () => {
                 //     console.log(`Last Updated: ${coin.last_updated}`) // last updated timestamp
                 // })
 
-                // // set prices
-                // icpPriceUsd.value = data['internet-computer'].usd
-                // btcPriceUsd.value = data['bitcoin'].usd
+                // Find the specific coins in the array
+                const icpData = data.find((coin: { id: string }) => coin.id === 'internet-computer')
+                const btcData = data.find((coin: { id: string }) => coin.id === 'bitcoin')
+
+                // Set the prices
+                icpPriceUsd.value = icpData?.current_price || 0
+                btcPriceUsd.value = btcData?.current_price || 0
 
                 // // log
-                // console.log('✨ ICP price: ' + icpPriceUsd.value)
-                // console.log('✨ BTC price: ' + btcPriceUsd.value)
+                console.log('✨ ICP price in USD: ' + icpPriceUsd.value)
+                console.log('✨ BTC price in USD: ' + btcPriceUsd.value)
 
                 // // set last price update
-                // lastPriceUpdate.value = now
+                lastPriceUpdate.value = now
 
             } catch (error) {
 
@@ -868,7 +873,7 @@ export const useTacoStore = defineStore('taco', () => {
 
             }
 
-            // try gecko terminal pool endpoint
+            // try gecko terminal pool endpoint for sneed
             try {
 
                 // log
@@ -890,25 +895,26 @@ export const useTacoStore = defineStore('taco', () => {
                 // console.log('taco.store: fetchCryptoPrices() - gecko terminal pool endpoint - body:', body)
 
                 // pull both token prices from the pool
-                const address = body.data.attributes.address
-                const baseTokenPriceNativeCurrency = body.data.attributes.base_token_price_native_currency
+
+                // const address = body.data.attributes.address
+                // const baseTokenPriceNativeCurrency = body.data.attributes.base_token_price_native_currency
                 const baseTokenPriceQuoteToken = body.data.attributes.base_token_price_quote_token
-                const baseTokenPriceUsd = body.data.attributes.base_token_price_usd
-                const fdvUsd = body.data.attributes.fdv_usd
-                const marketCapUsd = body.data.attributes.market_cap_usd
-                const name = body.data.attributes.name
-                const priceChangePercentageH1 = body.data.attributes.price_change_percentage.h1
-                const priceChangePercentageH24 = body.data.attributes.price_change_percentage.h24
-                const priceChangePercentageH6 = body.data.attributes.price_change_percentage.h6
-                const priceChangePercentageM15 = body.data.attributes.price_change_percentage.m15
-                const priceChangePercentageM30 = body.data.attributes.price_change_percentage.m30
-                const priceChangePercentageM5 = body.data.attributes.price_change_percentage.m5
-                const quoteTokenPriceNativeCurrency = body.data.attributes.quote_token_price_native_currency
-                const quoteTokenPriceBaseToken = body.data.attributes.quote_token_price_base_token
-                const quoteTokenPriceUsd = body.data.attributes.quote_token_price_usd
-                const reserveInUsd = body.data.attributes.reserve_in_usd
+                // const baseTokenPriceUsd = body.data.attributes.base_token_price_usd
+                // const fdvUsd = body.data.attributes.fdv_usd
+                // const marketCapUsd = body.data.attributes.market_cap_usd
+                // const name = body.data.attributes.name
+                // const priceChangePercentageH1 = body.data.attributes.price_change_percentage.h1
+                // const priceChangePercentageH24 = body.data.attributes.price_change_percentage.h24
+                // const priceChangePercentageH6 = body.data.attributes.price_change_percentage.h6
+                // const priceChangePercentageM15 = body.data.attributes.price_change_percentage.m15
+                // const priceChangePercentageM30 = body.data.attributes.price_change_percentage.m30
+                // const priceChangePercentageM5 = body.data.attributes.price_change_percentage.m5
+                // const quoteTokenPriceNativeCurrency = body.data.attributes.quote_token_price_native_currency
+                // const quoteTokenPriceBaseToken = body.data.attributes.quote_token_price_base_token
+                // const quoteTokenPriceUsd = body.data.attributes.quote_token_price_usd
+                // const reserveInUsd = body.data.attributes.reserve_in_usd
                 const basePrice  = Number(body.data.attributes.base_token_price_usd)
-                const quotePrice = Number(body.data.attributes.quote_token_price_usd)
+                // const quotePrice = Number(body.data.attributes.quote_token_price_usd)
 
                 // log
                 // console.log('address', address)
@@ -938,8 +944,8 @@ export const useTacoStore = defineStore('taco', () => {
                 sneedPriceIcp.value = baseTokenPriceQuoteToken || 0
 
                 // log
-                console.log('✨ Sneed price:', sneedPriceUsd.value)
-                console.log('✨ Sneed ICP price:', sneedPriceIcp.value)
+                console.log('✨ Sneed price in USD:', sneedPriceUsd.value)
+                console.log('✨ Sneed price in ICP:', sneedPriceIcp.value)
 
                 // set last price update
                 lastPriceUpdate.value = now                
@@ -957,10 +963,10 @@ export const useTacoStore = defineStore('taco', () => {
         else {
 
             console.log('taco.store: using saved crypto prices')
-            console.log('💾 ICP price:', icpPriceUsd.value)
-            console.log('💾 BTC price:', btcPriceUsd.value)
-            console.log('💾 Sneed price:', sneedPriceUsd.value)
-            console.log('💾 Sneed ICP price:', sneedPriceIcp.value)
+            console.log('💾 ICP price in USD:', icpPriceUsd.value)
+            console.log('💾 BTC price in USD:', btcPriceUsd.value)
+            console.log('💾 Sneed price in USD:', sneedPriceUsd.value)
+            console.log('💾 Sneed price in ICP:', sneedPriceIcp.value)
 
         }
 
@@ -1080,23 +1086,27 @@ export const useTacoStore = defineStore('taco', () => {
             fetchedTokenDetails.value = tokenDetails
 
             // log
-            // console.log('taco.store: fetchTokenDetails() - returned info:', tokenDetails)
+            console.log('taco.store: fetchTokenDetails() - returned info:', tokenDetails)
 
             // calculate total portfolio value in USD
+            console.log('\n=== Calculating Total Portfolio Value in USD ===')
             totalPortfolioValueInUsd.value = fetchedTokenDetails.value.reduce((acc, tokenEntry) => {
                 const tokenDetails = tokenEntry[1]
-                return acc + Number(tokenDetails.priceInUSD)
+                const tokenValue = Number(tokenDetails.priceInUSD) * (Number(tokenDetails.balance) / Math.pow(10, Number(tokenDetails.tokenDecimals)))
+                console.log(`Token ${tokenDetails.tokenSymbol}: $${tokenValue} (${Number(tokenDetails.balance) / Math.pow(10, Number(tokenDetails.tokenDecimals))} tokens @ $${Number(tokenDetails.priceInUSD)} each)`)
+                return acc + tokenValue
             }, 0)
+            console.log(`Total Portfolio Value in USD: $${totalPortfolioValueInUsd.value}`)
 
             // calculate total portfolio value in ICP
+            console.log('\n=== Calculating Total Portfolio Value in ICP ===')
             totalPortfolioValueInIcp.value = fetchedTokenDetails.value.reduce((acc, tokenEntry) => {
                 const tokenDetails = tokenEntry[1]
-                return acc + (Number(tokenDetails.priceInICP) / Math.pow(10, 8))
+                const tokenValue = (Number(tokenDetails.priceInICP) / Math.pow(10, 8)) * (Number(tokenDetails.balance) / Math.pow(10, Number(tokenDetails.tokenDecimals)))
+                console.log(`Token ${tokenDetails.tokenSymbol}: ${tokenValue} ICP (${Number(tokenDetails.balance) / Math.pow(10, Number(tokenDetails.tokenDecimals))} tokens @ ${Number(tokenDetails.priceInICP) / Math.pow(10, 8)} ICP each)`)
+                return acc + tokenValue
             }, 0)
-
-            // log
-            // console.log("totalPortfolioValueInUsd.value:", totalPortfolioValueInUsd.value)
-            // console.log("totalPortfolioValueInIcp.value:", totalPortfolioValueInIcp.value)
+            console.log(`Total Portfolio Value in ICP: ${totalPortfolioValueInIcp.value} ICP`)
 
             return            
 

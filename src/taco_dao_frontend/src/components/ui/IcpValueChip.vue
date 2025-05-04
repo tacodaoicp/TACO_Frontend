@@ -1,23 +1,25 @@
 <template>
 
-    <div class="taco-portfolio-value-chip">
+    <div class="taco-icp-value-chip">
 
         <!-- top -->
-        <span class="taco-portfolio-value-chip__top">
+        <span class="taco-icp-value-chip__top">
 
-            <!-- token portfolio icon -->
-            <TacoDaoTacoT 
-                title="TACO portfolio"
-                data-bs-toggle="tooltip"
-                data-bs-placement="left"
-                data-bs-custom-class="taco-tooltip"/>
+            <!-- icp logo -->
+            <img :src="icpLogo" 
+                 alt="ICP" 
+                 class="taco-icp-value-chip__icp-logo"
+                 title="ICP token"
+                 data-bs-toggle="tooltip"
+                 data-bs-placement="left"
+                 data-bs-custom-class="taco-tooltip">
 
-            <!-- price in icp -->
+            <!-- price in usd -->
             <span class="taco-text-black-to-white"
-                  title="Value of TACO portfolio in USD"
+                  title="Value of ICP in USD"
                   data-bs-toggle="tooltip"
                   data-bs-placement="right"
-                  data-bs-custom-class="taco-tooltip">${{ totalPortfolioValueInUsd.toFixed(2) }}</span>
+                  data-bs-custom-class="taco-tooltip">${{ icpPriceUsd.toFixed(2) }}</span>
 
         </span>
 
@@ -27,8 +29,8 @@
 
 <style lang="scss" scoped>
 
-    // taco portfolio value chip
-    .taco-portfolio-value-chip {
+    // taco icp value chip
+    .taco-icp-value-chip {
         display: flex;
         flex-direction: column;
         align-items: end;
@@ -40,9 +42,9 @@
             gap: 0.25rem;
 
             // token icon
-            svg {
-                width: 1.75rem;
-                height: 1.125rem;
+            img {
+                width: 1rem;
+                height: 1rem;
             }
 
             // icp price
@@ -77,10 +79,9 @@
     // Imports //
     /////////////
 
-    import TacoDaoTacoT from "../../assets/images/tacoDaoTacoT.vue"
-    import { ref, onMounted, onUnmounted } from 'vue'
     import { useTacoStore } from "../../stores/taco.store"
     import { storeToRefs } from "pinia"
+    import icpLogo from "../../assets/tokens/snspng/icp.png"
 
     ///////////
     // Store //
@@ -89,24 +90,9 @@
     // # SETUP #
     const tacoStore = useTacoStore()
 
-    // # ACTIONS #
-    const { fetchTokenDetails } = tacoStore
-
     // # STATE #
 
-    // dao
-    const { totalPortfolioValueInUsd } = storeToRefs(tacoStore)
-
-    /////////////////////
-    // lifecycle hooks //
-    /////////////////////
-
-    // on mount
-    onMounted(async () => {
-
-        // fetch token details from dao backend
-        await fetchTokenDetails()
-
-    })
+    // crypto prices
+    const { icpPriceUsd } = storeToRefs(tacoStore)
 
 </script>

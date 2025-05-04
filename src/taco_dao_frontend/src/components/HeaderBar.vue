@@ -71,13 +71,16 @@
     <div class="header-bar__right">
 
       <!-- icp price, taco dao holdings, and wallet container -->
-      <div class="header-bar__chips d-flex flex-nowrap align-items-center gap-4" 
+      <div class="header-bar__chips d-flex flex-nowrap align-items-center gap-3" 
             style="user-select: text;">
 
-        <!-- icp price -->
+        <!-- icp value -->
+        <IcpValueChip />
+
+        <!-- taco value -->
         <TacoTokenPriceChip />
 
-        <!-- taco dao holdings -->
+        <!-- portfolio value -->
         <TacoPortfolioValueChip />
 
       </div>
@@ -266,7 +269,7 @@
     &__right {
       display: flex;
       align-items: center;
-      gap: 1.5rem;
+      gap: 1rem;
     }
 
     // escape hatch
@@ -523,6 +526,7 @@
   import { useTacoStore } from "../stores/taco.store"
   import { storeToRefs } from "pinia"
   import TacoDaoLogo from "../assets/images/tacoDaoLogo.vue"
+  import IcpValueChip from "../components/ui/IcpValueChip.vue"
   import TacoTokenPriceChip from "../components/ui/TacoTokenPriceChip.vue"
   import TacoPortfolioValueChip from "../components/ui/TacoPortfolioValueChip.vue"
   import DfinityLogo from "../assets/images/dfinityLogo.vue"

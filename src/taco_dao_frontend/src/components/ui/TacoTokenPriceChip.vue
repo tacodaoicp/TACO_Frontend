@@ -21,18 +21,6 @@
 
         </span>
 
-        <!-- bottom -->
-        <span class="taco-token-price-chip__bottom">
-
-            <!-- price in usd -->
-            <span class="taco-text-black-to-white"
-                  title="Value of TACO token in ICP"
-                  data-bs-toggle="tooltip"
-                  data-bs-placement="bottom"
-                  data-bs-custom-class="taco-tooltip">{{ Number(sneedPriceIcp).toFixed(2) }} <img :src="icpLogo" alt="ICP" class="taco-token-price-chip__icp-logo" style="width: 0.75rem;"></span>
-
-        </span>
-
     </div>
 
 </template>
@@ -49,7 +37,7 @@
         &__top {
             display: inline-flex;
             align-items: center;
-            gap: 0.35rem;
+            gap: 0.25rem;
 
             // token icon
             img, svg {
@@ -91,10 +79,8 @@
     /////////////
 
     import TacoCoinIcon from "../../assets/tokens/tacoCoinIcon.vue"
-    import { ref, onMounted } from 'vue'
     import { useTacoStore } from "../../stores/taco.store"
     import { storeToRefs } from "pinia"
-    import icpLogo from "../../assets/tokens/snspng/icp.png"
 
     ////////////
     // Stores //
@@ -106,6 +92,6 @@
     // # STATE #
 
     // crypto prices
-    const { sneedPriceUsd, sneedPriceIcp } = storeToRefs(tacoStore)
+    const { sneedPriceUsd } = storeToRefs(tacoStore)
 
 </script>
