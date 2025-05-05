@@ -13,11 +13,12 @@
                 data-bs-custom-class="taco-tooltip"/>
 
             <!-- price in icp -->
+            <!-- Number(tacoPriceUsd).toFixed(2) -->
             <span class="taco-text-black-to-white"
                   title="Value of TACO token in USD"
                   data-bs-toggle="tooltip"
                   data-bs-placement="right"
-                  data-bs-custom-class="taco-tooltip">${{ Number(sneedPriceUsd).toFixed(2) }}</span>
+                  data-bs-custom-class="taco-tooltip">$0.00</span>
 
         </span>
 
