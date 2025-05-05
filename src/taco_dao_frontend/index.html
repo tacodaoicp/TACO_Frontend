@@ -1,27 +1,35 @@
 <!DOCTYPE html>
-<html lang="">
+<html lang="en">
 
 <head>
   <meta charset="utf-8" />
   <meta http-equiv="X-UA-Compatible" content="IE=edge" />
-  <meta name="viewport" content="width=device-width,initial-scale=0.75, user-scalable=0" />
-  <meta name="robots" content="noindex, nofollow">
+  <meta name="viewport" content="width=device-width, initial-scale=0.75, user-scalable=0" />
+  <meta name="robots" content="index, follow" />
+  <link rel="canonical" href="https://tacodao.com/" />
   <link rel="icon" href="/favicon.ico" />
   <title>Taco Dao</title>
+  <meta property="og:title" content="Taco Dao" />
+  <meta property="og:description" content="The tastiest entry point in crypto" />
+  <meta property="og:image" content="https://tacodao.com/td-light-1200x650.png" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:image" content="https://tacodao.com/td-light-1200x650.png" />
+  <meta name="twitter:title" content="Taco Dao" />
+  <meta name="twitter:description" content="The tastiest entry point in crypto" />
   <script>
-    if (
-      window.location.hostname === 'http://www.tacodao.com' ||
-      window.location.hostname === 'https://www.tacodao.com' ||
-      window.location.hostname === 'www.tacodao.com'
-    ) {
-      window.location.href = 'https://tacodao.com' + window.location.pathname + window.location.search + window.location.hash;
+    if (window.location.hostname === 'www.tacodao.com') {
+      window.location.href =
+        'https://tacodao.com' +
+        window.location.pathname +
+        window.location.search +
+        window.location.hash;
     }
   </script>
 </head>
 
 <body>
   <noscript>
-    <strong>Taco Dao doesn't work without JavaScript. Please enable it to continue.</strong>
+    <strong>👨‍🍳 Taco Dao doesn't work without JavaScript. Please enable it to continue.</strong>
   </noscript>
   <div id="app"></div>
   <script src="/src/main.js" type="module"></script>
