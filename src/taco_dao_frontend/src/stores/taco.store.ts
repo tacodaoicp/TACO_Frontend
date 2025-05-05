@@ -823,7 +823,7 @@ export const useTacoStore = defineStore('taco', () => {
             // console.log('fetching new crypto prices')
 
             // log
-            console.log('fetching new crypto prices')
+            console.log('✨ fetching new crypto prices')
 
             // try coingecko standard endpoint for icp and btc
             try {
@@ -965,7 +965,7 @@ export const useTacoStore = defineStore('taco', () => {
         // else, use saved prices
         else {
 
-            console.log('using saved crypto prices')
+            console.log('💾 using saved crypto prices')
             // console.log('💾 ICP price in USD:', icpPriceUsd.value)
             // console.log('💾 BTC price in USD:', btcPriceUsd.value)
             // console.log('💾 Sneed price in USD:', sneedPriceUsd.value)
