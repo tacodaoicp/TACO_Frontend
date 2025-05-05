@@ -1032,7 +1032,7 @@
     console.log(
       "👨‍🍳 Welcome to %cTaco Dao",
       "color: yellow;",
-      "\n❤️ Together we Perfect the Recipe!\n🌮 v1.0.0"
+      "\n❤️ Together, We Perfect The Recipe!\n🌮 v1.0.0"
     );
 
     // run mounted logic
