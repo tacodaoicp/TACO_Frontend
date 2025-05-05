@@ -10,6 +10,8 @@
   <title>Taco Dao</title>
   <script>
     if (
+      window.location.hostname === 'http://www.tacodao.com' ||
+      window.location.hostname === 'https://www.tacodao.com' ||
       window.location.hostname === 'www.tacodao.com'
     ) {
       window.location.href = 'https://tacodao.com' + window.location.pathname + window.location.search + window.location.hash;
