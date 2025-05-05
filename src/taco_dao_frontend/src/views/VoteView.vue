@@ -677,7 +677,7 @@
                             <div class="voting-receipt__top__left__bottom">
                               
                               <!-- website -->
-                              <span>www.tacodao.com</span>
+                              <span>tacodao.com</span>
                               
                               <!-- tagline -->
                               <span>Together we perfect the recipe</span>
