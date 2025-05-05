@@ -1014,7 +1014,7 @@ export const useTacoStore = defineStore('taco', () => {
 
             // get host
             const host = process.env.DFX_NETWORK === "local"
-                ? `http://localhost:50144`
+                ? `http://localhost:54973`
                 : "https://ic0.app";
 
             // create agent
@@ -1057,7 +1057,7 @@ export const useTacoStore = defineStore('taco', () => {
 
             // get host
             const host = process.env.DFX_NETWORK === "local"
-                ? `http://localhost:50144`
+                ? `http://localhost:54973`
                 : "https://ic0.app"
 
             // create agent
@@ -1123,7 +1123,7 @@ export const useTacoStore = defineStore('taco', () => {
         // console.log('taco.store: fetchAggregateAllocation() - Starting fetch...');
         try {
             const host = process.env.DFX_NETWORK === "local"
-                ? `http://localhost:50144`
+                ? `http://localhost:54973`
                 : "https://ic0.app"
             // console.log('taco.store: fetchAggregateAllocation() - Using host:', host);
 
@@ -1165,7 +1165,7 @@ export const useTacoStore = defineStore('taco', () => {
         // console.log('taco.store: fetchVotingPowerMetrics() - Starting fetch...');
         try {
             const host = process.env.DFX_NETWORK === "local"
-                ? `http://localhost:50144`
+                ? `http://localhost:54973`
                 : "https://ic0.app"
             // console.log('taco.store: fetchVotingPowerMetrics() - Using host:', host);
 
@@ -1227,7 +1227,7 @@ export const useTacoStore = defineStore('taco', () => {
                 const agent = await createAgent({
                     identity,
                     // host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-                    host: process.env.DFX_NETWORK === "local" ? `http://localhost:50144` : "https://ic0.app",
+                    host: process.env.DFX_NETWORK === "local" ? `http://localhost:54973` : "https://ic0.app",
                     fetchRootKey: process.env.DFX_NETWORK === "local",
                 })
 
@@ -1293,7 +1293,7 @@ export const useTacoStore = defineStore('taco', () => {
                 const agent = await createAgent({
                     identity,
                     // host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-                    host: process.env.DFX_NETWORK === "local" ? `http://localhost:50144` : "https://ic0.app",
+                    host: process.env.DFX_NETWORK === "local" ? `http://localhost:54973` : "https://ic0.app",
                     fetchRootKey: process.env.DFX_NETWORK === "local",
                 })
 
@@ -1355,7 +1355,7 @@ export const useTacoStore = defineStore('taco', () => {
                 const agent = await createAgent({
                     identity,
                     // host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-                    host: process.env.DFX_NETWORK === "local" ? `http://localhost:50144` : "https://ic0.app",
+                    host: process.env.DFX_NETWORK === "local" ? `http://localhost:54973` : "https://ic0.app",
                     fetchRootKey: process.env.DFX_NETWORK === "local",
                 })
 
@@ -1430,7 +1430,7 @@ export const useTacoStore = defineStore('taco', () => {
                 const agent = await createAgent({
                     identity,
                     // host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-                    host: process.env.DFX_NETWORK === "local" ? `http://localhost:50144` : "https://ic0.app",
+                    host: process.env.DFX_NETWORK === "local" ? `http://localhost:54973` : "https://ic0.app",
                     fetchRootKey: process.env.DFX_NETWORK === "local",
                 })
 
@@ -1496,7 +1496,7 @@ export const useTacoStore = defineStore('taco', () => {
 
             // get host
             const host = process.env.DFX_NETWORK === "local"
-                ? `http://localhost:50144`
+                ? `http://localhost:54973`
                 : "https://ic0.app"
 
             // create agent
