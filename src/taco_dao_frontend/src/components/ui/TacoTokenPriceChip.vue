@@ -15,7 +15,7 @@
             <!-- price in icp -->
             <!-- Number(tacoPriceUsd).toFixed(2) -->
             <span class="taco-text-black-to-white"
-                  title="Value of TACO token in USD"
+                  title="Value of TACO token in USD (token not yet launched)"
                   data-bs-toggle="tooltip"
                   data-bs-placement="right"
                   data-bs-custom-class="taco-tooltip">$0.00</span>
