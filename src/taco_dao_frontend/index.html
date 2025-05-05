@@ -8,6 +8,14 @@
   <meta name="robots" content="noindex, nofollow">
   <link rel="icon" href="/favicon.ico" />
   <title>Taco Dao</title>
+  <script>
+    if (
+      window.location.hostname === 'tacodao.com' ||
+      window.location.protocol !== 'https:'
+    ) {
+      window.location.href = 'https://www.tacodao.com' + window.location.pathname + window.location.search + window.location.hash;
+    }
+  </script>
 </head>
 
 <body>
