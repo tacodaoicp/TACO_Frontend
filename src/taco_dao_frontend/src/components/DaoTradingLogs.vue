@@ -59,6 +59,13 @@
 
                     </tr>
 
+                    <!-- empty row -->
+                    <tr v-if="logs.length === 0">
+                        <td colspan="3" class="text-center">
+                            <span style="opacity: 0.5;">No trades yet</span>
+                        </td>
+                    </tr>
+
                 </tbody>
 
             </table>

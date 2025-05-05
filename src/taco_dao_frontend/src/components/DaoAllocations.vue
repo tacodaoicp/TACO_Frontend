@@ -39,7 +39,7 @@
                     <i class="fa-solid fa-circle-info"></i>
                 </div>
 
-                <div class="d-flex flex-column align-items-center gap-1 ms-auto">
+                <div class="d-none d-md-flex flex-column align-items-center gap-1 ms-auto">
 
                     <!-- if viewing current -->
                     <span class="taco-text-white 
@@ -71,12 +71,12 @@
 
             <!-- if no holdings -->
             <div v-if="showCurrentHoldings && !currentHoldingsHaveValue" class="dao-allocations__no-holdings py-5 text-center">
-                <span class="taco-text-white">No holdings</span>
+                <span class="taco-text-white">No holdings yet</span>
             </div>
 
             <!-- if no allocations -->
             <div v-if="showCurrentAllocations && !currentAllocationsHaveValue" class="dao-allocations__no-allocations py-5 text-center">
-                <span class="taco-text-white">No allocations</span>
+                <span class="taco-text-white">No allocations yet</span>
             </div>
         
         </div>

@@ -10,7 +10,7 @@
                 <h3 class="news-content__title">
                     Hello World!
                 </h3>
-                <span class="news-content__date">🍽️ May 1, 2025</span>
+                <span class="news-content__date">🍽️ May 5, 2025</span>
                 <p class="news-content__text">
                     👨‍🍳 Hey, we're live!
                 </p>
@@ -21,7 +21,7 @@
                 <h3 class="news-content__title">
                     Shameless Social Media Promotion
                 </h3>
-                <span class="news-content__date">🍽️ May 1, 2025</span>
+                <span class="news-content__date">🍽️ May 5, 2025</span>
                 <p class="news-content__text">
                     <a href="https://oc.app/community/lizfz-ryaaa-aaaar-bagsa-cai" target="_blank">Open Chat</a><br>
                     <a href="https://nuance.xyz/user/tacodao" target="_blank">Nuance</a><br>
@@ -36,7 +36,7 @@
                 <h3 class="news-content__title">
                     Thank you from the Taco team!
                 </h3>
-                <span class="news-content__date">🍽️ May 1, 2025</span>
+                <span class="news-content__date">🍽️ May 5, 2025</span>
                 <p class="news-content__text">
                     You guys rock. Thanks for being patient with us. Enjoy the tacos! 🌮
                 </p>

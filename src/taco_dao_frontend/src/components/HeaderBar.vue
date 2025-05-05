@@ -70,6 +70,20 @@
     <!-- header bar right -->
     <div class="header-bar__right">
 
+      <!-- pre-sns disclaimer -->
+      <div class="header-bar__pre-sns-disclaimer">
+
+        <span class="badge bg-danger"
+              title="We're conducting our SNS launch right now! Once it is complete, TACO holders will be able to stake and hotkey their TACO, enabling voting and DAO trading"
+              data-bs-toggle="tooltip"
+              data-bs-placement="bottom"
+              data-bs-custom-class="taco-tooltip">
+              <i class="fa-solid fa-triangle-exclamation"></i>
+              <span class="ms-1 d-none d-md-inline">PRE-SNS</span>
+        </span>
+
+      </div>
+
       <!-- icp price, taco dao holdings, and wallet container -->
       <div class="header-bar__chips d-flex flex-nowrap align-items-center gap-3" 
             style="user-select: text;">
