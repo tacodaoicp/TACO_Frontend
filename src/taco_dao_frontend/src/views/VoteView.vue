@@ -616,8 +616,8 @@
                       <button v-if="!userLockedVote" 
                         @click="userLockedVote = true"
                         class="btn taco-btn taco-btn--green taco-btn--big w-100"
-                        :class="{'disabled': !currentSlidersSumTo100 || matchesLast}"
-                        :disabled="!currentSlidersSumTo100 || matchesLast">
+                        :class="{'disabled': !currentSlidersSumTo100 || matchesLast || !votePower}"
+                        :disabled="!currentSlidersSumTo100 || matchesLast || !votePower">
                         <span v-if="votePower > 0 && currentSlidersSumTo100 && !matchesLast">Lock In Vote</span>
                         <span v-if="votePower === 0 || !votePower">You have no voting power</span>
                         <span v-if="!currentSlidersSumTo100">All values do not equal 100%</span>
