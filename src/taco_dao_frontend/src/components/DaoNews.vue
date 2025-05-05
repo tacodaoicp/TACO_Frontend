@@ -25,14 +25,19 @@
                         :class="{'taco-nav-btn--active': selectedNav === 'news'}">News</button>                
 
                 <!-- open chat -->
-                <button @click="selectedNav = 'open-chat'" 
+                <!-- <button @click="selectedNav = 'open-chat'" 
                         class="btn taco-nav-btn"
-                        :class="{'taco-nav-btn--active': selectedNav === 'open-chat'}">Open Chat</button>              
+                        :class="{'taco-nav-btn--active': selectedNav === 'open-chat'}">Open Chat</button>               -->
 
                 <!-- twitter -->
-                <button @click="selectedNav = 'twitter'" 
+                <!-- <button @click="selectedNav = 'twitter'" 
                         class="btn taco-nav-btn"
-                        :class="{'taco-nav-btn--active': selectedNav === 'twitter'}">Twitter</button>
+                        :class="{'taco-nav-btn--active': selectedNav === 'twitter'}">Twitter</button> -->
+
+                <!-- trade logs -->
+                <button @click="selectedNav = 'trade-log'" 
+                        class="btn taco-nav-btn"
+                        :class="{'taco-nav-btn--active': selectedNav === 'trade-log'}">Trade Log</button>                        
 
             </div>
 
@@ -51,18 +56,13 @@
 
         </div>
 
-        <!-- open chat -->
-        <div v-if="hasShownOpenChat" v-show="selectedNav === 'open-chat'">
-          <!-- open chat frame -->
-          <OpenChatFrame :initialPath="'/community/rfeib-riaaa-aaaar-ar3oq-cai/channel/334961401678552956581044255076222828441'" 
-                        :baseTheme="'dark'" 
-                        :disableNav="true" />
-        </div>
+        <!-- trade log -->
+        <div v-show="selectedNav === 'trade-log'"
+            class="dao-news__content__trade-log overflow-hidden">
 
-        <!-- twitter -->
-        <div v-if="hasShownTwitter" v-show="selectedNav === 'twitter'">
-          <!-- twitter timeline -->
-          <TwitterTimeline />
+          <!-- trade log content -->
+          <DaoTradingLogs />
+
         </div>
 
       </div>
@@ -90,7 +90,14 @@
 
   // content
   &__content {
+    display: flex;
+    flex-direction: column;
 
+    // trade log
+    &__trade-log {
+      display: flex;
+    }
+    
   }
 
   // loading curtain
@@ -127,8 +134,9 @@
   import { ref, watch } from "vue"
   import astronautLoader from '../assets/images/astonautLoader.webp'
   import NewsContent from './ui/NewsContent.vue'
-  import OpenChatFrame from './ui/OpenChatFrame.vue'
-  import TwitterTimeline from './ui/TwitterTimeline.vue'
+  import DaoTradingLogs from './DaoTradingLogs.vue'
+  // import OpenChatFrame from './ui/OpenChatFrame.vue'
+  // import TwitterTimeline from './ui/TwitterTimeline.vue'
 
   /////////////////////
   // local variables //
@@ -142,16 +150,18 @@
 
   // references
   const selectedNav = ref('news')
-  const hasShownOpenChat = ref(false)
-  const hasShownTwitter = ref(false)
+  // const hasShownOpenChat = ref(false)
+  // const hasShownTwitter = ref(false)
+  const hasShownTradeLog = ref(false)
 
   //////////////
   // watchers //
   //////////////
 
   watch(() => selectedNav.value, (newNav) => {
-    if (newNav === 'open-chat') hasShownOpenChat.value = true
-    if (newNav === 'twitter') hasShownTwitter.value = true
+    // if (newNav === 'open-chat') hasShownOpenChat.value = true
+    // if (newNav === 'twitter') hasShownTwitter.value = true
+    if (newNav === 'trade-log') hasShownTradeLog.value = true
   })
 
 </script>

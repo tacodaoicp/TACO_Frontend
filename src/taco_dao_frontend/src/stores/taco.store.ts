@@ -292,6 +292,9 @@ export const useTacoStore = defineStore('taco', () => {
     const portfolioTokenPricesInUsd = useStorage('portfolioTokenPricesInUsd', [])
     const portfolioTokenPricesInIcp = useStorage('portfolioTokenPricesInIcp', [])
 
+    // treasury
+    const fetchedTradingStatus = ref()
+
     // snassy's (off limits don't touch!)    
     const timerHealth = ref({
         snapshot: {
@@ -805,7 +808,7 @@ export const useTacoStore = defineStore('taco', () => {
         // from coingecko standard endpoint
 
         // log
-        console.log('taco.store: fetchCryptoPrices()')
+        // console.log('taco.store: fetchCryptoPrices()')
 
         // get current time
         const now = Date.now()
@@ -820,7 +823,7 @@ export const useTacoStore = defineStore('taco', () => {
             // console.log('fetching new crypto prices')
 
             // log
-            console.log('taco.store: fetching new crypto prices')
+            // console.log('taco.store: fetching new crypto prices')
 
             // try coingecko standard endpoint for icp and btc
             try {
@@ -838,7 +841,7 @@ export const useTacoStore = defineStore('taco', () => {
                 const data = await response.json()
                 
                 // log
-                console.log('taco.store: fetchCryptoPrices() - coingecko standard endpoint data:', data)
+                // console.log('taco.store: fetchCryptoPrices() - coingecko standard endpoint data:', data)
 
                 // // detailed logging
                 // data.forEach((coin: any) => {
@@ -1011,7 +1014,7 @@ export const useTacoStore = defineStore('taco', () => {
 
             // get host
             const host = process.env.DFX_NETWORK === "local"
-                ? `http://localhost:63803`
+                ? `http://localhost:49811`
                 : "https://ic0.app";
 
             // create agent
@@ -1054,7 +1057,7 @@ export const useTacoStore = defineStore('taco', () => {
 
             // get host
             const host = process.env.DFX_NETWORK === "local"
-                ? `http://localhost:63803`
+                ? `http://localhost:49811`
                 : "https://ic0.app"
 
             // create agent
@@ -1086,27 +1089,27 @@ export const useTacoStore = defineStore('taco', () => {
             fetchedTokenDetails.value = tokenDetails
 
             // log
-            console.log('taco.store: fetchTokenDetails() - returned info:', tokenDetails)
+            // console.log('taco.store: fetchTokenDetails() - returned info:', tokenDetails)
 
             // calculate total portfolio value in USD
-            console.log('\n=== Calculating Total Portfolio Value in USD ===')
+            // console.log('\n=== Calculating Total Portfolio Value in USD ===')
             totalPortfolioValueInUsd.value = fetchedTokenDetails.value.reduce((acc, tokenEntry) => {
                 const tokenDetails = tokenEntry[1]
                 const tokenValue = Number(tokenDetails.priceInUSD) * (Number(tokenDetails.balance) / Math.pow(10, Number(tokenDetails.tokenDecimals)))
-                console.log(`Token ${tokenDetails.tokenSymbol}: $${tokenValue} (${Number(tokenDetails.balance) / Math.pow(10, Number(tokenDetails.tokenDecimals))} tokens @ $${Number(tokenDetails.priceInUSD)} each)`)
+                // console.log(`Token ${tokenDetails.tokenSymbol}: $${tokenValue} (${Number(tokenDetails.balance) / Math.pow(10, Number(tokenDetails.tokenDecimals))} tokens @ $${Number(tokenDetails.priceInUSD)} each)`)
                 return acc + tokenValue
             }, 0)
-            console.log(`Total Portfolio Value in USD: $${totalPortfolioValueInUsd.value}`)
+            // console.log(`Total Portfolio Value in USD: $${totalPortfolioValueInUsd.value}`)
 
             // calculate total portfolio value in ICP
-            console.log('\n=== Calculating Total Portfolio Value in ICP ===')
+            // console.log('\n=== Calculating Total Portfolio Value in ICP ===')
             totalPortfolioValueInIcp.value = fetchedTokenDetails.value.reduce((acc, tokenEntry) => {
                 const tokenDetails = tokenEntry[1]
                 const tokenValue = (Number(tokenDetails.priceInICP) / Math.pow(10, 8)) * (Number(tokenDetails.balance) / Math.pow(10, Number(tokenDetails.tokenDecimals)))
-                console.log(`Token ${tokenDetails.tokenSymbol}: ${tokenValue} ICP (${Number(tokenDetails.balance) / Math.pow(10, Number(tokenDetails.tokenDecimals))} tokens @ ${Number(tokenDetails.priceInICP) / Math.pow(10, 8)} ICP each)`)
+                // console.log(`Token ${tokenDetails.tokenSymbol}: ${tokenValue} ICP (${Number(tokenDetails.balance) / Math.pow(10, Number(tokenDetails.tokenDecimals))} tokens @ ${Number(tokenDetails.priceInICP) / Math.pow(10, 8)} ICP each)`)
                 return acc + tokenValue
             }, 0)
-            console.log(`Total Portfolio Value in ICP: ${totalPortfolioValueInIcp.value} ICP`)
+            // console.log(`Total Portfolio Value in ICP: ${totalPortfolioValueInIcp.value} ICP`)
 
             return            
 
@@ -1117,33 +1120,33 @@ export const useTacoStore = defineStore('taco', () => {
         }
     }
     const fetchAggregateAllocation = async () => {
-        console.log('taco.store: fetchAggregateAllocation() - Starting fetch...');
+        // console.log('taco.store: fetchAggregateAllocation() - Starting fetch...');
         try {
             const host = process.env.DFX_NETWORK === "local"
-                ? `http://localhost:63803`
+                ? `http://localhost:49811`
                 : "https://ic0.app"
-            console.log('taco.store: fetchAggregateAllocation() - Using host:', host);
+            // console.log('taco.store: fetchAggregateAllocation() - Using host:', host);
 
             const agent = await createAgent({
                 identity: new AnonymousIdentity(),
                 host,
                 fetchRootKey: process.env.DFX_NETWORK === "local",
             })
-            console.log('taco.store: fetchAggregateAllocation() - Agent created');
+            // console.log('taco.store: fetchAggregateAllocation() - Agent created');
 
             const canisterId = process.env.DFX_NETWORK === "ic"
                 ? 'vxqw7-iqaaa-aaaan-qzziq-cai'
                 : 'ywhqf-eyaaa-aaaad-qg6tq-cai';
-            console.log('taco.store: fetchAggregateAllocation() - Using canisterId:', canisterId);
+            // console.log('taco.store: fetchAggregateAllocation() - Using canisterId:', canisterId);
 
             const actor = Actor.createActor(daoBackendIDL, {
                 agent,
                 canisterId,
             })
-            console.log('taco.store: fetchAggregateAllocation() - Actor created');
+            // console.log('taco.store: fetchAggregateAllocation() - Actor created');
 
             const aggregateAllocation = await actor.getAggregateAllocation();
-            console.log('taco.store: fetchAggregateAllocation() - Raw response:', aggregateAllocation);
+            // console.log('taco.store: fetchAggregateAllocation() - Raw response:', aggregateAllocation);
 
             if (!aggregateAllocation || !Array.isArray(aggregateAllocation)) {
                 console.error('taco.store: fetchAggregateAllocation() - Invalid response format:', aggregateAllocation);
@@ -1151,7 +1154,7 @@ export const useTacoStore = defineStore('taco', () => {
             }
 
             fetchedAggregateAllocation.value = aggregateAllocation;
-            console.log('taco.store: fetchAggregateAllocation() - Updated state:', fetchedAggregateAllocation.value);
+            // console.log('taco.store: fetchAggregateAllocation() - Updated state:', fetchedAggregateAllocation.value);
             return;
         } catch (error) {
             console.error('taco.store: fetchAggregateAllocation() - Error:', error);
@@ -1162,7 +1165,7 @@ export const useTacoStore = defineStore('taco', () => {
         console.log('taco.store: fetchVotingPowerMetrics() - Starting fetch...');
         try {
             const host = process.env.DFX_NETWORK === "local"
-                ? `http://localhost:63803`
+                ? `http://localhost:49811`
                 : "https://ic0.app"
             console.log('taco.store: fetchVotingPowerMetrics() - Using host:', host);
 
@@ -1224,7 +1227,7 @@ export const useTacoStore = defineStore('taco', () => {
                 const agent = await createAgent({
                     identity,
                     // host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-                    host: process.env.DFX_NETWORK === "local" ? `http://localhost:63803` : "https://ic0.app",
+                    host: process.env.DFX_NETWORK === "local" ? `http://localhost:49811` : "https://ic0.app",
                     fetchRootKey: process.env.DFX_NETWORK === "local",
                 })
 
@@ -1290,7 +1293,7 @@ export const useTacoStore = defineStore('taco', () => {
                 const agent = await createAgent({
                     identity,
                     // host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-                    host: process.env.DFX_NETWORK === "local" ? `http://localhost:63803` : "https://ic0.app",
+                    host: process.env.DFX_NETWORK === "local" ? `http://localhost:49811` : "https://ic0.app",
                     fetchRootKey: process.env.DFX_NETWORK === "local",
                 })
 
@@ -1352,7 +1355,7 @@ export const useTacoStore = defineStore('taco', () => {
                 const agent = await createAgent({
                     identity,
                     // host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-                    host: process.env.DFX_NETWORK === "local" ? `http://localhost:63803` : "https://ic0.app",
+                    host: process.env.DFX_NETWORK === "local" ? `http://localhost:49811` : "https://ic0.app",
                     fetchRootKey: process.env.DFX_NETWORK === "local",
                 })
 
@@ -1427,7 +1430,7 @@ export const useTacoStore = defineStore('taco', () => {
                 const agent = await createAgent({
                     identity,
                     // host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-                    host: process.env.DFX_NETWORK === "local" ? `http://localhost:63803` : "https://ic0.app",
+                    host: process.env.DFX_NETWORK === "local" ? `http://localhost:49811` : "https://ic0.app",
                     fetchRootKey: process.env.DFX_NETWORK === "local",
                 })
 
@@ -1479,6 +1482,62 @@ export const useTacoStore = defineStore('taco', () => {
 
             // return
             return false
+
+        }
+    }
+
+    // treasury backend
+    const getTradingStatus = async () => {
+
+        // log
+        // console.log('taco.store: unfollowAllocation()')   
+
+        try {
+
+            // get host
+            const host = process.env.DFX_NETWORK === "local"
+                ? `http://localhost:49811`
+                : "https://ic0.app"
+
+            // create agent
+            const agent = await createAgent({
+                identity: new AnonymousIdentity(),
+                host,
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            })
+
+            // determine canisterId based on network
+            const canisterId = process.env.DFX_NETWORK === "ic"
+                ? 'v6t5d-6yaaa-aaaan-qzzja-cai'
+                : 'z4is7-giaaa-aaaad-qg6uq-cai';
+
+            // create actor
+            const actor = Actor.createActor(treasuryIDL, {
+                agent,
+                canisterId,
+            })
+            
+            //////////////////////
+            // post actor logic //
+
+            // get trading status
+            const tradingStatus = await actor.getTradingStatus()
+
+            // set fetched token details
+            // @ts-ignore
+            fetchedTradingStatus.value = tradingStatus
+
+            // log
+            console.log('taco.store: getTradingStatus() - returned info: - raw', tradingStatus)
+            console.log('taco.store: getTradingStatus() - returned info - fetched:', fetchedTradingStatus.value)
+            // @ts-ignore
+            // console.log('taco.store: getTradingStatus() - digging:', tradingStatus.ok?.executedTrades?.[0]?.amountBought)
+
+            return            
+
+        } catch (error) {
+
+            console.error('error fetching trading status from treasury backend:', error)
 
         }
     }
@@ -2595,6 +2654,7 @@ export const useTacoStore = defineStore('taco', () => {
         rebalanceConfig,
         fetchedVoterDetails,
         fetchedNeuronAllocations,
+        fetchedTradingStatus,
         // actions
         changeRoute,
         toggleDarkMode,
@@ -2635,6 +2695,7 @@ export const useTacoStore = defineStore('taco', () => {
         fetchNeuronAllocations,
         updateSystemParameter,
         updateSnapshotInterval,
+        getTradingStatus,
     }
 })
 
