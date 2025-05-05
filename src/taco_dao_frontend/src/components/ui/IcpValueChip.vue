@@ -45,6 +45,8 @@
             img {
                 width: 1rem;
                 height: 1rem;
+                outline: 1px solid var(--dark-orange-to-transparent);
+                border-radius: 999rem;
             }
 
             // icp price

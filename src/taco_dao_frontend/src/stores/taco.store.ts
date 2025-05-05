@@ -863,8 +863,8 @@ export const useTacoStore = defineStore('taco', () => {
                 btcPriceUsd.value = btcData?.current_price || 0
 
                 // // log
-                console.log('✨ ICP price in USD: ' + icpPriceUsd.value)
-                console.log('✨ BTC price in USD: ' + btcPriceUsd.value)
+                // console.log('✨ ICP price in USD: ' + icpPriceUsd.value)
+                // console.log('✨ BTC price in USD: ' + btcPriceUsd.value)
 
                 // // set last price update
                 lastPriceUpdate.value = now
@@ -947,8 +947,8 @@ export const useTacoStore = defineStore('taco', () => {
                 sneedPriceIcp.value = baseTokenPriceQuoteToken || 0
 
                 // log
-                console.log('✨ Sneed price in USD:', sneedPriceUsd.value)
-                console.log('✨ Sneed price in ICP:', sneedPriceIcp.value)
+                // console.log('✨ Sneed price in USD:', sneedPriceUsd.value)
+                // console.log('✨ Sneed price in ICP:', sneedPriceIcp.value)
 
                 // set last price update
                 lastPriceUpdate.value = now                
@@ -966,10 +966,10 @@ export const useTacoStore = defineStore('taco', () => {
         else {
 
             console.log('taco.store: using saved crypto prices')
-            console.log('💾 ICP price in USD:', icpPriceUsd.value)
-            console.log('💾 BTC price in USD:', btcPriceUsd.value)
-            console.log('💾 Sneed price in USD:', sneedPriceUsd.value)
-            console.log('💾 Sneed price in ICP:', sneedPriceIcp.value)
+            // console.log('💾 ICP price in USD:', icpPriceUsd.value)
+            // console.log('💾 BTC price in USD:', btcPriceUsd.value)
+            // console.log('💾 Sneed price in USD:', sneedPriceUsd.value)
+            // console.log('💾 Sneed price in ICP:', sneedPriceIcp.value)
 
         }
 
@@ -1014,7 +1014,7 @@ export const useTacoStore = defineStore('taco', () => {
 
             // get host
             const host = process.env.DFX_NETWORK === "local"
-                ? `http://localhost:49811`
+                ? `http://localhost:50144`
                 : "https://ic0.app";
 
             // create agent
@@ -1057,7 +1057,7 @@ export const useTacoStore = defineStore('taco', () => {
 
             // get host
             const host = process.env.DFX_NETWORK === "local"
-                ? `http://localhost:49811`
+                ? `http://localhost:50144`
                 : "https://ic0.app"
 
             // create agent
@@ -1123,7 +1123,7 @@ export const useTacoStore = defineStore('taco', () => {
         // console.log('taco.store: fetchAggregateAllocation() - Starting fetch...');
         try {
             const host = process.env.DFX_NETWORK === "local"
-                ? `http://localhost:49811`
+                ? `http://localhost:50144`
                 : "https://ic0.app"
             // console.log('taco.store: fetchAggregateAllocation() - Using host:', host);
 
@@ -1162,33 +1162,33 @@ export const useTacoStore = defineStore('taco', () => {
         }
     }    
     const fetchVotingPowerMetrics = async () => {
-        console.log('taco.store: fetchVotingPowerMetrics() - Starting fetch...');
+        // console.log('taco.store: fetchVotingPowerMetrics() - Starting fetch...');
         try {
             const host = process.env.DFX_NETWORK === "local"
-                ? `http://localhost:49811`
+                ? `http://localhost:50144`
                 : "https://ic0.app"
-            console.log('taco.store: fetchVotingPowerMetrics() - Using host:', host);
+            // console.log('taco.store: fetchVotingPowerMetrics() - Using host:', host);
 
             const agent = await createAgent({
                 identity: new AnonymousIdentity(),
                 host,
                 fetchRootKey: process.env.DFX_NETWORK === "local",
             })
-            console.log('taco.store: fetchVotingPowerMetrics() - Agent created');
+            // console.log('taco.store: fetchVotingPowerMetrics() - Agent created');
 
             const canisterId = process.env.DFX_NETWORK === "ic"
                 ? 'vxqw7-iqaaa-aaaan-qzziq-cai'
                 : 'ywhqf-eyaaa-aaaad-qg6tq-cai';
-            console.log('taco.store: fetchVotingPowerMetrics() - Using canisterId:', canisterId);
+            // console.log('taco.store: fetchVotingPowerMetrics() - Using canisterId:', canisterId);
 
             const actor = Actor.createActor(daoBackendIDL, {
                 agent,
                 canisterId,
             })
-            console.log('taco.store: fetchVotingPowerMetrics() - Actor created');
+            // console.log('taco.store: fetchVotingPowerMetrics() - Actor created');
 
             const response = await actor.votingPowerMetrics() as VotingMetricsResponse;
-            console.log('taco.store: fetchVotingPowerMetrics() - Raw response:', response);
+            // console.log('taco.store: fetchVotingPowerMetrics() - Raw response:', response);
 
             if (!response || !('ok' in response)) {
                 console.error('taco.store: fetchVotingPowerMetrics() - Invalid response format:', response);
@@ -1197,7 +1197,7 @@ export const useTacoStore = defineStore('taco', () => {
 
             // Store the response directly instead of wrapping it in an array
             fetchedVotingPowerMetrics.value = response;
-            console.log('taco.store: fetchVotingPowerMetrics() - Updated state:', fetchedVotingPowerMetrics.value);
+            // console.log('taco.store: fetchVotingPowerMetrics() - Updated state:', fetchedVotingPowerMetrics.value);
             return;
         } catch (error) {
             console.error('taco.store: fetchVotingPowerMetrics() - Error:', error);
@@ -1227,7 +1227,7 @@ export const useTacoStore = defineStore('taco', () => {
                 const agent = await createAgent({
                     identity,
                     // host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-                    host: process.env.DFX_NETWORK === "local" ? `http://localhost:49811` : "https://ic0.app",
+                    host: process.env.DFX_NETWORK === "local" ? `http://localhost:50144` : "https://ic0.app",
                     fetchRootKey: process.env.DFX_NETWORK === "local",
                 })
 
@@ -1293,7 +1293,7 @@ export const useTacoStore = defineStore('taco', () => {
                 const agent = await createAgent({
                     identity,
                     // host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-                    host: process.env.DFX_NETWORK === "local" ? `http://localhost:49811` : "https://ic0.app",
+                    host: process.env.DFX_NETWORK === "local" ? `http://localhost:50144` : "https://ic0.app",
                     fetchRootKey: process.env.DFX_NETWORK === "local",
                 })
 
@@ -1355,7 +1355,7 @@ export const useTacoStore = defineStore('taco', () => {
                 const agent = await createAgent({
                     identity,
                     // host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-                    host: process.env.DFX_NETWORK === "local" ? `http://localhost:49811` : "https://ic0.app",
+                    host: process.env.DFX_NETWORK === "local" ? `http://localhost:50144` : "https://ic0.app",
                     fetchRootKey: process.env.DFX_NETWORK === "local",
                 })
 
@@ -1430,7 +1430,7 @@ export const useTacoStore = defineStore('taco', () => {
                 const agent = await createAgent({
                     identity,
                     // host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-                    host: process.env.DFX_NETWORK === "local" ? `http://localhost:49811` : "https://ic0.app",
+                    host: process.env.DFX_NETWORK === "local" ? `http://localhost:50144` : "https://ic0.app",
                     fetchRootKey: process.env.DFX_NETWORK === "local",
                 })
 
@@ -1496,7 +1496,7 @@ export const useTacoStore = defineStore('taco', () => {
 
             // get host
             const host = process.env.DFX_NETWORK === "local"
-                ? `http://localhost:49811`
+                ? `http://localhost:50144`
                 : "https://ic0.app"
 
             // create agent
@@ -1528,8 +1528,8 @@ export const useTacoStore = defineStore('taco', () => {
             fetchedTradingStatus.value = tradingStatus
 
             // log
-            console.log('taco.store: getTradingStatus() - returned info: - raw', tradingStatus)
-            console.log('taco.store: getTradingStatus() - returned info - fetched:', fetchedTradingStatus.value)
+            // console.log('taco.store: getTradingStatus() - returned info: - raw', tradingStatus)
+            // console.log('taco.store: getTradingStatus() - returned info - fetched:', fetchedTradingStatus.value)
             // @ts-ignore
             // console.log('taco.store: getTradingStatus() - digging:', tradingStatus.ok?.executedTrades?.[0]?.amountBought)
 

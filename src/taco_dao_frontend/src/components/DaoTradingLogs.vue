@@ -267,6 +267,11 @@
 
     // refresh data
     const refreshData = async () => {
+        
+        // log
+        console.log('refreshing news tile...')
+
+        // get trading status
         await getTradingStatus()
     }
 
@@ -361,7 +366,7 @@
         await getTradingStatus()
 
         // log
-        console.log('DaoTradingLogs.vue: onMounted() - fetched trading status:', fetchedTradingStatus.value)
+        // console.log('DaoTradingLogs.vue: onMounted() - fetched trading status:', fetchedTradingStatus.value)
 
         // if no token details, fetch them
         if (!fetchedTokenDetails.value.length) {
@@ -369,7 +374,7 @@
         }
 
         // log
-        console.log('DaoTradingLogs.vue: onMounted() - fetched token details:', fetchedTokenDetails.value)
+        // console.log('DaoTradingLogs.vue: onMounted() - fetched token details:', fetchedTokenDetails.value)
 
         // set refresh interval
         refreshInterval = window.setInterval(refreshData, 60_000)

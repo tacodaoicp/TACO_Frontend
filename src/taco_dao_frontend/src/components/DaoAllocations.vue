@@ -839,7 +839,7 @@ LOCAL METHODS
                 if (percentages.length === 0) {
 
                     // log
-                    console.log('no allocations of value')
+                    // console.log('no allocations of value')
 
                     // set no holdings have value
                     currentAllocationsHaveValue.value = false
@@ -909,7 +909,7 @@ LOCAL METHODS
                 const holdings = fetchedTokenDetails.value || []
 
                 // log
-                console.log('holdings', holdings)
+                // console.log('holdings', holdings)
 
                 // calculate total value across all tokens
                 const totalValue = holdings.reduce((sum, [_, token]) => {
@@ -925,7 +925,7 @@ LOCAL METHODS
                 })
 
                 // log
-                console.log('percentages', percentages)
+                // console.log('percentages', percentages)
 
                 // create symbols array
                 const symbols = holdings.map(([_, token]) => token.tokenSymbol.toLowerCase())
