@@ -335,7 +335,52 @@
               <ul class="taco-bs-list 
                         list-group">
 
-                <!-- list item -->
+                <!-- list item - launching taco dao -->
+                <li class="standard-focus standard-focus--negative-offset
+                          list-group-item d-flex flex-nowrap py-3 gap-3"
+                    tabindex="0">
+
+                  <span class="taco-text-black-to-white text-nowrap">📰 <a class="taco-text-blue-to-light-blue" href="https://nuance.xyz/tacodao/13771-434go-diaaa-aaaaf-qakwq-cai/launching-taco-dao" target="_blank">Launching Taco Dao</a></span>
+
+                </li>   
+
+                <!-- list item - Applications of the Weighted Voting Framework -->
+                <li class="standard-focus standard-focus--negative-offset
+                          list-group-item d-flex flex-nowrap py-3 gap-3"
+                    tabindex="0">
+
+                  <span class="taco-text-black-to-white text-nowrap">📰 <a class="taco-text-blue-to-light-blue" href="https://nuance.xyz/tacodao/12606-434go-diaaa-aaaaf-qakwq-cai/applications-of-the-weighted-voting-framework" target="_blank">Applications of the WFW</a></span>
+
+                </li>                
+                
+                <!-- list item - introducing the taco dex -->
+                <li class="standard-focus standard-focus--negative-offset
+                          list-group-item d-flex flex-nowrap py-3 gap-3"
+                    tabindex="0">
+
+                  <span class="taco-text-black-to-white text-nowrap">📰 <a class="taco-text-blue-to-light-blue" href="https://nuance.xyz/tacodao/11330-434go-diaaa-aaaaf-qakwq-cai/introducing-the-taco-dex" target="_blank">Introducing the TACO DEX</a></span>
+
+                </li>
+
+                        <!-- list item - revealing taco dao -->
+                <li class="standard-focus standard-focus--negative-offset
+                          list-group-item d-flex flex-nowrap py-3 gap-3"
+                    tabindex="0">
+
+                  <span class="taco-text-black-to-white text-nowrap">📰 <a class="taco-text-blue-to-light-blue" href="https://nuance.xyz/tacodao/11327-434go-diaaa-aaaaf-qakwq-cai/revealing-taco-dao" target="_blank">Revealing Taco DAO</a></span>
+
+                </li>
+
+                        <!-- list item - announcing taco dao -->
+                <li class="standard-focus standard-focus--negative-offset
+                          list-group-item d-flex flex-nowrap py-3 gap-3"
+                    tabindex="0">
+
+                  <span class="taco-text-black-to-white text-nowrap">📰 <a class="taco-text-blue-to-light-blue" href="https://nuance.xyz/tacodao/5402-434go-diaaa-aaaaf-qakwq-cai/announcing-taco-dao" target="_blank">Announcing Taco DAO</a></span>
+
+                </li>
+
+                <!-- list item - whitepaper -->
                 <li class="standard-focus standard-focus--negative-offset
                           list-group-item d-flex flex-nowrap py-3 gap-3"
                     tabindex="0">
