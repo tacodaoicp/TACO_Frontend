@@ -7,7 +7,6 @@ import { ref, computed } from 'vue'
 import { defineStore } from 'pinia'
 import { useRouter } from 'vue-router'
 import { useStorage } from "@vueuse/core"
-import { useBigNumber } from '../composables/useBigNumber'
 
 // dfinity
 import { AuthClient } from "@dfinity/auth-client"
