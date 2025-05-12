@@ -14,7 +14,7 @@
         <div class="taco-container taco-container--l2 taco-container--l2--dark p-2">
 
             <!-- toolbar -->
-            <div class="taco-toolbar">
+            <div class="taco-toolbar flex-nowrap">
 
                 <!-- if not viewing historical - current and historical buttons -->
                 <div class="btn-group">
@@ -379,6 +379,11 @@
         .loading-img {
             width: 10rem;
         }
+    }
+
+    // overrides
+    .taco-toolbar {
+        flex-wrap: nowrap;
     }
 
 }

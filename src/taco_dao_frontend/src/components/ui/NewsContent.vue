@@ -8,14 +8,27 @@
             <!-- news item -->
             <div class="news-content__item">
                 <h3 class="news-content__title">
-                    Hello World!
+                    Sale Update
+                </h3>
+                <span class="news-content__date">🍽️ May 11, 2025</span>
+                <p class="news-content__text">
+                    Hey Everyone!
+                    <br>
+                    The <a href="https://nns.ic0.app/project/?project=lacdn-3iaaa-aaaaq-aae3a-cai" target="_blank">Decentralization Sale</a> is live and going great! Thank you to all the early birds! The sale runs through Friday, May 23, 2025, at 12:00 PM (noon) Pacific Time, or until we hit our maximum sale amount.
+                </p>
+            </div>                
+
+            <!-- news item -->
+            <div class="news-content__item">
+                <h3 class="news-content__title">
+                    Thank you from the Taco team!
                 </h3>
                 <span class="news-content__date">🍽️ May 5, 2025</span>
                 <p class="news-content__text">
-                    👨‍🍳 Hey, we're live!
+                    You guys rock. Thanks for being patient with us. Enjoy the tacos! 🌮
                 </p>
-            </div>
-
+            </div>    
+            
             <!-- news item -->
             <div class="news-content__item">
                 <h3 class="news-content__title">
@@ -29,16 +42,16 @@
                     <a href="https://x.com/tacodaoicp" target="_blank">X</a><br>
                     <a href="https://discord.gg/eVe8kqdVQd" target="_blank">Discord</a>
                 </p>
-            </div>
+            </div>            
 
             <!-- news item -->
             <div class="news-content__item">
                 <h3 class="news-content__title">
-                    Thank you from the Taco team!
+                    Hello World!
                 </h3>
                 <span class="news-content__date">🍽️ May 5, 2025</span>
                 <p class="news-content__text">
-                    You guys rock. Thanks for being patient with us. Enjoy the tacos! 🌮
+                    👨‍🍳 Hey, we're live!
                 </p>
             </div>
 
