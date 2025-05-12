@@ -397,7 +397,7 @@
 // phone protrait
 @media (max-width: 575.98px) {
     .dao-allocations__taco-chart-container {
-        max-height: unset; // needs an event listener to adjust height
+        max-height: unset !important; // needs an event listener to adjust height
     } 
     .dao-allocations__token-title__name-link {
         font-size: 0.875rem;
