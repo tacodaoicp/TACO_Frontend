@@ -79,12 +79,10 @@
                       <!-- key value pair -->
                       <div class="taco-list__kvp ps-3">
 
-                          <!-- down-over icon -->
-                          <i class="fa-solid fa-corner fa-rotate-180 me-2 taco-text-black-to-white"
-                            style="opacity: 0.5;"></i>
-
                           <!-- title -->
-                          <span class="taco-text-black-to-white">SNS Swap:</span>
+                          <span class="taco-text-black-to-white">
+                            <i class="fa-solid fa-corner fa-rotate-180 me-2 taco-text-black-to-white" style="opacity: 0.5;"></i> SNS Swap:
+                          </span>
 
                           <!-- data -->
                           <span class="taco-text-black-to-white">2,049,666 TACO (26.353%)</span>
@@ -100,12 +98,8 @@
                       <!-- key value pair -->
                       <div class="taco-list__kvp ps-3">
 
-                          <!-- down-over icon -->
-                          <i class="fa-solid fa-corner fa-rotate-180 me-2 taco-text-black-to-white"
-                            style="opacity: 0.5;"></i>
-
                           <!-- title -->
-                          <span class="taco-text-black-to-white">Founders' Presale:</span>
+                          <span class="taco-text-black-to-white"><i class="fa-solid fa-corner fa-rotate-180 me-2 taco-text-black-to-white" style="opacity: 0.5;"></i> Founders' Presale:</span>
 
                           <!-- data -->
                           <span class="taco-text-black-to-white">999,999 TACO (12.857%)</span>
@@ -121,12 +115,8 @@
                       <!-- key value pair -->
                       <div class="taco-list__kvp ps-3">
 
-                          <!-- down-over icon -->
-                          <i class="fa-solid fa-corner fa-rotate-180 me-2 taco-text-black-to-white"
-                            style="opacity: 0.5;"></i>
-
                           <!-- title -->
-                          <span class="taco-text-black-to-white">Front End Dev Allocation:</span>
+                          <span class="taco-text-black-to-white"><i class="fa-solid fa-corner fa-rotate-180 me-2 taco-text-black-to-white" style="opacity: 0.5;"></i> Front End Dev Allocation:</span>
 
                           <!-- data -->
                           <span class="taco-text-black-to-white">155,555 TACO  (2%)</span>
@@ -142,12 +132,8 @@
                       <!-- key value pair -->
                       <div class="taco-list__kvp ps-3">
 
-                          <!-- down-over icon -->
-                          <i class="fa-solid fa-corner fa-rotate-180 me-2 taco-text-black-to-white"
-                            style="opacity: 0.5;"></i>
-
                           <!-- title -->
-                          <span class="taco-text-black-to-white">Advisors' Allocation:</span>
+                          <span class="taco-text-black-to-white"><i class="fa-solid fa-corner fa-rotate-180 me-2 taco-text-black-to-white" style="opacity: 0.5;"></i> Advisors' Allocation:</span>
 
                           <!-- data -->
                           <span class="taco-text-black-to-white">115,077 TACO (1.479%)</span>
@@ -163,12 +149,8 @@
                       <!-- key value pair -->
                       <div class="taco-list__kvp ps-3">
 
-                          <!-- down-over icon -->
-                          <i class="fa-solid fa-corner fa-rotate-180 me-2 taco-text-black-to-white"
-                            style="opacity: 0.5;"></i>
-
                           <!-- title -->
-                          <span class="taco-text-black-to-white">Visual Design Allocation:</span>
+                          <span class="taco-text-black-to-white"><i class="fa-solid fa-corner fa-rotate-180 me-2 taco-text-black-to-white" style="opacity: 0.5;"></i> Visual Design Allocation:</span>
 
                           <!-- data -->
                           <span class="taco-text-black-to-white">77,777 TACO (1%)</span>
@@ -184,12 +166,8 @@
                       <!-- key value pair -->
                       <div class="taco-list__kvp ps-3">
 
-                          <!-- down-over icon -->
-                          <i class="fa-solid fa-corner fa-rotate-180 me-2 taco-text-black-to-white"
-                            style="opacity: 0.5;"></i>
-
                           <!-- title -->
-                          <span class="taco-text-black-to-white">DKP Swap:</span>
+                          <span class="taco-text-black-to-white"><i class="fa-solid fa-corner fa-rotate-180 me-2 taco-text-black-to-white" style="opacity: 0.5;"></i> DKP Swap:</span>
 
                           <!-- data -->
                           <span class="taco-text-black-to-white">700,000 TACO (9%)</span>
@@ -205,12 +183,8 @@
                       <!-- key value pair -->
                       <div class="taco-list__kvp ps-3">
 
-                          <!-- down-over icon -->
-                          <i class="fa-solid fa-corner fa-rotate-180 me-2 taco-text-black-to-white"
-                            style="opacity: 0.5;"></i>
-
                           <!-- title -->
-                          <span class="taco-text-black-to-white">Liquidity Pools:</span>
+                          <span class="taco-text-black-to-white"><i class="fa-solid fa-corner fa-rotate-180 me-2 taco-text-black-to-white" style="opacity: 0.5;"></i> Liquidity Pools:</span>
 
                           <!-- data -->
                           <span class="taco-text-black-to-white">395,975 TACO (5.091%)</span>
@@ -226,12 +200,8 @@
                       <!-- key value pair -->
                       <div class="taco-list__kvp ps-3">
 
-                          <!-- down-over icon -->
-                          <i class="fa-solid fa-corner fa-rotate-180 me-2 taco-text-black-to-white"
-                            style="opacity: 0.5;"></i>
-
                           <!-- title -->
-                          <span class="taco-text-black-to-white">Future Dev Allocation:</span>
+                          <span class="taco-text-black-to-white"><i class="fa-solid fa-corner fa-rotate-180 me-2 taco-text-black-to-white" style="opacity: 0.5;"></i> Future Dev Allocation:</span>
 
                           <!-- data -->
                           <span class="taco-text-black-to-white">930,975 TACO (11.97%)</span>
@@ -247,12 +217,8 @@
                       <!-- key value pair -->
                       <div class="taco-list__kvp ps-3">
 
-                          <!-- down-over icon -->
-                          <i class="fa-solid fa-corner fa-rotate-180 me-2 taco-text-black-to-white"
-                            style="opacity: 0.5;"></i>
-
                           <!-- title -->
-                          <span class="taco-text-black-to-white">TACO Mint Vault:</span>
+                          <span class="taco-text-black-to-white"><i class="fa-solid fa-corner fa-rotate-180 me-2 taco-text-black-to-white" style="opacity: 0.5;"></i> TACO Mint Vault:</span>
 
                           <!-- data -->
                           <span class="taco-text-black-to-white">2,352,753 TACO (30.25%)</span>
@@ -555,7 +521,7 @@
   import HeaderBar from "../components/HeaderBar.vue";
   import FooterBar from "../components/FooterBar.vue";
   import { ref } from "vue";
-  import TacoTitle from '../components/ui/TacoTitle.vue';
+  import TacoTitle from '../components/misc/TacoTitle.vue';
 
   /////////////////////
   // local variables //

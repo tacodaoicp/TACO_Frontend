@@ -540,11 +540,11 @@
   import { useTacoStore } from "../stores/taco.store"
   import { storeToRefs } from "pinia"
   import TacoDaoLogo from "../assets/images/tacoDaoLogo.vue"
-  import IcpValueChip from "../components/ui/IcpValueChip.vue"
-  import TacoTokenPriceChip from "../components/ui/TacoTokenPriceChip.vue"
-  import TacoPortfolioValueChip from "../components/ui/TacoPortfolioValueChip.vue"
+  import IcpValueChip from "../components/misc/IcpValueChip.vue"
+  import TacoTokenPriceChip from "../components/misc/TacoTokenPriceChip.vue"
+  import TacoPortfolioValueChip from "../components/misc/TacoPortfolioValueChip.vue"
   import DfinityLogo from "../assets/images/dfinityLogo.vue"
-  import DarkModeToggle from "../components/DarkModeToggle.vue"
+  import DarkModeToggle from "./theme/DarkModeToggle.vue"
   import { Tooltip } from 'bootstrap'
 
   ////////////

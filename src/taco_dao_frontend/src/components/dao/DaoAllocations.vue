@@ -516,11 +516,11 @@ LOCAL METHODS
     /////////////
 
     import { ref, watch, onMounted, onBeforeUnmount, computed, nextTick } from "vue"
-    import { useTacoStore } from "../stores/taco.store"
+    import { useTacoStore } from "../../stores/taco.store"
     import { storeToRefs } from "pinia"
-    import { tokenData } from "../components/data/TokenData"
-    import astronautLoader from '../assets/images/astonautLoader.webp'
-    import placeholder52x52 from '../assets/images/placeholder-52x52.png'
+    import { tokenData } from "../data/TokenData"
+    import astronautLoader from '../../assets/images/astonautLoader.webp'
+    import placeholder52x52 from '../../assets/images/placeholder-52x52.png'
     import { Tooltip } from 'bootstrap'
 
     ///////////

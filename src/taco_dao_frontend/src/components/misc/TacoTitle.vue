@@ -34,7 +34,10 @@
 
 <script setup>
 
-  import { computed } from 'vue';
+  // imports
+  import { computed } from 'vue'
+
+  // props
   const props = defineProps({
     level: {
       type: String,
@@ -53,8 +56,9 @@
       type: String,
       required: false,
     },
-  });
+  })
 
-  const tag = computed(() => props.level);
+  // computed
+  const tag = computed(() => props.level)
 
 </script>

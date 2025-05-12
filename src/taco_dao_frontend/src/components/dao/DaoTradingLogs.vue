@@ -234,9 +234,9 @@
     /////////////
 
     import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
-    import { useTacoStore } from '../stores/taco.store'
+    import { useTacoStore } from '../../stores/taco.store'
     import { storeToRefs } from 'pinia'
-    import { tokenData } from '../components/data/TokenData'
+    import { tokenData } from '../data/TokenData'
 
     ///////////
     // store //

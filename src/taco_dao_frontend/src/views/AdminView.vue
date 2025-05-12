@@ -821,8 +821,8 @@ import { useTacoStore, type GetSystemParameterResult } from '../stores/taco.stor
 import { storeToRefs } from "pinia"  
 import HeaderBar from "../components/HeaderBar.vue";
 import FooterBar from "../components/FooterBar.vue";
-import TacoTitle from '../components/ui/TacoTitle.vue';
-import TradingLogs from '../components/TradingLogs.vue';
+import TacoTitle from '../components/misc/TacoTitle.vue';
+import TradingLogs from '../components/admin/TradingLogs.vue';
 import { Principal } from '@dfinity/principal';
 
 // Add interface for VotingMetrics

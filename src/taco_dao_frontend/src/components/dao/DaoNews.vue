@@ -132,9 +132,9 @@
   /////////////
 
   import { ref, watch } from "vue"
-  import astronautLoader from '../assets/images/astonautLoader.webp'
-  import NewsContent from './ui/NewsContent.vue'
-  import DaoTradingLogs from './DaoTradingLogs.vue'
+  import astronautLoader from '../../assets/images/astonautLoader.webp'
+  import NewsContent from '../misc/NewsContent.vue'
+  import DaoTradingLogs from '../dao/DaoTradingLogs.vue'
   // import OpenChatFrame from './ui/OpenChatFrame.vue'
   // import TwitterTimeline from './ui/TwitterTimeline.vue'
 

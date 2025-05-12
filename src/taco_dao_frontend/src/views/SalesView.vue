@@ -554,7 +554,7 @@
   import HeaderBar from "../components/HeaderBar.vue";
   import FooterBar from "../components/FooterBar.vue";
   import {ref} from "vue";
-  import TacoTitle from '../components/ui/TacoTitle.vue';
+  import TacoTitle from '../components/misc/TacoTitle.vue';
 
   /////////////////////////
   // Reference Variables //

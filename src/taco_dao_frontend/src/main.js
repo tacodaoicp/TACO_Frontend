@@ -8,7 +8,7 @@ import HomeView from "./views/HomeView.vue"
 import DaoView from "./views/DaoView.vue"
 import VoteView from "./views/VoteView.vue"
 import SalesView from "./views/SalesView.vue"
-import SaleDKPSwap from "./components/SaleDKPSwap.vue"
+import SaleDKPSwap from "./components/sales/SaleDKPSwap.vue"
 import InfoView from "./views/InfoView.vue"
 import AdminView from "./views/AdminView.vue"
 import VueApexCharts from 'vue3-apexcharts'

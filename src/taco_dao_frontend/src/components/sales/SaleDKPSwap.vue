@@ -1049,8 +1049,8 @@
     // Imports //
     /////////////
 
-    import HeaderBar from "./HeaderBar.vue";
-    import FooterBar from "./FooterBar.vue";
-    import TacoTitle from '../components/ui/TacoTitle.vue'
+    import HeaderBar from "../../components/HeaderBar.vue";
+    import FooterBar from "../../components/FooterBar.vue";
+    import TacoTitle from '../../components/misc/TacoTitle.vue'
 
 </script>

@@ -206,9 +206,9 @@
   /////////////
 
   import { ref, onMounted, computed, watch } from "vue"
-  import { useTacoStore } from "../stores/taco.store"
+  import { useTacoStore } from "../../stores/taco.store"
   import { storeToRefs } from "pinia"
-  import astronautLoader from '../assets/images/astonautLoader.webp'
+  import astronautLoader from '../../assets/images/astonautLoader.webp'
 
   ///////////
   // Store //

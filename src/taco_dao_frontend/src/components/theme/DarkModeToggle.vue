@@ -54,7 +54,7 @@
     /////////////
 
     import { onMounted } from "vue";
-    import { useTacoStore } from "../stores/taco.store";
+    import { useTacoStore } from "../../stores/taco.store";
     import { storeToRefs } from "pinia";
 
     ////////////

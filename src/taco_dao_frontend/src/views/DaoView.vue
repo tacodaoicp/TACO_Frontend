@@ -251,10 +251,10 @@
 
   import HeaderBar from "../components/HeaderBar.vue";
   import FooterBar from "../components/FooterBar.vue";
-  import TacoTitle from '../components/ui/TacoTitle.vue'
-  import DaoAllocations from "../components/DaoAllocations.vue";
-  import DaoTrustedTokens from "../components/DaoTrustedTokens.vue";
-  import DaoVotePower from "../components/DaoVotePower.vue";
-  import DaoNews from "../components/DaoNews.vue";
+  import TacoTitle from '../components/misc/TacoTitle.vue'
+  import DaoAllocations from "../components/dao/DaoAllocations.vue";
+  import DaoTrustedTokens from "../components/dao/DaoTrustedTokens.vue";
+  import DaoVotePower from "../components/dao/DaoVotePower.vue";
+  import DaoNews from "../components/dao/DaoNews.vue";
 
 </script>
