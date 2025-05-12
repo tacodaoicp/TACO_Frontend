@@ -49,7 +49,7 @@
                           <span class="taco-text-black-to-white">Current Price:</span>
 
                           <!-- data -->
-                          <span class="taco-text-black-to-white"> 0.00 ICP ($0.00 USD)</span>
+                          <span class="taco-text-black-to-white ms-auto"> 0.00 ICP ($0.00 USD)</span>
 
                       </div>
 
@@ -66,7 +66,7 @@
                           <span class="taco-text-black-to-white">Circulating Supply:</span>
 
                           <!-- data -->
-                          <span class="taco-text-black-to-white">7,777,777 TACO</span>
+                          <span class="taco-text-black-to-white ms-auto">7,777,777 TACO</span>
 
                       </div>
 
@@ -85,7 +85,7 @@
                           </span>
 
                           <!-- data -->
-                          <span class="taco-text-black-to-white">2,049,666 TACO (26.353%)</span>
+                          <span class="taco-text-black-to-white ms-auto">2,049,666 TACO (26.353%)</span>
 
                       </div>
 
@@ -102,7 +102,7 @@
                           <span class="taco-text-black-to-white"><i class="fa-solid fa-corner fa-rotate-180 me-2 taco-text-black-to-white" style="opacity: 0.5;"></i> Founders' Presale:</span>
 
                           <!-- data -->
-                          <span class="taco-text-black-to-white">999,999 TACO (12.857%)</span>
+                          <span class="taco-text-black-to-white ms-auto">999,999 TACO (12.857%)</span>
 
                       </div>
 
@@ -116,10 +116,10 @@
                       <div class="taco-list__kvp ps-3">
 
                           <!-- title -->
-                          <span class="taco-text-black-to-white"><i class="fa-solid fa-corner fa-rotate-180 me-2 taco-text-black-to-white" style="opacity: 0.5;"></i> Front End Dev Allocation:</span>
+                          <span class="taco-text-black-to-white"><i class="fa-solid fa-corner fa-rotate-180 me-2 taco-text-black-to-white" style="opacity: 0.5;"></i> Frontend Dev Allocation:</span>
 
                           <!-- data -->
-                          <span class="taco-text-black-to-white">155,555 TACO  (2%)</span>
+                          <span class="taco-text-black-to-white ms-auto">155,555 TACO  (2%)</span>
 
                       </div>
 
@@ -133,10 +133,10 @@
                       <div class="taco-list__kvp ps-3">
 
                           <!-- title -->
-                          <span class="taco-text-black-to-white"><i class="fa-solid fa-corner fa-rotate-180 me-2 taco-text-black-to-white" style="opacity: 0.5;"></i> Advisors' Allocation:</span>
+                          <span class="taco-text-black-to-white"><i class="fa-solid fa-corner fa-rotate-180 me-2 taco-text-black-to-white" style="opacity: 0.5;"></i> Advisor Allocation:</span>
 
                           <!-- data -->
-                          <span class="taco-text-black-to-white">115,077 TACO (1.479%)</span>
+                          <span class="taco-text-black-to-white ms-auto">115,077 TACO (1.479%)</span>
 
                       </div>
 
@@ -153,7 +153,7 @@
                           <span class="taco-text-black-to-white"><i class="fa-solid fa-corner fa-rotate-180 me-2 taco-text-black-to-white" style="opacity: 0.5;"></i> Visual Design Allocation:</span>
 
                           <!-- data -->
-                          <span class="taco-text-black-to-white">77,777 TACO (1%)</span>
+                          <span class="taco-text-black-to-white ms-auto">77,777 TACO (1%)</span>
 
                       </div>
 
@@ -170,7 +170,7 @@
                           <span class="taco-text-black-to-white"><i class="fa-solid fa-corner fa-rotate-180 me-2 taco-text-black-to-white" style="opacity: 0.5;"></i> DKP Swap:</span>
 
                           <!-- data -->
-                          <span class="taco-text-black-to-white">700,000 TACO (9%)</span>
+                          <span class="taco-text-black-to-white ms-auto">700,000 TACO (9%)</span>
 
                       </div>
 
@@ -187,7 +187,7 @@
                           <span class="taco-text-black-to-white"><i class="fa-solid fa-corner fa-rotate-180 me-2 taco-text-black-to-white" style="opacity: 0.5;"></i> Liquidity Pools:</span>
 
                           <!-- data -->
-                          <span class="taco-text-black-to-white">395,975 TACO (5.091%)</span>
+                          <span class="taco-text-black-to-white ms-auto">395,975 TACO (5.091%)</span>
 
                       </div>
 
@@ -204,7 +204,7 @@
                           <span class="taco-text-black-to-white"><i class="fa-solid fa-corner fa-rotate-180 me-2 taco-text-black-to-white" style="opacity: 0.5;"></i> Future Dev Allocation:</span>
 
                           <!-- data -->
-                          <span class="taco-text-black-to-white">930,975 TACO (11.97%)</span>
+                          <span class="taco-text-black-to-white ms-auto">930,975 TACO (11.97%)</span>
 
                       </div>
 
@@ -221,7 +221,7 @@
                           <span class="taco-text-black-to-white"><i class="fa-solid fa-corner fa-rotate-180 me-2 taco-text-black-to-white" style="opacity: 0.5;"></i> TACO Mint Vault:</span>
 
                           <!-- data -->
-                          <span class="taco-text-black-to-white">2,352,753 TACO (30.25%)</span>
+                          <span class="taco-text-black-to-white ms-auto">2,352,753 TACO (30.25%)</span>
 
                       </div>
 
