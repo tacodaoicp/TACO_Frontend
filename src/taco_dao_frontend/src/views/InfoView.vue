@@ -306,7 +306,7 @@
                           list-group-item d-flex flex-nowrap py-3 gap-3"
                     tabindex="0">
 
-                  <span class="taco-text-black-to-white text-nowrap">📝 <a class="taco-text-blue-to-light-blue" href="/Taco_Dao_Whitepaper_v7.77_latest.pdf" target="_blank">Whitepaper</a></span>
+                  <span class="taco-text-black-to-white text-nowrap">📝 <a class="taco-text-blue-to-light-blue" href="/Taco_Dao_Whitepaper_v7.78_latest.pdf" target="_blank">Whitepaper</a></span>
 
                 </li>                        
 
