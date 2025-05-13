@@ -301,6 +301,15 @@
               <ul class="taco-bs-list 
                         list-group">
 
+                <!-- list item - whitepaper -->
+                <li class="standard-focus standard-focus--negative-offset
+                          list-group-item d-flex flex-nowrap py-3 gap-3"
+                    tabindex="0">
+
+                  <span class="taco-text-black-to-white text-nowrap">📝 <a class="taco-text-blue-to-light-blue" href="/Taco_Dao_Whitepaper_v7.77_latest.pdf" target="_blank">Whitepaper</a></span>
+
+                </li>                        
+
                 <!-- list item - launching taco dao -->
                 <li class="standard-focus standard-focus--negative-offset
                           list-group-item d-flex flex-nowrap py-3 gap-3"
@@ -343,15 +352,6 @@
                     tabindex="0">
 
                   <span class="taco-text-black-to-white text-nowrap">📰 <a class="taco-text-blue-to-light-blue" href="https://nuance.xyz/tacodao/5402-434go-diaaa-aaaaf-qakwq-cai/announcing-taco-dao" target="_blank">Announcing Taco DAO</a></span>
-
-                </li>
-
-                <!-- list item - whitepaper -->
-                <li class="standard-focus standard-focus--negative-offset
-                          list-group-item d-flex flex-nowrap py-3 gap-3"
-                    tabindex="0">
-
-                  <span class="taco-text-black-to-white text-nowrap">📝 <a class="taco-text-blue-to-light-blue" href="/Taco_Dao_Whitepaper_v7.77_latest.pdf" target="_blank">Whitepaper</a></span>
 
                 </li>
 
