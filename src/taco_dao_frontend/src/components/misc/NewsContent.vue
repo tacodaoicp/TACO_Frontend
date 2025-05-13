@@ -14,7 +14,9 @@
                 <p class="news-content__text">
                     Hey Everyone!
                     <br>
-                    The <a href="https://nns.ic0.app/project/?project=lacdn-3iaaa-aaaaq-aae3a-cai" target="_blank">Decentralization Sale</a> is live and going great! Thank you to all the early birds! The sale runs through Friday, May 23, 2025, at 12:00 PM (noon) Pacific Time, or until we hit our maximum sale amount.
+                    The <a href="https://nns.ic0.app/project/?project=lacdn-3iaaa-aaaaq-aae3a-cai"
+                     target="_blank"
+                     class="taco-text-blue-to-light-blue">Decentralization Sale</a> is live and going great! Thank you to all the early birds! The sale runs through Friday, May 23, 2025, at 12:00 PM (noon) Pacific Time, or until we hit our maximum sale amount.
                 </p>
             </div>                
 
@@ -36,11 +38,21 @@
                 </h3>
                 <span class="news-content__date">🍽️ May 5, 2025</span>
                 <p class="news-content__text">
-                    <a href="https://oc.app/community/lizfz-ryaaa-aaaar-bagsa-cai" target="_blank">Open Chat</a><br>
-                    <a href="https://nuance.xyz/user/tacodao" target="_blank">Nuance</a><br>
-                    <a href="https://taggr.link/#/user/4914" target="_blank">TAGGR</a><br>
-                    <a href="https://x.com/tacodaoicp" target="_blank">X</a><br>
-                    <a href="https://discord.gg/eVe8kqdVQd" target="_blank">Discord</a>
+                    <a href="https://oc.app/community/lizfz-ryaaa-aaaar-bagsa-cai" 
+                    target="_blank"
+                    class="taco-text-blue-to-light-blue">Open Chat</a><br>
+                    <a href="https://nuance.xyz/user/tacodao" 
+                    target="_blank"
+                    class="taco-text-blue-to-light-blue">Nuance</a><br>
+                    <a href="https://taggr.link/#/user/4914" 
+                    target="_blank"
+                    class="taco-text-blue-to-light-blue">TAGGR</a><br>
+                    <a href="https://x.com/tacodaoicp" 
+                    target="_blank"
+                    class="taco-text-blue-to-light-blue">X</a><br>
+                    <a href="https://discord.gg/eVe8kqdVQd" 
+                    target="_blank"
+                    class="taco-text-blue-to-light-blue">Discord</a>
                 </p>
             </div>            
 

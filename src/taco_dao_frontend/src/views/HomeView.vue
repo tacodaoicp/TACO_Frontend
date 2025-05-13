@@ -46,26 +46,34 @@
           <!-- coming soon h3  -->
           <h3 class="cs__h3 spacemono mt-2">v1.0.0</h3>
 
+          <!-- sale link -->
+          <span class="d-none d-sm-inline mb-5 text-center px-3" style="font-size: 1.5rem; font-weight: bold;">
+            <span class="taco-text-brown-to-white">🎉 Our <a href="https://nns.ic0.app/project/?project=lacdn-3iaaa-aaaaq-aae3a-cai"
+              class="taco-text-blue-to-light-blue">Decentralization Sale</a> is Live 🎉</span>
+            <br>
+            <span class="taco-text-brown-to-white small">Enjoy the Tacos!</span>
+          </span>            
+
           <!-- random link 1 -->
-          <span v-if="randomInt === 1" class="d-none d-sm-inline mb-5 text-center px-3" style="font-size: 1.5rem;">
+          <!-- <span v-if="randomInt === 1" class="d-none d-sm-inline mb-5 text-center px-3" style="font-size: 1.5rem;">
             <span class="taco-text-brown-to-white">Check out the </span>
             <RouterLink to="/dao" class="taco-text-blue-to-light-blue">DAO</RouterLink>
             <span class="taco-text-brown-to-white"> page for more info on the Dao</span>
-          </span>
+          </span> -->
 
           <!-- random link 2 -->
-          <span v-if="randomInt === 2" class="d-none d-sm-inline mb-5 text-center px-3" style="font-size: 1.5rem;">
+          <!-- <span v-if="randomInt === 2" class="d-none d-sm-inline mb-5 text-center px-3" style="font-size: 1.5rem;">
             <span class="taco-text-brown-to-white">Check out </span>
             <RouterLink to="/vote" class="taco-text-blue-to-light-blue">Voting</RouterLink>
             <span class="taco-text-brown-to-white"> to see how you can cast your vote</span>
-          </span>          
+          </span>           -->
 
           <!-- random link 3 -->
-          <span v-if="randomInt === 3" class="d-none d-sm-inline mb-5 text-center px-3" style="font-size: 1.5rem;">
+          <!-- <span v-if="randomInt === 3" class="d-none d-sm-inline mb-5 text-center px-3" style="font-size: 1.5rem;">
             <span class="taco-text-brown-to-white">Check out </span>
             <RouterLink to="/sales" class="taco-text-blue-to-light-blue">Sales</RouterLink>
             <span class="taco-text-brown-to-white"> for current and past sales</span>
-          </span>
+          </span> -->
           
           <!-- coming soon p -->
           <p class="cs__p taco-text-brown-to-white mt-1">
