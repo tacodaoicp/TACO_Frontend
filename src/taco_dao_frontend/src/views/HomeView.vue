@@ -47,11 +47,13 @@
           <h3 class="cs__h3 spacemono mt-2">v1.0.0</h3>
 
           <!-- sale link -->
-          <span class="d-none d-sm-inline mb-5 text-center px-3" style="font-size: 1.5rem; font-weight: bold;">
-            <span class="taco-text-brown-to-white">🎉 Our <a href="https://nns.ic0.app/project/?project=lacdn-3iaaa-aaaaq-aae3a-cai"
+          <span class="d-inline mb-5 text-center px-3 lh-on-mobile" style="font-size: 1.5rem; font-weight: bold;">
+            <span class="taco-text-brown-to-white
+              small-on-mobile">🎉 Our <a href="https://nns.ic0.app/project/?project=lacdn-3iaaa-aaaaq-aae3a-cai"
               class="taco-text-blue-to-light-blue">Decentralization Sale</a> is Live 🎉</span>
             <br>
-            <span class="taco-text-brown-to-white small">Enjoy the Tacos!</span>
+            <span class="taco-text-brown-to-white
+              smaller-on-mobile">Enjoy the Tacos!</span>
           </span>            
 
           <!-- random link 1 -->
@@ -403,6 +405,18 @@
   }
 }
 
+.lh-on-mobile {
+  line-height: 1.5;
+}
+
+.small-on-mobile {
+  font-size: 1.375rem;
+}
+
+.smaller-on-mobile {
+  font-size: 1.25rem;
+}
+
 ///////////////////
 // media queries //
 ///////////////////
@@ -415,6 +429,15 @@
   .home-view__center__bottom {
     flex-wrap: wrap;
   }
+  .lh-on-mobile {
+    line-height: 1;
+  }  
+  .small-on-mobile {
+    font-size: 1.125rem;
+  }
+  .smaller-on-mobile {
+    font-size: 1rem;
+  }    
 }
 
 // phone landscape
@@ -425,6 +448,16 @@
   .home-view__center__bottom {
     flex-wrap: wrap;
   }
+  .lh-on-mobile {
+    line-height: 1.25;
+  }  
+  .small-on-mobile {
+    font-size: 1.25rem;
+    line-height: 1;
+  }  
+  .smaller-on-mobile {
+    font-size: 1.125rem;
+  }  
 }
 
 // tablet
