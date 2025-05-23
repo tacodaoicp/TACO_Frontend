@@ -49,11 +49,10 @@
           <!-- sale link -->
           <span class="d-inline mb-5 text-center px-3 lh-on-mobile" style="font-size: 1.5rem; font-weight: bold;">
             <span class="taco-text-brown-to-white
-              small-on-mobile">🎉 Our <a href="https://nns.ic0.app/project/?project=lacdn-3iaaa-aaaaq-aae3a-cai"
-              class="taco-text-blue-to-light-blue">Decentralization Sale</a> is Live 🎉</span>
+              small-on-mobile">🌮 We're officially a DAO! 🌮</span>
             <br>
             <span class="taco-text-brown-to-white
-              smaller-on-mobile">Enjoy the Tacos!</span>
+              smaller-on-mobile">Thanks to everyone for participating in the decentralization sale</span>
           </span>            
 
           <!-- random link 1 -->
