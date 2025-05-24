@@ -52,7 +52,7 @@
               small-on-mobile">🌮 We're officially a DAO! 🌮</span>
             <br>
             <span class="taco-text-brown-to-white
-              smaller-on-mobile">Thanks to everyone for participating in the decentralization sale</span>
+              smaller-on-mobile">Thanks to everyone for participating in the decentralization sale! <br> Give everything time to unlock, we'll be connecting <br> the site as endpoints become available.</span>
           </span>            
 
           <!-- random link 1 -->

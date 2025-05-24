@@ -8,6 +8,17 @@
             <!-- news item -->
             <div class="news-content__item">
                 <h3 class="news-content__title">
+                    We're officially a DAO!
+                </h3>
+                <span class="news-content__date">🍽️ May 23, 2025</span>
+                <p class="news-content__text">
+                    Thanks to everyone for participating in the decentralization sale! Give everything time to unlock, we'll be connecting the site as endpoints become available.
+                </p>
+            </div>               
+
+            <!-- news item -->
+            <div class="news-content__item">
+                <h3 class="news-content__title">
                     Sale Update
                 </h3>
                 <span class="news-content__date">🍽️ May 11, 2025</span>
