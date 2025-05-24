@@ -73,16 +73,15 @@
       <!-- pre-sns disclaimer -->
       <div class="header-bar__pre-sns-disclaimer">
 
-        <a class="badge bg-warning text-dark"
-              href="https://nns.ic0.app/project/?project=lacdn-3iaaa-aaaaq-aae3a-cai"
+        <span class="badge bg-warning text-dark"
               target="_blank"
-              title="We're officially a DAO! Give everything time to unlock, we'll be connecting the site as endpoints become available."
+              title="Configuring Site. We're officially a DAO! Give everything time to unlock, we'll be connecting the site as endpoints become available."
               data-bs-toggle="tooltip"
               data-bs-placement="bottom"
               data-bs-custom-class="taco-tooltip">
               <i class="fa-solid fa-cubes"></i>
               <span class="ms-1 d-none d-md-inline">CONFIGURING</span>
-      </a>
+      </span>
 
       </div>
 
