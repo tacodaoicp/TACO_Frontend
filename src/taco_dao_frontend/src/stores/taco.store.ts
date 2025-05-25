@@ -245,8 +245,6 @@ export const useTacoStore = defineStore('taco', () => {
     // crypto prices
     const icpPriceUsd = useStorage('icpPriceUsd', 0)
     const btcPriceUsd = useStorage('btcPriceUsd', 0)
-    const sneedPriceUsd = useStorage('sneedPriceUsd', 0)
-    const sneedPriceIcp = useStorage('sneedPriceIcp', 0)
     const tacoPriceUsd = useStorage('tacoPriceUsd', 0)
     const tacoPriceIcp = useStorage('tacoPriceIcp', 0)
     const lastPriceUpdate = useStorage('lastPriceUpdate', 0)
@@ -879,7 +877,7 @@ export const useTacoStore = defineStore('taco', () => {
 
             }
 
-            // try gecko terminal pool endpoint for sneed
+            // try gecko terminal pool endpoint for taco
             try {
 
                 // log
@@ -887,7 +885,7 @@ export const useTacoStore = defineStore('taco', () => {
 
                 // use pool endpoint instead of token endpoint (previous version caused 500)
                 const resp = await fetch(
-                    `https://api.geckoterminal.com/api/v2/networks/icp/pools/osyzs-xiaaa-aaaag-qc76q-cai`,
+                    `https://api.geckoterminal.com/api/v2/networks/icp/pools/vhoia-myaaa-aaaar-qbmja-cai`,
                     { mode: 'cors' }
                 )
 
@@ -904,10 +902,10 @@ export const useTacoStore = defineStore('taco', () => {
                 const basePrice  = Number(body.data.attributes.base_token_price_usd)
                 
                 // set the base price
-                sneedPriceUsd.value = basePrice || 0
+                tacoPriceUsd.value = basePrice || 0
 
                 // set the base token price quote token
-                sneedPriceIcp.value = baseTokenPriceQuoteToken || 0
+                tacoPriceIcp.value = baseTokenPriceQuoteToken || 0
 
                 // set last price update
                 lastPriceUpdate.value = now                
@@ -927,8 +925,7 @@ export const useTacoStore = defineStore('taco', () => {
             console.log('💾 using saved crypto prices')
             // console.log('💾 ICP price in USD:', icpPriceUsd.value)
             // console.log('💾 BTC price in USD:', btcPriceUsd.value)
-            // console.log('💾 Sneed price in USD:', sneedPriceUsd.value)
-            // console.log('💾 Sneed price in ICP:', sneedPriceIcp.value)
+            // console.log('💾 Taco price in ICP:', tacoPriceIcp.value)
 
         }
 
@@ -2628,8 +2625,6 @@ export const useTacoStore = defineStore('taco', () => {
         userLedgerAccountId,
         icpPriceUsd,
         btcPriceUsd,
-        sneedPriceUsd,
-        sneedPriceIcp,
         tacoPriceUsd,
         tacoPriceIcp,
         portfolioTokenPricesInUsd,

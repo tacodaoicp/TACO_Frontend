@@ -13,12 +13,11 @@
                 data-bs-custom-class="taco-tooltip"/>
 
             <!-- price in icp -->
-            <!-- Number(tacoPriceUsd).toFixed(2) -->
             <span class="taco-text-black-to-white"
                   title="Value of TACO token in USD (token not yet launched)"
                   data-bs-toggle="tooltip"
                   data-bs-placement="right"
-                  data-bs-custom-class="taco-tooltip">$0.00</span>
+                  data-bs-custom-class="taco-tooltip">${{ tacoPriceUsd.toFixed(2) }}</span>
 
         </span>
 
@@ -93,6 +92,6 @@
     // # STATE #
 
     // crypto prices
-    const { sneedPriceUsd } = storeToRefs(tacoStore)
+    const { tacoPriceUsd } = storeToRefs(tacoStore)
 
 </script>
