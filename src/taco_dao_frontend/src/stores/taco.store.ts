@@ -716,10 +716,9 @@ export const useTacoStore = defineStore('taco', () => {
             await new Promise((resolve, reject) => {
                 authClient.login({
                     identityProvider:
-                        process.env.DFX_NETWORK === "ic"
-                            ? "https://identity.ic0.app"
-                            // : `http://${iiCanisterId}.localhost:4943/`, // this works on tirexs machine (linux)
-                            : `http://${iiCanisterId}.localhost:8080/`, // this works on erics machine (mac)
+                        process.env.DFX_NETWORK === "ic" || process.env.DFX_NETWORK === "staging"
+                            ? 'https://identity.ic0.app'
+                            : `http://${iiCanisterId}.localhost:8080/`,
                     onSuccess: resolve,
                     onError: reject,
                 })
@@ -818,6 +817,33 @@ export const useTacoStore = defineStore('taco', () => {
         // accept hotkey tutorial
         userAcceptedHotkeyTutorial.value = true
 
+    }
+
+    const daoBackendCanisterId = () => {
+
+        // determine canisterId based on network
+        switch (process.env.DFX_NETWORK) {
+            case "ic":
+                return process.env.CANISTER_ID_DAO_BACKEND_IC || 'vxqw7-iqaaa-aaaan-qzziq-cai';
+                break;
+            case "staging":
+                return  process.env.CANISTER_ID_DAO_BACKEND_STAGING || 'tisou-7aaaa-aaaai-atiea-cai';
+                break;
+        }        
+        return 'ywhqf-eyaaa-aaaad-qg6tq-cai'; // local canisterId
+    }
+
+    const treasuryCanisterId = () => {
+
+        switch (process.env.DFX_NETWORK) {
+            case "ic":
+                return process.env.CANISTER_ID_TREASURY_IC || 'v6t5d-6yaaa-aaaan-qzzja-cai';
+                break;
+            case "staging":
+                return  process.env.CANISTER_ID_TREASURY_STAGING || 'tptia-syaaa-aaaai-atieq-cai';
+                break;
+        }        
+        return 'z4is7-giaaa-aaaad-qg6uq-cai'; // local canisterId
     }
 
     // crypto prices
@@ -1001,6 +1027,8 @@ export const useTacoStore = defineStore('taco', () => {
                 fetchRootKey: process.env.DFX_NETWORK === "local",
             })
 
+            let canisterId = daoBackendCanisterId();
+
             // create actor
             const actor = Actor.createActor(daoBackendIDL, {
                 agent,
@@ -1081,7 +1109,7 @@ export const useTacoStore = defineStore('taco', () => {
                 fetchRootKey: process.env.DFX_NETWORK === "local",
             })
 
-            // create actor
+
             const actor = Actor.createActor(daoBackendIDL, {
                 agent,
                 canisterId: getDaoCanisterId(),
@@ -1583,14 +1611,11 @@ export const useTacoStore = defineStore('taco', () => {
             //console.log('refreshTimerStatus: Agent created');
 
             // Create DAO actor for snapshot info
-            const daoCanisterId = process.env.DFX_NETWORK === "ic"
-                ? 'vxqw7-iqaaa-aaaan-qzziq-cai'
-                : 'ywhqf-eyaaa-aaaad-qg6tq-cai';
             //console.log('refreshTimerStatus: Using DAO canisterId:', daoCanisterId);
 
             const daoActor = Actor.createActor(daoBackendIDL, {
                 agent,
-                canisterId: daoCanisterId,
+                canisterId: daoBackendCanisterId(),
             })
             //console.log('refreshTimerStatus: DAO Actor created');
 
@@ -1613,15 +1638,11 @@ export const useTacoStore = defineStore('taco', () => {
             }
 
             // Create Treasury actor for sync info
-            const treasuryCanisterId = process.env.DFX_NETWORK === "ic"
-                ? 'v6t5d-6yaaa-aaaan-qzzja-cai'
-                : 'z4is7-giaaa-aaaad-qg6uq-cai';
-
             //console.log('refreshTimerStatus: Using Treasury canisterId:', treasuryCanisterId);
 
             const treasuryActor = Actor.createActor(treasuryIDL, {
                 agent,
-                canisterId: treasuryCanisterId,
+                canisterId: treasuryCanisterId()
             })
             //console.log('refreshTimerStatus: Treasury Actor created');
 
@@ -1742,9 +1763,8 @@ export const useTacoStore = defineStore('taco', () => {
             })
 
             // determine canisterId based on network
-            const canisterId = process.env.DFX_NETWORK === "ic"
-                ? 'vxqw7-iqaaa-aaaan-qzziq-cai'
-                : 'ywhqf-eyaaa-aaaad-qg6tq-cai';
+            let canisterId = daoBackendCanisterId();
+
 
             // create actor
             const actor = Actor.createActor(daoBackendIDL, {
@@ -1776,9 +1796,8 @@ export const useTacoStore = defineStore('taco', () => {
             })
 
             // determine canisterId based on network
-            const canisterId = process.env.DFX_NETWORK === "ic"
-                ? 'vxqw7-iqaaa-aaaan-qzziq-cai'
-                : 'ywhqf-eyaaa-aaaad-qg6tq-cai';
+            let canisterId = daoBackendCanisterId();
+
 
             // create actor
             const actor = Actor.createActor(daoBackendIDL, {
@@ -1808,13 +1827,10 @@ export const useTacoStore = defineStore('taco', () => {
             });
 
             // determine canisterId based on network
-            const treasuryCanisterId = process.env.DFX_NETWORK === "ic"
-                ? 'vxqw7-iqaaa-aaaan-qzziq-cai'
-                : 'ywhqf-eyaaa-aaaad-qg6uq-cai';
 
             const actor = Actor.createActor(treasuryIDL, {
                 agent,
-                canisterId: treasuryCanisterId,
+                canisterId: treasuryCanisterId(),
             });
 
             await actor.admin_restartSyncs();
@@ -1847,13 +1863,9 @@ export const useTacoStore = defineStore('taco', () => {
                 fetchRootKey: process.env.DFX_NETWORK === "local",
             });
 
-            const treasuryCanisterId = process.env.DFX_NETWORK === "ic"
-                ? 'v6t5d-6yaaa-aaaan-qzzja-cai'
-                : 'z4is7-giaaa-aaaad-qg6uq-cai';
-
             const actor = Actor.createActor(treasuryIDL, {
                 agent,
-                canisterId: treasuryCanisterId,
+                canisterId: treasuryCanisterId(),
             });
 
             const result = await actor.admin_recoverPoolBalances() as Result_4;
@@ -1894,15 +1906,10 @@ export const useTacoStore = defineStore('taco', () => {
                 fetchRootKey: process.env.DFX_NETWORK === "local",
             })
 
-            // determine canisterId based on network
-            const canisterId = process.env.DFX_NETWORK === "ic"
-                ? 'v6t5d-6yaaa-aaaan-qzzja-cai'
-                : 'z4is7-giaaa-aaaad-qg6uq-cai';
-
             // create actor
             const actor = Actor.createActor(treasuryIDL, {
                 agent,
-                canisterId,
+                canisterId: treasuryCanisterId(),
             })
 
             await actor.admin_syncWithDao();
@@ -1942,9 +1949,8 @@ export const useTacoStore = defineStore('taco', () => {
             console.log('fetchSystemLogs: Agent created with authenticated identity');
 
             // determine canisterId based on network
-            const canisterId = process.env.DFX_NETWORK === "ic"
-                ? 'vxqw7-iqaaa-aaaan-qzziq-cai'
-                : 'ywhqf-eyaaa-aaaad-qg6tq-cai';
+            let canisterId = daoBackendCanisterId();
+
             console.log('fetchSystemLogs: Using canisterId:', canisterId);
 
             // create actor
@@ -1988,15 +1994,10 @@ export const useTacoStore = defineStore('taco', () => {
                 fetchRootKey: process.env.DFX_NETWORK === "local",
             })
 
-            // determine canisterId based on network
-            const canisterId = process.env.DFX_NETWORK === "ic"
-                ? 'v6t5d-6yaaa-aaaan-qzzja-cai'
-                : 'z4is7-giaaa-aaaad-qg6uq-cai';
-
             // create actor
             const actor = Actor.createActor(treasuryIDL, {
                 agent,
-                canisterId,
+                canisterId: treasuryCanisterId(),
             })
 
             const result = await actor.startRebalancing() as RebalanceResult;
@@ -2036,15 +2037,10 @@ export const useTacoStore = defineStore('taco', () => {
                 fetchRootKey: process.env.DFX_NETWORK === "local",
             })
 
-            // determine canisterId based on network
-            const canisterId = process.env.DFX_NETWORK === "ic"
-                ? 'v6t5d-6yaaa-aaaan-qzzja-cai'
-                : 'z4is7-giaaa-aaaad-qg6uq-cai';
-
             // create actor
             const actor = Actor.createActor(treasuryIDL, {
                 agent,
-                canisterId,
+                canisterId: treasuryCanisterId(),
             })
 
             const result = await actor.stopRebalancing() as RebalanceResult;
@@ -2086,7 +2082,7 @@ export const useTacoStore = defineStore('taco', () => {
             // Create treasury actor with authenticated identity
             const treasury = Actor.createActor<TreasuryService>(treasuryIDL, {
                 agent,
-                canisterId: getTreasuryCanisterId()
+                canisterId: treasuryCanisterId()
             });
             // END OF NOTE TO AI!
 
@@ -2166,7 +2162,7 @@ export const useTacoStore = defineStore('taco', () => {
             // Create treasury actor with authenticated identity
             const treasury = Actor.createActor<TreasuryService>(treasuryIDL, {
                 agent,
-                canisterId: getTreasuryCanisterId()
+                canisterId: treasuryCanisterId()
             });
 
             // END OF NOTE TO AI!
@@ -2211,10 +2207,8 @@ export const useTacoStore = defineStore('taco', () => {
                 host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
                 fetchRootKey: process.env.DFX_NETWORK === "local",
             });
+            let canisterId = daoBackendCanisterId();
 
-            const canisterId = process.env.DFX_NETWORK === "ic"
-                ? 'vxqw7-iqaaa-aaaan-qzziq-cai'
-                : 'ywhqf-eyaaa-aaaad-qg6tq-cai';
 
             const actor = Actor.createActor(daoBackendIDL, {
                 agent,
@@ -2261,7 +2255,7 @@ export const useTacoStore = defineStore('taco', () => {
             // Create treasury actor with authenticated identity
             const treasury = Actor.createActor<TreasuryService>(treasuryIDL, {
                 agent,
-                canisterId: getTreasuryCanisterId()
+                canisterId: treasuryCanisterId()
             });
 
             await treasury.admin_executeTradingCycle();
@@ -2294,9 +2288,8 @@ export const useTacoStore = defineStore('taco', () => {
                 fetchRootKey: process.env.DFX_NETWORK === "local",
             });
 
-            const canisterId = process.env.DFX_NETWORK === "ic"
-                ? 'vxqw7-iqaaa-aaaan-qzziq-cai'
-                : 'ywhqf-eyaaa-aaaad-qg6tq-cai';
+            let canisterId = daoBackendCanisterId();
+
 
             const actor = Actor.createActor(daoBackendIDL, {
                 agent,
@@ -2337,9 +2330,8 @@ export const useTacoStore = defineStore('taco', () => {
                 fetchRootKey: process.env.DFX_NETWORK === "local",
             });
 
-            const canisterId = process.env.DFX_NETWORK === "ic"
-                ? 'vxqw7-iqaaa-aaaan-qzziq-cai'
-                : 'ywhqf-eyaaa-aaaad-qg6tq-cai';
+            let canisterId = daoBackendCanisterId();
+
 
             const actor = Actor.createActor(daoBackendIDL, {
                 agent,
@@ -2381,9 +2373,8 @@ export const useTacoStore = defineStore('taco', () => {
             })
             console.log('taco.store: fetchVoterDetails() - Agent created');
 
-            const canisterId = process.env.DFX_NETWORK === "ic"
-                ? 'vxqw7-iqaaa-aaaan-qzziq-cai'
-                : 'ywhqf-eyaaa-aaaad-qg6tq-cai';
+            let canisterId = daoBackendCanisterId();
+
             console.log('taco.store: fetchVoterDetails() - Using canisterId:', canisterId);
 
             const actor = Actor.createActor(daoBackendIDL, {
@@ -2431,9 +2422,8 @@ export const useTacoStore = defineStore('taco', () => {
                 fetchRootKey: process.env.DFX_NETWORK === "local",
             });
 
-            const canisterId = process.env.DFX_NETWORK === "ic"
-                ? 'vxqw7-iqaaa-aaaan-qzziq-cai'
-                : 'ywhqf-eyaaa-aaaad-qg6tq-cai';
+            let canisterId = daoBackendCanisterId();
+
 
             const actor = Actor.createActor(daoBackendIDL, {
                 agent,
@@ -2487,9 +2477,8 @@ export const useTacoStore = defineStore('taco', () => {
             });
 
 
-            const canisterId = process.env.DFX_NETWORK === "ic"
-            ? 'vxqw7-iqaaa-aaaan-qzziq-cai'
-            : 'ywhqf-eyaaa-aaaad-qg6tq-cai';
+            let canisterId = daoBackendCanisterId();
+
 
             // Create treasury actor with authenticated identity
             const backend = Actor.createActor(daoBackendIDL, {
@@ -2561,9 +2550,8 @@ export const useTacoStore = defineStore('taco', () => {
             });
 
 
-            const canisterId = process.env.DFX_NETWORK === "ic"
-            ? 'vxqw7-iqaaa-aaaan-qzziq-cai'
-            : 'ywhqf-eyaaa-aaaad-qg6tq-cai';
+            let canisterId = daoBackendCanisterId();
+
 
             // Create treasury actor with authenticated identity
             const backend = Actor.createActor(daoBackendIDL, {
