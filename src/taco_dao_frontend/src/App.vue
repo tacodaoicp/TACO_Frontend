@@ -793,6 +793,23 @@
     height: 100%;
   }
 
+  ////////////////////////
+  // Animation Utilites //
+  ////////////////////////
+
+  .rotating-char {
+    display: inline-block;
+    animation: spin 8s linear infinite;
+  }
+  @keyframes spin {
+    from {
+      transform: rotate(0deg);
+    }
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
   //////////////////////////
   // Animated Backgrounds //
   //////////////////////////
