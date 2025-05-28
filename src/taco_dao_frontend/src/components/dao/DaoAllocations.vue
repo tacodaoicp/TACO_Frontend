@@ -14,7 +14,7 @@
         <div class="taco-container taco-container--l2 taco-container--l2--dark p-2">
 
             <!-- toolbar -->
-            <div class="taco-toolbar">
+            <div class="taco-toolbar flex-nowrap">
 
                 <!-- if not viewing historical - current and historical buttons -->
                 <div class="btn-group">
@@ -39,7 +39,7 @@
                     <i class="fa-solid fa-circle-info"></i>
                 </div>
 
-                <div class="d-flex flex-column align-items-center gap-1 ms-auto">
+                <div class="d-none d-md-flex flex-column align-items-center gap-1 ms-auto">
 
                     <!-- if viewing current -->
                     <span class="taco-text-white 
@@ -71,12 +71,12 @@
 
             <!-- if no holdings -->
             <div v-if="showCurrentHoldings && !currentHoldingsHaveValue" class="dao-allocations__no-holdings py-5 text-center">
-                <span class="taco-text-white">No holdings</span>
+                <span class="taco-text-white">No holdings yet</span>
             </div>
 
             <!-- if no allocations -->
             <div v-if="showCurrentAllocations && !currentAllocationsHaveValue" class="dao-allocations__no-allocations py-5 text-center">
-                <span class="taco-text-white">No allocations</span>
+                <span class="taco-text-white">No allocations yet</span>
             </div>
         
         </div>
@@ -381,6 +381,11 @@
         }
     }
 
+    // overrides
+    .taco-toolbar {
+        flex-wrap: nowrap;
+    }
+
 }
 
 ///////////////
@@ -397,7 +402,7 @@
 // phone protrait
 @media (max-width: 575.98px) {
     .dao-allocations__taco-chart-container {
-        max-height: unset; // needs an event listener to adjust height
+        max-height: unset !important; // needs an event listener to adjust height
     } 
     .dao-allocations__token-title__name-link {
         font-size: 0.875rem;
@@ -511,11 +516,11 @@ LOCAL METHODS
     /////////////
 
     import { ref, watch, onMounted, onBeforeUnmount, computed, nextTick } from "vue"
-    import { useTacoStore } from "../stores/taco.store"
+    import { useTacoStore } from "../../stores/taco.store"
     import { storeToRefs } from "pinia"
-    import { tokenData } from "../components/data/TokenData"
-    import astronautLoader from '../assets/images/astonautLoader.webp'
-    import placeholder52x52 from '../assets/images/placeholder-52x52.png'
+    import { tokenData } from "../data/TokenData"
+    import astronautLoader from '../../assets/images/astonautLoader.webp'
+    import placeholder52x52 from '../../assets/images/placeholder-52x52.png'
     import { Tooltip } from 'bootstrap'
 
     ///////////
@@ -839,7 +844,7 @@ LOCAL METHODS
                 if (percentages.length === 0) {
 
                     // log
-                    console.log('no allocations of value')
+                    // console.log('no allocations of value')
 
                     // set no holdings have value
                     currentAllocationsHaveValue.value = false
@@ -909,7 +914,7 @@ LOCAL METHODS
                 const holdings = fetchedTokenDetails.value || []
 
                 // log
-                console.log('holdings', holdings)
+                // console.log('holdings', holdings)
 
                 // calculate total value across all tokens
                 const totalValue = holdings.reduce((sum, [_, token]) => {
@@ -925,7 +930,7 @@ LOCAL METHODS
                 })
 
                 // log
-                console.log('percentages', percentages)
+                // console.log('percentages', percentages)
 
                 // create symbols array
                 const symbols = holdings.map(([_, token]) => token.tokenSymbol.toLowerCase())

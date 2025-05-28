@@ -1027,6 +1027,14 @@
     // log
     // // console.log('app mounted')
 
+    // friendly log
+    // console.log('👨‍🍳 Weclome to \033[33mTaco Dao\033[0m!')
+    console.log(
+      "👨‍🍳 Welcome to %cTaco Dao",
+      "color: yellow;",
+      "\n❤️ Together, We Perfect The Recipe!\n🌮 v1.0.1"
+    );
+
     // run mounted logic
     mountedLogic()
 

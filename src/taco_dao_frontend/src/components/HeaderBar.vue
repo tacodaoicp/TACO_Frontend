@@ -54,6 +54,9 @@
         
         </a>
 
+        <!-- chat - router link -->
+        <router-link to="/chat" class="header-bar__rl"><span class="header-bar__rl-span">Chat</span></router-link>        
+
       </div>
 
       <!-- pages menu button -->
@@ -69,6 +72,21 @@
 
     <!-- header bar right -->
     <div class="header-bar__right">
+
+      <!-- pre-sns disclaimer -->
+      <div class="header-bar__pre-sns-disclaimer">
+
+        <span class="badge bg-warning text-dark"
+              target="_blank"
+              title="Configuring Site. We're officially a DAO! Give everything time to unlock, we'll be connecting the site as endpoints become available."
+              data-bs-toggle="tooltip"
+              data-bs-placement="bottom"
+              data-bs-custom-class="taco-tooltip">
+              <i class="fa-solid fa-cubes"></i>
+              <span class="ms-1 d-none d-md-inline">CONFIGURING</span>
+      </span>
+
+      </div>
 
       <!-- icp price, taco dao holdings, and wallet container -->
       <div class="header-bar__chips d-flex flex-nowrap align-items-center gap-3" 
@@ -526,11 +544,11 @@
   import { useTacoStore } from "../stores/taco.store"
   import { storeToRefs } from "pinia"
   import TacoDaoLogo from "../assets/images/tacoDaoLogo.vue"
-  import IcpValueChip from "../components/ui/IcpValueChip.vue"
-  import TacoTokenPriceChip from "../components/ui/TacoTokenPriceChip.vue"
-  import TacoPortfolioValueChip from "../components/ui/TacoPortfolioValueChip.vue"
+  import IcpValueChip from "../components/misc/IcpValueChip.vue"
+  import TacoTokenPriceChip from "../components/misc/TacoTokenPriceChip.vue"
+  import TacoPortfolioValueChip from "../components/misc/TacoPortfolioValueChip.vue"
   import DfinityLogo from "../assets/images/dfinityLogo.vue"
-  import DarkModeToggle from "../components/DarkModeToggle.vue"
+  import DarkModeToggle from "./theme/DarkModeToggle.vue"
   import { Tooltip } from 'bootstrap'
 
   ////////////

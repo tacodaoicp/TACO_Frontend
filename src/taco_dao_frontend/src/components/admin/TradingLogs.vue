@@ -48,9 +48,9 @@
 
 <script setup lang="ts">
 import { computed, onMounted } from 'vue'
-import { useTacoStore } from '../stores/taco.store'
+import { useTacoStore } from '../../stores/taco.store'
 import { storeToRefs } from 'pinia'
-import { tokenData } from '../components/data/TokenData'
+import { tokenData } from '../data/TokenData'
 
 const store = useTacoStore()
 const { fetchedTokenDetails, tradingLogs } = storeToRefs(store)

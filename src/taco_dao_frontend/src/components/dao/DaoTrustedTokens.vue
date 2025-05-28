@@ -516,10 +516,10 @@ LOCAL METHODS
   /////////////
 
   import { ref, onMounted, computed, onBeforeUnmount } from "vue"
-  import { useTacoStore } from "../stores/taco.store"
+  import { useTacoStore } from "../../stores/taco.store"
   import { storeToRefs } from "pinia"
-  import astronautLoader from '../assets/images/astonautLoader.webp'
-  import { tokenData } from "../components/data/TokenData"
+  import astronautLoader from '../../assets/images/astonautLoader.webp'
+  import { tokenData } from "../data/TokenData"
 
   ///////////
   // Store //

@@ -11,10 +11,12 @@
       <!-- taco shell for coming soon -->
       <div class="tacoshell-cs">
 
-          <!-- taco dao logo svg -->
+          <!-- taco dao logo svg, clicking redirects to /dao -->
           <svg class="taco-dao-svg"
                xmlns="http://www.w3.org/2000/svg" 
-               viewBox="0 0 639.781 581.465">
+               viewBox="0 0 639.781 581.465"
+               @click="redirectToDao"
+               style="cursor: pointer;">
             <g id="taco-dao-svg_group" data-name="taco-dao-svg  group">
               <path d="M634.002,279.99l-9.168-56.052c-.122-.931-.272-1.856-.454-2.775l-.014-.085-.005-.002c-.519-2.595-1.26-5.147-2.182-7.661-1.917-5.225-4.157-10.323-5.835-15.642-.461-.36-.619-.913-.822-1.424-4.974-12.523-11.097-24.454-17.763-36.088-6.468-11.289-13.636-22.102-21.436-32.476-6.608-8.789-13.636-17.199-21.095-25.224-8.378-9.012-17.205-17.537-26.538-25.51-7.05-6.023-14.289-11.785-21.818-17.155-15.218-10.853-31.198-20.338-48.01-28.353-9.937-4.737-20.047-9.011-30.376-12.748-13.55-4.902-27.377-8.794-41.432-11.801-7.731-1.654-15.516-3.027-23.359-4.031-4.304-.551-8.613-1.04-12.922-1.532-4.933-.564-9.887-1.078-14.823-1.176-11.875-.238-23.757-.531-35.637.267-6.112.411-12.219.891-18.291,1.636-7.298.896-14.585,2.001-21.812,3.375-17.407,3.309-34.468,7.981-51.126,14.191-14.69,5.477-28.973,11.865-42.774,19.417-11.805,6.459-23.223,13.543-34.16,21.459-12.334,8.928-24.025,18.677-35.015,29.287-8.383,8.093-16.333,16.63-23.779,25.661-9.201,11.16-17.729,22.816-25.366,35.166-8.933,14.447-16.904,29.41-23.313,45.229-.267.658-.475,1.36-1.042,1.842.073.841-.344,1.546-.626,2.28-1.625,4.233-3.286,8.452-4.903,12.689-1.012,2.654-1.784,5.366-2.345,8.138l-.026.012-.075.467c-.169.882-.307,1.773-.429,2.67l-8.354,51.999c-.259,1.303-.484,2.615-.635,3.95-1.744,15.421,7.9,29.951,22.863,34.325,4.188,1.224,8.482,1.471,12.812,1.472,27.187.006,54.374.036,81.561.04,52.055.007,104.11.002,156.166.002h1.791c.122.004.245-.001.367.008.197.015.369.007.533-.008l.633-.187c.322-.208.472-.596.389-1.253-.04-.314-.004-.638-.004-.958,0-44.679,0-89.357-.002-134.036,0-2.5.195-2.313-2.34-2.328-.559-.004-1.119-.001-1.679-.001-18.231,0-36.463-.004-54.694.006-1.443.001-2.869-.076-4.292-.343-3.804-.713-5.737-2.927-5.776-6.746-.027-2.637.013-5.274.011-7.912-.008-12.947.04-25.896-.072-38.843-.03-3.444,1.953-6.903,6.455-6.477.713.067,1.438.009,2.158.009,59.091.004,118.183.009,177.275.012,6.477,0,12.954-.024,19.431-.004,3.115.01,5.094,1.757,5.536,4.823.114.789.177,1.592.175,2.388-.028,10.709-.081,21.418-.111,32.128-.012,4.715.076,9.432.01,14.146-.048,3.436-1.961,5.65-5.314,6.41-1.488.337-2.999.412-4.525.411-18.631-.013-37.262-.016-55.893-.001-3.546.003-3.049-.42-3.05,3.045-.012,44.199-.008,88.398-.008,132.597,0,.4-.006.8.002,1.199.001.074.003.128.005.196l1.821,1.708c.319.01.639.008.959.008h-.959s.96.001.96.001c75.724.013,151.448.037,227.171.019,6.391-.002,12.793.204,19.17-.492,15.533-1.696,27.915-15.214,28.217-30.829.03-1.529-.043-3.039-.194-4.534h.202Z" fill="#db8d27" stroke-width="0"/>
               <g id="taco-dao-svg_letters" data-name="taco-dao-svg  letters">
@@ -32,7 +34,9 @@
           </svg>
 
           <!-- coming soon h2 -->
-          <h2 class="cs__h2">
+          <h2 class="cs__h2"
+              @click="redirectToDao"
+              style="cursor: pointer;">
             <span class="cs__h2__line1 taco-text-brown-to-white">The <span class="cs__h2__line2__emphasis taco-text-brown-to-white">Tastiest</span> Entry Point in Crypto</span>
             <!-- <span class="cs__h2__line1 taco-text-brown-to-white">a Tasty Basket of</span>
             <span class="cs__h2__line2 taco-text-brown-to-white">Trusted <span class="cs__h2__line2__emphasis taco-text-brown-to-white">Internet Computer</span> Tokens</span>
@@ -40,28 +44,37 @@
           </h2>
 
           <!-- coming soon h3  -->
-          <h3 class="cs__h3 spacemono mt-2">v1.0.0</h3>
+          <h3 class="cs__h3 spacemono mt-2">v1.0.1</h3>
+
+          <!-- sale link -->
+          <span class="d-inline mb-5 text-center px-3 lh-on-mobile" style="font-size: 1.5rem; font-weight: bold;">
+            <span class="taco-text-brown-to-white
+              small-on-mobile">🌮 We're officially a DAO! 🌮</span>
+            <br>
+            <span class="taco-text-brown-to-white
+              smaller-on-mobile">Thanks to everyone for participating in the decentralization sale! <br> we'll be connecting the site as endpoints become available.</span>
+          </span>            
 
           <!-- random link 1 -->
-          <span v-if="randomInt === 1" class="d-none d-sm-inline mb-5 text-center px-3" style="font-size: 1.5rem;">
+          <!-- <span v-if="randomInt === 1" class="d-none d-sm-inline mb-5 text-center px-3" style="font-size: 1.5rem;">
             <span class="taco-text-brown-to-white">Check out the </span>
             <RouterLink to="/dao" class="taco-text-blue-to-light-blue">DAO</RouterLink>
             <span class="taco-text-brown-to-white"> page for more info on the Dao</span>
-          </span>
+          </span> -->
 
           <!-- random link 2 -->
-          <span v-if="randomInt === 2" class="d-none d-sm-inline mb-5 text-center px-3" style="font-size: 1.5rem;">
+          <!-- <span v-if="randomInt === 2" class="d-none d-sm-inline mb-5 text-center px-3" style="font-size: 1.5rem;">
             <span class="taco-text-brown-to-white">Check out </span>
             <RouterLink to="/vote" class="taco-text-blue-to-light-blue">Voting</RouterLink>
             <span class="taco-text-brown-to-white"> to see how you can cast your vote</span>
-          </span>          
+          </span>           -->
 
           <!-- random link 3 -->
-          <span v-if="randomInt === 3" class="d-none d-sm-inline mb-5 text-center px-3" style="font-size: 1.5rem;">
+          <!-- <span v-if="randomInt === 3" class="d-none d-sm-inline mb-5 text-center px-3" style="font-size: 1.5rem;">
             <span class="taco-text-brown-to-white">Check out </span>
             <RouterLink to="/sales" class="taco-text-blue-to-light-blue">Sales</RouterLink>
             <span class="taco-text-brown-to-white"> for current and past sales</span>
-          </span>
+          </span> -->
           
           <!-- coming soon p -->
           <p class="cs__p taco-text-brown-to-white mt-1">
@@ -391,6 +404,18 @@
   }
 }
 
+.lh-on-mobile {
+  line-height: 1.5;
+}
+
+.small-on-mobile {
+  font-size: 1.375rem;
+}
+
+.smaller-on-mobile {
+  font-size: 1.25rem;
+}
+
 ///////////////////
 // media queries //
 ///////////////////
@@ -403,6 +428,15 @@
   .home-view__center__bottom {
     flex-wrap: wrap;
   }
+  .lh-on-mobile {
+    line-height: 1;
+  }  
+  .small-on-mobile {
+    font-size: 1.125rem;
+  }
+  .smaller-on-mobile {
+    font-size: 1rem;
+  }    
 }
 
 // phone landscape
@@ -413,6 +447,16 @@
   .home-view__center__bottom {
     flex-wrap: wrap;
   }
+  .lh-on-mobile {
+    line-height: 1.25;
+  }  
+  .small-on-mobile {
+    font-size: 1.25rem;
+    line-height: 1;
+  }  
+  .smaller-on-mobile {
+    font-size: 1.125rem;
+  }  
 }
 
 // tablet
@@ -457,6 +501,11 @@
   ///////////////////
   // Local Methods //
   ///////////////////
+
+  // redirect to dao page
+  const redirectToDao = () => {
+    window.location.href = '/dao'
+  }
 
   //  generate a random number bewteen min and max
   const getRandomInt = (min: number, max: number) => {

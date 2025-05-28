@@ -17,7 +17,7 @@
                   title="Value of TACO token in USD"
                   data-bs-toggle="tooltip"
                   data-bs-placement="right"
-                  data-bs-custom-class="taco-tooltip">${{ Number(sneedPriceUsd).toFixed(2) }}</span>
+                  data-bs-custom-class="taco-tooltip">${{ tacoPriceUsd.toFixed(2) }}</span>
 
         </span>
 
@@ -92,6 +92,6 @@
     // # STATE #
 
     // crypto prices
-    const { sneedPriceUsd } = storeToRefs(tacoStore)
+    const { tacoPriceUsd } = storeToRefs(tacoStore)
 
 </script>
