@@ -54,6 +54,9 @@
         
         </a>
 
+        <!-- chat - router link -->
+        <router-link to="/chat" class="header-bar__rl"><span class="header-bar__rl-span">Chat</span></router-link>        
+
       </div>
 
       <!-- pages menu button -->

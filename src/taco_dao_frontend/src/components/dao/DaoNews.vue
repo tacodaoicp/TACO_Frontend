@@ -22,22 +22,17 @@
                 <!-- news -->
                 <button @click="selectedNav = 'news'" 
                         class="btn taco-nav-btn"
-                        :class="{'taco-nav-btn--active': selectedNav === 'news'}">News</button>                
-
-                <!-- open chat -->
-                <!-- <button @click="selectedNav = 'open-chat'" 
-                        class="btn taco-nav-btn"
-                        :class="{'taco-nav-btn--active': selectedNav === 'open-chat'}">Open Chat</button>               -->
-
-                <!-- twitter -->
-                <!-- <button @click="selectedNav = 'twitter'" 
-                        class="btn taco-nav-btn"
-                        :class="{'taco-nav-btn--active': selectedNav === 'twitter'}">Twitter</button> -->
+                        :class="{'taco-nav-btn--active': selectedNav === 'news'}">News</button>
 
                 <!-- trade logs -->
                 <button @click="selectedNav = 'trade-log'" 
                         class="btn taco-nav-btn"
-                        :class="{'taco-nav-btn--active': selectedNav === 'trade-log'}">Trade Log</button>                        
+                        :class="{'taco-nav-btn--active': selectedNav === 'trade-log'}">Trade Log</button>
+
+                <!-- changelog -->
+                <button @click="selectedNav = 'change-log'" 
+                        class="btn taco-nav-btn"
+                        :class="{'taco-nav-btn--active': selectedNav === 'change-log'}">Change Log</button>                        
 
             </div>
 
@@ -64,6 +59,15 @@
           <DaoTradingLogs />
 
         </div>
+
+        <!-- change log -->
+        <div v-show="selectedNav === 'change-log'"
+            class="dao-news__content__change-log overflow-hidden">
+
+          <!-- change log content -->
+          <ChangelogContent />
+
+        </div>        
 
       </div>
 
@@ -135,8 +139,7 @@
   import astronautLoader from '../../assets/images/astonautLoader.webp'
   import NewsContent from '../misc/NewsContent.vue'
   import DaoTradingLogs from '../dao/DaoTradingLogs.vue'
-  // import OpenChatFrame from './ui/OpenChatFrame.vue'
-  // import TwitterTimeline from './ui/TwitterTimeline.vue'
+  import ChangelogContent from '../misc/ChangelogContent.vue'
 
   /////////////////////
   // local variables //
