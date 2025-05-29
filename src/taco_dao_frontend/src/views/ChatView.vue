@@ -134,21 +134,11 @@
       // initialize the client
       const client = await initialise(iframe.value, {
         targetOrigin: 'https://oc.app',
-        initialPath: '/community/rfeib-riaaa-aaaar-ar3oq-cai/channel/334961401678552956581044255076222828441',
+        initialPath: '/community/lizfz-ryaaa-aaaar-bagsa-cai/channel/1733722051',
         theme: {
           name: 'taco-theme',
           base: 'dark',
-          overrides: {
-            primary: "#db8d27", // taco orange
-            bd: '#db8d27',
-            bg: 'transparent',
-            txt: "var(--brown-to-light-orange)",
-            placeholder: "#db8d27",
-            'txt-light': '#75c8af',
-            timeline: {
-              txt: "var(--brown-to-light-orange)"
-            },
-          }
+          overrides: {}
         }
       })
 
