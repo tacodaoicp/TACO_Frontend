@@ -74,7 +74,7 @@
     <div class="header-bar__right">
 
       <!-- pre-sns disclaimer -->
-      <div class="header-bar__pre-sns-disclaimer">
+      <div class="header-bar__pre-sns-disclaimer d-none">
 
         <span class="badge bg-warning text-dark"
               target="_blank"
@@ -216,6 +216,14 @@
           <span>Docs</span>
 
         </a>
+
+        <!-- chat - router link -->
+        <router-link to="/chat" class="list-group-item">
+
+          <!-- item text -->
+          <span>Chat</span>
+
+        </router-link>        
 
       </div>
 
@@ -452,6 +460,21 @@
 
   }
 
+  // custom breakpoint
+  @media (max-width: 490px) {
+
+    // hide inline page links
+    .header-bar__wallet-link {
+      display: none !important;
+    }
+
+    // hide chips
+    .header-bar__chips * {
+      display: none !important;
+    }    
+
+  }  
+
   // phone protrait
   @media (max-width: 575.98px) {
 
@@ -465,19 +488,29 @@
       display: block !important;
     }
 
-    // 
+    // reduce gap
     .header-bar__left {
       gap: 0;
     }
 
-    // 
+    // reduce escape hatch logo margin
     .escape-hatch-logo {
       margin-right: 0.25rem !important;
     }
 
-    // 
-    .header-bar__chips {
-      display: none !important;
+    // reduce header bar gap
+    .header-bar {
+      gap: 0.5rem;
+    }
+
+    // reduce right gap
+    .header-bar__right {
+      gap: 0rem;
+    }
+
+    // hide chips
+    .header-bar__chips * {
+      font-size: 0.675rem !important;
     }
 
   }

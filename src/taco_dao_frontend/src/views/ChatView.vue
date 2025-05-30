@@ -33,10 +33,25 @@
 
             </div>
 
-          </div>                    
+          </div>     
+          
+          <!-- iframe container -->
+          <div class="chat-iframe__container">
 
-          <!-- Open Chat iFrame -->
-          <iframe ref="iframe" title="OpenChat" frameborder="0" class="chat-iframe" />
+            <!-- iframe curtain -->
+            <div v-if="componentLoading" class="chat-iframe__loading-curtain">
+
+                <!-- astronaut -->
+                <img :src="astronautLoaderUrl" class="loading-img">
+
+            </div>              
+
+            <!-- Open Chat iFrame -->
+            <iframe ref="iframe" title="OpenChat" frameborder="0" class="chat-iframe" />
+
+          </div>
+
+
 
         </div>
 
@@ -63,6 +78,38 @@
     height: 100%;
     padding: 1rem;
     border-radius: 1.5rem;
+
+    // container
+    &__container {
+      display: flex;
+      flex-direction: column;
+      width: 100%;
+      flex-grow: 1;
+      position: relative;
+    }
+
+    // loading curtain
+    &__loading-curtain {
+        position: absolute;
+        height: calc(100% - 2rem);
+        width: calc(100% - 2rem);
+        top: 1rem;
+        left: 1rem;
+        right: 0;
+        bottom: 0;
+        background-color: rgba(0,0,0,0.5);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 0.5rem;
+        z-index: 99999; // above everything
+
+        // loading image
+        .loading-img {
+            width: 10rem;
+        }
+    }
+
   }
 
   ///////////////////
@@ -75,6 +122,15 @@
     .chat-iframe {
       padding: 0;
       border-radius: 0.5rem;
+    }
+
+    .chat-iframe__loading-curtain {
+      height: 100%;
+      width: 100%;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
     }
 
   }
@@ -111,12 +167,20 @@
   import FooterBar from "../components/FooterBar.vue"
   import { ref, onMounted } from "vue"
   import { initialise } from '@open-ic/openchat-xframe'
+  import astronautLoader from '../assets/images/astonautLoader.webp'
 
   /////////////////////
   // local variables //
   /////////////////////
 
+  // iframe
   const iframe = ref<HTMLIFrameElement | null>(null)
+
+  // astronaut loader
+  const astronautLoaderUrl = astronautLoader
+
+  // component
+  const componentLoading = ref(false)  
 
   /////////////////////
   // lifecycle hooks //
@@ -128,32 +192,28 @@
     // if iframe is not found, return
     if (!iframe.value) return
 
+    // set component loading to true
+    componentLoading.value = true
+
     // try to initialize the client
     try {
 
       // initialize the client
       const client = await initialise(iframe.value, {
         targetOrigin: 'https://oc.app',
-        initialPath: '/community/rfeib-riaaa-aaaar-ar3oq-cai/channel/334961401678552956581044255076222828441',
+        initialPath: '/community/lizfz-ryaaa-aaaar-bagsa-cai/channel/1733722051',
         theme: {
           name: 'taco-theme',
           base: 'dark',
-          overrides: {
-            primary: "#db8d27", // taco orange
-            bd: '#db8d27',
-            bg: 'transparent',
-            txt: "var(--brown-to-light-orange)",
-            placeholder: "#db8d27",
-            'txt-light': '#75c8af',
-            timeline: {
-              txt: "var(--brown-to-light-orange)"
-            },
-          }
+          overrides: {}
         }
       })
 
-      // client is now properly initialized
-      console.log('OpenChat initialized successfully')
+      // log
+      // console.log('OpenChat initialized successfully')
+
+      // set component loading to false
+      componentLoading.value = false      
 
     } catch (error) {
 

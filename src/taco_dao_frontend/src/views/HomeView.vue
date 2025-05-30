@@ -47,13 +47,18 @@
           <h3 class="cs__h3 spacemono mt-2">v1.0.1</h3>
 
           <!-- sale link -->
-          <span class="d-inline mb-5 text-center px-3 lh-on-mobile" style="font-size: 1.5rem; font-weight: bold;">
+          <span class="d-inline text-center px-3 lh-on-mobile" style="font-size: 1.5rem; font-weight: bold;">
             <span class="taco-text-brown-to-white
               small-on-mobile">🌮 We're officially a DAO! 🌮</span>
             <br>
             <span class="taco-text-brown-to-white
-              smaller-on-mobile">Thanks to everyone for participating in the decentralization sale! <br> we'll be connecting the site as endpoints become available.</span>
-          </span>            
+            small-on-mobile d-inline-flex mt-2">Next Steps: </span>
+          </span>
+          <ul class="list-unstyled mb-5 mt-2">
+            <li><span class="taco-text-brown-to-white small-on-mobile">🔲 Vote on initial portfolio funding</span></li>
+            <li><span class="taco-text-brown-to-white small-on-mobile">🔲 Trust at least two tokens</span></li>
+            <li><span class="taco-text-brown-to-white small-on-mobile" style="opacity: 0.25;">🔲 <span class="rotating-text">???????</span></span></li>
+          </ul>
 
           <!-- random link 1 -->
           <!-- <span v-if="randomInt === 1" class="d-none d-sm-inline mb-5 text-center px-3" style="font-size: 1.5rem;">
@@ -519,8 +524,25 @@
   // on mounted
   onMounted(() => {
 
-    // getRandomInt between 1 adn 3
+    // getRandomInt between 1 and 3
     randomInt.value = getRandomInt(1, 3)
+
+    // spin characters
+    const span = document.getElementsByClassName('rotating-text')[0]
+    if (!span) return
+
+    // get text
+    const text = span.textContent || ''
+    span.textContent = ''
+
+    // spin characters
+    Array.from(text).forEach((char: string, i: number) => {
+      const spanChar = document.createElement('span')
+      spanChar.textContent = char
+      spanChar.classList.add('rotating-char')
+      spanChar.style.animationDelay = `${i * 0.3}s`
+      span.appendChild(spanChar)
+    })
 
   })
 

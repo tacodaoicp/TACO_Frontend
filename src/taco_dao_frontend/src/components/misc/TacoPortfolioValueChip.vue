@@ -69,6 +69,20 @@
         }
     }
 
+    ///////////////////
+    // media queries //
+    ///////////////////
+
+    // custom breakpoint
+    @media (max-width: 575px) {
+
+        // reduce token icon size
+        .taco-portfolio-value-chip__top svg {
+            width: 1.5rem !important;
+        }
+
+    }      
+
 </style>
 
 <script setup>
