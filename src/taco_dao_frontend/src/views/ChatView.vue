@@ -36,22 +36,15 @@
           </div>     
           
           <!-- iframe container -->
-          <div class="chat-iframe__container">
-
-            <!-- iframe curtain -->
-            <div v-if="componentLoading" class="chat-iframe__loading-curtain">
-
-                <!-- astronaut -->
-                <img :src="astronautLoaderUrl" class="loading-img">
-
-            </div>              
+          <div class="chat-iframe__container">         
 
             <!-- Open Chat iFrame -->
             <iframe ref="iframe" title="OpenChat" frameborder="0" class="chat-iframe" />
 
+            <!-- astronaut -->
+            <img :src="astronautLoaderUrl" class="chat-iframe__loading-img">                
+
           </div>
-
-
 
         </div>
 
@@ -78,6 +71,7 @@
     height: 100%;
     padding: 1rem;
     border-radius: 1.5rem;
+    z-index: 2;
 
     // container
     &__container {
@@ -85,29 +79,17 @@
       flex-direction: column;
       width: 100%;
       flex-grow: 1;
-      position: relative;
+      position: relative;      
     }
 
-    // loading curtain
-    &__loading-curtain {
-        position: absolute;
-        height: calc(100% - 2rem);
-        width: calc(100% - 2rem);
-        top: 1rem;
-        left: 1rem;
-        right: 0;
-        bottom: 0;
-        background-color: rgba(0,0,0,0.5);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        border-radius: 0.5rem;
-        z-index: 99999; // above everything
-
-        // loading image
-        .loading-img {
-            width: 10rem;
-        }
+    // loading image
+    &__loading-img {
+      width: 10rem;
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 1;
     }
 
   }
@@ -116,24 +98,10 @@
   // media queries //
   ///////////////////
 
-  // phone protrait
-  @media (max-width: 575.98px) {
+  // // phone protrait
+  // @media (max-width: 575.98px) {
 
-    .chat-iframe {
-      padding: 0;
-      border-radius: 0.5rem;
-    }
-
-    .chat-iframe__loading-curtain {
-      height: 100%;
-      width: 100%;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-    }
-
-  }
+  // }
   
   // // phone landscape
   // @media (min-width: 576px) and (max-width: 767.98px) { 
@@ -179,9 +147,6 @@
   // astronaut loader
   const astronautLoaderUrl = astronautLoader
 
-  // component
-  const componentLoading = ref(false)  
-
   /////////////////////
   // lifecycle hooks //
   /////////////////////
@@ -191,9 +156,6 @@
 
     // if iframe is not found, return
     if (!iframe.value) return
-
-    // set component loading to true
-    componentLoading.value = true
 
     // try to initialize the client
     try {
@@ -210,10 +172,7 @@
       })
 
       // log
-      // console.log('OpenChat initialized successfully')
-
-      // set component loading to false
-      componentLoading.value = false      
+      // console.log('OpenChat initialized successfully')  
 
     } catch (error) {
 
