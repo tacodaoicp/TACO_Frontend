@@ -363,12 +363,12 @@
               <ul class="taco-bs-list 
                         list-group">
 
-                <!-- list item - ckbtc due dilligence report -->
+                <!-- list item - ckbtc due diligence report -->
                 <li class="standard-focus standard-focus--negative-offset
                           list-group-item d-flex flex-nowrap py-3 gap-3"
                     tabindex="0">
 
-                  <span class="taco-text-black-to-white text-nowrap">📝 <a class="taco-text-blue-to-light-blue" href="/ckBTC_DD_v1_latest.pdf" target="_blank">ckBTC Due Dilligence</a></span>
+                  <span class="taco-text-black-to-white text-nowrap">📝 <a class="taco-text-blue-to-light-blue" href="/ckBTC_DD_v1_latest.pdf" target="_blank">ckBTC Due Diligence</a></span>
 
                 </li>
 
