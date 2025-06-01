@@ -306,7 +306,7 @@
                           list-group-item d-flex flex-nowrap py-3 gap-3"
                     tabindex="0">
 
-                  <span class="taco-text-black-to-white text-nowrap">📝 <a class="taco-text-blue-to-light-blue" href="/Taco_Dao_Whitepaper_v7.78_latest.pdf" target="_blank">Whitepaper</a></span>
+                  <span class="taco-text-black-to-white text-nowrap">📄 <a class="taco-text-blue-to-light-blue" href="/Taco_Dao_Whitepaper_v7.78_latest.pdf" target="_blank">Whitepaper</a></span>
 
                 </li>                        
 
@@ -356,6 +356,23 @@
                 </li>
 
               </ul>
+
+              <!-- links title -->
+              <TacoTitle level="h2" emoji="📊" title="Research" class="mt-4" />
+
+              <ul class="taco-bs-list 
+                        list-group">
+
+                <!-- list item - ckbtc due dilligence report -->
+                <li class="standard-focus standard-focus--negative-offset
+                          list-group-item d-flex flex-nowrap py-3 gap-3"
+                    tabindex="0">
+
+                  <span class="taco-text-black-to-white text-nowrap">📝 <a class="taco-text-blue-to-light-blue" href="/ckBTC_DD_v1_latest.pdf" target="_blank">ckBTC Due Dilligence</a></span>
+
+                </li>
+
+              </ul>              
 
             </div>            
 
