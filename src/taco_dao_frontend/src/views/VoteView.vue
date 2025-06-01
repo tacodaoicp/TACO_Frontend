@@ -112,6 +112,16 @@
                               p-2"
                       >
 
+                        <!-- no tokens curtain -->
+                        <div v-if="tokenCount < 3" class="vote-allocations__no-tokens-curtain">
+
+                          <p v-if="tokenCount === 1" class="taco-text-white text-center mb-0 mb-sm-3"><i class="fa-solid fa-triangle-exclamation taco-text-orange"></i> No Trusted Tokens</p>
+                          <p v-if="tokenCount === 2" class="taco-text-white text-center mb-0 mb-sm-3"><i class="fa-solid fa-triangle-exclamation taco-text-orange"></i> Only One Trusted Token</p>
+                          <p v-if="tokenCount === 1 || tokenCount === 2" class="taco-text-white text-center mb-0 small d-none d-sm-block">The DAO must trust at least two tokens <br> before voting has any impact</p>
+                          
+                        </div>
+                        
+
                         <!-- chart -->
                         <apexchart type="pie" :options="chartOptions" :series="series"
                           class="vote-allocations__taco-chart" @dataPointSelection="handleChartSegmentClick">
@@ -124,6 +134,14 @@
 
                         <!-- flex container -->
                         <div class="d-flex w-100">
+
+                          <!-- no tokens curtain -->
+                          <div v-if="tokenCount < 3" class="vote-allocations__no-tokens-curtain">
+
+                            <p v-if="tokenCount === 1" class="taco-text-white text-center mb-0"><i class="fa-solid fa-triangle-exclamation taco-text-orange"></i> No Trusted Tokens</p>
+                            <p v-if="tokenCount === 2" class="taco-text-white text-center mb-0"><i class="fa-solid fa-triangle-exclamation taco-text-orange"></i> Only One Trusted Token</p>
+                            
+                          </div>
 
                           <!-- left -->
                           <div class="d-flex flex-column w-100">
@@ -486,6 +504,15 @@
                   <!-- voting controls -->
                   <div class="taco-container taco-container--l2
                               d-flex flex-column">
+
+                    <!-- no tokens curtain -->
+                    <div v-if="tokenCount < 3" class="vote-allocations__no-tokens-curtain">
+
+                      <p v-if="tokenCount === 1" class="taco-text-white text-center"><i class="fa-solid fa-triangle-exclamation taco-text-orange"></i> No Trusted Tokens</p>
+                      <p v-if="tokenCount === 2" class="taco-text-white text-center">Only One Trusted Token</p>
+                      <p v-if="tokenCount === 1 || tokenCount === 2" class="taco-text-white text-center mb-0 small">The DAO must trust at least two tokens <br> before voting has any impact</p>
+                      
+                    </div>                              
 
                     <!-- top - your vote title, voting power, and match current button -->
                     <div class="d-flex justify-content-between">
@@ -912,7 +939,7 @@
                   </div>
 
                   <!-- logged out, curtain -->
-                  <div v-if="!userLoggedIn" class="login-curtain">
+                  <div v-if="!userLoggedIn && tokenCount >= 3" class="login-curtain">
 
                     <!-- login button -->
                     <button class="btn iid-login" @click="iidLogIn()">
@@ -1380,6 +1407,7 @@
       // 
       &__taco-chart-container {
           max-height: 257px;
+          position: relative;
       }
 
       // 
@@ -1472,6 +1500,24 @@
               // max-height: 468px;
           }
       }
+
+      // no tokens curtain
+      &__no-tokens-curtain {
+        position: absolute;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0,0,0,0.75);
+        padding: 0 1rem;
+        z-index: 1000;
+        border-radius: 0.5rem;
+      }
+            
   }
 
   // vote following
@@ -2232,6 +2278,9 @@
   const seriesNames = ref(['loading'])
   const colors = ref(['#ccc'])
 
+  // token count
+  const tokenCount = ref(0)
+
   ///////////////////
   // local methods //
   ///////////////////  
@@ -2244,6 +2293,12 @@
 
     // log
     // console.log('VoteView.vue: fetchedTokenDetails:', tokenDetails)
+
+    // count of tokens
+    tokenCount.value = tokenDetails.length
+
+    // log
+    // console.log('VoteView.vue: tokenCount:', tokenCount)
 
   }
 

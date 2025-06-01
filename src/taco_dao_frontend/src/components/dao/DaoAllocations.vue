@@ -71,12 +71,12 @@
 
             <!-- if no holdings -->
             <div v-if="showCurrentHoldings && !currentHoldingsHaveValue" class="dao-allocations__no-holdings py-5 text-center">
-                <span class="taco-text-white">No holdings yet</span>
+                <span class="taco-text-black-to-white">No holdings yet</span>
             </div>
 
             <!-- if no allocations -->
             <div v-if="showCurrentAllocations && !currentAllocationsHaveValue" class="dao-allocations__no-allocations py-5 text-center">
-                <span class="taco-text-white">No allocations yet</span>
+                <span class="taco-text-black-to-white">No allocations yet</span>
             </div>
         
         </div>
