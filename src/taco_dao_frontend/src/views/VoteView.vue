@@ -113,11 +113,9 @@
                       >
 
                         <!-- no tokens curtain -->
-                        <div v-if="tokenCount < 2" class="vote-allocations__no-tokens-curtain">
+                        <div v-if="allocationCount === 0" class="vote-allocations__no-tokens-curtain">
 
-                          <p v-if="tokenCount === 0" class="taco-text-white text-center mb-0 mb-sm-3"><i class="fa-solid fa-triangle-exclamation taco-text-orange"></i> No Trusted Tokens</p>
-                          <p v-if="tokenCount === 1" class="taco-text-white text-center mb-0 mb-sm-3"><i class="fa-solid fa-triangle-exclamation taco-text-orange"></i> Only One Trusted Token</p>
-                          <p v-if="tokenCount === 0 || tokenCount === 1" class="taco-text-white text-center mb-0 small d-none d-sm-block">The DAO must trust at least two tokens <br> before voting has any impact</p>
+                          <p class="taco-text-white text-center mb-0"><i class="fa-solid fa-triangle-exclamation taco-text-orange"></i> No Allocations Yet</p>                          
                           
                         </div>
                         
@@ -136,10 +134,9 @@
                         <div class="d-flex w-100">
 
                           <!-- no tokens curtain -->
-                          <div v-if="tokenCount < 2" class="vote-allocations__no-tokens-curtain">
+                          <div v-if="allocationCount === 0" class="vote-allocations__no-tokens-curtain">
 
-                            <p v-if="tokenCount === 0" class="taco-text-white text-center mb-0"><i class="fa-solid fa-triangle-exclamation taco-text-orange"></i> No Trusted Tokens</p>
-                            <p v-if="tokenCount === 1" class="taco-text-white text-center mb-0"><i class="fa-solid fa-triangle-exclamation taco-text-orange"></i> Only One Trusted Token</p>
+                            <p class="taco-text-white text-center mb-0"><i class="fa-solid fa-triangle-exclamation taco-text-orange"></i> No Tokens Allocated</p>
                             
                           </div>
 
@@ -2901,6 +2898,11 @@
     const date = new Date(Number(epochTimestamp / BigInt(1_000_000)))
     return date.toLocaleDateString('en-US', options)
   }  
+
+  // return allocation count
+  const allocationCount = computed(() => {
+    return fetchedAggregateAllocation.value.length
+  })
 
   /////////////
   // utility //  
