@@ -455,6 +455,31 @@
       opacity: 0.25;
     }
 
+    &--green {
+      border-color: var(--green) !important;
+      background-color: var(--green);
+
+      &:hover {
+        background-color: var(--green-hover);
+        border-color: var(--green-hover) !important;
+      }
+
+      &:focus {
+        background-color: var(--green-hover);
+        border-color: var(--green-hover) !important;
+      }
+
+      &:focus-visible {
+        outline: 3px solid var(--light-brown-to-orange);
+        outline-offset: 0px;
+      }
+
+      &:active, &:active:focus, &:active:focus-visible {  
+        background-color: var(--green-hover);
+        border-color: var(--green-hover) !important;
+      }
+    }
+
   }
   @media (max-width: 575.98px) {
 

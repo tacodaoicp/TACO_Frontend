@@ -2268,6 +2268,8 @@
   const currentSliders = ref<any>([])
   const followPrincipalInput = ref<string>('')
   const formattedUserAllocation = ref()
+
+  // tutorial
   const userReshownHotkeyTutorial = ref(false)
 
   // user
