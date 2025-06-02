@@ -238,7 +238,7 @@
               <!-- team title -->
               <TacoTitle level="h2" emoji="🙌" title="Taco Team"/>
 
-              <!--  -->
+              <!-- team list -->
               <ul class="taco-bs-list 
                         list-group">
 
@@ -258,16 +258,7 @@
 
                   <span class="taco-text-black-to-white"><span class="fw-bold taco-text-black-to-white">TrickyVik</span> - Theory & Outreach</span>
 
-                </li>                
-
-                <!-- list item -->
-                <li class="standard-focus standard-focus--negative-offset
-                          list-group-item d-flex flex-nowrap py-3 gap-3"
-                    tabindex="0">
-
-                  <span class="taco-text-black-to-white"><a class="taco-text-blue-to-light-blue fw-bold" href="https://egidoval.com/" target="_blank">EgidoVal</a> - Art & Design</span>
-
-                </li>  
+                </li>
                 
                 <!-- list item -->
                 <li class="standard-focus standard-focus--negative-offset
@@ -276,7 +267,7 @@
 
                   <span class="taco-text-black-to-white"><a class="taco-text-blue-to-light-blue fw-bold" href="https://x.com/SnassyIcp" target="_blank">Snassy</a> - Backend Development</span>
 
-                </li>                
+                </li>
 
                 <!-- list item -->
                 <li class="standard-focus standard-focus--negative-offset
@@ -284,6 +275,24 @@
                     tabindex="0">
 
                   <span class="taco-text-black-to-white"><a class="taco-text-blue-to-light-blue fw-bold" href="http://ericrose.dev" target="_blank">ericrosedev</a> - Frontend Design & Development</span>
+
+                </li>
+
+              </ul>
+
+              <!-- contributors title -->
+              <TacoTitle level="h2" emoji="🤝" title="Taco Contributors" class="mt-4" />
+
+              <!-- contributors list -->
+              <ul class="taco-bs-list 
+                        list-group">
+
+                <!-- list item -->
+                <li class="standard-focus standard-focus--negative-offset
+                          list-group-item d-flex flex-nowrap py-3 gap-3"
+                    tabindex="0">
+
+                  <span class="taco-text-black-to-white"><a class="taco-text-blue-to-light-blue fw-bold" href="https://egidoval.com/" target="_blank">EgidoVal</a> - Art & Design</span>
 
                 </li>
 
@@ -374,7 +383,7 @@
 
               </ul>              
 
-            </div>            
+            </div>
 
           </div>
 
