@@ -168,7 +168,7 @@
                       Participants
                     </th>
 
-                    <th class="fw-bold ps-2 ps-sm-4 pe-2 pe-sm-3 text-center"
+                    <th class="fw-bold ps-2 ps-sm-4 pe-2 pe-sm-3 text-end"
                         scope="col">
                       Commitment
                     </th>
@@ -192,6 +192,38 @@
 
                   <tr>
 
+                    <td data-label="Started:" class="ps-3">May 9, 2025</td>
+
+                    <td data-label="Name:" class="ps-2 ps-sm-4 pe-2 pe-sm-3">SNS Decentralization Sale</td>
+
+                    <td data-label="Duration:" class="ps-2 ps-sm-4 pe-2 pe-sm-3 text-center">2 Weeks</td>
+
+                    <td data-label="Participants:" class="ps-2 ps-sm-4 pe-2 pe-sm-3 text-center">398</td>
+
+                    <td data-label="Commitment:" class="ps-2 ps-sm-4 pe-2 pe-sm-3 text-end">127,077 ICP</td>
+
+                    <td data-label="Status:" class="ps-2 ps-sm-4 pe-2 pe-sm-3">
+                      <span class="d-flex align-items-center" style="gap: 0.5rem;">
+                        <span class="taco-text-black-to-white">Completed</span>
+                        <i class="fa-solid fa-check small"
+                           style="color: var(--light-green-to-success-green-hover);"></i>
+                      </span>
+                    </td>
+
+                    <td data-label="View:" class="ps-2 ps-sm-4 pe-2 pe-sm-3 text-center">
+
+                      <a href="https://nns.ic0.app/project/?project=lacdn-3iaaa-aaaaq-aae3a-cai" target="_blank" style="background-color: transparent; color: var(--black);">
+                      
+                        <i class="fa-solid fa-arrow-up-right-from-square taco-text-brown-to-white"></i>
+                      
+                      </a>
+
+                    </td>
+
+                  </tr>
+
+                  <tr>
+
                     <td data-label="Started:" class="ps-3">May 3, 2024</td>
 
                     <td data-label="Name:" class="ps-2 ps-sm-4 pe-2 pe-sm-3">DKP Swap</td>
@@ -200,7 +232,7 @@
 
                     <td data-label="Participants:" class="ps-2 ps-sm-4 pe-2 pe-sm-3 text-center">76</td>
 
-                    <td data-label="Commitment:" class="ps-2 ps-sm-4 pe-2 pe-sm-3 text-center">21,750,358 DKP</td>
+                    <td data-label="Commitment:" class="ps-2 ps-sm-4 pe-2 pe-sm-3 text-end">21,750,358 DKP</td>
 
                     <td data-label="Status:" class="ps-2 ps-sm-4 pe-2 pe-sm-3">
                       <span class="d-flex align-items-center" style="gap: 0.5rem;">
