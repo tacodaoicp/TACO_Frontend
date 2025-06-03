@@ -8,6 +8,17 @@
             <!-- changelog item -->
             <div class="changelog-content__item">
                 <h3 class="changelog-content__title">
+                    v1.0.2
+                </h3>
+                <span class="changelog-content__date">🍽️ June 3, 2025</span>
+                <p class="changelog-content__text">
+                    - Added Sneed tab to /chat
+                </p>
+            </div>            
+
+            <!-- changelog item -->
+            <div class="changelog-content__item">
+                <h3 class="changelog-content__title">
                     v1.0.1
                 </h3>
                 <span class="changelog-content__date">🍽️ May 28, 2025</span>
