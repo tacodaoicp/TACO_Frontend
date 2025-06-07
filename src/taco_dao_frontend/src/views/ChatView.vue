@@ -55,7 +55,7 @@
                 <div class="btn-group">
 
                     <!-- open chat -->
-                    <button v-show="showOpenChat" class="btn taco-nav-btn taco-nav-btn--green taco-nav-btn--active ms-auto" @click="showAccessTutorial()">Access Taco HQ</button>                    
+                    <button v-show="showOpenChat" class="btn taco-nav-btn taco-nav-btn--green taco-nav-btn--active ms-auto" @click="showAccessTutorial()"><i class="fa-solid fa-lock"></i> Gated Access</button>                    
 
                 </div>
 
@@ -126,7 +126,7 @@
         <div class="access__message__dialog__top px-2 p-2">
 
           <!-- message top left -->
-          <div class="taco-text-white">How To Access Taco HQ</div>
+          <div class="taco-text-white ps-3">How To Access Taco HQ</div>
 
           <!-- message top right -->
           <div class="taco-text-black-to-white"></div>
@@ -156,7 +156,7 @@
             <!-- text -->
             <span class="taco-text-black-to-white text-center"
               style="font-size: 0.875rem;">
-              Hotkeying your SNS Neurons with you Open Chat principal allows you to access the gated chat room, Taco HQ <br><br> This allows Open Chat to confirm you have a voting stake in Taco Dao, and grant you access to the private room <br><br> Here is more information on <a href="https://support.dfinity.org/hc/en-us/articles/8939053696788-What-is-a-neuron-hotkey-and-how-do-I-use-it" target="_blank">Hotkeying</a> from Dfinity
+              Hotkeying your SNS Neurons with you Open Chat principal allows you to access the gated chat room, Taco HQ <br><br> This allows Open Chat to confirm you have a voting stake in Taco Dao, and grant you access to the private room <br><br> You must have <span style="font-weight: 900; text-decoration: underline;">at least 77 Taco staked for at least 27 days</span>. This is re-evaluated every 77 days<br><br> Here is more information on <a href="https://support.dfinity.org/hc/en-us/articles/8939053696788-What-is-a-neuron-hotkey-and-how-do-I-use-it" target="_blank">Hotkeying</a> from Dfinity
             </span>
 
           </div>
