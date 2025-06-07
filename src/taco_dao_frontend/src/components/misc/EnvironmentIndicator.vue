@@ -112,8 +112,9 @@
 
     // on mount
     onMounted(async () => {
+
         // log
-        console.log('environment indicator mounted')
+        // console.log('environment indicator mounted')
 
         // if host is staging
         if (process.env.DFX_NETWORK === "staging"){
