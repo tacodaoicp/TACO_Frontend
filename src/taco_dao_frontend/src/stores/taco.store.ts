@@ -365,28 +365,7 @@ export const useTacoStore = defineStore('taco', () => {
         return `http://localhost:${port}`
 
     }
-    function getTreasuryCanisterId(): Principal {
 
-        // get canister id
-        const canisterId = process.env.DFX_NETWORK === "ic"
-            ? 'v6t5d-6yaaa-aaaan-qzzja-cai' // ic
-            : 'z4is7-giaaa-aaaad-qg6uq-cai'; // local
-
-        // return principal
-        return Principal.fromText(canisterId)
-
-    }
-    function getDaoCanisterId(): Principal {
-
-        // get canister id
-        const canisterId = process.env.DFX_NETWORK === "ic"
-            ? 'vxqw7-iqaaa-aaaan-qzziq-cai' // ic
-            : 'ywhqf-eyaaa-aaaad-qg6tq-cai'; // local
-
-        // return principal
-        return Principal.fromText(canisterId)
-
-    }
 
     // app
     const changeRoute = (destination: string) => {
@@ -1032,7 +1011,7 @@ export const useTacoStore = defineStore('taco', () => {
             // create actor
             const actor = Actor.createActor(daoBackendIDL, {
                 agent,
-                canisterId: getDaoCanisterId(),
+                canisterId: daoBackendCanisterId(),
             })
             
             //////////////////////
@@ -1112,7 +1091,7 @@ export const useTacoStore = defineStore('taco', () => {
 
             const actor = Actor.createActor(daoBackendIDL, {
                 agent,
-                canisterId: getDaoCanisterId(),
+                canisterId: daoBackendCanisterId(),
             })
 
             //////////////////////
@@ -1177,7 +1156,7 @@ export const useTacoStore = defineStore('taco', () => {
             // create actor
             const actor = Actor.createActor(daoBackendIDL, {
                 agent,
-                canisterId: getDaoCanisterId(),
+                canisterId: daoBackendCanisterId(),
             })
 
             //////////////////////
@@ -1248,7 +1227,7 @@ export const useTacoStore = defineStore('taco', () => {
                 // create actor
                 const actor = Actor.createActor(daoBackendIDL, {
                     agent,
-                    canisterId: getDaoCanisterId(),
+                    canisterId: daoBackendCanisterId(),
                 })
 
                 //////////////////////
@@ -1322,7 +1301,7 @@ export const useTacoStore = defineStore('taco', () => {
                 // create actor
                 const actor = Actor.createActor(daoBackendIDL, {
                     agent,
-                    canisterId: getDaoCanisterId(),
+                    canisterId: daoBackendCanisterId(),
                 })
 
                 //////////////////////
@@ -1400,7 +1379,7 @@ export const useTacoStore = defineStore('taco', () => {
                 // create actor
                 const actor = Actor.createActor(daoBackendIDL, {
                     agent,
-                    canisterId: getDaoCanisterId(),
+                    canisterId: daoBackendCanisterId(),
                 })
 
                 //////////////////////
@@ -1478,7 +1457,7 @@ export const useTacoStore = defineStore('taco', () => {
                 // create actor
                 const actor = Actor.createActor(daoBackendIDL, {
                     agent,
-                    canisterId: getDaoCanisterId(),
+                    canisterId: daoBackendCanisterId(),
                 })
 
                 // log
@@ -1546,7 +1525,7 @@ export const useTacoStore = defineStore('taco', () => {
             // create actor
             const actor = Actor.createActor(treasuryIDL, {
                 agent,
-                canisterId: getTreasuryCanisterId(),
+                canisterId: treasuryCanisterId(),
             })
             
             //////////////////////

@@ -21,7 +21,7 @@
           <div class="taco-container taco-container--l2 taco-container--l2--dark p-2 mx-3 mt-3 mb-3 mb-sm-0">
 
             <!-- toolbar -->
-            <div class="taco-toolbar">
+            <div class="taco-toolbar gap-2">
 
               <!-- left -->
               <div class="taco-toolbar__left">
@@ -30,20 +30,27 @@
                 <div class="btn-group">
 
                     <!-- open chat -->
-                    <button class="btn taco-nav-btn taco-nav-btn--active">Open Chat</button>                    
+                    <button class="btn taco-nav-btn"
+                            @click="showOpenChat = true; showSneed = false;"
+                            :class="{ 'taco-nav-btn--active': showOpenChat }">Open Chat</button>
+
+                    <!-- sneed -->
+                    <button class="btn taco-nav-btn"
+                            @click="showOpenChat = false; showSneed = true;"
+                            :class="{ 'taco-nav-btn--active': showSneed }">Sneed</button>
 
                 </div>
 
               </div>
 
               <!-- right -->
-              <div class="taco-toolbar__right"> 
+              <div class="taco-toolbar__right flex-grow-1 d-flex justify-content-end"> 
 
                 <!-- buttons -->
                 <div class="btn-group">
 
                     <!-- open chat -->
-                    <button class="btn taco-nav-btn taco-nav-btn--green taco-nav-btn--active" @click="showAccessTutorial()">Access Taco HQ</button>                    
+                    <button v-show="showOpenChat" class="btn taco-nav-btn taco-nav-btn--green taco-nav-btn--active ms-auto" @click="showAccessTutorial()">Access Taco HQ</button>                    
 
                 </div>
 
@@ -53,14 +60,25 @@
 
           </div>     
           
-          <!-- iframe container -->
-          <div class="chat-iframe__container">         
+          <!-- open chat iframe container -->
+          <div v-show="showOpenChat" class="chat-iframe__container">         
 
             <!-- Open Chat iFrame -->
             <iframe ref="iframe" title="OpenChat" frameborder="0" class="chat-iframe" />
 
             <!-- astronaut -->
             <img :src="astronautLoaderUrl" class="chat-iframe__loading-img">                
+
+          </div>
+
+          <!-- sneed iframe container -->
+          <div v-show="showSneed" class="sneed-iframe__container">
+
+            <!-- sneed iFrame -->
+            <iframe ref="sneedIframe" title="Sneed" frameborder="0" class="sneed-iframe" />
+
+            <!-- astronaut -->
+            <img :src="astronautLoaderUrl" class="chat-iframe__loading-img"> 
 
           </div>
 
@@ -204,8 +222,8 @@
   // component style //
   /////////////////////
 
-  // Open Chat iFrame
-  .chat-iframe {
+  // iFrame
+  .chat-iframe, .sneed-iframe {
     width: 100%;
     height: 100%;
     padding: 1rem;
@@ -354,7 +372,7 @@
 
   import HeaderBar from "../components/HeaderBar.vue"
   import FooterBar from "../components/FooterBar.vue"
-  import { ref, onMounted } from "vue"
+  import { ref, onMounted, watch } from "vue"
   import { initialise } from '@open-ic/openchat-xframe'
   import astronautLoader from '../assets/images/astonautLoader.webp'
 
@@ -362,8 +380,17 @@
   // local variables //
   /////////////////////
 
-  // iframe
+  // open chat iframe
   const iframe = ref<HTMLIFrameElement | null>(null)
+
+  // sneed iframe
+  const sneedIframe = ref<HTMLIFrameElement | null>(null)
+
+  // show open chat
+  const showOpenChat = ref(true)
+
+  // show sneed
+  const showSneed = ref(false)
 
   // astronaut loader
   const astronautLoaderUrl = astronautLoader
@@ -397,7 +424,29 @@
 
     userShownAccessTutorial.value = false
 
-  }  
+  }
+
+
+  /////
+  // watcherse //
+  /////
+
+  // watch for showSneed
+  watch(showSneed, async (newVal) => {
+
+    // log
+    // console.log('ChatView.vue: showSneed:', newVal)
+
+    // initialize sneed iframe
+    if (sneedIframe.value) {
+      try {
+        sneedIframe.value.src = 'https://app.sneeddao.com/proposals?sns=lacdn-3iaaa-aaaaq-aae3a-cai'
+      } catch (error) {
+        console.error('Failed to initialize Sneed:', error)
+      }
+    }    
+
+  })
 
 
   /////////////////////
@@ -406,34 +455,22 @@
 
   // on mounted
   onMounted(async () => {
-
-    // if iframe is not found, return
-    if (!iframe.value) return
-
-    // try to initialize the client
-    try {
-
-      // initialize the client
-      const client = await initialise(iframe.value, {
-        targetOrigin: 'https://oc.app',
-        initialPath: '/community/lizfz-ryaaa-aaaar-bagsa-cai/channel/1733722051',
-        theme: {
-          name: 'taco-theme',
-          base: 'dark',
-          overrides: {}
-        }
-      })
-
-      // log
-      // console.log('OpenChat initialized successfully')  
-
-    } catch (error) {
-
-      // log error
-      console.error('Failed to initialize OpenChat:', error)
-
+    // initialize open chat iframe
+    if (iframe.value) {
+      try {
+        const client = await initialise(iframe.value, {
+          targetOrigin: 'https://oc.app',
+          initialPath: '/community/lizfz-ryaaa-aaaar-bagsa-cai/channel/1733722051',
+          theme: {
+            name: 'taco-theme',
+            base: 'dark',
+            overrides: {}
+          }
+        })
+      } catch (error) {
+        console.error('Failed to initialize OpenChat:', error)
+      }
     }
-
   })
 
 </script>
