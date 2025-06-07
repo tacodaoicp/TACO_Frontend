@@ -59,6 +59,9 @@
 
       </div>
 
+      <!-- environment indicator -->
+      <EnvironmentIndicator />
+
       <!-- pages menu button -->
       <button class="btn pages-menu__btn"
               @click="togglePagesMenu()">
@@ -583,6 +586,7 @@
   import DfinityLogo from "../assets/images/dfinityLogo.vue"
   import DarkModeToggle from "./theme/DarkModeToggle.vue"
   import { Tooltip } from 'bootstrap'
+  import EnvironmentIndicator from './misc/EnvironmentIndicator.vue'
 
   ////////////
   // Stores //
