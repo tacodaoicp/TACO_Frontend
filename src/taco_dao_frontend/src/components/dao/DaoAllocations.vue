@@ -245,6 +245,21 @@
 
                         </li>
 
+                        <!-- icp coins link - list item -->
+                        <li v-if="showCurrentAllocations">
+                            
+                            <!-- key -->
+                            <span class="dao-allocations__token-info-list__key
+                                         taco-text-white">ICPCoins.com:</span>
+
+                            <!-- value -->
+                            <span class="dao-allocations__token-info-list__value
+                                         taco-text-white ms-auto">
+                                <a class="small" style="color: var(--blue-to-light-blue);" :href="currentTokenIcpCoinsLink" target="_blank">{{ currentTokenSymbol }}</a>
+                            </span>
+
+                        </li>
+
                     </ul>
 
                 </div>
@@ -597,6 +612,7 @@ LOCAL METHODS
     const currentTokenPrice = ref<number>(0)
     const currentTokenPercentage = ref<number>(0)
     const currentTokenTrusted = ref<string>('N/A')
+    const currentTokenIcpCoinsLink = ref<string>('#')
 
     // no allocations
     const currentAllocationsHaveValue = ref<boolean>(true)
@@ -709,6 +725,11 @@ LOCAL METHODS
         if (selectedToken2) {
             const timestamp = selectedToken2.epochAdded
             currentTokenTrusted.value = formatTimestampDateOnly(timestamp)
+        }
+
+        // update current token icp coins link with tokenData
+        if (selectedToken) {
+            currentTokenIcpCoinsLink.value = selectedToken.icpCoinsLink
         }
 
     }
