@@ -43,6 +43,7 @@ import xmtk2Token from "../../assets/tokens/snspng/xmtk2.png"
 import yralToken from "../../assets/tokens/snspng/yral.png"
 import yukuDaoToken from "../../assets/tokens/snspng/yuku-dao.png"
 import ckusdcToken from "../../assets/tokens/ckusdc.png"
+import ckbtcToken from "../../assets/tokens/ckbtc.png"
 import icfcToken from "../../assets/tokens/snspng/icfc.png"
 import icpExToken from "../../assets/tokens/snspng/icpex.png"
 import nfidWalletToken from "../../assets/tokens/snspng/nfidw.png"
@@ -61,6 +62,7 @@ export const tokenImages: { [key: string]: string } = {
 "Alice": aliceToken,
 "Internet Computer": icpToken,
 "Chainkey USDC": ckusdcToken,
+"Chainkey BTC": ckbtcToken,
 "Local ICP": licpToken,    
 "BOOM DAO": boomDaoToken,
 "Catalyze": catalyzeToken,
@@ -155,11 +157,19 @@ export const tokenData = [
     {
         title: 'Chainkey USDC',
         symbol: 'ckusdc',
-        link: 'https://internetcomputer.org/',
+        link: 'https://icpcoins.com/#/token/ckBTC',
         icon: ckusdcToken,
         description: `Chain-key USDC (ckUSDC), a multi-chain USDC twin on the Internet Computer, is an ICRC-1-compliant token that is backed 1:1 by USDC such that 1 ckUSDC can always be redeemed for 1 USDC and vice versa.`,
         color: '#5122b5'
     },
+    {
+        title: 'Chainkey BTC',
+        symbol: 'ckbtc',
+        link: 'https://dashboard.internetcomputer.org/bitcoin',
+        icon: ckbtcToken,
+        description: `ckBTC is a pair of ICP smart contracts building on the Bitcoin canister and ckECDSA services. The contracts work together to enable users and canister smart contracts on ICP to send and receive BTC value within seconds — far faster than is possible with native BTC chain transactions, while also always allowing users and smart contracts to send and receive value to and from native BTC network addresses.`,
+        color: '#5122b5'
+    },    
     {
         title: 'CYCLES-TRANSFER-STATION',
         symbol: 'cts',
