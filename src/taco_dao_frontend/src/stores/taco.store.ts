@@ -370,7 +370,7 @@ export const useTacoStore = defineStore('taco', () => {
         if (!authClientInstance) {
             authClientInstance = await AuthClient.create({
                 idleOptions: {
-                    idleTimeout: 1000 * 60 * 60 * 24 * 30, // set to 30 days
+                    disableIdle: true
                 }
             })
         }
