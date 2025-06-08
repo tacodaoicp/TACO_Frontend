@@ -39,6 +39,7 @@
                     <i class="fa-solid fa-circle-info"></i>
                 </div>
 
+                <!-- date -->
                 <div class="d-none d-md-flex flex-column align-items-center gap-1 ms-auto">
 
                     <!-- if viewing current -->
