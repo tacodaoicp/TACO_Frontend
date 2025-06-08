@@ -2305,6 +2305,24 @@
     // count of tokens
     tokenCount.value = tokenDetails.length
 
+    // // create currentSliders array using fetchedTokenDetails
+    // currentSliders.value = tokenDetails.map((tokenDetail) => {
+    //   const [principal, details] = tokenDetail;
+    //   return {
+    //     symbol: details.tokenSymbol,
+    //     canisterId: principal.toString(),
+    //     currentPercentage: 0, // default to 0, adjust as needed
+    //     initialPercentage: 0, // default to 0, adjust as needed
+    //     isLocked: false,
+    //     badgeColor: '#ccc' // default color, adjust as needed
+    //   }
+    // })
+
+    // // run matchLast if user has a previous allocation
+    // if (formattedUserAllocation.value && formattedUserAllocation.value.allocations.length > 0) {
+    //   matchLast();
+    // }
+
     // log
     // console.log('VoteView.vue: tokenCount:', tokenCount)
 
@@ -2726,7 +2744,10 @@
     try { 
 
       // cast vote with backend
-      await updateAllocation(allocations)
+      // await updateAllocation(allocations)
+
+      // fake wait for 2 seconds
+      await new Promise(resolve => setTimeout(resolve, 2000))
 
       // log
       // console.log('VoteView.vue: vote cast')
@@ -2747,7 +2768,20 @@
       // turn off app loading
       appLoadingOff()
 
-      // add toast
+      // // add toast
+      // addToast({
+      //   id: Date.now(),
+      //   code: 'code',
+      //   tradeAmount: '',
+      //   tokenSellIdentifier: '',
+      //   tradeLimit: '',
+      //   tokenInitIdentifier: '',
+      //   title: '👨‍🍳 Vote Cast!',
+      //   icon: '',
+      //   message: `Allocation vote cast with ${votePower.value} VP`
+      // })
+
+      // add temp toast
       addToast({
         id: Date.now(),
         code: 'code',
@@ -2755,10 +2789,10 @@
         tokenSellIdentifier: '',
         tradeLimit: '',
         tokenInitIdentifier: '',
-        title: '👨‍🍳 Vote Cast!',
+        title: '👨‍🍳 Test Vote Cast!',
         icon: '',
-        message: `Allocation vote cast with ${votePower.value} VP`
-      })
+        message: `Test allocation vote cast with ${votePower.value} VP. We're turning the trading bot on soon!`
+      })      
 
     } catch (error) {
 
@@ -3054,10 +3088,13 @@
       // fetch and handle dao data
       await fetchTokenDetails()
       handleFetchedTokenDetails(fetchedTokenDetails.value)
+      // console.log('fetchedTokenDetails', fetchedTokenDetails.value)
       await fetchAggregateAllocation()
       handleFetchedAggregateAllocation(fetchedAggregateAllocation.value)
+      // console.log('fetchedAggregateAllocation', fetchedAggregateAllocation.value)
       await fetchVotingPowerMetrics()
       handleFetchedVotingPowerMetrics(fetchedVotingPowerMetrics.value)
+      // console.log('fetchedVotingPowerMetrics', fetchedVotingPowerMetrics.value)
 
       // check if user is logged in
       await checkIfLoggedIn()
@@ -3477,7 +3514,7 @@
     }
   }, { immediate: true })
 
-  // 
+  // show more past allocations
   const showMorePastAllocations = () => {
     displayedPastAllocations.value = formattedUserAllocation.value.pastAllocations.slice().reverse()
   }
