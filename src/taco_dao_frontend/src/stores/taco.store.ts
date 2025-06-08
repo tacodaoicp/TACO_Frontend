@@ -368,7 +368,11 @@ export const useTacoStore = defineStore('taco', () => {
     }
     const getAuthClient = async (): Promise<AuthClient> => {
         if (!authClientInstance) {
-            authClientInstance = await AuthClient.create()
+            authClientInstance = await AuthClient.create({
+                idleOptions: {
+                    idleTimeout: 1000 * 60 * 60 * 24 * 30, // set to 30 days
+                }
+            })
         }
         return authClientInstance
     }      
@@ -675,7 +679,7 @@ export const useTacoStore = defineStore('taco', () => {
         try {
 
             // create auth client
-            let authClient = await AuthClient.create()
+            const authClient = await getAuthClient()
 
             // if already logged in
             if (await authClient.isAuthenticated()) {
@@ -700,6 +704,7 @@ export const useTacoStore = defineStore('taco', () => {
             // login
             await new Promise((resolve, reject) => {
                 authClient.login({
+                    maxTimeToLive: BigInt(30 * 24 * 60 * 60 * 1000 * 1000 * 1000),
                     identityProvider:
                         process.env.DFX_NETWORK === "ic" || process.env.DFX_NETWORK === "staging"
                             ? 'https://identity.ic0.app'
