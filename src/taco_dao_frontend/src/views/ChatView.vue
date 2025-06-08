@@ -31,18 +31,13 @@
 
                     <!-- open chat -->
                     <button class="btn taco-nav-btn"
-                            @click="showOpenChat = true; showSneed = false; showDiscord = false;"
+                            @click="showOpenChat = true; showSneed = false;"
                             :class="{ 'taco-nav-btn--active': showOpenChat }">Open Chat</button>
 
                     <!-- sneed -->
                     <button class="btn taco-nav-btn"
-                            @click="showOpenChat = false; showSneed = true; showDiscord = false;"
+                            @click="showOpenChat = false; showSneed = true;"
                             :class="{ 'taco-nav-btn--active': showSneed }">Sneed Hub</button>
-
-                    <!-- discord -->
-                    <button class="btn taco-nav-btn"
-                            @click="showOpenChat = false; showSneed = false; showDiscord = true;"
-                            :class="{ 'taco-nav-btn--active': showDiscord }">Discord</button>
 
                 </div>
 
@@ -93,27 +88,7 @@
             <!-- astronaut -->
             <img :src="astronautLoaderUrl" class="chat-iframe__loading-img"> 
 
-          </div>
-
-          <!-- discord iframe container -->
-          <div v-show="showDiscord" class="discord-iframe__container">
-
-            <!-- discord iFrame -->
-            <iframe
-              ref="discordIframe"
-              title="Discord"
-              class="discord-iframe"
-              src="https://discord.com/widget?id=1184741598936977418&theme=dark"
-              allowtransparency="true"
-              frameborder="0"
-              sandbox="allow-popups allow-popups-to-escape-sandbox allow-same-origin allow-scripts"
-            ></iframe>
-
-
-            <!-- astronaut -->
-            <img :src="astronautLoaderUrl" class="chat-iframe__loading-img"> 
-
-          </div>          
+          </div>         
 
         </div>
 
@@ -393,7 +368,7 @@
   /////////////////////
 
   // iFrame
-  .chat-iframe, .sneed-iframe, .discord-iframe {
+  .chat-iframe, .sneed-iframe {
     width: 100%;
     height: 100%;
     padding: 1rem;
@@ -566,9 +541,6 @@
 
   // show sneed
   const showSneed = ref(false)
-
-  // show discord
-  const showDiscord = ref(false)
 
   // astronaut loader
   const astronautLoaderUrl = astronautLoader
