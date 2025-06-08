@@ -39,6 +39,7 @@
                     <i class="fa-solid fa-circle-info"></i>
                 </div>
 
+                <!-- date -->
                 <div class="d-none d-md-flex flex-column align-items-center gap-1 ms-auto">
 
                     <!-- if viewing current -->
@@ -58,7 +59,7 @@
         <div ref="tacoChartContainer"
              class="dao-allocations__taco-chart-container
                     taco-container taco-container--l2
-                    p-2">                  
+                    p-2">
 
             <!-- chart -->
             <apexchart 
@@ -272,12 +273,16 @@
 
     // taco chart container
     &__taco-chart-container {
-        max-height: 257px;
+        
+        // placeholder
+        
     }
 
     // taco chart
     &__taco-chart {
-        
+
+        // placeholder
+
     }
 
     // token title
@@ -402,7 +407,9 @@
 // phone protrait
 @media (max-width: 575.98px) {
     .dao-allocations__taco-chart-container {
-        max-height: unset !important; // needs an event listener to adjust height
+        
+        // placeholder
+        
     } 
     .dao-allocations__token-title__name-link {
         font-size: 0.875rem;
@@ -419,7 +426,9 @@
 // phone landscape
 @media (min-width: 576px) and (max-width: 767.98px) {
     .dao-allocations__taco-chart-container {
-        max-height: 210px;
+        
+        // placeholder
+        
     } 
     .dao-allocations__token-title__name-link {
         font-size: 0.875rem;
@@ -436,7 +445,9 @@
 // tablet
 @media (min-width: 767px) and (max-width: 991.98px) {
     .dao-allocations__taco-chart-container {
-        max-height: 285px;
+        
+        // placeholder
+
     }  
     .dao-allocations__token-title__name-link {
         font-size: 1rem;
@@ -450,7 +461,9 @@
 // small daktop
 @media (min-width: 992px) and (max-width: 1199.98px) {
     .dao-allocations__taco-chart-container {
-        max-height: 182px;
+        
+        // placeholder
+
     }
     .dao-allocations__token-title__name-link {
         font-size: 0.875rem;
@@ -467,7 +480,9 @@
 // medium desktop
 @media (min-width: 1200px) and (max-width: 1399.98px) {
     .dao-allocations__taco-chart-container {
-        max-height: 220px;
+        
+        // placeholder
+
     }
 }
 
@@ -598,19 +613,13 @@ LOCAL METHODS
 
     // set taco chart max height
     const handleSetTacoChartMaxHeight = async () => {
-        const element = tacoChartContainer.value;
+        const element = tacoChartContainer.value
         if (element) {
             element.style.maxHeight = ''; // Temporarily remove max-width to allow natural height
-
-            await nextTick(); // Wait for the DOM to update
-
-            if (window.innerWidth < maxWidthThreshold) {
-                const height = element.clientHeight;
-                const maxHeight = height / 2 + 12;
-                element.style.maxHeight = `${maxHeight}px`;
-            } else {
-                element.style.maxHeight = ''; // Ensure max-width is removed if above the threshold
-            }
+            await nextTick() // Wait for the DOM to update
+            const height = element.clientHeight
+            const maxHeight = height / 2
+            element.style.maxHeight = `${maxHeight}px`
         }
     }
 

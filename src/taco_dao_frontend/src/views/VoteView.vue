@@ -33,7 +33,7 @@
             <div class="vote-view__top-bar gap-2 mb-3 shadow">
 
               <!-- left-->
-              <div>
+              <div class="d-flex align-items-center">
 
                 <!-- if logged out, log in title -->
                 <h2 v-if="!userLoggedIn" class="vote-view__top-bar__title py-2">Log in to Vote</h2>                
@@ -44,6 +44,15 @@
                   <span v-if="votePower > 0" class="vote-view__top-bar__vote-power text-nowrap">({{ votePower }} VP)</span>
                   <span v-if="votePower === 0" class="vote-view__top-bar__vote-power text-nowrap">(0 VP)</span>
                 </h2>
+
+                <!-- hover tooltip info icon -->
+                <div v-if="userLoggedIn"
+                    class="me-auto taco-text-white" 
+                    data-bs-toggle="tooltip" 
+                    data-bs-placement="top" 
+                    title="It can take up to 15 minutes for voting power to update. We'll include a refresh countdown in the near future">
+                    <i class="fa-solid fa-circle-info"></i>
+                </div>                
 
               </div>
 
@@ -70,7 +79,7 @@
                 <button v-if="userLoggedIn" 
                   class="btn taco-nav-btn taco-nav-btn--active" 
                   @click="reshowHotkeyTutorial">
-                  <span class="taco-text-white">How to Hotkey</span>
+                  <span class="taco-text-black">How to Hotkey</span>
                 </button>
 
               </div>
@@ -1008,7 +1017,7 @@
             <!-- text -->
             <span class="taco-text-black-to-white text-center"
               style="font-size: 0.875rem;">
-              Hotkeying your SNS Neurons with you TacoDao.com principal allows you to vote via the TacoDAO interface. <br><br> You can always manually vote via command line if TacoDao.com is down, but hotkeying is the easiest way to vote. It's free, and allows you to support TacoDao by using our dApp! <br><br> Here is more information on <a href="https://support.dfinity.org/hc/en-us/articles/8939053696788-What-is-a-neuron-hotkey-and-how-do-I-use-it" target="_blank">Hotkeying</a> from Dfinity
+              Hotkeying your SNS Neurons with you TacoDao.com principal allows you to vote via the TacoDAO interface. <br><br> You can always manually vote via command line if TacoDao.com is down, but hotkeying is the easiest way to vote. It's free, and allows you to support TacoDao by using our dApp! <br><br> Here is more information on <a href="https://support.dfinity.org/hc/en-us/articles/8939053696788-What-is-a-neuron-hotkey-and-how-do-I-use-it" style="color: var(--blue-to-light-blue);" target="_blank">Hotkeying</a> from Dfinity
             </span>
 
           </div>
@@ -1035,7 +1044,7 @@
                   Copy your TacoDao.com principal from the top right corner of the screen
                 </li>
                 <li class="text-start">
-                  Go to <a href="https://nns.ic0.app/" target="_blank">The NNS</a> and login
+                  Go to <a href="https://nns.ic0.app/" style="color: var(--blue-to-light-blue);" target="_blank">The NNS</a> and login
                 </li>
                 <li class="text-start">
                   Go to the Neuron Staking page and select a TacoDAO neuron
