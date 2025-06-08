@@ -368,7 +368,11 @@ export const useTacoStore = defineStore('taco', () => {
     }
     const getAuthClient = async (): Promise<AuthClient> => {
         if (!authClientInstance) {
-            authClientInstance = await AuthClient.create()
+            authClientInstance = await AuthClient.create({
+                idleOptions: {
+                    idleTimeout: 1000 * 60 * 60 * 24 * 30, // set to 30 days
+                }
+            })
         }
         return authClientInstance
     }      
@@ -675,19 +679,21 @@ export const useTacoStore = defineStore('taco', () => {
         try {
 
             // create auth client
-            let authClient = await AuthClient.create()
+            const authClient = await getAuthClient()
 
             // if already logged in
             if (await authClient.isAuthenticated()) {
 
-                // set user principal
-                setUserPrincipal(authClient.getIdentity().getPrincipal().toString())
+                // redundant? remove this
 
-                // set user logged in to true
-                userLoggedIn.value = true
+                // // set user principal
+                // setUserPrincipal(authClient.getIdentity().getPrincipal().toString())
 
-                // calculate and set user ledger account ID
-                userLedgerAccountId.value = calculateAccountId(userPrincipal.value)
+                // // set user logged in to true
+                // userLoggedIn.value = true
+
+                // // calculate and set user ledger account ID
+                // userLedgerAccountId.value = calculateAccountId(userPrincipal.value)
 
                 // turn app loading off
                 appLoadingOff()
@@ -699,14 +705,20 @@ export const useTacoStore = defineStore('taco', () => {
 
             // login
             await new Promise((resolve, reject) => {
+
+                // login with auth client
                 authClient.login({
+                    maxTimeToLive: BigInt(30 * 24 * 60 * 60 * 1000 * 1000 * 1000), // 30 days (first digits in calculation)
                     identityProvider:
                         process.env.DFX_NETWORK === "ic" || process.env.DFX_NETWORK === "staging"
                             ? 'https://identity.ic0.app'
                             : `http://${iiCanisterId}.localhost:8080/`,
-                    onSuccess: resolve,
+                    onSuccess: async () => {
+                        console.log("You've logged in!")
+                    },
                     onError: reject,
                 })
+
             })
 
             // set user principal
@@ -764,6 +776,9 @@ export const useTacoStore = defineStore('taco', () => {
 
             // logout
             await authClient.logout()
+
+            // log
+            console.log("You've logged out!")
 
             // set user principal to empty string
             setUserPrincipal('')
