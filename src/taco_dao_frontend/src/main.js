@@ -23,7 +23,9 @@ const routes = [
     { path: "/sales", name: "Sales", component: SalesView },
     { path: "/sales/dkp-swap", name: "Sale1", component: SaleDKPSwap },
     { path: "/info", name: "Info", component: InfoView },
-    { path: "/chat", name: "Chat", component: ChatView },
+    { path: "/chat/oc", name: "ChatOC", component: ChatView },
+    { path: "/chat/sneed", name: "ChatSneed", component: ChatView },
+    { path: "/chat", redirect: "/chat/oc" },
     { path: "/admin", name: "Admin", component: AdminView },
     { path: "/:pathMatch(.*)*", redirect: "/" },
 ]
