@@ -568,7 +568,7 @@
                       }"
                     >
 
-                      <!-- trusted token -->
+                      <!-- trusted token slider -->
                       <li v-for="(control, index) in currentSliders" 
                         :key="index" 
                         class="d-flex flex-column w-100"
@@ -2096,91 +2096,6 @@
 
 <script setup lang="ts">
 
-  /* notes:
-
-  HTML
-    currentSliders
-      symbol
-      currentPercentage
-      isLocked
-      badgeColor
-    for trustedToken in currentSliders
-      left
-        symbol and badge color
-      right
-        percentage input
-          value bound to trustedToken.currentPercentage
-          disabled bound to trustedToken.isLocked or userLockedVote
-        lock button
-      bottom
-        slider input
-          value bound to trustedToken.currentPercentage
-          disabled bound to trustedToken.isLocked or userLockedVote or unlockedCount === 1
-          input event runs onAllocationChange(index, value as number)
-        
-  FETCHED
-    fetchedTokenDetails
-      [] of arrays
-        each sub-array has two objects
-          {} token principal encoded somehow
-          {} with token details
-            Active as a boolean, must be true to use
-            balance as a bigint
-            epochAdded as a bigint
-            isPaused as a boolean
-            pastPrices as an array of TODO: ??? (no history yet to see)
-            priceInICP as a bigint
-            priceInUSD as a number
-            tokenDecimals as a bigint
-            tokenName as a string
-            tokenSymbol as a string
-            tokenTransferFee as a bigint
-            tokenType as an object
-              {'#ICP' | '#ICRC12' | '#ICRC3'}
-
-    fetchedAggregateAllocation
-      [] of arrays
-        each sub-array has an object and a bigint
-          {} token principal encoded somehow
-          bigint for basis points
-
-    fetchedVotingPowerMetrics
-      {} with voting power metrics
-        allocatedVotingPower as a bigint
-        totalVotingPower as a bigint
-        totalVotingPowerByHotkeySetters as a bigint
-
-  MOUNTED
-    on mount
-      chart stuff
-
-      fetch and handle token details
-        log
-
-      fetch and handle aggregate allocation
-        allocations is fetchedAggregateAllocation
-        create an array of percentages from allocations
-        create an array of canister ids from allocations
-        create an empty array of symbols
-        for each canister id, fetch symbols from metadata, add to symbols array
-        create colors array from symbols and tokenData
-
-        now we have arrays for percentages, canisters ids, symbols, and colors
-        
-        handleApplyDataToChart
-        handleChartSegmentClick for first token with non-zero percentage
-
-        assign currentSliders ref with map of allocations
-          symbol, currentHoldingPercentage, isLocked?, badgeColor?
-
-      fetch and handle voting power metrics
-        log
-      
-      if logged in, fetch and handle user state
-        log
-  
-  */
-
   /////////////
   // imports //
   /////////////
@@ -2296,6 +2211,14 @@
   //////////////
   // handlers //  
 
+  // move me
+
+  // working array
+  let workingArray: any[] = []
+
+  // updated array
+  let updatedArray: any[] = []  
+
   // handle fetched token details
   const handleFetchedTokenDetails = async (tokenDetails: any) => {
 
@@ -2305,9 +2228,74 @@
     // count of tokens
     tokenCount.value = tokenDetails.length
 
-    // log
-    // console.log('VoteView.vue: tokenCount:', tokenCount)
+    //////////////////
+    // update chart //
+    //////////////////
 
+    // safely extract token data - now an array of [principal, basisPoints] tuples
+    const allTokens = tokenDetails || []
+
+    // filter out tokens that are paused or inactive
+    const extractedTokens = allTokens.filter((token: [any, { Active: boolean, isPaused: boolean }]) => {
+      return token[1].Active === true && token[1].isPaused === false
+    })
+
+    // log
+    // console.log('VoteView.vue: allTokens:', allTokens)
+    // console.log('VoteView.vue: extractedTokens (filtered):', extractedTokens)
+
+    // evenly distribute percentages at first
+    const percentages = extractedTokens.map((token: any) => 100 / extractedTokens.length)
+
+    // create array for symbols
+    let symbols: string[] = extractedTokens.map((token: [any, { tokenSymbol: string }]) => token[1].tokenSymbol)
+
+    // create colors array from symbols and tokenData
+    const colors = symbols.map((symbol: string) => {
+      const token = tokenData.find((token: any) => 
+        token.symbol.toLowerCase() === symbol.toLowerCase()
+      )
+      return token?.color || '#ff0000'
+    })
+
+    // apply colors to chart and create sliders if we have valid arrays
+    if (percentages && symbols && colors) {
+
+      // handle apply data to chart
+      await handleApplyDataToChart(percentages, symbols, colors)
+
+      // save to working array
+      workingArray = [percentages, symbols, colors]
+
+      /////////////////////////////////
+      // create currentSliders array //
+      /////////////////////////////////
+
+      // create canister IDs array from token details
+      const canisterIds = extractedTokens.map((token: [any, { tokenSymbol: string }]) => token[0].toString())
+
+      // create currentSliders array using default percentages
+      currentSliders.value = percentages.map((percentage: any, index: number) => {
+        return {
+          symbol: symbols[index],
+          canisterId: canisterIds[index], // Store the canister ID
+          currentPercentage: percentage,
+          initialPercentage: percentage, // store initial percentage
+          isLocked: false,
+          badgeColor: colors[index]
+        }
+      })    
+      
+    }
+
+    // else there is a problem
+    else {
+
+      // log error
+      console.error('VoteView.vue: error applying data to chart')
+
+    }
+    
   }
 
   // handle fetched aggregate allocation
@@ -2353,17 +2341,24 @@
       
       // calculate percentages once to use in both places
       const percentages = calculateExactPercentages(allocations)
+
+      // log
+      // console.log('percentages:', percentages)
       
       // create array of canister ids from principals
       const canisterIds = allocations.map((allocation: any) => 
         allocation[0].toString() // convert principal to string
       )
 
-      // create array for symbols
+      // log
+      // console.log('canisterIds:', canisterIds)
+
+      // create symbols array
       let symbols: string[] = []
 
       // get metadata for each canister id
       for (const canisterId of canisterIds) {
+
         // fetch metadata
         const fetchedMetadata = await icrc1Metadata(canisterId)
         
@@ -2371,26 +2366,72 @@
         // @ts-ignore
         const symbolEntry = fetchedMetadata.find((entry: any) => entry[0] === "icrc1:symbol")
         
-        // push symbol to symbols array
+        // if symbol entry and text, push symbol to symbols array
         if (symbolEntry && symbolEntry[1]?.Text) {
+
+          // push symbol to symbols array
           symbols.push(symbolEntry[1].Text)
+
         }
+
+        // else there is a problem
+        else {
+
+          // log error
+          console.error('VoteView.vue: error fetching metadata for canister id:', canisterId)
+
+        }
+
       }
 
-      // create colors array from symbols and tokenData
-      const colors = symbols.map((symbol: string) => {
-        const token = tokenData.find((token: any) => 
-          token.symbol.toLowerCase() === symbol.toLowerCase()
-        )
-        return token?.color || '#ff0000'
+      // log
+      // console.log('percentages:', percentages)
+      // console.log('symbols from metadata:', symbols)
+      // console.log('working array:', workingArray)
+
+      // create new array for chart update that respects the existing order
+      const newArray = workingArray[1].map((symbol: string) => {
+
+        // find the index of this symbol in the new symbols array
+        const symbolIndex = symbols.findIndex((s: string) => s === symbol)
+        
+        // if found, use the corresponding percentage, otherwise use 0
+        return symbolIndex !== -1 ? percentages[symbolIndex] : 0
+
       })
 
-      // apply data to chart if we have valid arrays
-      if (percentages.length && symbols.length && colors.length) {
+      // console.log('new array for chart:', newArray)
 
-        // handle apply data to chart
-        await handleApplyDataToChart(percentages, symbols, colors)
-        
+      // save to updated array
+      updatedArray = newArray  
+      
+      // log
+      // console.log('updatedArray:', updatedArray)
+
+      // update chart with new array
+      await handleUpdateDataOnChart(newArray)
+
+      // check if user has past allocations
+      if (formattedUserAllocation.value && formattedUserAllocation.value.allocations && formattedUserAllocation.value.allocations.length > 0){
+
+        // log
+        // console.log('user has past allocations, matching last')
+
+        // match last
+        matchLast()
+
+      } else {
+
+        // log
+        // console.log('user has no past allocations, matching dao')
+
+        // update the current sliders
+        currentSliders.value = currentSliders.value.map((slider: any, index: number) => ({
+          ...slider,
+          currentPercentage: updatedArray[index] || 0,
+          isLocked: false // unlock sliders
+        }))
+
       }
 
       /////////////////
@@ -2402,25 +2443,6 @@
       handleChartSegmentClick(null, null, { 
         dataPointIndex: firstNonZeroIndex >= 0 ? firstNonZeroIndex : 0 
       })
-
-      /////////////////////////////////
-      // create currentSliders array //
-      /////////////////////////////////
-
-      // create currentSliders array using the same exact percentages
-      currentSliders.value = allocations.map((allocation: any, index: number) => {
-        return {
-          symbol: symbols[index],
-          canisterId: allocation[0].toString(), // Store the canister ID
-          currentPercentage: percentages[index],
-          initialPercentage: percentages[index], // store initial percentage
-          isLocked: false,
-          badgeColor: colors[index]
-        }
-      })
-
-      // select match last
-      matchLast()
 
     } catch (error) {
 
@@ -2453,7 +2475,7 @@
 
   }
 
-  // // handle add follow
+  // handle add follow
   // const handleAddFollow = async (principal: string) => {
 
   //   // log
@@ -2622,6 +2644,24 @@
 
   }
 
+  // handle update data on chart
+  const handleUpdateDataOnChart = async (newValues: any[]) => {
+
+    // log
+    // console.log('handleUpdateDataOnChart: newValues:', newValues)
+
+      // update all values at once using nextTick
+      nextTick(() => {
+          series.value = newValues
+      })
+
+      // force chart update by updating options
+      chartOptions.value = {
+          ...chartOptions.value
+      }    
+    
+  }
+
   // handle clicking on a chart segment
   const handleChartSegmentClick = (event: any, chartContext: any, config: any) => {
 
@@ -2689,6 +2729,9 @@
   // cast vote
   const castVote = async () => {
 
+    // log
+    console.log('Casting Vote...')
+
     // turn on app loading
     appLoadingOn()
 
@@ -2722,6 +2765,9 @@
 
     }
 
+    // log
+    // console.log('allocations sum to 10000 basis points, casting vote')
+
     // cast vote with backend
     try { 
 
@@ -2729,7 +2775,7 @@
       await updateAllocation(allocations)
 
       // log
-      // console.log('VoteView.vue: vote cast')
+      console.log('... Vote Cast!')
 
       // refresh everything
       await fetchTokenDetails()
@@ -2760,6 +2806,19 @@
         message: `Allocation vote cast with ${votePower.value} VP`
       })
 
+      // // add temp toast
+      // addToast({
+      //   id: Date.now(),
+      //   code: 'code',
+      //   tradeAmount: '',
+      //   tokenSellIdentifier: '',
+      //   tradeLimit: '',
+      //   tokenInitIdentifier: '',
+      //   title: '👨‍🍳 Test Vote Cast!',
+      //   icon: '',
+      //   message: `Test allocation vote cast with ${votePower.value} VP. We're turning the trading bot on soon!`
+      // })      
+
     } catch (error) {
 
       // log
@@ -2768,6 +2827,8 @@
       // turn off app loading
       appLoadingOff()
 
+      // return to allocation sliders
+      userLockedVote.value = false      
     }
 
   }
@@ -2778,10 +2839,10 @@
     // log
     // console.log('VoteView.vue: matching dao allocations')
 
-    // reset each slider to its initial percentage
-    currentSliders.value = currentSliders.value.map((slider: any) => ({
+    // update each slider to use current dao allocation from updatedArray
+    currentSliders.value = currentSliders.value.map((slider: any, index: number) => ({
       ...slider,
-      currentPercentage: slider.initialPercentage,
+      currentPercentage: updatedArray[index] || 0,
       isLocked: false // unlock sliders
     }))
     
@@ -2790,8 +2851,28 @@
   // match last
   const matchLast = () => {
 
+    // log user allocation
+    // console.log('VoteView.vue: user allocation:', formattedUserAllocation.value)
+
+    // if allocations array is empty or undefined, return
+    if (!formattedUserAllocation.value || formattedUserAllocation.value.length === 0){
+
+      // log
+      // console.log('VoteView.vue: no user allocation, matching dao')
+
+      // match dao
+      matchDao()
+
+      // return
+      return
+
+    }
+
     // log
     // console.log('VoteView.vue: matching last allocations')
+
+    // log all allocations
+    // console.log('VoteView.vue: all allocations:', formattedUserAllocation.value.allocations)
 
     // set sliders to last allocation percentages
     currentSliders.value = currentSliders.value.map((slider: any) => {
@@ -2812,7 +2893,6 @@
         }
 
       } else {
-
 
        // return slider with current percentages
         return {
@@ -2976,18 +3056,28 @@
   // matches dao
   const matchesDao = computed(() => {
 
-    // return true if all sliders match the initial percentage
-    return currentSliders.value.every((s: any) => s.currentPercentage === s.initialPercentage)
+    // return true if all sliders match the current dao allocations (same as matchDao function)
+    return currentSliders.value.every((slider: any, index: number) => {
+
+      // compare current percentage with current dao allocation from updatedArray
+      return Math.abs(
+        slider.currentPercentage - 
+        (updatedArray[index] || 0)
+      ) < 0.01
+      
+    })
 
   })  
 
   // matches last
   const matchesLast = computed(() => {
+
     // if no user allocations yet, return false
     if (!formattedUserAllocation.value?.allocations) return false
 
     // return true if all sliders match their corresponding last allocation
     return currentSliders.value.every(slider => {
+
       // find matching allocation by canister id
       const matchingAllocation = formattedUserAllocation.value.allocations.find(
         allocation => allocation.token.toString() === slider.canisterId
@@ -2998,7 +3088,9 @@
         slider.currentPercentage - 
         (matchingAllocation ? Number(matchingAllocation.basisPoints) / 100 : 0)
       ) < 0.01
+      
     })
+
   })
 
   // max follows reached
@@ -3054,10 +3146,13 @@
       // fetch and handle dao data
       await fetchTokenDetails()
       handleFetchedTokenDetails(fetchedTokenDetails.value)
+      // console.log('fetchedTokenDetails', fetchedTokenDetails.value)
       await fetchAggregateAllocation()
       handleFetchedAggregateAllocation(fetchedAggregateAllocation.value)
+      // console.log('fetchedAggregateAllocation', fetchedAggregateAllocation.value)
       await fetchVotingPowerMetrics()
       handleFetchedVotingPowerMetrics(fetchedVotingPowerMetrics.value)
+      // console.log('fetchedVotingPowerMetrics', fetchedVotingPowerMetrics.value)
 
       // check if user is logged in
       await checkIfLoggedIn()
@@ -3477,7 +3572,7 @@
     }
   }, { immediate: true })
 
-  // 
+  // show more past allocations
   const showMorePastAllocations = () => {
     displayedPastAllocations.value = formattedUserAllocation.value.pastAllocations.slice().reverse()
   }

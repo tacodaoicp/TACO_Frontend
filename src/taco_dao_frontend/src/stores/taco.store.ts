@@ -220,6 +220,7 @@ export const useTacoStore = defineStore('taco', () => {
         tradeLimit?: string;
         tokenInitIdentifier?: string;
     }[]>([])
+    let authClientInstance: AuthClient | null = null
 
     // user
     const userLoggedIn = ref(false)
@@ -365,7 +366,16 @@ export const useTacoStore = defineStore('taco', () => {
         return `http://localhost:${port}`
 
     }
-
+    const getAuthClient = async (): Promise<AuthClient> => {
+        if (!authClientInstance) {
+            authClientInstance = await AuthClient.create({
+                idleOptions: {
+                    disableIdle: true
+                }
+            })
+        }
+        return authClientInstance
+    }      
 
     // app
     const changeRoute = (destination: string) => {
@@ -593,7 +603,7 @@ export const useTacoStore = defineStore('taco', () => {
         // console.log('checking if user is logged in')
 
         // create auth client
-        const authClient = await AuthClient.create()
+        const authClient = await getAuthClient()
 
         // if user is logged in
         if (await authClient.isAuthenticated()) {
@@ -669,7 +679,7 @@ export const useTacoStore = defineStore('taco', () => {
         try {
 
             // create auth client
-            let authClient = await AuthClient.create()
+            const authClient = await getAuthClient()
 
             // if already logged in
             if (await authClient.isAuthenticated()) {
@@ -694,6 +704,7 @@ export const useTacoStore = defineStore('taco', () => {
             // login
             await new Promise((resolve, reject) => {
                 authClient.login({
+                    maxTimeToLive: BigInt(30 * 24 * 60 * 60 * 1000 * 1000 * 1000),
                     identityProvider:
                         process.env.DFX_NETWORK === "ic" || process.env.DFX_NETWORK === "staging"
                             ? 'https://identity.ic0.app'
@@ -754,7 +765,7 @@ export const useTacoStore = defineStore('taco', () => {
         try {
 
             // create auth client
-            const authClient = await AuthClient.create()
+            const authClient = await getAuthClient()
 
             // logout
             await authClient.logout()
@@ -1204,7 +1215,7 @@ export const useTacoStore = defineStore('taco', () => {
         try {
 
             // create auth client
-            const authClient = await AuthClient.create()
+            const authClient = await getAuthClient()
 
             // if user is logged in
             if (await authClient.isAuthenticated()) {
@@ -1278,7 +1289,7 @@ export const useTacoStore = defineStore('taco', () => {
         try {
 
             // create auth client
-            const authClient = await AuthClient.create()
+            const authClient = await getAuthClient()
 
             // if user is logged in
             if (await authClient.isAuthenticated()) {
@@ -1356,7 +1367,7 @@ export const useTacoStore = defineStore('taco', () => {
         try {
 
             // create auth client
-            const authClient = await AuthClient.create()
+            const authClient = await getAuthClient()
 
             // if user is logged in
             if (await authClient.isAuthenticated()) {
@@ -1434,7 +1445,7 @@ export const useTacoStore = defineStore('taco', () => {
         try {
 
             // create auth client
-            const authClient = await AuthClient.create()
+            const authClient = await getAuthClient()
 
             // if user is logged in
             if (await authClient.isAuthenticated()) {
@@ -1824,7 +1835,7 @@ export const useTacoStore = defineStore('taco', () => {
         console.log('TacoStore: recoverPoolBalances called');
         try {
             // Create auth client
-            const authClient = await AuthClient.create();
+            const authClient = await getAuthClient();
             
             // Check if user is authenticated
             if (!await authClient.isAuthenticated()) {
@@ -1862,7 +1873,7 @@ export const useTacoStore = defineStore('taco', () => {
         try {
             // get host
             // create auth client
-            const authClient = await AuthClient.create();
+            const authClient = await getAuthClient();
             
             // Check if user is authenticated
             if (!await authClient.isAuthenticated()) {
@@ -1901,7 +1912,7 @@ export const useTacoStore = defineStore('taco', () => {
         console.log('fetchSystemLogs: Starting to fetch logs...');
         try {
             // create auth client
-            const authClient = await AuthClient.create();
+            const authClient = await getAuthClient();
             
             // Check if user is authenticated
             if (!await authClient.isAuthenticated()) {
@@ -1950,7 +1961,7 @@ export const useTacoStore = defineStore('taco', () => {
     const startRebalancing = async () => {
         try {
             // create auth client
-            const authClient = await AuthClient.create();
+            const authClient = await getAuthClient();
             
             // Check if user is authenticated
             if (!await authClient.isAuthenticated()) {
@@ -1993,7 +2004,7 @@ export const useTacoStore = defineStore('taco', () => {
     const stopRebalancing = async () => {
         try {
             // create auth client
-            const authClient = await AuthClient.create();
+            const authClient = await getAuthClient();
             
             // Check if user is authenticated
             if (!await authClient.isAuthenticated()) {
@@ -2042,7 +2053,7 @@ export const useTacoStore = defineStore('taco', () => {
             // DO NOT INTRODUCE A getTreasuryActor method !!
             // JUST LEAVE THIS CODE HERE AS IS !!
             // create auth client
-            const authClient = await AuthClient.create();
+            const authClient = await getAuthClient();
             
             // Check if user is authenticated
             if (!await authClient.isAuthenticated()) {
@@ -2122,7 +2133,7 @@ export const useTacoStore = defineStore('taco', () => {
             // JUST LEAVE THIS CODE HERE AS IS !!
 
             // create auth client
-            const authClient = await AuthClient.create();
+            const authClient = await getAuthClient();
             
             // Check if user is authenticated
             if (!await authClient.isAuthenticated()) {
@@ -2170,7 +2181,7 @@ export const useTacoStore = defineStore('taco', () => {
             // JUST LEAVE THIS CODE HERE AS IS !!
 
             // create auth client
-            const authClient = await AuthClient.create();
+            const authClient = await getAuthClient();
             
             // Check if user is authenticated
             if (!await authClient.isAuthenticated()) {
@@ -2215,7 +2226,7 @@ export const useTacoStore = defineStore('taco', () => {
         appLoadingOn();
         try {
             // create auth client
-            const authClient = await AuthClient.create();
+            const authClient = await getAuthClient();
             
             // Check if user is authenticated
             if (!await authClient.isAuthenticated()) {
@@ -2249,7 +2260,7 @@ export const useTacoStore = defineStore('taco', () => {
         console.log('TacoStore: pauseToken called for', principal.toText());
         try {
             // Create auth client
-            const authClient = await AuthClient.create();
+            const authClient = await getAuthClient();
             
             // Check if user is authenticated
             if (!await authClient.isAuthenticated()) {
@@ -2291,7 +2302,7 @@ export const useTacoStore = defineStore('taco', () => {
         console.log('TacoStore: unpauseToken called for', principal.toText());
         try {
             // Create auth client
-            const authClient = await AuthClient.create();
+            const authClient = await getAuthClient();
             
             // Check if user is authenticated
             if (!await authClient.isAuthenticated()) {
@@ -2333,7 +2344,7 @@ export const useTacoStore = defineStore('taco', () => {
         console.log('taco.store: fetchVoterDetails() - Starting fetch...');
         try {
             // Create auth client
-            const authClient = await AuthClient.create();
+            const authClient = await getAuthClient();
             
             // Check if user is authenticated
             if (!await authClient.isAuthenticated()) {
@@ -2384,7 +2395,7 @@ export const useTacoStore = defineStore('taco', () => {
     const fetchNeuronAllocations = async () => {
         try {
             // Create auth client
-            const authClient = await AuthClient.create();
+            const authClient = await getAuthClient();
 
             // Check if user is authenticated
             if (!await authClient.isAuthenticated()) {
@@ -2438,7 +2449,7 @@ export const useTacoStore = defineStore('taco', () => {
             appLoadingOn();
 
             // create auth client
-            const authClient = await AuthClient.create();
+            const authClient = await getAuthClient();
             
             // Check if user is authenticated
             if (!await authClient.isAuthenticated()) {
@@ -2509,7 +2520,7 @@ export const useTacoStore = defineStore('taco', () => {
             appLoadingOn();
 
             // create auth client
-            const authClient = await AuthClient.create();
+            const authClient = await getAuthClient();
             
             // Check if user is authenticated
             if (!await authClient.isAuthenticated()) {

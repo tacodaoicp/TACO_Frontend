@@ -366,7 +366,7 @@
 
               </ul>
 
-              <!-- links title -->
+              <!-- research title -->
               <TacoTitle level="h2" emoji="📊" title="Research" class="mt-4" />
 
               <ul class="taco-bs-list 
@@ -378,6 +378,15 @@
                     tabindex="0">
 
                   <span class="taco-text-black-to-white text-nowrap">📝 <a class="taco-text-blue-to-light-blue" href="/ckBTC_DD_v1_latest.pdf" target="_blank">ckBTC Due Diligence</a></span>
+
+                </li>
+
+                <!-- list item - sneed due diligence report -->
+                <li class="standard-focus standard-focus--negative-offset
+                          list-group-item d-flex flex-nowrap py-3 gap-3"
+                    tabindex="0">
+
+                  <span class="taco-text-black-to-white text-nowrap">📝 <a class="taco-text-blue-to-light-blue" href="/Sneed_DD_v1_latest.pdf" target="_blank">Sneed Due Diligence</a></span>
 
                 </li>
 

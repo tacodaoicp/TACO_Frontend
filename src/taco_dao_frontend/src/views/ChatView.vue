@@ -31,12 +31,12 @@
 
                     <!-- open chat -->
                     <button class="btn taco-nav-btn"
-                            @click="showOpenChat = true; showSneed = false;"
+                            @click="router.push('/chat/oc')"
                             :class="{ 'taco-nav-btn--active': showOpenChat }">Open Chat</button>
 
                     <!-- sneed -->
                     <button class="btn taco-nav-btn"
-                            @click="showOpenChat = false; showSneed = true;"
+                            @click="router.push('/chat/sneed')"
                             :class="{ 'taco-nav-btn--active': showSneed }">Sneed Hub</button>
 
                 </div>
@@ -519,6 +519,7 @@
   import FooterBar from "../components/FooterBar.vue"
   import { ref, onMounted, watch } from "vue"
   import { initialise } from '@open-ic/openchat-xframe'
+  import { useRoute, useRouter } from 'vue-router'
   import astronautLoader from '../assets/images/astonautLoader.webp'
   import sneedHubLoginImage from '../assets/images/tutorials/sneed-hub-login.png'
   import sneedHubLoggedInImage from '../assets/images/tutorials/sneed-hub-logged-in.png'
@@ -530,10 +531,12 @@
   // local variables //
   /////////////////////
 
+  // route
+  const route = useRoute()
+  const router = useRouter()
+
   // open chat iframe
   const iframe = ref<HTMLIFrameElement | null>(null)
-
-  // sneed iframe
   const sneedIframe = ref<HTMLIFrameElement | null>(null)
 
   // show open chat
@@ -541,6 +544,10 @@
 
   // show sneed
   const showSneed = ref(false)
+
+  // initialized flags
+  const openChatInitialized = ref(false)
+  const sneedInitialized = ref(false)
 
   // astronaut loader
   const astronautLoaderUrl = astronautLoader
@@ -551,10 +558,49 @@
   // sneed discussions tutorial
   const userShownSneedDiscussionsTutorial = ref(false)
 
-
   ///////////////////
   // local methods //
   ///////////////////  
+
+  // initialize open chat
+  const initializeOpenChat = async () => {
+
+    // log
+    console.log('ChatView.vue: initializeOpenChat')
+
+    if (iframe.value && !openChatInitialized.value) {
+      try {
+        const client = await initialise(iframe.value, {
+          targetOrigin: 'https://oc.app',
+          initialPath: '/community/lizfz-ryaaa-aaaar-bagsa-cai/channel/1733722051',
+          theme: {
+            name: 'taco-theme',
+            base: 'dark',
+            overrides: {}
+          }
+        })
+        openChatInitialized.value = true
+      } catch (error) {
+        console.error('Failed to initialize OpenChat:', error)
+      }
+    }
+  }
+
+  // initialize sneed
+  const initializeSneed = async () => {
+
+    // log
+    console.log('ChatView.vue: initializeSneed')
+
+    if (sneedIframe.value && !sneedInitialized.value) {
+      try {
+        sneedIframe.value.src = 'https://app.sneeddao.com/proposals?sns=lacdn-3iaaa-aaaaq-aae3a-cai'
+        sneedInitialized.value = true
+      } catch (error) {
+        console.error('Failed to initialize Sneed:', error)
+      }
+    }
+  }
 
   //////////////
   // handlers //  
@@ -603,23 +649,33 @@
   // watchers //
   //////////////
 
-  // watch for showSneed
-  watch(showSneed, async (newVal) => {
+  // watch for route changes
+  watch(() => route.path, async (newPath) => {
 
     // log
-    // console.log('ChatView.vue: showSneed:', newVal)
+    console.log('ChatView.vue: watch route')
 
-    // initialize sneed iframe
-    if (sneedIframe.value) {
-      try {
-        sneedIframe.value.src = 'https://app.sneeddao.com/proposals?sns=lacdn-3iaaa-aaaaq-aae3a-cai'
-      } catch (error) {
-        console.error('Failed to initialize Sneed:', error)
-      }
-    }    
+    // set showOpenChat and showSneed
+    showOpenChat.value = newPath === '/chat/oc'
+    showSneed.value = newPath === '/chat/sneed'
+
+    // if showOpenChat is true, initialize open chat iframe
+    if (showOpenChat.value) {
+
+      // initialize open chat iframe
+      await initializeOpenChat()
+
+    }
+
+    // if showSneed is true, initialize sneed iframe
+    if (showSneed.value) {
+
+      // initialize sneed iframe
+      await initializeSneed()
+      
+    }
 
   })
-
 
   /////////////////////
   // lifecycle hooks //
@@ -628,27 +684,26 @@
   // on mounted
   onMounted(async () => {
 
-    // initialize open chat iframe
-    if (iframe.value) {
+    // log
+    console.log('ChatView.vue: on mounted')
 
-      try {
+    // set initial state based on route
+    showOpenChat.value = route.path === '/chat/oc'
+    showSneed.value = route.path === '/chat/sneed'
 
-        const client = await initialise(iframe.value, {
-          targetOrigin: 'https://oc.app',
-          initialPath: '/community/lizfz-ryaaa-aaaar-bagsa-cai/channel/1733722051',
-          theme: {
-            name: 'taco-theme',
-            base: 'dark',
-            overrides: {}
-          }
-        })
+    // if showOpenChat is true, initialize open chat iframe
+    if (showOpenChat.value) {
 
-      } catch (error) {
+      // initialize open chat iframe
+      await initializeOpenChat()
 
-        // log error
-        console.error('Failed to initialize OpenChat:', error)
+    }
 
-      }
+    // if showSneed is true, initialize sneed iframe
+    if (showSneed.value) {
+
+      // initialize sneed iframe
+      await initializeSneed()
 
     }
 
