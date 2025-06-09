@@ -2103,11 +2103,9 @@
   import HeaderBar from "../components/HeaderBar.vue"
   import FooterBar from "../components/FooterBar.vue"
   import { ref, onMounted, onBeforeUnmount, computed, watch, nextTick } from "vue"
-  import { useRouter, useRoute } from 'vue-router'
   import { useTacoStore } from "../stores/taco.store"
   import { storeToRefs } from "pinia"  
   import { tokenData } from "../components/data/TokenData"
-  import VueApexCharts from 'vue3-apexcharts'
   import DfinityLogo from "../assets/images/dfinityLogo.vue"
   import { Principal } from "@dfinity/principal"
 

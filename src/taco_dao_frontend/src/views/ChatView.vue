@@ -18,7 +18,7 @@
           style="max-width: 1600px;">
 
           <!-- toolbar container - l2 -->
-          <div class="taco-container taco-container--l2 taco-container--l2--dark p-2 mx-3 mt-3 mb-3 mb-sm-0">
+          <div class="taco-container taco-container--l2 taco-container--l2--dark p-2 mx-3 mt-3 mb-0">
 
             <!-- toolbar -->
             <div class="taco-toolbar gap-2">
@@ -44,7 +44,7 @@
               </div>
 
               <!-- right -->
-              <div class="taco-toolbar__right flex-grow-1 d-flex justify-content-end gap-2"> 
+              <div class="taco-toolbar__right flex-grow-1 flex-wrap d-flex justify-content-end gap-2"> 
 
                 <!-- open chat links -->
                 <div v-show="showOpenChat" class="btn-group">
@@ -502,10 +502,16 @@
   // media queries //
   ///////////////////
 
-  // // phone protrait
-  // @media (max-width: 575.98px) {
-
-  // }
+  // phone protrait
+  @media (max-width: 575.98px) {
+    .chat-iframe__container, .sneed-iframe__container {
+      padding: 0.5rem 0.5rem;
+    }
+    .chat-iframe, .sneed-iframe {
+      padding: 0;
+      border-radius: 0.5rem;
+    }
+  }
   
   // // phone landscape
   // @media (min-width: 576px) and (max-width: 767.98px) { 
