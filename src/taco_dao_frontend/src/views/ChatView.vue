@@ -44,23 +44,43 @@
               </div>
 
               <!-- right -->
-              <div class="taco-toolbar__right flex-grow-1 d-flex justify-content-end"> 
+              <div class="taco-toolbar__right flex-grow-1 d-flex justify-content-end gap-2"> 
 
                 <!-- open chat links -->
-                <div class="btn-group">
+                <div v-show="showOpenChat" class="btn-group">
 
-                    <!-- gated access tutorial -->
-                    <button v-show="showOpenChat" class="btn taco-nav-btn taco-nav-btn--green taco-nav-btn--active ms-auto" @click="showAccessTutorial()"><i class="fa-solid fa-lock"></i> Gated Access</button>                              
+                  <!-- gated access tutorial -->
+                  <button class="btn taco-nav-btn taco-nav-btn--green taco-nav-btn--active ms-auto" 
+                    @click="showAccessTutorial()">
+                    <i class="fa-solid fa-lock"></i> Gated Access
+                  </button>                              
 
                 </div>
 
                 <!-- sneed links -->
-                <div class="btn-group">
+                <div v-show="showSneed" class="btn-group">
 
                     <!-- sneed discussions tutorial -->
-                    <button v-show="showSneed" class="btn taco-nav-btn taco-nav-btn--green taco-nav-btn--active ms-auto" @click="showSneedDiscussionsTutorial()"><i class="fa-solid fa-circle-question"></i> Sneed Discussions</button>                                   
+                    <button class="btn taco-nav-btn taco-nav-btn--green taco-nav-btn--active" 
+                    @click="showSneedDiscussionsTutorial()"
+                    title="How to Participate in Sneed Hub Discussions"
+                    data-bs-toggle="tooltip"
+                    data-bs-placement="top">
+                      <i class="fa-solid fa-circle-question"></i> Sneed Discussions
+                    </button>
 
-                </div>                     
+                </div>
+
+                <!-- refresh sneed iframe -->
+                <button 
+                v-show="showSneed"
+                class="btn taco-nav-btn taco-nav-btn--green taco-nav-btn--active" 
+                @click="refreshSneedIframe()"
+                title="Refresh Sneed Hub"
+                data-bs-toggle="tooltip"
+                data-bs-placement="top">
+                  <i class="fa-solid fa-rotate-right"></i>
+                </button>                
 
               </div>
 
@@ -520,12 +540,30 @@
   import { ref, onMounted, watch } from "vue"
   import { initialise } from '@open-ic/openchat-xframe'
   import { useRoute, useRouter } from 'vue-router'
+  import { useTacoStore } from "../stores/taco.store"
+  import { storeToRefs } from "pinia"    
   import astronautLoader from '../assets/images/astonautLoader.webp'
   import sneedHubLoginImage from '../assets/images/tutorials/sneed-hub-login.png'
   import sneedHubLoggedInImage from '../assets/images/tutorials/sneed-hub-logged-in.png'
   import sneedHubProposalsImage from '../assets/images/tutorials/sneed-hub-proposals.png'
   import sneedHubSnsSelectorImage from '../assets/images/tutorials/sneed-hub-sns-selector.png'
   import sneedHubProposalLinkImage from '../assets/images/tutorials/sneed-hub-proposal-link.png'
+
+  ///////////
+  // store //
+  ///////////
+
+  // # SETUP #
+  const tacoStore = useTacoStore()
+
+  // # STATE #
+
+  // none
+
+  // # ACTIONS #
+
+  // app
+  const { addToast } = tacoStore
 
   /////////////////////
   // local variables //
@@ -631,6 +669,13 @@
     // log
     // console.log('VoteView.vue: accepting sneed discussions tutorial locally')
 
+    // hide tooltip
+    const tooltip = document.querySelector('.tooltip')
+    if (tooltip) {
+      tooltip.remove()
+    }
+
+    // show sneed discussions tutorial
     userShownSneedDiscussionsTutorial.value = true
 
   }
@@ -642,6 +687,47 @@
     // console.log('VoteView.vue: accepting sneed discussions tutorial locally')
 
     userShownSneedDiscussionsTutorial.value = false
+
+  }
+
+  // refresh sneed iframe
+  const refreshSneedIframe = () => {
+
+    // log
+    // console.log('ChatView.vue: refreshSneedIframe')
+
+    // hide tooltip
+    const tooltip = document.querySelector('.tooltip')
+    if (tooltip) {
+      tooltip.remove()
+    }    
+
+    // refresh sneed iframe by reassigning src
+    if (sneedIframe.value) {
+      const currentSrc = sneedIframe.value.src
+      sneedIframe.value.src = 'about:blank'
+      setTimeout(() => {
+        if (sneedIframe.value) {
+          sneedIframe.value.src = currentSrc
+        }
+      }, 500)
+    }
+
+    // log
+    console.log('ChatView.vue: sneed iframe refreshed')
+
+    // toast
+    addToast({
+      id: Date.now(),
+      code: 'code',
+      tradeAmount: '',
+      tokenSellIdentifier: '',
+      tradeLimit: '',
+      tokenInitIdentifier: '',
+      title: '👨‍🍳 Sneed Hub Refreshed!',
+      icon: '',
+      message: `Sneed Hub has been refreshed`
+    })  
 
   }
   
