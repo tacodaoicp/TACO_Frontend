@@ -6,7 +6,7 @@
     <div class="header-bar__left">
 
       <!-- escape hatch -->
-      <router-link to="/">
+      <router-link to="/" class="header-bar__escape-hatch">
 
         <!-- taco dao logo -->
         <TacoDaoLogo class="escape-hatch-logo"/>
@@ -92,7 +92,7 @@
       </div>
 
       <!-- icp price, taco dao holdings, and wallet container -->
-      <div class="header-bar__chips d-flex flex-nowrap align-items-center gap-3" 
+      <div class="header-bar__chips d-flex flex-nowrap align-items-end" 
             style="user-select: text;">
 
         <!-- icp value -->
@@ -447,12 +447,26 @@
       }
     }
 
+    // chips
+    &__chips {
+      gap: 1rem;
+    }
+
   }
 
   ///////////////////
   // media queries //
   ///////////////////
   
+  // custom 400px breakpoint
+  @media (max-width: 400px) {
+
+    // hide escape hatch
+    .header-bar__escape-hatch {
+      display: none !important;
+    }
+
+  }
   // super small
   @media (max-width: 440px) {
 
@@ -471,10 +485,15 @@
       display: none !important;
     }
 
-    // hide chips
-    .header-bar__chips * {
-      display: none !important;
+    // 
+    .header-bar__chips {
+      gap: 0.5rem !important;
     }    
+
+    // 
+    .header-bar__chips * {
+      // display: none !important;
+    }
 
   }  
 
@@ -508,10 +527,15 @@
 
     // reduce right gap
     .header-bar__right {
-      gap: 0rem;
+      gap: 0.75rem;
     }
 
-    // hide chips
+    // 
+    .header-bar__chips {
+      gap: 0.75rem;
+    }
+
+    // 
     .header-bar__chips * {
       font-size: 0.675rem !important;
     }
