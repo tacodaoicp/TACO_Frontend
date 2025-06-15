@@ -883,7 +883,7 @@
                                     <span class="voting-receipt__kvp__key">From:</span>
 
                                     <!-- value -->
-                                    <span class="voting-receipt__kvp__value">April 06, 2025</span>
+                                    <span class="voting-receipt__kvp__value">{{ formatDate(pastAllocation.from) }}</span>
 
                                   </div>
 
@@ -894,7 +894,7 @@
                                     <span class="voting-receipt__kvp__key">To:</span>
 
                                     <!-- value -->
-                                    <span class="voting-receipt__kvp__value">April 06, 2025</span>
+                                    <span class="voting-receipt__kvp__value">{{ formatDate(pastAllocation.to) }}</span>
 
                                   </div>  
                                   
@@ -3163,6 +3163,11 @@
 
         // fetch and handle user allocation
         await fetchUserAllocation()
+
+        // log
+        // console.log('fetchedUserAllocation', fetchedUserAllocation.value)
+
+        // handle fetched user allocation
         handleFetchedUserAllocation(fetchedUserAllocation.value)
 
       } else {
