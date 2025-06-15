@@ -50,9 +50,10 @@
                 <div v-show="showOpenChat" class="btn-group">
 
                   <!-- gated access tutorial -->
-                  <button class="btn taco-nav-btn taco-nav-btn--green taco-nav-btn--active ms-auto" 
+                  <button class="btn taco-nav-btn taco-nav-btn--green taco-nav-btn--active ms-auto animate__animated animate__delay-1s" 
+                    :class="{ 'animate__swing': openChatSeenLocalValue }"
                     @click="showAccessTutorial()">
-                    <i class="fa-solid fa-lock"></i> Gated Access
+                    <i class="fa-solid fa-circle-question"></i> Gated Access
                   </button>                              
 
                 </div>
@@ -61,7 +62,8 @@
                 <div v-show="showSneed" class="btn-group">
 
                     <!-- sneed discussions tutorial -->
-                    <button class="btn taco-nav-btn taco-nav-btn--green taco-nav-btn--active" 
+                    <button class="btn taco-nav-btn taco-nav-btn--green taco-nav-btn--active animate__animated animate__delay-1s" 
+                    :class="{ 'animate__swing': sneedSeenLocalValue }"
                     @click="showSneedDiscussionsTutorial()"
                     title="How to Participate in Sneed Hub Discussions"
                     data-bs-toggle="tooltip"
@@ -564,7 +566,11 @@
 
   // # STATE #
 
-  // none
+  // user
+  const { openChatSeenStoreValue } = storeToRefs(tacoStore)
+  const { setOpenChatSeenStoreValue } = tacoStore  
+  const { sneedSeenStoreValue } = storeToRefs(tacoStore)
+  const { setSneedSeenStoreValue } = tacoStore  
 
   // # ACTIONS #
 
@@ -582,6 +588,9 @@
   // open chat iframe
   const iframe = ref<HTMLIFrameElement | null>(null)
   const sneedIframe = ref<HTMLIFrameElement | null>(null)
+
+  // user first time seeing chat page
+  const userFirstTimeSeeingChatPage = ref(true)
 
   // show open chat
   const showOpenChat = ref(true)
@@ -602,6 +611,12 @@
   // sneed discussions tutorial
   const userShownSneedDiscussionsTutorial = ref(false)
 
+  // users first time seeing the open chat page
+  const openChatSeenLocalValue = ref(false)
+
+  // users first time seeing the sneed page
+  const sneedSeenLocalValue = ref(false)
+
   ///////////////////
   // local methods //
   ///////////////////  
@@ -610,7 +625,7 @@
   const initializeOpenChat = async () => {
 
     // log
-    console.log('ChatView.vue: initializeOpenChat')
+    // console.log('ChatView.vue: initializeOpenChat')
 
     if (iframe.value && !openChatInitialized.value) {
       try {
@@ -628,13 +643,14 @@
         console.error('Failed to initialize OpenChat:', error)
       }
     }
+
   }
 
   // initialize sneed
   const initializeSneed = async () => {
 
     // log
-    console.log('ChatView.vue: initializeSneed')
+    // console.log('ChatView.vue: initializeSneed')
 
     if (sneedIframe.value && !sneedInitialized.value) {
       try {
@@ -644,6 +660,7 @@
         console.error('Failed to initialize Sneed:', error)
       }
     }
+    
   }
 
   //////////////
@@ -745,7 +762,7 @@
   watch(() => route.path, async (newPath) => {
 
     // log
-    console.log('ChatView.vue: watch route')
+    // console.log('ChatView.vue: watch route')
 
     // set showOpenChat and showSneed
     showOpenChat.value = newPath === '/chat/oc'
@@ -753,6 +770,31 @@
 
     // if showOpenChat is true, initialize open chat iframe
     if (showOpenChat.value) {
+
+      // log
+      // console.log('on /chat/oc')
+
+      // if user has not seen the open chat page
+      if (!openChatSeenStoreValue.value) {
+
+        // log
+        // console.log('user has not seen the open chat page')
+
+        // set store values
+        setOpenChatSeenStoreValue()
+
+        // set local value
+        openChatSeenLocalValue.value = true
+
+      } else {
+
+        // log
+        // console.log('user has seen the open chat page before')
+
+        // set local value
+        openChatSeenLocalValue.value = false
+
+      }
 
       // initialize open chat iframe
       await initializeOpenChat()
@@ -762,9 +804,34 @@
     // if showSneed is true, initialize sneed iframe
     if (showSneed.value) {
 
+      // log
+      // console.log('on /chat/sneed')
+
+      // if user has not seen the sneed page
+      if (!sneedSeenStoreValue.value) {
+
+        // log
+        // console.log('user has not seen the sneed page')
+
+        // set store value
+        setSneedSeenStoreValue()
+
+        // set local value
+        sneedSeenLocalValue.value = true
+
+      } else {
+
+        // log
+        // console.log('user has seen the sneed page before')
+
+        // set local value
+        sneedSeenLocalValue.value = false
+
+      }
+
       // initialize sneed iframe
       await initializeSneed()
-      
+
     }
 
   })
@@ -777,7 +844,7 @@
   onMounted(async () => {
 
     // log
-    console.log('ChatView.vue: on mounted')
+    // console.log('ChatView.vue: on mounted')
 
     // set initial state based on route
     showOpenChat.value = route.path === '/chat/oc'
@@ -786,6 +853,31 @@
     // if showOpenChat is true, initialize open chat iframe
     if (showOpenChat.value) {
 
+      // log
+      // console.log('on /chat/oc')
+
+      // if user has not seen the open chat page
+      if (!openChatSeenStoreValue.value) {
+
+        // log
+        // console.log('user has not seen the open chat page')
+
+        // set store values
+        setOpenChatSeenStoreValue()
+
+        // set local value
+        openChatSeenLocalValue.value = true
+
+      } else {
+
+        // log
+        // console.log('user has seen the open chat page before')
+
+        // set local value
+        openChatSeenLocalValue.value = false
+
+      }
+
       // initialize open chat iframe
       await initializeOpenChat()
 
@@ -793,6 +885,31 @@
 
     // if showSneed is true, initialize sneed iframe
     if (showSneed.value) {
+
+      // log
+      // console.log('on /chat/sneed')
+
+      // if user has not seen the sneed page
+      if (!sneedSeenStoreValue.value) {
+
+        // log
+        // console.log('user has not seen the sneed page')
+
+        // set store value
+        setSneedSeenStoreValue()
+
+        // set local value
+        sneedSeenLocalValue.value = true
+
+      } else {
+
+        // log
+        // console.log('user has seen the sneed page before')
+
+        // set local value
+        sneedSeenLocalValue.value = false
+
+      }
 
       // initialize sneed iframe
       await initializeSneed()
