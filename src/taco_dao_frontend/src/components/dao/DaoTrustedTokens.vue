@@ -644,7 +644,22 @@ LOCAL METHODS
 
   // format number to remove trailing zeros
   const formatNumber = (num: number) => {
-    return num.toFixed(4).replace(/\.?0+$/, '')
+
+    // if number is exactly 0, return 0
+    if (num === 0) {
+      return 0
+    }
+
+    // if the number is less that 0.0001, return ~0
+    if (Number(num.toFixed(4).replace(/\.?0+$/, '')) < 0.0001) {
+      return '~0'
+    }
+
+    // else return number with 4 decimal places
+    else {
+      return num.toFixed(4).replace(/\.?0+$/, '')
+    }
+
   }
 
   //////////////
