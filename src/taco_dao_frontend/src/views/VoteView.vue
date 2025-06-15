@@ -497,7 +497,7 @@
                       }} VP
 
                       <!-- info hover tooltip -->
-                      <i class="fa-solid fa-circle-info m-0 p-0"
+                      <i class="fa-solid fa-circle-info m-0 p-0 taco-text-black-to-white"
                         data-bs-toggle="tooltip"
                         data-bs-placement="top"
                         title="Voting power cast out of total voting power attached to hotkeys"
