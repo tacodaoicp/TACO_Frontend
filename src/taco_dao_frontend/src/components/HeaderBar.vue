@@ -141,7 +141,7 @@
 
             <span @click="copyUserPrincipalToClipboard()"
                   style="cursor: pointer;">
-              <i class="fa-regular fa-copy"></i>
+              <i class="fa-regular fa-copy taco-text-black-to-white"></i>
             </span>
             
           </span>

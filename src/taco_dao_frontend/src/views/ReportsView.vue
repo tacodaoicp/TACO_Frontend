@@ -262,7 +262,7 @@
                       <!-- link group -->
                       <span class="d-flex flex-column align-items-end">
 
-                        <span>something here</span>
+                        <span class="text-end">something here</span>
 
                         <span class="d-flex gap-2">
 
@@ -277,7 +277,7 @@
                      <!-- link group -->
                       <span class="d-flex flex-column align-items-end">
 
-                        <span>something else</span>
+                        <span class="text-end">something else</span>
 
                         <span class="d-flex gap-2">
 
@@ -316,9 +316,9 @@
                       <span class="taco-report-explorer__report-header__metadata">
                         <i class="fa-solid fa-luchador-mask"></i> 
                         <span> Written by </span>
-                        <span>@manilpwn</span>
+                        <span>manilpwn</span>
                         <span> and </span>
-                        <span>@TrickyVik</span>
+                        <span>TrickyVik</span>
                         <span class="small"> 06/2025</span>
                       </span>
 
@@ -592,7 +592,12 @@
 
                       </li>
 
-                      <li class="taco-report-explorer__report-li">Finality Guarantees: Medium Risk</li>
+                      <li class="taco-report-explorer__report-li">
+
+                        <!-- paragraph -->
+                        <p class="taco-report-explorer__report-paragraph">Finality Guarantees: Medium Risk</p>
+
+                      </li>
 
                     </ul>
 
@@ -639,7 +644,7 @@
                       <!-- link group -->
                       <span class="d-flex flex-column align-items-end">
 
-                        <span>#13 Add Token</span>
+                        <span class="text-end">#13 Add Token</span>
 
                         <span class="d-flex gap-2">
 
@@ -678,9 +683,9 @@
                       <span class="taco-report-explorer__report-header__metadata">
                         <i class="fa-solid fa-luchador-mask"></i> 
                         <span> Written by </span>
-                        <span>@manilpwn</span>
+                        <span>manilpwn</span>
                         <span> and </span>
-                        <span>@TrickyVik</span>
+                        <span>TrickyVik</span>
                         <span class="small"> 06/2025</span>
                       </span>
 
@@ -708,7 +713,7 @@
 
                     <!-- paragraph -->
                     <p class="taco-report-explorer__report-paragraph">
-                      On June 11th, 2023, Adam Powell took over SNS-1 by‬‭ purchasing a majority stake. His takeover turned the DAO from one containing multiple directions to one with a single, unified direction: creating a video game. With that, the blank slate experiment came to an abrupt end. Sneed DAO was created to continue where SNS-1 left off.                      
+                      On June 11th, 2023, Adam Powell took over SNS-1 by purchasing a majority stake. His takeover turned the DAO from one containing multiple directions to one with a single, unified direction: creating a video game. With that, the blank slate experiment came to an abrupt end. Sneed DAO was created to continue where SNS-1 left off.                      
                     </p>
                     
                     <!-- paragraph -->
@@ -951,7 +956,7 @@
                     
                     <!-- paragraph -->
                     <p class="taco-report-explorer__report-paragraph">
-                      Currently, the only revenue source for the RLL is the SNEED/ICP provision rewards from ICPSwap. 
+                      Currently, the main revenue source for the RLL is the SNEED/ICP provision rewards from ICPSwap.
                     </p>                      
                     
                     <hr>
@@ -1036,7 +1041,7 @@
                                 
                                 <!-- paragraph -->
                                 <p class="taco-report-explorer__report-paragraph">
-                                  Top - 16.53%
+                                  Top - 16.53% (Treasury)
                                 </p>
 
                               </li>
@@ -1046,7 +1051,7 @@
                                 
                                 <!-- paragraph -->
                                 <p class="taco-report-explorer__report-paragraph">
-                                  Second - 10.17%
+                                  Second - 10.17% (ICPSwap Pool)
                                 </p>
                                 
                               </li>
@@ -1056,7 +1061,7 @@
                                 
                                 <!-- paragraph -->
                                 <p class="taco-report-explorer__report-paragraph">
-                                  Third - 5.02%
+                                  Third - 5.02% (Sneed Team Neuron)
                                 </p>
                                 
                               </li>
@@ -1406,7 +1411,7 @@
                       <!-- link group -->
                       <span class="d-flex flex-column align-items-end">
 
-                        <span>#18 Motion to Add</span>
+                        <span class="text-end">#18 Motion to Add</span>
 
                         <span class="d-flex gap-2">
 
@@ -1421,7 +1426,7 @@
                       <!-- link group -->
                       <span class="d-flex flex-column align-items-end">
 
-                        <span>#15 Motion to Discuss</span>
+                        <span class="text-end">#15 Motion to Discuss</span>
 
                         <span class="d-flex gap-2">
 
@@ -1436,7 +1441,7 @@
                       <!-- link group -->
                       <span class="d-flex flex-column align-items-end">
 
-                        <span>#12 Motion to Discuss</span>
+                        <span class="text-end">#12 Motion to Discuss</span>
 
                         <span class="d-flex gap-2">
 
@@ -1486,7 +1491,7 @@
     flex-wrap: no-wrap;
     color: var(--black-to-white);
     
-    // report explorer
+    // left
     &__left {
       display: flex;
       flex-direction: column;
@@ -1497,37 +1502,53 @@
       border-bottom-left-radius: 0.5rem;
       background-color: var(--orange-to-light-brown);      
     }
+
+    // right
     &__right {
       display: flex;
       width: 100%;
     }
+
+    // title container
     &__title-container {
       margin: 0 1rem 0;
       padding: 1rem 0 0.5rem;
       border-bottom: 1px solid var(--black-to-white);
       transition: border-color 0.125s ease-in-out;
     }
+
+    // title
     &__title {
       position: relative;
       font-size: 1.5rem;
       text-align: center;
       font-family: "Space Mono";
+      color: var(--black-to-white);
     }
+
+    // list container
     &__list-container {
       padding-top: 1rem;
     }
+
+    // list
     &__list {
       list-style-type: none;
       padding: 0;
     }
-    &__list-item {
 
+    // list item
+    &__list-item {
+      // placeholder
     }
+
+    // list report
     &__list-report {
       display: flex;
       gap: 0.75rem;
       padding: 0.5rem 1rem;
       
+      // icon
       &__icon {
         min-width: 48px;
         width: 48px;
@@ -1540,21 +1561,32 @@
         background-position: center;
         background-size: contain;
       }
+
+      // title container
       &__title-container {
         display: flex;
         flex-direction: column;
       }    
+
+      // title
       &__title {
-        
+        color: var(--black-to-white);
       }
+
+      // hover
       &:hover {
         cursor: pointer;
         background-color: var(--dark-orange-to-brown);
       }  
+
+      // active
       &--active {
         background-color: var(--dark-orange-to-brown);
       }
+
     }
+
+    // hamburger menu
     &__hamburger-menu {
       display: none;
       position: absolute;
@@ -1589,20 +1621,32 @@
       }
 
     }
+
+    // report header
     &__report-header {
 
+      // title
       &__title {
         font-size: 2.5rem;
         font-family: "Space Mono";
+        color: var(--black-to-white);
       }
 
+      // metadata container
       &__metadata-container {
-
+        // placeholder
       }
 
+      // metadata
       &__metadata {
         font-size: 1rem;
+        color: var(--black-to-white);
 
+        * {
+          color: var(--black-to-white);
+        }
+
+        // icon
         i {
           color: var(--brown-to-light-orange);
         }
@@ -1610,19 +1654,26 @@
       }
 
     }
+
+    // report body
     &__report-body {
       padding-top: 2rem;
     }
+
+    // report heading
     &__report-heading {
       display: flex;
       align-items: center;
       gap: 0.75rem;
+      color: var(--black-to-white);
 
+      // all headings
       &--h1, &--h2, &--h3, &--h4, &--h5, &--h6 {
         font-family: "Space Mono";
         margin-bottom: 1rem;
       }
 
+      // individual headings
       &--h1 {
         font-size: 2rem;
       }
@@ -1642,49 +1693,74 @@
         font-size: 0.75rem;
       }
 
+      // icon
       i {
         font-size: 1.125rem;
         color: var(--dark-orange-to-brown);
       }
 
     }
+
+    // report paragraph
     &__report-paragraph {
       font-family: "Rubik";
       line-height: 1.825;
       font-weight: 300;
+      color: var(--black-to-white);
     }
+
+    // report ul and ol
     &__report-ul, &__report-ol {
       .taco-report-explorer__report-paragraph {
         margin: 0;
       }
     }
+
+    // report ul
     &__report-ul {
       list-style-type: '🌮';
     }
+
+    // report ol
     &__report-ol {
       list-style-type: decimal;
     }
+
+    // report li
     &__report-li {
       padding-left: 0.5rem;
+      color: var(--black-to-white);
     }
+
+    // report link
     &__report-link {
       font-family: "Rubik";
       color: var(--blue-to-light-blue);
     }
+
+    // report quote
     &__report-quote {
       border-left: 0.25rem solid var(--dark-orange);
       padding-left: 1rem;
       margin-left: 1rem;
+      color: var(--black-to-white);
     }
+
+    // report img
     &__report-img {
       width: fit-content;
       max-width: 100%;
       height: auto;
       border-radius: 0.25rem;
     }
+
+    // report hr
     &__report-container hr {
       margin: 2rem 0 1.5rem;
+      color: var(--black-to-white);
     }
+
+    // report footer
     &__report-footer {
       color: var(--black-to-white);
       display: flex;
@@ -1695,18 +1771,30 @@
       padding: 0.75rem 0 0.75rem 0;
       border-top: 1px solid var(--dark-orange);
       
+      // left
       &__left {
         font-size: 0.8 75rem;
       }
+
+      // center
       &__center {
         opacity: 0.5;
         font-size: 0.875rem;
+        color: var(--black-to-white);
       }
+
+      // right
       &__right {
         display: flex;
         flex-direction: column;
         font-size: 0.875rem;
         gap: 0.5rem;
+        color: var(--black-to-white);
+
+        * {
+          color: var(--black-to-white);
+        }
+        
       }
 
     }

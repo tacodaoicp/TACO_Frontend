@@ -53,7 +53,8 @@
                   <button class="btn taco-nav-btn taco-nav-btn--green taco-nav-btn--active ms-auto animate__animated animate__delay-1s" 
                     :class="{ 'animate__swing': openChatSeenLocalValue }"
                     @click="showAccessTutorial()">
-                    <i class="fa-solid fa-circle-question"></i> Gated Access
+                    <i class="fa-solid fa-circle-question"></i>
+                    <span class="hide-on-mobile"> Gated Access</span>
                   </button>                              
 
                 </div>
@@ -68,7 +69,8 @@
                     title="How to Participate in Sneed Hub Discussions"
                     data-bs-toggle="tooltip"
                     data-bs-placement="top">
-                      <i class="fa-solid fa-circle-question"></i> Sneed Discussions
+                      <i class="fa-solid fa-circle-question"></i>
+                      <span class="hide-on-mobile"> Sneed Discussions</span>
                     </button>
 
                 </div>
@@ -506,19 +508,34 @@
 
   // phone protrait
   @media (max-width: 575.98px) {
+
+    // reduce padding
     .chat-iframe__container, .sneed-iframe__container {
       padding: 0.5rem 0.5rem;
     }
+
+    // reduce padding
     .chat-iframe, .sneed-iframe {
       padding: 0;
       border-radius: 0.5rem;
     }
+
+    // hide on mobile
+    .hide-on-mobile {
+      display: none;
+    }
+
   }
   
-  // // phone landscape
-  // @media (min-width: 576px) and (max-width: 767.98px) { 
+  // phone landscape
+  @media (min-width: 576px) and (max-width: 767.98px) { 
 
-  // }
+    // hide on mobile
+    .hide-on-mobile {
+      display: none;
+    }
+
+  }
 
   // // tablet
   // @media (min-width: 767px) and (max-width: 991.98px) {
