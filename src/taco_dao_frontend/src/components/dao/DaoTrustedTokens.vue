@@ -569,15 +569,20 @@ LOCAL METHODS
   // handle fetched token details
   const handleFetchedTokenDetails = (fetchedTokenDetails: any) => {
 
+    // filter for active tokens
+    const activeTokens = fetchedTokenDetails.filter((token: [any, { Active: boolean, isPaused: boolean }]) => {
+      return token[1].Active === true && token[1].isPaused === false
+    })
+
     // calculate total value across all tokens
-    const totalValue = fetchedTokenDetails.reduce((sum: number, tokenArray: any) => {
+    const totalValue = activeTokens.reduce((sum: number, tokenArray: any) => {
       const token = tokenArray[1]
       const normalizedBalance = Number(token.balance) / Math.pow(10, Number(token.tokenDecimals))
       return sum + (normalizedBalance * Number(token.priceInUSD))
     }, 0)
 
     // map over fetched tokens and extract token details from inner array
-    formattedTokenDetails.value = fetchedTokenDetails.map((tokenArray: any) => {
+    formattedTokenDetails.value = activeTokens.map((tokenArray: any) => {
 
       // get token details from sub array
       const token = tokenArray[1]
@@ -639,7 +644,22 @@ LOCAL METHODS
 
   // format number to remove trailing zeros
   const formatNumber = (num: number) => {
-    return num.toFixed(4).replace(/\.?0+$/, '')
+
+    // if number is exactly 0, return 0
+    if (num === 0) {
+      return 0
+    }
+
+    // if the number is less that 0.0001, return ~0
+    if (Number(num.toFixed(4).replace(/\.?0+$/, '')) < 0.0001) {
+      return '~0'
+    }
+
+    // else return number with 4 decimal places
+    else {
+      return num.toFixed(4).replace(/\.?0+$/, '')
+    }
+
   }
 
   //////////////
