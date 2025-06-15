@@ -37,25 +37,44 @@
         
         </router-link>
 
-        <!-- sales - router link -->
+        <!-- chat - router link -->
+        <router-link to="/chat" 
+                    class="header-bar__rl"
+                    :class="{ 'router-link-active': $route.path.startsWith('/chat/') }">
+          
+          <span class="header-bar__rl-span">Chat</span>
+        
+        </router-link>     
+        
+        <!-- reports - router link -->
+        <router-link to="/reports" 
+                    class="header-bar__rl"
+                    :class="{ 'router-link-active': $route.path.startsWith('/reports/') }">
+          
+          <span class="header-bar__rl-span">Reports</span>
+        
+        </router-link>
+        
+         <!-- sales - router link -->
         <router-link to="/sales" class="header-bar__rl">
-                      
+          
           <span class="header-bar__rl-span">Sales</span>
         
         </router-link>
 
         <!-- info - router link -->
-        <router-link to="/info" class="header-bar__rl"><span class="header-bar__rl-span">Info</span></router-link>
-
+        <router-link to="/info" class="header-bar__rl">
+          
+          <span class="header-bar__rl-span">Info</span>
+        
+        </router-link>        
+        
         <!-- docs - router link -->
         <a href="https://github.com/tacodaoicp/" target="_blank" class="d-inline-flex" style="gap: 0.25rem; padding: 0 0.75rem;">
           
           <span class="header-bar__rl-span">Docs</span>
         
-        </a>
-
-        <!-- chat - router link -->
-        <router-link to="/chat" class="header-bar__rl"><span class="header-bar__rl-span">Chat</span></router-link>        
+        </a>        
 
       </div>
 
@@ -192,24 +211,44 @@
           <!-- item text -->
           <span>Vote</span>
 
-        </router-link>    
+        </router-link>
 
+        <!-- chat - router link -->
+        <router-link to="/chat" 
+                    class="list-group-item"
+                    :class="{ 'router-link-active': $route.path.startsWith('/chat/') }">
+
+          <!-- item text -->
+          <span>Chat</span>
+
+        </router-link>
+
+        <!-- reports - router link -->
+        <router-link to="/reports" 
+                    class="list-group-item"
+                    :class="{ 'router-link-active': $route.path.startsWith('/reports/') }">
+
+          <!-- item text -->
+          <span>Reports</span>
+
+        </router-link>         
+        
         <!-- sales - router link -->
         <router-link to="/sales" class="list-group-item">
 
           <!-- item text -->
           <span>Sales</span>
 
-        </router-link>
-
+        </router-link>    
+        
         <!-- info - router link -->
         <router-link to="/info" class="list-group-item">
 
           <!-- item text -->
           <span>Info</span>
 
-        </router-link>
-
+        </router-link>          
+        
         <!-- docs - anchor -->
         <a class="list-group-item"
            href="https://github.com/tacodaoicp/"
@@ -218,15 +257,7 @@
           <!-- item text -->
           <span>Docs</span>
 
-        </a>
-
-        <!-- chat - router link -->
-        <router-link to="/chat" class="list-group-item">
-
-          <!-- item text -->
-          <span>Chat</span>
-
-        </router-link>        
+        </a>        
 
       </div>
 

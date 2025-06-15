@@ -219,7 +219,7 @@ export const tokenData = [
         link: 'https://dolr.ai/',
         icpCoinsLink: 'https://icpcoins.com/#/token/DOLR',
         icon: dolrToken,
-        description: `World’s First AI-Powered Unstoppable Social Cloud`,
+        description: `World's First AI-Powered Unstoppable Social Cloud`,
         color: '#FF1D6E'
     },    
     {

@@ -459,7 +459,7 @@ export const useTacoStore = defineStore('taco', () => {
             root.style.setProperty("--yellow-to-orange", "#FED66C") // orange
             root.style.setProperty("--yellow-to-dark-orange", "#DA8D28") // dark orange
             root.style.setProperty("--yellow-to-black", "#2D2D2D") // black
-            root.style.setProperty("--brown-to-light-orange", "#934a17") // brown
+            root.style.setProperty("--brown-to-light-orange", "#FEEAC1") // light orange
             root.style.setProperty("--light-green-to-success-green-hover", "#7CDC86") // light green
             root.style.setProperty("--light-green-to-success-green", "#7CDC86") // light green
             root.style.setProperty("--green-to-orange", "#FED66C") // orange
