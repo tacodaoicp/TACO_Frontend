@@ -262,7 +262,7 @@
                       <!-- link group -->
                       <span class="d-flex flex-column align-items-end">
 
-                        <span>something here</span>
+                        <span class="text-end">something here</span>
 
                         <span class="d-flex gap-2">
 
@@ -277,7 +277,7 @@
                      <!-- link group -->
                       <span class="d-flex flex-column align-items-end">
 
-                        <span>something else</span>
+                        <span class="text-end">something else</span>
 
                         <span class="d-flex gap-2">
 
@@ -639,7 +639,7 @@
                       <!-- link group -->
                       <span class="d-flex flex-column align-items-end">
 
-                        <span>#13 Add Token</span>
+                        <span class="text-end">#13 Add Token</span>
 
                         <span class="d-flex gap-2">
 
@@ -1406,7 +1406,7 @@
                       <!-- link group -->
                       <span class="d-flex flex-column align-items-end">
 
-                        <span>#18 Motion to Add</span>
+                        <span class="text-end">#18 Motion to Add</span>
 
                         <span class="d-flex gap-2">
 
@@ -1421,7 +1421,7 @@
                       <!-- link group -->
                       <span class="d-flex flex-column align-items-end">
 
-                        <span>#15 Motion to Discuss</span>
+                        <span class="text-end">#15 Motion to Discuss</span>
 
                         <span class="d-flex gap-2">
 
@@ -1436,7 +1436,7 @@
                       <!-- link group -->
                       <span class="d-flex flex-column align-items-end">
 
-                        <span>#12 Motion to Discuss</span>
+                        <span class="text-end">#12 Motion to Discuss</span>
 
                         <span class="d-flex gap-2">
 
