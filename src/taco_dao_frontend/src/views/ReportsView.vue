@@ -56,7 +56,7 @@
                       
                       <!-- report title icon -->              
                       <div class="taco-report-explorer__list-report__icon"
-                          style="background-image: url(/src/assets/tokens/ckbtc.png);"></div>            
+                          :style="{ backgroundImage: `url(${ckBtcIconUrl})` }"></div>            
                       
                       <!-- report title container -->
                       <div class="taco-report-explorer__list-report__title-container">
@@ -71,7 +71,7 @@
                   </li>
                   
                   <!-- report item -->
-                  <li class="taco-report-explorer__list-item d-none" @click="toggleReportMenuOnMobile(); router.push('/reports/ddsneed')">
+                  <li class="taco-report-explorer__list-item" @click="toggleReportMenuOnMobile(); router.push('/reports/ddsneed')">
                     
                     <!-- report -->
                     <div class="taco-report-explorer__list-report"
@@ -79,7 +79,7 @@
                       
                       <!-- report title icon -->              
                       <div class="taco-report-explorer__list-report__icon"
-                          style="background-image: url(/src/assets/tokens/snspng/sneed.png);"></div>            
+                          :style="{ backgroundImage: `url(${sneedIconUrl})` }"></div>            
                       
                       <!-- report title container -->
                       <div class="taco-report-explorer__list-report__title-container">
@@ -316,9 +316,9 @@
                       <span class="taco-report-explorer__report-header__metadata">
                         <i class="fa-solid fa-luchador-mask"></i> 
                         <span> Written by </span>
-                        <a href="#" target="_blank" class="taco-text-blue-to-light-blue">@manilpwn</a> 
+                        <span>@manilpwn</span>
                         <span> and </span>
-                        <a href="#" target="_blank" class="taco-text-blue-to-light-blue">@TrickyVik</a>
+                        <span>@TrickyVik</span>
                         <span class="small"> 06/2025</span>
                       </span>
 
@@ -639,7 +639,7 @@
                       <!-- link group -->
                       <span class="d-flex flex-column align-items-end">
 
-                        <span>#13 Motion to Add</span>
+                        <span>#13 Add Token</span>
 
                         <span class="d-flex gap-2">
 
@@ -657,7 +657,804 @@
 
                 </div>
                 
-              </div>           
+              </div>   
+              
+              <!-- sneed dd report -->
+              <div v-if="reportId === 2" class="taco-report-explorer__report-container">
+
+                <!-- inner -->
+                <div class="taco-report-explorer__report-container__inner">
+                
+                  <!-- report header -->
+                  <div class="taco-report-explorer__report-header">
+                    
+                    <!-- report title -->
+                    <h2 class="taco-report-explorer__report-header__title">DUE DILIGENCE PROCESS Sneed DAO (SNEED)</h2>
+
+                    <!-- report metadata continer -->
+                    <div class="taco-report-explorer__report-header__metadata-container">
+
+                      <!-- report metadata -->
+                      <span class="taco-report-explorer__report-header__metadata">
+                        <i class="fa-solid fa-luchador-mask"></i> 
+                        <span> Written by </span>
+                        <span>@manilpwn</span>
+                        <span> and </span>
+                        <span>@TrickyVik</span>
+                        <span class="small"> 06/2025</span>
+                      </span>
+
+                    </div>        
+                    
+                  </div>
+
+                  <!-- report body -->
+                  <div class="taco-report-explorer__report-body">
+                    
+                    <!-- heading -->
+                    <h3 class="taco-report-explorer__report-heading
+                              taco-report-explorer__report-heading--h1">
+                      Team Background
+                      <i class="fa-solid fa-circle-info" 
+                        data-bs-toggle="tooltip" 
+                        data-bs-placement="top" 
+                        title="Assess the founding team's transparency, credibility, experience, and any past contributions to the ICP ecosystem"></i>
+                    </h3>
+                    
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      SNS-1 was the original SNS DAO for ICP, launched in 2022 as a framework and test run to experiment with decentralized governance over dApps. It served as a blank slate, and a community gathered, putting forth multiple ideas on how best to utilise the technology, debating what direction should be taken. The only project created during this period was ICPCoins, an index of the eponymous tokens circulating around the ecosystem.
+                    </p>
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      On June 11th, 2023, Adam Powell took over SNS-1 by‬‭ purchasing a majority stake. His takeover turned the DAO from one containing multiple directions to one with a single, unified direction: creating a video game. With that, the blank slate experiment came to an abrupt end. Sneed DAO was created to continue where SNS-1 left off.                      
+                    </p>
+                    
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      Sneed DAO is arguably the most sovereign DAO of the SNS DAOs, operating without any identifiable central leadership.
+                    </p>
+                    
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      One of the core contributors, Snassy, is doxxed and brings over two decades of professional development experience to the project. In the last 16 years, he worked at Intentional Software (later acquired by Microsoft), and then at Microsoft itself, where he served as a Principal Engineer and Principal Engineering Manager across both the Office and Windows divisions. He left Microsoft in 2024 to be a Web3 builder full-time.
+                    </p>
+                    
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      In direct messages on Discord, he shared that the core contributor group consists of five members, including himself. The remaining members are anonymous; two are developers with experience comparable to his own, while the other two are non-developers. He is actively recruiting additional talent.                      
+                    </p>                    
+
+                    <hr>
+
+                    <!-- heading -->
+                    <h3 class="taco-report-explorer__report-heading
+                              taco-report-explorer__report-heading--h1">
+                      Token Utility
+                      <i class="fa-solid fa-circle-info" 
+                        data-bs-toggle="tooltip" 
+                        data-bs-placement="top" 
+                        title="Examine the token's purpose and functionality within its ecosystem to ensure it provides tangible value and practical use cases"></i>
+                    </h3>  
+                    
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      The SNEED token serves as the governance token for Sneed DAO, enabling members to submit and vote on proposals that are implemented if approved.
+                    </p>      
+                    
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      SNEED is deflationary, <a href="https://github.com/solidstate-auditing/audits-public/blob/main/defi-vectors.md" target="_blank" class="taco-report-explorer__report-link">with a unique tokenomics model known as the Recursive Liquidity Loop (RLL)</a>. The RLL burns or distributes SNEED rewards from liquidity pools (LPs), stakes ICP rewards in an 8-year neuron, and distributes the resulting maturity rewards to governance members.
+                    </p>      
+                    
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      <a href="https://app.sneeddao.com/sneedlock" target="_blank" class="taco-report-explorer__report-link">SneedLock 2.0 enables users to lock tokens and liquidity pool positions for predefined durations</a>. It exists primarily to build trust between teams and communities by ensuring that locked assets remain inaccessible until the lock expires. Prior to SneedLock, teams had to blackhole LP positions to signal commitment - permanently forfeiting access to both the tokens and any LP rewards. SneedLock offers a more flexible alternative. It is planned for SneedLock to charge fees that will go to the Sneed DAO.                      
+                    </p>  
+                    
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      <a href="https://swaprunner.com/help" target="_blank" class="taco-report-explorer__report-link">SwapRunner is a DEX aggregator that enables users to split trade orders between ICPSwap and KongSwap to optimize execution</a>. A planned Time-Distributed Trading feature will enable users to break down large trades into smaller ones over time. <a href="https://swaprunner.com/help/rewards" target="_blank" class="taco-report-explorer__report-link">SwapRunner includes a rewards system that lets project teams sponsor specific achievements</a>, offering users incentives for completing various trading activities. Fees from sponsored achievements go to the Sneed DAO.
+                    </p>  
+                    
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      Both the SneedLock and SwapRunner canisters will be under DAO control when ready.
+                    </p>  
+                    
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      <a href="https://app.sneeddao.com/hub" target="_blank" class="taco-report-explorer__report-link">Sneed Hub serves as an explorer for SNS DAOs</a>, providing key information and links for each project. Its forum feature enables users to create discussion threads tied to SNS proposals, and - if they hotkey their SNS neurons - they can upvote or downvote posts using their voting power.
+                    </p>  
+                    
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      Snassy has pointed out that, as a blank canvas, Sneed DAO can serve as an on-ramp for projects too small to launch their own SNS. By first acquiring SNEED tokens, teams or individuals can contribute their projects to the Sneed DAO, with the expectation that their previously acquired tokens will gain value as the Sneed ecosystem expands.
+                    </p>                      
+                    
+                    <hr>
+
+                    <!-- heading -->
+                    <h3 class="taco-report-explorer__report-heading
+                              taco-report-explorer__report-heading--h1">
+                      Ecosystem Alignment
+                      <i class="fa-solid fa-circle-info" 
+                        data-bs-toggle="tooltip" 
+                        data-bs-placement="top" 
+                        title="Evaluate the token's synergy with other ICP projects, including any existing collaborations and suitability for inclusion in the Salsa Season rewards program."></i>
+                    </h3>  
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      SNEED was created in October 2023 and transitioned to an SNS DAO in January 2024. The original Sneed token was an implementation of Dfinity's ICRC1 standard, developed by the Sneed community to enable the direct addition of the token logo into the token canister. This implementation has been forked to create SNOGE, TENDIES, Insane Clown Protocol, Windoge98, Motokowifhat, Pepe, Internet Doge, and ALIEN.
+                    </p>   
+                    
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      When the SNEED transitioned to an SNS DAO, SneedSwap was developed to convert old tokens to new tokens. SneedSwap has been forked to SNS-ify DOGMI.
+                    </p>   
+                    
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      Sneed DAO has had and maintains several partnerships:
+                    </p>    
+                    
+                    <!-- unordered list -->
+                    <ul class="taco-report-explorer__report-ul">
+                      
+                      <!-- list item -->
+                      <li class="taco-report-explorer__report-li">
+
+                        <!-- paragraph -->
+                        <p class="taco-report-explorer__report-paragraph">
+                          ICPSwap: Partnered for Sneedlock, which has been used by many teams, currently resulting in a grand total of $840 across 22 different projects, for an average of $38.18 per project. Also used to provide prices to SwapRunner.
+                        </p>
+
+                      </li>
+
+                      <!-- list item -->
+                      <li class="taco-report-explorer__report-li">
+
+                        <!-- paragraph -->
+                        <p class="taco-report-explorer__report-paragraph">
+                          KongSwap: Used to provide prices to SwapRunner.
+                        </p>
+                        
+                      </li>
+
+                      <!-- list item -->
+                      <li class="taco-report-explorer__report-li">
+
+                        <!-- paragraph -->
+                        <p class="taco-report-explorer__report-paragraph">
+                          FomoWell: Collaborated with Sneed DAO to integrate an automatic SneedLock feature for launched tokens.
+                        </p>
+                        
+                      </li>
+                      
+                      <!-- list item -->
+                      <li class="taco-report-explorer__report-li">
+
+                        <!-- paragraph -->
+                        <p class="taco-report-explorer__report-paragraph">
+                          Neutrinite DAO & NeuronPool: Collaborating on the Recursive Liquidity Loop.
+                        </p>
+                        
+                      </li>
+                      
+                      <!-- list item -->
+                      <li class="taco-report-explorer__report-li">
+
+                        <!-- paragraph -->
+                        <p class="taco-report-explorer__report-paragraph">
+                          Catalyze: Collaborated to create an NFT-gated chat room.
+                        </p>
+                        
+                      </li>
+                      
+                      <!-- list item -->
+                      <li class="taco-report-explorer__report-li">
+
+                        <!-- paragraph -->
+                        <p class="taco-report-explorer__report-paragraph">
+                          OpenChat: Sneed was the first token to be added for tipping.
+                        </p>
+                        
+                      </li>
+                      
+                      <!-- list item -->
+                      <li class="taco-report-explorer__report-li">
+
+                        <!-- paragraph -->
+                        <p class="taco-report-explorer__report-paragraph">
+                          Bitcoin Labs: Collaborated on dApps such as the Sneedlock Explorer.
+                        </p>
+                        
+                      </li>
+                      
+                      <!-- list item -->
+                      <li class="taco-report-explorer__report-li">
+
+                        <!-- paragraph -->
+                        <p class="taco-report-explorer__report-paragraph">
+                          ELNA AI: Partnered to build a Mr. Sneed AI agent.
+                        </p>
+                        
+                      </li>
+                      
+                      <!-- list item -->
+                      <li class="taco-report-explorer__report-li">
+
+                        <!-- paragraph -->
+                        <p class="taco-report-explorer__report-paragraph">
+                          Taco DAO: Partnered to work on future projects. Sneed community members have expressed interest in having Sneed DAO participate in Salsa Season. Integrating SwapRunner achievements into Salsa Season is a viable option. Snassy is Taco DAO's lead developer.
+                        </p>
+                        
+                      </li>                      
+
+                    </ul>
+
+                    <hr>
+
+                    <!-- heading -->
+                    <h3 class="taco-report-explorer__report-heading
+                              taco-report-explorer__report-heading--h1">
+                      Community
+                      <i class="fa-solid fa-circle-info" 
+                        data-bs-toggle="tooltip" 
+                        data-bs-placement="top" 
+                        title="Assess the size and engagement of the token's community to gauge long-term adoption potential"></i>
+                    </h3>  
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      The official Discord server has 728 members, and the OpenChat community has 4093 members.
+                    </p>  
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      Diamond Club is an exclusive Discord channel gated by NFTs, consisting of those who were either airdropped a membership for holding more than 1 SNEED on the drop date, or those who have purchased entry. 3% of the royalty from a sale is immediately transferred to the DAO's treasury. There are 186 members as of June 2025 in the Diamond Club. This figure contains many well known ICP community members and the chat is active with discussions.
+                    </p>  
+                    
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      SNOGE is the official memecoin of the Sneed DAO, as decided by Motion Proposals #94 and #147. The creator of SNOGE hosts spaces on X to discuss the ICP ecosystem, and has hosted individuals such as Snassy and the TACO team.
+                    </p>                      
+                    
+                    <hr>
+
+                    <!-- heading -->
+                    <h3 class="taco-report-explorer__report-heading
+                              taco-report-explorer__report-heading--h1">
+                      Technology
+                      <i class="fa-solid fa-circle-info" 
+                        data-bs-toggle="tooltip" 
+                        data-bs-placement="top" 
+                        title="Review the project's technical foundation, focusing on code quality, scalability, and how effectively it leverages ICP's capabilities"></i>
+                    </h3>  
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      The SNS framework is regularly updated and vetted by the Network Nervous System (NNS) community, which oversees the entire ICP ecosystem. This vigilance ensures the adherence of SNEED's governance framework to the most rigorous standards of security and efficiency.
+                    </p>  
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      The core infrastructure of the RLL consists of the 8 year ICP NNS Neuron, ICP Neuron Vector, and ICP Splitter Vector. The ICP Neuron Vector controls the 8 year Neuron and manages maturity collection. The ICP Splitter Vector distributes ICP to the Treasury, Neuron Vector, and SNEED Buyback Vector in fixed proportions.
+                    </p>  
+                    
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      The token management of the RLL consists of the SNEED Buyback Vector, SNEED Splitter Vector, Sneed DAO Treasury, Sneed DeFi Canister, SNEED Burn Address, and RLL Distribution Canister. The SNEED Buyback Vector purchases SNEED from the market using ICP. The SNEED Splitter Vector distributes SNEED to the Treasury, DeFi Canister, and Burn Address in fixed proportions. The SNEED DeFi Canister distributes ICP to the ICP Splitter Vector and tokens to RLL Distribution.The SNEED Burn Address permanently removes SNEED from circulation. The RLL Distribution Canister distributes tokens to DAO voting members.
+                    </p>  
+                    
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      Currently, the only revenue source for the RLL is the SNEED/ICP provision rewards from ICPSwap. 
+                    </p>                      
+                    
+                    <hr>
+
+                    <!-- anon container -->
+                    <div class="d-flex flex-wrap gap-5">
+
+                      <!-- left -->
+                      <div>
+
+                        <!-- heading -->
+                        <h3 class="taco-report-explorer__report-heading
+                                  taco-report-explorer__report-heading--h1">
+                          Tokenomics
+                          <i class="fa-solid fa-circle-info" 
+                            data-bs-toggle="tooltip" 
+                            data-bs-placement="top" 
+                            title="Analyse the supply and distribution of the token; any inflationary/deflationary mechanisms; and any incentive structures, to ensure sustainability and fair distribution"></i>
+                        </h3>
+
+                        <!-- unordered list -->
+                        <ul class="taco-report-explorer__report-ul">
+
+                          <!-- list item -->
+                          <li class="taco-report-explorer__report-li">
+                            
+                            <!-- paragraph -->
+                            <p class="taco-report-explorer__report-paragraph">
+                              Initial Total Supply: 10,000
+                            </p>
+                            
+                          </li>
+
+                          <!-- list item -->
+                          <li class="taco-report-explorer__report-li">
+                            
+                            <!-- paragraph -->
+                            <p class="taco-report-explorer__report-paragraph">
+
+                              <!-- link -->
+                              <a href="https://app.sneeddao.com/sneedlock" target="_blank" class="taco-report-explorer__report-link">
+                                Current Total Supply (08/06/25): 9948.925
+                              </a>
+
+                            </p>
+                            
+                          </li>
+                          
+                          <!-- list item -->
+                          <li class="taco-report-explorer__report-li">
+                            
+                            <!-- paragraph -->
+                            <p class="taco-report-explorer__report-paragraph">
+                              Circulating Supply: 7,386.945
+                            </p>
+                            
+                          </li>
+                          
+                          <!-- list item -->
+                          <li class="taco-report-explorer__report-li">
+                            
+                            <!-- paragraph -->
+                            <p class="taco-report-explorer__report-paragraph">
+                              Burn per transaction: 0.00001
+                            </p>
+                            
+                          </li>
+                          
+                          <!-- list item -->
+                          <li class="taco-report-explorer__report-li">
+                            
+                            <!-- paragraph -->
+                            <p class="taco-report-explorer__report-paragraph">
+                              Holders:
+                            </p>
+
+                            <!-- unordered list -->
+                            <ul class="taco-report-explorer__report-ul" style="list-style-type: disc">
+
+                              <!-- list item -->
+                              <li class="taco-report-explorer__report-li">
+                                
+                                <!-- paragraph -->
+                                <p class="taco-report-explorer__report-paragraph">
+                                  Top - 16.53%
+                                </p>
+
+                              </li>
+
+                              <!-- list item -->
+                              <li class="taco-report-explorer__report-li">
+                                
+                                <!-- paragraph -->
+                                <p class="taco-report-explorer__report-paragraph">
+                                  Second - 10.17%
+                                </p>
+                                
+                              </li>
+                              
+                              <!-- list item -->
+                              <li class="taco-report-explorer__report-li">
+                                
+                                <!-- paragraph -->
+                                <p class="taco-report-explorer__report-paragraph">
+                                  Third - 5.02%
+                                </p>
+                                
+                              </li>
+                              
+                              <!-- list item -->
+                              <li class="taco-report-explorer__report-li">
+                                
+                                <!-- paragraph -->
+                                <p class="taco-report-explorer__report-paragraph">
+                                  Mean of Top 25 - 2.62%
+                                </p>
+                                
+                              </li>
+                              
+                              <!-- list item -->
+                              <li class="taco-report-explorer__report-li">
+                                
+                                <!-- paragraph -->
+                                <p class="taco-report-explorer__report-paragraph">
+                                  Median of Top 25 - 1.09%
+                                </p>
+                                
+                              </li>
+                              
+                              <!-- list item -->
+                              <li class="taco-report-explorer__report-li">
+                                
+                                <!-- paragraph -->
+                                <p class="taco-report-explorer__report-paragraph">
+                                  Mode of Top 25 - 1%
+                                </p>
+                                
+                              </li>
+                              
+                              <!-- list item -->
+                              <li class="taco-report-explorer__report-li">
+                                
+                                <!-- paragraph -->
+                                <p class="taco-report-explorer__report-paragraph">
+                                  Top 25 Total - 65.56%
+                                </p>
+                                
+                              </li>
+                              
+                              <!-- list item -->
+                              <li class="taco-report-explorer__report-li">
+                                
+                                <!-- paragraph -->
+                                <p class="taco-report-explorer__report-paragraph">
+                                  Mean of Top 100 - 0.85%
+                                </p>
+                                
+                              </li>
+                              
+                              <!-- list item -->
+                              <li class="taco-report-explorer__report-li">
+                                
+                                <!-- paragraph -->
+                                <p class="taco-report-explorer__report-paragraph">
+                                  Median of Top 100 - 0.285%
+                                </p>
+                                
+                              </li>
+                              
+                              <!-- list item -->
+                              <li class="taco-report-explorer__report-li">
+                                
+                                <!-- paragraph -->
+                                <p class="taco-report-explorer__report-paragraph">
+                                  Mode of Top 100 - 0.50, 0.16%
+                                </p>
+                                
+                              </li>
+                              
+                              <!-- list item -->
+                              <li class="taco-report-explorer__report-li">
+                                
+                                <!-- paragraph -->
+                                <p class="taco-report-explorer__report-paragraph">
+                                  Top 100 Total - 85%
+                                </p>
+                                
+                              </li>                          
+
+                            </ul>
+                            
+                          </li>                      
+
+                        </ul>
+
+                      </div>
+
+                      <!-- center -->
+                      <div>
+
+                        <!-- heading -->
+                        <h3 class="taco-report-explorer__report-heading
+                                  taco-report-explorer__report-heading--h1">
+                          Market Metrics
+                          <i class="fa-solid fa-circle-info" 
+                            data-bs-toggle="tooltip" 
+                            data-bs-placement="top" 
+                            title="Review key indicators such as trading volume and historical market performance."></i>
+                        </h3>
+
+                        <!-- unordered list -->
+                        <ul class="taco-report-explorer__report-ul">
+
+                          <!-- list item -->
+                          <li class="taco-report-explorer__report-li">
+                            
+                            <!-- paragraph -->
+                            <p class="taco-report-explorer__report-paragraph">
+                              All Time High (USD): 279.02
+                            </p>
+                            
+                          </li>
+
+                          <!-- list item -->
+                          <li class="taco-report-explorer__report-li">
+                            
+                            <!-- paragraph -->
+                            <p class="taco-report-explorer__report-paragraph">
+                              All Time High (ICP): 69.21
+                            </p>
+                            
+                          </li>
+                          
+                          <!-- list item -->
+                          <li class="taco-report-explorer__report-li">
+                            
+                            <!-- paragraph -->
+                            <p class="taco-report-explorer__report-paragraph">
+                              All Time Low (USD): 38.96
+                            </p>
+                            
+                          </li>
+                          
+                          <!-- list item -->
+                          <li class="taco-report-explorer__report-li">
+                            
+                            <!-- paragraph -->
+                            <p class="taco-report-explorer__report-paragraph">
+                              All Time Low (ICP): 6.43
+                            </p>
+                            
+                          </li>
+                          
+                          <!-- list item -->
+                          <li class="taco-report-explorer__report-li">
+                            
+                            <!-- paragraph -->
+                            <p class="taco-report-explorer__report-paragraph">
+                              As at 08/06/25(USD): 72.37
+                            </p>
+                            
+                          </li>                      
+
+                          <!-- list item -->
+                          <li class="taco-report-explorer__report-li">
+                            
+                            <!-- paragraph -->
+                            <p class="taco-report-explorer__report-paragraph">
+                              As at 08/06/25 (ICP): 13.65
+                            </p>
+
+                          </li>
+
+                          <!-- list item -->
+                          <li class="taco-report-explorer__report-li">
+                            
+                            <!-- paragraph -->
+                            <p class="taco-report-explorer__report-paragraph">
+                              Change from ATH USD: -74.06%
+                            </p>
+                            
+                          </li>
+                          
+                          <!-- list item -->
+                          <li class="taco-report-explorer__report-li">
+                            
+                            <!-- paragraph -->
+                            <p class="taco-report-explorer__report-paragraph">
+                              Change from ATL USD: 85.75%
+                            </p>
+                            
+                          </li>
+                          
+                          <!-- list item -->
+                          <li class="taco-report-explorer__report-li">
+                            
+                            <!-- paragraph -->
+                            <p class="taco-report-explorer__report-paragraph">
+                              USD Volume 24H as at 08/06/25: 2010
+                            </p>
+                            
+                          </li>
+
+                        </ul>
+
+                      </div>
+
+                      <!-- right -->
+                      <div>
+
+                        <!-- heading -->
+                        <h3 class="taco-report-explorer__report-heading
+                                  taco-report-explorer__report-heading--h1">
+                          Liquidity
+                        </h3>
+
+                        <!-- paragraph -->
+                        <p class="taco-report-explorer__report-paragraph">
+                          As per <a href="https://swaprunner.com" target="_blank" class="taco-report-explorer__report-link">SwapRunner</a> on the 8th of June 2025, a single transaction of:
+                        </p>
+
+                        <!-- unordered list -->
+                        <ul class="taco-report-explorer__report-ul">
+
+                          <!-- list item -->
+                          <li class="taco-report-explorer__report-li">
+                            
+                            <!-- paragraph -->
+                            <p class="taco-report-explorer__report-paragraph">
+                              20000 ICP ($106425.90) will result in a trade to 729.76 SNEED ($53728.54). 49.51% lost to price impact
+                            </p>
+                            
+                          </li>
+
+                          <!-- list item -->
+                          <li class="taco-report-explorer__report-li">
+                            
+                            <!-- paragraph -->
+                            <p class="taco-report-explorer__report-paragraph">
+                              10000 ICP ($53258.27) will result in a trade to 488.91 SNEED ($35996.36). 32.41% lost to price impact
+                            </p>
+                            
+                          </li>
+                          
+                          <!-- list item -->
+                          <li class="taco-report-explorer__report-li">
+                            
+                            <!-- paragraph -->
+                            <p class="taco-report-explorer__report-paragraph">
+                              1000 ICP ($5325.83) will result in a trade to 68.86 SNEED ($5069.83). 4.81% lost to price impact
+                            </p>
+                            
+                          </li>
+                          
+                          <!-- list item -->
+                          <li class="taco-report-explorer__report-li">
+                            
+                            <!-- paragraph -->
+                            <p class="taco-report-explorer__report-paragraph">
+                              250 ICP ($1331.46) will result in a trade to 17.82 SNEED ($1310.14). 1.60% lost to price impact
+                            </p>
+                            
+                          </li>
+
+                        </ul>
+
+                        <!-- paragraph -->
+                        <p class="taco-report-explorer__report-paragraph">
+                          As can be seen, liquidity for SNEED remains limited. If liquidity is not recycled, and there are no 'sells' between the DAO's 'buys', the effective slippage rate will be identical regardless of whether multiple small transactions or one large one take place.
+                        </p>
+
+                      </div>                      
+
+                    </div>
+
+                    <hr>
+
+                    <!-- headings -->
+                    <h3 class="taco-report-explorer__report-heading
+                              taco-report-explorer__report-heading--h1">
+                      Competitors
+                      <i class="fa-solid fa-circle-info" 
+                        data-bs-toggle="tooltip" 
+                        data-bs-placement="top" 
+                        title="Identify similar projects and assess the token's differentiators alongside the perceived competitive positioning within its niche"></i>
+                    </h3>
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      While there are numerous DAOs present on the ICP ecosystem, many either have a definitive purpose behind them, or are highly centralized.
+                    </p>
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      In terms of sovereignty and the extent to which collective intelligence and governance is planned to be executed, TACO and SNEED are subjectively the two most on-track DAOs.
+                    </p>
+                    
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      SNEED has no current DAO competitor who directly presents a 'blank slate' for collective leadership, nor plans to do so.
+                    </p>
+
+                    <hr>
+                   
+                    <!-- heading -->
+                    <h3 class="taco-report-explorer__report-heading
+                              taco-report-explorer__report-heading--h1">
+                      Security Risks
+                      <i class="fa-solid fa-circle-info" 
+                        data-bs-toggle="tooltip" 
+                        data-bs-placement="top" 
+                        title="Investigate perceived vulnerabilities, any audit reports, and adherence to security and regulatory standards"></i>
+                    </h3> 
+                    
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      <a href="https://github.com/icsneed/sneed_sns_dapp/tree/main/audit" target="_blank" class="taco-report-explorer__report-link">SneedSwap was audited by RIVVIR Tech, LLC.</a> The initial audit had 6 High Severity and 8 Medium Severity findings, all of which were addressed in the follow-up.
+                    </p>
+                    
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      The RLL relies on Neutrinite's DeFi Vectors, <a href="https://github.com/solidstate-auditing/audits-public/blob/main/defi-vectors.md" target="_blank" class="taco-report-explorer__report-link">which was audited by Solidstate</a>. All findings scored Strong or Sufficient.
+                    </p>                    
+
+                    <hr>
+                    
+                    <!-- back to top link -->
+                    <a href="#" @click.prevent="scrollToTop" class="taco-report-explorer__report-link text-center w-100 d-inline-block mt-2">Back to top</a>
+                    
+                  </div>
+
+                  <!-- report footer -->
+                  <div class="taco-report-explorer__report-footer">
+                    
+                    <!-- left -->
+                    <div class="taco-report-explorer__report-footer__left">
+                      
+                      ❤️🌮
+                      
+                    </div>
+                    
+                    <!-- center -->
+                    <div class="taco-report-explorer__report-footer__center text-center">
+                      
+                      &copy;2025 Taco Dao
+                      
+                    </div>
+                    
+                    <!-- right -->
+                    <div class="taco-report-explorer__report-footer__right">
+                      
+                      <!-- link group -->
+                      <span class="d-flex flex-column align-items-end">
+
+                        <span>#18 Motion to Add</span>
+
+                        <span class="d-flex gap-2">
+
+                          <a href="https://nns.ic0.app/proposal/?u=lacdn-3iaaa-aaaaq-aae3a-cai&proposal=18" class="taco-text-blue-to-light-blue text-end" target="_blank">NNS</a>                        
+
+                          <a href="https://app.sneeddao.com/proposal?proposalid=18&sns=lacdn-3iaaa-aaaaq-aae3a-cai" class="taco-text-blue-to-light-blue text-end" target="_blank">Sneed Hub</a>
+
+                        </span>
+                        
+                      </span>
+
+                      <!-- link group -->
+                      <span class="d-flex flex-column align-items-end">
+
+                        <span>#15 Motion to Discuss</span>
+
+                        <span class="d-flex gap-2">
+
+                          <a href="https://nns.ic0.app/proposal/?u=lacdn-3iaaa-aaaaq-aae3a-cai&proposal=15" class="taco-text-blue-to-light-blue text-end" target="_blank">NNS</a>                        
+
+                          <a href="https://app.sneeddao.com/proposal?proposalid=15&sns=lacdn-3iaaa-aaaaq-aae3a-cai" class="taco-text-blue-to-light-blue text-end" target="_blank">Sneed Hub</a>
+
+                        </span>
+                        
+                      </span>
+                      
+                      <!-- link group -->
+                      <span class="d-flex flex-column align-items-end">
+
+                        <span>#12 Motion to Discuss</span>
+
+                        <span class="d-flex gap-2">
+
+                          <a href="https://nns.ic0.app/proposal/?u=lacdn-3iaaa-aaaaq-aae3a-cai&proposal=12" class="taco-text-blue-to-light-blue text-end" target="_blank">NNS</a>                        
+
+                          <a href="https://app.sneeddao.com/proposal?proposalid=12&sns=lacdn-3iaaa-aaaaq-aae3a-cai" class="taco-text-blue-to-light-blue text-end" target="_blank">Sneed Hub</a>
+
+                        </span>
+                        
+                      </span>                      
+                      
+                    </div>
+                    
+                  </div>
+
+                </div>
+                
+              </div>                 
               
             </div>
             
@@ -979,6 +1776,8 @@
   import FooterBar from "../components/FooterBar.vue"
   import { ref, onMounted, watch, computed } from "vue"
   import { useRoute, useRouter } from 'vue-router'
+  import ckBtcIcon from '../assets/tokens/ckbtc.png'
+  import sneedIcon from '../assets/tokens/snspng/sneed.png'
 
   /////////////////////
   // local variables //
@@ -990,6 +1789,8 @@
 
   // report explorer
   const reportId = ref(0)
+  const ckBtcIconUrl = ckBtcIcon
+  const sneedIconUrl = sneedIcon
 
   // show report menu on mobile
   const showReportMenuOnMobile = ref(false)
@@ -1016,13 +1817,13 @@
   const toggleReportMenuOnMobile = () => {
 
     // log
-    console.log('ReportsView.vue: toggle report menu on mobile')
+    // console.log('ReportsView.vue: toggle report menu on mobile')
 
     // toggle
     showReportMenuOnMobile.value = !showReportMenuOnMobile.value
     
     // log
-    console.log('ReportsView.vue: showReportMenuOnMobile', showReportMenuOnMobile.value)
+    // console.log('ReportsView.vue: showReportMenuOnMobile', showReportMenuOnMobile.value)
 
   }
 
