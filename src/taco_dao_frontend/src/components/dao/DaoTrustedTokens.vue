@@ -569,15 +569,20 @@ LOCAL METHODS
   // handle fetched token details
   const handleFetchedTokenDetails = (fetchedTokenDetails: any) => {
 
+    // filter for active tokens
+    const activeTokens = fetchedTokenDetails.filter((token: [any, { Active: boolean, isPaused: boolean }]) => {
+      return token[1].Active === true && token[1].isPaused === false
+    })
+
     // calculate total value across all tokens
-    const totalValue = fetchedTokenDetails.reduce((sum: number, tokenArray: any) => {
+    const totalValue = activeTokens.reduce((sum: number, tokenArray: any) => {
       const token = tokenArray[1]
       const normalizedBalance = Number(token.balance) / Math.pow(10, Number(token.tokenDecimals))
       return sum + (normalizedBalance * Number(token.priceInUSD))
     }, 0)
 
     // map over fetched tokens and extract token details from inner array
-    formattedTokenDetails.value = fetchedTokenDetails.map((tokenArray: any) => {
+    formattedTokenDetails.value = activeTokens.map((tokenArray: any) => {
 
       // get token details from sub array
       const token = tokenArray[1]
