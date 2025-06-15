@@ -316,9 +316,9 @@
                       <span class="taco-report-explorer__report-header__metadata">
                         <i class="fa-solid fa-luchador-mask"></i> 
                         <span> Written by </span>
-                        <span>@manilpwn</span>
+                        <span>manilpwn</span>
                         <span> and </span>
-                        <span>@TrickyVik</span>
+                        <span>TrickyVik</span>
                         <span class="small"> 06/2025</span>
                       </span>
 
@@ -678,9 +678,9 @@
                       <span class="taco-report-explorer__report-header__metadata">
                         <i class="fa-solid fa-luchador-mask"></i> 
                         <span> Written by </span>
-                        <span>@manilpwn</span>
+                        <span>manilpwn</span>
                         <span> and </span>
-                        <span>@TrickyVik</span>
+                        <span>TrickyVik</span>
                         <span class="small"> 06/2025</span>
                       </span>
 
@@ -708,7 +708,7 @@
 
                     <!-- paragraph -->
                     <p class="taco-report-explorer__report-paragraph">
-                      On June 11th, 2023, Adam Powell took over SNS-1 by‬‭ purchasing a majority stake. His takeover turned the DAO from one containing multiple directions to one with a single, unified direction: creating a video game. With that, the blank slate experiment came to an abrupt end. Sneed DAO was created to continue where SNS-1 left off.                      
+                      On June 11th, 2023, Adam Powell took over SNS-1 by purchasing a majority stake. His takeover turned the DAO from one containing multiple directions to one with a single, unified direction: creating a video game. With that, the blank slate experiment came to an abrupt end. Sneed DAO was created to continue where SNS-1 left off.                      
                     </p>
                     
                     <!-- paragraph -->
@@ -951,7 +951,7 @@
                     
                     <!-- paragraph -->
                     <p class="taco-report-explorer__report-paragraph">
-                      Currently, the only revenue source for the RLL is the SNEED/ICP provision rewards from ICPSwap. 
+                      Currently, the main revenue source for the RLL is the SNEED/ICP provision rewards from ICPSwap.
                     </p>                      
                     
                     <hr>
@@ -1036,7 +1036,7 @@
                                 
                                 <!-- paragraph -->
                                 <p class="taco-report-explorer__report-paragraph">
-                                  Top - 16.53%
+                                  Top - 16.53% (Treasury)
                                 </p>
 
                               </li>
@@ -1046,7 +1046,7 @@
                                 
                                 <!-- paragraph -->
                                 <p class="taco-report-explorer__report-paragraph">
-                                  Second - 10.17%
+                                  Second - 10.17% (ICPSwap Pool)
                                 </p>
                                 
                               </li>
@@ -1056,7 +1056,7 @@
                                 
                                 <!-- paragraph -->
                                 <p class="taco-report-explorer__report-paragraph">
-                                  Third - 5.02%
+                                  Third - 5.02% (Sneed Team Neuron)
                                 </p>
                                 
                               </li>
