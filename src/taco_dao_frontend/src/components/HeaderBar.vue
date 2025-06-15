@@ -69,10 +69,10 @@
         
         </router-link>        
         
-        <!-- docs - router link -->
+        <!-- code - router link -->
         <a href="https://github.com/tacodaoicp/" target="_blank" class="d-inline-flex" style="gap: 0.25rem; padding: 0 0.75rem;">
           
-          <span class="header-bar__rl-span">Docs</span>
+          <span class="header-bar__rl-span">Code</span>
         
         </a>        
 
@@ -249,13 +249,13 @@
 
         </router-link>          
         
-        <!-- docs - anchor -->
+        <!-- code - anchor -->
         <a class="list-group-item"
            href="https://github.com/tacodaoicp/"
            target="_blank">
 
           <!-- item text -->
-          <span>Docs</span>
+          <span>Code</span>
 
         </a>        
 
