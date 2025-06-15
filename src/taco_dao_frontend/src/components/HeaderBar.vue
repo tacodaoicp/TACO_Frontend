@@ -6,7 +6,7 @@
     <div class="header-bar__left">
 
       <!-- escape hatch -->
-      <router-link to="/">
+      <router-link to="/" class="header-bar__escape-hatch">
 
         <!-- taco dao logo -->
         <TacoDaoLogo class="escape-hatch-logo"/>
@@ -37,25 +37,44 @@
         
         </router-link>
 
-        <!-- sales - router link -->
+        <!-- chat - router link -->
+        <router-link to="/chat" 
+                    class="header-bar__rl"
+                    :class="{ 'router-link-active': $route.path.startsWith('/chat/') }">
+          
+          <span class="header-bar__rl-span">Chat</span>
+        
+        </router-link>     
+        
+        <!-- reports - router link -->
+        <router-link to="/reports" 
+                    class="header-bar__rl"
+                    :class="{ 'router-link-active': $route.path.startsWith('/reports/') }">
+          
+          <span class="header-bar__rl-span">Reports</span>
+        
+        </router-link>
+        
+         <!-- sales - router link -->
         <router-link to="/sales" class="header-bar__rl">
-                      
+          
           <span class="header-bar__rl-span">Sales</span>
         
         </router-link>
 
         <!-- info - router link -->
-        <router-link to="/info" class="header-bar__rl"><span class="header-bar__rl-span">Info</span></router-link>
-
+        <router-link to="/info" class="header-bar__rl">
+          
+          <span class="header-bar__rl-span">Info</span>
+        
+        </router-link>        
+        
         <!-- docs - router link -->
         <a href="https://github.com/tacodaoicp/" target="_blank" class="d-inline-flex" style="gap: 0.25rem; padding: 0 0.75rem;">
           
           <span class="header-bar__rl-span">Docs</span>
         
-        </a>
-
-        <!-- chat - router link -->
-        <router-link to="/chat" class="header-bar__rl"><span class="header-bar__rl-span">Chat</span></router-link>        
+        </a>        
 
       </div>
 
@@ -92,7 +111,7 @@
       </div>
 
       <!-- icp price, taco dao holdings, and wallet container -->
-      <div class="header-bar__chips d-flex flex-nowrap align-items-center gap-3" 
+      <div class="header-bar__chips d-flex flex-nowrap align-items-end" 
             style="user-select: text;">
 
         <!-- icp value -->
@@ -192,24 +211,44 @@
           <!-- item text -->
           <span>Vote</span>
 
-        </router-link>    
+        </router-link>
 
+        <!-- chat - router link -->
+        <router-link to="/chat" 
+                    class="list-group-item"
+                    :class="{ 'router-link-active': $route.path.startsWith('/chat/') }">
+
+          <!-- item text -->
+          <span>Chat</span>
+
+        </router-link>
+
+        <!-- reports - router link -->
+        <router-link to="/reports" 
+                    class="list-group-item"
+                    :class="{ 'router-link-active': $route.path.startsWith('/reports/') }">
+
+          <!-- item text -->
+          <span>Reports</span>
+
+        </router-link>         
+        
         <!-- sales - router link -->
         <router-link to="/sales" class="list-group-item">
 
           <!-- item text -->
           <span>Sales</span>
 
-        </router-link>
-
+        </router-link>    
+        
         <!-- info - router link -->
         <router-link to="/info" class="list-group-item">
 
           <!-- item text -->
           <span>Info</span>
 
-        </router-link>
-
+        </router-link>          
+        
         <!-- docs - anchor -->
         <a class="list-group-item"
            href="https://github.com/tacodaoicp/"
@@ -218,15 +257,7 @@
           <!-- item text -->
           <span>Docs</span>
 
-        </a>
-
-        <!-- chat - router link -->
-        <router-link to="/chat" class="list-group-item">
-
-          <!-- item text -->
-          <span>Chat</span>
-
-        </router-link>        
+        </a>        
 
       </div>
 
@@ -447,12 +478,26 @@
       }
     }
 
+    // chips
+    &__chips {
+      gap: 1rem;
+    }
+
   }
 
   ///////////////////
   // media queries //
   ///////////////////
   
+  // custom 400px breakpoint
+  @media (max-width: 400px) {
+
+    // hide escape hatch
+    .header-bar__escape-hatch {
+      display: none !important;
+    }
+
+  }
   // super small
   @media (max-width: 440px) {
 
@@ -471,10 +516,15 @@
       display: none !important;
     }
 
-    // hide chips
-    .header-bar__chips * {
-      display: none !important;
+    // 
+    .header-bar__chips {
+      gap: 0.5rem !important;
     }    
+
+    // 
+    .header-bar__chips * {
+      // display: none !important;
+    }
 
   }  
 
@@ -508,10 +558,15 @@
 
     // reduce right gap
     .header-bar__right {
-      gap: 0rem;
+      gap: 0.75rem;
     }
 
-    // hide chips
+    // 
+    .header-bar__chips {
+      gap: 0.75rem;
+    }
+
+    // 
     .header-bar__chips * {
       font-size: 0.675rem !important;
     }

@@ -44,7 +44,7 @@
           </h2>
 
           <!-- coming soon h3  -->
-          <h3 class="cs__h3 spacemono mt-2">v1.0.2</h3>
+          <h3 class="cs__h3 spacemono mt-2">v1.0.3</h3>
 
           <!-- sale link -->
           <span class="d-inline text-center px-3 lh-on-mobile" style="font-size: 1.5rem; font-weight: bold;">
@@ -55,8 +55,8 @@
             small-on-mobile d-inline-flex mt-2">Next Steps: </span>
           </span>
           <ul class="list-unstyled mb-5 mt-2">
+            <li><span class="taco-text-brown-to-white small-on-mobile">✅ Trust at least two tokens</span></li>            
             <li><span class="taco-text-brown-to-white small-on-mobile">🔲 Vote on initial portfolio funding</span></li>
-            <li><span class="taco-text-brown-to-white small-on-mobile">✅ Trust at least two tokens</span></li>
             <li><span class="taco-text-brown-to-white small-on-mobile" style="opacity: 0.25;">🔲 <span class="rotating-text">???????</span></span></li>
           </ul>
 

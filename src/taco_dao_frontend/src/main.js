@@ -12,6 +12,7 @@ import SaleDKPSwap from "./components/sales/SaleDKPSwap.vue"
 import InfoView from "./views/InfoView.vue"
 import AdminView from "./views/AdminView.vue"
 import ChatView from "./views/ChatView.vue"
+import ReportsView from "./views/ReportsView.vue"
 import VueApexCharts from 'vue3-apexcharts'
 import VueClickAway from "vue3-click-away"
 import 'animate.css'
@@ -26,6 +27,10 @@ const routes = [
     { path: "/chat/oc", name: "ChatOC", component: ChatView },
     { path: "/chat/sneed", name: "ChatSneed", component: ChatView },
     { path: "/chat", redirect: "/chat/oc" },
+    { path: "/reports", redirect: "/reports/ddckbtc" },
+    { path: "/reports/example", component: ReportsView },    
+    { path: "/reports/ddckbtc", component: ReportsView },
+    { path: "/reports/ddsneed", component: ReportsView },
     { path: "/admin", name: "Admin", component: AdminView },
     { path: "/:pathMatch(.*)*", redirect: "/" },
 ]

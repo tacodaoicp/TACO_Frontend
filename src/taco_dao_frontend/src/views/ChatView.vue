@@ -18,7 +18,7 @@
           style="max-width: 1600px;">
 
           <!-- toolbar container - l2 -->
-          <div class="taco-container taco-container--l2 taco-container--l2--dark p-2 mx-3 mt-3 mb-3 mb-sm-0">
+          <div class="taco-container taco-container--l2 taco-container--l2--dark p-2 mx-3 mt-3 mb-0">
 
             <!-- toolbar -->
             <div class="taco-toolbar gap-2">
@@ -44,23 +44,45 @@
               </div>
 
               <!-- right -->
-              <div class="taco-toolbar__right flex-grow-1 d-flex justify-content-end"> 
+              <div class="taco-toolbar__right flex-grow-1 flex-wrap d-flex justify-content-end gap-2"> 
 
                 <!-- open chat links -->
-                <div class="btn-group">
+                <div v-show="showOpenChat" class="btn-group">
 
-                    <!-- gated access tutorial -->
-                    <button v-show="showOpenChat" class="btn taco-nav-btn taco-nav-btn--green taco-nav-btn--active ms-auto" @click="showAccessTutorial()"><i class="fa-solid fa-lock"></i> Gated Access</button>                              
+                  <!-- gated access tutorial -->
+                  <button class="btn taco-nav-btn taco-nav-btn--green taco-nav-btn--active ms-auto animate__animated animate__delay-1s" 
+                    :class="{ 'animate__swing': openChatSeenLocalValue }"
+                    @click="showAccessTutorial()">
+                    <i class="fa-solid fa-circle-question"></i> Gated Access
+                  </button>                              
 
                 </div>
 
                 <!-- sneed links -->
-                <div class="btn-group">
+                <div v-show="showSneed" class="btn-group">
 
                     <!-- sneed discussions tutorial -->
-                    <button v-show="showSneed" class="btn taco-nav-btn taco-nav-btn--green taco-nav-btn--active ms-auto" @click="showSneedDiscussionsTutorial()"><i class="fa-solid fa-circle-question"></i> Sneed Discussions</button>                                   
+                    <button class="btn taco-nav-btn taco-nav-btn--green taco-nav-btn--active animate__animated animate__delay-1s" 
+                    :class="{ 'animate__swing': sneedSeenLocalValue }"
+                    @click="showSneedDiscussionsTutorial()"
+                    title="How to Participate in Sneed Hub Discussions"
+                    data-bs-toggle="tooltip"
+                    data-bs-placement="top">
+                      <i class="fa-solid fa-circle-question"></i> Sneed Discussions
+                    </button>
 
-                </div>                     
+                </div>
+
+                <!-- refresh sneed iframe -->
+                <button 
+                v-show="showSneed"
+                class="btn taco-nav-btn taco-nav-btn--green taco-nav-btn--active" 
+                @click="refreshSneedIframe()"
+                title="Refresh Sneed Hub"
+                data-bs-toggle="tooltip"
+                data-bs-placement="top">
+                  <i class="fa-solid fa-rotate-right"></i>
+                </button>                
 
               </div>
 
@@ -482,10 +504,16 @@
   // media queries //
   ///////////////////
 
-  // // phone protrait
-  // @media (max-width: 575.98px) {
-
-  // }
+  // phone protrait
+  @media (max-width: 575.98px) {
+    .chat-iframe__container, .sneed-iframe__container {
+      padding: 0.5rem 0.5rem;
+    }
+    .chat-iframe, .sneed-iframe {
+      padding: 0;
+      border-radius: 0.5rem;
+    }
+  }
   
   // // phone landscape
   // @media (min-width: 576px) and (max-width: 767.98px) { 
@@ -520,12 +548,34 @@
   import { ref, onMounted, watch } from "vue"
   import { initialise } from '@open-ic/openchat-xframe'
   import { useRoute, useRouter } from 'vue-router'
+  import { useTacoStore } from "../stores/taco.store"
+  import { storeToRefs } from "pinia"    
   import astronautLoader from '../assets/images/astonautLoader.webp'
   import sneedHubLoginImage from '../assets/images/tutorials/sneed-hub-login.png'
   import sneedHubLoggedInImage from '../assets/images/tutorials/sneed-hub-logged-in.png'
   import sneedHubProposalsImage from '../assets/images/tutorials/sneed-hub-proposals.png'
   import sneedHubSnsSelectorImage from '../assets/images/tutorials/sneed-hub-sns-selector.png'
   import sneedHubProposalLinkImage from '../assets/images/tutorials/sneed-hub-proposal-link.png'
+
+  ///////////
+  // store //
+  ///////////
+
+  // # SETUP #
+  const tacoStore = useTacoStore()
+
+  // # STATE #
+
+  // user
+  const { openChatSeenStoreValue } = storeToRefs(tacoStore)
+  const { setOpenChatSeenStoreValue } = tacoStore  
+  const { sneedSeenStoreValue } = storeToRefs(tacoStore)
+  const { setSneedSeenStoreValue } = tacoStore  
+
+  // # ACTIONS #
+
+  // app
+  const { addToast } = tacoStore
 
   /////////////////////
   // local variables //
@@ -538,6 +588,9 @@
   // open chat iframe
   const iframe = ref<HTMLIFrameElement | null>(null)
   const sneedIframe = ref<HTMLIFrameElement | null>(null)
+
+  // user first time seeing chat page
+  const userFirstTimeSeeingChatPage = ref(true)
 
   // show open chat
   const showOpenChat = ref(true)
@@ -558,6 +611,12 @@
   // sneed discussions tutorial
   const userShownSneedDiscussionsTutorial = ref(false)
 
+  // users first time seeing the open chat page
+  const openChatSeenLocalValue = ref(false)
+
+  // users first time seeing the sneed page
+  const sneedSeenLocalValue = ref(false)
+
   ///////////////////
   // local methods //
   ///////////////////  
@@ -566,7 +625,7 @@
   const initializeOpenChat = async () => {
 
     // log
-    console.log('ChatView.vue: initializeOpenChat')
+    // console.log('ChatView.vue: initializeOpenChat')
 
     if (iframe.value && !openChatInitialized.value) {
       try {
@@ -584,13 +643,14 @@
         console.error('Failed to initialize OpenChat:', error)
       }
     }
+
   }
 
   // initialize sneed
   const initializeSneed = async () => {
 
     // log
-    console.log('ChatView.vue: initializeSneed')
+    // console.log('ChatView.vue: initializeSneed')
 
     if (sneedIframe.value && !sneedInitialized.value) {
       try {
@@ -600,6 +660,7 @@
         console.error('Failed to initialize Sneed:', error)
       }
     }
+    
   }
 
   //////////////
@@ -631,6 +692,13 @@
     // log
     // console.log('VoteView.vue: accepting sneed discussions tutorial locally')
 
+    // hide tooltip
+    const tooltip = document.querySelector('.tooltip')
+    if (tooltip) {
+      tooltip.remove()
+    }
+
+    // show sneed discussions tutorial
     userShownSneedDiscussionsTutorial.value = true
 
   }
@@ -644,6 +712,47 @@
     userShownSneedDiscussionsTutorial.value = false
 
   }
+
+  // refresh sneed iframe
+  const refreshSneedIframe = () => {
+
+    // log
+    // console.log('ChatView.vue: refreshSneedIframe')
+
+    // hide tooltip
+    const tooltip = document.querySelector('.tooltip')
+    if (tooltip) {
+      tooltip.remove()
+    }    
+
+    // refresh sneed iframe by reassigning src
+    if (sneedIframe.value) {
+      const currentSrc = sneedIframe.value.src
+      sneedIframe.value.src = 'about:blank'
+      setTimeout(() => {
+        if (sneedIframe.value) {
+          sneedIframe.value.src = currentSrc
+        }
+      }, 500)
+    }
+
+    // log
+    console.log('ChatView.vue: sneed iframe refreshed')
+
+    // toast
+    addToast({
+      id: Date.now(),
+      code: 'code',
+      tradeAmount: '',
+      tokenSellIdentifier: '',
+      tradeLimit: '',
+      tokenInitIdentifier: '',
+      title: '👨‍🍳 Sneed Hub Refreshed!',
+      icon: '',
+      message: `Sneed Hub has been refreshed`
+    })  
+
+  }
   
   ///////////////
   // watchers //
@@ -653,7 +762,7 @@
   watch(() => route.path, async (newPath) => {
 
     // log
-    console.log('ChatView.vue: watch route')
+    // console.log('ChatView.vue: watch route')
 
     // set showOpenChat and showSneed
     showOpenChat.value = newPath === '/chat/oc'
@@ -661,6 +770,31 @@
 
     // if showOpenChat is true, initialize open chat iframe
     if (showOpenChat.value) {
+
+      // log
+      // console.log('on /chat/oc')
+
+      // if user has not seen the open chat page
+      if (!openChatSeenStoreValue.value) {
+
+        // log
+        // console.log('user has not seen the open chat page')
+
+        // set store values
+        setOpenChatSeenStoreValue()
+
+        // set local value
+        openChatSeenLocalValue.value = true
+
+      } else {
+
+        // log
+        // console.log('user has seen the open chat page before')
+
+        // set local value
+        openChatSeenLocalValue.value = false
+
+      }
 
       // initialize open chat iframe
       await initializeOpenChat()
@@ -670,9 +804,34 @@
     // if showSneed is true, initialize sneed iframe
     if (showSneed.value) {
 
+      // log
+      // console.log('on /chat/sneed')
+
+      // if user has not seen the sneed page
+      if (!sneedSeenStoreValue.value) {
+
+        // log
+        // console.log('user has not seen the sneed page')
+
+        // set store value
+        setSneedSeenStoreValue()
+
+        // set local value
+        sneedSeenLocalValue.value = true
+
+      } else {
+
+        // log
+        // console.log('user has seen the sneed page before')
+
+        // set local value
+        sneedSeenLocalValue.value = false
+
+      }
+
       // initialize sneed iframe
       await initializeSneed()
-      
+
     }
 
   })
@@ -685,7 +844,7 @@
   onMounted(async () => {
 
     // log
-    console.log('ChatView.vue: on mounted')
+    // console.log('ChatView.vue: on mounted')
 
     // set initial state based on route
     showOpenChat.value = route.path === '/chat/oc'
@@ -694,6 +853,31 @@
     // if showOpenChat is true, initialize open chat iframe
     if (showOpenChat.value) {
 
+      // log
+      // console.log('on /chat/oc')
+
+      // if user has not seen the open chat page
+      if (!openChatSeenStoreValue.value) {
+
+        // log
+        // console.log('user has not seen the open chat page')
+
+        // set store values
+        setOpenChatSeenStoreValue()
+
+        // set local value
+        openChatSeenLocalValue.value = true
+
+      } else {
+
+        // log
+        // console.log('user has seen the open chat page before')
+
+        // set local value
+        openChatSeenLocalValue.value = false
+
+      }
+
       // initialize open chat iframe
       await initializeOpenChat()
 
@@ -701,6 +885,31 @@
 
     // if showSneed is true, initialize sneed iframe
     if (showSneed.value) {
+
+      // log
+      // console.log('on /chat/sneed')
+
+      // if user has not seen the sneed page
+      if (!sneedSeenStoreValue.value) {
+
+        // log
+        // console.log('user has not seen the sneed page')
+
+        // set store value
+        setSneedSeenStoreValue()
+
+        // set local value
+        sneedSeenLocalValue.value = true
+
+      } else {
+
+        // log
+        // console.log('user has seen the sneed page before')
+
+        // set local value
+        sneedSeenLocalValue.value = false
+
+      }
 
       // initialize sneed iframe
       await initializeSneed()

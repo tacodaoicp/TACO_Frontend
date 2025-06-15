@@ -74,6 +74,16 @@
     ///////////////////
 
     // custom breakpoint
+    @media (max-width: 490px) {
+
+        // flip orientation of top row
+        .taco-portfolio-value-chip__top {
+            flex-direction: column;
+        }
+
+    }     
+
+    // custom breakpoint
     @media (max-width: 575px) {
 
         // reduce token icon size

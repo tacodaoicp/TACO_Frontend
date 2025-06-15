@@ -241,7 +241,9 @@ export const useTacoStore = defineStore('taco', () => {
 
     })
     const userLedgerAccountId = ref('')
-    const userAcceptedHotkeyTutorial = useStorage('userAcceptedHotkeyTutorial', false)
+    const userAcceptedHotkeyTutorial = useStorage('userAcceptedHotkeyTutorial', false) // used on /vote page
+    const openChatSeenStoreValue = useStorage('openChatSeenStoreValue', false) // used on /chat/oc page
+    const sneedSeenStoreValue = useStorage('sneedSeenStoreValue', false) // used on /chat/sneed page
 
     // crypto prices
     const icpPriceUsd = useStorage('icpPriceUsd', 0)
@@ -457,7 +459,7 @@ export const useTacoStore = defineStore('taco', () => {
             root.style.setProperty("--yellow-to-orange", "#FED66C") // orange
             root.style.setProperty("--yellow-to-dark-orange", "#DA8D28") // dark orange
             root.style.setProperty("--yellow-to-black", "#2D2D2D") // black
-            root.style.setProperty("--brown-to-light-orange", "#934a17") // brown
+            root.style.setProperty("--brown-to-light-orange", "#FEEAC1") // light orange
             root.style.setProperty("--light-green-to-success-green-hover", "#7CDC86") // light green
             root.style.setProperty("--light-green-to-success-green", "#7CDC86") // light green
             root.style.setProperty("--green-to-orange", "#FED66C") // orange
@@ -808,7 +810,14 @@ export const useTacoStore = defineStore('taco', () => {
         userAcceptedHotkeyTutorial.value = true
 
     }
+    const setOpenChatSeenStoreValue = () => {
+        openChatSeenStoreValue.value = true
+    }
+    const setSneedSeenStoreValue = () => {
+        sneedSeenStoreValue.value = true
+    }
 
+    // todo: move this to where it should go
     const daoBackendCanisterId = () => {
 
         // determine canisterId based on network
@@ -822,7 +831,6 @@ export const useTacoStore = defineStore('taco', () => {
         }        
         return 'ywhqf-eyaaa-aaaad-qg6tq-cai'; // local canisterId
     }
-
     const treasuryCanisterId = () => {
 
         switch (process.env.DFX_NETWORK) {
@@ -835,6 +843,7 @@ export const useTacoStore = defineStore('taco', () => {
         }        
         return 'z4is7-giaaa-aaaad-qg6uq-cai'; // local canisterId
     }
+    // /todo
 
     // crypto prices
     const fetchCryptoPrices = async () => {
@@ -2621,6 +2630,8 @@ export const useTacoStore = defineStore('taco', () => {
         backendErrorText,
         toasts,
         userAcceptedHotkeyTutorial,
+        openChatSeenStoreValue,
+        sneedSeenStoreValue,
         timerHealth,
         snapshotStatus,
         systemLogs,
@@ -2669,5 +2680,7 @@ export const useTacoStore = defineStore('taco', () => {
         updateSystemParameter,
         updateSnapshotInterval,
         getTradingStatus,
+        setOpenChatSeenStoreValue,
+        setSneedSeenStoreValue,
     }
 })

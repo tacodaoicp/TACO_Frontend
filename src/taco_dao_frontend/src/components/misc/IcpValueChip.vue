@@ -73,6 +73,20 @@
         }
     }
 
+    ///////////////////
+    // media queries //
+    ///////////////////
+
+    // custom breakpoint
+    @media (max-width: 490px) {
+
+        // flip orientation of top row
+        .taco-icp-value-chip__top {
+            flex-direction: column;
+        }
+
+    }      
+
 </style>
 
 <script setup>
