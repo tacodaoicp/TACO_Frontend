@@ -44,7 +44,7 @@
           </h2>
 
           <!-- coming soon h3  -->
-          <h3 class="cs__h3 spacemono mt-2">v1.0.2</h3>
+          <h3 class="cs__h3 spacemono mt-2">v1.0.3</h3>
 
           <!-- sale link -->
           <span class="d-inline text-center px-3 lh-on-mobile" style="font-size: 1.5rem; font-weight: bold;">
