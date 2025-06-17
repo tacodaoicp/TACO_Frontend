@@ -2602,6 +2602,115 @@ export const useTacoStore = defineStore('taco', () => {
         }
     }
 
+    // Treasury Log Methods
+    const getTreasuryLogs = async (count: number) => {
+        try {
+            const authClient = await getAuthClient();
+            
+            if (!await authClient.isAuthenticated()) {
+                throw new Error('User not authenticated');
+            }
+
+            const identity = await authClient.getIdentity();
+            const agent = await createAgent({
+                identity,
+                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            });
+
+            const treasury = Actor.createActor<TreasuryService>(treasuryIDL, {
+                agent,
+                canisterId: treasuryCanisterId()
+            });
+
+            return await treasury.getLogs(BigInt(count));
+        } catch (error: any) {
+            console.error('Error fetching treasury logs:', error);
+            throw error;
+        }
+    }
+
+    const getTreasuryLogsByContext = async (context: string, count: number) => {
+        try {
+            const authClient = await getAuthClient();
+            
+            if (!await authClient.isAuthenticated()) {
+                throw new Error('User not authenticated');
+            }
+
+            const identity = await authClient.getIdentity();
+            const agent = await createAgent({
+                identity,
+                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            });
+
+            const treasury = Actor.createActor<TreasuryService>(treasuryIDL, {
+                agent,
+                canisterId: treasuryCanisterId()
+            });
+
+            return await treasury.getLogsByContext(context, BigInt(count));
+        } catch (error: any) {
+            console.error('Error fetching treasury logs by context:', error);
+            throw error;
+        }
+    }
+
+    const getTreasuryLogsByLevel = async (level: any, count: number) => {
+        try {
+            const authClient = await getAuthClient();
+            
+            if (!await authClient.isAuthenticated()) {
+                throw new Error('User not authenticated');
+            }
+
+            const identity = await authClient.getIdentity();
+            const agent = await createAgent({
+                identity,
+                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            });
+
+            const treasury = Actor.createActor<TreasuryService>(treasuryIDL, {
+                agent,
+                canisterId: treasuryCanisterId()
+            });
+
+            return await treasury.getLogsByLevel(level, BigInt(count));
+        } catch (error: any) {
+            console.error('Error fetching treasury logs by level:', error);
+            throw error;
+        }
+    }
+
+    const clearTreasuryLogs = async () => {
+        try {
+            const authClient = await getAuthClient();
+            
+            if (!await authClient.isAuthenticated()) {
+                throw new Error('User not authenticated');
+            }
+
+            const identity = await authClient.getIdentity();
+            const agent = await createAgent({
+                identity,
+                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            });
+
+            const treasury = Actor.createActor<TreasuryService>(treasuryIDL, {
+                agent,
+                canisterId: treasuryCanisterId()
+            });
+
+            return await treasury.clearLogs();
+        } catch (error: any) {
+            console.error('Error clearing treasury logs:', error);
+            throw error;
+        }
+    }
+
     // # RETURN #
     return {
         // state
@@ -2682,5 +2791,9 @@ export const useTacoStore = defineStore('taco', () => {
         getTradingStatus,
         setOpenChatSeenStoreValue,
         setSneedSeenStoreValue,
+        getTreasuryLogs,
+        getTreasuryLogsByContext,
+        getTreasuryLogsByLevel,
+        clearTreasuryLogs,
     }
 })

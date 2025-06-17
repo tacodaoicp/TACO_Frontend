@@ -11,6 +11,7 @@ import SalesView from "./views/SalesView.vue"
 import SaleDKPSwap from "./components/sales/SaleDKPSwap.vue"
 import InfoView from "./views/InfoView.vue"
 import AdminView from "./views/AdminView.vue"
+import AdminTradeView from "./views/AdminTradeView.vue"
 import ChatView from "./views/ChatView.vue"
 import ReportsView from "./views/ReportsView.vue"
 import VueApexCharts from 'vue3-apexcharts'
@@ -32,6 +33,7 @@ const routes = [
     { path: "/reports/ddckbtc", component: ReportsView },
     { path: "/reports/ddsneed", component: ReportsView },
     { path: "/admin", name: "Admin", component: AdminView },
+    { path: "/admin/trade", name: "AdminTrade", component: AdminTradeView },
     { path: "/:pathMatch(.*)*", redirect: "/" },
 ]
 
