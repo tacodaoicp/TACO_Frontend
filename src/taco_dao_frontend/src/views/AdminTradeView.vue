@@ -268,7 +268,7 @@ export default {
           context: log.context,
           message: log.message,
           component: log.component
-        })).sort((a, b) => b.timestamp - a.timestamp); // Sort newest first
+        })); // Keep backend order - no sorting needed
         
         this.lastRefresh = Date.now();
         
