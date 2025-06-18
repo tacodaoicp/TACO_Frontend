@@ -3,9 +3,9 @@
     <div class="taco-icp-value-chip">
 
         <!-- top -->
-        <span class="taco-icp-value-chip__top">
+        <span class="taco-icp-value-chip__inner">
 
-            <!-- icp logo -->
+            <!-- icp token -->
             <img :src="icpLogo" 
                  alt="ICP" 
                  class="taco-icp-value-chip__icp-logo"
@@ -35,8 +35,8 @@
         flex-direction: column;
         align-items: end;
         
-        // top
-        &__top {
+        // inner
+        &__inner {
             display: inline-flex;
             align-items: center;
             gap: 0.25rem;
@@ -49,7 +49,7 @@
                 border-radius: 999rem;
             }
 
-            // icp price
+            // price
             span {
                 white-space: nowrap;
                 line-height: 1;
@@ -58,18 +58,6 @@
                 font-weight: bold;
             }
 
-        }
-
-        // bottom
-        &__bottom {
-            display: inline-flex;
-
-            // usd price
-            span {
-                line-height: 1;
-                font-size: 0.75rem;
-                font-family: 'rubik';
-            }
         }
     }
 

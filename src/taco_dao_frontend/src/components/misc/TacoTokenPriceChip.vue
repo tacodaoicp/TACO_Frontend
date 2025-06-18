@@ -5,14 +5,14 @@
         <!-- top -->
         <span class="taco-token-price-chip__top">
 
-            <!-- token token icon -->
+            <!-- taco token icon -->
             <TacoCoinIcon 
                 title="TACO token"
                 data-bs-toggle="tooltip"
                 data-bs-placement="left"
                 data-bs-custom-class="taco-tooltip"/>
 
-            <!-- price in icp -->
+            <!-- price in usd -->
             <span class="taco-text-black-to-white"
                   title="Value of TACO token in USD"
                   data-bs-toggle="tooltip"
@@ -46,7 +46,7 @@
                 border: 1px solid var(--dark-orange-to-transparent);
             }
 
-            // icp price
+            // price
             span {
                 white-space: nowrap;
                 line-height: 1;
