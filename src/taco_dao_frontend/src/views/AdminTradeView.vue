@@ -488,7 +488,7 @@ export default {
         }
         
         // Check if this is a trade sizing group
-        if (log.context === 'do_executeTradingStep' && log.component === 'TRADE_SIZING' && log.message.includes('Using EXACT targeting')) {
+        if (log.context === 'do_executeTradingStep' && log.component === 'TRADE_SIZING' && log.message.startsWith('Using ')) {
           console.log('Found trade sizing, processing group...');
           const tradeSizingEntry = this.processTradeSizingGroup(i);
           if (tradeSizingEntry) {
@@ -949,7 +949,7 @@ export default {
       const firstLog = logs[currentIndex];
       
       // Parse the first log to get targeting strategy details
-      const strategyMatch = firstLog.message.match(/Using (\w+) targeting - Sell_diff=(\d+bp) Buy_diff=(\d+bp) Portfolio_value=([0-9.]+ICP) Max_trade_threshold=(\d+bp) Reason=(.+)/);
+      const strategyMatch = firstLog.message.match(/Using (\w+) (?:targeting|sizing) - Sell_diff=(\d+bp) Buy_diff=(\d+bp) Portfolio_value=([0-9.]+ICP) Max_trade_threshold=(\d+bp) Reason=(.+)/);
       if (!strategyMatch) {
         console.log('Could not parse trade sizing strategy log');
         return null;
