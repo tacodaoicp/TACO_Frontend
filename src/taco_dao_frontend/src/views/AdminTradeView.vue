@@ -257,6 +257,39 @@
                         </div>
                       </div>
                       
+                      <!-- Pair Selection Summary -->
+                      <div v-else-if="entry.type === 'pairSelection'" class="pair-selection-summary">
+                        <div class="log-header">
+                          <div class="log-timestamp">{{ formatLogTime(entry.timestamp) }}</div>
+                          <div class="log-level level-info">INFO</div>
+                          <div class="log-context">PAIR_SELECTION</div>
+                          <div class="log-component">{{ entry.component }}</div>
+                        </div>
+                        <div class="pair-selection-container mt-2">
+                          <div class="pair-selection-header">
+                            {{ entry.summaryMessage }}
+                          </div>
+                          <div class="pair-selection-result">
+                            <div class="pair-flow">
+                              <div class="token-box sell-token">
+                                <div class="token-label">SELL</div>
+                                <div class="token-symbol">{{ entry.sellToken }}</div>
+                                <div class="token-weight">Weight: {{ entry.sellWeight }}</div>
+                              </div>
+                              <div class="arrow">→</div>
+                              <div class="token-box buy-token">
+                                <div class="token-label">BUY</div>
+                                <div class="token-symbol">{{ entry.buyToken }}</div>
+                                <div class="token-weight">Weight: {{ entry.buyWeight }}</div>
+                              </div>
+                            </div>
+                            <div class="pair-stats mt-2">
+                              {{ entry.candidateStats }}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                      
                       <!-- Regular Log Entry -->
                       <div v-else>
                         <div class="log-header">
@@ -384,6 +417,20 @@ export default {
             continue;
           } else {
             console.log('Failed to process allocation analysis group');
+          }
+        }
+        
+        // Check if this is a pair selection group
+        if (log.context === 'selectTradingPair' && log.component === 'PAIR_SELECTION' && log.message.includes('Starting pair selection')) {
+          console.log('Found pair selection, processing group...');
+          const pairEntry = this.processPairSelectionGroup(i);
+          if (pairEntry) {
+            console.log('Successfully processed pair selection group:', pairEntry);
+            processed.push(pairEntry.entry);
+            i = pairEntry.nextIndex;
+            continue;
+          } else {
+            console.log('Failed to process pair selection group');
           }
         }
         
@@ -743,6 +790,88 @@ export default {
         },
         nextIndex: i
       };
+    },
+    
+    processPairSelectionGroup(startIndex) {
+      const logs = this.logs;
+      console.log('Processing pair selection group starting at index:', startIndex);
+      
+      let currentIndex = startIndex;
+      const firstLog = logs[currentIndex];
+      
+      // Parse the first log to get total candidates and min required
+      const startMatch = firstLog.message.match(/Total_candidates=(\d+) Min_required=(\d+)/);
+      if (!startMatch) {
+        console.log('Could not parse starting pair selection log');
+        return null;
+      }
+      
+      const totalCandidates = startMatch[1];
+      const minRequired = startMatch[2];
+      
+      // Look for candidates ready log
+      currentIndex++;
+      if (currentIndex >= logs.length) return null;
+      
+      const candidatesLog = logs[currentIndex];
+      if (!candidatesLog.message.includes('Candidates ready for weighted selection')) {
+        console.log('Expected candidates ready log not found');
+        return null;
+      }
+      
+      // Parse sell and buy candidates
+      const candidatesMatch = candidatesLog.message.match(/Sell_candidates=(\d+) Buy_candidates=(\d+)/);
+      if (!candidatesMatch) {
+        console.log('Could not parse candidates log');
+        return null;
+      }
+      
+      const sellCandidates = candidatesMatch[1];
+      const buyCandidates = candidatesMatch[2];
+      
+      // Look for pair selected log
+      currentIndex++;
+      if (currentIndex >= logs.length) return null;
+      
+      const selectedLog = logs[currentIndex];
+      if (!selectedLog.message.includes('Pair selected successfully')) {
+        console.log('Expected pair selected log not found');
+        return null;
+      }
+      
+      // Parse the selected pair details
+      const pairMatch = selectedLog.message.match(/Sell=([^(]+) \([^)]+\) Buy=([^(]+) \([^)]+\) Sell_random=(\d+)\/(\d+) Buy_random=(\d+)\/(\d+)/);
+      if (!pairMatch) {
+        console.log('Could not parse pair selected log');
+        return null;
+      }
+      
+      const sellToken = pairMatch[1].trim();
+      const buyToken = pairMatch[2].trim();
+      const sellRandom = pairMatch[3];
+      const sellTotal = pairMatch[4];
+      const buyRandom = pairMatch[5];
+      const buyTotal = pairMatch[6];
+      
+      // Create the compressed entry
+      const compressedEntry = {
+        type: 'pairSelection',
+        timestamp: firstLog.timestamp,
+        component: 'selectTradingPair',
+        summaryMessage: `Pair selection completed - ${totalCandidates} candidates evaluated (min required: ${minRequired})`,
+        sellToken: sellToken,
+        buyToken: buyToken,
+        sellWeight: `${sellRandom}/${sellTotal}`,
+        buyWeight: `${buyRandom}/${buyTotal}`,
+        candidateStats: `Sell candidates: ${sellCandidates}, Buy candidates: ${buyCandidates}`
+      };
+      
+      console.log('Created pair selection entry:', compressedEntry);
+      
+      return {
+        entry: compressedEntry,
+        nextIndex: currentIndex + 1
+      };
     }
   }
 }
@@ -1015,5 +1144,88 @@ export default {
   font-size: 0.75rem;
   color: #ffc107;
   border: 1px solid #ffc107;
+}
+
+/* Pair Selection Styles */
+.pair-selection-summary {
+  background: rgba(255, 107, 53, 0.1);
+  border-left: 4px solid #ff6b35;
+}
+
+.pair-selection-container {
+  background: rgba(0, 0, 0, 0.1);
+  border-radius: 6px;
+  padding: 12px;
+  margin-top: 8px;
+}
+
+.pair-selection-header {
+  font-weight: 600;
+  color: #e9ecef;
+  margin-bottom: 12px;
+  font-size: 0.875rem;
+}
+
+.pair-flow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  margin: 16px 0;
+}
+
+.token-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 12px 16px;
+  border-radius: 8px;
+  min-width: 120px;
+}
+
+.sell-token {
+  background: rgba(244, 67, 54, 0.1);
+  border: 2px solid #f44336;
+}
+
+.buy-token {
+  background: rgba(76, 175, 80, 0.1);
+  border: 2px solid #4caf50;
+}
+
+.token-label {
+  font-size: 0.7em;
+  font-weight: 600;
+  color: #adb5bd;
+  margin-bottom: 4px;
+}
+
+.token-symbol {
+  font-size: 1.0em;
+  font-weight: 700;
+  color: #e9ecef;
+  margin-bottom: 4px;
+}
+
+.token-weight {
+  font-size: 0.75em;
+  color: #adb5bd;
+}
+
+.arrow {
+  font-size: 1.5em;
+  font-weight: bold;
+  color: #ff6b35;
+}
+
+.pair-stats {
+  color: #adb5bd;
+  font-size: 0.75rem;
+  text-align: center;
+  font-style: italic;
+  background: rgba(255, 107, 53, 0.1);
+  padding: 6px;
+  border-radius: 4px;
+  border: 1px solid #ff6b35;
 }
 </style> 
