@@ -290,6 +290,59 @@
                         </div>
                       </div>
                       
+                      <!-- Trade Sizing Summary -->
+                      <div v-else-if="entry.type === 'tradeSizing'" class="trade-sizing-summary">
+                        <div class="log-header">
+                          <div class="log-timestamp">{{ formatLogTime(entry.timestamp) }}</div>
+                          <div class="log-level level-info">INFO</div>
+                          <div class="log-context">TRADE_SIZING</div>
+                          <div class="log-component">{{ entry.component }}</div>
+                        </div>
+                        <div class="trade-sizing-container mt-2">
+                          <div class="trade-sizing-header">
+                            {{ entry.summaryMessage }}
+                          </div>
+                          <div class="trade-sizing-details">
+                            <div class="sizing-strategy">
+                              <div class="strategy-box">
+                                <div class="strategy-label">TARGETING STRATEGY</div>
+                                <div class="strategy-value">{{ entry.strategy }}</div>
+                                <div class="strategy-reason">{{ entry.reason }}</div>
+                              </div>
+                              <div class="sizing-metrics">
+                                <div class="metric-row">
+                                  <span class="metric-label">Sell Diff:</span>
+                                  <span class="metric-value">{{ entry.sellDiff }}</span>
+                                </div>
+                                <div class="metric-row">
+                                  <span class="metric-label">Buy Diff:</span>
+                                  <span class="metric-value">{{ entry.buyDiff }}</span>
+                                </div>
+                                <div class="metric-row">
+                                  <span class="metric-label">Portfolio:</span>
+                                  <span class="metric-value">{{ entry.portfolioValue }}</span>
+                                </div>
+                                <div class="metric-row">
+                                  <span class="metric-label">Max Threshold:</span>
+                                  <span class="metric-value">{{ entry.maxThreshold }}</span>
+                                </div>
+                              </div>
+                            </div>
+                            <div class="trade-amount">
+                              <div class="amount-box">
+                                <div class="amount-label">CALCULATED TRADE SIZE</div>
+                                <div class="amount-value">{{ entry.icpValue }}</div>
+                                <div class="amount-raw">{{ entry.rawAmount }} (raw)</div>
+                                <div class="amount-limits">
+                                  <span class="limit-min">Min: {{ entry.minAllowed }}</span>
+                                  <span class="limit-max">Max: {{ entry.maxAllowed }}</span>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                      
                       <!-- Regular Log Entry -->
                       <div v-else>
                         <div class="log-header">
@@ -431,6 +484,20 @@ export default {
             continue;
           } else {
             console.log('Failed to process pair selection group');
+          }
+        }
+        
+        // Check if this is a trade sizing group
+        if (log.context === 'do_executeTradingStep' && log.component === 'TRADE_SIZING' && log.message.includes('Using EXACT targeting')) {
+          console.log('Found trade sizing, processing group...');
+          const tradeSizingEntry = this.processTradeSizingGroup(i);
+          if (tradeSizingEntry) {
+            console.log('Successfully processed trade sizing group:', tradeSizingEntry);
+            processed.push(tradeSizingEntry.entry);
+            i = tradeSizingEntry.nextIndex;
+            continue;
+          } else {
+            console.log('Failed to process trade sizing group');
           }
         }
         
@@ -872,6 +939,75 @@ export default {
         entry: compressedEntry,
         nextIndex: currentIndex + 1
       };
+    },
+    
+    processTradeSizingGroup(startIndex) {
+      const logs = this.logs;
+      console.log('Processing trade sizing group starting at index:', startIndex);
+      
+      let currentIndex = startIndex;
+      const firstLog = logs[currentIndex];
+      
+      // Parse the first log to get targeting strategy details
+      const strategyMatch = firstLog.message.match(/Using (\w+) targeting - Sell_diff=(\d+bp) Buy_diff=(\d+bp) Portfolio_value=([0-9.]+ICP) Max_trade_threshold=(\d+bp) Reason=(.+)/);
+      if (!strategyMatch) {
+        console.log('Could not parse trade sizing strategy log');
+        return null;
+      }
+      
+      const strategy = strategyMatch[1];
+      const sellDiff = strategyMatch[2];
+      const buyDiff = strategyMatch[3];
+      const portfolioValue = strategyMatch[4];
+      const maxThreshold = strategyMatch[5];
+      const reason = strategyMatch[6].replace(/_/g, ' ');
+      
+      // Look for trade size calculation log
+      currentIndex++;
+      if (currentIndex >= logs.length) return null;
+      
+      const sizeLog = logs[currentIndex];
+      if (!sizeLog.message.includes('Trade size calculated')) {
+        console.log('Expected trade size calculation log not found');
+        return null;
+      }
+      
+      // Parse the trade size details
+      const sizeMatch = sizeLog.message.match(/Trade size calculated - Amount=(\d+) \(raw\) ICP_value=([0-9.]+ICP) Min_allowed=([0-9.]+ICP) Max_allowed=([0-9.]+ICP)/);
+      if (!sizeMatch) {
+        console.log('Could not parse trade size calculation log');
+        return null;
+      }
+      
+      const rawAmount = sizeMatch[1];
+      const icpValue = sizeMatch[2];
+      const minAllowed = sizeMatch[3];
+      const maxAllowed = sizeMatch[4];
+      
+      // Create the compressed entry
+      const compressedEntry = {
+        type: 'tradeSizing',
+        timestamp: firstLog.timestamp,
+        component: 'do_executeTradingStep',
+        summaryMessage: `Trade sizing completed using ${strategy} targeting strategy`,
+        strategy: strategy,
+        reason: reason,
+        sellDiff: sellDiff,
+        buyDiff: buyDiff,
+        portfolioValue: portfolioValue,
+        maxThreshold: maxThreshold,
+        rawAmount: rawAmount,
+        icpValue: icpValue,
+        minAllowed: minAllowed,
+        maxAllowed: maxAllowed
+      };
+      
+      console.log('Created trade sizing entry:', compressedEntry);
+      
+      return {
+        entry: compressedEntry,
+        nextIndex: currentIndex + 1
+      };
     }
   }
 }
@@ -1227,5 +1363,132 @@ export default {
   padding: 6px;
   border-radius: 4px;
   border: 1px solid #ff6b35;
+}
+
+/* Trade Sizing Styles */
+.trade-sizing-summary {
+  background: rgba(138, 43, 226, 0.1);
+  border-left: 4px solid #8a2be2;
+}
+
+.trade-sizing-container {
+  background: rgba(0, 0, 0, 0.1);
+  border-radius: 6px;
+  padding: 12px;
+  margin-top: 8px;
+}
+
+.trade-sizing-header {
+  font-weight: 600;
+  color: #e9ecef;
+  margin-bottom: 12px;
+  font-size: 0.875rem;
+}
+
+.trade-sizing-details {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+}
+
+.sizing-strategy {
+  flex: 1;
+}
+
+.strategy-box {
+  background: rgba(138, 43, 226, 0.1);
+  border: 1px solid #8a2be2;
+  border-radius: 6px;
+  padding: 10px;
+  margin-bottom: 12px;
+}
+
+.strategy-label {
+  font-size: 0.7em;
+  font-weight: 600;
+  color: #adb5bd;
+  margin-bottom: 4px;
+}
+
+.strategy-value {
+  font-size: 1.0em;
+  font-weight: 700;
+  color: #8a2be2;
+  margin-bottom: 4px;
+}
+
+.strategy-reason {
+  font-size: 0.75em;
+  color: #adb5bd;
+  font-style: italic;
+}
+
+.sizing-metrics {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.metric-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.75rem;
+}
+
+.metric-label {
+  color: #adb5bd;
+  min-width: 80px;
+}
+
+.metric-value {
+  color: #e9ecef;
+  font-family: 'Courier New', monospace;
+  font-weight: bold;
+}
+
+.trade-amount {
+  flex: 1;
+}
+
+.amount-box {
+  background: rgba(40, 167, 69, 0.1);
+  border: 1px solid #28a745;
+  border-radius: 6px;
+  padding: 12px;
+  text-align: center;
+}
+
+.amount-label {
+  font-size: 0.7em;
+  font-weight: 600;
+  color: #adb5bd;
+  margin-bottom: 6px;
+}
+
+.amount-value {
+  font-size: 1.2em;
+  font-weight: 700;
+  color: #28a745;
+  margin-bottom: 4px;
+}
+
+.amount-raw {
+  font-size: 0.75em;
+  color: #adb5bd;
+  font-family: 'Courier New', monospace;
+  margin-bottom: 8px;
+}
+
+.amount-limits {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.7em;
+  color: #adb5bd;
+}
+
+.limit-min,
+.limit-max {
+  font-family: 'Courier New', monospace;
 }
 </style> 
