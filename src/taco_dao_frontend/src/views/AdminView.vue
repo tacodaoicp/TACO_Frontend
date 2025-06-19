@@ -113,7 +113,7 @@
                       <div>Total Trades: {{ timerHealth.treasury.tradingMetrics.totalTradesExecuted.toString() }}</div>
                       <div>Failed Trades: {{ timerHealth.treasury.tradingMetrics.totalTradesFailed.toString() }}</div>
                       <div>Success Rate: {{ (timerHealth.treasury.tradingMetrics.successRate * 100).toFixed(1) }}%</div>
-                      <div>Avg Slippage: {{ (timerHealth.treasury.tradingMetrics.avgSlippage * 100).toFixed(2) }}%</div>
+                      <div>Avg Slippage: {{ timerHealth.treasury.tradingMetrics.avgSlippage.toFixed(2) }}%</div>
                     </div>
                   </div>
                   <!-- Token Sync Status -->
