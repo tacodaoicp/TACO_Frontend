@@ -169,7 +169,7 @@
                       v-for="(entry, index) in processedLogs" 
                       :key="index"
                       class="log-entry"
-                      :class="entry.type === 'portfolio' ? 'log-portfolio' : getLogLevelClass(entry.level)"
+                      :class="entry.type === 'portfolio' ? 'log-portfolio' : entry.type === 'allocation' ? 'log-allocation' : getLogLevelClass(entry.level)"
                     >
                       <!-- Portfolio State Table -->
                       <div v-if="entry.type === 'portfolio'" class="portfolio-summary">
@@ -214,6 +214,46 @@
                               </tr>
                             </tbody>
                           </table>
+                        </div>
+                      </div>
+                      
+                      <!-- Allocation Analysis Table -->
+                      <div v-else-if="entry.type === 'allocation'" class="allocation-summary">
+                        <div class="log-header">
+                          <div class="log-timestamp">{{ formatLogTime(entry.timestamp) }}</div>
+                          <div class="log-level level-info">INFO</div>
+                          <div class="log-context">ALLOCATION_ANALYSIS</div>
+                          <div class="log-component">{{ entry.component }}</div>
+                        </div>
+                        <div class="allocation-table-container mt-2">
+                          <div class="allocation-summary-header">
+                            {{ entry.summaryMessage }}
+                          </div>
+                          <table class="allocation-table">
+                            <thead>
+                              <tr>
+                                <th>Token</th>
+                                <th>Current %</th>
+                                <th>Target %</th>
+                                <th>Difference</th>
+                                <th>Status</th>
+                                <th>Value (ICP)</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              <tr v-for="token in entry.tokens" :key="token.symbol" class="allocation-row" :class="token.statusClass">
+                                <td class="token-symbol">{{ token.symbol }}</td>
+                                <td class="allocation-percent">{{ token.currentPercent }}%</td>
+                                <td class="allocation-percent">{{ token.targetPercent }}%</td>
+                                <td class="allocation-diff" :class="token.diffClass">{{ token.difference }}</td>
+                                <td class="allocation-status">{{ token.status }}</td>
+                                <td class="token-value">{{ token.value }}</td>
+                              </tr>
+                            </tbody>
+                          </table>
+                          <div class="allocation-summary-stats mt-2">
+                            {{ entry.summaryStats }}
+                          </div>
                         </div>
                       </div>
                       
@@ -330,6 +370,20 @@ export default {
             continue;
           } else {
             console.log('Failed to process portfolio group');
+          }
+        }
+        
+        // Check if this is an allocation analysis group
+        if (log.context === 'calculateTradeRequirements' && log.component === 'ALLOCATION_ANALYSIS' && log.message.includes('Starting allocation analysis')) {
+          console.log('Found allocation analysis, processing group...');
+          const allocationEntry = this.processAllocationAnalysisGroup(i);
+          if (allocationEntry) {
+            console.log('Successfully processed allocation analysis group:', allocationEntry);
+            processed.push(allocationEntry.entry);
+            i = allocationEntry.nextIndex;
+            continue;
+          } else {
+            console.log('Failed to process allocation analysis group');
           }
         }
         
@@ -586,6 +640,109 @@ export default {
         },
         nextIndex: i
       };
+    },
+    
+    processAllocationAnalysisGroup(startIndex) {
+      const logs = this.filteredLogs;
+      const startLog = logs[startIndex];
+      
+      console.log('Processing allocation analysis group starting at:', startIndex, startLog);
+      
+      if (!startLog || !startLog.message.includes('Starting allocation analysis')) {
+        console.log('Not an allocation analysis start log');
+        return null;
+      }
+      
+      // Extract summary info from the first log
+      const summaryMessage = startLog.message;
+      console.log('Allocation summary message:', summaryMessage);
+      
+      // Parse tokens and analysis from subsequent logs
+      const tokens = [];
+      let summaryStats = '';
+      let i = startIndex + 1;
+      
+      console.log('Looking for allocation logs starting at index:', i);
+      
+      // Process all allocation analysis logs in this group
+      while (i < logs.length && 
+             logs[i].context === 'calculateTradeRequirements' && 
+             logs[i].component === 'ALLOCATION_ANALYSIS') {
+        
+        const log = logs[i];
+        const message = log.message;
+        
+        console.log('Processing allocation log:', message);
+        
+        // Parse target allocation logs
+        if (message.includes('Target allocation -')) {
+          const targetMatch = message.match(/Target allocation - (\w+) \([^)]+\): (\d+)bp \(([0-9.]+)%\)/);
+          if (targetMatch) {
+            const symbol = targetMatch[1];
+            const basisPoints = targetMatch[2];
+            const percentage = targetMatch[3];
+            
+            // Find or create token entry
+            let token = tokens.find(t => t.symbol === symbol);
+            if (!token) {
+              token = { symbol: symbol };
+              tokens.push(token);
+            }
+            token.targetPercent = percentage;
+            token.targetBasisPoints = basisPoints;
+          }
+        }
+        
+        // Parse token analysis logs (current vs target)
+        else if (message.includes('Token analysis -')) {
+          const analysisMatch = message.match(/Token analysis - (\w+): Current=(\d+)bp Target=(\d+)bp Diff=(\w+) ([+-]\d+)bp Value=([0-9.]+)ICP/);
+          if (analysisMatch) {
+            const symbol = analysisMatch[1];
+            const currentBp = analysisMatch[2];
+            const targetBp = analysisMatch[3];
+            const status = analysisMatch[4];
+            const diffBp = analysisMatch[5];
+            const value = analysisMatch[6];
+            
+            // Find or create token entry
+            let token = tokens.find(t => t.symbol === symbol);
+            if (!token) {
+              token = { symbol: symbol };
+              tokens.push(token);
+            }
+            
+            token.currentPercent = (parseInt(currentBp) / 100).toFixed(1);
+            token.targetPercent = (parseInt(targetBp) / 100).toFixed(1);
+            token.difference = diffBp + 'bp';
+            token.status = status;
+            token.value = value + ' ICP';
+            token.statusClass = status === 'OVERWEIGHT' ? 'overweight' : 'underweight';
+            token.diffClass = diffBp.startsWith('+') ? 'positive-diff' : 'negative-diff';
+          }
+        }
+        
+        // Parse allocation summary
+        else if (message.includes('Allocation summary -')) {
+          summaryStats = message.replace('Allocation summary - ', '');
+        }
+        
+        i++;
+      }
+      
+      console.log('Found', tokens.length, 'tokens in allocation analysis');
+      console.log('Summary stats:', summaryStats);
+      
+      return {
+        entry: {
+          type: 'allocation',
+          timestamp: startLog.timestamp,
+          component: startLog.context,
+          summaryMessage: summaryMessage,
+          tokens: tokens,
+          summaryStats: summaryStats
+        },
+        nextIndex: i
+      };
     }
   }
 }
@@ -772,5 +929,91 @@ export default {
 .totals-row td {
   font-weight: bold;
   color: #28a745 !important;
+}
+
+/* Allocation Analysis Styles */
+.log-allocation {
+  background: rgba(255, 193, 7, 0.1);
+  border-left: 4px solid #ffc107;
+}
+
+.allocation-summary-header {
+  color: #e9ecef;
+  font-size: 0.875rem;
+  margin-bottom: 8px;
+  padding: 4px 0;
+  border-bottom: 1px solid #495057;
+}
+
+.allocation-table-container {
+  overflow-x: auto;
+}
+
+.allocation-table {
+  width: 100%;
+  font-size: 0.75rem;
+  border-collapse: collapse;
+  margin-top: 4px;
+}
+
+.allocation-table th {
+  background: #495057;
+  color: #fff;
+  padding: 6px 8px;
+  text-align: left;
+  font-weight: bold;
+  border: 1px solid #6c757d;
+}
+
+.allocation-table td {
+  padding: 4px 8px;
+  border: 1px solid #495057;
+  color: #e9ecef;
+}
+
+.allocation-row:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.allocation-row.overweight {
+  background: rgba(220, 53, 69, 0.1);
+}
+
+.allocation-row.underweight {
+  background: rgba(13, 202, 240, 0.1);
+}
+
+.allocation-percent,
+.token-value {
+  font-family: 'Courier New', monospace;
+  text-align: right;
+}
+
+.allocation-diff {
+  font-family: 'Courier New', monospace;
+  text-align: right;
+  font-weight: bold;
+}
+
+.allocation-diff.positive-diff {
+  color: #0dcaf0 !important;
+}
+
+.allocation-diff.negative-diff {
+  color: #dc3545 !important;
+}
+
+.allocation-status {
+  font-weight: bold;
+  text-align: center;
+}
+
+.allocation-summary-stats {
+  background: rgba(255, 193, 7, 0.1);
+  padding: 8px;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  color: #ffc107;
+  border: 1px solid #ffc107;
 }
 </style> 
