@@ -359,6 +359,62 @@
                         </div>
                       </div>
                       
+                      <!-- Exchange Comparison Summary -->
+                      <div v-else-if="entry.type === 'exchangeComparison'" class="exchange-comparison-summary">
+                        <div class="log-header">
+                          <div class="log-timestamp">{{ formatLogTime(entry.timestamp) }}</div>
+                          <div class="log-level level-info">INFO</div>
+                          <div class="log-context">EXCHANGE_COMPARISON</div>
+                          <div class="log-component">{{ entry.component }}</div>
+                        </div>
+                        <div class="exchange-comparison-container mt-2">
+                          <div class="exchange-comparison-header">
+                            {{ entry.summaryMessage }}
+                          </div>
+                          <div class="comparison-details">
+                            <div class="trade-info">
+                              <div class="trade-pair">{{ entry.pair }}</div>
+                              <div class="trade-amount">{{ entry.amountFormatted }}</div>
+                              <div class="trade-slippage">Max Slippage: {{ entry.maxSlippage }}</div>
+                            </div>
+                            <div class="exchanges-comparison">
+                              <div v-for="exchange in entry.exchanges" :key="exchange.name" 
+                                   class="exchange-card" :class="{ 'selected': exchange.selected, 'not-selected': exchange.notSelected }">
+                                <div class="exchange-header">
+                                  <div class="exchange-name">{{ exchange.name }}</div>
+                                  <div class="exchange-status" :class="exchange.statusClass">{{ exchange.status }}</div>
+                                </div>
+                                <div class="exchange-details">
+                                  <div class="exchange-metric">
+                                    <span class="metric-label">Amount Out:</span>
+                                    <span class="metric-value">{{ exchange.amountOut }}</span>
+                                  </div>
+                                  <div class="exchange-metric">
+                                    <span class="metric-label">Slippage:</span>
+                                    <span class="metric-value">{{ exchange.slippage }}</span>
+                                  </div>
+                                  <div v-if="exchange.price" class="exchange-metric">
+                                    <span class="metric-label">Price:</span>
+                                    <span class="metric-value">{{ exchange.price }}</span>
+                                  </div>
+                                  <div v-if="exchange.poolInfo" class="exchange-pool-info">
+                                    {{ exchange.poolInfo }}
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                            <div class="final-selection">
+                              <div class="selection-winner">
+                                🏆 Winner: {{ entry.selectedExchange }}
+                              </div>
+                              <div class="selection-details">
+                                Best Amount: {{ entry.bestAmount }} | Best Slippage: {{ entry.bestSlippage }}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                      
                       <!-- Regular Log Entry -->
                       <div v-else>
                         <div class="log-header">
@@ -514,6 +570,20 @@ export default {
             continue;
           } else {
             console.log('Failed to process trade sizing group');
+          }
+        }
+        
+        // Check if this is an exchange comparison group
+        if (log.context === 'findBestExecution' && log.component === 'EXCHANGE_COMPARISON' && log.message.includes('Starting exchange comparison')) {
+          console.log('Found exchange comparison, processing group...');
+          const exchangeEntry = this.processExchangeComparisonGroup(i);
+          if (exchangeEntry) {
+            console.log('Successfully processed exchange comparison group:', exchangeEntry);
+            processed.push(exchangeEntry.entry);
+            i = exchangeEntry.nextIndex;
+            continue;
+          } else {
+            console.log('Failed to process exchange comparison group');
           }
         }
         
@@ -1060,6 +1130,150 @@ export default {
         entry: compressedEntry,
         nextIndex: currentIndex + 1
       };
+    },
+    
+    processExchangeComparisonGroup(startIndex) {
+      const logs = this.logs;
+      console.log('Processing exchange comparison group starting at index:', startIndex);
+      
+      let currentIndex = startIndex;
+      const firstLog = logs[currentIndex];
+      
+      // Parse the first log to get trade details
+      const startMatch = firstLog.message.match(/Starting exchange comparison - Pair=([^\\s]+) Amount_in=(\d+) \(raw\) Amount_formatted=([0-9.]+) Max_slippage=(\d+bp)/);
+      if (!startMatch) {
+        console.log('Could not parse exchange comparison start log');
+        return null;
+      }
+      
+      const pair = startMatch[1];
+      const amountIn = startMatch[2];
+      const amountFormatted = startMatch[3];
+      const maxSlippage = startMatch[4];
+      
+      const exchanges = [];
+      let selectedExchange = '';
+      let bestAmount = '';
+      let bestSlippage = '';
+      
+      // Process all exchange comparison logs in this group
+      currentIndex++;
+      while (currentIndex < logs.length && 
+             logs[currentIndex].context === 'findBestExecution' && 
+             logs[currentIndex].component === 'EXCHANGE_COMPARISON') {
+        
+        const log = logs[currentIndex];
+        const message = log.message;
+        
+        console.log('Processing exchange comparison log:', message);
+        
+        // KongSwap quote received
+        if (message.includes('KongSwap quote received')) {
+          const kongMatch = message.match(/KongSwap quote received - Amount_out=(\d+) Slippage=([0-9.]+%) Price=([0-9.]+) Status=(\w+)/);
+          if (kongMatch) {
+            exchanges.push({
+              name: 'KongSwap',
+              amountOut: kongMatch[1],
+              slippage: kongMatch[2],
+              price: kongMatch[3],
+              status: kongMatch[4],
+              statusClass: 'status-' + kongMatch[4].toLowerCase(),
+              selected: false,
+              notSelected: false
+            });
+          }
+        }
+        
+        // ICPSwap quote received (selected or not selected)
+        else if (message.includes('ICPSwap quote')) {
+          // Handle ICPSwap being selected as best
+          const icpBestMatch = message.match(/ICPSwap quote accepted as BEST - Amount_out=(\d+) Slippage=([0-9.]+%) Previous_best=(\w+) Status=(\w+)/);
+          if (icpBestMatch) {
+            exchanges.push({
+              name: 'ICPSwap',
+              amountOut: icpBestMatch[1],
+              slippage: icpBestMatch[2],
+              status: icpBestMatch[4],
+              statusClass: 'status-' + icpBestMatch[4].toLowerCase().replace('_', '-'),
+              selected: false, // Will be marked as selected in final selection
+              notSelected: false
+            });
+          } else {
+            // Handle ICPSwap not being selected
+            const icpNotSelectedMatch = message.match(/ICPSwap quote received but NOT selected - Amount_out=(\d+) Slippage=([0-9.]+%) Best_amount=(\d+) Status=(\w+)/);
+            if (icpNotSelectedMatch) {
+              exchanges.push({
+                name: 'ICPSwap',
+                amountOut: icpNotSelectedMatch[1],
+                slippage: icpNotSelectedMatch[2],
+                status: icpNotSelectedMatch[4],
+                statusClass: 'status-' + icpNotSelectedMatch[4].toLowerCase().replace('_', '-'),
+                selected: false,
+                notSelected: true
+              });
+            }
+          }
+        }
+        
+        // ICPSwap pool info
+        else if (message.includes('ICPSwap pool found')) {
+          const poolMatch = message.match(/ICPSwap pool found - Pool_ID=([^\\s]+)/);
+          if (poolMatch && exchanges.length > 0) {
+            // Add pool info to the last exchange (should be ICPSwap)
+            const lastExchange = exchanges[exchanges.length - 1];
+            if (lastExchange && lastExchange.name === 'ICPSwap') {
+              lastExchange.poolInfo = `Pool: ${poolMatch[1]}`;
+            }
+          }
+        }
+        
+        // Final selection
+        else if (message.includes('Exchange selection FINAL')) {
+          const finalMatch = message.match(/Exchange selection FINAL - Selected=#(\w+) Amount_out=(\d+) Best_slippage=([0-9.]+%) Status=(\w+)/);
+          if (finalMatch) {
+            selectedExchange = finalMatch[1];
+            bestAmount = finalMatch[2];
+            bestSlippage = finalMatch[3];
+            
+            // Mark the selected exchange
+            const selectedExch = exchanges.find(e => e.name === selectedExchange);
+            if (selectedExch) {
+              selectedExch.selected = true;
+              selectedExch.statusClass = 'status-selected';
+              selectedExch.status = 'SELECTED';
+            }
+          }
+          break; // This should be the last log in the group
+        }
+        
+        currentIndex++;
+      }
+      
+      console.log('Found', exchanges.length, 'exchanges in comparison');
+      console.log('Selected exchange:', selectedExchange);
+      
+      // Create the compressed entry
+      const compressedEntry = {
+        type: 'exchangeComparison',
+        timestamp: firstLog.timestamp,
+        component: 'findBestExecution',
+        summaryMessage: `Exchange comparison completed for ${pair} trade`,
+        pair: pair,
+        amountIn: amountIn,
+        amountFormatted: amountFormatted,
+        maxSlippage: maxSlippage,
+        exchanges: exchanges,
+        selectedExchange: selectedExchange,
+        bestAmount: bestAmount,
+        bestSlippage: bestSlippage
+      };
+      
+      console.log('Created exchange comparison entry:', compressedEntry);
+      
+      return {
+        entry: compressedEntry,
+        nextIndex: currentIndex + 1
+      };
     }
   }
 }
@@ -1591,6 +1805,171 @@ export default {
 
 .limit-min,
 .limit-max {
+  font-family: 'Courier New', monospace;
+}
+
+/* Exchange Comparison Styles */
+.exchange-comparison-summary {
+  background: rgba(32, 201, 151, 0.1);
+  border-left: 4px solid #20c997;
+}
+
+.exchange-comparison-container {
+  background: rgba(0, 0, 0, 0.1);
+  border-radius: 6px;
+  padding: 12px;
+  margin-top: 8px;
+}
+
+.exchange-comparison-header {
+  font-weight: 600;
+  color: #e9ecef;
+  margin-bottom: 12px;
+  font-size: 0.875rem;
+}
+
+.comparison-details {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.trade-info {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 20px;
+  padding: 8px;
+  background: rgba(32, 201, 151, 0.1);
+  border-radius: 6px;
+  border: 1px solid #20c997;
+}
+
+.trade-pair {
+  font-size: 1.1em;
+  font-weight: 700;
+  color: #20c997;
+}
+
+.trade-amount {
+  font-size: 1.0em;
+  font-weight: 600;
+  color: #e9ecef;
+  font-family: 'Courier New', monospace;
+}
+
+.trade-slippage {
+  font-size: 0.85em;
+  color: #adb5bd;
+}
+
+.exchanges-comparison {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+}
+
+.exchange-card {
+  flex: 1;
+  max-width: 250px;
+  background: rgba(0, 0, 0, 0.2);
+  border: 2px solid #495057;
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.exchange-card.selected {
+  border-color: #28a745;
+  background: rgba(40, 167, 69, 0.1);
+}
+
+.exchange-card.not-selected {
+  border-color: #dc3545;
+  background: rgba(220, 53, 69, 0.1);
+}
+
+.exchange-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.exchange-name {
+  font-size: 1.0em;
+  font-weight: 700;
+  color: #e9ecef;
+}
+
+.exchange-status {
+  font-size: 0.75em;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.exchange-status.status-selected {
+  background: #28a745;
+  color: white;
+}
+
+.exchange-status.status-accepted {
+  background: #17a2b8;
+  color: white;
+}
+
+.exchange-status.status-not-selected {
+  background: #dc3545;
+  color: white;
+}
+
+.exchange-details {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.exchange-metric {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.75rem;
+}
+
+.exchange-metric .metric-label {
+  color: #adb5bd;
+}
+
+.exchange-metric .metric-value {
+  color: #e9ecef;
+  font-family: 'Courier New', monospace;
+  font-weight: bold;
+}
+
+.exchange-pool-info {
+  font-size: 0.7em;
+  color: #6c757d;
+  font-style: italic;
+  margin-top: 4px;
+}
+
+.final-selection {
+  text-align: center;
+  padding: 12px;
+  background: rgba(32, 201, 151, 0.1);
+  border: 1px solid #20c997;
+  border-radius: 6px;
+}
+
+.selection-winner {
+  font-size: 1.1em;
+  font-weight: 700;
+  color: #20c997;
+  margin-bottom: 4px;
+}
+
+.selection-details {
+  font-size: 0.85em;
+  color: #adb5bd;
   font-family: 'Courier New', monospace;
 }
 </style> 
