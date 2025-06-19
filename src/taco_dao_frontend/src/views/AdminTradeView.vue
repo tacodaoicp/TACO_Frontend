@@ -258,10 +258,10 @@
                       </div>
                       
                       <!-- Pair Selection Summary -->
-                      <div v-else-if="entry.type === 'pairSelection'" class="pair-selection-summary">
+                      <div v-else-if="entry.type === 'pairSelection'" class="pair-selection-summary" :class="{ 'failed': entry.failed }">
                         <div class="log-header">
                           <div class="log-timestamp">{{ formatLogTime(entry.timestamp) }}</div>
-                          <div class="log-level level-info">INFO</div>
+                          <div class="log-level" :class="entry.failed ? 'level-warn' : 'level-info'">{{ entry.failed ? 'WARN' : 'INFO' }}</div>
                           <div class="log-context">PAIR_SELECTION</div>
                           <div class="log-component">{{ entry.component }}</div>
                         </div>
@@ -270,7 +270,8 @@
                             {{ entry.summaryMessage }}
                           </div>
                           <div class="pair-selection-result">
-                            <div class="pair-flow">
+                            <!-- Success case -->
+                            <div v-if="!entry.failed" class="pair-flow">
                               <div class="token-box sell-token">
                                 <div class="token-label">SELL</div>
                                 <div class="token-symbol">{{ entry.sellToken }}</div>
@@ -283,8 +284,23 @@
                                 <div class="token-weight">Weight: {{ entry.buyWeight }}</div>
                               </div>
                             </div>
+                            <!-- Failure case -->
+                            <div v-else class="pair-failure">
+                              <div class="failure-icon">⚠️</div>
+                              <div class="failure-message">{{ entry.failureReason }}</div>
+                              <div class="failure-details">
+                                <div class="failure-stat">
+                                  <span class="stat-label">Total Candidates:</span>
+                                  <span class="stat-value">{{ entry.totalCandidates }}</span>
+                                </div>
+                                <div class="failure-stat">
+                                  <span class="stat-label">Required:</span>
+                                  <span class="stat-value">{{ entry.minRequired }}</span>
+                                </div>
+                              </div>
+                            </div>
                             <div class="pair-stats mt-2">
-                              {{ entry.candidateStats }}
+                              {{ entry.failed ? '' : entry.candidateStats }}
                             </div>
                           </div>
                         </div>
@@ -876,18 +892,53 @@ export default {
       const totalCandidates = startMatch[1];
       const minRequired = startMatch[2];
       
-      // Look for candidates ready log
+      // Look for next log - could be candidates ready or insufficient candidates
       currentIndex++;
       if (currentIndex >= logs.length) return null;
       
-      const candidatesLog = logs[currentIndex];
-      if (!candidatesLog.message.includes('Candidates ready for weighted selection')) {
+      const nextLog = logs[currentIndex];
+      
+      // Check if this is an insufficient candidates warning
+      if (nextLog.message.includes('Insufficient candidates for pair selection')) {
+        const insufficientMatch = nextLog.message.match(/Need_at_least=(\d+) Have=(\d+)/);
+        if (!insufficientMatch) {
+          console.log('Could not parse insufficient candidates log');
+          return null;
+        }
+        
+        const needAtLeast = insufficientMatch[1];
+        const have = insufficientMatch[2];
+        
+        // Create the compressed entry for failed selection
+        const compressedEntry = {
+          type: 'pairSelection',
+          timestamp: firstLog.timestamp,
+          component: 'selectTradingPair',
+          summaryMessage: `Pair selection failed - Insufficient candidates`,
+          failed: true,
+          totalCandidates: totalCandidates,
+          minRequired: minRequired,
+          needAtLeast: needAtLeast,
+          have: have,
+          failureReason: `Need at least ${needAtLeast} candidates but only have ${have}`
+        };
+        
+        console.log('Created failed pair selection entry:', compressedEntry);
+        
+        return {
+          entry: compressedEntry,
+          nextIndex: currentIndex + 1
+        };
+      }
+      
+      // Otherwise, expect candidates ready log
+      if (!nextLog.message.includes('Candidates ready for weighted selection')) {
         console.log('Expected candidates ready log not found');
         return null;
       }
       
       // Parse sell and buy candidates
-      const candidatesMatch = candidatesLog.message.match(/Sell_candidates=(\d+) Buy_candidates=(\d+)/);
+      const candidatesMatch = nextLog.message.match(/Sell_candidates=(\d+) Buy_candidates=(\d+)/);
       if (!candidatesMatch) {
         console.log('Could not parse candidates log');
         return null;
@@ -920,12 +971,13 @@ export default {
       const buyRandom = pairMatch[5];
       const buyTotal = pairMatch[6];
       
-      // Create the compressed entry
+      // Create the compressed entry for successful selection
       const compressedEntry = {
         type: 'pairSelection',
         timestamp: firstLog.timestamp,
         component: 'selectTradingPair',
         summaryMessage: `Pair selection completed - ${totalCandidates} candidates evaluated (min required: ${minRequired})`,
+        failed: false,
         sellToken: sellToken,
         buyToken: buyToken,
         sellWeight: `${sellRandom}/${sellTotal}`,
@@ -1363,6 +1415,56 @@ export default {
   padding: 6px;
   border-radius: 4px;
   border: 1px solid #ff6b35;
+}
+
+.pair-selection-summary.failed {
+  background: rgba(220, 53, 69, 0.1);
+  border-left: 4px solid #dc3545;
+}
+
+.pair-failure {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 20px;
+  text-align: center;
+}
+
+.failure-icon {
+  font-size: 2em;
+  margin-bottom: 8px;
+}
+
+.failure-message {
+  font-size: 1.0em;
+  font-weight: 600;
+  color: #dc3545;
+  margin-bottom: 12px;
+}
+
+.failure-details {
+  display: flex;
+  gap: 20px;
+  justify-content: center;
+}
+
+.failure-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.stat-label {
+  font-size: 0.7em;
+  color: #adb5bd;
+  font-weight: 600;
+}
+
+.stat-value {
+  font-size: 1.0em;
+  color: #dc3545;
+  font-weight: 700;
 }
 
 /* Trade Sizing Styles */
