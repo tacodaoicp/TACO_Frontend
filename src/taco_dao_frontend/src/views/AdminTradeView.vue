@@ -26,6 +26,18 @@
                 <button class="btn btn-warning" @click="clearLogs" :disabled="isLoading">
                   Clear All Logs
                 </button>
+                <!-- View Mode Toggle -->
+                <div class="form-check form-switch ms-3">
+                  <input 
+                    class="form-check-input" 
+                    type="checkbox" 
+                    id="viewMode" 
+                    v-model="overviewMode"
+                  >
+                  <label class="form-check-label text-white" for="viewMode">
+                    {{ overviewMode ? 'Overview' : 'Detailed' }} View
+                  </label>
+                </div>
                 <div class="form-check form-switch ms-3">
                   <input 
                     class="form-check-input" 
@@ -147,19 +159,93 @@
                 </div>
                 
                 <div v-else>
-                  <div 
-                    v-for="(log, index) in filteredLogs" 
-                    :key="index"
-                    class="log-entry"
-                    :class="getLogLevelClass(log.level)"
-                  >
-                    <div class="log-header">
-                      <div class="log-timestamp">{{ formatLogTime(log.timestamp) }}</div>
-                      <div class="log-level" :class="'level-' + log.level.toLowerCase()">{{ log.level }}</div>
-                      <div class="log-context">{{ log.context }}</div>
-                      <div class="log-component">{{ log.component }}</div>
+                  <!-- Overview Mode -->
+                  <div v-if="overviewMode">
+                    <!-- Debug header to confirm overview mode is active -->
+                    <div class="overview-mode-header">
+                      📊 Overview Mode Active - Showing {{ processedLogs.length }} processed entries
                     </div>
-                    <div class="log-message">{{ log.message }}</div>
+                    <div 
+                      v-for="(entry, index) in processedLogs" 
+                      :key="index"
+                      class="log-entry"
+                      :class="entry.type === 'portfolio' ? 'log-portfolio' : getLogLevelClass(entry.level)"
+                    >
+                      <!-- Portfolio State Table -->
+                      <div v-if="entry.type === 'portfolio'" class="portfolio-summary">
+                        <div class="log-header">
+                          <div class="log-timestamp">{{ formatLogTime(entry.timestamp) }}</div>
+                          <div class="log-level level-info">INFO</div>
+                          <div class="log-context">PORTFOLIO_STATE</div>
+                          <div class="log-component">{{ entry.component }}</div>
+                        </div>
+                        <div class="portfolio-table-container mt-2">
+                          <div class="portfolio-summary-header">
+                            {{ entry.summaryMessage }}
+                          </div>
+                          <table class="portfolio-table">
+                            <thead>
+                              <tr>
+                                <th>Token</th>
+                                <th>Balance</th>
+                                <th>ICP Price</th>
+                                <th>USD Price</th>
+                                <th>ICP Value</th>
+                                <th>USD Value</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              <tr v-for="token in entry.tokens" :key="token.symbol" class="token-row">
+                                <td class="token-symbol">{{ token.symbol }}</td>
+                                <td class="token-balance">{{ token.balance }}</td>
+                                <td class="token-price">{{ token.priceICP }}</td>
+                                <td class="token-price">{{ token.priceUSD }}</td>
+                                <td class="token-value">{{ token.valueICP }}</td>
+                                <td class="token-value">{{ token.valueUSD }}</td>
+                              </tr>
+                              <!-- Totals Row -->
+                              <tr class="totals-row">
+                                <td><strong>TOTAL</strong></td>
+                                <td>-</td>
+                                <td>-</td>
+                                <td>-</td>
+                                <td><strong>{{ entry.totalICP }}</strong></td>
+                                <td><strong>{{ entry.totalUSD }}</strong></td>
+                              </tr>
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                      
+                      <!-- Regular Log Entry -->
+                      <div v-else>
+                        <div class="log-header">
+                          <div class="log-timestamp">{{ formatLogTime(entry.timestamp) }}</div>
+                          <div class="log-level" :class="'level-' + entry.level.toLowerCase()">{{ entry.level }}</div>
+                          <div class="log-context">{{ entry.context }}</div>
+                          <div class="log-component">{{ entry.component }}</div>
+                        </div>
+                        <div class="log-message">{{ entry.message }}</div>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <!-- Detailed Mode (Original) -->
+                  <div v-else>
+                    <div 
+                      v-for="(log, index) in filteredLogs" 
+                      :key="index"
+                      class="log-entry"
+                      :class="getLogLevelClass(log.level)"
+                    >
+                      <div class="log-header">
+                        <div class="log-timestamp">{{ formatLogTime(log.timestamp) }}</div>
+                        <div class="log-level" :class="'level-' + log.level.toLowerCase()">{{ log.level }}</div>
+                        <div class="log-context">{{ log.context }}</div>
+                        <div class="log-component">{{ log.component }}</div>
+                      </div>
+                      <div class="log-message">{{ log.message }}</div>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -193,6 +279,7 @@ export default {
       logCount: 100,
       searchTerm: '',
       autoRefresh: false,
+      overviewMode: false,
       refreshInterval: null,
       lastRefresh: null,
       error: null
@@ -214,6 +301,53 @@ export default {
       }
       
       return filtered;
+    },
+    
+    processedLogs() {
+      if (!this.overviewMode) return this.filteredLogs;
+      
+      console.log('Processing logs for overview mode, total logs:', this.filteredLogs.length);
+      
+      const processed = [];
+      let i = 0;
+      
+      while (i < this.filteredLogs.length) {
+        const log = this.filteredLogs[i];
+        
+        // Debug: Log what we're checking
+        if (log.context === 'logPortfolioState') {
+          console.log('Found logPortfolioState log:', log.message);
+        }
+        
+        // Check if this is a portfolio state summary log
+        if (log.context === 'logPortfolioState' && log.message.includes('Portfolio Summary:')) {
+          console.log('Found portfolio summary, processing group...');
+          const portfolioEntry = this.processPortfolioStateGroup(i);
+          if (portfolioEntry) {
+            console.log('Successfully processed portfolio group:', portfolioEntry);
+            processed.push(portfolioEntry.entry);
+            i = portfolioEntry.nextIndex;
+            continue;
+          } else {
+            console.log('Failed to process portfolio group');
+          }
+        }
+        
+        // Regular log entry
+        processed.push({
+          type: 'regular',
+          timestamp: log.timestamp,
+          level: log.level,
+          context: log.context,
+          component: log.component,
+          message: log.message
+        });
+        
+        i++;
+      }
+      
+      console.log('Processed logs result:', processed);
+      return processed;
     }
   },
   watch: {
@@ -359,6 +493,99 @@ export default {
         'text-warning': status === 'Idle',
         'text-danger': status.startsWith && status.startsWith('Failed')
       };
+    },
+    
+    processPortfolioStateGroup(startIndex) {
+      const logs = this.filteredLogs;
+      const summaryLog = logs[startIndex];
+      
+      console.log('Processing portfolio group starting at:', startIndex, summaryLog);
+      
+      if (!summaryLog || !summaryLog.message.includes('Portfolio Summary:')) {
+        console.log('Not a portfolio summary log');
+        return null;
+      }
+      
+      // Extract summary info from the first log
+      const summaryMessage = summaryLog.message;
+      console.log('Summary message:', summaryMessage);
+      
+      // Parse tokens from subsequent logs
+      const tokens = [];
+      let i = startIndex + 1;
+      
+      console.log('Looking for token logs starting at index:', i);
+      
+              // Look for token logs that follow the pattern: "Token: SYMBOL (address): Balance=... ICP_Value=... USD_Value=... Price_ICP=... Price_USD=... Status=Active"
+        while (i < logs.length && 
+               logs[i].context === 'logPortfolioState' && 
+               logs[i].message.includes('Token:')) {
+        
+        const tokenLog = logs[i];
+        const message = tokenLog.message;
+        
+        console.log('Checking token log:', message);
+        
+        // Only process active tokens
+        if (message.includes('Status=Active')) {
+          console.log('Found active token log, parsing...');
+          
+          // More flexible regex to handle different number formats
+          const tokenMatch = message.match(/Token: (\w+) \([^)]+\): Balance=([0-9.]+) ICP_Value=([0-9.]+) USD_Value=([0-9.]+) Price_ICP=([0-9.]+) Price_USD=([0-9.]+) Status=Active/);
+          
+          if (tokenMatch) {
+            console.log('Successfully parsed token:', tokenMatch[1]);
+            tokens.push({
+              symbol: tokenMatch[1],
+              balance: tokenMatch[2],
+              valueICP: tokenMatch[3],
+              valueUSD: tokenMatch[4],
+              priceICP: tokenMatch[5],
+              priceUSD: tokenMatch[6]
+            });
+          } else {
+            console.log('Failed to parse token with regex, trying simpler approach...');
+            
+            // Fallback: try to extract just the symbol for now
+            const symbolMatch = message.match(/Token: (\w+)/);
+            if (symbolMatch) {
+              tokens.push({
+                symbol: symbolMatch[1],
+                balance: 'N/A',
+                valueICP: 'N/A',
+                valueUSD: 'N/A',
+                priceICP: 'N/A',
+                priceUSD: 'N/A'
+              });
+            }
+          }
+        } else {
+          console.log('Skipping inactive/paused token');
+        }
+        
+        i++;
+      }
+      
+      console.log('Found', tokens.length, 'active tokens');
+      
+      // Extract totals from summary message
+      const totalICPMatch = summaryMessage.match(/Total_ICP=([0-9.]+)/);
+      const totalUSDMatch = summaryMessage.match(/Total_USD=([0-9.]+)/);
+      
+      console.log('Extracted totals - ICP:', totalICPMatch, 'USD:', totalUSDMatch);
+      
+      return {
+        entry: {
+          type: 'portfolio',
+          timestamp: summaryLog.timestamp,
+          component: summaryLog.component,
+          summaryMessage: summaryMessage,
+          tokens: tokens,
+          totalICP: totalICPMatch ? totalICPMatch[1] + ' ICP' : '0 ICP',
+          totalUSD: totalUSDMatch ? '$' + totalUSDMatch[1] : '$0'
+        },
+        nextIndex: i
+      };
     }
   }
 }
@@ -468,5 +695,82 @@ export default {
 
 .log-error {
   border-left: 3px solid #dc3545;
+}
+
+/* Overview Mode Styles */
+.overview-mode-header {
+  background: #28a745;
+  color: white;
+  padding: 8px 16px;
+  margin-bottom: 8px;
+  border-radius: 4px;
+  font-weight: bold;
+  text-align: center;
+}
+
+/* Portfolio State Styles */
+.log-portfolio {
+  background: rgba(13, 110, 253, 0.1);
+  border-left: 4px solid #0d6efd;
+}
+
+.portfolio-summary-header {
+  color: #e9ecef;
+  font-size: 0.875rem;
+  margin-bottom: 8px;
+  padding: 4px 0;
+  border-bottom: 1px solid #495057;
+}
+
+.portfolio-table-container {
+  overflow-x: auto;
+}
+
+.portfolio-table {
+  width: 100%;
+  font-size: 0.75rem;
+  border-collapse: collapse;
+  margin-top: 4px;
+}
+
+.portfolio-table th {
+  background: #495057;
+  color: #fff;
+  padding: 6px 8px;
+  text-align: left;
+  font-weight: bold;
+  border: 1px solid #6c757d;
+}
+
+.portfolio-table td {
+  padding: 4px 8px;
+  border: 1px solid #495057;
+  color: #e9ecef;
+}
+
+.token-row:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.token-symbol {
+  font-weight: bold;
+  color: #17a2b8 !important;
+}
+
+.token-balance,
+.token-price,
+.token-value {
+  font-family: 'Courier New', monospace;
+  text-align: right;
+}
+
+.totals-row {
+  background: rgba(40, 167, 69, 0.2);
+  border-top: 2px solid #28a745;
+}
+
+.totals-row td {
+  font-weight: bold;
+  color: #28a745 !important;
 }
 </style> 
