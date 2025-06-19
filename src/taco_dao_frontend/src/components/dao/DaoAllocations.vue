@@ -35,7 +35,7 @@
                 <div class="ms-2 me-auto taco-text-white" 
                     data-bs-toggle="tooltip" 
                     data-bs-placement="top" 
-                    title="Allocations are the voted upon targets of the DAO. Holdings are the actual amounts held by the DAO treasury.">
+                    title="Allocations are the voted upon targets of the DAO. Holdings are the actual amounts held by the DAO portfolio">
                     <i class="fa-solid fa-circle-info"></i>
                 </div>
 

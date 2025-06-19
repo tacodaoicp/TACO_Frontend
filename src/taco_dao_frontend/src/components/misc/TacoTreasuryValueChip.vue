@@ -1,29 +1,24 @@
 <template>
 
-    <div class="taco-portfolio-value-chip">
+    <div class="taco-treasury-value-chip">
 
         <!-- top -->
-        <span class="taco-portfolio-value-chip__top">
+        <span class="taco-treasury-value-chip__top">
 
-            <!-- portfolio icon -->
-            <!-- <TacoDaoTacoT 
-                title="TACO portfolio"
+            <!-- treasury icon -->
+            <i class="fa-solid fa-building-columns"
+                title="TACO treasury"
                 data-bs-toggle="tooltip"
                 data-bs-placement="left"
-                data-bs-custom-class="taco-tooltip"/> -->
-            <i class="fa-solid fa-chart-pie"
-                title="TACO portfolio"
-                data-bs-toggle="tooltip"
-                data-bs-placement="left"
-                data-bs-custom-class="taco-tooltip"></i>                
-            <!-- 🌮 -->
+                data-bs-custom-class="taco-tooltip"></i>
+            <!-- 🏦 -->
 
             <!-- price in usd -->
             <span class="taco-text-black-to-white"
-                  title="Value of TACO portfolio in USD"
+                  title="Value of TACO treasury in USD"
                   data-bs-toggle="tooltip"
                   data-bs-placement="right"
-                  data-bs-custom-class="taco-tooltip">${{ totalPortfolioValueInUsd.toFixed(2) }}</span>
+                  data-bs-custom-class="taco-tooltip">$500k</span>
 
         </span>
 
@@ -33,8 +28,8 @@
 
 <style lang="scss" scoped>
 
-    // taco portfolio value chip
-    .taco-portfolio-value-chip {
+    // taco treasury value chip
+    .taco-treasury-value-chip {
         display: flex;
         flex-direction: column;
         align-items: end;
@@ -45,13 +40,7 @@
             align-items: center;
             gap: 0.25rem;
 
-            // token icon
-            // svg {
-            //     width: 1.75rem;
-            //     height: 1.125rem;
-            // }
-
-            // portfolio icon
+            // treasury icon
             i {
                 // color: var(--black-to-white);
                 color: var(--light-orange);
@@ -69,17 +58,17 @@
 
         }
 
-        // bottom
-        &__bottom {
-            display: inline-flex;
+        // // bottom
+        // &__bottom {
+        //     display: inline-flex;
 
-            // usd price
-            span {
-                line-height: 1;
-                font-size: 0.75rem;
-                font-family: 'rubik';
-            }
-        }
+        //     // usd price
+        //     span {
+        //         line-height: 1;
+        //         font-size: 0.75rem;
+        //         font-family: 'rubik';
+        //     }
+        // }
     }
 
     ///////////////////
@@ -90,7 +79,7 @@
     @media (max-width: 490px) {
 
         // flip orientation of top row
-        .taco-portfolio-value-chip__top {
+        .taco-treasury-value-chip__top {
             flex-direction: column;
         }
 
@@ -100,7 +89,7 @@
     @media (max-width: 575px) {
 
         // reduce token icon size
-        .taco-portfolio-value-chip__top svg {
+        .taco-treasury-value-chip__top svg {
             width: 1.5rem !important;
         }
 
@@ -114,7 +103,7 @@
     // Imports //
     /////////////
 
-    import TacoDaoTacoT from "../../assets/images/tacoDaoTacoT.vue"
+    // import TacoDaoTacoT from "../../assets/images/tacoDaoTacoT.vue"
     import { ref, onMounted, onUnmounted } from 'vue'
     import { useTacoStore } from "../../stores/taco.store"
     import { storeToRefs } from "pinia"

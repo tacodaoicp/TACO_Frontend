@@ -95,23 +95,8 @@
     <!-- header bar right -->
     <div class="header-bar__right">
 
-      <!-- pre-sns disclaimer -->
-      <div class="header-bar__pre-sns-disclaimer d-none">
-
-        <span class="badge bg-warning text-dark"
-              target="_blank"
-              title="Configuring Site. We're officially a DAO! Give everything time to unlock, we'll be connecting the site as endpoints become available."
-              data-bs-toggle="tooltip"
-              data-bs-placement="bottom"
-              data-bs-custom-class="taco-tooltip">
-              <i class="fa-solid fa-cubes"></i>
-              <span class="ms-1 d-none d-md-inline">CONFIGURING</span>
-      </span>
-
-      </div>
-
       <!-- icp price, taco dao holdings, and wallet container -->
-      <div class="header-bar__chips d-flex flex-nowrap align-items-end" 
+      <div class="header-bar__chips" 
             style="user-select: text;">
 
         <!-- icp value -->
@@ -121,7 +106,13 @@
         <TacoTokenPriceChip />
 
         <!-- portfolio value -->
-        <TacoPortfolioValueChip />
+        <!-- <TacoPortfolioValueChip /> -->
+
+        <!-- treasury value -->
+        <!-- <TacoTreasuryValueChip /> -->
+
+        <!-- entity value -->
+        <TacoEntityValueChip />
 
       </div>
 
@@ -480,6 +471,9 @@
 
     // chips
     &__chips {
+      display: flex;
+      flex-wrap: no-wrap;
+      align-items: center;
       gap: 1rem;
     }
 
@@ -519,6 +513,7 @@
     // 
     .header-bar__chips {
       gap: 0.5rem !important;
+      align-items: flex-end;;
     }    
 
     // 
@@ -638,6 +633,8 @@
   import IcpValueChip from "../components/misc/IcpValueChip.vue"
   import TacoTokenPriceChip from "../components/misc/TacoTokenPriceChip.vue"
   import TacoPortfolioValueChip from "../components/misc/TacoPortfolioValueChip.vue"
+  import TacoEntityValueChip from "../components/misc/TacoEntityValueChip.vue"
+  import TacoTreasuryValueChip from "../components/misc/TacoTreasuryValueChip.vue"
   import DfinityLogo from "../assets/images/dfinityLogo.vue"
   import DarkModeToggle from "./theme/DarkModeToggle.vue"
   import { Tooltip } from 'bootstrap'
