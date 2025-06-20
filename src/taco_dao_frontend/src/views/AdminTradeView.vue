@@ -171,21 +171,37 @@
                       class="log-entry"
                       :class="entry.type === 'portfolio' ? 'log-portfolio' : entry.type === 'allocation' ? 'log-allocation' : entry.type === 'tradingCycleHeader' ? 'trading-cycle-header' : getLogLevelClass(entry.level)"
                     >
-                      <!-- Trading Cycle Header -->
-                      <div v-if="entry.type === 'tradingCycleHeader'" class="trading-cycle-header-content">
-                        <div class="cycle-header-main" @click="toggleCycle(entry.cycleId)">
-                          <div class="cycle-expand-icon">
-                            {{ isCycleExpanded(entry.cycleId) ? '▼' : '▶' }}
-                          </div>
-                          <div class="cycle-header-info">
-                            <div class="cycle-title">🔄 Trading Cycle</div>
-                            <div class="cycle-timestamp">{{ formatLogTime(entry.timestamp) }}</div>
-                            <div class="cycle-status" :class="'status-' + (entry.status || '').toLowerCase()">
-                              Status: {{ entry.status }}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
+                                             <!-- Trading Cycle Header -->
+                       <div v-if="entry.type === 'tradingCycleHeader'" class="trading-cycle-header-content">
+                         <div class="cycle-header-main" @click="toggleCycle(entry.cycleId)">
+                           <div class="cycle-expand-icon">
+                             {{ isCycleExpanded(entry.cycleId) ? '▼' : '▶' }}
+                           </div>
+                           <div class="cycle-header-info">
+                             <div class="cycle-title">🔄 Trading Cycle</div>
+                             <div class="cycle-timestamp">{{ formatLogTime(entry.timestamp) }}</div>
+                             <div class="cycle-summary">
+                               <!-- Show trade summaries if any -->
+                               <div v-if="entry.analysis.trades.length > 0" class="trade-summaries">
+                                 <div v-for="(trade, idx) in entry.analysis.trades" :key="idx" class="trade-summary">
+                                   <span class="trade-pair">{{ trade.sellAmount }} {{ trade.sellToken }} → {{ trade.buyAmount }} {{ trade.buyToken }}</span>
+                                   <span class="trade-dex">{{ trade.dex }}</span>
+                                 </div>
+                               </div>
+                               <!-- Show status if no trades -->
+                               <div v-else class="cycle-status" :class="'status-' + entry.analysis.status">
+                                 {{ entry.analysis.status === 'no_trades' ? 'No trades executed' : 
+                                    entry.analysis.status === 'failed' ? 'Trading failed' : 'Unknown status' }}
+                               </div>
+                             </div>
+                             <div class="cycle-badge" :class="'badge-' + entry.analysis.status">
+                               {{ entry.analysis.totalTrades > 0 ? 
+                                  (entry.analysis.hasErrors ? `${entry.analysis.totalTrades} trades (with errors)` : `${entry.analysis.totalTrades} trades`) :
+                                  (entry.analysis.hasErrors ? 'Failed' : 'No trades') }}
+                             </div>
+                           </div>
+                         </div>
+                       </div>
                       <!-- Portfolio State Table -->
                       <div v-if="entry.type === 'portfolio'" class="portfolio-summary">
                         <div class="log-header">
@@ -673,9 +689,8 @@ export default {
         
         // Check if this is a trading cycle start - add as collapsible header
         if (log.context === 'do_executeTradingCycle' && log.component === 'REBALANCE_CYCLE' && log.message.includes('Trading cycle started')) {
-          const statusMatch = log.message.match(/Status=([^\\s]+)/);
-          const status = statusMatch ? statusMatch[1].replace('#', '') : 'Unknown';
           const cycleId = `cycle_${log.timestamp}`;
+          const cycleAnalysis = this.analyzeTradingCycle(i);
           
           processed.push({
             type: 'tradingCycleHeader',
@@ -685,7 +700,7 @@ export default {
             context: log.context,
             component: log.component,
             message: log.message,
-            status: status
+            analysis: cycleAnalysis
           });
           
           i++;
@@ -1780,6 +1795,124 @@ export default {
       }
       
       return false;
+    },
+    
+    analyzeTradingCycle(startIndex) {
+      // Find all logs that belong to this trading cycle
+      const childLogs = [];
+      let i = startIndex + 1;
+      
+      // Collect logs until we hit the next trading cycle or end of logs
+      while (i < this.filteredLogs.length) {
+        const log = this.filteredLogs[i];
+        
+        // Stop if we hit another trading cycle
+        if (log.context === 'do_executeTradingCycle' && log.component === 'REBALANCE_CYCLE' && log.message.includes('Trading cycle started')) {
+          break;
+        }
+        
+        childLogs.push(log);
+        i++;
+      }
+      
+      // Analyze the child logs for successful trades
+      const trades = [];
+      let hasErrors = false;
+      
+      for (const log of childLogs) {
+        // Look for successful trade execution logs
+        if (log.context === 'executeTrade' && log.component === 'TRADE_EXECUTION') {
+          if (log.message.includes('trade SUCCESS')) {
+            // Extract trade details from the success message
+            const tradeInfo = this.extractTradeInfo(log.message, childLogs);
+            if (tradeInfo) {
+              trades.push(tradeInfo);
+            }
+          } else if (log.message.includes('trade FAILED')) {
+            hasErrors = true;
+          }
+        }
+        
+        // Check for other error indicators
+        if (log.level === 'ERROR' || log.message.toLowerCase().includes('error') || log.message.toLowerCase().includes('failed')) {
+          hasErrors = true;
+        }
+      }
+      
+      return {
+        trades: trades,
+        hasErrors: hasErrors,
+        totalTrades: trades.length,
+        status: trades.length > 0 ? (hasErrors ? 'partial_success' : 'success') : (hasErrors ? 'failed' : 'no_trades')
+      };
+    },
+    
+    extractTradeInfo(successMessage, allChildLogs) {
+      try {
+        console.log('Extracting trade info from:', successMessage);
+        
+        // Determine DEX from success message
+        let dex = 'Unknown';
+        if (successMessage.includes('KongSwap')) {
+          dex = 'KongSwap';
+        } else if (successMessage.includes('ICPSwap')) {
+          dex = 'ICPSwap';
+        }
+        
+        // Extract amount received from success message
+        // Pattern: "Amount_received=123456 Expected_min=..."
+        const amountReceivedMatch = successMessage.match(/Amount_received=(\d+)/);
+        const amountReceived = amountReceivedMatch ? amountReceivedMatch[1] : null;
+        
+        if (!amountReceived) {
+          console.log('Could not extract amount received from success message');
+          return null;
+        }
+        
+        // Find the trade start log to get input details
+        const startLog = allChildLogs.find(log => 
+          log.context === 'executeTrade' && 
+          log.component === 'TRADE_EXECUTION' && 
+          log.message.includes('Trade execution STARTED')
+        );
+        
+        if (!startLog) {
+          console.log('Could not find trade start log');
+          return null;
+        }
+        
+        // Extract trade details from start message
+        // Pattern: "Pair=TACO/ICP Amount_in=1000000 (raw) Amount_formatted=10.00"
+        const pairMatch = startLog.message.match(/Pair=([^\/]+)\/([^\s]+)/);
+        const amountInMatch = startLog.message.match(/Amount_in=(\d+) \(raw\)/);
+        const amountFormattedMatch = startLog.message.match(/Amount_formatted=([0-9.]+)/);
+        
+        if (!pairMatch || !amountInMatch) {
+          console.log('Could not extract pair or amount from start log');
+          return null;
+        }
+        
+        const sellToken = pairMatch[1];
+        const buyToken = pairMatch[2];
+        const sellAmount = amountFormattedMatch ? amountFormattedMatch[1] : (parseInt(amountInMatch[1]) / 100000000).toFixed(2);
+        
+        // Convert received amount to formatted amount (assume 8 decimals for now, could be improved)
+        const buyAmount = (parseInt(amountReceived) / 100000000).toFixed(2);
+        
+        console.log('Extracted trade info:', { sellToken, sellAmount, buyToken, buyAmount, dex });
+        
+        return {
+          sellAmount: sellAmount,
+          sellToken: sellToken,
+          buyAmount: buyAmount,
+          buyToken: buyToken,
+          dex: dex
+        };
+        
+      } catch (e) {
+        console.error('Error extracting trade info:', e);
+        return null;
+      }
     }
   }
 }
@@ -2786,5 +2919,72 @@ export default {
 .status-warning {
   color: #ffc107;
   background: rgba(255, 193, 7, 0.2);
+}
+
+.cycle-summary {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.trade-summaries {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.trade-summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.75rem;
+}
+
+.trade-pair {
+  color: #e9ecef;
+  font-family: 'Courier New', monospace;
+  font-weight: 600;
+}
+
+.trade-dex {
+  color: #17a2b8;
+  background: rgba(23, 162, 184, 0.2);
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-size: 0.65rem;
+  font-weight: 600;
+}
+
+.cycle-badge {
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 12px;
+  white-space: nowrap;
+}
+
+.badge-success {
+  color: #28a745;
+  background: rgba(40, 167, 69, 0.2);
+  border: 1px solid rgba(40, 167, 69, 0.3);
+}
+
+.badge-partial_success {
+  color: #ffc107;
+  background: rgba(255, 193, 7, 0.2);
+  border: 1px solid rgba(255, 193, 7, 0.3);
+}
+
+.badge-failed {
+  color: #dc3545;
+  background: rgba(220, 53, 69, 0.2);
+  border: 1px solid rgba(220, 53, 69, 0.3);
+}
+
+.badge-no_trades {
+  color: #6c757d;
+  background: rgba(108, 117, 125, 0.2);
+  border: 1px solid rgba(108, 117, 125, 0.3);
 }
 </style> 
