@@ -188,17 +188,19 @@
                                    <span class="trade-dex">{{ trade.dex }}</span>
                                  </div>
                                </div>
-                               <!-- Show status if no trades -->
-                               <div v-else class="cycle-status" :class="'status-' + entry.analysis.status">
-                                 {{ entry.analysis.status === 'no_trades' ? 'No trades executed' : 
-                                    entry.analysis.status === 'failed' ? 'Trading failed' : 'Unknown status' }}
-                               </div>
+                                                               <!-- Show status if no trades -->
+                                <div v-else class="cycle-status" :class="'status-' + entry.analysis.status">
+                                  {{ entry.analysis.status === 'no_trades' ? 'No trades executed' : 
+                                     entry.analysis.status === 'skipped' ? 'Cycle skipped - no trading candidates' :
+                                     entry.analysis.status === 'failed' ? 'Trading failed' : 'Unknown status' }}
+                                </div>
                              </div>
-                             <div class="cycle-badge" :class="'badge-' + entry.analysis.status">
-                               {{ entry.analysis.totalTrades > 0 ? 
-                                  (entry.analysis.hasErrors ? `${entry.analysis.totalTrades} trades (with errors)` : `${entry.analysis.totalTrades} trades`) :
-                                  (entry.analysis.hasErrors ? 'Failed' : 'No trades') }}
-                             </div>
+                                                           <div class="cycle-badge" :class="'badge-' + entry.analysis.status">
+                                {{ entry.analysis.totalTrades > 0 ? 
+                                   (entry.analysis.hasErrors ? `${entry.analysis.totalTrades} trades (with errors)` : `${entry.analysis.totalTrades} trades`) :
+                                   entry.analysis.status === 'skipped' ? 'Skipped' :
+                                   (entry.analysis.hasErrors ? 'Failed' : 'No trades') }}
+                              </div>
                            </div>
                          </div>
                        </div>
@@ -1818,6 +1820,7 @@ export default {
       // Analyze the child logs for successful trades
       const trades = [];
       let hasErrors = false;
+      let wasSkipped = false;
       
       for (const log of childLogs) {
         // Look for successful trade execution logs
@@ -1833,8 +1836,22 @@ export default {
           }
         }
         
-        // Check for other error indicators
-        if (log.level === 'ERROR' || log.message.toLowerCase().includes('error') || log.message.toLowerCase().includes('failed')) {
+        // Check for skipped cycles (no candidates found)
+        if (log.context === 'selectTradingPair' && log.component === 'PAIR_SELECTION' && 
+            log.message.includes('Insufficient candidates')) {
+          wasSkipped = true;
+        }
+        
+        // Check for actual errors (be more specific)
+        if (log.level === 'ERROR') {
+          hasErrors = true;
+        }
+        
+        // Check for specific error patterns that indicate real problems
+        if (log.message.includes('trade FAILED') || 
+            log.message.includes('Trade execution EXCEPTION') ||
+            log.message.includes('Error executing') ||
+            log.message.includes('Failed to execute')) {
           hasErrors = true;
         }
       }
@@ -1842,8 +1859,11 @@ export default {
       return {
         trades: trades,
         hasErrors: hasErrors,
+        wasSkipped: wasSkipped,
         totalTrades: trades.length,
-        status: trades.length > 0 ? (hasErrors ? 'partial_success' : 'success') : (hasErrors ? 'failed' : 'no_trades')
+        status: trades.length > 0 ? (hasErrors ? 'partial_success' : 'success') : 
+                wasSkipped ? 'skipped' : 
+                (hasErrors ? 'failed' : 'no_trades')
       };
     },
     
@@ -2921,6 +2941,11 @@ export default {
   background: rgba(255, 193, 7, 0.2);
 }
 
+.status-skipped {
+  color: #17a2b8;
+  background: rgba(23, 162, 184, 0.2);
+}
+
 .cycle-summary {
   flex: 1;
   display: flex;
@@ -2986,5 +3011,11 @@ export default {
   color: #6c757d;
   background: rgba(108, 117, 125, 0.2);
   border: 1px solid rgba(108, 117, 125, 0.3);
+}
+
+.badge-skipped {
+  color: #17a2b8;
+  background: rgba(23, 162, 184, 0.2);
+  border: 1px solid rgba(23, 162, 184, 0.3);
 }
 </style> 
