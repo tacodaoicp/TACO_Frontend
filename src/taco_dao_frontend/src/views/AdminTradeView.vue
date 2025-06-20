@@ -169,7 +169,7 @@
                       v-for="(entry, index) in processedLogs" 
                       :key="index"
                       class="log-entry"
-                      :class="entry.type === 'portfolio' ? 'log-portfolio' : entry.type === 'allocation' ? 'log-allocation' : entry.type === 'tradingCycleHeader' ? 'trading-cycle-header' : getLogLevelClass(entry.level)"
+                      :class="entry.type === 'portfolio' ? 'log-portfolio' : entry.type === 'allocation' ? 'log-allocation' : entry.type === 'tradingCycleHeader' ? ['trading-cycle-header', entry.isPartial ? 'partial-cycle' : ''] : getLogLevelClass(entry.level)"
                     >
                                              <!-- Trading Cycle Header -->
                        <div v-if="entry.type === 'tradingCycleHeader'" class="trading-cycle-header-content">
@@ -178,7 +178,9 @@
                              {{ isCycleExpanded(entry.cycleId) ? '▼' : '▶' }}
                            </div>
                            <div class="cycle-header-info">
-                             <div class="cycle-title">🔄 Trading Cycle</div>
+                             <div class="cycle-title">
+                               {{ entry.isPartial ? '🔄❓ Trading Cycle (Partial)' : '🔄 Trading Cycle' }}
+                             </div>
                              <div class="cycle-timestamp">{{ formatLogTime(entry.timestamp) }}</div>
                              <div class="cycle-summary">
                                <!-- Show trade summaries if any -->
@@ -685,6 +687,40 @@ export default {
       
       const processed = [];
       let i = 0;
+      
+      // Check if we have orphaned logs at the start (logs before the first trading cycle)
+      let firstCycleIndex = -1;
+      for (let j = 0; j < this.filteredLogs.length; j++) {
+        const log = this.filteredLogs[j];
+        if (log.context === 'do_executeTradingCycle' && log.component === 'REBALANCE_CYCLE' && log.message.includes('Trading cycle started')) {
+          firstCycleIndex = j;
+          break;
+        }
+      }
+      
+      // If we have logs before the first cycle, create a partial cycle header
+      if (firstCycleIndex > 0) {
+        const orphanedLogs = this.filteredLogs.slice(0, firstCycleIndex);
+        const partialCycleAnalysis = this.analyzePartialTradingCycle(orphanedLogs);
+        
+        processed.push({
+          type: 'tradingCycleHeader',
+          cycleId: 'partial_cycle',
+          timestamp: orphanedLogs[0].timestamp,
+          level: 'INFO',
+          context: 'do_executeTradingCycle',
+          component: 'REBALANCE_CYCLE',
+          message: 'Partial trading cycle (started before log window)',
+          analysis: partialCycleAnalysis,
+          isPartial: true
+        });
+        
+        // If the partial cycle is expanded, process the orphaned logs normally
+        // If collapsed, skip them
+        if (!this.isCycleExpanded('partial_cycle')) {
+          i = firstCycleIndex;
+        }
+      }
       
       while (i < this.filteredLogs.length) {
         const log = this.filteredLogs[i];
@@ -1771,6 +1807,21 @@ export default {
     },
     
     isLogInCollapsedCycle(logIndex) {
+      // Check if this log belongs to the partial cycle (orphaned logs at the start)
+      let firstCycleIndex = -1;
+      for (let j = 0; j < this.filteredLogs.length; j++) {
+        const log = this.filteredLogs[j];
+        if (log.context === 'do_executeTradingCycle' && log.component === 'REBALANCE_CYCLE' && log.message.includes('Trading cycle started')) {
+          firstCycleIndex = j;
+          break;
+        }
+      }
+      
+      // If this log is before the first cycle and the partial cycle is collapsed
+      if (firstCycleIndex > 0 && logIndex < firstCycleIndex) {
+        return !this.isCycleExpanded('partial_cycle'); // Hide only if collapsed
+      }
+      
       // Find the most recent trading cycle before this log
       let lastCycleIndex = -1;
       let lastCycleId = null;
@@ -1817,17 +1868,31 @@ export default {
         i++;
       }
       
-      // Analyze the child logs for successful trades
+      return this.analyzeLogsForTrades(childLogs);
+    },
+    
+    analyzePartialTradingCycle(orphanedLogs) {
+      // Analyze the orphaned logs the same way as regular cycle logs
+      const analysis = this.analyzeLogsForTrades(orphanedLogs);
+      
+      // Mark as partial for display purposes
+      analysis.isPartial = true;
+      
+      return analysis;
+    },
+    
+    analyzeLogsForTrades(logs) {
+      // Analyze the logs for successful trades
       const trades = [];
       let hasErrors = false;
       let wasSkipped = false;
       
-      for (const log of childLogs) {
+      for (const log of logs) {
         // Look for successful trade execution logs
         if (log.context === 'executeTrade' && log.component === 'TRADE_EXECUTION') {
           if (log.message.includes('trade SUCCESS')) {
             // Extract trade details from the success message
-            const tradeInfo = this.extractTradeInfo(log.message, childLogs);
+            const tradeInfo = this.extractTradeInfo(log.message, logs);
             if (tradeInfo) {
               trades.push(tradeInfo);
             }
@@ -2873,6 +2938,12 @@ export default {
   background: rgba(108, 117, 125, 0.15);
   border-left: 4px solid #6c757d;
   margin-bottom: 4px;
+}
+
+.trading-cycle-header.partial-cycle {
+  background: rgba(23, 162, 184, 0.15);
+  border-left: 4px solid #17a2b8;
+  border-style: dashed;
 }
 
 .trading-cycle-header-content {
