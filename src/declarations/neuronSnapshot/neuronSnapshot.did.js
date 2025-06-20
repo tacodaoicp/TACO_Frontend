@@ -27,7 +27,6 @@ export const idlFactory = ({ IDL }) => {
     'votingPower' : IDL.Nat,
     'neuronId' : IDL.Vec(IDL.Nat8),
   });
-  const NeuronId = IDL.Record({ 'id' : IDL.Vec(IDL.Nat8) });
   const NeuronSnapshotError = IDL.Variant({
     'Timeout' : IDL.Null,
     'Cancelled' : IDL.Null,
@@ -42,6 +41,7 @@ export const idlFactory = ({ IDL }) => {
     'result' : NeuronSnapshotResult,
     'timestamp' : Timestamp,
   });
+  const NeuronId = IDL.Record({ 'id' : IDL.Vec(IDL.Nat8) });
   const NeuronPermission = IDL.Record({
     'principal' : IDL.Opt(IDL.Principal),
     'permission_type' : IDL.Vec(IDL.Int32),
@@ -92,7 +92,7 @@ export const idlFactory = ({ IDL }) => {
     'Ok' : SnapshotId,
     'Err' : TakeNeuronSnapshotError,
   });
-  return IDL.Service({
+  const neuronSnapshot = IDL.Service({
     'cancel_neuron_snapshot' : IDL.Func([], [CancelNeuronSnapshotResult], []),
     'clearLogs' : IDL.Func([], [], []),
     'getCumulativeValuesAtSnapshot' : IDL.Func(
@@ -124,13 +124,7 @@ export const idlFactory = ({ IDL }) => {
         ],
         ['query'],
       ),
-    'get_neuron_snapshot_curr_neuron_id' : IDL.Func(
-        [],
-        [IDL.Opt(NeuronId)],
-        ['query'],
-      ),
     'get_neuron_snapshot_head_id' : IDL.Func([], [SnapshotId], ['query']),
-    'get_neuron_snapshot_importing_count' : IDL.Func([], [IDL.Nat], ['query']),
     'get_neuron_snapshot_info' : IDL.Func(
         [SnapshotId],
         [IDL.Opt(NeuronSnapshotInfo)],
@@ -156,5 +150,6 @@ export const idlFactory = ({ IDL }) => {
     'setTest' : IDL.Func([IDL.Bool], [], []),
     'take_neuron_snapshot' : IDL.Func([], [TakeNeuronSnapshotResult], []),
   });
+  return neuronSnapshot;
 };
 export const init = ({ IDL }) => { return []; };

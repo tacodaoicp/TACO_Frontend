@@ -77,7 +77,7 @@ export type TakeNeuronSnapshotError = { 'AlreadyTakingSnapshot' : null } |
 export type TakeNeuronSnapshotResult = { 'Ok' : SnapshotId } |
   { 'Err' : TakeNeuronSnapshotError };
 export type Timestamp = bigint;
-export interface _SERVICE {
+export interface neuronSnapshot {
   'cancel_neuron_snapshot' : ActorMethod<[], CancelNeuronSnapshotResult>,
   'clearLogs' : ActorMethod<[], undefined>,
   'getCumulativeValuesAtSnapshot' : ActorMethod<
@@ -97,9 +97,7 @@ export interface _SERVICE {
       }
     ]
   >,
-  'get_neuron_snapshot_curr_neuron_id' : ActorMethod<[], [] | [NeuronId]>,
   'get_neuron_snapshot_head_id' : ActorMethod<[], SnapshotId>,
-  'get_neuron_snapshot_importing_count' : ActorMethod<[], bigint>,
   'get_neuron_snapshot_info' : ActorMethod<
     [SnapshotId],
     [] | [NeuronSnapshotInfo]
@@ -118,5 +116,6 @@ export interface _SERVICE {
   'setTest' : ActorMethod<[boolean], undefined>,
   'take_neuron_snapshot' : ActorMethod<[], TakeNeuronSnapshotResult>,
 }
+export interface _SERVICE extends neuronSnapshot {}
 export declare const idlFactory: IDL.InterfaceFactory;
 export declare const init: (args: { IDL: typeof IDL }) => IDL.Type[];

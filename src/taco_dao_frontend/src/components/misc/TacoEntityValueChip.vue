@@ -1,26 +1,81 @@
 <template>
 
-    <div class="taco-entity-value-chip">
+    <div class="taco-entity-value-chip"
+        @mouseover="showTacoEntityTooltip" 
+        @mouseleave="hideTacoEntityTooltip"
+    >
 
         <!-- top -->
-        <span class="taco-entity-value-chip__top">
+        <span class="taco-entity-value-chip__inner">
 
             <!-- some icon -->
             <!-- <TacoDaoLogo /> -->
-            <TacoDaoTacoT title="Taco Dao Entity"
-                  data-bs-toggle="tooltip"
-                  data-bs-placement="right"
-                  data-bs-custom-class="taco-tooltip"/>
+            <TacoDaoTacoT />
 
             <!-- price in usd -->
-            <span class="taco-text-black-to-white" @mouseover="showTacoEntityTooltip" @mouseleave="hideTacoEntityTooltip">${{ formatNumber(tacoEntityValueUsd) }}</span>
+            <span class="taco-text-black-to-white">${{ formatNumber(totalPortfolioValueInUsd + totalTreasuryValueInUsd) }}</span>
 
         </span>
 
         <!-- hover tooltip -->
         <div v-if="showingTacoEntityTooltip"
-             class="taco-entity-value-chip__tooltip">
-            <span class="taco-text-black-to-white">stuff here</span>
+             class="taco-entity-value-chip__tooltip shadow">
+
+             <!-- header -->
+            <div class="taco-entity-value-chip__tooltip__header">
+
+                 <!-- taco dao logo -->
+                <TacoDaoLogo class="taco-entity-value-chip__tooltip__header__logo" />
+                
+            </div>
+
+            <!-- kvp -->
+            <div class="taco-entity-value-chip__tooltip__kvp pt-2"
+                style="padding-top: 0.75rem !important;">
+
+                <!-- key -->
+                <span class="taco-entity-value-chip__tooltip__kvp__key 
+                    taco-text-black-to-white">
+                    <i class="fa-solid fa-building-columns"></i>
+                    Treasury
+                </span>
+
+                <!-- value -->
+                <span class="taco-entity-value-chip__tooltip__kvp__value 
+                    taco-text-black-to-white">${{formatNumber(totalTreasuryValueInUsd)}}</span>
+
+            </div>
+
+            <!-- kvp -->
+            <div class="taco-entity-value-chip__tooltip__kvp py-2"
+                style="padding-bottom: 0.75rem !important;">
+
+                <!-- key -->
+                <span class="taco-entity-value-chip__tooltip__kvp__key 
+                    taco-text-black-to-white">
+                    <i class="fa-solid fa-chart-pie"></i>
+                    Portfolio
+                </span>
+
+                <!-- value -->
+                <span class="taco-entity-value-chip__tooltip__kvp__value 
+                    taco-text-black-to-white">${{formatNumber(snsTreasuryBalance)}}</span>
+
+            </div>
+
+            <!-- kvp -->
+            <div class="taco-entity-value-chip__tooltip__kvp py-2">
+
+                <!-- key -->
+                <span class="taco-entity-value-chip__tooltip__kvp__key 
+                    taco-text-black-to-white">Total</span>
+
+                <!-- value -->
+                <span class="taco-entity-value-chip__tooltip__kvp__value 
+                    taco-text-black-to-white">${{formatNumber(snsTreasuryBalance + totalTreasuryValueInUsd)}}</span>
+
+            </div>
+
         </div>
 
     </div>
@@ -34,9 +89,10 @@
         display: flex;
         flex-direction: column;
         align-items: end;
+        position: relative;
         
-        // top
-        &__top {
+        // inner
+        &__inner {
             display: inline-flex;
             align-items: center;
             gap: 0.25rem;
@@ -58,17 +114,67 @@
 
         }
 
-        // // bottom
-        // &__bottom {
-        //     display: inline-flex;
+        // tooltip
+        &__tooltip {
+            border: 1px solid var(--dark-orange);
+            position: absolute;
+            top: calc(100% + 0.75rem);
+            right: 0;
+            width: fit-content;
+            border-radius: 0.5rem;
+            background-color: var(--orange-to-brown);
+            color: var(--black-to-white);
+            display: flex;
+            flex-direction: column;
+            // gap: 0.5rem;
 
-        //     // usd price
-        //     span {
-        //         line-height: 1;
-        //         font-size: 0.75rem;
-        //         font-family: 'rubik';
-        //     }
-        // }
+            // header
+            &__header {
+                text-align: center;
+                font-size: 0.875rem;
+                border-bottom: 1px solid var(--dark-orange);
+                padding: 0.5rem 1rem 0.5rem;
+
+                // logo
+                &__logo {
+                    width: 3rem;
+                    height: 3rem;
+                }
+            }
+
+            // kvp
+            &__kvp {
+                display: flex;
+                justify-content: space-between;
+                gap: 0.75rem;
+                padding: 0.25rem 1rem 0;
+
+                // key
+                &__key {
+                    display: flex;
+                    align-items: center;
+                    gap: 0.4rem;
+                    text-align: left;
+                    font-size: 0.875rem;
+                    font-weight: 500;
+                }
+
+                // value
+                &__value {
+                    text-align: right;
+                    font-size: 0.875rem;
+                    font-family: 'rubik';
+                    font-weight: 700;                    
+                }
+
+                // last of type
+                &:last-of-type {
+                    border-top: 1px solid var(--dark-orange);
+                }
+                
+            }
+            
+        }
     }
 
     ///////////////////
@@ -117,12 +223,12 @@
     const tacoStore = useTacoStore()
 
     // # ACTIONS #
-    const { fetchTokenDetails } = tacoStore
+    const { fetchTokenDetails, icrc1BalanceOf } = tacoStore
 
     // # STATE #
 
     // dao
-    const { totalPortfolioValueInUsd } = storeToRefs(tacoStore)
+    const { totalPortfolioValueInUsd, totalTreasuryValueInUsd } = storeToRefs(tacoStore)
 
     /////////////////////
     // local variables //
@@ -131,26 +237,15 @@
     // showing taco entity tooltip
     const showingTacoEntityTooltip = ref(false)
 
+    // sns treasury balance
+    const snsTreasuryBalance = ref(0)
+
     ///////////////////
     // local methods //
     ///////////////////
 
-    // format number
-    const formatNumber = (num) => {
-        if (typeof num !== 'number') {
-            return num
-        }
-        if (num >= 10000000) {
-            return '10m+'
-        }
-        if (num >= 1000) {
-            return new Intl.NumberFormat('en-US', {
-                notation: 'compact',
-                compactDisplay: 'short'
-            }).format(num).toLowerCase();
-        }
-        return num.toFixed(2)
-    }
+    //////////////
+    // handlers //
 
     // show taco entity tooltip
     const showTacoEntityTooltip = () => {
@@ -162,13 +257,40 @@
         showingTacoEntityTooltip.value = false
     }
 
-    //////////////
-    // computed //
-    //////////////
+    // fetch balance of sns treasury
+    const fetchSnsTreasuryBalance = async () => {
 
-    // taco entity value in usd
-    const tacoEntityValueUsd = computed(() => {
-        return formatNumber(1)
+        // fetch balance
+        const balance = await icrc1BalanceOf('kknbx-zyaaa-aaaaq-aae4a-cai', 'lhdfz-wqaaa-aaaaq-aae3q-cai')
+
+        // log
+        console.log('taco.store: fetchSnsTreasuryBalance() - returned balance:', balance)
+
+        // set balance
+        snsTreasuryBalance.value = balance
+
+    }
+
+    /////////////
+    // returns //
+
+    // format number
+    const formatNumber = computed(() => {
+        return (num) => {
+            if (typeof num !== 'number') {
+                return num
+            }
+            if (num >= 10000000) {
+                return '10m+'
+            }
+            if (num >= 1000) {
+                return new Intl.NumberFormat('en-US', {
+                    notation: 'compact',
+                    compactDisplay: 'short'
+                }).format(num).toLowerCase();
+            }
+            return num.toFixed(2)
+        }
     })
 
     /////////////////////
@@ -180,6 +302,9 @@
 
         // fetch token details from dao backend
         await fetchTokenDetails()
+
+        // fetch sns treasury balance
+        await fetchSnsTreasuryBalance()
 
     })
 

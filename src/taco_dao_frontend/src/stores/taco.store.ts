@@ -465,8 +465,10 @@ export const useTacoStore = defineStore('taco', () => {
             root.style.setProperty("--green-to-orange", "#FED66C") // orange
             root.style.setProperty("--green-to-brown", "#934a17") // green
             root.style.setProperty("--green-to-yellow", "#FEC800") // yellow
+            root.style.setProperty("--dark-green-to-light-green", "#B4C2E9") // light green
             root.style.setProperty("--success-green-to-success-green-hover", "#19B229") // success green hover
             root.style.setProperty("--success-green-hover-to-success-green", "#179F25") // success green
+            root.style.setProperty("--success-green-hover-to-light-green", "#7CDC86") // light green
             root.style.setProperty("--dark-green-to-dark-brown", "#512100") // dark brown
             root.style.setProperty("--blue-to-light-blue", "#B4C2E9") // light blue
             root.style.setProperty("--brown-to-white", "#ffffff") // white
@@ -531,8 +533,10 @@ export const useTacoStore = defineStore('taco', () => {
             root.style.setProperty("--light-green-to-success-green", "#19B229") // success green
             root.style.setProperty("--green-to-orange", "#B7CD02") // green
             root.style.setProperty("--green-to-yellow", "#B7CD02") // green
+            root.style.setProperty("--dark-green-to-light-green", "#B4C2E9") // dark green
             root.style.setProperty("--success-green-to-success-green-hover", "#179F25") // success green hover
             root.style.setProperty("--success-green-hover-to-success-green", "#19B229") // success green
+            root.style.setProperty("--success-green-hover-to-light-green", "#179F25") // light green
             root.style.setProperty("--dark-green-to-dark-brown", "#7D8828") // dark green
             root.style.setProperty("--green-to-brown", "#B7CD02") // brown
             root.style.setProperty("--blue-to-light-blue", "#546595") // blue
@@ -998,6 +1002,56 @@ export const useTacoStore = defineStore('taco', () => {
 
             // log error
             console.error('error fetching metadata from icrc1 canister:', error)
+
+            // return false
+            return false
+
+        }
+
+    }
+    const icrc1BalanceOf = async (canisterId: string, accountId: string) => {
+        
+        // log
+        console.log('taco.store: icrc1BalanceOf() - calling for balance...')
+        console.log('taco.store: icrc1BalanceOf() - canisterId:', canisterId)
+        console.log('taco.store: icrc1BalanceOf() - accountId:', accountId)
+
+        try {
+
+            // get host
+            const host = process.env.DFX_NETWORK === "local"
+                ? getLocalHost()
+                : "https://ic0.app";
+
+            // create agent
+            const agent = await createAgent({
+                identity: new AnonymousIdentity(),
+                host,
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            })         
+
+            // create actor
+            const actor = Actor.createActor(idlFactory, {
+                agent,
+                canisterId: canisterId,
+            })
+
+            //////////////////////
+            // post actor logic //
+
+            // get balance
+            const balance = await actor.icrc1_balance_of(accountId)
+
+            // log
+            console.log('taco.store: icrc1BalanceOf() - returned balance:', balance)
+
+            // return balance
+            return balance
+
+        } catch (error) {
+
+            // log error
+            console.error('error fetching balance from icrc1 canister:', error)
 
             // return false
             return false
@@ -2795,5 +2849,6 @@ export const useTacoStore = defineStore('taco', () => {
         getTreasuryLogsByContext,
         getTreasuryLogsByLevel,
         clearTreasuryLogs,
+        icrc1BalanceOf,
     }
 })
