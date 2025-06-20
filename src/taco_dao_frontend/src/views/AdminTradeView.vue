@@ -169,8 +169,23 @@
                       v-for="(entry, index) in processedLogs" 
                       :key="index"
                       class="log-entry"
-                      :class="entry.type === 'portfolio' ? 'log-portfolio' : entry.type === 'allocation' ? 'log-allocation' : getLogLevelClass(entry.level)"
+                      :class="entry.type === 'portfolio' ? 'log-portfolio' : entry.type === 'allocation' ? 'log-allocation' : entry.type === 'tradingCycleHeader' ? 'trading-cycle-header' : getLogLevelClass(entry.level)"
                     >
+                      <!-- Trading Cycle Header -->
+                      <div v-if="entry.type === 'tradingCycleHeader'" class="trading-cycle-header-content">
+                        <div class="cycle-header-main" @click="toggleCycle(entry.cycleId)">
+                          <div class="cycle-expand-icon">
+                            {{ isCycleExpanded(entry.cycleId) ? '▼' : '▶' }}
+                          </div>
+                          <div class="cycle-header-info">
+                            <div class="cycle-title">🔄 Trading Cycle</div>
+                            <div class="cycle-timestamp">{{ formatLogTime(entry.timestamp) }}</div>
+                            <div class="cycle-status" :class="'status-' + (entry.status || '').toLowerCase()">
+                              Status: {{ entry.status }}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
                       <!-- Portfolio State Table -->
                       <div v-if="entry.type === 'portfolio'" class="portfolio-summary">
                         <div class="log-header">
@@ -623,7 +638,8 @@ export default {
       overviewMode: false,
       refreshInterval: null,
       lastRefresh: null,
-      error: null
+      error: null,
+      expandedCycles: new Set()
     }
   },
   computed: {
@@ -654,6 +670,33 @@ export default {
       
       while (i < this.filteredLogs.length) {
         const log = this.filteredLogs[i];
+        
+        // Check if this is a trading cycle start - add as collapsible header
+        if (log.context === 'do_executeTradingCycle' && log.component === 'REBALANCE_CYCLE' && log.message.includes('Trading cycle started')) {
+          const statusMatch = log.message.match(/Status=([^\\s]+)/);
+          const status = statusMatch ? statusMatch[1].replace('#', '') : 'Unknown';
+          const cycleId = `cycle_${log.timestamp}`;
+          
+          processed.push({
+            type: 'tradingCycleHeader',
+            cycleId: cycleId,
+            timestamp: log.timestamp,
+            level: log.level,
+            context: log.context,
+            component: log.component,
+            message: log.message,
+            status: status
+          });
+          
+          i++;
+          continue;
+        }
+        
+        // Skip logs if they belong to a collapsed trading cycle
+        if (this.isLogInCollapsedCycle(i)) {
+          i++;
+          continue;
+        }
         
         // Debug: Log what we're checking
         if (log.context === 'logPortfolioState') {
@@ -1696,6 +1739,47 @@ export default {
       parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
       
       return parts.join('.');
+    },
+    
+    toggleCycle(cycleId) {
+      if (this.expandedCycles.has(cycleId)) {
+        this.expandedCycles.delete(cycleId);
+      } else {
+        this.expandedCycles.add(cycleId);
+      }
+    },
+    
+    isCycleExpanded(cycleId) {
+      return this.expandedCycles.has(cycleId);
+    },
+    
+    isLogInCollapsedCycle(logIndex) {
+      // Find the most recent trading cycle before this log
+      let lastCycleIndex = -1;
+      let lastCycleId = null;
+      
+      for (let i = logIndex - 1; i >= 0; i--) {
+        const log = this.filteredLogs[i];
+        if (log.context === 'do_executeTradingCycle' && log.component === 'REBALANCE_CYCLE' && log.message.includes('Trading cycle started')) {
+          lastCycleIndex = i;
+          lastCycleId = `cycle_${log.timestamp}`;
+          break;
+        }
+      }
+      
+      // If we found a cycle and it's collapsed, check if this log is before the next cycle
+      if (lastCycleId && !this.isCycleExpanded(lastCycleId)) {
+        // Check if there's another cycle after the last one but before this log
+        for (let i = lastCycleIndex + 1; i < logIndex; i++) {
+          const log = this.filteredLogs[i];
+          if (log.context === 'do_executeTradingCycle' && log.component === 'REBALANCE_CYCLE' && log.message.includes('Trading cycle started')) {
+            return false; // This log is after a new cycle started
+          }
+        }
+        return true; // This log belongs to the collapsed cycle
+      }
+      
+      return false;
     }
   }
 }
@@ -2629,5 +2713,78 @@ export default {
 .error-text {
   color: #dc3545 !important;
   font-weight: 700;
+}
+
+/* Trading Cycle Header Styles */
+.trading-cycle-header {
+  background: rgba(108, 117, 125, 0.15);
+  border-left: 4px solid #6c757d;
+  margin-bottom: 4px;
+}
+
+.trading-cycle-header-content {
+  padding: 8px 12px;
+}
+
+.cycle-header-main {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.cycle-header-main:hover {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 4px;
+}
+
+.cycle-expand-icon {
+  font-size: 0.9em;
+  color: #adb5bd;
+  min-width: 16px;
+  text-align: center;
+}
+
+.cycle-header-info {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex: 1;
+}
+
+.cycle-title {
+  font-size: 0.9em;
+  font-weight: 700;
+  color: #e9ecef;
+}
+
+.cycle-timestamp {
+  font-size: 0.75rem;
+  color: #6c757d;
+  font-family: 'Courier New', monospace;
+}
+
+.cycle-status {
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.3);
+}
+
+.status-ok {
+  color: #28a745;
+  background: rgba(40, 167, 69, 0.2);
+}
+
+.status-error {
+  color: #dc3545;
+  background: rgba(220, 53, 69, 0.2);
+}
+
+.status-warning {
+  color: #ffc107;
+  background: rgba(255, 193, 7, 0.2);
 }
 </style> 
