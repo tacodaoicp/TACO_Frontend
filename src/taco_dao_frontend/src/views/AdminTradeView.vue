@@ -415,6 +415,149 @@
                         </div>
                       </div>
                       
+                      <!-- Trade Execution Summary -->
+                      <div v-else-if="entry.type === 'tradeExecution'" class="trade-execution-summary" :class="{ 'success': entry.finalResult?.success, 'failed': !entry.finalResult?.success }">
+                        <div class="log-header">
+                          <div class="log-timestamp">{{ formatLogTime(entry.timestamp) }}</div>
+                          <div class="log-level" :class="entry.finalResult?.success ? 'level-info' : 'level-error'">{{ entry.finalResult?.success ? 'INFO' : 'ERROR' }}</div>
+                          <div class="log-context">TRADE_EXECUTION</div>
+                          <div class="log-component">{{ entry.component }}</div>
+                        </div>
+                        <div class="trade-execution-container mt-2">
+                          <div class="trade-execution-header">
+                            {{ entry.summaryMessage }}
+                          </div>
+                          
+                          <!-- Trade Overview -->
+                          <div class="trade-overview">
+                            <div class="trade-basic-info">
+                              <div class="trade-pair-display">
+                                <span class="pair-label">Trading Pair:</span>
+                                <span class="pair-value">{{ entry.pair }}</span>
+                              </div>
+                              <div class="trade-exchange">
+                                <span class="exchange-label">Exchange:</span>
+                                <span class="exchange-value">{{ entry.exchange }}</span>
+                              </div>
+                              <div class="trade-amount-in">
+                                <span class="amount-label">Amount In:</span>
+                                <span class="amount-value">{{ entry.amountFormatted }}</span>
+                                <span class="amount-raw">({{ entry.amountIn }} raw)</span>
+                              </div>
+                              <div class="trade-min-out">
+                                <span class="min-label">Min Expected:</span>
+                                <span class="min-value">{{ entry.minAmountFormatted }}</span>
+                                <span class="min-raw">({{ entry.minAmountOut }} raw)</span>
+                              </div>
+                            </div>
+                          </div>
+                          
+                          <!-- Trade Steps -->
+                          <div v-if="entry.tradeSteps && entry.tradeSteps.length > 0" class="trade-steps">
+                            <div class="steps-header">Execution Steps:</div>
+                            <div class="steps-list">
+                              <div v-for="(step, index) in entry.tradeSteps" :key="index" class="trade-step" :class="step.type">
+                                <!-- KongSwap Preparation -->
+                                <div v-if="step.type === 'preparation'" class="step-content">
+                                  <div class="step-icon">⚙️</div>
+                                  <div class="step-details">
+                                    <div class="step-title">{{ step.exchange }} Preparation</div>
+                                    <div class="step-info">
+                                      <span>Slippage: {{ step.slippageTolerance }}%</span>
+                                      <span>Deadline: {{ step.deadline }}s</span>
+                                    </div>
+                                  </div>
+                                </div>
+                                
+                                <!-- KongSwap Execution Start -->
+                                <div v-else-if="step.type === 'execution_start'" class="step-content">
+                                  <div class="step-icon">🚀</div>
+                                  <div class="step-details">
+                                    <div class="step-title">{{ step.exchange }} Execution Started</div>
+                                    <div class="step-info">{{ step.status }}</div>
+                                  </div>
+                                </div>
+                                
+                                <!-- ICPSwap Pool Validation -->
+                                <div v-else-if="step.type === 'pool_validation'" class="step-content">
+                                  <div class="step-icon">🔍</div>
+                                  <div class="step-details">
+                                    <div class="step-title">{{ step.exchange }} Pool Validation</div>
+                                    <div class="step-info">
+                                      <div>Pool ID: {{ step.poolId }}</div>
+                                      <div>Token0: {{ step.token0 }}</div>
+                                      <div>Token1: {{ step.token1 }}</div>
+                                    </div>
+                                  </div>
+                                </div>
+                                
+                                <!-- ICPSwap Execution Parameters -->
+                                <div v-else-if="step.type === 'execution_parameters'" class="step-content">
+                                  <div class="step-icon">📊</div>
+                                  <div class="step-details">
+                                    <div class="step-title">{{ step.exchange }} Parameters Set</div>
+                                    <div class="step-info">
+                                      <div>Amount After Fee: {{ formatExchangeAmount(step.amountAfterFee, 8) }}</div>
+                                      <div>Transfer Fee: {{ formatExchangeAmount(step.transferFee, 8) }}</div>
+                                      <div>Zero For One: {{ step.zeroForOne }}</div>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                          
+                          <!-- Final Result -->
+                          <div v-if="entry.finalResult" class="trade-result" :class="{ 'success': entry.finalResult.success, 'failed': !entry.finalResult.success }">
+                            <div class="result-header">
+                              <div class="result-icon">{{ entry.finalResult.success ? '✅' : '❌' }}</div>
+                              <div class="result-title">{{ entry.finalResult.success ? 'Trade Completed Successfully' : 'Trade Failed' }}</div>
+                              <div class="result-exchange">{{ entry.finalResult.exchange }}</div>
+                            </div>
+                            
+                            <div class="result-details">
+                              <!-- Success Details -->
+                              <div v-if="entry.finalResult.success" class="success-details">
+                                <div class="result-metric">
+                                  <span class="metric-label">Amount Received:</span>
+                                  <span class="metric-value">{{ formatExchangeAmount(entry.finalResult.amountReceived, entry.buyTokenDecimals) }}</span>
+                                  <span class="metric-raw">({{ entry.finalResult.amountReceived }} raw)</span>
+                                </div>
+                                <div class="result-metric">
+                                  <span class="metric-label">Expected Minimum:</span>
+                                  <span class="metric-value">{{ formatExchangeAmount(entry.finalResult.expectedMin, entry.buyTokenDecimals) }}</span>
+                                  <span class="metric-raw">({{ entry.finalResult.expectedMin }} raw)</span>
+                                </div>
+                                <div class="result-metric">
+                                  <span class="metric-label">{{ entry.finalResult.exchange === 'KongSwap' ? 'Actual Slippage' : 'Effective Slippage' }}:</span>
+                                  <span class="metric-value">{{ entry.finalResult.exchange === 'KongSwap' ? entry.finalResult.actualSlippage : entry.finalResult.effectiveSlippage }}%</span>
+                                </div>
+                                <div class="result-metric">
+                                  <span class="metric-label">Execution Time:</span>
+                                  <span class="metric-value">{{ entry.finalResult.executionTime }}ms</span>
+                                </div>
+                              </div>
+                              
+                              <!-- Failure Details -->
+                              <div v-else class="failure-details">
+                                <div class="result-metric">
+                                  <span class="metric-label">Error:</span>
+                                  <span class="metric-value error-text">{{ entry.finalResult.error }}</span>
+                                </div>
+                                <div v-if="entry.finalResult.executionTime" class="result-metric">
+                                  <span class="metric-label">Execution Time:</span>
+                                  <span class="metric-value">{{ entry.finalResult.executionTime }}ms</span>
+                                </div>
+                                <div class="result-metric">
+                                  <span class="metric-label">Status:</span>
+                                  <span class="metric-value">{{ entry.finalResult.status }}</span>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                      
                       <!-- Regular Log Entry -->
                       <div v-else>
                         <div class="log-header">
@@ -584,6 +727,20 @@ export default {
             continue;
           } else {
             console.log('Failed to process exchange comparison group');
+          }
+        }
+        
+        // Check if this is a trade execution group
+        if (log.context === 'executeTrade' && log.component === 'TRADE_EXECUTION' && log.message.includes('Trade execution STARTED')) {
+          console.log('Found trade execution, processing group...');
+          const tradeEntry = this.processTradeExecutionGroup(i);
+          if (tradeEntry) {
+            console.log('Successfully processed trade execution group:', tradeEntry);
+            processed.push(tradeEntry.entry);
+            i = tradeEntry.nextIndex;
+            continue;
+          } else {
+            console.log('Failed to process trade execution group');
           }
         }
         
@@ -1289,6 +1446,234 @@ export default {
       };
       
       console.log('Created exchange comparison entry:', compressedEntry);
+      
+      return {
+        entry: compressedEntry,
+        nextIndex: currentIndex + 1
+      };
+    },
+    
+    processTradeExecutionGroup(startIndex) {
+      const logs = this.filteredLogs;
+      const firstLog = logs[startIndex];
+      
+      console.log('Processing trade execution group starting at:', startIndex, firstLog);
+      
+      if (!firstLog || !firstLog.message.includes('Trade execution STARTED')) {
+        console.log('Not a trade execution start log');
+        return null;
+      }
+      
+      // Parse the start message for basic trade info
+      const startMessage = firstLog.message;
+      console.log('Trade execution start message:', startMessage);
+      
+      // Extract trade details from start message
+      const exchangeMatch = startMessage.match(/Exchange=(#\w+)/);
+      const pairMatch = startMessage.match(/Pair=([^\s]+)/);
+      const amountInMatch = startMessage.match(/Amount_in=(\d+) \(raw\)/);
+      const amountFormattedMatch = startMessage.match(/Amount_formatted=([0-9.]+)/);
+      const minAmountOutMatch = startMessage.match(/Min_amount_out=(\d+) \(raw\)/);
+      const minAmountFormattedMatch = startMessage.match(/Min_amount_out_formatted=([0-9.]+)/);
+      const timestampMatch = startMessage.match(/Timestamp=(\d+)/);
+      
+      if (!exchangeMatch || !pairMatch) {
+        console.log('Failed to parse essential trade execution details');
+        return null;
+      }
+      
+      const exchange = exchangeMatch[1].replace('#', '');
+      const pair = pairMatch[1];
+      const amountIn = amountInMatch ? amountInMatch[1] : '0';
+      const amountFormatted = amountFormattedMatch ? amountFormattedMatch[1] : '0';
+      const minAmountOut = minAmountOutMatch ? minAmountOutMatch[1] : '0';
+      const minAmountFormatted = minAmountFormattedMatch ? minAmountFormattedMatch[1] : '0';
+      const timestamp = timestampMatch ? timestampMatch[1] : '';
+      
+      // Extract buy token symbol for decimal formatting
+      const pairParts = pair.split('/');
+      const buyTokenSymbol = pairParts.length > 1 ? pairParts[1] : '';
+      let buyTokenDecimals = 8; // Default to 8 decimals
+      
+      // Find the buy token decimals from fetched token details
+      if (this.tacoStore.fetchedTokenDetails) {
+        const tokenEntry = this.tacoStore.fetchedTokenDetails.find(([_, details]) => 
+          details.tokenSymbol.toLowerCase() === buyTokenSymbol.toLowerCase()
+        );
+        if (tokenEntry) {
+          buyTokenDecimals = Number(tokenEntry[1].tokenDecimals);
+        }
+      }
+      
+      const tradeSteps = [];
+      let currentIndex = startIndex + 1;
+      let finalResult = null;
+      
+      // Process all trade execution logs in this group
+      while (currentIndex < logs.length && 
+             logs[currentIndex].context === 'executeTrade' && 
+             logs[currentIndex].component === 'TRADE_EXECUTION') {
+        
+        const log = logs[currentIndex];
+        const message = log.message;
+        
+        console.log('Processing trade execution log:', message);
+        
+        // KongSwap preparation step
+        if (message.includes('KongSwap trade preparation')) {
+          const prepMatch = message.match(/Symbols=([^\s]+) Slippage_tolerance=([0-9.]+)% Deadline=(\d+)s Min_amount_out=(\d+)/);
+          if (prepMatch) {
+            tradeSteps.push({
+              type: 'preparation',
+              exchange: 'KongSwap',
+              symbols: prepMatch[1],
+              slippageTolerance: prepMatch[2],
+              deadline: prepMatch[3],
+              minAmountOut: prepMatch[4]
+            });
+          }
+        }
+        
+        // KongSwap execution start
+        else if (message.includes('KongSwap execution STARTING')) {
+          tradeSteps.push({
+            type: 'execution_start',
+            exchange: 'KongSwap',
+            status: 'Parameters set, calling executeTransferAndSwap'
+          });
+        }
+        
+        // ICPSwap pool validation
+        else if (message.includes('ICPSwap pool validation')) {
+          const poolMatch = message.match(/Pool_ID=([^\s]+) Token0=([^\s]+) Token1=([^\s]+)/);
+          if (poolMatch) {
+            tradeSteps.push({
+              type: 'pool_validation',
+              exchange: 'ICPSwap',
+              poolId: poolMatch[1],
+              token0: poolMatch[2],
+              token1: poolMatch[3]
+            });
+          }
+        }
+        
+        // ICPSwap execution parameters
+        else if (message.includes('ICPSwap execution parameters')) {
+          const paramMatch = message.match(/Amount_after_fee=(\d+) Transfer_fee=(\d+) Min_amount_out=(\d+) Zero_for_one=([^\s]+)/);
+          if (paramMatch) {
+            tradeSteps.push({
+              type: 'execution_parameters',
+              exchange: 'ICPSwap',
+              amountAfterFee: paramMatch[1],
+              transferFee: paramMatch[2],
+              minAmountOut: paramMatch[3],
+              zeroForOne: paramMatch[4]
+            });
+          }
+        }
+        
+        // Trade success (KongSwap)
+        else if (message.includes('KongSwap trade SUCCESS')) {
+          const successMatch = message.match(/Amount_received=(\d+) Expected_min=(\d+) Actual_slippage=([0-9.]+)% Execution_time=(\d+)ms Status=(\w+)/);
+          if (successMatch) {
+            finalResult = {
+              success: true,
+              exchange: 'KongSwap',
+              amountReceived: successMatch[1],
+              expectedMin: successMatch[2],
+              actualSlippage: successMatch[3],
+              executionTime: successMatch[4],
+              status: successMatch[5]
+            };
+          }
+          break; // This should be the last log in the group
+        }
+        
+        // Trade success (ICPSwap)
+        else if (message.includes('ICPSwap trade SUCCESS')) {
+          const successMatch = message.match(/Amount_received=(\d+) Expected_min=(\d+) Effective_slippage=([0-9.]+)% Execution_time=(\d+)ms Status=(\w+)/);
+          if (successMatch) {
+            finalResult = {
+              success: true,
+              exchange: 'ICPSwap',
+              amountReceived: successMatch[1],
+              expectedMin: successMatch[2],
+              effectiveSlippage: successMatch[3],
+              executionTime: successMatch[4],
+              status: successMatch[5]
+            };
+          }
+          break; // This should be the last log in the group
+        }
+        
+        // Trade failure (KongSwap)
+        else if (message.includes('KongSwap trade FAILED')) {
+          const failMatch = message.match(/Error=([^\s]+(?:\s+[^\s]+)*?) Execution_time=(\d+)ms Status=(\w+)/);
+          if (failMatch) {
+            finalResult = {
+              success: false,
+              exchange: 'KongSwap',
+              error: failMatch[1],
+              executionTime: failMatch[2],
+              status: failMatch[3]
+            };
+          }
+          break; // This should be the last log in the group
+        }
+        
+        // Trade failure (ICPSwap)
+        else if (message.includes('ICPSwap trade FAILED')) {
+          const failMatch = message.match(/Error=([^\s]+(?:\s+[^\s]+)*?) Execution_time=(\d+)ms Status=(\w+)/);
+          if (failMatch) {
+            finalResult = {
+              success: false,
+              exchange: 'ICPSwap',
+              error: failMatch[1],
+              executionTime: failMatch[2],
+              status: failMatch[3]
+            };
+          }
+          break; // This should be the last log in the group
+        }
+        
+        // Trade execution exception
+        else if (message.includes('Trade execution EXCEPTION')) {
+          const exceptionMatch = message.match(/Error=([^\s]+(?:\s+[^\s]+)*?) Exchange=(#\w+) Status=(\w+)/);
+          if (exceptionMatch) {
+            finalResult = {
+              success: false,
+              exchange: exceptionMatch[2].replace('#', ''),
+              error: exceptionMatch[1],
+              status: exceptionMatch[3]
+            };
+          }
+          break; // This should be the last log in the group
+        }
+        
+        currentIndex++;
+      }
+      
+      console.log('Found', tradeSteps.length, 'trade execution steps');
+      console.log('Final result:', finalResult);
+      
+      // Create the compressed entry
+      const compressedEntry = {
+        type: 'tradeExecution',
+        timestamp: firstLog.timestamp,
+        component: 'executeTrade',
+        summaryMessage: `Trade execution ${finalResult?.success ? 'completed successfully' : 'failed'} on ${exchange}`,
+        exchange: exchange,
+        pair: pair,
+        amountIn: amountIn,
+        amountFormatted: amountFormatted,
+        minAmountOut: minAmountOut,
+        minAmountFormatted: minAmountFormatted,
+        buyTokenDecimals: buyTokenDecimals,
+        tradeSteps: tradeSteps,
+        finalResult: finalResult
+      };
+      
+      console.log('Created trade execution entry:', compressedEntry);
       
       return {
         entry: compressedEntry,
@@ -2008,5 +2393,241 @@ export default {
   font-size: 0.85em;
   color: #adb5bd;
   font-family: 'Courier New', monospace;
+}
+
+/* Trade Execution Styles */
+.trade-execution-summary {
+  background: rgba(108, 117, 125, 0.1);
+  border-left: 4px solid #6c757d;
+}
+
+.trade-execution-summary.success {
+  background: rgba(40, 167, 69, 0.1);
+  border-left: 4px solid #28a745;
+}
+
+.trade-execution-summary.failed {
+  background: rgba(220, 53, 69, 0.1);
+  border-left: 4px solid #dc3545;
+}
+
+.trade-execution-container {
+  background: rgba(0, 0, 0, 0.1);
+  border-radius: 6px;
+  padding: 12px;
+  margin-top: 8px;
+}
+
+.trade-execution-header {
+  font-weight: 600;
+  color: #e9ecef;
+  margin-bottom: 12px;
+  font-size: 0.875rem;
+}
+
+.trade-overview {
+  margin-bottom: 16px;
+}
+
+.trade-basic-info {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  padding: 8px;
+  background: rgba(108, 117, 125, 0.1);
+  border-radius: 6px;
+  border: 1px solid #6c757d;
+}
+
+.trade-execution-summary.success .trade-basic-info {
+  background: rgba(40, 167, 69, 0.1);
+  border-color: #28a745;
+}
+
+.trade-execution-summary.failed .trade-basic-info {
+  background: rgba(220, 53, 69, 0.1);
+  border-color: #dc3545;
+}
+
+.trade-pair-display,
+.trade-exchange,
+.trade-amount-in,
+.trade-min-out {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.75rem;
+}
+
+.pair-label,
+.exchange-label,
+.amount-label,
+.min-label {
+  color: #adb5bd;
+  font-weight: 600;
+}
+
+.pair-value,
+.exchange-value,
+.amount-value,
+.min-value {
+  color: #e9ecef;
+  font-family: 'Courier New', monospace;
+  font-weight: bold;
+}
+
+.amount-raw,
+.min-raw {
+  color: #6c757d;
+  font-size: 0.65rem;
+  margin-left: 4px;
+}
+
+.trade-steps {
+  margin-bottom: 16px;
+}
+
+.steps-header {
+  font-size: 0.8em;
+  font-weight: 600;
+  color: #adb5bd;
+  margin-bottom: 8px;
+}
+
+.steps-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.trade-step {
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid #495057;
+  border-radius: 6px;
+  padding: 8px;
+}
+
+.step-content {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.step-icon {
+  font-size: 1.2em;
+  line-height: 1;
+}
+
+.step-details {
+  flex: 1;
+}
+
+.step-title {
+  font-size: 0.8em;
+  font-weight: 600;
+  color: #e9ecef;
+  margin-bottom: 4px;
+}
+
+.step-info {
+  font-size: 0.7em;
+  color: #adb5bd;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.step-info > div {
+  margin-bottom: 2px;
+}
+
+.trade-result {
+  background: rgba(0, 0, 0, 0.2);
+  border: 2px solid #495057;
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.trade-result.success {
+  border-color: #28a745;
+  background: rgba(40, 167, 69, 0.1);
+}
+
+.trade-result.failed {
+  border-color: #dc3545;
+  background: rgba(220, 53, 69, 0.1);
+}
+
+.result-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #495057;
+}
+
+.result-icon {
+  font-size: 1.2em;
+}
+
+.result-title {
+  font-size: 1.0em;
+  font-weight: 700;
+  color: #e9ecef;
+  flex: 1;
+}
+
+.result-exchange {
+  font-size: 0.8em;
+  font-weight: 600;
+  color: #adb5bd;
+  background: rgba(0, 0, 0, 0.3);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.result-details {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.success-details,
+.failure-details {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.result-metric {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.75rem;
+}
+
+.result-metric .metric-label {
+  color: #adb5bd;
+  font-weight: 600;
+  min-width: 120px;
+}
+
+.result-metric .metric-value {
+  color: #e9ecef;
+  font-family: 'Courier New', monospace;
+  font-weight: bold;
+  text-align: right;
+}
+
+.result-metric .metric-raw {
+  color: #6c757d;
+  font-size: 0.65rem;
+  margin-left: 4px;
+}
+
+.error-text {
+  color: #dc3545 !important;
+  font-weight: 700;
 }
 </style> 
