@@ -655,7 +655,7 @@ export default {
       logCount: 100,
       searchTerm: '',
       autoRefresh: false,
-      overviewMode: false,
+      overviewMode: true,
       refreshInterval: null,
       lastRefresh: null,
       error: null,
