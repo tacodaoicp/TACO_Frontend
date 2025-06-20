@@ -384,11 +384,11 @@
                                   <div class="exchange-name">{{ exchange.name }}</div>
                                   <div class="exchange-status" :class="exchange.statusClass">{{ exchange.status }}</div>
                                 </div>
-                                <div class="exchange-details">
-                                  <div class="exchange-metric">
-                                    <span class="metric-label">Amount Out:</span>
-                                    <span class="metric-value">{{ exchange.amountOut }}</span>
-                                  </div>
+                                                                 <div class="exchange-details">
+                                   <div class="exchange-metric">
+                                     <span class="metric-label">Amount Out:</span>
+                                     <span class="metric-value">{{ formatExchangeAmount(exchange.amountOut, entry.buyTokenDecimals) }}</span>
+                                   </div>
                                   <div class="exchange-metric">
                                     <span class="metric-label">Slippage:</span>
                                     <span class="metric-value">{{ exchange.slippage }}</span>
@@ -614,6 +614,10 @@ export default {
     }
   },
   async mounted() {
+    // Fetch token details to get proper decimals for formatting
+    if (!this.tacoStore.fetchedTokenDetails.length) {
+      await this.tacoStore.fetchTokenDetails();
+    }
     await this.refreshLogs();
     await this.refreshTradingStatus();
   },
@@ -1151,6 +1155,21 @@ export default {
       const amountFormatted = startMatch[3];
       const maxSlippage = startMatch[4];
       
+      // Extract buy token symbol and get its decimals
+      const pairParts = pair.split('/');
+      const buyTokenSymbol = pairParts.length > 1 ? pairParts[1] : '';
+      let buyTokenDecimals = 8; // Default to 8 decimals
+      
+      // Find the buy token decimals from fetched token details
+      if (this.tacoStore.fetchedTokenDetails) {
+        const tokenEntry = this.tacoStore.fetchedTokenDetails.find(([_, details]) => 
+          details.tokenSymbol.toLowerCase() === buyTokenSymbol.toLowerCase()
+        );
+        if (tokenEntry) {
+          buyTokenDecimals = Number(tokenEntry[1].tokenDecimals);
+        }
+      }
+      
       const exchanges = [];
       let selectedExchange = '';
       let bestAmount = '';
@@ -1262,6 +1281,7 @@ export default {
         amountIn: amountIn,
         amountFormatted: amountFormatted,
         maxSlippage: maxSlippage,
+        buyTokenDecimals: buyTokenDecimals,
         exchanges: exchanges,
         selectedExchange: selectedExchange,
         bestAmount: bestAmount,
@@ -1274,6 +1294,23 @@ export default {
         entry: compressedEntry,
         nextIndex: currentIndex + 1
       };
+    },
+    
+    formatExchangeAmount(rawAmount, decimals) {
+      if (!rawAmount || !decimals) return rawAmount;
+      
+      const amount = parseFloat(rawAmount) / Math.pow(10, decimals);
+      
+      // Show all necessary decimals (up to the token's decimal precision)
+      // Remove trailing zeros but keep at least 2 decimal places for readability
+      const formatted = amount.toFixed(decimals);
+      const trimmed = parseFloat(formatted).toString();
+      
+      // Add thousands separators while preserving all significant decimals
+      const parts = trimmed.split('.');
+      parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+      
+      return parts.join('.');
     }
   }
 }
