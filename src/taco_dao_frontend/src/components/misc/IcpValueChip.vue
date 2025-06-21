@@ -69,8 +69,8 @@
     @media (max-width: 490px) {
 
         // flip orientation of top row
-        .taco-icp-value-chip__top {
-            flex-direction: column;
+        .taco-icp-value-chip__inner {
+            flex-direction: column !important;
         }
 
     }      
