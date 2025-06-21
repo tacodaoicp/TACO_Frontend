@@ -29,7 +29,7 @@
                 
             </div>
 
-            <!-- kvp -->
+            <!-- kvp (total) -->
             <div class="taco-entity-value-chip__tooltip__kvp pt-2"
                 style="padding-top: 0.75rem !important;">
 
@@ -44,11 +44,45 @@
                 <span class="taco-entity-value-chip__tooltip__kvp__value 
                     taco-text-black-to-white">${{formatNumber(totalTreasuryValueInUsd)}}</span>
 
+            </div>               
+
+            <!-- kvp (taco) -->
+            <div class="taco-entity-value-chip__tooltip__kvp pt-2"
+                style="padding-top: 0.75rem !important; padding-left: 1.25rem !important;">
+
+                <!-- key -->
+                <span class="taco-entity-value-chip__tooltip__kvp__key 
+                    taco-text-black-to-white">
+                    <TacoCoinIcon style="width: 1rem; height: 1rem;"/>
+                    Taco
+                </span>
+
+                <!-- value -->
+                <span class="taco-entity-value-chip__tooltip__kvp__value 
+                    taco-text-black-to-white">${{formatNumber(snsTreasuryTacoValueInUsd)}}</span>
+
             </div>
 
-            <!-- kvp -->
+            <!-- kvp (icp) -->
+            <div class="taco-entity-value-chip__tooltip__kvp pt-2"
+                style="padding: 0.75rem 1rem 1rem 1.25rem !important; border-bottom: 1px solid var(--dark-orange);">
+
+                <!-- key -->
+                <span class="taco-entity-value-chip__tooltip__kvp__key 
+                    taco-text-black-to-white">
+                    <img :src="icpLogo" style="width: 1rem; height: 1rem;"/>
+                    ICP
+                </span>
+
+                <!-- value -->
+                <span class="taco-entity-value-chip__tooltip__kvp__value 
+                    taco-text-black-to-white">${{formatNumber(snsTreasuryIcpValueInUsd)}}</span>
+
+            </div>         
+
+            <!-- kvp (portfolio) -->
             <div class="taco-entity-value-chip__tooltip__kvp py-2"
-                style="padding-bottom: 0.75rem !important;">
+                style="padding-bottom: 0.75rem !important; padding-top: 0.75rem !important;">
 
                 <!-- key -->
                 <span class="taco-entity-value-chip__tooltip__kvp__key 
@@ -59,11 +93,11 @@
 
                 <!-- value -->
                 <span class="taco-entity-value-chip__tooltip__kvp__value 
-                    taco-text-black-to-white">${{formatNumber(snsTreasuryBalance)}}</span>
+                    taco-text-black-to-white">${{formatNumber(totalPortfolioValueInUsd)}}</span>
 
             </div>
 
-            <!-- kvp -->
+            <!-- kvp (total) -->
             <div class="taco-entity-value-chip__tooltip__kvp py-2">
 
                 <!-- key -->
@@ -72,7 +106,7 @@
 
                 <!-- value -->
                 <span class="taco-entity-value-chip__tooltip__kvp__value 
-                    taco-text-black-to-white">${{formatNumber(snsTreasuryBalance + totalTreasuryValueInUsd)}}</span>
+                    taco-text-black-to-white">${{formatNumber(totalTreasuryValueInUsd + totalPortfolioValueInUsd)}}</span>
 
             </div>
 
@@ -214,6 +248,9 @@
     import { ref, onMounted, onUnmounted, computed } from 'vue'
     import { useTacoStore } from "../../stores/taco.store"
     import { storeToRefs } from "pinia"
+    import { Principal } from '@dfinity/principal'
+    import icpLogo from "../../assets/tokens/snspng/icp.png"
+    import TacoCoinIcon from "../../assets/tokens/tacoCoinIcon.vue"
 
     ///////////
     // Store //
@@ -223,12 +260,12 @@
     const tacoStore = useTacoStore()
 
     // # ACTIONS #
-    const { fetchTokenDetails, icrc1BalanceOf } = tacoStore
+    const { fetchTokenDetails, fetchTotalTreasuryValueInUsd } = tacoStore
 
     // # STATE #
 
     // dao
-    const { totalPortfolioValueInUsd, totalTreasuryValueInUsd } = storeToRefs(tacoStore)
+    const { totalPortfolioValueInUsd, totalTreasuryValueInUsd, snsTreasuryTacoValueInUsd, snsTreasuryIcpValueInUsd } = storeToRefs(tacoStore)
 
     /////////////////////
     // local variables //
@@ -236,9 +273,6 @@
 
     // showing taco entity tooltip
     const showingTacoEntityTooltip = ref(false)
-
-    // sns treasury balance
-    const snsTreasuryBalance = ref(0)
 
     ///////////////////
     // local methods //
@@ -255,20 +289,6 @@
     // hide taco entity tooltip
     const hideTacoEntityTooltip = () => {
         showingTacoEntityTooltip.value = false
-    }
-
-    // fetch balance of sns treasury
-    const fetchSnsTreasuryBalance = async () => {
-
-        // fetch balance
-        const balance = await icrc1BalanceOf('kknbx-zyaaa-aaaaq-aae4a-cai', 'lhdfz-wqaaa-aaaaq-aae3q-cai')
-
-        // log
-        console.log('taco.store: fetchSnsTreasuryBalance() - returned balance:', balance)
-
-        // set balance
-        snsTreasuryBalance.value = balance
-
     }
 
     /////////////
@@ -300,11 +320,14 @@
     // on mount
     onMounted(async () => {
 
+        // log
+        // console.log('TacoEntityValueChip mounted')
+
         // fetch token details from dao backend
         await fetchTokenDetails()
 
-        // fetch sns treasury balance
-        await fetchSnsTreasuryBalance()
+        // fetch total treasury value in usd
+        await fetchTotalTreasuryValueInUsd()
 
     })
 

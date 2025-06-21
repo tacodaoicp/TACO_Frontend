@@ -95,7 +95,7 @@
     <!-- header bar right -->
     <div class="header-bar__right">
 
-      <!-- icp price, taco dao holdings, and wallet container -->
+      <!-- token chips, entity value chip -->
       <div class="header-bar__chips" 
             style="user-select: text;">
 
@@ -104,12 +104,6 @@
 
         <!-- taco value -->
         <TacoTokenPriceChip />
-
-        <!-- portfolio value -->
-        <!-- <TacoPortfolioValueChip /> -->
-
-        <!-- treasury value -->
-        <!-- <TacoTreasuryValueChip /> -->
 
         <!-- entity value -->
         <TacoEntityValueChip />
