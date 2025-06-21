@@ -8,7 +8,7 @@
             <!-- astronaut -->
             <img :src="astronautLoaderUrl" class="loading-img">
 
-        </div>        
+        </div>
 
         <!-- toolbar container - l2 -->
         <div class="taco-container taco-container--l2 taco-container--l2--dark p-2">
@@ -59,7 +59,26 @@
         <div ref="tacoChartContainer"
              class="dao-allocations__taco-chart-container
                     taco-container taco-container--l2
-                    p-2">
+                    p-2 position-relative">
+
+            <!-- dao allocations button -->
+            <button class="btn taco-nav-btn position-absolute taco-nav-btn--active"
+                    style="top: 0.5rem; left: 0.5rem; z-index: 1000;"
+                    title="View DAO allocations"
+                    data-bs-toggle="tooltip"
+                    data-bs-placement="top">
+                DAO
+            </button>
+
+            <!-- my allocations button -->
+            <button v-if="showCurrentAllocations"
+                    class="btn taco-nav-btn position-absolute disabled"
+                    style="top: 0.5rem; right: 0.5rem; z-index: 1000; pointer-events: all;"
+                    title="Coming Soon"
+                    data-bs-toggle="tooltip"
+                    data-bs-placement="top">
+                Mine
+            </button>
 
             <!-- chart -->
             <apexchart 
