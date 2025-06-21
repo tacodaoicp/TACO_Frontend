@@ -262,6 +262,11 @@ export const useTacoStore = defineStore('taco', () => {
     const portfolioTokenPricesInUsd = useStorage('portfolioTokenPricesInUsd', [])
     const portfolioTokenPricesInIcp = useStorage('portfolioTokenPricesInIcp', [])
 
+    // sns provided canisters
+    const snsTreasuryTacoValueInUsd = ref(0)
+    const snsTreasuryIcpValueInUsd = ref(0)
+    const totalTreasuryValueInUsd = ref(0)
+
     // treasury
     const fetchedTradingStatus = ref()
 
@@ -465,8 +470,10 @@ export const useTacoStore = defineStore('taco', () => {
             root.style.setProperty("--green-to-orange", "#FED66C") // orange
             root.style.setProperty("--green-to-brown", "#934a17") // green
             root.style.setProperty("--green-to-yellow", "#FEC800") // yellow
+            root.style.setProperty("--dark-green-to-light-green", "#B4C2E9") // light green
             root.style.setProperty("--success-green-to-success-green-hover", "#19B229") // success green hover
             root.style.setProperty("--success-green-hover-to-success-green", "#179F25") // success green
+            root.style.setProperty("--success-green-hover-to-light-green", "#7CDC86") // light green
             root.style.setProperty("--dark-green-to-dark-brown", "#512100") // dark brown
             root.style.setProperty("--blue-to-light-blue", "#B4C2E9") // light blue
             root.style.setProperty("--brown-to-white", "#ffffff") // white
@@ -531,8 +538,10 @@ export const useTacoStore = defineStore('taco', () => {
             root.style.setProperty("--light-green-to-success-green", "#19B229") // success green
             root.style.setProperty("--green-to-orange", "#B7CD02") // green
             root.style.setProperty("--green-to-yellow", "#B7CD02") // green
+            root.style.setProperty("--dark-green-to-light-green", "#B4C2E9") // dark green
             root.style.setProperty("--success-green-to-success-green-hover", "#179F25") // success green hover
             root.style.setProperty("--success-green-hover-to-success-green", "#19B229") // success green
+            root.style.setProperty("--success-green-hover-to-light-green", "#179F25") // light green
             root.style.setProperty("--dark-green-to-dark-brown", "#7D8828") // dark green
             root.style.setProperty("--green-to-brown", "#B7CD02") // brown
             root.style.setProperty("--blue-to-light-blue", "#546595") // blue
@@ -1005,6 +1014,162 @@ export const useTacoStore = defineStore('taco', () => {
         }
 
     }
+    const icrc1BalanceOf = async (canisterId: string, owner: Principal, subaccount?: Uint8Array) => {
+        
+        // log
+        // console.log('taco.store: icrc1BalanceOf() - calling for balance...')
+        // console.log('taco.store: icrc1BalanceOf() - canisterId:', canisterId)
+        // console.log('taco.store: icrc1BalanceOf() - owner:', owner.toText())
+
+        try {
+
+            // get host
+            const host = process.env.DFX_NETWORK === "local"
+                ? getLocalHost()
+                : "https://ic0.app";
+
+            // create agent
+            const agent = await createAgent({
+                identity: new AnonymousIdentity(),
+                host,
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            })         
+
+            // create actor
+            const actor = Actor.createActor(idlFactory, {
+                agent,
+                canisterId: canisterId,
+            })
+
+            //////////////////////
+            // post actor logic //
+
+            // create account identifier
+            const accountId = {
+                owner: owner,
+                subaccount: subaccount ? [subaccount] : []
+            }
+
+            // get balance
+            const balance = await actor.icrc1_balance_of(accountId)
+
+            // log
+            // console.log('taco.store: icrc1BalanceOf() - returned balance:', balance)
+
+            // return balance
+            return balance
+
+        } catch (error) {
+
+            // log error
+            console.error('error fetching balance from icrc1 canister:', error)
+
+            // return false
+            return false
+
+        }
+
+    }
+
+    // sns provided canisters
+    const fetchTotalTreasuryValueInUsd = async () => {
+
+        // first fetch the total ICP in the treasury
+        // second fetch the total TACO in the treasury
+        // convert both to usd
+        // add both values together
+        // set total treasury value in usd
+
+        /////////////////////////
+        // conversion function //
+        /////////////////////////
+
+        // convert hex string to Uint8Array
+        const hexToUint8Array = (hex: string): Uint8Array => {
+            const bytes = new Uint8Array(hex.length / 2)
+            for (let i = 0; i < hex.length; i += 2) {
+                bytes[i / 2] = parseInt(hex.substr(i, 2), 16)
+            }
+            return bytes
+        }
+
+        /////////////////////////////////////
+        // fetch total ICP in the treasury //
+        /////////////////////////////////////
+
+        // log
+        // console.log('taco.store: fetchTotalTreasuryValueInUsd()')
+
+        // call icrc1 balance of for sns treasury taco balance
+        const snsTreasuryTacoBalance = await icrc1BalanceOf(
+            'kknbx-zyaaa-aaaaq-aae4a-cai', 
+            Principal.fromText('lhdfz-wqaaa-aaaaq-aae3q-cai'),
+            hexToUint8Array('ab5aaa420bfefa4244885e1b59347569bafacb144ecb6578fe3aed5cd772dc78')
+        )
+
+        // log
+        // console.log('treasury taco balance:', snsTreasuryTacoBalance)
+
+        //////////////////////////////////////
+        // fetch total TACO in the treasury //
+        //////////////////////////////////////
+        
+        // log
+        // console.log('taco.store: fetchTotalTreasuryValueInUsd() - fetching total ICP in the treasury')
+
+        // call icp ledger balance for sns treasury icp balance
+        const snsTreasuryIcpBalance = await icrc1BalanceOf(
+            'ryjl3-tyaaa-aaaaa-aaaba-cai', // ICP ledger canister ID
+            Principal.fromText('lhdfz-wqaaa-aaaaq-aae3q-cai'),
+            // hexToUint8Array('df86d44b4cf253518395a3213fbb6b256a27e60fb590c1b27211be9011709fdc')
+        )
+
+        // log
+        // console.log('treasury icp balance:', snsTreasuryIcpBalance)
+
+        /////////////////
+        // format data //
+        /////////////////
+
+        // convert balances to numbers
+        const tacoBalance = snsTreasuryTacoBalance ? Number(snsTreasuryTacoBalance) : 0
+        const icpBalance = snsTreasuryIcpBalance ? Number(snsTreasuryIcpBalance) : 0
+
+        // convert to proper units (ICP has 8 decimals, TACO has 8 decimals)
+        const tacoBalanceNormalized = tacoBalance / Math.pow(10, 8)
+        const icpBalanceNormalized = icpBalance / Math.pow(10, 8)
+
+        // convert to USD using current prices
+        const tacoValueUsd = tacoBalanceNormalized * tacoPriceUsd.value
+
+        // log
+        // console.log('taco value in usd: %c$' + tacoValueUsd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }), 'color: green; font-weight: bold;')
+
+        // convert to USD using current prices
+        const icpValueUsd = icpBalanceNormalized * icpPriceUsd.value
+
+        // log
+        // console.log('icp value in usd: %c$' + icpValueUsd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }), 'color: green; font-weight: bold;')
+
+        // calculate total treasury value in usd
+        const totalValue = tacoValueUsd + icpValueUsd
+
+        // log total value
+        // console.log('total treasury value: %c$' + totalValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }), 'color: green; font-weight: bold;')
+
+        // set sns treasury taco value in usd
+        snsTreasuryTacoValueInUsd.value = tacoValueUsd
+
+        // set sns treasury icp value in usd
+        snsTreasuryIcpValueInUsd.value = icpValueUsd
+
+        // set total treasury value in usd
+        totalTreasuryValueInUsd.value = totalValue
+
+        // return
+        return
+
+    }
 
     // dao backend
     const fetchTokenDetails = async () => {
@@ -1061,6 +1226,9 @@ export const useTacoStore = defineStore('taco', () => {
 
             }, 0)
 
+            // log
+            // console.log('taco.store: fetchTokenDetails() - total portfolio value in USD:', totalPortfolioValueInUsd.value)
+
             // calculate total portfolio value in ICP
             totalPortfolioValueInIcp.value = fetchedTokenDetails.value.reduce((acc, tokenEntry) => {
 
@@ -1074,6 +1242,9 @@ export const useTacoStore = defineStore('taco', () => {
                 return acc + tokenValue
 
             }, 0)
+
+            // log
+            // console.log('taco.store: fetchTokenDetails() - total portfolio value in ICP:', totalPortfolioValueInIcp.value)
 
             // return
             return            
@@ -2602,6 +2773,115 @@ export const useTacoStore = defineStore('taco', () => {
         }
     }
 
+    // Treasury Log Methods
+    const getTreasuryLogs = async (count: number) => {
+        try {
+            const authClient = await getAuthClient();
+            
+            if (!await authClient.isAuthenticated()) {
+                throw new Error('User not authenticated');
+            }
+
+            const identity = await authClient.getIdentity();
+            const agent = await createAgent({
+                identity,
+                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            });
+
+            const treasury = Actor.createActor<TreasuryService>(treasuryIDL, {
+                agent,
+                canisterId: treasuryCanisterId()
+            });
+
+            return await treasury.getLogs(BigInt(count));
+        } catch (error: any) {
+            console.error('Error fetching treasury logs:', error);
+            throw error;
+        }
+    }
+
+    const getTreasuryLogsByContext = async (context: string, count: number) => {
+        try {
+            const authClient = await getAuthClient();
+            
+            if (!await authClient.isAuthenticated()) {
+                throw new Error('User not authenticated');
+            }
+
+            const identity = await authClient.getIdentity();
+            const agent = await createAgent({
+                identity,
+                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            });
+
+            const treasury = Actor.createActor<TreasuryService>(treasuryIDL, {
+                agent,
+                canisterId: treasuryCanisterId()
+            });
+
+            return await treasury.getLogsByContext(context, BigInt(count));
+        } catch (error: any) {
+            console.error('Error fetching treasury logs by context:', error);
+            throw error;
+        }
+    }
+
+    const getTreasuryLogsByLevel = async (level: any, count: number) => {
+        try {
+            const authClient = await getAuthClient();
+            
+            if (!await authClient.isAuthenticated()) {
+                throw new Error('User not authenticated');
+            }
+
+            const identity = await authClient.getIdentity();
+            const agent = await createAgent({
+                identity,
+                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            });
+
+            const treasury = Actor.createActor<TreasuryService>(treasuryIDL, {
+                agent,
+                canisterId: treasuryCanisterId()
+            });
+
+            return await treasury.getLogsByLevel(level, BigInt(count));
+        } catch (error: any) {
+            console.error('Error fetching treasury logs by level:', error);
+            throw error;
+        }
+    }
+
+    const clearTreasuryLogs = async () => {
+        try {
+            const authClient = await getAuthClient();
+            
+            if (!await authClient.isAuthenticated()) {
+                throw new Error('User not authenticated');
+            }
+
+            const identity = await authClient.getIdentity();
+            const agent = await createAgent({
+                identity,
+                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            });
+
+            const treasury = Actor.createActor<TreasuryService>(treasuryIDL, {
+                agent,
+                canisterId: treasuryCanisterId()
+            });
+
+            return await treasury.clearLogs();
+        } catch (error: any) {
+            console.error('Error clearing treasury logs:', error);
+            throw error;
+        }
+    }
+
     // # RETURN #
     return {
         // state
@@ -2640,6 +2920,9 @@ export const useTacoStore = defineStore('taco', () => {
         fetchedVoterDetails,
         fetchedNeuronAllocations,
         fetchedTradingStatus,
+        totalTreasuryValueInUsd,
+        snsTreasuryTacoValueInUsd,
+        snsTreasuryIcpValueInUsd,
         // actions
         changeRoute,
         toggleDarkMode,
@@ -2682,5 +2965,11 @@ export const useTacoStore = defineStore('taco', () => {
         getTradingStatus,
         setOpenChatSeenStoreValue,
         setSneedSeenStoreValue,
+        getTreasuryLogs,
+        getTreasuryLogsByContext,
+        getTreasuryLogsByLevel,
+        clearTreasuryLogs,
+        icrc1BalanceOf,
+        fetchTotalTreasuryValueInUsd,
     }
 })

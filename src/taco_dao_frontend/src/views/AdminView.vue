@@ -8,6 +8,15 @@
         <div class="row">
           <TacoTitle level="h2" emoji="🔑" title="Admin Panel" class="mt-4" style="padding-left: 1rem !important;"/>
           
+          <!-- Quick Navigation -->
+          <div class="mb-4">
+            <div class="d-flex gap-3">
+              <router-link to="/admin/trade" class="btn btn-info">
+                📈 View Trading Logs
+              </router-link>
+            </div>
+          </div>
+          
           <!-- Timer Health Dashboard -->
           <div class="card bg-dark text-white mb-4">
             <div class="card-header d-flex justify-content-between align-items-center">
@@ -104,7 +113,7 @@
                       <div>Total Trades: {{ timerHealth.treasury.tradingMetrics.totalTradesExecuted.toString() }}</div>
                       <div>Failed Trades: {{ timerHealth.treasury.tradingMetrics.totalTradesFailed.toString() }}</div>
                       <div>Success Rate: {{ (timerHealth.treasury.tradingMetrics.successRate * 100).toFixed(1) }}%</div>
-                      <div>Avg Slippage: {{ (timerHealth.treasury.tradingMetrics.avgSlippage * 100).toFixed(2) }}%</div>
+                      <div>Avg Slippage: {{ timerHealth.treasury.tradingMetrics.avgSlippage.toFixed(2) }}%</div>
                     </div>
                   </div>
                   <!-- Token Sync Status -->

@@ -443,7 +443,7 @@ export const tokenData = [
     {
         title: 'Sneed',
         symbol: 'sneed',
-        link: 'app.sneeddao.com/',
+        link: 'https://app.sneeddao.com/',
         icpCoinsLink: 'https://icpcoins.com/#/token/SNEED',
         icon: sneedToken,
         description: `A 'blank canvas' DAO designed to enable the community to innovate, Sneed offers an accessible, open platform for creative and technological exploration on the Internet Computer Protocol.`,
