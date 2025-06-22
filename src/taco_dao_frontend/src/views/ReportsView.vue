@@ -52,32 +52,32 @@
               <div class="taco-report-explorer__list-container">
                 
                 <!-- reports list -->
-                <ul class="taco-report-explorer__list">      
-                    
-                  <!-- report item -->
-                  <li class="taco-report-explorer__list-item" @click="toggleReportMenuOnMobile(); router.push('/reports/ddckbtc')">
+                <ul class="taco-report-explorer__list">    
+                  
+                  <!-- motoko - report item -->
+                  <li class="taco-report-explorer__list-item" @click="toggleReportMenuOnMobile(); router.push('/reports/ddmotoko')">
                     
                     <!-- report -->
                     <div class="taco-report-explorer__list-report"
-                    :class="{ 'taco-report-explorer__list-report--active': reportId === 1 }">
+                    :class="{ 'taco-report-explorer__list-report--active': reportId === 3 }">
                       
                       <!-- report title icon -->              
                       <div class="taco-report-explorer__list-report__icon"
-                          :style="{ backgroundImage: `url(${ckBtcIconUrl})` }"></div>            
+                          :style="{ backgroundImage: `url(${motokoIconUrl})` }"></div>            
                       
                       <!-- report title container -->
                       <div class="taco-report-explorer__list-report__title-container">
                         
                         <!-- report title -->
-                        <span class="taco-report-explorer__list-report__title">DUE DILIGENCE PROCESS CHAIN-KEY BITCOIN (ckBTC)</span>
+                        <span class="taco-report-explorer__list-report__title">DUE DILIGENCE PROCESS Motoko DAO (MOTOKO)</span>
                         
                       </div>
                       
                     </div>
                     
                   </li>
-                  
-                  <!-- report item -->
+
+                  <!-- sneed - report item -->
                   <li class="taco-report-explorer__list-item" @click="toggleReportMenuOnMobile(); router.push('/reports/ddsneed')">
                     
                     <!-- report -->
@@ -98,7 +98,30 @@
                       
                     </div>
                     
-                  </li>
+                  </li>                     
+                    
+                  <!-- ckbtc - report item -->
+                  <li class="taco-report-explorer__list-item" @click="toggleReportMenuOnMobile(); router.push('/reports/ddckbtc')">
+                    
+                    <!-- report -->
+                    <div class="taco-report-explorer__list-report"
+                    :class="{ 'taco-report-explorer__list-report--active': reportId === 1 }">
+                      
+                      <!-- report title icon -->              
+                      <div class="taco-report-explorer__list-report__icon"
+                          :style="{ backgroundImage: `url(${ckBtcIconUrl})` }"></div>            
+                      
+                      <!-- report title container -->
+                      <div class="taco-report-explorer__list-report__title-container">
+                        
+                        <!-- report title -->
+                        <span class="taco-report-explorer__list-report__title">DUE DILIGENCE PROCESS CHAIN-KEY BITCOIN (ckBTC)</span>
+                        
+                      </div>
+                      
+                    </div>
+                    
+                  </li>           
                   
                 </ul>
                 
@@ -1222,7 +1245,7 @@
                             
                             <!-- paragraph -->
                             <p class="taco-report-explorer__report-paragraph">
-                              As at 08/06/25(USD): 72.37
+                              As of 08/06/25(USD): 72.37
                             </p>
                             
                           </li>                      
@@ -1232,7 +1255,7 @@
                             
                             <!-- paragraph -->
                             <p class="taco-report-explorer__report-paragraph">
-                              As at 08/06/25 (ICP): 13.65
+                              As of 08/06/25 (ICP): 13.65
                             </p>
 
                           </li>
@@ -1262,7 +1285,7 @@
                             
                             <!-- paragraph -->
                             <p class="taco-report-explorer__report-paragraph">
-                              USD Volume 24H as at 08/06/25: 2010
+                              USD Volume 24H as of 08/06/25: 2010
                             </p>
                             
                           </li>
@@ -1466,6 +1489,1183 @@
 
                 </div>
                 
+              </div>   
+              
+              <!-- motoko dd report -->
+              <div v-if="reportId === 3" class="taco-report-explorer__report-container">
+
+                <!-- inner -->
+                <div class="taco-report-explorer__report-container__inner">
+                
+                  <!-- report header -->
+                  <div class="taco-report-explorer__report-header">
+                    
+                    <!-- report title -->
+                    <h2 class="taco-report-explorer__report-header__title">DUE DILIGENCE PROCESS Motoko DAO (MOTOKO)</h2>
+
+                    <!-- report metadata continer -->
+                    <div class="taco-report-explorer__report-header__metadata-container">
+
+                      <!-- report metadata -->
+                      <span class="taco-report-explorer__report-header__metadata">
+                        <i class="fa-solid fa-luchador-mask"></i> 
+                        <span> Written by </span>
+                        <span>manilpwn</span>
+                        <span> and </span>
+                        <span>TrickyVik</span>
+                        <span class="small"> 06/2025</span>
+                      </span>
+
+                    </div>        
+                    
+                  </div>
+
+                  <!-- report body -->
+                  <div class="taco-report-explorer__report-body">
+                    
+                    <!-- heading -->
+                    <h3 class="taco-report-explorer__report-heading
+                              taco-report-explorer__report-heading--h1">
+                      Team Background
+                      <i class="fa-solid fa-circle-info" 
+                        data-bs-toggle="tooltip" 
+                        data-bs-placement="top" 
+                        title="Assess the founding team's transparency, credibility, experience, and any past contributions to the ICP ecosystem"></i>
+                    </h3>
+                    
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      Motoko Ghosts is a collection of 10, 000 uniquely illustrated NFTs created by Jon Ball of Poked Studio. They established a visual identity around Motoko, a programming language designed by DFINITY for writing smart contracts on ICP.
+                    </p>
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      Before the creation of the Motoko DAO, <a href="https://x.com/sonic_ooo/status/1745314196034588816?t=p9K9YrK2DF2OD_cPX2QYTA" target="_blank" class="taco-report-explorer__report-link">10,000 $MOTOKO tokens were minted and airdropped 1:1 to Motoko Ghosts NFT holders</a>. Community member AccumulatingICP and the Sonic team collaborated on this.
+                    </p>
+                    
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      Motoko DAO was created to give the Motoko Ghosts community a structure to collectively steer the direction of the Motoko Ghosts brand. RemCodes developed a 1:1 Swap function which was used to give existing holders of $MOTOKO the ability to convert their tokens to SNS governance tokens. Four custodians were designated to execute this transition: Bug Slayer, AccumulatingICP, RemCodes, and BobbyO.
+                    </p>
+                    
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      The founders of Dragginz, Adam Powell and Donna Powell, are involved as investors and advisors. The Dragginz team has committed to working on the Toko NFT Maker & Marketplace (Toko) until it is ready to transition under Motoko DAO's governance. The Powells previously created Neopets, a 1999 online video game which within less than a decade accrued 140 million accounts. They went on to form Meteor Games after selling Neopets, which, among other projects, created a Facebook game named Island Paradise, which at its peak claimed 6.8 million monthly users. Adam Powell has contributed ICP to several SNS launches, and the Powells are vocal contributors to the broader ICP ecosystem.
+                    </p>
+                    
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      Approved governance proposals have appointed six $MOTOKO team hires:
+                    </p>
+
+                    <!-- unordered list -->
+                    <ul class="taco-report-explorer__report-ul">
+                      
+                      <!-- list item -->
+                      <li class="taco-report-explorer__report-li">
+
+                        <!-- paragraph -->
+                        <p class="taco-report-explorer__report-paragraph">
+                          <a href="https://app.sneeddao.com/proposal?proposalid=224&sns=ko36b-myaaa-aaaaq-aadbq-cai" target="_blank" class="taco-report-explorer__report-link">Proposal ID 224 appointed VingTheory as Frontend Developer</a>. He created the ICpxy NFT collection and has worked with Poked Studio. He is currently working on the Motoko Mining dApp.
+                        </p>
+
+                      </li>
+
+                      <!-- list item -->
+                      <li class="taco-report-explorer__report-li">
+
+                        <!-- paragraph -->
+                        <p class="taco-report-explorer__report-paragraph">
+                          <a href="https://app.sneeddao.com/proposal?proposalid=225&sns=ko36b-myaaa-aaaaq-aadbq-cai" target="_blank" class="taco-report-explorer__report-link">Proposal ID 225 appointed Enoch as Backend Developer</a>. He has worked on numerous projects including Motoko Pals, Tswaanda Africa, and has contributed to IC-Websocket Motoko. He is also DevRel and Instructor at ICP HUB South Africa.
+                        </p>
+
+                      </li>
+
+                      <!-- list item -->
+                      <li class="taco-report-explorer__report-li">
+
+                        <!-- paragraph -->
+                        <p class="taco-report-explorer__report-paragraph">
+                          <a href="https://app.sneeddao.com/proposal?proposalid=227&sns=ko36b-myaaa-aaaaq-aadbq-cai" target="_blank" class="taco-report-explorer__report-link">Proposal ID 227 appointed AccumulatingICP as Product Manager</a>. He has worked as a Technical Writer at InfinitySwap, done marketing for Finny, is currently Product Manager & doing marketing for ToolKit, and has a Named Neuron for Due Diligence on SNS Decentralisation Swaps.
+                        </p>
+
+                      </li>
+                      
+                      <!-- list item -->
+                      <li class="taco-report-explorer__report-li">
+
+                        <!-- paragraph -->
+                        <p class="taco-report-explorer__report-paragraph">
+                          <a href="https://app.sneeddao.com/proposal?proposalid=228&sns=ko36b-myaaa-aaaaq-aadbq-cai" target="_blank" class="taco-report-explorer__report-link">Proposal ID 228 appointed Mohammed as Graphic Designer</a>. He has 3 years of experience in this field.
+                        </p>
+
+                      </li>
+                      
+                      <!-- list item -->
+                      <li class="taco-report-explorer__report-li">
+
+                        <!-- paragraph -->
+                        <p class="taco-report-explorer__report-paragraph">
+                          <a href="https://app.sneeddao.com/proposal?proposalid=229&sns=ko36b-myaaa-aaaaq-aadbq-cai" target="_blank" class="taco-report-explorer__report-link">Proposal ID 229 appointed MyArtbar as 3D Animation Artist</a>. He is creator and lead artist for multiple ICP NFT collections including MotokoPals, Puzzle, Offspring, and Space Odyssey.
+                        </p>
+
+                      </li>
+                      
+                      <!-- list item -->
+                      <li class="taco-report-explorer__report-li">
+
+                        <!-- paragraph -->
+                        <p class="taco-report-explorer__report-paragraph">
+                          <a href="https://app.sneeddao.com/proposal?proposalid=233&sns=ko36b-myaaa-aaaaq-aadbq-cai" target="_blank" class="taco-report-explorer__report-link">Proposal ID 233 appointed Jay Nolan as Content Creator</a>. He has created content tailored to the Internet Computer and the Motoko DAO.
+                        </p>
+
+                      </li>
+
+                    </ul>                    
+
+                    <hr>
+
+                    <!-- heading -->
+                    <h3 class="taco-report-explorer__report-heading
+                              taco-report-explorer__report-heading--h1">
+                      Token Utility
+                      <i class="fa-solid fa-circle-info" 
+                        data-bs-toggle="tooltip" 
+                        data-bs-placement="top" 
+                        title="Examine the token's purpose and functionality within its ecosystem to ensure it provides tangible value and practical use cases"></i>
+                    </h3>  
+                    
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      The MOTOKO token serves as the governance token for Motoko DAO, enabling members to submit and vote on proposals that are implemented if approved.
+                    </p>  
+                    
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      The Motoko DAO controls, or will control, the canisters of the Motoko Ghosts, Motoko Pals, BTC Flower, ETH Flower, ICP Flower, Pineapple Punks, BTC Flower 2.0, Grapes of Wrath, Cherries, and Bold Art Degens NFT collections. There is a planned collection of 3D Motoko Ghosts that will be paired 1:1 with the current 2D Motoko Ghosts.
+                    </p>  
+                    
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      <a href="https://motoko-1.gitbook.io/motoko-mining/" target="_blank" class="taco-report-explorer__report-link">Motoko Mining will be a platform that allows users to stake their Motoko Ghost</a>, burn $MOTOKO, and have a chance to earn $MOTOKO and a “fuel asset” that will be leveraged in the Motoko MMO. Details for the MMO have not been announced yet, but it will be a combination of PvE & PvP where users level up their Motoko Ghost & compete for $MOTOKO.
+                    </p>  
+                    
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      Toko is an NFT Maker & Marketplace planned to be launched this year. The progress that has been completed so far includes account creation, the upload of assets of any filetype, the ability to add tags to assets, the design of the majority of the system, and its wireframe. <a href="https://x.com/dragginzgame/status/1920435166507413664" target="_blank" class="taco-report-explorer__report-link">A video sneak peek of NFT Maker has been shared</a>. The plan for the MVP includes tools for creators to launch simple collections and a marketplace with the basic features of listing, buying, royalties, and transfers.
+                    </p>  
+                    
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      Toko will be funded by an optional minting fee - a small percentage of each claim and sale going to the DAO. Creators will be able to adjust this percentage or remove it completely. Secondary sales will have adjustable parameters too. While these values will be fixed upon creation, creators can set predefined ranges which they can adjust between post-creation.
+                    </p>  
+                    
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      Toko will be built with a focus on creator control and flexibility. This includes creators being able to adjust how many NFTs can ever be minted, how many times they can be transferred, whether royalties taper off over time, allocating % of each sale to fund cycles that keep NFTs usable, and claim rules. Additional planned concepts include splitting and merging NFTs, weighted layer-based NFT generation, as well as mass imports of existing NFT collections.
+                    </p>  
+                    
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      <a href="https://x.com/dragginzgame/status/1932136841127272613" target="_blank" class="taco-report-explorer__report-link">Donna has explored potential use cases spanning music, merchandise, events, writing, real-world art, charities, and gaming</a>:
+                    </p>
+
+                    <!-- unordered list -->
+                    <ul class="taco-report-explorer__report-ul">
+                      
+                      <!-- list item -->
+                      <li class="taco-report-explorer__report-li">
+
+                        <!-- paragraph -->
+                        <p class="taco-report-explorer__report-paragraph">
+                          Exclusive content.
+                        </p>
+
+                      </li>
+
+                      <!-- list item -->
+                      <li class="taco-report-explorer__report-li">
+
+                        <!-- paragraph -->
+                        <p class="taco-report-explorer__report-paragraph">
+                          Dynamic NFTs that evolve over time based on engagement or ownership duration.
+                        </p>
+
+                      </li>
+
+                      <!-- list item -->
+                      <li class="taco-report-explorer__report-li">
+
+                        <!-- paragraph -->
+                        <p class="taco-report-explorer__report-paragraph">
+                          Royalty routing that splits payments transparently and instantly.
+                        </p>
+
+                      </li>
+                      
+                      <!-- list item -->
+                      <li class="taco-report-explorer__report-li">
+
+                        <!-- paragraph -->
+                        <p class="taco-report-explorer__report-paragraph">
+                          Fan club access to private Discords, early tour dates, and voting on future releases.
+                        </p>
+
+                      </li>
+                      
+                      <!-- list item -->
+                      <li class="taco-report-explorer__report-li">
+
+                        <!-- paragraph -->
+                        <p class="taco-report-explorer__report-paragraph">
+                          Claiming merchandise via NFTs prior to conventions and shows to prevent overproduction and reduce the shipping footprint.
+                        </p>
+
+                      </li>
+                      
+                      <!-- list item -->
+                      <li class="taco-report-explorer__report-li">
+
+                        <!-- paragraph -->
+                        <p class="taco-report-explorer__report-paragraph">
+                          Gamified experiences.
+                        </p>
+
+                      </li>   
+                      
+                      <!-- list item -->
+                      <li class="taco-report-explorer__report-li">
+
+                        <!-- paragraph -->
+                        <p class="taco-report-explorer__report-paragraph">
+                          Proof of Origin.
+                        </p>
+
+                      </li>   
+                      
+                      <!-- list item -->
+                      <li class="taco-report-explorer__report-li">
+
+                        <!-- paragraph -->
+                        <p class="taco-report-explorer__report-paragraph">
+                          NFT tickets that are non-transferable and burned upon entry to remove scalping, or, alternatively, royalties on resales.
+                        </p>
+
+                      </li>   
+                      
+                      <!-- list item -->
+                      <li class="taco-report-explorer__report-li">
+
+                        <!-- paragraph -->
+                        <p class="taco-report-explorer__report-paragraph">
+                          Proof of Attendance.
+                        </p>
+
+                      </li>   
+                      
+                      <!-- list item -->
+                      <li class="taco-report-explorer__report-li">
+
+                        <!-- paragraph -->
+                        <p class="taco-report-explorer__report-paragraph">
+                          Serialized writing and publishing.
+                        </p>
+
+                      </li>  
+                      
+                      <!-- list item -->
+                      <li class="taco-report-explorer__report-li">
+
+                        <!-- paragraph -->
+                        <p class="taco-report-explorer__report-paragraph">
+                          NFTs tied to real-world art events and physical artwork as certificates of authenticity
+                        </p>
+
+                      </li>  
+                      
+                      <!-- list item -->
+                      <li class="taco-report-explorer__report-li">
+
+                        <!-- paragraph -->
+                        <p class="taco-report-explorer__report-paragraph">
+                          Transparent donation flows for charitable causes, including Proof of Donation NFTs.
+                        </p>
+
+                      </li>  
+                      
+                      <!-- list item -->
+                      <li class="taco-report-explorer__report-li">
+
+                        <!-- paragraph -->
+                        <p class="taco-report-explorer__report-paragraph">
+                          In-game NFTs with cross-IP utility and custom logic for interactive gameplay.
+                        </p>
+
+                      </li>                        
+
+                    </ul>   
+                    
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      There are also plans to release official Motoko Ghosts merchandise this year, including a Motoko Merch line, toys, plushies, and trading cards. The legal and financial structure - such as how proceeds will be routed to the DAO treasury - is still under discussion, but Donna has noted that conversations with the DFINITY Foundation have already taken place regarding this merchandise being present at official DFINITY events.
+                    </p>
+                    
+                    <hr>
+
+                    <!-- heading -->
+                    <h3 class="taco-report-explorer__report-heading
+                              taco-report-explorer__report-heading--h1">
+                      Ecosystem Alignment
+                      <i class="fa-solid fa-circle-info" 
+                        data-bs-toggle="tooltip" 
+                        data-bs-placement="top" 
+                        title="Evaluate the token's synergy with other ICP projects, including any existing collaborations and suitability for inclusion in the Salsa Season rewards program."></i>
+                    </h3>  
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      Motoko DAO aligns closely with the broader ICP ecosystem by promoting the Motoko programming language - not just as a tool for smart contract development, but as a cultural brand. Subjectively speaking, Motoko Ghosts are cute and lend themselves easily to merchandisable formats like plushies.
+                    </p>
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      With ICP often praised for its technical superiority, building out a world-class NFT standard on this stack makes natural sense.
+                    </p>
+                    
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      There are already collaborations in place - most notably with Poked Studio and Ludo. While Dragginz is a separate project, the Dragginz team has clarified that strong NFT infrastructure is a prerequisite for the Dragginz game itself, and that work on Toko does not represent a shift away from Dragginz development.
+                    </p>
+                    
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      This due diligence process was the first to be initiated by a community member rather than the TACO DAO team. <a href="https://forum.dfinity.org/t/commission-due-diligence-report-on-motoko-token-for-taco-dao/50192" target="_blank" class="taco-report-explorer__report-link">The proposal came from long-time active member CryptoMyth</a>.
+                    </p>
+                    
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      During the writing of this due diligence, <a href="https://x.com/MotokoGhosts/status/1936132191907459228" target="_blank" class="taco-report-explorer__report-link">Motoko Ghosts held a meme contest on X in collaboration with Windoge98</a>.
+                    </p>                    
+
+                    <hr>
+
+                    <!-- heading -->
+                    <h3 class="taco-report-explorer__report-heading
+                              taco-report-explorer__report-heading--h1">
+                      Community
+                      <i class="fa-solid fa-circle-info" 
+                        data-bs-toggle="tooltip" 
+                        data-bs-placement="top" 
+                        title="Assess the size and engagement of the token's community to gauge long-term adoption potential"></i>
+                    </h3>  
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      The Motoko DAO Community Discord server has 1.45k members, the Toko Discord server has 81 members, and the OpenChat community has 360 members.
+                    </p>  
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      On X, MotokoGhosts has 1997 followers and TokoMarket_ has 300 followers.
+                    </p>                      
+                    
+                    <hr>
+
+                    <!-- heading -->
+                    <h3 class="taco-report-explorer__report-heading
+                              taco-report-explorer__report-heading--h1">
+                      Technology
+                      <i class="fa-solid fa-circle-info" 
+                        data-bs-toggle="tooltip" 
+                        data-bs-placement="top" 
+                        title="Review the project's technical foundation, focusing on code quality, scalability, and how effectively it leverages ICP's capabilities"></i>
+                    </h3>  
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      <a href="https://forum.dfinity.org/t/why-support-boom-evolving-into-mimic/44176" target="_blank" class="taco-report-explorer__report-link">Mimic is an open-source, schema-based query and data modelling language for handling complex data</a>. It was originally developed for Dragginz and is now being used for Toko. For now, Mimic does not have the necessary documentation to make it accessible.
+                    </p>  
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      <a href="https://forum.dfinity.org/t/migrating-existing-nfts-to-the-motoko-marketplace/43389/19" target="_blank" class="taco-report-explorer__report-link">Adam has outlined the creation of the “NextGenNFT” standard</a>, an ambitious evolution of NFTs designed to meet the emotional and technological demands of digital experiences in 2030. It will use Plutchik's Wheel of Emotions - a psychological model identifying eight primary emotions (Joy, Trust, Fear, Surprise, Sadness, Disgust, Anger, Anticipation) - as a framework to create emotionally responsive NFTs.
+                    </p>  
+                    
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      This is intended to support modular interactions and to scale across a range of applications, including gaming, AR/VR, and live streaming.
+                    </p>  
+                    
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      Current NFT standards are limited to static metadata and basic ownership mechanics, lacking native support for dynamic, interactive, or emotionally responsive features. The proposed NextGenNFT standard introduces 23 components to address these gaps:
+                    </p>   
+                    
+                    <!-- unordered list -->
+                    <ul class="taco-report-explorer__report-ul">
+                      
+                      <!-- list item -->
+                      <li class="taco-report-explorer__report-li">
+
+                        <!-- paragraph -->
+                        <p class="taco-report-explorer__report-paragraph">
+                          NFT Name: Mutable title (e.g., “Wedding Day” to “10th Anniversary”).
+                        </p>
+
+                      </li>
+
+                      <!-- list item -->
+                      <li class="taco-report-explorer__report-li">
+
+                        <!-- paragraph -->
+                        <p class="taco-report-explorer__report-paragraph">
+                          Description: Mutable text for narrative evolution.
+                        </p>
+
+                      </li>
+
+                      <!-- list item -->
+                      <li class="taco-report-explorer__report-li">
+
+                        <!-- paragraph -->
+                        <p class="taco-report-explorer__report-paragraph">
+                          ID: Immutable unique identifier.
+                        </p>
+
+                      </li>
+                      
+                      <!-- list item -->
+                      <li class="taco-report-explorer__report-li">
+
+                        <!-- paragraph -->
+                        <p class="taco-report-explorer__report-paragraph">
+                          Issuer: Immutable entity that minted the NFT.
+                        </p>
+
+                      </li>
+                      
+                      <!-- list item -->
+                      <li class="taco-report-explorer__report-li">
+
+                        <!-- paragraph -->
+                        <p class="taco-report-explorer__report-paragraph">
+                          Asset: Mutable content that can adapt to context.
+                        </p>
+
+                      </li>
+                      
+                      <!-- list item -->
+                      <li class="taco-report-explorer__report-li">
+
+                        <!-- paragraph -->
+                        <p class="taco-report-explorer__report-paragraph">
+                          Attributes: Mutable key-value pairs for dynamic metadata (e.g., “mood: happy”).
+                        </p>
+
+                      </li>   
+                      
+                      <!-- list item -->
+                      <li class="taco-report-explorer__report-li">
+
+                        <!-- paragraph -->
+                        <p class="taco-report-explorer__report-paragraph">
+                          Immutable Part: Defines unchangeable fields.
+                        </p>
+
+                      </li>   
+                      
+                      <!-- list item -->
+                      <li class="taco-report-explorer__report-li">
+
+                        <!-- paragraph -->
+                        <p class="taco-report-explorer__report-paragraph">
+                          Royalties: Built-in creator compensation for secondary sales.
+                        </p>
+
+                      </li>   
+                      
+                      <!-- list item -->
+                      <li class="taco-report-explorer__report-li">
+
+                        <!-- paragraph -->
+                        <p class="taco-report-explorer__report-paragraph">
+                          Dynamic Metadata: Mechanism to update mutable fields.
+                        </p>
+
+                      </li>   
+                      
+                      <!-- list item -->
+                      <li class="taco-report-explorer__report-li">
+
+                        <!-- paragraph -->
+                        <p class="taco-report-explorer__report-paragraph">
+                          Conditional Logic: Restricts access/perks based on conditions.
+                        </p>
+
+                      </li>  
+                      
+                      <!-- list item -->
+                      <li class="taco-report-explorer__report-li">
+
+                        <!-- paragraph -->
+                        <p class="taco-report-explorer__report-paragraph">
+                          Execution Logic: Automates actions (e.g., transfers on death).
+                        </p>
+
+                      </li>  
+                      
+                      <!-- list item -->
+                      <li class="taco-report-explorer__report-li">
+
+                        <!-- paragraph -->
+                        <p class="taco-report-explorer__report-paragraph">
+                          Ownership Structure: Supports multiple co-owners.
+                        </p>
+
+                      </li>  
+                      
+                      <!-- list item -->
+                      <li class="taco-report-explorer__report-li">
+
+                        <!-- paragraph -->
+                        <p class="taco-report-explorer__report-paragraph">
+                          Context Handler: Adapts asset to environment (e.g., VR vs. mobile).
+                        </p>
+
+                      </li>    
+                      
+                      <!-- list item -->
+                      <li class="taco-report-explorer__report-li">
+
+                        <!-- paragraph -->
+                        <p class="taco-report-explorer__report-paragraph">
+                          Encryption Layer: Secures sensitive data (e.g., biometrics).
+                        </p>
+
+                      </li>    
+
+                      <!-- list item -->
+                      <li class="taco-report-explorer__report-li">
+
+                        <!-- paragraph -->
+                        <p class="taco-report-explorer__report-paragraph">
+                          Pricing Engine: Dynamically adjusts value based on demand.
+                        </p>
+
+                      </li>    
+
+                      <!-- list item -->
+                      <li class="taco-report-explorer__report-li">
+
+                        <!-- paragraph -->
+                        <p class="taco-report-explorer__report-paragraph">
+                          Sentiment Interface: Responds to user emotions (e.g., glows for Joy).
+                        </p>
+
+                      </li>    
+
+                      <!-- list item -->
+                      <li class="taco-report-explorer__report-li">
+
+                        <!-- paragraph -->
+                        <p class="taco-report-explorer__report-paragraph">
+                          Oracle Support: Integrates real-time data (e.g., weather).
+                        </p>
+
+                      </li>    
+
+                      <!-- list item -->
+                      <li class="taco-report-explorer__report-li">
+
+                        <!-- paragraph -->
+                        <p class="taco-report-explorer__report-paragraph">
+                          Generative Module: Creates unique content at minting.
+                        </p>
+
+                      </li>    
+
+                      <!-- list item -->
+                      <li class="taco-report-explorer__report-li">
+
+                        <!-- paragraph -->
+                        <p class="taco-report-explorer__report-paragraph">
+                          Soulbound Status: Locks NFT to a wallet.
+                        </p>
+
+                      </li>    
+
+                      <!-- list item -->
+                      <li class="taco-report-explorer__report-li">
+
+                        <!-- paragraph -->
+                        <p class="taco-report-explorer__report-paragraph">
+                          Transferable but Non-Sellable Status: Allows gifting but not selling.
+                        </p>
+
+                      </li>    
+
+                      <!-- list item -->
+                      <li class="taco-report-explorer__report-li">
+
+                        <!-- paragraph -->
+                        <p class="taco-report-explorer__report-paragraph">
+                          Self-Destruct Settings: Enables expiration/burning (e.g., post-event).
+                        </p>
+
+                      </li>    
+
+                      <!-- list item -->
+                      <li class="taco-report-explorer__report-li">
+
+                        <!-- paragraph -->
+                        <p class="taco-report-explorer__report-paragraph">
+                          Revocability Status: Allows issuer to cancel NFT.
+                        </p>
+
+                      </li>    
+
+                      <!-- list item -->
+                      <li class="taco-report-explorer__report-li">
+
+                        <!-- paragraph -->
+                        <p class="taco-report-explorer__report-paragraph">
+                          Social Impact Metrics: Tracks engagement/impact (e.g., boycott success).
+                        </p>
+
+                      </li>    
+
+                    </ul>                       
+                    
+                    <hr>
+
+                    <!-- anon container -->
+                    <div class="d-flex flex-wrap gap-5">
+
+                      <!-- left -->
+                      <div>
+
+                        <!-- heading -->
+                        <h3 class="taco-report-explorer__report-heading
+                                  taco-report-explorer__report-heading--h1">
+                          Tokenomics
+                          <i class="fa-solid fa-circle-info" 
+                            data-bs-toggle="tooltip" 
+                            data-bs-placement="top" 
+                            title="Analyse the supply and distribution of the token; any inflationary/deflationary mechanisms; and any incentive structures, to ensure sustainability and fair distribution"></i>
+                        </h3>
+
+                        <!-- unordered list -->
+                        <ul class="taco-report-explorer__report-ul">
+
+                          <!-- list item -->
+                          <li class="taco-report-explorer__report-li">
+                            
+                            <!-- paragraph -->
+                            <p class="taco-report-explorer__report-paragraph">
+                              Initial Total Supply: 10,000
+                            </p>
+                            
+                          </li>
+
+                          <!-- list item -->
+                          <li class="taco-report-explorer__report-li">
+                            
+                            <!-- paragraph -->
+                            <p class="taco-report-explorer__report-paragraph">
+
+                              <!-- link -->
+                              <a href="https://app.sneeddao.com/sneedlock" target="_blank" class="taco-report-explorer__report-link">
+                                Current Total Supply (22/06/25): 54,660,973
+                              </a>
+
+                            </p>
+                            
+                          </li>
+                          
+                          <!-- list item -->
+                          <li class="taco-report-explorer__report-li">
+                            
+                            <!-- paragraph -->
+                            <p class="taco-report-explorer__report-paragraph">
+                              Circulating Supply: 42,259,439
+                            </p>
+                            
+                          </li>
+                          
+                          <!-- list item -->
+                          <li class="taco-report-explorer__report-li">
+                            
+                            <!-- paragraph -->
+                            <p class="taco-report-explorer__report-paragraph">
+                              Burn per transaction: 0.1
+                            </p>
+                            
+                          </li>
+                          
+                          <!-- list item -->
+                          <li class="taco-report-explorer__report-li">
+                            
+                            <!-- paragraph -->
+                            <p class="taco-report-explorer__report-paragraph">
+                              Holders:
+                            </p>
+
+                            <!-- unordered list -->
+                            <ul class="taco-report-explorer__report-ul" style="list-style-type: disc">
+
+                              <!-- list item -->
+                              <li class="taco-report-explorer__report-li">
+                                
+                                <!-- paragraph -->
+                                <p class="taco-report-explorer__report-paragraph">
+                                  Top - 22.68% (Treasury)
+                                </p>
+
+                              </li>
+
+                              <!-- list item -->
+                              <li class="taco-report-explorer__report-li">
+                                
+                                <!-- paragraph -->
+                                <p class="taco-report-explorer__report-paragraph">
+                                  Second - 16.46%
+                                </p>
+                                
+                              </li>
+                              
+                              <!-- list item -->
+                              <li class="taco-report-explorer__report-li">
+                                
+                                <!-- paragraph -->
+                                <p class="taco-report-explorer__report-paragraph">
+                                  Third - 3.6%
+                                </p>
+                                
+                              </li>
+                              
+                              <!-- list item -->
+                              <li class="taco-report-explorer__report-li">
+                                
+                                <!-- paragraph -->
+                                <p class="taco-report-explorer__report-paragraph">
+                                  Mean of Top 25 - 2.5324%
+                                </p>
+                                
+                              </li>
+                              
+                              <!-- list item -->
+                              <li class="taco-report-explorer__report-li">
+                                
+                                <!-- paragraph -->
+                                <p class="taco-report-explorer__report-paragraph">
+                                  Median of Top 25 - 0.69%
+                                </p>
+                                
+                              </li>
+                              
+                              <!-- list item -->
+                              <li class="taco-report-explorer__report-li">
+                                
+                                <!-- paragraph -->
+                                <p class="taco-report-explorer__report-paragraph">
+                                  Mode of Top 25 - 0.55%
+                                </p>
+                                
+                              </li>
+                              
+                              <!-- list item -->
+                              <li class="taco-report-explorer__report-li">
+                                
+                                <!-- paragraph -->
+                                <p class="taco-report-explorer__report-paragraph">
+                                  Top 25 Total - 63.31%
+                                </p>
+                                
+                              </li>
+                              
+                              <!-- list item -->
+                              <li class="taco-report-explorer__report-li">
+                                
+                                <!-- paragraph -->
+                                <p class="taco-report-explorer__report-paragraph">
+                                  Mean of Top 100 - 0.7762%
+                                </p>
+                                
+                              </li>
+                              
+                              <!-- list item -->
+                              <li class="taco-report-explorer__report-li">
+                                
+                                <!-- paragraph -->
+                                <p class="taco-report-explorer__report-paragraph">
+                                  Median of Top 100 - 0.2%
+                                </p>
+                                
+                              </li>
+                              
+                              <!-- list item -->
+                              <li class="taco-report-explorer__report-li">
+                                
+                                <!-- paragraph -->
+                                <p class="taco-report-explorer__report-paragraph">
+                                  Mode of Top 100 - 0.18%
+                                </p>
+                                
+                              </li>
+                              
+                              <!-- list item -->
+                              <li class="taco-report-explorer__report-li">
+                                
+                                <!-- paragraph -->
+                                <p class="taco-report-explorer__report-paragraph">
+                                  Top 100 Total - 77.62%
+                                </p>
+                                
+                              </li>                          
+
+                            </ul>
+                            
+                          </li>                      
+
+                        </ul>
+
+                      </div>
+
+                      <!-- center -->
+                      <div>
+
+                        <!-- heading -->
+                        <h3 class="taco-report-explorer__report-heading
+                                  taco-report-explorer__report-heading--h1">
+                          Market Metrics
+                          <i class="fa-solid fa-circle-info" 
+                            data-bs-toggle="tooltip" 
+                            data-bs-placement="top" 
+                            title="Review key indicators such as trading volume and historical market performance."></i>
+                        </h3>
+
+                        <!-- unordered list -->
+                        <ul class="taco-report-explorer__report-ul">
+
+                          <!-- list item -->
+                          <li class="taco-report-explorer__report-li">
+                            
+                            <!-- paragraph -->
+                            <p class="taco-report-explorer__report-paragraph">
+                              All Time High (USD): 334.11
+                            </p>
+                            
+                          </li>
+
+                          <!-- list item -->
+                          <li class="taco-report-explorer__report-li">
+                            
+                            <!-- paragraph -->
+                            <p class="taco-report-explorer__report-paragraph">
+                              All Time High (ICP): 27.39
+                            </p>
+                            
+                          </li>
+                          
+                          <!-- list item -->
+                          <li class="taco-report-explorer__report-li">
+                            
+                            <!-- paragraph -->
+                            <p class="taco-report-explorer__report-paragraph">
+                              All Time Low (USD): 0.00122
+                            </p>
+                            
+                          </li>
+                          
+                          <!-- list item -->
+                          <li class="taco-report-explorer__report-li">
+                            
+                            <!-- paragraph -->
+                            <p class="taco-report-explorer__report-paragraph">
+                              All Time Low (ICP): 0.0022
+                            </p>
+                            
+                          </li>
+                          
+                          <!-- list item -->
+                          <li class="taco-report-explorer__report-li">
+                            
+                            <!-- paragraph -->
+                            <p class="taco-report-explorer__report-paragraph">
+                              As of 18/06/25(USD): 0.0942
+                            </p>
+                            
+                          </li>                      
+
+                          <!-- list item -->
+                          <li class="taco-report-explorer__report-li">
+                            
+                            <!-- paragraph -->
+                            <p class="taco-report-explorer__report-paragraph">
+                              As of 18/06/25 (ICP): 0.0187
+                            </p>
+
+                          </li>
+
+                          <!-- list item -->
+                          <li class="taco-report-explorer__report-li">
+                            
+                            <!-- paragraph -->
+                            <p class="taco-report-explorer__report-paragraph">
+                              Change from ATH USD: -99.972%
+                            </p>
+                            
+                          </li>
+                          
+                          <!-- list item -->
+                          <li class="taco-report-explorer__report-li">
+                            
+                            <!-- paragraph -->
+                            <p class="taco-report-explorer__report-paragraph">
+                              Change from ATL USD: 7621.311%
+                            </p>
+                            
+                          </li>
+                          
+                          <!-- list item -->
+                          <li class="taco-report-explorer__report-li">
+                            
+                            <!-- paragraph -->
+                            <p class="taco-report-explorer__report-paragraph">
+                              USD Volume 24H as of 18/06/25: 16436
+                            </p>
+                            
+                          </li>
+
+                        </ul>
+
+                      </div>
+
+                      <!-- right -->
+                      <div>
+
+                        <!-- heading -->
+                        <h3 class="taco-report-explorer__report-heading
+                                  taco-report-explorer__report-heading--h1">
+                          Liquidity
+                        </h3>
+
+                        <!-- paragraph -->
+                        <p class="taco-report-explorer__report-paragraph">
+                          As per <a href="https://swaprunner.com" target="_blank" class="taco-report-explorer__report-link">SwapRunner</a> on the 18th of June 2025, a single transaction of:
+                        </p>
+
+                        <!-- unordered list -->
+                        <ul class="taco-report-explorer__report-ul">
+
+                          <!-- list item -->
+                          <li class="taco-report-explorer__report-li">
+                            
+                            <!-- paragraph -->
+                            <p class="taco-report-explorer__report-paragraph">
+                              20000 ICP ($100817.27) will result in a trade to 717209.30 MOTOKO ($67469.52). 33.077% lost to price impact
+                            </p>
+                            
+                          </li>
+
+                          <!-- list item -->
+                          <li class="taco-report-explorer__report-li">
+                            
+                            <!-- paragraph -->
+                            <p class="taco-report-explorer__report-paragraph">
+                              10000 ICP ($50408.63) will result in a trade to 421841.63 MOTOKO ($39683.61). 21.276% lost to price impact
+                            </p>
+                            
+                          </li>
+                          
+                          <!-- list item -->
+                          <li class="taco-report-explorer__report-li">
+                            
+                            <!-- paragraph -->
+                            <p class="taco-report-explorer__report-paragraph">
+                              1000 ICP ($5040.86) will result in a trade to 51562.78 MOTOKO ($4850.63). 3.774% lost to price impact
+                            </p>
+                            
+                          </li>
+                          
+                          <!-- list item -->
+                          <li class="taco-report-explorer__report-li">
+                            
+                            <!-- paragraph -->
+                            <p class="taco-report-explorer__report-paragraph">
+                              250 ICP ($1260.22) will result in a trade to 13226.93 MOTOKO ($1242.83). 1.38% lost to price impact
+                            </p>
+                            
+                          </li>
+
+                        </ul>
+
+                        <!-- paragraph -->
+                        <p class="taco-report-explorer__report-paragraph">
+                          As can be seen, liquidity for MOTOKO remains limited. If liquidity is not recycled, and there are no 'sells' between the DAO's 'buys', the effective slippage rate will be identical regardless of whether multiple small transactions or one large one take place.
+                        </p>
+
+                      </div>                      
+
+                    </div>
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      $MOTOKO's supply changed in January 2025, explaining the vast majority of the price changes. Therefore we can approximate ATH and ATL to get a more accurate figure of the data
+                    </p>
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      All Time High (USD): ~ 0.0611
+                    </p>
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      This means that the actual dollar value ATH is not the true ATH, and the true ATH adjusted for supply changes is June 9th's 0.1237 USD.
+                    </p>
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      Actual Change from ATH USD: ~ 23.848%
+                    </p>                    
+
+                    <hr>
+
+                    <!-- headings -->
+                    <h3 class="taco-report-explorer__report-heading
+                              taco-report-explorer__report-heading--h1">
+                      Competitors
+                      <i class="fa-solid fa-circle-info" 
+                        data-bs-toggle="tooltip" 
+                        data-bs-placement="top" 
+                        title="Identify similar projects and assess the token's differentiators alongside the perceived competitive positioning within its niche"></i>
+                    </h3>
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      Motoko Ghosts originally launched without DAO control, and during this period, <a href="https://motoko-backdoor-report.gitbook.io/motoko-backdoor-report" target="_blank" class="taco-report-explorer__report-link">the NFT canister contained a backdoor</a>. This vulnerability was exploited through a series of timed upgrades and wallet transfers that extracted thousands of ICP via dormant NFTs. The issue was later investigated, the backdoor removed, the code verified, and control handed to the Motoko DAO.
+                    </p>
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      In assessing the competitive landscape, <a href="https://x.com/dragginzgame/status/1932136841127272613" target="_blank" class="taco-report-explorer__report-link">Donna has noted the following</a>:
+                    </p>
+                    
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      “The existing NFT landscape on the Internet Computer is a mess. There is little to no support for existing collections. Many creators have had their NFTs stop working completely because they ran out of cycles even though they paid marketplace fees that were supposed to cover exactly that. On top of that, there's been security issues, missing assets, and no real way to fix anything when it goes wrong.”
+                    </p>
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      Motoko DAO aims to address these gaps by prioritizing canister maintainability, long-term creator control, and technical flexibility.
+                    </p>   
+                    
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      The $CLOUD memecoin has positioned itself as a brand-awareness vehicle for the Internet Computer, citing the alignment between its name and ICP's positioning as a decentralized cloud. Its visibility is supported by community advocate BobbyO, who promotes $CLOUD and creates educational content around ICP. Similarly, $MOTOKO leverages the name of the Internet Computer's native programming language to elevate ecosystem visibility. While $CLOUD leans on association and influencer marketing, Motoko DAO's strategy centers around development, community creation, and physical goods — offering a more infrastructure-anchored approach to ICP branding.
+                    </p>   
+                    
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      Google trends show NFT interest is one-fiftieth what it was in January 2022. Over the course of 2022, trading volume in NFTs on OpenSea, one of the largest NFT marketplaces, witnessed a <a href="https://web.archive.org/web/20220829170925/https://fortune.com/2022/08/29/nfts-opensea-crypto-winter-bubble-blockchain-web3/" target="_blank" class="taco-report-explorer__report-link">99% decline</a> from its ATH. While recently the volume of new users has seen OpenSea <a href="https://www.msn.com/en-us/money/markets/opensea-reports-highest-monthly-user-count-since-2023-are-nfts-back/ar-AA1GlZlu" target="_blank" class="taco-report-explorer__report-link">reach highs not seen since 2023</a>, the monthly volume of $81 million still far underperforms the $5 billion seen in January 2022.
+                    </p>   
+                    
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      The most significant competitors to $MOTOKO will be those best poised to compete with its main product, that being Toko. The two most noteworthy marketplaces are OpenSea and Rarible.
+                    </p>   
+                    
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      OpenSea is an exchange that allows for a wide variety of NFT collections from static images to music to be minted on chain by anybody, with some creator flexibility regarding fees. However, NFT creators are at risk of being <a href="https://nftevening.com/what-is-opensea/" target="_blank" class="taco-report-explorer__report-link">deplatformed by the owners of the site due to the lack of community control</a>. While OpenSea operates under a peer-to-peer transaction system, the owners of OpenSea can theoretically prevent a creator from successfully listing on the platform (<a href="https://www.cryptopolitan.com/game-developers-hit-opensea-nft-delisting/" target="_blank" class="taco-report-explorer__report-link">and has done so</a>).
+                    </p>   
+                    
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      Rarible utilises a governance token of its own, $RARI, which avoids the centralisation issues posed by OpenSea, and while Rarible still does have some policies on what is considered acceptable to list, it is a form of self-regulation voted upon by governance holders rather than one imposed by executives. Rarible utilises a significant transaction fee - 2.5% - for both buyers and sellers. Rarible also allows for direct fiat transactions to be used in the minting of NFTs.
+                    </p>   
+                    
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      Toko differs from these two large competitors by focusing on a far greater level of creator control, both in terms of creation and cost, by allowing for creators to pick and choose from a wide variety of tools, while also having royalties be entirely flexible. Toko marketplace has made no statements regarding the possibility for direct fiat transactions to occur, which may lead to some loss of market share due to the perceived difficulty some may have in accessing the ICP blockchain in general.
+                    </p>                       
+
+                    <hr>
+                   
+                    <!-- heading -->
+                    <h3 class="taco-report-explorer__report-heading
+                              taco-report-explorer__report-heading--h1">
+                      Security Risks
+                      <i class="fa-solid fa-circle-info" 
+                        data-bs-toggle="tooltip" 
+                        data-bs-placement="top" 
+                        title="Investigate perceived vulnerabilities, any audit reports, and adherence to security and regulatory standards"></i>
+                    </h3> 
+                    
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      Motoko Mining is currently under audit.
+                    </p>
+                    
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      It is worth noting that virtually everything purported by the Motoko DAO team is either speculative, promised, theoretical, or otherwise non-tangible, and the only created project so far is the Motoko Ghosts NFT collection (which predated the DAO), and the DAO's most significant asset is its ownership of other NFT-controlling canisters. Additionally, the DAO has made agreements with certain NFT creators to have control end up in the DAO's hands, that have yet to be followed through.
+                    </p>   
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      Subjectively speaking the largely unlaunched nature of Motoko DAO's projects would ordinarily engender caution, though it is worth noting the connections and trust Motoko DAO has earned from large figures. The Powells have expressed significant interest in the Toko marketplace, and it was after they joined as advisors that the idea was actually brought into existence. <a href="https://x.com/dragginzgame/status/1932136841127272613" target="_blank" class="taco-report-explorer__report-link">It was their Dragginz twitter account that posted a fleshed-out version of the concept</a>. The Dragginz Team are creating the Toko marketplace themselves and 'donating' it to the DAO for no explicit financial gain. This suggests existing significant financial and technical backing of the visions proposed by Motoko DAO.
+                    </p>
+
+                    <hr>
+                    
+                    <!-- back to top link -->
+                    <a href="#" @click.prevent="scrollToTop" class="taco-report-explorer__report-link text-center w-100 d-inline-block mt-2">Back to top</a>
+                    
+                  </div>
+
+                  <!-- report footer -->
+                  <div class="taco-report-explorer__report-footer">
+                    
+                    <!-- left -->
+                    <div class="taco-report-explorer__report-footer__left">
+                      
+                      ❤️🌮
+                      
+                    </div>
+                    
+                    <!-- center -->
+                    <div class="taco-report-explorer__report-footer__center text-center">
+                      
+                      &copy;2025 Taco Dao
+                      
+                    </div>
+                    
+                    <!-- right -->
+                    <div class="taco-report-explorer__report-footer__right">
+                      
+                      <!-- link group -->
+                      <span class="d-flex flex-column align-items-end">
+
+                        <span class="text-end">#14 Motion to Discuss</span>
+
+                        <span class="d-flex gap-2">
+
+                          <a href="https://nns.ic0.app/proposal/?u=lacdn-3iaaa-aaaaq-aae3a-cai&proposal=14" class="taco-text-blue-to-light-blue text-end" target="_blank">NNS</a>                        
+
+                          <a href="https://app.sneeddao.com/proposal?proposalid=14&sns=lacdn-3iaaa-aaaaq-aae3a-cai" class="taco-text-blue-to-light-blue text-end" target="_blank">Sneed Hub</a>
+
+                        </span>
+                        
+                      </span>                      
+                      
+                    </div>
+                    
+                  </div>
+
+                </div>
+                
               </div>                 
               
             </div>
@@ -1481,70 +2681,70 @@
     <!-- footer bar -->
     <FooterBar />
 
-      <!-- message modal -->
-     <div v-if="!userAcceptedReportsDisclaimer || userReshownReportsDisclaimer" class="reports__message">
+    <!-- message modal -->
+    <div v-if="!userAcceptedReportsDisclaimer || userReshownReportsDisclaimer" class="reports__message">
       
-        <!-- message -->
-        <div class="reports__message__dialog">
-          
-          <!-- message top -->
-          <div class="reports__message__dialog__top px-2 p-2">
+      <!-- message -->
+      <div class="reports__message__dialog">
+        
+        <!-- message top -->
+        <div class="reports__message__dialog__top px-2 p-2">
 
-            <!-- message top left -->
-            <div class="taco-text-white">Disclaimer</div>
+          <!-- message top left -->
+          <div class="taco-text-white">Disclaimer</div>
 
-            <!-- message top right -->
-            <div class="taco-text-black-to-white"></div>
+          <!-- message top right -->
+          <div class="taco-text-black-to-white"></div>
 
-          </div>
+        </div>
 
-          <!-- message middle -->
-          <div class="reports__message__dialog__middle">
+        <!-- message middle -->
+        <div class="reports__message__dialog__middle">
 
-            <!-- content -->
-            <div class="d-flex flex-column align-items-center justify-content-start pt-4 pb-5">
+          <!-- content -->
+          <div class="d-flex flex-column align-items-center justify-content-start pt-4 pb-5">
 
-              <!-- hotkey svg icon -->
-              <i class="fa-solid fa-triangle-exclamation"
-                style="font-size: 5rem; color: var(--dark-orange-to-light-brown);"></i>
+            <!-- hotkey svg icon -->
+            <i class="fa-solid fa-triangle-exclamation"
+              style="font-size: 5rem; color: var(--dark-orange-to-light-brown);"></i>
 
-              <!-- title -->
-              <span class="taco-text-black-to-white d-inline-block text-center px-2 pt-2 pb-1"
-                style="font-weight: 600;">
-                Legal Disclaimer
-              </span>
+            <!-- title -->
+            <span class="taco-text-black-to-white d-inline-block text-center px-2 pt-2 pb-1"
+              style="font-weight: 600;">
+              Legal Disclaimer
+            </span>
 
-              <!-- text -->
-              <span class="taco-text-black-to-white px-4 pt-2 pb-1 text-center">
-                These reports are for informational purposes only and do not constitute investment advice, financial advice, trading advice, legal advice, or any other type of advice. Nothing contained herein should be interpreted as such. No representations or warranties are made regarding the accuracy, completeness, or reliability of the information provided. The authors shall not be liable for any losses or damages—whether direct, indirect, incidental, punitive, or consequential—arising from the use of or reliance on this material. All information is subject to change without notice, and no obligation is assumed to update or revise the content.
-              </span>
-
-            </div>
+            <!-- text -->
+            <span class="taco-text-black-to-white px-4 pt-2 pb-1 text-center">
+              These reports are for informational purposes only and do not constitute investment advice, financial advice, trading advice, legal advice, or any other type of advice. Nothing contained herein should be interpreted as such. No representations or warranties are made regarding the accuracy, completeness, or reliability of the information provided. The authors shall not be liable for any losses or damages—whether direct, indirect, incidental, punitive, or consequential—arising from the use of or reliance on this material. All information is subject to change without notice, and no obligation is assumed to update or revise the content.
+            </span>
 
           </div>
 
-          <!-- message bottom -->
-          <div class="reports__message__dialog__bottom p-2">
+        </div>
 
-            <!-- message bottom left -->
-            <div class="taco-text-black-to-white"></div>
+        <!-- message bottom -->
+        <div class="reports__message__dialog__bottom p-2">
 
-            <!-- message bottom right -->
-            <div class="taco-text-black-to-white">
+          <!-- message bottom left -->
+          <div class="taco-text-black-to-white"></div>
 
-              <!-- close button -->
-              <button class="btn taco-nav-btn"
-                      @click="acceptReportsDisclaimer(); hideDisclaimerLocally()">
-                Got It
-              </button>
+          <!-- message bottom right -->
+          <div class="taco-text-black-to-white">
 
-            </div>
+            <!-- close button -->
+            <button class="btn taco-nav-btn"
+                    @click="acceptReportsDisclaimer(); hideDisclaimerLocally()">
+              Got It
+            </button>
 
           </div>
 
-        </div> 
+        </div>
+
+      </div> 
       
-      </div>
+    </div>
 
   </div>
 
@@ -1990,7 +3190,8 @@
   import { useRoute, useRouter } from 'vue-router'
   import ckBtcIcon from '../assets/tokens/ckbtc.png'
   import sneedIcon from '../assets/tokens/snspng/sneed.png'
-
+  import motokoIcon from '../assets/tokens/snspng/motoko.png'
+  
   ///////////
   // store //
   ///////////
@@ -2020,6 +3221,7 @@
   const reportId = ref(0)
   const ckBtcIconUrl = ckBtcIcon
   const sneedIconUrl = sneedIcon
+  const motokoIconUrl = motokoIcon
 
   // show report menu on mobile
   const showReportMenuOnMobile = ref(false)
@@ -2105,6 +3307,8 @@
       reportId.value = 1
     } else if (newPath === '/reports/ddsneed') {
       reportId.value = 2
+    } else if (newPath === '/reports/ddmotoko') {
+      reportId.value = 3
     } else if (newPath === '/reports/example') {
       reportId.value = 0
     }
