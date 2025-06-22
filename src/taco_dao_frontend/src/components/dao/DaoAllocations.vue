@@ -163,7 +163,7 @@
                 <div>
 
                     <!-- list of key/value pairs -->
-                    <ul class="dao-allocations__token-info-list">
+                    <ul class="dao-allocations__token-info-list overflow-auto">
 
                         <!-- symbol - list item -->
                         <li>
@@ -178,7 +178,7 @@
 
                         </li>
 
-                        <!-- holding amount - list item -->
+                        <!-- holding amount in token - list item -->
                         <li v-if="showCurrentHoldings">
 
                             <!-- key -->
@@ -202,12 +202,30 @@
 
                         </li>
 
-                        <!-- holding value - list item -->
+                        <!-- holding value in icp - list item -->
                         <li v-if="showCurrentHoldings">
 
                             <!-- key -->
                             <span class="dao-allocations__token-info-list__key
-                                         taco-text-white">Value:</span>
+                                         taco-text-white">ICP Value:</span>
+
+                            <!-- value -->
+                            <span class="dao-allocations__token-info-list__value
+                                         taco-text-white d-flex align-items-center gap-1 ms-auto">
+
+                                <!-- holding value -->
+                                <span class="small">{{ ((currentTokenHoldings * currentTokenPrice) / icpPriceUsd).toFixed(2) }} ICP</span>
+
+                            </span>
+
+                        </li>                           
+
+                        <!-- holding value in usd - list item -->
+                        <li v-if="showCurrentHoldings">
+
+                            <!-- key -->
+                            <span class="dao-allocations__token-info-list__key
+                                         taco-text-white">USD Value:</span>
 
                             <!-- value -->
                             <span class="dao-allocations__token-info-list__value
@@ -278,6 +296,24 @@
                             </span>
 
                         </li>
+
+                        <!-- dd report - list item -->
+                        <li v-if="showCurrentAllocations && ddReportRouteExists">
+                            
+                            <!-- key -->
+                            <span class="dao-allocations__token-info-list__key
+                                         taco-text-white">Due Diligence:</span>
+
+                            <!-- value -->
+                            <span class="dao-allocations__token-info-list__value
+                                         taco-text-white ms-auto">
+
+                                <!-- dd report link -->
+                                <router-link class="small" style="color: var(--blue-to-light-blue);" :to="`/reports/dd${currentTokenSymbol.toLowerCase()}`">View</router-link>
+                                
+                            </span>
+
+                        </li>                        
 
                     </ul>
 
@@ -583,6 +619,7 @@ LOCAL METHODS
 
     // dao backend
     const { fetchedTokenDetails } = storeToRefs(tacoStore)
+    const { icpPriceUsd } = storeToRefs(tacoStore)
     const { fetchedAggregateAllocation } = storeToRefs(tacoStore)
 
     // # ACTIONS #
@@ -766,12 +803,20 @@ LOCAL METHODS
 
     // format number to remove trailing zeros
     const formatNumber = (num: number) => {
-        return num.toFixed(4).replace(/\.?0+$/, '')
+        const formatted = num.toFixed(4).replace(/\.?0+$/, '')
+        return formatted === '0' ? '~0' : formatted
     }    
 
     //////////////
     // computed //
     //////////////
+
+    // check if dd report route exists for current token
+    const ddReportRouteExists = computed(() => {
+        const tokenSymbol = currentTokenSymbol.value.toLowerCase()
+        const availableRoutes = ['ckbtc', 'sneed', 'motoko']
+        return availableRoutes.includes(tokenSymbol)
+    })
 
     //////////////
     // watchers //
