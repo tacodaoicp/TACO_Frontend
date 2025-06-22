@@ -178,7 +178,7 @@
 
                         </li>
 
-                        <!-- holding amount - list item -->
+                        <!-- holding amount in token - list item -->
                         <li v-if="showCurrentHoldings">
 
                             <!-- key -->
@@ -202,12 +202,30 @@
 
                         </li>
 
-                        <!-- holding value - list item -->
+                        <!-- holding value in icp - list item -->
                         <li v-if="showCurrentHoldings">
 
                             <!-- key -->
                             <span class="dao-allocations__token-info-list__key
-                                         taco-text-white">Value:</span>
+                                         taco-text-white">ICP Value:</span>
+
+                            <!-- value -->
+                            <span class="dao-allocations__token-info-list__value
+                                         taco-text-white d-flex align-items-center gap-1 ms-auto">
+
+                                <!-- holding value -->
+                                <span class="small">{{ ((currentTokenHoldings * currentTokenPrice) / icpPriceUsd).toFixed(2) }} ICP</span>
+
+                            </span>
+
+                        </li>                           
+
+                        <!-- holding value in usd - list item -->
+                        <li v-if="showCurrentHoldings">
+
+                            <!-- key -->
+                            <span class="dao-allocations__token-info-list__key
+                                         taco-text-white">USD Value:</span>
 
                             <!-- value -->
                             <span class="dao-allocations__token-info-list__value
@@ -601,6 +619,7 @@ LOCAL METHODS
 
     // dao backend
     const { fetchedTokenDetails } = storeToRefs(tacoStore)
+    const { icpPriceUsd } = storeToRefs(tacoStore)
     const { fetchedAggregateAllocation } = storeToRefs(tacoStore)
 
     // # ACTIONS #
