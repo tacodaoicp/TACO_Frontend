@@ -9,7 +9,7 @@
     <div class="scroll-y-container h-100">  
 
       <!-- bootstrap container -->
-      <div class="container h-100">
+      <div class="container">
 
         <!-- bootstrap row -->
         <div class="row h-100 d-flex flex-column flex-nowrap overflow-hidden px-2 px-sm-0">
