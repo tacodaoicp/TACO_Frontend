@@ -803,7 +803,8 @@ LOCAL METHODS
 
     // format number to remove trailing zeros
     const formatNumber = (num: number) => {
-        return num.toFixed(4).replace(/\.?0+$/, '')
+        const formatted = num.toFixed(4).replace(/\.?0+$/, '')
+        return formatted === '0' ? '~0' : formatted
     }    
 
     //////////////
