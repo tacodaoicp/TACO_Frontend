@@ -1515,7 +1515,7 @@
               </span>
 
               <!-- text -->
-              <span class="taco-text-black-to-white px-4 pt-2 pb-1">
+              <span class="taco-text-black-to-white px-4 pt-2 pb-1 text-center">
                 These reports are for informational purposes only and do not constitute investment advice, financial advice, trading advice, legal advice, or any other type of advice. Nothing contained herein should be interpreted as such. No representations or warranties are made regarding the accuracy, completeness, or reliability of the information provided. The authors shall not be liable for any losses or damages—whether direct, indirect, incidental, punitive, or consequential—arising from the use of or reliance on this material. All information is subject to change without notice, and no obligation is assumed to update or revise the content.
               </span>
 
