@@ -161,6 +161,7 @@
             display: flex;
             flex-direction: column;
             // gap: 0.5rem;
+            z-index: 1000;
 
             // header
             &__header {
@@ -219,8 +220,12 @@
     @media (max-width: 490px) {
 
         // flip orientation of top row
-        .taco-entity-value-chip__top {
-            flex-direction: column;
+        .taco-entity-value-chip__inner {
+            flex-direction: column !important;
+
+            svg {
+                padding-bottom: 0.125rem;
+            }
         }
 
     }     
@@ -229,7 +234,7 @@
     @media (max-width: 575px) {
 
         // reduce token icon size
-        .taco-entity-value-chip__top svg {
+        .taco-entity-value-chip__inner svg {
             width: 1.5rem !important;
         }
 
