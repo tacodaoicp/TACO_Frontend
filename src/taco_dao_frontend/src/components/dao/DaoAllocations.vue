@@ -163,7 +163,7 @@
                 <div>
 
                     <!-- list of key/value pairs -->
-                    <ul class="dao-allocations__token-info-list">
+                    <ul class="dao-allocations__token-info-list overflow-auto">
 
                         <!-- symbol - list item -->
                         <li>
@@ -278,6 +278,24 @@
                             </span>
 
                         </li>
+
+                        <!-- dd report - list item -->
+                        <li v-if="showCurrentAllocations && ddReportRouteExists">
+                            
+                            <!-- key -->
+                            <span class="dao-allocations__token-info-list__key
+                                         taco-text-white">Due Diligence:</span>
+
+                            <!-- value -->
+                            <span class="dao-allocations__token-info-list__value
+                                         taco-text-white ms-auto">
+
+                                <!-- dd report link -->
+                                <router-link class="small" style="color: var(--blue-to-light-blue);" :to="`/reports/dd${currentTokenSymbol.toLowerCase()}`">View</router-link>
+                                
+                            </span>
+
+                        </li>                        
 
                     </ul>
 
@@ -772,6 +790,13 @@ LOCAL METHODS
     //////////////
     // computed //
     //////////////
+
+    // check if dd report route exists for current token
+    const ddReportRouteExists = computed(() => {
+        const tokenSymbol = currentTokenSymbol.value.toLowerCase()
+        const availableRoutes = ['ckbtc', 'sneed', 'motoko']
+        return availableRoutes.includes(tokenSymbol)
+    })
 
     //////////////
     // watchers //
