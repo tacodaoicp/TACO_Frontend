@@ -244,6 +244,7 @@ export const useTacoStore = defineStore('taco', () => {
     const userAcceptedHotkeyTutorial = useStorage('userAcceptedHotkeyTutorial', false) // used on /vote page
     const openChatSeenStoreValue = useStorage('openChatSeenStoreValue', false) // used on /chat/oc page
     const sneedSeenStoreValue = useStorage('sneedSeenStoreValue', false) // used on /chat/sneed page
+    const userAcceptedReportsDisclaimer = useStorage('userAcceptedReportsDisclaimer', false) // used on /reports page
 
     // crypto prices
     const icpPriceUsd = useStorage('icpPriceUsd', 0)
@@ -824,6 +825,9 @@ export const useTacoStore = defineStore('taco', () => {
     }
     const setSneedSeenStoreValue = () => {
         sneedSeenStoreValue.value = true
+    }
+    const acceptReportsDisclaimer = () => {
+        userAcceptedReportsDisclaimer.value = true
     }
 
     // todo: move this to where it should go
@@ -2910,6 +2914,7 @@ export const useTacoStore = defineStore('taco', () => {
         backendErrorText,
         toasts,
         userAcceptedHotkeyTutorial,
+        userAcceptedReportsDisclaimer,
         openChatSeenStoreValue,
         sneedSeenStoreValue,
         timerHealth,
@@ -2971,5 +2976,6 @@ export const useTacoStore = defineStore('taco', () => {
         clearTreasuryLogs,
         icrc1BalanceOf,
         fetchTotalTreasuryValueInUsd,
+        acceptReportsDisclaimer,
     }
 })

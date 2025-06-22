@@ -452,7 +452,7 @@
 
       container: tutorial-dialog / inline-size;
 
-      // the magic
+      // container queries
       @container tutorial-dialog (inline-size > 400px) {
         .access__message__dialog__middle, .sneed-discussions__message__dialog__middle {
           flex-direction: row;

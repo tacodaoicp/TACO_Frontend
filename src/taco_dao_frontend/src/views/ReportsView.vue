@@ -38,6 +38,13 @@
                 <!-- title -->
                 <h2 class="taco-report-explorer__title
                           space-mono-semibold">Browse Reports</h2>
+
+                <!-- disclaimer -->
+                <a href="#" 
+                  @click="reshownDisclaimerLocally()" 
+                  class="taco-text-blue-to-light-blue text-center d-inline-block w-100 small">
+                  Reports Disclaimer
+                </a>
                 
               </div>
               
@@ -1474,6 +1481,71 @@
     <!-- footer bar -->
     <FooterBar />
 
+      <!-- message modal -->
+     <div v-if="!userAcceptedReportsDisclaimer || userReshownReportsDisclaimer" class="reports__message">
+      
+        <!-- message -->
+        <div class="reports__message__dialog">
+          
+          <!-- message top -->
+          <div class="reports__message__dialog__top px-2 p-2">
+
+            <!-- message top left -->
+            <div class="taco-text-white">Disclaimer</div>
+
+            <!-- message top right -->
+            <div class="taco-text-black-to-white"></div>
+
+          </div>
+
+          <!-- message middle -->
+          <div class="reports__message__dialog__middle">
+
+            <!-- content -->
+            <div class="d-flex flex-column align-items-center justify-content-start pt-4 pb-5">
+
+              <!-- hotkey svg icon -->
+              <i class="fa-solid fa-triangle-exclamation"
+                style="font-size: 5rem; color: var(--dark-orange-to-light-brown);"></i>
+
+              <!-- title -->
+              <span class="taco-text-black-to-white d-inline-block text-center px-2 pt-2 pb-1"
+                style="font-weight: 600;">
+                Legal Disclaimer
+              </span>
+
+              <!-- text -->
+              <span class="taco-text-black-to-white px-4 pt-2 pb-1">
+                These reports are for informational purposes only and do not constitute investment advice, financial advice, trading advice, legal advice, or any other type of advice. Nothing contained herein should be interpreted as such. No representations or warranties are made regarding the accuracy, completeness, or reliability of the information provided. The authors shall not be liable for any losses or damages—whether direct, indirect, incidental, punitive, or consequential—arising from the use of or reliance on this material. All information is subject to change without notice, and no obligation is assumed to update or revise the content.
+              </span>
+
+            </div>
+
+          </div>
+
+          <!-- message bottom -->
+          <div class="reports__message__dialog__bottom p-2">
+
+            <!-- message bottom left -->
+            <div class="taco-text-black-to-white"></div>
+
+            <!-- message bottom right -->
+            <div class="taco-text-black-to-white">
+
+              <!-- close button -->
+              <button class="btn taco-nav-btn"
+                      @click="acceptReportsDisclaimer(); hideDisclaimerLocally()">
+                Got It
+              </button>
+
+            </div>
+
+          </div>
+
+        </div> 
+      
+      </div>
+
   </div>
 
 </template>
@@ -1801,6 +1873,56 @@
 
   }
 
+  // vote message modal
+  .reports__message {
+    position: absolute;
+    top: 0;
+    left: 0;
+    display: flex;
+    justify-content: center;
+    align-items: start;
+    width: 100%;
+    height: 100%;
+    background-color: var(--curtain-bg);
+    z-index: 1000;
+    margin: 0;
+    padding: 0;
+    overflow: auto;
+
+    // dialog
+    &__dialog {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      width: 100%;
+      max-width: 40rem;
+      border-radius: 0.5rem;
+      background-color: var(--light-orange-to-dark-brown);
+      border: 1px solid var(--dark-orange);
+      overflow: clip;
+      margin: 2rem 2rem 2rem;
+
+      // top and bottom
+      &__top, &__bottom {
+        display: flex;
+        width: 100%;
+        justify-content: space-between;
+        background-color: var(--dark-orange);
+      }
+
+      // middle
+      &__middle {
+        display: flex;
+        flex-direction: row;
+        align-items: start;
+        gap: 2rem;
+      }
+
+    }
+
+  }  
+
   ///////////////////
   // media queries //
   ///////////////////
@@ -1863,9 +1985,28 @@
   import HeaderBar from "../components/HeaderBar.vue"
   import FooterBar from "../components/FooterBar.vue"
   import { ref, onMounted, watch, computed } from "vue"
+  import { useTacoStore } from "../stores/taco.store"
+  import { storeToRefs } from "pinia"  
   import { useRoute, useRouter } from 'vue-router'
   import ckBtcIcon from '../assets/tokens/ckbtc.png'
   import sneedIcon from '../assets/tokens/snspng/sneed.png'
+
+  ///////////
+  // store //
+  ///////////
+
+  // # SETUP #
+  const tacoStore = useTacoStore()
+
+  // # STATE #
+
+  // user
+  const { userAcceptedReportsDisclaimer } = storeToRefs(tacoStore)
+
+  // # ACTIONS #
+
+  // user
+  const { acceptReportsDisclaimer } = tacoStore
 
   /////////////////////
   // local variables //
@@ -1883,9 +2024,15 @@
   // show report menu on mobile
   const showReportMenuOnMobile = ref(false)
 
+  // disclaimer
+  const userReshownReportsDisclaimer = ref(false)
+
   ///////////////////
   // local methods //
   ///////////////////  
+
+  //////////////
+  // handlers //    
 
   // scroll to top
   const scrollToTop = () => {
@@ -1914,6 +2061,22 @@
     // console.log('ReportsView.vue: showReportMenuOnMobile', showReportMenuOnMobile.value)
 
   }
+
+  // reshown disclaimer locally
+  const reshownDisclaimerLocally = () => {
+    userReshownReportsDisclaimer.value = true
+  }
+
+  // accept reports disclaimer locally
+  const hideDisclaimerLocally = () => {
+    userReshownReportsDisclaimer.value = false
+  }
+
+  /////////////
+  // returns //  
+  
+  // 
+
 
   //////////////
   // computed //

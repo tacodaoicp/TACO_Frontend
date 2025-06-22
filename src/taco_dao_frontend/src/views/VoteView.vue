@@ -1565,7 +1565,7 @@
 
       container: tutorial-dialog / inline-size;
 
-      // the magic
+      // container queries
       @container tutorial-dialog (inline-size > 400px) {
         .vote__message__dialog__middle {
           flex-direction: row;
@@ -2138,7 +2138,6 @@
   const { userPrincipal } = storeToRefs(tacoStore)
   const { truncatedPrincipal } = storeToRefs(tacoStore)
   const { userAcceptedHotkeyTutorial } = storeToRefs(tacoStore)
-  const { acceptHotkeyTutorial } = tacoStore
 
   // dao backend
   const { fetchedTokenDetails } = storeToRefs(tacoStore)
@@ -2155,6 +2154,7 @@
   // app
   const { appLoadingOn, appLoadingOff } = tacoStore
   const { addToast } = tacoStore
+  const { acceptHotkeyTutorial } = tacoStore
 
   // dao backend
   const { fetchTokenDetails } = tacoStore
