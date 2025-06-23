@@ -83,6 +83,8 @@
                     <option :value="100">100 logs</option>
                     <option :value="200">200 logs</option>
                     <option :value="500">500 logs</option>
+                    <option :value="1000">1000 logs</option>
+                    <option :value="5000">5000 logs</option>
                   </select>
                 </div>
                 <div class="col-md-3">
