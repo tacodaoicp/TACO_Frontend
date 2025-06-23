@@ -640,6 +640,124 @@
                         </div>
                       </div>
                       
+                      <!-- ICP Fallback Summary -->
+                      <div v-else-if="entry.type === 'icpFallback'" class="icp-fallback-summary" :class="{ 'success': entry.result?.success, 'failed': !entry.result?.success }">
+                        <div class="log-header">
+                          <div class="log-timestamp">{{ formatLogTime(entry.timestamp) }}</div>
+                          <div class="log-level" :class="entry.result?.success ? 'level-info' : 'level-error'">{{ entry.result?.success ? 'INFO' : 'ERROR' }}</div>
+                          <div class="log-context">ICP_FALLBACK</div>
+                          <div class="log-component">{{ entry.component }}</div>
+                        </div>
+                        <div class="icp-fallback-container mt-2">
+                          <div class="icp-fallback-header">
+                            {{ entry.summaryMessage }}
+                          </div>
+                          
+                          <!-- Fallback Strategy Overview -->
+                          <div class="fallback-overview">
+                            <div class="fallback-reason">
+                              <div class="reason-icon">🚫</div>
+                              <div class="reason-details">
+                                <div class="reason-title">Direct Route Failed</div>
+                                <div class="reason-text">{{ entry.originalError }}</div>
+                              </div>
+                            </div>
+                            
+                            <div class="fallback-arrow">→</div>
+                            
+                            <div class="fallback-strategy">
+                              <div class="strategy-icon">🔄</div>
+                              <div class="strategy-details">
+                                <div class="strategy-title">ICP Fallback Strategy</div>
+                                <div class="strategy-text">{{ entry.strategy }}</div>
+                              </div>
+                            </div>
+                          </div>
+                          
+                          <!-- Trade Pairs Display -->
+                          <div class="fallback-pairs">
+                            <div class="pair-comparison">
+                              <div class="original-pair failed">
+                                <div class="pair-label">Original (Failed)</div>
+                                <div class="pair-value">{{ entry.originalPair }}</div>
+                                <div class="pair-status">❌ No Route</div>
+                              </div>
+                              
+                              <div class="fallback-arrow-large">→</div>
+                              
+                              <div class="fallback-pair" :class="{ 'success': entry.result?.success, 'failed': !entry.result?.success }">
+                                <div class="pair-label">Fallback</div>
+                                <div class="pair-value">{{ entry.fallbackPair }}</div>
+                                <div class="pair-status">{{ entry.result?.success ? '✅ Success' : '❌ Failed' }}</div>
+                              </div>
+                            </div>
+                          </div>
+                          
+                          <!-- Fallback Result -->
+                          <div v-if="entry.result" class="fallback-result" :class="{ 'success': entry.result.success, 'failed': !entry.result.success }">
+                            <div class="result-header">
+                              <div class="result-icon">{{ entry.result.success ? '✅' : '❌' }}</div>
+                              <div class="result-title">{{ entry.result.success ? 'Fallback Trade Completed' : 'Fallback Trade Failed' }}</div>
+                            </div>
+                            
+                            <!-- Success Details -->
+                            <div v-if="entry.result.success" class="success-details">
+                              <div class="result-metrics">
+                                <div class="result-metric">
+                                  <span class="metric-label">Sold Token:</span>
+                                  <span class="metric-value">{{ entry.result.soldToken }}</span>
+                                </div>
+                                <div class="result-metric">
+                                  <span class="metric-label">Amount Sold:</span>
+                                  <span class="metric-value">{{ formatExchangeAmount(entry.result.amountSold, 8) }}</span>
+                                </div>
+                                <div class="result-metric">
+                                  <span class="metric-label">ICP Received:</span>
+                                  <span class="metric-value">{{ formatExchangeAmount(entry.result.icpReceived, 8) }}</span>
+                                </div>
+                                <div class="result-metric">
+                                  <span class="metric-label">Exchange:</span>
+                                  <span class="metric-value">{{ entry.result.exchange }}</span>
+                                </div>
+                              </div>
+                              
+                              <div class="next-cycle-info">
+                                <div class="next-cycle-label">Next Cycle Will Execute:</div>
+                                <div class="next-cycle-trade">{{ entry.result.nextTrade }}</div>
+                              </div>
+                            </div>
+                            
+                            <!-- Failure Details -->
+                            <div v-else class="failure-details">
+                              <div v-if="entry.result.reason" class="result-metric">
+                                <span class="metric-label">Reason:</span>
+                                <span class="metric-value error-text">{{ entry.result.reason }}</span>
+                              </div>
+                              <div v-if="entry.result.originalError" class="result-metric">
+                                <span class="metric-label">Original Error:</span>
+                                <span class="metric-value error-text">{{ entry.result.originalError }}</span>
+                              </div>
+                              <div v-if="entry.result.fallbackError" class="result-metric">
+                                <span class="metric-label">Fallback Error:</span>
+                                <span class="metric-value error-text">{{ entry.result.fallbackError }}</span>
+                              </div>
+                              <div v-if="entry.result.icpRouteError" class="result-metric">
+                                <span class="metric-label">ICP Route Error:</span>
+                                <span class="metric-value error-text">{{ entry.result.icpRouteError }}</span>
+                              </div>
+                              <div v-if="entry.result.error" class="result-metric">
+                                <span class="metric-label">Error:</span>
+                                <span class="metric-value error-text">{{ entry.result.error }}</span>
+                              </div>
+                              <div v-if="entry.result.status" class="result-metric">
+                                <span class="metric-label">Status:</span>
+                                <span class="metric-value">{{ entry.result.status }}</span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                      
                       <!-- Regular Log Entry -->
                       <div v-else>
                         <div class="log-header">
@@ -873,6 +991,20 @@ export default {
           }
         }
         
+        // Check if this is an ICP fallback group
+        if (log.context === 'do_executeTradingStep' && log.component === 'ICP_FALLBACK' && log.message.includes('Direct route failed, attempting ICP fallback')) {
+          console.log('Found ICP fallback, processing group...');
+          const fallbackEntry = this.processICPFallbackGroup(i);
+          if (fallbackEntry) {
+            console.log('Successfully processed ICP fallback group:', fallbackEntry);
+            processed.push(fallbackEntry.entry);
+            i = fallbackEntry.nextIndex;
+            continue;
+          } else {
+            console.log('Failed to process ICP fallback group');
+          }
+        }
+
         // Check if this is a trade execution group
         if (log.context === 'executeTrade' && log.component === 'TRADE_EXECUTION' && log.message.includes('Trade execution STARTED')) {
           console.log('Found trade execution, processing group...');
@@ -1830,6 +1962,126 @@ export default {
       return {
         entry: compressedEntry,
         nextIndex: currentIndex + 1
+      };
+    },
+
+    processICPFallbackGroup(startIndex) {
+      const logs = this.logs;
+      console.log('Processing ICP fallback group starting at index:', startIndex);
+      
+      let currentIndex = startIndex;
+      const firstLog = logs[currentIndex];
+      
+      // Parse the first log to get original pair and fallback details
+      const fallbackMatch = firstLog.message.match(/Original_pair=([^/]+)\/([^\s]+) Fallback_pair=([^/]+)\/([^\s]+) Original_error=([^\s]+(?:\s+[^\s]+)*?) Strategy=(.+)/);
+      if (!fallbackMatch) {
+        console.log('Could not parse ICP fallback start log');
+        return null;
+      }
+      
+      const originalSellToken = fallbackMatch[1];
+      const originalBuyToken = fallbackMatch[2];
+      const fallbackSellToken = fallbackMatch[3];
+      const fallbackBuyToken = fallbackMatch[4];
+      const originalError = fallbackMatch[5];
+      const strategy = fallbackMatch[6].replace(/_/g, ' ');
+      
+      // Look for the outcome - success or failure
+      let fallbackResult = null;
+      let resultFound = false;
+      
+      currentIndex++;
+      while (currentIndex < logs.length && !resultFound) {
+        const log = logs[currentIndex];
+        
+        // Stop if we reach a different context or component
+        if (log.context !== 'do_executeTradingStep' || log.component !== 'ICP_FALLBACK') {
+          break;
+        }
+        
+        const message = log.message;
+        
+        // Check for successful fallback trade
+        if (message.includes('ICP fallback trade SUCCESS')) {
+          const successMatch = message.match(/Sold=([^\s]+) Amount_sold=(\d+) ICP_received=(\d+) Exchange=(#?\w+) Next_cycle_will_trade=(.+)/);
+          if (successMatch) {
+            fallbackResult = {
+              success: true,
+              soldToken: successMatch[1],
+              amountSold: successMatch[2],
+              icpReceived: successMatch[3],
+              exchange: successMatch[4].replace('#', ''),
+              nextTrade: successMatch[5]
+            };
+            resultFound = true;
+          }
+        }
+        
+        // Check for failed fallback trade
+        else if (message.includes('ICP fallback trade FAILED')) {
+          const failMatch = message.match(/Original_error=([^\s]+(?:\s+[^\s]+)*?) ICP_fallback_error=([^\s]+(?:\s+[^\s]+)*?) Status=(.+)/);
+          if (failMatch) {
+            fallbackResult = {
+              success: false,
+              originalError: failMatch[1],
+              fallbackError: failMatch[2],
+              status: failMatch[3]
+            };
+            resultFound = true;
+          }
+        }
+        
+        // Check for no ICP fallback route
+        else if (message.includes('ICP fallback route NOT FOUND')) {
+          const noRouteMatch = message.match(/Original_error=([^\s]+(?:\s+[^\s]+)*?) ICP_route_error=([^\s]+(?:\s+[^\s]+)*?) Status=(.+)/);
+          if (noRouteMatch) {
+            fallbackResult = {
+              success: false,
+              originalError: noRouteMatch[1],
+              icpRouteError: noRouteMatch[2],
+              status: noRouteMatch[3]
+            };
+            resultFound = true;
+          }
+        }
+        
+        // Check for no ICP fallback possible (was already targeting ICP)
+        else if (message.includes('No ICP fallback possible')) {
+          const noFallbackMatch = message.match(/Error=([^\s]+(?:\s+[^\s]+)*?) Status=(.+)/);
+          if (noFallbackMatch) {
+            fallbackResult = {
+              success: false,
+              error: noFallbackMatch[1],
+              status: noFallbackMatch[2],
+              reason: 'Original trade was already targeting ICP'
+            };
+            resultFound = true;
+          }
+        }
+        
+        currentIndex++;
+      }
+      
+      console.log('Found ICP fallback result:', fallbackResult);
+      
+      // Create the compressed entry
+      const compressedEntry = {
+        type: 'icpFallback',
+        timestamp: firstLog.timestamp,
+        component: 'ICP_FALLBACK',
+        summaryMessage: `ICP Fallback ${fallbackResult?.success ? 'succeeded' : 'failed'} - ${originalSellToken}/${originalBuyToken} → ${fallbackSellToken}/${fallbackBuyToken}`,
+        originalPair: `${originalSellToken}/${originalBuyToken}`,
+        fallbackPair: `${fallbackSellToken}/${fallbackBuyToken}`,
+        originalError: originalError,
+        strategy: strategy,
+        result: fallbackResult
+      };
+      
+      console.log('Created ICP fallback entry:', compressedEntry);
+      
+      return {
+        entry: compressedEntry,
+        nextIndex: currentIndex
       };
     },
     
@@ -3182,5 +3434,195 @@ export default {
   color: #17a2b8;
   background: rgba(23, 162, 184, 0.2);
   border: 1px solid rgba(23, 162, 184, 0.3);
+}
+
+/* ICP Fallback Styles */
+.icp-fallback-summary {
+  background: rgba(255, 193, 7, 0.1);
+  border-left: 4px solid #ffc107;
+}
+
+.icp-fallback-summary.success {
+  background: rgba(40, 167, 69, 0.1);
+  border-left: 4px solid #28a745;
+}
+
+.icp-fallback-summary.failed {
+  background: rgba(220, 53, 69, 0.1);
+  border-left: 4px solid #dc3545;
+}
+
+.icp-fallback-container {
+  background: rgba(0, 0, 0, 0.1);
+  border-radius: 6px;
+  padding: 12px;
+  margin-top: 8px;
+}
+
+.icp-fallback-header {
+  font-weight: 600;
+  color: #e9ecef;
+  margin-bottom: 12px;
+  font-size: 0.875rem;
+}
+
+.fallback-overview {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 16px;
+  padding: 12px;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 6px;
+  border: 1px solid #495057;
+}
+
+.fallback-reason,
+.fallback-strategy {
+  flex: 1;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.reason-icon,
+.strategy-icon {
+  font-size: 1.5em;
+  line-height: 1;
+}
+
+.reason-details,
+.strategy-details {
+  flex: 1;
+}
+
+.reason-title,
+.strategy-title {
+  font-size: 0.8em;
+  font-weight: 600;
+  color: #e9ecef;
+  margin-bottom: 4px;
+}
+
+.reason-text,
+.strategy-text {
+  font-size: 0.75em;
+  color: #adb5bd;
+  line-height: 1.3;
+}
+
+.fallback-arrow {
+  font-size: 1.5em;
+  color: #ffc107;
+  font-weight: bold;
+}
+
+.fallback-pairs {
+  margin-bottom: 16px;
+}
+
+.pair-comparison {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  justify-content: center;
+}
+
+.original-pair,
+.fallback-pair {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 12px 16px;
+  border-radius: 8px;
+  min-width: 140px;
+  text-align: center;
+}
+
+.original-pair.failed {
+  background: rgba(220, 53, 69, 0.1);
+  border: 2px solid #dc3545;
+}
+
+.fallback-pair.success {
+  background: rgba(40, 167, 69, 0.1);
+  border: 2px solid #28a745;
+}
+
+.fallback-pair.failed {
+  background: rgba(220, 53, 69, 0.1);
+  border: 2px solid #dc3545;
+}
+
+.pair-label {
+  font-size: 0.7em;
+  font-weight: 600;
+  color: #adb5bd;
+  margin-bottom: 4px;
+}
+
+.pair-value {
+  font-size: 1.0em;
+  font-weight: 700;
+  color: #e9ecef;
+  margin-bottom: 6px;
+  font-family: 'Courier New', monospace;
+}
+
+.pair-status {
+  font-size: 0.75em;
+  font-weight: 600;
+}
+
+.fallback-arrow-large {
+  font-size: 2em;
+  color: #ffc107;
+  font-weight: bold;
+}
+
+.fallback-result {
+  background: rgba(0, 0, 0, 0.2);
+  border: 2px solid #495057;
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.fallback-result.success {
+  border-color: #28a745;
+  background: rgba(40, 167, 69, 0.1);
+}
+
+.fallback-result.failed {
+  border-color: #dc3545;
+  background: rgba(220, 53, 69, 0.1);
+}
+
+.result-metrics {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.next-cycle-info {
+  background: rgba(23, 162, 184, 0.1);
+  border: 1px solid #17a2b8;
+  border-radius: 6px;
+  padding: 8px;
+  text-align: center;
+}
+
+.next-cycle-label {
+  font-size: 0.7em;
+  color: #adb5bd;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.next-cycle-trade {
+  font-size: 0.8em;
+  color: #17a2b8;
+  font-weight: 700;
+  font-family: 'Courier New', monospace;
 }
 </style> 
