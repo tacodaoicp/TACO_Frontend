@@ -104,6 +104,7 @@
               <h3 class="mb-0">Current Trading Status</h3>
             </div>
             <div class="card-body">
+              <!-- First Row -->
               <div class="row">
                 <div class="col-md-3">
                   <div class="metric-item">
@@ -129,6 +130,52 @@
                   <div class="metric-item">
                     <label>Success Rate</label>
                     <div class="value">{{ tradingStatus.metrics?.successRate ? (tradingStatus.metrics.successRate * 100).toFixed(1) : '0.0' }}%</div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Second Row - Skip Statistics -->
+              <div class="row mt-3">
+                <div class="col-md-3">
+                  <div class="metric-item">
+                    <label>Skipped Trades</label>
+                    <div class="value text-warning">{{ tradingStatus.metrics?.totalTradesSkipped || 0 }}</div>
+                  </div>
+                </div>
+                <div class="col-md-3">
+                  <div class="metric-item">
+                    <label>Skip Rate</label>
+                    <div class="value text-warning">{{ tradingStatus.metrics?.skipRate ? (tradingStatus.metrics.skipRate * 100).toFixed(1) : '0.0' }}%</div>
+                  </div>
+                </div>
+                <div class="col-md-6">
+                  <div class="metric-item skip-breakdown" v-if="tradingStatus.metrics?.skipBreakdown">
+                    <label>Skip Breakdown</label>
+                    <div class="skip-stats">
+                      <div class="skip-stat" v-if="tradingStatus.metrics.skipBreakdown.noPairsFound > 0">
+                        <span class="skip-label">No Pairs:</span>
+                        <span class="skip-value">{{ tradingStatus.metrics.skipBreakdown.noPairsFound }}</span>
+                      </div>
+                      <div class="skip-stat" v-if="tradingStatus.metrics.skipBreakdown.noExecutionPath > 0">
+                        <span class="skip-label">No Route:</span>
+                        <span class="skip-value">{{ tradingStatus.metrics.skipBreakdown.noExecutionPath }}</span>
+                      </div>
+                      <div class="skip-stat" v-if="tradingStatus.metrics.skipBreakdown.tokensFiltered > 0">
+                        <span class="skip-label">Filtered:</span>
+                        <span class="skip-value">{{ tradingStatus.metrics.skipBreakdown.tokensFiltered }}</span>
+                      </div>
+                      <div class="skip-stat" v-if="tradingStatus.metrics.skipBreakdown.pausedTokens > 0">
+                        <span class="skip-label">Paused:</span>
+                        <span class="skip-value">{{ tradingStatus.metrics.skipBreakdown.pausedTokens }}</span>
+                      </div>
+                      <div class="skip-stat" v-if="tradingStatus.metrics.skipBreakdown.insufficientCandidates > 0">
+                        <span class="skip-label">Few Candidates:</span>
+                        <span class="skip-value">{{ tradingStatus.metrics.skipBreakdown.insufficientCandidates }}</span>
+                      </div>
+                      <div v-if="!hasAnySkips(tradingStatus.metrics.skipBreakdown)" class="text-muted">
+                        No skips recorded
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -1004,6 +1051,15 @@ export default {
         'text-warning': status === 'Idle',
         'text-danger': status.startsWith && status.startsWith('Failed')
       };
+    },
+
+    hasAnySkips(skipBreakdown) {
+      if (!skipBreakdown) return false;
+      return skipBreakdown.noPairsFound > 0 ||
+             skipBreakdown.noExecutionPath > 0 ||
+             skipBreakdown.tokensFiltered > 0 ||
+             skipBreakdown.pausedTokens > 0 ||
+             skipBreakdown.insufficientCandidates > 0;
     },
     
     processPortfolioStateGroup(startIndex) {
@@ -2023,6 +2079,44 @@ export default {
   font-size: 1.5rem;
   font-weight: bold;
   color: #fff;
+}
+
+/* Skip Statistics Styles */
+.skip-breakdown {
+  text-align: left !important;
+}
+
+.skip-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.skip-stat {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(255, 193, 7, 0.1);
+  border: 1px solid rgba(255, 193, 7, 0.3);
+  border-radius: 12px;
+  padding: 2px 8px;
+  font-size: 0.75rem;
+}
+
+.skip-label {
+  color: #ffc107;
+  font-weight: 600;
+}
+
+.skip-value {
+  color: #fff;
+  font-weight: bold;
+  background: rgba(255, 193, 7, 0.2);
+  border-radius: 6px;
+  padding: 1px 4px;
+  min-width: 20px;
+  text-align: center;
 }
 
 .logs-container {
