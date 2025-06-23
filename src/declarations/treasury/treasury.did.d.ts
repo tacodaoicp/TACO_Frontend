@@ -57,7 +57,16 @@ export type Result_2 = {
         'successRate' : number,
         'lastUpdate' : bigint,
         'totalTradesExecuted' : bigint,
+        'skipBreakdown' : {
+          'tokensFiltered' : bigint,
+          'insufficientCandidates' : bigint,
+          'noExecutionPath' : bigint,
+          'noPairsFound' : bigint,
+          'pausedTokens' : bigint,
+        },
+        'skipRate' : number,
         'totalTradesFailed' : bigint,
+        'totalTradesSkipped' : bigint,
       },
       'rebalanceStatus' : RebalanceStatus,
       'portfolioState' : {
@@ -132,6 +141,20 @@ export interface treasury {
   'getLogs' : ActorMethod<[bigint], Array<LogEntry>>,
   'getLogsByContext' : ActorMethod<[string, bigint], Array<LogEntry>>,
   'getLogsByLevel' : ActorMethod<[LogLevel, bigint], Array<LogEntry>>,
+  'getSkipMetrics' : ActorMethod<
+    [],
+    {
+      'skipBreakdown' : {
+        'tokensFiltered' : bigint,
+        'insufficientCandidates' : bigint,
+        'noExecutionPath' : bigint,
+        'noPairsFound' : bigint,
+        'pausedTokens' : bigint,
+      },
+      'skipRate' : number,
+      'totalTradesSkipped' : bigint,
+    }
+  >,
   'getSystemParameters' : ActorMethod<[], RebalanceConfig>,
   'getTokenDetails' : ActorMethod<[], Array<[Principal, TokenDetails]>>,
   'getTokenPriceHistory' : ActorMethod<[Array<Principal>], Result_3>,
@@ -140,6 +163,7 @@ export interface treasury {
     [Array<[TransferRecipient, bigint, Principal, number]>, boolean],
     [boolean, [] | [Array<[Principal, bigint]>]]
   >,
+  'resetRebalanceState' : ActorMethod<[], Result>,
   'setTest' : ActorMethod<[boolean], undefined>,
   'startRebalancing' : ActorMethod<[], Result>,
   'stopRebalancing' : ActorMethod<[], Result>,

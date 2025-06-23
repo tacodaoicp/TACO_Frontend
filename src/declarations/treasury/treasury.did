@@ -20,6 +20,25 @@ type treasury =
    /// * Get the last N log entries for a specific level
    ///    * Only accessible by master admin, controller, or DAO
    getLogsByLevel: (LogLevel, nat) -> (vec LogEntry) query;
+   /// * Get skip metrics and breakdown
+   ///    * 
+   ///    * Returns detailed information about skipped trades including:
+   ///    * - Total skipped trades
+   ///    * - Breakdown by skip reason
+   ///    * - Skip rate as percentage of all attempts
+   getSkipMetrics: () ->
+    (record {
+       skipBreakdown:
+        record {
+          insufficientCandidates: nat;
+          noExecutionPath: nat;
+          noPairsFound: nat;
+          pausedTokens: nat;
+          tokensFiltered: nat;
+        };
+       skipRate: float64;
+       totalTradesSkipped: nat;
+     }) query;
    /// * Get system rebalance parameters
    ///  *
    ///  * Returns all rebalancing configuration parameters that control the behavior
@@ -60,6 +79,11 @@ type treasury =
               principal;
               nat64;
             });
+   /// * Reset the rebalancing state to initial values
+   ///    *
+   ///    * Completely resets all metrics, trade history, and timers
+   ///    * Only callable by DAO or controller.
+   resetRebalanceState: () -> (Result);
    /// * Set test mode (modifies safety parameters)
    ///    * Only callable by DAO.
    setTest: (bool) -> ();
@@ -180,9 +204,19 @@ type Result_2 =
        record {
          avgSlippage: float64;
          lastUpdate: int;
+         skipBreakdown:
+          record {
+            insufficientCandidates: nat;
+            noExecutionPath: nat;
+            noPairsFound: nat;
+            pausedTokens: nat;
+            tokensFiltered: nat;
+          };
+         skipRate: float64;
          successRate: float64;
          totalTradesExecuted: nat;
          totalTradesFailed: nat;
+         totalTradesSkipped: nat;
        };
       portfolioState:
        record {
