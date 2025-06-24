@@ -384,7 +384,7 @@ const submitCondition = async () => {
     await store.addTriggerCondition(
       newCondition.value.name,
       newCondition.value.direction,
-      newCondition.value.percentage / 100,
+      newCondition.value.percentage,
       timeWindowNS,
       applicableTokens
     )
