@@ -46,7 +46,7 @@
               </div>
               
               <div v-else class="conditions-list">
-                <div v-for="condition in conditions" :key="condition.id" class="condition-card mb-3">
+                <div v-for="condition in conditions" :key="Number(condition.id)" class="condition-card mb-3">
                   <div class="d-flex justify-content-between align-items-start">
                     <div class="condition-info">
                       <h5 class="mb-2">
@@ -55,7 +55,7 @@
                         <span v-else class="badge bg-success ms-2">Active</span>
                       </h5>
                       <div class="condition-details">
-                        <div><strong>Direction:</strong> {{ condition.direction === 'Up' ? '📈 Up' : '📉 Down' }}</div>
+                        <div><strong>Direction:</strong> {{ condition.direction.Up !== undefined ? '📈 Up' : '📉 Down' }}</div>
                         <div><strong>Threshold:</strong> {{ (condition.percentage * 100).toFixed(1) }}%</div>
                         <div><strong>Time Window:</strong> {{ formatTimeWindow(condition.timeWindowNS) }}</div>
                         <div><strong>Applies to:</strong> 
@@ -71,12 +71,12 @@
                       <button 
                         class="btn btn-sm" 
                         :class="condition.isActive ? 'btn-secondary' : 'btn-success'"
-                        @click="toggleActive(condition.id, !condition.isActive)">
+                        @click="toggleActive(Number(condition.id), !condition.isActive)">
                         {{ condition.isActive ? '⏸️' : '▶️' }}
                       </button>
                       <button 
                         class="btn btn-sm btn-danger" 
-                        @click="deleteCondition(condition.id)">
+                        @click="deleteCondition(Number(condition.id))">
                         🗑️
                       </button>
                     </div>
@@ -112,11 +112,11 @@
               </div>
               
               <div v-else class="alerts-list">
-                <div v-for="alert in alerts" :key="alert.id" class="alert-card mb-3">
+                <div v-for="alert in alerts" :key="Number(alert.id)" class="alert-card mb-3">
                   <div class="alert-info">
                     <h6 class="mb-2">
-                      🚨 {{ alert.conditionName }}
-                      <span class="badge bg-danger ms-2">{{ alert.direction === 'Up' ? '📈' : '📉' }} {{ (alert.changePercentage * 100).toFixed(2) }}%</span>
+                      🚨 {{ alert.triggeredCondition.name }}
+                      <span class="badge bg-danger ms-2">{{ alert.triggeredCondition.direction.Up !== undefined ? '📈' : '📉' }} {{ (alert.priceData.actualChangePercent).toFixed(2) }}%</span>
                     </h6>
                     <div class="alert-details">
                       <div><strong>Token:</strong> {{ getTokenSymbol(alert.token) }}</div>
@@ -248,11 +248,46 @@ import { useTacoStore } from '../stores/taco.store'
 import HeaderBar from '../components/HeaderBar.vue'
 import TacoTitle from '../components/misc/TacoTitle.vue'
 
+interface PriceDirection {
+  Up?: null;
+  Down?: null;
+}
+
+interface TriggerCondition {
+  id: bigint;
+  name: string;
+  direction: PriceDirection;
+  percentage: number;
+  timeWindowNS: bigint;
+  applicableTokens: any[];
+  isActive: boolean;
+  createdAt: bigint;
+  createdBy: any;
+}
+
+interface TriggerPriceData {
+  currentPrice: bigint;
+  minPriceInWindow: bigint;
+  maxPriceInWindow: bigint;
+  windowStartTime: bigint;
+  actualChangePercent: number;
+  changeType: any;
+}
+
+interface PriceAlertLog {
+  id: bigint;
+  timestamp: bigint;
+  token: any;
+  tokenSymbol: string;
+  triggeredCondition: TriggerCondition;
+  priceData: TriggerPriceData;
+}
+
 const store = useTacoStore()
 
 // State
-const conditions = ref([])
-const alerts = ref([])
+const conditions = ref<TriggerCondition[]>([])
+const alerts = ref<PriceAlertLog[]>([])
 const loadingConditions = ref(false)
 const loadingAlerts = ref(false)
 const submitting = ref(false)
@@ -344,7 +379,7 @@ const submitCondition = async () => {
   submitting.value = true
   try {
     const timeWindowNS = BigInt(newCondition.value.timeValue * getTimeMultiplier() * 1_000_000_000)
-    const applicableTokens = [] // Empty array means all tokens
+    const applicableTokens: any[] = [] // Empty array means all tokens
     
     await store.addTriggerCondition(
       newCondition.value.name,
@@ -363,7 +398,7 @@ const submitCondition = async () => {
 }
 
 const getTimeMultiplier = () => {
-  const multipliers = {
+  const multipliers: Record<string, number> = {
     minutes: 60,
     hours: 60 * 60,
     days: 60 * 60 * 24
