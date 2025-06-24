@@ -1540,17 +1540,17 @@
 
                     <!-- paragraph -->
                     <p class="taco-report-explorer__report-paragraph">
-                      Before the creation of the Motoko DAO, <a href="https://x.com/sonic_ooo/status/1745314196034588816?t=p9K9YrK2DF2OD_cPX2QYTA" target="_blank" class="taco-report-explorer__report-link">10,000 $MOTOKO tokens were minted and airdropped 1:1 to Motoko Ghosts NFT holders</a>. Community member AccumulatingICP and the Sonic team collaborated on this.
+                      Before the creation of the Motoko DAO, <a href="https://x.com/sonic_ooo/status/1745314196034588816?t=p9K9YrK2DF2OD_cPX2QYTA" target="_blank" class="taco-report-explorer__report-link">10,000 $MOTOKO tokens were minted and airdropped 1:1 to Motoko Ghosts NFT holders</a>. Community member AccumulatingICP and the Sonic team collaborated on this, with DFINITY being involved in the process & decision making, and Jon Ball giving the greenlight to proceed.
                     </p>
                     
                     <!-- paragraph -->
                     <p class="taco-report-explorer__report-paragraph">
-                      Motoko DAO was created to give the Motoko Ghosts community a structure to collectively steer the direction of the Motoko Ghosts brand. RemCodes developed a 1:1 Swap function which was used to give existing holders of $MOTOKO the ability to convert their tokens to SNS governance tokens. Four custodians were designated to execute this transition: Bug Slayer, AccumulatingICP, RemCodes, and BobbyO.
+                      Motoko DAO was created to give the Motoko Ghosts community a structure to collectively steer the direction of the Motoko Ghosts brand. An ICPSwap LP was used to give existing holders of $MOTOKO the ability to convert their tokens to SNS governance tokens. Four custodians were designated to execute this transition: Bug Slayer, AccumulatingICP, RemCodes, and BobbyO.
                     </p>
                     
                     <!-- paragraph -->
                     <p class="taco-report-explorer__report-paragraph">
-                      The founders of Dragginz, Adam Powell and Donna Powell, are involved as investors and advisors. The Dragginz team has committed to working on the Toko NFT Maker & Marketplace (Toko) until it is ready to transition under Motoko DAO's governance. The Powells previously created Neopets, a 1999 online video game which within less than a decade accrued 140 million accounts. They went on to form Meteor Games after selling Neopets, which, among other projects, created a Facebook game named Island Paradise, which at its peak claimed 6.8 million monthly users. Adam Powell has contributed ICP to several SNS launches, and the Powells are vocal contributors to the broader ICP ecosystem.
+                      The founders of Dragginz, Adam Powell and Donna Powell, are involved as investors and advisors. The Dragginz team has committed to working on the Toko NFT Maker & Marketplace (Toko) until it is ready to transition under Motoko DAO. The Powells previously created Neopets, a 1999 online video game which within less than a decade accrued 140 million accounts. They went on to form Meteor Games after selling Neopets, which, among other projects, created a Facebook game named Island Paradise, which at its peak claimed 6.8 million monthly users. Adam Powell has contributed ICP to several SNS launches, and the Powells are vocal contributors to the broader ICP ecosystem.
                     </p>
                     
                     <!-- paragraph -->
@@ -1566,7 +1566,7 @@
 
                         <!-- paragraph -->
                         <p class="taco-report-explorer__report-paragraph">
-                          <a href="https://app.sneeddao.com/proposal?proposalid=224&sns=ko36b-myaaa-aaaaq-aadbq-cai" target="_blank" class="taco-report-explorer__report-link">Proposal ID 224 appointed VingTheory as Frontend Developer</a>. He created the ICpxy NFT collection and has worked with Poked Studio. He is currently working on the Motoko Mining dApp.
+                          <a href="https://app.sneeddao.com/proposal?proposalid=224&sns=ko36b-myaaa-aaaaq-aadbq-cai" target="_blank" class="taco-report-explorer__report-link">Proposal ID 224 appointed VingTheory as Frontend Developer</a>. He created the ICpxy NFT collection and has worked with Poked Studio. He is working on the Motoko Mining dApp and the Motoko MMO.
                         </p>
 
                       </li>
@@ -1576,7 +1576,7 @@
 
                         <!-- paragraph -->
                         <p class="taco-report-explorer__report-paragraph">
-                          <a href="https://app.sneeddao.com/proposal?proposalid=225&sns=ko36b-myaaa-aaaaq-aadbq-cai" target="_blank" class="taco-report-explorer__report-link">Proposal ID 225 appointed Enoch as Backend Developer</a>. He has worked on numerous projects including Motoko Pals, Tswaanda Africa, and has contributed to IC-Websocket Motoko. He is also DevRel and Instructor at ICP HUB South Africa.
+                          <a href="https://app.sneeddao.com/proposal?proposalid=225&sns=ko36b-myaaa-aaaaq-aadbq-cai" target="_blank" class="taco-report-explorer__report-link">Proposal ID 225 appointed Enoch as Backend Developer</a>. He has worked on numerous projects including Motoko Pals, Tswaanda Africa, and has contributed to IC-Websocket Motoko. He is also DevRel and Instructor at ICP HUB South Africa. He is working on the Motoko MMO.
                         </p>
 
                       </li>
@@ -1642,7 +1642,7 @@
                     
                     <!-- paragraph -->
                     <p class="taco-report-explorer__report-paragraph">
-                      The Motoko DAO controls, or will control, the canisters of the Motoko Ghosts, Motoko Pals, BTC Flower, ETH Flower, ICP Flower, Pineapple Punks, BTC Flower 2.0, Grapes of Wrath, Cherries, and Bold Art Degens NFT collections. There is a planned collection of 3D Motoko Ghosts that will be paired 1:1 with the current 2D Motoko Ghosts.
+                      The Motoko DAO controls the canisters of the Motoko Ghosts and Motoko Pals NFT collections. There is a planned collection of 3D Motoko Ghosts that will be paired 1:1 with the current 2D Motoko Ghosts.
                     </p>  
                     
                     <!-- paragraph -->
@@ -1657,8 +1657,13 @@
                     
                     <!-- paragraph -->
                     <p class="taco-report-explorer__report-paragraph">
-                      Toko will be funded by an optional minting fee - a small percentage of each claim and sale going to the DAO. Creators will be able to adjust this percentage or remove it completely. Secondary sales will have adjustable parameters too. While these values will be fixed upon creation, creators can set predefined ranges which they can adjust between post-creation.
+                      Adam has stated that Toko may be under NNS control, with development being done by and royalties going to Motoko DAO.
                     </p>  
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      Toko will be funded by an optional minting fee - a small percentage of each claim and sale going to the DAO. Creators will be able to adjust this percentage or remove it completely. While these values will be fixed upon creation, creators can set predefined ranges which they can adjust between post-creation. Adam has stated that Motoko DAO may receive all fees from secondary sales.
+                    </p>                      
                     
                     <!-- paragraph -->
                     <p class="taco-report-explorer__report-paragraph">
@@ -1834,7 +1839,7 @@
                     
                     <!-- paragraph -->
                     <p class="taco-report-explorer__report-paragraph">
-                      There are already collaborations in place - most notably with Poked Studio and Ludo. While Dragginz is a separate project, the Dragginz team has clarified that strong NFT infrastructure is a prerequisite for the Dragginz game itself, and that work on Toko does not represent a shift away from Dragginz development.
+                      While Dragginz is a separate project, the Dragginz team has clarified that strong NFT infrastructure is a prerequisite for the Dragginz game itself, and that work on Toko does not represent a shift away from Dragginz development.
                     </p>
                     
                     <!-- paragraph -->
@@ -2439,6 +2444,26 @@
 
                         </ul>
 
+                        <!-- paragraph -->
+                        <p class="taco-report-explorer__report-paragraph">
+                          $MOTOKO's supply changed in January 2025, explaining the vast majority of the price changes. Therefore we can approximate ATH and ATL to get a more accurate figure of the data
+                        </p>
+
+                        <!-- paragraph -->
+                        <p class="taco-report-explorer__report-paragraph">
+                          All Time High (USD): ~ 0.0611
+                        </p>
+
+                        <!-- paragraph -->
+                        <p class="taco-report-explorer__report-paragraph">
+                          This means that the actual dollar value ATH is not the true ATH, and the true ATH adjusted for supply changes is June 9th's 0.1237 USD.
+                        </p>
+
+                        <!-- paragraph -->
+                        <p class="taco-report-explorer__report-paragraph">
+                          Actual Change from ATH USD: ~ 23.848%
+                        </p>   
+
                       </div>
 
                       <!-- right -->
@@ -2509,25 +2534,7 @@
 
                     </div>
 
-                    <!-- paragraph -->
-                    <p class="taco-report-explorer__report-paragraph">
-                      $MOTOKO's supply changed in January 2025, explaining the vast majority of the price changes. Therefore we can approximate ATH and ATL to get a more accurate figure of the data
-                    </p>
-
-                    <!-- paragraph -->
-                    <p class="taco-report-explorer__report-paragraph">
-                      All Time High (USD): ~ 0.0611
-                    </p>
-
-                    <!-- paragraph -->
-                    <p class="taco-report-explorer__report-paragraph">
-                      This means that the actual dollar value ATH is not the true ATH, and the true ATH adjusted for supply changes is June 9th's 0.1237 USD.
-                    </p>
-
-                    <!-- paragraph -->
-                    <p class="taco-report-explorer__report-paragraph">
-                      Actual Change from ATH USD: ~ 23.848%
-                    </p>                    
+                 
 
                     <hr>
 
