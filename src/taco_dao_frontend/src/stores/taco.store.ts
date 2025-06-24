@@ -193,6 +193,32 @@ export interface GetSystemParameterResult {
     LogAdmin?: Principal;
 }
 
+// Trading pause system interfaces
+interface TradingPauseReason {
+    PriceAlert?: {
+        conditionName: string;
+        triggeredAt: bigint;
+        alertId: bigint;
+    };
+    CircuitBreaker?: {
+        reason: string;
+        triggeredAt: bigint;
+        severity: string;
+    };
+}
+
+interface TradingPauseRecord {
+    token: Principal;
+    tokenSymbol: string;
+    reason: TradingPauseReason;
+    pausedAt: bigint;
+}
+
+interface TradingPausesResponse {
+    pausedTokens: TradingPauseRecord[];
+    totalCount: bigint;
+}
+
 /////////////
 // Exports //
 /////////////
@@ -3064,6 +3090,142 @@ export const useTacoStore = defineStore('taco', () => {
         }
     };
 
+    // Trading pause management functions
+    const listTradingPauses = async () => {
+        try {
+            const authClient = await getAuthClient();
+            
+            if (!await authClient.isAuthenticated()) {
+                throw new Error('User not authenticated');
+            }
+
+            const identity = await authClient.getIdentity();
+            const agent = await createAgent({
+                identity,
+                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            });
+
+            const treasury = Actor.createActor<TreasuryService>(treasuryIDL, {
+                agent,
+                canisterId: treasuryCanisterId()
+            });
+
+            return await treasury.listTradingPauses();
+        } catch (error: any) {
+            console.error('Error listing trading pauses:', error);
+            throw error;
+        }
+    };
+
+    const getTradingPauseInfo = async (token: Principal) => {
+        try {
+            const authClient = await getAuthClient();
+            
+            if (!await authClient.isAuthenticated()) {
+                throw new Error('User not authenticated');
+            }
+
+            const identity = await authClient.getIdentity();
+            const agent = await createAgent({
+                identity,
+                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            });
+
+            const treasury = Actor.createActor<TreasuryService>(treasuryIDL, {
+                agent,
+                canisterId: treasuryCanisterId()
+            });
+
+            return await treasury.getTradingPauseInfo(token);
+        } catch (error: any) {
+            console.error('Error getting trading pause info:', error);
+            throw error;
+        }
+    };
+
+    const unpauseTokenFromTrading = async (token: Principal) => {
+        try {
+            const authClient = await getAuthClient();
+            
+            if (!await authClient.isAuthenticated()) {
+                throw new Error('User not authenticated');
+            }
+
+            const identity = await authClient.getIdentity();
+            const agent = await createAgent({
+                identity,
+                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            });
+
+            const treasury = Actor.createActor<TreasuryService>(treasuryIDL, {
+                agent,
+                canisterId: treasuryCanisterId()
+            });
+
+            return await treasury.unpauseTokenFromTrading(token);
+        } catch (error: any) {
+            console.error('Error unpausing token from trading:', error);
+            throw error;
+        }
+    };
+
+    const pauseTokenFromTradingManual = async (token: Principal, reason: string) => {
+        try {
+            const authClient = await getAuthClient();
+            
+            if (!await authClient.isAuthenticated()) {
+                throw new Error('User not authenticated');
+            }
+
+            const identity = await authClient.getIdentity();
+            const agent = await createAgent({
+                identity,
+                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            });
+
+            const treasury = Actor.createActor<TreasuryService>(treasuryIDL, {
+                agent,
+                canisterId: treasuryCanisterId()
+            });
+
+            return await treasury.pauseTokenFromTradingManual(token, reason);
+        } catch (error: any) {
+            console.error('Error pausing token from trading:', error);
+            throw error;
+        }
+    };
+
+    const clearAllTradingPauses = async () => {
+        try {
+            const authClient = await getAuthClient();
+            
+            if (!await authClient.isAuthenticated()) {
+                throw new Error('User not authenticated');
+            }
+
+            const identity = await authClient.getIdentity();
+            const agent = await createAgent({
+                identity,
+                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            });
+
+            const treasury = Actor.createActor<TreasuryService>(treasuryIDL, {
+                agent,
+                canisterId: treasuryCanisterId()
+            });
+
+            return await treasury.clearAllTradingPauses();
+        } catch (error: any) {
+            console.error('Error clearing all trading pauses:', error);
+            throw error;
+        }
+    };
+
     // # RETURN #
     return {
         // state
@@ -3161,5 +3323,10 @@ export const useTacoStore = defineStore('taco', () => {
         removeTriggerCondition,
         getPriceAlerts,
         clearPriceAlerts,
+        listTradingPauses,
+        getTradingPauseInfo,
+        unpauseTokenFromTrading,
+        pauseTokenFromTradingManual,
+        clearAllTradingPauses,
     }
 })

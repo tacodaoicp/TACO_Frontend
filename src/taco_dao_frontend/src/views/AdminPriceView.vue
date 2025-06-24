@@ -127,6 +127,71 @@
               </div>
             </div>
           </div>
+
+          <!-- Trading Pauses Management -->
+          <div class="card bg-dark text-white mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+              <h3 class="mb-0">Trading Pauses</h3>
+              <div class="d-flex gap-2">
+                <button class="btn btn-primary" @click="refreshTradingPauses">
+                  🔄 Refresh
+                </button>
+                <button class="btn btn-success" @click="showManualPauseModal = true">
+                  ⏸️ Manual Pause
+                </button>
+                <button class="btn btn-danger" @click="clearAllTradingPauses" v-if="tradingPauses.length > 0">
+                  🧹 Clear All
+                </button>
+              </div>
+            </div>
+            
+            <div class="card-body">
+              <div v-if="loadingTradingPauses" class="text-center">
+                <div class="spinner-border" role="status">
+                  <span class="visually-hidden">Loading...</span>
+                </div>
+              </div>
+              
+              <div v-else-if="tradingPauses.length === 0" class="text-center text-muted">
+                No tokens currently paused from trading
+              </div>
+              
+              <div v-else class="trading-pauses-list">
+                <div v-for="pause in tradingPauses" :key="pause.token.toString()" class="pause-card mb-3">
+                  <div class="d-flex justify-content-between align-items-start">
+                    <div class="pause-info">
+                      <h6 class="mb-2">
+                        ⏸️ {{ pause.tokenSymbol }}
+                        <span class="badge ms-2" :class="getPauseReasonBadgeClass(pause.reason)">
+                          {{ getPauseReasonText(pause.reason) }}
+                        </span>
+                      </h6>
+                      <div class="pause-details">
+                        <div><strong>Token:</strong> {{ getTokenSymbol(pause.token) }}</div>
+                        <div><strong>Paused:</strong> {{ formatTimestamp(pause.pausedAt) }}</div>
+                        <div><strong>Duration:</strong> {{ getPauseDuration(pause.pausedAt) }}</div>
+                        <div v-if="pause.reason.PriceAlert">
+                          <strong>Condition:</strong> {{ pause.reason.PriceAlert.conditionName }}
+                          <br><strong>Alert ID:</strong> {{ pause.reason.PriceAlert.alertId }}
+                        </div>
+                        <div v-if="pause.reason.CircuitBreaker">
+                          <strong>Reason:</strong> {{ pause.reason.CircuitBreaker.reason }}
+                          <br><strong>Severity:</strong> {{ pause.reason.CircuitBreaker.severity }}
+                        </div>
+                      </div>
+                    </div>
+                    <div class="pause-actions">
+                      <button 
+                        class="btn btn-sm btn-success" 
+                        @click="unpauseToken(pause.token)">
+                        ▶️ Unpause
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -239,6 +304,49 @@
         </div>
       </div>
     </div>
+
+    <!-- Manual Pause Modal -->
+    <div v-if="showManualPauseModal" class="modal d-block" tabindex="-1" style="background: rgba(0,0,0,0.5)">
+      <div class="modal-dialog">
+        <div class="modal-content bg-dark text-white">
+          <div class="modal-header">
+            <h5 class="modal-title">Manual Trading Pause</h5>
+            <button type="button" class="btn-close btn-close-white" @click="closeManualPauseModal"></button>
+          </div>
+          <div class="modal-body">
+            <form @submit.prevent="submitManualPause">
+              <div class="mb-3">
+                <label class="form-label">Token Principal</label>
+                <input 
+                  type="text" 
+                  class="form-control" 
+                  v-model="manualPauseForm.tokenPrincipal" 
+                  required 
+                  placeholder="rdmx6-jaaaa-aaaah-qcaiq-cai">
+                <small class="text-muted">Enter the principal ID of the token to pause</small>
+              </div>
+              
+              <div class="mb-3">
+                <label class="form-label">Reason</label>
+                <textarea 
+                  class="form-control" 
+                  v-model="manualPauseForm.reason" 
+                  required 
+                  rows="3"
+                  placeholder="Explain why this token should be paused from trading..."></textarea>
+              </div>
+
+              <div class="d-flex justify-content-end gap-2">
+                <button type="button" class="btn btn-secondary" @click="closeManualPauseModal">Cancel</button>
+                <button type="submit" class="btn btn-danger" :disabled="submittingPause">
+                  {{ submittingPause ? 'Pausing...' : 'Pause Token' }}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -247,6 +355,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useTacoStore } from '../stores/taco.store'
 import HeaderBar from '../components/HeaderBar.vue'
 import TacoTitle from '../components/misc/TacoTitle.vue'
+import { Principal } from '@dfinity/principal'
 
 interface PriceDirection {
   Up?: null;
@@ -288,12 +397,16 @@ const store = useTacoStore()
 // State
 const conditions = ref<TriggerCondition[]>([])
 const alerts = ref<PriceAlertLog[]>([])
+const tradingPauses = ref<any[]>([])
 const loadingConditions = ref(false)
 const loadingAlerts = ref(false)
+const loadingTradingPauses = ref(false)
 const submitting = ref(false)
+const submittingPause = ref(false)
 
 // Modal state
 const showAddModal = ref(false)
+const showManualPauseModal = ref(false)
 const newCondition = ref({
   name: '',
   direction: 'Up',
@@ -301,6 +414,10 @@ const newCondition = ref({
   timeValue: 2,
   timeUnit: 'hours',
   tokenScope: 'all'
+})
+const manualPauseForm = ref({
+  tokenPrincipal: '',
+  reason: ''
 })
 
 // Methods
@@ -418,27 +535,114 @@ const closeModal = () => {
   }
 }
 
+// Trading pause functions
+const refreshTradingPauses = async () => {
+  loadingTradingPauses.value = true
+  try {
+    const result = await store.listTradingPauses()
+    tradingPauses.value = result.pausedTokens
+  } catch (error) {
+    console.error('Failed to fetch trading pauses:', error)
+  }
+  loadingTradingPauses.value = false
+}
+
+const unpauseToken = async (token: any) => {
+  if (!confirm('Are you sure you want to unpause this token from trading?')) return
+  
+  try {
+    await store.unpauseTokenFromTrading(token)
+    await refreshTradingPauses()
+  } catch (error) {
+    console.error('Failed to unpause token:', error)
+  }
+}
+
+const clearAllTradingPauses = async () => {
+  if (!confirm('Are you sure you want to clear ALL trading pauses?')) return
+  
+  try {
+    await store.clearAllTradingPauses()
+    tradingPauses.value = []
+  } catch (error) {
+    console.error('Failed to clear all trading pauses:', error)
+  }
+}
+
+const getPauseReasonText = (reason: any) => {
+  if (reason.PriceAlert) {
+    return 'Price Alert'
+  } else if (reason.CircuitBreaker) {
+    return 'Circuit Breaker'
+  }
+  return 'Unknown'
+}
+
+const getPauseReasonBadgeClass = (reason: any) => {
+  if (reason.PriceAlert) {
+    return 'bg-warning'
+  } else if (reason.CircuitBreaker) {
+    return 'bg-danger'
+  }
+  return 'bg-secondary'
+}
+
+const getPauseDuration = (pausedAt: bigint) => {
+  const now = Date.now()
+  const pausedTime = Number(pausedAt / BigInt(1_000_000))
+  const diffMs = now - pausedTime
+  const diffMinutes = Math.floor(diffMs / 60000)
+  const diffHours = Math.floor(diffMinutes / 60)
+  const diffDays = Math.floor(diffHours / 24)
+  
+  if (diffDays > 0) return `${diffDays}d ${diffHours % 24}h`
+  if (diffHours > 0) return `${diffHours}h ${diffMinutes % 60}m`
+  return `${diffMinutes}m`
+}
+
+const submitManualPause = async () => {
+  submittingPause.value = true
+  try {
+    const tokenPrincipal = Principal.fromText(manualPauseForm.value.tokenPrincipal)
+    await store.pauseTokenFromTradingManual(tokenPrincipal, manualPauseForm.value.reason)
+    await refreshTradingPauses()
+    closeManualPauseModal()
+  } catch (error) {
+    console.error('Failed to pause token manually:', error)
+  }
+  submittingPause.value = false
+}
+
+const closeManualPauseModal = () => {
+  showManualPauseModal.value = false
+  manualPauseForm.value = {
+    tokenPrincipal: '',
+    reason: ''
+  }
+}
+
 // Lifecycle
 onMounted(async () => {
   await refreshConditions()
   await refreshAlerts()
+  await refreshTradingPauses()
 })
 </script>
 
 <style scoped>
-.condition-card, .alert-card {
+.condition-card, .alert-card, .pause-card {
   background: rgba(255, 255, 255, 0.1);
   border-radius: 8px;
   padding: 1rem;
   border: 1px solid rgba(255, 255, 255, 0.2);
 }
 
-.condition-details, .alert-details {
+.condition-details, .alert-details, .pause-details {
   font-size: 0.9em;
   line-height: 1.4;
 }
 
-.condition-details > div, .alert-details > div {
+.condition-details > div, .alert-details > div, .pause-details > div {
   margin-bottom: 0.25rem;
 }
 
@@ -446,6 +650,13 @@ onMounted(async () => {
   background: rgba(255, 255, 255, 0.1);
   border: 1px solid rgba(255, 255, 255, 0.3);
   color: white;
+}
+
+.form-control:focus, .form-select:focus {
+  background: rgba(255, 255, 255, 0.15);
+  border-color: rgba(255, 255, 255, 0.5);
+  color: white;
+  box-shadow: 0 0 0 0.2rem rgba(255, 255, 255, 0.25);
 }
 
 .form-control:focus, .form-select:focus {

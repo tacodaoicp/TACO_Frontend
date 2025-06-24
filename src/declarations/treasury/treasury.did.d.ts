@@ -72,8 +72,10 @@ export type Result = { 'ok' : string } |
 export type Result_1 = { 'ok' : string } |
   { 'err' : RebalanceError };
 export type Result_2 = { 'ok' : string } |
+  { 'err' : TradingPauseError };
+export type Result_3 = { 'ok' : string } |
   { 'err' : SyncErrorTreasury };
-export type Result_3 = {
+export type Result_4 = {
     'ok' : {
       'executedTrades' : Array<TradeRecord>,
       'metrics' : {
@@ -102,11 +104,11 @@ export type Result_3 = {
     }
   } |
   { 'err' : string };
-export type Result_4 = { 'ok' : Array<[Principal, Array<PricePoint__1>]> } |
+export type Result_5 = { 'ok' : Array<[Principal, Array<PricePoint__1>]> } |
   { 'err' : string };
-export type Result_5 = { 'ok' : string } |
+export type Result_6 = { 'ok' : string } |
   { 'err' : string };
-export type Result_6 = { 'ok' : bigint } |
+export type Result_7 = { 'ok' : bigint } |
   { 'err' : PriceFailsafeError };
 export type Subaccount = Uint8Array | number[];
 export type SyncErrorTreasury = { 'NotDAO' : null } |
@@ -140,6 +142,41 @@ export interface TradeRecord {
   'exchange' : ExchangeType,
   'tokenBought' : Principal,
   'slippage' : number,
+}
+export type TradingPauseError = { 'TokenNotPaused' : null } |
+  { 'TokenNotFound' : null } |
+  { 'TokenAlreadyPaused' : null } |
+  { 'SystemError' : string } |
+  { 'NotAuthorized' : null };
+export type TradingPauseReason = {
+    'PriceAlert' : {
+      'conditionName' : string,
+      'alertId' : bigint,
+      'triggeredAt' : bigint,
+    }
+  } |
+  {
+    'CircuitBreaker' : {
+      'triggeredAt' : bigint,
+      'severity' : string,
+      'reason' : string,
+    }
+  };
+export interface TradingPauseRecord {
+  'pausedAt' : bigint,
+  'token' : Principal,
+  'tokenSymbol' : string,
+  'reason' : TradingPauseReason,
+}
+export interface TradingPauseRecord__1 {
+  'pausedAt' : bigint,
+  'token' : Principal,
+  'tokenSymbol' : string,
+  'reason' : TradingPauseReason,
+}
+export interface TradingPausesResponse {
+  'totalCount' : bigint,
+  'pausedTokens' : Array<TradingPauseRecord>,
 }
 export type TransferRecipient = { 'principal' : Principal } |
   { 'accountId' : { 'owner' : Principal, 'subaccount' : [] | [Subaccount] } };
@@ -199,11 +236,12 @@ export interface UpdateConfig {
 export interface treasury {
   'addTriggerCondition' : ActorMethod<
     [string, PriceDirection__1, number, bigint, Array<Principal>],
-    Result_6
+    Result_7
   >,
   'admin_executeTradingCycle' : ActorMethod<[], Result_1>,
-  'admin_recoverPoolBalances' : ActorMethod<[], Result_5>,
-  'admin_syncWithDao' : ActorMethod<[], Result_5>,
+  'admin_recoverPoolBalances' : ActorMethod<[], Result_6>,
+  'admin_syncWithDao' : ActorMethod<[], Result_6>,
+  'clearAllTradingPauses' : ActorMethod<[], Result_2>,
   'clearLogs' : ActorMethod<[], undefined>,
   'clearPriceAlerts' : ActorMethod<[], Result>,
   'getCurrentAllocations' : ActorMethod<[], Array<[Principal, bigint]>>,
@@ -234,10 +272,16 @@ export interface treasury {
   >,
   'getSystemParameters' : ActorMethod<[], RebalanceConfig>,
   'getTokenDetails' : ActorMethod<[], Array<[Principal, TokenDetails]>>,
-  'getTokenPriceHistory' : ActorMethod<[Array<Principal>], Result_4>,
-  'getTradingStatus' : ActorMethod<[], Result_3>,
+  'getTokenPriceHistory' : ActorMethod<[Array<Principal>], Result_5>,
+  'getTradingPauseInfo' : ActorMethod<
+    [Principal],
+    [] | [TradingPauseRecord__1]
+  >,
+  'getTradingStatus' : ActorMethod<[], Result_4>,
   'getTriggerCondition' : ActorMethod<[bigint], [] | [TriggerCondition]>,
+  'listTradingPauses' : ActorMethod<[], TradingPausesResponse>,
   'listTriggerConditions' : ActorMethod<[], Array<TriggerCondition>>,
+  'pauseTokenFromTradingManual' : ActorMethod<[Principal, string], Result_2>,
   'receiveTransferTasks' : ActorMethod<
     [Array<[TransferRecipient, bigint, Principal, number]>, boolean],
     [boolean, [] | [Array<[Principal, bigint]>]]
@@ -250,8 +294,9 @@ export interface treasury {
   'stopRebalancing' : ActorMethod<[], Result_1>,
   'syncTokenDetailsFromDAO' : ActorMethod<
     [Array<[Principal, TokenDetails]>],
-    Result_2
+    Result_3
   >,
+  'unpauseTokenFromTrading' : ActorMethod<[Principal], Result_2>,
   'updateRebalanceConfig' : ActorMethod<
     [UpdateConfig, [] | [boolean]],
     Result_1
