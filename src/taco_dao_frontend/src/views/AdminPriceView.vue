@@ -56,7 +56,7 @@
                       </h5>
                       <div class="condition-details">
                         <div><strong>Direction:</strong> {{ condition.direction.Up !== undefined ? '📈 Up' : '📉 Down' }}</div>
-                        <div><strong>Threshold:</strong> {{ (condition.percentage * 100).toFixed(1) }}%</div>
+                        <div><strong>Threshold:</strong> {{ condition.percentage.toFixed(1) }}%</div>
                         <div><strong>Time Window:</strong> {{ formatTimeWindow(condition.timeWindowNS) }}</div>
                         <div><strong>Applies to:</strong> 
                           <span v-if="condition.applicableTokens.length === 0">All tokens</span>
