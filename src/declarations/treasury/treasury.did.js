@@ -1,4 +1,15 @@
 export const idlFactory = ({ IDL }) => {
+  const PriceDirection__1 = IDL.Variant({ 'Up' : IDL.Null, 'Down' : IDL.Null });
+  const PriceFailsafeError = IDL.Variant({
+    'InvalidTimeWindow' : IDL.Null,
+    'DuplicateName' : IDL.Null,
+    'SystemError' : IDL.Text,
+    'ConditionNotFound' : IDL.Null,
+    'NotAuthorized' : IDL.Null,
+    'InvalidPercentage' : IDL.Null,
+    'InvalidTokenList' : IDL.Null,
+  });
+  const Result_6 = IDL.Variant({ 'ok' : IDL.Nat, 'err' : PriceFailsafeError });
   const RebalanceError = IDL.Variant({
     'LiquidityError' : IDL.Text,
     'TradeError' : IDL.Text,
@@ -6,8 +17,9 @@ export const idlFactory = ({ IDL }) => {
     'ConfigError' : IDL.Text,
     'PriceError' : IDL.Text,
   });
-  const Result = IDL.Variant({ 'ok' : IDL.Text, 'err' : RebalanceError });
-  const Result_4 = IDL.Variant({ 'ok' : IDL.Text, 'err' : IDL.Text });
+  const Result_1 = IDL.Variant({ 'ok' : IDL.Text, 'err' : RebalanceError });
+  const Result_5 = IDL.Variant({ 'ok' : IDL.Text, 'err' : IDL.Text });
+  const Result = IDL.Variant({ 'ok' : IDL.Text, 'err' : PriceFailsafeError });
   const LogLevel = IDL.Variant({
     'INFO' : IDL.Null,
     'WARN' : IDL.Null,
@@ -19,6 +31,39 @@ export const idlFactory = ({ IDL }) => {
     'level' : LogLevel,
     'message' : IDL.Text,
     'timestamp' : IDL.Int,
+  });
+  const ChangeType = IDL.Variant({
+    'CurrentToMax' : IDL.Null,
+    'CurrentToMin' : IDL.Null,
+    'MinToMax' : IDL.Null,
+  });
+  const TriggerPriceData = IDL.Record({
+    'currentPrice' : IDL.Nat,
+    'actualChangePercent' : IDL.Float64,
+    'changeType' : ChangeType,
+    'windowStartTime' : IDL.Int,
+    'maxPriceInWindow' : IDL.Nat,
+    'minPriceInWindow' : IDL.Nat,
+  });
+  const PriceDirection = IDL.Variant({ 'Up' : IDL.Null, 'Down' : IDL.Null });
+  const TriggerCondition__1 = IDL.Record({
+    'id' : IDL.Nat,
+    'direction' : PriceDirection,
+    'timeWindowNS' : IDL.Nat,
+    'name' : IDL.Text,
+    'createdAt' : IDL.Int,
+    'createdBy' : IDL.Principal,
+    'isActive' : IDL.Bool,
+    'percentage' : IDL.Float64,
+    'applicableTokens' : IDL.Vec(IDL.Principal),
+  });
+  const PriceAlertLog = IDL.Record({
+    'id' : IDL.Nat,
+    'token' : IDL.Principal,
+    'tokenSymbol' : IDL.Text,
+    'timestamp' : IDL.Int,
+    'priceData' : TriggerPriceData,
+    'triggeredCondition' : TriggerCondition__1,
   });
   const RebalanceConfig = IDL.Record({
     'tokenSyncTimeoutNS' : IDL.Nat,
@@ -64,7 +109,7 @@ export const idlFactory = ({ IDL }) => {
     'time' : IDL.Int,
     'icpPrice' : IDL.Nat,
   });
-  const Result_3 = IDL.Variant({
+  const Result_4 = IDL.Variant({
     'ok' : IDL.Vec(IDL.Tuple(IDL.Principal, IDL.Vec(PricePoint__1))),
     'err' : IDL.Text,
   });
@@ -88,7 +133,7 @@ export const idlFactory = ({ IDL }) => {
     'Idle' : IDL.Null,
     'Trading' : IDL.Null,
   });
-  const Result_2 = IDL.Variant({
+  const Result_3 = IDL.Variant({
     'ok' : IDL.Record({
       'executedTrades' : IDL.Vec(TradeRecord),
       'metrics' : IDL.Record({
@@ -117,6 +162,17 @@ export const idlFactory = ({ IDL }) => {
     }),
     'err' : IDL.Text,
   });
+  const TriggerCondition = IDL.Record({
+    'id' : IDL.Nat,
+    'direction' : PriceDirection,
+    'timeWindowNS' : IDL.Nat,
+    'name' : IDL.Text,
+    'createdAt' : IDL.Int,
+    'createdBy' : IDL.Principal,
+    'isActive' : IDL.Bool,
+    'percentage' : IDL.Float64,
+    'applicableTokens' : IDL.Vec(IDL.Principal),
+  });
   const Subaccount = IDL.Vec(IDL.Nat8);
   const TransferRecipient = IDL.Variant({
     'principal' : IDL.Principal,
@@ -129,7 +185,7 @@ export const idlFactory = ({ IDL }) => {
     'NotDAO' : IDL.Null,
     'UnexpectedError' : IDL.Text,
   });
-  const Result_1 = IDL.Variant({ 'ok' : IDL.Text, 'err' : SyncErrorTreasury });
+  const Result_2 = IDL.Variant({ 'ok' : IDL.Text, 'err' : SyncErrorTreasury });
   const UpdateConfig = IDL.Record({
     'maxPriceHistoryEntries' : IDL.Opt(IDL.Nat),
     'priceUpdateIntervalNS' : IDL.Opt(IDL.Nat),
@@ -145,11 +201,31 @@ export const idlFactory = ({ IDL }) => {
     'maxTradeAttemptsPerInterval' : IDL.Opt(IDL.Nat),
     'maxKongswapAttempts' : IDL.Opt(IDL.Nat),
   });
+  const TriggerConditionUpdate = IDL.Record({
+    'direction' : IDL.Opt(PriceDirection),
+    'timeWindowNS' : IDL.Opt(IDL.Nat),
+    'name' : IDL.Opt(IDL.Text),
+    'isActive' : IDL.Opt(IDL.Bool),
+    'percentage' : IDL.Opt(IDL.Float64),
+    'applicableTokens' : IDL.Opt(IDL.Vec(IDL.Principal)),
+  });
   const treasury = IDL.Service({
-    'admin_executeTradingCycle' : IDL.Func([], [Result], []),
-    'admin_recoverPoolBalances' : IDL.Func([], [Result_4], []),
-    'admin_syncWithDao' : IDL.Func([], [Result_4], []),
+    'addTriggerCondition' : IDL.Func(
+        [
+          IDL.Text,
+          PriceDirection__1,
+          IDL.Float64,
+          IDL.Nat,
+          IDL.Vec(IDL.Principal),
+        ],
+        [Result_6],
+        [],
+      ),
+    'admin_executeTradingCycle' : IDL.Func([], [Result_1], []),
+    'admin_recoverPoolBalances' : IDL.Func([], [Result_5], []),
+    'admin_syncWithDao' : IDL.Func([], [Result_5], []),
     'clearLogs' : IDL.Func([], [], []),
+    'clearPriceAlerts' : IDL.Func([], [Result], []),
     'getCurrentAllocations' : IDL.Func(
         [],
         [IDL.Vec(IDL.Tuple(IDL.Principal, IDL.Nat))],
@@ -164,6 +240,21 @@ export const idlFactory = ({ IDL }) => {
     'getLogsByLevel' : IDL.Func(
         [LogLevel, IDL.Nat],
         [IDL.Vec(LogEntry)],
+        ['query'],
+      ),
+    'getPriceAlerts' : IDL.Func(
+        [IDL.Nat, IDL.Nat],
+        [
+          IDL.Record({
+            'alerts' : IDL.Vec(PriceAlertLog),
+            'totalCount' : IDL.Nat,
+          }),
+        ],
+        ['query'],
+      ),
+    'getPriceAlertsForToken' : IDL.Func(
+        [IDL.Principal, IDL.Nat],
+        [IDL.Vec(PriceAlertLog)],
         ['query'],
       ),
     'getSkipMetrics' : IDL.Func(
@@ -191,10 +282,20 @@ export const idlFactory = ({ IDL }) => {
       ),
     'getTokenPriceHistory' : IDL.Func(
         [IDL.Vec(IDL.Principal)],
-        [Result_3],
+        [Result_4],
         ['query'],
       ),
-    'getTradingStatus' : IDL.Func([], [Result_2], ['query']),
+    'getTradingStatus' : IDL.Func([], [Result_3], ['query']),
+    'getTriggerCondition' : IDL.Func(
+        [IDL.Nat],
+        [IDL.Opt(TriggerCondition)],
+        ['query'],
+      ),
+    'listTriggerConditions' : IDL.Func(
+        [],
+        [IDL.Vec(TriggerCondition)],
+        ['query'],
+      ),
     'receiveTransferTasks' : IDL.Func(
         [
           IDL.Vec(
@@ -205,17 +306,24 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Bool, IDL.Opt(IDL.Vec(IDL.Tuple(IDL.Principal, IDL.Nat64)))],
         [],
       ),
-    'resetRebalanceState' : IDL.Func([], [Result], []),
+    'removeTriggerCondition' : IDL.Func([IDL.Nat], [Result], []),
+    'resetRebalanceState' : IDL.Func([], [Result_1], []),
     'setTest' : IDL.Func([IDL.Bool], [], []),
-    'startRebalancing' : IDL.Func([], [Result], []),
-    'stopRebalancing' : IDL.Func([], [Result], []),
+    'setTriggerConditionActive' : IDL.Func([IDL.Nat, IDL.Bool], [Result], []),
+    'startRebalancing' : IDL.Func([], [Result_1], []),
+    'stopRebalancing' : IDL.Func([], [Result_1], []),
     'syncTokenDetailsFromDAO' : IDL.Func(
         [IDL.Vec(IDL.Tuple(IDL.Principal, TokenDetails))],
-        [Result_1],
+        [Result_2],
         [],
       ),
     'updateRebalanceConfig' : IDL.Func(
         [UpdateConfig, IDL.Opt(IDL.Bool)],
+        [Result_1],
+        [],
+      ),
+    'updateTriggerCondition' : IDL.Func(
+        [IDL.Nat, TriggerConditionUpdate],
         [Result],
         [],
       ),

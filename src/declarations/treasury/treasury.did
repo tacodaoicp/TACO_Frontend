@@ -1,11 +1,24 @@
 type treasury = 
  service {
-   admin_executeTradingCycle: () -> (Result);
-   admin_recoverPoolBalances: () -> (Result_4);
-   admin_syncWithDao: () -> (Result_4);
+   /// * Add a new price trigger condition
+   ///    *
+   ///    * Creates a failsafe rule that will pause tokens when price movements
+   ///    * exceed the specified threshold within the time window.
+   ///    *
+   ///    * Only callable by admins with appropriate permissions.
+   addTriggerCondition: (text, PriceDirection__1, float64, nat,
+    vec principal) -> (Result_6);
+   admin_executeTradingCycle: () -> (Result_1);
+   admin_recoverPoolBalances: () -> (Result_5);
+   admin_syncWithDao: () -> (Result_5);
    /// * Clear all logs
    ///    * Only accessible by master admin or controller
    clearLogs: () -> ();
+   /// * Clear price alerts log
+   ///    *
+   ///    * Removes all price alert history.
+   ///    * Only callable by admins with appropriate permissions.
+   clearPriceAlerts: () -> (Result);
    /// * Get current token allocations in basis points
    getCurrentAllocations: () -> (vec record {
                                        principal;
@@ -20,6 +33,20 @@ type treasury =
    /// * Get the last N log entries for a specific level
    ///    * Only accessible by master admin, controller, or DAO
    getLogsByLevel: (LogLevel, nat) -> (vec LogEntry) query;
+   /// * Get price alerts (paginated)
+   ///    *
+   ///    * Returns recent price alert events that triggered token pausing.
+   ///    * Accessible by any user with query access.
+   getPriceAlerts: (nat, nat) ->
+    (record {
+       alerts: vec PriceAlertLog;
+       totalCount: nat;
+     }) query;
+   /// * Get price alerts for a specific token
+   ///    *
+   ///    * Returns price alert events for a particular token.
+   ///    * Accessible by any user with query access.
+   getPriceAlertsForToken: (principal, nat) -> (vec PriceAlertLog) query;
    /// * Get skip metrics and breakdown
    ///    * 
    ///    * Returns detailed information about skipped trades including:
@@ -51,7 +78,7 @@ type treasury =
                                  principal;
                                  TokenDetails;
                                }) query;
-   getTokenPriceHistory: (vec principal) -> (Result_3) query;
+   getTokenPriceHistory: (vec principal) -> (Result_4) query;
    /// * Get detailed rebalancing status information
    ///    *
    ///    * Returns:
@@ -60,7 +87,17 @@ type treasury =
    ///    * - Portfolio valuation
    ///    * - Current vs target allocations
    ///    * - Performance metrics
-   getTradingStatus: () -> (Result_2) query;
+   getTradingStatus: () -> (Result_3) query;
+   /// * Get a specific trigger condition by ID
+   ///    *
+   ///    * Returns details of a single failsafe rule.
+   ///    * Accessible by any user with query access.
+   getTriggerCondition: (nat) -> (opt TriggerCondition) query;
+   /// * List all trigger conditions
+   ///    *
+   ///    * Returns all configured failsafe rules.
+   ///    * Accessible by any user with query access.
+   listTriggerConditions: () -> (vec TriggerCondition) query;
    /// * Process batch transfers from the DAO
    ///    *
    ///    * Handles both immediate and queued transfers of various token types.
@@ -79,14 +116,24 @@ type treasury =
               principal;
               nat64;
             });
+   /// * Remove a trigger condition
+   ///    *
+   ///    * Deletes a failsafe rule permanently.
+   ///    * Only callable by admins with appropriate permissions.
+   removeTriggerCondition: (nat) -> (Result);
    /// * Reset the rebalancing state to initial values
    ///    *
    ///    * Completely resets all metrics, trade history, and timers
    ///    * Only callable by DAO or controller.
-   resetRebalanceState: () -> (Result);
+   resetRebalanceState: () -> (Result_1);
    /// * Set test mode (modifies safety parameters)
    ///    * Only callable by DAO.
    setTest: (bool) -> ();
+   /// * Activate or deactivate a trigger condition
+   ///    *
+   ///    * Enables or disables a failsafe rule without deleting it.
+   ///    * Only callable by admins with appropriate permissions.
+   setTriggerConditionActive: (nat, bool) -> (Result);
    /// * Start the automatic rebalancing process
    ///    *
    ///    * Initializes the rebalancing engine, which will periodically:
@@ -95,12 +142,12 @@ type treasury =
    ///    * 3. Execute trades on the best exchange
    ///    *
    ///    * Only callable by DAO or controller.
-   startRebalancing: () -> (Result);
+   startRebalancing: () -> (Result_1);
    /// * Stop the automatic rebalancing process
    ///    *
    ///    * Cancels all timers and sets the system to idle state
    ///    * Only callable by DAO or controller.
-   stopRebalancing: () -> (Result);
+   stopRebalancing: () -> (Result_1);
    /// * Synchronize token details with DAO
    ///    *
    ///    * Updates token status from the DAO including:
@@ -109,12 +156,17 @@ type treasury =
    syncTokenDetailsFromDAO: (vec record {
                                    principal;
                                    TokenDetails;
-                                 }) -> (Result_1);
+                                 }) -> (Result_2);
    /// * Update the rebalancing configuration parameters
    ///    *
    ///    * Allows adjustment of trading intervals, sizes, and safety limits
    ///    * Only callable by DAO or controller.
-   updateRebalanceConfig: (UpdateConfig, opt bool) -> (Result);
+   updateRebalanceConfig: (UpdateConfig, opt bool) -> (Result_1);
+   /// * Update an existing trigger condition
+   ///    *
+   ///    * Modifies parameters of an existing failsafe rule.
+   ///    * Only callable by admins with appropriate permissions.
+   updateTriggerCondition: (nat, TriggerConditionUpdate) -> (Result);
  };
 type UpdateConfig = 
  record {
@@ -131,6 +183,48 @@ type UpdateConfig =
    rebalanceIntervalNS: opt nat;
    shortSyncIntervalNS: opt nat;
    tokenSyncTimeoutNS: opt nat;
+ };
+type TriggerPriceData = 
+ record {
+   actualChangePercent: float64;
+   changeType: ChangeType;
+   currentPrice: nat;
+   maxPriceInWindow: nat;
+   minPriceInWindow: nat;
+   windowStartTime: int;
+ };
+type TriggerCondition__1 = 
+ record {
+   applicableTokens: vec principal;
+   createdAt: int;
+   createdBy: principal;
+   direction: PriceDirection;
+   id: nat;
+   isActive: bool;
+   name: text;
+   percentage: float64;
+   timeWindowNS: nat;
+ };
+type TriggerConditionUpdate = 
+ record {
+   applicableTokens: opt vec principal;
+   direction: opt PriceDirection;
+   isActive: opt bool;
+   name: opt text;
+   percentage: opt float64;
+   timeWindowNS: opt nat;
+ };
+type TriggerCondition = 
+ record {
+   applicableTokens: vec principal;
+   createdAt: int;
+   createdBy: principal;
+   direction: PriceDirection;
+   id: nat;
+   isActive: bool;
+   name: text;
+   percentage: float64;
+   timeWindowNS: nat;
  };
 type TransferRecipient = 
  variant {
@@ -181,12 +275,17 @@ type SyncErrorTreasury =
    UnexpectedError: text;
  };
 type Subaccount = blob;
-type Result_4 = 
+type Result_6 = 
+ variant {
+   err: PriceFailsafeError;
+   ok: nat;
+ };
+type Result_5 = 
  variant {
    err: text;
    ok: text;
  };
-type Result_3 = 
+type Result_4 = 
  variant {
    err: text;
    ok: vec record {
@@ -194,7 +293,7 @@ type Result_3 =
              vec PricePoint__1;
            };
  };
-type Result_2 = 
+type Result_3 = 
  variant {
    err: text;
    ok:
@@ -234,14 +333,19 @@ type Result_2 =
       rebalanceStatus: RebalanceStatus;
     };
  };
-type Result_1 = 
+type Result_2 = 
  variant {
    err: SyncErrorTreasury;
    ok: text;
  };
-type Result = 
+type Result_1 = 
  variant {
    err: RebalanceError;
+   ok: text;
+ };
+type Result = 
+ variant {
+   err: PriceFailsafeError;
    ok: text;
  };
 type RebalanceStatus = 
@@ -284,6 +388,35 @@ type PricePoint =
    time: int;
    usdPrice: float64;
  };
+type PriceFailsafeError = 
+ variant {
+   ConditionNotFound;
+   DuplicateName;
+   InvalidPercentage;
+   InvalidTimeWindow;
+   InvalidTokenList;
+   NotAuthorized;
+   SystemError: text;
+ };
+type PriceDirection__1 = 
+ variant {
+   Down;
+   Up;
+ };
+type PriceDirection = 
+ variant {
+   Down;
+   Up;
+ };
+type PriceAlertLog = 
+ record {
+   id: nat;
+   priceData: TriggerPriceData;
+   timestamp: int;
+   token: principal;
+   tokenSymbol: text;
+   triggeredCondition: TriggerCondition__1;
+ };
 type LogLevel = 
  variant {
    ERROR;
@@ -302,5 +435,11 @@ type ExchangeType =
  variant {
    ICPSwap;
    KongSwap;
+ };
+type ChangeType = 
+ variant {
+   CurrentToMax;
+   CurrentToMin;
+   MinToMax;
  };
 service : () -> treasury

@@ -2,6 +2,9 @@ import type { Principal } from '@dfinity/principal';
 import type { ActorMethod } from '@dfinity/agent';
 import type { IDL } from '@dfinity/candid';
 
+export type ChangeType = { 'CurrentToMax' : null } |
+  { 'CurrentToMin' : null } |
+  { 'MinToMax' : null };
 export type ExchangeType = { 'KongSwap' : null } |
   { 'ICPSwap' : null };
 export interface LogEntry {
@@ -14,6 +17,25 @@ export interface LogEntry {
 export type LogLevel = { 'INFO' : null } |
   { 'WARN' : null } |
   { 'ERROR' : null };
+export interface PriceAlertLog {
+  'id' : bigint,
+  'token' : Principal,
+  'tokenSymbol' : string,
+  'timestamp' : bigint,
+  'priceData' : TriggerPriceData,
+  'triggeredCondition' : TriggerCondition__1,
+}
+export type PriceDirection = { 'Up' : null } |
+  { 'Down' : null };
+export type PriceDirection__1 = { 'Up' : null } |
+  { 'Down' : null };
+export type PriceFailsafeError = { 'InvalidTimeWindow' : null } |
+  { 'DuplicateName' : null } |
+  { 'SystemError' : string } |
+  { 'ConditionNotFound' : null } |
+  { 'NotAuthorized' : null } |
+  { 'InvalidPercentage' : null } |
+  { 'InvalidTokenList' : null };
 export interface PricePoint {
   'usdPrice' : number,
   'time' : bigint,
@@ -46,10 +68,12 @@ export type RebalanceStatus = { 'Failed' : string } |
   { 'Idle' : null } |
   { 'Trading' : null };
 export type Result = { 'ok' : string } |
-  { 'err' : RebalanceError };
+  { 'err' : PriceFailsafeError };
 export type Result_1 = { 'ok' : string } |
+  { 'err' : RebalanceError };
+export type Result_2 = { 'ok' : string } |
   { 'err' : SyncErrorTreasury };
-export type Result_2 = {
+export type Result_3 = {
     'ok' : {
       'executedTrades' : Array<TradeRecord>,
       'metrics' : {
@@ -78,10 +102,12 @@ export type Result_2 = {
     }
   } |
   { 'err' : string };
-export type Result_3 = { 'ok' : Array<[Principal, Array<PricePoint__1>]> } |
+export type Result_4 = { 'ok' : Array<[Principal, Array<PricePoint__1>]> } |
   { 'err' : string };
-export type Result_4 = { 'ok' : string } |
+export type Result_5 = { 'ok' : string } |
   { 'err' : string };
+export type Result_6 = { 'ok' : bigint } |
+  { 'err' : PriceFailsafeError };
 export type Subaccount = Uint8Array | number[];
 export type SyncErrorTreasury = { 'NotDAO' : null } |
   { 'UnexpectedError' : string };
@@ -117,6 +143,44 @@ export interface TradeRecord {
 }
 export type TransferRecipient = { 'principal' : Principal } |
   { 'accountId' : { 'owner' : Principal, 'subaccount' : [] | [Subaccount] } };
+export interface TriggerCondition {
+  'id' : bigint,
+  'direction' : PriceDirection,
+  'timeWindowNS' : bigint,
+  'name' : string,
+  'createdAt' : bigint,
+  'createdBy' : Principal,
+  'isActive' : boolean,
+  'percentage' : number,
+  'applicableTokens' : Array<Principal>,
+}
+export interface TriggerConditionUpdate {
+  'direction' : [] | [PriceDirection],
+  'timeWindowNS' : [] | [bigint],
+  'name' : [] | [string],
+  'isActive' : [] | [boolean],
+  'percentage' : [] | [number],
+  'applicableTokens' : [] | [Array<Principal>],
+}
+export interface TriggerCondition__1 {
+  'id' : bigint,
+  'direction' : PriceDirection,
+  'timeWindowNS' : bigint,
+  'name' : string,
+  'createdAt' : bigint,
+  'createdBy' : Principal,
+  'isActive' : boolean,
+  'percentage' : number,
+  'applicableTokens' : Array<Principal>,
+}
+export interface TriggerPriceData {
+  'currentPrice' : bigint,
+  'actualChangePercent' : number,
+  'changeType' : ChangeType,
+  'windowStartTime' : bigint,
+  'maxPriceInWindow' : bigint,
+  'minPriceInWindow' : bigint,
+}
 export interface UpdateConfig {
   'maxPriceHistoryEntries' : [] | [bigint],
   'priceUpdateIntervalNS' : [] | [bigint],
@@ -133,14 +197,27 @@ export interface UpdateConfig {
   'maxKongswapAttempts' : [] | [bigint],
 }
 export interface treasury {
-  'admin_executeTradingCycle' : ActorMethod<[], Result>,
-  'admin_recoverPoolBalances' : ActorMethod<[], Result_4>,
-  'admin_syncWithDao' : ActorMethod<[], Result_4>,
+  'addTriggerCondition' : ActorMethod<
+    [string, PriceDirection__1, number, bigint, Array<Principal>],
+    Result_6
+  >,
+  'admin_executeTradingCycle' : ActorMethod<[], Result_1>,
+  'admin_recoverPoolBalances' : ActorMethod<[], Result_5>,
+  'admin_syncWithDao' : ActorMethod<[], Result_5>,
   'clearLogs' : ActorMethod<[], undefined>,
+  'clearPriceAlerts' : ActorMethod<[], Result>,
   'getCurrentAllocations' : ActorMethod<[], Array<[Principal, bigint]>>,
   'getLogs' : ActorMethod<[bigint], Array<LogEntry>>,
   'getLogsByContext' : ActorMethod<[string, bigint], Array<LogEntry>>,
   'getLogsByLevel' : ActorMethod<[LogLevel, bigint], Array<LogEntry>>,
+  'getPriceAlerts' : ActorMethod<
+    [bigint, bigint],
+    { 'alerts' : Array<PriceAlertLog>, 'totalCount' : bigint }
+  >,
+  'getPriceAlertsForToken' : ActorMethod<
+    [Principal, bigint],
+    Array<PriceAlertLog>
+  >,
   'getSkipMetrics' : ActorMethod<
     [],
     {
@@ -157,21 +234,32 @@ export interface treasury {
   >,
   'getSystemParameters' : ActorMethod<[], RebalanceConfig>,
   'getTokenDetails' : ActorMethod<[], Array<[Principal, TokenDetails]>>,
-  'getTokenPriceHistory' : ActorMethod<[Array<Principal>], Result_3>,
-  'getTradingStatus' : ActorMethod<[], Result_2>,
+  'getTokenPriceHistory' : ActorMethod<[Array<Principal>], Result_4>,
+  'getTradingStatus' : ActorMethod<[], Result_3>,
+  'getTriggerCondition' : ActorMethod<[bigint], [] | [TriggerCondition]>,
+  'listTriggerConditions' : ActorMethod<[], Array<TriggerCondition>>,
   'receiveTransferTasks' : ActorMethod<
     [Array<[TransferRecipient, bigint, Principal, number]>, boolean],
     [boolean, [] | [Array<[Principal, bigint]>]]
   >,
-  'resetRebalanceState' : ActorMethod<[], Result>,
+  'removeTriggerCondition' : ActorMethod<[bigint], Result>,
+  'resetRebalanceState' : ActorMethod<[], Result_1>,
   'setTest' : ActorMethod<[boolean], undefined>,
-  'startRebalancing' : ActorMethod<[], Result>,
-  'stopRebalancing' : ActorMethod<[], Result>,
+  'setTriggerConditionActive' : ActorMethod<[bigint, boolean], Result>,
+  'startRebalancing' : ActorMethod<[], Result_1>,
+  'stopRebalancing' : ActorMethod<[], Result_1>,
   'syncTokenDetailsFromDAO' : ActorMethod<
     [Array<[Principal, TokenDetails]>],
+    Result_2
+  >,
+  'updateRebalanceConfig' : ActorMethod<
+    [UpdateConfig, [] | [boolean]],
     Result_1
   >,
-  'updateRebalanceConfig' : ActorMethod<[UpdateConfig, [] | [boolean]], Result>,
+  'updateTriggerCondition' : ActorMethod<
+    [bigint, TriggerConditionUpdate],
+    Result
+  >,
 }
 export interface _SERVICE extends treasury {}
 export declare const idlFactory: IDL.InterfaceFactory;

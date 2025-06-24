@@ -2886,6 +2886,184 @@ export const useTacoStore = defineStore('taco', () => {
         }
     }
 
+    //=========================================================================
+    // PRICE FAILSAFE SYSTEM METHODS
+    //=========================================================================
+
+    const listTriggerConditions = async () => {
+        try {
+            const authClient = await getAuthClient();
+            
+            if (!await authClient.isAuthenticated()) {
+                throw new Error('User not authenticated');
+            }
+
+            const identity = await authClient.getIdentity();
+            const agent = await createAgent({
+                identity,
+                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            });
+
+            const treasury = Actor.createActor<TreasuryService>(treasuryIDL, {
+                agent,
+                canisterId: treasuryCanisterId()
+            });
+
+            return await treasury.listTriggerConditions();
+        } catch (error: any) {
+            console.error('Error listing trigger conditions:', error);
+            throw error;
+        }
+    };
+
+    const addTriggerCondition = async (
+        name: string,
+        direction: string,
+        percentage: number,
+        timeWindowNS: bigint,
+        applicableTokens: Principal[]
+    ) => {
+        try {
+            const authClient = await getAuthClient();
+            
+            if (!await authClient.isAuthenticated()) {
+                throw new Error('User not authenticated');
+            }
+
+            const identity = await authClient.getIdentity();
+            const agent = await createAgent({
+                identity,
+                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            });
+
+            const treasury = Actor.createActor<TreasuryService>(treasuryIDL, {
+                agent,
+                canisterId: treasuryCanisterId()
+            });
+
+            return await treasury.addTriggerCondition(
+                name,
+                direction === 'Up' ? { Up: null } : { Down: null },
+                percentage,
+                timeWindowNS,
+                applicableTokens
+            );
+        } catch (error: any) {
+            console.error('Error adding trigger condition:', error);
+            throw error;
+        }
+    };
+
+    const setTriggerConditionActive = async (conditionId: number, isActive: boolean) => {
+        try {
+            const authClient = await getAuthClient();
+            
+            if (!await authClient.isAuthenticated()) {
+                throw new Error('User not authenticated');
+            }
+
+            const identity = await authClient.getIdentity();
+            const agent = await createAgent({
+                identity,
+                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            });
+
+            const treasury = Actor.createActor<TreasuryService>(treasuryIDL, {
+                agent,
+                canisterId: treasuryCanisterId()
+            });
+
+            return await treasury.setTriggerConditionActive(BigInt(conditionId), isActive);
+        } catch (error: any) {
+            console.error('Error setting trigger condition active:', error);
+            throw error;
+        }
+    };
+
+    const removeTriggerCondition = async (conditionId: number) => {
+        try {
+            const authClient = await getAuthClient();
+            
+            if (!await authClient.isAuthenticated()) {
+                throw new Error('User not authenticated');
+            }
+
+            const identity = await authClient.getIdentity();
+            const agent = await createAgent({
+                identity,
+                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            });
+
+            const treasury = Actor.createActor<TreasuryService>(treasuryIDL, {
+                agent,
+                canisterId: treasuryCanisterId()
+            });
+
+            return await treasury.removeTriggerCondition(BigInt(conditionId));
+        } catch (error: any) {
+            console.error('Error removing trigger condition:', error);
+            throw error;
+        }
+    };
+
+    const getPriceAlerts = async (offset: number, limit: number) => {
+        try {
+            const authClient = await getAuthClient();
+            
+            if (!await authClient.isAuthenticated()) {
+                throw new Error('User not authenticated');
+            }
+
+            const identity = await authClient.getIdentity();
+            const agent = await createAgent({
+                identity,
+                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            });
+
+            const treasury = Actor.createActor<TreasuryService>(treasuryIDL, {
+                agent,
+                canisterId: treasuryCanisterId()
+            });
+
+            return await treasury.getPriceAlerts(BigInt(offset), BigInt(limit));
+        } catch (error: any) {
+            console.error('Error getting price alerts:', error);
+            throw error;
+        }
+    };
+
+    const clearPriceAlerts = async () => {
+        try {
+            const authClient = await getAuthClient();
+            
+            if (!await authClient.isAuthenticated()) {
+                throw new Error('User not authenticated');
+            }
+
+            const identity = await authClient.getIdentity();
+            const agent = await createAgent({
+                identity,
+                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            });
+
+            const treasury = Actor.createActor<TreasuryService>(treasuryIDL, {
+                agent,
+                canisterId: treasuryCanisterId()
+            });
+
+            return await treasury.clearPriceAlerts();
+        } catch (error: any) {
+            console.error('Error clearing price alerts:', error);
+            throw error;
+        }
+    };
+
     // # RETURN #
     return {
         // state
@@ -2977,5 +3155,11 @@ export const useTacoStore = defineStore('taco', () => {
         icrc1BalanceOf,
         fetchTotalTreasuryValueInUsd,
         acceptReportsDisclaimer,
+        listTriggerConditions,
+        addTriggerCondition,
+        setTriggerConditionActive,
+        removeTriggerCondition,
+        getPriceAlerts,
+        clearPriceAlerts,
     }
 })

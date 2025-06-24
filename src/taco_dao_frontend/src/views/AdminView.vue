@@ -14,6 +14,9 @@
               <router-link to="/admin/trade" class="btn btn-info">
                 📈 View Trading Logs
               </router-link>
+              <router-link to="/admin/price" class="btn btn-warning">
+                🚨 Price Failsafe Admin
+              </router-link>
             </div>
           </div>
           
