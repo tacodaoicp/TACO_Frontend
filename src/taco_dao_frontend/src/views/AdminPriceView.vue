@@ -17,6 +17,9 @@
               <router-link to="/admin/trade" class="btn btn-info">
                 📈 View Trading Logs
               </router-link>
+              <router-link to="/admin/pricehistory" class="btn btn-primary">
+                📊 Price History
+              </router-link>
             </div>
           </div>
 

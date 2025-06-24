@@ -3226,6 +3226,39 @@ export const useTacoStore = defineStore('taco', () => {
         }
     };
 
+    const getTokenPriceHistory = async (tokens: Principal[]) => {
+        try {
+            const authClient = await getAuthClient();
+            
+            if (!await authClient.isAuthenticated()) {
+                throw new Error('User not authenticated');
+            }
+
+            const identity = await authClient.getIdentity();
+            const agent = await createAgent({
+                identity,
+                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            });
+
+            const treasury = Actor.createActor<TreasuryService>(treasuryIDL, {
+                agent,
+                canisterId: treasuryCanisterId()
+            });
+
+            const result = await treasury.getTokenPriceHistory(tokens);
+            if ('ok' in result) {
+                return result.ok;
+            } else {
+                console.error('Error getting token price history:', result.err);
+                return [];
+            }
+        } catch (error: any) {
+            console.error('Error getting token price history:', error);
+            throw error;
+        }
+    };
+
     // # RETURN #
     return {
         // state
@@ -3328,5 +3361,6 @@ export const useTacoStore = defineStore('taco', () => {
         unpauseTokenFromTrading,
         pauseTokenFromTradingManual,
         clearAllTradingPauses,
+        getTokenPriceHistory,
     }
 })
