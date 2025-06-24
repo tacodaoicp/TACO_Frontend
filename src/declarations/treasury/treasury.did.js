@@ -96,7 +96,16 @@ export const idlFactory = ({ IDL }) => {
         'successRate' : IDL.Float64,
         'lastUpdate' : IDL.Int,
         'totalTradesExecuted' : IDL.Nat,
+        'skipBreakdown' : IDL.Record({
+          'tokensFiltered' : IDL.Nat,
+          'insufficientCandidates' : IDL.Nat,
+          'noExecutionPath' : IDL.Nat,
+          'noPairsFound' : IDL.Nat,
+          'pausedTokens' : IDL.Nat,
+        }),
+        'skipRate' : IDL.Float64,
         'totalTradesFailed' : IDL.Nat,
+        'totalTradesSkipped' : IDL.Nat,
       }),
       'rebalanceStatus' : RebalanceStatus,
       'portfolioState' : IDL.Record({
@@ -157,6 +166,23 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Vec(LogEntry)],
         ['query'],
       ),
+    'getSkipMetrics' : IDL.Func(
+        [],
+        [
+          IDL.Record({
+            'skipBreakdown' : IDL.Record({
+              'tokensFiltered' : IDL.Nat,
+              'insufficientCandidates' : IDL.Nat,
+              'noExecutionPath' : IDL.Nat,
+              'noPairsFound' : IDL.Nat,
+              'pausedTokens' : IDL.Nat,
+            }),
+            'skipRate' : IDL.Float64,
+            'totalTradesSkipped' : IDL.Nat,
+          }),
+        ],
+        ['query'],
+      ),
     'getSystemParameters' : IDL.Func([], [RebalanceConfig], ['query']),
     'getTokenDetails' : IDL.Func(
         [],
@@ -179,6 +205,7 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Bool, IDL.Opt(IDL.Vec(IDL.Tuple(IDL.Principal, IDL.Nat64)))],
         [],
       ),
+    'resetRebalanceState' : IDL.Func([], [Result], []),
     'setTest' : IDL.Func([IDL.Bool], [], []),
     'startRebalancing' : IDL.Func([], [Result], []),
     'stopRebalancing' : IDL.Func([], [Result], []),
