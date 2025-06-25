@@ -3259,6 +3259,34 @@ export const useTacoStore = defineStore('taco', () => {
         }
     };
 
+    const getPortfolioHistory = async (limit: number = 1000) => {
+        try {
+            const authClient = await getAuthClient();
+            
+            if (!await authClient.isAuthenticated()) {
+                throw new Error('User not authenticated');
+            }
+
+            const identity = await authClient.getIdentity();
+            const agent = await createAgent({
+                identity,
+                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            });
+
+            const dao = Actor.createActor(daoBackendIDL, {
+                agent,
+                canisterId: daoBackendCanisterId()
+            });
+
+            const result = await dao.getHistoricBalanceAndAllocation(BigInt(limit));
+            return result;
+        } catch (error: any) {
+            console.error('Error getting portfolio history:', error);
+            throw error;
+        }
+    };
+
     // # RETURN #
     return {
         // state
@@ -3362,5 +3390,6 @@ export const useTacoStore = defineStore('taco', () => {
         pauseTokenFromTradingManual,
         clearAllTradingPauses,
         getTokenPriceHistory,
+        getPortfolioHistory,
     }
 })

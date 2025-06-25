@@ -38,6 +38,7 @@
                     v-model="selectedTokenPrincipal" 
                     @change="loadPriceHistory">
                     <option value="">Choose a token...</option>
+                    <option value="PORTFOLIO">📊 Portfolio - Total Value</option>
                     <option 
                       v-for="[principal, details] in availableTokens" 
                       :key="principal.toString()" 
@@ -273,23 +274,43 @@ const loadPriceHistory = async () => {
   
   loading.value = true
   try {
-    const principal = Principal.fromText(selectedTokenPrincipal.value)
-    const result = await store.getTokenPriceHistory([principal])
-    
-    if (result && result.length > 0) {
-      priceData.value = result[0][1]
+    if (selectedTokenPrincipal.value === 'PORTFOLIO') {
+      // Load portfolio history from DAO
+      const portfolioHistory = await store.getPortfolioHistory(2000) as any[]
       
-      const tokenDetails = availableTokens.value.find(([p, _]) => 
-        p.toString() === selectedTokenPrincipal.value
-      )
-      selectedTokenSymbol.value = tokenDetails ? tokenDetails[1].tokenSymbol : 'Unknown'
+      // Convert portfolio history to price data format
+      priceData.value = portfolioHistory.map(([timestamp, balanceAllocation]: any) => ({
+        time: timestamp,
+        icpPrice: balanceAllocation.totalWorthInICP,
+        usdPrice: balanceAllocation.totalWorthInUSD
+      })).reverse() // Reverse to get chronological order (oldest first)
+      
+      selectedTokenSymbol.value = 'Portfolio'
       
       // Draw chart after data is loaded
       nextTick(() => {
         drawChart()
       })
     } else {
-      priceData.value = []
+      // Load individual token price history
+      const principal = Principal.fromText(selectedTokenPrincipal.value)
+      const result = await store.getTokenPriceHistory([principal])
+      
+      if (result && result.length > 0) {
+        priceData.value = result[0][1]
+        
+        const tokenDetails = availableTokens.value.find(([p, _]) => 
+          p.toString() === selectedTokenPrincipal.value
+        )
+        selectedTokenSymbol.value = tokenDetails ? tokenDetails[1].tokenSymbol : 'Unknown'
+        
+        // Draw chart after data is loaded
+        nextTick(() => {
+          drawChart()
+        })
+      } else {
+        priceData.value = []
+      }
     }
   } catch (error) {
     console.error('Failed to load price history:', error)
@@ -340,9 +361,13 @@ const handleMouseMove = (event: MouseEvent) => {
   if (pointIndex >= 0 && pointIndex < dataPoints) {
     const point = filteredPriceData.value[pointIndex]
     const date = new Date(Number(point.time) / 1_000_000)
-    const price = priceUnit.value === 'icp' 
-      ? Number(point.icpPrice) / 100_000_000 
-      : point.usdPrice
+    const price = selectedTokenPrincipal.value === 'PORTFOLIO' ?
+      (priceUnit.value === 'icp' 
+        ? Number(point.icpPrice) / 100_000_000 
+        : point.usdPrice) :
+      (priceUnit.value === 'icp' 
+        ? Number(point.icpPrice) / 100_000_000 
+        : point.usdPrice)
     
     hoveredPoint.value = {
       date: date.toLocaleDateString(),
@@ -395,11 +420,17 @@ const drawChart = () => {
   ctx.fillRect(0, 0, width, height)
   
   // Get price data
-  const prices = filteredPriceData.value.map((point: any) => 
-    priceUnit.value === 'icp' 
-      ? Number(point.icpPrice) / 100_000_000 
-      : point.usdPrice
-  )
+  const prices = filteredPriceData.value.map((point: any) => {
+    if (selectedTokenPrincipal.value === 'PORTFOLIO') {
+      return priceUnit.value === 'icp' 
+        ? Number(point.icpPrice) / 100_000_000  // Portfolio ICP values are already in e8s
+        : point.usdPrice                        // Portfolio USD values are already in dollars
+    } else {
+      return priceUnit.value === 'icp' 
+        ? Number(point.icpPrice) / 100_000_000 
+        : point.usdPrice
+    }
+  })
   
   if (prices.length === 0) return
   
@@ -515,9 +546,16 @@ const filteredPriceData = computed(() => {
 const currentPrice = computed(() => {
   if (!filteredPriceData.value.length) return 0
   const latest = filteredPriceData.value[filteredPriceData.value.length - 1]
-  return priceUnit.value === 'icp' 
-    ? Number(latest.icpPrice) / 100_000_000 
-    : latest.usdPrice
+  
+  if (selectedTokenPrincipal.value === 'PORTFOLIO') {
+    return priceUnit.value === 'icp' 
+      ? Number(latest.icpPrice) / 100_000_000 
+      : latest.usdPrice
+  } else {
+    return priceUnit.value === 'icp' 
+      ? Number(latest.icpPrice) / 100_000_000 
+      : latest.usdPrice
+  }
 })
 
 // Price statistics
@@ -535,11 +573,17 @@ const stats = computed(() => {
     }
   }
   
-  const prices = filteredPriceData.value.map(point => 
-    priceUnit.value === 'icp' 
-      ? Number(point.icpPrice) / 100_000_000 
-      : point.usdPrice
-  )
+  const prices = filteredPriceData.value.map(point => {
+    if (selectedTokenPrincipal.value === 'PORTFOLIO') {
+      return priceUnit.value === 'icp' 
+        ? Number(point.icpPrice) / 100_000_000 
+        : point.usdPrice
+    } else {
+      return priceUnit.value === 'icp' 
+        ? Number(point.icpPrice) / 100_000_000 
+        : point.usdPrice
+    }
+  })
   
   const times = filteredPriceData.value.map(point => Number(point.time))
   
@@ -547,20 +591,30 @@ const stats = computed(() => {
   const now = Date.now() * 1_000_000
   const oneDayAgo = now - (24 * 60 * 60 * 1_000_000_000)
   const last24hData = filteredPriceData.value.filter(point => Number(point.time) >= oneDayAgo)
-  const last24hPrices = last24hData.map(point => 
-    priceUnit.value === 'icp' 
-      ? Number(point.icpPrice) / 100_000_000 
-      : point.usdPrice
-  )
+  const last24hPrices = last24hData.map(point => {
+    if (selectedTokenPrincipal.value === 'PORTFOLIO') {
+      return priceUnit.value === 'icp' 
+        ? Number(point.icpPrice) / 100_000_000 
+        : point.usdPrice
+    } else {
+      return priceUnit.value === 'icp' 
+        ? Number(point.icpPrice) / 100_000_000 
+        : point.usdPrice
+    }
+  })
   
   const high24h = last24hPrices.length ? Math.max(...last24hPrices) : 0
   const low24h = last24hPrices.length ? Math.min(...last24hPrices) : 0
   
   // 24h change
   const oldestIn24h = last24hData.length ? last24hData[0] : null
-  const oldPrice = oldestIn24h ? (priceUnit.value === 'icp' 
-    ? Number(oldestIn24h.icpPrice) / 100_000_000 
-    : oldestIn24h.usdPrice) : 0
+  const oldPrice = oldestIn24h ? (selectedTokenPrincipal.value === 'PORTFOLIO' ? 
+    (priceUnit.value === 'icp' 
+      ? Number(oldestIn24h.icpPrice) / 100_000_000 
+      : oldestIn24h.usdPrice) :
+    (priceUnit.value === 'icp' 
+      ? Number(oldestIn24h.icpPrice) / 100_000_000 
+      : oldestIn24h.usdPrice)) : 0
   const change24h = oldPrice ? ((currentPrice.value - oldPrice) / oldPrice) * 100 : 0
   
   // All-time stats
@@ -601,11 +655,17 @@ const formatDate = (timestamp: number) => {
 const chartRangePercent = computed(() => {
   if (!filteredPriceData.value.length) return '0.00'
   
-  const prices = filteredPriceData.value.map(point => 
-    priceUnit.value === 'icp' 
-      ? Number(point.icpPrice) / 100_000_000 
-      : point.usdPrice
-  )
+  const prices = filteredPriceData.value.map(point => {
+    if (selectedTokenPrincipal.value === 'PORTFOLIO') {
+      return priceUnit.value === 'icp' 
+        ? Number(point.icpPrice) / 100_000_000 
+        : point.usdPrice
+    } else {
+      return priceUnit.value === 'icp' 
+        ? Number(point.icpPrice) / 100_000_000 
+        : point.usdPrice
+    }
+  })
   
   const minPrice = Math.min(...prices)
   const maxPrice = Math.max(...prices)
@@ -624,11 +684,11 @@ watch([priceUnit, timeRange], () => {
 // Lifecycle
 onMounted(async () => {
   await loadAvailableTokens()
-  if (availableTokens.value.length > 0) {
-    selectedTokenPrincipal.value = availableTokens.value[0].principal
-    selectedTokenSymbol.value = availableTokens.value[0].symbol
-    await loadPriceHistory()
-  }
+  // Default to Portfolio view
+  selectedTokenPrincipal.value = 'PORTFOLIO'
+  selectedTokenSymbol.value = 'Portfolio'
+  await loadPriceHistory()
+  
   // Draw chart after data is loaded
   nextTick(() => {
     drawChart()
