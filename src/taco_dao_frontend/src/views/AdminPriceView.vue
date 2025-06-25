@@ -195,11 +195,8 @@
               </div>
             </div>
           </div>
-        </div>
-      </div>
-    </div>
 
-    <!-- Portfolio Circuit Breakers Management -->
+          <!-- Portfolio Circuit Breakers Management -->
     <div class="card bg-dark text-white mb-4">
       <div class="card-header d-flex justify-content-between align-items-center">
         <h3 class="mb-0">Portfolio Circuit Breakers</h3>
@@ -551,6 +548,9 @@
               </div>
             </form>
           </div>
+        </div>
+      </div>
+    </div>
         </div>
       </div>
     </div>
