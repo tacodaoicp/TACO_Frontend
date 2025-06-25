@@ -551,11 +551,14 @@ const loadPriceHistory = async () => {
   loading.value = true
   try {
     if (selectedTokenPrincipal.value === 'PORTFOLIO_DAO') {
-      const portfolioHistory = await store.getPortfolioHistory(2000) as any[]
-      priceData.value = portfolioHistory.map(([timestamp, balanceAllocation]: any) => ({
+      // Use the DAO's historic balance and allocation data which includes target allocations
+      const historicData = await store.getPortfolioHistory(2000) as any[]
+      priceData.value = historicData.map(([timestamp, data]: any) => ({
         time: timestamp,
-        icpPrice: balanceAllocation.totalWorthInICP,
-        usdPrice: balanceAllocation.totalWorthInUSD
+        icpPrice: typeof data.totalWorthInICP === 'bigint' ? data.totalWorthInICP : BigInt(data.totalWorthInICP || 0),
+        usdPrice: typeof data.totalWorthInUSD === 'bigint' ? Number(data.totalWorthInUSD) : (data.totalWorthInUSD || 0),
+        balances: data.balances || [], // Historical actual portfolio composition
+        allocations: data.allocations || [] // Historical target allocations
       })).reverse()
       selectedTokenSymbol.value = 'Portfolio (DAO)'
       
@@ -616,10 +619,48 @@ const loadPriceHistory = async () => {
   })
 }
 
-const updateSliderData = () => {
+// Helper function to get token color from symbol
+const getTokenColor = (symbol: string) => {
+  const tokenInfo = tokenData.find(t => t.symbol === symbol?.toLowerCase())
+  return tokenInfo?.color || tokenData.find(t => t.symbol === 'default')?.color || '#777777'
+}
+
+const updateSliderData = async () => {
   const index = Number(sliderPosition.value)
   if (index >= 0 && index < filteredPriceData.value.length) {
-    sliderData.value = filteredPriceData.value[index]
+    const selectedPoint = filteredPriceData.value[index]
+    
+    // For portfolio views with historical data, create enhanced slider data
+    if ((selectedTokenPrincipal.value === 'PORTFOLIO_DAO') && selectedPoint.balances && selectedPoint.allocations) {
+      sliderData.value = {
+        ...selectedPoint,
+        portfolioHoldings: selectedPoint.balances
+          .filter(([_, basisPoints]: [any, any]) => Number(basisPoints) > 0)
+          .map(([principal, basisPoints]: [any, any]) => {
+            const tokenDetails = store.fetchedTokenDetails.find((tokenEntry: any) => tokenEntry[0].toString() === principal.toString())
+            const symbol = tokenDetails ? tokenDetails[1].tokenSymbol : 'Unknown'
+            return {
+              symbol,
+              percentage: Number(basisPoints) / 100,
+              color: getTokenColor(symbol)
+            }
+          }),
+        targetAllocations: selectedPoint.allocations
+          .filter(([_, basisPoints]: [any, any]) => Number(basisPoints) > 0)
+          .map(([principal, basisPoints]: [any, any]) => {
+            const tokenDetails = store.fetchedTokenDetails.find((tokenEntry: any) => tokenEntry[0].toString() === principal.toString())
+            const symbol = tokenDetails ? tokenDetails[1].tokenSymbol : 'Unknown'
+            return {
+              symbol,
+              percentage: Number(basisPoints) / 100,
+              color: getTokenColor(symbol)
+            }
+          })
+      }
+    } else {
+      // For other views or when no historical data is available
+      sliderData.value = selectedPoint
+    }
   } else {
     sliderData.value = null
   }
