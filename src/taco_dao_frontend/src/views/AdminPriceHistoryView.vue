@@ -615,7 +615,8 @@ const stats = computed(() => {
   }
   
   const prices = filteredPriceData.value.map(point => {
-    if (selectedTokenPrincipal.value === 'PORTFOLIO') {
+    const isPortfolio = selectedTokenPrincipal.value === 'PORTFOLIO_DAO' || selectedTokenPrincipal.value === 'PORTFOLIO_TREASURY'
+    if (isPortfolio) {
       return priceUnit.value === 'icp' 
         ? Number(point.icpPrice) / 100_000_000 
         : point.usdPrice
@@ -636,7 +637,8 @@ const stats = computed(() => {
     return pointTime >= oneDayAgo
   })
   const last24hPrices = last24hData.map(point => {
-    if (selectedTokenPrincipal.value === 'PORTFOLIO') {
+    const isPortfolio = selectedTokenPrincipal.value === 'PORTFOLIO_DAO' || selectedTokenPrincipal.value === 'PORTFOLIO_TREASURY'
+    if (isPortfolio) {
       return priceUnit.value === 'icp' 
         ? Number(point.icpPrice) / 100_000_000 
         : point.usdPrice
@@ -652,7 +654,8 @@ const stats = computed(() => {
   
   // 24h change
   const oldestIn24h = last24hData.length ? last24hData[0] : null
-  const oldPrice = oldestIn24h ? (selectedTokenPrincipal.value === 'PORTFOLIO' ? 
+  const isPortfolioForOldPrice = selectedTokenPrincipal.value === 'PORTFOLIO_DAO' || selectedTokenPrincipal.value === 'PORTFOLIO_TREASURY'
+  const oldPrice = oldestIn24h ? (isPortfolioForOldPrice ? 
     (priceUnit.value === 'icp' 
       ? Number(oldestIn24h.icpPrice) / 100_000_000 
       : oldestIn24h.usdPrice) :
@@ -700,7 +703,8 @@ const chartRangePercent = computed(() => {
   if (!filteredPriceData.value.length) return '0.00'
   
   const prices = filteredPriceData.value.map(point => {
-    if (selectedTokenPrincipal.value === 'PORTFOLIO') {
+    const isPortfolio = selectedTokenPrincipal.value === 'PORTFOLIO_DAO' || selectedTokenPrincipal.value === 'PORTFOLIO_TREASURY'
+    if (isPortfolio) {
       return priceUnit.value === 'icp' 
         ? Number(point.icpPrice) / 100_000_000 
         : point.usdPrice
@@ -729,8 +733,8 @@ watch([priceUnit, timeRange], () => {
 onMounted(async () => {
   await loadAvailableTokens()
   // Default to Portfolio view
-  selectedTokenPrincipal.value = 'PORTFOLIO'
-  selectedTokenSymbol.value = 'Portfolio'
+  selectedTokenPrincipal.value = 'PORTFOLIO_DAO'
+  selectedTokenSymbol.value = 'Portfolio (DAO)'
   await loadPriceHistory()
   
   // Draw chart after data is loaded
