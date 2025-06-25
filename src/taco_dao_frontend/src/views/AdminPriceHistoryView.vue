@@ -459,53 +459,106 @@ const allocationsChartOptions = computed(() => ({
 
 // Chart series and colors
 const holdingsSeries = computed(() => {
-  if (!sliderData.value?.tokens) return []
+  // For Treasury data: use tokens array
+  if (sliderData.value?.tokens) {
+    const totalValue = sliderData.value.tokens.reduce((sum: number, token: any) => 
+      sum + (token.valueInUSD || 0), 0)
+    
+    if (totalValue === 0) return []
+    
+    return sliderData.value.tokens
+      .filter((token: any) => (token.valueInUSD || 0) > 0)
+      .map((token: any) => ((token.valueInUSD / totalValue) * 100))
+  }
   
-  const totalValue = sliderData.value.tokens.reduce((sum: number, token: any) => 
-    sum + (token.valueInUSD || 0), 0)
+  // For DAO data: use portfolioHoldings array
+  if (sliderData.value?.portfolioHoldings) {
+    return sliderData.value.portfolioHoldings.map((holding: any) => holding.percentage)
+  }
   
-  if (totalValue === 0) return []
-  
-  return sliderData.value.tokens
-    .filter((token: any) => (token.valueInUSD || 0) > 0)
-    .map((token: any) => ((token.valueInUSD / totalValue) * 100))
+  return []
 })
 
 const holdingsLabels = computed(() => {
-  if (!sliderData.value?.tokens) return []
-  return sliderData.value.tokens
-    .filter((token: any) => (token.valueInUSD || 0) > 0)
-    .map((token: any) => token.symbol?.toUpperCase() || 'UNKNOWN')
+  // For Treasury data: use tokens array
+  if (sliderData.value?.tokens) {
+    return sliderData.value.tokens
+      .filter((token: any) => (token.valueInUSD || 0) > 0)
+      .map((token: any) => token.symbol?.toUpperCase() || 'UNKNOWN')
+  }
+  
+  // For DAO data: use portfolioHoldings array
+  if (sliderData.value?.portfolioHoldings) {
+    return sliderData.value.portfolioHoldings.map((holding: any) => holding.symbol?.toUpperCase() || 'UNKNOWN')
+  }
+  
+  return []
 })
 
 const holdingsColors = computed(() => {
-  if (!sliderData.value?.tokens) return []
-  return sliderData.value.tokens
-    .filter((token: any) => (token.valueInUSD || 0) > 0)
-    .map((token: any) => {
-      const symbol = token.symbol?.toLowerCase() || 'default'
-      const tokenInfo = tokenData.find(t => t.symbol === symbol)
-      return tokenInfo?.color || tokenData.find(t => t.symbol === 'default')?.color || '#777777'
-    })
+  // For Treasury data: use tokens array
+  if (sliderData.value?.tokens) {
+    return sliderData.value.tokens
+      .filter((token: any) => (token.valueInUSD || 0) > 0)
+      .map((token: any) => {
+        const symbol = token.symbol?.toLowerCase() || 'default'
+        const tokenInfo = tokenData.find(t => t.symbol === symbol)
+        return tokenInfo?.color || tokenData.find(t => t.symbol === 'default')?.color || '#777777'
+      })
+  }
+  
+  // For DAO data: use portfolioHoldings array
+  if (sliderData.value?.portfolioHoldings) {
+    return sliderData.value.portfolioHoldings.map((holding: any) => holding.color || '#777777')
+  }
+  
+  return []
 })
 
 const allocationsSeries = computed(() => {
-  if (!targetAllocationData.value?.length) return []
-  return targetAllocationData.value.map((allocation: any) => allocation.percentage)
+  // Use slider-specific historical target allocations if available
+  if (sliderData.value?.targetAllocations) {
+    return sliderData.value.targetAllocations.map((allocation: any) => allocation.percentage)
+  }
+  
+  // Fallback to static current allocations
+  if (targetAllocationData.value?.length) {
+    return targetAllocationData.value.map((allocation: any) => allocation.percentage)
+  }
+  
+  return []
 })
 
 const allocationsLabels = computed(() => {
-  if (!targetAllocationData.value?.length) return []
-  return targetAllocationData.value.map((allocation: any) => allocation.symbol?.toUpperCase() || 'UNKNOWN')
+  // Use slider-specific historical target allocations if available
+  if (sliderData.value?.targetAllocations) {
+    return sliderData.value.targetAllocations.map((allocation: any) => allocation.symbol?.toUpperCase() || 'UNKNOWN')
+  }
+  
+  // Fallback to static current allocations
+  if (targetAllocationData.value?.length) {
+    return targetAllocationData.value.map((allocation: any) => allocation.symbol?.toUpperCase() || 'UNKNOWN')
+  }
+  
+  return []
 })
 
 const allocationsColors = computed(() => {
-  if (!targetAllocationData.value?.length) return []
-  return targetAllocationData.value.map((allocation: any) => {
-    const symbol = allocation.symbol?.toLowerCase() || 'default'
-    const tokenInfo = tokenData.find(t => t.symbol === symbol)
-    return tokenInfo?.color || tokenData.find(t => t.symbol === 'default')?.color || '#777777'
-  })
+  // Use slider-specific historical target allocations if available
+  if (sliderData.value?.targetAllocations) {
+    return sliderData.value.targetAllocations.map((allocation: any) => allocation.color || '#777777')
+  }
+  
+  // Fallback to static current allocations
+  if (targetAllocationData.value?.length) {
+    return targetAllocationData.value.map((allocation: any) => {
+      const symbol = allocation.symbol?.toLowerCase() || 'default'
+      const tokenInfo = tokenData.find(t => t.symbol === symbol)
+      return tokenInfo?.color || tokenData.find(t => t.symbol === 'default')?.color || '#777777'
+    })
+  }
+  
+  return []
 })
 
 // Methods
