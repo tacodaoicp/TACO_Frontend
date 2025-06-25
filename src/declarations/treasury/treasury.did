@@ -7,10 +7,10 @@ type treasury =
    ///    *
    ///    * Only callable by admins with appropriate permissions.
    addTriggerCondition: (text, PriceDirection__1, float64, nat,
-    vec principal) -> (Result_7);
+    vec principal) -> (Result_9);
    admin_executeTradingCycle: () -> (Result_1);
-   admin_recoverPoolBalances: () -> (Result_6);
-   admin_syncWithDao: () -> (Result_6);
+   admin_recoverPoolBalances: () -> (Result_8);
+   admin_syncWithDao: () -> (Result_8);
    /// * Clear all trading pauses (emergency function)
    ///    *
    ///    * Removes all tokens from the trading pause registry.
@@ -38,6 +38,11 @@ type treasury =
    /// * Get the last N log entries for a specific level
    ///    * Only accessible by master admin, controller, or DAO
    getLogsByLevel: (LogLevel, nat) -> (vec LogEntry) query;
+   /// * Get portfolio history
+   ///    * 
+   ///    * Returns recent portfolio snapshots for analysis and charting.
+   ///    * Accessible by authenticated users.
+   getPortfolioHistory: (nat) -> (Result_7) query;
    /// * Get price alerts (paginated)
    ///    *
    ///    * Returns recent price alert events that triggered token pausing.
@@ -83,7 +88,7 @@ type treasury =
                                  principal;
                                  TokenDetails;
                                }) query;
-   getTokenPriceHistory: (vec principal) -> (Result_5) query;
+   getTokenPriceHistory: (vec principal) -> (Result_6) query;
    /// * Get trading pause record for a specific token
    ///    *
    ///    * Returns the pause record if the token is paused from trading, null otherwise.
@@ -97,7 +102,7 @@ type treasury =
    ///    * - Portfolio valuation
    ///    * - Current vs target allocations
    ///    * - Performance metrics
-   getTradingStatus: () -> (Result_4) query;
+   getTradingStatus: () -> (Result_5) query;
    /// * Get a specific trigger condition by ID
    ///    *
    ///    * Returns details of a single failsafe rule.
@@ -176,7 +181,9 @@ type treasury =
    syncTokenDetailsFromDAO: (vec record {
                                    principal;
                                    TokenDetails;
-                                 }) -> (Result_3);
+                                 }) -> (Result_4);
+   /// * Manually trigger a portfolio snapshot (admin function)
+   takeManualPortfolioSnapshot: () -> (Result_3);
    /// * Manually unpause a token from trading
    ///    *
    ///    * Removes a token from the trading pause registry, allowing it to trade again.
@@ -317,6 +324,17 @@ type TokenType =
    ICRC12;
    ICRC3;
  };
+type TokenSnapshot = 
+ record {
+   balance: nat;
+   decimals: nat;
+   priceInICP: nat;
+   priceInUSD: float64;
+   symbol: text;
+   token: principal;
+   valueInICP: nat;
+   valueInUSD: float64;
+ };
 type TokenDetails = 
  record {
    Active: bool;
@@ -340,17 +358,30 @@ type SyncErrorTreasury =
    UnexpectedError: text;
  };
 type Subaccount = blob;
-type Result_7 = 
+type SnapshotReason = 
+ variant {
+   Manual;
+   PostTrade;
+   PreTrade;
+   PriceUpdate;
+   Scheduled;
+ };
+type Result_9 = 
  variant {
    err: PriceFailsafeError;
    ok: nat;
  };
-type Result_6 = 
+type Result_8 = 
  variant {
    err: text;
    ok: text;
  };
-type Result_5 = 
+type Result_7 = 
+ variant {
+   err: PortfolioSnapshotError;
+   ok: PortfolioHistoryResponse;
+ };
+type Result_6 = 
  variant {
    err: text;
    ok: vec record {
@@ -358,7 +389,7 @@ type Result_5 =
              vec PricePoint__1;
            };
  };
-type Result_4 = 
+type Result_5 = 
  variant {
    err: text;
    ok:
@@ -398,9 +429,14 @@ type Result_4 =
       rebalanceStatus: RebalanceStatus;
     };
  };
-type Result_3 = 
+type Result_4 = 
  variant {
    err: SyncErrorTreasury;
+   ok: text;
+ };
+type Result_3 = 
+ variant {
+   err: PortfolioSnapshotError;
    ok: text;
  };
 type Result_2 = 
@@ -486,6 +522,25 @@ type PriceAlertLog =
    token: principal;
    tokenSymbol: text;
    triggeredCondition: TriggerCondition__1;
+ };
+type PortfolioSnapshotError = 
+ variant {
+   InvalidLimit;
+   NotAuthorized;
+   SystemError: text;
+ };
+type PortfolioSnapshot = 
+ record {
+   snapshotReason: SnapshotReason;
+   timestamp: int;
+   tokens: vec TokenSnapshot;
+   totalValueICP: nat;
+   totalValueUSD: float64;
+ };
+type PortfolioHistoryResponse = 
+ record {
+   snapshots: vec PortfolioSnapshot;
+   totalCount: nat;
  };
 type LogLevel = 
  variant {

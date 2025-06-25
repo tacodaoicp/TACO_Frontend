@@ -17,6 +17,20 @@ export interface LogEntry {
 export type LogLevel = { 'INFO' : null } |
   { 'WARN' : null } |
   { 'ERROR' : null };
+export interface PortfolioHistoryResponse {
+  'totalCount' : bigint,
+  'snapshots' : Array<PortfolioSnapshot>,
+}
+export interface PortfolioSnapshot {
+  'totalValueICP' : bigint,
+  'totalValueUSD' : number,
+  'tokens' : Array<TokenSnapshot>,
+  'snapshotReason' : SnapshotReason,
+  'timestamp' : bigint,
+}
+export type PortfolioSnapshotError = { 'SystemError' : string } |
+  { 'NotAuthorized' : null } |
+  { 'InvalidLimit' : null };
 export interface PriceAlertLog {
   'id' : bigint,
   'token' : Principal,
@@ -74,8 +88,10 @@ export type Result_1 = { 'ok' : string } |
 export type Result_2 = { 'ok' : string } |
   { 'err' : TradingPauseError };
 export type Result_3 = { 'ok' : string } |
+  { 'err' : PortfolioSnapshotError };
+export type Result_4 = { 'ok' : string } |
   { 'err' : SyncErrorTreasury };
-export type Result_4 = {
+export type Result_5 = {
     'ok' : {
       'executedTrades' : Array<TradeRecord>,
       'metrics' : {
@@ -104,12 +120,19 @@ export type Result_4 = {
     }
   } |
   { 'err' : string };
-export type Result_5 = { 'ok' : Array<[Principal, Array<PricePoint__1>]> } |
+export type Result_6 = { 'ok' : Array<[Principal, Array<PricePoint__1>]> } |
   { 'err' : string };
-export type Result_6 = { 'ok' : string } |
+export type Result_7 = { 'ok' : PortfolioHistoryResponse } |
+  { 'err' : PortfolioSnapshotError };
+export type Result_8 = { 'ok' : string } |
   { 'err' : string };
-export type Result_7 = { 'ok' : bigint } |
+export type Result_9 = { 'ok' : bigint } |
   { 'err' : PriceFailsafeError };
+export type SnapshotReason = { 'PreTrade' : null } |
+  { 'PostTrade' : null } |
+  { 'Scheduled' : null } |
+  { 'PriceUpdate' : null } |
+  { 'Manual' : null };
 export type Subaccount = Uint8Array | number[];
 export type SyncErrorTreasury = { 'NotDAO' : null } |
   { 'UnexpectedError' : string };
@@ -128,6 +151,16 @@ export interface TokenDetails {
   'tokenName' : string,
   'pausedDueToSyncFailure' : boolean,
   'tokenType' : TokenType,
+}
+export interface TokenSnapshot {
+  'decimals' : bigint,
+  'token' : Principal,
+  'balance' : bigint,
+  'priceInICP' : bigint,
+  'priceInUSD' : number,
+  'valueInICP' : bigint,
+  'valueInUSD' : number,
+  'symbol' : string,
 }
 export type TokenType = { 'ICP' : null } |
   { 'ICRC3' : null } |
@@ -236,11 +269,11 @@ export interface UpdateConfig {
 export interface treasury {
   'addTriggerCondition' : ActorMethod<
     [string, PriceDirection__1, number, bigint, Array<Principal>],
-    Result_7
+    Result_9
   >,
   'admin_executeTradingCycle' : ActorMethod<[], Result_1>,
-  'admin_recoverPoolBalances' : ActorMethod<[], Result_6>,
-  'admin_syncWithDao' : ActorMethod<[], Result_6>,
+  'admin_recoverPoolBalances' : ActorMethod<[], Result_8>,
+  'admin_syncWithDao' : ActorMethod<[], Result_8>,
   'clearAllTradingPauses' : ActorMethod<[], Result_2>,
   'clearLogs' : ActorMethod<[], undefined>,
   'clearPriceAlerts' : ActorMethod<[], Result>,
@@ -248,6 +281,7 @@ export interface treasury {
   'getLogs' : ActorMethod<[bigint], Array<LogEntry>>,
   'getLogsByContext' : ActorMethod<[string, bigint], Array<LogEntry>>,
   'getLogsByLevel' : ActorMethod<[LogLevel, bigint], Array<LogEntry>>,
+  'getPortfolioHistory' : ActorMethod<[bigint], Result_7>,
   'getPriceAlerts' : ActorMethod<
     [bigint, bigint],
     { 'alerts' : Array<PriceAlertLog>, 'totalCount' : bigint }
@@ -272,12 +306,12 @@ export interface treasury {
   >,
   'getSystemParameters' : ActorMethod<[], RebalanceConfig>,
   'getTokenDetails' : ActorMethod<[], Array<[Principal, TokenDetails]>>,
-  'getTokenPriceHistory' : ActorMethod<[Array<Principal>], Result_5>,
+  'getTokenPriceHistory' : ActorMethod<[Array<Principal>], Result_6>,
   'getTradingPauseInfo' : ActorMethod<
     [Principal],
     [] | [TradingPauseRecord__1]
   >,
-  'getTradingStatus' : ActorMethod<[], Result_4>,
+  'getTradingStatus' : ActorMethod<[], Result_5>,
   'getTriggerCondition' : ActorMethod<[bigint], [] | [TriggerCondition]>,
   'listTradingPauses' : ActorMethod<[], TradingPausesResponse>,
   'listTriggerConditions' : ActorMethod<[], Array<TriggerCondition>>,
@@ -294,8 +328,9 @@ export interface treasury {
   'stopRebalancing' : ActorMethod<[], Result_1>,
   'syncTokenDetailsFromDAO' : ActorMethod<
     [Array<[Principal, TokenDetails]>],
-    Result_3
+    Result_4
   >,
+  'takeManualPortfolioSnapshot' : ActorMethod<[], Result_3>,
   'unpauseTokenFromTrading' : ActorMethod<[Principal], Result_2>,
   'updateRebalanceConfig' : ActorMethod<
     [UpdateConfig, [] | [boolean]],
