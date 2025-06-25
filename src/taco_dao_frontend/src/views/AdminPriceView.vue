@@ -199,6 +199,114 @@
       </div>
     </div>
 
+    <!-- Portfolio Circuit Breakers Management -->
+    <div class="card bg-dark text-white mb-4">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <h3 class="mb-0">Portfolio Circuit Breakers</h3>
+        <div class="d-flex gap-2">
+          <button class="btn btn-primary" @click="refreshPortfolioConditions">
+            🔄 Refresh
+          </button>
+          <button class="btn btn-success" @click="showAddPortfolioModal = true">
+            ➕ Add Portfolio Condition
+          </button>
+        </div>
+      </div>
+      
+      <div class="card-body">
+        <div v-if="loadingPortfolioConditions" class="text-center">
+          <div class="spinner-border" role="status">
+            <span class="visually-hidden">Loading...</span>
+          </div>
+        </div>
+        
+        <div v-else-if="portfolioConditions.length === 0" class="text-center text-muted">
+          No portfolio circuit breaker conditions configured
+        </div>
+        
+        <div v-else class="conditions-list">
+          <div v-for="condition in portfolioConditions" :key="Number(condition.id)" class="condition-card mb-3">
+            <div class="d-flex justify-content-between align-items-start">
+              <div class="condition-info">
+                <h5 class="mb-2">
+                  {{ condition.name }}
+                  <span v-if="!condition.isActive" class="badge bg-secondary ms-2">Inactive</span>
+                  <span v-else class="badge bg-success ms-2">Active</span>
+                </h5>
+                <div class="condition-details">
+                  <div><strong>Direction:</strong> {{ condition.direction.Up !== undefined ? '📈 Up' : '📉 Down' }}</div>
+                  <div><strong>Threshold:</strong> {{ condition.percentage.toFixed(1) }}%</div>
+                  <div><strong>Value Type:</strong> {{ condition.valueType.ICP !== undefined ? 'ICP' : 'USD' }}</div>
+                  <div><strong>Time Window:</strong> {{ formatTimeWindow(condition.timeWindowNS) }}</div>
+                  <div class="text-muted small">
+                    Created: {{ formatTimestamp(condition.createdAt) }}
+                  </div>
+                </div>
+              </div>
+              <div class="condition-actions d-flex gap-2">
+                <button 
+                  class="btn btn-sm" 
+                  :class="condition.isActive ? 'btn-secondary' : 'btn-success'"
+                  @click="togglePortfolioActive(Number(condition.id), !condition.isActive)">
+                  {{ condition.isActive ? '⏸️' : '▶️' }}
+                </button>
+                <button 
+                  class="btn btn-sm btn-danger" 
+                  @click="deletePortfolioCondition(Number(condition.id))">
+                  🗑️
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Portfolio Circuit Breaker Logs -->
+    <div class="card bg-dark text-white mb-4">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <h3 class="mb-0">Portfolio Circuit Breaker History</h3>
+        <div class="d-flex gap-2">
+          <button class="btn btn-primary" @click="refreshPortfolioLogs">
+            🔄 Refresh
+          </button>
+          <button class="btn btn-warning" @click="clearPortfolioLogs">
+            🧹 Clear All
+          </button>
+        </div>
+      </div>
+      
+      <div class="card-body">
+        <div v-if="loadingPortfolioLogs" class="text-center">
+          <div class="spinner-border" role="status">
+            <span class="visually-hidden">Loading...</span>
+          </div>
+        </div>
+        
+        <div v-else-if="portfolioLogs.length === 0" class="text-center text-muted">
+          No portfolio circuit breakers triggered yet
+        </div>
+        
+        <div v-else class="alerts-list">
+          <div v-for="log in portfolioLogs" :key="Number(log.id)" class="alert-card mb-3">
+            <div class="alert-info">
+              <h6 class="mb-2">
+                🔥 {{ log.triggeredCondition.name }}
+                <span class="badge bg-danger ms-2">{{ log.triggeredCondition.direction.Up !== undefined ? '📈' : '📉' }} {{ (log.portfolioData.actualChangePercent).toFixed(2) }}%</span>
+              </h6>
+              <div class="alert-details">
+                <div><strong>Value Type:</strong> {{ log.triggeredCondition.valueType.ICP !== undefined ? 'ICP' : 'USD' }}</div>
+                <div><strong>Triggered:</strong> {{ formatTimestamp(log.timestamp) }}</div>
+                <div><strong>Current Value:</strong> {{ formatPortfolioValue(log.portfolioData.currentValue, log.triggeredCondition.valueType) }}</div>
+                <div><strong>Min Value:</strong> {{ formatPortfolioValue(log.portfolioData.minValueInWindow, log.triggeredCondition.valueType) }}</div>
+                <div><strong>Max Value:</strong> {{ formatPortfolioValue(log.portfolioData.maxValueInWindow, log.triggeredCondition.valueType) }}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- Add Condition Modal -->
     <div v-if="showAddModal" class="modal d-block" tabindex="-1" style="background: rgba(0,0,0,0.5)">
       <div class="modal-dialog modal-lg">
@@ -350,6 +458,102 @@
         </div>
       </div>
     </div>
+
+    <!-- Add Portfolio Condition Modal -->
+    <div v-if="showAddPortfolioModal" class="modal d-block" tabindex="-1" style="background: rgba(0,0,0,0.5)">
+      <div class="modal-dialog modal-lg">
+        <div class="modal-content bg-dark text-white">
+          <div class="modal-header">
+            <h5 class="modal-title">Add Portfolio Circuit Breaker</h5>
+            <button type="button" class="btn-close btn-close-white" @click="closePortfolioModal"></button>
+          </div>
+          <div class="modal-body">
+            <form @submit.prevent="submitPortfolioCondition">
+              <div class="mb-3">
+                <label class="form-label">Condition Name</label>
+                <input 
+                  type="text" 
+                  class="form-control" 
+                  v-model="newPortfolioCondition.name" 
+                  required 
+                  placeholder="e.g., Portfolio Crash Protection">
+              </div>
+              
+              <div class="row">
+                <div class="col-md-6">
+                  <div class="mb-3">
+                    <label class="form-label">Portfolio Direction</label>
+                    <select class="form-select" v-model="newPortfolioCondition.direction" required>
+                      <option value="Up">📈 Up (Portfolio Increase)</option>
+                      <option value="Down">📉 Down (Portfolio Decrease)</option>
+                    </select>
+                  </div>
+                </div>
+                <div class="col-md-6">
+                  <div class="mb-3">
+                    <label class="form-label">Threshold Percentage</label>
+                    <div class="input-group">
+                      <input 
+                        type="number" 
+                        class="form-control" 
+                        v-model="newPortfolioCondition.percentage" 
+                        required 
+                        min="0.1" 
+                        max="1000" 
+                        step="0.1"
+                        placeholder="20.0">
+                      <span class="input-group-text">%</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="row">
+                <div class="col-md-6">
+                  <div class="mb-3">
+                    <label class="form-label">Value Type</label>
+                    <select class="form-select" v-model="newPortfolioCondition.valueType" required>
+                      <option value="ICP">🪙 ICP</option>
+                      <option value="USD">💵 USD</option>
+                    </select>
+                  </div>
+                </div>
+                <div class="col-md-6">
+                  <div class="mb-3">
+                    <label class="form-label">Time Window</label>
+                    <div class="row">
+                      <div class="col-8">
+                        <input 
+                          type="number" 
+                          class="form-control" 
+                          v-model="newPortfolioCondition.timeValue" 
+                          required 
+                          min="1" 
+                          placeholder="2">
+                      </div>
+                      <div class="col-4">
+                        <select class="form-select" v-model="newPortfolioCondition.timeUnit" required>
+                          <option value="minutes">Minutes</option>
+                          <option value="hours">Hours</option>
+                          <option value="days">Days</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="d-flex justify-content-end gap-2">
+                <button type="button" class="btn btn-secondary" @click="closePortfolioModal">Cancel</button>
+                <button type="submit" class="btn btn-primary" :disabled="submittingPortfolio">
+                  {{ submittingPortfolio ? 'Saving...' : 'Add Portfolio Condition' }}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -401,15 +605,21 @@ const store = useTacoStore()
 const conditions = ref<TriggerCondition[]>([])
 const alerts = ref<PriceAlertLog[]>([])
 const tradingPauses = ref<any[]>([])
+const portfolioConditions = ref<any[]>([])
+const portfolioLogs = ref<any[]>([])
 const loadingConditions = ref(false)
 const loadingAlerts = ref(false)
 const loadingTradingPauses = ref(false)
+const loadingPortfolioConditions = ref(false)
+const loadingPortfolioLogs = ref(false)
 const submitting = ref(false)
 const submittingPause = ref(false)
+const submittingPortfolio = ref(false)
 
 // Modal state
 const showAddModal = ref(false)
 const showManualPauseModal = ref(false)
+const showAddPortfolioModal = ref(false)
 const newCondition = ref({
   name: '',
   direction: 'Up',
@@ -421,6 +631,14 @@ const newCondition = ref({
 const manualPauseForm = ref({
   tokenPrincipal: '',
   reason: ''
+})
+const newPortfolioCondition = ref({
+  name: '',
+  direction: 'Down',
+  percentage: 20.0,
+  timeValue: 2,
+  timeUnit: 'hours',
+  valueType: 'USD'
 })
 
 // Methods
@@ -624,11 +842,108 @@ const closeManualPauseModal = () => {
   }
 }
 
+// Portfolio circuit breaker functions
+const refreshPortfolioConditions = async () => {
+  loadingPortfolioConditions.value = true
+  try {
+    const result = await store.listPortfolioCircuitBreakerConditions()
+    portfolioConditions.value = result
+  } catch (error) {
+    console.error('Failed to fetch portfolio conditions:', error)
+  }
+  loadingPortfolioConditions.value = false
+}
+
+const refreshPortfolioLogs = async () => {
+  loadingPortfolioLogs.value = true
+  try {
+    const result = await store.getPortfolioCircuitBreakerLogs(0, 50)
+    portfolioLogs.value = result.logs
+  } catch (error) {
+    console.error('Failed to fetch portfolio logs:', error)
+  }
+  loadingPortfolioLogs.value = false
+}
+
+const togglePortfolioActive = async (id: number, isActive: boolean) => {
+  try {
+    await store.setPortfolioCircuitBreakerConditionActive(id, isActive)
+    await refreshPortfolioConditions()
+  } catch (error) {
+    console.error('Failed to toggle portfolio condition:', error)
+  }
+}
+
+const deletePortfolioCondition = async (id: number) => {
+  if (!confirm('Are you sure you want to delete this portfolio condition?')) return
+  
+  try {
+    await store.removePortfolioCircuitBreakerCondition(id)
+    await refreshPortfolioConditions()
+  } catch (error) {
+    console.error('Failed to delete portfolio condition:', error)
+  }
+}
+
+const clearPortfolioLogs = async () => {
+  if (!confirm('Are you sure you want to clear all portfolio circuit breaker logs?')) return
+  
+  try {
+    await store.clearPortfolioCircuitBreakerLogs()
+    portfolioLogs.value = []
+  } catch (error) {
+    console.error('Failed to clear portfolio logs:', error)
+  }
+}
+
+const formatPortfolioValue = (value: number, valueType: any) => {
+  if (valueType.ICP !== undefined) {
+    return `${value.toFixed(2)} ICP`
+  } else {
+    return `$${value.toFixed(2)}`
+  }
+}
+
+const submitPortfolioCondition = async () => {
+  submittingPortfolio.value = true
+  try {
+    const timeWindowNS = BigInt(newPortfolioCondition.value.timeValue * getTimeMultiplier() * 1_000_000_000)
+    
+    await store.addPortfolioCircuitBreakerCondition(
+      newPortfolioCondition.value.name,
+      newPortfolioCondition.value.direction,
+      newPortfolioCondition.value.percentage,
+      timeWindowNS,
+      newPortfolioCondition.value.valueType
+    )
+    
+    await refreshPortfolioConditions()
+    closePortfolioModal()
+  } catch (error) {
+    console.error('Failed to add portfolio condition:', error)
+  }
+  submittingPortfolio.value = false
+}
+
+const closePortfolioModal = () => {
+  showAddPortfolioModal.value = false
+  newPortfolioCondition.value = {
+    name: '',
+    direction: 'Down',
+    percentage: 20.0,
+    timeValue: 2,
+    timeUnit: 'hours',
+    valueType: 'USD'
+  }
+}
+
 // Lifecycle
 onMounted(async () => {
   await refreshConditions()
   await refreshAlerts()
   await refreshTradingPauses()
+  await refreshPortfolioConditions()
+  await refreshPortfolioLogs()
 })
 </script>
 

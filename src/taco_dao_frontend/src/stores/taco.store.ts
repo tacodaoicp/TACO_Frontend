@@ -2103,7 +2103,7 @@ export const useTacoStore = defineStore('taco', () => {
 
             const result = await actor.admin_recoverPoolBalances() as Result_8;
             if ('err' in result) {
-                throw new Error(result.err);
+                throw new Error(JSON.stringify(result.err));
             }
             await refreshTimerStatus();
             console.log('TacoStore: Pool balances recovered:', result.ok);
@@ -3387,6 +3387,218 @@ export const useTacoStore = defineStore('taco', () => {
         }
     };
 
+    // Portfolio Circuit Breaker Functions
+    const listPortfolioCircuitBreakerConditions = async () => {
+        try {
+            const authClient = await getAuthClient();
+            
+            if (!await authClient.isAuthenticated()) {
+                throw new Error('User not authenticated');
+            }
+
+            const identity = await authClient.getIdentity();
+            const agent = await createAgent({
+                identity,
+                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            });
+
+            const treasury = Actor.createActor<TreasuryService>(treasuryIDL, {
+                agent,
+                canisterId: treasuryCanisterId()
+            });
+
+            const result = await treasury.listPortfolioCircuitBreakerConditions();
+            return result;
+        } catch (error: any) {
+            console.error('Error listing portfolio circuit breaker conditions:', error);
+            throw error;
+        }
+    };
+
+    const addPortfolioCircuitBreakerCondition = async (
+        name: string,
+        direction: string,
+        percentage: number,
+        timeWindowNS: bigint,
+        valueType: string
+    ) => {
+        try {
+            const authClient = await getAuthClient();
+            
+            if (!await authClient.isAuthenticated()) {
+                throw new Error('User not authenticated');
+            }
+
+            const identity = await authClient.getIdentity();
+            const agent = await createAgent({
+                identity,
+                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            });
+
+            const treasury = Actor.createActor<TreasuryService>(treasuryIDL, {
+                agent,
+                canisterId: treasuryCanisterId()
+            });
+
+            const directionVariant = direction === 'Up' ? { Up: null } : { Down: null };
+            const valueTypeVariant = valueType === 'ICP' ? { ICP: null } : { USD: null };
+            
+            const result = await treasury.addPortfolioCircuitBreakerCondition(
+                name,
+                directionVariant,
+                percentage,
+                timeWindowNS,
+                valueTypeVariant
+            );
+            
+            if ('ok' in result) {
+                console.log('Portfolio circuit breaker condition added:', result.ok);
+                return result.ok;
+            } else {
+                console.error('Error adding portfolio circuit breaker condition:', result.err);
+                throw new Error('Failed to add portfolio circuit breaker condition');
+            }
+        } catch (error: any) {
+            console.error('Error adding portfolio circuit breaker condition:', error);
+            throw error;
+        }
+    };
+
+    const setPortfolioCircuitBreakerConditionActive = async (conditionId: number, isActive: boolean) => {
+        try {
+            const authClient = await getAuthClient();
+            
+            if (!await authClient.isAuthenticated()) {
+                throw new Error('User not authenticated');
+            }
+
+            const identity = await authClient.getIdentity();
+            const agent = await createAgent({
+                identity,
+                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            });
+
+            const treasury = Actor.createActor<TreasuryService>(treasuryIDL, {
+                agent,
+                canisterId: treasuryCanisterId()
+            });
+
+            const result = await treasury.setPortfolioCircuitBreakerConditionActive(BigInt(conditionId), isActive);
+            
+            if ('ok' in result) {
+                console.log('Portfolio circuit breaker condition active status changed:', result.ok);
+                return result.ok;
+            } else {
+                console.error('Error setting portfolio circuit breaker condition active:', result.err);
+                throw new Error('Failed to set portfolio circuit breaker condition active');
+            }
+        } catch (error: any) {
+            console.error('Error setting portfolio circuit breaker condition active:', error);
+            throw error;
+        }
+    };
+
+    const removePortfolioCircuitBreakerCondition = async (conditionId: number) => {
+        try {
+            const authClient = await getAuthClient();
+            
+            if (!await authClient.isAuthenticated()) {
+                throw new Error('User not authenticated');
+            }
+
+            const identity = await authClient.getIdentity();
+            const agent = await createAgent({
+                identity,
+                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            });
+
+            const treasury = Actor.createActor<TreasuryService>(treasuryIDL, {
+                agent,
+                canisterId: treasuryCanisterId()
+            });
+
+            const result = await treasury.removePortfolioCircuitBreakerCondition(BigInt(conditionId));
+            
+            if ('ok' in result) {
+                console.log('Portfolio circuit breaker condition removed:', result.ok);
+                return result.ok;
+            } else {
+                console.error('Error removing portfolio circuit breaker condition:', result.err);
+                throw new Error('Failed to remove portfolio circuit breaker condition');
+            }
+        } catch (error: any) {
+            console.error('Error removing portfolio circuit breaker condition:', error);
+            throw error;
+        }
+    };
+
+    const getPortfolioCircuitBreakerLogs = async (offset: number, limit: number) => {
+        try {
+            const authClient = await getAuthClient();
+            
+            if (!await authClient.isAuthenticated()) {
+                throw new Error('User not authenticated');
+            }
+
+            const identity = await authClient.getIdentity();
+            const agent = await createAgent({
+                identity,
+                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            });
+
+            const treasury = Actor.createActor<TreasuryService>(treasuryIDL, {
+                agent,
+                canisterId: treasuryCanisterId()
+            });
+
+            const result = await treasury.getPortfolioCircuitBreakerLogs(BigInt(offset), BigInt(limit));
+            return result;
+        } catch (error: any) {
+            console.error('Error getting portfolio circuit breaker logs:', error);
+            throw error;
+        }
+    };
+
+    const clearPortfolioCircuitBreakerLogs = async () => {
+        try {
+            const authClient = await getAuthClient();
+            
+            if (!await authClient.isAuthenticated()) {
+                throw new Error('User not authenticated');
+            }
+
+            const identity = await authClient.getIdentity();
+            const agent = await createAgent({
+                identity,
+                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            });
+
+            const treasury = Actor.createActor<TreasuryService>(treasuryIDL, {
+                agent,
+                canisterId: treasuryCanisterId()
+            });
+
+            const result = await treasury.clearPortfolioCircuitBreakerLogs();
+            
+            if ('ok' in result) {
+                console.log('Portfolio circuit breaker logs cleared:', result.ok);
+                return result.ok;
+            } else {
+                console.error('Error clearing portfolio circuit breaker logs:', result.err);
+                throw new Error('Failed to clear portfolio circuit breaker logs');
+            }
+        } catch (error: any) {
+            console.error('Error clearing portfolio circuit breaker logs:', error);
+            throw error;
+        }
+    };
+
     
 
     // # RETURN #
@@ -3495,5 +3707,11 @@ export const useTacoStore = defineStore('taco', () => {
         getPortfolioHistory,
         getTreasuryPortfolioHistory,
         takeManualPortfolioSnapshot,
+        listPortfolioCircuitBreakerConditions,
+        addPortfolioCircuitBreakerCondition,
+        setPortfolioCircuitBreakerConditionActive,
+        removePortfolioCircuitBreakerCondition,
+        getPortfolioCircuitBreakerLogs,
+        clearPortfolioCircuitBreakerLogs,
     }
 })
