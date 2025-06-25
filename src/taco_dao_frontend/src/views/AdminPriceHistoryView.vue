@@ -284,7 +284,7 @@ const loadPriceHistory = async () => {
         icpPrice: balanceAllocation.totalWorthInICP,
         usdPrice: balanceAllocation.totalWorthInUSD
       })).reverse() // Reverse to get chronological order (oldest first)
-      
+
       selectedTokenSymbol.value = 'Portfolio'
       
       // Draw chart after data is loaded
@@ -520,26 +520,31 @@ const formatPrice = (price: number) => {
 const filteredPriceData = computed(() => {
   if (!priceData.value.length) return []
   
-  const now = Date.now() * 1_000_000
-  let cutoffTime = 0
+  const now = BigInt(Date.now() * 1_000_000)  // Convert milliseconds to nanoseconds as BigInt
+  let cutoffTime = BigInt(0)
   
   switch (timeRange.value) {
     case '24h':
-      cutoffTime = now - (24 * 60 * 60 * 1_000_000_000)
+      cutoffTime = now - BigInt(25 * 60 * 60 * 1_000_000_000)  // 25 hours in nanoseconds (to account for hourly snapshots)
       break
     case '7d':
-      cutoffTime = now - (7 * 24 * 60 * 60 * 1_000_000_000)
+      cutoffTime = now - BigInt(7 * 24 * 60 * 60 * 1_000_000_000)  // 7 days in nanoseconds
       break
     case '30d':
-      cutoffTime = now - (30 * 24 * 60 * 60 * 1_000_000_000)
+      cutoffTime = now - BigInt(30 * 24 * 60 * 60 * 1_000_000_000)  // 30 days in nanoseconds
       break
     case 'all':
     default:
-      cutoffTime = 0
+      cutoffTime = BigInt(0)
       break
   }
   
-  return priceData.value.filter(point => Number(point.time) >= cutoffTime)
+  const filtered = priceData.value.filter(point => {
+    const pointTime = typeof point.time === 'bigint' ? point.time : BigInt(point.time)
+    return pointTime >= cutoffTime
+  })
+  
+  return filtered
 })
 
 // Current price
@@ -588,9 +593,12 @@ const stats = computed(() => {
   const times = filteredPriceData.value.map(point => Number(point.time))
   
   // 24h data
-  const now = Date.now() * 1_000_000
-  const oneDayAgo = now - (24 * 60 * 60 * 1_000_000_000)
-  const last24hData = filteredPriceData.value.filter(point => Number(point.time) >= oneDayAgo)
+  const now = BigInt(Date.now() * 1_000_000)
+  const oneDayAgo = now - BigInt(25 * 60 * 60 * 1_000_000_000)  // 25 hours to match the filter
+  const last24hData = filteredPriceData.value.filter(point => {
+    const pointTime = typeof point.time === 'bigint' ? point.time : BigInt(point.time)
+    return pointTime >= oneDayAgo
+  })
   const last24hPrices = last24hData.map(point => {
     if (selectedTokenPrincipal.value === 'PORTFOLIO') {
       return priceUnit.value === 'icp' 
