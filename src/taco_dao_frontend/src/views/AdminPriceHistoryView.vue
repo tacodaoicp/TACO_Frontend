@@ -169,9 +169,9 @@
           </div>
 
           <!-- Slider Data Display -->
-          <div class="card bg-dark text-white mb-4" v-if="sliderData && isPortfolioView">
+          <div class="card bg-dark text-white mb-4" v-if="sliderData">
             <div class="card-header">
-              <h3 class="mb-0">📊 Portfolio at {{ formatSliderDate(sliderData.time) }}</h3>
+              <h3 class="mb-0">📊 {{ isPortfolioView ? 'Portfolio' : selectedTokenSymbol + ' & Portfolio Context' }} at {{ formatSliderDate(sliderData.time) }}</h3>
             </div>
             <div class="card-body">
               <div class="row">
@@ -179,15 +179,29 @@
                 <div class="col-md-4">
                   <div class="slider-info-section">
                     <h5 class="mb-3">💰 Price Information</h5>
-                    <div class="info-item">
-                      <span class="info-label">Value (ICP):</span>
-                      <span class="info-value">{{ formatSliderPrice(sliderData.icpPrice, 'icp') }}</span>
+                    
+                    <!-- Individual Token Price (for token views) -->
+                    <div v-if="!isPortfolioView && (sliderData.icpPrice || sliderData.usdPrice)">
+                      <div class="info-item">
+                        <span class="info-label">{{ selectedTokenSymbol }} Price:</span>
+                        <span class="info-value">{{ formatSliderPrice(sliderData.icpPrice || sliderData.usdPrice, priceUnit) }}</span>
+                      </div>
+                      <hr class="my-2">
                     </div>
-                    <div class="info-item">
-                      <span class="info-label">Value (USD):</span>
-                      <span class="info-value">{{ formatSliderPrice(sliderData.usdPrice, 'usd') }}</span>
+                    
+                    <!-- Portfolio Values -->
+                    <div v-if="sliderData.portfolioIcpValue || sliderData.portfolioUsdValue || isPortfolioView">
+                      <div class="info-item">
+                        <span class="info-label">Portfolio (ICP):</span>
+                        <span class="info-value">{{ formatSliderPrice(sliderData.portfolioIcpValue || sliderData.icpPrice, 'icp') }}</span>
+                      </div>
+                      <div class="info-item">
+                        <span class="info-label">Portfolio (USD):</span>
+                        <span class="info-value">{{ formatSliderPrice(sliderData.portfolioUsdValue || sliderData.usdPrice, 'usd') }}</span>
+                      </div>
                     </div>
-                    <div class="info-item">
+                    
+                    <div class="info-item mt-2">
                       <span class="info-label">Date:</span>
                       <span class="info-value">{{ formatSliderDateTime(sliderData.time) }}</span>
                     </div>
@@ -682,6 +696,18 @@ const updateSliderData = async () => {
     // Always start with the main chart data point
     sliderData.value = { ...selectedPoint }
     
+    // For individual token views, we need to ensure price info is available
+    // If the selected point doesn't have icpPrice/usdPrice, use the price data
+    if (!sliderData.value.icpPrice && !sliderData.value.usdPrice) {
+      if (priceUnit.value === 'icp') {
+        sliderData.value.icpPrice = selectedPoint.price || 0
+        sliderData.value.usdPrice = 0 // Individual tokens don't have USD data directly
+      } else {
+        sliderData.value.usdPrice = selectedPoint.price || 0
+        sliderData.value.icpPrice = 0 // Individual tokens don't have ICP data directly
+      }
+    }
+    
     // Find closest Treasury data point by timestamp for portfolio holdings
     if (treasuryPortfolioData.value.length > 0) {
       const closestTreasuryPoint = treasuryPortfolioData.value.reduce((closest, current) => {
@@ -693,6 +719,9 @@ const updateSliderData = async () => {
       // Add Treasury tokens data for portfolio holdings
       if (closestTreasuryPoint.tokens) {
         sliderData.value.tokens = closestTreasuryPoint.tokens
+        // Also add portfolio values for context
+        sliderData.value.portfolioIcpValue = closestTreasuryPoint.icpPrice
+        sliderData.value.portfolioUsdValue = closestTreasuryPoint.usdPrice
       }
     }
     
