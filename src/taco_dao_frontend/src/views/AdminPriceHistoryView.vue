@@ -245,7 +245,7 @@ const store = useTacoStore()
 const selectedTokenPrincipal = ref<string>('')
 const selectedTokenSymbol = ref<string>('')
 const priceUnit = ref<'icp' | 'usd'>('usd')
-const timeRange = ref<'24h' | '7d' | '30d' | 'all'>('7d')
+const timeRange = ref<'24h' | '7d' | '30d' | 'all'>('24h')
 const loading = ref(false)
 const priceData = ref<any[]>([])
 const availableTokens = ref<any[]>([])
@@ -283,6 +283,11 @@ const loadPriceHistory = async () => {
         p.toString() === selectedTokenPrincipal.value
       )
       selectedTokenSymbol.value = tokenDetails ? tokenDetails[1].tokenSymbol : 'Unknown'
+      
+      // Draw chart after data is loaded
+      nextTick(() => {
+        drawChart()
+      })
     } else {
       priceData.value = []
     }
