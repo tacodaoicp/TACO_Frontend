@@ -636,6 +636,11 @@ onMounted(async () => {
   padding-bottom: 2rem;
 }
 
+/* Override the global .app overflow:clip for this page only */
+:global(.app) {
+  overflow: auto !important;
+}
+
 .chart-container {
   position: relative;
   height: 400px;
