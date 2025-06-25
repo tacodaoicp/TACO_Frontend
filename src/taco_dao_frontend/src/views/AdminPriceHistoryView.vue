@@ -364,7 +364,7 @@ const drawChart = () => {
   
   const width = rect.width
   const height = rect.height
-  const paddingLeft = 80
+  const paddingLeft = priceUnit.value === 'icp' ? 120 : 80  // More space for ICP prices
   const paddingRight = 40
   const paddingTop = 40
   const paddingBottom = 40
