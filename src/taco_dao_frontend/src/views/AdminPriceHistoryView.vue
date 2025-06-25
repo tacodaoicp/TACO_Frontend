@@ -38,7 +38,8 @@
                     v-model="selectedTokenPrincipal" 
                     @change="loadPriceHistory">
                     <option value="">Choose a token...</option>
-                    <option value="PORTFOLIO">📊 Portfolio - Total Value</option>
+                    <option value="PORTFOLIO_DAO">📊 Portfolio (DAO) - Allocation History</option>
+                    <option value="PORTFOLIO_TREASURY">📈 Portfolio (Treasury) - Live Snapshots</option>
                     <option 
                       v-for="[principal, details] in availableTokens" 
                       :key="principal.toString()" 
@@ -279,8 +280,8 @@ const loadPriceHistory = async () => {
   
   loading.value = true
   try {
-    if (selectedTokenPrincipal.value === 'PORTFOLIO') {
-      // Load portfolio history from DAO
+    if (selectedTokenPrincipal.value === 'PORTFOLIO_DAO') {
+      // Load portfolio history from DAO (existing implementation)
       const portfolioHistory = await store.getPortfolioHistory(2000) as any[]
       
       // Convert portfolio history to price data format
@@ -290,12 +291,39 @@ const loadPriceHistory = async () => {
         usdPrice: balanceAllocation.totalWorthInUSD
       })).reverse() // Reverse to get chronological order (oldest first)
 
-      selectedTokenSymbol.value = 'Portfolio'
+      selectedTokenSymbol.value = 'Portfolio (DAO)'
       
       // Draw chart after data is loaded
       nextTick(() => {
         drawChart()
       })
+    } else if (selectedTokenPrincipal.value === 'PORTFOLIO_TREASURY') {
+      // Load portfolio snapshots from Treasury (new implementation)
+      try {
+        const portfolioSnapshots = await store.getTreasuryPortfolioHistory(1000) as any
+        
+        // Convert treasury snapshots to price data format
+        if (portfolioSnapshots && portfolioSnapshots.snapshots) {
+          priceData.value = portfolioSnapshots.snapshots.map((snapshot: any) => ({
+            time: snapshot.timestamp,
+            icpPrice: snapshot.totalValueICP,
+            usdPrice: snapshot.totalValueUSD
+          }))
+        } else {
+          priceData.value = []
+        }
+
+        selectedTokenSymbol.value = 'Portfolio (Treasury)'
+        
+        // Draw chart after data is loaded
+        nextTick(() => {
+          drawChart()
+        })
+      } catch (error) {
+        console.error('Failed to load treasury portfolio snapshots:', error)
+        priceData.value = []
+        selectedTokenSymbol.value = 'Portfolio (Treasury) - Error'
+      }
     } else {
       // Load individual token price history
       const principal = Principal.fromText(selectedTokenPrincipal.value)
@@ -366,7 +394,8 @@ const handleMouseMove = (event: MouseEvent) => {
   if (pointIndex >= 0 && pointIndex < dataPoints) {
     const point = filteredPriceData.value[pointIndex]
     const date = new Date(Number(point.time) / 1_000_000)
-    const price = selectedTokenPrincipal.value === 'PORTFOLIO' ?
+    const isPortfolio = selectedTokenPrincipal.value === 'PORTFOLIO_DAO' || selectedTokenPrincipal.value === 'PORTFOLIO_TREASURY'
+    const price = isPortfolio ?
       (priceUnit.value === 'icp' 
         ? Number(point.icpPrice) / 100_000_000 
         : point.usdPrice) :
@@ -425,8 +454,9 @@ const drawChart = () => {
   ctx.fillRect(0, 0, width, height)
   
   // Get price data
+  const isPortfolio = selectedTokenPrincipal.value === 'PORTFOLIO_DAO' || selectedTokenPrincipal.value === 'PORTFOLIO_TREASURY'
   const prices = filteredPriceData.value.map((point: any) => {
-    if (selectedTokenPrincipal.value === 'PORTFOLIO') {
+    if (isPortfolio) {
       return priceUnit.value === 'icp' 
         ? Number(point.icpPrice) / 100_000_000  // Portfolio ICP values are already in e8s
         : point.usdPrice                        // Portfolio USD values are already in dollars
@@ -557,7 +587,8 @@ const currentPrice = computed(() => {
   if (!filteredPriceData.value.length) return 0
   const latest = filteredPriceData.value[filteredPriceData.value.length - 1]
   
-  if (selectedTokenPrincipal.value === 'PORTFOLIO') {
+  const isPortfolio = selectedTokenPrincipal.value === 'PORTFOLIO_DAO' || selectedTokenPrincipal.value === 'PORTFOLIO_TREASURY'
+  if (isPortfolio) {
     return priceUnit.value === 'icp' 
       ? Number(latest.icpPrice) / 100_000_000 
       : latest.usdPrice

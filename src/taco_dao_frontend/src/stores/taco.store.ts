@@ -14,7 +14,7 @@ import { Actor, AnonymousIdentity } from "@dfinity/agent"
 import { createAgent } from '@dfinity/utils'
 import { idlFactory } from "../../../declarations/ledger_canister/ledger_canister.did.js"
 import { idlFactory as daoBackendIDL } from "../../../declarations/dao_backend/DAO_backend.did.js"
-import { Result_4, idlFactory as treasuryIDL, UpdateConfig, RebalanceConfig, _SERVICE as TreasuryService } from "../../../declarations/treasury/treasury.did.js"
+import { Result_4, Result_8, idlFactory as treasuryIDL, UpdateConfig, RebalanceConfig, _SERVICE as TreasuryService } from "../../../declarations/treasury/treasury.did.js"
 import { Principal } from '@dfinity/principal'
 import { AccountIdentifier } from '@dfinity/ledger-icp'
 import { canisterId as iiCanisterId } from "../../../declarations/internet_identity/index.js"
@@ -216,6 +216,39 @@ interface TradingPauseRecord {
 
 interface TradingPausesResponse {
     pausedTokens: TradingPauseRecord[];
+    totalCount: bigint;
+}
+
+// Portfolio snapshot system interfaces
+interface TokenSnapshot {
+    token: Principal;
+    symbol: string;
+    balance: bigint;
+    decimals: bigint;
+    priceInICP: bigint;
+    priceInUSD: number;
+    valueInICP: bigint;
+    valueInUSD: number;
+}
+
+interface SnapshotReason {
+    PreTrade?: null;
+    PostTrade?: null;
+    Scheduled?: null;
+    PriceUpdate?: null;
+    Manual?: null;
+}
+
+interface PortfolioSnapshot {
+    timestamp: bigint;
+    tokens: TokenSnapshot[];
+    totalValueICP: bigint;
+    totalValueUSD: number;
+    snapshotReason: SnapshotReason;
+}
+
+interface PortfolioHistoryResponse {
+    snapshots: PortfolioSnapshot[];
     totalCount: bigint;
 }
 
@@ -2068,7 +2101,7 @@ export const useTacoStore = defineStore('taco', () => {
                 canisterId: treasuryCanisterId(),
             });
 
-            const result = await actor.admin_recoverPoolBalances() as Result_4;
+            const result = await actor.admin_recoverPoolBalances() as Result_8;
             if ('err' in result) {
                 throw new Error(result.err);
             }
@@ -3287,6 +3320,75 @@ export const useTacoStore = defineStore('taco', () => {
         }
     };
 
+    const getTreasuryPortfolioHistory = async (limit: number = 1000) => {
+        try {
+            const authClient = await getAuthClient();
+            
+            if (!await authClient.isAuthenticated()) {
+                throw new Error('User not authenticated');
+            }
+
+            const identity = await authClient.getIdentity();
+            const agent = await createAgent({
+                identity,
+                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            });
+
+            const treasury = Actor.createActor<TreasuryService>(treasuryIDL, {
+                agent,
+                canisterId: treasuryCanisterId()
+            });
+
+            const result = await treasury.getPortfolioHistory(BigInt(limit));
+            if ('ok' in result) {
+                return result.ok;
+            } else {
+                console.error('Error getting treasury portfolio history:', result.err);
+                return { snapshots: [], totalCount: BigInt(0) };
+            }
+        } catch (error: any) {
+            console.error('Error getting treasury portfolio history:', error);
+            return { snapshots: [], totalCount: BigInt(0) };
+        }
+    };
+
+    const takeManualPortfolioSnapshot = async () => {
+        try {
+            const authClient = await getAuthClient();
+            
+            if (!await authClient.isAuthenticated()) {
+                throw new Error('User not authenticated');
+            }
+
+            const identity = await authClient.getIdentity();
+            const agent = await createAgent({
+                identity,
+                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            });
+
+            const treasury = Actor.createActor<TreasuryService>(treasuryIDL, {
+                agent,
+                canisterId: treasuryCanisterId()
+            });
+
+            const result = await treasury.takeManualPortfolioSnapshot();
+            if ('ok' in result) {
+                console.log('Manual portfolio snapshot taken:', result.ok);
+                return result.ok;
+            } else {
+                console.error('Error taking manual portfolio snapshot:', result.err);
+                throw new Error('Failed to take manual portfolio snapshot');
+            }
+        } catch (error: any) {
+            console.error('Error taking manual portfolio snapshot:', error);
+            throw error;
+        }
+    };
+
+    
+
     // # RETURN #
     return {
         // state
@@ -3391,5 +3493,7 @@ export const useTacoStore = defineStore('taco', () => {
         clearAllTradingPauses,
         getTokenPriceHistory,
         getPortfolioHistory,
+        getTreasuryPortfolioHistory,
+        takeManualPortfolioSnapshot,
     }
 })
