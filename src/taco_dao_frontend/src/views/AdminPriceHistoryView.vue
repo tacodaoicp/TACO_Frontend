@@ -144,8 +144,8 @@
             </div>
           </div>
 
-          <!-- Time Slider (only for portfolio views) -->
-          <div class="card bg-dark text-white mb-4" v-if="isPortfolioView && filteredPriceData.length">
+                      <!-- Time Slider (shows portfolio context for any token view) -->
+          <div class="card bg-dark text-white mb-4" v-if="showSlider">
             <div class="card-header">
               <h3 class="mb-0">📅 Time Explorer</h3>
             </div>
@@ -381,6 +381,9 @@ const isPortfolioView = computed(() =>
   selectedTokenPrincipal.value === 'PORTFOLIO_TREASURY'
 )
 
+// Always show slider since we always load portfolio data
+const showSlider = computed(() => filteredPriceData.value.length > 0)
+
 const sliderPercent = computed(() => {
   if (filteredPriceData.value.length <= 1) return 0
   return (Number(sliderPosition.value) / (filteredPriceData.value.length - 1)) * 100
@@ -457,62 +460,38 @@ const allocationsChartOptions = computed(() => ({
   grid: { padding: { top: 0, right: 0, bottom: 0, left: 0 } }
 }))
 
-// Chart series and colors
+// Chart series and colors - Always use Treasury data for portfolio holdings
 const holdingsSeries = computed(() => {
-  // For Treasury data: use tokens array
-  if (sliderData.value?.tokens) {
-    const totalValue = sliderData.value.tokens.reduce((sum: number, token: any) => 
-      sum + (token.valueInUSD || 0), 0)
-    
-    if (totalValue === 0) return []
-    
-    return sliderData.value.tokens
-      .filter((token: any) => (token.valueInUSD || 0) > 0)
-      .map((token: any) => ((token.valueInUSD / totalValue) * 100))
-  }
+  if (!sliderData.value?.tokens) return []
   
-  // For DAO data: use portfolioHoldings array
-  if (sliderData.value?.portfolioHoldings) {
-    return sliderData.value.portfolioHoldings.map((holding: any) => holding.percentage)
-  }
+  const totalValue = sliderData.value.tokens.reduce((sum: number, token: any) => 
+    sum + (token.valueInUSD || 0), 0)
   
-  return []
+  if (totalValue === 0) return []
+  
+  return sliderData.value.tokens
+    .filter((token: any) => (token.valueInUSD || 0) > 0)
+    .map((token: any) => ((token.valueInUSD / totalValue) * 100))
 })
 
 const holdingsLabels = computed(() => {
-  // For Treasury data: use tokens array
-  if (sliderData.value?.tokens) {
-    return sliderData.value.tokens
-      .filter((token: any) => (token.valueInUSD || 0) > 0)
-      .map((token: any) => token.symbol?.toUpperCase() || 'UNKNOWN')
-  }
+  if (!sliderData.value?.tokens) return []
   
-  // For DAO data: use portfolioHoldings array
-  if (sliderData.value?.portfolioHoldings) {
-    return sliderData.value.portfolioHoldings.map((holding: any) => holding.symbol?.toUpperCase() || 'UNKNOWN')
-  }
-  
-  return []
+  return sliderData.value.tokens
+    .filter((token: any) => (token.valueInUSD || 0) > 0)
+    .map((token: any) => token.symbol?.toUpperCase() || 'UNKNOWN')
 })
 
 const holdingsColors = computed(() => {
-  // For Treasury data: use tokens array
-  if (sliderData.value?.tokens) {
-    return sliderData.value.tokens
-      .filter((token: any) => (token.valueInUSD || 0) > 0)
-      .map((token: any) => {
-        const symbol = token.symbol?.toLowerCase() || 'default'
-        const tokenInfo = tokenData.find(t => t.symbol === symbol)
-        return tokenInfo?.color || tokenData.find(t => t.symbol === 'default')?.color || '#777777'
-      })
-  }
+  if (!sliderData.value?.tokens) return []
   
-  // For DAO data: use portfolioHoldings array
-  if (sliderData.value?.portfolioHoldings) {
-    return sliderData.value.portfolioHoldings.map((holding: any) => holding.color || '#777777')
-  }
-  
-  return []
+  return sliderData.value.tokens
+    .filter((token: any) => (token.valueInUSD || 0) > 0)
+    .map((token: any) => {
+      const symbol = token.symbol?.toLowerCase() || 'default'
+      const tokenInfo = tokenData.find(t => t.symbol === symbol)
+      return tokenInfo?.color || tokenData.find(t => t.symbol === 'default')?.color || '#777777'
+    })
 })
 
 const allocationsSeries = computed(() => {
@@ -598,45 +577,63 @@ const loadTargetAllocations = async () => {
   }
 }
 
+// Store both portfolio datasets
+const treasuryPortfolioData = ref<any[]>([])
+const daoPortfolioData = ref<any[]>([])
+
 const loadPriceHistory = async () => {
   if (!selectedTokenPrincipal.value) return
   
   loading.value = true
   try {
-    if (selectedTokenPrincipal.value === 'PORTFOLIO_DAO') {
-      // Use the DAO's historic balance and allocation data which includes target allocations
-      const historicData = await store.getPortfolioHistory(2000) as any[]
-      priceData.value = historicData.map(([timestamp, data]: any) => ({
+    // Always load both portfolio datasets in parallel for slider functionality
+    const [treasuryResult, daoResult] = await Promise.all([
+      store.getTreasuryPortfolioHistory(1000).catch(e => {
+        console.error('Failed to load treasury portfolio:', e)
+        return { snapshots: [] }
+      }),
+      store.getPortfolioHistory(2000).catch(e => {
+        console.error('Failed to load DAO portfolio:', e)
+        return []
+      })
+    ])
+    
+    // Process Treasury data
+    if (treasuryResult && treasuryResult.snapshots) {
+      treasuryPortfolioData.value = treasuryResult.snapshots.map((snapshot: any) => ({
+        time: snapshot.timestamp,
+        icpPrice: snapshot.totalValueICP,
+        usdPrice: snapshot.totalValueUSD,
+        tokens: snapshot.tokens
+      }))
+    } else {
+      treasuryPortfolioData.value = []
+    }
+    
+    // Process DAO data
+    if (Array.isArray(daoResult)) {
+      daoPortfolioData.value = daoResult.map(([timestamp, data]: any) => ({
         time: timestamp,
         icpPrice: typeof data.totalWorthInICP === 'bigint' ? data.totalWorthInICP : BigInt(data.totalWorthInICP || 0),
         usdPrice: typeof data.totalWorthInUSD === 'bigint' ? Number(data.totalWorthInUSD) : (data.totalWorthInUSD || 0),
-        balances: data.balances || [], // Historical actual portfolio composition
-        allocations: data.allocations || [] // Historical target allocations
+        balances: data.balances || [],
+        allocations: data.allocations || []
       })).reverse()
+    } else {
+      daoPortfolioData.value = []
+    }
+    
+    // Load the main price chart data based on selection
+    if (selectedTokenPrincipal.value === 'PORTFOLIO_DAO') {
+      priceData.value = daoPortfolioData.value
       selectedTokenSymbol.value = 'Portfolio (DAO)'
       
     } else if (selectedTokenPrincipal.value === 'PORTFOLIO_TREASURY') {
-      try {
-        const portfolioSnapshots = await store.getTreasuryPortfolioHistory(1000) as any
-        
-        if (portfolioSnapshots && portfolioSnapshots.snapshots) {
-          priceData.value = portfolioSnapshots.snapshots.map((snapshot: any) => ({
-            time: snapshot.timestamp,
-            icpPrice: snapshot.totalValueICP,
-            usdPrice: snapshot.totalValueUSD,
-            tokens: snapshot.tokens // Include token breakdown for composition charts
-          }))
-        } else {
-          priceData.value = []
-        }
-        selectedTokenSymbol.value = 'Portfolio (Treasury)'
-        
-      } catch (error) {
-        console.error('Failed to load treasury portfolio snapshots:', error)
-        priceData.value = []
-        selectedTokenSymbol.value = 'Portfolio (Treasury) - Error'
-      }
+      priceData.value = treasuryPortfolioData.value
+      selectedTokenSymbol.value = 'Portfolio (Treasury)'
+      
     } else {
+      // Load individual token price data
       const principal = Principal.fromText(selectedTokenPrincipal.value)
       const result = await store.getTokenPriceHistory([principal])
       
@@ -650,10 +647,8 @@ const loadPriceHistory = async () => {
       }
     }
     
-    // Load target allocations for portfolio views
-    if (isPortfolioView.value) {
-      await loadTargetAllocations()
-    }
+    // Always load target allocations for the allocations pie chart
+    await loadTargetAllocations()
     
     // Initialize slider to latest data point
     if (filteredPriceData.value.length > 0) {
@@ -682,23 +677,36 @@ const updateSliderData = async () => {
   const index = Number(sliderPosition.value)
   if (index >= 0 && index < filteredPriceData.value.length) {
     const selectedPoint = filteredPriceData.value[index]
+    const selectedTime = selectedPoint.time
     
-    // For portfolio views with historical data, create enhanced slider data
-    if ((selectedTokenPrincipal.value === 'PORTFOLIO_DAO') && selectedPoint.balances && selectedPoint.allocations) {
-      sliderData.value = {
-        ...selectedPoint,
-        portfolioHoldings: selectedPoint.balances
-          .filter(([_, basisPoints]: [any, any]) => Number(basisPoints) > 0)
-          .map(([principal, basisPoints]: [any, any]) => {
-            const tokenDetails = store.fetchedTokenDetails.find((tokenEntry: any) => tokenEntry[0].toString() === principal.toString())
-            const symbol = tokenDetails ? tokenDetails[1].tokenSymbol : 'Unknown'
-            return {
-              symbol,
-              percentage: Number(basisPoints) / 100,
-              color: getTokenColor(symbol)
-            }
-          }),
-        targetAllocations: selectedPoint.allocations
+    // Always start with the main chart data point
+    sliderData.value = { ...selectedPoint }
+    
+    // Find closest Treasury data point by timestamp for portfolio holdings
+    if (treasuryPortfolioData.value.length > 0) {
+      const closestTreasuryPoint = treasuryPortfolioData.value.reduce((closest, current) => {
+        const currentDiff = Math.abs(Number(current.time) - Number(selectedTime))
+        const closestDiff = Math.abs(Number(closest.time) - Number(selectedTime))
+        return currentDiff < closestDiff ? current : closest
+      })
+      
+      // Add Treasury tokens data for portfolio holdings
+      if (closestTreasuryPoint.tokens) {
+        sliderData.value.tokens = closestTreasuryPoint.tokens
+      }
+    }
+    
+    // Find closest DAO data point by timestamp for target allocations
+    if (daoPortfolioData.value.length > 0) {
+      const closestDaoPoint = daoPortfolioData.value.reduce((closest, current) => {
+        const currentDiff = Math.abs(Number(current.time) - Number(selectedTime))
+        const closestDiff = Math.abs(Number(closest.time) - Number(selectedTime))
+        return currentDiff < closestDiff ? current : closest
+      })
+      
+      // Process DAO allocations data for target allocations pie chart
+      if (closestDaoPoint.allocations && closestDaoPoint.allocations.length > 0) {
+        sliderData.value.targetAllocations = closestDaoPoint.allocations
           .filter(([_, basisPoints]: [any, any]) => Number(basisPoints) > 0)
           .map(([principal, basisPoints]: [any, any]) => {
             const tokenDetails = store.fetchedTokenDetails.find((tokenEntry: any) => tokenEntry[0].toString() === principal.toString())
@@ -710,10 +718,8 @@ const updateSliderData = async () => {
             }
           })
       }
-    } else {
-      // For other views or when no historical data is available
-      sliderData.value = selectedPoint
     }
+    
   } else {
     sliderData.value = null
   }
