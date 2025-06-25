@@ -123,6 +123,11 @@
                 <p>No price history available for this token</p>
               </div>
               
+              <div v-else-if="!filteredPriceData.length && timeRange === '24h'" class="text-center text-muted">
+                <p>No portfolio data in the last 24 hours</p>
+                <small>Portfolio snapshots are created when users update allocations. Try a longer time range.</small>
+              </div>
+              
               <div v-else class="chart-container">
                 <canvas 
                   ref="chartCanvas" 
@@ -525,7 +530,7 @@ const filteredPriceData = computed(() => {
   
   switch (timeRange.value) {
     case '24h':
-      cutoffTime = now - BigInt(25 * 60 * 60 * 1_000_000_000)  // 25 hours in nanoseconds (to account for hourly snapshots)
+      cutoffTime = now - BigInt(24 * 60 * 60 * 1_000_000_000)  // 24 hours in nanoseconds
       break
     case '7d':
       cutoffTime = now - BigInt(7 * 24 * 60 * 60 * 1_000_000_000)  // 7 days in nanoseconds
@@ -594,7 +599,7 @@ const stats = computed(() => {
   
   // 24h data
   const now = BigInt(Date.now() * 1_000_000)
-  const oneDayAgo = now - BigInt(25 * 60 * 60 * 1_000_000_000)  // 25 hours to match the filter
+  const oneDayAgo = now - BigInt(24 * 60 * 60 * 1_000_000_000)  // 24 hours
   const last24hData = filteredPriceData.value.filter(point => {
     const pointTime = typeof point.time === 'bigint' ? point.time : BigInt(point.time)
     return pointTime >= oneDayAgo
