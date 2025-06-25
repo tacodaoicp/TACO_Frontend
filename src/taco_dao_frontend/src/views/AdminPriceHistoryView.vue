@@ -144,6 +144,98 @@
             </div>
           </div>
 
+          <!-- Time Slider (only for portfolio views) -->
+          <div class="card bg-dark text-white mb-4" v-if="isPortfolioView && filteredPriceData.length">
+            <div class="card-header">
+              <h3 class="mb-0">📅 Time Explorer</h3>
+            </div>
+            <div class="card-body">
+              <div class="mb-3">
+                <label class="form-label">Select time point to explore portfolio composition:</label>
+                <input 
+                  type="range" 
+                  class="form-range" 
+                  :min="0" 
+                  :max="filteredPriceData.length - 1" 
+                  v-model="sliderPosition"
+                  @input="updateSliderData"
+                  :style="{ background: `linear-gradient(to right, #58BA56 0%, #58BA56 ${sliderPercent}%, #444 ${sliderPercent}%, #444 100%)` }">
+              </div>
+              <div class="d-flex justify-content-between text-muted small">
+                <span>{{ formatSliderDate(filteredPriceData[0]?.time) }}</span>
+                <span>{{ formatSliderDate(filteredPriceData[filteredPriceData.length - 1]?.time) }}</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Slider Data Display -->
+          <div class="card bg-dark text-white mb-4" v-if="sliderData && isPortfolioView">
+            <div class="card-header">
+              <h3 class="mb-0">📊 Portfolio at {{ formatSliderDate(sliderData.time) }}</h3>
+            </div>
+            <div class="card-body">
+              <div class="row">
+                <!-- Price Info -->
+                <div class="col-md-4">
+                  <div class="slider-info-section">
+                    <h5 class="mb-3">💰 Price Information</h5>
+                    <div class="info-item">
+                      <span class="info-label">Value (ICP):</span>
+                      <span class="info-value">{{ formatSliderPrice(sliderData.icpPrice, 'icp') }}</span>
+                    </div>
+                    <div class="info-item">
+                      <span class="info-label">Value (USD):</span>
+                      <span class="info-value">{{ formatSliderPrice(sliderData.usdPrice, 'usd') }}</span>
+                    </div>
+                    <div class="info-item">
+                      <span class="info-label">Date:</span>
+                      <span class="info-value">{{ formatSliderDateTime(sliderData.time) }}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Portfolio Composition -->
+                <div class="col-md-4" v-if="sliderData.tokens && sliderData.tokens.length">
+                  <div class="slider-info-section">
+                    <h5 class="mb-3">🏛️ Portfolio Holdings</h5>
+                    <div class="pie-chart-container">
+                      <apexchart 
+                        type="pie" 
+                        :options="holdingsChartOptions" 
+                        :series="holdingsSeries" 
+                        height="200">
+                      </apexchart>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Target Allocations -->
+                <div class="col-md-4" v-if="targetAllocationData.length">
+                  <div class="slider-info-section">
+                    <h5 class="mb-3">🎯 Target Allocations</h5>
+                    <div class="pie-chart-container">
+                      <apexchart 
+                        type="pie" 
+                        :options="allocationsChartOptions" 
+                        :series="allocationsSeries" 
+                        height="200">
+                      </apexchart>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- No Data Message -->
+                <div class="col-md-8" v-if="!sliderData.tokens || !sliderData.tokens.length">
+                  <div class="text-center text-muted py-4">
+                    <i class="fas fa-info-circle fa-2x mb-2"></i>
+                    <p>No portfolio composition data available for this time point.</p>
+                    <small>Portfolio snapshots contain detailed token breakdowns only for treasury data.</small>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
           <!-- Price Statistics -->
           <div class="card bg-dark text-white mb-4" v-if="selectedTokenPrincipal && priceData.length">
             <div class="card-header">
@@ -244,6 +336,7 @@ import { useTacoStore } from '../stores/taco.store'
 import HeaderBar from '../components/HeaderBar.vue'
 import TacoTitle from '../components/misc/TacoTitle.vue'
 import { Principal } from '@dfinity/principal'
+import { default as apexchart } from 'vue3-apexcharts'
 
 // Store
 const store = useTacoStore()
@@ -262,6 +355,159 @@ const hoveredPoint = ref<any>(null)
 const tooltipStyle = ref<any>({})
 const chartCollapsed = ref(false)
 
+// Time slider state
+const sliderPosition = ref(0)
+const sliderData = ref<any>(null)
+const targetAllocationData = ref<any[]>([])
+
+// Token data for colors (copied from DAO component)
+const tokenData = [
+  { symbol: 'taco', color: '#f8a01b' },
+  { symbol: 'icp', color: '#3b00b9' },
+  { symbol: 'ckbtc', color: '#f7931a' },
+  { symbol: 'ckusdc', color: '#2775ca' },
+  { symbol: 'sneed', color: '#047b3e' },
+  { symbol: 'dkp', color: '#ff6b35' },
+  { symbol: 'boom', color: '#e74c3c' },
+  { symbol: 'chat', color: '#9b59b6' },
+  { symbol: 'kinic', color: '#1abc9c' },
+  { symbol: 'cycles', color: '#34495e' },
+  { symbol: 'default', color: '#777777' }
+]
+
+// Computed properties
+const isPortfolioView = computed(() => 
+  selectedTokenPrincipal.value === 'PORTFOLIO_DAO' || 
+  selectedTokenPrincipal.value === 'PORTFOLIO_TREASURY'
+)
+
+const sliderPercent = computed(() => {
+  if (filteredPriceData.value.length <= 1) return 0
+  return (Number(sliderPosition.value) / (filteredPriceData.value.length - 1)) * 100
+})
+
+// Holdings chart configuration
+const holdingsChartOptions = computed(() => ({
+  chart: {
+    type: 'pie',
+    fontFamily: 'Space Mono',
+    animations: { enabled: true, easing: 'easeout', speed: 350 }
+  },
+  plotOptions: {
+    pie: {
+      startAngle: -90,
+      endAngle: 90,
+      customScale: 1,
+      expandOnClick: false
+    }
+  },
+  colors: holdingsColors.value,
+  dataLabels: {
+    enabled: true,
+    formatter: function (val: any, opts: any) {
+      return holdingsLabels.value[opts.seriesIndex] + ' ' + val.toFixed(1) + '%'
+    },
+    style: { fontSize: '12px', fontFamily: 'Space Mono', fontWeight: 'bold' },
+    background: {
+      enabled: true,
+      foreColor: '#fff',
+      padding: 4,
+      borderRadius: 2,
+      borderWidth: 1,
+      borderColor: '#fff',
+      opacity: 1
+    }
+  },
+  legend: { show: false },
+  grid: { padding: { top: 0, right: 0, bottom: 0, left: 0 } }
+}))
+
+const allocationsChartOptions = computed(() => ({
+  chart: {
+    type: 'pie',
+    fontFamily: 'Space Mono',
+    animations: { enabled: true, easing: 'easeout', speed: 350 }
+  },
+  plotOptions: {
+    pie: {
+      startAngle: -90,
+      endAngle: 90,
+      customScale: 1,
+      expandOnClick: false
+    }
+  },
+  colors: allocationsColors.value,
+  dataLabels: {
+    enabled: true,
+    formatter: function (val: any, opts: any) {
+      return allocationsLabels.value[opts.seriesIndex] + ' ' + val.toFixed(1) + '%'
+    },
+    style: { fontSize: '12px', fontFamily: 'Space Mono', fontWeight: 'bold' },
+    background: {
+      enabled: true,
+      foreColor: '#fff',
+      padding: 4,
+      borderRadius: 2,
+      borderWidth: 1,
+      borderColor: '#fff',
+      opacity: 1
+    }
+  },
+  legend: { show: false },
+  grid: { padding: { top: 0, right: 0, bottom: 0, left: 0 } }
+}))
+
+// Chart series and colors
+const holdingsSeries = computed(() => {
+  if (!sliderData.value?.tokens) return []
+  
+  const totalValue = sliderData.value.tokens.reduce((sum: number, token: any) => 
+    sum + (token.valueInUSD || 0), 0)
+  
+  if (totalValue === 0) return []
+  
+  return sliderData.value.tokens
+    .filter((token: any) => (token.valueInUSD || 0) > 0)
+    .map((token: any) => ((token.valueInUSD / totalValue) * 100))
+})
+
+const holdingsLabels = computed(() => {
+  if (!sliderData.value?.tokens) return []
+  return sliderData.value.tokens
+    .filter((token: any) => (token.valueInUSD || 0) > 0)
+    .map((token: any) => token.symbol?.toUpperCase() || 'UNKNOWN')
+})
+
+const holdingsColors = computed(() => {
+  if (!sliderData.value?.tokens) return []
+  return sliderData.value.tokens
+    .filter((token: any) => (token.valueInUSD || 0) > 0)
+    .map((token: any) => {
+      const symbol = token.symbol?.toLowerCase() || 'default'
+      const tokenInfo = tokenData.find(t => t.symbol === symbol)
+      return tokenInfo?.color || tokenData.find(t => t.symbol === 'default')?.color || '#777777'
+    })
+})
+
+const allocationsSeries = computed(() => {
+  if (!targetAllocationData.value?.length) return []
+  return targetAllocationData.value.map((allocation: any) => allocation.percentage)
+})
+
+const allocationsLabels = computed(() => {
+  if (!targetAllocationData.value?.length) return []
+  return targetAllocationData.value.map((allocation: any) => allocation.symbol?.toUpperCase() || 'UNKNOWN')
+})
+
+const allocationsColors = computed(() => {
+  if (!targetAllocationData.value?.length) return []
+  return targetAllocationData.value.map((allocation: any) => {
+    const symbol = allocation.symbol?.toLowerCase() || 'default'
+    const tokenInfo = tokenData.find(t => t.symbol === symbol)
+    return tokenInfo?.color || tokenData.find(t => t.symbol === 'default')?.color || '#777777'
+  })
+})
+
 // Methods
 const loadAvailableTokens = async () => {
   try {
@@ -275,86 +521,149 @@ const loadAvailableTokens = async () => {
   }
 }
 
+const loadTargetAllocations = async () => {
+  try {
+    await store.fetchAggregateAllocation()
+    const aggregateAllocation = store.fetchedAggregateAllocation || []
+    
+    targetAllocationData.value = aggregateAllocation
+      .filter(([_, percentage]: any) => percentage > 0)
+      .map(([principal, percentage]: any) => {
+        const tokenDetails = availableTokens.value.find(([p, _]: any) => 
+          p.toString() === principal.toString())
+        const symbol = tokenDetails ? tokenDetails[1].tokenSymbol : principal.toString().slice(0, 8)
+        
+        return {
+          symbol,
+          percentage: Number(percentage) / 100, // Convert basis points to percentage
+          principal: principal.toString()
+        }
+      })
+  } catch (error) {
+    console.error('Failed to load target allocations:', error)
+    targetAllocationData.value = []
+  }
+}
+
 const loadPriceHistory = async () => {
   if (!selectedTokenPrincipal.value) return
   
   loading.value = true
   try {
     if (selectedTokenPrincipal.value === 'PORTFOLIO_DAO') {
-      // Load portfolio history from DAO (existing implementation)
       const portfolioHistory = await store.getPortfolioHistory(2000) as any[]
-      
-      // Convert portfolio history to price data format
       priceData.value = portfolioHistory.map(([timestamp, balanceAllocation]: any) => ({
         time: timestamp,
         icpPrice: balanceAllocation.totalWorthInICP,
         usdPrice: balanceAllocation.totalWorthInUSD
-      })).reverse() // Reverse to get chronological order (oldest first)
-
+      })).reverse()
       selectedTokenSymbol.value = 'Portfolio (DAO)'
       
-      // Draw chart after data is loaded
-      nextTick(() => {
-        drawChart()
-      })
     } else if (selectedTokenPrincipal.value === 'PORTFOLIO_TREASURY') {
-      // Load portfolio snapshots from Treasury (new implementation)
       try {
         const portfolioSnapshots = await store.getTreasuryPortfolioHistory(1000) as any
         
-        // Convert treasury snapshots to price data format
         if (portfolioSnapshots && portfolioSnapshots.snapshots) {
           priceData.value = portfolioSnapshots.snapshots.map((snapshot: any) => ({
             time: snapshot.timestamp,
             icpPrice: snapshot.totalValueICP,
-            usdPrice: snapshot.totalValueUSD
+            usdPrice: snapshot.totalValueUSD,
+            tokens: snapshot.tokens // Include token breakdown for composition charts
           }))
         } else {
           priceData.value = []
         }
-
         selectedTokenSymbol.value = 'Portfolio (Treasury)'
         
-        // Draw chart after data is loaded
-        nextTick(() => {
-          drawChart()
-        })
       } catch (error) {
         console.error('Failed to load treasury portfolio snapshots:', error)
         priceData.value = []
         selectedTokenSymbol.value = 'Portfolio (Treasury) - Error'
       }
     } else {
-      // Load individual token price history
       const principal = Principal.fromText(selectedTokenPrincipal.value)
       const result = await store.getTokenPriceHistory([principal])
       
       if (result && result.length > 0) {
         priceData.value = result[0][1]
-        
         const tokenDetails = availableTokens.value.find(([p, _]) => 
-          p.toString() === selectedTokenPrincipal.value
-        )
+          p.toString() === selectedTokenPrincipal.value)
         selectedTokenSymbol.value = tokenDetails ? tokenDetails[1].tokenSymbol : 'Unknown'
-        
-        // Draw chart after data is loaded
-        nextTick(() => {
-          drawChart()
-        })
       } else {
         priceData.value = []
       }
     }
+    
+    // Load target allocations for portfolio views
+    if (isPortfolioView.value) {
+      await loadTargetAllocations()
+    }
+    
+    // Initialize slider to latest data point
+    if (filteredPriceData.value.length > 0) {
+      sliderPosition.value = filteredPriceData.value.length - 1
+      updateSliderData()
+    }
+    
   } catch (error) {
     console.error('Failed to load price history:', error)
     priceData.value = []
   }
   loading.value = false
+  
+  nextTick(() => {
+    drawChart()
+  })
+}
+
+const updateSliderData = () => {
+  const index = Number(sliderPosition.value)
+  if (index >= 0 && index < filteredPriceData.value.length) {
+    sliderData.value = filteredPriceData.value[index]
+  } else {
+    sliderData.value = null
+  }
+}
+
+const formatSliderDate = (timestamp: any) => {
+  if (!timestamp) return ''
+  const date = new Date(Number(timestamp) / 1_000_000)
+  return date.toLocaleDateString()
+}
+
+const formatSliderDateTime = (timestamp: any) => {
+  if (!timestamp) return ''
+  const date = new Date(Number(timestamp) / 1_000_000)
+  return date.toLocaleString()
+}
+
+const formatSliderPrice = (price: any, unit: string) => {
+  if (price === null || price === undefined) return 'N/A'
+  const numPrice = typeof price === 'bigint' ? Number(price) / 100_000_000 : Number(price)
+  
+  if (unit === 'usd') {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    }).format(numPrice)
+  } else {
+    return new Intl.NumberFormat('en-US', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 4
+    }).format(numPrice) + ' ICP'
+  }
 }
 
 const setTimeRange = (range: '24h' | '7d' | '30d' | 'all') => {
   timeRange.value = range
   updateChart()
+  // Reset slider to latest data point when time range changes
+  if (filteredPriceData.value.length > 0) {
+    sliderPosition.value = filteredPriceData.value.length - 1
+    updateSliderData()
+  }
 }
 
 const updateChart = () => {
@@ -729,6 +1038,10 @@ watch([priceUnit, timeRange], () => {
   updateChart()
 })
 
+watch(sliderPosition, () => {
+  updateSliderData()
+})
+
 // Lifecycle
 onMounted(async () => {
   await loadAvailableTokens()
@@ -830,5 +1143,107 @@ onMounted(async () => {
 .card-header {
   background: rgba(255, 255, 255, 0.05);
   border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+/* Time Slider Styles */
+.form-range {
+  background: transparent;
+  height: 8px;
+}
+
+.form-range::-webkit-slider-track {
+  background: #444;
+  border-radius: 4px;
+  height: 8px;
+}
+
+.form-range::-webkit-slider-thumb {
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #58BA56;
+  cursor: pointer;
+  border: 2px solid white;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.form-range::-moz-range-track {
+  background: #444;
+  border-radius: 4px;
+  height: 8px;
+  border: none;
+}
+
+.form-range::-moz-range-thumb {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #58BA56;
+  cursor: pointer;
+  border: 2px solid white;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+/* Slider Info Styles */
+.slider-info-section {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+  padding: 1rem;
+  height: 100%;
+}
+
+.slider-info-section h5 {
+  color: white;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+  padding-bottom: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.info-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.75rem;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.info-item:last-child {
+  border-bottom: none;
+  margin-bottom: 0;
+}
+
+.info-label {
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 0.9rem;
+}
+
+.info-value {
+  color: white;
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+
+.pie-chart-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 200px;
+}
+
+/* ApexCharts dark theme overrides */
+:deep(.apexcharts-text) {
+  fill: white !important;
+}
+
+:deep(.apexcharts-datalabel-label) {
+  fill: white !important;
+  font-weight: 600 !important;
+}
+
+:deep(.apexcharts-datalabel-value) {
+  fill: white !important;
+  font-weight: 600 !important;
 }
 </style> 
