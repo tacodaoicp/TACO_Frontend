@@ -314,9 +314,23 @@ const handleMouseMove = (event: MouseEvent) => {
   const x = event.clientX - rect.left
   const y = event.clientY - rect.top
   
-  // Simple point detection logic
+  // Use the same padding calculation as the chart
+  const paddingLeft = priceUnit.value === 'icp' ? 120 : 80
+  const paddingRight = 40
+  
+  // Only detect points within the chart area
+  if (x < paddingLeft || x > rect.width - paddingRight) {
+    hoveredPoint.value = null
+    return
+  }
+  
+  // Calculate the relative position within the chart area
+  const chartWidth = rect.width - paddingLeft - paddingRight
+  const relativeX = x - paddingLeft
   const dataPoints = filteredPriceData.value.length
-  const pointIndex = Math.floor((x / canvas.width) * dataPoints)
+  
+  // Calculate which data point we're hovering over
+  const pointIndex = Math.floor((relativeX / chartWidth) * dataPoints)
   
   if (pointIndex >= 0 && pointIndex < dataPoints) {
     const point = filteredPriceData.value[pointIndex]
@@ -342,6 +356,8 @@ const handleMouseMove = (event: MouseEvent) => {
       pointerEvents: 'none',
       zIndex: 1000
     }
+  } else {
+    hoveredPoint.value = null
   }
 }
 
