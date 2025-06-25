@@ -67,10 +67,21 @@
           <!-- Price Chart -->
           <div class="card bg-dark text-white mb-4" v-if="selectedTokenPrincipal">
             <div class="card-header d-flex justify-content-between align-items-center">
-              <h3 class="mb-0">
-                {{ selectedTokenSymbol }} Price History
-                <span class="badge bg-secondary ms-2">{{ priceUnit.toUpperCase() }}</span>
-              </h3>
+              <div class="d-flex align-items-center gap-3">
+                <button 
+                  class="btn btn-sm btn-outline-light"
+                  @click="chartCollapsed = !chartCollapsed"
+                  :title="chartCollapsed ? 'Expand Chart' : 'Collapse Chart'">
+                  {{ chartCollapsed ? '▶' : '▼' }}
+                </button>
+                <h3 class="mb-0">
+                  {{ selectedTokenSymbol }} Price History
+                  <span class="badge bg-secondary ms-2">{{ priceUnit.toUpperCase() }}</span>
+                </h3>
+                <div v-if="!chartCollapsed && priceData.length" class="badge bg-info">
+                  Range: {{ chartRangePercent }}%
+                </div>
+              </div>
               <div class="d-flex gap-2">
                 <button 
                   class="btn btn-sm btn-outline-light" 
@@ -99,7 +110,7 @@
               </div>
             </div>
             
-            <div class="card-body">
+            <div class="card-body" v-show="!chartCollapsed">
               <div v-if="loading" class="text-center">
                 <div class="spinner-border" role="status">
                   <span class="visually-hidden">Loading price data...</span>
@@ -242,6 +253,7 @@ const chartKey = ref(0)
 const chartCanvas = ref<HTMLCanvasElement | null>(null)
 const hoveredPoint = ref<any>(null)
 const tooltipStyle = ref<any>({})
+const chartCollapsed = ref(false)
 
 // Methods
 const loadAvailableTokens = async () => {
@@ -352,7 +364,10 @@ const drawChart = () => {
   
   const width = rect.width
   const height = rect.height
-  const padding = 40
+  const paddingLeft = 80
+  const paddingRight = 40
+  const paddingTop = 40
+  const paddingBottom = 40
   
   // Clear canvas
   ctx.fillStyle = 'transparent'
@@ -371,25 +386,39 @@ const drawChart = () => {
   const maxPrice = Math.max(...prices)
   const priceRange = maxPrice - minPrice || 1
   
-  // Draw grid
+  // Draw grid and Y-axis labels
   ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)'
   ctx.lineWidth = 1
+  ctx.font = '12px Arial'
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.7)'
+  ctx.textAlign = 'right'
   
-  // Horizontal grid lines
+  // Horizontal grid lines with Y-axis labels
   for (let i = 0; i <= 5; i++) {
-    const y = padding + (i * (height - 2 * padding)) / 5
+    const y = paddingTop + (i * (height - paddingTop - paddingBottom)) / 5
+    
+    // Draw grid line
     ctx.beginPath()
-    ctx.moveTo(padding, y)
-    ctx.lineTo(width - padding, y)
+    ctx.moveTo(paddingLeft, y)
+    ctx.lineTo(width - paddingRight, y)
     ctx.stroke()
+    
+    // Calculate and draw price label
+    const priceAtY = maxPrice - (i * priceRange) / 5
+    const formattedPrice = priceUnit.value === 'usd' 
+      ? '$' + priceAtY.toFixed(priceAtY < 1 ? 6 : 2)
+      : priceAtY.toFixed(priceAtY < 1 ? 8 : 4) + ' ICP'
+    
+    ctx.fillText(formattedPrice, paddingLeft - 5, y + 4)
   }
   
   // Vertical grid lines
+  ctx.textAlign = 'center'
   for (let i = 0; i <= 10; i++) {
-    const x = padding + (i * (width - 2 * padding)) / 10
+    const x = paddingLeft + (i * (width - paddingLeft - paddingRight)) / 10
     ctx.beginPath()
-    ctx.moveTo(x, padding)
-    ctx.lineTo(x, height - padding)
+    ctx.moveTo(x, paddingTop)
+    ctx.lineTo(x, height - paddingBottom)
     ctx.stroke()
   }
   
@@ -399,8 +428,8 @@ const drawChart = () => {
   ctx.beginPath()
   
   prices.forEach((price, index) => {
-    const x = padding + (index / (prices.length - 1)) * (width - 2 * padding)
-    const y = height - padding - ((price - minPrice) / priceRange) * (height - 2 * padding)
+    const x = paddingLeft + (index / (prices.length - 1)) * (width - paddingLeft - paddingRight)
+    const y = height - paddingBottom - ((price - minPrice) / priceRange) * (height - paddingTop - paddingBottom)
     
     if (index === 0) {
       ctx.moveTo(x, y)
@@ -413,8 +442,8 @@ const drawChart = () => {
   
   // Fill area under line
   ctx.fillStyle = 'rgba(88, 186, 86, 0.1)'
-  ctx.lineTo(width - padding, height - padding)
-  ctx.lineTo(padding, height - padding)
+  ctx.lineTo(width - paddingRight, height - paddingBottom)
+  ctx.lineTo(paddingLeft, height - paddingBottom)
   ctx.closePath()
   ctx.fill()
 }
@@ -547,6 +576,25 @@ const formatDate = (timestamp: number) => {
   }).format(date)
 }
 
+// Chart range percentage (difference between highest and lowest price in the visible range)
+const chartRangePercent = computed(() => {
+  if (!filteredPriceData.value.length) return '0.00'
+  
+  const prices = filteredPriceData.value.map(point => 
+    priceUnit.value === 'icp' 
+      ? Number(point.icpPrice) / 100_000_000 
+      : point.usdPrice
+  )
+  
+  const minPrice = Math.min(...prices)
+  const maxPrice = Math.max(...prices)
+  
+  if (minPrice === 0) return '∞'
+  
+  const percentChange = ((maxPrice - minPrice) / minPrice) * 100
+  return percentChange.toFixed(2)
+})
+
 // Watchers
 watch([priceUnit, timeRange], () => {
   updateChart()
@@ -568,6 +616,10 @@ onMounted(async () => {
 </script>
 
 <style scoped>
+.admin-price-history-view {
+  padding-bottom: 2rem;
+}
+
 .chart-container {
   position: relative;
   height: 400px;
