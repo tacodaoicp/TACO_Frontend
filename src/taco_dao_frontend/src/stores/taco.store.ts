@@ -15,6 +15,7 @@ import { createAgent } from '@dfinity/utils'
 import { idlFactory } from "../../../declarations/ledger_canister/ledger_canister.did.js"
 import { idlFactory as daoBackendIDL } from "../../../declarations/dao_backend/DAO_backend.did.js"
 import { Result_4, Result_8, idlFactory as treasuryIDL, UpdateConfig, RebalanceConfig, _SERVICE as TreasuryService } from "../../../declarations/treasury/treasury.did.js"
+import { idlFactory as neuronSnapshotIDL, _SERVICE as NeuronSnapshotService } from "../../../declarations/neuronSnapshot/neuronSnapshot.did.js"
 import { Principal } from '@dfinity/principal'
 import { AccountIdentifier } from '@dfinity/ledger-icp'
 import { canisterId as iiCanisterId } from "../../../declarations/internet_identity/index.js"
@@ -914,6 +915,18 @@ export const useTacoStore = defineStore('taco', () => {
                 break;
         }        
         return 'z4is7-giaaa-aaaad-qg6uq-cai'; // local canisterId
+    }
+
+    const neuronSnapshotCanisterId = () => {
+        switch (process.env.DFX_NETWORK) {
+            case "ic":
+                return process.env.CANISTER_ID_NEURONSNAPSHOT_IC || 'ljhvw-mqaaa-aaaan-qzzsq-cai';
+                break;
+            case "staging":
+                return  process.env.CANISTER_ID_NEURONSNAPSHOT_STAGING || 'ljhvw-mqaaa-aaaan-qzzsq-cai';
+                break;
+        }        
+        return 'ljhvw-mqaaa-aaaan-qzzsq-cai'; // local canisterId
     }
     // /todo
 
@@ -3599,6 +3612,183 @@ export const useTacoStore = defineStore('taco', () => {
         }
     };
 
+    // NEURON SNAPSHOT FUNCTIONS
+    const getNeuronSnapshotStatus = async () => {
+        try {
+            const agent = await createAgent({
+                identity: new AnonymousIdentity(),
+                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            });
+
+            const neuronSnapshot = Actor.createActor<NeuronSnapshotService>(neuronSnapshotIDL, {
+                agent,
+                canisterId: neuronSnapshotCanisterId()
+            });
+
+            return await neuronSnapshot.get_neuron_snapshot_status();
+        } catch (error: any) {
+            console.error('Error getting neuron snapshot status:', error);
+            throw error;
+        }
+    };
+
+    const getNeuronSnapshotsInfo = async (start: number, length: number) => {
+        try {
+            const agent = await createAgent({
+                identity: new AnonymousIdentity(),
+                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            });
+
+            const neuronSnapshot = Actor.createActor<NeuronSnapshotService>(neuronSnapshotIDL, {
+                agent,
+                canisterId: neuronSnapshotCanisterId()
+            });
+
+            return await neuronSnapshot.get_neuron_snapshots_info(BigInt(start), BigInt(length));
+        } catch (error: any) {
+            console.error('Error getting neuron snapshots info:', error);
+            throw error;
+        }
+    };
+
+    const getNeuronSnapshotInfo = async (snapshotId: bigint) => {
+        try {
+            const agent = await createAgent({
+                identity: new AnonymousIdentity(),
+                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            });
+
+            const neuronSnapshot = Actor.createActor<NeuronSnapshotService>(neuronSnapshotIDL, {
+                agent,
+                canisterId: neuronSnapshotCanisterId()
+            });
+
+            return await neuronSnapshot.get_neuron_snapshot_info(snapshotId);
+        } catch (error: any) {
+            console.error('Error getting neuron snapshot info:', error);
+            throw error;
+        }
+    };
+
+    const getCumulativeValuesAtSnapshot = async (snapshotId: bigint | null) => {
+        try {
+            const agent = await createAgent({
+                identity: new AnonymousIdentity(),
+                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            });
+
+            const neuronSnapshot = Actor.createActor<NeuronSnapshotService>(neuronSnapshotIDL, {
+                agent,
+                canisterId: neuronSnapshotCanisterId()
+            });
+
+            return await neuronSnapshot.getCumulativeValuesAtSnapshot(snapshotId ? [snapshotId] : []);
+        } catch (error: any) {
+            console.error('Error getting cumulative values at snapshot:', error);
+            throw error;
+        }
+    };
+
+    const getNeuronDataForDAO = async (snapshotId: bigint, start: number, limit: number) => {
+        try {
+            const agent = await createAgent({
+                identity: new AnonymousIdentity(),
+                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            });
+
+            const neuronSnapshot = Actor.createActor<NeuronSnapshotService>(neuronSnapshotIDL, {
+                agent,
+                canisterId: neuronSnapshotCanisterId()
+            });
+
+            return await neuronSnapshot.getNeuronDataForDAO(snapshotId, BigInt(start), BigInt(limit));
+        } catch (error: any) {
+            console.error('Error getting neuron data for DAO:', error);
+            throw error;
+        }
+    };
+
+    const takeNeuronSnapshot = async () => {
+        try {
+            const authClient = await getAuthClient();
+            
+            if (!await authClient.isAuthenticated()) {
+                throw new Error('User not authenticated');
+            }
+
+            const identity = await authClient.getIdentity();
+            const agent = await createAgent({
+                identity,
+                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            });
+
+            const neuronSnapshot = Actor.createActor<NeuronSnapshotService>(neuronSnapshotIDL, {
+                agent,
+                canisterId: neuronSnapshotCanisterId()
+            });
+
+            return await neuronSnapshot.take_neuron_snapshot();
+        } catch (error: any) {
+            console.error('Error taking neuron snapshot:', error);
+            throw error;
+        }
+    };
+
+    const getMaxNeuronSnapshots = async () => {
+        try {
+            const agent = await createAgent({
+                identity: new AnonymousIdentity(),
+                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            });
+
+            const neuronSnapshot = Actor.createActor<NeuronSnapshotService>(neuronSnapshotIDL, {
+                agent,
+                canisterId: neuronSnapshotCanisterId()
+            });
+
+            return await neuronSnapshot.getMaxNeuronSnapshots();
+        } catch (error: any) {
+            console.error('Error getting max neuron snapshots:', error);
+            throw error;
+        }
+    };
+
+    const setMaxNeuronSnapshots = async (maxSnapshots: number) => {
+        try {
+            const authClient = await getAuthClient();
+            
+            if (!await authClient.isAuthenticated()) {
+                throw new Error('User not authenticated');
+            }
+
+            const identity = await authClient.getIdentity();
+            const agent = await createAgent({
+                identity,
+                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            });
+
+            const neuronSnapshot = Actor.createActor<NeuronSnapshotService>(neuronSnapshotIDL, {
+                agent,
+                canisterId: neuronSnapshotCanisterId()
+            });
+
+            await neuronSnapshot.setMaxNeuronSnapshots(BigInt(maxSnapshots));
+            console.log('Successfully set max neuron snapshots to:', maxSnapshots);
+            return true;
+        } catch (error: any) {
+            console.error('Error setting max neuron snapshots:', error);
+            throw error;
+        }
+    };
+
     
 
     // # RETURN #
@@ -3713,5 +3903,14 @@ export const useTacoStore = defineStore('taco', () => {
         removePortfolioCircuitBreakerCondition,
         getPortfolioCircuitBreakerLogs,
         clearPortfolioCircuitBreakerLogs,
+        // neuron snapshot functions
+        getNeuronSnapshotStatus,
+        getNeuronSnapshotsInfo,
+        getNeuronSnapshotInfo,
+        getCumulativeValuesAtSnapshot,
+        getNeuronDataForDAO,
+        takeNeuronSnapshot,
+        getMaxNeuronSnapshots,
+        setMaxNeuronSnapshots,
     }
 })

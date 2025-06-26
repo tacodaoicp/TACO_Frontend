@@ -2,12 +2,13 @@ type neuronSnapshot =
  service {
    cancel_neuron_snapshot: () -> (CancelNeuronSnapshotResult);
    clearLogs: () -> ();
-   getCumulativeValuesAtSnapshot: (snapshotId: opt SnapshotId) ->
+   getCumulativeValuesAtSnapshot: (opt SnapshotId) ->
     (opt CumulativeVP) query;
-   getLogs: (count: nat) -> (vec LogEntry) query;
-   getLogsByContext: (context: text, count: nat) -> (vec LogEntry) query;
-   getLogsByLevel: (level: LogLevel, count: nat) -> (vec LogEntry) query;
-   getNeuronDataForDAO: (snapshotId: SnapshotId, start: nat, limit: nat) ->
+   getLogs: (nat) -> (vec LogEntry) query;
+   getLogsByContext: (text, nat) -> (vec LogEntry) query;
+   getLogsByLevel: (LogLevel, nat) -> (vec LogEntry) query;
+   getMaxNeuronSnapshots: () -> (nat) query;
+   getNeuronDataForDAO: (SnapshotId, nat, nat) ->
     (opt
       record {
         entries: vec record {
@@ -17,17 +18,17 @@ type neuronSnapshot =
         stopped_at: opt nat;
         total_entries: nat;
       }) query;
+   get_neuron_snapshot_curr_neuron_id: () -> (opt NeuronId) query;
    get_neuron_snapshot_head_id: () -> (SnapshotId) query;
-   get_neuron_snapshot_info: (id: SnapshotId) ->
-    (opt NeuronSnapshotInfo) query;
-   get_neuron_snapshot_neurons: (snapshot_id: SnapshotId, start: nat, length:
-    nat) -> (vec Neuron) query;
+   get_neuron_snapshot_importing_count: () -> (nat) query;
+   get_neuron_snapshot_info: (SnapshotId) -> (opt NeuronSnapshotInfo) query;
+   get_neuron_snapshot_neurons: (SnapshotId, nat, nat) -> (vec Neuron) query;
    get_neuron_snapshot_status: () -> (NeuronSnapshotStatus) query;
-   get_neuron_snapshots_info: (start: nat, length: nat) ->
-    (vec NeuronSnapshotInfo) query;
-   setLogAdmin: (admin: principal) -> ();
-   setSnsGovernanceCanisterId: (canisterId: principal) -> ();
-   setTest: (enabled: bool) -> ();
+   get_neuron_snapshots_info: (nat, nat) -> (vec NeuronSnapshotInfo) query;
+   setLogAdmin: (principal) -> ();
+   setMaxNeuronSnapshots: (nat) -> ();
+   setSnsGovernanceCanisterId: (principal) -> ();
+   setTest: (bool) -> ();
    take_neuron_snapshot: () -> (TakeNeuronSnapshotResult);
  };
 type Timestamp = nat64;

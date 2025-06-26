@@ -14,6 +14,7 @@ import AdminView from "./views/AdminView.vue"
 import AdminTradeView from "./views/AdminTradeView.vue"
 import AdminPriceView from "./views/AdminPriceView.vue"
 import AdminPriceHistoryView from "./views/AdminPriceHistoryView.vue"
+import AdminNeuronView from "./views/AdminNeuronView.vue"
 import ChatView from "./views/ChatView.vue"
 import ReportsView from "./views/ReportsView.vue"
 import VueApexCharts from 'vue3-apexcharts'
@@ -39,6 +40,7 @@ const routes = [
     { path: "/admin/trade", name: "AdminTrade", component: AdminTradeView },
     { path: "/admin/price", name: "AdminPrice", component: AdminPriceView },
   { path: "/admin/pricehistory", name: "AdminPriceHistory", component: AdminPriceHistoryView },
+    { path: "/admin/neuron", name: "AdminNeuron", component: AdminNeuronView },
     { path: "/:pathMatch(.*)*", redirect: "/" },
 ]
 

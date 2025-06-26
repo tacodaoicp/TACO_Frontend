@@ -87,6 +87,7 @@ export interface neuronSnapshot {
   'getLogs' : ActorMethod<[bigint], Array<LogEntry>>,
   'getLogsByContext' : ActorMethod<[string, bigint], Array<LogEntry>>,
   'getLogsByLevel' : ActorMethod<[LogLevel, bigint], Array<LogEntry>>,
+  'getMaxNeuronSnapshots' : ActorMethod<[], bigint>,
   'getNeuronDataForDAO' : ActorMethod<
     [SnapshotId, bigint, bigint],
     [] | [
@@ -97,7 +98,9 @@ export interface neuronSnapshot {
       }
     ]
   >,
+  'get_neuron_snapshot_curr_neuron_id' : ActorMethod<[], [] | [NeuronId]>,
   'get_neuron_snapshot_head_id' : ActorMethod<[], SnapshotId>,
+  'get_neuron_snapshot_importing_count' : ActorMethod<[], bigint>,
   'get_neuron_snapshot_info' : ActorMethod<
     [SnapshotId],
     [] | [NeuronSnapshotInfo]
@@ -112,6 +115,7 @@ export interface neuronSnapshot {
     Array<NeuronSnapshotInfo>
   >,
   'setLogAdmin' : ActorMethod<[Principal], undefined>,
+  'setMaxNeuronSnapshots' : ActorMethod<[bigint], undefined>,
   'setSnsGovernanceCanisterId' : ActorMethod<[Principal], undefined>,
   'setTest' : ActorMethod<[boolean], undefined>,
   'take_neuron_snapshot' : ActorMethod<[], TakeNeuronSnapshotResult>,
