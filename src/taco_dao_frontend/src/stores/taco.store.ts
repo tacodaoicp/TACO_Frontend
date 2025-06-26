@@ -920,13 +920,13 @@ export const useTacoStore = defineStore('taco', () => {
     const neuronSnapshotCanisterId = () => {
         switch (process.env.DFX_NETWORK) {
             case "ic":
-                return process.env.CANISTER_ID_NEURONSNAPSHOT_IC || 'ljhvw-mqaaa-aaaan-qzzsq-cai';
+                return process.env.CANISTER_ID_NEURONSNAPSHOT_IC || 'vzs3x-taaaa-aaaan-qzzjq-cai';
                 break;
             case "staging":
-                return  process.env.CANISTER_ID_NEURONSNAPSHOT_STAGING || 'ljhvw-mqaaa-aaaan-qzzsq-cai';
+                return  process.env.CANISTER_ID_NEURONSNAPSHOT_STAGING || 'tgqd4-eqaaa-aaaai-atifa-cai';
                 break;
         }        
-        return 'ljhvw-mqaaa-aaaan-qzzsq-cai'; // local canisterId
+        return 'tgqd4-eqaaa-aaaai-atifa-cai'; // local canisterId
     }
     // /todo
 
