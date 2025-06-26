@@ -147,6 +147,22 @@ export const idlFactory = ({ IDL }) => {
     'pausedDueToSyncFailure' : IDL.Bool,
     'tokenType' : TokenType,
   });
+  const RefreshError = IDL.Variant({
+    'NotAllowed' : IDL.Null,
+    'NoNeuronsFound' : IDL.Null,
+    'SnsGovernanceError' : IDL.Text,
+    'UnexpectedError' : IDL.Text,
+    'SystemInactive' : IDL.Null,
+  });
+  const Result_6 = IDL.Variant({
+    'ok' : IDL.Record({
+      'aggregateUpdated' : IDL.Bool,
+      'oldVotingPower' : IDL.Nat,
+      'neuronsUpdated' : IDL.Nat,
+      'newVotingPower' : IDL.Nat,
+    }),
+    'err' : RefreshError,
+  });
   const SyncError = IDL.Variant({
     'NotTreasury' : IDL.Null,
     'UnexpectedError' : IDL.Text,
@@ -216,7 +232,7 @@ export const idlFactory = ({ IDL }) => {
     }),
     'err' : AuthorizationError,
   });
-  return IDL.Service({
+  const ContinuousDAO = IDL.Service({
     'addAdmin' : IDL.Func([IDL.Principal], [Result_1], []),
     'addToken' : IDL.Func([IDL.Principal, TokenType__1], [Result_1], []),
     'admin_getNeuronAllocations' : IDL.Func(
@@ -304,6 +320,7 @@ export const idlFactory = ({ IDL }) => {
         ['query'],
       ),
     'pauseToken' : IDL.Func([IDL.Principal], [Result_1], []),
+    'refreshUserVotingPower' : IDL.Func([], [Result_6], []),
     'removeAdmin' : IDL.Func([IDL.Principal], [Result_1], []),
     'removeFollower' : IDL.Func([IDL.Principal], [Result_5], []),
     'removeToken' : IDL.Func([IDL.Principal], [Result_1], []),
@@ -338,5 +355,6 @@ export const idlFactory = ({ IDL }) => {
       ),
     'votingPowerMetrics' : IDL.Func([], [Result], ['query']),
   });
+  return ContinuousDAO;
 };
 export const init = ({ IDL }) => { return []; };

@@ -124,6 +124,17 @@ type SyncError =
    NotTreasury;
    UnexpectedError: text;
  };
+type Result_6 = 
+ variant {
+   err: RefreshError;
+   ok:
+    record {
+      aggregateUpdated: bool;
+      neuronsUpdated: nat;
+      newVotingPower: nat;
+      oldVotingPower: nat;
+    };
+ };
 type Result_5 = 
  variant {
    err: FollowError;
@@ -160,6 +171,14 @@ type Result =
       totalVotingPower: nat;
       totalVotingPowerByHotkeySetters: nat;
     };
+ };
+type RefreshError = 
+ variant {
+   NoNeuronsFound;
+   NotAllowed;
+   SnsGovernanceError: text;
+   SystemInactive;
+   UnexpectedError: text;
  };
 type PricePoint = 
  record {
@@ -222,6 +241,94 @@ type FollowError =
    SystemInactive;
    UnexpectedError: text;
  };
+type ContinuousDAO = 
+ service {
+   addAdmin: (principal) -> (Result_1);
+   addToken: (principal, TokenType__1) -> (Result_1);
+   admin_getNeuronAllocations: () ->
+    (vec record {
+           blob;
+           NeuronAllocation;
+         }) query;
+   admin_getUserAllocation: (principal) -> (opt UserState) query;
+   admin_getUserAllocations: () -> (vec record {
+                                          principal;
+                                          UserState;
+                                        }) query;
+   admin_recalculateAllVotingPower: (nat) -> ();
+   clearLogs: () -> ();
+   followAllocation: (principal) -> (Result_5);
+   getAdminPermissions: () ->
+    (vec record {
+           principal;
+           vec AdminPermission;
+         }) query;
+   getAggregateAllocation: () -> (vec record {
+                                        principal;
+                                        nat;
+                                      }) query;
+   getFollowersWithNeuronCounts: () -> (vec record {
+                                              principal;
+                                              nat;
+                                            }) query;
+   getHistoricBalanceAndAllocation: (nat) ->
+    (vec record {
+           int;
+           HistoricBalanceAllocation;
+         }) query;
+   getLogs: (nat) -> (vec LogEntry) query;
+   getLogsByContext: (text, nat) -> (vec LogEntry) query;
+   getLogsByLevel: (LogLevel, nat) -> (vec LogEntry) query;
+   getNeuronAllocation: (blob) -> (opt NeuronAllocation) query;
+   getSnapshotInfo: () ->
+    (opt
+      record {
+        lastSnapshotId: nat;
+        lastSnapshotTime: int;
+        totalVotingPower: nat;
+      }) query;
+   getSystemParameters: () -> (vec SystemParameter) query;
+   getTokenDetails: () -> (vec record {
+                                 principal;
+                                 TokenDetails;
+                               }) query;
+   getUserAllocation: () -> (opt UserState) query;
+   grantAdminPermission: (principal, AdminFunction, nat) -> (Result_1);
+   hasAdminPermission: (principal, AdminFunction) -> (bool) query;
+   pauseToken: (principal) -> (Result_1);
+   refreshUserVotingPower: () -> (Result_6);
+   removeAdmin: (principal) -> (Result_1);
+   removeFollower: (principal) -> (Result_5);
+   removeToken: (principal) -> (Result_1);
+   setTacoAddress: (principal) -> ();
+   set_sns_governance_canister_id: (principal) -> ();
+   syncTokenDetailsFromTreasury: (vec record {
+                                        principal;
+                                        TokenDetails;
+                                      }) -> (Result_4);
+   unfollowAllocation: (principal) -> (Result_3);
+   unpauseToken: (principal) -> (Result_1);
+   updateAllocation: (vec Allocation) -> (Result_2);
+   /// * Update Minting Vault configuration
+   ///  *
+   ///  * Allows configuration of premium rates, update intervals, and enabling/disabling swapping
+   ///  * Only callable by admins with the updateMintingVaultConfig permission.
+   updateMintingVaultConfig: (UpdateConfig__1) -> (Result_1);
+   updateSpamParameters:
+    (record {
+       allowedCalls: opt nat;
+       allowedSilentWarnings: opt nat;
+       timeWindowSpamCheck: opt int;
+     }) -> (Result_1);
+   updateSystemParameter: (SystemParameter) -> (Result_1);
+   updateSystemState: (SystemState) -> (Result_1);
+   /// * Update treasury rebalance configuration
+   ///  *
+   ///  * Allows configuration of trading intervals, sizes, and safety limits
+   ///  * Only callable by admins with the updateTreasuryConfig permission.
+   updateTreasuryConfig: (UpdateConfig, opt bool) -> (Result_1);
+   votingPowerMetrics: () -> (Result) query;
+ };
 type AuthorizationError = 
  variant {
    NotAdmin;
@@ -268,89 +375,4 @@ type AdminFunction =
    updateSystemState;
    updateTreasuryConfig;
  };
-service : {
-  addAdmin: (principal) -> (Result_1);
-  addToken: (principal, TokenType__1) -> (Result_1);
-  admin_getNeuronAllocations: () ->
-   (vec record {
-          blob;
-          NeuronAllocation;
-        }) query;
-  admin_getUserAllocation: (principal) -> (opt UserState) query;
-  admin_getUserAllocations: () -> (vec record {
-                                         principal;
-                                         UserState;
-                                       }) query;
-  admin_recalculateAllVotingPower: (nat) -> ();
-  clearLogs: () -> ();
-  followAllocation: (principal) -> (Result_5);
-  getAdminPermissions: () ->
-   (vec record {
-          principal;
-          vec AdminPermission;
-        }) query;
-  getAggregateAllocation: () -> (vec record {
-                                       principal;
-                                       nat;
-                                     }) query;
-  getFollowersWithNeuronCounts: () -> (vec record {
-                                             principal;
-                                             nat;
-                                           }) query;
-  getHistoricBalanceAndAllocation: (nat) ->
-   (vec record {
-          int;
-          HistoricBalanceAllocation;
-        }) query;
-  getLogs: (nat) -> (vec LogEntry) query;
-  getLogsByContext: (text, nat) -> (vec LogEntry) query;
-  getLogsByLevel: (LogLevel, nat) -> (vec LogEntry) query;
-  getNeuronAllocation: (blob) -> (opt NeuronAllocation) query;
-  getSnapshotInfo: () ->
-   (opt
-     record {
-       lastSnapshotId: nat;
-       lastSnapshotTime: int;
-       totalVotingPower: nat;
-     }) query;
-  getSystemParameters: () -> (vec SystemParameter) query;
-  getTokenDetails: () -> (vec record {
-                                principal;
-                                TokenDetails;
-                              }) query;
-  getUserAllocation: () -> (opt UserState) query;
-  grantAdminPermission: (principal, AdminFunction, nat) -> (Result_1);
-  hasAdminPermission: (principal, AdminFunction) -> (bool) query;
-  pauseToken: (principal) -> (Result_1);
-  removeAdmin: (principal) -> (Result_1);
-  removeFollower: (principal) -> (Result_5);
-  removeToken: (principal) -> (Result_1);
-  setTacoAddress: (principal) -> ();
-  set_sns_governance_canister_id: (principal) -> ();
-  syncTokenDetailsFromTreasury: (vec record {
-                                       principal;
-                                       TokenDetails;
-                                     }) -> (Result_4);
-  unfollowAllocation: (principal) -> (Result_3);
-  unpauseToken: (principal) -> (Result_1);
-  updateAllocation: (vec Allocation) -> (Result_2);
-  /// * Update Minting Vault configuration
-  ///  *
-  ///  * Allows configuration of premium rates, update intervals, and enabling/disabling swapping
-  ///  * Only callable by admins with the updateMintingVaultConfig permission.
-  updateMintingVaultConfig: (UpdateConfig__1) -> (Result_1);
-  updateSpamParameters:
-   (record {
-      allowedCalls: opt nat;
-      allowedSilentWarnings: opt nat;
-      timeWindowSpamCheck: opt int;
-    }) -> (Result_1);
-  updateSystemParameter: (SystemParameter) -> (Result_1);
-  updateSystemState: (SystemState) -> (Result_1);
-  /// * Update treasury rebalance configuration
-  ///  *
-  ///  * Allows configuration of trading intervals, sizes, and safety limits
-  ///  * Only callable by admins with the updateTreasuryConfig permission.
-  updateTreasuryConfig: (UpdateConfig, opt bool) -> (Result_1);
-  votingPowerMetrics: () -> (Result) query;
-}
+service : () -> ContinuousDAO

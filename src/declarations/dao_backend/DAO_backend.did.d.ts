@@ -33,6 +33,86 @@ export interface Allocation__1 { 'token' : Principal, 'basisPoints' : bigint }
 export type AuthorizationError = { 'NotAllowed' : null } |
   { 'NotAdmin' : null } |
   { 'UnexpectedError' : string };
+export interface ContinuousDAO {
+  'addAdmin' : ActorMethod<[Principal], Result_1>,
+  'addToken' : ActorMethod<[Principal, TokenType__1], Result_1>,
+  'admin_getNeuronAllocations' : ActorMethod<
+    [],
+    Array<[Uint8Array | number[], NeuronAllocation]>
+  >,
+  'admin_getUserAllocation' : ActorMethod<[Principal], [] | [UserState]>,
+  'admin_getUserAllocations' : ActorMethod<[], Array<[Principal, UserState]>>,
+  'admin_recalculateAllVotingPower' : ActorMethod<[bigint], undefined>,
+  'clearLogs' : ActorMethod<[], undefined>,
+  'followAllocation' : ActorMethod<[Principal], Result_5>,
+  'getAdminPermissions' : ActorMethod<
+    [],
+    Array<[Principal, Array<AdminPermission>]>
+  >,
+  'getAggregateAllocation' : ActorMethod<[], Array<[Principal, bigint]>>,
+  'getFollowersWithNeuronCounts' : ActorMethod<[], Array<[Principal, bigint]>>,
+  'getHistoricBalanceAndAllocation' : ActorMethod<
+    [bigint],
+    Array<[bigint, HistoricBalanceAllocation]>
+  >,
+  'getLogs' : ActorMethod<[bigint], Array<LogEntry>>,
+  'getLogsByContext' : ActorMethod<[string, bigint], Array<LogEntry>>,
+  'getLogsByLevel' : ActorMethod<[LogLevel, bigint], Array<LogEntry>>,
+  'getNeuronAllocation' : ActorMethod<
+    [Uint8Array | number[]],
+    [] | [NeuronAllocation]
+  >,
+  'getSnapshotInfo' : ActorMethod<
+    [],
+    [] | [
+      {
+        'totalVotingPower' : bigint,
+        'lastSnapshotTime' : bigint,
+        'lastSnapshotId' : bigint,
+      }
+    ]
+  >,
+  'getSystemParameters' : ActorMethod<[], Array<SystemParameter>>,
+  'getTokenDetails' : ActorMethod<[], Array<[Principal, TokenDetails]>>,
+  'getUserAllocation' : ActorMethod<[], [] | [UserState]>,
+  'grantAdminPermission' : ActorMethod<
+    [Principal, AdminFunction, bigint],
+    Result_1
+  >,
+  'hasAdminPermission' : ActorMethod<[Principal, AdminFunction], boolean>,
+  'pauseToken' : ActorMethod<[Principal], Result_1>,
+  'refreshUserVotingPower' : ActorMethod<[], Result_6>,
+  'removeAdmin' : ActorMethod<[Principal], Result_1>,
+  'removeFollower' : ActorMethod<[Principal], Result_5>,
+  'removeToken' : ActorMethod<[Principal], Result_1>,
+  'setTacoAddress' : ActorMethod<[Principal], undefined>,
+  'set_sns_governance_canister_id' : ActorMethod<[Principal], undefined>,
+  'syncTokenDetailsFromTreasury' : ActorMethod<
+    [Array<[Principal, TokenDetails]>],
+    Result_4
+  >,
+  'unfollowAllocation' : ActorMethod<[Principal], Result_3>,
+  'unpauseToken' : ActorMethod<[Principal], Result_1>,
+  'updateAllocation' : ActorMethod<[Array<Allocation>], Result_2>,
+  'updateMintingVaultConfig' : ActorMethod<[UpdateConfig__1], Result_1>,
+  'updateSpamParameters' : ActorMethod<
+    [
+      {
+        'timeWindowSpamCheck' : [] | [bigint],
+        'allowedCalls' : [] | [bigint],
+        'allowedSilentWarnings' : [] | [bigint],
+      },
+    ],
+    Result_1
+  >,
+  'updateSystemParameter' : ActorMethod<[SystemParameter], Result_1>,
+  'updateSystemState' : ActorMethod<[SystemState], Result_1>,
+  'updateTreasuryConfig' : ActorMethod<
+    [UpdateConfig, [] | [boolean]],
+    Result_1
+  >,
+  'votingPowerMetrics' : ActorMethod<[], Result>,
+}
 export type FollowError = { 'FollowLimitReached' : null } |
   { 'FollowerNoAllocationYetMade' : null } |
   { 'NotAllowed' : null } |
@@ -77,6 +157,11 @@ export interface PricePoint {
   'time' : bigint,
   'icpPrice' : bigint,
 }
+export type RefreshError = { 'NotAllowed' : null } |
+  { 'NoNeuronsFound' : null } |
+  { 'SnsGovernanceError' : string } |
+  { 'UnexpectedError' : string } |
+  { 'SystemInactive' : null };
 export type Result = {
     'ok' : {
       'principalCount' : bigint,
@@ -97,6 +182,15 @@ export type Result_4 = { 'ok' : string } |
   { 'err' : SyncError };
 export type Result_5 = { 'ok' : string } |
   { 'err' : FollowError };
+export type Result_6 = {
+    'ok' : {
+      'aggregateUpdated' : boolean,
+      'oldVotingPower' : bigint,
+      'neuronsUpdated' : bigint,
+      'newVotingPower' : bigint,
+    }
+  } |
+  { 'err' : RefreshError };
 export type SyncError = { 'NotTreasury' : null } |
   { 'UnexpectedError' : string };
 export type SystemParameter = { 'MaxFollowers' : bigint } |
@@ -192,84 +286,6 @@ export interface UserState {
   'lastAllocationUpdate' : bigint,
   'neurons' : Array<NeuronVP>,
 }
-export interface _SERVICE {
-  'addAdmin' : ActorMethod<[Principal], Result_1>,
-  'addToken' : ActorMethod<[Principal, TokenType__1], Result_1>,
-  'admin_getNeuronAllocations' : ActorMethod<
-    [],
-    Array<[Uint8Array | number[], NeuronAllocation]>
-  >,
-  'admin_getUserAllocation' : ActorMethod<[Principal], [] | [UserState]>,
-  'admin_getUserAllocations' : ActorMethod<[], Array<[Principal, UserState]>>,
-  'admin_recalculateAllVotingPower' : ActorMethod<[bigint], undefined>,
-  'clearLogs' : ActorMethod<[], undefined>,
-  'followAllocation' : ActorMethod<[Principal], Result_5>,
-  'getAdminPermissions' : ActorMethod<
-    [],
-    Array<[Principal, Array<AdminPermission>]>
-  >,
-  'getAggregateAllocation' : ActorMethod<[], Array<[Principal, bigint]>>,
-  'getFollowersWithNeuronCounts' : ActorMethod<[], Array<[Principal, bigint]>>,
-  'getHistoricBalanceAndAllocation' : ActorMethod<
-    [bigint],
-    Array<[bigint, HistoricBalanceAllocation]>
-  >,
-  'getLogs' : ActorMethod<[bigint], Array<LogEntry>>,
-  'getLogsByContext' : ActorMethod<[string, bigint], Array<LogEntry>>,
-  'getLogsByLevel' : ActorMethod<[LogLevel, bigint], Array<LogEntry>>,
-  'getNeuronAllocation' : ActorMethod<
-    [Uint8Array | number[]],
-    [] | [NeuronAllocation]
-  >,
-  'getSnapshotInfo' : ActorMethod<
-    [],
-    [] | [
-      {
-        'totalVotingPower' : bigint,
-        'lastSnapshotTime' : bigint,
-        'lastSnapshotId' : bigint,
-      }
-    ]
-  >,
-  'getSystemParameters' : ActorMethod<[], Array<SystemParameter>>,
-  'getTokenDetails' : ActorMethod<[], Array<[Principal, TokenDetails]>>,
-  'getUserAllocation' : ActorMethod<[], [] | [UserState]>,
-  'grantAdminPermission' : ActorMethod<
-    [Principal, AdminFunction, bigint],
-    Result_1
-  >,
-  'hasAdminPermission' : ActorMethod<[Principal, AdminFunction], boolean>,
-  'pauseToken' : ActorMethod<[Principal], Result_1>,
-  'removeAdmin' : ActorMethod<[Principal], Result_1>,
-  'removeFollower' : ActorMethod<[Principal], Result_5>,
-  'removeToken' : ActorMethod<[Principal], Result_1>,
-  'setTacoAddress' : ActorMethod<[Principal], undefined>,
-  'set_sns_governance_canister_id' : ActorMethod<[Principal], undefined>,
-  'syncTokenDetailsFromTreasury' : ActorMethod<
-    [Array<[Principal, TokenDetails]>],
-    Result_4
-  >,
-  'unfollowAllocation' : ActorMethod<[Principal], Result_3>,
-  'unpauseToken' : ActorMethod<[Principal], Result_1>,
-  'updateAllocation' : ActorMethod<[Array<Allocation>], Result_2>,
-  'updateMintingVaultConfig' : ActorMethod<[UpdateConfig__1], Result_1>,
-  'updateSpamParameters' : ActorMethod<
-    [
-      {
-        'timeWindowSpamCheck' : [] | [bigint],
-        'allowedCalls' : [] | [bigint],
-        'allowedSilentWarnings' : [] | [bigint],
-      },
-    ],
-    Result_1
-  >,
-  'updateSystemParameter' : ActorMethod<[SystemParameter], Result_1>,
-  'updateSystemState' : ActorMethod<[SystemState], Result_1>,
-  'updateTreasuryConfig' : ActorMethod<
-    [UpdateConfig, [] | [boolean]],
-    Result_1
-  >,
-  'votingPowerMetrics' : ActorMethod<[], Result>,
-}
+export interface _SERVICE extends ContinuousDAO {}
 export declare const idlFactory: IDL.InterfaceFactory;
 export declare const init: (args: { IDL: typeof IDL }) => IDL.Type[];
