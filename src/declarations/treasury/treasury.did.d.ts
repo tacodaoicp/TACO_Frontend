@@ -42,6 +42,7 @@ export interface PortfolioCircuitBreakerCondition__1 {
 export type PortfolioCircuitBreakerError = { 'InvalidTimeWindow' : null } |
   { 'DuplicateName' : null } |
   { 'SystemError' : string } |
+  { 'InvalidParameters' : string } |
   { 'ConditionNotFound' : null } |
   { 'NotAuthorized' : null } |
   { 'InvalidPercentage' : null };
@@ -349,6 +350,8 @@ export interface treasury {
   'getLogs' : ActorMethod<[bigint], Array<LogEntry>>,
   'getLogsByContext' : ActorMethod<[string, bigint], Array<LogEntry>>,
   'getLogsByLevel' : ActorMethod<[LogLevel, bigint], Array<LogEntry>>,
+  'getMaxPriceHistoryEntries' : ActorMethod<[], bigint>,
+  'getPausedTokenThresholdForCircuitBreaker' : ActorMethod<[], bigint>,
   'getPortfolioCircuitBreakerCondition' : ActorMethod<
     [bigint],
     [] | [PortfolioCircuitBreakerCondition]
@@ -417,6 +420,10 @@ export interface treasury {
   >,
   'takeManualPortfolioSnapshot' : ActorMethod<[], Result_4>,
   'unpauseTokenFromTrading' : ActorMethod<[Principal], Result_3>,
+  'updatePausedTokenThresholdForCircuitBreaker' : ActorMethod<
+    [bigint],
+    Result_2
+  >,
   'updatePortfolioCircuitBreakerCondition' : ActorMethod<
     [bigint, PortfolioCircuitBreakerUpdate],
     Result_2

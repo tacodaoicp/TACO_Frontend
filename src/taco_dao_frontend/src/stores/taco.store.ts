@@ -3903,6 +3903,26 @@ export const useTacoStore = defineStore('taco', () => {
         }
     };
 
+    const getMaxPriceHistoryEntries = async () => {
+        try {
+            const agent = await createAgent({
+                identity: new AnonymousIdentity(),
+                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            });
+
+            const treasury = Actor.createActor<TreasuryService>(treasuryIDL, {
+                agent,
+                canisterId: treasuryCanisterId()
+            });
+
+            return await treasury.getMaxPriceHistoryEntries();
+        } catch (error: any) {
+            console.error('Error getting max price history entries:', error);
+            throw error;
+        }
+    };
+
     
 
     // # RETURN #
@@ -4027,5 +4047,6 @@ export const useTacoStore = defineStore('taco', () => {
         takeNeuronSnapshot,
         getMaxNeuronSnapshots,
         setMaxNeuronSnapshots,
+        getMaxPriceHistoryEntries,
     }
 })

@@ -543,6 +543,19 @@
                     class="form-control"
                   />
                 </div>
+                <div class="config-item">
+                  <label>Max Price History Entries</label>
+                  <input 
+                    type="number" 
+                    v-model="configInputs.maxPriceHistoryEntries" 
+                    step="1" 
+                    min="10"
+                    max="1000000"
+                    @input="validateInput('maxPriceHistoryEntries')"
+                    class="form-control"
+                  />
+                  <div class="help-text text-muted">Range: 10-1,000,000 entries. At 1-min intervals: 1M entries ≈ 1.8 years</div>
+                </div>
               </div>
               <div v-else class="text-center py-4">Loading configuration...</div>
               <div class="d-flex gap-2 mt-4">
@@ -1047,11 +1060,15 @@ const configInputs = ref({
   portfolioRebalancePeriodMinutes: 0,
   shortSyncIntervalSeconds: 0,
   longSyncIntervalMinutes: 0,
-  tokenSyncTimeoutSeconds: 0
+  tokenSyncTimeoutSeconds: 0,
+  maxPriceHistoryEntries: 0
 });
 
 const isConfigValid = ref(true);
 const hasConfigChanges = ref(false);
+
+// Track original maxPriceHistoryEntries for change detection
+const originalMaxPriceHistoryEntries = ref(0);
 
 const NS_PER_SECOND = 1_000_000_000n;
 const NS_PER_MINUTE = NS_PER_SECOND * 60n;
@@ -1074,9 +1091,19 @@ const secondsToNs = (seconds: number) => {
 };
 
 // Initialize config inputs when rebalanceConfig changes
-watch(rebalanceConfig, (newConfig) => {
+watch(rebalanceConfig, async (newConfig) => {
   if (newConfig) {
     try {
+      // Load current max price history entries
+      let currentMaxPriceHistory = 0;
+      try {
+        const maxPriceHistoryEntries = await tacoStore.getMaxPriceHistoryEntries();
+        currentMaxPriceHistory = Number(maxPriceHistoryEntries);
+        originalMaxPriceHistoryEntries.value = currentMaxPriceHistory;
+      } catch (error) {
+        console.error('Error loading max price history entries:', error);
+      }
+
       configInputs.value = {
         maxSlippageBasisPoints: Number(newConfig.maxSlippageBasisPoints) / 100,
         minTradeValueICP: Number(newConfig.minTradeValueICP),
@@ -1088,7 +1115,8 @@ watch(rebalanceConfig, (newConfig) => {
         portfolioRebalancePeriodMinutes: nsToMinutes(newConfig.portfolioRebalancePeriodNS),
         shortSyncIntervalSeconds: nsToSeconds(newConfig.shortSyncIntervalNS),
         longSyncIntervalMinutes: nsToMinutes(newConfig.longSyncIntervalNS),
-        tokenSyncTimeoutSeconds: nsToSeconds(newConfig.tokenSyncTimeoutNS)
+        tokenSyncTimeoutSeconds: nsToSeconds(newConfig.tokenSyncTimeoutNS),
+        maxPriceHistoryEntries: currentMaxPriceHistory
       };
       hasConfigChanges.value = false;
     } catch (error) {
@@ -1105,7 +1133,8 @@ watch(rebalanceConfig, (newConfig) => {
         portfolioRebalancePeriodMinutes: 0,
         shortSyncIntervalSeconds: 0,
         longSyncIntervalMinutes: 0,
-        tokenSyncTimeoutSeconds: 0
+        tokenSyncTimeoutSeconds: 0,
+        maxPriceHistoryEntries: 0
       };
     }
   }
@@ -1129,7 +1158,8 @@ watch(configInputs, () => {
       String(minutesToNs(current.portfolioRebalancePeriodMinutes)) !== String(original.portfolioRebalancePeriodNS) ||
       String(secondsToNs(current.shortSyncIntervalSeconds)) !== String(original.shortSyncIntervalNS) ||
       String(minutesToNs(current.longSyncIntervalMinutes)) !== String(original.longSyncIntervalNS) ||
-      String(secondsToNs(current.tokenSyncTimeoutSeconds)) !== String(original.tokenSyncTimeoutNS);
+      String(secondsToNs(current.tokenSyncTimeoutSeconds)) !== String(original.tokenSyncTimeoutNS) ||
+      current.maxPriceHistoryEntries !== originalMaxPriceHistoryEntries.value;
   }
 }, { deep: true });
 
@@ -1153,8 +1183,8 @@ const updateConfig = async () => {
     shortSyncIntervalNS: [secondsToNs(configInputs.value.shortSyncIntervalSeconds)],
     longSyncIntervalNS: [minutesToNs(configInputs.value.longSyncIntervalMinutes)],
     tokenSyncTimeoutNS: [secondsToNs(configInputs.value.tokenSyncTimeoutSeconds)],
-    maxPriceHistoryEntries: [],
-    priceUpdateIntervalNS: []
+    maxPriceHistoryEntries: configInputs.value.maxPriceHistoryEntries > 0 ? [BigInt(Math.round(configInputs.value.maxPriceHistoryEntries))] as [bigint] : [] as [],
+    priceUpdateIntervalNS: [] as []
   };
   
   await tacoStore.updateRebalanceConfig(updates);
@@ -1173,7 +1203,8 @@ const resetConfig = () => {
       portfolioRebalancePeriodMinutes: nsToMinutes(rebalanceConfig.value.portfolioRebalancePeriodNS),
       shortSyncIntervalSeconds: nsToSeconds(rebalanceConfig.value.shortSyncIntervalNS),
       longSyncIntervalMinutes: nsToMinutes(rebalanceConfig.value.longSyncIntervalNS),
-      tokenSyncTimeoutSeconds: nsToSeconds(rebalanceConfig.value.tokenSyncTimeoutNS)
+      tokenSyncTimeoutSeconds: nsToSeconds(rebalanceConfig.value.tokenSyncTimeoutNS),
+      maxPriceHistoryEntries: originalMaxPriceHistoryEntries.value
     };
     hasConfigChanges.value = false;
   }

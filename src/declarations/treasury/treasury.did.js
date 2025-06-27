@@ -11,6 +11,7 @@ export const idlFactory = ({ IDL }) => {
     'InvalidTimeWindow' : IDL.Null,
     'DuplicateName' : IDL.Null,
     'SystemError' : IDL.Text,
+    'InvalidParameters' : IDL.Text,
     'ConditionNotFound' : IDL.Null,
     'NotAuthorized' : IDL.Null,
     'InvalidPercentage' : IDL.Null,
@@ -409,6 +410,12 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Vec(LogEntry)],
         ['query'],
       ),
+    'getMaxPriceHistoryEntries' : IDL.Func([], [IDL.Nat], ['query']),
+    'getPausedTokenThresholdForCircuitBreaker' : IDL.Func(
+        [],
+        [IDL.Nat],
+        ['query'],
+      ),
     'getPortfolioCircuitBreakerCondition' : IDL.Func(
         [IDL.Nat],
         [IDL.Opt(PortfolioCircuitBreakerCondition)],
@@ -528,6 +535,11 @@ export const idlFactory = ({ IDL }) => {
       ),
     'takeManualPortfolioSnapshot' : IDL.Func([], [Result_4], []),
     'unpauseTokenFromTrading' : IDL.Func([IDL.Principal], [Result_3], []),
+    'updatePausedTokenThresholdForCircuitBreaker' : IDL.Func(
+        [IDL.Nat],
+        [Result_2],
+        [],
+      ),
     'updatePortfolioCircuitBreakerCondition' : IDL.Func(
         [IDL.Nat, PortfolioCircuitBreakerUpdate],
         [Result_2],

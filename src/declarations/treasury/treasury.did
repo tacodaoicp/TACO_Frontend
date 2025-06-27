@@ -48,6 +48,13 @@ type treasury =
    /// * Get the last N log entries for a specific level
    ///    * Only accessible by master admin, controller, or DAO
    getLogsByLevel: (LogLevel, nat) -> (vec LogEntry) query;
+   /// * Get current maximum price history entries configuration
+   ///    * 
+   ///    * Returns the current limit for price history entries per token.
+   ///    * Accessible by any user with query access.
+   getMaxPriceHistoryEntries: () -> (nat) query;
+   /// * Get the current paused token threshold for circuit breaker
+   getPausedTokenThresholdForCircuitBreaker: () -> (nat) query;
    /// * Get a specific portfolio circuit breaker condition
    getPortfolioCircuitBreakerCondition: (nat) ->
     (opt PortfolioCircuitBreakerCondition) query;
@@ -215,6 +222,11 @@ type treasury =
    ///    * Removes a token from the trading pause registry, allowing it to trade again.
    ///    * Only callable by admins with appropriate permissions.
    unpauseTokenFromTrading: (principal) -> (Result_3);
+   /// * Update the paused token threshold for circuit breaker
+   ///    *
+   ///    * Sets the number of paused tokens that will trigger the circuit breaker.
+   ///    * Only callable by admins with appropriate permissions.
+   updatePausedTokenThresholdForCircuitBreaker: (nat) -> (Result_2);
    /// * Update an existing portfolio circuit breaker condition
    updatePortfolioCircuitBreakerCondition: (nat,
     PortfolioCircuitBreakerUpdate) -> (Result_2);
@@ -631,6 +643,7 @@ type PortfolioCircuitBreakerError =
  variant {
    ConditionNotFound;
    DuplicateName;
+   InvalidParameters: text;
    InvalidPercentage;
    InvalidTimeWindow;
    NotAuthorized;
