@@ -185,9 +185,14 @@
           <div class="card bg-dark text-white mb-4">
             <div class="card-header d-flex justify-content-between align-items-center">
               <h3 class="mb-0">Voting Dashboard</h3>
-              <button class="btn btn-primary" @click="refreshVotingMetrics">
-                Refresh Metrics
-              </button>
+              <div class="d-flex gap-2">
+                <button class="btn btn-success" @click="refreshUserVotingPower" :disabled="refreshingVP">
+                  {{ refreshingVP ? 'Refreshing...' : '🔄 Refresh My Voting Power' }}
+                </button>
+                <button class="btn btn-primary" @click="refreshVotingMetrics">
+                  Refresh Metrics
+                </button>
+              </div>
             </div>
             
             <div class="card-body">
@@ -854,6 +859,7 @@ const selectedComponent = ref('all');
 const isRecoveringBalances = ref(false);
 const showOnlyActive = ref(false);
 const showOnlyFollowing = ref(false);
+const refreshingVP = ref(false);
 
 // Get store
 const tacoStore = useTacoStore();
@@ -1452,6 +1458,19 @@ function uint8ArrayToHex(array: Uint8Array): string {
 
 // Add new function for updating snapshot interval
 const snapshotIntervalMinutes = ref(15); // Default to 15 minutes
+
+// Add refresh user voting power function
+async function refreshUserVotingPower() {
+    refreshingVP.value = true;
+    try {
+        await tacoStore.refreshUserVotingPower();
+        console.log('AdminView: User voting power refreshed successfully');
+    } catch (error) {
+        console.error('AdminView: Error refreshing user voting power:', error);
+    } finally {
+        refreshingVP.value = false;
+    }
+}
 
 async function updateSnapshotInterval() {
   if (!snapshotIntervalMinutes.value || snapshotIntervalMinutes.value < 1) return;

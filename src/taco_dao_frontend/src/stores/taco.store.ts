@@ -800,6 +800,14 @@ export const useTacoStore = defineStore('taco', () => {
             // calculate and set user ledger account ID
             userLedgerAccountId.value = calculateAccountId(userPrincipal.value)
 
+            // refresh voting power immediately after login
+            try {
+                await refreshUserVotingPower()
+            } catch (error) {
+                console.log('Could not refresh voting power on login:', error)
+                // Don't fail login if refresh fails
+            }
+
             // turn app loading off
             appLoadingOff()
 
@@ -1527,6 +1535,112 @@ export const useTacoStore = defineStore('taco', () => {
 
             // log error
             console.error('error fetching user allocation:', error)
+
+            // return
+            return false
+
+        }
+
+    }
+    const refreshUserVotingPower = async () => {
+
+        // log
+        console.log('taco.store: refreshUserVotingPower()')      
+
+        try {
+
+            // create auth client
+            const authClient = await getAuthClient()
+
+            // if user is logged in
+            if (await authClient.isAuthenticated()) {
+
+                // get host
+                const host = process.env.DFX_NETWORK === "local"
+                    ? getLocalHost()
+                    : "https://ic0.app";                
+
+                // get identity
+                const identity = await authClient.getIdentity()
+
+                // create an agent with the user's identity
+                const agent = await createAgent({
+                    identity,
+                    host,
+                    fetchRootKey: process.env.DFX_NETWORK === "local",
+                })
+
+                // create actor
+                const actor = Actor.createActor(daoBackendIDL, {
+                    agent,
+                    canisterId: daoBackendCanisterId(),
+                })
+
+                //////////////////////
+                // post actor logic //            
+
+                // call the refreshUserVotingPower function
+                // @ts-ignore
+                const result = await actor.refreshUserVotingPower() as any
+
+                // log the result
+                console.log('taco.store: DAO backend - actor.refreshUserVotingPower() - result:', result)  
+
+                // check if successful
+                if (result && result.ok) {
+                    // refresh user allocation to get updated data
+                    await fetchUserAllocation()
+                    
+                    // show success toast
+                    addToast({
+                        id: Date.now(),
+                        code: 'voting-power-refreshed',
+                        title: 'Voting Power Updated',
+                        icon: 'fa-solid fa-check-circle',
+                        message: `Updated from ${result.ok.oldVotingPower} to ${result.ok.newVotingPower} VP (${result.ok.neuronsUpdated} neurons)`
+                    })
+                    
+                    return result.ok
+                } else {
+                    // handle error case
+                    const errorMsg = result && result.err ? JSON.stringify(result.err) : 'Unknown error'
+                    console.error('Error refreshing voting power:', errorMsg)
+                    
+                    // show error toast
+                    addToast({
+                        id: Date.now(),
+                        code: 'voting-power-error',
+                        title: 'Voting Power Refresh Failed',
+                        icon: 'fa-solid fa-exclamation-triangle',
+                        message: `Failed to refresh voting power: ${errorMsg}`
+                    })
+                    
+                    return false
+                }
+
+            } else {
+
+                // log
+                console.log('cannot refresh voting power, user not logged in')
+
+                // return
+                return false
+
+            }
+
+        } catch (error) {
+
+            // log error
+            console.error('error refreshing voting power:', error)
+
+            // show error toast
+            addToast({
+                id: Date.now(),
+                code: 'voting-power-error',
+                title: 'Voting Power Refresh Failed',
+                icon: 'fa-solid fa-exclamation-triangle',
+                message: `Error: ${error}`
+            })
 
             // return
             return false
@@ -3847,6 +3961,7 @@ export const useTacoStore = defineStore('taco', () => {
         fetchAggregateAllocation,
         fetchVotingPowerMetrics,
         fetchUserAllocation,
+        refreshUserVotingPower,
         updateAllocation,
         followAllocation,
         unfollowAllocation,
