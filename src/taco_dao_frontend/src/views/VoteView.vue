@@ -45,13 +45,26 @@
                   <span v-if="votePower === 0" class="vote-view__top-bar__vote-power text-nowrap">(0 VP)</span>
                 </h2>
 
-                <!-- hover tooltip info icon -->
-                <div v-if="userLoggedIn"
-                    class="me-auto taco-text-white" 
+                <!-- refresh voting power button -->
+                <div v-if="userLoggedIn" class="me-auto d-flex align-items-center gap-2">
+                  <button 
+                    class="btn btn-sm btn-outline-light" 
+                    @click="refreshVotingPower"
+                    :disabled="refreshingVP"
                     data-bs-toggle="tooltip" 
                     data-bs-placement="top" 
-                    title="It can take up to 15 minutes for voting power to update. We'll include a refresh countdown in the near future">
-                    <i class="fa-solid fa-circle-info"></i>
+                    title="Refresh your voting power immediately after adding hotkeys to neurons">
+                    <i class="fa-solid fa-refresh" :class="{ 'fa-spin': refreshingVP }"></i>
+                    {{ refreshingVP ? 'Refreshing...' : 'Refresh VP' }}
+                  </button>
+                  
+                  <!-- hover tooltip info icon -->
+                  <div class="taco-text-white" 
+                      data-bs-toggle="tooltip" 
+                      data-bs-placement="top" 
+                      title="Click refresh if you just added hotkeys to neurons and want to see your voting power immediately">
+                      <i class="fa-solid fa-circle-info"></i>
+                  </div>
                 </div>                
 
               </div>
@@ -2193,6 +2206,7 @@
 
   // user
   const userLockedVote = ref(false)
+  const refreshingVP = ref(false)
 
   // chart
   const series = ref([100])
@@ -2205,6 +2219,22 @@
   ///////////////////
   // local methods //
   ///////////////////  
+
+  // refresh voting power
+  const refreshVotingPower = async () => {
+    refreshingVP.value = true
+    try {
+      const { refreshUserVotingPower } = tacoStore
+      await refreshUserVotingPower()
+      // After refreshing, fetch updated user allocation
+      await fetchUserAllocation()
+      handleFetchedUserAllocation(fetchedUserAllocation.value)
+    } catch (error) {
+      console.error('Error refreshing voting power:', error)
+    } finally {
+      refreshingVP.value = false
+    }
+  }
 
   //////////////
   // handlers //  
