@@ -2334,6 +2334,10 @@
 
                         </ul>
 
+                        <!-- paragraph -->
+                        <p class="taco-report-explorer__report-paragraph">
+                        </p>
+
                       </div>
 
                       <!-- center -->
