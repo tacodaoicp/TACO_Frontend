@@ -2336,6 +2336,7 @@
 
                         <!-- paragraph -->
                         <p class="taco-report-explorer__report-paragraph">
+                          Inflationary mechanisms do exist in the forms of APY from staking rewards. For a 1 year old neuron with a 3 month dissolve delay, a staker will earn 25% APY. This is a significant amount for a small dissolve delay (when compared to ICP's max of 8 years) and over 40% of the total supply is staking without dissolving, though not all neurons are at that rate. This is planned to decrease to 0% over the course of 4 years.
                         </p>
 
                       </div>
