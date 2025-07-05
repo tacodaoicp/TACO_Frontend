@@ -4094,23 +4094,33 @@ export const useTacoStore = defineStore('taco', () => {
 
     const getProposalsThreads = async () => {
         try {
+            console.log('🔍 Starting getProposalsThreads...');
+            
             // First find the TACO forum
+            console.log('🔍 Step 1: Finding TACO forum...');
             const tacoForum = await findTacoForum();
             if (!tacoForum) {
+                console.log('❌ TACO forum not found');
                 throw new Error('TACO forum not found');
             }
+            console.log('✅ Found TACO forum with ID:', tacoForum.id.toString());
 
             // Then get the proposals topic
+            console.log('🔍 Step 2: Getting proposals topic for forum ID:', tacoForum.id.toString());
             const proposalsMapping = await getProposalsTopic(tacoForum.id);
             if (!proposalsMapping) {
+                console.log('❌ Proposals topic not found for forum ID:', tacoForum.id.toString());
                 throw new Error('Proposals topic not found');
             }
+            console.log('✅ Found proposals topic with ID:', proposalsMapping.proposals_topic_id.toString());
 
             // Finally get all threads in the proposals topic
+            console.log('🔍 Step 3: Getting threads for topic ID:', proposalsMapping.proposals_topic_id.toString());
             const threads = await getThreadsByTopic(proposalsMapping.proposals_topic_id);
+            console.log('✅ Found', threads.length, 'threads');
             return threads;
         } catch (error: any) {
-            console.error('Error getting proposals threads:', error);
+            console.error('❌ Error getting proposals threads:', error);
             throw error;
         }
     };

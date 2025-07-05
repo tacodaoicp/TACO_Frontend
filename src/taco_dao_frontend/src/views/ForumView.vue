@@ -86,17 +86,20 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
+import { storeToRefs } from 'pinia'
 import { useTacoStore } from '../stores/taco.store'
 
 const router = useRouter()
 const tacoStore = useTacoStore()
 
-// Destructure reactive values from store
+// Destructure reactive values from store (maintaining reactivity)
 const { 
     appLoading, 
-    fetchedProposalsThreads,
-    getProposalsThreads
-} = tacoStore
+    fetchedProposalsThreads
+} = storeToRefs(tacoStore)
+
+// Destructure methods (methods don't need reactivity)
+const { getProposalsThreads } = tacoStore
 
 // Local state
 const error = ref('')
