@@ -16,6 +16,7 @@ import { idlFactory } from "../../../declarations/ledger_canister/ledger_caniste
 import { idlFactory as daoBackendIDL } from "../../../declarations/dao_backend/DAO_backend.did.js"
 import { Result_4, Result_8, idlFactory as treasuryIDL, UpdateConfig, RebalanceConfig, _SERVICE as TreasuryService } from "../../../declarations/treasury/treasury.did.js"
 import { idlFactory as neuronSnapshotIDL, _SERVICE as NeuronSnapshotService } from "../../../declarations/neuronSnapshot/neuronSnapshot.did.js"
+import { idlFactory as sneedForumIDL, _SERVICE as SneedForumService } from "../../../declarations/sneed_sns_forum/sneed_sns_forum.did.js"
 import { Principal } from '@dfinity/principal'
 import { AccountIdentifier } from '@dfinity/ledger-icp'
 import { canisterId as iiCanisterId } from "../../../declarations/internet_identity/index.js"
@@ -253,6 +254,15 @@ interface PortfolioHistoryResponse {
     totalCount: bigint;
 }
 
+// Forum interfaces (using Candid types from the IDL)
+import type {
+    ForumResponse as CandidForumResponse,
+    TopicResponse as CandidTopicResponse,
+    ThreadResponse as CandidThreadResponse,
+    PostResponse as CandidPostResponse,
+    ProposalTopicMappingResponse as CandidProposalTopicMappingResponse
+} from "../../../declarations/sneed_sns_forum/sneed_sns_forum.did.d"
+
 /////////////
 // Exports //
 /////////////
@@ -347,7 +357,14 @@ export const useTacoStore = defineStore('taco', () => {
             rebalanceStatus: 'Idle',
             rebalanceError: undefined
         }
-    } as TimerHealth)    
+    } as TimerHealth)
+
+    // forum
+    const tacoForumId = ref<bigint | null>(null)
+    const proposalsTopicId = ref<bigint | null>(null)
+    const fetchedForums = ref<CandidForumResponse[]>([])
+    const fetchedProposalsThreads = ref<CandidThreadResponse[]>([])
+    const fetchedThreadPosts = ref<CandidPostResponse[]>([])    
     const systemLogs = ref<SystemLog[]>([])
     const tradingLogs = ref<TradingLog[]>([])
     const formatTokenAmount = (amount: bigint, decimals: number): string => {
@@ -3923,6 +3940,197 @@ export const useTacoStore = defineStore('taco', () => {
         }
     };
 
+    //=========================================================================
+    // FORUM SYSTEM METHODS
+    //=========================================================================
+
+    const sneedForumCanisterId = () => {
+        switch (process.env.DFX_NETWORK) {
+            case "ic":
+                return process.env.CANISTER_ID_NEURONSNAPSHOT_IC || 'mcigm-4aaaa-aaaad-qhlkq-cai';
+                break;
+            case "staging":
+                return  process.env.CANISTER_ID_NEURONSNAPSHOT_STAGING || 'mcigm-4aaaa-aaaad-qhlkq-cai'; // nrtf2-wiaaa-aaaad-aankq-cai << real staging
+                break;
+        }        
+        return 'mcigm-4aaaa-aaaad-qhlkq-cai'; 
+    };
+
+    const tacoSnsRootCanisterId = () => {
+        // TACO DAO SNS root canister ID
+        return 'lhdfz-wqaaa-aaaaq-aae3q-cai';
+    };
+
+    const getAllForums = async () => {
+        try {
+            const agent = await createAgent({
+                identity: new AnonymousIdentity(),
+                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            });
+
+            const forumActor = Actor.createActor<SneedForumService>(sneedForumIDL, {
+                agent,
+                canisterId: sneedForumCanisterId()
+            });
+
+            const forums = await forumActor.get_forums();
+            fetchedForums.value = forums;
+            console.log('Fetched forums:', forums);
+            return forums;
+        } catch (error: any) {
+            console.error('Error getting forums:', error);
+            throw error;
+        }
+    };
+
+    const findTacoForum = async () => {
+        try {
+            const forums = await getAllForums();
+            
+            // Find the TACO forum by looking for the one with our SNS root canister ID
+            const tacoSnsRoot = Principal.fromText(tacoSnsRootCanisterId());
+            
+            const tacoForum = forums.find(forum => 
+                forum.sns_root_canister_id && 
+                forum.sns_root_canister_id.toString() === tacoSnsRoot.toString()
+            );
+            
+            if (tacoForum) {
+                tacoForumId.value = tacoForum.id;
+                console.log('Found TACO forum:', tacoForum);
+                return tacoForum;
+            } else {
+                console.log('TACO forum not found. Available forums:', forums);
+                return null;
+            }
+        } catch (error: any) {
+            console.error('Error finding TACO forum:', error);
+            throw error;
+        }
+    };
+
+    const getProposalsTopic = async (forumId: bigint) => {
+        try {
+            const agent = await createAgent({
+                identity: new AnonymousIdentity(),
+                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            });
+
+            const forumActor = Actor.createActor<SneedForumService>(sneedForumIDL, {
+                agent,
+                canisterId: sneedForumCanisterId()
+            });
+
+            const proposalsTopicMapping = await forumActor.get_proposals_topic(forumId);
+            
+            if (proposalsTopicMapping.length > 0) {
+                const mapping = proposalsTopicMapping[0]!;
+                proposalsTopicId.value = mapping.proposals_topic_id;
+                console.log('Found proposals topic:', mapping);
+                return mapping;
+            } else {
+                console.log('Proposals topic not found for forum:', forumId);
+                return null;
+            }
+        } catch (error: any) {
+            console.error('Error getting proposals topic:', error);
+            throw error;
+        }
+    };
+
+    const getThreadsByTopic = async (topicId: bigint) => {
+        try {
+            const agent = await createAgent({
+                identity: new AnonymousIdentity(),
+                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            });
+
+            const forumActor = Actor.createActor<SneedForumService>(sneedForumIDL, {
+                agent,
+                canisterId: sneedForumCanisterId()
+            });
+
+            const threads = await forumActor.get_threads_by_topic(topicId);
+            fetchedProposalsThreads.value = threads;
+            console.log('Fetched threads for topic:', topicId, threads);
+            return threads;
+        } catch (error: any) {
+            console.error('Error getting threads by topic:', error);
+            throw error;
+        }
+    };
+
+    const getPostsByThread = async (threadId: bigint) => {
+        try {
+            const agent = await createAgent({
+                identity: new AnonymousIdentity(),
+                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            });
+
+            const forumActor = Actor.createActor<SneedForumService>(sneedForumIDL, {
+                agent,
+                canisterId: sneedForumCanisterId()
+            });
+
+            const posts = await forumActor.get_posts_by_thread(threadId);
+            fetchedThreadPosts.value = posts;
+            console.log('Fetched posts for thread:', threadId, posts);
+            return posts;
+        } catch (error: any) {
+            console.error('Error getting posts by thread:', error);
+            throw error;
+        }
+    };
+
+    const getProposalsThreads = async () => {
+        try {
+            // First find the TACO forum
+            const tacoForum = await findTacoForum();
+            if (!tacoForum) {
+                throw new Error('TACO forum not found');
+            }
+
+            // Then get the proposals topic
+            const proposalsMapping = await getProposalsTopic(tacoForum.id);
+            if (!proposalsMapping) {
+                throw new Error('Proposals topic not found');
+            }
+
+            // Finally get all threads in the proposals topic
+            const threads = await getThreadsByTopic(proposalsMapping.proposals_topic_id);
+            return threads;
+        } catch (error: any) {
+            console.error('Error getting proposals threads:', error);
+            throw error;
+        }
+    };
+
+    const getThread = async (threadId: bigint) => {
+        try {
+            const agent = await createAgent({
+                identity: new AnonymousIdentity(),
+                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            });
+
+            const forumActor = Actor.createActor<SneedForumService>(sneedForumIDL, {
+                agent,
+                canisterId: sneedForumCanisterId()
+            });
+
+            const thread = await forumActor.get_thread(threadId);
+            console.log('Fetched thread:', threadId, thread);
+            return thread;
+        } catch (error: any) {
+            console.error('Error getting thread:', error);
+            throw error;
+        }
+    };
+
     
 
     // # RETURN #
@@ -4048,5 +4256,18 @@ export const useTacoStore = defineStore('taco', () => {
         getMaxNeuronSnapshots,
         setMaxNeuronSnapshots,
         getMaxPriceHistoryEntries,
+        // forum functions
+        tacoForumId,
+        proposalsTopicId,
+        fetchedForums,
+        fetchedProposalsThreads,
+        fetchedThreadPosts,
+        getAllForums,
+        findTacoForum,
+        getProposalsTopic,
+        getThreadsByTopic,
+        getPostsByThread,
+        getProposalsThreads,
+        getThread,
     }
 })

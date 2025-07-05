@@ -17,6 +17,8 @@ import AdminPriceHistoryView from "./views/AdminPriceHistoryView.vue"
 import AdminNeuronView from "./views/AdminNeuronView.vue"
 import ChatView from "./views/ChatView.vue"
 import ReportsView from "./views/ReportsView.vue"
+import ForumView from "./views/ForumView.vue"
+import ThreadView from "./views/ThreadView.vue"
 import VueApexCharts from 'vue3-apexcharts'
 import VueClickAway from "vue3-click-away"
 import 'animate.css'
@@ -39,8 +41,10 @@ const routes = [
     { path: "/admin", name: "Admin", component: AdminView },
     { path: "/admin/trade", name: "AdminTrade", component: AdminTradeView },
     { path: "/admin/price", name: "AdminPrice", component: AdminPriceView },
-  { path: "/admin/pricehistory", name: "AdminPriceHistory", component: AdminPriceHistoryView },
+      { path: "/admin/pricehistory", name: "AdminPriceHistory", component: AdminPriceHistoryView },
     { path: "/admin/neuron", name: "AdminNeuron", component: AdminNeuronView },
+    { path: "/forum", name: "Forum", component: ForumView },
+    { path: "/forum/thread/:id", name: "Thread", component: ThreadView },
     { path: "/:pathMatch(.*)*", redirect: "/" },
 ]
 
