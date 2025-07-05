@@ -1,0 +1,226 @@
+type VoteType = 
+ variant {
+   downvote;
+   upvote;
+ };
+type VoteResponse = 
+ record {
+   created_at: int;
+   neuron_id: NeuronId;
+   post_id: nat;
+   updated_at: int;
+   vote_type: VoteType;
+   voter_principal: principal;
+   voting_power: nat;
+ };
+type UpdateTextLimitsInput = 
+ record {
+   forum_description_max_length: opt nat;
+   forum_title_max_length: opt nat;
+   post_body_max_length: opt nat;
+   post_title_max_length: opt nat;
+   thread_body_max_length: opt nat;
+   thread_title_max_length: opt nat;
+   topic_description_max_length: opt nat;
+   topic_title_max_length: opt nat;
+ };
+type TopicResponse = 
+ record {
+   created_at: int;
+   created_by: principal;
+   deleted: bool;
+   description: text;
+   forum_id: nat;
+   id: nat;
+   parent_topic_id: opt nat;
+   title: text;
+   updated_at: int;
+   updated_by: principal;
+ };
+type ThreadResponse = 
+ record {
+   body: text;
+   created_at: int;
+   created_by: principal;
+   deleted: bool;
+   id: nat;
+   title: opt text;
+   topic_id: nat;
+   updated_at: int;
+   updated_by: principal;
+ };
+type TextLimits = 
+ record {
+   forum_description_max_length: nat;
+   forum_title_max_length: nat;
+   post_body_max_length: nat;
+   post_title_max_length: nat;
+   thread_body_max_length: nat;
+   thread_title_max_length: nat;
+   topic_description_max_length: nat;
+   topic_title_max_length: nat;
+ };
+type SetProposalTopicInput = 
+ record {
+   forum_id: nat;
+   topic_id: nat;
+ };
+type Result_1 = 
+ variant {
+   err: ForumError;
+   ok: nat;
+ };
+type Result = 
+ variant {
+   err: ForumError;
+   ok;
+ };
+type ProposalTopicMappingResponse = 
+ record {
+   forum_id: nat;
+   proposals_topic_id: nat;
+   set_at: int;
+   set_by: principal;
+ };
+type ProposalThreadMappingResponse = 
+ record {
+   created_at: int;
+   created_by: principal;
+   proposal_id: nat;
+   sns_root_canister_id: principal;
+   thread_id: nat;
+ };
+type PostResponse = 
+ record {
+   body: text;
+   created_at: int;
+   created_by: principal;
+   deleted: bool;
+   downvote_score: nat;
+   id: nat;
+   reply_to_post_id: opt nat;
+   thread_id: nat;
+   title: opt text;
+   updated_at: int;
+   updated_by: principal;
+   upvote_score: nat;
+ };
+type NeuronId = record {id: blob;};
+type ForumStats = 
+ record {
+   total_forums: nat;
+   total_posts: nat;
+   total_threads: nat;
+   total_topics: nat;
+   total_votes: nat;
+ };
+type ForumResponse = 
+ record {
+   created_at: int;
+   created_by: principal;
+   deleted: bool;
+   description: text;
+   id: nat;
+   sns_root_canister_id: opt principal;
+   title: text;
+   updated_at: int;
+   updated_by: principal;
+ };
+type ForumError = 
+ variant {
+   AlreadyExists: text;
+   InternalError: text;
+   InvalidInput: text;
+   NotFound: text;
+   Unauthorized: text;
+ };
+type CreateTopicInput = 
+ record {
+   description: text;
+   forum_id: nat;
+   parent_topic_id: opt nat;
+   title: text;
+ };
+type CreateThreadInput = 
+ record {
+   body: text;
+   title: opt text;
+   topic_id: nat;
+ };
+type CreateProposalThreadInput = 
+ record {
+   proposal_id: nat;
+   sns_root_canister_id: principal;
+ };
+type CreateForumInput = 
+ record {
+   description: text;
+   sns_root_canister_id: opt principal;
+   title: text;
+ };
+type AdminInfo = 
+ record {
+   added_at: int;
+   added_by: nat32;
+   "principal": principal;
+ };
+service : {
+  add_admin: (principal) -> (Result);
+  create_forum: (CreateForumInput) -> (Result_1);
+  create_post: (nat, opt nat, opt text, text) -> (Result_1);
+  create_proposal_thread: (CreateProposalThreadInput) -> (Result_1);
+  create_proposal_thread_with_auto_setup: (CreateProposalThreadInput) ->
+   (Result_1);
+  create_thread: (CreateThreadInput) -> (Result_1);
+  create_topic: (CreateTopicInput) -> (Result_1);
+  delete_forum: (nat) -> (Result);
+  delete_post: (nat) -> (Result);
+  delete_thread: (nat) -> (Result);
+  delete_topic: (nat) -> (Result);
+  get_admins: () -> (vec AdminInfo) query;
+  get_forum: (nat) -> (opt ForumResponse) query;
+  get_forum_admin: (nat) -> (opt ForumResponse) query;
+  get_forums: () -> (vec ForumResponse) query;
+  get_forums_admin: () -> (vec ForumResponse) query;
+  get_post: (nat) -> (opt PostResponse) query;
+  get_post_admin: (nat) -> (opt PostResponse) query;
+  get_post_replies: (nat) -> (vec PostResponse) query;
+  get_post_replies_admin: (nat) -> (vec PostResponse) query;
+  get_post_votes: (nat) -> (vec VoteResponse) query;
+  get_posts_by_thread: (nat) -> (vec PostResponse) query;
+  get_posts_by_thread_admin: (nat) -> (vec PostResponse) query;
+  get_proposal_thread: (principal, nat) ->
+   (opt ProposalThreadMappingResponse) query;
+  get_proposals_topic: (nat) -> (opt ProposalTopicMappingResponse) query;
+  get_stats: () -> (ForumStats) query;
+  get_subtopics: (nat) -> (vec TopicResponse) query;
+  get_text_limits: () -> (TextLimits) query;
+  get_thread: (nat) -> (opt ThreadResponse) query;
+  get_thread_admin: (nat) -> (opt ThreadResponse) query;
+  get_thread_proposal_id: (nat) -> (opt record {
+                                          nat32;
+                                          nat;
+                                        }) query;
+  get_threads_by_topic: (nat) -> (vec ThreadResponse) query;
+  get_threads_by_topic_admin: (nat) -> (vec ThreadResponse) query;
+  get_topic: (nat) -> (opt TopicResponse) query;
+  get_topic_admin: (nat) -> (opt TopicResponse) query;
+  get_topics_by_forum: (nat) -> (vec TopicResponse) query;
+  get_topics_by_forum_admin: (nat) -> (vec TopicResponse) query;
+  health_check: () -> (bool) query;
+  is_admin: (principal) -> (bool) query;
+  remove_admin: (principal) -> (Result);
+  remove_proposals_topic: (nat) -> (Result);
+  retract_vote: (nat) -> (Result);
+  set_proposals_topic: (SetProposalTopicInput) -> (Result);
+  undelete_forum: (nat) -> (Result);
+  undelete_post: (nat) -> (Result);
+  undelete_thread: (nat) -> (Result);
+  undelete_topic: (nat) -> (Result);
+  update_forum: (nat, CreateForumInput) -> (Result);
+  update_post: (nat, opt text, text) -> (Result);
+  update_text_limits: (UpdateTextLimitsInput) -> (Result);
+  update_thread: (nat, opt text, text) -> (Result);
+  update_topic: (nat, CreateTopicInput) -> (Result);
+  vote_on_post: (nat, VoteType) -> (Result);
+}
