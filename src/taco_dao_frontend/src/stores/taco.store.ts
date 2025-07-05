@@ -3958,7 +3958,7 @@ export const useTacoStore = defineStore('taco', () => {
 
     const tacoSnsRootCanisterId = () => {
         // TACO DAO SNS root canister ID
-        return 'lhdfz-wqaaa-aaaaq-aae3q-cai';
+        return 'lacdn-3iaaa-aaaaq-aae3a-cai';
     };
 
     const getAllForums = async () => {
@@ -4000,10 +4000,16 @@ export const useTacoStore = defineStore('taco', () => {
                 tacoForumId.value = tacoForum.id;
                 console.log('Found TACO forum:', tacoForum);
                 return tacoForum;
-            } else {
-                console.log('TACO forum not found. Available forums:', forums);
-                return null;
-            }
+                    } else {
+            console.log('TACO forum not found. Looking for SNS root canister ID:', tacoSnsRoot.toString());
+            console.log('Available forums:', forums);
+            console.log('Forum SNS root canister IDs:', forums.map(f => ({
+                id: f.id.toString(),
+                title: f.title,
+                sns_root_canister_id: f.sns_root_canister_id?.toString() || 'null'
+            })));
+            return null;
+        }
         } catch (error: any) {
             console.error('Error finding TACO forum:', error);
             throw error;
