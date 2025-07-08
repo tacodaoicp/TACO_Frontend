@@ -180,6 +180,7 @@ service : {
   get_admins: () -> (vec AdminInfo) query;
   get_forum: (nat) -> (opt ForumResponse) query;
   get_forum_admin: (nat) -> (opt ForumResponse) query;
+  get_forum_by_sns_root: (principal) -> (opt ForumResponse) query;
   get_forums: () -> (vec ForumResponse) query;
   get_forums_admin: () -> (vec ForumResponse) query;
   get_post: (nat) -> (opt PostResponse) query;
@@ -192,6 +193,8 @@ service : {
   get_proposal_thread: (principal, nat) ->
    (opt ProposalThreadMappingResponse) query;
   get_proposals_topic: (nat) -> (opt ProposalTopicMappingResponse) query;
+  get_proposals_topic_by_sns_root: (principal) ->
+   (opt ProposalTopicMappingResponse) query;
   get_stats: () -> (ForumStats) query;
   get_subtopics: (nat) -> (vec TopicResponse) query;
   get_text_limits: () -> (TextLimits) query;

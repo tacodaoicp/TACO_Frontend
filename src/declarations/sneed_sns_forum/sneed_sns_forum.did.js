@@ -167,6 +167,11 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Opt(ForumResponse)],
         ['query'],
       ),
+    'get_forum_by_sns_root' : IDL.Func(
+        [IDL.Principal],
+        [IDL.Opt(ForumResponse)],
+        ['query'],
+      ),
     'get_forums' : IDL.Func([], [IDL.Vec(ForumResponse)], ['query']),
     'get_forums_admin' : IDL.Func([], [IDL.Vec(ForumResponse)], ['query']),
     'get_post' : IDL.Func([IDL.Nat], [IDL.Opt(PostResponse)], ['query']),
@@ -199,6 +204,11 @@ export const idlFactory = ({ IDL }) => {
       ),
     'get_proposals_topic' : IDL.Func(
         [IDL.Nat],
+        [IDL.Opt(ProposalTopicMappingResponse)],
+        ['query'],
+      ),
+    'get_proposals_topic_by_sns_root' : IDL.Func(
+        [IDL.Principal],
         [IDL.Opt(ProposalTopicMappingResponse)],
         ['query'],
       ),

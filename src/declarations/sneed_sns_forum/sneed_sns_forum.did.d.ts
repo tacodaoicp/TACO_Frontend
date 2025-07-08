@@ -161,6 +161,7 @@ export interface _SERVICE {
   'get_admins' : ActorMethod<[], Array<AdminInfo>>,
   'get_forum' : ActorMethod<[bigint], [] | [ForumResponse]>,
   'get_forum_admin' : ActorMethod<[bigint], [] | [ForumResponse]>,
+  'get_forum_by_sns_root' : ActorMethod<[Principal], [] | [ForumResponse]>,
   'get_forums' : ActorMethod<[], Array<ForumResponse>>,
   'get_forums_admin' : ActorMethod<[], Array<ForumResponse>>,
   'get_post' : ActorMethod<[bigint], [] | [PostResponse]>,
@@ -176,6 +177,10 @@ export interface _SERVICE {
   >,
   'get_proposals_topic' : ActorMethod<
     [bigint],
+    [] | [ProposalTopicMappingResponse]
+  >,
+  'get_proposals_topic_by_sns_root' : ActorMethod<
+    [Principal],
     [] | [ProposalTopicMappingResponse]
   >,
   'get_stats' : ActorMethod<[], ForumStats>,
