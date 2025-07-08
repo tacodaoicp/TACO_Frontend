@@ -3986,30 +3986,30 @@ export const useTacoStore = defineStore('taco', () => {
 
     const findTacoForum = async () => {
         try {
-            const forums = await getAllForums();
-            
-            // Find the TACO forum by looking for the one with our SNS root canister ID
+            const agent = await createAgent({
+                identity: new AnonymousIdentity(),
+                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            });
+
+            const forumActor = Actor.createActor<SneedForumService>(sneedForumIDL, {
+                agent,
+                canisterId: sneedForumCanisterId()
+            });
+
+            // Direct lookup using SNS root canister ID (much more efficient!)
             const tacoSnsRoot = Principal.fromText(tacoSnsRootCanisterId());
+            const tacoForum = await forumActor.get_forum_by_sns_root(tacoSnsRoot);
             
-            const tacoForum = forums.find(forum => 
-                forum.sns_root_canister_id && 
-                forum.sns_root_canister_id.toString() === tacoSnsRoot.toString()
-            );
-            
-            if (tacoForum) {
-                tacoForumId.value = tacoForum.id;
-                console.log('Found TACO forum:', tacoForum);
-                return tacoForum;
-                    } else {
-            console.log('TACO forum not found. Looking for SNS root canister ID:', tacoSnsRoot.toString());
-            console.log('Available forums:', forums);
-            console.log('Forum SNS root canister IDs:', forums.map(f => ({
-                id: f.id.toString(),
-                title: f.title,
-                sns_root_canister_id: f.sns_root_canister_id?.toString() || 'null'
-            })));
-            return null;
-        }
+            if (tacoForum && tacoForum.length > 0) {
+                const forum = tacoForum[0]!;
+                tacoForumId.value = forum.id;
+                console.log('Found TACO forum via direct lookup:', forum);
+                return forum;
+            } else {
+                console.log('TACO forum not found for SNS root canister ID:', tacoSnsRoot.toString());
+                return null;
+            }
         } catch (error: any) {
             console.error('Error finding TACO forum:', error);
             throw error;
@@ -4042,6 +4042,38 @@ export const useTacoStore = defineStore('taco', () => {
             }
         } catch (error: any) {
             console.error('Error getting proposals topic:', error);
+            throw error;
+        }
+    };
+
+    const getProposalsTopicDirect = async () => {
+        try {
+            const agent = await createAgent({
+                identity: new AnonymousIdentity(),
+                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            });
+
+            const forumActor = Actor.createActor<SneedForumService>(sneedForumIDL, {
+                agent,
+                canisterId: sneedForumCanisterId()
+            });
+
+            // Direct lookup using SNS root canister ID - super efficient!
+            const tacoSnsRoot = Principal.fromText(tacoSnsRootCanisterId());
+            const proposalsTopicMapping = await forumActor.get_proposals_topic_by_sns_root(tacoSnsRoot);
+            
+            if (proposalsTopicMapping && proposalsTopicMapping.length > 0) {
+                const mapping = proposalsTopicMapping[0]!;
+                proposalsTopicId.value = mapping.proposals_topic_id;
+                console.log('Found proposals topic via direct SNS lookup:', mapping);
+                return mapping;
+            } else {
+                console.log('Proposals topic not found for SNS root canister ID:', tacoSnsRoot.toString());
+                return null;
+            }
+        } catch (error: any) {
+            console.error('Error getting proposals topic via direct lookup:', error);
             throw error;
         }
     };
@@ -4094,28 +4126,19 @@ export const useTacoStore = defineStore('taco', () => {
 
     const getProposalsThreads = async () => {
         try {
-            console.log('🔍 Starting getProposalsThreads...');
+            console.log('🔍 Starting getProposalsThreads... (OPTIMIZED VERSION)');
             
-            // First find the TACO forum
-            console.log('🔍 Step 1: Finding TACO forum...');
-            const tacoForum = await findTacoForum();
-            if (!tacoForum) {
-                console.log('❌ TACO forum not found');
-                throw new Error('TACO forum not found');
-            }
-            console.log('✅ Found TACO forum with ID:', tacoForum.id.toString());
-
-            // Then get the proposals topic
-            console.log('🔍 Step 2: Getting proposals topic for forum ID:', tacoForum.id.toString());
-            const proposalsMapping = await getProposalsTopic(tacoForum.id);
+            // Skip the forum lookup and go directly to proposals topic via SNS root!
+            console.log('🔍 Step 1: Getting proposals topic via direct SNS root lookup...');
+            const proposalsMapping = await getProposalsTopicDirect();
             if (!proposalsMapping) {
-                console.log('❌ Proposals topic not found for forum ID:', tacoForum.id.toString());
+                console.log('❌ Proposals topic not found via direct lookup');
                 throw new Error('Proposals topic not found');
             }
             console.log('✅ Found proposals topic with ID:', proposalsMapping.proposals_topic_id.toString());
 
-            // Finally get all threads in the proposals topic
-            console.log('🔍 Step 3: Getting threads for topic ID:', proposalsMapping.proposals_topic_id.toString());
+            // Get all threads in the proposals topic
+            console.log('🔍 Step 2: Getting threads for topic ID:', proposalsMapping.proposals_topic_id.toString());
             const threads = await getThreadsByTopic(proposalsMapping.proposals_topic_id);
             console.log('✅ Found', threads.length, 'threads');
             return threads;
@@ -4281,6 +4304,7 @@ export const useTacoStore = defineStore('taco', () => {
         getAllForums,
         findTacoForum,
         getProposalsTopic,
+        getProposalsTopicDirect,
         getThreadsByTopic,
         getPostsByThread,
         getProposalsThreads,
