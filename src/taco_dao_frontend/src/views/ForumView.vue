@@ -57,11 +57,11 @@
                             <div class="thread-footer">
                                 <div class="author">
                                     <i class="fa-solid fa-user"></i>
-                                    <span>{{ formatPrincipal(thread.created_by) }}</span>
+                                    <span>{{ getPrincipalDisplayName(thread.created_by) }}</span>
                                 </div>
                                 <div class="updated">
                                     <i class="fa-solid fa-clock"></i>
-                                    <span>Updated {{ formatDate(thread.updated_at) }}</span>
+                                    <span>Updated {{ formatDate(thread.updated_at) }} by {{ getPrincipalDisplayName(thread.updated_by) }}</span>
                                 </div>
                             </div>
                         </div>
@@ -99,7 +99,7 @@ const {
 } = storeToRefs(tacoStore)
 
 // Destructure methods (methods don't need reactivity)
-const { getProposalsThreads } = tacoStore
+const { getProposalsThreads, getPrincipalDisplayName } = tacoStore
 
 // Local state
 const error = ref('')
@@ -135,13 +135,6 @@ const formatDate = (timestamp) => {
         hour: '2-digit',
         minute: '2-digit'
     })
-}
-
-const formatPrincipal = (principal) => {
-    const principalStr = principal.toString()
-    return principalStr.length > 20 ? 
-        principalStr.substring(0, 8) + '...' + principalStr.substring(principalStr.length - 8) :
-        principalStr
 }
 
 const truncateText = (text, maxLength) => {

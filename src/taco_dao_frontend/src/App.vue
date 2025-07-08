@@ -1054,6 +1054,10 @@
     // log
     // // console.log('running app mounted logic')
 
+    // check if user is logged in (this will trigger name loading if logged in)
+    //console.log('🚀 Running app initialization - checking login status...');
+    await checkIfLoggedIn()
+
     // fetch crypto prices
     fetchCryptoPrices()
 

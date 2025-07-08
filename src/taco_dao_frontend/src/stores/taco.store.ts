@@ -722,6 +722,7 @@ export const useTacoStore = defineStore('taco', () => {
     // user
     const checkIfLoggedIn = async () => {
 
+        console.log('🔍 checkIfLoggedIn() called');
         // log
         // console.log('checking if user is logged in')
 
@@ -744,6 +745,7 @@ export const useTacoStore = defineStore('taco', () => {
             userLoggedIn.value = true
 
             // Load names cache in background (non-blocking)
+            console.log('🔍 Triggering loadAllNames() from checkIfLoggedIn - user is logged in');
             loadAllNames().catch(console.error);
 
 
@@ -863,6 +865,7 @@ export const useTacoStore = defineStore('taco', () => {
             }
 
             // Load names cache in background (non-blocking)
+            console.log('🔍 Triggering loadAllNames() from iidLogIn - after successful login');
             loadAllNames().catch(console.error);
 
             // turn app loading off
@@ -4217,13 +4220,13 @@ export const useTacoStore = defineStore('taco', () => {
     const appSneedDaoCanisterId = () => {
         switch (process.env.DFX_NETWORK) {
             case "ic":
-                return process.env.CANISTER_ID_APP_SNEEDDAO_BACKEND_IC || 'mcigm-4aaaa-aaaad-qhlkq-cai'; // Replace with actual IC canister ID
+                return process.env.CANISTER_ID_APP_SNEEDDAO_BACKEND_IC || 'g7s5u-tqaaa-aaaad-qhktq-cai'; // Replace with actual IC canister ID
                 break;
             case "staging":
-                return process.env.CANISTER_ID_APP_SNEEDDAO_BACKEND_STAGING || 'mcigm-4aaaa-aaaad-qhlkq-cai'; // Replace with actual staging ID
+                return process.env.CANISTER_ID_APP_SNEEDDAO_BACKEND_STAGING || 'g7s5u-tqaaa-aaaad-qhktq-cai'; // Replace with actual staging ID
                 break;
         }        
-        return 'mcigm-4aaaa-aaaad-qhlkq-cai'; // Replace with actual local/default ID
+        return 'g7s5u-tqaaa-aaaad-qhktq-cai'; // Replace with actual local/default ID
     };
 
     // Helper function to convert Uint8Array or number[] to hex string for map keys
@@ -4238,9 +4241,15 @@ export const useTacoStore = defineStore('taco', () => {
 
     // Load all names (non-blocking) - call this on app startup
     const loadAllNames = async () => {
-        if (namesLoading.value) return; // Already loading
+        console.log('🔍 loadAllNames() called');
+        
+        if (namesLoading.value) {
+            console.log('⏳ Names already loading, skipping...');
+            return; // Already loading
+        }
         
         try {
+            console.log('🚀 Starting to load all names...');
             namesLoading.value = true;
             
             const agent = await createAgent({
@@ -4249,16 +4258,22 @@ export const useTacoStore = defineStore('taco', () => {
                 fetchRootKey: process.env.DFX_NETWORK === "local",
             });
 
+            const canisterId = appSneedDaoCanisterId();
+            console.log('🔗 Connecting to app_sneeddao_backend canister:', canisterId);
+            console.log('🌐 DFX_NETWORK:', process.env.DFX_NETWORK);
+            
             const appSneedDaoActor = Actor.createActor<AppSneedDaoService>(appSneedDaoIDL, {
                 agent,
-                canisterId: appSneedDaoCanisterId()
+                canisterId: canisterId
             });
 
             // Load all principal names and neuron names in parallel
+            console.log('📞 Making API calls to get_all_principal_names() and get_all_neuron_names()...');
             const [principalNames, neuronNames] = await Promise.all([
                 appSneedDaoActor.get_all_principal_names(),
                 appSneedDaoActor.get_all_neuron_names()
             ]);
+            console.log('📦 Received data - principalNames:', principalNames.length, 'neuronNames:', neuronNames.length);
 
             // Clear and populate principal names cache
             namesCache.value.principals.clear();

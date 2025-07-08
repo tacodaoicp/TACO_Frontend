@@ -17,7 +17,7 @@
                         </div>
                         <div class="meta-item">
                             <i class="fa-solid fa-user"></i>
-                            <span>{{ formatPrincipal(currentThread.created_by) }}</span>
+                            <span>{{ getPrincipalDisplayName(currentThread.created_by) }}</span>
                         </div>
                         <div class="meta-item">
                             <i class="fa-solid fa-calendar"></i>
@@ -51,7 +51,7 @@
                         <div class="post-header">
                             <div class="post-author">
                                 <i class="fa-solid fa-user"></i>
-                                <span>{{ formatPrincipal(currentThread.created_by) }}</span>
+                                <span>{{ getPrincipalDisplayName(currentThread.created_by) }}</span>
                                 <span class="post-type">Original Post</span>
                             </div>
                             <div class="post-date">
@@ -82,7 +82,7 @@
                                 <div class="post-header">
                                     <div class="post-author">
                                         <i class="fa-solid fa-user"></i>
-                                        <span>{{ formatPrincipal(post.created_by) }}</span>
+                                        <span>{{ getPrincipalDisplayName(post.created_by) }}</span>
                                         <span v-if="getPostTitle(post)" class="post-title">{{ getPostTitle(post) }}</span>
                                     </div>
                                     <div class="post-date">
@@ -140,7 +140,8 @@ const {
     appLoading, 
     fetchedThreadPosts,
     getPostsByThread,
-    getThread
+    getThread,
+    getPrincipalDisplayName
 } = tacoStore
 
 // Local state
@@ -198,13 +199,6 @@ const formatDate = (timestamp) => {
         hour: '2-digit',
         minute: '2-digit'
     })
-}
-
-const formatPrincipal = (principal) => {
-    const principalStr = principal.toString()
-    return principalStr.length > 20 ? 
-        principalStr.substring(0, 8) + '...' + principalStr.substring(principalStr.length - 8) :
-        principalStr
 }
 
 // Load data on mount
