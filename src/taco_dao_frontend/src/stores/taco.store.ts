@@ -17,6 +17,7 @@ import { idlFactory as daoBackendIDL } from "../../../declarations/dao_backend/D
 import { Result_4, Result_8, idlFactory as treasuryIDL, UpdateConfig, RebalanceConfig, _SERVICE as TreasuryService } from "../../../declarations/treasury/treasury.did.js"
 import { idlFactory as neuronSnapshotIDL, _SERVICE as NeuronSnapshotService } from "../../../declarations/neuronSnapshot/neuronSnapshot.did.js"
 import { idlFactory as sneedForumIDL, _SERVICE as SneedForumService } from "../../../declarations/sneed_sns_forum/sneed_sns_forum.did.js"
+import { idlFactory as appSneedDaoIDL, _SERVICE as AppSneedDaoService } from "../../../declarations/app_sneeddao_backend/app_sneeddao_backend.did.js"
 import { Principal } from '@dfinity/principal'
 import { AccountIdentifier } from '@dfinity/ledger-icp'
 import { canisterId as iiCanisterId } from "../../../declarations/internet_identity/index.js"
@@ -263,6 +264,30 @@ import type {
     ProposalTopicMappingResponse as CandidProposalTopicMappingResponse
 } from "../../../declarations/sneed_sns_forum/sneed_sns_forum.did.d"
 
+// Naming system interfaces
+interface NeuronNameKey {
+    sns_root_canister_id: Principal;
+    neuron_id: {
+        id: Uint8Array;
+    };
+}
+
+interface NeuronNameEntry {
+    name: string;
+    verified: boolean;
+}
+
+interface PrincipalNameEntry {
+    name: string;
+    verified: boolean;
+}
+
+interface NamesCache {
+    principals: Map<string, PrincipalNameEntry>;
+    neurons: Map<string, NeuronNameEntry>; // key format: "snsRoot:neuronIdHex"
+    lastLoaded: number | null;
+}
+
 /////////////
 // Exports //
 /////////////
@@ -364,7 +389,16 @@ export const useTacoStore = defineStore('taco', () => {
     const proposalsTopicId = ref<bigint | null>(null)
     const fetchedForums = ref<CandidForumResponse[]>([])
     const fetchedProposalsThreads = ref<CandidThreadResponse[]>([])
-    const fetchedThreadPosts = ref<CandidPostResponse[]>([])    
+    const fetchedThreadPosts = ref<CandidPostResponse[]>([])
+    
+    // naming system  
+    const namesCache = ref<NamesCache>({
+        principals: new Map(),
+        neurons: new Map(),
+        lastLoaded: null
+    })
+    const namesLoading = ref(false)
+    
     const systemLogs = ref<SystemLog[]>([])
     const tradingLogs = ref<TradingLog[]>([])
     const formatTokenAmount = (amount: bigint, decimals: number): string => {
@@ -709,6 +743,9 @@ export const useTacoStore = defineStore('taco', () => {
             // set user logged in to true
             userLoggedIn.value = true
 
+            // Load names cache in background (non-blocking)
+            loadAllNames().catch(console.error);
+
 
         } else {
 
@@ -824,6 +861,9 @@ export const useTacoStore = defineStore('taco', () => {
                 console.log('Could not refresh voting power on login:', error)
                 // Don't fail login if refresh fails
             }
+
+            // Load names cache in background (non-blocking)
+            loadAllNames().catch(console.error);
 
             // turn app loading off
             appLoadingOff()
@@ -4170,6 +4210,230 @@ export const useTacoStore = defineStore('taco', () => {
         }
     };
 
+    //=========================================================================
+    // NAMING SYSTEM METHODS
+    //=========================================================================
+
+    const appSneedDaoCanisterId = () => {
+        switch (process.env.DFX_NETWORK) {
+            case "ic":
+                return process.env.CANISTER_ID_APP_SNEEDDAO_BACKEND_IC || 'mcigm-4aaaa-aaaad-qhlkq-cai'; // Replace with actual IC canister ID
+                break;
+            case "staging":
+                return process.env.CANISTER_ID_APP_SNEEDDAO_BACKEND_STAGING || 'mcigm-4aaaa-aaaad-qhlkq-cai'; // Replace with actual staging ID
+                break;
+        }        
+        return 'mcigm-4aaaa-aaaad-qhlkq-cai'; // Replace with actual local/default ID
+    };
+
+    // Helper function to convert Uint8Array or number[] to hex string for map keys
+    const uint8ArrayToHex = (arr: Uint8Array | number[]): string => {
+        return Array.from(arr, byte => byte.toString(16).padStart(2, '0')).join('');
+    };
+
+    // Helper function to create neuron map key
+    const createNeuronKey = (snsRoot: Principal, neuronId: Uint8Array | number[]): string => {
+        return `${snsRoot.toString()}:${uint8ArrayToHex(neuronId)}`;
+    };
+
+    // Load all names (non-blocking) - call this on app startup
+    const loadAllNames = async () => {
+        if (namesLoading.value) return; // Already loading
+        
+        try {
+            namesLoading.value = true;
+            
+            const agent = await createAgent({
+                identity: new AnonymousIdentity(),
+                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            });
+
+            const appSneedDaoActor = Actor.createActor<AppSneedDaoService>(appSneedDaoIDL, {
+                agent,
+                canisterId: appSneedDaoCanisterId()
+            });
+
+            // Load all principal names and neuron names in parallel
+            const [principalNames, neuronNames] = await Promise.all([
+                appSneedDaoActor.get_all_principal_names(),
+                appSneedDaoActor.get_all_neuron_names()
+            ]);
+
+            // Clear and populate principal names cache
+            namesCache.value.principals.clear();
+            principalNames.forEach(([principal, [name, verified]]) => {
+                namesCache.value.principals.set(principal.toString(), { name, verified });
+            });
+
+            // Clear and populate neuron names cache
+            namesCache.value.neurons.clear();
+            neuronNames.forEach(([neuronKey, [name, verified]]) => {
+                const mapKey = createNeuronKey(neuronKey.sns_root_canister_id, neuronKey.neuron_id.id);
+                namesCache.value.neurons.set(mapKey, { name, verified });
+            });
+
+            namesCache.value.lastLoaded = Date.now();
+            
+            console.log(`✅ Loaded ${principalNames.length} principal names and ${neuronNames.length} neuron names`);
+            
+        } catch (error: any) {
+            console.error('Error loading names:', error);
+            // Don't throw - this is non-blocking
+        } finally {
+            namesLoading.value = false;
+        }
+    };
+
+    // Get principal name or fallback to truncated principal
+    const getPrincipalDisplayName = (principal: Principal | string): string => {
+        const principalStr = typeof principal === 'string' ? principal : principal.toString();
+        const cachedName = namesCache.value.principals.get(principalStr);
+        
+        if (cachedName) {
+            return cachedName.verified ? `✓ ${cachedName.name}` : cachedName.name;
+        }
+        
+        // Fallback to truncated principal
+        const cleaned = principalStr.replace(/-/g, '');
+        return cleaned.length > 10 ? 
+            cleaned.substring(0, 5) + '...' + cleaned.substring(cleaned.length - 5) :
+            cleaned;
+    };
+
+    // Get neuron name or fallback to neuron ID
+    const getNeuronDisplayName = (snsRoot: Principal, neuronId: Uint8Array | number[]): string => {
+        const mapKey = createNeuronKey(snsRoot, neuronId);
+        const cachedName = namesCache.value.neurons.get(mapKey);
+        
+        if (cachedName) {
+            return cachedName.verified ? `✓ ${cachedName.name}` : cachedName.name;
+        }
+        
+        // Fallback to truncated neuron ID
+        const neuronIdHex = uint8ArrayToHex(neuronId);
+        return neuronIdHex.length > 12 ? 
+            `Neuron ${neuronIdHex.substring(0, 6)}...${neuronIdHex.substring(neuronIdHex.length - 6)}` :
+            `Neuron ${neuronIdHex}`;
+    };
+
+    // Set principal name for logged-in user
+    const setPrincipalName = async (name: string) => {
+        try {
+            if (!userLoggedIn.value) {
+                throw new Error('User must be logged in to set names');
+            }
+
+            const authClient = await getAuthClient();
+            const identity = authClient.getIdentity();
+            
+            const agent = await createAgent({
+                identity,
+                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            });
+
+            const appSneedDaoActor = Actor.createActor<AppSneedDaoService>(appSneedDaoIDL, {
+                agent,
+                canisterId: appSneedDaoCanisterId()
+            });
+
+            const result = await appSneedDaoActor.set_principal_name(name);
+            
+            if ('ok' in result) {
+                console.log('✅ Principal name set successfully:', result.ok);
+                
+                // Update cache immediately
+                const userPrincipalStr = userPrincipal.value;
+                namesCache.value.principals.set(userPrincipalStr, { name, verified: false });
+                
+                return result.ok;
+            } else {
+                throw new Error(result.err);
+            }
+        } catch (error: any) {
+            console.error('Error setting principal name:', error);
+            throw error;
+        }
+    };
+
+    // Set neuron name for logged-in user  
+    const setNeuronName = async (snsRoot: Principal, neuronId: Uint8Array | number[], name: string) => {
+        try {
+            if (!userLoggedIn.value) {
+                throw new Error('User must be logged in to set names');
+            }
+
+            const authClient = await getAuthClient();
+            const identity = authClient.getIdentity();
+            
+            const agent = await createAgent({
+                identity,
+                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            });
+
+            const appSneedDaoActor = Actor.createActor<AppSneedDaoService>(appSneedDaoIDL, {
+                agent,
+                canisterId: appSneedDaoCanisterId()
+            });
+
+            // Convert number[] to Uint8Array if needed
+            const neuronIdUint8 = neuronId instanceof Uint8Array ? neuronId : new Uint8Array(neuronId);
+            
+            const result = await appSneedDaoActor.set_neuron_name(snsRoot, { id: neuronIdUint8 }, name);
+            
+            if ('ok' in result) {
+                console.log('✅ Neuron name set successfully:', result.ok);
+                
+                // Update cache immediately
+                const mapKey = createNeuronKey(snsRoot, neuronId);
+                namesCache.value.neurons.set(mapKey, { name, verified: false });
+                
+                return result.ok;
+            } else {
+                throw new Error(result.err);
+            }
+        } catch (error: any) {
+            console.error('Error setting neuron name:', error);
+            throw error;
+        }
+    };
+
+    // Get user's neurons for the names page
+    const getUserNeurons = async () => {
+        try {
+            if (!userLoggedIn.value) {
+                throw new Error('User must be logged in');
+            }
+
+            const authClient = await getAuthClient();
+            const identity = authClient.getIdentity();
+            
+            const agent = await createAgent({
+                identity,
+                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            });
+
+            const appSneedDaoActor = Actor.createActor<AppSneedDaoService>(appSneedDaoIDL, {
+                agent,
+                canisterId: appSneedDaoCanisterId()
+            });
+
+            const result = await appSneedDaoActor.get_user_neurons();
+            
+            if ('ok' in result) {
+                return result.ok;
+            } else {
+                throw new Error(result.err);
+            }
+        } catch (error: any) {
+            console.error('Error getting user neurons:', error);
+            throw error;
+        }
+    };
+
     
 
     // # RETURN #
@@ -4309,5 +4573,14 @@ export const useTacoStore = defineStore('taco', () => {
         getPostsByThread,
         getProposalsThreads,
         getThread,
+        // naming system functions
+        namesCache,
+        namesLoading,
+        loadAllNames,
+        getPrincipalDisplayName,
+        getNeuronDisplayName,
+        setPrincipalName,
+        setNeuronName,
+        getUserNeurons,
     }
 })

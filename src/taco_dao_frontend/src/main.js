@@ -19,6 +19,7 @@ import ChatView from "./views/ChatView.vue"
 import ReportsView from "./views/ReportsView.vue"
 import ForumView from "./views/ForumView.vue"
 import ThreadView from "./views/ThreadView.vue"
+import NamesView from "./views/NamesView.vue"
 import VueApexCharts from 'vue3-apexcharts'
 import VueClickAway from "vue3-click-away"
 import 'animate.css'
@@ -45,6 +46,7 @@ const routes = [
     { path: "/admin/neuron", name: "AdminNeuron", component: AdminNeuronView },
     { path: "/forum", name: "Forum", component: ForumView },
     { path: "/forum/thread/:id", name: "Thread", component: ThreadView },
+    { path: "/names", name: "Names", component: NamesView },
     { path: "/:pathMatch(.*)*", redirect: "/" },
 ]
 
