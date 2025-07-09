@@ -272,7 +272,9 @@
                   <div 
                     v-for="post in posts" 
                     :key="post.id.toString()"
+                    :id="`post-${post.id.toString()}`"
                     class="post-card taco-container taco-container--l1 mb-3"
+                    :class="{ 'post-highlighted': highlightedPost === post.id.toString() }"
                   >
                     <div class="post-header">
                       <div class="d-flex justify-content-between align-items-start">
@@ -281,10 +283,16 @@
                           <span class="text-muted ms-2">
                             {{ formatDate(new Date(Number(post.created_at) / 1_000_000)) }}
                           </span>
-                          <span v-if="post.reply_to_post_id && post.reply_to_post_id.length > 0" class="text-muted ms-2">
+                          <button 
+                            v-if="post.reply_to_post_id && post.reply_to_post_id.length > 0" 
+                            @click="scrollToParentPost(post.reply_to_post_id[0])"
+                            class="btn btn-link btn-sm text-muted ms-2 p-0 reply-indicator"
+                            title="Go to parent post"
+                          >
                             <i class="fa-solid fa-reply me-1"></i>
                             reply
-                          </span>
+                            <i class="fa-solid fa-arrow-up-right-from-square ms-1"></i>
+                          </button>
                         </div>
                         <div class="post-votes">
                           <span class="text-success me-2">
@@ -407,6 +415,7 @@ const showNewPostForm = ref(false)
 const newPostBody = ref('')
 const replyingToPost = ref<bigint | null>(null)
 const replyBody = ref('')
+const highlightedPost = ref<string | null>(null)
 
 // Reactive data
 const proposal = ref<any>(null)
@@ -571,6 +580,30 @@ const startReply = (postId: bigint) => {
 const cancelReply = () => {
   replyingToPost.value = null
   replyBody.value = ''
+}
+
+// Scroll to parent post
+const scrollToParentPost = (parentPostId: bigint) => {
+  const parentPostElement = document.getElementById(`post-${parentPostId.toString()}`)
+  if (parentPostElement) {
+    parentPostElement.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    highlightedPost.value = parentPostId.toString()
+    
+    // Clear highlight after 3 seconds
+    setTimeout(() => {
+      highlightedPost.value = null
+    }, 3000)
+  } else {
+    console.warn('Parent post not found:', parentPostId.toString())
+    // Show toast or alert that parent post is not visible
+    tacoStore.addToast({
+      id: Date.now(),
+      code: 'parent-post-not-found',
+      title: 'Parent Post Not Found',
+      icon: 'fa-solid fa-exclamation-triangle',
+      message: 'The parent post may be in a different page or not loaded yet.'
+    })
+  }
 }
 
 // Utility functions
@@ -767,12 +800,39 @@ onMounted(() => {
 
 .post-card {
   padding: 1.5rem;
+  transition: background-color 0.3s ease, border-color 0.3s ease;
+  
+  &.post-highlighted {
+    background-color: var(--yellow-to-orange);
+    border: 2px solid var(--orange);
+    box-shadow: 0 0 10px rgba(254, 200, 0, 0.3);
+  }
   
   .post-header {
     margin-bottom: 1rem;
     
     .post-author {
       font-size: 0.9rem;
+      
+      .reply-indicator {
+        text-decoration: none;
+        color: var(--dark-gray) !important;
+        font-size: 0.85rem;
+        border: none;
+        background: none;
+        padding: 0;
+        margin: 0;
+        
+        &:hover {
+          color: var(--orange) !important;
+          text-decoration: underline;
+        }
+        
+        &:focus {
+          outline: none;
+          box-shadow: none;
+        }
+      }
     }
     
     .post-votes {
