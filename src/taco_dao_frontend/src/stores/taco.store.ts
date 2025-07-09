@@ -449,6 +449,10 @@ export const useTacoStore = defineStore('taco', () => {
     
     // proposals
     const fetchedTacoProposals = ref<TacoProposal[]>([])
+    const proposalsLoading = ref(false)
+    const proposalsLoadingMore = ref(false)
+    const proposalsHasMore = ref(true)
+    const proposalsLastId = ref<bigint | null>(null)
     
     // naming system  
     const namesCache = ref<NamesCache>({
@@ -4320,109 +4324,149 @@ export const useTacoStore = defineStore('taco', () => {
         return 'lhdfz-wqaaa-aaaaq-aae3q-cai';
     };
 
-    const fetchTacoProposals = async (limit: number = 20) => {
-        try {
-            console.log('🔍 Fetching TACO DAO proposals...');
-            console.log('🔗 Using SNS governance canister:', tacoSnsGovernanceCanisterId());
+    const fetchTacoProposalsInternal = async (beforeProposal: bigint | null = null, limit: number = 20) => {
+        console.log('🔍 Fetching TACO DAO proposals...', beforeProposal ? `before ID ${beforeProposal}` : 'from latest');
+        console.log('🔗 Using SNS governance canister:', tacoSnsGovernanceCanisterId());
+        
+        const agent = await createAgent({
+            identity: new AnonymousIdentity(),
+            host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+            fetchRootKey: process.env.DFX_NETWORK === "local",
+        });
+
+        const governanceActor = Actor.createActor(snsGovernanceIDL, {
+            agent,
+            canisterId: tacoSnsGovernanceCanisterId()
+        });
+
+        // Create request for list_proposals
+        const request = {
+            include_reward_status: [], // Include all reward statuses
+            before_proposal: beforeProposal ? [{ id: beforeProposal }] : [], // Pagination support
+            limit: limit,
+            exclude_type: [], // Don't exclude any types
+            include_topics: [], // Include all topics
+            include_status: [], // Include all statuses
+        };
+
+        console.log('📞 Calling list_proposals with request:', request);
+        const response = await governanceActor.list_proposals(request) as any;
+        console.log('📦 Raw response from list_proposals:', response);
+        
+        // Check if response has proposals directly (sometimes the structure is different)
+        let proposals;
+        if (response && response.proposals) {
+            proposals = response.proposals;
+            console.log('✅ Found proposals directly in response');
+        } else if (response && response.Ok && response.Ok.proposals) {
+            proposals = response.Ok.proposals;
+            console.log('✅ Found proposals in response.Ok');
+        } else if (Array.isArray(response)) {
+            proposals = response;
+            console.log('✅ Response is array of proposals');
+        } else {
+            console.error('❌ Unexpected response structure:', response);
+            throw new Error(`Unexpected response structure: ${JSON.stringify(response)}`);
+        }
+        
+        console.log('✅ Fetched', proposals.length, 'TACO DAO proposals');
+        
+        // Transform the raw proposal data into our TacoProposal format
+        const transformedProposals: TacoProposal[] = proposals.map((proposalData: any) => {
+            // Extract data from array-wrapped fields
+            const proposal = proposalData.proposal && proposalData.proposal[0] ? proposalData.proposal[0] : null;
+            const tally = proposalData.latest_tally && proposalData.latest_tally[0] ? proposalData.latest_tally[0] : null;
+            const id = proposalData.id && proposalData.id[0] ? proposalData.id[0] : null;
+            const proposer = proposalData.proposer && proposalData.proposer[0] ? proposalData.proposer[0] : null;
             
-            const agent = await createAgent({
-                identity: new AnonymousIdentity(),
-                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-                fetchRootKey: process.env.DFX_NETWORK === "local",
-            });
-
-            const governanceActor = Actor.createActor(snsGovernanceIDL, {
-                agent,
-                canisterId: tacoSnsGovernanceCanisterId()
-            });
-
-            // Create request for list_proposals
-            const request = {
-                include_reward_status: [], // Include all reward statuses
-                before_proposal: [], // No pagination, start from latest
-                limit: limit,
-                exclude_type: [], // Don't exclude any types
-                include_topics: [], // Include all topics
-                include_status: [], // Include all statuses
-            };
-
-            console.log('📞 Calling list_proposals with request:', request);
-            const response = await governanceActor.list_proposals(request) as any;
-            console.log('📦 Raw response from list_proposals:', response);
-            
-            // Check if response has proposals directly (sometimes the structure is different)
-            let proposals;
-            if (response && response.proposals) {
-                proposals = response.proposals;
-                console.log('✅ Found proposals directly in response');
-            } else if (response && response.Ok && response.Ok.proposals) {
-                proposals = response.Ok.proposals;
-                console.log('✅ Found proposals in response.Ok');
-            } else if (Array.isArray(response)) {
-                proposals = response;
-                console.log('✅ Response is array of proposals');
-            } else {
-                console.error('❌ Unexpected response structure:', response);
-                throw new Error(`Unexpected response structure: ${JSON.stringify(response)}`);
+            // Determine status based on timestamps
+            let status: 'Open' | 'Adopted' | 'Rejected' | 'Failed' | 'Executed' = 'Open';
+            if (proposalData.failed_timestamp_seconds > 0) {
+                status = 'Failed';
+            } else if (proposalData.executed_timestamp_seconds > 0) {
+                status = 'Executed';
+            } else if (proposalData.decided_timestamp_seconds > 0) {
+                // Check if it was adopted or rejected based on voting
+                if (tally && tally.yes > tally.no) {
+                    status = 'Adopted';
+                } else {
+                    status = 'Rejected';
+                }
             }
             
-            console.log('✅ Fetched', proposals.length, 'TACO DAO proposals');
+            return {
+                id: id?.id || BigInt(0),
+                title: proposal?.title || 'Untitled Proposal',
+                summary: proposal?.summary || '',
+                url: proposal?.url || '',
+                status,
+                createdAt: new Date(Number(proposalData.proposal_creation_timestamp_seconds) * 1000),
+                decidedAt: proposalData.decided_timestamp_seconds > 0 
+                    ? new Date(Number(proposalData.decided_timestamp_seconds) * 1000) 
+                    : undefined,
+                executedAt: proposalData.executed_timestamp_seconds > 0 
+                    ? new Date(Number(proposalData.executed_timestamp_seconds) * 1000) 
+                    : undefined,
+                proposer: proposer ? uint8ArrayToHex(proposer.id) : undefined,
+                yesVotes: tally?.yes || BigInt(0),
+                noVotes: tally?.no || BigInt(0),
+                totalVotes: tally?.total || BigInt(0),
+            };
+        });
+        
+        // Sort by creation date (newest first)
+        transformedProposals.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+        
+        return {
+            proposals: transformedProposals,
+            hasMore: proposals.length === limit, // If we got exactly the limit, there might be more
+            lastId: transformedProposals.length > 0 ? transformedProposals[transformedProposals.length - 1].id : null
+        };
+    };
+
+    const fetchTacoProposals = async (limit: number = 20) => {
+        try {
+            proposalsLoading.value = true;
             
-            // Transform the raw proposal data into our TacoProposal format
-            const transformedProposals: TacoProposal[] = proposals.map((proposalData: any) => {
-                console.log('🔄 Processing proposal:', proposalData);
-                
-                // Extract data from array-wrapped fields
-                const proposal = proposalData.proposal && proposalData.proposal[0] ? proposalData.proposal[0] : null;
-                const tally = proposalData.latest_tally && proposalData.latest_tally[0] ? proposalData.latest_tally[0] : null;
-                const id = proposalData.id && proposalData.id[0] ? proposalData.id[0] : null;
-                const proposer = proposalData.proposer && proposalData.proposer[0] ? proposalData.proposer[0] : null;
-                
-                // Determine status based on timestamps
-                let status: 'Open' | 'Adopted' | 'Rejected' | 'Failed' | 'Executed' = 'Open';
-                if (proposalData.failed_timestamp_seconds > 0) {
-                    status = 'Failed';
-                } else if (proposalData.executed_timestamp_seconds > 0) {
-                    status = 'Executed';
-                } else if (proposalData.decided_timestamp_seconds > 0) {
-                    // Check if it was adopted or rejected based on voting
-                    if (tally && tally.yes > tally.no) {
-                        status = 'Adopted';
-                    } else {
-                        status = 'Rejected';
-                    }
-                }
-                
-                return {
-                    id: id?.id || BigInt(0),
-                    title: proposal?.title || 'Untitled Proposal',
-                    summary: proposal?.summary || '',
-                    url: proposal?.url || '',
-                    status,
-                    createdAt: new Date(Number(proposalData.proposal_creation_timestamp_seconds) * 1000),
-                    decidedAt: proposalData.decided_timestamp_seconds > 0 
-                        ? new Date(Number(proposalData.decided_timestamp_seconds) * 1000) 
-                        : undefined,
-                    executedAt: proposalData.executed_timestamp_seconds > 0 
-                        ? new Date(Number(proposalData.executed_timestamp_seconds) * 1000) 
-                        : undefined,
-                    proposer: proposer ? uint8ArrayToHex(proposer.id) : undefined,
-                    yesVotes: tally?.yes || BigInt(0),
-                    noVotes: tally?.no || BigInt(0),
-                    totalVotes: tally?.total || BigInt(0),
-                };
-            });
+            const result = await fetchTacoProposalsInternal(null, limit);
             
-            // Sort by creation date (newest first)
-            transformedProposals.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+            fetchedTacoProposals.value = result.proposals;
+            proposalsHasMore.value = result.hasMore;
+            proposalsLastId.value = result.lastId;
             
-            fetchedTacoProposals.value = transformedProposals;
-            console.log('✅ Successfully processed', transformedProposals.length, 'proposals');
-            return transformedProposals;
+            console.log('✅ Successfully loaded', result.proposals.length, 'proposals');
+            return result.proposals;
         } catch (error: any) {
             console.error('❌ Error fetching TACO DAO proposals:', error);
             console.error('❌ Error details:', error.message, error.stack);
             throw error;
+        } finally {
+            proposalsLoading.value = false;
+        }
+    };
+
+    const loadMoreTacoProposals = async (limit: number = 20) => {
+        if (!proposalsHasMore.value || proposalsLoadingMore.value || !proposalsLastId.value) {
+            return [];
+        }
+
+        try {
+            proposalsLoadingMore.value = true;
+            
+            const result = await fetchTacoProposalsInternal(proposalsLastId.value, limit);
+            
+            // Append new proposals to existing ones
+            fetchedTacoProposals.value = [...fetchedTacoProposals.value, ...result.proposals];
+            proposalsHasMore.value = result.hasMore;
+            proposalsLastId.value = result.lastId;
+            
+            console.log('✅ Successfully loaded', result.proposals.length, 'more proposals');
+            return result.proposals;
+        } catch (error: any) {
+            console.error('❌ Error loading more TACO DAO proposals:', error);
+            throw error;
+        } finally {
+            proposalsLoadingMore.value = false;
         }
     };
 
@@ -4804,7 +4848,11 @@ export const useTacoStore = defineStore('taco', () => {
         getThread,
         // proposals functions
         fetchedTacoProposals,
+        proposalsLoading,
+        proposalsLoadingMore,
+        proposalsHasMore,
         fetchTacoProposals,
+        loadMoreTacoProposals,
         // naming system functions
         namesCache,
         namesLoading,

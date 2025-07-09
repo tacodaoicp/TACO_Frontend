@@ -14,7 +14,7 @@
           <TacoTitle level="h2" emoji="🗳️" title="TACO DAO Proposals" class="mt-4" />
 
           <!-- loading state -->
-          <div v-if="loading" class="d-flex justify-content-center align-items-center py-5">
+          <div v-if="proposalsLoading" class="d-flex justify-content-center align-items-center py-5">
             <div class="spinner-border text-primary" role="status">
               <span class="visually-hidden">Loading proposals...</span>
             </div>
@@ -36,7 +36,7 @@
             <!-- refresh button -->
             <div class="d-flex justify-content-between align-items-center mb-3">
               <span class="text-muted">{{ proposals.length }} proposals found</span>
-              <button @click="loadProposals" class="btn btn-outline-primary btn-sm" :disabled="loading">
+              <button @click="loadProposals" class="btn btn-outline-primary btn-sm" :disabled="proposalsLoading">
                 <i class="fa-solid fa-refresh me-1"></i>
                 Refresh
               </button>
@@ -127,6 +127,24 @@
               </div>
             </div>
 
+            <!-- load more button -->
+            <div v-if="proposalsHasMore && proposals.length > 0" class="text-center mt-4">
+              <button 
+                @click="loadMoreProposals" 
+                class="btn btn-primary" 
+                :disabled="proposalsLoadingMore"
+              >
+                <span v-if="proposalsLoadingMore">
+                  <i class="fa-solid fa-spinner fa-spin me-2"></i>
+                  Loading more...
+                </span>
+                <span v-else>
+                  <i class="fa-solid fa-chevron-down me-2"></i>
+                  Load More Proposals
+                </span>
+              </button>
+            </div>
+
             <!-- empty state -->
             <div v-if="proposals.length === 0" class="text-center py-5">
               <i class="fa-solid fa-inbox text-muted fa-3x mb-3"></i>
@@ -153,21 +171,30 @@ import TacoTitle from '../components/misc/TacoTitle.vue'
 
 const tacoStore = useTacoStore()
 
-const loading = ref(false)
 const error = ref<string | null>(null)
 
 const proposals = computed(() => tacoStore.fetchedTacoProposals)
+const proposalsLoading = computed(() => tacoStore.proposalsLoading)
+const proposalsLoadingMore = computed(() => tacoStore.proposalsLoadingMore)
+const proposalsHasMore = computed(() => tacoStore.proposalsHasMore)
 
 const loadProposals = async () => {
-  loading.value = true
   error.value = null
   
   try {
-    await tacoStore.fetchTacoProposals(50) // Fetch up to 50 proposals
+    await tacoStore.fetchTacoProposals(20) // Fetch 20 proposals at a time
   } catch (err: any) {
     error.value = err.message || 'Failed to load proposals'
-  } finally {
-    loading.value = false
+  }
+}
+
+const loadMoreProposals = async () => {
+  error.value = null
+  
+  try {
+    await tacoStore.loadMoreTacoProposals(20) // Load 20 more proposals
+  } catch (err: any) {
+    error.value = err.message || 'Failed to load more proposals'
   }
 }
 
