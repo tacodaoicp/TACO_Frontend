@@ -2873,6 +2873,45 @@ export const useTacoStore = defineStore('taco', () => {
             fetchedNeuronAllocations.value = [];
         }
     }
+
+    const adminGetUserAllocation = async (principal: Principal) => {
+        console.log('taco.store: adminGetUserAllocation() - Starting fetch for principal:', principal.toString());
+        try {
+            // Create auth client
+            const authClient = await getAuthClient();
+
+            // Check if user is authenticated
+            if (!await authClient.isAuthenticated()) {
+                console.error('User not authenticated');
+                return null;
+            }
+
+            // Get authenticated identity
+            const identity = await authClient.getIdentity();
+
+            const agent = await createAgent({
+                identity,
+                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            });
+
+            let canisterId = daoBackendCanisterId();
+
+            const actor = Actor.createActor(daoBackendIDL, {
+                agent,
+                canisterId,
+            });
+
+            const result = await actor.admin_getUserAllocation(principal);
+            console.log('taco.store: adminGetUserAllocation() - Raw response:', result);
+
+            return result;
+        } catch (error: any) {
+            console.error('taco.store: adminGetUserAllocation() - Error:', error);
+            throw error;
+        }
+    }
+
     const updateSystemParameter = async (paramName: string, value: bigint): Promise<boolean> => {
         console.log('TacoStore: updateSystemParameter called with', paramName, value);
         try {
@@ -4531,6 +4570,7 @@ export const useTacoStore = defineStore('taco', () => {
         unpauseToken,
         fetchVoterDetails,
         fetchNeuronAllocations,
+        adminGetUserAllocation,
         updateSystemParameter,
         updateSnapshotInterval,
         getTradingStatus,

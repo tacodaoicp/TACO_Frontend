@@ -20,6 +20,9 @@
               <router-link to="/admin/neuron" class="btn btn-success">
                 🧠 Neuron Snapshot Admin
               </router-link>
+              <router-link to="/admin/votes" class="btn btn-primary">
+                🗳️ Vote History Admin
+              </router-link>
             </div>
           </div>
           
