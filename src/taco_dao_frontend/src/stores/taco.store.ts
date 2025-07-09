@@ -18,6 +18,7 @@ import { Result_4, Result_8, idlFactory as treasuryIDL, UpdateConfig, RebalanceC
 import { idlFactory as neuronSnapshotIDL, _SERVICE as NeuronSnapshotService } from "../../../declarations/neuronSnapshot/neuronSnapshot.did.js"
 import { idlFactory as sneedForumIDL, _SERVICE as SneedForumService } from "../../../declarations/sneed_sns_forum/sneed_sns_forum.did.js"
 import { idlFactory as appSneedDaoIDL, _SERVICE as AppSneedDaoService } from "../../../declarations/app_sneeddao_backend/app_sneeddao_backend.did.js"
+import { idlFactory as snsGovernanceIDL } from "../../../declarations/sns_governance/sns_governance.did.js"
 import { Principal } from '@dfinity/principal'
 import { AccountIdentifier } from '@dfinity/ledger-icp'
 import { canisterId as iiCanisterId } from "../../../declarations/internet_identity/index.js"
@@ -288,6 +289,61 @@ interface NamesCache {
     lastLoaded: number | null;
 }
 
+// SNS Governance interfaces
+interface ProposalData {
+    id?: { id: bigint };
+    proposal?: {
+        title: string;
+        summary: string;
+        url: string;
+        action?: any;
+    };
+    proposal_creation_timestamp_seconds: bigint;
+    decided_timestamp_seconds: bigint;
+    executed_timestamp_seconds: bigint;
+    failed_timestamp_seconds: bigint;
+    latest_tally?: {
+        yes: bigint;
+        no: bigint;
+        total: bigint;
+        timestamp_seconds: bigint;
+    };
+    proposer?: { id: Uint8Array };
+    is_eligible_for_rewards: boolean;
+    ballots: [string, { vote: any; voting_power: bigint; cast_timestamp_seconds: bigint }][];
+}
+
+interface TacoProposal {
+    id: bigint;
+    title: string;
+    summary: string;
+    url: string;
+    status: 'Open' | 'Adopted' | 'Rejected' | 'Failed' | 'Executed';
+    createdAt: Date;
+    decidedAt?: Date;
+    executedAt?: Date;
+    proposer?: string;
+    yesVotes: bigint;
+    noVotes: bigint;
+    totalVotes: bigint;
+}
+
+interface ListProposalsResponse {
+    proposals: ProposalData[];
+    include_ballots_by_caller?: boolean;
+    include_topic_filtering?: boolean;
+}
+
+interface GovernanceError {
+    error_message: string;
+    error_type: number;
+}
+
+interface ListProposalsResult {
+    Ok?: ListProposalsResponse;
+    Err?: GovernanceError;
+}
+
 /////////////
 // Exports //
 /////////////
@@ -390,6 +446,9 @@ export const useTacoStore = defineStore('taco', () => {
     const fetchedForums = ref<CandidForumResponse[]>([])
     const fetchedProposalsThreads = ref<CandidThreadResponse[]>([])
     const fetchedThreadPosts = ref<CandidPostResponse[]>([])
+    
+    // proposals
+    const fetchedTacoProposals = ref<TacoProposal[]>([])
     
     // naming system  
     const namesCache = ref<NamesCache>({
@@ -4253,6 +4312,121 @@ export const useTacoStore = defineStore('taco', () => {
     };
 
     //=========================================================================
+    // TACO DAO PROPOSALS METHODS
+    //=========================================================================
+
+    const tacoSnsGovernanceCanisterId = () => {
+        // TACO DAO SNS governance canister ID
+        return 'lhdfz-wqaaa-aaaaq-aae3q-cai';
+    };
+
+    const fetchTacoProposals = async (limit: number = 20) => {
+        try {
+            console.log('🔍 Fetching TACO DAO proposals...');
+            console.log('🔗 Using SNS governance canister:', tacoSnsGovernanceCanisterId());
+            
+            const agent = await createAgent({
+                identity: new AnonymousIdentity(),
+                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            });
+
+            const governanceActor = Actor.createActor(snsGovernanceIDL, {
+                agent,
+                canisterId: tacoSnsGovernanceCanisterId()
+            });
+
+            // Create request for list_proposals
+            const request = {
+                include_reward_status: [], // Include all reward statuses
+                before_proposal: [], // No pagination, start from latest
+                limit: limit,
+                exclude_type: [], // Don't exclude any types
+                include_topics: [], // Include all topics
+                include_status: [], // Include all statuses
+            };
+
+            console.log('📞 Calling list_proposals with request:', request);
+            const response = await governanceActor.list_proposals(request) as any;
+            console.log('📦 Raw response from list_proposals:', response);
+            
+            // Check if response has proposals directly (sometimes the structure is different)
+            let proposals;
+            if (response && response.proposals) {
+                proposals = response.proposals;
+                console.log('✅ Found proposals directly in response');
+            } else if (response && response.Ok && response.Ok.proposals) {
+                proposals = response.Ok.proposals;
+                console.log('✅ Found proposals in response.Ok');
+            } else if (Array.isArray(response)) {
+                proposals = response;
+                console.log('✅ Response is array of proposals');
+            } else {
+                console.error('❌ Unexpected response structure:', response);
+                throw new Error(`Unexpected response structure: ${JSON.stringify(response)}`);
+            }
+            
+            console.log('✅ Fetched', proposals.length, 'TACO DAO proposals');
+            
+            // Transform the raw proposal data into our TacoProposal format
+            const transformedProposals: TacoProposal[] = proposals.map((proposalData: any) => {
+                console.log('🔄 Processing proposal:', proposalData);
+                
+                // Extract data from array-wrapped fields
+                const proposal = proposalData.proposal && proposalData.proposal[0] ? proposalData.proposal[0] : null;
+                const tally = proposalData.latest_tally && proposalData.latest_tally[0] ? proposalData.latest_tally[0] : null;
+                const id = proposalData.id && proposalData.id[0] ? proposalData.id[0] : null;
+                const proposer = proposalData.proposer && proposalData.proposer[0] ? proposalData.proposer[0] : null;
+                
+                // Determine status based on timestamps
+                let status: 'Open' | 'Adopted' | 'Rejected' | 'Failed' | 'Executed' = 'Open';
+                if (proposalData.failed_timestamp_seconds > 0) {
+                    status = 'Failed';
+                } else if (proposalData.executed_timestamp_seconds > 0) {
+                    status = 'Executed';
+                } else if (proposalData.decided_timestamp_seconds > 0) {
+                    // Check if it was adopted or rejected based on voting
+                    if (tally && tally.yes > tally.no) {
+                        status = 'Adopted';
+                    } else {
+                        status = 'Rejected';
+                    }
+                }
+                
+                return {
+                    id: id?.id || BigInt(0),
+                    title: proposal?.title || 'Untitled Proposal',
+                    summary: proposal?.summary || '',
+                    url: proposal?.url || '',
+                    status,
+                    createdAt: new Date(Number(proposalData.proposal_creation_timestamp_seconds) * 1000),
+                    decidedAt: proposalData.decided_timestamp_seconds > 0 
+                        ? new Date(Number(proposalData.decided_timestamp_seconds) * 1000) 
+                        : undefined,
+                    executedAt: proposalData.executed_timestamp_seconds > 0 
+                        ? new Date(Number(proposalData.executed_timestamp_seconds) * 1000) 
+                        : undefined,
+                    proposer: proposer ? uint8ArrayToHex(proposer.id) : undefined,
+                    yesVotes: tally?.yes || BigInt(0),
+                    noVotes: tally?.no || BigInt(0),
+                    totalVotes: tally?.total || BigInt(0),
+                };
+            });
+            
+            // Sort by creation date (newest first)
+            transformedProposals.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+            
+            fetchedTacoProposals.value = transformedProposals;
+            console.log('✅ Successfully processed', transformedProposals.length, 'proposals');
+            return transformedProposals;
+        } catch (error: any) {
+            console.error('❌ Error fetching TACO DAO proposals:', error);
+            console.error('❌ Error details:', error.message, error.stack);
+            throw error;
+        }
+    };
+
+    //=========================================================================
     // NAMING SYSTEM METHODS
     //=========================================================================
 
@@ -4628,6 +4802,9 @@ export const useTacoStore = defineStore('taco', () => {
         getPostsByThread,
         getProposalsThreads,
         getThread,
+        // proposals functions
+        fetchedTacoProposals,
+        fetchTacoProposals,
         // naming system functions
         namesCache,
         namesLoading,
