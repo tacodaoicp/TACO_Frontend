@@ -44,10 +44,11 @@
 
             <!-- proposals grid -->
             <div class="proposals-grid">
-              <div
+              <router-link
                 v-for="proposal in proposals"
                 :key="proposal.id.toString()"
-                class="proposal-card taco-container taco-container--l1"
+                :to="`/proposal/${proposal.id.toString()}`"
+                class="proposal-card taco-container taco-container--l1 text-decoration-none"
               >
                 <!-- proposal header -->
                 <div class="proposal-header">
@@ -124,7 +125,7 @@
                     Decided {{ formatDate(proposal.decidedAt) }}
                   </span>
                 </div>
-              </div>
+              </router-link>
             </div>
 
             <!-- load more button -->
@@ -262,15 +263,19 @@ onMounted(() => {
 }
 
 .proposal-card {
+  display: block;
   padding: 1.5rem;
   border-radius: 0.5rem;
   border: 1px solid var(--light-orange);
   background: var(--black-to-white);
   transition: all 0.2s ease;
+  color: inherit;
 
   &:hover {
     transform: translateY(-2px);
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    color: inherit;
+    text-decoration: none;
   }
 }
 

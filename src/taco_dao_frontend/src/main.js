@@ -22,6 +22,7 @@ import ForumView from "./views/ForumView.vue"
 import ThreadView from "./views/ThreadView.vue"
 import NamesView from "./views/NamesView.vue"
 import ProposalsView from "./views/ProposalsView.vue"
+import ProposalView from "./views/ProposalView.vue"
 import VueApexCharts from 'vue3-apexcharts'
 import VueClickAway from "vue3-click-away"
 import 'animate.css'
@@ -51,6 +52,7 @@ const routes = [
     { path: "/forum/thread/:id", name: "Thread", component: ThreadView },
     { path: "/names", name: "Names", component: NamesView },
     { path: "/proposals", name: "Proposals", component: ProposalsView },
+    { path: "/proposal/:id", name: "Proposal", component: ProposalView },
     { path: "/:pathMatch(.*)*", redirect: "/" },
 ]
 

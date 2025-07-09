@@ -4315,6 +4315,96 @@ export const useTacoStore = defineStore('taco', () => {
         }
     };
 
+    const getProposalThread = async (proposalId: bigint) => {
+        try {
+            console.log('🔍 Looking up thread for proposal ID:', proposalId.toString());
+            
+            const agent = await createAgent({
+                identity: new AnonymousIdentity(),
+                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            });
+
+            const forumActor = Actor.createActor<SneedForumService>(sneedForumIDL, {
+                agent,
+                canisterId: sneedForumCanisterId()
+            });
+
+            const tacoSnsRoot = Principal.fromText(tacoSnsRootCanisterId());
+            const proposalThreadMapping = await forumActor.get_proposal_thread(tacoSnsRoot, proposalId);
+            
+            if (proposalThreadMapping && proposalThreadMapping.length > 0) {
+                const mapping = proposalThreadMapping[0]!;
+                console.log('✅ Found existing thread mapping:', mapping);
+                
+                // Now get the actual thread details
+                const thread = await forumActor.get_thread(mapping.thread_id);
+                if (thread && thread.length > 0) {
+                    console.log('✅ Found thread details:', thread[0]);
+                    return {
+                        mapping,
+                        thread: thread[0],
+                        exists: true
+                    };
+                }
+            }
+            
+            console.log('❌ No thread found for proposal:', proposalId.toString());
+            return {
+                mapping: null,
+                thread: null,
+                exists: false
+            };
+        } catch (error: any) {
+            console.error('Error getting proposal thread:', error);
+            throw error;
+        }
+    };
+
+    const createProposalThread = async (proposalId: bigint) => {
+        try {
+            console.log('🔧 Creating thread for proposal ID:', proposalId.toString());
+            
+            if (!userLoggedIn.value) {
+                throw new Error('Must be logged in to create proposal threads');
+            }
+
+            const authClient = await getAuthClient();
+            const identity = authClient.getIdentity();
+            
+            const agent = await createAgent({
+                identity,
+                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            });
+
+            const forumActor = Actor.createActor<SneedForumService>(sneedForumIDL, {
+                agent,
+                canisterId: sneedForumCanisterId()
+            });
+
+            const tacoSnsRoot = Principal.fromText(tacoSnsRootCanisterId());
+            const result = await forumActor.create_proposal_thread_with_auto_setup({
+                sns_root_canister_id: tacoSnsRoot,
+                proposal_id: proposalId
+            });
+            
+            if ('ok' in result) {
+                console.log('✅ Successfully created proposal thread with ID:', result.ok);
+                return {
+                    success: true,
+                    threadId: result.ok
+                };
+            } else {
+                console.error('❌ Failed to create proposal thread:', result.err);
+                throw new Error(`Failed to create thread: ${JSON.stringify(result.err)}`);
+            }
+        } catch (error: any) {
+            console.error('Error creating proposal thread:', error);
+            throw error;
+        }
+    };
+
     //=========================================================================
     // TACO DAO PROPOSALS METHODS
     //=========================================================================
@@ -4846,6 +4936,8 @@ export const useTacoStore = defineStore('taco', () => {
         getPostsByThread,
         getProposalsThreads,
         getThread,
+        getProposalThread,
+        createProposalThread,
         // proposals functions
         fetchedTacoProposals,
         proposalsLoading,
