@@ -217,8 +217,58 @@
                   </div>
                 </div>
 
+                <!-- new post form (when thread exists) -->
+                <div v-if="tacoStore.userLoggedIn" class="new-post-section mb-4">
+                  <div v-if="!showNewPostForm" class="text-center">
+                    <button @click="toggleNewPostForm" class="btn btn-primary">
+                      <i class="fa-solid fa-plus me-2"></i>
+                      Add Comment
+                    </button>
+                  </div>
+                  
+                  <div v-else class="new-post-form taco-container taco-container--l1">
+                    <div class="mb-3">
+                      <label for="newPostBody" class="form-label">
+                        <strong>Add a comment</strong>
+                      </label>
+                      <textarea
+                        id="newPostBody"
+                        v-model="newPostBody"
+                        class="form-control"
+                        rows="4"
+                        placeholder="Share your thoughts on this proposal..."
+                        :disabled="creatingPost"
+                      ></textarea>
+                    </div>
+                    
+                    <div class="d-flex justify-content-end gap-2">
+                      <button 
+                        @click="toggleNewPostForm" 
+                        class="btn btn-outline-secondary"
+                        :disabled="creatingPost"
+                      >
+                        Cancel
+                      </button>
+                      <button 
+                        @click="createNewPost" 
+                        class="btn btn-primary"
+                        :disabled="creatingPost || !newPostBody.trim()"
+                      >
+                        <span v-if="creatingPost">
+                          <i class="fa-solid fa-spinner fa-spin me-2"></i>
+                          Posting...
+                        </span>
+                        <span v-else>
+                          <i class="fa-solid fa-paper-plane me-2"></i>
+                          Post Comment
+                        </span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
                 <!-- posts list -->
-                <div v-else-if="posts.length > 0" class="posts-list">
+                <div v-if="posts.length > 0" class="posts-list">
                   <div 
                     v-for="post in posts" 
                     :key="post.id.toString()"
@@ -230,6 +280,10 @@
                           <strong>{{ tacoStore.getPrincipalDisplayName(post.created_by) }}</strong>
                           <span class="text-muted ms-2">
                             {{ formatDate(new Date(Number(post.created_at) / 1_000_000)) }}
+                          </span>
+                          <span v-if="post.reply_to_post_id && post.reply_to_post_id.length > 0" class="text-muted ms-2">
+                            <i class="fa-solid fa-reply me-1"></i>
+                            reply
                           </span>
                         </div>
                         <div class="post-votes">
@@ -248,13 +302,68 @@
                     <div class="post-content mt-2">
                       {{ post.body }}
                     </div>
+                    
+                    <!-- post actions -->
+                    <div class="post-actions mt-3">
+                      <button 
+                        v-if="tacoStore.userLoggedIn && replyingToPost !== post.id"
+                        @click="startReply(post.id)" 
+                        class="btn btn-outline-primary btn-sm"
+                        :disabled="creatingPost"
+                      >
+                        <i class="fa-solid fa-reply me-1"></i>
+                        Reply
+                      </button>
+                    </div>
+                    
+                    <!-- reply form -->
+                    <div v-if="replyingToPost === post.id" class="reply-form mt-3 ps-3 border-start border-primary">
+                      <div class="mb-3">
+                        <label :for="`replyBody-${post.id}`" class="form-label">
+                          <strong>Reply to {{ tacoStore.getPrincipalDisplayName(post.created_by) }}</strong>
+                        </label>
+                        <textarea
+                          :id="`replyBody-${post.id}`"
+                          v-model="replyBody"
+                          class="form-control"
+                          rows="3"
+                          placeholder="Write your reply..."
+                          :disabled="creatingPost"
+                        ></textarea>
+                      </div>
+                      
+                      <div class="d-flex justify-content-end gap-2">
+                        <button 
+                          @click="cancelReply" 
+                          class="btn btn-outline-secondary btn-sm"
+                          :disabled="creatingPost"
+                        >
+                          Cancel
+                        </button>
+                        <button 
+                          @click="createReply(post.id)" 
+                          class="btn btn-primary btn-sm"
+                          :disabled="creatingPost || !replyBody.trim()"
+                        >
+                          <span v-if="creatingPost">
+                            <i class="fa-solid fa-spinner fa-spin me-2"></i>
+                            Replying...
+                          </span>
+                          <span v-else>
+                            <i class="fa-solid fa-paper-plane me-2"></i>
+                            Post Reply
+                          </span>
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 </div>
 
                 <!-- no posts -->
-                <div v-else class="text-center py-4">
+                <div v-else-if="!tacoStore.userLoggedIn" class="text-center py-4">
                   <i class="fa-solid fa-inbox text-muted fa-2x mb-2"></i>
                   <p class="text-muted">No posts in this discussion yet.</p>
+                  <p class="text-muted">Please log in to start the conversation.</p>
                 </div>
               </div>
             </div>
@@ -293,6 +402,11 @@ const error = ref<string | null>(null)
 const threadLoading = ref(false)
 const postsLoading = ref(false)
 const creatingThread = ref(false)
+const creatingPost = ref(false)
+const showNewPostForm = ref(false)
+const newPostBody = ref('')
+const replyingToPost = ref<bigint | null>(null)
+const replyBody = ref('')
 
 // Reactive data
 const proposal = ref<any>(null)
@@ -380,6 +494,83 @@ const createThread = async () => {
   } finally {
     creatingThread.value = false
   }
+}
+
+// Create new post
+const createNewPost = async () => {
+  if (!newPostBody.value.trim()) return
+  
+  try {
+    creatingPost.value = true
+    error.value = null
+    
+    const result = await tacoStore.createPost(
+      threadData.value.thread.id,
+      newPostBody.value.trim()
+    )
+    
+    if (result.success) {
+      newPostBody.value = ''
+      showNewPostForm.value = false
+      // Reload posts to show the new post
+      await loadPosts(threadData.value.thread.id)
+    }
+  } catch (err: any) {
+    error.value = err.message || 'Failed to create post'
+    console.error('Error creating post:', err)
+  } finally {
+    creatingPost.value = false
+  }
+}
+
+// Create reply to post
+const createReply = async (parentPostId: bigint) => {
+  if (!replyBody.value.trim()) return
+  
+  try {
+    creatingPost.value = true
+    error.value = null
+    
+    const result = await tacoStore.createPost(
+      threadData.value.thread.id,
+      replyBody.value.trim(),
+      parentPostId
+    )
+    
+    if (result.success) {
+      replyBody.value = ''
+      replyingToPost.value = null
+      // Reload posts to show the new reply
+      await loadPosts(threadData.value.thread.id)
+    }
+  } catch (err: any) {
+    error.value = err.message || 'Failed to create reply'
+    console.error('Error creating reply:', err)
+  } finally {
+    creatingPost.value = false
+  }
+}
+
+// Toggle new post form
+const toggleNewPostForm = () => {
+  showNewPostForm.value = !showNewPostForm.value
+  if (!showNewPostForm.value) {
+    newPostBody.value = ''
+  }
+}
+
+// Start replying to a post
+const startReply = (postId: bigint) => {
+  replyingToPost.value = postId
+  replyBody.value = ''
+  // Close new post form if open
+  showNewPostForm.value = false
+}
+
+// Cancel reply
+const cancelReply = () => {
+  replyingToPost.value = null
+  replyBody.value = ''
 }
 
 // Utility functions
@@ -546,6 +737,34 @@ onMounted(() => {
   text-align: left;
 }
 
+.new-post-section {
+  .new-post-form {
+    padding: 1.5rem;
+    
+    .form-label {
+      color: var(--white-to-black);
+      margin-bottom: 0.5rem;
+    }
+    
+    .form-control {
+      background: var(--light-orange-to-orange);
+      border: 1px solid var(--orange);
+      color: var(--white-to-black);
+      
+      &:focus {
+        background: var(--light-orange-to-orange);
+        border-color: var(--dark-orange);
+        box-shadow: 0 0 0 0.2rem rgba(218, 141, 40, 0.25);
+        color: var(--white-to-black);
+      }
+      
+      &::placeholder {
+        color: var(--dark-gray);
+      }
+    }
+  }
+}
+
 .post-card {
   padding: 1.5rem;
   
@@ -564,6 +783,41 @@ onMounted(() => {
   .post-content {
     white-space: pre-wrap;
     line-height: 1.6;
+  }
+  
+  .post-actions {
+    border-top: 1px solid var(--light-orange);
+    padding-top: 1rem;
+  }
+  
+  .reply-form {
+    background: var(--light-orange-to-orange);
+    padding: 1rem;
+    border-radius: 0.375rem;
+    margin-top: 1rem;
+    
+    .form-label {
+      color: var(--white-to-black);
+      margin-bottom: 0.5rem;
+      font-size: 0.9rem;
+    }
+    
+    .form-control {
+      background: var(--white-to-light-orange);
+      border: 1px solid var(--orange);
+      color: var(--white-to-black);
+      
+      &:focus {
+        background: var(--white-to-light-orange);
+        border-color: var(--dark-orange);
+        box-shadow: 0 0 0 0.2rem rgba(218, 141, 40, 0.25);
+        color: var(--white-to-black);
+      }
+      
+      &::placeholder {
+        color: var(--dark-gray);
+      }
+    }
   }
 }
 </style> 

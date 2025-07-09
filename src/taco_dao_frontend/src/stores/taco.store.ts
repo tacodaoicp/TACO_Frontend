@@ -4405,6 +4405,51 @@ export const useTacoStore = defineStore('taco', () => {
         }
     };
 
+    const createPost = async (threadId: bigint, body: string, replyToPostId?: bigint, title?: string) => {
+        try {
+            console.log('🔧 Creating post for thread ID:', threadId.toString());
+            
+            if (!userLoggedIn.value) {
+                throw new Error('Must be logged in to create posts');
+            }
+
+            const authClient = await getAuthClient();
+            const identity = authClient.getIdentity();
+            
+            const agent = await createAgent({
+                identity,
+                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            });
+
+            const forumActor = Actor.createActor<SneedForumService>(sneedForumIDL, {
+                agent,
+                canisterId: sneedForumCanisterId()
+            });
+
+            const result = await forumActor.create_post(
+                threadId,
+                replyToPostId ? [replyToPostId] : [],
+                title ? [title] : [],
+                body
+            );
+            
+            if ('ok' in result) {
+                console.log('✅ Successfully created post with ID:', result.ok);
+                return {
+                    success: true,
+                    postId: result.ok
+                };
+            } else {
+                console.error('❌ Failed to create post:', result.err);
+                throw new Error(`Failed to create post: ${JSON.stringify(result.err)}`);
+            }
+        } catch (error: any) {
+            console.error('Error creating post:', error);
+            throw error;
+        }
+    };
+
     //=========================================================================
     // TACO DAO PROPOSALS METHODS
     //=========================================================================
@@ -4938,6 +4983,7 @@ export const useTacoStore = defineStore('taco', () => {
         getThread,
         getProposalThread,
         createProposalThread,
+        createPost,
         // proposals functions
         fetchedTacoProposals,
         proposalsLoading,
