@@ -295,11 +295,42 @@
                           </button>
                         </div>
                         <div class="post-votes">
-                          <span class="text-success me-2">
+                          <button 
+                            v-if="tacoStore.userLoggedIn"
+                            @click="voteOnPost(post.id, 'upvote')"
+                            class="btn btn-sm vote-btn"
+                            :class="{
+                              'btn-success': getUserVote(post.id).voteType === 'upvote',
+                              'btn-outline-success': getUserVote(post.id).voteType !== 'upvote'
+                            }"
+                            :disabled="getUserVote(post.id).voting || creatingPost"
+                            :title="getUserVote(post.id).voteType === 'upvote' ? 'Click to remove upvote' : 'Upvote this post'"
+                          >
+                            <i v-if="getUserVote(post.id).voting && getUserVote(post.id).voteType !== 'downvote'" class="fa-solid fa-spinner fa-spin me-1"></i>
+                            <i v-else class="fa-solid fa-thumbs-up me-1"></i>
+                            {{ post.upvote_score.toString() }}
+                          </button>
+                          <span v-else class="text-success me-2">
                             <i class="fa-solid fa-thumbs-up me-1"></i>
                             {{ post.upvote_score.toString() }}
                           </span>
-                          <span class="text-danger">
+
+                          <button 
+                            v-if="tacoStore.userLoggedIn"
+                            @click="voteOnPost(post.id, 'downvote')"
+                            class="btn btn-sm vote-btn ms-2"
+                            :class="{
+                              'btn-danger': getUserVote(post.id).voteType === 'downvote',
+                              'btn-outline-danger': getUserVote(post.id).voteType !== 'downvote'
+                            }"
+                            :disabled="getUserVote(post.id).voting || creatingPost"
+                            :title="getUserVote(post.id).voteType === 'downvote' ? 'Click to remove downvote' : 'Downvote this post'"
+                          >
+                            <i v-if="getUserVote(post.id).voting && getUserVote(post.id).voteType !== 'upvote'" class="fa-solid fa-spinner fa-spin me-1"></i>
+                            <i v-else class="fa-solid fa-thumbs-down me-1"></i>
+                            {{ post.downvote_score.toString() }}
+                          </button>
+                          <span v-else class="text-danger ms-2">
                             <i class="fa-solid fa-thumbs-down me-1"></i>
                             {{ post.downvote_score.toString() }}
                           </span>
@@ -416,11 +447,103 @@ const newPostBody = ref('')
 const replyingToPost = ref<bigint | null>(null)
 const replyBody = ref('')
 const highlightedPost = ref<string | null>(null)
+const userVotes = ref<Map<string, { voteType: 'upvote' | 'downvote' | null; voting: boolean }>>(new Map())
 
 // Reactive data
 const proposal = ref<any>(null)
 const threadData = ref<any>({ exists: false, mapping: null, thread: null })
 const posts = ref<any[]>([])
+
+// Initialize user votes for posts
+const initializeUserVotes = async () => {
+  if (!tacoStore.userLoggedIn || posts.value.length === 0) return
+  
+  try {
+    // Get votes for each post to determine user's current vote
+    const userPrincipal = tacoStore.userPrincipal
+    const voteChecks = posts.value.map(async (post) => {
+      try {
+        const votes = await tacoStore.getPostVotes(post.id)
+        const userVote = votes.find(vote => vote.voter_principal.toString() === userPrincipal)
+        const voteType = userVote ? ('upvote' in userVote.vote_type ? 'upvote' : 'downvote') : null
+        
+        userVotes.value.set(post.id.toString(), {
+          voteType,
+          voting: false
+        })
+      } catch (error) {
+        console.error('Error getting votes for post:', post.id, error)
+        userVotes.value.set(post.id.toString(), {
+          voteType: null,
+          voting: false
+        })
+      }
+    })
+    
+    await Promise.all(voteChecks)
+  } catch (error) {
+    console.error('Error initializing user votes:', error)
+  }
+}
+
+// Get user's current vote for a post
+const getUserVote = (postId: bigint) => {
+  return userVotes.value.get(postId.toString()) || { voteType: null, voting: false }
+}
+
+// Vote on a post
+const voteOnPost = async (postId: bigint, voteType: 'upvote' | 'downvote') => {
+  if (!tacoStore.userLoggedIn) return
+  
+  const currentVote = getUserVote(postId)
+  
+  try {
+    // Set voting state
+    userVotes.value.set(postId.toString(), {
+      ...currentVote,
+      voting: true
+    })
+    
+    // If user is clicking the same vote type, retract the vote
+    if (currentVote.voteType === voteType) {
+      await tacoStore.retractVote(postId)
+      userVotes.value.set(postId.toString(), {
+        voteType: null,
+        voting: false
+      })
+    } else {
+      // Vote or change vote
+      await tacoStore.voteOnPost(postId, voteType)
+      userVotes.value.set(postId.toString(), {
+        voteType,
+        voting: false
+      })
+    }
+    
+    // Refresh the posts to get updated vote counts
+    if (threadData.value.exists && threadData.value.thread) {
+      await loadPosts(threadData.value.thread.id)
+      // Reinitialize user votes for the updated posts
+      await initializeUserVotes()
+    }
+    
+  } catch (error: any) {
+    console.error('Error voting on post:', error)
+    userVotes.value.set(postId.toString(), {
+      ...currentVote,
+      voting: false
+    })
+    
+    // Show error toast
+    tacoStore.addToast({
+      id: Date.now(),
+      code: 'vote-error',
+      title: 'Vote Failed',
+      icon: 'fa-solid fa-exclamation-triangle',
+      message: `Failed to vote: ${error.message || 'Unknown error'}`
+    })
+  }
+}
 
 // Find proposal from store
 const findProposal = () => {
@@ -465,6 +588,8 @@ const loadThreadData = async () => {
     
     if (threadData.value.exists && threadData.value.thread) {
       await loadPosts(threadData.value.thread.id)
+      // Initialize user votes after posts are loaded
+      await initializeUserVotes()
     }
   } catch (err: any) {
     console.error('Error loading thread data:', err)
@@ -523,6 +648,8 @@ const createNewPost = async () => {
       showNewPostForm.value = false
       // Reload posts to show the new post
       await loadPosts(threadData.value.thread.id)
+      // Reinitialize user votes for the updated posts
+      await initializeUserVotes()
     }
   } catch (err: any) {
     error.value = err.message || 'Failed to create post'
@@ -551,6 +678,8 @@ const createReply = async (parentPostId: bigint) => {
       replyingToPost.value = null
       // Reload posts to show the new reply
       await loadPosts(threadData.value.thread.id)
+      // Reinitialize user votes for the updated posts
+      await initializeUserVotes()
     }
   } catch (err: any) {
     error.value = err.message || 'Failed to create reply'
@@ -837,6 +966,72 @@ onMounted(() => {
     
     .post-votes {
       font-size: 0.85rem;
+      
+      .vote-btn {
+        min-width: 60px;
+        border-radius: 20px;
+        font-size: 0.8rem;
+        font-weight: 500;
+        transition: all 0.2s ease;
+        position: relative;
+        
+        &:hover:not(:disabled) {
+          transform: translateY(-1px);
+        }
+        
+        &:disabled {
+          opacity: 0.7;
+          cursor: not-allowed;
+        }
+        
+        // Upvote button styles
+        &.btn-success {
+          background-color: var(--success-green);
+          border-color: var(--success-green);
+          color: white;
+          
+          &:hover:not(:disabled) {
+            background-color: var(--success-green-hover);
+            border-color: var(--success-green-hover);
+          }
+        }
+        
+        &.btn-outline-success {
+          background-color: transparent;
+          border-color: var(--success-green);
+          color: var(--success-green);
+          
+          &:hover:not(:disabled) {
+            background-color: var(--success-green);
+            border-color: var(--success-green);
+            color: white;
+          }
+        }
+        
+        // Downvote button styles
+        &.btn-danger {
+          background-color: var(--red);
+          border-color: var(--red);
+          color: white;
+          
+          &:hover:not(:disabled) {
+            background-color: var(--red-hover);
+            border-color: var(--red-hover);
+          }
+        }
+        
+        &.btn-outline-danger {
+          background-color: transparent;
+          border-color: var(--red);
+          color: var(--red);
+          
+          &:hover:not(:disabled) {
+            background-color: var(--red);
+            border-color: var(--red);
+            color: white;
+          }
+        }
+      }
     }
   }
   
