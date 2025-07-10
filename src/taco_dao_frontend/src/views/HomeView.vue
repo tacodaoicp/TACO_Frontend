@@ -56,8 +56,8 @@
           </span>
           <ul class="list-unstyled mb-5 mt-2">
             <li><span class="taco-text-brown-to-white small-on-mobile">✅ Trust at least two tokens</span></li>            
-            <li><span class="taco-text-brown-to-white small-on-mobile">🔲 Vote on initial portfolio funding</span></li>
-            <li><span class="taco-text-brown-to-white small-on-mobile" style="opacity: 0.25;">🔲 <span class="rotating-text">???????</span></span></li>
+            <li><span class="taco-text-brown-to-white small-on-mobile">✅ Vote on initial portfolio funding</span></li>
+            <li><span class="taco-text-brown-to-white small-on-mobile">🌮 Now let's perfect the recipe!</span></li>
           </ul>
 
           <!-- random link 1 -->
