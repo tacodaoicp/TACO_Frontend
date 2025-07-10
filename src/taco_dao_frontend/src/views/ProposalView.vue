@@ -217,12 +217,64 @@
                   </div>
                 </div>
 
+                <!-- new post form (when thread exists) -->
+                <div v-if="tacoStore.userLoggedIn" class="new-post-section mb-4">
+                  <div v-if="!showNewPostForm" class="text-center">
+                    <button @click="toggleNewPostForm" class="btn btn-primary">
+                      <i class="fa-solid fa-plus me-2"></i>
+                      Add Comment
+                    </button>
+                  </div>
+                  
+                  <div v-else class="new-post-form taco-container taco-container--l1">
+                    <div class="mb-3">
+                      <label for="newPostBody" class="form-label">
+                        <strong>Add a comment</strong>
+                      </label>
+                      <textarea
+                        id="newPostBody"
+                        v-model="newPostBody"
+                        class="form-control"
+                        rows="4"
+                        placeholder="Share your thoughts on this proposal..."
+                        :disabled="creatingPost"
+                      ></textarea>
+                    </div>
+                    
+                    <div class="d-flex justify-content-end gap-2">
+                      <button 
+                        @click="toggleNewPostForm" 
+                        class="btn btn-outline-secondary"
+                        :disabled="creatingPost"
+                      >
+                        Cancel
+                      </button>
+                      <button 
+                        @click="createNewPost" 
+                        class="btn btn-primary"
+                        :disabled="creatingPost || !newPostBody.trim()"
+                      >
+                        <span v-if="creatingPost">
+                          <i class="fa-solid fa-spinner fa-spin me-2"></i>
+                          Posting...
+                        </span>
+                        <span v-else>
+                          <i class="fa-solid fa-paper-plane me-2"></i>
+                          Post Comment
+                        </span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
                 <!-- posts list -->
-                <div v-else-if="posts.length > 0" class="posts-list">
+                <div v-if="posts.length > 0" class="posts-list">
                   <div 
                     v-for="post in posts" 
                     :key="post.id.toString()"
+                    :id="`post-${post.id.toString()}`"
                     class="post-card taco-container taco-container--l1 mb-3"
+                    :class="{ 'post-highlighted': highlightedPost === post.id.toString() }"
                   >
                     <div class="post-header">
                       <div class="d-flex justify-content-between align-items-start">
@@ -231,13 +283,54 @@
                           <span class="text-muted ms-2">
                             {{ formatDate(new Date(Number(post.created_at) / 1_000_000)) }}
                           </span>
+                          <button 
+                            v-if="post.reply_to_post_id && post.reply_to_post_id.length > 0" 
+                            @click="scrollToParentPost(post.reply_to_post_id[0])"
+                            class="btn btn-link btn-sm text-muted ms-2 p-0 reply-indicator"
+                            title="Go to parent post"
+                          >
+                            <i class="fa-solid fa-reply me-1"></i>
+                            reply
+                            <i class="fa-solid fa-arrow-up-right-from-square ms-1"></i>
+                          </button>
                         </div>
                         <div class="post-votes">
-                          <span class="text-success me-2">
+                          <button 
+                            v-if="tacoStore.userLoggedIn"
+                            @click="voteOnPost(post.id, 'upvote')"
+                            class="btn btn-sm vote-btn"
+                            :class="{
+                              'btn-success': getUserVote(post.id).voteType === 'upvote',
+                              'btn-outline-success': getUserVote(post.id).voteType !== 'upvote'
+                            }"
+                            :disabled="getUserVote(post.id).voting || creatingPost"
+                            :title="getUserVote(post.id).voteType === 'upvote' ? 'Click to remove upvote' : 'Upvote this post'"
+                          >
+                            <i v-if="getUserVote(post.id).voting && getUserVote(post.id).voteType !== 'downvote'" class="fa-solid fa-spinner fa-spin me-1"></i>
+                            <i v-else class="fa-solid fa-thumbs-up me-1"></i>
+                            {{ post.upvote_score.toString() }}
+                          </button>
+                          <span v-else class="text-success me-2">
                             <i class="fa-solid fa-thumbs-up me-1"></i>
                             {{ post.upvote_score.toString() }}
                           </span>
-                          <span class="text-danger">
+
+                          <button 
+                            v-if="tacoStore.userLoggedIn"
+                            @click="voteOnPost(post.id, 'downvote')"
+                            class="btn btn-sm vote-btn ms-2"
+                            :class="{
+                              'btn-danger': getUserVote(post.id).voteType === 'downvote',
+                              'btn-outline-danger': getUserVote(post.id).voteType !== 'downvote'
+                            }"
+                            :disabled="getUserVote(post.id).voting || creatingPost"
+                            :title="getUserVote(post.id).voteType === 'downvote' ? 'Click to remove downvote' : 'Downvote this post'"
+                          >
+                            <i v-if="getUserVote(post.id).voting && getUserVote(post.id).voteType !== 'upvote'" class="fa-solid fa-spinner fa-spin me-1"></i>
+                            <i v-else class="fa-solid fa-thumbs-down me-1"></i>
+                            {{ post.downvote_score.toString() }}
+                          </button>
+                          <span v-else class="text-danger ms-2">
                             <i class="fa-solid fa-thumbs-down me-1"></i>
                             {{ post.downvote_score.toString() }}
                           </span>
@@ -248,13 +341,68 @@
                     <div class="post-content mt-2">
                       {{ post.body }}
                     </div>
+                    
+                    <!-- post actions -->
+                    <div class="post-actions mt-3">
+                      <button 
+                        v-if="tacoStore.userLoggedIn && replyingToPost !== post.id"
+                        @click="startReply(post.id)" 
+                        class="btn btn-outline-primary btn-sm"
+                        :disabled="creatingPost"
+                      >
+                        <i class="fa-solid fa-reply me-1"></i>
+                        Reply
+                      </button>
+                    </div>
+                    
+                    <!-- reply form -->
+                    <div v-if="replyingToPost === post.id" class="reply-form mt-3 ps-3 border-start border-primary">
+                      <div class="mb-3">
+                        <label :for="`replyBody-${post.id}`" class="form-label">
+                          <strong>Reply to {{ tacoStore.getPrincipalDisplayName(post.created_by) }}</strong>
+                        </label>
+                        <textarea
+                          :id="`replyBody-${post.id}`"
+                          v-model="replyBody"
+                          class="form-control"
+                          rows="3"
+                          placeholder="Write your reply..."
+                          :disabled="creatingPost"
+                        ></textarea>
+                      </div>
+                      
+                      <div class="d-flex justify-content-end gap-2">
+                        <button 
+                          @click="cancelReply" 
+                          class="btn btn-outline-secondary btn-sm"
+                          :disabled="creatingPost"
+                        >
+                          Cancel
+                        </button>
+                        <button 
+                          @click="createReply(post.id)" 
+                          class="btn btn-primary btn-sm"
+                          :disabled="creatingPost || !replyBody.trim()"
+                        >
+                          <span v-if="creatingPost">
+                            <i class="fa-solid fa-spinner fa-spin me-2"></i>
+                            Replying...
+                          </span>
+                          <span v-else>
+                            <i class="fa-solid fa-paper-plane me-2"></i>
+                            Post Reply
+                          </span>
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 </div>
 
                 <!-- no posts -->
-                <div v-else class="text-center py-4">
+                <div v-else-if="!tacoStore.userLoggedIn" class="text-center py-4">
                   <i class="fa-solid fa-inbox text-muted fa-2x mb-2"></i>
                   <p class="text-muted">No posts in this discussion yet.</p>
+                  <p class="text-muted">Please log in to start the conversation.</p>
                 </div>
               </div>
             </div>
@@ -293,11 +441,109 @@ const error = ref<string | null>(null)
 const threadLoading = ref(false)
 const postsLoading = ref(false)
 const creatingThread = ref(false)
+const creatingPost = ref(false)
+const showNewPostForm = ref(false)
+const newPostBody = ref('')
+const replyingToPost = ref<bigint | null>(null)
+const replyBody = ref('')
+const highlightedPost = ref<string | null>(null)
+const userVotes = ref<Map<string, { voteType: 'upvote' | 'downvote' | null; voting: boolean }>>(new Map())
 
 // Reactive data
 const proposal = ref<any>(null)
 const threadData = ref<any>({ exists: false, mapping: null, thread: null })
 const posts = ref<any[]>([])
+
+// Initialize user votes for posts
+const initializeUserVotes = async () => {
+  if (!tacoStore.userLoggedIn || posts.value.length === 0) return
+  
+  try {
+    // Get votes for each post to determine user's current vote
+    const userPrincipal = tacoStore.userPrincipal
+    const voteChecks = posts.value.map(async (post) => {
+      try {
+        const votes = await tacoStore.getPostVotes(post.id)
+        const userVote = votes.find(vote => vote.voter_principal.toString() === userPrincipal)
+        const voteType = userVote ? ('upvote' in userVote.vote_type ? 'upvote' : 'downvote') : null
+        
+        userVotes.value.set(post.id.toString(), {
+          voteType,
+          voting: false
+        })
+      } catch (error) {
+        console.error('Error getting votes for post:', post.id, error)
+        userVotes.value.set(post.id.toString(), {
+          voteType: null,
+          voting: false
+        })
+      }
+    })
+    
+    await Promise.all(voteChecks)
+  } catch (error) {
+    console.error('Error initializing user votes:', error)
+  }
+}
+
+// Get user's current vote for a post
+const getUserVote = (postId: bigint) => {
+  return userVotes.value.get(postId.toString()) || { voteType: null, voting: false }
+}
+
+// Vote on a post
+const voteOnPost = async (postId: bigint, voteType: 'upvote' | 'downvote') => {
+  if (!tacoStore.userLoggedIn) return
+  
+  const currentVote = getUserVote(postId)
+  
+  try {
+    // Set voting state
+    userVotes.value.set(postId.toString(), {
+      ...currentVote,
+      voting: true
+    })
+    
+    // If user is clicking the same vote type, retract the vote
+    if (currentVote.voteType === voteType) {
+      await tacoStore.retractVote(postId)
+      userVotes.value.set(postId.toString(), {
+        voteType: null,
+        voting: false
+      })
+    } else {
+      // Vote or change vote
+      await tacoStore.voteOnPost(postId, voteType)
+      userVotes.value.set(postId.toString(), {
+        voteType,
+        voting: false
+      })
+    }
+    
+    // Refresh the posts to get updated vote counts
+    if (threadData.value.exists && threadData.value.thread) {
+      await loadPosts(threadData.value.thread.id)
+      // Reinitialize user votes for the updated posts
+      await initializeUserVotes()
+    }
+    
+  } catch (error: any) {
+    console.error('Error voting on post:', error)
+    userVotes.value.set(postId.toString(), {
+      ...currentVote,
+      voting: false
+    })
+    
+    // Show error toast
+    tacoStore.addToast({
+      id: Date.now(),
+      code: 'vote-error',
+      title: 'Vote Failed',
+      icon: 'fa-solid fa-exclamation-triangle',
+      message: `Failed to vote: ${error.message || 'Unknown error'}`
+    })
+  }
+}
 
 // Find proposal from store
 const findProposal = () => {
@@ -342,6 +588,8 @@ const loadThreadData = async () => {
     
     if (threadData.value.exists && threadData.value.thread) {
       await loadPosts(threadData.value.thread.id)
+      // Initialize user votes after posts are loaded
+      await initializeUserVotes()
     }
   } catch (err: any) {
     console.error('Error loading thread data:', err)
@@ -379,6 +627,111 @@ const createThread = async () => {
     console.error('Error creating thread:', err)
   } finally {
     creatingThread.value = false
+  }
+}
+
+// Create new post
+const createNewPost = async () => {
+  if (!newPostBody.value.trim()) return
+  
+  try {
+    creatingPost.value = true
+    error.value = null
+    
+    const result = await tacoStore.createPost(
+      threadData.value.thread.id,
+      newPostBody.value.trim()
+    )
+    
+    if (result.success) {
+      newPostBody.value = ''
+      showNewPostForm.value = false
+      // Reload posts to show the new post
+      await loadPosts(threadData.value.thread.id)
+      // Reinitialize user votes for the updated posts
+      await initializeUserVotes()
+    }
+  } catch (err: any) {
+    error.value = err.message || 'Failed to create post'
+    console.error('Error creating post:', err)
+  } finally {
+    creatingPost.value = false
+  }
+}
+
+// Create reply to post
+const createReply = async (parentPostId: bigint) => {
+  if (!replyBody.value.trim()) return
+  
+  try {
+    creatingPost.value = true
+    error.value = null
+    
+    const result = await tacoStore.createPost(
+      threadData.value.thread.id,
+      replyBody.value.trim(),
+      parentPostId
+    )
+    
+    if (result.success) {
+      replyBody.value = ''
+      replyingToPost.value = null
+      // Reload posts to show the new reply
+      await loadPosts(threadData.value.thread.id)
+      // Reinitialize user votes for the updated posts
+      await initializeUserVotes()
+    }
+  } catch (err: any) {
+    error.value = err.message || 'Failed to create reply'
+    console.error('Error creating reply:', err)
+  } finally {
+    creatingPost.value = false
+  }
+}
+
+// Toggle new post form
+const toggleNewPostForm = () => {
+  showNewPostForm.value = !showNewPostForm.value
+  if (!showNewPostForm.value) {
+    newPostBody.value = ''
+  }
+}
+
+// Start replying to a post
+const startReply = (postId: bigint) => {
+  replyingToPost.value = postId
+  replyBody.value = ''
+  // Close new post form if open
+  showNewPostForm.value = false
+}
+
+// Cancel reply
+const cancelReply = () => {
+  replyingToPost.value = null
+  replyBody.value = ''
+}
+
+// Scroll to parent post
+const scrollToParentPost = (parentPostId: bigint) => {
+  const parentPostElement = document.getElementById(`post-${parentPostId.toString()}`)
+  if (parentPostElement) {
+    parentPostElement.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    highlightedPost.value = parentPostId.toString()
+    
+    // Clear highlight after 3 seconds
+    setTimeout(() => {
+      highlightedPost.value = null
+    }, 3000)
+  } else {
+    console.warn('Parent post not found:', parentPostId.toString())
+    // Show toast or alert that parent post is not visible
+    tacoStore.addToast({
+      id: Date.now(),
+      code: 'parent-post-not-found',
+      title: 'Parent Post Not Found',
+      icon: 'fa-solid fa-exclamation-triangle',
+      message: 'The parent post may be in a different page or not loaded yet.'
+    })
   }
 }
 
@@ -546,24 +899,180 @@ onMounted(() => {
   text-align: left;
 }
 
+.new-post-section {
+  .new-post-form {
+    padding: 1.5rem;
+    
+    .form-label {
+      color: var(--white-to-black);
+      margin-bottom: 0.5rem;
+    }
+    
+    .form-control {
+      background: var(--light-orange-to-orange);
+      border: 1px solid var(--orange);
+      color: var(--white-to-black);
+      
+      &:focus {
+        background: var(--light-orange-to-orange);
+        border-color: var(--dark-orange);
+        box-shadow: 0 0 0 0.2rem rgba(218, 141, 40, 0.25);
+        color: var(--white-to-black);
+      }
+      
+      &::placeholder {
+        color: var(--dark-gray);
+      }
+    }
+  }
+}
+
 .post-card {
   padding: 1.5rem;
+  transition: background-color 0.3s ease, border-color 0.3s ease;
+  
+  &.post-highlighted {
+    background-color: var(--yellow-to-orange);
+    border: 2px solid var(--orange);
+    box-shadow: 0 0 10px rgba(254, 200, 0, 0.3);
+  }
   
   .post-header {
     margin-bottom: 1rem;
     
     .post-author {
       font-size: 0.9rem;
+      
+      .reply-indicator {
+        text-decoration: none;
+        color: var(--dark-gray) !important;
+        font-size: 0.85rem;
+        border: none;
+        background: none;
+        padding: 0;
+        margin: 0;
+        
+        &:hover {
+          color: var(--orange) !important;
+          text-decoration: underline;
+        }
+        
+        &:focus {
+          outline: none;
+          box-shadow: none;
+        }
+      }
     }
     
     .post-votes {
       font-size: 0.85rem;
+      
+      .vote-btn {
+        min-width: 60px;
+        border-radius: 20px;
+        font-size: 0.8rem;
+        font-weight: 500;
+        transition: all 0.2s ease;
+        position: relative;
+        
+        &:hover:not(:disabled) {
+          transform: translateY(-1px);
+        }
+        
+        &:disabled {
+          opacity: 0.7;
+          cursor: not-allowed;
+        }
+        
+        // Upvote button styles
+        &.btn-success {
+          background-color: var(--success-green);
+          border-color: var(--success-green);
+          color: white;
+          
+          &:hover:not(:disabled) {
+            background-color: var(--success-green-hover);
+            border-color: var(--success-green-hover);
+          }
+        }
+        
+        &.btn-outline-success {
+          background-color: transparent;
+          border-color: var(--success-green);
+          color: var(--success-green);
+          
+          &:hover:not(:disabled) {
+            background-color: var(--success-green);
+            border-color: var(--success-green);
+            color: white;
+          }
+        }
+        
+        // Downvote button styles
+        &.btn-danger {
+          background-color: var(--red);
+          border-color: var(--red);
+          color: white;
+          
+          &:hover:not(:disabled) {
+            background-color: var(--red-hover);
+            border-color: var(--red-hover);
+          }
+        }
+        
+        &.btn-outline-danger {
+          background-color: transparent;
+          border-color: var(--red);
+          color: var(--red);
+          
+          &:hover:not(:disabled) {
+            background-color: var(--red);
+            border-color: var(--red);
+            color: white;
+          }
+        }
+      }
     }
   }
   
   .post-content {
     white-space: pre-wrap;
     line-height: 1.6;
+  }
+  
+  .post-actions {
+    border-top: 1px solid var(--light-orange);
+    padding-top: 1rem;
+  }
+  
+  .reply-form {
+    background: var(--light-orange-to-orange);
+    padding: 1rem;
+    border-radius: 0.375rem;
+    margin-top: 1rem;
+    
+    .form-label {
+      color: var(--white-to-black);
+      margin-bottom: 0.5rem;
+      font-size: 0.9rem;
+    }
+    
+    .form-control {
+      background: var(--white-to-light-orange);
+      border: 1px solid var(--orange);
+      color: var(--white-to-black);
+      
+      &:focus {
+        background: var(--white-to-light-orange);
+        border-color: var(--dark-orange);
+        box-shadow: 0 0 0 0.2rem rgba(218, 141, 40, 0.25);
+        color: var(--white-to-black);
+      }
+      
+      &::placeholder {
+        color: var(--dark-gray);
+      }
+    }
   }
 }
 </style> 

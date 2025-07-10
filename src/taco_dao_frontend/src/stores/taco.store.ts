@@ -4405,6 +4405,154 @@ export const useTacoStore = defineStore('taco', () => {
         }
     };
 
+    const createPost = async (threadId: bigint, body: string, replyToPostId?: bigint, title?: string) => {
+        try {
+            console.log('🔧 Creating post for thread ID:', threadId.toString());
+            
+            if (!userLoggedIn.value) {
+                throw new Error('Must be logged in to create posts');
+            }
+
+            const authClient = await getAuthClient();
+            const identity = authClient.getIdentity();
+            
+            const agent = await createAgent({
+                identity,
+                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            });
+
+            const forumActor = Actor.createActor<SneedForumService>(sneedForumIDL, {
+                agent,
+                canisterId: sneedForumCanisterId()
+            });
+
+            const result = await forumActor.create_post(
+                threadId,
+                replyToPostId ? [replyToPostId] : [],
+                title ? [title] : [],
+                body
+            );
+            
+            if ('ok' in result) {
+                console.log('✅ Successfully created post with ID:', result.ok);
+                return {
+                    success: true,
+                    postId: result.ok
+                };
+            } else {
+                console.error('❌ Failed to create post:', result.err);
+                throw new Error(`Failed to create post: ${JSON.stringify(result.err)}`);
+            }
+        } catch (error: any) {
+            console.error('Error creating post:', error);
+            throw error;
+        }
+    };
+
+    const voteOnPost = async (postId: bigint, voteType: 'upvote' | 'downvote') => {
+        try {
+            console.log('🗳️ Voting on post ID:', postId.toString(), 'vote type:', voteType);
+            
+            if (!userLoggedIn.value) {
+                throw new Error('Must be logged in to vote');
+            }
+
+            const authClient = await getAuthClient();
+            const identity = authClient.getIdentity();
+            
+            const agent = await createAgent({
+                identity,
+                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            });
+
+            const forumActor = Actor.createActor<SneedForumService>(sneedForumIDL, {
+                agent,
+                canisterId: sneedForumCanisterId()
+            });
+
+            const voteTypeVariant = voteType === 'upvote' ? { upvote: null } : { downvote: null };
+            const result = await forumActor.vote_on_post(postId, voteTypeVariant);
+            
+            if ('ok' in result) {
+                console.log('✅ Successfully voted on post');
+                return {
+                    success: true
+                };
+            } else {
+                console.error('❌ Failed to vote on post:', result.err);
+                throw new Error(`Failed to vote: ${JSON.stringify(result.err)}`);
+            }
+        } catch (error: any) {
+            console.error('Error voting on post:', error);
+            throw error;
+        }
+    };
+
+    const retractVote = async (postId: bigint) => {
+        try {
+            console.log('🔄 Retracting vote on post ID:', postId.toString());
+            
+            if (!userLoggedIn.value) {
+                throw new Error('Must be logged in to retract vote');
+            }
+
+            const authClient = await getAuthClient();
+            const identity = authClient.getIdentity();
+            
+            const agent = await createAgent({
+                identity,
+                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            });
+
+            const forumActor = Actor.createActor<SneedForumService>(sneedForumIDL, {
+                agent,
+                canisterId: sneedForumCanisterId()
+            });
+
+            const result = await forumActor.retract_vote(postId);
+            
+            if ('ok' in result) {
+                console.log('✅ Successfully retracted vote');
+                return {
+                    success: true
+                };
+            } else {
+                console.error('❌ Failed to retract vote:', result.err);
+                throw new Error(`Failed to retract vote: ${JSON.stringify(result.err)}`);
+            }
+        } catch (error: any) {
+            console.error('Error retracting vote:', error);
+            throw error;
+        }
+    };
+
+    const getPostVotes = async (postId: bigint) => {
+        try {
+            console.log('📊 Getting votes for post ID:', postId.toString());
+            
+            const agent = await createAgent({
+                identity: new AnonymousIdentity(),
+                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            });
+
+            const forumActor = Actor.createActor<SneedForumService>(sneedForumIDL, {
+                agent,
+                canisterId: sneedForumCanisterId()
+            });
+
+            const votes = await forumActor.get_post_votes(postId);
+            console.log('✅ Retrieved votes for post:', votes);
+            return votes;
+        } catch (error: any) {
+            console.error('Error getting post votes:', error);
+            throw error;
+        }
+    };
+
     //=========================================================================
     // TACO DAO PROPOSALS METHODS
     //=========================================================================
@@ -4938,6 +5086,10 @@ export const useTacoStore = defineStore('taco', () => {
         getThread,
         getProposalThread,
         createProposalThread,
+        createPost,
+        voteOnPost,
+        retractVote,
+        getPostVotes,
         // proposals functions
         fetchedTacoProposals,
         proposalsLoading,
