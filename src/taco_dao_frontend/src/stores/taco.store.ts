@@ -3923,6 +3923,919 @@ export const useTacoStore = defineStore('taco', () => {
         }
     };
 
+    const getMaxPortfolioSnapshots = async () => {
+        try {
+            const agent = await createAgent({
+                identity: new AnonymousIdentity(),
+                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            });
+
+            const treasury = Actor.createActor<TreasuryService>(treasuryIDL, {
+                agent,
+                canisterId: treasuryCanisterId()
+            });
+
+            return await (treasury as any).getMaxPortfolioSnapshots();
+        } catch (error: any) {
+            console.error('Error getting max portfolio snapshots:', error);
+            throw error;
+        }
+    };
+
+    const updateMaxPortfolioSnapshots = async (newLimit: number) => {
+        try {
+            const authClient = await getAuthClient();
+            
+            if (!await authClient.isAuthenticated()) {
+                throw new Error('User not authenticated');
+            }
+
+            const identity = await authClient.getIdentity();
+            const agent = await createAgent({
+                identity,
+                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            });
+
+            const treasury = Actor.createActor<TreasuryService>(treasuryIDL, {
+                agent,
+                canisterId: treasuryCanisterId()
+            });
+
+            const result = await (treasury as any).updateMaxPortfolioSnapshots(BigInt(newLimit));
+            if ('ok' in result) {
+                console.log('Successfully updated max portfolio snapshots:', result.ok);
+                return result.ok;
+            } else {
+                console.error('Error updating max portfolio snapshots:', result.err);
+                throw new Error(result.err);
+            }
+        } catch (error: any) {
+            console.error('Error updating max portfolio snapshots:', error);
+            throw error;
+        }
+    };
+
+    //=========================================================================
+    // FORUM SYSTEM METHODS
+    //=========================================================================
+
+    const sneedForumCanisterId = () => {
+        switch (process.env.DFX_NETWORK) {
+            case "ic":
+                return process.env.CANISTER_ID_NEURONSNAPSHOT_IC || 'mcigm-4aaaa-aaaad-qhlkq-cai';
+                break;
+            case "staging":
+                return  process.env.CANISTER_ID_NEURONSNAPSHOT_STAGING || 'mcigm-4aaaa-aaaad-qhlkq-cai'; // nrtf2-wiaaa-aaaad-aankq-cai << real staging
+                break;
+        }        
+        return 'mcigm-4aaaa-aaaad-qhlkq-cai'; 
+    };
+
+    const tacoSnsRootCanisterId = () => {
+        // TACO DAO SNS root canister ID
+        return 'lacdn-3iaaa-aaaaq-aae3a-cai';
+    };
+
+    const getAllForums = async () => {
+        try {
+            const agent = await createAgent({
+                identity: new AnonymousIdentity(),
+                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            });
+
+            const forumActor = Actor.createActor<SneedForumService>(sneedForumIDL, {
+                agent,
+                canisterId: sneedForumCanisterId()
+            });
+
+            const forums = await forumActor.get_forums();
+            fetchedForums.value = forums;
+            console.log('Fetched forums:', forums);
+            return forums;
+        } catch (error: any) {
+            console.error('Error getting forums:', error);
+            throw error;
+        }
+    };
+
+    const findTacoForum = async () => {
+        try {
+            const agent = await createAgent({
+                identity: new AnonymousIdentity(),
+                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            });
+
+            const forumActor = Actor.createActor<SneedForumService>(sneedForumIDL, {
+                agent,
+                canisterId: sneedForumCanisterId()
+            });
+
+            // Direct lookup using SNS root canister ID (much more efficient!)
+            const tacoSnsRoot = Principal.fromText(tacoSnsRootCanisterId());
+            const tacoForum = await forumActor.get_forum_by_sns_root(tacoSnsRoot);
+            
+            if (tacoForum && tacoForum.length > 0) {
+                const forum = tacoForum[0]!;
+                tacoForumId.value = forum.id;
+                console.log('Found TACO forum via direct lookup:', forum);
+                return forum;
+            } else {
+                console.log('TACO forum not found for SNS root canister ID:', tacoSnsRoot.toString());
+                return null;
+            }
+        } catch (error: any) {
+            console.error('Error finding TACO forum:', error);
+            throw error;
+        }
+    };
+
+    const getProposalsTopic = async (forumId: bigint) => {
+        try {
+            const agent = await createAgent({
+                identity: new AnonymousIdentity(),
+                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            });
+
+            const forumActor = Actor.createActor<SneedForumService>(sneedForumIDL, {
+                agent,
+                canisterId: sneedForumCanisterId()
+            });
+
+            const proposalsTopicMapping = await forumActor.get_proposals_topic(forumId);
+            
+            if (proposalsTopicMapping.length > 0) {
+                const mapping = proposalsTopicMapping[0]!;
+                proposalsTopicId.value = mapping.proposals_topic_id;
+                console.log('Found proposals topic:', mapping);
+                return mapping;
+            } else {
+                console.log('Proposals topic not found for forum:', forumId);
+                return null;
+            }
+        } catch (error: any) {
+            console.error('Error getting proposals topic:', error);
+            throw error;
+        }
+    };
+
+    const getProposalsTopicDirect = async () => {
+        try {
+            const agent = await createAgent({
+                identity: new AnonymousIdentity(),
+                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            });
+
+            const forumActor = Actor.createActor<SneedForumService>(sneedForumIDL, {
+                agent,
+                canisterId: sneedForumCanisterId()
+            });
+
+            // Direct lookup using SNS root canister ID - super efficient!
+            const tacoSnsRoot = Principal.fromText(tacoSnsRootCanisterId());
+            const proposalsTopicMapping = await forumActor.get_proposals_topic_by_sns_root(tacoSnsRoot);
+            
+            if (proposalsTopicMapping && proposalsTopicMapping.length > 0) {
+                const mapping = proposalsTopicMapping[0]!;
+                proposalsTopicId.value = mapping.proposals_topic_id;
+                console.log('Found proposals topic via direct SNS lookup:', mapping);
+                return mapping;
+            } else {
+                console.log('Proposals topic not found for SNS root canister ID:', tacoSnsRoot.toString());
+                return null;
+            }
+        } catch (error: any) {
+            console.error('Error getting proposals topic via direct lookup:', error);
+            throw error;
+        }
+    };
+
+    const getThreadsByTopic = async (topicId: bigint) => {
+        try {
+            const agent = await createAgent({
+                identity: new AnonymousIdentity(),
+                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            });
+
+            const forumActor = Actor.createActor<SneedForumService>(sneedForumIDL, {
+                agent,
+                canisterId: sneedForumCanisterId()
+            });
+
+            const threads = await forumActor.get_threads_by_topic(topicId);
+            fetchedProposalsThreads.value = threads;
+            console.log('Fetched threads for topic:', topicId, threads);
+            return threads;
+        } catch (error: any) {
+            console.error('Error getting threads by topic:', error);
+            throw error;
+        }
+    };
+
+    const getPostsByThread = async (threadId: bigint) => {
+        try {
+            const agent = await createAgent({
+                identity: new AnonymousIdentity(),
+                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            });
+
+            const forumActor = Actor.createActor<SneedForumService>(sneedForumIDL, {
+                agent,
+                canisterId: sneedForumCanisterId()
+            });
+
+            const posts = await forumActor.get_posts_by_thread(threadId);
+            fetchedThreadPosts.value = posts;
+            console.log('Fetched posts for thread:', threadId, posts);
+            return posts;
+        } catch (error: any) {
+            console.error('Error getting posts by thread:', error);
+            throw error;
+        }
+    };
+
+    const getProposalsThreads = async () => {
+        try {
+            console.log('🔍 Starting getProposalsThreads... (OPTIMIZED VERSION)');
+            
+            // Skip the forum lookup and go directly to proposals topic via SNS root!
+            console.log('🔍 Step 1: Getting proposals topic via direct SNS root lookup...');
+            const proposalsMapping = await getProposalsTopicDirect();
+            if (!proposalsMapping) {
+                console.log('❌ Proposals topic not found via direct lookup');
+                throw new Error('Proposals topic not found');
+            }
+            console.log('✅ Found proposals topic with ID:', proposalsMapping.proposals_topic_id.toString());
+
+            // Get all threads in the proposals topic
+            console.log('🔍 Step 2: Getting threads for topic ID:', proposalsMapping.proposals_topic_id.toString());
+            const threads = await getThreadsByTopic(proposalsMapping.proposals_topic_id);
+            console.log('✅ Found', threads.length, 'threads');
+            return threads;
+        } catch (error: any) {
+            console.error('❌ Error getting proposals threads:', error);
+            throw error;
+        }
+    };
+
+    const getThread = async (threadId: bigint) => {
+        try {
+            const agent = await createAgent({
+                identity: new AnonymousIdentity(),
+                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            });
+
+            const forumActor = Actor.createActor<SneedForumService>(sneedForumIDL, {
+                agent,
+                canisterId: sneedForumCanisterId()
+            });
+
+            const thread = await forumActor.get_thread(threadId);
+            console.log('Fetched thread:', threadId, thread);
+            return thread;
+        } catch (error: any) {
+            console.error('Error getting thread:', error);
+            throw error;
+        }
+    };
+
+    const getProposalThread = async (proposalId: bigint) => {
+        try {
+            console.log('🔍 Looking up thread for proposal ID:', proposalId.toString());
+            
+            const agent = await createAgent({
+                identity: new AnonymousIdentity(),
+                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            });
+
+            const forumActor = Actor.createActor<SneedForumService>(sneedForumIDL, {
+                agent,
+                canisterId: sneedForumCanisterId()
+            });
+
+            const tacoSnsRoot = Principal.fromText(tacoSnsRootCanisterId());
+            const proposalThreadMapping = await forumActor.get_proposal_thread(tacoSnsRoot, proposalId);
+            
+            if (proposalThreadMapping && proposalThreadMapping.length > 0) {
+                const mapping = proposalThreadMapping[0]!;
+                console.log('✅ Found existing thread mapping:', mapping);
+                
+                // Now get the actual thread details
+                const thread = await forumActor.get_thread(mapping.thread_id);
+                if (thread && thread.length > 0) {
+                    console.log('✅ Found thread details:', thread[0]);
+                    return {
+                        mapping,
+                        thread: thread[0],
+                        exists: true
+                    };
+                }
+            }
+            
+            console.log('❌ No thread found for proposal:', proposalId.toString());
+            return {
+                mapping: null,
+                thread: null,
+                exists: false
+            };
+        } catch (error: any) {
+            console.error('Error getting proposal thread:', error);
+            throw error;
+        }
+    };
+
+    const createProposalThread = async (proposalId: bigint) => {
+        try {
+            console.log('🔧 Creating thread for proposal ID:', proposalId.toString());
+            
+            if (!userLoggedIn.value) {
+                throw new Error('Must be logged in to create proposal threads');
+            }
+
+            const authClient = await getAuthClient();
+            const identity = authClient.getIdentity();
+            
+            const agent = await createAgent({
+                identity,
+                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            });
+
+            const forumActor = Actor.createActor<SneedForumService>(sneedForumIDL, {
+                agent,
+                canisterId: sneedForumCanisterId()
+            });
+
+            const tacoSnsRoot = Principal.fromText(tacoSnsRootCanisterId());
+            const result = await forumActor.create_proposal_thread_with_auto_setup({
+                sns_root_canister_id: tacoSnsRoot,
+                proposal_id: proposalId
+            });
+            
+            if ('ok' in result) {
+                console.log('✅ Successfully created proposal thread with ID:', result.ok);
+                return {
+                    success: true,
+                    threadId: result.ok
+                };
+            } else {
+                console.error('❌ Failed to create proposal thread:', result.err);
+                throw new Error(`Failed to create thread: ${JSON.stringify(result.err)}`);
+            }
+        } catch (error: any) {
+            console.error('Error creating proposal thread:', error);
+            throw error;
+        }
+    };
+
+    const createPost = async (threadId: bigint, body: string, replyToPostId?: bigint, title?: string) => {
+        try {
+            console.log('🔧 Creating post for thread ID:', threadId.toString());
+            
+            if (!userLoggedIn.value) {
+                throw new Error('Must be logged in to create posts');
+            }
+
+            const authClient = await getAuthClient();
+            const identity = authClient.getIdentity();
+            
+            const agent = await createAgent({
+                identity,
+                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            });
+
+            const forumActor = Actor.createActor<SneedForumService>(sneedForumIDL, {
+                agent,
+                canisterId: sneedForumCanisterId()
+            });
+
+            const result = await forumActor.create_post(
+                threadId,
+                replyToPostId ? [replyToPostId] : [],
+                title ? [title] : [],
+                body
+            );
+            
+            if ('ok' in result) {
+                console.log('✅ Successfully created post with ID:', result.ok);
+                return {
+                    success: true,
+                    postId: result.ok
+                };
+            } else {
+                console.error('❌ Failed to create post:', result.err);
+                throw new Error(`Failed to create post: ${JSON.stringify(result.err)}`);
+            }
+        } catch (error: any) {
+            console.error('Error creating post:', error);
+            throw error;
+        }
+    };
+
+    const voteOnPost = async (postId: bigint, voteType: 'upvote' | 'downvote') => {
+        try {
+            console.log('🗳️ Voting on post ID:', postId.toString(), 'vote type:', voteType);
+            
+            if (!userLoggedIn.value) {
+                throw new Error('Must be logged in to vote');
+            }
+
+            const authClient = await getAuthClient();
+            const identity = authClient.getIdentity();
+            
+            const agent = await createAgent({
+                identity,
+                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            });
+
+            const forumActor = Actor.createActor<SneedForumService>(sneedForumIDL, {
+                agent,
+                canisterId: sneedForumCanisterId()
+            });
+
+            const voteTypeVariant = voteType === 'upvote' ? { upvote: null } : { downvote: null };
+            const result = await forumActor.vote_on_post(postId, voteTypeVariant);
+            
+            if ('ok' in result) {
+                console.log('✅ Successfully voted on post');
+                return {
+                    success: true
+                };
+            } else {
+                console.error('❌ Failed to vote on post:', result.err);
+                throw new Error(`Failed to vote: ${JSON.stringify(result.err)}`);
+            }
+        } catch (error: any) {
+            console.error('Error voting on post:', error);
+            throw error;
+        }
+    };
+
+    const retractVote = async (postId: bigint) => {
+        try {
+            console.log('🔄 Retracting vote on post ID:', postId.toString());
+            
+            if (!userLoggedIn.value) {
+                throw new Error('Must be logged in to retract vote');
+            }
+
+            const authClient = await getAuthClient();
+            const identity = authClient.getIdentity();
+            
+            const agent = await createAgent({
+                identity,
+                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            });
+
+            const forumActor = Actor.createActor<SneedForumService>(sneedForumIDL, {
+                agent,
+                canisterId: sneedForumCanisterId()
+            });
+
+            const result = await forumActor.retract_vote(postId);
+            
+            if ('ok' in result) {
+                console.log('✅ Successfully retracted vote');
+                return {
+                    success: true
+                };
+            } else {
+                console.error('❌ Failed to retract vote:', result.err);
+                throw new Error(`Failed to retract vote: ${JSON.stringify(result.err)}`);
+            }
+        } catch (error: any) {
+            console.error('Error retracting vote:', error);
+            throw error;
+        }
+    };
+
+    const getPostVotes = async (postId: bigint) => {
+        try {
+            console.log('📊 Getting votes for post ID:', postId.toString());
+            
+            const agent = await createAgent({
+                identity: new AnonymousIdentity(),
+                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            });
+
+            const forumActor = Actor.createActor<SneedForumService>(sneedForumIDL, {
+                agent,
+                canisterId: sneedForumCanisterId()
+            });
+
+            const votes = await forumActor.get_post_votes(postId);
+            console.log('✅ Retrieved votes for post:', votes);
+            return votes;
+        } catch (error: any) {
+            console.error('Error getting post votes:', error);
+            throw error;
+        }
+    };
+
+    //=========================================================================
+    // TACO DAO PROPOSALS METHODS
+    //=========================================================================
+
+    const tacoSnsGovernanceCanisterId = () => {
+        // TACO DAO SNS governance canister ID
+        return 'lhdfz-wqaaa-aaaaq-aae3q-cai';
+    };
+
+    const fetchTacoProposalsInternal = async (beforeProposal: bigint | null = null, limit: number = 20) => {
+        console.log('🔍 Fetching TACO DAO proposals...', beforeProposal ? `before ID ${beforeProposal}` : 'from latest');
+        console.log('🔗 Using SNS governance canister:', tacoSnsGovernanceCanisterId());
+        
+        const agent = await createAgent({
+            identity: new AnonymousIdentity(),
+            host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+            fetchRootKey: process.env.DFX_NETWORK === "local",
+        });
+
+        const governanceActor = Actor.createActor(snsGovernanceIDL, {
+            agent,
+            canisterId: tacoSnsGovernanceCanisterId()
+        });
+
+        // Create request for list_proposals
+        const request = {
+            include_reward_status: [], // Include all reward statuses
+            before_proposal: beforeProposal ? [{ id: beforeProposal }] : [], // Pagination support
+            limit: limit,
+            exclude_type: [], // Don't exclude any types
+            include_topics: [], // Include all topics
+            include_status: [], // Include all statuses
+        };
+
+        console.log('📞 Calling list_proposals with request:', request);
+        const response = await governanceActor.list_proposals(request) as any;
+        console.log('📦 Raw response from list_proposals:', response);
+        
+        // Check if response has proposals directly (sometimes the structure is different)
+        let proposals;
+        if (response && response.proposals) {
+            proposals = response.proposals;
+            console.log('✅ Found proposals directly in response');
+        } else if (response && response.Ok && response.Ok.proposals) {
+            proposals = response.Ok.proposals;
+            console.log('✅ Found proposals in response.Ok');
+        } else if (Array.isArray(response)) {
+            proposals = response;
+            console.log('✅ Response is array of proposals');
+        } else {
+            console.error('❌ Unexpected response structure:', response);
+            throw new Error(`Unexpected response structure: ${JSON.stringify(response)}`);
+        }
+        
+        console.log('✅ Fetched', proposals.length, 'TACO DAO proposals');
+        
+        // Transform the raw proposal data into our TacoProposal format
+        const transformedProposals: TacoProposal[] = proposals.map((proposalData: any) => {
+            // Extract data from array-wrapped fields
+            const proposal = proposalData.proposal && proposalData.proposal[0] ? proposalData.proposal[0] : null;
+            const tally = proposalData.latest_tally && proposalData.latest_tally[0] ? proposalData.latest_tally[0] : null;
+            const id = proposalData.id && proposalData.id[0] ? proposalData.id[0] : null;
+            const proposer = proposalData.proposer && proposalData.proposer[0] ? proposalData.proposer[0] : null;
+            
+            // Determine status based on timestamps
+            let status: 'Open' | 'Adopted' | 'Rejected' | 'Failed' | 'Executed' = 'Open';
+            if (proposalData.failed_timestamp_seconds > 0) {
+                status = 'Failed';
+            } else if (proposalData.executed_timestamp_seconds > 0) {
+                status = 'Executed';
+            } else if (proposalData.decided_timestamp_seconds > 0) {
+                // Check if it was adopted or rejected based on voting
+                if (tally && tally.yes > tally.no) {
+                    status = 'Adopted';
+                } else {
+                    status = 'Rejected';
+                }
+            }
+            
+            return {
+                id: id?.id || BigInt(0),
+                title: proposal?.title || 'Untitled Proposal',
+                summary: proposal?.summary || '',
+                url: proposal?.url || '',
+                status,
+                createdAt: new Date(Number(proposalData.proposal_creation_timestamp_seconds) * 1000),
+                decidedAt: proposalData.decided_timestamp_seconds > 0 
+                    ? new Date(Number(proposalData.decided_timestamp_seconds) * 1000) 
+                    : undefined,
+                executedAt: proposalData.executed_timestamp_seconds > 0 
+                    ? new Date(Number(proposalData.executed_timestamp_seconds) * 1000) 
+                    : undefined,
+                proposer: proposer ? uint8ArrayToHex(proposer.id) : undefined,
+                yesVotes: tally?.yes || BigInt(0),
+                noVotes: tally?.no || BigInt(0),
+                totalVotes: tally?.total || BigInt(0),
+            };
+        });
+        
+        // Sort by creation date (newest first)
+        transformedProposals.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+        
+        return {
+            proposals: transformedProposals,
+            hasMore: proposals.length === limit, // If we got exactly the limit, there might be more
+            lastId: transformedProposals.length > 0 ? transformedProposals[transformedProposals.length - 1].id : null
+        };
+    };
+
+    const fetchTacoProposals = async (limit: number = 20) => {
+        try {
+            proposalsLoading.value = true;
+            
+            const result = await fetchTacoProposalsInternal(null, limit);
+            
+            fetchedTacoProposals.value = result.proposals;
+            proposalsHasMore.value = result.hasMore;
+            proposalsLastId.value = result.lastId;
+            
+            console.log('✅ Successfully loaded', result.proposals.length, 'proposals');
+            return result.proposals;
+        } catch (error: any) {
+            console.error('❌ Error fetching TACO DAO proposals:', error);
+            console.error('❌ Error details:', error.message, error.stack);
+            throw error;
+        } finally {
+            proposalsLoading.value = false;
+        }
+    };
+
+    const loadMoreTacoProposals = async (limit: number = 20) => {
+        if (!proposalsHasMore.value || proposalsLoadingMore.value || !proposalsLastId.value) {
+            return [];
+        }
+
+        try {
+            proposalsLoadingMore.value = true;
+            
+            const result = await fetchTacoProposalsInternal(proposalsLastId.value, limit);
+            
+            // Append new proposals to existing ones
+            fetchedTacoProposals.value = [...fetchedTacoProposals.value, ...result.proposals];
+            proposalsHasMore.value = result.hasMore;
+            proposalsLastId.value = result.lastId;
+            
+            console.log('✅ Successfully loaded', result.proposals.length, 'more proposals');
+            return result.proposals;
+        } catch (error: any) {
+            console.error('❌ Error loading more TACO DAO proposals:', error);
+            throw error;
+        } finally {
+            proposalsLoadingMore.value = false;
+        }
+    };
+
+    //=========================================================================
+    // NAMING SYSTEM METHODS
+    //=========================================================================
+
+    const appSneedDaoCanisterId = () => {
+        switch (process.env.DFX_NETWORK) {
+            case "ic":
+                return process.env.CANISTER_ID_APP_SNEEDDAO_BACKEND_IC || 'g7s5u-tqaaa-aaaad-qhktq-cai'; // Replace with actual IC canister ID
+                break;
+            case "staging":
+                return process.env.CANISTER_ID_APP_SNEEDDAO_BACKEND_STAGING || 'g7s5u-tqaaa-aaaad-qhktq-cai'; // Replace with actual staging ID
+                break;
+        }        
+        return 'g7s5u-tqaaa-aaaad-qhktq-cai'; // Replace with actual local/default ID
+    };
+
+    // Helper function to convert Uint8Array or number[] to hex string for map keys
+    const uint8ArrayToHex = (arr: Uint8Array | number[]): string => {
+        return Array.from(arr, byte => byte.toString(16).padStart(2, '0')).join('');
+    };
+
+    // Helper function to create neuron map key
+    const createNeuronKey = (snsRoot: Principal, neuronId: Uint8Array | number[]): string => {
+        return `${snsRoot.toString()}:${uint8ArrayToHex(neuronId)}`;
+    };
+
+    // Load all names (non-blocking) - call this on app startup
+    const loadAllNames = async () => {
+        console.log('🔍 loadAllNames() called');
+        
+        if (namesLoading.value) {
+            console.log('⏳ Names already loading, skipping...');
+            return; // Already loading
+        }
+        
+        try {
+            console.log('🚀 Starting to load all names...');
+            namesLoading.value = true;
+            
+            const agent = await createAgent({
+                identity: new AnonymousIdentity(),
+                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            });
+
+            const canisterId = appSneedDaoCanisterId();
+            console.log('🔗 Connecting to app_sneeddao_backend canister:', canisterId);
+            console.log('🌐 DFX_NETWORK:', process.env.DFX_NETWORK);
+            
+            const appSneedDaoActor = Actor.createActor<AppSneedDaoService>(appSneedDaoIDL, {
+                agent,
+                canisterId: canisterId
+            });
+
+            // Load all principal names and neuron names in parallel
+            console.log('📞 Making API calls to get_all_principal_names() and get_all_neuron_names()...');
+            const [principalNames, neuronNames] = await Promise.all([
+                appSneedDaoActor.get_all_principal_names(),
+                appSneedDaoActor.get_all_neuron_names()
+            ]);
+            console.log('📦 Received data - principalNames:', principalNames.length, 'neuronNames:', neuronNames.length);
+
+            // Clear and populate principal names cache
+            namesCache.value.principals.clear();
+            principalNames.forEach(([principal, [name, verified]]) => {
+                namesCache.value.principals.set(principal.toString(), { name, verified });
+            });
+
+            // Clear and populate neuron names cache
+            namesCache.value.neurons.clear();
+            neuronNames.forEach(([neuronKey, [name, verified]]) => {
+                const mapKey = createNeuronKey(neuronKey.sns_root_canister_id, neuronKey.neuron_id.id);
+                namesCache.value.neurons.set(mapKey, { name, verified });
+            });
+
+            namesCache.value.lastLoaded = Date.now();
+            
+            console.log(`✅ Loaded ${principalNames.length} principal names and ${neuronNames.length} neuron names`);
+            
+        } catch (error: any) {
+            console.error('Error loading names:', error);
+            // Don't throw - this is non-blocking
+        } finally {
+            namesLoading.value = false;
+        }
+    };
+
+    // Get principal name or fallback to truncated principal
+    const getPrincipalDisplayName = (principal: Principal | string): string => {
+        const principalStr = typeof principal === 'string' ? principal : principal.toString();
+        const cachedName = namesCache.value.principals.get(principalStr);
+        
+        if (cachedName) {
+            return cachedName.verified ? `✓ ${cachedName.name}` : cachedName.name;
+        }
+        
+        // Fallback to truncated principal
+        const cleaned = principalStr.replace(/-/g, '');
+        return cleaned.length > 10 ? 
+            cleaned.substring(0, 5) + '...' + cleaned.substring(cleaned.length - 5) :
+            cleaned;
+    };
+
+    // Get neuron name or fallback to neuron ID
+    const getNeuronDisplayName = (snsRoot: Principal, neuronId: Uint8Array | number[]): string => {
+        const mapKey = createNeuronKey(snsRoot, neuronId);
+        const cachedName = namesCache.value.neurons.get(mapKey);
+        
+        if (cachedName) {
+            return cachedName.verified ? `✓ ${cachedName.name}` : cachedName.name;
+        }
+        
+        // Fallback to truncated neuron ID
+        const neuronIdHex = uint8ArrayToHex(neuronId);
+        return neuronIdHex.length > 12 ? 
+            `Neuron ${neuronIdHex.substring(0, 6)}...${neuronIdHex.substring(neuronIdHex.length - 6)}` :
+            `Neuron ${neuronIdHex}`;
+    };
+
+    // Set principal name for logged-in user
+    const setPrincipalName = async (name: string) => {
+        try {
+            if (!userLoggedIn.value) {
+                throw new Error('User must be logged in to set names');
+            }
+
+            const authClient = await getAuthClient();
+            const identity = authClient.getIdentity();
+            
+            const agent = await createAgent({
+                identity,
+                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            });
+
+            const appSneedDaoActor = Actor.createActor<AppSneedDaoService>(appSneedDaoIDL, {
+                agent,
+                canisterId: appSneedDaoCanisterId()
+            });
+
+            const result = await appSneedDaoActor.set_principal_name(name);
+            
+            if ('ok' in result) {
+                console.log('✅ Principal name set successfully:', result.ok);
+                
+                // Update cache immediately
+                const userPrincipalStr = userPrincipal.value;
+                namesCache.value.principals.set(userPrincipalStr, { name, verified: false });
+                
+                return result.ok;
+            } else {
+                throw new Error(result.err);
+            }
+        } catch (error: any) {
+            console.error('Error setting principal name:', error);
+            throw error;
+        }
+    };
+
+    // Set neuron name for logged-in user  
+    const setNeuronName = async (snsRoot: Principal, neuronId: Uint8Array | number[], name: string) => {
+        try {
+            if (!userLoggedIn.value) {
+                throw new Error('User must be logged in to set names');
+            }
+
+            const authClient = await getAuthClient();
+            const identity = authClient.getIdentity();
+            
+            const agent = await createAgent({
+                identity,
+                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            });
+
+            const appSneedDaoActor = Actor.createActor<AppSneedDaoService>(appSneedDaoIDL, {
+                agent,
+                canisterId: appSneedDaoCanisterId()
+            });
+
+            // Convert number[] to Uint8Array if needed
+            const neuronIdUint8 = neuronId instanceof Uint8Array ? neuronId : new Uint8Array(neuronId);
+            
+            const result = await appSneedDaoActor.set_neuron_name(snsRoot, { id: neuronIdUint8 }, name);
+            
+            if ('ok' in result) {
+                console.log('✅ Neuron name set successfully:', result.ok);
+                
+                // Update cache immediately
+                const mapKey = createNeuronKey(snsRoot, neuronId);
+                namesCache.value.neurons.set(mapKey, { name, verified: false });
+                
+                return result.ok;
+            } else {
+                throw new Error(result.err);
+            }
+        } catch (error: any) {
+            console.error('Error setting neuron name:', error);
+            throw error;
+        }
+    };
+
+    // Get user's neurons for the names page
+    const getUserNeurons = async () => {
+        try {
+            if (!userLoggedIn.value) {
+                throw new Error('User must be logged in');
+            }
+
+            const authClient = await getAuthClient();
+            const identity = authClient.getIdentity();
+            
+            const agent = await createAgent({
+                identity,
+                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            });
+
+            const appSneedDaoActor = Actor.createActor<AppSneedDaoService>(appSneedDaoIDL, {
+                agent,
+                canisterId: appSneedDaoCanisterId()
+            });
+
+            const result = await appSneedDaoActor.get_user_neurons();
+            
+            if ('ok' in result) {
+                return result.ok;
+            } else {
+                throw new Error(result.err);
+            }
+        } catch (error: any) {
+            console.error('Error getting user neurons:', error);
+            throw error;
+        }
+    };
+
     
 
     // # RETURN #
@@ -4048,5 +4961,43 @@ export const useTacoStore = defineStore('taco', () => {
         getMaxNeuronSnapshots,
         setMaxNeuronSnapshots,
         getMaxPriceHistoryEntries,
+        getMaxPortfolioSnapshots,
+        updateMaxPortfolioSnapshots,
+        // forum functions
+        tacoForumId,
+        proposalsTopicId,
+        fetchedForums,
+        fetchedProposalsThreads,
+        fetchedThreadPosts,
+        getAllForums,
+        findTacoForum,
+        getProposalsTopic,
+        getProposalsTopicDirect,
+        getThreadsByTopic,
+        getPostsByThread,
+        getProposalsThreads,
+        getThread,
+        getProposalThread,
+        createProposalThread,
+        createPost,
+        voteOnPost,
+        retractVote,
+        getPostVotes,
+        // proposals functions
+        fetchedTacoProposals,
+        proposalsLoading,
+        proposalsLoadingMore,
+        proposalsHasMore,
+        fetchTacoProposals,
+        loadMoreTacoProposals,
+        // naming system functions
+        namesCache,
+        namesLoading,
+        loadAllNames,
+        getPrincipalDisplayName,
+        getNeuronDisplayName,
+        setPrincipalName,
+        setNeuronName,
+        getUserNeurons,
     }
 })

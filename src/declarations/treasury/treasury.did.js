@@ -47,7 +47,7 @@ export const idlFactory = ({ IDL }) => {
     'SystemError' : IDL.Text,
     'NotAuthorized' : IDL.Null,
   });
-  const Result_3 = IDL.Variant({ 'ok' : IDL.Text, 'err' : TradingPauseError });
+  const Result_4 = IDL.Variant({ 'ok' : IDL.Text, 'err' : TradingPauseError });
   const Result_2 = IDL.Variant({
     'ok' : IDL.Text,
     'err' : PortfolioCircuitBreakerError,
@@ -329,7 +329,7 @@ export const idlFactory = ({ IDL }) => {
     'UnexpectedError' : IDL.Text,
   });
   const Result_5 = IDL.Variant({ 'ok' : IDL.Text, 'err' : SyncErrorTreasury });
-  const Result_4 = IDL.Variant({
+  const Result_3 = IDL.Variant({
     'ok' : IDL.Text,
     'err' : PortfolioSnapshotError,
   });
@@ -390,7 +390,7 @@ export const idlFactory = ({ IDL }) => {
     'admin_executeTradingCycle' : IDL.Func([], [Result_1], []),
     'admin_recoverPoolBalances' : IDL.Func([], [Result_9], []),
     'admin_syncWithDao' : IDL.Func([], [Result_9], []),
-    'clearAllTradingPauses' : IDL.Func([], [Result_3], []),
+    'clearAllTradingPauses' : IDL.Func([], [Result_4], []),
     'clearLogs' : IDL.Func([], [], []),
     'clearPortfolioCircuitBreakerLogs' : IDL.Func([], [Result_2], []),
     'clearPriceAlerts' : IDL.Func([], [Result], []),
@@ -410,6 +410,7 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Vec(LogEntry)],
         ['query'],
       ),
+    'getMaxPortfolioSnapshots' : IDL.Func([], [IDL.Nat], ['query']),
     'getMaxPriceHistoryEntries' : IDL.Func([], [IDL.Nat], ['query']),
     'getPausedTokenThresholdForCircuitBreaker' : IDL.Func(
         [],
@@ -499,7 +500,7 @@ export const idlFactory = ({ IDL }) => {
       ),
     'pauseTokenFromTradingManual' : IDL.Func(
         [IDL.Principal, IDL.Text],
-        [Result_3],
+        [Result_4],
         [],
       ),
     'receiveTransferTasks' : IDL.Func(
@@ -533,8 +534,9 @@ export const idlFactory = ({ IDL }) => {
         [Result_5],
         [],
       ),
-    'takeManualPortfolioSnapshot' : IDL.Func([], [Result_4], []),
-    'unpauseTokenFromTrading' : IDL.Func([IDL.Principal], [Result_3], []),
+    'takeManualPortfolioSnapshot' : IDL.Func([], [Result_3], []),
+    'unpauseTokenFromTrading' : IDL.Func([IDL.Principal], [Result_4], []),
+    'updateMaxPortfolioSnapshots' : IDL.Func([IDL.Nat], [Result_3], []),
     'updatePausedTokenThresholdForCircuitBreaker' : IDL.Func(
         [IDL.Nat],
         [Result_2],

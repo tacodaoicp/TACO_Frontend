@@ -152,9 +152,9 @@ export type Result_11 = { 'ok' : bigint } |
 export type Result_2 = { 'ok' : string } |
   { 'err' : PortfolioCircuitBreakerError };
 export type Result_3 = { 'ok' : string } |
-  { 'err' : TradingPauseError };
-export type Result_4 = { 'ok' : string } |
   { 'err' : PortfolioSnapshotError };
+export type Result_4 = { 'ok' : string } |
+  { 'err' : TradingPauseError };
 export type Result_5 = { 'ok' : string } |
   { 'err' : SyncErrorTreasury };
 export type Result_6 = {
@@ -342,7 +342,7 @@ export interface treasury {
   'admin_executeTradingCycle' : ActorMethod<[], Result_1>,
   'admin_recoverPoolBalances' : ActorMethod<[], Result_9>,
   'admin_syncWithDao' : ActorMethod<[], Result_9>,
-  'clearAllTradingPauses' : ActorMethod<[], Result_3>,
+  'clearAllTradingPauses' : ActorMethod<[], Result_4>,
   'clearLogs' : ActorMethod<[], undefined>,
   'clearPortfolioCircuitBreakerLogs' : ActorMethod<[], Result_2>,
   'clearPriceAlerts' : ActorMethod<[], Result>,
@@ -350,6 +350,7 @@ export interface treasury {
   'getLogs' : ActorMethod<[bigint], Array<LogEntry>>,
   'getLogsByContext' : ActorMethod<[string, bigint], Array<LogEntry>>,
   'getLogsByLevel' : ActorMethod<[LogLevel, bigint], Array<LogEntry>>,
+  'getMaxPortfolioSnapshots' : ActorMethod<[], bigint>,
   'getMaxPriceHistoryEntries' : ActorMethod<[], bigint>,
   'getPausedTokenThresholdForCircuitBreaker' : ActorMethod<[], bigint>,
   'getPortfolioCircuitBreakerCondition' : ActorMethod<
@@ -398,7 +399,7 @@ export interface treasury {
   >,
   'listTradingPauses' : ActorMethod<[], TradingPausesResponse>,
   'listTriggerConditions' : ActorMethod<[], Array<TriggerCondition>>,
-  'pauseTokenFromTradingManual' : ActorMethod<[Principal, string], Result_3>,
+  'pauseTokenFromTradingManual' : ActorMethod<[Principal, string], Result_4>,
   'receiveTransferTasks' : ActorMethod<
     [Array<[TransferRecipient, bigint, Principal, number]>, boolean],
     [boolean, [] | [Array<[Principal, bigint]>]]
@@ -418,8 +419,9 @@ export interface treasury {
     [Array<[Principal, TokenDetails]>],
     Result_5
   >,
-  'takeManualPortfolioSnapshot' : ActorMethod<[], Result_4>,
-  'unpauseTokenFromTrading' : ActorMethod<[Principal], Result_3>,
+  'takeManualPortfolioSnapshot' : ActorMethod<[], Result_3>,
+  'unpauseTokenFromTrading' : ActorMethod<[Principal], Result_4>,
+  'updateMaxPortfolioSnapshots' : ActorMethod<[bigint], Result_3>,
   'updatePausedTokenThresholdForCircuitBreaker' : ActorMethod<
     [bigint],
     Result_2
