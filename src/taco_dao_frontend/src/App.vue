@@ -998,9 +998,10 @@
   // Imports //
   /////////////
 
-  import { onMounted } from 'vue';
+  import { onMounted, watch } from 'vue';
   import { useTacoStore } from "./stores/taco.store";
   import { storeToRefs } from "pinia";
+  import { useRoute } from 'vue-router'
   import 'bootstrap/dist/css/bootstrap.css';
   import '@fortawesome/fontawesome-pro/css/fontawesome.css';
   import '@fortawesome/fontawesome-pro/css/light.css';
@@ -1041,6 +1042,9 @@
   // Local Variables //
   /////////////////////
 
+  // route
+  const route = useRoute()
+
   // images
   const astronautLoaderUrl =  astronautLoader
 
@@ -1062,6 +1066,30 @@
     fetchCryptoPrices()
 
   }
+
+  // update robots meta
+  const updateRobotsMeta = (robotsContent) => {
+    let tag = document.querySelector('meta[name="robots"]')
+    if (!tag) {
+      tag = document.createElement('meta')
+      tag.setAttribute('name', 'robots')
+      document.head.appendChild(tag)
+    }
+    tag.setAttribute('content', robotsContent)
+  }
+
+  //////////////
+  // Wathcers //
+  //////////////
+
+  // watch for changes to the route
+  watch(
+    () => route.meta.robots,
+    (robots) => {
+      updateRobotsMeta(robots || 'index')
+    },
+    { immediate: true }
+  )  
 
   /////////////////////
   // Lifecycle Hooks //
