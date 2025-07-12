@@ -461,6 +461,15 @@
         flex-wrap: nowrap;
     }
 
+    // custom tooltip styles to match dataLabels
+    :deep(.custom-tooltip) {
+        padding: 4px 8px !important;
+        font-size: 14px !important;
+        font-family: 'Space Mono' !important;
+        font-weight: bold !important;
+        color: #fff !important;
+    }
+
 }
 
 ///////////////
@@ -1255,50 +1264,20 @@ LOCAL METHODS
         legend: {show: false},
         stroke: {show: false},
         tooltip: {
-            enabled: false,
-            enabledOnSeries: undefined,
-            shared: false,
-            followCursor: false,
-            intersect: true,
-            inverseOrder: false,
-            custom: undefined,
-            hideEmptySeries: true,
-            fillSeriesColor: false,
-            theme: false,
+            enabled: true,
+            fillSeriesColor: true,
             style: {
-            fontSize: '12px',
-            fontFamily: undefined
+                fontSize: '16px',
+                fontFamily: 'Space Mono',
+                fontWeight: 'bold',
             },
-            onDatasetHover: {
-                highlightDataSeries: false,
-            },
-            x: {
-                show: true,
-                format: 'dd MMM',
-                formatter: undefined,
-            },
-            y: {
-                formatter: undefined,
-                title: {
-                    formatter: (seriesName: any) => seriesName,
-                },
-            },
-            z: {
-                formatter: undefined,
-                title: 'Size: '
-            },
-            marker: {
-                show: true,
-            },
-            items: {
-            display: 'flex',
-            },
-            fixed: {
-                enabled: false,
-                position: 'topRight',
-                offsetX: 0,
-                offsetY: 0,
-            },
+            custom: function({ series, seriesIndex, dataPointIndex, w }: any) {
+                const val = series[seriesIndex]
+                const symbol = seriesNames.value[seriesIndex].toUpperCase()
+                return `<div class="custom-tooltip">
+                    <span>${symbol} ${val.toFixed(2)}%</span>
+                </div>`
+            }
         },
         markers: {
             size: 1,
