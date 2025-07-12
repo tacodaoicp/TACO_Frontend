@@ -23,7 +23,7 @@ type treasury =
    ///    *
    ///    * Removes all tokens from the trading pause registry.
    ///    * Only callable by master admins.
-   clearAllTradingPauses: () -> (Result_3);
+   clearAllTradingPauses: () -> (Result_4);
    /// * Clear all logs
    ///    * Only accessible by master admin or controller
    clearLogs: () -> ();
@@ -48,6 +48,11 @@ type treasury =
    /// * Get the last N log entries for a specific level
    ///    * Only accessible by master admin, controller, or DAO
    getLogsByLevel: (LogLevel, nat) -> (vec LogEntry) query;
+   /// * Get the current maximum portfolio snapshots limit
+   ///    * 
+   ///    * Returns the current limit for portfolio snapshots storage.
+   ///    * Accessible by any user with query access.
+   getMaxPortfolioSnapshots: () -> (nat) query;
    /// * Get current maximum price history entries configuration
    ///    * 
    ///    * Returns the current limit for price history entries per token.
@@ -151,7 +156,7 @@ type treasury =
    ///    *
    ///    * Allows admins to pause tokens from trading with a circuit breaker reason.
    ///    * Only callable by admins with appropriate permissions.
-   pauseTokenFromTradingManual: (principal, text) -> (Result_3);
+   pauseTokenFromTradingManual: (principal, text) -> (Result_4);
    /// * Process batch transfers from the DAO
    ///    *
    ///    * Handles both immediate and queued transfers of various token types.
@@ -216,12 +221,18 @@ type treasury =
                                    TokenDetails;
                                  }) -> (Result_5);
    /// * Manually trigger a portfolio snapshot (admin function)
-   takeManualPortfolioSnapshot: () -> (Result_4);
+   takeManualPortfolioSnapshot: () -> (Result_3);
    /// * Manually unpause a token from trading
    ///    *
    ///    * Removes a token from the trading pause registry, allowing it to trade again.
    ///    * Only callable by admins with appropriate permissions.
-   unpauseTokenFromTrading: (principal) -> (Result_3);
+   unpauseTokenFromTrading: (principal) -> (Result_4);
+   /// * Update the maximum portfolio snapshots limit
+   ///    * 
+   ///    * Sets the maximum number of portfolio snapshots to store.
+   ///    * Older snapshots will be automatically removed when the limit is exceeded.
+   ///    * Only callable by admins with appropriate permissions.
+   updateMaxPortfolioSnapshots: (nat) -> (Result_3);
    /// * Update the paused token threshold for circuit breaker
    ///    *
    ///    * Sets the number of paused tokens that will trigger the circuit breaker.
@@ -472,12 +483,12 @@ type Result_5 =
  };
 type Result_4 = 
  variant {
-   err: PortfolioSnapshotError;
+   err: TradingPauseError;
    ok: text;
  };
 type Result_3 = 
  variant {
-   err: TradingPauseError;
+   err: PortfolioSnapshotError;
    ok: text;
  };
 type Result_2 = 
