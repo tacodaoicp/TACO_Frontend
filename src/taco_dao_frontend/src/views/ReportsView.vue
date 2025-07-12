@@ -2832,7 +2832,7 @@
                     
                     <!-- paragraph -->
                     <p class="taco-report-explorer__report-paragraph">
-                      <a href="https://x.com/VictorICPGold" target="_blank" class="taco-report-explorer__report-link">VictorICP is the Community Manager</a>, also being involved in the <a href="https://x.com/ICPLoteria" target="_blank" class="taco-report-explorer__report-link">ICPLoteria NFT collection</a>.
+                      <a href="https://x.com/VictorICPGold" target="_blank" class="taco-report-explorer__report-link">VictorICP is the Community Manager</a>, also being the creator of the <a href="https://x.com/ICPLoteria" target="_blank" class="taco-report-explorer__report-link">ICPLoteria NFT collection</a>.
                     </p>
                     
                     <!-- paragraph -->
@@ -2906,7 +2906,7 @@
 
                     <!-- paragraph -->
                     <p class="taco-report-explorer__report-paragraph">
-                      Programmable gold is a unique value proposition. Integration of GLTD can impact broader ICP adoption, facilitating enhanced liquidity and user engagement.
+                      Programmable gold is a unique value proposition. Integration of GLDT can impact broader ICP adoption, facilitating enhanced liquidity and user engagement.
                     </p>
                     
                     <!-- paragraph -->
