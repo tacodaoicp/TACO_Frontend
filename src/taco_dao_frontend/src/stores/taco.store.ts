@@ -5076,12 +5076,12 @@ export const useTacoStore = defineStore('taco', () => {
         getMaxPriceHistoryEntries,
         getMaxPortfolioSnapshots,
         updateMaxPortfolioSnapshots,
-        // // forum functions
-        // tacoForumId,
-        // proposalsTopicId,
-        // fetchedForums,
-        // fetchedProposalsThreads,
-        // fetchedThreadPosts,
+        // forum functions
+        tacoForumId,
+        proposalsTopicId,
+        fetchedForums,
+        fetchedProposalsThreads,
+        fetchedThreadPosts,
         getAllForums,
         findTacoForum,
         getProposalsTopic,
@@ -5096,16 +5096,16 @@ export const useTacoStore = defineStore('taco', () => {
         voteOnPost,
         retractVote,
         getPostVotes,
-        // // proposals functions
-        // fetchedTacoProposals,
-        // proposalsLoading,
-        // proposalsLoadingMore,
-        // proposalsHasMore,
+        // proposals functions
+        fetchedTacoProposals,
+        proposalsLoading,
+        proposalsLoadingMore,
+        proposalsHasMore,
         fetchTacoProposals,
         loadMoreTacoProposals,
-        // // naming system functions
-        // namesCache,
-        // namesLoading,
+        // naming system functions
+        namesCache,
+        namesLoading,
         loadAllNames,
         getPrincipalDisplayName,
         getNeuronDisplayName,
