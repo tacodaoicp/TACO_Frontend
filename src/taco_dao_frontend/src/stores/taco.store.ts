@@ -347,7 +347,30 @@ export const useTacoStore = defineStore('taco', () => {
             rebalanceStatus: 'Idle',
             rebalanceError: undefined
         }
-    } as TimerHealth)    
+    } as TimerHealth)
+
+    // forum
+    const tacoForumId = ref<bigint | null>(null)
+    const proposalsTopicId = ref<bigint | null>(null)
+    const fetchedForums = ref<CandidForumResponse[]>([])
+    const fetchedProposalsThreads = ref<CandidThreadResponse[]>([])
+    const fetchedThreadPosts = ref<CandidPostResponse[]>([])
+
+    // proposals
+    const fetchedTacoProposals = ref<TacoProposal[]>([])
+    const proposalsLoading = ref(false)
+    const proposalsLoadingMore = ref(false)
+    const proposalsHasMore = ref(true)
+    const proposalsLastId = ref<bigint | null>(null)
+
+    // naming system  
+    const namesCache = ref<NamesCache>({
+        principals: new Map(),
+        neurons: new Map(),
+        lastLoaded: null
+    })
+    const namesLoading = ref(false)
+    
     const systemLogs = ref<SystemLog[]>([])
     const tradingLogs = ref<TradingLog[]>([])
     const formatTokenAmount = (amount: bigint, decimals: number): string => {
