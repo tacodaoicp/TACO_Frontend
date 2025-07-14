@@ -14,7 +14,7 @@
         <!-- taco container -->
         <div class="taco-container
                     taco-container--l1
-                    d-flex flex-column gap-0 w-100 p-0 flex-grow-1 mt-2"
+                    d-flex flex-column gap-0 w-100 p-0 flex-grow-1 mt-2 overflow-hidden"
           style="max-width: 1600px;">
 
           <!-- toolbar container - l2 -->
@@ -34,10 +34,10 @@
                             @click="router.push('/chat/oc')"
                             :class="{ 'taco-nav-btn--active': showOpenChat }">Open Chat</button>
 
-                    <!-- sneed -->
+                    <!-- forum -->
                     <button class="btn taco-nav-btn"
-                            @click="router.push('/chat/sneed')"
-                            :class="{ 'taco-nav-btn--active': showSneed }">Sneed Hub</button>
+                            @click="router.push('/chat/forum')"
+                            :class="{ 'taco-nav-btn--active': showForum }">Proposal Forum</button>
 
                 </div>
 
@@ -59,38 +59,11 @@
 
                 </div>
 
-                <!-- sneed links -->
-                <div v-show="showSneed" class="btn-group">
-
-                    <!-- sneed discussions tutorial -->
-                    <button class="btn taco-nav-btn taco-nav-btn--green taco-nav-btn--active animate__animated animate__delay-1s" 
-                    :class="{ 'animate__swing': sneedSeenLocalValue }"
-                    @click="showSneedDiscussionsTutorial()"
-                    title="How to Participate in Sneed Hub Discussions"
-                    data-bs-toggle="tooltip"
-                    data-bs-placement="top">
-                      <i class="fa-solid fa-circle-question"></i>
-                      <span class="hide-on-mobile"> Sneed Discussions</span>
-                    </button>
-
-                </div>
-
-                <!-- refresh sneed iframe -->
-                <button 
-                v-show="showSneed"
-                class="btn taco-nav-btn taco-nav-btn--green taco-nav-btn--active" 
-                @click="refreshSneedIframe()"
-                title="Refresh Sneed Hub"
-                data-bs-toggle="tooltip"
-                data-bs-placement="top">
-                  <i class="fa-solid fa-rotate-right"></i>
-                </button>                
-
               </div>
 
             </div>
 
-          </div>     
+          </div>
           
           <!-- open chat iframe container -->
           <div v-show="showOpenChat" class="chat-iframe__container">         
@@ -103,14 +76,11 @@
 
           </div>
 
-          <!-- sneed iframe container -->
-          <div v-show="showSneed" class="sneed-iframe__container">
+          <!-- forum container -->
+          <div v-show="showForum" class="forum-container">
 
-            <!-- sneed iFrame -->
-            <iframe ref="sneedIframe" title="Sneed" frameborder="0" class="sneed-iframe" />
-
-            <!-- astronaut -->
-            <img :src="astronautLoaderUrl" class="chat-iframe__loading-img"> 
+            <!-- forum component -->
+            <ForumView />
 
           </div>         
 
@@ -242,144 +212,7 @@
 
       </div>
       
-    </div>   
-    
-    <!-- sneed discussions modal -->
-    <div v-if="userShownSneedDiscussionsTutorial" class="sneed-discussions__message">
-      
-      <!-- message -->
-      <div class="sneed-discussions__message__dialog">
-        
-        <!-- message top -->
-        <div class="sneed-discussions__message__dialog__top px-2 p-2">
-
-          <!-- message top left -->
-          <div class="taco-text-white ps-3">How To Participate in Sneed Hub Discussions</div>
-
-          <!-- message top right -->
-          <div class="taco-text-black-to-white"></div>
-
-        </div>
-
-        <!-- message middle -->
-        <div class="sneed-discussions__message__dialog__middle">
-
-          <!-- left -->
-          <div class="d-flex flex-column align-items-center justify-content-start">
-
-            <!-- sneed svg icon -->
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 59 92" class="taco-text-black-to-white" style="width: 3.5rem;">
-              <path fill="currentColor" d="M24.905,52.704c.813.382,2.064,1.057,2.922,1.167,1.033.133,2.136.006,3.172.063,7.908.436,14.201,9.595,10.194,16.906-3.937,7.182-14.755,8.606-20.783,3.265-4.645-4.115-4.813-9.825-1.963-15.086.214-.396.667-.964.817-1.319.032-.076.064-.139.048-.226-1.152-.038-2.288.059-3.437.072-3.48,4.174-4.553,9.419-2.311,14.494,3.816,8.636,15.065,11.74,23.427,8.087,9.311-4.068,13.398-15.536,5.086-22.929-10.03-8.922-29.914-10.492-33.977-25.283-3.27-11.901,4.824-23.401,16.51-25.932,15.248-3.302,29.74,9.551,26.297,25.259-.438,1.998-1.208,3.948-2.213,5.723-.051.036.048.12.065.124h4.577c.052,0,.164-.11.2-.166.12-.183.328-.793.425-1.04,1.128-2.86,2.089-7.298,1.907-10.359-.677-11.399-8.763-20.552-19.638-23.449C17.56-2.9-.642,13.24,3.779,32.512c2.384,10.391,12.184,15.989,21.126,20.192Z"/>
-              <path fill="currentColor" d="M32.841,40.984c-6.736-3.168-17.703-6.757-16.134-16.296,1.291-7.849,10.208-11.694,17.345-9.205,5.959,2.077,10.621,8.952,7.425,15.117-1.341,2.586-3.667,4.509-5.84,6.367-.058.032.046.118.062.122h6.408c5.069-5.023,6.094-12.269,2.399-18.45-6.764-11.314-24.235-10.926-30.514.71-4.293,7.954-.829,15.511,6.167,20.158,10.619,7.055,29.783,10.129,31.133,25.625.981,11.263-8.719,20.162-19.377,21.268-14.508,1.506-27.893-10.794-23.496-25.693.283-.958.777-1.959,1.026-2.88.025-.093.066-.224.046-.315-.05-.225-1.279-.042-1.497-.038-.792.016-1.892-.104-2.63-.006-.326.044-.465.606-.578.887-3.206,7.994-1.174,17.471,4.577,23.744,9.855,10.749,26.798,11.668,37.902,2.258,8.652-7.332,11.147-19.564,5.029-29.382-4.145-6.652-12.546-10.743-19.453-13.992Z"/>
-              <path fill="currentColor" d="M27.46,18.719c-.02.031-.092.075-.092.092v15.929c0,.006.085.092.092.092h3.723c.006,0,.092-.085.092-.092v-15.929c0-.006-.085-.092-.092-.092h-3.723Z"/>
-              <path fill="currentColor" d="M31.164,60.055c1.414.333,2.106,1.393,2.826,2.545h3.692c-.667-4.655-6.187-6.455-10.266-5.353-8.731,2.359-8.966,15.101.245,16.809,1.884.349,3.742.185,5.537-.469,2.116-.771,3.235-1.876,3.997-3.997.097-.271.298-.807.341-1.065.011-.066-.042-.126-.067-.126h-3.723c-.354.529-.519,1.107-.948,1.615-1.295,1.536-3.79,1.604-5.449.631-4.711-2.765-2.607-12.1,3.815-10.589Z"/>
-            </svg>
-
-            <!-- title -->
-            <span class="taco-text-black-to-white d-inline-block text-center px-2 pt-2 pb-1"
-              style="font-weight: 600;">
-              What are Sneed Hub Discussions?
-            </span>
-
-            <!-- text -->
-            <span class="taco-text-black-to-white text-center"
-              style="font-size: 0.875rem;">
-              Sneed Hub Discussions are Reddit-like forums where your up/down vote power is the same as your SNS voting power! 
-              <br><br>
-              A new discussion is automatically created for each SNS proposal
-              <br><br>
-              /chat/sneed automatically places you on the Taco Dao Proposals page, you can tell by the "Taco Dao" selection in the top right
-              <br>
-              <img :src="sneedHubSnsSelectorImage" alt="" class="py-2" style="width: 100%; max-width: 13rem;">
-              <br>
-              and the "Proposals" selection highlighted in the navigation
-              <br>
-              <img :src="sneedHubProposalsImage" alt="" class="py-2" style="width: 100%;">              
-              <br>
-              Select a proposal by clicking on it's link
-              <br>
-              <img :src="sneedHubProposalLinkImage" alt="" class="py-2" style="width: 100%; max-width: 3rem;">
-              <br>
-              Then scroll down to the discussion section to participate!
-            </span>
-
-          </div>
-
-          <!-- right -->
-          <div class="d-flex flex-column align-items-center justify-content-start">
-
-            <!-- up/down vote icons -->
-            <span class="d-flex align-items-center justify-content-center" style="font-size: 3.5rem;">
-              <span style="color: rgb(107, 142, 107);">▲</span>
-              <span style="color: rgb(184, 92, 92);">▼</span>
-            </span>
-
-            <!-- title -->
-            <span class="taco-text-black-to-white d-inline-block text-center px-2 pt-2 pb-1"
-              style="font-weight: 600;">
-              How to Up/Dowm Vote<br>With Your Voting Power
-            </span>
-
-            <!-- text -->
-            <span class="taco-text-black-to-white text-start"
-              style="font-size: 0.875rem;">
-              <ol style="list-style-type: decimal; padding-left: 1.75rem;">
-                <li class="text-start">
-                  Log into Sned Hub
-                  <br>
-                  <img :src="sneedHubLoginImage" alt="sneed discussions" class="sneed-discussions__message__dialog__img">
-                </li>
-                <li class="text-start">
-                  Onced logged in, click this button to view and copy your principal
-                  <br>
-                  <img :src="sneedHubLoggedInImage" alt="sneed discussions" class="sneed-discussions__message__dialog__img">
-                </li>
-                <li class="text-start">
-                  Go to <a href="https://nns.ic0.app/" style="color: var(--blue-to-light-blue);" target="_blank">The NNS</a> and login
-                </li>    
-                <li class="text-start">
-                  Go to the Neuron Staking page and select a TacoDAO neuron
-                </li>
-                <li class="text-start">
-                  Scroll to the bottom of the page and select "Add Hotkey"
-                </li> 
-                <li class="text-start">
-                  Enter your Sneed Hub principal and click "Confirm"
-                </li>                                                
-              </ol>
-              <span class="d-inline-flex text-center">That's it, you should now be able to vote in Sneed Hub Discussions!</span>
-              <br><br> 
-              <span class="d-inline-flex text-center">There are no stake amount, or duration, minumuns for participating in Sneed Hub Discussions</span>
-              <br><br> 
-              <p class="text-center m-0 p-0">Here is more information on <a href="https://support.dfinity.org/hc/en-us/articles/8939053696788-What-is-a-neuron-hotkey-and-how-do-I-use-it" style="color: var(--blue-to-light-blue);" target="_blank">Hotkeying</a> from Dfinity</p>
-            </span>
-
-          </div>
-
-        </div>
-
-        <!-- message bottom -->
-        <div class="access__message__dialog__bottom p-2">
-
-          <!-- message bottom left -->
-          <div class="taco-text-black-to-white"></div>
-
-          <!-- message bottom right -->
-          <div class="taco-text-black-to-white">
-
-            <!-- close button -->
-            <button class="btn taco-nav-btn"
-                    @click="hideSneedDiscussionsTutorial()">
-              Got It
-            </button>
-
-          </div>
-
-        </div>
-
-      </div>
-
-    </div>   
+    </div> 
 
   </div>
 
@@ -392,7 +225,7 @@
   /////////////////////
 
   // iFrame
-  .chat-iframe, .sneed-iframe {
+  .chat-iframe, .forum-container {
     width: 100%;
     height: 100%;
     padding: 1rem;
@@ -420,8 +253,13 @@
 
   }
 
+  // forum container
+  .forum-container {
+    overflow: hidden;
+  }
+
   // message modal
-  .access__message, .sneed-discussions__message {
+  .access__message {
     position: absolute;
     top: 0;
     left: 0;
@@ -454,20 +292,20 @@
 
       // container queries
       @container tutorial-dialog (inline-size > 400px) {
-        .access__message__dialog__middle, .sneed-discussions__message__dialog__middle {
+        .access__message__dialog__middle {
           flex-direction: row;
           padding: 3rem;
         }
-        .access__message__dialog__middle > div, .sneed-discussions__message__dialog__middle > div {
+        .access__message__dialog__middle > div {
           width: 50%;
         }
       }
       @container tutorial-dialog (inline-size < 400px) {
-        .access__message__dialog__middle, .sneed-discussions__message__dialog__middle {
+        .access__message__dialog__middle {
           flex-direction: column;
           padding: 3rem 1rem;
         }
-        .access__message__dialog__middle > div, .sneed-discussions__message__dialog__middle > div {
+        .access__message__dialog__middle > div {
           width: 100%;
         }
       }
@@ -510,12 +348,12 @@
   @media (max-width: 575.98px) {
 
     // reduce padding
-    .chat-iframe__container, .sneed-iframe__container {
+    .chat-iframe__container, .forum-container {
       padding: 0.5rem 0.5rem;
     }
 
     // reduce padding
-    .chat-iframe, .sneed-iframe {
+    .chat-iframe {
       padding: 0;
       border-radius: 0.5rem;
     }
@@ -562,17 +400,13 @@
 
   import HeaderBar from "../components/HeaderBar.vue"
   import FooterBar from "../components/FooterBar.vue"
+  import ForumView from "../components/forum/ForumView.vue"
   import { ref, onMounted, watch } from "vue"
   import { initialise } from '@open-ic/openchat-xframe'
   import { useRoute, useRouter } from 'vue-router'
   import { useTacoStore } from "../stores/taco.store"
   import { storeToRefs } from "pinia"    
   import astronautLoader from '../assets/images/astonautLoader.webp'
-  import sneedHubLoginImage from '../assets/images/tutorials/sneed-hub-login.png'
-  import sneedHubLoggedInImage from '../assets/images/tutorials/sneed-hub-logged-in.png'
-  import sneedHubProposalsImage from '../assets/images/tutorials/sneed-hub-proposals.png'
-  import sneedHubSnsSelectorImage from '../assets/images/tutorials/sneed-hub-sns-selector.png'
-  import sneedHubProposalLinkImage from '../assets/images/tutorials/sneed-hub-proposal-link.png'
 
   ///////////
   // store //
@@ -586,8 +420,6 @@
   // user
   const { openChatSeenStoreValue } = storeToRefs(tacoStore)
   const { setOpenChatSeenStoreValue } = tacoStore  
-  const { sneedSeenStoreValue } = storeToRefs(tacoStore)
-  const { setSneedSeenStoreValue } = tacoStore  
 
   // # ACTIONS #
 
@@ -604,7 +436,6 @@
 
   // open chat iframe
   const iframe = ref<HTMLIFrameElement | null>(null)
-  const sneedIframe = ref<HTMLIFrameElement | null>(null)
 
   // user first time seeing chat page
   const userFirstTimeSeeingChatPage = ref(true)
@@ -612,12 +443,11 @@
   // show open chat
   const showOpenChat = ref(true)
 
-  // show sneed
-  const showSneed = ref(false)
+  // show forum
+  const showForum = ref(false)
 
   // initialized flags
   const openChatInitialized = ref(false)
-  const sneedInitialized = ref(false)
 
   // astronaut loader
   const astronautLoaderUrl = astronautLoader
@@ -625,14 +455,8 @@
   // gated accesstutorial
   const userShownAccessTutorial = ref(false)
 
-  // sneed discussions tutorial
-  const userShownSneedDiscussionsTutorial = ref(false)
-
   // users first time seeing the open chat page
   const openChatSeenLocalValue = ref(false)
-
-  // users first time seeing the sneed page
-  const sneedSeenLocalValue = ref(false)
 
   ///////////////////
   // local methods //
@@ -663,23 +487,6 @@
 
   }
 
-  // initialize sneed
-  const initializeSneed = async () => {
-
-    // log
-    // console.log('ChatView.vue: initializeSneed')
-
-    if (sneedIframe.value && !sneedInitialized.value) {
-      try {
-        sneedIframe.value.src = 'https://app.sneeddao.com/proposals?sns=lacdn-3iaaa-aaaaq-aae3a-cai'
-        sneedInitialized.value = true
-      } catch (error) {
-        console.error('Failed to initialize Sneed:', error)
-      }
-    }
-    
-  }
-
   //////////////
   // handlers //  
 
@@ -702,74 +509,6 @@
     userShownAccessTutorial.value = false
 
   }
-
-  // show sneed discussions tutorial
-  const showSneedDiscussionsTutorial = () => {
-
-    // log
-    // console.log('VoteView.vue: accepting sneed discussions tutorial locally')
-
-    // hide tooltip
-    const tooltip = document.querySelector('.tooltip')
-    if (tooltip) {
-      tooltip.remove()
-    }
-
-    // show sneed discussions tutorial
-    userShownSneedDiscussionsTutorial.value = true
-
-  }
-
-  // hide sneed discussions tutorial
-  const hideSneedDiscussionsTutorial = () => {
-
-    // log
-    // console.log('VoteView.vue: accepting sneed discussions tutorial locally')
-
-    userShownSneedDiscussionsTutorial.value = false
-
-  }
-
-  // refresh sneed iframe
-  const refreshSneedIframe = () => {
-
-    // log
-    // console.log('ChatView.vue: refreshSneedIframe')
-
-    // hide tooltip
-    const tooltip = document.querySelector('.tooltip')
-    if (tooltip) {
-      tooltip.remove()
-    }    
-
-    // refresh sneed iframe by reassigning src
-    if (sneedIframe.value) {
-      const currentSrc = sneedIframe.value.src
-      sneedIframe.value.src = 'about:blank'
-      setTimeout(() => {
-        if (sneedIframe.value) {
-          sneedIframe.value.src = currentSrc
-        }
-      }, 500)
-    }
-
-    // log
-    console.log('ChatView.vue: sneed iframe refreshed')
-
-    // toast
-    addToast({
-      id: Date.now(),
-      code: 'code',
-      tradeAmount: '',
-      tokenSellIdentifier: '',
-      tradeLimit: '',
-      tokenInitIdentifier: '',
-      title: '👨‍🍳 Sneed Hub Refreshed!',
-      icon: '',
-      message: `Sneed Hub has been refreshed`
-    })  
-
-  }
   
   ///////////////
   // watchers //
@@ -781,9 +520,9 @@
     // log
     // console.log('ChatView.vue: watch route')
 
-    // set showOpenChat and showSneed
+    // set showOpenChat and showForum
     showOpenChat.value = newPath === '/chat/oc'
-    showSneed.value = newPath === '/chat/sneed'
+    showForum.value = newPath.startsWith('/chat/forum')
 
     // if showOpenChat is true, initialize open chat iframe
     if (showOpenChat.value) {
@@ -818,36 +557,11 @@
 
     }
 
-    // if showSneed is true, initialize sneed iframe
-    if (showSneed.value) {
-
-      // log
-      // console.log('on /chat/sneed')
-
-      // if user has not seen the sneed page
-      if (!sneedSeenStoreValue.value) {
-
-        // log
-        // console.log('user has not seen the sneed page')
-
-        // set store value
-        setSneedSeenStoreValue()
-
-        // set local value
-        sneedSeenLocalValue.value = true
-
-      } else {
-
-        // log
-        // console.log('user has seen the sneed page before')
-
-        // set local value
-        sneedSeenLocalValue.value = false
-
-      }
-
-      // initialize sneed iframe
-      await initializeSneed()
+    // if showForum is true, initialize forum
+    if (showForum.value) {
+      
+      // 
+      showForum.value = true
 
     }
 
@@ -865,7 +579,7 @@
 
     // set initial state based on route
     showOpenChat.value = route.path === '/chat/oc'
-    showSneed.value = route.path === '/chat/sneed'
+    showForum.value = route.path.startsWith('/chat/forum')
 
     // if showOpenChat is true, initialize open chat iframe
     if (showOpenChat.value) {
@@ -897,39 +611,6 @@
 
       // initialize open chat iframe
       await initializeOpenChat()
-
-    }
-
-    // if showSneed is true, initialize sneed iframe
-    if (showSneed.value) {
-
-      // log
-      // console.log('on /chat/sneed')
-
-      // if user has not seen the sneed page
-      if (!sneedSeenStoreValue.value) {
-
-        // log
-        // console.log('user has not seen the sneed page')
-
-        // set store value
-        setSneedSeenStoreValue()
-
-        // set local value
-        sneedSeenLocalValue.value = true
-
-      } else {
-
-        // log
-        // console.log('user has seen the sneed page before')
-
-        // set local value
-        sneedSeenLocalValue.value = false
-
-      }
-
-      // initialize sneed iframe
-      await initializeSneed()
 
     }
 

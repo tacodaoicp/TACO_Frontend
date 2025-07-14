@@ -394,7 +394,6 @@ export const useTacoStore = defineStore('taco', () => {
     const userLedgerAccountId = ref('')
     const userAcceptedHotkeyTutorial = useStorage('userAcceptedHotkeyTutorial', false) // used on /vote page
     const openChatSeenStoreValue = useStorage('openChatSeenStoreValue', false) // used on /chat/oc page
-    const sneedSeenStoreValue = useStorage('sneedSeenStoreValue', false) // used on /chat/sneed page
     const userAcceptedReportsDisclaimer = useStorage('userAcceptedReportsDisclaimer', false) // used on /reports page
 
     // crypto prices
@@ -640,6 +639,7 @@ export const useTacoStore = defineStore('taco', () => {
             root.style.setProperty("--yellow-to-dark-orange", "#DA8D28") // dark orange
             root.style.setProperty("--yellow-to-black", "#2D2D2D") // black
             root.style.setProperty("--brown-to-light-orange", "#FEEAC1") // light orange
+            root.style.setProperty("--brown-to-light-gray", "#F4F3EC") // light gray
             root.style.setProperty("--light-green-to-success-green-hover", "#7CDC86") // light green
             root.style.setProperty("--light-green-to-success-green", "#7CDC86") // light green
             root.style.setProperty("--green-to-orange", "#FED66C") // orange
@@ -709,6 +709,7 @@ export const useTacoStore = defineStore('taco', () => {
             root.style.setProperty("--yellow-to-dark-orange", "#FEC800") // yellow
             root.style.setProperty("--yellow-to-black", "#FEC800") // yellow
             root.style.setProperty("--brown-to-light-orange", "#934a17") // brown
+            root.style.setProperty("--brown-to-light-gray", "#934a17") // brown
             root.style.setProperty("--light-green-to-success-green-hover", "#179F25") // success green hover
             root.style.setProperty("--light-green-to-success-green", "#19B229") // success green
             root.style.setProperty("--green-to-orange", "#B7CD02") // green
@@ -1013,9 +1014,6 @@ export const useTacoStore = defineStore('taco', () => {
     }
     const setOpenChatSeenStoreValue = () => {
         openChatSeenStoreValue.value = true
-    }
-    const setSneedSeenStoreValue = () => {
-        sneedSeenStoreValue.value = true
     }
     const acceptReportsDisclaimer = () => {
         userAcceptedReportsDisclaimer.value = true
@@ -5030,7 +5028,6 @@ export const useTacoStore = defineStore('taco', () => {
         userAcceptedHotkeyTutorial,
         userAcceptedReportsDisclaimer,
         openChatSeenStoreValue,
-        sneedSeenStoreValue,
         timerHealth,
         snapshotStatus,
         systemLogs,
@@ -5085,7 +5082,6 @@ export const useTacoStore = defineStore('taco', () => {
         updateSnapshotInterval,
         getTradingStatus,
         setOpenChatSeenStoreValue,
-        setSneedSeenStoreValue,
         getTreasuryLogs,
         getTreasuryLogsByContext,
         getTreasuryLogsByLevel,
