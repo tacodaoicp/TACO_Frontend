@@ -154,12 +154,12 @@
     // lifecycle hooks //
     /////////////////////  
 
-    // on mounted
-    onMounted(async () => {
+    // // on mounted
+    // onMounted(async () => {
 
-        // log
-        console.log('forum view mounted')
+    //     // log
+    //     // console.log('forum view mounted')
 
-    })
+    // })
 
 </script>

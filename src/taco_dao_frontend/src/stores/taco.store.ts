@@ -7,8 +7,6 @@ import { ref, computed } from 'vue'
 import { defineStore } from 'pinia'
 import { useRouter } from 'vue-router'
 import { useStorage } from "@vueuse/core"
-
-// dfinity
 import { AuthClient } from "@dfinity/auth-client"
 import { Actor, AnonymousIdentity } from "@dfinity/agent"
 import { createAgent } from '@dfinity/utils'
@@ -24,7 +22,10 @@ import { AccountIdentifier } from '@dfinity/ledger-icp'
 import { canisterId as iiCanisterId } from "../../../declarations/internet_identity/index.js"
 import type { Result_1, UserState } from "../../../declarations/dao_backend/DAO_backend.did.d"
 
-// types
+///////////
+// Types //
+///////////
+
 interface SnapshotInfo {
     lastSnapshotId: bigint;
     lastSnapshotTime: bigint;
@@ -196,8 +197,6 @@ export interface GetSystemParameterResult {
     MaxFollowed?: bigint;
     LogAdmin?: Principal;
 }
-
-// Trading pause system interfaces
 interface TradingPauseReason {
     PriceAlert?: {
         conditionName: string;
@@ -210,20 +209,16 @@ interface TradingPauseReason {
         severity: string;
     };
 }
-
 interface TradingPauseRecord {
     token: Principal;
     tokenSymbol: string;
     reason: TradingPauseReason;
     pausedAt: bigint;
 }
-
 interface TradingPausesResponse {
     pausedTokens: TradingPauseRecord[];
     totalCount: bigint;
 }
-
-// Portfolio snapshot system interfaces
 interface TokenSnapshot {
     token: Principal;
     symbol: string;
@@ -234,7 +229,6 @@ interface TokenSnapshot {
     valueInICP: bigint;
     valueInUSD: number;
 }
-
 interface SnapshotReason {
     PreTrade?: null;
     PostTrade?: null;
@@ -242,7 +236,6 @@ interface SnapshotReason {
     PriceUpdate?: null;
     Manual?: null;
 }
-
 interface PortfolioSnapshot {
     timestamp: bigint;
     tokens: TokenSnapshot[];
@@ -250,13 +243,10 @@ interface PortfolioSnapshot {
     totalValueUSD: number;
     snapshotReason: SnapshotReason;
 }
-
 interface PortfolioHistoryResponse {
     snapshots: PortfolioSnapshot[];
     totalCount: bigint;
 }
-
-// Forum interfaces (using Candid types from the IDL)
 import type {
     ForumResponse as CandidForumResponse,
     TopicResponse as CandidTopicResponse,
@@ -264,32 +254,25 @@ import type {
     PostResponse as CandidPostResponse,
     ProposalTopicMappingResponse as CandidProposalTopicMappingResponse
 } from "../../../declarations/sneed_sns_forum/sneed_sns_forum.did.d"
-
-// Naming system interfaces
 interface NeuronNameKey {
     sns_root_canister_id: Principal;
     neuron_id: {
         id: Uint8Array;
     };
 }
-
 interface NeuronNameEntry {
     name: string;
     verified: boolean;
 }
-
 interface PrincipalNameEntry {
     name: string;
     verified: boolean;
 }
-
 interface NamesCache {
     principals: Map<string, PrincipalNameEntry>;
     neurons: Map<string, NeuronNameEntry>; // key format: "snsRoot:neuronIdHex"
     lastLoaded: number | null;
 }
-
-// SNS Governance interfaces
 interface ProposalData {
     id?: { id: bigint };
     proposal?: {
@@ -312,7 +295,6 @@ interface ProposalData {
     is_eligible_for_rewards: boolean;
     ballots: [string, { vote: any; voting_power: bigint; cast_timestamp_seconds: bigint }][];
 }
-
 interface TacoProposal {
     id: bigint;
     title: string;
@@ -327,18 +309,15 @@ interface TacoProposal {
     noVotes: bigint;
     totalVotes: bigint;
 }
-
 interface ListProposalsResponse {
     proposals: ProposalData[];
     include_ballots_by_caller?: boolean;
     include_topic_filtering?: boolean;
 }
-
 interface GovernanceError {
     error_message: string;
     error_type: number;
 }
-
 interface ListProposalsResult {
     Ok?: ListProposalsResponse;
     Err?: GovernanceError;
@@ -392,9 +371,9 @@ export const useTacoStore = defineStore('taco', () => {
 
     })
     const userLedgerAccountId = ref('')
-    const userAcceptedHotkeyTutorial = useStorage('userAcceptedHotkeyTutorial', false) // used on /vote page
-    const openChatSeenStoreValue = useStorage('openChatSeenStoreValue', false) // used on /chat/oc page
-    const userAcceptedReportsDisclaimer = useStorage('userAcceptedReportsDisclaimer', false) // used on /reports page
+    const userAcceptedHotkeyTutorial = useStorage('userAcceptedHotkeyTutorial', false)
+    const openChatSeenStoreValue = useStorage('openChatSeenStoreValue', false)
+    const userAcceptedReportsDisclaimer = useStorage('userAcceptedReportsDisclaimer', false)
 
     // crypto prices
     const icpPriceUsd = useStorage('icpPriceUsd', 0)
@@ -421,7 +400,7 @@ export const useTacoStore = defineStore('taco', () => {
     // treasury
     const fetchedTradingStatus = ref()
 
-    // snassy's (off limits don't touch!)    
+    // snassy's 
     const timerHealth = ref({
         snapshot: {
             active: false,
@@ -461,15 +440,11 @@ export const useTacoStore = defineStore('taco', () => {
     })
     const namesLoading = ref(false)
     
+    // logs
     const systemLogs = ref<SystemLog[]>([])
     const tradingLogs = ref<TradingLog[]>([])
-    const formatTokenAmount = (amount: bigint, decimals: number): string => {
-        const amountStr = amount.toString();
-        const padded = amountStr.padStart(decimals + 1, '0');
-        const integerPart = padded.slice(0, -decimals) || '0';
-        const decimalPart = padded.slice(-decimals);
-        return `${integerPart}.${decimalPart}`;
-    }
+
+    // other
     const tokenMetadataCache = new Map<string, TokenMetadata>();
     const rebalanceConfig = ref<RebalanceConfig | null>(null)
     const systemParameters = ref<GetSystemParameterResult | null>(null)
@@ -480,11 +455,18 @@ export const useTacoStore = defineStore('taco', () => {
         lastSnapshotTime: null as bigint | null,
         nextExpectedSnapshot: null as bigint | null,
         inProgress: false
-    })      
+    })
 
     // # ACTIONS #
 
     // local methods
+    const formatTokenAmount = (amount: bigint, decimals: number): string => {
+        const amountStr = amount.toString();
+        const padded = amountStr.padStart(decimals + 1, '0');
+        const integerPart = padded.slice(0, -decimals) || '0';
+        const decimalPart = padded.slice(-decimals);
+        return `${integerPart}.${decimalPart}`;
+    }    
     const convertBigIntToString = (obj: any): any => {
 
         // if array
@@ -786,7 +768,6 @@ export const useTacoStore = defineStore('taco', () => {
     // user
     const checkIfLoggedIn = async () => {
 
-        console.log('🔍 checkIfLoggedIn() called');
         // log
         // console.log('checking if user is logged in')
 
@@ -808,9 +789,11 @@ export const useTacoStore = defineStore('taco', () => {
             // set user logged in to true
             userLoggedIn.value = true
 
+            // log
+            // console.log('🔍 Triggering loadAllNames() from checkIfLoggedIn - user is logged in')
+
             // Load names cache in background (non-blocking)
-            console.log('🔍 Triggering loadAllNames() from checkIfLoggedIn - user is logged in');
-            loadAllNames().catch(console.error);
+            loadAllNames().catch(console.error)
 
 
         } else {
@@ -912,7 +895,7 @@ export const useTacoStore = defineStore('taco', () => {
             // calculate and set user ledger account ID
             userLedgerAccountId.value = calculateAccountId(userPrincipal.value)
 
-            // // console.log('setting user logged in to true')
+            // console.log('setting user logged in to true')
 
             // set user logged in to true
             userLoggedIn.value = true
@@ -924,12 +907,16 @@ export const useTacoStore = defineStore('taco', () => {
             try {
                 await refreshUserVotingPower()
             } catch (error) {
-                console.log('Could not refresh voting power on login:', error)
+
+                // log
+                // console.log('Could not refresh voting power on login:', error)
+
                 // Don't fail login if refresh fails
+
             }
 
             // Load names cache in background (non-blocking)
-            console.log('🔍 Triggering loadAllNames() from iidLogIn - after successful login');
+            // console.log('🔍 Triggering loadAllNames() from iidLogIn - after successful login');
             loadAllNames().catch(console.error);
 
             // turn app loading off
@@ -1019,7 +1006,7 @@ export const useTacoStore = defineStore('taco', () => {
         userAcceptedReportsDisclaimer.value = true
     }
 
-    // todo: move this to where it should go
+    // canister ids
     const daoBackendCanisterId = () => {
 
         // determine canisterId based on network
@@ -1045,7 +1032,6 @@ export const useTacoStore = defineStore('taco', () => {
         }        
         return 'z4is7-giaaa-aaaad-qg6uq-cai'; // local canisterId
     }
-
     const neuronSnapshotCanisterId = () => {
         switch (process.env.DFX_NETWORK) {
             case "ic":
@@ -1057,7 +1043,6 @@ export const useTacoStore = defineStore('taco', () => {
         }        
         return 'tgqd4-eqaaa-aaaai-atifa-cai'; // local canisterId
     }
-    // /todo
 
     // crypto prices
     const fetchCryptoPrices = async () => {
@@ -1073,9 +1058,6 @@ export const useTacoStore = defineStore('taco', () => {
 
         // if time to update has passed, fetch new prices
         if (now - lastPriceUpdate.value > timeToUpdate) {
-
-            // log
-            // console.log('fetching new crypto prices')
 
             // log
             console.log('✨ fetching new crypto prices')
@@ -1152,7 +1134,7 @@ export const useTacoStore = defineStore('taco', () => {
             } catch (error) {
 
                 // log error
-                console.log('error fetching crypto prices from gecko terminal pool endpoint:', error)
+                console.error('error fetching crypto prices from gecko terminal pool endpoint:', error)
 
             }
 
@@ -1666,7 +1648,7 @@ export const useTacoStore = defineStore('taco', () => {
     const refreshUserVotingPower = async () => {
 
         // log
-        console.log('taco.store: refreshUserVotingPower()')      
+        // console.log('taco.store: refreshUserVotingPower()')      
 
         try {
 
@@ -1705,7 +1687,7 @@ export const useTacoStore = defineStore('taco', () => {
                 const result = await actor.refreshUserVotingPower() as any
 
                 // log the result
-                console.log('taco.store: DAO backend - actor.refreshUserVotingPower() - result:', result)  
+                // console.log('taco.store: DAO backend - actor.refreshUserVotingPower() - result:', result)  
 
                 // check if successful
                 if (result && result.ok) {
@@ -1742,7 +1724,7 @@ export const useTacoStore = defineStore('taco', () => {
             } else {
 
                 // log
-                console.log('cannot refresh voting power, user not logged in')
+                // console.log('cannot refresh voting power, user not logged in')
 
                 // return
                 return false
@@ -2053,7 +2035,7 @@ export const useTacoStore = defineStore('taco', () => {
         }
     }
 
-    // snassy's (off limits don't touch!)
+    // snassy's
     const getTokenMetadata = async (canisterId: string): Promise<TokenMetadata> => {
         if (tokenMetadataCache.has(canisterId)) {
             return tokenMetadataCache.get(canisterId)!;
@@ -2075,7 +2057,7 @@ export const useTacoStore = defineStore('taco', () => {
         return tokenMetadata;
     }
     const refreshTimerStatus = async () => {
-        console.log('refreshTimerStatus: Starting refresh...');
+        // console.log('refreshTimerStatus: Starting refresh...');
         try {
             // get host
             const host = process.env.DFX_NETWORK === "local"
@@ -2161,13 +2143,13 @@ export const useTacoStore = defineStore('taco', () => {
                 
                 // Update trading logs from executed trades
                 if (executedTrades) {
-                    console.log('refreshTimerStatus: Processing trades with token details:', 
-                        fetchedTokenDetails.value.map(t => ({
-                            id: (t[0] as Principal).toText(),
-                            symbol: t[1]?.tokenSymbol,
-                            decimals: t[1]?.tokenDecimals?.toString()
-                        }))
-                    );
+                    // console.log('refreshTimerStatus: Processing trades with token details:', 
+                    //     fetchedTokenDetails.value.map(t => ({
+                    //         id: (t[0] as Principal).toText(),
+                    //         symbol: t[1]?.tokenSymbol,
+                    //         decimals: t[1]?.tokenDecimals?.toString()
+                    //     }))
+                    // )
                     tradingLogs.value = executedTrades.map((trade: Trade) => {
                         if (trade.error && trade.error.length > 0) {
                             return {
@@ -2293,7 +2275,7 @@ export const useTacoStore = defineStore('taco', () => {
         }
     }
     const restartTreasurySyncs = async () => {
-        console.log('TacoStore: restartTreasurySyncs called');
+        // console.log('TacoStore: restartTreasurySyncs called');
         try {
             // get host
             const host = process.env.DFX_NETWORK === "local"
@@ -2316,14 +2298,14 @@ export const useTacoStore = defineStore('taco', () => {
 
             await actor.admin_restartSyncs();
             await refreshTimerStatus();
-            console.log('TacoStore: Treasury syncs restarted');
+            // console.log('TacoStore: Treasury syncs restarted');
         } catch (error) {
             console.error('TacoStore: Error restarting treasury syncs:', error);
             throw error;
         }
     }
     const recoverPoolBalances = async () => {
-        console.log('TacoStore: recoverPoolBalances called');
+        // console.log('TacoStore: recoverPoolBalances called');
         try {
             // Create auth client
             const authClient = await getAuthClient();
@@ -2354,7 +2336,7 @@ export const useTacoStore = defineStore('taco', () => {
                 throw new Error(JSON.stringify(result.err));
             }
             await refreshTimerStatus();
-            console.log('TacoStore: Pool balances recovered:', result.ok);
+            // console.log('TacoStore: Pool balances recovered:', result.ok);
         } catch (error) {
             console.error('TacoStore: Error recovering pool balances:', error);
             throw error;
@@ -2400,26 +2382,26 @@ export const useTacoStore = defineStore('taco', () => {
         }
     }
     const fetchSystemLogs = async () => {
-        console.log('fetchSystemLogs: Starting to fetch logs...');
+        // console.log('fetchSystemLogs: Starting to fetch logs...');
         try {
             // create auth client
             const authClient = await getAuthClient();
             
             // Check if user is authenticated
             if (!await authClient.isAuthenticated()) {
-                console.log('fetchSystemLogs: User not authenticated');
+                // console.log('fetchSystemLogs: User not authenticated');
                 return;
             }
 
             // get identity
             const identity = await authClient.getIdentity();
-            console.log('fetchSystemLogs: Got authenticated identity');
+            // console.log('fetchSystemLogs: Got authenticated identity');
 
             // get host
             const host = process.env.DFX_NETWORK === "local"
                 ? `http://localhost:54612`
                 : "https://ic0.app"
-            console.log('fetchSystemLogs: Using host:', host);
+            // console.log('fetchSystemLogs: Using host:', host);
 
             // create agent with authenticated identity
             const agent = await createAgent({
@@ -2427,24 +2409,24 @@ export const useTacoStore = defineStore('taco', () => {
                 host,
                 fetchRootKey: process.env.DFX_NETWORK === "local",
             })
-            console.log('fetchSystemLogs: Agent created with authenticated identity');
+            // console.log('fetchSystemLogs: Agent created with authenticated identity');
 
             // determine canisterId based on network
             let canisterId = daoBackendCanisterId();
 
-            console.log('fetchSystemLogs: Using canisterId:', canisterId);
+            // console.log('fetchSystemLogs: Using canisterId:', canisterId);
 
             // create actor
             const actor = Actor.createActor(daoBackendIDL, {
                 agent,
                 canisterId,
             })
-            console.log('fetchSystemLogs: Actor created');
+            // console.log('fetchSystemLogs: Actor created');
 
             const logs = await actor.getLogs(100) as SystemLog[];
-            console.log('fetchSystemLogs: Received logs:', logs);
+            // console.log('fetchSystemLogs: Received logs:', logs);
             systemLogs.value = logs;
-            console.log('fetchSystemLogs: Updated systemLogs.value:', systemLogs.value);
+            // console.log('fetchSystemLogs: Updated systemLogs.value:', systemLogs.value);
         } catch (error) {
             console.error('fetchSystemLogs: Error fetching system logs:', error);
         }
@@ -2536,7 +2518,7 @@ export const useTacoStore = defineStore('taco', () => {
         }
     }
     const updateRebalanceConfig = async (updates: UpdateConfig) => {
-        console.log('TacoStore: updateRebalanceConfig called with', updates);
+        // console.log('TacoStore: updateRebalanceConfig called with', updates);
         try {
             appLoadingOn();
 
@@ -2568,7 +2550,7 @@ export const useTacoStore = defineStore('taco', () => {
             // END OF NOTE TO AI!
 
             const result = await treasury.updateRebalanceConfig(updates, []);
-            console.log('TacoStore: updateRebalanceConfig result:', result);
+            // console.log('TacoStore: updateRebalanceConfig result:', result);
 
             if ('ok' in result) {
                 addToast({
@@ -2748,7 +2730,7 @@ export const useTacoStore = defineStore('taco', () => {
         }
     }
     const pauseToken = async (principal: Principal): Promise<boolean> => {
-        console.log('TacoStore: pauseToken called for', principal.toText());
+        // console.log('TacoStore: pauseToken called for', principal.toText());
         try {
             // Create auth client
             const authClient = await getAuthClient();
@@ -2782,7 +2764,7 @@ export const useTacoStore = defineStore('taco', () => {
                 console.error('Error pausing token:', result.err);
                 return false;
             }
-            console.log('TacoStore: Token paused successfully');
+            // console.log('TacoStore: Token paused successfully');
             return true;
         } catch (error) {
             console.error('TacoStore: Error pausing token:', error);
@@ -2790,7 +2772,7 @@ export const useTacoStore = defineStore('taco', () => {
         }
     }
     const unpauseToken = async (principal: Principal): Promise<boolean> => {
-        console.log('TacoStore: unpauseToken called for', principal.toText());
+        // console.log('TacoStore: unpauseToken called for', principal.toText());
         try {
             // Create auth client
             const authClient = await getAuthClient();
@@ -2824,7 +2806,7 @@ export const useTacoStore = defineStore('taco', () => {
                 console.error('Error unpausing token:', result.err);
                 return false;
             }
-            console.log('TacoStore: Token unpaused successfully');
+            // console.log('TacoStore: Token unpaused successfully');
             return true;
         } catch (error) {
             console.error('TacoStore: Error unpausing token:', error);
@@ -2832,7 +2814,7 @@ export const useTacoStore = defineStore('taco', () => {
         }
     }
     const fetchVoterDetails = async () => {
-        console.log('taco.store: fetchVoterDetails() - Starting fetch...');
+        // console.log('taco.store: fetchVoterDetails() - Starting fetch...');
         try {
             // Create auth client
             const authClient = await getAuthClient();
@@ -2852,20 +2834,20 @@ export const useTacoStore = defineStore('taco', () => {
                 host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
                 fetchRootKey: process.env.DFX_NETWORK === "local",
             })
-            console.log('taco.store: fetchVoterDetails() - Agent created');
+            // console.log('taco.store: fetchVoterDetails() - Agent created');
 
             let canisterId = daoBackendCanisterId();
 
-            console.log('taco.store: fetchVoterDetails() - Using canisterId:', canisterId);
+            // console.log('taco.store: fetchVoterDetails() - Using canisterId:', canisterId);
 
             const actor = Actor.createActor(daoBackendIDL, {
                 agent,
                 canisterId,
             })
-            console.log('taco.store: fetchVoterDetails() - Actor created');
+            // console.log('taco.store: fetchVoterDetails() - Actor created');
 
             const voterDetails = await actor.admin_getUserAllocations();
-            console.log('taco.store: fetchVoterDetails() - Raw response:', voterDetails);
+            // console.log('taco.store: fetchVoterDetails() - Raw response:', voterDetails);
 
             if (!voterDetails || !Array.isArray(voterDetails)) {
                 console.error('taco.store: fetchVoterDetails() - Invalid response format:', voterDetails);
@@ -2876,7 +2858,7 @@ export const useTacoStore = defineStore('taco', () => {
                 principal,
                 state
             }));
-            console.log('taco.store: fetchVoterDetails() - Updated state:', fetchedVoterDetails.value);
+            // console.log('taco.store: fetchVoterDetails() - Updated state:', fetchedVoterDetails.value);
             return;
         } catch (error) {
             console.error('taco.store: fetchVoterDetails() - Error:', error);
@@ -2912,7 +2894,7 @@ export const useTacoStore = defineStore('taco', () => {
             });
 
             const result = await actor.admin_getNeuronAllocations();
-            console.log('Raw neuron allocations:', result);
+            // console.log('Raw neuron allocations:', result);
 
             if (!Array.isArray(result)) {
                 console.error('Expected array response from admin_getNeuronAllocations, got:', typeof result);
@@ -2928,15 +2910,14 @@ export const useTacoStore = defineStore('taco', () => {
                 allocations: allocation.allocations.map((alloc: Allocation) => [alloc.token.toText(), BigInt(alloc.basisPoints)])
             }));
 
-            console.log('Processed neuron allocations:', fetchedNeuronAllocations.value);
+            // console.log('Processed neuron allocations:', fetchedNeuronAllocations.value);
         } catch (error) {
             console.error('Error fetching neuron allocations:', error);
             fetchedNeuronAllocations.value = [];
         }
     }
-
     const adminGetUserAllocation = async (principal: Principal) => {
-        console.log('taco.store: adminGetUserAllocation() - Starting fetch for principal:', principal.toString());
+        // console.log('taco.store: adminGetUserAllocation() - Starting fetch for principal:', principal.toString());
         try {
             // Create auth client
             const authClient = await getAuthClient();
@@ -2964,7 +2945,7 @@ export const useTacoStore = defineStore('taco', () => {
             });
 
             const result = await actor.admin_getUserAllocation(principal);
-            console.log('taco.store: adminGetUserAllocation() - Raw response:', result);
+            // console.log('taco.store: adminGetUserAllocation() - Raw response:', result);
 
             return result;
         } catch (error: any) {
@@ -2972,9 +2953,8 @@ export const useTacoStore = defineStore('taco', () => {
             throw error;
         }
     }
-
     const updateSystemParameter = async (paramName: string, value: bigint): Promise<boolean> => {
-        console.log('TacoStore: updateSystemParameter called with', paramName, value);
+        // console.log('TacoStore: updateSystemParameter called with', paramName, value);
         try {
             appLoadingOn();
 
@@ -3045,7 +3025,7 @@ export const useTacoStore = defineStore('taco', () => {
         }
     }
     const updateSnapshotInterval = async (intervalNS: bigint): Promise<boolean> => {
-        console.log('TacoStore: updateSnapshotInterval called with', intervalNS);
+        // console.log('TacoStore: updateSnapshotInterval called with', intervalNS);
         try {
             appLoadingOn();
 
@@ -3150,7 +3130,6 @@ export const useTacoStore = defineStore('taco', () => {
             throw error;
         }
     }
-
     const getTreasuryLogsByContext = async (context: string, count: number) => {
         try {
             const authClient = await getAuthClient();
@@ -3177,7 +3156,6 @@ export const useTacoStore = defineStore('taco', () => {
             throw error;
         }
     }
-
     const getTreasuryLogsByLevel = async (level: any, count: number) => {
         try {
             const authClient = await getAuthClient();
@@ -3204,7 +3182,6 @@ export const useTacoStore = defineStore('taco', () => {
             throw error;
         }
     }
-
     const clearTreasuryLogs = async () => {
         try {
             const authClient = await getAuthClient();
@@ -3232,10 +3209,7 @@ export const useTacoStore = defineStore('taco', () => {
         }
     }
 
-    //=========================================================================
-    // PRICE FAILSAFE SYSTEM METHODS
-    //=========================================================================
-
+    // price failsafe system methods
     const listTriggerConditions = async () => {
         try {
             const authClient = await getAuthClient();
@@ -3261,8 +3235,7 @@ export const useTacoStore = defineStore('taco', () => {
             console.error('Error listing trigger conditions:', error);
             throw error;
         }
-    };
-
+    }
     const addTriggerCondition = async (
         name: string,
         direction: string,
@@ -3300,8 +3273,7 @@ export const useTacoStore = defineStore('taco', () => {
             console.error('Error adding trigger condition:', error);
             throw error;
         }
-    };
-
+    }
     const setTriggerConditionActive = async (conditionId: number, isActive: boolean) => {
         try {
             const authClient = await getAuthClient();
@@ -3327,8 +3299,7 @@ export const useTacoStore = defineStore('taco', () => {
             console.error('Error setting trigger condition active:', error);
             throw error;
         }
-    };
-
+    }
     const removeTriggerCondition = async (conditionId: number) => {
         try {
             const authClient = await getAuthClient();
@@ -3354,8 +3325,7 @@ export const useTacoStore = defineStore('taco', () => {
             console.error('Error removing trigger condition:', error);
             throw error;
         }
-    };
-
+    }
     const getPriceAlerts = async (offset: number, limit: number) => {
         try {
             const authClient = await getAuthClient();
@@ -3381,8 +3351,7 @@ export const useTacoStore = defineStore('taco', () => {
             console.error('Error getting price alerts:', error);
             throw error;
         }
-    };
-
+    }
     const clearPriceAlerts = async () => {
         try {
             const authClient = await getAuthClient();
@@ -3408,9 +3377,9 @@ export const useTacoStore = defineStore('taco', () => {
             console.error('Error clearing price alerts:', error);
             throw error;
         }
-    };
+    }
 
-    // Trading pause management functions
+    // trading pause management functions
     const listTradingPauses = async () => {
         try {
             const authClient = await getAuthClient();
@@ -3436,8 +3405,7 @@ export const useTacoStore = defineStore('taco', () => {
             console.error('Error listing trading pauses:', error);
             throw error;
         }
-    };
-
+    }
     const getTradingPauseInfo = async (token: Principal) => {
         try {
             const authClient = await getAuthClient();
@@ -3463,8 +3431,7 @@ export const useTacoStore = defineStore('taco', () => {
             console.error('Error getting trading pause info:', error);
             throw error;
         }
-    };
-
+    }
     const unpauseTokenFromTrading = async (token: Principal) => {
         try {
             const authClient = await getAuthClient();
@@ -3490,8 +3457,7 @@ export const useTacoStore = defineStore('taco', () => {
             console.error('Error unpausing token from trading:', error);
             throw error;
         }
-    };
-
+    }
     const pauseTokenFromTradingManual = async (token: Principal, reason: string) => {
         try {
             const authClient = await getAuthClient();
@@ -3517,8 +3483,7 @@ export const useTacoStore = defineStore('taco', () => {
             console.error('Error pausing token from trading:', error);
             throw error;
         }
-    };
-
+    }
     const clearAllTradingPauses = async () => {
         try {
             const authClient = await getAuthClient();
@@ -3544,8 +3509,7 @@ export const useTacoStore = defineStore('taco', () => {
             console.error('Error clearing all trading pauses:', error);
             throw error;
         }
-    };
-
+    }
     const getTokenPriceHistory = async (tokens: Principal[]) => {
         try {
             const authClient = await getAuthClient();
@@ -3577,8 +3541,7 @@ export const useTacoStore = defineStore('taco', () => {
             console.error('Error getting token price history:', error);
             throw error;
         }
-    };
-
+    }
     const getPortfolioHistory = async (limit: number = 1000) => {
         try {
             const authClient = await getAuthClient();
@@ -3605,8 +3568,7 @@ export const useTacoStore = defineStore('taco', () => {
             console.error('Error getting portfolio history:', error);
             throw error;
         }
-    };
-
+    }
     const getTreasuryPortfolioHistory = async (limit: number = 1000) => {
         try {
             const authClient = await getAuthClient();
@@ -3638,8 +3600,7 @@ export const useTacoStore = defineStore('taco', () => {
             console.error('Error getting treasury portfolio history:', error);
             return { snapshots: [], totalCount: BigInt(0) };
         }
-    };
-
+    }
     const takeManualPortfolioSnapshot = async () => {
         try {
             const authClient = await getAuthClient();
@@ -3662,7 +3623,7 @@ export const useTacoStore = defineStore('taco', () => {
 
             const result = await treasury.takeManualPortfolioSnapshot();
             if ('ok' in result) {
-                console.log('Manual portfolio snapshot taken:', result.ok);
+                // console.log('Manual portfolio snapshot taken:', result.ok);
                 return result.ok;
             } else {
                 console.error('Error taking manual portfolio snapshot:', result.err);
@@ -3672,9 +3633,9 @@ export const useTacoStore = defineStore('taco', () => {
             console.error('Error taking manual portfolio snapshot:', error);
             throw error;
         }
-    };
+    }
 
-    // Portfolio Circuit Breaker Functions
+    // portfolio circuit breaker
     const listPortfolioCircuitBreakerConditions = async () => {
         try {
             const authClient = await getAuthClient();
@@ -3701,8 +3662,7 @@ export const useTacoStore = defineStore('taco', () => {
             console.error('Error listing portfolio circuit breaker conditions:', error);
             throw error;
         }
-    };
-
+    }
     const addPortfolioCircuitBreakerCondition = async (
         name: string,
         direction: string,
@@ -3741,7 +3701,7 @@ export const useTacoStore = defineStore('taco', () => {
             );
             
             if ('ok' in result) {
-                console.log('Portfolio circuit breaker condition added:', result.ok);
+                // console.log('Portfolio circuit breaker condition added:', result.ok);
                 return result.ok;
             } else {
                 console.error('Error adding portfolio circuit breaker condition:', result.err);
@@ -3751,8 +3711,7 @@ export const useTacoStore = defineStore('taco', () => {
             console.error('Error adding portfolio circuit breaker condition:', error);
             throw error;
         }
-    };
-
+    }
     const setPortfolioCircuitBreakerConditionActive = async (conditionId: number, isActive: boolean) => {
         try {
             const authClient = await getAuthClient();
@@ -3776,7 +3735,7 @@ export const useTacoStore = defineStore('taco', () => {
             const result = await treasury.setPortfolioCircuitBreakerConditionActive(BigInt(conditionId), isActive);
             
             if ('ok' in result) {
-                console.log('Portfolio circuit breaker condition active status changed:', result.ok);
+                // console.log('Portfolio circuit breaker condition active status changed:', result.ok);
                 return result.ok;
             } else {
                 console.error('Error setting portfolio circuit breaker condition active:', result.err);
@@ -3786,8 +3745,7 @@ export const useTacoStore = defineStore('taco', () => {
             console.error('Error setting portfolio circuit breaker condition active:', error);
             throw error;
         }
-    };
-
+    }
     const removePortfolioCircuitBreakerCondition = async (conditionId: number) => {
         try {
             const authClient = await getAuthClient();
@@ -3811,7 +3769,7 @@ export const useTacoStore = defineStore('taco', () => {
             const result = await treasury.removePortfolioCircuitBreakerCondition(BigInt(conditionId));
             
             if ('ok' in result) {
-                console.log('Portfolio circuit breaker condition removed:', result.ok);
+                // console.log('Portfolio circuit breaker condition removed:', result.ok);
                 return result.ok;
             } else {
                 console.error('Error removing portfolio circuit breaker condition:', result.err);
@@ -3821,8 +3779,7 @@ export const useTacoStore = defineStore('taco', () => {
             console.error('Error removing portfolio circuit breaker condition:', error);
             throw error;
         }
-    };
-
+    }
     const getPortfolioCircuitBreakerLogs = async (offset: number, limit: number) => {
         try {
             const authClient = await getAuthClient();
@@ -3849,8 +3806,7 @@ export const useTacoStore = defineStore('taco', () => {
             console.error('Error getting portfolio circuit breaker logs:', error);
             throw error;
         }
-    };
-
+    }
     const clearPortfolioCircuitBreakerLogs = async () => {
         try {
             const authClient = await getAuthClient();
@@ -3874,7 +3830,7 @@ export const useTacoStore = defineStore('taco', () => {
             const result = await treasury.clearPortfolioCircuitBreakerLogs();
             
             if ('ok' in result) {
-                console.log('Portfolio circuit breaker logs cleared:', result.ok);
+                // console.log('Portfolio circuit breaker logs cleared:', result.ok);
                 return result.ok;
             } else {
                 console.error('Error clearing portfolio circuit breaker logs:', result.err);
@@ -3884,9 +3840,9 @@ export const useTacoStore = defineStore('taco', () => {
             console.error('Error clearing portfolio circuit breaker logs:', error);
             throw error;
         }
-    };
+    }
 
-    // NEURON SNAPSHOT FUNCTIONS
+    // neuron snapshots
     const getNeuronSnapshotStatus = async () => {
         try {
             const agent = await createAgent({
@@ -3905,8 +3861,7 @@ export const useTacoStore = defineStore('taco', () => {
             console.error('Error getting neuron snapshot status:', error);
             throw error;
         }
-    };
-
+    }
     const getNeuronSnapshotsInfo = async (start: number, length: number) => {
         try {
             const agent = await createAgent({
@@ -3925,8 +3880,7 @@ export const useTacoStore = defineStore('taco', () => {
             console.error('Error getting neuron snapshots info:', error);
             throw error;
         }
-    };
-
+    }
     const getNeuronSnapshotInfo = async (snapshotId: bigint) => {
         try {
             const agent = await createAgent({
@@ -3945,8 +3899,7 @@ export const useTacoStore = defineStore('taco', () => {
             console.error('Error getting neuron snapshot info:', error);
             throw error;
         }
-    };
-
+    }
     const getCumulativeValuesAtSnapshot = async (snapshotId: bigint | null) => {
         try {
             const agent = await createAgent({
@@ -3965,8 +3918,7 @@ export const useTacoStore = defineStore('taco', () => {
             console.error('Error getting cumulative values at snapshot:', error);
             throw error;
         }
-    };
-
+    }
     const getNeuronDataForDAO = async (snapshotId: bigint, start: number, limit: number) => {
         try {
             const agent = await createAgent({
@@ -3985,8 +3937,7 @@ export const useTacoStore = defineStore('taco', () => {
             console.error('Error getting neuron data for DAO:', error);
             throw error;
         }
-    };
-
+    }
     const takeNeuronSnapshot = async () => {
         try {
             const authClient = await getAuthClient();
@@ -4012,8 +3963,7 @@ export const useTacoStore = defineStore('taco', () => {
             console.error('Error taking neuron snapshot:', error);
             throw error;
         }
-    };
-
+    }
     const getMaxNeuronSnapshots = async () => {
         try {
             const agent = await createAgent({
@@ -4032,8 +3982,7 @@ export const useTacoStore = defineStore('taco', () => {
             console.error('Error getting max neuron snapshots:', error);
             throw error;
         }
-    };
-
+    }
     const setMaxNeuronSnapshots = async (maxSnapshots: number) => {
         try {
             const authClient = await getAuthClient();
@@ -4055,14 +4004,13 @@ export const useTacoStore = defineStore('taco', () => {
             });
 
             await neuronSnapshot.setMaxNeuronSnapshots(BigInt(maxSnapshots));
-            console.log('Successfully set max neuron snapshots to:', maxSnapshots);
+            // console.log('Successfully set max neuron snapshots to:', maxSnapshots);
             return true;
         } catch (error: any) {
             console.error('Error setting max neuron snapshots:', error);
             throw error;
         }
-    };
-
+    }
     const getMaxPriceHistoryEntries = async () => {
         try {
             const agent = await createAgent({
@@ -4081,8 +4029,7 @@ export const useTacoStore = defineStore('taco', () => {
             console.error('Error getting max price history entries:', error);
             throw error;
         }
-    };
-
+    }
     const getMaxPortfolioSnapshots = async () => {
         try {
             const agent = await createAgent({
@@ -4101,8 +4048,7 @@ export const useTacoStore = defineStore('taco', () => {
             console.error('Error getting max portfolio snapshots:', error);
             throw error;
         }
-    };
-
+    }
     const updateMaxPortfolioSnapshots = async (newLimit: number) => {
         try {
             const authClient = await getAuthClient();
@@ -4125,7 +4071,7 @@ export const useTacoStore = defineStore('taco', () => {
 
             const result = await (treasury as any).updateMaxPortfolioSnapshots(BigInt(newLimit));
             if ('ok' in result) {
-                console.log('Successfully updated max portfolio snapshots:', result.ok);
+                // console.log('Successfully updated max portfolio snapshots:', result.ok);
                 return result.ok;
             } else {
                 console.error('Error updating max portfolio snapshots:', result.err);
@@ -4135,12 +4081,9 @@ export const useTacoStore = defineStore('taco', () => {
             console.error('Error updating max portfolio snapshots:', error);
             throw error;
         }
-    };
+    }
 
-    //=========================================================================
-    // FORUM SYSTEM METHODS
-    //=========================================================================
-
+    // forum system methods
     const sneedForumCanisterId = () => {
         switch (process.env.DFX_NETWORK) {
             case "ic":
@@ -4151,13 +4094,11 @@ export const useTacoStore = defineStore('taco', () => {
                 break;
         }        
         return 'mcigm-4aaaa-aaaad-qhlkq-cai'; 
-    };
-
+    }
     const tacoSnsRootCanisterId = () => {
         // TACO DAO SNS root canister ID
         return 'lacdn-3iaaa-aaaaq-aae3a-cai';
-    };
-
+    }
     const getAllForums = async () => {
         try {
             const agent = await createAgent({
@@ -4173,14 +4114,13 @@ export const useTacoStore = defineStore('taco', () => {
 
             const forums = await forumActor.get_forums();
             fetchedForums.value = forums;
-            console.log('Fetched forums:', forums);
+            // console.log('Fetched forums:', forums);
             return forums;
         } catch (error: any) {
             console.error('Error getting forums:', error);
             throw error;
         }
-    };
-
+    }
     const findTacoForum = async () => {
         try {
             const agent = await createAgent({
@@ -4201,18 +4141,17 @@ export const useTacoStore = defineStore('taco', () => {
             if (tacoForum && tacoForum.length > 0) {
                 const forum = tacoForum[0]!;
                 tacoForumId.value = forum.id;
-                console.log('Found TACO forum via direct lookup:', forum);
+                // console.log('Found TACO forum via direct lookup:', forum);
                 return forum;
             } else {
-                console.log('TACO forum not found for SNS root canister ID:', tacoSnsRoot.toString());
+                // console.log('TACO forum not found for SNS root canister ID:', tacoSnsRoot.toString());
                 return null;
             }
         } catch (error: any) {
             console.error('Error finding TACO forum:', error);
             throw error;
         }
-    };
-
+    }
     const getProposalsTopic = async (forumId: bigint) => {
         try {
             const agent = await createAgent({
@@ -4231,18 +4170,17 @@ export const useTacoStore = defineStore('taco', () => {
             if (proposalsTopicMapping.length > 0) {
                 const mapping = proposalsTopicMapping[0]!;
                 proposalsTopicId.value = mapping.proposals_topic_id;
-                console.log('Found proposals topic:', mapping);
+                // console.log('Found proposals topic:', mapping);
                 return mapping;
             } else {
-                console.log('Proposals topic not found for forum:', forumId);
+                // console.log('Proposals topic not found for forum:', forumId);
                 return null;
             }
         } catch (error: any) {
             console.error('Error getting proposals topic:', error);
             throw error;
         }
-    };
-
+    }
     const getProposalsTopicDirect = async () => {
         try {
             const agent = await createAgent({
@@ -4263,18 +4201,17 @@ export const useTacoStore = defineStore('taco', () => {
             if (proposalsTopicMapping && proposalsTopicMapping.length > 0) {
                 const mapping = proposalsTopicMapping[0]!;
                 proposalsTopicId.value = mapping.proposals_topic_id;
-                console.log('Found proposals topic via direct SNS lookup:', mapping);
+                // console.log('Found proposals topic via direct SNS lookup:', mapping);
                 return mapping;
             } else {
-                console.log('Proposals topic not found for SNS root canister ID:', tacoSnsRoot.toString());
+                // console.log('Proposals topic not found for SNS root canister ID:', tacoSnsRoot.toString());
                 return null;
             }
         } catch (error: any) {
             console.error('Error getting proposals topic via direct lookup:', error);
             throw error;
         }
-    };
-
+    }
     const getThreadsByTopic = async (topicId: bigint) => {
         try {
             const agent = await createAgent({
@@ -4290,14 +4227,13 @@ export const useTacoStore = defineStore('taco', () => {
 
             const threads = await forumActor.get_threads_by_topic(topicId);
             fetchedProposalsThreads.value = threads;
-            console.log('Fetched threads for topic:', topicId, threads);
+            // console.log('Fetched threads for topic:', topicId, threads);
             return threads;
         } catch (error: any) {
             console.error('Error getting threads by topic:', error);
             throw error;
         }
-    };
-
+    }
     const getPostsByThread = async (threadId: bigint) => {
         try {
             const agent = await createAgent({
@@ -4313,38 +4249,36 @@ export const useTacoStore = defineStore('taco', () => {
 
             const posts = await forumActor.get_posts_by_thread(threadId);
             fetchedThreadPosts.value = posts;
-            console.log('Fetched posts for thread:', threadId, posts);
+            // console.log('Fetched posts for thread:', threadId, posts);
             return posts;
         } catch (error: any) {
             console.error('Error getting posts by thread:', error);
             throw error;
         }
-    };
-
+    }
     const getProposalsThreads = async () => {
         try {
-            console.log('🔍 Starting getProposalsThreads... (OPTIMIZED VERSION)');
+            // console.log('🔍 Starting getProposalsThreads... (OPTIMIZED VERSION)');
             
             // Skip the forum lookup and go directly to proposals topic via SNS root!
-            console.log('🔍 Step 1: Getting proposals topic via direct SNS root lookup...');
+            // console.log('🔍 Step 1: Getting proposals topic via direct SNS root lookup...');
             const proposalsMapping = await getProposalsTopicDirect();
             if (!proposalsMapping) {
                 console.log('❌ Proposals topic not found via direct lookup');
                 throw new Error('Proposals topic not found');
             }
-            console.log('✅ Found proposals topic with ID:', proposalsMapping.proposals_topic_id.toString());
+            // console.log('✅ Found proposals topic with ID:', proposalsMapping.proposals_topic_id.toString());
 
             // Get all threads in the proposals topic
-            console.log('🔍 Step 2: Getting threads for topic ID:', proposalsMapping.proposals_topic_id.toString());
+            // console.log('🔍 Step 2: Getting threads for topic ID:', proposalsMapping.proposals_topic_id.toString());
             const threads = await getThreadsByTopic(proposalsMapping.proposals_topic_id);
-            console.log('✅ Found', threads.length, 'threads');
+            // console.log('✅ Found', threads.length, 'threads');
             return threads;
         } catch (error: any) {
             console.error('❌ Error getting proposals threads:', error);
             throw error;
         }
-    };
-
+    }
     const getThread = async (threadId: bigint) => {
         try {
             const agent = await createAgent({
@@ -4359,17 +4293,16 @@ export const useTacoStore = defineStore('taco', () => {
             });
 
             const thread = await forumActor.get_thread(threadId);
-            console.log('Fetched thread:', threadId, thread);
+            // console.log('Fetched thread:', threadId, thread);
             return thread;
         } catch (error: any) {
             console.error('Error getting thread:', error);
             throw error;
         }
-    };
-
+    }
     const getProposalThread = async (proposalId: bigint) => {
         try {
-            console.log('🔍 Looking up thread for proposal ID:', proposalId.toString());
+            // console.log('🔍 Looking up thread for proposal ID:', proposalId.toString());
             
             const agent = await createAgent({
                 identity: new AnonymousIdentity(),
@@ -4387,12 +4320,12 @@ export const useTacoStore = defineStore('taco', () => {
             
             if (proposalThreadMapping && proposalThreadMapping.length > 0) {
                 const mapping = proposalThreadMapping[0]!;
-                console.log('✅ Found existing thread mapping:', mapping);
+                // console.log('✅ Found existing thread mapping:', mapping);
                 
                 // Now get the actual thread details
                 const thread = await forumActor.get_thread(mapping.thread_id);
                 if (thread && thread.length > 0) {
-                    console.log('✅ Found thread details:', thread[0]);
+                    // console.log('✅ Found thread details:', thread[0]);
                     return {
                         mapping,
                         thread: thread[0],
@@ -4401,7 +4334,7 @@ export const useTacoStore = defineStore('taco', () => {
                 }
             }
             
-            console.log('❌ No thread found for proposal:', proposalId.toString());
+            // console.log('❌ No thread found for proposal:', proposalId.toString());
             return {
                 mapping: null,
                 thread: null,
@@ -4411,11 +4344,10 @@ export const useTacoStore = defineStore('taco', () => {
             console.error('Error getting proposal thread:', error);
             throw error;
         }
-    };
-
+    }
     const createProposalThread = async (proposalId: bigint) => {
         try {
-            console.log('🔧 Creating thread for proposal ID:', proposalId.toString());
+            // console.log('🔧 Creating thread for proposal ID:', proposalId.toString());
             
             if (!userLoggedIn.value) {
                 throw new Error('Must be logged in to create proposal threads');
@@ -4442,7 +4374,7 @@ export const useTacoStore = defineStore('taco', () => {
             });
             
             if ('ok' in result) {
-                console.log('✅ Successfully created proposal thread with ID:', result.ok);
+                // console.log('✅ Successfully created proposal thread with ID:', result.ok);
                 return {
                     success: true,
                     threadId: result.ok
@@ -4455,11 +4387,10 @@ export const useTacoStore = defineStore('taco', () => {
             console.error('Error creating proposal thread:', error);
             throw error;
         }
-    };
-
+    }
     const createPost = async (threadId: bigint, body: string, replyToPostId?: bigint, title?: string) => {
         try {
-            console.log('🔧 Creating post for thread ID:', threadId.toString());
+            // console.log('🔧 Creating post for thread ID:', threadId.toString());
             
             if (!userLoggedIn.value) {
                 throw new Error('Must be logged in to create posts');
@@ -4487,7 +4418,7 @@ export const useTacoStore = defineStore('taco', () => {
             );
             
             if ('ok' in result) {
-                console.log('✅ Successfully created post with ID:', result.ok);
+                // console.log('✅ Successfully created post with ID:', result.ok);
                 return {
                     success: true,
                     postId: result.ok
@@ -4500,11 +4431,10 @@ export const useTacoStore = defineStore('taco', () => {
             console.error('Error creating post:', error);
             throw error;
         }
-    };
-
+    }
     const voteOnPost = async (postId: bigint, voteType: 'upvote' | 'downvote') => {
         try {
-            console.log('🗳️ Voting on post ID:', postId.toString(), 'vote type:', voteType);
+            // console.log('🗳️ Voting on post ID:', postId.toString(), 'vote type:', voteType);
             
             if (!userLoggedIn.value) {
                 throw new Error('Must be logged in to vote');
@@ -4528,7 +4458,7 @@ export const useTacoStore = defineStore('taco', () => {
             const result = await forumActor.vote_on_post(postId, voteTypeVariant);
             
             if ('ok' in result) {
-                console.log('✅ Successfully voted on post');
+                // console.log('✅ Successfully voted on post');
                 return {
                     success: true
                 };
@@ -4540,11 +4470,10 @@ export const useTacoStore = defineStore('taco', () => {
             console.error('Error voting on post:', error);
             throw error;
         }
-    };
-
+    }
     const retractVote = async (postId: bigint) => {
         try {
-            console.log('🔄 Retracting vote on post ID:', postId.toString());
+            // console.log('🔄 Retracting vote on post ID:', postId.toString());
             
             if (!userLoggedIn.value) {
                 throw new Error('Must be logged in to retract vote');
@@ -4567,7 +4496,7 @@ export const useTacoStore = defineStore('taco', () => {
             const result = await forumActor.retract_vote(postId);
             
             if ('ok' in result) {
-                console.log('✅ Successfully retracted vote');
+                // console.log('✅ Successfully retracted vote');
                 return {
                     success: true
                 };
@@ -4579,11 +4508,10 @@ export const useTacoStore = defineStore('taco', () => {
             console.error('Error retracting vote:', error);
             throw error;
         }
-    };
-
+    }
     const getPostVotes = async (postId: bigint) => {
         try {
-            console.log('📊 Getting votes for post ID:', postId.toString());
+            // console.log('📊 Getting votes for post ID:', postId.toString());
             
             const agent = await createAgent({
                 identity: new AnonymousIdentity(),
@@ -4597,26 +4525,22 @@ export const useTacoStore = defineStore('taco', () => {
             });
 
             const votes = await forumActor.get_post_votes(postId);
-            console.log('✅ Retrieved votes for post:', votes);
+            // console.log('✅ Retrieved votes for post:', votes);
             return votes;
         } catch (error: any) {
             console.error('Error getting post votes:', error);
             throw error;
         }
-    };
+    }
 
-    //=========================================================================
-    // TACO DAO PROPOSALS METHODS
-    //=========================================================================
-
+    // taco dao proposal methods
     const tacoSnsGovernanceCanisterId = () => {
         // TACO DAO SNS governance canister ID
         return 'lhdfz-wqaaa-aaaaq-aae3q-cai';
-    };
-
+    }
     const fetchTacoProposalsInternal = async (beforeProposal: bigint | null = null, limit: number = 20) => {
-        console.log('🔍 Fetching TACO DAO proposals...', beforeProposal ? `before ID ${beforeProposal}` : 'from latest');
-        console.log('🔗 Using SNS governance canister:', tacoSnsGovernanceCanisterId());
+        // console.log('🔍 Fetching TACO DAO proposals...', beforeProposal ? `before ID ${beforeProposal}` : 'from latest');
+        // console.log('🔗 Using SNS governance canister:', tacoSnsGovernanceCanisterId());
         
         const agent = await createAgent({
             identity: new AnonymousIdentity(),
@@ -4639,27 +4563,27 @@ export const useTacoStore = defineStore('taco', () => {
             include_status: [], // Include all statuses
         };
 
-        console.log('📞 Calling list_proposals with request:', request);
+        // console.log('📞 Calling list_proposals with request:', request);
         const response = await governanceActor.list_proposals(request) as any;
-        console.log('📦 Raw response from list_proposals:', response);
+        // console.log('📦 Raw response from list_proposals:', response);
         
         // Check if response has proposals directly (sometimes the structure is different)
         let proposals;
         if (response && response.proposals) {
             proposals = response.proposals;
-            console.log('✅ Found proposals directly in response');
+            // console.log('✅ Found proposals directly in response');
         } else if (response && response.Ok && response.Ok.proposals) {
             proposals = response.Ok.proposals;
-            console.log('✅ Found proposals in response.Ok');
+            // console.log('✅ Found proposals in response.Ok');
         } else if (Array.isArray(response)) {
             proposals = response;
-            console.log('✅ Response is array of proposals');
+            // console.log('✅ Response is array of proposals');
         } else {
             console.error('❌ Unexpected response structure:', response);
             throw new Error(`Unexpected response structure: ${JSON.stringify(response)}`);
         }
         
-        console.log('✅ Fetched', proposals.length, 'TACO DAO proposals');
+        // console.log('✅ Fetched', proposals.length, 'TACO DAO proposals');
         
         // Transform the raw proposal data into our TacoProposal format
         const transformedProposals: TacoProposal[] = proposals.map((proposalData: any) => {
@@ -4668,6 +4592,7 @@ export const useTacoStore = defineStore('taco', () => {
             const tally = proposalData.latest_tally && proposalData.latest_tally[0] ? proposalData.latest_tally[0] : null;
             const id = proposalData.id && proposalData.id[0] ? proposalData.id[0] : null;
             const proposer = proposalData.proposer && proposalData.proposer[0] ? proposalData.proposer[0] : null;
+            const topic = proposalData.topic && proposalData.topic[0] ? proposalData.topic[0] : null;
             
             // Determine status based on timestamps
             let status: 'Open' | 'Adopted' | 'Rejected' | 'Failed' | 'Executed' = 'Open';
@@ -4701,6 +4626,7 @@ export const useTacoStore = defineStore('taco', () => {
                 yesVotes: tally?.yes || BigInt(0),
                 noVotes: tally?.no || BigInt(0),
                 totalVotes: tally?.total || BigInt(0),
+                topic: topic || 'Untitled Proposal'
             };
         });
         
@@ -4712,8 +4638,7 @@ export const useTacoStore = defineStore('taco', () => {
             hasMore: proposals.length === limit, // If we got exactly the limit, there might be more
             lastId: transformedProposals.length > 0 ? transformedProposals[transformedProposals.length - 1].id : null
         };
-    };
-
+    }
     const fetchTacoProposals = async (limit: number = 20) => {
         try {
             proposalsLoading.value = true;
@@ -4724,7 +4649,7 @@ export const useTacoStore = defineStore('taco', () => {
             proposalsHasMore.value = result.hasMore;
             proposalsLastId.value = result.lastId;
             
-            console.log('✅ Successfully loaded', result.proposals.length, 'proposals');
+            // console.log('✅ Successfully loaded', result.proposals.length, 'proposals');
             return result.proposals;
         } catch (error: any) {
             console.error('❌ Error fetching TACO DAO proposals:', error);
@@ -4733,8 +4658,7 @@ export const useTacoStore = defineStore('taco', () => {
         } finally {
             proposalsLoading.value = false;
         }
-    };
-
+    }
     const loadMoreTacoProposals = async (limit: number = 20) => {
         if (!proposalsHasMore.value || proposalsLoadingMore.value || !proposalsLastId.value) {
             return [];
@@ -4750,7 +4674,7 @@ export const useTacoStore = defineStore('taco', () => {
             proposalsHasMore.value = result.hasMore;
             proposalsLastId.value = result.lastId;
             
-            console.log('✅ Successfully loaded', result.proposals.length, 'more proposals');
+            // console.log('✅ Successfully loaded', result.proposals.length, 'more proposals');
             return result.proposals;
         } catch (error: any) {
             console.error('❌ Error loading more TACO DAO proposals:', error);
@@ -4758,12 +4682,9 @@ export const useTacoStore = defineStore('taco', () => {
         } finally {
             proposalsLoadingMore.value = false;
         }
-    };
+    }
 
-    //=========================================================================
-    // NAMING SYSTEM METHODS
-    //=========================================================================
-
+    // naming system methods
     const appSneedDaoCanisterId = () => {
         switch (process.env.DFX_NETWORK) {
             case "ic":
@@ -4774,29 +4695,23 @@ export const useTacoStore = defineStore('taco', () => {
                 break;
         }        
         return 'g7s5u-tqaaa-aaaad-qhktq-cai'; // Replace with actual local/default ID
-    };
-
-    // Helper function to convert Uint8Array or number[] to hex string for map keys
+    }
     const uint8ArrayToHex = (arr: Uint8Array | number[]): string => {
         return Array.from(arr, byte => byte.toString(16).padStart(2, '0')).join('');
-    };
-
-    // Helper function to create neuron map key
+    }
     const createNeuronKey = (snsRoot: Principal, neuronId: Uint8Array | number[]): string => {
         return `${snsRoot.toString()}:${uint8ArrayToHex(neuronId)}`;
-    };
-
-    // Load all names (non-blocking) - call this on app startup
+    }
     const loadAllNames = async () => {
-        console.log('🔍 loadAllNames() called');
+        // console.log('🔍 loadAllNames() called');
         
         if (namesLoading.value) {
-            console.log('⏳ Names already loading, skipping...');
+            // console.log('⏳ Names already loading, skipping...');
             return; // Already loading
         }
         
         try {
-            console.log('🚀 Starting to load all names...');
+            // console.log('🚀 Starting to load all names...');
             namesLoading.value = true;
             
             const agent = await createAgent({
@@ -4806,8 +4721,8 @@ export const useTacoStore = defineStore('taco', () => {
             });
 
             const canisterId = appSneedDaoCanisterId();
-            console.log('🔗 Connecting to app_sneeddao_backend canister:', canisterId);
-            console.log('🌐 DFX_NETWORK:', process.env.DFX_NETWORK);
+            // console.log('🔗 Connecting to app_sneeddao_backend canister:', canisterId);
+            // console.log('🌐 DFX_NETWORK:', process.env.DFX_NETWORK);
             
             const appSneedDaoActor = Actor.createActor<AppSneedDaoService>(appSneedDaoIDL, {
                 agent,
@@ -4815,12 +4730,12 @@ export const useTacoStore = defineStore('taco', () => {
             });
 
             // Load all principal names and neuron names in parallel
-            console.log('📞 Making API calls to get_all_principal_names() and get_all_neuron_names()...');
+            // console.log('📞 Making API calls to get_all_principal_names() and get_all_neuron_names()...');
             const [principalNames, neuronNames] = await Promise.all([
                 appSneedDaoActor.get_all_principal_names(),
                 appSneedDaoActor.get_all_neuron_names()
             ]);
-            console.log('📦 Received data - principalNames:', principalNames.length, 'neuronNames:', neuronNames.length);
+            // console.log('📦 Received data - principalNames:', principalNames.length, 'neuronNames:', neuronNames.length);
 
             // Clear and populate principal names cache
             namesCache.value.principals.clear();
@@ -4837,7 +4752,7 @@ export const useTacoStore = defineStore('taco', () => {
 
             namesCache.value.lastLoaded = Date.now();
             
-            console.log(`✅ Loaded ${principalNames.length} principal names and ${neuronNames.length} neuron names`);
+            // console.log(`✅ Loaded ${principalNames.length} principal names and ${neuronNames.length} neuron names`);
             
         } catch (error: any) {
             console.error('Error loading names:', error);
@@ -4845,9 +4760,7 @@ export const useTacoStore = defineStore('taco', () => {
         } finally {
             namesLoading.value = false;
         }
-    };
-
-    // Get principal name or fallback to truncated principal
+    }
     const getPrincipalDisplayName = (principal: Principal | string): string => {
         const principalStr = typeof principal === 'string' ? principal : principal.toString();
         const cachedName = namesCache.value.principals.get(principalStr);
@@ -4861,9 +4774,7 @@ export const useTacoStore = defineStore('taco', () => {
         return cleaned.length > 10 ? 
             cleaned.substring(0, 5) + '...' + cleaned.substring(cleaned.length - 5) :
             cleaned;
-    };
-
-    // Get neuron name or fallback to neuron ID
+    }
     const getNeuronDisplayName = (snsRoot: Principal, neuronId: Uint8Array | number[]): string => {
         const mapKey = createNeuronKey(snsRoot, neuronId);
         const cachedName = namesCache.value.neurons.get(mapKey);
@@ -4877,9 +4788,7 @@ export const useTacoStore = defineStore('taco', () => {
         return neuronIdHex.length > 12 ? 
             `Neuron ${neuronIdHex.substring(0, 6)}...${neuronIdHex.substring(neuronIdHex.length - 6)}` :
             `Neuron ${neuronIdHex}`;
-    };
-
-    // Set principal name for logged-in user
+    }
     const setPrincipalName = async (name: string) => {
         try {
             if (!userLoggedIn.value) {
@@ -4903,7 +4812,7 @@ export const useTacoStore = defineStore('taco', () => {
             const result = await appSneedDaoActor.set_principal_name(name);
             
             if ('ok' in result) {
-                console.log('✅ Principal name set successfully:', result.ok);
+                // console.log('✅ Principal name set successfully:', result.ok);
                 
                 // Update cache immediately
                 const userPrincipalStr = userPrincipal.value;
@@ -4917,9 +4826,7 @@ export const useTacoStore = defineStore('taco', () => {
             console.error('Error setting principal name:', error);
             throw error;
         }
-    };
-
-    // Set neuron name for logged-in user  
+    }
     const setNeuronName = async (snsRoot: Principal, neuronId: Uint8Array | number[], name: string) => {
         try {
             if (!userLoggedIn.value) {
@@ -4946,7 +4853,7 @@ export const useTacoStore = defineStore('taco', () => {
             const result = await appSneedDaoActor.set_neuron_name(snsRoot, { id: neuronIdUint8 }, name);
             
             if ('ok' in result) {
-                console.log('✅ Neuron name set successfully:', result.ok);
+                // console.log('✅ Neuron name set successfully:', result.ok);
                 
                 // Update cache immediately
                 const mapKey = createNeuronKey(snsRoot, neuronId);
@@ -4960,9 +4867,7 @@ export const useTacoStore = defineStore('taco', () => {
             console.error('Error setting neuron name:', error);
             throw error;
         }
-    };
-
-    // Get user's neurons for the names page
+    }
     const getUserNeurons = async () => {
         try {
             if (!userLoggedIn.value) {
@@ -4994,9 +4899,7 @@ export const useTacoStore = defineStore('taco', () => {
             console.error('Error getting user neurons:', error);
             throw error;
         }
-    };
-
-    
+    }
 
     // # RETURN #
     return {
@@ -5039,6 +4942,17 @@ export const useTacoStore = defineStore('taco', () => {
         totalTreasuryValueInUsd,
         snsTreasuryTacoValueInUsd,
         snsTreasuryIcpValueInUsd,
+        tacoForumId,
+        proposalsTopicId,
+        fetchedForums,
+        fetchedProposalsThreads,
+        fetchedThreadPosts,
+        fetchedTacoProposals,
+        proposalsLoading,
+        proposalsLoadingMore,
+        proposalsHasMore,
+        namesCache,
+        namesLoading,
         // actions
         changeRoute,
         toggleDarkMode,
@@ -5110,7 +5024,6 @@ export const useTacoStore = defineStore('taco', () => {
         removePortfolioCircuitBreakerCondition,
         getPortfolioCircuitBreakerLogs,
         clearPortfolioCircuitBreakerLogs,
-        // neuron snapshot functions
         getNeuronSnapshotStatus,
         getNeuronSnapshotsInfo,
         getNeuronSnapshotInfo,
@@ -5122,12 +5035,6 @@ export const useTacoStore = defineStore('taco', () => {
         getMaxPriceHistoryEntries,
         getMaxPortfolioSnapshots,
         updateMaxPortfolioSnapshots,
-        // forum functions
-        tacoForumId,
-        proposalsTopicId,
-        fetchedForums,
-        fetchedProposalsThreads,
-        fetchedThreadPosts,
         getAllForums,
         findTacoForum,
         getProposalsTopic,
@@ -5142,16 +5049,8 @@ export const useTacoStore = defineStore('taco', () => {
         voteOnPost,
         retractVote,
         getPostVotes,
-        // proposals functions
-        fetchedTacoProposals,
-        proposalsLoading,
-        proposalsLoadingMore,
-        proposalsHasMore,
         fetchTacoProposals,
         loadMoreTacoProposals,
-        // naming system functions
-        namesCache,
-        namesLoading,
         loadAllNames,
         getPrincipalDisplayName,
         getNeuronDisplayName,

@@ -1046,7 +1046,7 @@
   const route = useRoute()
 
   // images
-  const astronautLoaderUrl =  astronautLoader
+  const astronautLoaderUrl = astronautLoader
 
   ///////////////////
   // Local Methods //

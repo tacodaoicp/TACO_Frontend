@@ -3,8 +3,11 @@
     <div class="forum-threads-list">
 
         <!-- loading curtain -->
-        <div v-if="appLoading" class="forum-threads-list__loading-curtain">
-            <div class="forum-threads-list__loading-curtain__spinner"></div>
+        <div v-show="componentLoading" class="forum-threads-list__loading-curtain">
+            
+          <!-- astronaut -->
+          <img :src="astronautLoaderUrl" class="loading-img">
+
         </div>
 
         <!-- title container -->
@@ -22,14 +25,20 @@
 
                 <!-- search -->
                 <input type="text" 
+                v-model="searchQuery"
                 placeholder="Search"
                 class="forum-threads-list__search taco-input">
 
-                <!-- filter -->
-                <select class="forum-threads-list__filter taco-input">
-                    <option value="all">Type</option>
-                    <option value="active">addToken</option>
-                    <option value="inactive">another type with a long name that might mess with the spaceing and layout</option>
+                <!-- type filter -->
+                <select v-model="selectedTopic" class="forum-threads-list__filter taco-input">
+                    <option value="all">All Topics</option>
+                    <option value="DaoCommunitySettings">DAO Community Settings</option>
+                    <option value="SnsFrameworkManagement">SNS Framework Management</option>
+                    <option value="DappCanisterManagement">Dapp Canister Management</option>
+                    <option value="ApplicationBusinessLogic">Application Business Logic</option>
+                    <option value="Governance">Governance</option>
+                    <option value="TreasuryAssetManagement">Treasury Asset Management</option>
+                    <option value="CriticalDappOperations">Critical Dapp Operations</option>
                 </select>
 
             </div>
@@ -45,73 +54,79 @@
             <ul class="forum-threads-list__list">
 
                 <!-- thread item -->
-                <li v-for="thread in fetchedProposalsThreads"
-                    :key="thread.id.toString()"
-                    @click="goToThread(thread.id)"
-                    :class="['forum-threads-list__list-item', { 'forum-threads-list__thread--active': activeThreadId === thread.id.toString() }]">
+                <router-link
+                  v-for="proposal in filteredProposals"
+                  :key="proposal.id.toString()"
+                  :to="`/chat/forum/${proposal.id.toString()}`"
+                  :class="['forum-threads-list__list-item', { 'forum-threads-list__thread--active': activeThreadId === proposal.id.toString() }]">
 
-                    <!-- thread -->
-                    <div class="forum-threads-list__thread">
+                  <!-- thread -->
+                  <div class="forum-threads-list__thread">
 
-                        <!-- left -->
-                        <div class="forum-threads-list__thread__left">
+                      <!-- left -->
+                      <div class="forum-threads-list__thread__left">
 
-                            <!-- thread icon -->              
-                            <div class="forum-threads-list__thread__icon shadow">#{{ thread.id.toString() }}</div>
+                          <!-- thread icon -->              
+                          <div class="forum-threads-list__thread__icon shadow">#{{ proposal.id.toString() }}</div>
 
-                            <!-- thread status -->
-                            <span class="forum-threads-list__thread__status">OPEN</span>
-                            <!-- <span class="forum-threads-list__thread__status">PASSED</span>
-                            <span class="forum-threads-list__thread__status">FAILED</span> -->
+                          <!-- thread status -->
+                          <span class="forum-threads-list__thread__status"
+                                :class="['forum-threads-list__thread__status', { 'forum-threads-list__thread__status--passed': proposal.status === 'Executed', 'forum-threads-list__thread__status--failed': proposal.status === 'Rejected' }]">
+                          {{ formatStatus(proposal.status) }}</span>
 
-                        </div>
+                      </div>
 
-                        <!-- right -->
-                        <div class="forum-threads-list__thread__right">
+                      <!-- right -->
+                      <div class="forum-threads-list__thread__right">
 
-                            <!-- top -->
-                            <div class="forum-threads-list__thread__right__top">
+                          <!-- top -->
+                          <div class="forum-threads-list__thread__right__top">
 
-                                <!-- type -->
-                                <span class="forum-threads-list__thread__type">addToken</span>
+                              <!-- type -->
+                              <span class="forum-threads-list__thread__type">
+                                {{ getTopicKey(proposal.topic) }}
+                              </span>
 
-                                <!-- date -->
-                                <span class="forum-threads-list__thread__date">{{ formatDate(thread.created_at) }}</span>
+                              <!-- date -->
+                              <span class="forum-threads-list__thread__date">
+                                {{ formatDate(proposal.createdAt) }}
+                              </span>
 
-                            </div>
+                          </div>
 
-                            <!-- middle -->
-                            <div class="forum-threads-list__thread__right__middle">
+                          <!-- middle -->
+                          <div class="forum-threads-list__thread__right__middle">
 
-                                <!-- title -->
-                                <span class="forum-threads-list__thread__title">{{ truncateText(thread.body, 200) }}</span>
+                              <!-- title -->
+                              <span class="forum-threads-list__thread__title">{{ proposal.title }}</span>
 
-                            </div>
+                          </div>
 
-                            <!-- bottom -->
-                            <div class="forum-threads-list__thread__right__bottom">
-                                
-                                <!-- author -->
-                                <span class="forum-threads-list__thread__author">{{ getPrincipalDisplayName(thread.created_by) }}</span>
+                          <!-- bottom -->
+                          <div class="forum-threads-list__thread__right__bottom">
+                              
+                              <!-- author -->
+                              <span class="forum-threads-list__thread__author">name</span>
 
-                                <!-- author principal -->
-                                <!-- <span class="forum-threads-list__thread__principal">…kdnr4w</span> -->
+                              <!-- principal -->
+                              <span class="forum-threads-list__thread__principal">{{ truncateHex(proposal.proposer) }}</span>
 
-                            </div>
+                          </div>
 
-                        </div>
+                      </div>
 
-                    </div>
+                  </div>
 
-                </li>
+                </router-link>
                 
             </ul>
 
             <!-- load more button container -->
-            <div class="forum-threads-list__load-more-button-container">
+            <div v-if="hasMoreProposals" class="forum-threads-list__load-more-button-container">
 
                 <!-- load more button -->
-                <button class="forum-threads-list__load-more-button btn taco-btn taco-btn--green taco-btn--big">Load More</button>
+                <button @click="loadMoreProposals" 
+                        class="forum-threads-list__load-more-button btn taco-btn taco-btn--green taco-btn--big">Load More</button>
 
             </div>
 
@@ -125,6 +140,30 @@
 
 .forum-threads-list {
     overflow: auto;
+    position: relative;
+    min-height: 100%;
+
+    // loading curtain
+    &__loading-curtain {
+      position: absolute;
+      height: 100%;
+      width: 100%;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: rgba(0,0,0,0.5);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 99999;
+      border-top-left-radius: 0.5rem;
+      border-bottom-left-radius: 0.5rem;
+
+      .loading-img {
+        width: 10rem;
+      }
+    }
 
     ///////////
     // title //
@@ -138,6 +177,7 @@
       top: 0;
       background-color: var(--orange-to-light-brown);
       transition: background-color 0.25s;
+      border-top-left-radius: 0.5rem;
 
       // inner
       &__inner {
@@ -203,7 +243,7 @@
 
     // list item
     &__list-item {
-      // placeholder
+      text-decoration: none;
     }
 
     ////////////
@@ -234,6 +274,7 @@
         align-items: start;
         justify-content: start;
         gap: 0.125rem;
+        overflow: hidden;
 
         // top
         &__top {
@@ -282,6 +323,19 @@
         color: var(--brown);
         font-weight: 600;
         font-size: 0.75rem;        
+
+        // passed
+        &--passed {
+          background-color: var(--success-green-hover);
+          color: var(--white);
+        }
+
+        // failed
+        &--failed {
+          background-color: var(--red);
+          color: var(--white);
+        }
+        
       }
 
       // type
@@ -290,6 +344,10 @@
         font-size: 0.825rem;
         font-family: "Rubik";
         font-weight: 600;
+        -webkit-line-clamp: 1;
+        -webkit-box-orient: vertical;  
+        overflow: hidden;
+        text-overflow: ellipsis;
       }
 
       // date
@@ -343,7 +401,7 @@
       }  
 
       // active
-      &--active {
+      &--active .forum-threads-list__thread {
         background-color: var(--dark-orange-to-brown);
       }
 
@@ -368,10 +426,11 @@
     // Imports //
     /////////////
 
-    import { ref, onMounted } from 'vue'
-    import { useRouter } from 'vue-router'
+    import { ref, onMounted, computed, watch } from 'vue'
+    import { useRouter, useRoute } from 'vue-router'
     import { storeToRefs } from 'pinia'
     import { useTacoStore } from '../../stores/taco.store'
+    import astronautLoader from '../../assets/images/astonautLoader.webp'
 
     ///////////
     // store //
@@ -383,69 +442,243 @@
     // # STATE #
 
     // 
-    const { appLoading, fetchedProposalsThreads} = storeToRefs(tacoStore)
 
     // # ACTIONS #
 
     // 
-    const { getProposalsThreads, getPrincipalDisplayName } = tacoStore
 
     /////////////////////
     // local variables //
     /////////////////////
 
-    // router
-    const router = useRouter()
+    // loading curtain
+    const componentLoading = ref(false)
+
+    // images
+    const astronautLoaderUrl = astronautLoader
+
+    // route
+    const route = useRoute()
 
     // error
     const error = ref('')
 
-    // active thread id
-    const activeThreadId = ref('')
+    // search query
+    const searchQuery = ref('')
+    
+    // track if we've loaded all proposals for search
+    const hasLoadedAllForSearch = ref(false)
+    
+    // track if there are more proposals to load
+    const hasMoreProposals = ref(true)
+    
+    // selected topic filter
+    const selectedTopic = ref('all')    
 
     ///////////////////
     // local methods //
     ///////////////////
 
     // load forum data
-    const loadForumData = async () => {
-        try {
-            error.value = ''
-            await getProposalsThreads()
-        } catch (err) {
-            console.error('Error loading forum data:', err)
-            error.value = 'Failed to load forum data. Please try again.'
-        }
+    const loadProposals = async () => {
+      error.value = null
+      
+      try {
+        await tacoStore.fetchTacoProposals(20) // Fetch 20 proposals at a time
+      } catch (err) {
+        error.value = err.message || 'Failed to load proposals'
+      }
     }
 
-    // go to thread
-    const goToThread = (threadId) => {
-        activeThreadId.value = threadId.toString()
-        router.push(`/chat/forum/${threadId.toString()}`)
+    // load more proposals
+    const loadMoreProposals = async () => {
+
+      // show loading curtain
+      componentLoading.value = true
+
+      // set error to null
+      error.value = null
+      
+      // load more proposals
+      try {
+
+        // get previous count
+        const previousCount = proposals.value.length
+
+        // load more proposals
+        await tacoStore.loadMoreTacoProposals(20)
+
+        // get new count
+        const newCount = proposals.value.length
+        
+        // if no new proposals were loaded, we've reached the end
+        if (newCount === previousCount) {
+
+          // set has more proposals to false
+          hasMoreProposals.value = false
+
+        }
+
+      } catch (err) {
+
+        // set error
+        error.value = err.message || 'Failed to load more proposals'
+
+      } finally {
+
+        // hide loading curtain
+        componentLoading.value = false
+
+      }
+
     }
+
+    // load all proposals
+    const loadAllProposals = async () => {
+
+      // show loading curtain
+      componentLoading.value = true
+
+      // set error to null
+      error.value = null
+      
+      // load all proposals
+      try {
+
+        // load all proposals
+        await tacoStore.loadMoreTacoProposals(99999)
+
+        // set has loaded all for search to true
+        hasLoadedAllForSearch.value = true
+
+        // set has more proposals to false
+        hasMoreProposals.value = false // no more proposals to load after loading all
+
+      } catch (err) {
+
+        // set error
+        error.value = err.message || 'Failed to load all proposals'
+
+      } finally {
+
+        // hide loading curtain
+        componentLoading.value = false
+
+      }
+
+    }    
 
     // format date
-    const formatDate = (timestamp) => {
-        const date = new Date(Number(timestamp) / 1_000_000) // Convert nanoseconds to milliseconds
-        return date.toLocaleDateString('en-US', {
-            year: 'numeric',
-            month: '2-digit',
-            day: '2-digit'
-        })
+    const formatDate = (date) => {
+      return date.toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit'
+      })
     }
 
-    // truncate text
-    const truncateText = (text, maxLength) => {
-        if (text.length <= maxLength) return text
-        return text.substring(0, maxLength) + '...'
+    // truncate hex
+    const truncateHex = (hex) => {
+      if (hex.length <= 10) return hex
+      return '...' + hex.substring(hex.length - 5)
     }
     
     //////////////
     // computed //
     //////////////
 
-    // 
+    // format status
+    const formatStatus = (status) => {
+      if (status === "Executed") return "PASSED"
+      if (status === "Rejected") return "FAILED"
+      return status
+    }
+
+    // get topic key
+    const getTopicKey = (topic) => {
+      if (typeof topic === 'object' && topic !== null) {
+        return Object.keys(topic)[0] || 'Unknown'
+      }
+      return topic || 'Unknown'
+    }
+    
+    // filtered proposals
+    const filteredProposals = computed(() => {
+      let filtered = proposals.value
+      
+      // apply topic filter
+      if (selectedTopic.value !== 'all') {
+        filtered = filtered.filter(proposal => {
+          const topicKey = getTopicKey(proposal.topic)
+          return topicKey === selectedTopic.value
+        })
+      }
+      
+      // apply search filter
+      if (searchQuery.value.trim()) {
+        const query = searchQuery.value.toLowerCase().trim()
+        
+        filtered = filtered.filter(proposal => {
+          // search in title
+          if (proposal.title && proposal.title.toLowerCase().includes(query)) {
+            return true
+          }
+          
+          // search in topic
+          const topicKey = getTopicKey(proposal.topic)
+          if (topicKey.toLowerCase().includes(query)) {
+            return true
+          }
+          
+          // search in proposer address
+          if (proposal.proposer && proposal.proposer.toLowerCase().includes(query)) {
+            return true
+          }
+          
+          // search in status
+          if (proposal.status && proposal.status.toLowerCase().includes(query)) {
+            return true
+          }
+          
+          return false
+        })
+      }
+      
+      return filtered
+    })
+
+    // active thread id
+    const activeThreadId = computed(() => {
+      
+        // get id from route params
+        const id = route.params.id
+        
+        // return thread id if id exists, otherwise empty string
+        return id || ''
+        
+    })
+
+    // fetched proposals
+    const proposals = computed(() => tacoStore.fetchedTacoProposals)
   
+    //////////////
+    // watchers //
+    //////////////
+    
+    // watch search query to load all proposals when user starts searching
+    watch(searchQuery, (newQuery) => {
+      if (newQuery.trim() && !hasLoadedAllForSearch.value) {
+        loadAllProposals()
+      }
+    })
+    
+    // watch topic filter to load all proposals when user selects a topic
+    watch(selectedTopic, (newTopic) => {
+      if (newTopic !== 'all' && !hasLoadedAllForSearch.value) {
+        loadAllProposals()
+      }
+    })
+    
     /////////////////////
     // lifecycle hooks //
     /////////////////////  
@@ -454,10 +687,16 @@
     onMounted(async () => {
 
         // log
-        console.log('forum thread list mounted')
+        // console.log('forum thread list mounted')
+
+        // show loading curtain
+        componentLoading.value = true
 
         // load forum data
-        loadForumData()
+        await loadProposals()
+
+        // hide loading curtain
+        componentLoading.value = false
 
     })
 
