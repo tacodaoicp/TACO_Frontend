@@ -97,7 +97,7 @@
                       class="forum-thread-view__header__date"
                       data-bs-toggle="tooltip" 
                       data-bs-placement="top" 
-                      title="test">
+                      :title="formatDate(proposal.createdAt)">
                     {{ formatShortDate(proposal.createdAt) }}
                 </span>
 
@@ -359,8 +359,8 @@
                             <!-- reply bottom-->
                             <div class="forum-thread-view__post-reply__bottom">
 
-                                                                 <!-- submit button -->
-                                 <button @click="submitReply(post.id)"
+                                <!-- submit button -->
+                                <button @click="submitReply(post.id)"
                                          :disabled="!replyBody.trim()"
                                          class="btn taco-btn taco-btn--green">Submit</button>
 
@@ -1033,6 +1033,7 @@
             .reply-cancel-btn {
                 background-color: var(--light-orange);
                 border: 1px solid var(--dark-orange);
+                color: var(--black)
             }
 
         }
@@ -1855,6 +1856,15 @@
             day: '2-digit'
         })
     }
+    const formatDate = (date: Date) => {
+        return date.toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+        })
+    }    
     const formatTimestampDate = (timestamp: bigint) => {
         // convert nanoseconds to milliseconds for Date constructor
         const milliseconds = Number(timestamp) / 1_000_000
