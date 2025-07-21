@@ -58,7 +58,8 @@
                   v-for="proposal in filteredProposals"
                   :key="proposal.id.toString()"
                   :to="`/chat/forum/${proposal.id.toString()}`"
-                  :class="['forum-threads-list__list-item', { 'forum-threads-list__thread--active': activeThreadId === proposal.id.toString() }]">
+                  :class="['forum-threads-list__list-item', { 'forum-threads-list__thread--active': activeThreadId === proposal.id.toString() }]"
+                  @click="toggleThreadMenu">
 
                   <!-- thread -->
                   <div class="forum-threads-list__thread">
@@ -322,7 +323,8 @@
         padding: 0 0.375rem;
         color: var(--brown);
         font-weight: 600;
-        font-size: 0.75rem;        
+        font-size: 0.75rem;
+        text-transform: uppercase;
 
         // passed
         &--passed {
@@ -445,7 +447,8 @@
 
     // # ACTIONS #
 
-    // 
+    // forum
+    const { toggleThreadMenu } = tacoStore // not reactive
 
     /////////////////////
     // local variables //
@@ -481,17 +484,33 @@
 
     // load forum data
     const loadProposals = async () => {
+
+      // log
+      // console.log('loadProposals')
+
+      // nullify error
       error.value = null
       
+      // try
       try {
+
+        // fetch proposals
         await tacoStore.fetchTacoProposals(20) // Fetch 20 proposals at a time
+
       } catch (err) {
+
+        // set error
         error.value = err.message || 'Failed to load proposals'
+
       }
+
     }
 
     // load more proposals
     const loadMoreProposals = async () => {
+
+      // log
+      // console.log('loadMoreProposals')
 
       // show loading curtain
       componentLoading.value = true
@@ -535,6 +554,9 @@
 
     // load all proposals
     const loadAllProposals = async () => {
+
+      // log
+      // console.log('loadAllProposals')
 
       // show loading curtain
       componentLoading.value = true

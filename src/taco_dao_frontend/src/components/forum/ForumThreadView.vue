@@ -12,7 +12,11 @@
 
         <!-- hamburger menu for small screens -->
         <div class="forum-thread-view__hamburger-menu shadow"
-            @click="toggleThreadMenuOnMobile">
+            @click="toggleThreadMenu"
+            :style="{
+                'top': proposalSelected ? '3.5rem' : '0.5rem',
+                'right': proposalSelected ? '0.25rem' : '0.5rem'
+            }">
 
             <!-- icon -->
             <i class="fa-light fa-bars forum-thread-view__hamburger-menu__icon"></i>
@@ -97,22 +101,80 @@
                     {{ formatShortDate(proposal.createdAt) }}
                 </span>
 
-                <!-- comment count and refresh button -->
-                <div class="d-flex align-items-center">
+                <!-- comment count, add comment button, and refresh button -->
+                <div class="d-flex align-items-center flex-wrap">
 
                     <!-- comment count -->
-                    <span class="forum-thread-view__header__comment-count">
+                    <span @click="addingNewComment = !addingNewComment, replyingToPost = null"
+                        class="forum-thread-view__header__comment-count">
                         {{ posts.length }} comments
                     </span>
 
+                    <!-- add comment button -->
+                    <button @click="addingNewComment = !addingNewComment, replyingToPost = null"
+                            class="forum-thread-view__header__add-comment btn"
+                            :class="{ 'forum-thread-view__header__add-comment--active': addingNewComment }">
+                        <i class="fa-solid fa-comment"></i>
+                    </button>
+
                     <!-- refresh button -->
-                    <!-- @click="loadThreadData" -->
                     <button @click="refreshPosts"
                         class="forum-thread-view__header__refresh btn">
                         <i class="fa-solid fa-refresh"></i>
                     </button>
 
                 </div>
+
+            </div>
+
+        </div>
+
+        <!-- new comment -->
+        <div v-if="proposalSelected && !error && addingNewComment" class="forum-thread-view__new-comment">
+
+            <!-- title -->
+            <span class="forum-thread-view__new-comment__title">New Comment</span>
+
+            <!-- title input container -->
+            <div class="forum-thread-view__new-comment__title-input-container">
+
+                <!-- title input -->
+                <input v-model="newPostTitle" 
+                        type="text" 
+                        class="form-control taco-input" 
+                        placeholder="Optional title…"
+                        maxlength="100">
+
+                <!-- character count -->
+                <span class="forum-thread-view__new-comment__character-count">{{ newPostTitle.length }}/100</span>
+
+            </div>
+
+            <!-- text area container -->
+            <div class="forum-thread-view__new-comment__text-area-container">
+
+                <!-- text area -->
+                <textarea v-model="newPostBody" 
+                        class="form-control taco-input" 
+                        placeholder="Comment…"
+                        maxlength="1000"></textarea>
+
+                <!-- character count -->
+                <span class="forum-thread-view__new-comment__character-count">{{ newPostBody.length }}/1000</span>
+
+            </div>
+
+            <!-- buttons -->
+            <div class="forum-thread-view__new-comment__buttons">
+
+                <!-- submit button -->
+                <button @click="createNewPost()"
+                        :disabled="!newPostBody.trim()"
+                        class="btn taco-btn taco-btn--green">Submit</button>
+
+                <!-- cancel button -->
+                <button @click="addingNewComment = false"
+                        class="btn taco-btn cancel-btn">Cancel</button>
 
             </div>
 
@@ -128,14 +190,33 @@
                 <div v-if="posts.length > 0" class="forum-thread-view__post-list">
 
                     <!-- post -->
-                    <div v-for="post in sortedPosts" :key="post.id.toString()" class="forum-thread-view__post shadow">
+                    <div v-for="post in sortedPosts" 
+                         :key="post.id.toString()" 
+                         class="forum-thread-view__post shadow"
+                         :class="{ 'forum-thread-view__post--collapsed': collapsedPosts.has(post.id.toString()) }"
+                         :style="{ marginLeft: getPostNestingLevel(post, new Map(posts.map(p => [p.id.toString(), p]))) * 1.5 + 'rem' }">
+
+                        <!-- post loading curtain -->
+                        <div v-if="post.loading" class="forum-thread-view__post__loading-curtain">
+                            
+                            <!-- astronaut -->
+                            <img :src="astronautLoaderUrl" class="loading-img">
+
+                        </div>
 
                         <!-- post header -->
                         <div class="forum-thread-view__post-header">
 
                             <!-- expand/collapse button -->
-                            <button class="forum-thread-view__post-expand-collapse-btn">
-                                <i class="fa-solid fa-minus"></i>
+                            <button @click="collapseGroup(post.id)"
+                                    class="forum-thread-view__post-expand-collapse-btn">
+
+                                <!-- minus icon -->
+                                <i v-if="collapsedPosts.has(post.id.toString())" class="fa-solid fa-plus fa-fw"></i>
+
+                                <!-- plus icon -->
+                                <i v-else class="fa-solid fa-minus fa-fw"></i>
+
                             </button>
 
                             <!-- post author -->
@@ -193,32 +274,44 @@
                                 <div class="forum-thread-view__post-voting__top">
 
                                     <!-- upvote button -->
-                                    <div class="forum-thread-view__post-voting__upvote-btn">
+                                    <button class="forum-thread-view__post-voting__upvote-btn"
+                                            :class="{ 'forum-thread-view__post-voting__upvote-btn--voted': getUserVote(post.id).voteType === 'upvote' }"
+                                            @click="voteOnPost(post.id, 'upvote')"
+                                            :disabled="getUserVote(post.id).voting">
 
                                         <!-- vote arrow -->
                                         <svg class="forum-thread-view__post-voting__vote-arrow" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 11.087 11.252">
                                             <path fill="currentColor" d="M.909,6.24h2.225v5.012h4.816v-5.012h2.222c.239,0,.47-.093.643-.258.348-.331.363-.881.032-1.23-.01-.011-.021-.022-.032-.032h0L6.2.258h0c-.366-.348-.941-.348-1.307,0L.269,4.718c-.348.332-.362.883-.031,1.231.01.01.02.021.031.031.172.164.399.257.637.26" />
                                         </svg>
 
-                                    </div>
+                                    </button>
 
                                     <!-- vote count -->
                                     <div class="forum-thread-view__post-voting__vote-count">
 
-                                        <!-- vote count number -->
-                                        <span class="forum-thread-view__post-voting__vote-count-number">0</span>
+                                                                            <!-- vote count number -->
+                                    <span class="forum-thread-view__post-voting__vote-count-number"
+                                          :class="{
+                                              'forum-thread-view__post-voting__vote-count-number--positive': getNetVoteScoreValue(post) > 0,
+                                              'forum-thread-view__post-voting__vote-count-number--negative': getNetVoteScoreValue(post) < 0
+                                          }">
+                                        {{ getNetVoteScore(post) }}
+                                    </span>
 
                                     </div>
 
                                     <!-- downvote button -->
-                                    <div class="forum-thread-view__post-voting__downvote-btn">
+                                    <button class="forum-thread-view__post-voting__downvote-btn"
+                                            :class="{ 'forum-thread-view__post-voting__downvote-btn--voted': getUserVote(post.id).voteType === 'downvote' }"
+                                            @click="voteOnPost(post.id, 'downvote')"
+                                            :disabled="getUserVote(post.id).voting">
 
                                         <!-- vote arrow -->
                                         <svg class="forum-thread-view__post-voting__vote-arrow" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 11.087 11.252">
                                             <path fill="currentColor" d="M.909,6.24h2.225v5.012h4.816v-5.012h2.222c.239,0,.47-.093.643-.258.348-.331.363-.881.032-1.23-.01-.011-.021-.022-.032-.032h0L6.2.258h0c-.366-.348-.941-.348-1.307,0L.269,4.718c-.348.332-.362.883-.031,1.231.01.01.02.021.031.031.172.164.399.257.637.26" />
                                         </svg>
 
-                                    </div>
+                                    </button>
 
                                 </div>
 
@@ -226,16 +319,18 @@
                                 <div class="forum-thread-view__post-voting__bottom">
 
                                     <!-- my vp -->
-                                    <span class="forum-thread-view__post-voting__my-vp">0</span>
+                                    <span class="forum-thread-view__post-voting__my-vp"
+                                        data-bs-toggle="tooltip" 
+                                        data-bs-placement="top" 
+                                        title="My Voting Power">0</span>
 
                                 </div>
-
-
 
                             </div>
 
                             <!-- reply button -->
-                            <button class="forum-thread-view__post-reply-btn">
+                            <button @click="startReply(post.id), addingNewComment = false"
+                                    class="forum-thread-view__post-reply-btn">
 
                                 <!-- reply icon -->
                                 <i class="fa-solid fa-comment"></i>
@@ -244,6 +339,36 @@
                                 <span>Reply</span>
 
                             </button>
+
+                        </div>
+
+                        <!-- reply form -->
+                        <div v-if="replyingToPost === post.id" 
+                            class="forum-thread-view__post-reply">
+
+                            <!-- reply top -->
+                            <div class="forum-thread-view__post-reply__top">
+
+                                <!-- reply body -->
+                                <textarea v-model="replyBody" 
+                                        placeholder="Add a comment…" 
+                                        class="form-control taco-input"></textarea>
+
+                            </div>
+
+                            <!-- reply bottom-->
+                            <div class="forum-thread-view__post-reply__bottom">
+
+                                                                 <!-- submit button -->
+                                 <button @click="submitReply(post.id)"
+                                         :disabled="!replyBody.trim()"
+                                         class="btn taco-btn taco-btn--green">Submit</button>
+
+                                <!-- cancel button -->
+                                <button @click="cancelReply" 
+                                        class="btn taco-btn reply-cancel-btn">Cancel</button>
+
+                            </div>
 
                         </div>
 
@@ -261,24 +386,25 @@
         </div>
 
         <!-- add a comment button container -->
-        <div v-if="proposalSelected && !error" 
+        <div v-if="proposalSelected && !error && posts.length === 0" 
             class="forum-thread-view__add-comment-container">
 
             <!-- login to comment -->
             <button v-if="!userLoggedIn"
-                    class="btn d-flex align-items-center gap-1"
+                    class="btn d-flex align-items-center gap-2"
                     @click="iidLogIn()">
 
                 <!-- dfinity logo -->
                 <DfinityLogo style="width: 1.375rem;" />
                 
                 <!-- login to post -->
-                <span>Login to Comment</span>
+                <span style="color: var(--black-to-white);">Login to Comment</span>
 
             </button>
 
             <!-- add a comment button -->
-            <button v-else
+            <button v-if="userLoggedIn && !addingNewComment"
+                    @click="addingNewComment = !addingNewComment"
                     class="btn taco-btn taco-btn--green taco-btn--big">Add a Comment</button>
 
         </div>
@@ -308,7 +434,7 @@
 
             </div>
 
-        </div>        
+        </div>
 
     </div>
 
@@ -354,15 +480,14 @@
     &__hamburger-menu {
       display: none;
       position: absolute;
-      top: 0.5rem;
-      right: 0.5rem;
-      background-color: var(--dark-orange-to-light-brown);
+    //   top: 3.5rem;
+      right: 0.25rem;
+      background-color: var(--brown);
       height: fit-content;
       padding: 0.5rem 0.75rem;
       border-radius: 0.25rem;
       z-index: 2000;
       cursor: pointer;
-      border: 1px solid var(--dark-orange);
 
       // icon
       &__icon {
@@ -483,6 +608,7 @@
         // right
         &__right {  
             display: flex;
+            flex-wrap: wrap;
             align-items: center;
             gap: 0.75rem;
             margin-left: auto;
@@ -491,7 +617,7 @@
         // title
         &__title {
             font-size: 1.125rem;
-            font-weight: 600;
+            font-weight: 400;
         }
 
         // date
@@ -509,13 +635,83 @@
             font-weight: 600;
             text-wrap: nowrap;
             color: var(--black);
+            cursor: pointer;
+            user-select: none;
+        }
+
+        // add comment button
+        &__add-comment {
+            padding: 0.2rem 0.6rem;
+            color: var(--dark-brown-to-light-orange);
+            margin-left: 0.25rem;
+            
+            // active
+            &--active {
+                color: var(--dark-brown);
+                background-color: var(--light-orange);
+                border: 1px solid var(--brown);
+            }
         }
 
         // refresh button
         &__refresh {
+            padding: 0.2rem 0.6rem;
             color: var(--dark-brown-to-light-orange);
         }
 
+    }
+
+    // new comment
+    &__new-comment {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+        padding: 1rem 1rem 0.5rem;
+        background-color: var(--orange-to-brown);
+        border-radius: 0.5rem;
+        border: 1px solid var(--dark-orange);
+        margin: 1rem;
+
+        // title container
+        &__title-input-container {
+            display: flex;
+            flex-direction: column;
+        }
+
+        // title
+        &__title {
+            font-weight: 600;
+            font-size: 1.125rem;
+            padding-left: 0.25rem;
+            color: var(--black-to-white);
+        }
+
+        // character count
+        &__character-count {
+            display: block;
+            text-align: right;
+            font-size: 0.875rem;
+            color: var(--dark-brown-to-light-orange);
+        }
+
+        // input
+        input, textarea {
+            font-weight: 400;
+            font-size: 1rem;
+        }
+
+        // buttons
+        &__buttons {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .cancel-btn {
+            background-color: var(--light-orange);
+            border: 1px solid var(--dark-orange);
+            border-radius: 0.5rem;
+            padding: 0.25rem 0.75rem;
+        }
     }
 
     // error container
@@ -559,7 +755,7 @@
 
     // thread posts
     &__posts {
-        padding: 0 1rem;
+        padding: 0 1rem 2.5rem;
     }
 
     // post list
@@ -572,11 +768,44 @@
 
     // post
     &__post {
-        padding: 1rem;
+        padding: 1rem 1rem 0.25rem 1rem;
         background-color: var(--orange-to-brown);
         border-radius: 0.5rem;
         border: 1px solid var(--dark-orange);
         color: var(--black-to-white);
+        position: relative;
+
+        // collapsed state
+        &--collapsed {
+            padding-bottom: 1rem;
+            
+            // hide post body and footer when collapsed
+            .forum-thread-view__post-body,
+            .forum-thread-view__post-footer,
+            .forum-thread-view__post-reply {
+                display: none;
+            }
+        }
+
+        // post loading curtain
+        &__loading-curtain {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            border-radius: 0.375rem;
+
+            // loading img
+            .loading-img {
+                width: 10rem;
+            }
+        }
 
         // post header
         &-header {
@@ -673,8 +902,8 @@
                 display: flex;
                 align-items: center;
                 justify-content: center;
-                background-color: var(--light-orange);
-                border: 1px solid var(--dark-orange);
+                background-color: var(--light-orange-to-dark-brown);
+                border: 1px solid var(--dark-orange-to-dark-brown);
                 border-radius: 0.25rem;
                 padding: 0.5rem;
             }
@@ -685,6 +914,17 @@
                 // vote arrow
                 .forum-thread-view__post-voting__vote-arrow {
                     color: var(--success-green);
+                }
+
+                // voted state
+                &--voted {
+                    background-color: var(--success-green);
+                    border-color: var(--success-green);
+
+                    // vote arrow
+                    .forum-thread-view__post-voting__vote-arrow {
+                        color: white;
+                    }
                 }
             }
 
@@ -697,6 +937,17 @@
                     transform: rotate(180deg);
                     color: var(--red);
                 }
+
+                // voted state
+                &--voted {
+                    background-color: var(--red);
+                    border-color: var(--red);
+
+                    // vote arrow
+                    .forum-thread-view__post-voting__vote-arrow {
+                        color: white;
+                    }
+                }
             }
 
             // vote count
@@ -706,7 +957,17 @@
                 &-number {
                     line-height: 0;
                     font-weight: 600;
-                    color: var(--dark-gray);
+                    color: var(--dark-gray-to-gray);
+
+                    // positive
+                    &--positive {
+                        color: var(--success-green);
+                    }
+
+                    // negative
+                    &--negative {
+                        color: var(--red);
+                    }
                 }
             }
 
@@ -717,7 +978,7 @@
 
             // my vp
             &__my-vp {
-                color: var(--brown);
+                color: var(--brown-to-light-orange);
                 font-size: 0.875rem;
             }
 
@@ -728,20 +989,50 @@
             display: flex;
             align-items: center;
             gap: 0.5rem;
-            background-color: var(--light-orange);
-            border: 1px solid var(--dark-orange);
+            background-color: var(--light-orange-to-dark-brown);
+            border: 1px solid var(--dark-orange-to-dark-brown);
             border-radius: 0.25rem;
             padding: 0.25rem 0.75rem;
 
             // icon
             i {
-                color: var(--black);
+                color: var(--black-to-white);
                 font-size: 0.875rem;
             }
 
             // text
             span {
                 font-size: 0.875rem;
+                color: var(--black-to-white);
+            }
+
+        }
+
+        // post reply
+        &-reply {
+
+            // top
+            &__top {
+                margin-top: 0.5rem;
+            }
+
+            // bottom
+            &__bottom {
+                display: flex;
+                gap: 0.25rem;
+                margin: 0.5rem 0 0.25rem;
+            }
+
+            // text area
+            textarea {
+                font-weight: 400;
+                font-size: 1rem;
+            }
+
+            // cancel button
+            .reply-cancel-btn {
+                background-color: var(--light-orange);
+                border: 1px solid var(--dark-orange);
             }
 
         }
@@ -751,7 +1042,7 @@
     // no posts
     &__no-posts {
         text-align: center;
-        padding: 1.5rem 0 1rem;
+        padding: 2rem 0 0;
         
         span {
             font-size: 1.25rem;
@@ -764,7 +1055,6 @@
         display: flex;
         justify-content: center;
         align-items: center;
-        padding: 1rem 1rem 1.5rem 1rem;
     }
     
 }
@@ -788,7 +1078,9 @@
 
     // show hamburger menu
     .forum-thread-view__hamburger-menu {
-        display: block !important;
+        display: flex !important;
+        align-items: center;
+        justify-content: center;
     }
 
 }
@@ -808,15 +1100,33 @@
 
     // show hamburger menu
     .forum-thread-view__hamburger-menu {
-        display: block !important;
+        display: flex !important;
+        align-items: center;
+        justify-content: center;
     }
     
 }
 
-// // tablet
-// @media (min-width: 767px) and (max-width: 991.98px) {
-    
-// }
+// tablet
+@media (min-width: 767px) and (max-width: 991.98px) {
+    // hide twisty arrow
+    .twisty-arrow {
+        display: none !important;
+    }
+
+    // show wiggly arrow
+    .wiggly-arrow {
+        display: block !important;
+    }
+
+    // show hamburger menu
+    .forum-thread-view__hamburger-menu {
+        display: flex !important;
+        align-items: center;
+        justify-content: center;
+    }
+
+}
 
 // // small daktop
 // @media (min-width: 992px) and (max-width: 1199.98px) {
@@ -839,6 +1149,7 @@
     import { ref, onMounted, computed, watch } from 'vue'
     import { useRoute } from 'vue-router'
     import { useTacoStore } from '../../stores/taco.store'
+    import { storeToRefs } from 'pinia'
     import TwistyArrow from '../../assets/images/twistyArrow.vue'
     import WigglyArrow from '../../assets/images/wigglyArrow.vue'
     import SneedHeadTiny from '../../assets/images/sneed-head-tiny.png'
@@ -854,18 +1165,20 @@
 
     // # STATE #
 
-    const {
-        fetchedThreadPosts,
-        getPostsByThread,
-        getThread,
-        getPrincipalDisplayName,
-        userLoggedIn
-    } = tacoStore
+    // user
+    const { userLoggedIn } = storeToRefs(tacoStore) // reactive
+
+    // forum
+    const { threadMenuOpen } = storeToRefs(tacoStore) // reactive
 
     // # ACTIONS #
 
-    // iid login
+    // user
     const { iidLogIn } = tacoStore // not reactive
+    const { getPrincipalDisplayName } = tacoStore // not reactive
+
+    // forum
+    const { toggleThreadMenu } = tacoStore // not reactive
 
     /////////////////////
     // local variables //
@@ -889,24 +1202,38 @@
     // thread has been started
     const threadStarted = ref(false)
 
+    // replying to post
+    const replyingToPost = ref<bigint | null>(null)
+
+    // reply body
+    const replyBody = ref('')
+
+    // adding new comment
+    const addingNewComment = ref(false)
+
+    // new post title
+    const newPostTitle = ref('')
+
+    // new post body
+    const newPostBody = ref('')
+
+    // collapsed posts
+    const collapsedPosts = ref<Set<string>>(new Set())
+
     // images
     const astronautLoaderUrl = astronautLoader
-    const sneedHeadTiny = SneedHeadTiny    
+    const sneedHeadTiny = SneedHeadTiny
 
 
 
     
+
+    // snassys examples
 
     const creatingThread = ref(false)
-    const creatingPost = ref(false)
     const showNewPostForm = ref(false)
-    const newPostBody = ref('')
-    const replyingToPost = ref<bigint | null>(null)
-    const replyBody = ref('')
     const highlightedPost = ref<string | null>(null)
     const userVotes = ref<Map<string, { voteType: 'upvote' | 'downvote' | null; voting: boolean }>>(new Map())
-
-    
     const threadData = ref<any>({ exists: false, mapping: null, thread: null })
     const posts = ref<any[]>([])
 
@@ -1131,161 +1458,10 @@
 
     }
 
-
-
-
-
-
-    // get user's current vote for a post
-    const getUserVote = (postId: bigint) => {
-        return userVotes.value.get(postId.toString()) || { voteType: null, voting: false }
-    }
-
-    // vote on a post
-    const voteOnPost = async (postId: bigint, voteType: 'upvote' | 'downvote') => {
-        if (!tacoStore.userLoggedIn) return
-        
-        const currentVote = getUserVote(postId)
-        
-        try {
-            // Set voting state
-            userVotes.value.set(postId.toString(), {
-            ...currentVote,
-            voting: true
-            })
-            
-            // If user is clicking the same vote type, retract the vote
-            if (currentVote.voteType === voteType) {
-            await tacoStore.retractVote(postId)
-            userVotes.value.set(postId.toString(), {
-                voteType: null,
-                voting: false
-            })
-            } else {
-            // Vote or change vote
-            await tacoStore.voteOnPost(postId, voteType)
-            userVotes.value.set(postId.toString(), {
-                voteType,
-                voting: false
-            })
-            }
-            
-            // Refresh the posts to get updated vote counts
-            if (threadData.value.exists && threadData.value.thread) {
-            await loadPosts(threadData.value.thread.id)
-            // Reinitialize user votes for the updated posts
-            await initializeUserVotes()
-            }
-            
-        } catch (error: any) {
-            console.error('Error voting on post:', error)
-            userVotes.value.set(postId.toString(), {
-            ...currentVote,
-            voting: false
-            })
-            
-            // Show error toast
-            tacoStore.addToast({
-            id: Date.now(),
-            code: 'vote-error',
-            title: 'Vote Failed',
-            icon: 'fa-solid fa-exclamation-triangle',
-            message: `Failed to vote: ${error.message || 'Unknown error'}`
-            })
-        }
-    }
-
-    // create new thread for proposal
-    const createThread = async () => {
-        try {
-            creatingThread.value = true
-            error.value = null
-            
-            const result = await tacoStore.createProposalThread(proposalId.value!)
-            if (result.success) {
-            // Reload thread data to show the new thread
-            await loadThreadData()
-            }
-        } catch (err: any) {
-            error.value = err.message || 'Failed to create discussion thread'
-            console.error('Error creating thread:', err)
-        } finally {
-            creatingThread.value = false
-        }
-    }
-
-    // create new post
-    const createNewPost = async () => {
-        if (!newPostBody.value.trim()) return
-        
-        try {
-            creatingPost.value = true
-            error.value = null
-            
-            const result = await tacoStore.createPost(
-            threadData.value.thread.id,
-            newPostBody.value.trim()
-            )
-            
-            if (result.success) {
-            newPostBody.value = ''
-            showNewPostForm.value = false
-            // Reload posts to show the new post
-            await loadPosts(threadData.value.thread.id)
-            // Reinitialize user votes for the updated posts
-            await initializeUserVotes()
-            }
-        } catch (err: any) {
-            error.value = err.message || 'Failed to create post'
-            console.error('Error creating post:', err)
-        } finally {
-            creatingPost.value = false
-        }
-    }
-
-    // create reply to post
-    const createReply = async (parentPostId: bigint) => {
-        if (!replyBody.value.trim()) return
-        
-        try {
-            creatingPost.value = true
-            error.value = null
-            
-            const result = await tacoStore.createPost(
-            threadData.value.thread.id,
-            replyBody.value.trim(),
-            parentPostId
-            )
-            
-            if (result.success) {
-            replyBody.value = ''
-            replyingToPost.value = null
-            // Reload posts to show the new reply
-            await loadPosts(threadData.value.thread.id)
-            // Reinitialize user votes for the updated posts
-            await initializeUserVotes()
-            }
-        } catch (err: any) {
-            error.value = err.message || 'Failed to create reply'
-            console.error('Error creating reply:', err)
-        } finally {
-            creatingPost.value = false
-        }
-    }
-
-    // toggle new post form
-    const toggleNewPostForm = () => {
-        showNewPostForm.value = !showNewPostForm.value
-        if (!showNewPostForm.value) {
-            newPostBody.value = ''
-        }
-    }
-
     // start replying to a post
     const startReply = (postId: bigint) => {
         replyingToPost.value = postId
         replyBody.value = ''
-        // Close new post form if open
         showNewPostForm.value = false
     }
 
@@ -1295,56 +1471,383 @@
         replyBody.value = ''
     }
 
-    // scroll to parent post
-    const scrollToParentPost = (parentPostId: bigint) => {
-        const parentPostElement = document.getElementById(`post-${parentPostId.toString()}`)
-        if (parentPostElement) {
-            parentPostElement.scrollIntoView({ behavior: 'smooth', block: 'center' })
-            highlightedPost.value = parentPostId.toString()
+    // create reply to post
+    const submitReply = async (parentPostId: bigint) => {
+
+        // if reply body is empty
+        if (!replyBody.value.trim()) {
+
+            // hide component loading
+            componentLoading.value = false
+
+            // return
+            return
+
+        }
+        
+        // try
+        try {
+
+            // set post loading to true
+            const post = posts.value.find(post => post.id === parentPostId)
+            if (post) post.loading = true
+
+            // nullify error
+            error.value = null
+
+            // create post
+            const result = await tacoStore.createPost(
+                threadData.value.thread.id,
+                replyBody.value.trim(),
+                parentPostId
+            )
             
-            // Clear highlight after 3 seconds
-            setTimeout(() => {
-            highlightedPost.value = null
-            }, 3000)
-        } else {
-            console.warn('Parent post not found:', parentPostId.toString())
-            // Show toast or alert that parent post is not visible
-            tacoStore.addToast({
-            id: Date.now(),
-            code: 'parent-post-not-found',
-            title: 'Parent Post Not Found',
-            icon: 'fa-solid fa-exclamation-triangle',
-            message: 'The parent post may be in a different page or not loaded yet.'
-            })
+            // if post created successfully
+            if (result.success) {
+
+                // nullify reply body
+                replyBody.value = ''
+
+                // nullify replying to post
+                replyingToPost.value = null
+
+                // reload posts to show the new reply
+                await loadPosts(threadData.value.thread.id)
+
+                // reinitialize user votes for the updated posts
+                await initializeUserVotes()
+
+            }
+
+        } 
+        
+        // catch
+        catch (err: any) {
+
+            // set error
+            error.value = err.message || 'Failed to create reply'
+
+            // log error
+            console.error('Error creating reply:', err)
+            
+        } 
+        
+        // finally
+        finally {
+
+            // reload posts
+            await loadPosts(threadData.value.thread.id)
+
+            // set post loading to false
+            const post = posts.value.find(post => post.id === parentPostId)
+            if (post) post.loading = false
+
+        }
+        
+    }
+
+    // create new thread for proposal
+    const createThread = async () => {
+
+        // try
+        try {
+            
+            // show component loading
+            componentLoading.value = true
+
+            // nullify error
+            error.value = null
+            
+            // create thread
+            const result = await tacoStore.createProposalThread(proposalId.value!)
+
+            // log
+            // console.log('thread creation result', result)
+
+            // if thread created successfully
+            if (result.success) {
+
+                // log
+                // console.log('thread creation successful, loading thread data')
+
+                // reload thread data
+                await loadThreadData()
+
+            }
+
+        } 
+        
+        // catch
+        catch (err: any) {
+
+            // set error
+            error.value = err.message || 'Failed to create discussion thread'
+
+            // log error
+            console.error('Error creating thread:', err)
+
+        } 
+        
+        // finally
+        finally {
+
+            // hide component loading
+            componentLoading.value = false
+
         }
     }
 
-    // toggle thread menu on mobile
-    const toggleThreadMenuOnMobile = () => {
-        // placeholder for mobile menu toggle functionality
-        // console.log('toggle thread menu on mobile')
+    // create new post
+    const createNewPost = async () => {
+
+        // log
+        // console.log('creating new post')
+
+        // if new post body is empty, return
+        if (!newPostBody.value.trim()) return
+
+        // if no thread exists, create thread
+        if (!threadData.value.exists) {
+
+            // log
+            // console.log('no thread exists')
+
+            // create thread
+            await createThread()
+
+            // log
+            // console.log('thread creation done')
+
+        }
+        
+        // try
+        try {
+
+            // log
+            // console.log('creating comment')
+
+            // show component loading
+            componentLoading.value = true
+
+            // nullify error
+            error.value = null
+            
+            // create post
+            const result = await tacoStore.createPost(
+                threadData.value.thread.id,
+                newPostBody.value.trim(),
+                undefined,
+                newPostTitle.value.trim() || undefined
+            )
+
+            // if post created successfully
+            if (result.success) {
+
+                // log
+                // console.log('post created successfully')
+
+                // nullify new post body
+                newPostBody.value = ''
+
+                // hide new post form
+                showNewPostForm.value = false
+                
+                // reload posts to show the new post
+                await loadPosts(threadData.value.thread.id)
+
+                // reinitialize user votes for the updated posts
+                await initializeUserVotes()
+
+            }
+
+        } 
+        
+        // catch
+        catch (err: any) {
+
+            // set error
+            error.value = err.message || 'Failed to create post'
+
+            // log error
+            console.error('Error creating post:', err)
+
+        } 
+        
+        // finally
+        finally {
+
+            // hide new post form
+            showNewPostForm.value = false
+
+            // hide component loading
+            componentLoading.value = false
+
+        }
+
     }    
 
-    // utility functions
-    const getStatusClass = (status: string) => {
-        switch (status) {
-            case 'Open': return 'badge bg-primary'
-            case 'Adopted': return 'badge bg-success'
-            case 'Executed': return 'badge bg-info'
-            case 'Rejected': return 'badge bg-danger'
-            case 'Failed': return 'badge bg-warning'
-            default: return 'badge bg-secondary'
+    // collapse group
+    const collapseGroup = (postId: bigint) => {
+
+        // log
+        // console.log('collapsing group', postId)
+
+        // toggle collapsed state
+        const postIdStr = postId.toString()
+        if (collapsedPosts.value.has(postIdStr)) {
+            collapsedPosts.value.delete(postIdStr)
+        } else {
+            collapsedPosts.value.add(postIdStr)
         }
+        
     }
-    const formatDate = (date: Date) => {
-        return date.toLocaleDateString('en-US', {
-            year: 'numeric',
-            month: 'short',
-            day: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit'
-        })
+
+    // calculate net vote score (upvotes minus downvotes)
+    const getNetVoteScore = (post: any) => {
+
+        // get upvotes and downvotes
+        const upvotes = Number(post.upvote_score || 0)
+
+        // get downvotes
+        const downvotes = Number(post.downvote_score || 0)
+
+        // calculate net score
+        const netScore = upvotes - downvotes
+        
+        // move decimal place up 8 positions and hide decimals
+        const adjustedScore = Math.floor(netScore / 100000000)
+
+        // add comma formatting
+        const formattedScore = adjustedScore.toLocaleString()
+
+        // add + prefix for positive numbers, keep - for negative
+        return adjustedScore > 0 ? `+${formattedScore}` : formattedScore
+
     }
+
+    // get numeric value for vote score (for conditional styling)
+    const getNetVoteScoreValue = (post: any) => {
+
+        // get upvotes and downvotes
+        const upvotes = Number(post.upvote_score || 0)
+
+        // get downvotes
+        const downvotes = Number(post.downvote_score || 0)
+
+        // calculate net score
+        const netScore = upvotes - downvotes
+        
+        // move decimal place up 8 positions and hide decimals
+        return Math.floor(netScore / 100000000)
+
+    }
+
+    // get user's current vote for a post
+    const getUserVote = (postId: bigint) => {
+
+        // return user vote or default to null
+        return userVotes.value.get(postId.toString()) || { voteType: null, voting: false }
+        
+    }
+
+    // vote on a post
+    const voteOnPost = async (postId: bigint, voteType: 'upvote' | 'downvote') => {
+
+        // if user is not logged in, return
+        if (!tacoStore.userLoggedIn) return
+        
+        // try
+        try {
+
+            // set post loading to true
+            const post = posts.value.find(post => post.id === postId)
+            if (post) post.loading = true   
+            
+            // get user's current vote
+            const currentVote = getUserVote(postId)            
+
+            // set voting state
+            userVotes.value.set(postId.toString(), {
+                ...currentVote,
+                voting: true
+            })
+            
+            // if user is clicking the same vote type
+            if (currentVote.voteType === voteType) {
+
+                // retract vote
+                await tacoStore.retractVote(postId)
+
+                // set user vote to null
+                userVotes.value.set(postId.toString(), {
+                    voteType: null,
+                    voting: false
+                })
+
+            } 
+            
+            // else
+            else {
+
+                // vote or change vote
+                await tacoStore.voteOnPost(postId, voteType)
+
+                // set user vote to the new vote type
+                userVotes.value.set(postId.toString(), {
+                    voteType,
+                    voting: false
+                })
+
+            }
+            
+            // refresh posts
+            if (threadData.value.exists && threadData.value.thread) {
+
+                // load posts
+                await loadPosts(threadData.value.thread.id)
+
+                // reinitialize user votes
+                await initializeUserVotes()
+
+            }
+            
+        } 
+        
+        // catch
+        catch (error: any) {
+
+            // log error
+            console.error('Error voting on post:', error)
+
+            // set user vote to null
+            userVotes.value.set(postId.toString(), {
+                ...currentVote,
+                voting: false
+            })
+            
+            // show error toast
+            tacoStore.addToast({
+                id: Date.now(),
+                code: 'vote-error',
+                title: 'Vote Failed',
+                icon: 'fa-solid fa-exclamation-triangle',
+                message: `Failed to vote: ${error.message || 'Unknown error'}`
+            })
+
+        }
+
+        // finally
+        finally {
+
+            // set post loading to false
+            const post = posts.value.find(post => post.id === postId)
+            if (post) post.loading = false
+
+        }
+
+    }
+
+    // date formatting
     const formatShortDate = (date: Date) => {
         return date.toLocaleDateString('en-US', {
             year: 'numeric',
@@ -1373,6 +1876,57 @@
         })
     }
 
+
+
+
+
+
+    // snassy examples
+
+    // toggle new post form
+    const toggleNewPostForm = () => {
+        showNewPostForm.value = !showNewPostForm.value
+        if (!showNewPostForm.value) {
+            newPostBody.value = ''
+        }
+    }
+
+    // scroll to parent post
+    const scrollToParentPost = (parentPostId: bigint) => {
+        const parentPostElement = document.getElementById(`post-${parentPostId.toString()}`)
+        if (parentPostElement) {
+            parentPostElement.scrollIntoView({ behavior: 'smooth', block: 'center' })
+            highlightedPost.value = parentPostId.toString()
+            
+            // Clear highlight after 3 seconds
+            setTimeout(() => {
+            highlightedPost.value = null
+            }, 3000)
+        } else {
+            console.warn('Parent post not found:', parentPostId.toString())
+            // Show toast or alert that parent post is not visible
+            tacoStore.addToast({
+            id: Date.now(),
+            code: 'parent-post-not-found',
+            title: 'Parent Post Not Found',
+            icon: 'fa-solid fa-exclamation-triangle',
+            message: 'The parent post may be in a different page or not loaded yet.'
+            })
+        }
+    }  
+
+    // utility functions
+    const getStatusClass = (status: string) => {
+        switch (status) {
+            case 'Open': return 'badge bg-primary'
+            case 'Adopted': return 'badge bg-success'
+            case 'Executed': return 'badge bg-info'
+            case 'Rejected': return 'badge bg-danger'
+            case 'Failed': return 'badge bg-warning'
+            default: return 'badge bg-secondary'
+        }
+    }
+
     // check if post was edited (at least 1 minute apart)
     const isPostEdited = (post: any) => {
         // convert nanoseconds to milliseconds
@@ -1385,6 +1939,7 @@
         // only show edited if difference is 60+ seconds (1 minute)
         return timeDiffSeconds >= 60
     }
+
     const formatVotes = (votes: bigint) => {
         const num = Number(votes)
         if (num >= 1000000) {
@@ -1396,7 +1951,7 @@
     }
     const truncateHex = (hex: string) => {
         if (hex.length <= 10) return hex
-        return hex.substring(0, 6) + '...' + hex.substring(hex.length - 4)
+        return hex.substring(0, 6) + '…' + hex.substring(hex.length - 4)
     }
     const calculateYesPercentage = (proposal: any) => {
         if (proposal.totalVotes === BigInt(0)) return 0
@@ -1406,7 +1961,13 @@
         if (proposal.totalVotes === BigInt(0)) return 0
         return (Number(proposal.noVotes) / Number(proposal.totalVotes)) * 100
     }
+
+
+
+
+
     
+
     //////////////
     // computed //
     //////////////
@@ -1422,13 +1983,78 @@
 
     })
 
-    // sorted posts by created date (most recent first)
+    // calculate nesting level for a post
+    const getPostNestingLevel = (post: any, postsMap: Map<string, any>): number => {
+        if (!post.reply_to_post_id || !Array.isArray(post.reply_to_post_id) || post.reply_to_post_id.length === 0) {
+            return 0 // top level post
+        }
+        
+        // find the first parent post (assuming single parent for simplicity)
+        const parentId = post.reply_to_post_id[0]
+        const parentPost = postsMap.get(parentId.toString())
+        
+        if (!parentPost) {
+            return 0 // parent not found, treat as top level
+        }
+        
+        // recursively calculate parent's nesting level and add 1
+        return getPostNestingLevel(parentPost, postsMap) + 1
+    }
+
+    // sorted posts with replies nested under parent posts
     const sortedPosts = computed(() => {
-        return [...posts.value].sort((a, b) => {
-            const aCreated = Number(a.created_at)
-            const bCreated = Number(b.created_at)
-            return bCreated - aCreated // descending order (newest first)
+        if (!posts.value.length) return []
+        
+        // create a map of posts by id for quick lookup
+        const postsMap = new Map(posts.value.map(post => [post.id.toString(), post]))
+        
+        // separate top-level posts (no reply_to_post_id) from replies
+        const topLevelPosts: any[] = []
+        const replies: any[] = []
+        
+        posts.value.forEach(post => {
+            // check if post is a reply by looking for valid reply_to_post_id array
+            const isReply = post.reply_to_post_id && 
+                           Array.isArray(post.reply_to_post_id) && 
+                           post.reply_to_post_id.length > 0
+            
+            if (isReply) {
+                replies.push(post)
+            } else {
+                topLevelPosts.push(post)
+            }
         })
+        
+        // sort top-level posts by creation date (oldest first)
+        topLevelPosts.sort((a, b) => Number(a.created_at) - Number(b.created_at))
+        
+        // sort replies by creation date (oldest first)
+        replies.sort((a, b) => Number(a.created_at) - Number(b.created_at))
+        
+        // insert replies after their parent posts
+        const result: any[] = []
+        
+        topLevelPosts.forEach(post => {
+            result.push(post)
+            
+            // find all replies to this post
+            const postReplies = replies.filter(reply => 
+                reply.reply_to_post_id && 
+                Array.isArray(reply.reply_to_post_id) &&
+                reply.reply_to_post_id.some((parentId: bigint) => parentId === post.id)
+            )
+            
+            // add replies after the parent post
+            result.push(...postReplies)
+        })
+        
+        // safety check: if we're missing posts, fall back to original order
+        if (result.length !== posts.value.length) {
+            console.warn('Some posts were lost in sorting, falling back to original order')
+            return posts.value.sort((a, b) => Number(a.created_at) - Number(b.created_at))
+        }
+        
+        return result
     })
 
     //////////////
@@ -1466,7 +2092,7 @@
 
         }
 
-    }, { immediate: true })
+    })
   
     /////////////////////
     // lifecycle hooks //

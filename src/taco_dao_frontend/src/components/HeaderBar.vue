@@ -401,7 +401,7 @@
       box-shadow: 0px 3px 6px 0px rgba(0,0,0,0.16);
       -webkit-box-shadow: 0px 3px 6px 0px rgba(0,0,0,0.16);
       -moz-box-shadow: 0px 3px 6px 0px rgba(0,0,0,0.16);
-      z-index: 99998; // below loading curtain
+      z-index: 9999; // below loading curtain
 
       // account menu button
       &__btn {

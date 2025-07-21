@@ -448,7 +448,7 @@
       align-items: center;
       justify-content: center;
       border-radius: 0.5rem;
-      z-index: 99999; // above everything
+      z-index: 9998; // above everything
 
       .loading-img {
           width: 10rem;

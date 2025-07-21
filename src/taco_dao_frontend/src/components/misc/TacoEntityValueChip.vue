@@ -161,7 +161,7 @@
             display: flex;
             flex-direction: column;
             // gap: 0.5rem;
-            z-index: 1000;
+            z-index: 9999;
 
             // header
             &__header {

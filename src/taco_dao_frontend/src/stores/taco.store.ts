@@ -424,6 +424,7 @@ export const useTacoStore = defineStore('taco', () => {
     const fetchedForums = ref<CandidForumResponse[]>([])
     const fetchedProposalsThreads = ref<CandidThreadResponse[]>([])
     const fetchedThreadPosts = ref<CandidPostResponse[]>([])
+    const threadMenuOpen = ref(false)
     
     // proposals
     const fetchedTacoProposals = ref<TacoProposal[]>([])
@@ -588,6 +589,7 @@ export const useTacoStore = defineStore('taco', () => {
         if (!darkModeToggled.value) {
             root.style.setProperty("--white-to-black", "#2D2D2D") // black
             root.style.setProperty("--white-to-light-orange", "#FEEAC1") // light orange
+            root.style.setProperty("--white-to-light-blue", "#B4C2E9") // light blue
             root.style.setProperty("--dark-gray-to-light-gray", "#F4F3EC") // light gray
             root.style.setProperty("--dark-gray-to-gray", "#777777") // dark gray
             root.style.setProperty("--black-to-white", "#FFFFFF") // white
@@ -658,6 +660,7 @@ export const useTacoStore = defineStore('taco', () => {
         else {
             root.style.setProperty("--white-to-black", "#ffffff") // white
             root.style.setProperty("--white-to-light-orange", "#ffffff") // white
+            root.style.setProperty("--white-to-light-blue", "#ffffff") // white
             root.style.setProperty("--dark-gray-to-light-gray", "#777777") // dark gray
             root.style.setProperty("--dark-gray-to-gray", "#ACACA8") // dark
             root.style.setProperty("--black-to-white", "#2D2D2D") // black
@@ -4264,7 +4267,7 @@ export const useTacoStore = defineStore('taco', () => {
             // console.log('🔍 Step 1: Getting proposals topic via direct SNS root lookup...');
             const proposalsMapping = await getProposalsTopicDirect();
             if (!proposalsMapping) {
-                console.log('❌ Proposals topic not found via direct lookup');
+                // console.log('❌ Proposals topic not found via direct lookup');
                 throw new Error('Proposals topic not found');
             }
             // console.log('✅ Found proposals topic with ID:', proposalsMapping.proposals_topic_id.toString());
@@ -4532,6 +4535,15 @@ export const useTacoStore = defineStore('taco', () => {
             throw error;
         }
     }
+    const toggleThreadMenu = () => {
+
+        // log
+        // console.log('toggleThreadMenu', threadMenuOpen.value)
+
+        // toggle thread menu
+        threadMenuOpen.value = !threadMenuOpen.value
+        
+    }
 
     // taco dao proposal methods
     const tacoSnsGovernanceCanisterId = () => {
@@ -4771,8 +4783,8 @@ export const useTacoStore = defineStore('taco', () => {
         
         // Fallback to truncated principal
         const cleaned = principalStr.replace(/-/g, '');
-        return cleaned.length > 10 ? 
-            cleaned.substring(0, 5) + '...' + cleaned.substring(cleaned.length - 5) :
+        return cleaned.length > 5 ? 
+            '…' + cleaned.substring(cleaned.length - 5) :
             cleaned;
     }
     const getNeuronDisplayName = (snsRoot: Principal, neuronId: Uint8Array | number[]): string => {
@@ -4953,6 +4965,7 @@ export const useTacoStore = defineStore('taco', () => {
         proposalsHasMore,
         namesCache,
         namesLoading,
+        threadMenuOpen,
         // actions
         changeRoute,
         toggleDarkMode,
@@ -5057,5 +5070,6 @@ export const useTacoStore = defineStore('taco', () => {
         setPrincipalName,
         setNeuronName,
         getUserNeurons,
+        toggleThreadMenu,
     }
 })

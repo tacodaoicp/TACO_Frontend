@@ -3,7 +3,7 @@
     <div class="forum-view">
 
         <!-- left -->
-        <div class="forum-view__left">
+        <div v-show="threadMenuOpen" class="forum-view__left">
 
             <!-- forum threads -->
             <ForumThreadsList />
@@ -41,7 +41,7 @@
       border-right: 1px solid var(--dark-orange);
       border-top-left-radius: 0.5rem;
       border-bottom-left-radius: 0.5rem;
-      background-color: var(--orange-to-light-brown);      
+      background-color: var(--orange-to-light-brown);
     }
 
     // right
@@ -62,7 +62,7 @@
       position: absolute;
       top: 0;
       left: 0;
-      z-index: 1000;
+      z-index: 9999;
       border: none;
       outline: 1px solid var(--dark-orange);
       border-radius: 0.5rem;
@@ -76,7 +76,7 @@
       position: absolute;
       top: 0;
       left: 0;
-      z-index: 1000;
+      z-index: 9999;
       border: none;
       outline: 1px solid var(--dark-orange);
       border-radius: 0.5rem;
@@ -87,7 +87,21 @@
   // tablet
   @media (min-width: 767px) and (max-width: 991.98px) {
     .forum-view__left {
-        max-width: 18rem;
+      position: absolute;
+      top: 0;
+      left: 0;
+      z-index: 9999;
+      border: none;
+      outline: 1px solid var(--dark-orange);
+      border-radius: 0.5rem;
+      height: 100%;
+    }
+  }
+
+  // greater than 991px
+  @media (min-width: 992px) {
+    .forum-view__left {
+      display: flex !important;
     }
   }
 
@@ -114,19 +128,20 @@
     import { ref, computed, onMounted } from 'vue'
     import ForumThreadsList from './ForumThreadsList.vue'
     import ForumThreadView from './ForumThreadView.vue'
-    // import { useTacoStore } from '../../stores/taco.store'
-    // import { storeToRefs } from 'pinia'
+    import { useTacoStore } from '../../stores/taco.store'
+    import { storeToRefs } from 'pinia'
 
     ///////////
     // store //
     ///////////
 
     // # SETUP #
-    // const tacoStore = useTacoStore()
+    const tacoStore = useTacoStore()
 
     // # STATE #
 
-    // 
+    // forum
+    const { threadMenuOpen } = storeToRefs(tacoStore) // reactive
 
     // # ACTIONS #
 

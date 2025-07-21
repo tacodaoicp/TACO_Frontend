@@ -292,7 +292,9 @@
                             <!-- value -->
                             <span class="dao-allocations__token-info-list__value
                                          taco-text-white ms-auto">
-                                <a class="small" style="color: var(--blue-to-light-blue);" :href="currentTokenIcpCoinsLink" target="_blank">{{ currentTokenSymbol }}</a>
+                                <a class="small" style="color: var(--white-to-light-blue);" 
+                                    :href="currentTokenIcpCoinsLink" 
+                                    target="_blank">{{ currentTokenSymbol }}</a>
                             </span>
 
                         </li>
@@ -448,7 +450,7 @@
         align-items: center;
         justify-content: center;
         border-radius: 0.5rem;
-        z-index: 99999; // above everything
+        z-index: 9998; // above everything
 
         // loading image
         .loading-img {

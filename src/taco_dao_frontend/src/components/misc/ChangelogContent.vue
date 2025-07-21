@@ -8,6 +8,17 @@
             <!-- changelog item -->
             <div class="changelog-content__item">
                 <h3 class="changelog-content__title">
+                    v1.0.4
+                </h3>
+                <span class="changelog-content__date">🍽️ July 21, 2025</span>
+                <p class="changelog-content__text">
+                    - Added custom Sneed Hub integration at /chat/forum
+                </p>
+            </div> 
+
+            <!-- changelog item -->
+            <div class="changelog-content__item">
+                <h3 class="changelog-content__title">
                     v1.0.3
                 </h3>
                 <span class="changelog-content__date">🍽️ June 15, 2025</span>

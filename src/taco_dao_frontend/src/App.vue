@@ -1106,7 +1106,7 @@
     console.log(
       "👨‍🍳 Welcome to %cTaco Dao",
       "color: yellow;",
-      "\n❤️ Together, We Perfect The Recipe!\n🌮 v1.0.3"
+      "\n❤️ Together, We Perfect The Recipe!\n🌮 v1.0.4"
     );
 
     // run mounted logic

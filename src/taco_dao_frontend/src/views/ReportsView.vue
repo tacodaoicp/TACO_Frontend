@@ -92,7 +92,7 @@
                       <div class="taco-report-explorer__list-report__title-container">
                         
                         <!-- report title -->
-                        <span class="taco-report-explorer__list-report__title">DUE DILIGENCE PROCESS Sneed (SNS)</span>
+                        <span class="taco-report-explorer__list-report__title">DUE DILIGENCE PROCESS Sneed (SNEED)</span>
                         
                       </div>
                       
