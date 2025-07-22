@@ -53,6 +53,29 @@
                 
                 <!-- reports list -->
                 <ul class="taco-report-explorer__list">    
+
+                  <!-- gold dao - report item -->
+                  <li class="taco-report-explorer__list-item" @click="toggleReportMenuOnMobile(); router.push('/reports/ddgolddao')">
+                    
+                    <!-- report -->
+                    <div class="taco-report-explorer__list-report"
+                    :class="{ 'taco-report-explorer__list-report--active': reportId === 4 }">
+                      
+                      <!-- report title icon -->              
+                      <div class="taco-report-explorer__list-report__icon"
+                          :style="{ backgroundImage: `url(${goldDaoIconUrl})` }"></div>            
+                      
+                      <!-- report title container -->
+                      <div class="taco-report-explorer__list-report__title-container">
+                        
+                        <!-- report title -->
+                        <span class="taco-report-explorer__list-report__title">DUE DILIGENCE PROCESS Gold DAO (GOLDAO) & Gold Token (GLDT)</span>
+                        
+                      </div>
+                      
+                    </div>
+                    
+                  </li>                  
                   
                   <!-- motoko - report item -->
                   <li class="taco-report-explorer__list-item" @click="toggleReportMenuOnMobile(); router.push('/reports/ddmotoko')">
@@ -1441,7 +1464,7 @@
                       <!-- link group -->
                       <span class="d-flex flex-column align-items-end">
 
-                        <span class="text-end">#18 Motion to Add</span>
+                        <span class="text-end">#18 Add Token</span>
 
                         <span class="d-flex gap-2">
 
@@ -2656,6 +2679,21 @@
                     
                     <!-- right -->
                     <div class="taco-report-explorer__report-footer__right">
+
+                      <!-- link group -->
+                      <span class="d-flex flex-column align-items-end">
+
+                        <span class="text-end">#45 Add Token</span>
+
+                        <span class="d-flex gap-2">
+
+                          <a href="https://nns.ic0.app/proposal/?u=lacdn-3iaaa-aaaaq-aae3a-cai&proposal=45" class="taco-text-blue-to-light-blue text-end" target="_blank">NNS</a>                        
+
+                          <a href="https://app.sneeddao.com/proposal?proposalid=45&sns=lacdn-3iaaa-aaaaq-aae3a-cai" class="taco-text-blue-to-light-blue text-end" target="_blank">Sneed Hub</a>
+
+                        </span>
+                        
+                      </span>                        
                       
                       <!-- link group -->
                       <span class="d-flex flex-column align-items-end">
@@ -2678,7 +2716,1108 @@
 
                 </div>
                 
-              </div>                 
+              </div>
+
+              <!-- gold dao dd report -->
+              <div v-if="reportId === 4" class="taco-report-explorer__report-container">
+
+                <!-- inner -->
+                <div class="taco-report-explorer__report-container__inner">
+                
+                  <!-- report header -->
+                  <div class="taco-report-explorer__report-header">
+                    
+                    <!-- report title -->
+                    <h2 class="taco-report-explorer__report-header__title">DUE DILIGENCE Gold DAO (GOLDAO) & Gold Token (GLDT)</h2>
+
+                    <!-- report metadata continer -->
+                    <div class="taco-report-explorer__report-header__metadata-container">
+
+                      <!-- report metadata -->
+                      <span class="taco-report-explorer__report-header__metadata">
+                        <i class="fa-solid fa-luchador-mask"></i> 
+                        <span> Written by </span>
+                        <span>manilpwn</span>
+                        <span> and </span>
+                        <span>TrickyVik</span>
+                        <span class="small"> 07/2025</span>
+                      </span>
+
+                    </div>        
+                    
+                  </div>
+
+                  <!-- report body -->
+                  <div class="taco-report-explorer__report-body">
+                    
+                    <!-- heading -->
+                    <h3 class="taco-report-explorer__report-heading
+                              taco-report-explorer__report-heading--h1">
+                      Team Background
+                      <i class="fa-solid fa-circle-info" 
+                        data-bs-toggle="tooltip" 
+                        data-bs-placement="top" 
+                        title="Assess the founding team's transparency, credibility, experience, and any past contributions to the ICP ecosystem"></i>
+                    </h3>
+                    
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      “The DAO” is the most famous early example of a DAO. It was launched in 2016 on Ethereum as a decentralized venture capital fund, <a href="https://www.sec.gov/files/litigation/investreport/34-81207.pdf" target="_blank" class="taco-report-explorer__report-link">raising over $150 million USD</a>. A vulnerability in the code was exploited to drain ~ $60 million USD worth of ETH from The DAO. As a result, the Ethereum network was hard forked to enable original owners to re-obtain their ETH. Some continued using the unforked Ethereum blockchain, which came to be known as Ethereum Classic.
+                    </p>
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      A German company, Slock.it, <a href="https://www.coindesk.com/markets/2016/05/12/the-dao-or-how-a-leaderless-ethereum-project-raised-50-million" target="_blank" class="taco-report-explorer__report-link">created the open-source DAO framework used for The DAO</a>. According to CoinDesk, DAO.Link, a Swiss-based company, was created by Slock.it in partnership with the cryptocurrency brokerage Bity in order to provide an interface between DAOs and real-world legal structures. <a href="https://forum.dfinity.org/t/sns-the-gold-dao-by-dao-link/24255" target="_blank" class="taco-report-explorer__report-link">DAO.Link created Gold DAO</a>. The founding team consisted of individuals that worked for DFINITY, ORIGYN, Yumi, Bity, and Quantum.
+                    </p>
+                    
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      On DAO.Link's website, under history, DAO.Link makes no claim to being involved in the creation of The DAO, <a href="https://dao.link/about" target="_blank" class="taco-report-explorer__report-link">they only claim to being involved in helping users recover funds from The DAO's hack</a>. If CoinDesk is accurate, this could potentially be seen as information that lacks the full context of the situation.
+                    </p>
+                    
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      The ORIGYN Foundation created the ORIGYN protocol, designed to bring RWAs (Real-World Assets) fully on-chain. It is the main contributor to the ORIGYN NFT standard that is running the perpetual marketplace of the GLD NFT. ORIGYN donated 500m OGY to Gold DAO.
+                    </p>
+                    
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      Although requested multiple times, the Gold DAO team did not provide any information related to team members and their experience. <a href="https://www.linkedin.com/company/daolink/people/" target="_blank" class="taco-report-explorer__report-link">According to LinkedIn</a>:
+                    </p>
+
+                    <!-- unordered list -->
+                    <ul class="taco-report-explorer__report-ul">
+                      
+                      <!-- list item -->
+                      <li class="taco-report-explorer__report-li">
+
+                        <!-- paragraph -->
+                        <p class="taco-report-explorer__report-paragraph">
+                          <a href="https://www.linkedin.com/in/julien-aerni-04b247152/" target="_blank" class="taco-report-explorer__report-link">Julien Aerni is Président of Dao.Link</a>, having ~ 5 years of industry experience, also being CEO at Quantum and Co-Founder of Genesium.
+                        </p>
+
+                      </li>
+
+                      <!-- list item -->
+                      <li class="taco-report-explorer__report-li">
+
+                        <!-- paragraph -->
+                        <p class="taco-report-explorer__report-paragraph">
+                          <a href="https://www.linkedin.com/in/dustin-becker-90159092/" target="_blank" class="taco-report-explorer__report-link">Dustin Becker is Tech lead at Dao.Link</a>, having ~ 16 years of experience in software, and also being Head of Innovation Tech at Bity.
+                        </p>
+
+                      </li>
+
+                      <!-- list item -->
+                      <li class="taco-report-explorer__report-li">
+
+                        <!-- paragraph -->
+                        <p class="taco-report-explorer__report-paragraph">
+                          <a href="https://www.linkedin.com/in/gautierwojda/" target="_blank" class="taco-report-explorer__report-link">Gautier Wodja is co-CTO at Dao.Link</a>, having ~ 8 years of experience in software, also being Staff Engineer at Bity, co-CTO at ORIGYN Foundation, and Software Architect at Bochsler Finance.
+                        </p>
+
+                      </li>
+                      
+                      <!-- list item -->
+                      <li class="taco-report-explorer__report-li">
+
+                        <!-- paragraph -->
+                        <p class="taco-report-explorer__report-paragraph">
+                          <a href="https://www.linkedin.com/in/cencensong/" target="_blank" class="taco-report-explorer__report-link">Melissa Song is Head of Business Development & Partnerships at Dao.Link</a>, having ~ 14 years of industry experience, also being CEO of Bity, and previously being Head of Business Development: RWA & NFTs at Bochsler Finance.
+                        </p>
+
+                      </li>
+
+                    </ul>   
+                    
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      <a href="https://x.com/VictorICPGold" target="_blank" class="taco-report-explorer__report-link">VictorICP is the Community Manager</a>, also being the creator of the <a href="https://x.com/ICPLoteria" target="_blank" class="taco-report-explorer__report-link">ICPLoteria NFT collection</a>.
+                    </p>
+                    
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      <a href="https://dashboard.internetcomputer.org/sns/tw2vt-hqaaa-aaaaq-aab6a-cai/proposal/27" target="_blank" class="taco-report-explorer__report-link">156,746 ICP was transferred from the treasury to the team wallet</a>.
+                    </p>
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      Recently, with proposals <a href="https://nns.ic0.app/proposal/?u=tw2vt-hqaaa-aaaaq-aab6a-cai&proposal=240" target="_blank" class="taco-report-explorer__report-link">240</a> and <a href="https://nns.ic0.app/proposal/?u=tw2vt-hqaaa-aaaaq-aab6a-cai&proposal=251" target="_blank" class="taco-report-explorer__report-link">251</a>, Chris Yost of the Cloud Foundation was transferred GOLDAO tokens to make educational videos.
+                    </p>
+
+                    <hr>
+
+                    <!-- heading -->
+                    <h3 class="taco-report-explorer__report-heading
+                              taco-report-explorer__report-heading--h1">
+                      Token Utility
+                      <i class="fa-solid fa-circle-info" 
+                        data-bs-toggle="tooltip" 
+                        data-bs-placement="top" 
+                        title="Examine the token's purpose and functionality within its ecosystem to ensure it provides tangible value and practical use cases"></i>
+                    </h3>  
+                    
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      The GOLDAO token serves as the governance token for Gold DAO, enabling members to submit and vote on proposals that are implemented if approved.
+                    </p>
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      The Gold NFT or GLD NFT represents direct ownership of physical gold bullion bars in sizes of 1g, 10g, 100g, or 1kg, stored in vaults in Switzerland. <a href="https://help.bity.com/en/articles/9680005-who-produced-the-gold-bar" target="_blank" class="taco-report-explorer__report-link">All gold bars are produced by Metalor</a>, a global leading gold refiner. <a href="https://help.bity.com/en/articles/9680087-who-performs-the-auditing-at-the-vault" target="_blank" class="taco-report-explorer__report-link">These bars are periodically audited by KPMG</a>, one of the world's leading accounting firms. <a href="https://docs.gold-dao.org/gold-dao-whitepaper/the-ecosystem/products/gold-nft-gld-nft" target="_blank" class="taco-report-explorer__report-link">The ORIGYN Protocol is used to issue digital certificates minted as NFTs</a>, providing unique identifiers linked to the bars. Any upgrades to the NFT canisters need to go through ORIGYN which Gold DAO has a 500m token stake in. <a href="https://docs.gold-dao.org/resources/gold-dao-owned-neurons/ogy-neuron" target="_blank" class="taco-report-explorer__report-link">The OGY tokens are in a neuron locked for 5 years</a>, from which rewards are distributed to Gold DAO neuron owners.
+                    </p>
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      Bity is a Swiss-based brokerage for cryptocurrency that provides the frontend to facilitate buying and selling of GLD NFTs, as well as a framework to perform KYC. <a href="https://help.bity.com/en/articles/9680033-how-is-the-gold-nft-price-determined" target="_blank" class="taco-report-explorer__report-link">The GLD NFT price is calculated based on the LBMA (London Bullion Market Association) Spot price of gold</a>, plus the production costs and any additional fees such as storage, auditing, and transportation. <a href="https://help.bity.com/en/articles/9680077-how-can-i-redeem-the-physical-gold-bar-from-my-nfts" target="_blank" class="taco-report-explorer__report-link">Owners can redeem their NFT to physical gold</a> by undergoing KYC, contacting the Bity support team, depositing the NFT to a wallet address provided by the support team, depositing a fee of 300 CHF to another address provided by the support team, and attending an appointment in Zurich to collect. Bity is working on providing additional delivery methods and expanding redemption locations. <a href="https://help.bity.com/en/articles/9680058-how-can-i-resell-my-gld-nft" target="_blank" class="taco-report-explorer__report-link">Owners can sell their NFT to Bity for the current spot price</a>, minus a 3% commission, having to complete KYC, and receiving funds in USDT. <a href="https://help.bity.com/en/articles/9680059-how-can-i-transfer-my-gld-nft-to-someone-else" target="_blank" class="taco-report-explorer__report-link">GLD NFTs can be transferred between wallet addresses</a>, with the originating wallet requiring 11 OGY tokens to initiate the transfer. The Gold DAO team is working on creating a secondary market for GLD NFTs.
+                    </p>
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      <a href="https://docs.gold-dao.org/gold-dao-whitepaper/the-ecosystem/products/gold-token-gldt" target="_blank" class="taco-report-explorer__report-link">The Gold Token or GLDT is a fungible token backed by GLD NFTs</a>. 1 GLDT represents 0.01g of gold. GLDT is minted when a GLD NFT is swapped for GLDT, for which there is no fee. GLDT can be swapped for GLD NFTs, for which there is a fee of 1 GLDT per NFT. <a href="https://x.com/OneSecBridge/status/1943346067514290195" target="_blank" class="taco-report-explorer__report-link">GLDT can be bridged to BASE using OneSecBridge</a>.
+                    </p>
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      Information on the planned GLDT staking mechanism was only discovered through a chance community tip. The subject is absent from the knowledge hub sidebar and is not linked in any of the sidebar's articles. <a href="https://docs.gold-dao.org/resources/gldt-staking" target="_blank" class="taco-report-explorer__report-link">It only appears via a direct 'GLDT staking' search</a>, suggesting it may still be in the conceptual stage. GLDT staking allows users to lock their GLDT tokens and earn passive rewards in GOLDAO, ICP, and OGY. The minimum stake is 10 GLDT. Rewards are sourced from a dedicated GOLDAO neuron, with distributions based on stake size and an age bonus that doubles rewards annually. Staked GLDT has a one-week unlock delay, or users can pay a 5% fee for immediate access. The system aims for a ~5% APY, scaling the GOLDAO neuron to match GLDT staking demand. Early stakers may see higher returns until more GLDT is staked. The GOLDAO neuron will be funded from a 200 million GOLDAO treasury allocation for product growth, and its creation will dilute rewards for existing GOLDAO stakers.
+                    </p>
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      <a href="https://docs.gold-dao.org/gold-dao-whitepaper/the-ecosystem/products/usd-pegged-stablecoin-usdg" target="_blank" class="taco-report-explorer__report-link">The planned USDG token will be a USD-pegged stablecoin minted by opening a Collateralized Debt Position (CDP) against GLDT</a>. USDG gains its value by being leveraged against GLDT which is itself convertible 1:1 with gold through the Gold NFT system.Those who issue USDG would do so to remain exposed to gold while also having liquid funds.
+                    </p>
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      <a href="https://2669388926-files.gitbook.io/~/files/v0/b/gitbook-x-prod.appspot.com/o/spaces%2FhyYilEcr51QGR1f1ZQ8w%2Fuploads%2FBcCDXIGwAHLVyxGVs238%2FAMA%20Q%26A%20Telegram%20Gold%20DAO.pdf?alt=media&token=3b8ca526-f413-47dd-a5e4-7ba7d20c1a81" target="_blank" class="taco-report-explorer__report-link">The Gold DAO team does not rule out adding other RWAs in the future</a>.
+                    </p>
+                    
+                    <hr>
+
+                    <!-- heading -->
+                    <h3 class="taco-report-explorer__report-heading
+                              taco-report-explorer__report-heading--h1">
+                      Ecosystem Alignment
+                      <i class="fa-solid fa-circle-info" 
+                        data-bs-toggle="tooltip" 
+                        data-bs-placement="top" 
+                        title="Evaluate the token's synergy with other ICP projects, including any existing collaborations and suitability for inclusion in the Salsa Season rewards program."></i>
+                    </h3>  
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      Programmable gold is a unique value proposition. Integration of GLDT can impact broader ICP adoption, facilitating enhanced liquidity and user engagement.
+                    </p>
+                    
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      The Gold DAO invested 17.5k ICP in the first SNS sale of WaterNeuron. <a href="https://docs.gold-dao.org/resources/gold-dao-owned-neurons/wtn-neuron" target="_blank" class="taco-report-explorer__report-link">The rewards from the resulting neuron are distributed to GOLDAO governance participants</a>.
+                    </p>
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      OpenChat uses GLDT for tipping.
+                    </p>
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      Including GLDT in the TACO DAO portfolio means that Salsa Season rewards program participants gain exposure to gold.
+                    </p>
+
+                    <hr>
+
+                    <!-- heading -->
+                    <h3 class="taco-report-explorer__report-heading
+                              taco-report-explorer__report-heading--h1">
+                      Community
+                      <i class="fa-solid fa-circle-info" 
+                        data-bs-toggle="tooltip" 
+                        data-bs-placement="top" 
+                        title="Assess the size and engagement of the token's community to gauge long-term adoption potential"></i>
+                    </h3>  
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      The Gold DAO telegram has 3314 members, and the OpenChat community has 1668 members.
+                    </p>
+                    
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      On X, TheGoldDAO has 16.7k followers.
+                    </p>
+                    
+                    <hr>
+
+                    <!-- heading -->
+                    <h3 class="taco-report-explorer__report-heading
+                              taco-report-explorer__report-heading--h1">
+                      Technology
+                      <i class="fa-solid fa-circle-info" 
+                        data-bs-toggle="tooltip" 
+                        data-bs-placement="top" 
+                        title="Review the project's technical foundation, focusing on code quality, scalability, and how effectively it leverages ICP's capabilities"></i>
+                    </h3>  
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      <a href="https://docs.gold-dao.org/gold-dao-whitepaper/technology/technology" target="_blank" class="taco-report-explorer__report-link">All components directly related to the Gold project are fully deployed on the Internet Computer Protocol (ICP)</a>. The system is powered by canisters that handle NFT issuance, token minting, ledger tracking, and KYC. The GLD NFT canister, which issues the NFTs backed by physical gold, is built on the ORIGYN Protocol. ORIGYN NFTs offer low costs and fast transaction speeds, enabling complex data storage while being fully decentralized.
+                    </p>
+                    
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      <a href="https://app.gldt.org/advanced/gldt" target="_blank" class="taco-report-explorer__report-link">Users interact through the GLDT Swap frontend</a>, which connects to the GLDT Swap canister responsible for minting GLDT tokens when GLD NFTs are locked. All NFT swaps are routed through the BITY KYC canister, which manages identity verification. The frontend interfaces for the swap portal and the GLDT ledger explorer are hosted on-chain as part of the SNS.
+                    </p>
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      <a href="https://docs.gold-dao.org/gold-dao-whitepaper/the-ecosystem/products/usd-pegged-stablecoin-usdg" target="_blank" class="taco-report-explorer__report-link">USDG mechanics</a>, currently in the conceptual and design phase, remain subject to revision. To mint USDG, users lock at least 150% of the desired value in GLDT, with a minimum deposit amount of 100 GLDT, no fee for initiation, and a 1% fee for closure. If price fluctuations cause the Collateral Ratio (CR) to fall below 150% but stay above 110%, users cannot mint more USDG but can still add collateral or repay their USDG debt. Falling below 110% triggers liquidation of the collateral. <a href="https://docs.gold-dao.org/gold-dao-whitepaper/tokenomics/ownership" target="_blank" class="taco-report-explorer__report-link">The oracle canisters involved in the pegging of USDG are yet to be elucidated upon</a>.
+                    </p>
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      Liquidation is executed through the Stability Pool, where users can stake USDG. When liquidation occurs, a proportional amount of staked USDG is burned to cover the debt, and the corresponding GLDT is distributed to the pool participants. Users staking in the Stability Pool are incentivised with GOLDAO tokens.
+                    </p>
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      In the scenario of liquidation, which would happen from the USD price of gold dropping, the issuer of the USDG would lose their GLDT collateral and be left the USDG. Therefore they are forced to 'cash out' with an asset that is valued lower than the initial collateral, due to the 150% minimum ratio. As liquidation is triggered below a 110% CR, this forces an additional loss of 9.09% (drop from 110 to 100) upon the issuer when compared to the loss in price for GLDT. Stability pool participants profit from this loss.
+                    </p>
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      To further enforce the USDG price peg by blunting any short term fluctuations, such as those incurred from market dumping, USDG can be redeemed through a 'redemption channel' for GLDT from CDPs with the lowest CR, incurring a 0.5% fee. Users swap 1 USDG for $1 worth of GLDT, and instant profit is gained by the difference between the value of USDG and $1. If natural supply and demand does not restore the price peg in a timely fashion, arbitrageurs attracted by the prospect of instant profit will rapidly push the price back to $1 (or rather keep it above $0.995).
+                    </p>
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      The purpose of this system is to ensure that USDG remains reliably pegged to the dollar while allowing for fluctuations in the value of GLDT. The 40% zone between 150% and 110% is wide enough to avoid sudden liquidations, while the 10% margin between 110% and 100% guarantees that, in liquidation, GLDT is reclaimed to reestablish backing. A 33.33% drop in the price of gold without extra collateral being added is required to destroy this peg, but such a drop is extremely rare and has historically taken years. The failure of the peg would come about from the inaction of issuers in an extremely long period of time, rather than the fluctuation of the gold price.
+                    </p>                      
+                    
+                    <hr>
+
+                    <!-- anon container -->
+                    <div class="d-flex flex-wrap gap-5">
+
+                      <!-- section 1 - GLDT -->
+                      <div>
+
+                        <!-- heading -->
+                        <h3 class="taco-report-explorer__report-heading
+                                  taco-report-explorer__report-heading--h1">
+                          Tokenomics
+                          <i class="fa-solid fa-circle-info" 
+                            data-bs-toggle="tooltip" 
+                            data-bs-placement="top" 
+                            title="Analyse the supply and distribution of the token; any inflationary/deflationary mechanisms; and any incentive structures, to ensure sustainability and fair distribution"></i>
+                        </h3>
+
+                        <!-- heading -->
+                        <h3 class="taco-report-explorer__report-heading
+                                  taco-report-explorer__report-heading--h1"
+                            style="font-weight: 600;">
+                          GLDT
+                        </h3>
+
+                        <!-- unordered list -->
+                        <ul class="taco-report-explorer__report-ul">
+
+                          <!-- list item -->
+                          <li class="taco-report-explorer__report-li">
+                            
+                            <!-- paragraph -->
+                            <p class="taco-report-explorer__report-paragraph">
+                              Total Supply: 702,800
+                            </p>
+                            
+                          </li>
+                          
+                          <!-- list item -->
+                          <li class="taco-report-explorer__report-li">
+                            
+                            <!-- paragraph -->
+                            <p class="taco-report-explorer__report-paragraph">
+                              Circulating Supply: 702,800
+                            </p>
+                            
+                          </li>
+                          
+                          <!-- list item -->
+                          <li class="taco-report-explorer__report-li">
+                            
+                            <!-- paragraph -->
+                            <p class="taco-report-explorer__report-paragraph">
+                              Burn per transaction: 0.1 GLDT, currently $0.11
+                            </p>
+                            
+                          </li>
+
+                          <!-- list item -->
+                          <li class="taco-report-explorer__report-li">
+                            
+                            <!-- paragraph -->
+                            <p class="taco-report-explorer__report-paragraph">
+                              In a scenario where there are 10 trusted tokens and the portfolio is trading at a 7 minute interval, TACO DAO would be losing approximately $824.9 a year to GLDT burn per transaction fees.
+                            </p>
+                            
+                          </li>
+                          
+                          <!-- list item -->
+                          <li class="taco-report-explorer__report-li">
+                            
+                            <!-- paragraph -->
+                            <p class="taco-report-explorer__report-paragraph">
+                              Holders:
+                            </p>
+
+                            <!-- unordered list -->
+                            <ul class="taco-report-explorer__report-ul" style="list-style-type: disc">
+
+                              <!-- list item -->
+                              <li class="taco-report-explorer__report-li">
+                                
+                                <!-- paragraph -->
+                                <p class="taco-report-explorer__report-paragraph">
+                                  Top - 34.27% (ICPSwap ckUSDT Pool)
+                                </p>
+
+                              </li>
+
+                              <!-- list item -->
+                              <li class="taco-report-explorer__report-li">
+                                
+                                <!-- paragraph -->
+                                <p class="taco-report-explorer__report-paragraph">
+                                  Second - 15.42% (Kongswap)
+                                </p>
+                                
+                              </li>
+                              
+                              <!-- list item -->
+                              <li class="taco-report-explorer__report-li">
+                                
+                                <!-- paragraph -->
+                                <p class="taco-report-explorer__report-paragraph">
+                                  Third - 11.92%
+                                </p>
+                                
+                              </li>
+                              
+                              <!-- list item -->
+                              <li class="taco-report-explorer__report-li">
+                                
+                                <!-- paragraph -->
+                                <p class="taco-report-explorer__report-paragraph">
+                                  Mean of Top 25 - 3.7668%
+                                </p>
+                                
+                              </li>
+                              
+                              <!-- list item -->
+                              <li class="taco-report-explorer__report-li">
+                                
+                                <!-- paragraph -->
+                                <p class="taco-report-explorer__report-paragraph">
+                                  Median of Top 25 - 0.88%
+                                </p>
+                                
+                              </li>
+                              
+                              <!-- list item -->
+                              <li class="taco-report-explorer__report-li">
+                                
+                                <!-- paragraph -->
+                                <p class="taco-report-explorer__report-paragraph">
+                                  Mode of Top 25 - 1.42%
+                                </p>
+                                
+                              </li>
+                              
+                              <!-- list item -->
+                              <li class="taco-report-explorer__report-li">
+                                
+                                <!-- paragraph -->
+                                <p class="taco-report-explorer__report-paragraph">
+                                  Top 25 Total - 94.17%
+                                </p>
+                                
+                              </li>
+                              
+                              <!-- list item -->
+                              <li class="taco-report-explorer__report-li">
+                                
+                                <!-- paragraph -->
+                                <p class="taco-report-explorer__report-paragraph">
+                                  Mean of Top 100 - 0.991%
+                                </p>
+                                
+                              </li>
+                              
+                              <!-- list item -->
+                              <li class="taco-report-explorer__report-li">
+                                
+                                <!-- paragraph -->
+                                <p class="taco-report-explorer__report-paragraph">
+                                  Median of Top 100 - 0.06%
+                                </p>
+                                
+                              </li>
+                              
+                              <!-- list item -->
+                              <li class="taco-report-explorer__report-li">
+                                
+                                <!-- paragraph -->
+                                <p class="taco-report-explorer__report-paragraph">
+                                  Mode of Top 100 - 0.02%
+                                </p>
+                                
+                              </li>
+                              
+                              <!-- list item -->
+                              <li class="taco-report-explorer__report-li">
+                                
+                                <!-- paragraph -->
+                                <p class="taco-report-explorer__report-paragraph">
+                                  Top 100 Total - 99.1%
+                                </p>
+                                
+                              </li>                          
+
+                            </ul>
+                            
+                          </li>                      
+
+                        </ul>
+
+                        <!-- heading -->
+                        <h3 class="taco-report-explorer__report-heading
+                                  taco-report-explorer__report-heading--h1"
+                            style="font-weight: 600;">
+                          GOLDAO
+                        </h3>
+
+                        <!-- unordered list -->
+                        <ul class="taco-report-explorer__report-ul">
+
+                          <!-- list item -->
+                          <li class="taco-report-explorer__report-li">
+                            
+                            <!-- paragraph -->
+                            <p class="taco-report-explorer__report-paragraph">
+                              Total Supply: 992,916,862
+                            </p>
+                            
+                          </li>
+                          
+                          <!-- list item -->
+                          <li class="taco-report-explorer__report-li">
+                            
+                            <!-- paragraph -->
+                            <p class="taco-report-explorer__report-paragraph">
+                              Circulating Supply: 707,592,233
+                            </p>
+                            
+                          </li>
+                          
+                          <!-- list item -->
+                          <li class="taco-report-explorer__report-li">
+                            
+                            <!-- paragraph -->
+                            <p class="taco-report-explorer__report-paragraph">
+                              Burn per transaction: 0.0001 GOLDAO, currently $0.00000248
+                            </p>
+                            
+                          </li>
+
+                          <!-- list item -->
+                          <li class="taco-report-explorer__report-li">
+                            
+                            <!-- paragraph -->
+                            <p class="taco-report-explorer__report-paragraph">
+                              In a scenario where there are 10 trusted tokens and the portfolio is trading at a 7 minute interval, TACO DAO would be losing approximately $0.018 a year to GOLDAO burn per transaction fees.
+                            </p>
+                            
+                          </li>
+                          
+                          <!-- list item -->
+                          <li class="taco-report-explorer__report-li">
+                            
+                            <!-- paragraph -->
+                            <p class="taco-report-explorer__report-paragraph">
+                              Holders:
+                            </p>
+
+                            <!-- unordered list -->
+                            <ul class="taco-report-explorer__report-ul" style="list-style-type: disc">
+
+                              <!-- list item -->
+                              <li class="taco-report-explorer__report-li">
+                                
+                                <!-- paragraph -->
+                                <p class="taco-report-explorer__report-paragraph">
+                                  Top - 28.73% (Treasury)
+                                </p>
+
+                              </li>
+
+                              <!-- list item -->
+                              <li class="taco-report-explorer__report-li">
+                                
+                                <!-- paragraph -->
+                                <p class="taco-report-explorer__report-paragraph">
+                                  Second - 26.06%
+                                </p>
+                                
+                              </li>
+                              
+                              <!-- list item -->
+                              <li class="taco-report-explorer__report-li">
+                                
+                                <!-- paragraph -->
+                                <p class="taco-report-explorer__report-paragraph">
+                                  Third - 0.99%
+                                </p>
+                                
+                              </li>
+                              
+                              <!-- list item -->
+                              <li class="taco-report-explorer__report-li">
+                                
+                                <!-- paragraph -->
+                                <p class="taco-report-explorer__report-paragraph">
+                                  Mean of Top 25 - 2.5048%
+                                </p>
+                                
+                              </li>
+                              
+                              <!-- list item -->
+                              <li class="taco-report-explorer__report-li">
+                                
+                                <!-- paragraph -->
+                                <p class="taco-report-explorer__report-paragraph">
+                                  Median of Top 25 - 0.3%
+                                </p>
+                                
+                              </li>
+                              
+                              <!-- list item -->
+                              <li class="taco-report-explorer__report-li">
+                                
+                                <!-- paragraph -->
+                                <p class="taco-report-explorer__report-paragraph">
+                                  Mode of Top 25 - 0.3%
+                                </p>
+                                
+                              </li>
+                              
+                              <!-- list item -->
+                              <li class="taco-report-explorer__report-li">
+                                
+                                <!-- paragraph -->
+                                <p class="taco-report-explorer__report-paragraph">
+                                  Top 25 Total - 62.62%
+                                </p>
+                                
+                              </li>
+                              
+                              <!-- list item -->
+                              <li class="taco-report-explorer__report-li">
+                                
+                                <!-- paragraph -->
+                                <p class="taco-report-explorer__report-paragraph">
+                                  Mean of Top 100 - 0.8063%
+                                </p>
+                                
+                              </li>
+                              
+                              <!-- list item -->
+                              <li class="taco-report-explorer__report-li">
+                                
+                                <!-- paragraph -->
+                                <p class="taco-report-explorer__report-paragraph">
+                                  Median of Top 100 - 0.25%
+                                </p>
+                                
+                              </li>
+                              
+                              <!-- list item -->
+                              <li class="taco-report-explorer__report-li">
+                                
+                                <!-- paragraph -->
+                                <p class="taco-report-explorer__report-paragraph">
+                                  Mode of Top 100 - 0.25%
+                                </p>
+                                
+                              </li>
+                              
+                              <!-- list item -->
+                              <li class="taco-report-explorer__report-li">
+                                
+                                <!-- paragraph -->
+                                <p class="taco-report-explorer__report-paragraph">
+                                  Top 100 Total - 80.63%
+                                </p>
+                                
+                              </li>                          
+
+                            </ul>
+                            
+                          </li>                      
+
+                        </ul>      
+                        
+                        <!-- paragraph -->
+                        <p class="taco-report-explorer__report-paragraph">
+                          <a href="https://docs.gold-dao.org/tokenomics/burning-mechanisms" target="_blank" class="taco-report-explorer__report-link">Gold DAO uses a minting system whereby exactly 40 million new tokens are minted per year as voting rewards</a>. <a href="https://docs.gold-dao.org/how-to/receive-rewards/rewards-calculation" target="_blank" class="taco-report-explorer__report-link">This figure will be halved every four years</a>. 33% of the rewards from the Gold DAO ICP neurons are used to buy GOLDAO tokens on ICPSwap and subsequently burn them. GLDT TX and swap fees are also used to buyback and burn GOLDAO tokens. This means that, while supply may be increasing at a fixed rate, depending on the number of transactions, the yields from the ICP neurons, and the price of GOLDAO to ICP, the supply may be deflationary.
+                        </p>
+
+                      </div>
+
+                      <!-- section 2 -->
+                      <div>
+
+                        <!-- heading -->
+                        <h3 class="taco-report-explorer__report-heading
+                                  taco-report-explorer__report-heading--h1">
+                          Market Metrics
+                          <i class="fa-solid fa-circle-info" 
+                            data-bs-toggle="tooltip" 
+                            data-bs-placement="top" 
+                            title="Review key indicators such as trading volume and historical market performance."></i>
+                        </h3>
+
+                        <!-- heading -->
+                        <h3 class="taco-report-explorer__report-heading
+                                  taco-report-explorer__report-heading--h1">
+                          GLDT
+                        </h3>
+
+                        <!-- unordered list -->
+                        <ul class="taco-report-explorer__report-ul">
+
+                          <!-- list item -->
+                          <li class="taco-report-explorer__report-li">
+                            
+                            <!-- paragraph -->
+                            <p class="taco-report-explorer__report-paragraph">
+                              All Time High (USD): 1.1359
+                            </p>
+                            
+                          </li>
+
+                          <!-- list item -->
+                          <li class="taco-report-explorer__report-li">
+                            
+                            <!-- paragraph -->
+                            <p class="taco-report-explorer__report-paragraph">
+                              All Time High (ICP): 0.2448
+                            </p>
+                            
+                          </li>
+                          
+                          <!-- list item -->
+                          <li class="taco-report-explorer__report-li">
+                            
+                            <!-- paragraph -->
+                            <p class="taco-report-explorer__report-paragraph">
+                              All Time Low (USD): 0.859
+                            </p>
+                            
+                          </li>
+                          
+                          <!-- list item -->
+                          <li class="taco-report-explorer__report-li">
+                            
+                            <!-- paragraph -->
+                            <p class="taco-report-explorer__report-paragraph">
+                              All Time Low (ICP): 0.0612
+                            </p>
+                            
+                          </li>
+                          
+                          <!-- list item -->
+                          <li class="taco-report-explorer__report-li">
+                            
+                            <!-- paragraph -->
+                            <p class="taco-report-explorer__report-paragraph">
+                              As of 11/07/25(USD): 1.1196
+                            </p>
+                            
+                          </li>                      
+
+                          <!-- list item -->
+                          <li class="taco-report-explorer__report-li">
+                            
+                            <!-- paragraph -->
+                            <p class="taco-report-explorer__report-paragraph">
+                              As of 11/07/25 (ICP): 0.2034
+                            </p>
+
+                          </li>
+
+                          <!-- list item -->
+                          <li class="taco-report-explorer__report-li">
+                            
+                            <!-- paragraph -->
+                            <p class="taco-report-explorer__report-paragraph">
+                              Change from ATH USD: -1.43499%
+                            </p>
+                            
+                          </li>
+                          
+                          <!-- list item -->
+                          <li class="taco-report-explorer__report-li">
+                            
+                            <!-- paragraph -->
+                            <p class="taco-report-explorer__report-paragraph">
+                              Change from ATL USD: 30.3376%
+                            </p>
+                            
+                          </li>
+                          
+                          <!-- list item -->
+                          <li class="taco-report-explorer__report-li">
+                            
+                            <!-- paragraph -->
+                            <p class="taco-report-explorer__report-paragraph">
+                              USD Volume 24H as of 11/07/25: 7674
+                            </p>
+                            
+                          </li>
+
+                        </ul>
+
+                        <!-- heading -->
+                        <h3 class="taco-report-explorer__report-heading
+                                  taco-report-explorer__report-heading--h1">
+                          GOLDAO
+                        </h3>
+
+                        <!-- unordered list -->
+                        <ul class="taco-report-explorer__report-ul">
+
+                          <!-- list item -->
+                          <li class="taco-report-explorer__report-li">
+                            
+                            <!-- paragraph -->
+                            <p class="taco-report-explorer__report-paragraph">
+                              All Time High (USD): 0.0986
+                            </p>
+                            
+                          </li>
+
+                          <!-- list item -->
+                          <li class="taco-report-explorer__report-li">
+                            
+                            <!-- paragraph -->
+                            <p class="taco-report-explorer__report-paragraph">
+                              All Time High (ICP): 0.0069
+                            </p>
+                            
+                          </li>
+                          
+                          <!-- list item -->
+                          <li class="taco-report-explorer__report-li">
+                            
+                            <!-- paragraph -->
+                            <p class="taco-report-explorer__report-paragraph">
+                              All Time Low (USD): 0.0135
+                            </p>
+                            
+                          </li>
+                          
+                          <!-- list item -->
+                          <li class="taco-report-explorer__report-li">
+                            
+                            <!-- paragraph -->
+                            <p class="taco-report-explorer__report-paragraph">
+                              All Time Low (ICP): 0.0024
+                            </p>
+                            
+                          </li>
+                          
+                          <!-- list item -->
+                          <li class="taco-report-explorer__report-li">
+                            
+                            <!-- paragraph -->
+                            <p class="taco-report-explorer__report-paragraph">
+                              As of 11/07/25(USD): 0.0249
+                            </p>
+                            
+                          </li>                      
+
+                          <!-- list item -->
+                          <li class="taco-report-explorer__report-li">
+                            
+                            <!-- paragraph -->
+                            <p class="taco-report-explorer__report-paragraph">
+                              As of 11/07/25 (ICP): 0.0045
+                            </p>
+
+                          </li>
+
+                          <!-- list item -->
+                          <li class="taco-report-explorer__report-li">
+                            
+                            <!-- paragraph -->
+                            <p class="taco-report-explorer__report-paragraph">
+                              Change from ATH USD: -74.746%
+                            </p>
+                            
+                          </li>
+                          
+                          <!-- list item -->
+                          <li class="taco-report-explorer__report-li">
+                            
+                            <!-- paragraph -->
+                            <p class="taco-report-explorer__report-paragraph">
+                              Change from ATL USD: 84.44%
+                            </p>
+                            
+                          </li>
+                          
+                          <!-- list item -->
+                          <li class="taco-report-explorer__report-li">
+                            
+                            <!-- paragraph -->
+                            <p class="taco-report-explorer__report-paragraph">
+                              USD Volume 24H as of 11/07/25: 8339
+                            </p>
+                            
+                          </li>
+
+                        </ul>
+
+                      </div>
+
+                      <!-- section 3 -->
+                      <div>
+
+                        <!-- heading -->
+                        <h3 class="taco-report-explorer__report-heading
+                                  taco-report-explorer__report-heading--h1">
+                          Liquidity
+                        </h3>
+
+                        <!-- paragraph -->
+                        <p class="taco-report-explorer__report-paragraph">
+                          As per <a href="https://swaprunner.com" target="_blank" class="taco-report-explorer__report-link">SwapRunner</a> on the 11th of July 2025, a single transaction of:
+                        </p>
+
+                        <!-- unordered list -->
+                        <ul class="taco-report-explorer__report-ul">
+
+                          <!-- list item -->
+                          <li class="taco-report-explorer__report-li">
+                            
+                            <!-- paragraph -->
+                            <p class="taco-report-explorer__report-paragraph">
+                              20000 ICP ($110399.99) will result in a trade to 3162888.48 GOLDAO ($78452.98). 28.938% lost to price impact
+                            </p>
+                            
+                          </li>
+
+                          <!-- list item -->
+                          <li class="taco-report-explorer__report-li">
+                            
+                            <!-- paragraph -->
+                            <p class="taco-report-explorer__report-paragraph">
+                              10000 ICP ($55199.99) will result in a trade to 1768943.80 GOLDAO ($43877.27). 20.512% lost to price impact
+                            </p>
+                            
+                          </li>
+                          
+                          <!-- list item -->
+                          <li class="taco-report-explorer__report-li">
+                            
+                            <!-- paragraph -->
+                            <p class="taco-report-explorer__report-paragraph">
+                              1000 ICP ($5519.99) will result in a trade to 214579.91 GOLDAO ($5322.49). 3.578% lost to price impact
+                            </p>
+                            
+                          </li>
+                          
+                          <!-- list item -->
+                          <li class="taco-report-explorer__report-li">
+                            
+                            <!-- paragraph -->
+                            <p class="taco-report-explorer__report-paragraph">
+                              250 ICP ($1380) will result in a trade to 54978 GOLDAO ($1363.71). 1.18% lost to price impact
+                            </p>
+                            
+                          </li>
+
+                        </ul>
+
+                        <!-- paragraph -->
+                        <p class="taco-report-explorer__report-paragraph">
+                          As per <a href="https://swaprunner.com" target="_blank" class="taco-report-explorer__report-link">SwapRunner</a> on the 11th of July 2025, a single transaction of:
+                        </p>
+
+                        <!-- unordered list -->
+                        <ul class="taco-report-explorer__report-ul">
+
+                          <!-- list item -->
+                          <li class="taco-report-explorer__report-li">
+                            
+                            <!-- paragraph -->
+                            <p class="taco-report-explorer__report-paragraph">
+                              20000 ICP ($110399.99) will result in a trade to 37115.39 GLDT ($41750.74). 62.182% lost to price impact
+                            </p>
+                            
+                          </li>
+
+                          <!-- list item -->
+                          <li class="taco-report-explorer__report-li">
+                            
+                            <!-- paragraph -->
+                            <p class="taco-report-explorer__report-paragraph">
+                              10000 ICP ($55199.99) will result in a trade to 27504.96 GLDT ($30940.05). 43.949% lost to price impact
+                            </p>
+                            
+                          </li>
+                          
+                          <!-- list item -->
+                          <li class="taco-report-explorer__report-li">
+                            
+                            <!-- paragraph -->
+                            <p class="taco-report-explorer__report-paragraph">
+                              1000 ICP ($5519.99) will result in a trade to 4602.07 GLDT ($5176.82). 6.217% lost to price impact
+                            </p>
+                            
+                          </li>
+                          
+                          <!-- list item -->
+                          <li class="taco-report-explorer__report-li">
+                            
+                            <!-- paragraph -->
+                            <p class="taco-report-explorer__report-paragraph">
+                              250 ICP ($1380) will result in a trade to 1205.55 GLDT ($1356.11). 1.731% lost to price impact
+                            </p>
+                            
+                          </li>
+
+                        </ul>
+
+                      </div>                      
+
+                    </div>
+
+                    <hr>
+
+                    <!-- headings -->
+                    <h3 class="taco-report-explorer__report-heading
+                              taco-report-explorer__report-heading--h1">
+                      Competitors
+                      <i class="fa-solid fa-circle-info" 
+                        data-bs-toggle="tooltip" 
+                        data-bs-placement="top" 
+                        title="Identify similar projects and assess the token's differentiators alongside the perceived competitive positioning within its niche"></i>
+                    </h3>
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      GLDT competes with other tokens pegged to the price of gold, such as Paxos, but all of these tokens will have a near identical value, based on whatever measurement of gold they are backed by. As the price will largely be the same and the difference in gains is minute between the gold standards, the reasons as to why someone would choose GLDT over another gold token depend heavily on the infrastructure. Competitors like Paxos utilize the Ethereum blockchain, which has higher fees and lower speeds than the ICP blockchain. Additionally, policies come from a centralized company with Paxos (Paxos Trust Company LLC); with Gold DAO decisions should be democratic. Ergo, interfacing with the ICP ecosystem would be the main reason one would choose GLDT over other gold coins. By being built on the ICP blockchain, GLDT can take advantage of the cross-chain capabilities of ICP.
+                    </p>
+                    
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      Several USD stablecoins exist across numerous blockchains, with two main methods of backing existing:
+                    </p>  
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      One is being backed by fiat USD or other non crypto assets. This method is employed by large stablecoins such as USDT and USDC. In 2025, Tether reported that USDT was backed over 90% by cash or cash assets such as treasury bonds, with the remainder being a mix of bitcoin, precious metals, and other investments. What constitutes 'other investments' is unknown because Tether has never allowed a full audit.
+                    </p>  
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      The other option is to be backed by some form of cryptocurrency related securities. Tokens such as Dai over-collateralize with a vast array of cryptocurrencies, and, similar to USDG, automatically liquidate at a certain ratio of collateral to USD. In Dai's case, <a href="https://blockapps.net/blog/understanding-the-dai-liquidation-process-steps-risks-and-strategies-to-avoid-liquidation/" target="_blank" class="taco-report-explorer__report-link">it is 124%</a>. The ratio is likely much higher than 100% (and USDG's 110%) to account for the sudden and vast drops in price often seen with volatile cryptocurrencies.
+                    </p>  
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      The choice of USDG to be backed by gold enables a stablecoin that utilises a backing asset not subject to vast sways of volatility, while also not being subject to inflationary pressures often seen on 'stable' fiat.
+                    </p>  
+
+                    <hr>
+                   
+                    <!-- heading -->
+                    <h3 class="taco-report-explorer__report-heading
+                              taco-report-explorer__report-heading--h1">
+                      Security Risks
+                      <i class="fa-solid fa-circle-info" 
+                        data-bs-toggle="tooltip" 
+                        data-bs-placement="top" 
+                        title="Investigate perceived vulnerabilities, any audit reports, and adherence to security and regulatory standards"></i>
+                    </h3> 
+                    
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      GLDT <a href="https://github.com/VibraniumAudits/VibraniumAudits-GoldDAO/blob/main/Vibranium-Audit-for-GLDT.pdf" target="_blank" class="taco-report-explorer__report-link">was audited by Vibranium Audits</a> in October 2024 and a total of nine vulnerabilities were perceived, one of which was considered 'high' in severity. This high severity issue was surrounding the potential for an error to overload the system should it be continuous. To our knowledge, there exists no update on whether the nine vulnerabilities have been resolved since October 2024.
+                    </p>
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      Origyn NFT <a href="https://cdn.prod.website-files.com/64215e127d1ff32f211b42d7/66d45b10112e7670b3a3e4e9_Vibranium-Audit-for-Origyn-Revised.pdf" target="_blank" class="taco-report-explorer__report-link">was audited by Vibranium Audits</a>. The audit had two High Severity findings that were resolved, one Low Severity finding that was acknowledged, and three Informational findings that were acknowledged.
+                    </p>
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      <a href="https://help.bity.com/en/articles/9680075-where-are-gold-bars-stored" target="_blank" class="taco-report-explorer__report-link">The gold bars are fully insured</a>, which means that even if the existence of the physical gold is compromised (such as through robbery), they are still backed by the highest echelons of the Swiss financial and legal systems.
+                    </p>
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      The implications of a 51% attack on GOLDAO are unknown, as the canister that controls the minting right for GLDT <a href="https://docs.gold-dao.org/gold-dao-whitepaper/tokenomics/ownership" target="_blank" class="taco-report-explorer__report-link">is in turn controlled by the GOLDAO SNS</a>. A 51-percenter may impact the methods by which GLDT is minted, ruining the chain-of-supply between USDG, GLDT, and GLD NFT.
+                    </p>
+                    
+                    <!-- back to top link -->
+                    <a href="#" @click.prevent="scrollToTop" class="taco-report-explorer__report-link text-center w-100 d-inline-block mt-2">Back to top</a>
+                    
+                  </div>
+
+                  <!-- report footer -->
+                  <div class="taco-report-explorer__report-footer">
+                    
+                    <!-- left -->
+                    <div class="taco-report-explorer__report-footer__left">
+                      
+                      ❤️🌮
+                      
+                    </div>
+                    
+                    <!-- center -->
+                    <div class="taco-report-explorer__report-footer__center text-center">
+                      
+                      &copy;2025 Taco Dao
+                      
+                    </div>
+                    
+                    <!-- right -->
+                    <div class="taco-report-explorer__report-footer__right">                    
+                      
+                      <!-- link group -->
+                      <span class="d-flex flex-column align-items-end">
+
+                        <span class="text-end">#25 Motion to Discuss</span>
+
+                        <span class="d-flex gap-2">
+
+                          <a href="https://nns.ic0.app/proposal/?u=lacdn-3iaaa-aaaaq-aae3a-cai&proposal=25" class="taco-text-blue-to-light-blue text-end" target="_blank">NNS</a>                        
+
+                          <a href="https://app.sneeddao.com/proposal?proposalid=25&sns=lacdn-3iaaa-aaaaq-aae3a-cai" class="taco-text-blue-to-light-blue text-end" target="_blank">Sneed Hub</a>
+
+                        </span>
+                        
+                      </span>                      
+                      
+                    </div>
+                    
+                  </div>
+
+                </div>
+                
+              </div>              
               
             </div>
             
@@ -3203,6 +4342,7 @@
   import ckBtcIcon from '../assets/tokens/ckbtc.png'
   import sneedIcon from '../assets/tokens/snspng/sneed.png'
   import motokoIcon from '../assets/tokens/snspng/motoko.png'
+  import goldDaoIcon from '../assets/tokens/snspng/gold-dao.png'
   
   ///////////
   // store //
@@ -3234,6 +4374,7 @@
   const ckBtcIconUrl = ckBtcIcon
   const sneedIconUrl = sneedIcon
   const motokoIconUrl = motokoIcon
+  const goldDaoIconUrl = goldDaoIcon
 
   // show report menu on mobile
   const showReportMenuOnMobile = ref(false)
@@ -3321,6 +4462,8 @@
       reportId.value = 2
     } else if (newPath === '/reports/ddmotoko') {
       reportId.value = 3
+    } else if (newPath === '/reports/ddgolddao') {
+      reportId.value = 4
     } else if (newPath === '/reports/example') {
       reportId.value = 0
     }
