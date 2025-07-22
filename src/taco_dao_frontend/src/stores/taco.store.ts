@@ -343,15 +343,6 @@ interface ListProposalsResult {
     Err?: GovernanceError;
 }
 
-// Forum interfaces (using Candid types from the IDL)
-import type {
-    ForumResponse as CandidForumResponse,
-    TopicResponse as CandidTopicResponse,
-    ThreadResponse as CandidThreadResponse,
-    PostResponse as CandidPostResponse,
-    ProposalTopicMappingResponse as CandidProposalTopicMappingResponse
-} from "../../../declarations/sneed_sns_forum/sneed_sns_forum.did.d"
-
 // Naming system interfaces
 interface NeuronNameKey {
     sns_root_canister_id: Principal;
