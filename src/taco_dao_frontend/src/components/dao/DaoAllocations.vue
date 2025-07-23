@@ -309,7 +309,7 @@
                                          taco-text-white ms-auto">
 
                                 <!-- dd report link -->
-                                <router-link class="small" style="color: var(--blue-to-light-blue);" :to="`/reports/dd${currentTokenSymbol.toLowerCase()}`">View</router-link>
+                                <router-link class="small" style="color: var(--white-to-light-blue);" :to="`/reports/dd${currentTokenSymbol.toLowerCase()}`">View</router-link>
                                 
                             </span>
 
@@ -814,7 +814,7 @@ LOCAL METHODS
     // check if dd report route exists for current token
     const ddReportRouteExists = computed(() => {
         const tokenSymbol = currentTokenSymbol.value.toLowerCase()
-        const availableRoutes = ['ckbtc', 'sneed', 'motoko']
+        const availableRoutes = ['ckbtc', 'sneed', 'motoko', 'sgldt']
         return availableRoutes.includes(tokenSymbol)
     })
 
