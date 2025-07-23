@@ -52,6 +52,7 @@ import cecilTheLionDaoToken from "../../assets/tokens/snspng/cecil-the-lion-dao.
 import personalDaoToken from "../../assets/tokens/snspng/personal-dao.png"
 import dolrToken from "../../assets/tokens/snspng/dolr.png"
 import fuelEvToken from "../../assets/tokens/snspng/fuelev.png"
+import sgldtToken from "../../assets/tokens/sgldt.png"
 
 //////////////
 // mappings //
@@ -106,6 +107,7 @@ export const tokenImages: { [key: string]: string } = {
 "FuelEV": fuelEvToken,
 "ICExplorer": icpExToken,
 "FomoWell": fomoWellToken,
+"sGLDT": sgldtToken,
 }  
 
 //////////
@@ -574,5 +576,14 @@ export const tokenData = [
         icon: usdc2Token,
         description: `Test USDC description`,
         color: '#00ff00'
+    },
+    {
+        title: 'sGLDT',
+        symbol: 'sgldt',
+        link: 'https://svault.app',
+        icpCoinsLink: '#',
+        icon: sgldtToken,
+        description: `Reduce the fees associated with Gold Token by Wrapping for sGLDT`,
+        color: '#c6ad52'
     }
 ]
