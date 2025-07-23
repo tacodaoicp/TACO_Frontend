@@ -292,7 +292,7 @@
                             <!-- value -->
                             <span class="dao-allocations__token-info-list__value
                                          taco-text-white ms-auto">
-                                <a class="small" style="color: var(--blue-to-light-blue);" :href="currentTokenIcpCoinsLink" target="_blank">{{ currentTokenSymbol }}</a>
+                                <a class="small" style="color: var(--white-to-light-blue);" :href="currentTokenIcpCoinsLink" target="_blank">{{ currentTokenSymbol }}</a>
                             </span>
 
                         </li>
