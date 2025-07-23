@@ -581,7 +581,7 @@ export const tokenData = [
         title: 'sGLDT',
         symbol: 'sgldt',
         link: 'https://svault.app',
-        icpCoinsLink: '#',
+        icpCoinsLink: 'https://icpcoins.com/#/token/SGLDT',
         icon: sgldtToken,
         description: `Reduce the fees associated with Gold Token by Wrapping for sGLDT`,
         color: '#c6ad52'
