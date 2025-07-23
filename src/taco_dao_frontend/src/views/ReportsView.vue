@@ -54,6 +54,29 @@
                 <!-- reports list -->
                 <ul class="taco-report-explorer__list">    
 
+                  <!-- wrapped gold dao - report item -->
+                  <li class="taco-report-explorer__list-item" @click="toggleReportMenuOnMobile(); router.push('/reports/ddsgldt')">
+                    
+                    <!-- report -->
+                    <div class="taco-report-explorer__list-report"
+                    :class="{ 'taco-report-explorer__list-report--active': reportId === 5 }">
+                      
+                      <!-- report title icon -->              
+                      <div class="taco-report-explorer__list-report__icon"
+                          :style="{ backgroundImage: `url(${sgldtIconUrl})` }"></div>            
+                      
+                      <!-- report title container -->
+                      <div class="taco-report-explorer__list-report__title-container">
+                        
+                        <!-- report title -->
+                        <span class="taco-report-explorer__list-report__title">DUE DILIGENCE PROCESS GLDT Wrapper (sGLDT)</span>
+                        
+                      </div>
+                      
+                    </div>
+                    
+                  </li>
+
                   <!-- gold dao - report item -->
                   <li class="taco-report-explorer__list-item" @click="toggleReportMenuOnMobile(); router.push('/reports/ddgolddao')">
                     
@@ -86,7 +109,8 @@
                       
                       <!-- report title icon -->              
                       <div class="taco-report-explorer__list-report__icon"
-                          :style="{ backgroundImage: `url(${motokoIconUrl})` }"></div>            
+                          :style="{ backgroundImage: `url(${motokoIconUrl})` }"
+                          style="background-color: lightgray;"></div>            
                       
                       <!-- report title container -->
                       <div class="taco-report-explorer__list-report__title-container">
@@ -2562,8 +2586,6 @@
 
                     </div>
 
-                 
-
                     <hr>
 
                     <!-- headings -->
@@ -3817,7 +3839,323 @@
 
                 </div>
                 
-              </div>              
+              </div>
+              
+              <!-- wrapped gold dao dd report -->
+              <div v-if="reportId === 5" class="taco-report-explorer__report-container">
+
+                <!-- inner -->
+                <div class="taco-report-explorer__report-container__inner">
+                
+                  <!-- report header -->
+                  <div class="taco-report-explorer__report-header">
+                    
+                    <!-- report title -->
+                    <h2 class="taco-report-explorer__report-header__title">DUE DILIGENCE GLDT Wrapper (sGLDT)</h2>
+
+                    <!-- report metadata continer -->
+                    <div class="taco-report-explorer__report-header__metadata-container">
+
+                      <!-- report metadata -->
+                      <span class="taco-report-explorer__report-header__metadata">
+                        <i class="fa-solid fa-luchador-mask"></i> 
+                        <span> Written by </span>
+                        <span>TrickyVik</span>
+                        <span class="small"> 07/2025</span>
+                      </span>
+
+                    </div>        
+                    
+                  </div>
+
+                  <!-- report body -->
+                  <div class="taco-report-explorer__report-body">
+                    
+                    <!-- heading -->
+                    <h3 class="taco-report-explorer__report-heading
+                              taco-report-explorer__report-heading--h1">
+                      Team Background
+                      <i class="fa-solid fa-circle-info" 
+                        data-bs-toggle="tooltip" 
+                        data-bs-placement="top" 
+                        title="Assess the founding team's transparency, credibility, experience, and any past contributions to the ICP ecosystem"></i>
+                    </h3>
+                    
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      sGLDT was devved up by Bitcorn Labs, a loose conglomerate of anon devs with an extensive history of contributions to the ICP ecosystem. They are closely affiliated with the Sneed DAO. Some of their contributions include:
+                    </p>
+
+                    <!-- unordered list -->
+                    <ul class="taco-report-explorer__report-ul">
+                      
+                      <!-- list item -->
+                      <li class="taco-report-explorer__report-li">
+
+                        <!-- paragraph -->
+                        <p class="taco-report-explorer__report-paragraph">
+                          Migrating tokens through dip20, icrc1, and icrc2 token standards
+                        </p>
+
+                      </li>
+                      
+                      <!-- list item -->
+                      <li class="taco-report-explorer__report-li">
+
+                        <!-- paragraph -->
+                        <p class="taco-report-explorer__report-paragraph">
+                          Helping create an early indexer of ICRC tokens and produce token transaction URLs in a format needed to list on websites like OpenChat
+                        </p>
+
+                      </li>
+
+                      <!-- list item -->
+                      <li class="taco-report-explorer__report-li">
+
+                        <!-- paragraph -->
+                        <p class="taco-report-explorer__report-paragraph">
+                          Helping to add Sneed to OpenChat, which was the first token to be used for tipping
+                        </p>
+
+                      </li>
+
+                      <!-- list item -->
+                      <li class="taco-report-explorer__report-li">
+
+                        <!-- paragraph -->
+                        <p class="taco-report-explorer__report-paragraph">
+                          Creating a webpage that shows locked tokens for SneedLock, which locks tokens and liquidity pool positions for predefined durations
+                        </p>
+
+                      </li>
+
+                      <!-- list item -->
+                      <li class="taco-report-explorer__report-li">
+
+                        <!-- paragraph -->
+                        <p class="taco-report-explorer__report-paragraph">
+                          Creating a service that automatically creates DAO proposals to top up cycles when cycle balances are low
+                        </p>
+
+                      </li>
+
+                    </ul>
+
+                    <hr>
+
+                    <!-- heading -->
+                    <h3 class="taco-report-explorer__report-heading
+                              taco-report-explorer__report-heading--h1">
+                      Token Utility
+                      <i class="fa-solid fa-circle-info" 
+                        data-bs-toggle="tooltip" 
+                        data-bs-placement="top" 
+                        title="Examine the token's purpose and functionality within its ecosystem to ensure it provides tangible value and practical use cases"></i>
+                    </h3>  
+                    
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      <a href="https://docs.gold-dao.org/gold-dao-whitepaper/the-ecosystem/products/gold-token-gldt" target="_blank" class="taco-report-explorer__report-link">The Gold Token or GLDT is a fungible token backed by GLD NFTs</a>. 1 GLDT represents 0.01g of gold. GLDT has a burn per transaction of 0.1 GLDT, currently $0.11, making it unsuitable for high frequency trading.
+                    </p>
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      sGLDT is a low fee wrapper of GLDT, bringing the tx fee down to 0.00001. Each sGLDT is backed 1:1 with GLDT and readily-convertible. sGLDT is suitable for high frequency trading
+                    </p>
+                    
+                    <hr>
+
+                    <!-- heading -->
+                    <h3 class="taco-report-explorer__report-heading
+                              taco-report-explorer__report-heading--h1">
+                      Ecosystem Alignment
+                      <i class="fa-solid fa-circle-info" 
+                        data-bs-toggle="tooltip" 
+                        data-bs-placement="top" 
+                        title="Evaluate the token's synergy with other ICP projects, including any existing collaborations and suitability for inclusion in the Salsa Season rewards program."></i>
+                    </h3>  
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      GLDT tx fees are used to buyback and burn GOLDAO tokens. sGLDT takes this source of burning from GOLDAO, which could be interpreted as negatively impacting it.
+                    </p>
+                    
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      If TACO DAO included GLDT in its portfolio, in a scenario where there are 10 trusted tokens and the portfolio is trading at a 7 minute interval, TACO DAO would be losing approximately $824.9 a year to GLDT burn per transaction fees. By including sGLDT in the portfolio instead, TACO DAO would save on this loss while getting the same exposure to gold.
+                    </p>
+
+                    <hr>
+
+                    <!-- heading -->
+                    <h3 class="taco-report-explorer__report-heading
+                              taco-report-explorer__report-heading--h1">
+                      Technology
+                      <i class="fa-solid fa-circle-info" 
+                        data-bs-toggle="tooltip" 
+                        data-bs-placement="top" 
+                        title="Review the project's technical foundation, focusing on code quality, scalability, and how effectively it leverages ICP's capabilities"></i>
+                    </h3>  
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      The sGLDT canister (sVAULT) is a novel icrc1234 implementation serving as an icrc1/icrc2 ledger and a converter. The converter consists of the wrap and unwrap methods. The Sneed DAO is the controller of this canister.
+                    </p>
+                    
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      The wrap method mints sGLDT when it approves that it has received GLDT, and sends that GLDT to the sVAULT. This incurs two GLDT tx fees, and no sGLDT fee (because the canister is both ledger and converter).
+                    </p>
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      The unwrap method burns sGLDT when it approves that it has received sGLDT, and sends the corresponding GLDT to the burner. This incurs a fee of 0.2 sGLDT and one GLDT tx fee.
+                    </p>
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      Unwrap and sGLDT tx fees are split 50/50 between the sVAULT team and the Sneed DAO treasury.
+                    </p>                    
+                    
+                    <hr>
+
+                    <!-- heading -->
+                    <h3 class="taco-report-explorer__report-heading
+                              taco-report-explorer__report-heading--h1">
+                      Tokenomics
+                      <i class="fa-solid fa-circle-info" 
+                        data-bs-toggle="tooltip" 
+                        data-bs-placement="top" 
+                        title="Analyse the supply and distribution of the token; any inflationary/deflationary mechanisms; and any incentive structures, to ensure sustainability and fair distribution"></i>
+                    </h3>
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      It is a new, wrapped version of GLDT. <a href="https://tacodao.com/reports/ddgolddao" class="taco-report-explorer__report-link">Refer to Gold DAO's DD report for GLDT's market metrics</a>.
+                    </p>
+                    
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      As of 22/07/2025, <a href="https://svault.app" target="_blank" class="taco-report-explorer__report-link">there is a total of 8751.77749903 GLDT in the sVAULT</a>, which is equivalent to the supply of sGLDT.
+                    </p>                   
+
+                    <hr>
+
+                    <!-- heading -->
+                    <h3 class="taco-report-explorer__report-heading
+                              taco-report-explorer__report-heading--h1">
+                      Market Metrics
+                      <i class="fa-solid fa-circle-info" 
+                        data-bs-toggle="tooltip" 
+                        data-bs-placement="top" 
+                        title="Review key indicators such as trading volume and historical market performance."></i>
+                    </h3>
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      It is a new, wrapped version of GLDT. <a href="https://tacodao.com/reports/ddgolddao" class="taco-report-explorer__report-link">Refer to Gold DAO's DD report for GLDT's market metrics</a>.
+                    </p>
+
+                    <!-- heading -->
+                    <h3 class="taco-report-explorer__report-heading
+                              taco-report-explorer__report-heading--h2 mt-4">
+                      Liquidity:
+                    </h3>
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      As per <a href="https://swaprunner.com/" target="_blank" class="taco-report-explorer__report-link">SwapRunner</a> on the 22nd of July, a single transaction of:
+                    </p>
+
+                    <!-- unordered list -->
+                    <ul class="taco-report-explorer__report-ul">
+                      <li class="taco-report-explorer__report-li">
+                        <p class="taco-report-explorer__report-paragraph">10 ICP ($59.19) will result in a trade to 52.71 sGLDT ($58.08). 1.87% lost to price impact</p>
+                      </li>
+                    </ul> 
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      The price of sGLDT can be expected to be pegged to GLDT because of the incentive of arbitrage, and GLDT is a stablecoin. Therefore, sGLDT's liquidity should not be seen as a concern for TACO DAO's trading operations.
+                    </p>
+
+                    <!-- heading -->
+                    <h3 class="taco-report-explorer__report-heading
+                              taco-report-explorer__report-heading--h1">
+                      Security Risks
+                      <i class="fa-solid fa-circle-info" 
+                        data-bs-toggle="tooltip" 
+                        data-bs-placement="top" 
+                        title="Investigate perceived vulnerabilities, any audit reports, and adherence to security and regulatory standards"></i>
+                    </h3>                    
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      <a href="https://tacodao.com/reports/ddgolddao" class="taco-report-explorer__report-link">Refer to Gold DAO's DD report for security risks on GLDT</a>.
+                    </p>
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      The sVAULT team claims to have had their code pen tested, with no issues found. Snassy gives it a thumbs up.
+                    </p>
+                    
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      The same code was used for rebob.fun and dragonwizards.club, which have been running for over 10 months without issues.
+                    </p>
+                    
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      A 66% vote in the Sneed DAO would be required to take the GLDT in the sVAULT.
+                    </p>                    
+                    
+                    <!-- back to top link -->
+                    <a href="#" @click.prevent="scrollToTop" class="taco-report-explorer__report-link text-center w-100 d-inline-block mt-2">Back to top</a>
+                    
+                  </div>
+
+                  <!-- report footer -->
+                  <div class="taco-report-explorer__report-footer">
+                    
+                    <!-- left -->
+                    <div class="taco-report-explorer__report-footer__left">
+                      
+                      ❤️🌮
+                      
+                    </div>
+                    
+                    <!-- center -->
+                    <div class="taco-report-explorer__report-footer__center text-center">
+                      
+                      &copy;2025 Taco Dao
+                      
+                    </div>
+                    
+                    <!-- right -->
+                    <div class="taco-report-explorer__report-footer__right">                    
+                      
+                      <!-- link group -->
+                      <span class="d-flex flex-column align-items-end">
+
+                        <span class="text-end">#56 Motion to Discuss</span>
+
+                        <span class="d-flex gap-2">
+
+                          <a href="https://nns.ic0.app/proposal/?u=lacdn-3iaaa-aaaaq-aae3a-cai&proposal=56" class="taco-text-blue-to-light-blue text-end" target="_blank">NNS</a>                        
+
+                          <a href="https://app.sneeddao.com/proposal?proposalid=56&sns=lacdn-3iaaa-aaaaq-aae3a-cai" class="taco-text-blue-to-light-blue text-end" target="_blank">Sneed Hub</a>
+
+                        </span>
+                        
+                      </span>                      
+                      
+                    </div>
+                    
+                  </div>
+
+                </div>
+                
+              </div>
               
             </div>
             
@@ -3983,6 +4321,7 @@
         background-repeat: no-repeat;
         background-position: center;
         background-size: contain;
+        background-color: transparent;
       }
 
       // title container
@@ -4343,6 +4682,7 @@
   import sneedIcon from '../assets/tokens/snspng/sneed.png'
   import motokoIcon from '../assets/tokens/snspng/motoko.png'
   import goldDaoIcon from '../assets/tokens/snspng/gold-dao.png'
+  import sgldtIcon from '../assets/tokens/sgldt.png'
   
   ///////////
   // store //
@@ -4375,6 +4715,7 @@
   const sneedIconUrl = sneedIcon
   const motokoIconUrl = motokoIcon
   const goldDaoIconUrl = goldDaoIcon
+  const sgldtIconUrl = sgldtIcon
 
   // show report menu on mobile
   const showReportMenuOnMobile = ref(false)
@@ -4464,6 +4805,8 @@
       reportId.value = 3
     } else if (newPath === '/reports/ddgolddao') {
       reportId.value = 4
+    } else if (newPath === '/reports/ddsgldt') {
+      reportId.value = 5
     } else if (newPath === '/reports/example') {
       reportId.value = 0
     }
