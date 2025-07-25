@@ -54,6 +54,29 @@
                 <!-- reports list -->
                 <ul class="taco-report-explorer__list">    
 
+                  <!-- open chat - report item -->
+                  <li class="taco-report-explorer__list-item" @click="toggleReportMenuOnMobile(); router.push('/reports/openchat')">
+                    
+                    <!-- report -->
+                    <div class="taco-report-explorer__list-report"
+                    :class="{ 'taco-report-explorer__list-report--active': reportId === 6 }">
+                      
+                      <!-- report title icon -->              
+                      <div class="taco-report-explorer__list-report__icon"
+                          :style="{ backgroundImage: `url(${openChatIconUrl})` }"></div>            
+                      
+                      <!-- report title container -->
+                      <div class="taco-report-explorer__list-report__title-container">
+                        
+                        <!-- report title -->
+                        <span class="taco-report-explorer__list-report__title">DUE DILIGENCE PROCESS OpenChat (CHAT)</span>
+                        
+                      </div>
+                      
+                    </div>
+                    
+                  </li>
+
                   <!-- wrapped gold dao - report item -->
                   <li class="taco-report-explorer__list-item" @click="toggleReportMenuOnMobile(); router.push('/reports/ddsgldt')">
                     
@@ -2750,7 +2773,7 @@
                   <div class="taco-report-explorer__report-header">
                     
                     <!-- report title -->
-                    <h2 class="taco-report-explorer__report-header__title">DUE DILIGENCE Gold DAO (GOLDAO) & Gold Token (GLDT)</h2>
+                    <h2 class="taco-report-explorer__report-header__title">DUE DILIGENCE PROCESS Gold DAO (GOLDAO) & Gold Token (GLDT)</h2>
 
                     <!-- report metadata continer -->
                     <div class="taco-report-explorer__report-header__metadata-container">
@@ -2859,7 +2882,7 @@
                     
                     <!-- paragraph -->
                     <p class="taco-report-explorer__report-paragraph">
-                      <a href="https://dashboard.internetcomputer.org/sns/tw2vt-hqaaa-aaaaq-aab6a-cai/proposal/27" target="_blank" class="taco-report-explorer__report-link">156,746 ICP was transferred from the treasury to the team wallet</a>.
+                      <a href="https://dashboard.internetcomputer.org/sns/tw2vt-hqaaa-aaaaq-aab6a-cai/proposal/27" target="_blank" class="taco-report-explorer__report-link">156,746 ICP was transferred from the treasury to the team wallet</a>. The team wallet now has an ICP balance of 394.67 ICP and 223217.76 WTN, so a $TACO bounty was offered for clarity on the destination of these funds. A community member with a track record of accurate wallet tracing reported that approximately 117k ICP went to WaterNeuron, 20k ICP went to Binance, and the remainder is unknown.
                     </p>
 
                     <!-- paragraph -->
@@ -3851,7 +3874,7 @@
                   <div class="taco-report-explorer__report-header">
                     
                     <!-- report title -->
-                    <h2 class="taco-report-explorer__report-header__title">DUE DILIGENCE GLDT Wrapper (sGLDT)</h2>
+                    <h2 class="taco-report-explorer__report-header__title">DUE DILIGENCE PROCESS GLDT Wrapper (sGLDT)</h2>
 
                     <!-- report metadata continer -->
                     <div class="taco-report-explorer__report-header__metadata-container">
@@ -4132,7 +4155,22 @@
                     </div>
                     
                     <!-- right -->
-                    <div class="taco-report-explorer__report-footer__right">                    
+                    <div class="taco-report-explorer__report-footer__right">       
+                      
+                      <!-- link group -->
+                      <span class="d-flex flex-column align-items-end">
+
+                        <span class="text-end">#65 Add Token</span>
+
+                        <span class="d-flex gap-2">
+
+                          <a href="https://nns.ic0.app/proposal/?u=lacdn-3iaaa-aaaaq-aae3a-cai&proposal=65" class="taco-text-blue-to-light-blue text-end" target="_blank">NNS</a>                        
+
+                          <a href="https://app.sneeddao.com/proposal?proposalid=65&sns=lacdn-3iaaa-aaaaq-aae3a-cai" class="taco-text-blue-to-light-blue text-end" target="_blank">Sneed Hub</a>
+
+                        </span>
+                        
+                      </span>                      
                       
                       <!-- link group -->
                       <span class="d-flex flex-column align-items-end">
@@ -4156,6 +4194,1370 @@
                 </div>
                 
               </div>
+                    
+              <!-- open chat dd report -->
+              <div v-if="reportId === 6" class="taco-report-explorer__report-container">
+
+                <!-- inner -->
+                <div class="taco-report-explorer__report-container__inner">
+                
+                  <!-- report header -->
+                  <div class="taco-report-explorer__report-header">
+                    
+                    <!-- report title -->
+                    <h2 class="taco-report-explorer__report-header__title">DUE DILIGENCE PROCESS OpenChat (CHAT)</h2>
+
+                    <!-- report metadata continer -->
+                    <div class="taco-report-explorer__report-header__metadata-container">
+
+                      <!-- report metadata -->
+                      <span class="taco-report-explorer__report-header__metadata">
+                        <i class="fa-solid fa-luchador-mask"></i> 
+                        <span> Written by Tirex, manilpwn, & TrickyVik</span>
+                        <span class="small"> 07/2025</span>
+                      </span>
+
+                    </div>        
+                    
+                  </div>
+
+                  <!-- report body -->
+                  <div class="taco-report-explorer__report-body">
+                    
+                    <!-- heading -->
+                    <h3 class="taco-report-explorer__report-heading
+                              taco-report-explorer__report-heading--h1">
+                      Team Background
+                      <i class="fa-solid fa-circle-info" 
+                        data-bs-toggle="tooltip" 
+                        data-bs-placement="top" 
+                        title="Assess the founding team's transparency, credibility, experience, and any past contributions to the ICP ecosystem"></i>
+                    </h3>
+                    
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      OpenChat was ideated before Internet Computer's mainnet launch. DFINITY contracted software
+developers <a href="https://www.linkedin.com/in/matt-grogan-99535121/" target="_blank" class="taco-report-explorer__report-link">Matt Grogan</a> and <a href="https://www.linkedin.com/in/hamish-peebles-868251a9/?originalSubdomain=uk" target="_blank" class="taco-report-explorer__report-link">Hamish Peebles</a> to build a dApp that would showcase the potential of the
+Internet Computer, and the two chose to build an instant messaging app. The Internet Computer mainnet
+launch was on May 7th, 2021, and the OpenChat test version launched June 3rd, 2021. <a href="https://www.linkedin.com/in/julian-jelfs-7a68a415a/?originalSubdomain=uk" target="_blank" class="taco-report-explorer__report-link">Julian Jelfs</a> joined
+the team as a frontend dev shortly after, enabling the original two to focus on the backend.
+                    </p>
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      Matt has over 25 years of software engineering experience. He has recently focused on building
+microservice backends supporting a multi-tenant platform for running online travel agencies. He holds a
+Master's Degree in Engineering and Computer Science from the University of Oxford.
+                    </p>
+                    
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      Hamish has over 13 years of software engineering experience, which he transitioned into after obtaining a
+Degree in Mathematics from Cambridge University. He focused primarily on high throughput, low
+latency cloud-based systems and worked for Emirates where he led the design of a B2B hotel search
+engine.
+                    </p>
+                    
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      Julian has been 'dabbling' in software engineering for ~ 25 years. He has a varied industry background
+consisting of defence, risk management, e-commerce, educational technology, travel, and chat. He holds a
+Master's Degree in Politics, Philosophy & Economics from the University of Oxford.
+                    </p>
+                    
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      The team, whilst contracted to DFINITY, also built the first version of the NNS dApp and won an <a href="https://x.com/dominic_w/status/1439682958047293442" target="_blank" class="taco-report-explorer__report-link">internal
+DFINITY hackathon</a> with <a href="https://github.com/open-chat-labs/priv-ic" target="_blank" class="taco-report-explorer__report-link">PrivIC</a>, which served as inspiration for NFID. They perform regular code
+reviews of new IC replica versions. OpenChat was the second SNS to be launched, SNS-1 being the first.
+                    </p>
+                    
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      OpenChat is <a href="https://x.com/OpenChat/status/1873018431622275241" target="_blank" class="taco-report-explorer__report-link">contracting</a> <a href="https://www.linkedin.com/in/ivanthedev/" target="_blank" class="taco-report-explorer__report-link">Ivan Jukic</a> as a developer and <a href="https://www.linkedin.com/in/jwfriedman/" target="_blank" class="taco-report-explorer__report-link">Jesse Friedman</a> for marketing:
+                    </p>                    
+
+                    <!-- unordered list -->
+                    <ul class="taco-report-explorer__report-ul">
+                      
+                      <!-- list item -->
+                      <li class="taco-report-explorer__report-li">
+
+                        <!-- paragraph -->
+                        <p class="taco-report-explorer__report-paragraph">
+                          Ivan is a software engineer with over 12 years of experience. He has worked as Principal
+Engineer at Emirates.
+                        </p>
+
+                      </li>
+                      
+                      <!-- list item -->
+                      <li class="taco-report-explorer__report-li">
+
+                        <!-- paragraph -->
+                        <p class="taco-report-explorer__report-paragraph">
+                          Jesse is an internationally recognized beverage, food, hospitality, and brand building expert. He
+was co-founder & brewmaster at Almanac, a widely recognized figure in the craft beer and food
+space. He was contracted by DFINITY as evangelist for 1 year and 5 months
+                        </p>
+
+                      </li>
+
+                    </ul>
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      Via proposals <a href="https://dashboard.internetcomputer.org/sns/3e3x2-xyaaa-aaaaq-aaalq-cai/proposal/1780" target="_blank" class="taco-report-explorer__report-link">1780</a>, <a href="https://dashboard.internetcomputer.org/sns/3e3x2-xyaaa-aaaaq-aaalq-cai/proposal/1837" target="_blank" class="taco-report-explorer__report-link">1837</a>, and <a href="https://dashboard.internetcomputer.org/sns/3e3x2-xyaaa-aaaaq-aaalq-cai/proposal/1853" target="_blank" class="taco-report-explorer__report-link">1853</a>, the team was paid a total of 58500 ICP from the treasury for work
+done in Q2 2025.
+                    </p>
+                    
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      Via proposal <a href="https://dashboard.internetcomputer.org/sns/3e3x2-xyaaa-aaaaq-aaalq-cai/proposal/1975" target="_blank" class="taco-report-explorer__report-link">1975</a>, the team has been paid 15000 ICP from the treasury for work in Q3 2025. There will
+be two more installments that will make the total value of all three installments in Q3 add up to 304000
+USD.
+                    </p>                    
+
+                    <hr>
+
+                    <!-- heading -->
+                    <h3 class="taco-report-explorer__report-heading
+                              taco-report-explorer__report-heading--h1">
+                      Token Utility
+                      <i class="fa-solid fa-circle-info" 
+                        data-bs-toggle="tooltip" 
+                        data-bs-placement="top" 
+                        title="Examine the token's purpose and functionality within its ecosystem to ensure it provides tangible value and practical use cases"></i>
+                    </h3>  
+                    
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      The CHAT token serves as the governance token for OpenChat, enabling members to submit and vote on
+proposals that are implemented if approved.
+                    </p>
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      OpenChat is a fully featured chat application designed for mobile and desktop running entirely on the
+Internet Computer. It has a community feature similar to Discord servers, which can have various
+different 'channels' for people to interact in. <a href="https://x.com/OpenChat/status/1648373664872579072" target="_blank" class="taco-report-explorer__report-link">Communities can have channels that are gated by certain
+requirements to join</a>. These requirements can include the verification of locked DAO token neurons,
+token balances, unique personhood, credentials, or a payment which is split equally among community
+owners and from which a small % goes to the OpenChat treasury
+                    </p>
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      <a href="https://x.com/OpenChat/status/1555600823576576001" target="_blank" class="taco-report-explorer__report-link">SNS DAO communities can add a 'Proposals' channel</a>, which DAO members can vote from if they
+hotkey their neurons to their OpenChat canister ID. Threads can be created under individual proposals to
+discuss them.
+                    </p>
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      The dApp has many quality-of-life features and settings, such as the ability for users to customize the
+look of their UI with custom colour themes and font sizes. Communities come decked out with
+customisable parameters, channel descriptions, and channel rules. Profiles have usernames, display
+names, bios, and profile pictures. <a href="https://x.com/OpenChat/status/1442447454985674753" target="_blank" class="taco-report-explorer__report-link">Users of Android devices can receive push notifications</a>. Large scale
+video & audio live spaces are able to be hosted, allowing communities to come together and discuss live
+en masse, or allowing projects to make live presentations and answer questions.
+                    </p>
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      There exists a two-tier system: free users can send text messages, audio messages, images, videos, files,
+gifs, reactions, and tokens. Free users can also create polls and private groups. <a href="https://x.com/OpenChat/status/1623739037029638148" target="_blank" class="taco-report-explorer__report-link">$CHAT can be used to pay
+for 'Diamond' premium features</a>. Diamond unlocks video calls, community creation, gated group
+creation, <a href="https://x.com/OpenChat/status/1750920544097010089" target="_blank" class="taco-report-explorer__report-link">p2p swaps</a>, <a href="https://x.com/OpenChat/status/1522152787022389249" target="_blank" class="taco-report-explorer__report-link">translation of messages</a>, eligibility for airdrops & rewards, and a diamond badge.
+Diamond also increases the member limit of created private groups, MB size of media messages, and MB
+storage.
+                    </p>
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      With an iFrame, <a href="https://x.com/OpenChat/status/1695044139497214260" target="_blank" class="taco-report-explorer__report-link">OpenChat can be embedded into dApps and accessed directly within them</a>, similar to
+how YouTube videos may be embedded into other websites (news articles, etc). Currently, OpenChat does
+not charge for these integrations, but may do so later as part of the chat as a service roadmap item
+                    </p>
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      There is a built-in wallet which users can send tokens to, withdraw tokens from, and swap with.
+Alongside p2p swaps and token tipping, tokens can be used to create 'prize' messages, which other users
+can claim tokens from. Prize messages can have claim restrictions, parameters such as claim period and
+number of claimants, and be distributed randomly or equally to claimants. Projects pay 500 CHAT for
+their token to be added to OpenChat.
+                    </p>
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      The <a href="https://oc.app/blog/chit" target="_blank" class="taco-report-explorer__report-link">CHIT program</a> rewards users for maintaining a daily streak of using OpenChat, using different
+features, referring verified users, or through one-off opportunities created by the team. To participate,
+users need to either have a <a href="https://x.com/OpenChat/status/1733040851582960055" target="_blank" class="taco-report-explorer__report-link">lifetime diamond membership</a>, or a standard diamond membership with a
+<a href="https://x.com/OpenChat/status/1817903346885259698" target="_blank" class="taco-report-explorer__report-link">proof of unique personhood</a>, disabling farmers from making multiple accounts. There is a top 10
+leaderboard of CHIT holders for the current month, previous month, and all time. In the case that users
+miss days, streaks are insurable with $CHAT. While CHIT was previously used to determine $CHAT
+airdrops on a quarterly basis, <a href="https://dashboard.internetcomputer.org/sns/3e3x2-xyaaa-aaaaq-aaalq-cai/proposal/1946" target="_blank" class="taco-report-explorer__report-link">this mechanism is being retired</a>. Going forward, CHIT will be spendable
+directly on OpenChat enhancements and customizations.
+                    </p>
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      Overall, OpenChat lives up to its claim to being fully featured and stating all of the dApp's intricacies
+would bloat this section.
+                    </p>
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      <a href="https://oc.app/roadmap" target="_blank" class="taco-report-explorer__report-link">Roadmap-wise</a>, the near-term focus is currently on:
+                    </p>
+
+                    <!-- unordered list -->
+                    <ul class="taco-report-explorer__report-ul">
+                      
+                      <!-- list item -->
+                      <li class="taco-report-explorer__report-li">
+
+                        <!-- paragraph -->
+                        <p class="taco-report-explorer__report-paragraph">
+                          Integrating autonomous agents to automate tasks, provide information, or just for fun. There is
+also a planned AI chat bot
+                        </p>
+
+                      </li>
+
+                      <!-- list item -->
+                      <li class="taco-report-explorer__report-li">
+
+                        <!-- paragraph -->
+                        <p class="taco-report-explorer__report-paragraph">
+                          Adding end-to-end encryption to 1-1 chats and private group chats
+                        </p>
+
+                      </li>
+
+                      <!-- list item -->
+                      <li class="taco-report-explorer__report-li">
+
+                        <!-- paragraph -->
+                        <p class="taco-report-explorer__report-paragraph">
+                          Integrating 3rd party wallets
+                        </p>
+
+                      </li>
+
+                      <!-- list item -->
+                      <li class="taco-report-explorer__report-li">
+
+                        <!-- paragraph -->
+                        <p class="taco-report-explorer__report-paragraph">
+                          Enabling native Bitcoin deposits and withdrawals
+                        </p>
+
+                      </li>
+
+                      <!-- list item -->
+                      <li class="taco-report-explorer__report-li">
+
+                        <!-- paragraph -->
+                        <p class="taco-report-explorer__report-paragraph">
+                          Verifying communities with blue ticks, enabling monetisation of communities via advertising,
+enabling owners to pay to boost their community in the community explorer, and decentralising
+community governance
+                        </p>
+
+                      </li>
+
+                      <!-- list item -->
+                      <li class="taco-report-explorer__report-li">
+
+                        <!-- paragraph -->
+                        <p class="taco-report-explorer__report-paragraph">
+                          Investigating the viability of building native apps for iOS and Android
+                        </p>
+
+                      </li>
+
+                      <!-- list item -->
+                      <li class="taco-report-explorer__report-li">
+
+                        <!-- paragraph -->
+                        <p class="taco-report-explorer__report-paragraph">
+                          <a href="https://x.com/OpenChat/status/1948059146995253647" target="_blank" class="taco-report-explorer__report-link">Improving the mobile UI</a>
+                        </p>
+
+                      </li>
+
+                    </ul>
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      Long-term goals include:
+                    </p>
+
+                    <!-- unordered list -->
+                    <ul class="taco-report-explorer__report-ul">
+                      
+                      <!-- list item -->
+                      <li class="taco-report-explorer__report-li">
+
+                        <!-- paragraph -->
+                        <p class="taco-report-explorer__report-paragraph">
+                          Integration of NFTs into wallets, verified NFT avatars, NFTs displayed on profile, and NFT gates
+                        </p>
+
+                      </li>
+
+                      <!-- list item -->
+                      <li class="taco-report-explorer__report-li">
+
+                        <!-- paragraph -->
+                        <p class="taco-report-explorer__report-paragraph">
+                          Contacts/friends
+                        </p>
+
+                      </li>
+
+                      <!-- list item -->
+                      <li class="taco-report-explorer__report-li">
+
+                        <!-- paragraph -->
+                        <p class="taco-report-explorer__report-paragraph">
+                          Personas/alts tied to the same account
+                        </p>
+
+                      </li>
+
+                      <!-- list item -->
+                      <li class="taco-report-explorer__report-li">
+
+                        <!-- paragraph -->
+                        <p class="taco-report-explorer__report-paragraph">
+                          Integration into UTOPIA clouds
+                        </p>
+
+                      </li>
+
+                      <!-- list item -->
+                      <li class="taco-report-explorer__report-li">
+
+                        <!-- paragraph -->
+                        <p class="taco-report-explorer__report-paragraph">
+                          Group and community tags
+                        </p>
+
+                      </li>
+
+                      <!-- list item -->
+                      <li class="taco-report-explorer__report-li">
+
+                        <!-- paragraph -->
+                        <p class="taco-report-explorer__report-paragraph">
+                          Gallery views for images in chats
+                        </p>
+
+                      </li>
+
+                      <!-- list item -->
+                      <li class="taco-report-explorer__report-li">
+
+                        <!-- paragraph -->
+                        <p class="taco-report-explorer__report-paragraph">
+                          Community event calendars
+                        </p>
+
+                      </li>
+
+                      <!-- list item -->
+                      <li class="taco-report-explorer__report-li">
+
+                        <!-- paragraph -->
+                        <p class="taco-report-explorer__report-paragraph">
+                          Custom emojis and stickers
+                        </p>
+
+                      </li>
+
+                    </ul>
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      At the end of the roadmap are the following wide-scoped options that may be pursued:
+                    </p>
+
+                    <!-- unordered list -->
+                    <ul class="taco-report-explorer__report-ul">
+                      
+                      <!-- list item -->
+                      <li class="taco-report-explorer__report-li">
+
+                        <!-- paragraph -->
+                        <p class="taco-report-explorer__report-paragraph">
+                          Liking/disliking messages and having a sort by popularity option, like Reddit
+                        </p>
+
+                      </li>
+
+                      <!-- list item -->
+                      <li class="taco-report-explorer__report-li">
+
+                        <!-- paragraph -->
+                        <p class="taco-report-explorer__report-paragraph">
+                          Users following users and subscribing to feeds, like X
+                        </p>
+
+                      </li>
+
+                      <!-- list item -->
+                      <li class="taco-report-explorer__report-li">
+
+                        <!-- paragraph -->
+                        <p class="taco-report-explorer__report-paragraph">
+                          A Web3 job board, like Fiverr
+                        </p>
+
+                      </li>
+
+                    </ul>
+                    
+                    <hr>
+
+                    <!-- heading -->
+                    <h3 class="taco-report-explorer__report-heading
+                              taco-report-explorer__report-heading--h1">
+                      Ecosystem Alignment
+                      <i class="fa-solid fa-circle-info" 
+                        data-bs-toggle="tooltip" 
+                        data-bs-placement="top" 
+                        title="Evaluate the token's synergy with other ICP projects, including any existing collaborations and suitability for inclusion in the Salsa Season rewards program."></i>
+                    </h3>  
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      OpenChat is deeply integrated into the ecosystem, as it is almost ubiquitously used by ICP-based projects
+and communities. Token prizes, token tipping, gated channels, polls, proposal channels, iFrames, and live
+spaces provide significant and essential utility to Web3 communities. Roadmap items such as community
+decentralisation, autonomous agents, community event calendars, custom emojis, NFT integration, and
+other community features will further strengthen this. Many features that are offered, or eventually will be
+offered, are impossible or difficult to achieve on Web2 applications such as Discord. OpenChat's
+utilisation of the ICP blockchain encourages users to further explore the ecosystem and ICP as a whole.
+Certain community requirements, such as locked neurons or token balances, spur a user to do more on
+ICP than just use OpenChat.
+                    </p>
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      OpenChat has had and maintains several collaborations:
+                    </p>
+
+                    <!-- unordered list -->
+                    <ul class="taco-report-explorer__report-ul">
+                      
+                      <!-- list item -->
+                      <li class="taco-report-explorer__report-li">
+
+                        <!-- paragraph -->
+                        <p class="taco-report-explorer__report-paragraph">
+                          <a href="https://x.com/OpenChat/status/1592565875789660160" target="_blank" class="taco-report-explorer__report-link">2000 SNS-1 tokens (20% of the supply) were airdropped to early OpenChat users</a>
+                        </p>
+
+                      </li>
+
+                      <!-- list item -->
+                      <li class="taco-report-explorer__report-li">
+
+                        <!-- paragraph -->
+                        <p class="taco-report-explorer__report-paragraph">
+                          Custom Windoge98 colour theme
+                        </p>
+
+                      </li>
+
+                      <!-- list item -->
+                      <li class="taco-report-explorer__report-li">
+
+                        <!-- paragraph -->
+                        <p class="taco-report-explorer__report-paragraph">
+                          Exchange rates from ICPCoins
+                        </p>
+
+                      </li>
+
+                      <!-- list item -->
+                      <li class="taco-report-explorer__report-li">
+
+                        <!-- paragraph -->
+                        <p class="taco-report-explorer__report-paragraph">
+                          <a href="https://x.com/OpenFPL_DAO/status/1725067760760140217" target="_blank" class="taco-report-explorer__report-link">Sponsored OpenFPL paying for kids' football kits</a>
+                        </p>
+
+                      </li>
+
+                      <!-- list item -->
+                      <li class="taco-report-explorer__report-li">
+
+                        <!-- paragraph -->
+                        <p class="taco-report-explorer__report-paragraph">
+                          <a href="https://x.com/OpenChat/status/1725156479135617396" target="_blank" class="taco-report-explorer__report-link">Partnered with Modclub for content moderation</a>
+                        </p>
+
+                      </li>                      
+
+                      <!-- list item -->
+                      <li class="taco-report-explorer__report-li">
+
+                        <!-- paragraph -->
+                        <p class="taco-report-explorer__report-paragraph">
+                          Integration for third party bots e.g. ELNA.ai
+                        </p>
+
+                      </li>
+
+                      <!-- list item -->
+                      <li class="taco-report-explorer__report-li">
+
+                        <!-- paragraph -->
+                        <p class="taco-report-explorer__report-paragraph">
+                          <a href="https://x.com/OpenChat/status/1817903346885259698" target="_blank" class="taco-report-explorer__report-link">Proof of Unique Personhood via DecideAI</a>
+                        </p>
+
+                      </li>
+
+                      <!-- list item -->
+                      <li class="taco-report-explorer__report-li">
+
+                        <!-- paragraph -->
+                        <p class="taco-report-explorer__report-paragraph">
+                          <a href="https://x.com/OpenChat/status/1843917939558494695" target="_blank" class="taco-report-explorer__report-link">ICPSwap and KongSwap as swap providers</a>
+                        </p>
+
+                      </li>
+
+                      <!-- list item -->
+                      <li class="taco-report-explorer__report-li">
+
+                        <!-- paragraph -->
+                        <p class="taco-report-explorer__report-paragraph">
+                          <a href="https://openchat.myspreadshop.com/black+lion-A66e80408031199471ee853d3?productType=812&sellable=VMQ2NqYJexSL1rLyAayj-812-7&appearance=1" target="_blank" class="taco-report-explorer__report-link">The shop offering OpenChat merchandise has merchandise with typographic illustrations of a
+lion</a>, presumably in reference to <a href="https://cecildao.org/" target="_blank" class="taco-report-explorer__report-link">Cecil The Lion DAO</a>
+                        </p>
+
+                      </li>
+
+                    </ul>    
+                    
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      The OpenChat team has stated that they may consider getting involved in Salsa Season down the line.
+Integrating CHIT directly into Salsa Season may be a viable option. Salsa Season will have off-seasons
+and active seasons to create hype around the active seasons, so projects that integrate their rewards
+programs would do so in order to join in on the seasonal hype and hot-points of engagement.
+                    </p>
+
+                    <hr>
+
+                    <!-- heading -->
+                    <h3 class="taco-report-explorer__report-heading
+                              taco-report-explorer__report-heading--h1">
+                      Community
+                      <i class="fa-solid fa-circle-info" 
+                        data-bs-toggle="tooltip" 
+                        data-bs-placement="top" 
+                        title="Assess the size and engagement of the token's community to gauge long-term adoption potential"></i>
+                    </h3>  
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      <a href="https://tokenterminal.com/explorer/projects/openchat/metrics/all" target="_blank" class="taco-report-explorer__report-link">According to tokenterminal</a>, as of 09/07/2025, in the last 365 days, there were 99.2k registered users
+(72.4k of which were referred), 61.4k unique person proofs, 806.6k hour of usage, 6 million messages,
+231.4k message tips, 898k message reactions, 89.6k video calls, 36.3k P2P swaps, a monthly average of
+334 active groups, a monthly average of 948 active channels, and a monthly average of 23.7k active
+users.
+                    </p>
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      On X, <a href="https://x.com/OpenChat" target="_blank" class="taco-report-explorer__report-link">OpenChat has 27.9k followers</a>.
+                    </p>                 
+                    
+                    <hr>
+
+                    <!-- heading -->
+                    <h3 class="taco-report-explorer__report-heading
+                              taco-report-explorer__report-heading--h1">
+                      Technology
+                      <i class="fa-solid fa-circle-info" 
+                        data-bs-toggle="tooltip" 
+                        data-bs-placement="top" 
+                        title="Review the project's technical foundation, focusing on code quality, scalability, and how effectively it leverages ICP's capabilities"></i>
+                    </h3>  
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      The SNS framework is regularly updated and vetted by the Network Nervous System (NNS) community,
+which oversees the entire ICP ecosystem. This vigilance ensures the adherence of CHAT's governance
+framework to the most rigorous standards of security and efficiency.
+                    </p>
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      <a href="https://github.com/open-chat-labs/open-chat/blob/master/architecture/doc.md#openchat-architecture" target="_blank" class="taco-report-explorer__report-link">OpenChat is a system composed of canister smart contracts running on the Internet Computer that
+provides chat functionality</a>. <a href="https://forum.dfinity.org/t/proposal-to-allow-an-openchat-principal-to-create-canisters-on-subnet-2fq7c/17437" target="_blank" class="taco-report-explorer__report-link">While initially running on one dedicated subnet, it now spans multiple</a>.
+                    </p>   
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      Each user and each group is assigned their own canister. User canisters hold the user's direct chats
+including messages of both parties, references to each group the user is a member of, and other relevant
+data. The user's canister is also a wallet. Group canisters store and manage the group's members and
+roles, text messages and group events, and other associated details. The user index canister coordinates
+user canisters and the group index canister coordinates group canisters. User and group canisters are
+upgraded in batches with an API call by the SNS. The user index maintains a distributed hash table for
+efficient discovery and routing, allowing scalable lookups without scanning the entire user set.
+                    </p>   
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      Each user canister implements a custom message indexing system using stable BTrees for efficient
+chronological access and search. Direct chat data is stored bidirectionally in both participants' canisters
+for redundancy and fast retrieval. Group membership is tracked through linked references rather than
+duplicating user data across group canisters. The platform implements custom serialization protocols
+optimized for Candid encoding efficiency, reducing storage overhead compared to standard JSON
+approaches.
+                    </p>   
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      The per-entity canister model brings significant benefits but also introduces scaling challenges. Pros
+include scalability of data and processing, straightforward access control, and having each canister
+function as a wallet with a stable on-chain identity. The trade-offs include the need for each canister to
+maintain a minimum cycle buffer and the fact that upgrades across many canisters are costly and slow.
+Since genesis, <a href="https://x.com/OpenChat/status/1867622369537536337" target="_blank" class="taco-report-explorer__report-link">many cycle-saving optimisations have been made</a>.
+                    </p>   
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      OpenStorage is a scalable file storage system consisting of an index canister and dynamically created
+bucket canisters that hold file data such as images and videos. Once a bucket is full it becomes read-only,
+and a new bucket is created. Duplicate files are only stored once, making the forwarding of file messages
+cheap and quick. Each file has an owner and a set of accessors - principals who are permitted to view the
+file. Users are given a storage allowance of 0.1GB if they've verified unique personhood, or 1GB if
+they've paid for diamond.
+                    </p>   
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      The assets canister serves the static assets for the web app. Each HTTP GET request from the browser to
+the assets canister is intercepted by the service worker, which uses the IC public key to verify the
+signature of each asset and prove it has not been served by a malicious node and tampered with, before
+returning the HTTP GET response.
+                    </p>   
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      The cycles dispenser canister is responsible for topping up other canisters when they are running low,
+using predictive refilling algorithms based on usage patterns rather than reactive top-ups. Error handling
+implements circuit breaker patterns when individual canisters become unresponsive, gracefully degrading
+features rather than failing entirely. The frontend implements intelligent caching of canister responses to
+minimize query calls. Message batching algorithms group multiple operations into single canister calls,
+reducing cycle consumption. The platform uses stable memory migration patterns that minimize upgrade
+downtime.
+                    </p>   
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      The client library uses WebRTC to send typing indicators and message data directly between online users'
+browsers. All messages are still sent through the Internet Computer to ensure delivery, but WebRTC
+serves as a performance optimization. WebRTC is end-to-end encrypted and well suited to decentralized
+applications but requires off-chain components. Voice and video calls use the Daily API, coordinated via
+a secure bridge hosted on AWS. This integration allows for calls while maintaining user authentication
+through access tokens. The landing page and push notifications also rely on off-chain components.
+                    </p>   
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      Users can sign in with Internet Identity, NFID, email, Ethereum, Solana, Google, Plug, etc. UserGeek is
+integrated to collect and analyse user app usage data without external dependencies, preserving user
+privacy through local anonymization before transmission.
+                    </p>   
+                    
+                    <hr>
+
+                    <!-- anon container -->
+                    <div class="d-flex flex-wrap gap-5">
+
+                      <!-- left -->
+                      <div>
+
+                        <!-- heading -->
+                        <h3 class="taco-report-explorer__report-heading
+                                  taco-report-explorer__report-heading--h1">
+                          Tokenomics
+                          <i class="fa-solid fa-circle-info" 
+                            data-bs-toggle="tooltip" 
+                            data-bs-placement="top" 
+                            title="Analyse the supply and distribution of the token; any inflationary/deflationary mechanisms; and any incentive structures, to ensure sustainability and fair distribution"></i>
+                        </h3>
+
+                        <!-- unordered list -->
+                        <ul class="taco-report-explorer__report-ul">
+
+                          <!-- list item -->
+                          <li class="taco-report-explorer__report-li">
+                            
+                            <!-- paragraph -->
+                            <p class="taco-report-explorer__report-paragraph">
+                              Total Supply: 105,385,697
+                            </p>
+                            
+                          </li>
+
+                          <!-- list item -->
+                          <li class="taco-report-explorer__report-li">
+                            
+                            <!-- paragraph -->
+                            <p class="taco-report-explorer__report-paragraph">
+
+                              <!-- link -->
+                              <a href="https://app.sneeddao.com/sneedlock" target="_blank" class="taco-report-explorer__report-link">
+                                Circulating Supply: 57,039,847
+                              </a>
+
+                            </p>
+                            
+                          </li>
+                          
+                          <!-- list item -->
+                          <li class="taco-report-explorer__report-li">
+                            
+                            <!-- paragraph -->
+                            <p class="taco-report-explorer__report-paragraph">
+                              Burn per transaction: 0.001 CHAT, currently $0.0001405
+                            </p>
+                            
+                          </li>
+
+                          <!-- list item -->
+                          <li class="taco-report-explorer__report-li">
+                            
+                            <!-- paragraph -->
+                            <p class="taco-report-explorer__report-paragraph">
+                              In a scenario where there are 10 trusted tokens and the portfolio is trading at a 7 minute interval, TACO
+DAO would be losing approximately $1.0198 a year to CHAT burn per transaction fees
+                            </p>
+                            
+                          </li>
+                          
+                          <!-- list item -->
+                          <li class="taco-report-explorer__report-li">
+                            
+                            <!-- paragraph -->
+                            <p class="taco-report-explorer__report-paragraph">
+                              Holders:
+                            </p>
+
+                            <!-- unordered list -->
+                            <ul class="taco-report-explorer__report-ul" style="list-style-type: disc">
+
+                              <!-- list item -->
+                              <li class="taco-report-explorer__report-li">
+                                
+                                <!-- paragraph -->
+                                <p class="taco-report-explorer__report-paragraph">
+                                  Top - 47.55% (Treasury)
+                                </p>
+
+                              </li>
+
+                              <!-- list item -->
+                              <li class="taco-report-explorer__report-li">
+                                
+                                <!-- paragraph -->
+                                <p class="taco-report-explorer__report-paragraph">
+                                  Second - 1.96%
+                                </p>
+                                
+                              </li>
+                              
+                              <!-- list item -->
+                              <li class="taco-report-explorer__report-li">
+                                
+                                <!-- paragraph -->
+                                <p class="taco-report-explorer__report-paragraph">
+                                  Third - 1.96%
+                                </p>
+                                
+                              </li>
+                              
+                              <!-- list item -->
+                              <li class="taco-report-explorer__report-li">
+                                
+                                <!-- paragraph -->
+                                <p class="taco-report-explorer__report-paragraph">
+                                  Mean of Top 25 - 3.0104%
+                                </p>
+                                
+                              </li>
+                              
+                              <!-- list item -->
+                              <li class="taco-report-explorer__report-li">
+                                
+                                <!-- paragraph -->
+                                <p class="taco-report-explorer__report-paragraph">
+                                  Median of Top 25 - 0.98%
+                                </p>
+                                
+                              </li>
+                              
+                              <!-- list item -->
+                              <li class="taco-report-explorer__report-li">
+                                
+                                <!-- paragraph -->
+                                <p class="taco-report-explorer__report-paragraph">
+                                  Mode of Top 25 - 0.98%
+                                </p>
+                                
+                              </li>
+                              
+                              <!-- list item -->
+                              <li class="taco-report-explorer__report-li">
+                                
+                                <!-- paragraph -->
+                                <p class="taco-report-explorer__report-paragraph">
+                                  Top 25 Total - 75.26%
+                                </p>
+                                
+                              </li>
+                              
+                              <!-- list item -->
+                              <li class="taco-report-explorer__report-li">
+                                
+                                <!-- paragraph -->
+                                <p class="taco-report-explorer__report-paragraph">
+                                  Mean of Top 100 - 0.8675%
+                                </p>
+                                
+                              </li>
+                              
+                              <!-- list item -->
+                              <li class="taco-report-explorer__report-li">
+                                
+                                <!-- paragraph -->
+                                <p class="taco-report-explorer__report-paragraph">
+                                  Median of Top 100 - 0.17%
+                                </p>
+                                
+                              </li>
+                              
+                              <!-- list item -->
+                              <li class="taco-report-explorer__report-li">
+                                
+                                <!-- paragraph -->
+                                <p class="taco-report-explorer__report-paragraph">
+                                  Mode of Top 100 - 0.04%
+                                </p>
+                                
+                              </li>
+                              
+                              <!-- list item -->
+                              <li class="taco-report-explorer__report-li">
+                                
+                                <!-- paragraph -->
+                                <p class="taco-report-explorer__report-paragraph">
+                                  Top 100 Total - 86.75%
+                                </p>
+                                
+                              </li>                          
+
+                            </ul>
+                            
+                          </li>                      
+
+                        </ul>
+
+                        <!-- paragraph -->
+                        <p class="taco-report-explorer__report-paragraph">
+                          Inflationary mechanisms do exist in the forms of APY from staking rewards. For a 182 day old neuron
+with a 1 year dissolve delay, a staker will earn 6.25% APY.
+                        </p>
+
+                      </div>
+
+                      <!-- center -->
+                      <div>
+
+                        <!-- heading -->
+                        <h3 class="taco-report-explorer__report-heading
+                                  taco-report-explorer__report-heading--h1">
+                          Market Metrics
+                          <i class="fa-solid fa-circle-info" 
+                            data-bs-toggle="tooltip" 
+                            data-bs-placement="top" 
+                            title="Review key indicators such as trading volume and historical market performance."></i>
+                        </h3>
+
+                        <!-- unordered list -->
+                        <ul class="taco-report-explorer__report-ul">
+
+                          <!-- list item -->
+                          <li class="taco-report-explorer__report-li">
+                            
+                            <!-- paragraph -->
+                            <p class="taco-report-explorer__report-paragraph">
+                              All Time High (USD): 1.06
+                            </p>
+                            
+                          </li>
+
+                          <!-- list item -->
+                          <li class="taco-report-explorer__report-li">
+                            
+                            <!-- paragraph -->
+                            <p class="taco-report-explorer__report-paragraph">
+                              All Time Low (USD): 0.1156
+                            </p>
+                            
+                          </li>
+                          
+                          <!-- list item -->
+                          <li class="taco-report-explorer__report-li">
+                            
+                            <!-- paragraph -->
+                            <p class="taco-report-explorer__report-paragraph">
+                              As of 15/07/25(USD): 0.1405
+                            </p>
+                            
+                          </li>
+                          
+                          <!-- list item -->
+                          <li class="taco-report-explorer__report-li">
+                            
+                            <!-- paragraph -->
+                            <p class="taco-report-explorer__report-paragraph">
+                              As of 15/07/25 (ICP): 0.026461129 ICP
+                            </p>
+                            
+                          </li>
+                          
+                          <!-- list item -->
+                          <li class="taco-report-explorer__report-li">
+                            
+                            <!-- paragraph -->
+                            <p class="taco-report-explorer__report-paragraph">
+                              Change from ATH USD: -86.745%
+                            </p>
+                            
+                          </li>                      
+
+                          <!-- list item -->
+                          <li class="taco-report-explorer__report-li">
+                            
+                            <!-- paragraph -->
+                            <p class="taco-report-explorer__report-paragraph">
+                              Change from ATL USD: 21.54%
+                            </p>
+
+                          </li>
+
+                          <!-- list item -->
+                          <li class="taco-report-explorer__report-li">
+                            
+                            <!-- paragraph -->
+                            <p class="taco-report-explorer__report-paragraph">
+                              USD Volume 24H as of 15/07/25: 3754
+                            </p>
+                            
+                          </li>
+
+                        </ul> 
+
+                      </div>
+
+                      <!-- right -->
+                      <div>
+
+                        <!-- heading -->
+                        <h3 class="taco-report-explorer__report-heading
+                                  taco-report-explorer__report-heading--h1">
+                          Liquidity
+                        </h3>
+
+                        <!-- paragraph -->
+                        <p class="taco-report-explorer__report-paragraph">
+                          As per <a href="https://swaprunner.com" target="_blank" class="taco-report-explorer__report-link">SwapRunner</a> on the 15th of July 2025, a single transaction of:
+                        </p>
+
+                        <!-- unordered list -->
+                        <ul class="taco-report-explorer__report-ul">
+
+                          <!-- list item -->
+                          <li class="taco-report-explorer__report-li">
+                            
+                            <!-- paragraph -->
+                            <p class="taco-report-explorer__report-paragraph">
+                              20000 ICP ($106159.43) will result in a trade to 530230.092 CHAT ($72069.34). 32.112% lost to
+price impact
+                            </p>
+                            
+                          </li>
+
+                          <!-- list item -->
+                          <li class="taco-report-explorer__report-li">
+                            
+                            <!-- paragraph -->
+                            <p class="taco-report-explorer__report-paragraph">
+                              10000 ICP ($53079.71) will result in a trade to 303487.11 CHAT ($42967.34). 19.051% lost to
+price impact
+                            </p>
+                            
+                          </li>
+                          
+                          <!-- list item -->
+                          <li class="taco-report-explorer__report-li">
+                            
+                            <!-- paragraph -->
+                            <p class="taco-report-explorer__report-paragraph">
+                              1000 ICP ($5307.97) will result in a trade to 36347.55 CHAT ($5146.04). 3.051% lost to price
+impact
+                            </p>
+                            
+                          </li>
+                          
+                          <!-- list item -->
+                          <li class="taco-report-explorer__report-li">
+                            
+                            <!-- paragraph -->
+                            <p class="taco-report-explorer__report-paragraph">
+                              250 ICP ($1326.99) will result in a trade to 9279.21 CHAT ($1313.74) 0.999% lost to price
+impact
+                            </p>
+                            
+                          </li>
+
+                        </ul>
+
+                      </div>                      
+
+                    </div>
+
+                    <hr>
+
+                    <!-- headings -->
+                    <h3 class="taco-report-explorer__report-heading
+                              taco-report-explorer__report-heading--h1">
+                      Competitors
+                      <i class="fa-solid fa-circle-info" 
+                        data-bs-toggle="tooltip" 
+                        data-bs-placement="top" 
+                        title="Identify similar projects and assess the token's differentiators alongside the perceived competitive positioning within its niche"></i>
+                    </h3>
+
+                    <h4 class="taco-report-explorer__report-heading
+                              taco-report-explorer__report-heading--h2">
+                      Web2
+                    </h4>
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      Telegram and WhatsApp are client-server messaging systems where individuals can engage in private
+one-on-one chats, participate in groups, or receive updates via channels or broadcasts. Both platforms are
+owned by private entities: WhatsApp by Meta Platforms Inc., and Telegram by Pavel Durov through
+companies registered in the British Virgin Islands. WhatsApp provides end-to-end encryption (E2EE) by
+default, <a href="https://www.kaspersky.com/resource-center/preemptive-safety/messaging-app-security" target="_blank" class="taco-report-explorer__report-link">while Telegram uses client-server encryption for standard chats and requires users to initiate a
+"Secret Chat" for E2EE</a>. As a result, neither company can access or read E2EE content or hand it over to
+authorities—even under pressure—though WhatsApp's security has been undermined by zero-day
+exploits, <a href="https://cybersecuritynews.com/paragon-spyware-exploited-whatsapp-zero-day-vulnerability/" target="_blank" class="taco-report-explorer__report-link">such as one by NSO Group's Pegasus spyware (tied to the Israeli government-linked firm)</a>,
+which infected devices of politically exposed individuals without breaking E2EE directly. Telegram's
+default chats can be accessed by the company, hackers, or authorities via court orders or force. <a href="https://www.themoscowtimes.com/2017/05/16/russian-messenger-telegram-pledges-to-keep-data-safe-amid-rumored-government-pressure-a58006" target="_blank" class="taco-report-explorer__report-link">While
+Telegram resisted Russian demands to expose dissidents in the past</a>, it has updated its policy to disclose
+user metadata (like IP addresses and phone numbers) for suspected criminals or terrorists, <a href="https://techcrunch.com/2025/01/07/telegram-reports-spike-in-sharing-user-data-with-law-enforcement/" target="_blank" class="taco-report-explorer__report-link">and has done so
+thousands of times in recent years</a>, including to U.S., European, and other authorities—contrary to earlier
+claims of zero compliance. Similar privacy-oriented apps like Signal (centralized with default E2EE) and
+Keet (fully P2P with E2EE) face comparable risks of metadata exposure or device-level exploits, despite
+their non-profit or decentralized designs.
+                    </p>
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      OpenChat differs from these four because it is aiming to be fully on-chain, and is wholly DAO-governed.
+Being on-chain means its code and data are replicated across a decentralized network of nodes, making it
+tamperproof and resistant to pressure from centralized entities. Its code is open-source, and any changes
+have to be voted on by token holders. Consequently, compliance with legal requests would depend on
+open votes by token holders rather than directives from a central entity.
+                    </p>
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      Discord and Slack operate on a "rooms" system of communication, where communities are created with
+internal organization, allowing for the creation of different chatrooms for different topics under the
+community umbrella. Within such an umbrella, private rooms may exist. In both Discord and Slack,
+access to private rooms is controlled at the discretion of admins (invite-only in Slack; typically role-based
+permissions in Discord). <a href="https://famoid.com/blog/who-owns-discord/" target="_blank" class="taco-report-explorer__report-link">Discord is wholly owned by a private corporation</a>, <a href="https://brandsownedby.com/who-owns-slack/" target="_blank" class="taco-report-explorer__report-link">while Slack is owned by a
+publicly traded company</a>. Both platforms use encryption for data in transit and at rest but lack end-to-end
+encryption, making them susceptible to government pressure for content access in response to legal
+requests.
+                    </p>
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      OpenChat allows for both peer-to-peer messaging alongside the rooms system utilised on Discord and
+Slack. With a planned E2EE for messaging, and a decentralised form of control, OpenChat will combine
+both systems detailed above, while maintaining privacy and sovereignty.
+                    </p>
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      <a href="—" target="_blank" class="taco-report-explorer__report-link">Element is a secure messaging client on the Matrix Protocol</a>, enabling users to send messages, join rooms,
+or make calls. It is decentralized through federation: independent homeservers interconnect using open
+APIs, allowing users on different servers to chat without a central authority, similar to email - <a href="https://matrix.org/blog/2024/10/29/matrix-2.0-is-here/" target="_blank" class="taco-report-explorer__report-link">preventing
+single points of failure and enabling data sovereignty via self-hosting</a>. Like OpenChat, it is a hybrid
+offering E2EE and a rooms system. Element has upper hands over OpenChat in features such as
+<a href="https://matrix.org/ecosystem/bridges/" target="_blank" class="taco-report-explorer__report-link">cross-platform bridging with external apps such as Slack and Whatsapp</a>, <a href="https://element.io/blog/end-to-end-encrypted-voice-and-video-for-self-hosted-community-users/" target="_blank" class="taco-report-explorer__report-link">encrypted voice/video calls</a>, and
+broad integrations.
+                    </p>
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      OpenChat edges out Element with its blockchain-based decentralization, <a href="https://anarc.at/blog/2022-06-17-matrix-notes/" target="_blank" class="taco-report-explorer__report-link">unlike Element's
+server-dependent federation vulnerable to operator trust or downtime</a>. Its DAO governance via CHAT
+token holders enables community-driven decisions and self-sustaining economic incentives (revenue from
+fees making up for voting rewards), and it leverages ICP's low-cost infrastructure to minimize operational
+expenses. This setup potentially avoids Element's funding struggles - <a href="https://matrix.org/blog/2025/02/crossroads/" target="_blank" class="taco-report-explorer__report-link">such as the Matrix Foundation's
+2025 funding appeal to sustain bridges</a>, which risked shutdowns without donations. DAO governance can
+mean eventual near-frictionless and inclusive organisation. Web3 integrations like in-app wallets, P2P
+token swaps, tipping, neuron-gated channels, other current features, and other planned features, are
+crypto-native use cases that Element's non-blockchain model can't replicate in a trustless manner.
+                    </p> 
+                    
+                    <h4 class="taco-report-explorer__report-heading
+                              taco-report-explorer__report-heading--h2">
+                      Web3
+                    </h4>
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      <a href="https://xmtp.org/" target="_blank" class="taco-report-explorer__report-link">XMTP is a decentralized, open-source messaging protocol designed for Web3</a>. <a href="https://status.app/" target="_blank" class="taco-report-explorer__report-link">Status is an
+Ethereum-based open-source app</a>. OpenChat, XMTP, and Status all aim for decentralized,
+privacy-focused messaging in Web3, but they differ significantly in architecture, scope, and execution.
+                    </p> 
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      <a href="https://docs.xmtp.org/intro/faq" target="_blank" class="taco-report-explorer__report-link">XMTP operates as a chain-agnostic protocol</a>, allowing developers to embed messaging into wallets or
+dApps (<a href="https://xmtp.org/blog/coinbasewallet" target="_blank" class="taco-report-explorer__report-link">e.g., integrations with Coinbase Wallet</a> or <a href="https://xmtp.org/blog/lens-dms-with-xmtp" target="_blank" class="taco-report-explorer__report-link">Lens Protocol</a>). Its decentralized network of
+nodes—<a href="https://xmtp.org/docs/concepts/decentralizing-xmtp" target="_blank" class="taco-report-explorer__report-link">currently permissioned and selected by Ephemera (previously XMTP Labs) for reliability and
+diversity</a>—handles message routing and storage off-chain in a peer-to-peer fashion, <a href="https://xmtp.org/docs/concepts/decentralizing-xmtp" target="_blank" class="taco-report-explorer__report-link">with end-to-end
+encryption via the Messaging Layer Security (MLS) protocol</a>. This provides perfect forward secrecy,
+meaning that even if a user's long-term private keys are compromised in the future, <a href="https://docs.xmtp.org/protocol/security" target="_blank" class="taco-report-explorer__report-link">past messages remain
+secure and cannot be decrypted</a>. <a href="https://docs.xmtp.org/inboxes/user-consent/support-user-consent" target="_blank" class="taco-report-explorer__report-link">Additionally, XMTP features spam filtering at the app level</a>. In contrast
+to XMTP, which serves as a flexible backend for integrating messaging into other Web3 applications,
+OpenChat operates as a complete, standalone, feature-rich chat application; a ready to use experience.
+                    </p> 
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      <a href="https://status.app/help/getting-started/what-is-status" target="_blank" class="taco-report-explorer__report-link">Status combines secure messaging, a crypto wallet, communities, token-gates and dApp access</a>, achieving
+privacy through P2P networking via the <a href="https://docs.waku.org/" target="_blank" class="taco-report-explorer__report-link">Waku protocol (a scalable, privacy-focused P2P messaging
+suite)</a>, E2EE, and metadata hiding. It is governed by the SNT token; this governance appears more
+advisory than binding compared to ICP's SNS <a href="https://www.gate.com/learn/articles/what-is-status/667" target="_blank" class="taco-report-explorer__report-link">[1]</a><a href="https://status.app/help/wallet/about-the-status-snt-token" target="_blank" class="taco-report-explorer__report-link">[2]</a>. The core messaging and P2P networking occur
+off-chain via the Waku protocol, relying on decentralized peers for routing and delivery rather than
+blockchain consensus. In contrast, OpenChat is fully on-chain, with all messaging, data storage, and logic
+executed directly within ICP's canister smart contracts for complete tamper-proof sovereignty.
+                    </p> 
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      SocialFi competitors exist in the ICP ecosystem, most not attempting quite the same thing as OpenChat.
+                      <a href="https://medium.com/dfinity/distrikt-a-community-owned-professional-social-network-on-the-internet-computer-has-launched-12ca9642b9b9" target="_blank" class="taco-report-explorer__report-link">Distrikt is a decentralized social media platform</a>, blending elements of Twitter and LinkedIn. <a href="https://forum.dfinity.org/t/introducing-a-decentralized-end-to-end-encrypted-messaging-app/35189" target="_blank" class="taco-report-explorer__report-link">ICPanda
+Message is a decentralized end-to-end encrypted messaging application</a>. It lacks OpenChat's extensive list
+of features. The most similar ICP-based competitor is Catalyze, <a href="https://chat.catalyze.one/" target="_blank" class="taco-report-explorer__report-link">a decentralized platform for Web3
+communities and events</a>, having features such as chat, voice calls, token/NFT gated access, cross-chain
+functionalities, and a rewards program. OpenChat surpasses Catalyze in adoption.
+                    </p> 
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      Put simply, <a href="https://learn.internetcomputer.org/hc/en-us" target="_blank" class="taco-report-explorer__report-link">due to the inherent superpowers of the Internet Computer Protocol</a>, OpenChat has the most
+features, minimal off-chain components, very low fees, very high speeds, and can be expected to be
+scalable. As an instant messaging app, it may not hold the competitive edge in certain privacy aspects,
+and it does not have multi-chain support. As a communication app for crypto communities, OpenChat
+appears to offer much more than its few competitors.
+                    </p> 
+
+                    <h4 class="taco-report-explorer__report-heading
+                              taco-report-explorer__report-heading--h2">
+                      Profitability
+                    </h4>
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      Telegram generated <a href="https://resourcera.com/data/social/telegram-revenue/" target="_blank" class="taco-report-explorer__report-link">in excess of $1 billion USD in 2024</a>, earning income from advertisements, premium
+subscriptions, and in-app purchases.
+                    </p> 
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      In 2024, WhatsApp recorded revenue of <a href="https://www.businessofapps.com/data/whatsapp-statistics/" target="_blank" class="taco-report-explorer__report-link">around $1.7 billion USD</a>, almost all of which was driven from its
+'WhatsApp for Business' scheme which charges businesses after 1000 messages are sent in areas such as
+customer service, authentication, or marketing. <a href="https://electroiq.com/stats/whatsapp-business-statistics/" target="_blank" class="taco-report-explorer__report-link">Over three-quarters of a million users were active monthly
+on WhatsApp for Business</a>.
+                    </p> 
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      Discord generated <a href="https://www.startupbooted.com/how-does-discord-make-money-the-hidden-truth-revealed" target="_blank" class="taco-report-explorer__report-link">around $575 million USD in 2023</a>, with its main revenue stream being Discord Nitro -
+a premium membership model - that accounted for $207 million of the 2023 earnings, or 36%. Server
+boosting allows for community owners to pay for their servers to have increased quality in its features,
+including video and audio quality, and this provides another form of income for the company.
+                    </p> 
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      Element is <a href="https://element.io/blog/synapse-now-lives-at-github-com-element-hq-synapse/" target="_blank" class="taco-report-explorer__report-link">not a profitable company as of 2023</a>. Revenues surpassed 10 million Pound Sterling but the
+company New Vector Limited, which oversees Element, <a href="https://tracxn.com/d/legal-entities/united-kingdom/new-vector-limited/__9P-jCeWRPdT-Bd1JmzmmgtJ1wU9ENSPzDzU9NeM__KM" target="_blank" class="taco-report-explorer__report-link">recorded a loss of 12.9 million pounds</a>, with the
+company spending more of its over <a href="https://tracxn.com/d/companies/element/__-CfYlwWsIKlLgg4xLqpUmf0zpi1awWpwmsDdD5pPcvM" target="_blank" class="taco-report-explorer__report-link">$48 million worth of investments</a> than it recouped.
+                    </p> 
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      XMTP does not currently exist in its full release form, and thus has no ordinary revenues, but the
+overseeing company Ephemera <a href="https://finance.yahoo.com/news/crypto-messaging-startup-ephemera-raises-130000835.html?guccounter=1&guce_referrer=aHR0cHM6Ly93d3cuYmluZy5jb20v&guce_referrer_sig=AQAAAIUKR7aw3qoBdbM4eWH6tdH1SdsMILToyd4sNvQMBIHqNW38R96KsjX7kUn7Su5xEddBDfullgA5QdJiJTW_2fuB5hrlrxDfYslv8hCkEIeSo1Si7XutXkZ7_C3rHhWFi4r4FtWBjKFxohI6ZZvNmi9b3UtQRWw0gkmveACDxloD" target="_blank" class="taco-report-explorer__report-link">plans to garner a steady income via the network fees paid by developers
+to use the Ephemera-owned servers</a>. From multiple rounds of investment, Ephemera reached a
+post-money equity <a href="https://www.ainvest.com/news/ephemera-raises-20-million-series-funding-valuing-company-300-million-2507/" target="_blank" class="taco-report-explorer__report-link">value of $300 million in 2025</a>.
+                    </p> 
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      Status is estimated by one source to have a revenue of <a href="https://growjo.com/company/StatusApp" target="_blank" class="taco-report-explorer__report-link">just over $507,000 USD per year</a>, and drew over
+                      <a href="https://tracxn.com/d/companies/status/__3VON_-ta6v5UX3TqsrlVcB2AcKCCRzFnpqKjnHsjGHE?utm_source=chatgpt.com#about-the-company" target="_blank" class="taco-report-explorer__report-link">$100 million USD in investment in 2017</a>.
+                    </p> 
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      Current revenue streams for OpenChat include ICP neurons, diamond memberships, payment gated
+channels, CHIT streak insurances, token listing fees, failed proposal token burns, and fees on prize
+messages. Planned revenue streams include advertising on the dApp, paid community boosting,
+OpenChat as a service integrated into other dApps, increased file storage, and OC enhancements
+(personal themes, emoji packs, etc). Potential revenue streams include tx fees for token transfers, tx fees
+fees for token swaps, and charging large private communities. The team has stated that their current focus
+is on user growth over monetisation. <a href="https://tokenterminal.com/explorer/projects/openchat/metrics/all" target="_blank" class="taco-report-explorer__report-link">According to tokenterminal</a>, OpenChat made 111k USD from
+Diamond Memberships in the last 365 days. <a href="https://www.icexplorer.io/address/details/2jvtu-yqaaa-aaaaq-aaama-cai-t6mekta.d1216f443ead88f8f98a80b2ea59697726f18dffaa58d0a0156d0c605a01b672" target="_blank" class="taco-report-explorer__report-link">The treasury of OpenChat has</a> 35,981.04 ICP and 48,343,162
+CHAT, valued at around $7 million USD as of the end of July.
+                    </p> 
+
+                    <hr>
+                   
+                    <!-- heading -->
+                    <h3 class="taco-report-explorer__report-heading
+                              taco-report-explorer__report-heading--h1">
+                      Security Risks
+                      <i class="fa-solid fa-circle-info" 
+                        data-bs-toggle="tooltip" 
+                        data-bs-placement="top" 
+                        title="Investigate perceived vulnerabilities, any audit reports, and adherence to security and regulatory standards"></i>
+                    </h3> 
+                    
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      <a href="https://dashboard.internetcomputer.org/sns/3e3x2-xyaaa-aaaaq-aaalq-cai/proposal/829" target="_blank" class="taco-report-explorer__report-link">OpenChat DAO is registered as an LLC in the Marshall Islands</a>, a jurisdiction with DAO-specific
+legislation designed to limit liability for members and protect against individual prosecution. This
+structure was chosen after review of multiple jurisdictions.
+                    </p>
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      <a href="https://x.com/OpenChat/status/1659487606541828096" target="_blank" class="taco-report-explorer__report-link">OpenChat Labs LTD</a> was formed to handle off-chain responsibilities such as custody of the oc.app
+domain and intellectual property, managing app store contracts, funding in-app voice/video calls, and
+employing the core development team.
+                    </p> 
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      OpenChat's communities are not currently included in the plan for end-to-end encryption unlike direct
+chats and private groups. Public communities do not by their nature require encryption but private
+communities may face privacy risks without it. While data in deleted communities is permanently erased
+from ICP canisters, messages could be scraped before deletion. This exposes users to potential
+retrospective judgment if societal norms or laws change, as such copies could persist outside OpenChat's
+control.
+                    </p> 
+
+                    <hr>
+                    
+                    <!-- back to top link -->
+                    <a href="#" @click.prevent="scrollToTop" class="taco-report-explorer__report-link text-center w-100 d-inline-block mt-2">Back to top</a>
+                    
+                  </div>
+
+                  <!-- report footer -->
+                  <div class="taco-report-explorer__report-footer">
+                    
+                    <!-- left -->
+                    <div class="taco-report-explorer__report-footer__left">
+                      
+                      ❤️🌮
+                      
+                    </div>
+                    
+                    <!-- center -->
+                    <div class="taco-report-explorer__report-footer__center text-center">
+                      
+                      &copy;2025 Taco Dao
+                      
+                    </div>
+                    
+                    <!-- right -->
+                    <div class="taco-report-explorer__report-footer__right">
+
+                      <!-- link group -->
+                      <!-- <span class="d-flex flex-column align-items-end">
+
+                        <span class="text-end">#45 Add Token</span>
+
+                        <span class="d-flex gap-2">
+
+                          <a href="https://nns.ic0.app/proposal/?u=lacdn-3iaaa-aaaaq-aae3a-cai&proposal=45" class="taco-text-blue-to-light-blue text-end" target="_blank">NNS</a>                        
+
+                          <a href="https://app.sneeddao.com/proposal?proposalid=45&sns=lacdn-3iaaa-aaaaq-aae3a-cai" class="taco-text-blue-to-light-blue text-end" target="_blank">Sneed Hub</a>
+
+                        </span>
+                        
+                      </span> -->
+                      
+                      <!-- link group -->
+                      <!-- <span class="d-flex flex-column align-items-end">
+
+                        <span class="text-end">#14 Motion to Discuss</span>
+
+                        <span class="d-flex gap-2">
+
+                          <a href="https://nns.ic0.app/proposal/?u=lacdn-3iaaa-aaaaq-aae3a-cai&proposal=14" class="taco-text-blue-to-light-blue text-end" target="_blank">NNS</a>                        
+
+                          <a href="https://app.sneeddao.com/proposal?proposalid=14&sns=lacdn-3iaaa-aaaaq-aae3a-cai" class="taco-text-blue-to-light-blue text-end" target="_blank">Sneed Hub</a>
+
+                        </span>
+                        
+                      </span> -->
+                      
+                      <!-- link group -->
+                      <span class="d-flex flex-column align-items-end">
+
+                        <span class="text-end">Motion to Discuss</span>
+
+                        <span class="d-flex gap-2">
+
+                          <span style="font-style: italic;">Not Started Yet</span>
+
+                        </span>
+                        
+                      </span> 
+
+                    </div>
+                    
+                  </div>
+
+                </div>
+                
+              </div>                    
               
             </div>
             
@@ -4683,6 +6085,7 @@
   import motokoIcon from '../assets/tokens/snspng/motoko.png'
   import goldDaoIcon from '../assets/tokens/snspng/gold-dao.png'
   import sgldtIcon from '../assets/tokens/sgldt.png'
+  import openChatIcon from '../assets/tokens/snspng/openchat.png'
   
   ///////////
   // store //
@@ -4716,6 +6119,7 @@
   const motokoIconUrl = motokoIcon
   const goldDaoIconUrl = goldDaoIcon
   const sgldtIconUrl = sgldtIcon
+  const openChatIconUrl = openChatIcon
 
   // show report menu on mobile
   const showReportMenuOnMobile = ref(false)
@@ -4768,12 +6172,6 @@
     userReshownReportsDisclaimer.value = false
   }
 
-  /////////////
-  // returns //  
-  
-  // 
-
-
   //////////////
   // computed //
   //////////////
@@ -4796,17 +6194,19 @@
     // log
     // console.log('ReportsView.vue: watch route')
 
-    // set reportId
-    if (newPath === '/reports/ddckbtc') {
+    // set reportId (dd* links supported for historical linking)
+    if (newPath === '/reports/ddckbtc' || newPath === '/reports/ckbtc') {
       reportId.value = 1
-    } else if (newPath === '/reports/ddsneed') {
+    } else if (newPath === '/reports/ddsneed' || newPath === '/reports/sneed') {
       reportId.value = 2
-    } else if (newPath === '/reports/ddmotoko') {
+    } else if (newPath === '/reports/ddmotoko' || newPath === '/reports/motoko') {
       reportId.value = 3
-    } else if (newPath === '/reports/ddgolddao') {
+    } else if (newPath === '/reports/ddgolddao' || newPath === '/reports/golddao') {
       reportId.value = 4
-    } else if (newPath === '/reports/ddsgldt') {
+    } else if (newPath === '/reports/ddsgldt' || newPath === '/reports/sgldt') {
       reportId.value = 5
+    } else if (newPath === '/reports/openchat') {
+      reportId.value = 6
     } else if (newPath === '/reports/example') {
       reportId.value = 0
     }

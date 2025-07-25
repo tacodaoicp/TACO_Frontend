@@ -31,13 +31,19 @@ const routes = [
     { path: "/chat/oc", name: "ChatOC", component: ChatView },
     { path: "/chat/sneed", name: "ChatSneed", component: ChatView },
     { path: "/chat", redirect: "/chat/oc" },
-    { path: "/reports", redirect: "/reports/ddsgldt" },
-    { path: "/reports/example", component: ReportsView },    
-    { path: "/reports/ddckbtc", component: ReportsView },
-    { path: "/reports/ddsneed", component: ReportsView },
-    { path: "/reports/ddmotoko", component: ReportsView },
-    { path: "/reports/ddgolddao", component: ReportsView },
-    { path: "/reports/ddsgldt", component: ReportsView },
+    { path: "/reports", redirect: "/reports/openchat" },
+    { path: "/reports/example", component: ReportsView }, // dd* links should remain for historical linking
+    { path: "/reports/ddckbtc", component: ReportsView }, // dd* links should remain for historical linking
+    { path: "/reports/ddsneed", component: ReportsView }, // dd* links should remain for historical linking
+    { path: "/reports/ddmotoko", component: ReportsView }, // dd* links should remain for historical linking
+    { path: "/reports/ddgolddao", component: ReportsView }, // dd* links should remain for historical linking
+    { path: "/reports/ddsgldt", component: ReportsView }, // dd* links should remain for historical linking
+    { path: "/reports/ckbtc", component: ReportsView },
+    { path: "/reports/sneed", component: ReportsView },
+    { path: "/reports/motoko", component: ReportsView },
+    { path: "/reports/golddao", component: ReportsView },
+    { path: "/reports/sgldt", component: ReportsView },    
+    { path: "/reports/openchat", component: ReportsView },
     { path: "/admin", name: "Admin", component: AdminView },
     { path: "/admin/trade", name: "AdminTrade", component: AdminTradeView },
     { path: "/admin/price", name: "AdminPrice", component: AdminPriceView },
