@@ -38,13 +38,19 @@ const routes = [
     { path: "/chat/forum", name: "ChatForum", component: ChatView, meta: { robots: 'index' } },
     { path: "/chat/forum/:id", name: "ChatForumThread", component: ChatView, meta: { robots: 'index' } },
     { path: "/chat", redirect: "/chat/oc" },
-    { path: "/reports", redirect: "/reports/ddsgldt" },
+    { path: "/reports", redirect: "/reports/openchat" },
     { path: "/reports/example", component: ReportsView, meta: { robots: 'index' } },    
-    { path: "/reports/ddckbtc", component: ReportsView, meta: { robots: 'index' } },
-    { path: "/reports/ddsneed", component: ReportsView, meta: { robots: 'index' } },
-    { path: "/reports/ddmotoko", component: ReportsView, meta: { robots: 'index' } },
-    { path: "/reports/ddgolddao", component: ReportsView, meta: { robots: 'index' } },
-    { path: "/reports/ddsgldt", component: ReportsView, meta: { robots: 'index' } },
+    { path: "/reports/ddckbtc", component: ReportsView, meta: { robots: 'index' } }, // dd* links should remain for historical linking
+    { path: "/reports/ddsneed", component: ReportsView, meta: { robots: 'index' } }, // dd* links should remain for historical linking
+    { path: "/reports/ddmotoko", component: ReportsView, meta: { robots: 'index' } }, // dd* links should remain for historical linking
+    { path: "/reports/ddgolddao", component: ReportsView, meta: { robots: 'index' } }, // dd* links should remain for historical linking
+    { path: "/reports/ddsgldt", component: ReportsView, meta: { robots: 'index' } }, // dd* links should remain for historical linking
+    { path: "/reports/ckbtc", component: ReportsView, meta: { robots: 'index' } },
+    { path: "/reports/sneed", component: ReportsView, meta: { robots: 'index' } },
+    { path: "/reports/motoko", component: ReportsView, meta: { robots: 'index' } },
+    { path: "/reports/golddao", component: ReportsView, meta: { robots: 'index' } },
+    { path: "/reports/sgldt", component: ReportsView, meta: { robots: 'index' } },    
+    { path: "/reports/openchat", component: ReportsView, meta: { robots: 'index' } },    
     { path: "/admin", name: "Admin", component: AdminView, meta: { robots: 'noindex' } },
     { path: "/admin/trade", name: "AdminTrade", component: AdminTradeView, meta: { robots: 'noindex' } },
     { path: "/admin/price", name: "AdminPrice", component: AdminPriceView, meta: { robots: 'noindex' } },
