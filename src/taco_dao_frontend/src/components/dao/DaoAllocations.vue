@@ -62,7 +62,8 @@
                     p-2 position-relative">
 
             <!-- dao allocations button -->
-            <button class="btn taco-nav-btn position-absolute taco-nav-btn--active"
+            <button v-if="showCurrentAllocations" 
+                    class="btn taco-nav-btn position-absolute taco-nav-btn--active"
                     style="top: 0.5rem; left: 0.5rem; z-index: 1000;"
                     title="View DAO allocations"
                     data-bs-toggle="tooltip"
