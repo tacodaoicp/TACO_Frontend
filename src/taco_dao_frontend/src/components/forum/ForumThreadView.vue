@@ -120,32 +120,54 @@
             </div>
 
         </div>
-        
-        <!-- add a comment button -->
-        <button v-if="proposalSelected && !error && !addingNewComment && userLoggedIn && posts.length > 0"
-                @click="addingNewComment = !addingNewComment, replyingToPost = null"
-                class="forum-thread-view__add-comment btn">
 
-            <!-- add comment icon -->
-            <i class="fa-solid fa-comment"></i>
+        <!-- new comment and sort selector container -->
+         <div class="d-flex align-items-baseline justify-content-between flex-wrap gap-3 mx-3">
 
-            <!-- add comment text -->
-            <span>Add a Comment</span>
+            <!-- left -->
+            <div>
 
-        </button>
+                <!-- add a comment button -->
+                <button v-if="proposalSelected && !error && !addingNewComment && userLoggedIn && posts.length > 0"
+                        @click="addingNewComment = !addingNewComment, replyingToPost = null"
+                        class="forum-thread-view__add-comment btn">
 
-        <!-- login to add comment button -->
-        <button v-if="!userLoggedIn && posts.length > 0" 
-                class="forum-thread-view__add-comment btn"
-                @click="iidLogIn()">
+                    <!-- add comment icon -->
+                    <i class="fa-solid fa-comment"></i>
 
-            <!-- dfinity logo -->
-            <DfinityLogo style="width: 1.375rem;" />
+                    <!-- add comment text -->
+                    <span>Add a Comment</span>
 
-            <!-- login to add comment text -->
-            <span>Login to Comment</span>
+                </button>
 
-        </button>
+                <!-- login to add comment button -->
+                <button v-if="!userLoggedIn && posts.length > 0" 
+                        class="forum-thread-view__add-comment btn"
+                        @click="iidLogIn()">
+
+                    <!-- dfinity logo -->
+                    <DfinityLogo style="width: 1.375rem;" />
+
+                    <!-- login to add comment text -->
+                    <span>Login to Comment</span>
+
+                </button>
+
+            </div>
+
+            <!-- right -->
+            <div class="ms-auto">
+
+                <!-- sort selector -->
+                <select v-model="sortBy" class="forum-thread-view__sort-selector">
+                    <option value="newest">Newest First</option>
+                    <option value="score">By Score</option>
+                    <option value="oldest">Oldest First</option>
+                </select>
+
+            </div>
+
+         </div>
 
         <!-- new comment -->
         <div v-if="proposalSelected && !error && addingNewComment" class="forum-thread-view__new-comment">
@@ -727,7 +749,6 @@
         color: var(--black-to-white);
         border: 1px solid var(--black-to-white);
         border-radius: 0.375rem;
-        margin-left: 1rem;
         padding: 0.5rem 1rem;
 
         // active
@@ -737,6 +758,17 @@
             border-radius: 0.375rem;
         }
     }
+
+    // sort selector
+    &__sort-selector {
+        font-size: 1rem;
+        padding: 0.5rem 0.5rem 0.5rem 1rem;
+        border-radius: 0.25rem;
+        border: 1px solid var(--black-to-white);
+        background-color: transparent;
+        font-family: "Space Mono";
+        color: var(--black-to-white);
+    }    
 
     // new comment
     &__new-comment {
@@ -1309,6 +1341,9 @@
     // collapsed posts
     const collapsedPosts = ref<Set<string>>(new Set())
 
+    // sort by
+    const sortBy = ref('newest')
+
     // images
     const astronautLoaderUrl = astronautLoader
     const sneedHeadTiny = SneedHeadTiny
@@ -1319,8 +1354,7 @@
 
     // snassys examples
 
-    const creatingThread = ref(false)
-    const showNewPostForm = ref(false)
+
     const highlightedPost = ref<string | null>(null)
     const userVotes = ref<Map<string, { voteType: 'upvote' | 'downvote' | null; voting: boolean }>>(new Map())
     const threadData = ref<any>({ exists: false, mapping: null, thread: null })
@@ -1556,7 +1590,7 @@
     const startReply = (postId: bigint) => {
         replyingToPost.value = postId
         replyBody.value = ''
-        showNewPostForm.value = false
+        addingNewComment.value = false
     }
 
     // cancel reply
@@ -1742,15 +1776,18 @@
 
                 // nullify new post body
                 newPostBody.value = ''
-
-                // hide new post form
-                showNewPostForm.value = false
                 
                 // reload posts to show the new post
                 await loadPosts(threadData.value.thread.id)
 
                 // reinitialize user votes for the updated posts
                 await initializeUserVotes()
+
+                // log
+                // console.log('new post created successfully, hiding new post form')
+
+                // hide new post form
+                addingNewComment.value = false
 
             }
 
@@ -1771,7 +1808,7 @@
         finally {
 
             // hide new post form
-            showNewPostForm.value = false
+            addingNewComment.value = false
 
             // hide component loading
             componentLoading.value = false
@@ -2018,12 +2055,7 @@
     // snassy examples
 
     // toggle new post form
-    const toggleNewPostForm = () => {
-        showNewPostForm.value = !showNewPostForm.value
-        if (!showNewPostForm.value) {
-            newPostBody.value = ''
-        }
-    }
+
 
     // scroll to parent post
     const scrollToParentPost = (parentPostId: bigint) => {
@@ -2156,6 +2188,8 @@
 
     // sorted posts using organizePostsTree logic
     const sortedPosts = computed(() => {
+        
+        // if there are no posts, return an empty array
         if (!posts.value.length) return []
         
         // create a map of all posts with replies array
@@ -2164,38 +2198,91 @@
 
         // initialize all posts in the map with empty replies array
         posts.value.forEach(post => {
+
+            // set post id as key and post data as value in the map
             postMap.set(Number(post.id), { ...post, replies: [] })
+
         })
 
         // organize into tree structure
         posts.value.forEach(post => {
+
+            // get post data from map
             const postData = postMap.get(Number(post.id))
+
+            // if post has a parent
             if (post.reply_to_post_id && Array.isArray(post.reply_to_post_id) && post.reply_to_post_id.length > 0) {
+
+                // get parent id
                 const parentId = Number(post.reply_to_post_id[0])
+
+                // get parent from map
                 const parent = postMap.get(parentId)
+                
+                // if parent exists
                 if (parent) {
+
+                    // add post to parent's replies
                     parent.replies.push(postData)
-                } else {
+
+                } 
+                
+                // else
+                else {
+
                     // parent not found, treat as root post
                     rootPosts.push(postData)
+
                 }
-            } else {
+                
+            } 
+            
+            // else
+            else {
+
+                // add post to root posts
                 rootPosts.push(postData)
+
             }
+
         })
 
-        // recursive function to sort replies by score
-        const sortRepliesByScore = (post: any) => {
-            post.replies.sort((a: any, b: any) => calculatePostScore(b) - calculatePostScore(a))
-            post.replies.forEach(sortRepliesByScore)
+        // recursive function to sort replies based on sortBy value
+        const sortReplies = (post: any) => {
+            switch (sortBy.value) {
+                case 'newest':
+                    post.replies.sort((a: any, b: any) => Number(b.created_at) - Number(a.created_at))
+                    break
+                case 'oldest':
+                    post.replies.sort((a: any, b: any) => Number(a.created_at) - Number(b.created_at))
+                    break
+                case 'score':
+                    post.replies.sort((a: any, b: any) => calculatePostScore(b) - calculatePostScore(a))
+                    break
+            }
+            
+            // recursively sort replies
+            post.replies.forEach(sortReplies)
         }
 
-        // sort root posts by ID (chronological) and then sort all replies by score
-        rootPosts.sort((a, b) => Number(a.id) - Number(b.id))
-        rootPosts.forEach(sortRepliesByScore)
+        // sort root posts based on sortBy value
+        switch (sortBy.value) {
+            case 'newest':
+                rootPosts.sort((a, b) => Number(b.created_at) - Number(a.created_at))
+                break
+            case 'oldest':
+                rootPosts.sort((a, b) => Number(a.created_at) - Number(b.created_at))
+                break
+            case 'score':
+                rootPosts.sort((a, b) => calculatePostScore(b) - calculatePostScore(a))
+                break
+        }
+        
+        rootPosts.forEach(sortReplies)
 
         // flatten the tree structure back to a flat array for the template
         return flattenPostTree(rootPosts)
+        
     })
 
     //////////////
