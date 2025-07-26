@@ -4853,6 +4853,8 @@ export const useTacoStore = defineStore('taco', () => {
             namesLoading.value = false;
         }
     }
+
+    // gets names from sneed hub
     const getPrincipalDisplayName = (principal: Principal | string): string => {
         const principalStr = typeof principal === 'string' ? principal : principal.toString();
         const cachedName = namesCache.value.principals.get(principalStr);
@@ -4867,6 +4869,8 @@ export const useTacoStore = defineStore('taco', () => {
             '…' + cleaned.substring(cleaned.length - 5) :
             cleaned;
     }
+
+    // gets names from sneed hub
     const getNeuronDisplayName = (snsRoot: Principal, neuronId: Uint8Array | number[]): string => {
         const mapKey = createNeuronKey(snsRoot, neuronId);
         const cachedName = namesCache.value.neurons.get(mapKey);
@@ -4881,6 +4885,8 @@ export const useTacoStore = defineStore('taco', () => {
             `Neuron ${neuronIdHex.substring(0, 6)}...${neuronIdHex.substring(neuronIdHex.length - 6)}` :
             `Neuron ${neuronIdHex}`;
     }
+
+    // 
     const setPrincipalName = async (name: string) => {
         try {
             if (!userLoggedIn.value) {

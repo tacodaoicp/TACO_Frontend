@@ -105,17 +105,9 @@
                 <div class="d-flex align-items-center flex-wrap">
 
                     <!-- comment count -->
-                    <span @click="addingNewComment = !addingNewComment, replyingToPost = null"
-                        class="forum-thread-view__header__comment-count">
+                    <span class="forum-thread-view__header__comment-count">
                         {{ posts.length }} comments
                     </span>
-
-                    <!-- add comment button -->
-                    <button @click="addingNewComment = !addingNewComment, replyingToPost = null"
-                            class="forum-thread-view__header__add-comment btn"
-                            :class="{ 'forum-thread-view__header__add-comment--active': addingNewComment }">
-                        <i class="fa-solid fa-comment"></i>
-                    </button>
 
                     <!-- refresh button -->
                     <button @click="refreshPosts"
@@ -128,6 +120,34 @@
             </div>
 
         </div>
+        
+        <!-- add a comment button -->
+        <button v-if="proposalSelected && !error && !addingNewComment && userLoggedIn && posts.length > 0"
+                @click="addingNewComment = !addingNewComment, replyingToPost = null"
+                class="forum-thread-view__add-comment btn">
+
+            <!-- add comment icon -->
+            <i class="fa-solid fa-comment"></i>
+
+            <!-- add comment text -->
+            <span>Add a Comment</span>
+
+        </button>
+
+        <!-- login to add comment button -->
+        <button v-if="!userLoggedIn && posts.length > 0" 
+                class="forum-thread-view__add-comment btn"
+                @click="iidLogIn()">
+
+            <!-- dfinity logo -->
+            <DfinityLogo style="width: 1.375rem;" />
+
+            <!-- login to add comment text -->
+            <span>Login to Comment</span>
+
+        </button>
+
+
 
         <!-- new comment -->
         <div v-if="proposalSelected && !error && addingNewComment" class="forum-thread-view__new-comment">
@@ -194,7 +214,10 @@
                          :key="post.id.toString()" 
                          class="forum-thread-view__post shadow"
                          :class="{ 'forum-thread-view__post--collapsed': collapsedPosts.has(post.id.toString()) }"
-                         :style="{ marginLeft: getPostNestingLevel(post, new Map(posts.map(p => [p.id.toString(), p]))) * 1.5 + 'rem' }">
+                         :style="{ 
+                             marginLeft: getPostNestingLevel(post, new Map(posts.map(p => [p.id.toString(), p]))) * 1.5 + 'rem',
+                             display: isPostHidden(post) ? 'none' : 'block'
+                         }">
 
                         <!-- post loading curtain -->
                         <div v-if="post.loading" class="forum-thread-view__post__loading-curtain">
@@ -329,7 +352,8 @@
                             </div>
 
                             <!-- reply button -->
-                            <button @click="startReply(post.id), addingNewComment = false"
+                            <button v-if="userLoggedIn"
+                                    @click="startReply(post.id), addingNewComment = false"
                                     class="forum-thread-view__post-reply-btn">
 
                                 <!-- reply icon -->
@@ -337,6 +361,19 @@
 
                                 <!-- reply text -->
                                 <span>Reply</span>
+
+                            </button>
+
+                            <!-- login to reply -->
+                            <button v-else
+                                    @click="iidLogIn()"
+                                    class="forum-thread-view__post-reply-btn">
+
+                                <!-- dfinity logo -->
+                                <DfinityLogo style="width: 1.375rem;" />
+
+                                <!-- login to reply text -->
+                                <span>Login to Reply</span>
 
                             </button>
 
@@ -391,7 +428,7 @@
 
             <!-- login to comment -->
             <button v-if="!userLoggedIn"
-                    class="btn d-flex align-items-center gap-2"
+                    class="forum-thread-view__add-comment btn ms-0"
                     @click="iidLogIn()">
 
                 <!-- dfinity logo -->
@@ -405,30 +442,55 @@
             <!-- add a comment button -->
             <button v-if="userLoggedIn && !addingNewComment"
                     @click="addingNewComment = !addingNewComment"
-                    class="btn taco-btn taco-btn--green taco-btn--big">Add a Comment</button>
+                    class="forum-thread-view__add-comment btn ms-0">
+                    
+                    <!-- add comment icon -->
+                    <i class="fa-solid fa-comment"></i>
+
+                    <!-- add comment text -->
+                    <span>Add a Comment</span>
+                    
+                </button>
 
         </div>
 
         <!-- error -->
         <div v-if="error" class="forum-thread-view__error-container">
 
+            <!-- taco error image -->
+            <TacoError class="forum-thread-view__error-container__image" />
+
             <!-- title -->
-            <span class="forum-thread-view__error-container__title">Something went tacos up 😱</span>
+            <span class="forum-thread-view__error-container__title">Uh oh! Something went tacos up 😱</span>
 
             <!-- error message -->
-            <span class="forum-thread-view__error-container__message">error: {{ error || 'none provided' }}</span>
+            <span class="forum-thread-view__error-container__message">{{ error || 'none provided' }}</span>
 
             <!-- reload container -->
             <div class="forum-thread-view__error-container__reload-container">
+
+                <!-- back button -->
+                <button @click="error = null" class="btn taco-nav-btn taco-nav-btn--active mt-3">
+                    
+                    <!-- back icon -->
+                    <i class="fa-solid fa-arrow-left"></i>
+
+                    <!-- back text -->
+                    <span>Back</span>
+
+                </button>
+                
+                <!-- or -->
+                <span style="color: var(--black-to-white);">or</span>
                 
                 <!-- retry button -->
-                <button @click="loadThreadData" class="btn taco-nav-btn taco-nav-btn--active">
+                <button @click="error = null; componentLoading = true; loadThreadData().then(() => componentLoading = false)" class="btn taco-nav-btn taco-nav-btn--active mt-3">
 
                     <!-- reload icon -->
                     <i class="fa-solid fa-refresh"></i>
 
                     <!-- retry text -->
-                    <span>Retry</span>
+                    <span>Reload</span>
                     
                 </button>
 
@@ -635,8 +697,6 @@
             font-weight: 600;
             text-wrap: nowrap;
             color: var(--black);
-            cursor: pointer;
-            user-select: none;
         }
 
         // add comment button
@@ -659,6 +719,25 @@
             color: var(--dark-brown-to-light-orange);
         }
 
+    }
+
+    // add comment button
+    &__add-comment {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        color: var(--black-to-white);
+        border: 1px solid var(--black-to-white);
+        border-radius: 0.375rem;
+        margin-left: 1rem;
+        padding: 0.5rem 1rem;
+
+        // active
+        &:active {
+            color: var(--black-to-white);
+            border: 1px solid var(--black-to-white);
+            border-radius: 0.375rem;
+        }
     }
 
     // new comment
@@ -725,18 +804,28 @@
         gap: 1rem;
         margin-top: 5rem;
 
+        // image
+        &__image {
+            width: 100%;
+            max-width: 10rem;
+        }
+
         // title
         &__title {
-            
+            color: var(--black-to-white);
         }
 
         // message  
         &__message {
-            
+            color: var(--black-to-white);
         }
 
         // reload container 
         &__reload-container {
+            display: flex;
+            align-items: baseline;
+            flex-wrap: wrap;
+            gap: 1rem;
 
             // reload button
             .btn {
@@ -1156,6 +1245,7 @@
     import SneedHeadTiny from '../../assets/images/sneed-head-tiny.png'
     import astronautLoader from '../../assets/images/astonautLoader.webp'
     import DfinityLogo from "../../assets/images/dfinityLogo.vue"
+    import TacoError from '../../assets/images/tacoError.vue'
 
     ///////////
     // store //
@@ -1687,13 +1777,44 @@
 
     }    
 
+    // check if a post should be hidden (has a collapsed ancestor)
+    const isPostHidden = (post: any): boolean => {
+        // if this post has no parent, it's never hidden
+        if (!post.reply_to_post_id || !Array.isArray(post.reply_to_post_id) || post.reply_to_post_id.length === 0) {
+            return false
+        }
+        
+        // check if any ancestor is collapsed
+        const checkAncestors = (currentPost: any): boolean => {
+            if (!currentPost.reply_to_post_id || !Array.isArray(currentPost.reply_to_post_id) || currentPost.reply_to_post_id.length === 0) {
+                return false
+            }
+            
+            // check if parent is collapsed
+            const parentId = currentPost.reply_to_post_id[0]
+            if (collapsedPosts.value.has(parentId.toString())) {
+                return true
+            }
+            
+            // recursively check parent's ancestors
+            const parentPost = posts.value.find(p => p.id === parentId)
+            if (parentPost) {
+                return checkAncestors(parentPost)
+            }
+            
+            return false
+        }
+        
+        return checkAncestors(post)
+    }
+
     // collapse group
     const collapseGroup = (postId: bigint) => {
 
         // log
         // console.log('collapsing group', postId)
 
-        // toggle collapsed state
+        // toggle collapsed state for just this post
         const postIdStr = postId.toString()
         if (collapsedPosts.value.has(postIdStr)) {
             collapsedPosts.value.delete(postIdStr)
@@ -1757,15 +1878,15 @@
         // if user is not logged in, return
         if (!tacoStore.userLoggedIn) return
         
+        // get user's current vote
+        const currentVote = getUserVote(postId)
+        
         // try
         try {
 
             // set post loading to true
             const post = posts.value.find(post => post.id === postId)
             if (post) post.loading = true   
-            
-            // get user's current vote
-            const currentVote = getUserVote(postId)            
 
             // set voting state
             userVotes.value.set(postId.toString(), {
@@ -2011,60 +2132,67 @@
         return getPostNestingLevel(parentPost, postsMap) + 1
     }
 
-    // sorted posts with replies nested under parent posts
-    const sortedPosts = computed(() => {
-        if (!posts.value.length) return []
+    // calculate post score for sorting (similar to organizePostsTree)
+    const calculatePostScore = (post: any) => {
+        return getNetVoteScoreValue(post)
+    }
+
+    // flatten tree structure into ordered list
+    const flattenPostTree = (posts: any[]): any[] => {
+        const result: any[] = []
         
-        // create a map of posts by id for quick lookup
-        const postsMap = new Map(posts.value.map(post => [post.id.toString(), post]))
-        
-        // separate top-level posts (no reply_to_post_id) from replies
-        const topLevelPosts: any[] = []
-        const replies: any[] = []
-        
-        posts.value.forEach(post => {
-            // check if post is a reply by looking for valid reply_to_post_id array
-            const isReply = post.reply_to_post_id && 
-                           Array.isArray(post.reply_to_post_id) && 
-                           post.reply_to_post_id.length > 0
-            
-            if (isReply) {
-                replies.push(post)
-            } else {
-                topLevelPosts.push(post)
+        posts.forEach(post => {
+            result.push(post)
+            if (post.replies && post.replies.length > 0) {
+                result.push(...flattenPostTree(post.replies))
             }
         })
         
-        // sort top-level posts by creation date (oldest first)
-        topLevelPosts.sort((a, b) => Number(a.created_at) - Number(b.created_at))
-        
-        // sort replies by creation date (oldest first)
-        replies.sort((a, b) => Number(a.created_at) - Number(b.created_at))
-        
-        // insert replies after their parent posts
-        const result: any[] = []
-        
-        topLevelPosts.forEach(post => {
-            result.push(post)
-            
-            // find all replies to this post
-            const postReplies = replies.filter(reply => 
-                reply.reply_to_post_id && 
-                Array.isArray(reply.reply_to_post_id) &&
-                reply.reply_to_post_id.some((parentId: bigint) => parentId === post.id)
-            )
-            
-            // add replies after the parent post
-            result.push(...postReplies)
-        })
-        
-        // safety check: if we're missing posts, fall back to original order
-        if (result.length !== posts.value.length) {
-            console.warn('Some posts were lost in sorting, falling back to original order')
-            return posts.value.sort((a, b) => Number(a.created_at) - Number(b.created_at))
-        }
-        
         return result
+    }
+
+    // sorted posts using organizePostsTree logic
+    const sortedPosts = computed(() => {
+        if (!posts.value.length) return []
+        
+        // create a map of all posts with replies array
+        const postMap = new Map()
+        const rootPosts: any[] = []
+
+        // initialize all posts in the map with empty replies array
+        posts.value.forEach(post => {
+            postMap.set(Number(post.id), { ...post, replies: [] })
+        })
+
+        // organize into tree structure
+        posts.value.forEach(post => {
+            const postData = postMap.get(Number(post.id))
+            if (post.reply_to_post_id && Array.isArray(post.reply_to_post_id) && post.reply_to_post_id.length > 0) {
+                const parentId = Number(post.reply_to_post_id[0])
+                const parent = postMap.get(parentId)
+                if (parent) {
+                    parent.replies.push(postData)
+                } else {
+                    // parent not found, treat as root post
+                    rootPosts.push(postData)
+                }
+            } else {
+                rootPosts.push(postData)
+            }
+        })
+
+        // recursive function to sort replies by score
+        const sortRepliesByScore = (post: any) => {
+            post.replies.sort((a: any, b: any) => calculatePostScore(b) - calculatePostScore(a))
+            post.replies.forEach(sortRepliesByScore)
+        }
+
+        // sort root posts by ID (chronological) and then sort all replies by score
+        rootPosts.sort((a, b) => Number(a.id) - Number(b.id))
+        rootPosts.forEach(sortRepliesByScore)
+
+        // flatten the tree structure back to a flat array for the template
+        return flattenPostTree(rootPosts)
     })
 
     //////////////
@@ -2099,6 +2227,25 @@
 
             // set proposal selected to false
             proposalSelected.value = false
+
+        }
+
+    })
+
+    // watch for logout
+    watch(() => userLoggedIn.value, async (newVal) => {
+
+        // log
+        // console.log('user logged in changed to', newVal)
+
+        // if user is logged out
+        if (!newVal) {
+
+            // set adding new comment to false
+            addingNewComment.value = false
+
+            // set replying to post to null
+            replyingToPost.value = null
 
         }
 
