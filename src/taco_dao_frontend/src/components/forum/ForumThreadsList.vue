@@ -107,7 +107,8 @@
                           <div class="forum-threads-list__thread__right__bottom">
                               
                               <!-- author -->
-                              <span class="forum-threads-list__thread__author">name</span>
+                              <span v-if="getProposerNeuronDisplayName(proposal.proposer) !== ''"
+                                    class="forum-threads-list__thread__author">{{ getProposerNeuronDisplayName(proposal.proposer) }}</span>
 
                               <!-- principal -->
                               <span class="forum-threads-list__thread__principal">{{ truncateHex(proposal.proposer) }}</span>
@@ -433,6 +434,7 @@
     import { storeToRefs } from 'pinia'
     import { useTacoStore } from '../../stores/taco.store'
     import astronautLoader from '../../assets/images/astonautLoader.webp'
+    import { Principal } from '@dfinity/principal'
 
     ///////////
     // store //
@@ -447,8 +449,28 @@
 
     // # ACTIONS #
 
+    // user
+    const { getNeuronDisplayName } = tacoStore // not reactive
+
     // forum
     const { toggleThreadMenu } = tacoStore // not reactive
+
+    /////////////////////
+    // local methods //
+    /////////////////////
+
+    // convert proposer string to neuron display name
+    const getProposerNeuronDisplayName = (proposerString) => {
+        if (!proposerString) return ''
+        
+        // convert the proposer string to Uint8Array (neuron ID)
+        const neuronIdBytes = new Uint8Array(proposerString.match(/.{1,2}/g).map(byte => parseInt(byte, 16)))
+        
+        // SNS root canister ID
+        const snsRoot = Principal.fromText('lacdn-3iaaa-aaaaq-aae3a-cai')
+        
+        return getNeuronDisplayName(snsRoot, neuronIdBytes)
+    }
 
     /////////////////////
     // local variables //

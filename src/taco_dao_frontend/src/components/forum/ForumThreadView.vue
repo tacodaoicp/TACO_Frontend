@@ -147,8 +147,6 @@
 
         </button>
 
-
-
         <!-- new comment -->
         <div v-if="proposalSelected && !error && addingNewComment" class="forum-thread-view__new-comment">
 
@@ -1472,6 +1470,11 @@
 
     // refresh posts
     const refreshPosts = async () => {
+
+        // if thread id is null, just return
+        if (!threadData.value.thread?.id) {
+            return
+        }
 
         // component loading
         componentLoading.value = true

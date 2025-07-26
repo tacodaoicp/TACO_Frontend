@@ -4879,11 +4879,8 @@ export const useTacoStore = defineStore('taco', () => {
             return cachedName.verified ? `✓ ${cachedName.name}` : cachedName.name;
         }
         
-        // Fallback to truncated neuron ID
-        const neuronIdHex = uint8ArrayToHex(neuronId);
-        return neuronIdHex.length > 12 ? 
-            `Neuron ${neuronIdHex.substring(0, 6)}...${neuronIdHex.substring(neuronIdHex.length - 6)}` :
-            `Neuron ${neuronIdHex}`;
+        // return empty string if no match found
+        return '';
     }
 
     // 
