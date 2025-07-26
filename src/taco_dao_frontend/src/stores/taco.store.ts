@@ -4788,12 +4788,18 @@ export const useTacoStore = defineStore('taco', () => {
         }        
         return 'g7s5u-tqaaa-aaaad-qhktq-cai'; // Replace with actual local/default ID
     }
+
+    // uint8 array to hex
     const uint8ArrayToHex = (arr: Uint8Array | number[]): string => {
         return Array.from(arr, byte => byte.toString(16).padStart(2, '0')).join('');
     }
+
+    // create neuron key
     const createNeuronKey = (snsRoot: Principal, neuronId: Uint8Array | number[]): string => {
         return `${snsRoot.toString()}:${uint8ArrayToHex(neuronId)}`;
     }
+
+    // load all names
     const loadAllNames = async () => {
         // console.log('🔍 loadAllNames() called');
         
@@ -4854,7 +4860,7 @@ export const useTacoStore = defineStore('taco', () => {
         }
     }
 
-    // gets names from sneed hub
+    // get principal name
     const getPrincipalDisplayName = (principal: Principal | string): string => {
         const principalStr = typeof principal === 'string' ? principal : principal.toString();
         const cachedName = namesCache.value.principals.get(principalStr);
@@ -4870,7 +4876,7 @@ export const useTacoStore = defineStore('taco', () => {
             cleaned;
     }
 
-    // gets names from sneed hub
+    // get neuron name
     const getNeuronDisplayName = (snsRoot: Principal, neuronId: Uint8Array | number[]): string => {
         const mapKey = createNeuronKey(snsRoot, neuronId);
         const cachedName = namesCache.value.neurons.get(mapKey);
@@ -4883,7 +4889,7 @@ export const useTacoStore = defineStore('taco', () => {
         return '';
     }
 
-    // 
+    // get principal name
     const setPrincipalName = async (name: string) => {
         try {
             if (!userLoggedIn.value) {
@@ -4922,6 +4928,8 @@ export const useTacoStore = defineStore('taco', () => {
             throw error;
         }
     }
+
+    // set neuron name
     const setNeuronName = async (snsRoot: Principal, neuronId: Uint8Array | number[], name: string) => {
         try {
             if (!userLoggedIn.value) {
@@ -4963,6 +4971,8 @@ export const useTacoStore = defineStore('taco', () => {
             throw error;
         }
     }
+
+    // get user neurons
     const getUserNeurons = async () => {
         try {
             if (!userLoggedIn.value) {

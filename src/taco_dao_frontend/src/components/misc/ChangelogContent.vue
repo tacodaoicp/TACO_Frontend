@@ -12,9 +12,9 @@
                 </h3>
                 <span class="changelog-content__date">🍽️ July 21, 2025</span>
                 <p class="changelog-content__text">
-                    - Added custom Sneed Hub integration at /chat/forum
+                    - Replaced Sneed tab with a custom Sneed Hub integration at /chat/forum
                 </p>
-            </div> 
+            </div>
 
             <!-- changelog item -->
             <div class="changelog-content__item">

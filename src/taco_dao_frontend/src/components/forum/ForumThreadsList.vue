@@ -161,9 +161,11 @@
       z-index: 99999;
       border-top-left-radius: 0.5rem;
       border-bottom-left-radius: 0.5rem;
+      user-select: none;
 
       .loading-img {
         width: 10rem;
+        user-select: none;
       }
     }
 

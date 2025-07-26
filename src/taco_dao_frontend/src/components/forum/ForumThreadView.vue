@@ -283,7 +283,7 @@
                             </div>
 
                             <!-- post update -->
-                            <div v-if="isPostEdited(post)" class="forum-thread-view__post-updated">
+                            <div v-if="isPostEdited(post)" class="d-none forum-thread-view__post-updated">
 
                                 <!-- update date text -->
                                 <span data-bs-toggle="tooltip" 
@@ -551,9 +551,11 @@
       align-items: center;
       justify-content: center;
       z-index: 99999;
+      user-select: none;
 
       .loading-img {
         width: 10rem;
+        user-select: none;
       }
 
     }    
@@ -562,13 +564,12 @@
     &__hamburger-menu {
       display: none;
       position: absolute;
-    //   top: 3.5rem;
       right: 0.25rem;
       background-color: var(--brown);
       height: fit-content;
       padding: 0.5rem 0.75rem;
       border-radius: 0.25rem;
-      z-index: 2000;
+      z-index: 999;
       cursor: pointer;
 
       // icon
@@ -607,7 +608,7 @@
         .wiggly-arrow { 
             display: none;
             width: 6rem;
-            transform: translate(2rem, -3rem) rotate(-10deg);
+            transform: translate(2rem, -3rem);
         }
 
         // show twisty arrow when on small screens
@@ -883,6 +884,8 @@
         flex-direction: column;
         gap: 1rem;
         margin-top: 1rem;
+        overflow-x: hidden;
+        overflow-y: auto;
     }
 
     // post
@@ -929,6 +932,7 @@
         // post header
         &-header {
             display: flex;
+            flex-wrap: wrap;
             align-items: baseline;
         }
 
@@ -998,6 +1002,7 @@
         &-footer {
             display: flex;
             align-items: start;
+            flex-wrap: wrap;
             gap: 0.5rem;
             margin-top: 0.75rem;
         }
@@ -1186,6 +1191,15 @@
 // media queries //
 ///////////////////
 
+// less than 390px
+@media (max-width: 389.98px) {
+
+    // hide twisty arrow
+    .forum-thread-view__navigation__right {
+        display: none !important;
+    }
+}
+
 // phone protrait
 @media (max-width: 575.98px) {
     
@@ -1314,8 +1328,14 @@
     // component loading
     const componentLoading = ref(false)
 
-    // error
-    const error = ref<string | null>(null)
+    // user votes
+    const userVotes = ref<Map<string, { voteType: 'upvote' | 'downvote' | null; voting: boolean }>>(new Map())
+    
+    // thread data
+    const threadData = ref<any>({ exists: false, mapping: null, thread: null })
+
+    // posts
+    const posts = ref<any[]>([])
 
     // proposal
     const proposal = ref<any>(null)
@@ -1351,19 +1371,8 @@
     const astronautLoaderUrl = astronautLoader
     const sneedHeadTiny = SneedHeadTiny
 
-
-
-    
-
-    // snassys examples
-
-
-    const highlightedPost = ref<string | null>(null)
-    const userVotes = ref<Map<string, { voteType: 'upvote' | 'downvote' | null; voting: boolean }>>(new Map())
-    const threadData = ref<any>({ exists: false, mapping: null, thread: null })
-    const posts = ref<any[]>([])
-
-
+    // error
+    const error = ref<string | null>(null)    
 
     ///////////////////
     // local methods //
@@ -2012,6 +2021,56 @@
 
     }
 
+    // calculate nesting level for a post
+    const getPostNestingLevel = (post: any, postsMap: Map<string, any>): number => {
+        if (!post.reply_to_post_id || !Array.isArray(post.reply_to_post_id) || post.reply_to_post_id.length === 0) {
+            return 0 // top level post
+        }
+        
+        // find the first parent post (assuming single parent for simplicity)
+        const parentId = post.reply_to_post_id[0]
+        const parentPost = postsMap.get(parentId.toString())
+        
+        if (!parentPost) {
+            return 0 // parent not found, treat as top level
+        }
+        
+        // recursively calculate parent's nesting level and add 1
+        return getPostNestingLevel(parentPost, postsMap) + 1
+    }
+
+    // calculate post score for sorting (similar to organizePostsTree)
+    const calculatePostScore = (post: any) => {
+        return getNetVoteScoreValue(post)
+    }
+
+    // flatten tree structure into ordered list
+    const flattenPostTree = (posts: any[]): any[] => {
+        const result: any[] = []
+        
+        posts.forEach(post => {
+            result.push(post)
+            if (post.replies && post.replies.length > 0) {
+                result.push(...flattenPostTree(post.replies))
+            }
+        })
+        
+        return result
+    }
+
+    // check if post was edited (at least 1 minute apart)
+    const isPostEdited = (post: any) => {
+        // convert nanoseconds to milliseconds
+        const createdMs = Number(post.created_at) / 1_000_000
+        const updatedMs = Number(post.updated_at) / 1_000_000
+        
+        // calculate time difference in seconds
+        const timeDiffSeconds = (updatedMs - createdMs) / 1000
+        
+        // only show edited if difference is 60+ seconds (1 minute)
+        return timeDiffSeconds >= 60
+    }
+
     // date formatting
     const formatShortDate = (date: Date) => {
         return date.toLocaleDateString('en-US', {
@@ -2050,93 +2109,6 @@
         })
     }
 
-
-
-
-
-
-    // snassy examples
-
-    // toggle new post form
-
-
-    // scroll to parent post
-    const scrollToParentPost = (parentPostId: bigint) => {
-        const parentPostElement = document.getElementById(`post-${parentPostId.toString()}`)
-        if (parentPostElement) {
-            parentPostElement.scrollIntoView({ behavior: 'smooth', block: 'center' })
-            highlightedPost.value = parentPostId.toString()
-            
-            // Clear highlight after 3 seconds
-            setTimeout(() => {
-            highlightedPost.value = null
-            }, 3000)
-        } else {
-            console.warn('Parent post not found:', parentPostId.toString())
-            // Show toast or alert that parent post is not visible
-            tacoStore.addToast({
-            id: Date.now(),
-            code: 'parent-post-not-found',
-            title: 'Parent Post Not Found',
-            icon: 'fa-solid fa-exclamation-triangle',
-            message: 'The parent post may be in a different page or not loaded yet.'
-            })
-        }
-    }  
-
-    // utility functions
-    const getStatusClass = (status: string) => {
-        switch (status) {
-            case 'Open': return 'badge bg-primary'
-            case 'Adopted': return 'badge bg-success'
-            case 'Executed': return 'badge bg-info'
-            case 'Rejected': return 'badge bg-danger'
-            case 'Failed': return 'badge bg-warning'
-            default: return 'badge bg-secondary'
-        }
-    }
-
-    // check if post was edited (at least 1 minute apart)
-    const isPostEdited = (post: any) => {
-        // convert nanoseconds to milliseconds
-        const createdMs = Number(post.created_at) / 1_000_000
-        const updatedMs = Number(post.updated_at) / 1_000_000
-        
-        // calculate time difference in seconds
-        const timeDiffSeconds = (updatedMs - createdMs) / 1000
-        
-        // only show edited if difference is 60+ seconds (1 minute)
-        return timeDiffSeconds >= 60
-    }
-
-    const formatVotes = (votes: bigint) => {
-        const num = Number(votes)
-        if (num >= 1000000) {
-            return (num / 1000000).toFixed(1) + 'M'
-        } else if (num >= 1000) {
-            return (num / 1000).toFixed(1) + 'K'
-        }
-        return num.toString()
-    }
-    const truncateHex = (hex: string) => {
-        if (hex.length <= 10) return hex
-        return hex.substring(0, 6) + '…' + hex.substring(hex.length - 4)
-    }
-    const calculateYesPercentage = (proposal: any) => {
-        if (proposal.totalVotes === BigInt(0)) return 0
-        return (Number(proposal.yesVotes) / Number(proposal.totalVotes)) * 100
-    }
-    const calculateNoPercentage = (proposal: any) => {
-        if (proposal.totalVotes === BigInt(0)) return 0
-        return (Number(proposal.noVotes) / Number(proposal.totalVotes)) * 100
-    }
-
-
-
-
-
-    
-
     //////////////
     // computed //
     //////////////
@@ -2151,43 +2123,6 @@
         return id ? BigInt(id) : null
 
     })
-
-    // calculate nesting level for a post
-    const getPostNestingLevel = (post: any, postsMap: Map<string, any>): number => {
-        if (!post.reply_to_post_id || !Array.isArray(post.reply_to_post_id) || post.reply_to_post_id.length === 0) {
-            return 0 // top level post
-        }
-        
-        // find the first parent post (assuming single parent for simplicity)
-        const parentId = post.reply_to_post_id[0]
-        const parentPost = postsMap.get(parentId.toString())
-        
-        if (!parentPost) {
-            return 0 // parent not found, treat as top level
-        }
-        
-        // recursively calculate parent's nesting level and add 1
-        return getPostNestingLevel(parentPost, postsMap) + 1
-    }
-
-    // calculate post score for sorting (similar to organizePostsTree)
-    const calculatePostScore = (post: any) => {
-        return getNetVoteScoreValue(post)
-    }
-
-    // flatten tree structure into ordered list
-    const flattenPostTree = (posts: any[]): any[] => {
-        const result: any[] = []
-        
-        posts.forEach(post => {
-            result.push(post)
-            if (post.replies && post.replies.length > 0) {
-                result.push(...flattenPostTree(post.replies))
-            }
-        })
-        
-        return result
-    }
 
     // sorted posts using organizePostsTree logic
     const sortedPosts = computed(() => {
