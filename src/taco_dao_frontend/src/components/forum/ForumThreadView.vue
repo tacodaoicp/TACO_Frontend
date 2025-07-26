@@ -982,13 +982,16 @@
         // post title
         &-title {
             font-weight: 600;
-            margin-bottom: 0.25rem;
+            margin-bottom: 0.5rem;
             font-size: 1.125rem;
         }
 
         // post text
         &-text {
+            font-family: "Rubik";
+            font-weight: 300;
             margin-bottom: 0;
+            line-height: 1.625;
         }
 
         // post footer
