@@ -122,13 +122,14 @@
         </div>
 
         <!-- new comment and sort selector container -->
-         <div class="d-flex align-items-baseline justify-content-between flex-wrap gap-2 mx-3">
+         <div v-if="proposalSelected && !error && posts.length > 0"
+                class="d-flex align-items-baseline justify-content-between flex-wrap gap-2 mx-3">
 
             <!-- left -->
             <div>
 
                 <!-- add a comment button -->
-                <button v-if="proposalSelected && !error && !addingNewComment && userLoggedIn && posts.length > 0"
+                <button v-if="!addingNewComment && userLoggedIn"
                         @click="addingNewComment = !addingNewComment, replyingToPost = null"
                         class="forum-thread-view__add-comment btn">
 
@@ -141,7 +142,7 @@
                 </button>
 
                 <!-- login to add comment button -->
-                <button v-if="!userLoggedIn && posts.length > 0" 
+                <button v-if="!userLoggedIn" 
                         class="forum-thread-view__add-comment btn"
                         @click="iidLogIn()">
 
@@ -156,7 +157,7 @@
             </div>
 
             <!-- right -->
-            <div v-if="posts.length > 0" class="ms-auto">
+            <div class="ms-auto">
 
                 <!-- sort selector -->
                 <select v-model="sortBy" class="forum-thread-view__sort-selector">
