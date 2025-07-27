@@ -122,7 +122,7 @@
         </div>
 
         <!-- new comment and sort selector container -->
-         <div class="d-flex align-items-baseline justify-content-between flex-wrap gap-3 mx-3">
+         <div class="d-flex align-items-baseline justify-content-between flex-wrap gap-2 mx-3">
 
             <!-- left -->
             <div>
@@ -156,13 +156,13 @@
             </div>
 
             <!-- right -->
-            <div class="ms-auto">
+            <div v-if="posts.length > 0" class="ms-auto">
 
                 <!-- sort selector -->
                 <select v-model="sortBy" class="forum-thread-view__sort-selector">
-                    <option value="newest">Newest First</option>
+                    <option value="newest">By Newest</option>
                     <option value="score">By Score</option>
-                    <option value="oldest">Oldest First</option>
+                    <option value="oldest">By Oldest</option>
                 </select>
 
             </div>
@@ -763,7 +763,7 @@
     // sort selector
     &__sort-selector {
         font-size: 1rem;
-        padding: 0.5rem 0.5rem 0.5rem 1rem;
+        padding: 0.5rem;
         border-radius: 0.25rem;
         border: 1px solid var(--black-to-white);
         background-color: transparent;
