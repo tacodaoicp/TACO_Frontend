@@ -1777,14 +1777,14 @@ export const useTacoStore = defineStore('taco', () => {
                     // refresh user allocation to get updated data
                     await fetchUserAllocation()
                     
-                    // show success toast
-                    addToast({
-                        id: Date.now(),
-                        code: 'voting-power-refreshed',
-                        title: 'Voting Power Updated',
-                        icon: 'fa-solid fa-check-circle',
-                        message: `Updated from ${result.ok.oldVotingPower} to ${result.ok.newVotingPower} VP (${result.ok.neuronsUpdated} neurons)`
-                    })
+                    // // show success toast
+                    // addToast({
+                    //     id: Date.now(),
+                    //     code: 'voting-power-refreshed',
+                    //     title: 'Voting Power Updated',
+                    //     icon: 'fa-solid fa-check-circle',
+                    //     message: `Updated from ${result.ok.oldVotingPower} to ${result.ok.newVotingPower} VP (${result.ok.neuronsUpdated} neurons)`
+                    // })
                     
                     return result.ok
                 } else {
