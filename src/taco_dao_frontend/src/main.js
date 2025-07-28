@@ -60,9 +60,7 @@ const routes = [
     { path: "/admin/votes", name: "AdminVotes", component: AdminVotesView, meta: { robots: 'noindex' } },
     { path: "/forum", name: "Forum", component: ForumView, meta: { robots: 'noindex' } },
     { path: "/forum/thread/:id", name: "Thread", component: ThreadView, meta: { robots: 'noindex' } },
-    { path: "/names", name: "Names", component: NamesView, meta: { robots: 'noindex' } },
-    { path: "/proposals", name: "Proposals", component: ProposalsView, meta: { robots: 'noindex' } },
-    { path: "/proposal/:id", name: "Proposal", component: ProposalView, meta: { robots: 'noindex' } },
+    { path: "/names", name: "Names", component: NamesView, meta: { robots: 'noindex' } }, //remove once integrated
     { path: "/:pathMatch(.*)*", redirect: "/" },
 ]
 
