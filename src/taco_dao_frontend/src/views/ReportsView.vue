@@ -4343,7 +4343,7 @@ Internet Computer. It has a community feature similar to Discord servers, which 
 different 'channels' for people to interact in. <a href="https://x.com/OpenChat/status/1648373664872579072" target="_blank" class="taco-report-explorer__report-link">Communities can have channels that are gated by certain
 requirements to join</a>. These requirements can include the verification of locked DAO token neurons,
 token balances, unique personhood, credentials, or a payment which is split equally among community
-owners and from which a small % goes to the OpenChat treasury
+owners and from which a small % goes to the OpenChat treasury. Communities can get verified with blue ticks via proposals.
                     </p>
 
                     <!-- paragraph -->
@@ -4358,7 +4358,7 @@ discuss them.
                       The dApp has many quality-of-life features and settings, such as the ability for users to customize the
 look of their UI with custom colour themes and font sizes. Communities come decked out with
 customisable parameters, channel descriptions, and channel rules. Profiles have usernames, display
-names, bios, and profile pictures. <a href="https://x.com/OpenChat/status/1442447454985674753" target="_blank" class="taco-report-explorer__report-link">Users of Android devices can receive push notifications</a>. Large scale
+names, bios, and profile pictures. <a href="https://x.com/OpenChat/status/1442447454985674753" target="_blank" class="taco-report-explorer__report-link">Users of Android and iOS devices can receive push notifications</a>. Large scale
 video & audio live spaces are able to be hosted, allowing communities to come together and discuss live
 en masse, or allowing projects to make live presentations and answer questions.
                     </p>
@@ -4386,7 +4386,7 @@ not charge for these integrations, but may do so later as part of the chat as a 
 Alongside p2p swaps and token tipping, tokens can be used to create 'prize' messages, which other users
 can claim tokens from. Prize messages can have claim restrictions, parameters such as claim period and
 number of claimants, and be distributed randomly or equally to claimants. Projects pay 500 CHAT for
-their token to be added to OpenChat.
+their token to be added to OpenChat. Native bitcoin can be deposited and withdrawn.
                     </p>
 
                     <!-- paragraph -->
@@ -4431,7 +4431,7 @@ also a planned AI chat bot
 
                         <!-- paragraph -->
                         <p class="taco-report-explorer__report-paragraph">
-                          Adding end-to-end encryption to 1-1 chats and private group chats
+                          Adding end-to-end encryption to 1-1 chats, private group chats, and private channels.
                         </p>
 
                       </li>
@@ -4451,7 +4451,7 @@ also a planned AI chat bot
 
                         <!-- paragraph -->
                         <p class="taco-report-explorer__report-paragraph">
-                          Enabling native Bitcoin deposits and withdrawals
+                          Enabling monetisation of communities via advertising, enabling owners to pay to boost their community in the community explorer, and decentralising community governance.
                         </p>
 
                       </li>
@@ -4461,19 +4461,7 @@ also a planned AI chat bot
 
                         <!-- paragraph -->
                         <p class="taco-report-explorer__report-paragraph">
-                          Verifying communities with blue ticks, enabling monetisation of communities via advertising,
-enabling owners to pay to boost their community in the community explorer, and decentralising
-community governance
-                        </p>
-
-                      </li>
-
-                      <!-- list item -->
-                      <li class="taco-report-explorer__report-li">
-
-                        <!-- paragraph -->
-                        <p class="taco-report-explorer__report-paragraph">
-                          Investigating the viability of building native apps for iOS and Android
+                          Building native apps for iOS and Android.
                         </p>
 
                       </li>
@@ -4744,6 +4732,16 @@ lion</a>, presumably in reference to <a href="https://cecildao.org/" target="_bl
 
                       </li>
 
+                      <!-- list item -->
+                      <li class="taco-report-explorer__report-li">
+
+                        <!-- paragraph -->
+                        <p class="taco-report-explorer__report-paragraph">
+                          Helping other teams integrate the Eventstore Canister, developed by the OpenChat team, which is used to analyse app usage data.
+                        </p>
+
+                      </li>                      
+
                     </ul>    
                     
                     <!-- paragraph -->
@@ -4866,20 +4864,26 @@ downtime.
 
                     <!-- paragraph -->
                     <p class="taco-report-explorer__report-paragraph">
-                      The client library uses WebRTC to send typing indicators and message data directly between online users'
-browsers. All messages are still sent through the Internet Computer to ensure delivery, but WebRTC
-serves as a performance optimization. WebRTC is end-to-end encrypted and well suited to decentralized
-applications but requires off-chain components. Voice and video calls use the Daily API, coordinated via
-a secure bridge hosted on AWS. This integration allows for calls while maintaining user authentication
-through access tokens. The landing page and push notifications also rely on off-chain components.
+                      The client library uses WebRTC to send typing indicators and message data directly between
+online users' browsers. All messages are still sent through the Internet Computer to ensure
+delivery, but WebRTC serves as a performance optimization. WebRTC is end-to-end encrypted
+and well suited to decentralized applications but requires off-chain components. Voice and
+video calls use the Daily API, coordinated via a secure bridge hosted on AWS. This integration
+allows for calls while maintaining user authentication through access tokens. Push notifications
+also rely on off-chain components.
                     </p>   
 
                     <!-- paragraph -->
                     <p class="taco-report-explorer__report-paragraph">
-                      Users can sign in with Internet Identity, NFID, email, Ethereum, Solana, Google, Plug, etc. UserGeek is
-integrated to collect and analyse user app usage data without external dependencies, preserving user
-privacy through local anonymization before transmission.
-                    </p>   
+                      Users can sign in with passkeys such as Internet Identity, NFID, email, Ethereum, Solana, Google, etc.
+                    </p>  
+                    
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      OpenChat data is recorded and transmitted to UserGeek and Token Terminal to collect and
+analyse user app usage data, preserving user privacy through local anonymization before
+transmission.
+                    </p>                      
                     
                     <hr>
 
@@ -5441,8 +5445,123 @@ OpenChat as a service integrated into other dApps, increased file storage, and O
 (personal themes, emoji packs, etc). Potential revenue streams include tx fees for token transfers, tx fees
 fees for token swaps, and charging large private communities. The team has stated that their current focus
 is on user growth over monetisation. <a href="https://tokenterminal.com/explorer/projects/openchat/metrics/all" target="_blank" class="taco-report-explorer__report-link">According to tokenterminal</a>, OpenChat made 111k USD from
-Diamond Memberships in the last 365 days. <a href="https://www.icexplorer.io/address/details/2jvtu-yqaaa-aaaaq-aaama-cai-t6mekta.d1216f443ead88f8f98a80b2ea59697726f18dffaa58d0a0156d0c605a01b672" target="_blank" class="taco-report-explorer__report-link">The treasury of OpenChat has</a> 35,981.04 ICP and 48,343,162
-CHAT, valued at around $7 million USD as of the end of July.
+Diamond Memberships in the last 365 days.
+                    </p> 
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      As of the end of July, <a href="https://www.icexplorer.io/address/details/2jvtu-yqaaa-aaaaq-aaama-cai-t6mekta.d1216f443ead88f8f98a80b2ea59697726f18dffaa58d0a0156d0c605a01b672" target="_blank" class="taco-report-explorer__report-link">the treasury of OpenChat has</a>:
+                    </p>    
+                    
+                    <!-- list -->
+                    <ul class="taco-report-explorer__report-ul">
+
+                      <!-- list item -->
+                      <li class="taco-report-explorer__report-li">
+
+                        <!-- paragraph -->
+                        <p class="taco-report-explorer__report-paragraph">
+                          <a href="https://dashboard.internetcomputer.org/account/a2200978cf15fa0d19b7c7eb75cc5d6d3ebabbacaec64a2a9a3f811277619c57" target="_blank" class="taco-report-explorer__report-link">35,981.54 ICP</a> (liquid)
+                        </p>
+
+                      </li>
+
+                      <!-- list item -->
+                      <li class="taco-report-explorer__report-li">
+
+                        <!-- paragraph -->
+                        <p class="taco-report-explorer__report-paragraph">
+                          <a href="https://www.icexplorer.io/address/details/2jvtu-yqaaa-aaaaq-aaama-cai-t6mekta.d1216f443ead88f8f98a80b2ea59697726f18dffaa58d0a0156d0c605a01b672" target="_blank" class="taco-report-explorer__report-link">48,343,162.39 CHAT (~$6.23M)</a>
+                        </p>
+
+                      </li>
+
+                      <!-- list item -->
+                      <li class="taco-report-explorer__report-li">
+
+                        <!-- paragraph -->
+                        <p class="taco-report-explorer__report-paragraph">
+                          <a href="https://dashboard.internetcomputer.org/neuron/17682165960669268263" target="_blank" class="taco-report-explorer__report-link">105,113.74 ICP in an 8-year neuron</a>
+                        </p>
+
+                      </li>
+
+                      <!-- list item -->
+                      <li class="taco-report-explorer__report-li">
+
+                        <!-- paragraph -->
+                        <p class="taco-report-explorer__report-paragraph">
+                          <a href="https://dashboard.internetcomputer.org/neuron/15574844586067538603" target="_blank" class="taco-report-explorer__report-link">300,001 ICP in a 6-month neuron</a>
+                        </p>
+
+                      </li>
+
+                      <!-- list item -->
+                      <li class="taco-report-explorer__report-li">
+
+                        <!-- paragraph -->
+                        <p class="taco-report-explorer__report-paragraph">
+                          100,000 ICP in a dissolving neuron set to unlock on 8th October 2025
+                        </p>
+
+                      </li>
+
+                      <!-- list item -->
+                      <li class="taco-report-explorer__report-li">
+
+                        <!-- paragraph -->
+                        <p class="taco-report-explorer__report-paragraph">
+                          <a href="https://dashboard.internetcomputer.org/account/6074e8a8002ffc6938dfcb50cea5ad25879cf6a2393acec6d4e9dbb683662ef3" target="_blank" class="taco-report-explorer__report-link">9,236.86 ICP in the cycles dispenser</a>
+                        </p>
+
+                      </li>
+
+                      <!-- list item -->
+                      <li class="taco-report-explorer__report-li">
+
+                        <!-- paragraph -->
+                        <p class="taco-report-explorer__report-paragraph">
+                          38,678 ICP in WaterNeuron (34,687 nICP)
+                        </p>
+
+                      </li>
+
+                      <!-- list item -->
+                      <li class="taco-report-explorer__report-li">
+
+                        <!-- paragraph -->
+                        <p class="taco-report-explorer__report-paragraph">
+                          $1,489 in Bitmart reserved to pay for CEX listings and liquidity
+                        </p>
+
+                      </li>
+
+                      <!-- list item -->
+                      <li class="taco-report-explorer__report-li">
+
+                        <!-- paragraph -->
+                        <p class="taco-report-explorer__report-paragraph">
+                          ~$5,000 in DEX liquidity
+                        </p>
+
+                      </li>
+
+                      <!-- list item -->
+                      <li class="taco-report-explorer__report-li">
+
+                        <!-- paragraph -->
+                        <p class="taco-report-explorer__report-paragraph">
+                          A total of $172,710 distributed between CEX liquidity and Coinstore
+                        </p>
+
+                      </li>
+                      
+                    </ul>
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      Some figures were sourced from Section 6 of proposal 1975 (created July 4th) and may be
+inaccurate due to limited references and the time that has passed.
                     </p> 
 
                     <hr>
@@ -5469,17 +5588,7 @@ structure was chosen after review of multiple jurisdictions.
                       <a href="https://x.com/OpenChat/status/1659487606541828096" target="_blank" class="taco-report-explorer__report-link">OpenChat Labs LTD</a> was formed to handle off-chain responsibilities such as custody of the oc.app
 domain and intellectual property, managing app store contracts, funding in-app voice/video calls, and
 employing the core development team.
-                    </p> 
-
-                    <!-- paragraph -->
-                    <p class="taco-report-explorer__report-paragraph">
-                      OpenChat's communities are not currently included in the plan for end-to-end encryption unlike direct
-chats and private groups. Public communities do not by their nature require encryption but private
-communities may face privacy risks without it. While data in deleted communities is permanently erased
-from ICP canisters, messages could be scraped before deletion. This exposes users to potential
-retrospective judgment if societal norms or laws change, as such copies could persist outside OpenChat's
-control.
-                    </p> 
+                    </p>
 
                     <hr>
                     
