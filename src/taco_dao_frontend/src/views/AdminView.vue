@@ -10,7 +10,10 @@
           
           <!-- Quick Navigation -->
           <div class="mb-4">
-            <div class="d-flex gap-3">
+            <div class="d-flex gap-3 flex-wrap">
+              <router-link to="/admin/archives" class="btn btn-dark">
+                📦 Archive Management
+              </router-link>
               <router-link to="/admin/trade" class="btn btn-info">
                 📈 View Trading Logs
               </router-link>
