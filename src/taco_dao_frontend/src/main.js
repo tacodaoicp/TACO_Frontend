@@ -35,10 +35,10 @@ const routes = [
     { path: "/sales/dkp-swap", name: "Sale1", component: SaleDKPSwap, meta: { robots: 'index' } },
     { path: "/info", name: "Info", component: InfoView, meta: { robots: 'index' } },
     { path: "/chat/oc", name: "ChatOC", component: ChatView, meta: { robots: 'index' } },
-    { path: "/chat/sneed", redirect: "/chat/forum", meta: { robots: 'noindex' } },
+    { path: "/chat/sneed", redirect: "/chat/forum", meta: { robots: 'noindex' } }, // keep for historical linking
     { path: "/chat/forum", name: "ChatForum", component: ChatView, meta: { robots: 'index' } },
     { path: "/chat/forum/:id", name: "ChatForumThread", component: ChatView, meta: { robots: 'index' } },
-    { path: "/chat", redirect: "/chat/oc", meta: { robots: 'noindex' } }, // keep for historical linking
+    { path: "/chat", redirect: "/chat/oc", meta: { robots: 'noindex' } },
     { path: "/reports", redirect: "/reports/openchat", meta: { robots: 'noindex' } },
     { path: "/reports/example", component: ReportsView, meta: { robots: 'index' } },    
     { path: "/reports/ddckbtc", component: ReportsView, meta: { robots: 'index' } }, // dd* links should remain for historical linking

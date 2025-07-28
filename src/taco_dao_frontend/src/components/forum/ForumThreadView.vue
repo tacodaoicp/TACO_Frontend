@@ -1,6 +1,7 @@
 <template>
 
-    <div class="forum-thread-view">
+    <div class="forum-thread-view"
+        :class="[{ 'overflow-hidden': componentLoading }]">
 
         <!-- loading curtain -->
         <div v-show="componentLoading" class="forum-thread-view__loading-curtain">
@@ -44,10 +45,12 @@
             <div class="forum-thread-view__navigation__left">
                 
                 <!-- buttons -->
-                <div class="btn-group">
+                <div class="btn-group flex-wrap">
 
                     <!-- discussion -->
-                    <button class="btn taco-nav-btn taco-nav-btn--active">Discussion</button>
+                    <button class="btn taco-nav-btn"
+                            :class="{ 'taco-nav-btn--active': threadNavigation === 'discussion' }"
+                            @click="threadNavigation = 'discussion'">Discussion</button>
 
                     <!-- voting -->
                     <!-- <button class="btn taco-nav-btn">Voting</button> -->
@@ -56,14 +59,17 @@
                     <!-- <button class="btn taco-nav-btn">Vote</button> -->
 
                     <!-- details -->
-                    <!-- <button class="btn taco-nav-btn">Details</button> -->
+                    <button class="btn taco-nav-btn"
+                            :class="{ 'taco-nav-btn--active': threadNavigation === 'details' }"
+                            @click="threadNavigation = 'details'">Details</button>
 
                 </div>
 
             </div>
 
             <!-- thread navigation right -->
-            <div class="forum-thread-view__navigation__right">
+            <div v-if="threadNavigation === 'discussion'" 
+                class="forum-thread-view__navigation__right">
 
                 <!-- sneed head tiny -->
                 <img :src="sneedHeadTiny" 
@@ -77,8 +83,13 @@
 
         </div>
 
+        <!-- ########## -->
+        <!-- discussion -->
+        <!-- ########## -->
+
         <!-- thread header -->
-        <div v-if="proposalSelected && !error" class="forum-thread-view__header shadow">
+        <div v-if="proposalSelected && !error && threadNavigation === 'discussion'" 
+            class="forum-thread-view__header shadow">
 
             <!-- thread header left -->
             <div class="forum-thread-view__header__left">
@@ -122,7 +133,7 @@
         </div>
 
         <!-- new comment and sort selector container -->
-         <div v-if="proposalSelected && !error && posts.length > 0"
+         <div v-if="proposalSelected && !error && posts.length > 0 && threadNavigation === 'discussion'"
                 class="d-flex align-items-baseline justify-content-between flex-wrap gap-2 mx-3">
 
             <!-- left -->
@@ -171,7 +182,8 @@
          </div>
 
         <!-- new comment -->
-        <div v-if="proposalSelected && !error && addingNewComment" class="forum-thread-view__new-comment">
+        <div v-if="proposalSelected && !error && addingNewComment && threadNavigation === 'discussion'" 
+            class="forum-thread-view__new-comment">
 
             <!-- title -->
             <span class="forum-thread-view__new-comment__title">New Comment</span>
@@ -222,7 +234,8 @@
         </div>
 
         <!-- thread content -->
-        <div v-if="proposalSelected && !error" class="forum-thread-view__content">
+        <div v-if="proposalSelected && !error && threadNavigation === 'discussion'" 
+            class="forum-thread-view__content">
 
             <!-- thread posts -->
             <div class="forum-thread-view__posts">
@@ -444,7 +457,7 @@
         </div>
 
         <!-- add a comment button container -->
-        <div v-if="proposalSelected && !error && posts.length === 0" 
+        <div v-if="proposalSelected && !error && posts.length === 0 && threadNavigation === 'discussion'" 
             class="forum-thread-view__add-comment-container">
 
             <!-- login to comment -->
@@ -474,6 +487,309 @@
                 </button>
 
         </div>
+
+        <!-- ####### -->
+        <!-- details -->
+        <!-- ####### -->
+
+        <!-- thread details -->
+        <div v-if="proposalSelected && !error && threadNavigation === 'details'" 
+            class="forum-thread-view__details">
+
+            <!-- details content -->
+            <div class="forum-thread-view__details__content">
+
+                <!-- title -->
+                <div class="forum-thread-view__details__title">
+
+                    <!-- title number -->
+                    <span class="forum-thread-view__details__title-number">#{{ proposal.id }}&nbsp;</span>
+
+                    <!-- title text -->
+                    <span class="forum-thread-view__details__title-text">{{ proposal.title }}</span>
+
+                </div>                
+
+                <!-- progress details -->
+                <div class="forum-thread-view__details__progress-container">
+
+                    <!-- top -->
+                    <div class="forum-thread-view__details__progress-container__top">
+
+                        <!-- left -->
+                        <div class="forum-thread-view__details__progress-container__top__left">
+
+                            <!-- yes percentage and count container -->
+                             <div class="forum-thread-view__details__progress-container__yes-details">
+
+                                <!-- yes percentage -->
+                                <span class="forum-thread-view__details__progress-container__yes-percentage">
+                                    Yes <strong>{{ (Number(proposal.yesVotes) / Number(proposal.totalVotes) * 100).toFixed(2) }}%</strong>
+                                </span>
+
+                                <!-- yes count -->
+                                <span class="forum-thread-view__details__progress-container__yes-count">{{ Number((Number(proposal.yesVotes) / 100000000).toFixed(0)).toLocaleString() }} VP</span>
+
+                             </div>
+
+                        </div>
+
+                        <!-- center -->
+                        <div class="forum-thread-view__details__progress-container__top__center">
+
+                            <!-- total eligable and last updated container -->
+                             <div class="forum-thread-view__details__progress-container__misc-details">
+
+                                <!-- total votes -->
+                                <span class="forum-thread-view__details__progress-container__total-votes">Total Votes</span>
+
+                                <!-- total eligable -->
+                                <span class="forum-thread-view__details__progress-container__eligable-count">{{ Number((Number(proposal.totalVotes) / 100000000).toFixed(0)).toLocaleString() }} VP</span>
+
+                             </div>
+
+                        </div>
+
+                        <!-- right -->
+                        <div class="forum-thread-view__details__progress-container__top__right">
+
+                            <!-- no percentage and count container -->
+                             <div class="forum-thread-view__details__progress-container__no-details">
+
+                                <!-- no percentage -->
+                                <span class="forum-thread-view__details__progress-container__no-percentage">No <strong>{{ (Number(proposal.noVotes) / Number(proposal.totalVotes) * 100).toFixed(2) }}%</strong></span>
+
+                                <!-- no count -->
+                                <span class="forum-thread-view__details__progress-container__no-count">{{ Number((Number(proposal.noVotes) / 100000000).toFixed(0)).toLocaleString() }} VP</span>
+
+                             </div>
+
+                        </div>
+
+                    </div>
+
+                    <!-- bottom -->
+                    <div class="forum-thread-view__details__progress-container__bottom">
+                        
+                        <!-- progress -->
+                        <div class="progress forum-thread-view__details__progress-container__progress" 
+                            role="progressbar">
+
+                            <!-- 3% threshold -->
+                            <div class="three-percent-threshold"
+                                data-bs-toggle="tooltip" 
+                                data-bs-placement="bottom" 
+                                title="Minimum Participation (3%): At least this much voting power must participate for the proposal to be valid">
+                            </div>
+
+                            <!-- 50% threshold -->
+                            <div class="fifty-percent-threshold"
+                                data-bs-toggle="tooltip" 
+                                data-bs-placement="bottom" 
+                                title="Simple Majority (50%): If a simple majority is needed, and more than half of the votes are Yes, the proposal will pass">
+                            </div>
+
+                            <!-- 66.6% threshold -->
+                            <div class="sixty-six-percent-threshold"
+                                data-bs-toggle="tooltip" 
+                                data-bs-placement="bottom" 
+                                title="Super Majority (66.66%): If a super majority is needed, and more than 2/3 of the votes are Yes, the proposal will pass">
+                            </div>
+
+                            <!-- yes progress bar -->
+                            <div class="progress-bar progress-bar--yes" 
+                                :style="{ width: (Number(proposal.yesVotes) / Number(proposal.totalVotes) * 100).toFixed(2) + '%' }"
+                                data-bs-toggle="tooltip" 
+                                data-bs-placement="bottom" 
+                                title="Yes Votes"></div>
+
+                            <!-- no progress bar -->
+                            <div class="progress-bar progress-bar--no" 
+                                :style="{ width: (Number(proposal.noVotes) / Number(proposal.totalVotes) * 100).toFixed(2) + '%' }"
+                                data-bs-toggle="tooltip" 
+                                data-bs-placement="bottom" 
+                                title="No Votes"></div>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+                <!-- key value pairs -->
+                <div class="forum-thread-view__details__key-value-pairs">
+                    
+                    <!-- topic -->
+                    <div class="forum-thread-view__details__key-value-pair">
+
+                        <!-- topic key -->
+                        <span class="forum-thread-view__details__key">Topic</span>
+
+                        <!-- topic value -->
+                        <span class="forum-thread-view__details__value">
+                            {{ Object.keys(proposal.topic)[0].replace(/([A-Z])/g, ' $1').trim() }}
+                        </span>
+
+                    </div>
+
+                    <!-- description -->
+                    <div class="forum-thread-view__details__key-value-pair">
+
+                        <!-- description key -->
+                        <span class="forum-thread-view__details__key">Description</span>
+
+                        <!-- description value -->
+                        <span class="forum-thread-view__details__value wordwrap-anywhere" v-html="proposal.summary"></span>
+
+                    </div>
+
+                    <!-- proposer -->
+                    <div class="forum-thread-view__details__key-value-pair">
+
+                        <!-- proposer key -->
+                        <span class="forum-thread-view__details__key">Proposing Neuron</span>
+
+                        <!-- proposer value -->
+                        <span class="forum-thread-view__details__value">
+
+                            <!-- proposer name -->
+                            <span v-if="getProposerNeuronDisplayName(proposal.proposer) !== ''">
+                                {{ getProposerNeuronDisplayName(proposal.proposer) }}&nbsp;
+                            </span>
+
+                            <!-- proposer address -->
+                            <span class="wordwrap-anywhere">
+                                {{ proposal.proposer }}
+                            </span>
+
+                        </span>
+
+                    </div>
+
+                    <!-- created -->
+                    <div class="forum-thread-view__details__key-value-pair">
+
+                        <!-- created key -->
+                        <span class="forum-thread-view__details__key">Created</span>
+
+                        <!-- created value -->
+                        <span class="forum-thread-view__details__value">{{ proposal.createdAt }}</span>
+
+                    </div>
+
+                    <!-- status -->
+                    <div class="forum-thread-view__details__key-value-pair">
+
+                        <!-- status key -->
+                        <span class="forum-thread-view__details__key">Status</span>
+
+                        <!-- status value -->
+                        <span class="forum-thread-view__details__value forum-thread-view__details__value__status"
+                            :class="[{ 'forum-thread-view__details__value__passed': proposal.status === 'Executed', 'forum-thread-view__details__value__failed': proposal.status === 'Rejected' }]">
+                            {{ formatStatus(proposal.status) }}
+                        </span>
+
+                    </div>
+
+                    <!-- decided date -->
+                    <div v-if="proposal.status === 'Executed' || proposal.status === 'Rejected'"    class="forum-thread-view__details__key-value-pair">
+                        
+                        <!-- decided date key -->
+                        <span class="forum-thread-view__details__key">Decision Date</span>
+
+                        <!-- decided date value -->
+                        <span class="forum-thread-view__details__value">{{ proposal.decidedAt }}</span>
+                        
+                    </div>
+
+                    <!-- execution date -->
+                    <div v-if="proposal.status === 'Executed'" class="forum-thread-view__details__key-value-pair">
+
+                        <!-- execution date key -->
+                        <span class="forum-thread-view__details__key">Execution Date</span>
+
+                        <!-- execution date value -->
+                        <span class="forum-thread-view__details__value">{{ proposal.executedAt }}</span>
+
+                    </div>
+
+                    <!-- url -->
+                    <div class="forum-thread-view__details__key-value-pair">
+
+                        <!-- url key -->
+                        <span class="forum-thread-view__details__key">URL</span>
+
+                        <!-- url value -->
+                        <span class="forum-thread-view__details__value">
+                            <a :href="proposal.url" target="_blank"
+                            style="color: var(--blue-to-light-blue);">
+                                {{ proposal.url }}
+                            </a>
+                        </span>
+
+                    </div>
+
+                    <!-- links -->
+                    <div class="forum-thread-view__details__key-value-pair">
+
+                        <!-- links key -->
+                        <span class="forum-thread-view__details__key">Links</span>
+
+                        <!-- links value -->
+                        <div class="forum-thread-view__details__value d-flex flex-wrap gap-3">
+
+                            <!-- nns -->
+                            <a :href="`https://nns.ic0.app/proposal/?u=lacdn-3iaaa-aaaaq-aae3a-cai&proposal=${proposal.id}`" target="_blank"
+                            style="color: var(--blue-to-light-blue);">NNS</a>
+
+                            <!-- internet computer dashboard -->
+                            <a :href="`https://dashboard.internetcomputer.org/sns/lacdn-3iaaa-aaaaq-aae3a-cai/proposal/${proposal.id}`" target="_blank"
+                            style="color: var(--blue-to-light-blue);">Dashboard</a>
+
+                            <!-- ic toolkit -->
+                            <a :href="`https://ic-toolkit.app/sns-management/lacdn-3iaaa-aaaaq-aae3a-cai/proposals/view/${proposal.id}`" target="_blank"
+                            style="color: var(--blue-to-light-blue);">IC Toolkit</a>
+
+                        </div>
+
+                    </div>
+
+                    <!-- voting info -->
+                    <div class="forum-thread-view__details__voting-info mb-3">
+
+                        <!-- voting info key -->
+                        <span class="forum-thread-view__details__key">Voting Info</span>
+
+                        <!-- voting info value -->
+                        <span class="forum-thread-view__details__value">
+
+                            <span class="d-flex flex-column gap-1 mt-2" style="font-size: 1rem;">
+
+                                <span>There are two ways a proposal can be decided</span>
+
+                                <span class="mt-2"><strong>Immediate majority decision:</strong></span>
+
+                                <span>A proposal is immediately adopted or rejected if, before the voting period ends, more than half of the total voting power votes Yes (indicated by the yellow marker), or at least half votes No, respectively.</span>
+
+                                <span class="mt-2"><strong>Standard majority decision:</strong></span>
+
+                                <span>At the end of the voting period, a proposal is adopted if more than half of the votes cast are Yes votes, provided these votes represent at least 3% of the total voting power (indicated by the orange marker). Otherwise, it is rejected. Before a proposal is decided, the voting period can be extended in order to "wait for quiet". Such voting period extensions occur when a proposal's voting results turn from either a Yes majority to a No majority or vice versa.</span>
+
+                            </span>
+
+                        </span>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+        </div>
+
+        <!-- ##### -->
+        <!-- error -->
+        <!-- ##### -->
 
         <!-- error -->
         <div v-if="error" class="forum-thread-view__error-container">
@@ -1185,6 +1501,248 @@
         justify-content: center;
         align-items: center;
     }
+
+    // details
+    &__details {
+        color: var(--black-to-white);
+
+        // content
+        &__content {
+            padding: 1.5rem 2rem 1rem;
+        }
+
+        // title
+        &__title {
+            line-height: 1.25;
+
+            // title number
+            &-number {
+                font-size: 2.25rem;
+            }
+
+            // title text
+            &-text {
+                font-size: 2.25rem;
+            }
+
+        }
+
+        // progress container
+        &__progress-container {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            margin-top: 1rem;
+            border-top: 1px solid var(--dark-orange);
+            border-bottom: 1px solid var(--dark-orange);
+            padding: 1rem 0 1.5rem;
+
+            // top
+            &__top {
+                display: flex;
+                align-items: flex-end;
+                justify-content: space-between;
+                gap: 0.75rem;
+
+                // left
+                &__left {
+                    
+                }
+
+                // center
+                &__center {
+                    
+                }
+                
+                // right
+                &__right {
+                    
+                }
+
+            }
+
+            // bottom
+            &__bottom {
+                
+            }
+
+            // yes details
+            &__yes-details {
+                display: flex;
+                flex-direction: column;
+            }
+
+            // yes percentage
+            &__yes-percentage {
+                font-size: 1.25rem;
+                text-align: center;
+            }
+
+            // yes count
+            &__yes-count {
+                font-size: 0.875rem;
+                text-align: center;
+            }
+
+            // misc details
+            &__misc-details {
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+            }
+
+            // total votes
+            &__total-votes {
+                font-size: 1.25rem;
+                text-align: center;
+            }
+
+            // eligable count
+            &__eligable-count {
+                font-size: 0.875rem;
+                text-align: center;
+            }
+
+            // no details
+            &__no-details {
+                display: flex;
+                flex-direction: column;
+                align-items: flex-end;
+            }
+
+            // no percentage
+            &__no-percentage {
+                font-size: 1.25rem;
+                text-align: center;
+            }
+
+            // no count
+            &__no-count {
+                font-size: 0.875rem;
+                text-align: center;
+            }
+
+            // progress
+            &__progress {
+                position: relative;
+                background-color: var(--white-to-light-orange);
+
+                // first progress bar
+                .progress-bar--yes {
+                    background-color: var(--success-green);
+                }
+
+                // second progress bar
+                .progress-bar--no {
+                    background-color: var(--red);   
+                    position: absolute;
+                    right: 0;
+                    top: 0;
+                    bottom: 0;
+                }
+
+                // progress indicator
+                .three-percent-threshold {
+                    position: absolute;
+                    left: 3%;
+                    top: 0;
+                    bottom: 0;
+                    background-color: var(--light-orange-to-dark-brown);
+                    width: 3px;
+                }
+
+                // progress indicator
+                .fifty-percent-threshold {
+                    position: absolute;
+                    left: 50%;
+                    top: 0;
+                    bottom: 0;
+                    background-color: var(--light-orange-to-dark-brown);
+                    width: 3px;
+                }
+
+                // progress indicator
+                .sixty-six-percent-threshold {
+                    position: absolute;
+                    left: 66.66%;
+                    top: 0;
+                    bottom: 0;
+                    background-color: var(--light-orange-to-dark-brown);
+                    width: 3px;
+                }
+
+            }
+            
+        }
+
+        // key value pairs
+        &__key-value-pairs {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            padding-top: 1.5rem;
+        }
+
+        // key value pair
+        &__key-value-pair {
+            display: flex;
+            align-items: baseline;
+            flex-wrap: wrap;
+            gap: 0.25rem 0.75rem;
+        }        
+
+        // key
+        &__key {
+            padding: 0.25rem 0.5rem;
+            border-radius: 0.25rem;
+            background-color: var(--dark-orange);
+            color: var(--white);
+            font-size: 0.875rem;
+        }
+
+        // value
+        &__value {
+            font-size: 1.125rem;
+
+            // status
+            &__status {
+                color: var(--black-to-white);
+                outline: 1px solid var(--black-to-white);
+                padding: 0.125rem 0.5rem;
+                border-radius: 0.25rem;
+            }
+
+            // passed
+            &__passed {
+                color: var(--white) !important;
+                background-color: var(--success-green) !important;
+                padding: 0.125rem 0.5rem;
+                border-radius: 0.25rem;
+                outline: none;
+            }
+
+            // failed
+            &__failed {
+                color: var(--white) !important;
+                background-color: var(--red) !important;
+                padding: 0.125rem 0.5rem;
+                border-radius: 0.25rem;
+                outline: none;
+            }
+
+        }
+        
+        // voting info
+        &__voting-info {
+
+            // voting info text
+            &-text {
+                
+            }
+
+        }
+        
+    }
     
 }
 
@@ -1193,7 +1751,7 @@
 ///////////////////
 
 // less than 390px
-@media (max-width: 389.98px) {
+@media (max-width: 499.98px) {
 
     // hide twisty arrow
     .forum-thread-view__navigation__right {
@@ -1294,6 +1852,7 @@
     import astronautLoader from '../../assets/images/astonautLoader.webp'
     import DfinityLogo from "../../assets/images/dfinityLogo.vue"
     import TacoError from '../../assets/images/tacoError.vue'
+    import { Principal } from '@dfinity/principal'
 
     ///////////
     // store //
@@ -1315,6 +1874,7 @@
     // user
     const { iidLogIn } = tacoStore // not reactive
     const { getPrincipalDisplayName } = tacoStore // not reactive
+    const { getNeuronDisplayName } = tacoStore // not reactive
 
     // forum
     const { toggleThreadMenu } = tacoStore // not reactive
@@ -1328,6 +1888,9 @@
 
     // component loading
     const componentLoading = ref(false)
+
+    // thread navigation
+    const threadNavigation = ref('discussion')
 
     // user votes
     const userVotes = ref<Map<string, { voteType: 'upvote' | 'downvote' | null; voting: boolean }>>(new Map())
@@ -1384,6 +1947,12 @@
 
         // log
         // console.log('loading proposal')
+
+        // scroll to top before setting loading state
+        const container = document.querySelector('.forum-thread-view')
+        if (container) {
+            container.scrollTop = 0
+        }
 
         // set component loading to true
         componentLoading.value = true
@@ -2072,6 +2641,19 @@
         return timeDiffSeconds >= 60
     }
 
+    // convert proposer string to neuron display name
+    const getProposerNeuronDisplayName = (proposerString: string) => {
+        if (!proposerString) return ''
+        
+        // convert the proposer string to Uint8Array (neuron ID)
+        const neuronIdBytes = new Uint8Array(proposerString.match(/.{1,2}/g)?.map(byte => parseInt(byte, 16)) || [])
+        
+        // SNS root canister ID
+        const snsRoot = Principal.fromText('lacdn-3iaaa-aaaaq-aae3a-cai')
+        
+        return getNeuronDisplayName(snsRoot, neuronIdBytes)
+    }
+
     // date formatting
     const formatShortDate = (date: Date) => {
         return date.toLocaleDateString('en-US', {
@@ -2223,6 +2805,13 @@
         return flattenPostTree(rootPosts)
         
     })
+
+    // format status
+    const formatStatus = (status: string) => {
+      if (status === "Executed") return "PASSED"
+      if (status === "Rejected") return "FAILED"
+      return status
+    }    
 
     //////////////
     // watchers //

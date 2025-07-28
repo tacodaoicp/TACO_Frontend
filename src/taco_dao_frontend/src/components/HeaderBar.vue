@@ -38,13 +38,20 @@
         </router-link>
 
         <!-- chat - router link -->
-        <router-link to="/chat" 
-                    class="header-bar__rl"
-                    :class="{ 'router-link-active': $route.path.startsWith('/chat/') }">
+        <router-link to="/chat/oc" 
+                    class="header-bar__rl">
           
           <span class="header-bar__rl-span">Chat</span>
         
-        </router-link>     
+        </router-link>    
+        
+        <!-- forum - router link -->
+        <router-link to="/chat/forum" 
+                    class="header-bar__rl">
+          
+          <span class="header-bar__rl-span">Forum</span>
+        
+        </router-link>            
         
         <!-- reports - router link -->
         <router-link to="/reports" 
@@ -199,14 +206,22 @@
         </router-link>
 
         <!-- chat - router link -->
-        <router-link to="/chat" 
-                    class="list-group-item"
-                    :class="{ 'router-link-active': $route.path.startsWith('/chat/') }">
+        <router-link to="/chat/oc" 
+                    class="list-group-item">
 
           <!-- item text -->
           <span>Chat</span>
 
         </router-link>
+
+        <!-- forum - router link -->
+        <router-link to="/chat/forum" 
+                    class="list-group-item">
+
+          <!-- item text -->
+          <span>Forum</span>
+
+        </router-link>        
 
         <!-- reports - router link -->
         <router-link to="/reports" 
