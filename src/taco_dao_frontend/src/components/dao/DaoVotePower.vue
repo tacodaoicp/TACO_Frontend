@@ -13,7 +13,7 @@
     <!-- you have x VP -->
     <div class="dao-vote-power__vp">
       <span class="dao-vote-power__vp__title">Your Voting Power</span>
-      <span v-if="userLoggedIn" class="dao-vote-power__vp__count">{{ votePower }}</span>
+      <span v-if="userLoggedIn" class="dao-vote-power__vp__count">{{ votePower.toLocaleString('en-US') }}</span>
       <span v-if="!userLoggedIn" class="dao-vote-power__vp__count">0</span>
     </div>
 

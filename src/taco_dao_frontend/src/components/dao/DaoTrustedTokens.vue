@@ -152,19 +152,19 @@
                   <!-- symbol -->
                   <th class="fw-bold" 
                       scope="col">
-                      <span class="ps-3 pe-4">Symbol</span>
+                      <span class="pe-4">Symbol</span>
                   </th>
 
                   <!-- percentage -->
                   <th class="fw-bold text-end"
                       scope="col">
-                      <span class="pe-4">%</span>
+                      <span class="pe-4">% Held</span>
                   </th> 
 
                   <!-- holdings -->
                   <th class="fw-bold text-end"
                       scope="col">
-                      <span class="pe-4">Holdings</span>
+                      <span class="pe-4"># Held</span>
                   </th>
 
                   <!-- value -->
@@ -213,19 +213,19 @@
 
                   </td>
 
-                  <!-- holding % -->
+                  <!-- % held -->
                   <td class="text-end pe-4">
                     <span>{{ token.holdingPercentage.amount }}%</span>
                   </td>
 
-                  <!-- holdings -->
+                  <!-- # held -->
                   <td class="text-end pe-4">
                     <span data-bs-toggle="tooltip" data-bs-placement="top" :title="token.currentHoldings.amount">{{ formatNumber(token.currentHoldings.amount) }}</span>
                   </td>
 
                   <!-- value -->
                   <td class="text-end pe-4">
-                    <span>${{ (token.currentHoldings.amount * token.priceInUSD).toFixed(2) }}</span>
+                    <span>${{ (token.currentHoldings.amount * token.priceInUSD).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}</span>
                   </td>
 
                   <!-- date added -->
@@ -659,7 +659,7 @@ LOCAL METHODS
     return date.toLocaleDateString('en-US', options)
   }
 
-  // format number to remove trailing zeros
+  // format number to remove trailing zeros and add commas
   const formatNumber = (num: number) => {
 
     // if number is exactly 0, return 0
@@ -672,9 +672,12 @@ LOCAL METHODS
       return '~0'
     }
 
-    // else return number with 4 decimal places
+    // else return number with 4 decimal places and commas
     else {
-      return num.toFixed(4).replace(/\.?0+$/, '')
+      return num.toLocaleString('en-US', {
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 4
+      }).replace(/\.?0+$/, '')
     }
 
   }
