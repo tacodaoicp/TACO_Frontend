@@ -722,6 +722,7 @@
                         <!-- url value -->
                         <span class="forum-thread-view__details__value">
                             <a :href="proposal.url" target="_blank"
+                            class="wordwrap-anywhere"
                             style="color: var(--blue-to-light-blue);">
                                 {{ proposal.url }}
                             </a>
