@@ -5240,6 +5240,11 @@ impact
 
                         </ul>
 
+                        <!-- paragraph -->
+                        <p class="taco-report-explorer__report-paragraph">
+                          As can be seen, liquidity for CHAT remains limited. If liquidity is not recycled, and there are no 'sells' between the DAO's 'buys', the effective slippage rate will be identical regardless of whether multiple small transactions or one large one take place.
+                        </p>
+
                       </div>                      
 
                     </div>
