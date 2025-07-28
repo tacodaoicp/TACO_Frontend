@@ -41,8 +41,8 @@
                 <!-- if logged in, allocation voting title -->
                 <h2 v-if="userLoggedIn" class="vote-view__top-bar__title py-2">
                   <span class="whitespace-nowrap">Welcome, &hellip;{{ truncatedPrincipal }}&nbsp;</span>
-                  <span v-if="votePower > 0" class="vote-view__top-bar__vote-power text-nowrap">({{ votePower }} VP)</span>
-                  <span v-if="votePower === 0" class="vote-view__top-bar__vote-power text-nowrap">(0 VP)</span>
+                  <span v-if="votePower !== '0'" class="vote-view__top-bar__vote-power text-nowrap">({{ votePower }} VP)</span>
+                  <span v-if="votePower === '0'" class="vote-view__top-bar__vote-power text-nowrap">(0 VP)</span>
                   
                   <!-- refresh voting power button -->
                   <button 
@@ -657,8 +657,8 @@
                         class="btn taco-btn taco-btn--green taco-btn--big w-100"
                         :class="{'disabled': !currentSlidersSumTo100 || matchesLast || !votePower}"
                         :disabled="!currentSlidersSumTo100 || matchesLast || !votePower">
-                        <span v-if="votePower > 0 && currentSlidersSumTo100 && !matchesLast">Lock In Vote</span>
-                        <span v-if="votePower === 0 || !votePower">You have no voting power</span>
+                        <span v-if="votePower !== '0' && currentSlidersSumTo100 && !matchesLast">Lock In Vote</span>
+                        <span v-if="votePower === '0' || !votePower">You have no voting power</span>
                         <span v-if="!currentSlidersSumTo100">All values do not equal 100%</span>
                         <span v-if="currentSlidersSumTo100 && matchesLast">Must Be A New Vote</span>
                       </button>
