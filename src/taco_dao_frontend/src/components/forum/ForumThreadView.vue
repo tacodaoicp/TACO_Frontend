@@ -1,6 +1,7 @@
 <template>
 
-    <div class="forum-thread-view">
+    <div class="forum-thread-view"
+        :class="[{ 'overflow-hidden': componentLoading }]">
 
         <!-- loading curtain -->
         <div v-show="componentLoading" class="forum-thread-view__loading-curtain">
@@ -44,10 +45,12 @@
             <div class="forum-thread-view__navigation__left">
                 
                 <!-- buttons -->
-                <div class="btn-group">
+                <div class="btn-group flex-wrap">
 
                     <!-- discussion -->
-                    <button class="btn taco-nav-btn taco-nav-btn--active">Discussion</button>
+                    <button class="btn taco-nav-btn"
+                            :class="{ 'taco-nav-btn--active': threadNavigation === 'discussion' }"
+                            @click="threadNavigation = 'discussion'">Discussion</button>
 
                     <!-- voting -->
                     <!-- <button class="btn taco-nav-btn">Voting</button> -->
@@ -56,14 +59,17 @@
                     <!-- <button class="btn taco-nav-btn">Vote</button> -->
 
                     <!-- details -->
-                    <!-- <button class="btn taco-nav-btn">Details</button> -->
+                    <button class="btn taco-nav-btn"
+                            :class="{ 'taco-nav-btn--active': threadNavigation === 'details' }"
+                            @click="threadNavigation = 'details'">Details</button>
 
                 </div>
 
             </div>
 
             <!-- thread navigation right -->
-            <div class="forum-thread-view__navigation__right">
+            <div v-if="threadNavigation === 'discussion'" 
+                class="forum-thread-view__navigation__right">
 
                 <!-- sneed head tiny -->
                 <img :src="sneedHeadTiny" 
@@ -77,8 +83,13 @@
 
         </div>
 
+        <!-- ########## -->
+        <!-- discussion -->
+        <!-- ########## -->
+
         <!-- thread header -->
-        <div v-if="proposalSelected && !error" class="forum-thread-view__header shadow">
+        <div v-if="proposalSelected && !error && threadNavigation === 'discussion'" 
+            class="forum-thread-view__header shadow">
 
             <!-- thread header left -->
             <div class="forum-thread-view__header__left">
@@ -105,17 +116,9 @@
                 <div class="d-flex align-items-center flex-wrap">
 
                     <!-- comment count -->
-                    <span @click="addingNewComment = !addingNewComment, replyingToPost = null"
-                        class="forum-thread-view__header__comment-count">
+                    <span class="forum-thread-view__header__comment-count">
                         {{ posts.length }} comments
                     </span>
-
-                    <!-- add comment button -->
-                    <button @click="addingNewComment = !addingNewComment, replyingToPost = null"
-                            class="forum-thread-view__header__add-comment btn"
-                            :class="{ 'forum-thread-view__header__add-comment--active': addingNewComment }">
-                        <i class="fa-solid fa-comment"></i>
-                    </button>
 
                     <!-- refresh button -->
                     <button @click="refreshPosts"
@@ -129,8 +132,58 @@
 
         </div>
 
+        <!-- new comment and sort selector container -->
+         <div v-if="proposalSelected && !error && posts.length > 0 && threadNavigation === 'discussion'"
+                class="d-flex align-items-baseline justify-content-between flex-wrap gap-2 mx-3">
+
+            <!-- left -->
+            <div>
+
+                <!-- add a comment button -->
+                <button v-if="!addingNewComment && userLoggedIn"
+                        @click="addingNewComment = !addingNewComment, replyingToPost = null"
+                        class="forum-thread-view__add-comment btn">
+
+                    <!-- add comment icon -->
+                    <i class="fa-solid fa-comment"></i>
+
+                    <!-- add comment text -->
+                    <span>Add a Comment</span>
+
+                </button>
+
+                <!-- login to add comment button -->
+                <button v-if="!userLoggedIn" 
+                        class="forum-thread-view__add-comment btn"
+                        @click="iidLogIn()">
+
+                    <!-- dfinity logo -->
+                    <DfinityLogo style="width: 1.375rem;" />
+
+                    <!-- login to add comment text -->
+                    <span>Login to Comment</span>
+
+                </button>
+
+            </div>
+
+            <!-- right -->
+            <div class="ms-auto">
+
+                <!-- sort selector -->
+                <select v-model="sortBy" class="forum-thread-view__sort-selector">
+                    <option value="newest">By Newest</option>
+                    <option value="score">By Score</option>
+                    <option value="oldest">By Oldest</option>
+                </select>
+
+            </div>
+
+         </div>
+
         <!-- new comment -->
-        <div v-if="proposalSelected && !error && addingNewComment" class="forum-thread-view__new-comment">
+        <div v-if="proposalSelected && !error && addingNewComment && threadNavigation === 'discussion'" 
+            class="forum-thread-view__new-comment">
 
             <!-- title -->
             <span class="forum-thread-view__new-comment__title">New Comment</span>
@@ -181,7 +234,8 @@
         </div>
 
         <!-- thread content -->
-        <div v-if="proposalSelected && !error" class="forum-thread-view__content">
+        <div v-if="proposalSelected && !error && threadNavigation === 'discussion'" 
+            class="forum-thread-view__content">
 
             <!-- thread posts -->
             <div class="forum-thread-view__posts">
@@ -194,7 +248,10 @@
                          :key="post.id.toString()" 
                          class="forum-thread-view__post shadow"
                          :class="{ 'forum-thread-view__post--collapsed': collapsedPosts.has(post.id.toString()) }"
-                         :style="{ marginLeft: getPostNestingLevel(post, new Map(posts.map(p => [p.id.toString(), p]))) * 1.5 + 'rem' }">
+                         :style="{ 
+                             marginLeft: getPostNestingLevel(post, new Map(posts.map(p => [p.id.toString(), p]))) * 1.5 + 'rem',
+                             display: isPostHidden(post) ? 'none' : 'block'
+                         }">
 
                         <!-- post loading curtain -->
                         <div v-if="post.loading" class="forum-thread-view__post__loading-curtain">
@@ -240,7 +297,7 @@
                             </div>
 
                             <!-- post update -->
-                            <div v-if="isPostEdited(post)" class="forum-thread-view__post-updated">
+                            <div v-if="isPostEdited(post)" class="d-none forum-thread-view__post-updated">
 
                                 <!-- update date text -->
                                 <span data-bs-toggle="tooltip" 
@@ -329,7 +386,8 @@
                             </div>
 
                             <!-- reply button -->
-                            <button @click="startReply(post.id), addingNewComment = false"
+                            <button v-if="userLoggedIn"
+                                    @click="startReply(post.id), addingNewComment = false"
                                     class="forum-thread-view__post-reply-btn">
 
                                 <!-- reply icon -->
@@ -337,6 +395,19 @@
 
                                 <!-- reply text -->
                                 <span>Reply</span>
+
+                            </button>
+
+                            <!-- login to reply -->
+                            <button v-else
+                                    @click="iidLogIn()"
+                                    class="forum-thread-view__post-reply-btn">
+
+                                <!-- dfinity logo -->
+                                <DfinityLogo style="width: 1.375rem;" />
+
+                                <!-- login to reply text -->
+                                <span>Login to Reply</span>
 
                             </button>
 
@@ -386,12 +457,12 @@
         </div>
 
         <!-- add a comment button container -->
-        <div v-if="proposalSelected && !error && posts.length === 0" 
+        <div v-if="proposalSelected && !error && posts.length === 0 && threadNavigation === 'discussion'" 
             class="forum-thread-view__add-comment-container">
 
             <!-- login to comment -->
             <button v-if="!userLoggedIn"
-                    class="btn d-flex align-items-center gap-2"
+                    class="forum-thread-view__add-comment btn ms-0"
                     @click="iidLogIn()">
 
                 <!-- dfinity logo -->
@@ -405,30 +476,359 @@
             <!-- add a comment button -->
             <button v-if="userLoggedIn && !addingNewComment"
                     @click="addingNewComment = !addingNewComment"
-                    class="btn taco-btn taco-btn--green taco-btn--big">Add a Comment</button>
+                    class="forum-thread-view__add-comment btn ms-0">
+                    
+                    <!-- add comment icon -->
+                    <i class="fa-solid fa-comment"></i>
+
+                    <!-- add comment text -->
+                    <span>Add a Comment</span>
+                    
+                </button>
 
         </div>
+
+        <!-- ####### -->
+        <!-- details -->
+        <!-- ####### -->
+
+        <!-- thread details -->
+        <div v-if="proposalSelected && !error && threadNavigation === 'details'" 
+            class="forum-thread-view__details">
+
+            <!-- details content -->
+            <div class="forum-thread-view__details__content">
+
+                <!-- title -->
+                <div class="forum-thread-view__details__title">
+
+                    <!-- title number -->
+                    <span class="forum-thread-view__details__title-number">#{{ proposal.id }}&nbsp;</span>
+
+                    <!-- title text -->
+                    <span class="forum-thread-view__details__title-text">{{ proposal.title }}</span>
+
+                </div>                
+
+                <!-- progress details -->
+                <div class="forum-thread-view__details__progress-container">
+
+                    <!-- top -->
+                    <div class="forum-thread-view__details__progress-container__top">
+
+                        <!-- left -->
+                        <div class="forum-thread-view__details__progress-container__top__left">
+
+                            <!-- yes percentage and count container -->
+                             <div class="forum-thread-view__details__progress-container__yes-details">
+
+                                <!-- yes percentage -->
+                                <span class="forum-thread-view__details__progress-container__yes-percentage">
+                                    Yes <strong>{{ (Number(proposal.yesVotes) / Number(proposal.totalVotes) * 100).toFixed(2) }}%</strong>
+                                </span>
+
+                                <!-- yes count -->
+                                <span class="forum-thread-view__details__progress-container__yes-count">{{ Number((Number(proposal.yesVotes) / 100000000).toFixed(0)).toLocaleString() }} VP</span>
+
+                             </div>
+
+                        </div>
+
+                        <!-- center -->
+                        <div class="forum-thread-view__details__progress-container__top__center">
+
+                            <!-- total eligable and last updated container -->
+                             <div class="forum-thread-view__details__progress-container__misc-details">
+
+                                <!-- total votes -->
+                                <span class="forum-thread-view__details__progress-container__total-votes">Total Votes</span>
+
+                                <!-- total eligable -->
+                                <span class="forum-thread-view__details__progress-container__eligable-count">{{ Number((Number(proposal.totalVotes) / 100000000).toFixed(0)).toLocaleString() }} VP</span>
+
+                             </div>
+
+                        </div>
+
+                        <!-- right -->
+                        <div class="forum-thread-view__details__progress-container__top__right">
+
+                            <!-- no percentage and count container -->
+                             <div class="forum-thread-view__details__progress-container__no-details">
+
+                                <!-- no percentage -->
+                                <span class="forum-thread-view__details__progress-container__no-percentage">No <strong>{{ (Number(proposal.noVotes) / Number(proposal.totalVotes) * 100).toFixed(2) }}%</strong></span>
+
+                                <!-- no count -->
+                                <span class="forum-thread-view__details__progress-container__no-count">{{ Number((Number(proposal.noVotes) / 100000000).toFixed(0)).toLocaleString() }} VP</span>
+
+                             </div>
+
+                        </div>
+
+                    </div>
+
+                    <!-- bottom -->
+                    <div class="forum-thread-view__details__progress-container__bottom">
+                        
+                        <!-- progress -->
+                        <div class="progress forum-thread-view__details__progress-container__progress" 
+                            role="progressbar">
+
+                            <!-- 3% threshold -->
+                            <div class="three-percent-threshold"
+                                data-bs-toggle="tooltip" 
+                                data-bs-placement="bottom" 
+                                title="Minimum Participation (3%): At least this much voting power must participate for the proposal to be valid">
+                            </div>
+
+                            <!-- 50% threshold -->
+                            <div class="fifty-percent-threshold"
+                                data-bs-toggle="tooltip" 
+                                data-bs-placement="bottom" 
+                                title="Simple Majority (50%): If a simple majority is needed, and more than half of the votes are Yes, the proposal will pass">
+                            </div>
+
+                            <!-- 66.6% threshold -->
+                            <div class="sixty-six-percent-threshold"
+                                data-bs-toggle="tooltip" 
+                                data-bs-placement="bottom" 
+                                title="Super Majority (66.66%): If a super majority is needed, and more than 2/3 of the votes are Yes, the proposal will pass">
+                            </div>
+
+                            <!-- yes progress bar -->
+                            <div class="progress-bar progress-bar--yes" 
+                                :style="{ width: (Number(proposal.yesVotes) / Number(proposal.totalVotes) * 100).toFixed(2) + '%' }"
+                                data-bs-toggle="tooltip" 
+                                data-bs-placement="bottom" 
+                                title="Yes Votes"></div>
+
+                            <!-- no progress bar -->
+                            <div class="progress-bar progress-bar--no" 
+                                :style="{ width: (Number(proposal.noVotes) / Number(proposal.totalVotes) * 100).toFixed(2) + '%' }"
+                                data-bs-toggle="tooltip" 
+                                data-bs-placement="bottom" 
+                                title="No Votes"></div>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+                <!-- key value pairs -->
+                <div class="forum-thread-view__details__key-value-pairs">
+                    
+                    <!-- topic -->
+                    <div class="forum-thread-view__details__key-value-pair">
+
+                        <!-- topic key -->
+                        <span class="forum-thread-view__details__key">Topic</span>
+
+                        <!-- topic value -->
+                        <span class="forum-thread-view__details__value">
+                            {{ Object.keys(proposal.topic)[0].replace(/([A-Z])/g, ' $1').trim() }}
+                        </span>
+
+                    </div>
+
+                    <!-- description -->
+                    <div class="forum-thread-view__details__key-value-pair">
+
+                        <!-- description key -->
+                        <span class="forum-thread-view__details__key">Description</span>
+
+                        <!-- description value -->
+                        <span class="forum-thread-view__details__value wordwrap-anywhere" v-html="proposal.summary"></span>
+
+                    </div>
+
+                    <!-- proposer -->
+                    <div class="forum-thread-view__details__key-value-pair">
+
+                        <!-- proposer key -->
+                        <span class="forum-thread-view__details__key">Proposing Neuron</span>
+
+                        <!-- proposer value -->
+                        <span class="forum-thread-view__details__value">
+
+                            <!-- proposer name -->
+                            <span v-if="getProposerNeuronDisplayName(proposal.proposer) !== ''">
+                                {{ getProposerNeuronDisplayName(proposal.proposer) }}&nbsp;
+                            </span>
+
+                            <!-- proposer address -->
+                            <span class="wordwrap-anywhere">
+                                {{ proposal.proposer }}
+                            </span>
+
+                        </span>
+
+                    </div>
+
+                    <!-- created -->
+                    <div class="forum-thread-view__details__key-value-pair">
+
+                        <!-- created key -->
+                        <span class="forum-thread-view__details__key">Created</span>
+
+                        <!-- created value -->
+                        <span class="forum-thread-view__details__value">{{ proposal.createdAt }}</span>
+
+                    </div>
+
+                    <!-- status -->
+                    <div class="forum-thread-view__details__key-value-pair">
+
+                        <!-- status key -->
+                        <span class="forum-thread-view__details__key">Status</span>
+
+                        <!-- status value -->
+                        <span class="forum-thread-view__details__value forum-thread-view__details__value__status"
+                            :class="[{ 'forum-thread-view__details__value__passed': proposal.status === 'Executed', 'forum-thread-view__details__value__failed': proposal.status === 'Rejected' }]">
+                            {{ formatStatus(proposal.status) }}
+                        </span>
+
+                    </div>
+
+                    <!-- decided date -->
+                    <div v-if="proposal.status === 'Executed' || proposal.status === 'Rejected'"    class="forum-thread-view__details__key-value-pair">
+                        
+                        <!-- decided date key -->
+                        <span class="forum-thread-view__details__key">Decision Date</span>
+
+                        <!-- decided date value -->
+                        <span class="forum-thread-view__details__value">{{ proposal.decidedAt }}</span>
+                        
+                    </div>
+
+                    <!-- execution date -->
+                    <div v-if="proposal.status === 'Executed'" class="forum-thread-view__details__key-value-pair">
+
+                        <!-- execution date key -->
+                        <span class="forum-thread-view__details__key">Execution Date</span>
+
+                        <!-- execution date value -->
+                        <span class="forum-thread-view__details__value">{{ proposal.executedAt }}</span>
+
+                    </div>
+
+                    <!-- url -->
+                    <div class="forum-thread-view__details__key-value-pair">
+
+                        <!-- url key -->
+                        <span class="forum-thread-view__details__key">URL</span>
+
+                        <!-- url value -->
+                        <span class="forum-thread-view__details__value">
+                            <a :href="proposal.url" target="_blank"
+                            class="wordwrap-anywhere"
+                            style="color: var(--blue-to-light-blue);">
+                                {{ proposal.url }}
+                            </a>
+                        </span>
+
+                    </div>
+
+                    <!-- links -->
+                    <div class="forum-thread-view__details__key-value-pair">
+
+                        <!-- links key -->
+                        <span class="forum-thread-view__details__key">Links</span>
+
+                        <!-- links value -->
+                        <div class="forum-thread-view__details__value d-flex flex-wrap gap-3">
+
+                            <!-- nns -->
+                            <a :href="`https://nns.ic0.app/proposal/?u=lacdn-3iaaa-aaaaq-aae3a-cai&proposal=${proposal.id}`" target="_blank"
+                            style="color: var(--blue-to-light-blue);">NNS</a>
+
+                            <!-- internet computer dashboard -->
+                            <a :href="`https://dashboard.internetcomputer.org/sns/lacdn-3iaaa-aaaaq-aae3a-cai/proposal/${proposal.id}`" target="_blank"
+                            style="color: var(--blue-to-light-blue);">Dashboard</a>
+
+                            <!-- ic toolkit -->
+                            <a :href="`https://ic-toolkit.app/sns-management/lacdn-3iaaa-aaaaq-aae3a-cai/proposals/view/${proposal.id}`" target="_blank"
+                            style="color: var(--blue-to-light-blue);">IC Toolkit</a>
+
+                        </div>
+
+                    </div>
+
+                    <!-- voting info -->
+                    <div class="forum-thread-view__details__voting-info mb-3">
+
+                        <!-- voting info key -->
+                        <span class="forum-thread-view__details__key">Voting Info</span>
+
+                        <!-- voting info value -->
+                        <span class="forum-thread-view__details__value">
+
+                            <span class="d-flex flex-column gap-1 mt-2" style="font-size: 1rem;">
+
+                                <span>There are two ways a proposal can be decided</span>
+
+                                <span class="mt-2"><strong>Immediate majority decision:</strong></span>
+
+                                <span>A proposal is immediately adopted or rejected if, before the voting period ends, more than half of the total voting power votes Yes (indicated by the yellow marker), or at least half votes No, respectively.</span>
+
+                                <span class="mt-2"><strong>Standard majority decision:</strong></span>
+
+                                <span>At the end of the voting period, a proposal is adopted if more than half of the votes cast are Yes votes, provided these votes represent at least 3% of the total voting power (indicated by the orange marker). Otherwise, it is rejected. Before a proposal is decided, the voting period can be extended in order to "wait for quiet". Such voting period extensions occur when a proposal's voting results turn from either a Yes majority to a No majority or vice versa.</span>
+
+                            </span>
+
+                        </span>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+        </div>
+
+        <!-- ##### -->
+        <!-- error -->
+        <!-- ##### -->
 
         <!-- error -->
         <div v-if="error" class="forum-thread-view__error-container">
 
+            <!-- taco error image -->
+            <TacoError class="forum-thread-view__error-container__image" />
+
             <!-- title -->
-            <span class="forum-thread-view__error-container__title">Something went tacos up 😱</span>
+            <span class="forum-thread-view__error-container__title">Uh oh! Something went tacos up 😱</span>
 
             <!-- error message -->
-            <span class="forum-thread-view__error-container__message">error: {{ error || 'none provided' }}</span>
+            <span class="forum-thread-view__error-container__message">{{ error || 'none provided' }}</span>
 
             <!-- reload container -->
             <div class="forum-thread-view__error-container__reload-container">
+
+                <!-- back button -->
+                <button @click="error = null" class="btn taco-nav-btn taco-nav-btn--active mt-3">
+                    
+                    <!-- back icon -->
+                    <i class="fa-solid fa-arrow-left"></i>
+
+                    <!-- back text -->
+                    <span>Back</span>
+
+                </button>
+                
+                <!-- or -->
+                <span style="color: var(--black-to-white);">or</span>
                 
                 <!-- retry button -->
-                <button @click="loadThreadData" class="btn taco-nav-btn taco-nav-btn--active">
+                <button @click="error = null; componentLoading = true; loadThreadData().then(() => componentLoading = false)" class="btn taco-nav-btn taco-nav-btn--active mt-3">
 
                     <!-- reload icon -->
                     <i class="fa-solid fa-refresh"></i>
 
                     <!-- retry text -->
-                    <span>Retry</span>
+                    <span>Reload</span>
                     
                 </button>
 
@@ -469,9 +869,11 @@
       align-items: center;
       justify-content: center;
       z-index: 99999;
+      user-select: none;
 
       .loading-img {
         width: 10rem;
+        user-select: none;
       }
 
     }    
@@ -480,13 +882,12 @@
     &__hamburger-menu {
       display: none;
       position: absolute;
-    //   top: 3.5rem;
       right: 0.25rem;
       background-color: var(--brown);
       height: fit-content;
       padding: 0.5rem 0.75rem;
       border-radius: 0.25rem;
-      z-index: 2000;
+      z-index: 999;
       cursor: pointer;
 
       // icon
@@ -525,7 +926,7 @@
         .wiggly-arrow { 
             display: none;
             width: 6rem;
-            transform: translate(2rem, -3rem) rotate(-10deg);
+            transform: translate(2rem, -3rem);
         }
 
         // show twisty arrow when on small screens
@@ -635,8 +1036,6 @@
             font-weight: 600;
             text-wrap: nowrap;
             color: var(--black);
-            cursor: pointer;
-            user-select: none;
         }
 
         // add comment button
@@ -660,6 +1059,35 @@
         }
 
     }
+
+    // add comment button
+    &__add-comment {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        color: var(--black-to-white);
+        border: 1px solid var(--black-to-white);
+        border-radius: 0.375rem;
+        padding: 0.5rem 1rem;
+
+        // active
+        &:active {
+            color: var(--black-to-white);
+            border: 1px solid var(--black-to-white);
+            border-radius: 0.375rem;
+        }
+    }
+
+    // sort selector
+    &__sort-selector {
+        font-size: 1rem;
+        padding: 0.5rem;
+        border-radius: 0.25rem;
+        border: 1px solid var(--black-to-white);
+        background-color: transparent;
+        font-family: "Space Mono";
+        color: var(--black-to-white);
+    }    
 
     // new comment
     &__new-comment {
@@ -725,18 +1153,28 @@
         gap: 1rem;
         margin-top: 5rem;
 
+        // image
+        &__image {
+            width: 100%;
+            max-width: 10rem;
+        }
+
         // title
         &__title {
-            
+            color: var(--black-to-white);
         }
 
         // message  
         &__message {
-            
+            color: var(--black-to-white);
         }
 
         // reload container 
         &__reload-container {
+            display: flex;
+            align-items: baseline;
+            flex-wrap: wrap;
+            gap: 1rem;
 
             // reload button
             .btn {
@@ -764,6 +1202,8 @@
         flex-direction: column;
         gap: 1rem;
         margin-top: 1rem;
+        overflow-x: hidden;
+        overflow-y: auto;
     }
 
     // post
@@ -810,6 +1250,7 @@
         // post header
         &-header {
             display: flex;
+            flex-wrap: wrap;
             align-items: baseline;
         }
 
@@ -863,19 +1304,23 @@
         // post title
         &-title {
             font-weight: 600;
-            margin-bottom: 0.25rem;
+            margin-bottom: 0.5rem;
             font-size: 1.125rem;
         }
 
         // post text
         &-text {
+            font-family: "Rubik";
+            font-weight: 300;
             margin-bottom: 0;
+            line-height: 1.625;
         }
 
         // post footer
         &-footer {
             display: flex;
             align-items: start;
+            flex-wrap: wrap;
             gap: 0.5rem;
             margin-top: 0.75rem;
         }
@@ -1057,12 +1502,263 @@
         justify-content: center;
         align-items: center;
     }
+
+    // details
+    &__details {
+        color: var(--black-to-white);
+
+        // content
+        &__content {
+            padding: 1.5rem 2rem 1rem;
+        }
+
+        // title
+        &__title {
+            line-height: 1.25;
+
+            // title number
+            &-number {
+                font-size: 2.25rem;
+            }
+
+            // title text
+            &-text {
+                font-size: 2.25rem;
+            }
+
+        }
+
+        // progress container
+        &__progress-container {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            margin-top: 1rem;
+            border-top: 1px solid var(--dark-orange);
+            border-bottom: 1px solid var(--dark-orange);
+            padding: 1rem 0 1.5rem;
+
+            // top
+            &__top {
+                display: flex;
+                align-items: flex-end;
+                justify-content: space-between;
+                gap: 0.75rem;
+
+                // left
+                &__left {
+                    
+                }
+
+                // center
+                &__center {
+                    
+                }
+                
+                // right
+                &__right {
+                    
+                }
+
+            }
+
+            // bottom
+            &__bottom {
+                
+            }
+
+            // yes details
+            &__yes-details {
+                display: flex;
+                flex-direction: column;
+            }
+
+            // yes percentage
+            &__yes-percentage {
+                font-size: 1.25rem;
+                text-align: center;
+            }
+
+            // yes count
+            &__yes-count {
+                font-size: 0.875rem;
+                text-align: center;
+            }
+
+            // misc details
+            &__misc-details {
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+            }
+
+            // total votes
+            &__total-votes {
+                font-size: 1.25rem;
+                text-align: center;
+            }
+
+            // eligable count
+            &__eligable-count {
+                font-size: 0.875rem;
+                text-align: center;
+            }
+
+            // no details
+            &__no-details {
+                display: flex;
+                flex-direction: column;
+                align-items: flex-end;
+            }
+
+            // no percentage
+            &__no-percentage {
+                font-size: 1.25rem;
+                text-align: center;
+            }
+
+            // no count
+            &__no-count {
+                font-size: 0.875rem;
+                text-align: center;
+            }
+
+            // progress
+            &__progress {
+                position: relative;
+                background-color: var(--white-to-light-orange);
+
+                // first progress bar
+                .progress-bar--yes {
+                    background-color: var(--success-green);
+                }
+
+                // second progress bar
+                .progress-bar--no {
+                    background-color: var(--red);   
+                    position: absolute;
+                    right: 0;
+                    top: 0;
+                    bottom: 0;
+                }
+
+                // progress indicator
+                .three-percent-threshold {
+                    position: absolute;
+                    left: 3%;
+                    top: 0;
+                    bottom: 0;
+                    background-color: var(--light-orange-to-dark-brown);
+                    width: 3px;
+                }
+
+                // progress indicator
+                .fifty-percent-threshold {
+                    position: absolute;
+                    left: 50%;
+                    top: 0;
+                    bottom: 0;
+                    background-color: var(--light-orange-to-dark-brown);
+                    width: 3px;
+                }
+
+                // progress indicator
+                .sixty-six-percent-threshold {
+                    position: absolute;
+                    left: 66.66%;
+                    top: 0;
+                    bottom: 0;
+                    background-color: var(--light-orange-to-dark-brown);
+                    width: 3px;
+                }
+
+            }
+            
+        }
+
+        // key value pairs
+        &__key-value-pairs {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            padding-top: 1.5rem;
+        }
+
+        // key value pair
+        &__key-value-pair {
+            display: flex;
+            align-items: baseline;
+            flex-wrap: wrap;
+            gap: 0.25rem 0.75rem;
+        }        
+
+        // key
+        &__key {
+            padding: 0.25rem 0.5rem;
+            border-radius: 0.25rem;
+            background-color: var(--dark-orange);
+            color: var(--white);
+            font-size: 0.875rem;
+        }
+
+        // value
+        &__value {
+            font-size: 1.125rem;
+
+            // status
+            &__status {
+                color: var(--black-to-white);
+                outline: 1px solid var(--black-to-white);
+                padding: 0.125rem 0.5rem;
+                border-radius: 0.25rem;
+            }
+
+            // passed
+            &__passed {
+                color: var(--white) !important;
+                background-color: var(--success-green) !important;
+                padding: 0.125rem 0.5rem;
+                border-radius: 0.25rem;
+                outline: none;
+            }
+
+            // failed
+            &__failed {
+                color: var(--white) !important;
+                background-color: var(--red) !important;
+                padding: 0.125rem 0.5rem;
+                border-radius: 0.25rem;
+                outline: none;
+            }
+
+        }
+        
+        // voting info
+        &__voting-info {
+
+            // voting info text
+            &-text {
+                
+            }
+
+        }
+        
+    }
     
 }
 
 ///////////////////
 // media queries //
 ///////////////////
+
+// less than 390px
+@media (max-width: 499.98px) {
+
+    // hide twisty arrow
+    .forum-thread-view__navigation__right {
+        display: none !important;
+    }
+}
 
 // phone protrait
 @media (max-width: 575.98px) {
@@ -1156,6 +1852,8 @@
     import SneedHeadTiny from '../../assets/images/sneed-head-tiny.png'
     import astronautLoader from '../../assets/images/astonautLoader.webp'
     import DfinityLogo from "../../assets/images/dfinityLogo.vue"
+    import TacoError from '../../assets/images/tacoError.vue'
+    import { Principal } from '@dfinity/principal'
 
     ///////////
     // store //
@@ -1177,6 +1875,7 @@
     // user
     const { iidLogIn } = tacoStore // not reactive
     const { getPrincipalDisplayName } = tacoStore // not reactive
+    const { getNeuronDisplayName } = tacoStore // not reactive
 
     // forum
     const { toggleThreadMenu } = tacoStore // not reactive
@@ -1191,8 +1890,17 @@
     // component loading
     const componentLoading = ref(false)
 
-    // error
-    const error = ref<string | null>(null)
+    // thread navigation
+    const threadNavigation = ref('discussion')
+
+    // user votes
+    const userVotes = ref<Map<string, { voteType: 'upvote' | 'downvote' | null; voting: boolean }>>(new Map())
+    
+    // thread data
+    const threadData = ref<any>({ exists: false, mapping: null, thread: null })
+
+    // posts
+    const posts = ref<any[]>([])
 
     // proposal
     const proposal = ref<any>(null)
@@ -1221,24 +1929,15 @@
     // collapsed posts
     const collapsedPosts = ref<Set<string>>(new Set())
 
+    // sort by
+    const sortBy = ref('newest')
+
     // images
     const astronautLoaderUrl = astronautLoader
     const sneedHeadTiny = SneedHeadTiny
 
-
-
-    
-
-    // snassys examples
-
-    const creatingThread = ref(false)
-    const showNewPostForm = ref(false)
-    const highlightedPost = ref<string | null>(null)
-    const userVotes = ref<Map<string, { voteType: 'upvote' | 'downvote' | null; voting: boolean }>>(new Map())
-    const threadData = ref<any>({ exists: false, mapping: null, thread: null })
-    const posts = ref<any[]>([])
-
-
+    // error
+    const error = ref<string | null>(null)    
 
     ///////////////////
     // local methods //
@@ -1249,6 +1948,12 @@
 
         // log
         // console.log('loading proposal')
+
+        // scroll to top before setting loading state
+        const container = document.querySelector('.forum-thread-view')
+        if (container) {
+            container.scrollTop = 0
+        }
 
         // set component loading to true
         componentLoading.value = true
@@ -1383,6 +2088,11 @@
     // refresh posts
     const refreshPosts = async () => {
 
+        // if thread id is null, just return
+        if (!threadData.value.thread?.id) {
+            return
+        }
+
         // component loading
         componentLoading.value = true
 
@@ -1463,7 +2173,7 @@
     const startReply = (postId: bigint) => {
         replyingToPost.value = postId
         replyBody.value = ''
-        showNewPostForm.value = false
+        addingNewComment.value = false
     }
 
     // cancel reply
@@ -1649,15 +2359,18 @@
 
                 // nullify new post body
                 newPostBody.value = ''
-
-                // hide new post form
-                showNewPostForm.value = false
                 
                 // reload posts to show the new post
                 await loadPosts(threadData.value.thread.id)
 
                 // reinitialize user votes for the updated posts
                 await initializeUserVotes()
+
+                // log
+                // console.log('new post created successfully, hiding new post form')
+
+                // hide new post form
+                addingNewComment.value = false
 
             }
 
@@ -1678,7 +2391,7 @@
         finally {
 
             // hide new post form
-            showNewPostForm.value = false
+            addingNewComment.value = false
 
             // hide component loading
             componentLoading.value = false
@@ -1687,13 +2400,44 @@
 
     }    
 
+    // check if a post should be hidden (has a collapsed ancestor)
+    const isPostHidden = (post: any): boolean => {
+        // if this post has no parent, it's never hidden
+        if (!post.reply_to_post_id || !Array.isArray(post.reply_to_post_id) || post.reply_to_post_id.length === 0) {
+            return false
+        }
+        
+        // check if any ancestor is collapsed
+        const checkAncestors = (currentPost: any): boolean => {
+            if (!currentPost.reply_to_post_id || !Array.isArray(currentPost.reply_to_post_id) || currentPost.reply_to_post_id.length === 0) {
+                return false
+            }
+            
+            // check if parent is collapsed
+            const parentId = currentPost.reply_to_post_id[0]
+            if (collapsedPosts.value.has(parentId.toString())) {
+                return true
+            }
+            
+            // recursively check parent's ancestors
+            const parentPost = posts.value.find(p => p.id === parentId)
+            if (parentPost) {
+                return checkAncestors(parentPost)
+            }
+            
+            return false
+        }
+        
+        return checkAncestors(post)
+    }
+
     // collapse group
     const collapseGroup = (postId: bigint) => {
 
         // log
         // console.log('collapsing group', postId)
 
-        // toggle collapsed state
+        // toggle collapsed state for just this post
         const postIdStr = postId.toString()
         if (collapsedPosts.value.has(postIdStr)) {
             collapsedPosts.value.delete(postIdStr)
@@ -1757,15 +2501,15 @@
         // if user is not logged in, return
         if (!tacoStore.userLoggedIn) return
         
+        // get user's current vote
+        const currentVote = getUserVote(postId)
+        
         // try
         try {
 
             // set post loading to true
             const post = posts.value.find(post => post.id === postId)
             if (post) post.loading = true   
-            
-            // get user's current vote
-            const currentVote = getUserVote(postId)            
 
             // set voting state
             userVotes.value.set(postId.toString(), {
@@ -1848,6 +2592,69 @@
 
     }
 
+    // calculate nesting level for a post
+    const getPostNestingLevel = (post: any, postsMap: Map<string, any>): number => {
+        if (!post.reply_to_post_id || !Array.isArray(post.reply_to_post_id) || post.reply_to_post_id.length === 0) {
+            return 0 // top level post
+        }
+        
+        // find the first parent post (assuming single parent for simplicity)
+        const parentId = post.reply_to_post_id[0]
+        const parentPost = postsMap.get(parentId.toString())
+        
+        if (!parentPost) {
+            return 0 // parent not found, treat as top level
+        }
+        
+        // recursively calculate parent's nesting level and add 1
+        return getPostNestingLevel(parentPost, postsMap) + 1
+    }
+
+    // calculate post score for sorting (similar to organizePostsTree)
+    const calculatePostScore = (post: any) => {
+        return getNetVoteScoreValue(post)
+    }
+
+    // flatten tree structure into ordered list
+    const flattenPostTree = (posts: any[]): any[] => {
+        const result: any[] = []
+        
+        posts.forEach(post => {
+            result.push(post)
+            if (post.replies && post.replies.length > 0) {
+                result.push(...flattenPostTree(post.replies))
+            }
+        })
+        
+        return result
+    }
+
+    // check if post was edited (at least 1 minute apart)
+    const isPostEdited = (post: any) => {
+        // convert nanoseconds to milliseconds
+        const createdMs = Number(post.created_at) / 1_000_000
+        const updatedMs = Number(post.updated_at) / 1_000_000
+        
+        // calculate time difference in seconds
+        const timeDiffSeconds = (updatedMs - createdMs) / 1000
+        
+        // only show edited if difference is 60+ seconds (1 minute)
+        return timeDiffSeconds >= 60
+    }
+
+    // convert proposer string to neuron display name
+    const getProposerNeuronDisplayName = (proposerString: string) => {
+        if (!proposerString) return ''
+        
+        // convert the proposer string to Uint8Array (neuron ID)
+        const neuronIdBytes = new Uint8Array(proposerString.match(/.{1,2}/g)?.map(byte => parseInt(byte, 16)) || [])
+        
+        // SNS root canister ID
+        const snsRoot = Principal.fromText('lacdn-3iaaa-aaaaq-aae3a-cai')
+        
+        return getNeuronDisplayName(snsRoot, neuronIdBytes)
+    }
+
     // date formatting
     const formatShortDate = (date: Date) => {
         return date.toLocaleDateString('en-US', {
@@ -1886,98 +2693,6 @@
         })
     }
 
-
-
-
-
-
-    // snassy examples
-
-    // toggle new post form
-    const toggleNewPostForm = () => {
-        showNewPostForm.value = !showNewPostForm.value
-        if (!showNewPostForm.value) {
-            newPostBody.value = ''
-        }
-    }
-
-    // scroll to parent post
-    const scrollToParentPost = (parentPostId: bigint) => {
-        const parentPostElement = document.getElementById(`post-${parentPostId.toString()}`)
-        if (parentPostElement) {
-            parentPostElement.scrollIntoView({ behavior: 'smooth', block: 'center' })
-            highlightedPost.value = parentPostId.toString()
-            
-            // Clear highlight after 3 seconds
-            setTimeout(() => {
-            highlightedPost.value = null
-            }, 3000)
-        } else {
-            console.warn('Parent post not found:', parentPostId.toString())
-            // Show toast or alert that parent post is not visible
-            tacoStore.addToast({
-            id: Date.now(),
-            code: 'parent-post-not-found',
-            title: 'Parent Post Not Found',
-            icon: 'fa-solid fa-exclamation-triangle',
-            message: 'The parent post may be in a different page or not loaded yet.'
-            })
-        }
-    }  
-
-    // utility functions
-    const getStatusClass = (status: string) => {
-        switch (status) {
-            case 'Open': return 'badge bg-primary'
-            case 'Adopted': return 'badge bg-success'
-            case 'Executed': return 'badge bg-info'
-            case 'Rejected': return 'badge bg-danger'
-            case 'Failed': return 'badge bg-warning'
-            default: return 'badge bg-secondary'
-        }
-    }
-
-    // check if post was edited (at least 1 minute apart)
-    const isPostEdited = (post: any) => {
-        // convert nanoseconds to milliseconds
-        const createdMs = Number(post.created_at) / 1_000_000
-        const updatedMs = Number(post.updated_at) / 1_000_000
-        
-        // calculate time difference in seconds
-        const timeDiffSeconds = (updatedMs - createdMs) / 1000
-        
-        // only show edited if difference is 60+ seconds (1 minute)
-        return timeDiffSeconds >= 60
-    }
-
-    const formatVotes = (votes: bigint) => {
-        const num = Number(votes)
-        if (num >= 1000000) {
-            return (num / 1000000).toFixed(1) + 'M'
-        } else if (num >= 1000) {
-            return (num / 1000).toFixed(1) + 'K'
-        }
-        return num.toString()
-    }
-    const truncateHex = (hex: string) => {
-        if (hex.length <= 10) return hex
-        return hex.substring(0, 6) + '…' + hex.substring(hex.length - 4)
-    }
-    const calculateYesPercentage = (proposal: any) => {
-        if (proposal.totalVotes === BigInt(0)) return 0
-        return (Number(proposal.yesVotes) / Number(proposal.totalVotes)) * 100
-    }
-    const calculateNoPercentage = (proposal: any) => {
-        if (proposal.totalVotes === BigInt(0)) return 0
-        return (Number(proposal.noVotes) / Number(proposal.totalVotes)) * 100
-    }
-
-
-
-
-
-    
-
     //////////////
     // computed //
     //////////////
@@ -1993,79 +2708,111 @@
 
     })
 
-    // calculate nesting level for a post
-    const getPostNestingLevel = (post: any, postsMap: Map<string, any>): number => {
-        if (!post.reply_to_post_id || !Array.isArray(post.reply_to_post_id) || post.reply_to_post_id.length === 0) {
-            return 0 // top level post
-        }
-        
-        // find the first parent post (assuming single parent for simplicity)
-        const parentId = post.reply_to_post_id[0]
-        const parentPost = postsMap.get(parentId.toString())
-        
-        if (!parentPost) {
-            return 0 // parent not found, treat as top level
-        }
-        
-        // recursively calculate parent's nesting level and add 1
-        return getPostNestingLevel(parentPost, postsMap) + 1
-    }
-
-    // sorted posts with replies nested under parent posts
+    // sorted posts using organizePostsTree logic
     const sortedPosts = computed(() => {
+        
+        // if there are no posts, return an empty array
         if (!posts.value.length) return []
         
-        // create a map of posts by id for quick lookup
-        const postsMap = new Map(posts.value.map(post => [post.id.toString(), post]))
-        
-        // separate top-level posts (no reply_to_post_id) from replies
-        const topLevelPosts: any[] = []
-        const replies: any[] = []
-        
+        // create a map of all posts with replies array
+        const postMap = new Map()
+        const rootPosts: any[] = []
+
+        // initialize all posts in the map with empty replies array
         posts.value.forEach(post => {
-            // check if post is a reply by looking for valid reply_to_post_id array
-            const isReply = post.reply_to_post_id && 
-                           Array.isArray(post.reply_to_post_id) && 
-                           post.reply_to_post_id.length > 0
+
+            // set post id as key and post data as value in the map
+            postMap.set(Number(post.id), { ...post, replies: [] })
+
+        })
+
+        // organize into tree structure
+        posts.value.forEach(post => {
+
+            // get post data from map
+            const postData = postMap.get(Number(post.id))
+
+            // if post has a parent
+            if (post.reply_to_post_id && Array.isArray(post.reply_to_post_id) && post.reply_to_post_id.length > 0) {
+
+                // get parent id
+                const parentId = Number(post.reply_to_post_id[0])
+
+                // get parent from map
+                const parent = postMap.get(parentId)
+                
+                // if parent exists
+                if (parent) {
+
+                    // add post to parent's replies
+                    parent.replies.push(postData)
+
+                } 
+                
+                // else
+                else {
+
+                    // parent not found, treat as root post
+                    rootPosts.push(postData)
+
+                }
+                
+            } 
             
-            if (isReply) {
-                replies.push(post)
-            } else {
-                topLevelPosts.push(post)
+            // else
+            else {
+
+                // add post to root posts
+                rootPosts.push(postData)
+
             }
+
         })
-        
-        // sort top-level posts by creation date (oldest first)
-        topLevelPosts.sort((a, b) => Number(a.created_at) - Number(b.created_at))
-        
-        // sort replies by creation date (oldest first)
-        replies.sort((a, b) => Number(a.created_at) - Number(b.created_at))
-        
-        // insert replies after their parent posts
-        const result: any[] = []
-        
-        topLevelPosts.forEach(post => {
-            result.push(post)
+
+        // recursive function to sort replies based on sortBy value
+        const sortReplies = (post: any) => {
+            switch (sortBy.value) {
+                case 'newest':
+                    post.replies.sort((a: any, b: any) => Number(b.created_at) - Number(a.created_at))
+                    break
+                case 'oldest':
+                    post.replies.sort((a: any, b: any) => Number(a.created_at) - Number(b.created_at))
+                    break
+                case 'score':
+                    post.replies.sort((a: any, b: any) => calculatePostScore(b) - calculatePostScore(a))
+                    break
+            }
             
-            // find all replies to this post
-            const postReplies = replies.filter(reply => 
-                reply.reply_to_post_id && 
-                Array.isArray(reply.reply_to_post_id) &&
-                reply.reply_to_post_id.some((parentId: bigint) => parentId === post.id)
-            )
-            
-            // add replies after the parent post
-            result.push(...postReplies)
-        })
-        
-        // safety check: if we're missing posts, fall back to original order
-        if (result.length !== posts.value.length) {
-            console.warn('Some posts were lost in sorting, falling back to original order')
-            return posts.value.sort((a, b) => Number(a.created_at) - Number(b.created_at))
+            // recursively sort replies
+            post.replies.forEach(sortReplies)
+        }
+
+        // sort root posts based on sortBy value
+        switch (sortBy.value) {
+            case 'newest':
+                rootPosts.sort((a, b) => Number(b.created_at) - Number(a.created_at))
+                break
+            case 'oldest':
+                rootPosts.sort((a, b) => Number(a.created_at) - Number(b.created_at))
+                break
+            case 'score':
+                rootPosts.sort((a, b) => calculatePostScore(b) - calculatePostScore(a))
+                break
         }
         
-        return result
+        rootPosts.forEach(sortReplies)
+
+        // flatten the tree structure back to a flat array for the template
+        return flattenPostTree(rootPosts)
+        
     })
+
+    // format status
+    const formatStatus = (status: string) => {
+      if (status === "Executed") return "PASSED"
+      if (status === "Rejected") return "FAILED"
+      return status
+    }    
 
     //////////////
     // watchers //
@@ -2099,6 +2846,25 @@
 
             // set proposal selected to false
             proposalSelected.value = false
+
+        }
+
+    })
+
+    // watch for logout
+    watch(() => userLoggedIn.value, async (newVal) => {
+
+        // log
+        // console.log('user logged in changed to', newVal)
+
+        // if user is logged out
+        if (!newVal) {
+
+            // set adding new comment to false
+            addingNewComment.value = false
+
+            // set replying to post to null
+            replyingToPost.value = null
 
         }
 

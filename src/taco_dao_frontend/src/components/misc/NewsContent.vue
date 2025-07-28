@@ -8,13 +8,24 @@
             <!-- news item -->
             <div class="news-content__item">
                 <h3 class="news-content__title">
+                    We're funding the portfolio!
+                </h3>
+                <span class="news-content__date">🍽️ July 26, 2025</span>
+                <p class="news-content__text">
+                    After testing with smaller amounts, we're happy with how the trading bot is performing and we've started transferring larger sums. We've also introduced a vector to slowely release funds into the portfolio, giving the bot time to digest the changes, preventing sudden imbalances.
+                </p>
+            </div>
+
+            <!-- news item -->
+            <div class="news-content__item">
+                <h3 class="news-content__title">
                     We're officially a DAO!
                 </h3>
                 <span class="news-content__date">🍽️ May 23, 2025</span>
                 <p class="news-content__text">
                     Thanks to everyone for participating in the decentralization sale! Give everything time to unlock, we'll be connecting the site as endpoints become available.
                 </p>
-            </div>               
+            </div>
 
             <!-- news item -->
             <div class="news-content__item">

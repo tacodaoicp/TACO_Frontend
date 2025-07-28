@@ -39,33 +39,26 @@
                 <h2 v-if="!userLoggedIn" class="vote-view__top-bar__title py-2">Log in to Vote</h2>                
 
                 <!-- if logged in, allocation voting title -->
-                <h2 v-if="userLoggedIn" class="vote-view__top-bar__title py-2 pe-3">
+                <h2 v-if="userLoggedIn" class="vote-view__top-bar__title py-2">
                   <span class="whitespace-nowrap">Welcome, &hellip;{{ truncatedPrincipal }}&nbsp;</span>
-                  <span v-if="votePower > 0" class="vote-view__top-bar__vote-power text-nowrap">({{ votePower }} VP)</span>
-                  <span v-if="votePower === 0" class="vote-view__top-bar__vote-power text-nowrap">(0 VP)</span>
-                </h2>
-
-                <!-- refresh voting power button -->
-                <div v-if="userLoggedIn" class="me-auto d-flex align-items-center gap-2">
+                  <span v-if="votePower !== '0'" class="vote-view__top-bar__vote-power text-nowrap">({{ votePower }} VP)</span>
+                  <span v-if="votePower === '0'" class="vote-view__top-bar__vote-power text-nowrap">(0 VP)</span>
+                  
+                  <!-- refresh voting power button -->
                   <button 
-                    class="btn btn-sm btn-outline-light" 
+                    class="btn btn-sm taco-text-white py-0 border-0"
                     @click="refreshVotingPower"
                     :disabled="refreshingVP"
                     data-bs-toggle="tooltip" 
-                    data-bs-placement="top" 
-                    title="Refresh your voting power immediately after adding hotkeys to neurons">
+                    data-bs-placement="top"
+                    title="Refresh your voting power">
+
+                    <!-- refresh icon -->
                     <i class="fa-solid fa-refresh" :class="{ 'fa-spin': refreshingVP }"></i>
-                    {{ refreshingVP ? 'Refreshing...' : 'Refresh VP' }}
+
                   </button>
-                  
-                  <!-- hover tooltip info icon -->
-                  <div class="taco-text-white" 
-                      data-bs-toggle="tooltip" 
-                      data-bs-placement="top" 
-                      title="Click refresh if you just added hotkeys to neurons and want to see your voting power immediately">
-                      <i class="fa-solid fa-circle-info"></i>
-                  </div>
-                </div>                
+
+                </h2>               
 
               </div>
 
@@ -502,11 +495,11 @@
                     <span class="taco-text-black-to-white d-inline-flex align-items-center gap-1
                                  d-flex w-100 justify-content-end text-end mt-2" style="font-size: 0.75rem;">
                       {{
-                        (Number(fetchedVotingPowerMetrics?.ok?.allocatedVotingPower) / Math.pow(10, 8)).toFixed(2)
+                        (Number(fetchedVotingPowerMetrics?.ok?.allocatedVotingPower) / Math.pow(10, 8)).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })
                       }}
                       of
                       {{
-                        (Number(fetchedVotingPowerMetrics?.ok?.totalVotingPowerByHotkeySetters) / Math.pow(10, 8)).toFixed(2)
+                        (Number(fetchedVotingPowerMetrics?.ok?.totalVotingPowerByHotkeySetters) / Math.pow(10, 8)).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })
                       }} VP
 
                       <!-- info hover tooltip -->
@@ -664,8 +657,8 @@
                         class="btn taco-btn taco-btn--green taco-btn--big w-100"
                         :class="{'disabled': !currentSlidersSumTo100 || matchesLast || !votePower}"
                         :disabled="!currentSlidersSumTo100 || matchesLast || !votePower">
-                        <span v-if="votePower > 0 && currentSlidersSumTo100 && !matchesLast">Lock In Vote</span>
-                        <span v-if="votePower === 0 || !votePower">You have no voting power</span>
+                        <span v-if="votePower !== '0' && currentSlidersSumTo100 && !matchesLast">Lock In Vote</span>
+                        <span v-if="votePower === '0' || !votePower">You have no voting power</span>
                         <span v-if="!currentSlidersSumTo100">All values do not equal 100%</span>
                         <span v-if="currentSlidersSumTo100 && matchesLast">Must Be A New Vote</span>
                       </button>
@@ -3072,7 +3065,7 @@
     if (!formattedUserAllocation.value) return 0
 
     // return formatted voting power
-    return (Number(formattedUserAllocation.value.votingPower) / Math.pow(10, 8)).toFixed(2)
+    return (Number(formattedUserAllocation.value.votingPower) / Math.pow(10, 8)).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })
 
     // log
     // console.log('VoteView.vue: vote power:', votePower.value)

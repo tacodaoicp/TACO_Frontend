@@ -62,7 +62,8 @@
                     p-2 position-relative">
 
             <!-- dao allocations button -->
-            <button class="btn taco-nav-btn position-absolute taco-nav-btn--active"
+            <button v-if="showCurrentAllocations" 
+                    class="btn taco-nav-btn position-absolute taco-nav-btn--active"
                     style="top: 0.5rem; left: 0.5rem; z-index: 1000;"
                     title="View DAO allocations"
                     data-bs-toggle="tooltip"
@@ -203,7 +204,7 @@
                         </li>
 
                         <!-- holding value in icp - list item -->
-                        <li v-if="showCurrentHoldings">
+                        <li v-if="showCurrentHoldings && currentTokenSymbol !== 'icp'">
 
                             <!-- key -->
                             <span class="dao-allocations__token-info-list__key
@@ -214,7 +215,7 @@
                                          taco-text-white d-flex align-items-center gap-1 ms-auto">
 
                                 <!-- holding value -->
-                                <span class="small">{{ ((currentTokenHoldings * currentTokenPrice) / icpPriceUsd).toFixed(2) }} ICP</span>
+                                <span class="small">{{ ((currentTokenHoldings * currentTokenPrice) / icpPriceUsd).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }} ICP</span>
 
                             </span>
 
@@ -232,7 +233,7 @@
                                          taco-text-white d-flex align-items-center gap-1 ms-auto">
 
                                 <!-- holding value -->
-                                <span class="small">${{ (currentTokenHoldings * currentTokenPrice).toFixed(2) }}</span>
+                                <span class="small">${{ (currentTokenHoldings * currentTokenPrice).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}</span>
 
                             </span>
 
@@ -311,7 +312,7 @@
                                          taco-text-white ms-auto">
 
                                 <!-- dd report link -->
-                                <router-link class="small" style="color: var(--blue-to-light-blue);" :to="`/reports/dd${currentTokenSymbol.toLowerCase()}`">View</router-link>
+                                <router-link class="small" style="color: var(--white-to-light-blue);" :to="`/reports/dd${currentTokenSymbol.toLowerCase()}`">View</router-link>
                                 
                             </span>
 
@@ -812,9 +813,12 @@ LOCAL METHODS
         }).format(date)
     }
 
-    // format number to remove trailing zeros
+    // format number to remove trailing zeros and add commas
     const formatNumber = (num: number) => {
-        const formatted = num.toFixed(4).replace(/\.?0+$/, '')
+        const formatted = num.toLocaleString('en-US', {
+            minimumFractionDigits: 0,
+            maximumFractionDigits: 4
+        }).replace(/\.?0+$/, '')
         return formatted === '0' ? '~0' : formatted
     }    
 
@@ -825,7 +829,7 @@ LOCAL METHODS
     // check if dd report route exists for current token
     const ddReportRouteExists = computed(() => {
         const tokenSymbol = currentTokenSymbol.value.toLowerCase()
-        const availableRoutes = ['ckbtc', 'sneed', 'motoko']
+        const availableRoutes = ['ckbtc', 'sneed', 'motoko', 'sgldt']
         return availableRoutes.includes(tokenSymbol)
     })
 

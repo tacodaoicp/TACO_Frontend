@@ -152,19 +152,19 @@
                   <!-- symbol -->
                   <th class="fw-bold" 
                       scope="col">
-                      <span class="ps-3 pe-4">Symbol</span>
+                      <span class="pe-4">Symbol</span>
                   </th>
 
                   <!-- percentage -->
                   <th class="fw-bold text-end"
                       scope="col">
-                      <span class="pe-4">%</span>
+                      <span class="pe-4">% Held</span>
                   </th> 
 
                   <!-- holdings -->
                   <th class="fw-bold text-end"
                       scope="col">
-                      <span class="pe-4">Holdings</span>
+                      <span class="pe-4"># Held</span>
                   </th>
 
                   <!-- value -->
@@ -202,23 +202,30 @@
                         target="_blank"
                         class="taco-text-blue-to-light-blue">{{ token.symbol }}</a>
 
+                      <!-- paused indicator -->
+                      <span v-if="token.isPaused" 
+                            class="dao-trusted-tokens__table__paused-indicator"
+                            data-bs-toggle="tooltip" 
+                            data-bs-placement="top" 
+                            title="This token is paused. It will not be included in the trading bots rotation until it is unpaused.">Paused</span>
+
                     </div>
 
                   </td>
 
-                  <!-- holding % -->
+                  <!-- % held -->
                   <td class="text-end pe-4">
                     <span>{{ token.holdingPercentage.amount }}%</span>
                   </td>
 
-                  <!-- holdings -->
+                  <!-- # held -->
                   <td class="text-end pe-4">
                     <span data-bs-toggle="tooltip" data-bs-placement="top" :title="token.currentHoldings.amount">{{ formatNumber(token.currentHoldings.amount) }}</span>
                   </td>
 
                   <!-- value -->
                   <td class="text-end pe-4">
-                    <span>${{ (token.currentHoldings.amount * token.priceInUSD).toFixed(2) }}</span>
+                    <span>${{ (token.currentHoldings.amount * token.priceInUSD).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}</span>
                   </td>
 
                   <!-- date added -->
@@ -425,6 +432,16 @@
 
     }
 
+    // paused indicator
+    &__paused-indicator {
+      color: var(--black-to-white) !important;
+      background-color: var(--orange-to-brown) !important;
+      border-radius: 0.25rem;
+      padding: 0rem 0.325rem;
+      font-size: 0.75rem;
+      border: 1px solid var(--dark-orange);
+    }
+
   }
 
   // token image
@@ -453,7 +470,7 @@
       .loading-img {
           width: 10rem;
       }
-  }  
+  }
 
 }
 
@@ -557,7 +574,7 @@ LOCAL METHODS
   const isAmountHeld = computed(() => navSelected.value === 'amount-held')
 
   // formatted token details
-  const formattedTokenDetails = ref([])
+  const formattedTokenDetails = ref<any[]>([])
 
   ///////////////////
   // local methods //
@@ -569,9 +586,9 @@ LOCAL METHODS
   // handle fetched token details
   const handleFetchedTokenDetails = (fetchedTokenDetails: any) => {
 
-    // filter for active tokens
+    // filter for active tokens (including paused ones)
     const activeTokens = fetchedTokenDetails.filter((token: [any, { Active: boolean, isPaused: boolean }]) => {
-      return token[1].Active === true && token[1].isPaused === false
+      return token[1].Active === true
     })
 
     // calculate total value across all tokens
@@ -642,7 +659,7 @@ LOCAL METHODS
     return date.toLocaleDateString('en-US', options)
   }
 
-  // format number to remove trailing zeros
+  // format number to remove trailing zeros and add commas
   const formatNumber = (num: number) => {
 
     // if number is exactly 0, return 0
@@ -655,9 +672,12 @@ LOCAL METHODS
       return '~0'
     }
 
-    // else return number with 4 decimal places
+    // else return number with 4 decimal places and commas
     else {
-      return num.toFixed(4).replace(/\.?0+$/, '')
+      return num.toLocaleString('en-US', {
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 4
+      }).replace(/\.?0+$/, '')
     }
 
   }

@@ -35,16 +35,23 @@ const routes = [
     { path: "/sales/dkp-swap", name: "Sale1", component: SaleDKPSwap, meta: { robots: 'index' } },
     { path: "/info", name: "Info", component: InfoView, meta: { robots: 'index' } },
     { path: "/chat/oc", name: "ChatOC", component: ChatView, meta: { robots: 'index' } },
+    { path: "/chat/sneed", redirect: "/chat/forum", meta: { robots: 'noindex' } }, // keep for historical linking
     { path: "/chat/forum", name: "ChatForum", component: ChatView, meta: { robots: 'index' } },
     { path: "/chat/forum/:id", name: "ChatForumThread", component: ChatView, meta: { robots: 'index' } },
-    { path: "/chat", redirect: "/chat/oc" },
-    { path: "/reports", redirect: "/reports/ddsgldt" },
+    { path: "/chat", redirect: "/chat/oc", meta: { robots: 'noindex' } },
+    { path: "/reports", redirect: "/reports/openchat", meta: { robots: 'noindex' } },
     { path: "/reports/example", component: ReportsView, meta: { robots: 'index' } },    
-    { path: "/reports/ddckbtc", component: ReportsView, meta: { robots: 'index' } },
-    { path: "/reports/ddsneed", component: ReportsView, meta: { robots: 'index' } },
-    { path: "/reports/ddmotoko", component: ReportsView, meta: { robots: 'index' } },
-    { path: "/reports/ddgolddao", component: ReportsView, meta: { robots: 'index' } },
-    { path: "/reports/ddsgldt", component: ReportsView, meta: { robots: 'index' } },
+    { path: "/reports/ddckbtc", component: ReportsView, meta: { robots: 'index' } }, // dd* links should remain for historical linking
+    { path: "/reports/ddsneed", component: ReportsView, meta: { robots: 'index' } }, // dd* links should remain for historical linking
+    { path: "/reports/ddmotoko", component: ReportsView, meta: { robots: 'index' } }, // dd* links should remain for historical linking
+    { path: "/reports/ddgolddao", component: ReportsView, meta: { robots: 'index' } }, // dd* links should remain for historical linking
+    { path: "/reports/ddsgldt", component: ReportsView, meta: { robots: 'index' } }, // dd* links should remain for historical linking
+    { path: "/reports/ckbtc", component: ReportsView, meta: { robots: 'index' } },
+    { path: "/reports/sneed", component: ReportsView, meta: { robots: 'index' } },
+    { path: "/reports/motoko", component: ReportsView, meta: { robots: 'index' } },
+    { path: "/reports/golddao", component: ReportsView, meta: { robots: 'index' } },
+    { path: "/reports/sgldt", component: ReportsView, meta: { robots: 'index' } },    
+    { path: "/reports/openchat", component: ReportsView, meta: { robots: 'index' } },    
     { path: "/admin", name: "Admin", component: AdminView, meta: { robots: 'noindex' } },
     { path: "/admin/trade", name: "AdminTrade", component: AdminTradeView, meta: { robots: 'noindex' } },
     { path: "/admin/price", name: "AdminPrice", component: AdminPriceView, meta: { robots: 'noindex' } },
@@ -53,9 +60,7 @@ const routes = [
     { path: "/admin/votes", name: "AdminVotes", component: AdminVotesView, meta: { robots: 'noindex' } },
     { path: "/forum", name: "Forum", component: ForumView, meta: { robots: 'noindex' } },
     { path: "/forum/thread/:id", name: "Thread", component: ThreadView, meta: { robots: 'noindex' } },
-    { path: "/names", name: "Names", component: NamesView, meta: { robots: 'noindex' } },
-    { path: "/proposals", name: "Proposals", component: ProposalsView, meta: { robots: 'noindex' } },
-    { path: "/proposal/:id", name: "Proposal", component: ProposalView, meta: { robots: 'noindex' } },
+    { path: "/names", name: "Names", component: NamesView, meta: { robots: 'noindex' } }, //remove once integrated
     { path: "/:pathMatch(.*)*", redirect: "/" },
 ]
 

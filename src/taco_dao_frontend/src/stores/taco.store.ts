@@ -1777,14 +1777,14 @@ export const useTacoStore = defineStore('taco', () => {
                     // refresh user allocation to get updated data
                     await fetchUserAllocation()
                     
-                    // show success toast
-                    addToast({
-                        id: Date.now(),
-                        code: 'voting-power-refreshed',
-                        title: 'Voting Power Updated',
-                        icon: 'fa-solid fa-check-circle',
-                        message: `Updated from ${result.ok.oldVotingPower} to ${result.ok.newVotingPower} VP (${result.ok.neuronsUpdated} neurons)`
-                    })
+                    // // show success toast
+                    // addToast({
+                    //     id: Date.now(),
+                    //     code: 'voting-power-refreshed',
+                    //     title: 'Voting Power Updated',
+                    //     icon: 'fa-solid fa-check-circle',
+                    //     message: `Updated from ${result.ok.oldVotingPower} to ${result.ok.newVotingPower} VP (${result.ok.neuronsUpdated} neurons)`
+                    // })
                     
                     return result.ok
                 } else {
@@ -4788,12 +4788,18 @@ export const useTacoStore = defineStore('taco', () => {
         }        
         return 'g7s5u-tqaaa-aaaad-qhktq-cai'; // Replace with actual local/default ID
     }
+
+    // uint8 array to hex
     const uint8ArrayToHex = (arr: Uint8Array | number[]): string => {
         return Array.from(arr, byte => byte.toString(16).padStart(2, '0')).join('');
     }
+
+    // create neuron key
     const createNeuronKey = (snsRoot: Principal, neuronId: Uint8Array | number[]): string => {
         return `${snsRoot.toString()}:${uint8ArrayToHex(neuronId)}`;
     }
+
+    // load all names
     const loadAllNames = async () => {
         // console.log('🔍 loadAllNames() called');
         
@@ -4853,6 +4859,8 @@ export const useTacoStore = defineStore('taco', () => {
             namesLoading.value = false;
         }
     }
+
+    // get principal name
     const getPrincipalDisplayName = (principal: Principal | string): string => {
         const principalStr = typeof principal === 'string' ? principal : principal.toString();
         const cachedName = namesCache.value.principals.get(principalStr);
@@ -4867,6 +4875,8 @@ export const useTacoStore = defineStore('taco', () => {
             '…' + cleaned.substring(cleaned.length - 5) :
             cleaned;
     }
+
+    // get neuron name
     const getNeuronDisplayName = (snsRoot: Principal, neuronId: Uint8Array | number[]): string => {
         const mapKey = createNeuronKey(snsRoot, neuronId);
         const cachedName = namesCache.value.neurons.get(mapKey);
@@ -4875,12 +4885,11 @@ export const useTacoStore = defineStore('taco', () => {
             return cachedName.verified ? `✓ ${cachedName.name}` : cachedName.name;
         }
         
-        // Fallback to truncated neuron ID
-        const neuronIdHex = uint8ArrayToHex(neuronId);
-        return neuronIdHex.length > 12 ? 
-            `Neuron ${neuronIdHex.substring(0, 6)}...${neuronIdHex.substring(neuronIdHex.length - 6)}` :
-            `Neuron ${neuronIdHex}`;
+        // return empty string if no match found
+        return '';
     }
+
+    // get principal name
     const setPrincipalName = async (name: string) => {
         try {
             if (!userLoggedIn.value) {
@@ -4919,6 +4928,8 @@ export const useTacoStore = defineStore('taco', () => {
             throw error;
         }
     }
+
+    // set neuron name
     const setNeuronName = async (snsRoot: Principal, neuronId: Uint8Array | number[], name: string) => {
         try {
             if (!userLoggedIn.value) {
@@ -4960,6 +4971,8 @@ export const useTacoStore = defineStore('taco', () => {
             throw error;
         }
     }
+
+    // get user neurons
     const getUserNeurons = async () => {
         try {
             if (!userLoggedIn.value) {

@@ -276,9 +276,9 @@
     if (!formattedUserAllocation.value) return 0
 
     // return formatted voting power
-    return (Number(formattedUserAllocation.value.votingPower) / Math.pow(10, 8)).toFixed(2)
+    return (Number(formattedUserAllocation.value.votingPower) / Math.pow(10, 8)).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })
 
-  })  
+  })
 
   // return formatted date
   const formatDate = (epochTimestamp: bigint) => {
