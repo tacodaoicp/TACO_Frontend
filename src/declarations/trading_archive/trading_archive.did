@@ -1,0 +1,267 @@
+type Value = 
+ variant {
+   Array: vec Value;
+   Blob: blob;
+   Int: int;
+   Map: vec record {
+              text;
+              Value;
+            };
+   Nat: nat;
+   Text: text;
+ };
+type TradingPauseReason = 
+ variant {
+   AdminAction;
+   CircuitBreaker;
+   LiquidityIssue;
+   PriceVolatility;
+   SystemMaintenance;
+ };
+type TradingPauseBlockData = 
+ record {
+   duration: opt int;
+   reason: TradingPauseReason;
+   token: principal;
+   tokenSymbol: text;
+ };
+type TradingMetrics = 
+ record {
+   avgSlippage: float64;
+   avgTradeSize: nat;
+   exchangeBreakdown: vec record {
+                            ExchangeType;
+                            nat;
+                          };
+   successfulTrades: nat;
+   topTokensByVolume: vec record {
+                            principal;
+                            nat;
+                          };
+   totalTrades: nat;
+   totalVolume: nat;
+   uniqueTraders: nat;
+ };
+type TradingArchiveV2 = 
+ service {
+   archiveCircuitBreakerBlock: (circuitBreaker: CircuitBreakerBlockData) ->
+    (Result_5);
+   archiveTradeBlock: (trade: TradeBlockData) -> (Result_5);
+   archiveTradingPauseBlock: (pause: TradingPauseBlockData) -> (Result_5);
+   catchUpImport: () -> (Result_1);
+   getArchiveStatus: () -> (Result_4) query;
+   getBatchImportStatus: () ->
+    (record {
+       intervalSeconds: nat;
+       isRunning: bool;
+       lastImportedPriceAlertId: nat;
+       lastImportedTradeTimestamp: int;
+     }) query;
+   getLogs: (count: nat) -> (vec LogEntry) query;
+   getTimerStatus: () -> (TimerStatus) query;
+   getTradingMetrics: (startTime: int, endTime: int) -> (Result_3) query;
+   icrc3_get_archives: (args: GetArchivesArgs) -> (GetArchivesResult) query;
+   icrc3_get_blocks: (args: GetBlocksArgs) -> (GetBlocksResult) query;
+   icrc3_get_tip_certificate: () -> (opt DataCertificate) query;
+   icrc3_supported_block_types: () -> (vec BlockType) query;
+   queryBlocks: (filter: BlockFilter) -> (Result_2) query;
+   resetImportTimestamps: () -> (Result_1);
+   runLegacyManualBatchImport: () -> (Result_1);
+   runManualBatchImport: () -> (Result_1);
+   setMaxInnerLoopIterations: (iterations: nat) -> (Result_1);
+   startBatchImportSystem: () -> (Result_1);
+   startLegacyBatchImportSystem: () -> (Result_1);
+   stopAllTimers: () -> (Result_1);
+   stopBatchImportSystem: () -> (Result_1);
+   updateConfig: (newConfig: ArchiveConfig) -> (Result);
+ };
+type TradeBlockData = 
+ record {
+   amountBought: nat;
+   amountSold: nat;
+   error: opt text;
+   exchange: ExchangeType;
+   fee: nat;
+   slippage: float64;
+   success: bool;
+   tokenBought: principal;
+   tokenSold: principal;
+   trader: principal;
+ };
+type TimerStatus = 
+ record {
+   innerLoopCurrentBatch: nat;
+   innerLoopCurrentType: text;
+   innerLoopLastRun: int;
+   innerLoopNextScheduled: int;
+   innerLoopRunning: bool;
+   innerLoopStartTime: int;
+   innerLoopTotalBatches: nat;
+   middleLoopCurrentState: text;
+   middleLoopLastRun: int;
+   middleLoopNextScheduled: int;
+   middleLoopRunning: bool;
+   middleLoopStartTime: int;
+   middleLoopTotalRuns: nat;
+   outerLoopIntervalSeconds: nat;
+   outerLoopLastRun: int;
+   outerLoopRunning: bool;
+   outerLoopTotalRuns: nat;
+ };
+type TacoBlockType = 
+ variant {
+   Allocation;
+   Circuit;
+   Pause;
+   Portfolio;
+   Price;
+   Trade;
+ };
+type Result_5 = 
+ variant {
+   err: ArchiveError;
+   ok: nat;
+ };
+type Result_4 = 
+ variant {
+   err: ArchiveError;
+   ok: ArchiveStatus;
+ };
+type Result_3 = 
+ variant {
+   err: ArchiveError;
+   ok: TradingMetrics;
+ };
+type Result_2 = 
+ variant {
+   err: ArchiveError;
+   ok: ArchiveQueryResult;
+ };
+type Result_1 = 
+ variant {
+   err: text;
+   ok: text;
+ };
+type Result = 
+ variant {
+   err: ArchiveError;
+   ok: text;
+ };
+type LogLevel = 
+ variant {
+   ERROR;
+   INFO;
+   WARN;
+ };
+type LogEntry = 
+ record {
+   component: text;
+   context: text;
+   level: LogLevel;
+   message: text;
+   timestamp: int;
+ };
+type GetBlocksResult = 
+ record {
+   archived_blocks: vec ArchivedBlock;
+   blocks: vec Block;
+   log_length: nat;
+ };
+type GetBlocksArgs = 
+ vec record {
+       length: nat;
+       start: nat;
+     };
+type GetArchivesResult = 
+ vec record {
+       canister_id: principal;
+       end: nat;
+       start: nat;
+     };
+type GetArchivesArgs = record {from: opt principal;};
+type ExchangeType = 
+ variant {
+   ICPSwap;
+   KongSwap;
+ };
+type DataCertificate = 
+ record {
+   certificate: blob;
+   hash_tree: blob;
+ };
+type CircuitBreakerEventType = 
+ variant {
+   PortfolioBreaker;
+   PriceAlert;
+   SystemEmergency;
+   TradingPause;
+ };
+type CircuitBreakerBlockData = 
+ record {
+   actualValue: float64;
+   eventType: CircuitBreakerEventType;
+   severity: text;
+   systemResponse: text;
+   thresholdValue: float64;
+   tokensAffected: vec principal;
+   triggerToken: opt principal;
+ };
+type BlockType = 
+ record {
+   block_type: text;
+   url: text;
+ };
+type BlockFilter = 
+ record {
+   blockTypes: opt vec TacoBlockType;
+   endTime: opt int;
+   maxAmount: opt nat;
+   minAmount: opt nat;
+   startTime: opt int;
+   tokens: opt vec principal;
+   traders: opt vec principal;
+ };
+type Block = 
+ record {
+   block: Value;
+   id: nat;
+ };
+type ArchivedBlock = 
+ record {
+   args: GetBlocksArgs;
+   callback: func (GetBlocksArgs) -> (GetBlocksResult) query;
+ };
+type ArchiveStatus = 
+ record {
+   lastArchiveTime: int;
+   newestBlock: opt nat;
+   oldestBlock: opt nat;
+   storageUsed: nat;
+   supportedBlockTypes: vec text;
+   totalBlocks: nat;
+ };
+type ArchiveQueryResult = 
+ record {
+   blocks: vec Block;
+   hasMore: bool;
+   nextIndex: opt nat;
+   totalCount: nat;
+ };
+type ArchiveError = 
+ variant {
+   BlockNotFound;
+   InvalidBlockType;
+   InvalidData;
+   InvalidTimeRange;
+   NotAuthorized;
+   StorageFull;
+   SystemError: text;
+ };
+type ArchiveConfig = 
+ record {
+   autoArchiveEnabled: bool;
+   blockRetentionPeriodNS: int;
+   enableCompression: bool;
+   maxBlocksPerCanister: nat;
+ };
+service : () -> TradingArchiveV2
