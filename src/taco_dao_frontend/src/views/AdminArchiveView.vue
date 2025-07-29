@@ -399,13 +399,36 @@ export default {
 
     async createArchiveActors() {
       try {
-        // Get agent from taco store
-        const agent = this.tacoStore.agent
+        // Create authenticated agent (same pattern as store functions)
+        const { createAgent } = await import('@dfinity/utils')
+        const { AuthClient } = await import('@dfinity/auth-client')
         
-        // Create actors with proper canister IDs
+        // Get authenticated identity using the same pattern as taco store
+        const authClient = await AuthClient.create({
+          idleOptions: {
+            disableIdle: true,
+            disableDefaultIdleCallback: true
+          }
+        })
+        
+        const identity = await authClient.getIdentity()
+        
+        // Determine host
+        const host = process.env.DFX_NETWORK === "local" ? "http://127.0.0.1:4943" : "https://icp0.io"
+        
+        // Create agent with authenticated identity
+        const agent = await createAgent({
+          identity: identity,
+          host: host,
+          fetchRootKey: process.env.DFX_NETWORK === "local"
+        })
+        
+        // Create actors with proper canister IDs and authenticated agent
         this.tradingActor = createTradingActor(this.tradingArchiveCanisterId(), { agent })
         this.portfolioActor = createPortfolioActor(this.portfolioArchiveCanisterId(), { agent })
         this.priceActor = createPriceActor(this.priceArchiveCanisterId(), { agent })
+        
+        console.log('Archive actors created with identity:', identity.getPrincipal().toString())
       } catch (error) {
         console.error('Failed to create archive actors:', error)
         this.errorMessage = 'Failed to initialize archive actors'
@@ -469,11 +492,14 @@ export default {
     },
 
     async startBatchImportSystem() {
+      console.log('startBatchImportSystem called')
       this.loading = true
       this.clearMessages()
       
       try {
+        console.log('Calling startBatchImportSystem on actor:', this.currentArchiveActor)
         const result = await this.currentArchiveActor.startBatchImportSystem()
+        console.log('startBatchImportSystem result:', result)
         if (result.ok) {
           this.successMessage = result.ok
         } else {
@@ -481,6 +507,7 @@ export default {
         }
         await this.refreshStatus()
       } catch (error) {
+        console.error('startBatchImportSystem error:', error)
         this.errorMessage = `Failed to start batch import system: ${error.message}`
       }
       
@@ -526,12 +553,15 @@ export default {
     },
 
     async runManualBatchImport() {
+      console.log('runManualBatchImport called')
       this.loading = true
       this.clearMessages()
       this.successMessage = 'Manual batch import started. Check logs for progress...'
       
       try {
+        console.log('Calling runManualBatchImport on actor:', this.currentArchiveActor)
         const result = await this.currentArchiveActor.runManualBatchImport()
+        console.log('runManualBatchImport result:', result)
         if (result.ok) {
           this.successMessage = result.ok
         } else {
@@ -540,6 +570,7 @@ export default {
         await this.refreshStatus()
         await this.refreshLogs()
       } catch (error) {
+        console.error('runManualBatchImport error:', error)
         this.errorMessage = `Failed to run manual batch import: ${error.message}`
       }
       
