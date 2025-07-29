@@ -429,10 +429,28 @@ export default {
         // Get legacy status for compatibility
         this.legacyStatus = await this.currentArchiveActor.getBatchImportStatus()
         
-        // Get archive status
-        const archiveStatusResult = await this.currentArchiveActor.getArchiveStatus()
-        if (archiveStatusResult.ok) {
-          this.archiveStatus = archiveStatusResult.ok
+        // Get archive status - try new public method first, fallback to old method
+        try {
+          if (this.currentArchiveActor.getArchiveStats) {
+            this.archiveStatus = await this.currentArchiveActor.getArchiveStats()
+          } else {
+            const archiveStatusResult = await this.currentArchiveActor.getArchiveStatus()
+            if (archiveStatusResult.ok) {
+              this.archiveStatus = archiveStatusResult.ok
+            } else {
+              console.error('Failed to get archive status:', archiveStatusResult.err)
+              this.errorMessage = `Failed to get archive status: ${JSON.stringify(archiveStatusResult.err)}`
+            }
+          }
+        } catch (error) {
+          console.error('Error getting archive stats, trying fallback method:', error)
+          // Fallback to old method
+          const archiveStatusResult = await this.currentArchiveActor.getArchiveStatus()
+          if (archiveStatusResult.ok) {
+            this.archiveStatus = archiveStatusResult.ok
+          } else {
+            throw new Error(`Both methods failed: ${JSON.stringify(archiveStatusResult.err)}`)
+          }
         }
       } catch (error) {
         this.errorMessage = `Failed to refresh status: ${error.message}`
