@@ -305,9 +305,9 @@ import { useTacoStore } from '../stores/taco.store'
 import { mapStores } from 'pinia'
 
 // Import archive actors
-import { createActor as createTradingActor, canisterId as tradingCanisterId } from '../../../declarations/trading_archive'
-import { createActor as createPortfolioActor, canisterId as portfolioCanisterId } from '../../../declarations/portfolio_archive'  
-import { createActor as createPriceActor, canisterId as priceCanisterId } from '../../../declarations/price_archive'
+import { createActor as createTradingActor } from '../../../declarations/trading_archive'
+import { createActor as createPortfolioActor } from '../../../declarations/portfolio_archive'
+import { createActor as createPriceActor } from '../../../declarations/price_archive'
 
 export default {
   name: 'AdminArchiveView',
@@ -366,15 +366,46 @@ export default {
     }
   },
   methods: {
+    // Canister ID functions similar to taco.store.ts pattern
+    tradingArchiveCanisterId() {
+      switch (process.env.DFX_NETWORK) {
+        case "ic":
+          return process.env.CANISTER_ID_TRADING_ARCHIVE_IC || 'rdmx6-jaaaa-aaaah-qczva-cai';
+        case "staging":
+          return process.env.CANISTER_ID_TRADING_ARCHIVE_STAGING || 'be2us-64aaa-aaaaa-qaabq-cai';
+      }
+      return 'be2us-64aaa-aaaaa-qaabq-cai'; // local canisterId
+    },
+
+    portfolioArchiveCanisterId() {
+      switch (process.env.DFX_NETWORK) {
+        case "ic":
+          return process.env.CANISTER_ID_PORTFOLIO_ARCHIVE_IC || 'renrk-eyaaa-aaaah-qczuq-cai';
+        case "staging":  
+          return process.env.CANISTER_ID_PORTFOLIO_ARCHIVE_STAGING || 'bkyz2-fmaaa-aaaaa-qaaaq-cai';
+      }
+      return 'bkyz2-fmaaa-aaaaa-qaaaq-cai'; // local canisterId
+    },
+
+    priceArchiveCanisterId() {
+      switch (process.env.DFX_NETWORK) {
+        case "ic":
+          return process.env.CANISTER_ID_PRICE_ARCHIVE_IC || 'rrkah-fqaaa-aaaah-qczua-cai';
+        case "staging":
+          return process.env.CANISTER_ID_PRICE_ARCHIVE_STAGING || 'br5f7-7uaaa-aaaaa-qaaca-cai';
+      }
+      return 'br5f7-7uaaa-aaaaa-qaaca-cai'; // local canisterId
+    },
+
     async createArchiveActors() {
       try {
         // Get agent from taco store
         const agent = this.tacoStore.agent
         
-        // Create actors
-        this.tradingActor = createTradingActor(tradingCanisterId, { agent })
-        this.portfolioActor = createPortfolioActor(portfolioCanisterId, { agent })
-        this.priceActor = createPriceActor(priceCanisterId, { agent })
+        // Create actors with proper canister IDs
+        this.tradingActor = createTradingActor(this.tradingArchiveCanisterId(), { agent })
+        this.portfolioActor = createPortfolioActor(this.portfolioArchiveCanisterId(), { agent })
+        this.priceActor = createPriceActor(this.priceArchiveCanisterId(), { agent })
       } catch (error) {
         console.error('Failed to create archive actors:', error)
         this.errorMessage = 'Failed to initialize archive actors'
