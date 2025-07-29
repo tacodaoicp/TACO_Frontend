@@ -36,6 +36,18 @@ export const idlFactory = ({ IDL }) => {
     'lastArchiveTime' : IDL.Int,
   });
   const Result_2 = IDL.Variant({ 'ok' : ArchiveStatus, 'err' : ArchiveError });
+  const LogLevel = IDL.Variant({
+    'INFO' : IDL.Null,
+    'WARN' : IDL.Null,
+    'ERROR' : IDL.Null,
+  });
+  const LogEntry = IDL.Record({
+    'component' : IDL.Text,
+    'context' : IDL.Text,
+    'level' : LogLevel,
+    'message' : IDL.Text,
+    'timestamp' : IDL.Int,
+  });
   const TimerStatus = IDL.Record({
     'innerLoopRunning' : IDL.Bool,
     'middleLoopCurrentState' : IDL.Text,
@@ -103,6 +115,7 @@ export const idlFactory = ({ IDL }) => {
   const Result = IDL.Variant({ 'ok' : IDL.Text, 'err' : ArchiveError });
   const PortfolioArchiveV2 = IDL.Service({
     'archivePortfolioBlock' : IDL.Func([PortfolioBlockData], [Result_3], []),
+    'getArchiveStats' : IDL.Func([], [ArchiveStatus], ['query']),
     'getArchiveStatus' : IDL.Func([], [Result_2], ['query']),
     'getBatchImportStatus' : IDL.Func(
         [],
@@ -115,6 +128,7 @@ export const idlFactory = ({ IDL }) => {
         ],
         ['query'],
       ),
+    'getLogs' : IDL.Func([IDL.Nat], [IDL.Vec(LogEntry)], ['query']),
     'getTimerStatus' : IDL.Func([], [TimerStatus], ['query']),
     'icrc3_get_archives' : IDL.Func(
         [GetArchivesArgs],

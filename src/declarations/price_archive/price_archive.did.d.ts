@@ -73,6 +73,7 @@ export type LogLevel = { 'INFO' : null } |
 export interface PriceArchiveV2 {
   'archivePriceBlock' : ActorMethod<[PriceBlockData], Result_6>,
   'catchUpImport' : ActorMethod<[], Result_1>,
+  'getArchiveStats' : ActorMethod<[], ArchiveStatus>,
   'getArchiveStatus' : ActorMethod<[], Result_5>,
   'getBatchImportStatus' : ActorMethod<
     [],

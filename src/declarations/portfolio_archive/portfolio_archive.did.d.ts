@@ -43,8 +43,19 @@ export interface GetBlocksResult {
   'blocks' : Array<Block>,
   'archived_blocks' : Array<ArchivedBlock>,
 }
+export interface LogEntry {
+  'component' : string,
+  'context' : string,
+  'level' : LogLevel,
+  'message' : string,
+  'timestamp' : bigint,
+}
+export type LogLevel = { 'INFO' : null } |
+  { 'WARN' : null } |
+  { 'ERROR' : null };
 export interface PortfolioArchiveV2 {
   'archivePortfolioBlock' : ActorMethod<[PortfolioBlockData], Result_3>,
+  'getArchiveStats' : ActorMethod<[], ArchiveStatus>,
   'getArchiveStatus' : ActorMethod<[], Result_2>,
   'getBatchImportStatus' : ActorMethod<
     [],
@@ -54,6 +65,7 @@ export interface PortfolioArchiveV2 {
       'isRunning' : boolean,
     }
   >,
+  'getLogs' : ActorMethod<[bigint], Array<LogEntry>>,
   'getTimerStatus' : ActorMethod<[], TimerStatus>,
   'icrc3_get_archives' : ActorMethod<[GetArchivesArgs], GetArchivesResult>,
   'icrc3_get_blocks' : ActorMethod<[GetBlocksArgs], GetBlocksResult>,

@@ -192,6 +192,7 @@ export const idlFactory = ({ IDL }) => {
         [],
       ),
     'catchUpImport' : IDL.Func([], [Result_1], []),
+    'getArchiveStats' : IDL.Func([], [ArchiveStatus], ['query']),
     'getArchiveStatus' : IDL.Func([], [Result_4], ['query']),
     'getBatchImportStatus' : IDL.Func(
         [],

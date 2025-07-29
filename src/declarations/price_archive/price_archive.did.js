@@ -159,6 +159,7 @@ export const idlFactory = ({ IDL }) => {
   const PriceArchiveV2 = IDL.Service({
     'archivePriceBlock' : IDL.Func([PriceBlockData], [Result_6], []),
     'catchUpImport' : IDL.Func([], [Result_1], []),
+    'getArchiveStats' : IDL.Func([], [ArchiveStatus], ['query']),
     'getArchiveStatus' : IDL.Func([], [Result_5], ['query']),
     'getBatchImportStatus' : IDL.Func(
         [],

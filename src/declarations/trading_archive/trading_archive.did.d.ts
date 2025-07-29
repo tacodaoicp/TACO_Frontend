@@ -140,6 +140,7 @@ export interface TradingArchiveV2 {
   'archiveTradeBlock' : ActorMethod<[TradeBlockData], Result_5>,
   'archiveTradingPauseBlock' : ActorMethod<[TradingPauseBlockData], Result_5>,
   'catchUpImport' : ActorMethod<[], Result_1>,
+  'getArchiveStats' : ActorMethod<[], ArchiveStatus>,
   'getArchiveStatus' : ActorMethod<[], Result_4>,
   'getBatchImportStatus' : ActorMethod<
     [],

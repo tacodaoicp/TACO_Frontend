@@ -49,6 +49,7 @@ type TradingArchiveV2 =
    archiveTradeBlock: (trade: TradeBlockData) -> (Result_5);
    archiveTradingPauseBlock: (pause: TradingPauseBlockData) -> (Result_5);
    catchUpImport: () -> (Result_1);
+   getArchiveStats: () -> (ArchiveStatus) query;
    getArchiveStatus: () -> (Result_4) query;
    getBatchImportStatus: () ->
     (record {

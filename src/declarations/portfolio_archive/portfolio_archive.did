@@ -71,6 +71,7 @@ type PortfolioBlockData =
 type PortfolioArchiveV2 = 
  service {
    archivePortfolioBlock: (portfolio: PortfolioBlockData) -> (Result_3);
+   getArchiveStats: () -> (ArchiveStatus) query;
    getArchiveStatus: () -> (Result_2) query;
    getBatchImportStatus: () ->
     (record {
@@ -78,6 +79,7 @@ type PortfolioArchiveV2 =
        isRunning: bool;
        lastPortfolioImportTime: int;
      }) query;
+   getLogs: (count: nat) -> (vec LogEntry) query;
    getTimerStatus: () -> (TimerStatus) query;
    icrc3_get_archives: (args: GetArchivesArgs) -> (GetArchivesResult) query;
    icrc3_get_blocks: (args: GetBlocksArgs) -> (GetBlocksResult) query;
@@ -92,6 +94,20 @@ type PortfolioArchiveV2 =
    stopAllTimers: () -> (Result_1);
    stopBatchImportSystem: () -> (Result_1);
    updateConfig: (newConfig: ArchiveConfig) -> (Result);
+ };
+type LogLevel = 
+ variant {
+   ERROR;
+   INFO;
+   WARN;
+ };
+type LogEntry = 
+ record {
+   component: text;
+   context: text;
+   level: LogLevel;
+   message: text;
+   timestamp: int;
  };
 type GetBlocksResult = 
  record {
