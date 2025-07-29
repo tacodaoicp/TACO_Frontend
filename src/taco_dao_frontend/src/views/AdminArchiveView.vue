@@ -300,12 +300,14 @@
 
 <script>
 import HeaderBar from '../components/HeaderBar.vue'
-import TacoTitle from '../components/TacoTitle.vue'
+import TacoTitle from '../components/misc/TacoTitle.vue'
+import { useTacoStore } from '../stores/taco.store'
+import { mapStores } from 'pinia'
 
-// Import archive actors (adjust paths as needed)
-import { trading_archive } from '../../../declarations/trading_archive'
-import { portfolio_archive } from '../../../declarations/portfolio_archive'  
-import { price_archive } from '../../../declarations/price_archive'
+// Import archive actors
+import { createActor as createTradingActor, canisterId as tradingCanisterId } from '../../../declarations/trading_archive'
+import { createActor as createPortfolioActor, canisterId as portfolioCanisterId } from '../../../declarations/portfolio_archive'  
+import { createActor as createPriceActor, canisterId as priceCanisterId } from '../../../declarations/price_archive'
 
 export default {
   name: 'AdminArchiveView',
@@ -326,21 +328,30 @@ export default {
       showConfigModal: false,
       configMaxIterations: 10,
       
+      // Archive actors
+      tradingActor: null,
+      portfolioActor: null,
+      priceActor: null,
+      
       // Refresh interval
       refreshInterval: null
     }
   },
   computed: {
+    ...mapStores(useTacoStore),
     currentArchiveActor() {
       switch (this.selectedArchive) {
-        case 'trading_archive': return trading_archive
-        case 'portfolio_archive': return portfolio_archive
-        case 'price_archive': return price_archive
-        default: return trading_archive
+        case 'trading_archive': return this.tradingActor
+        case 'portfolio_archive': return this.portfolioActor
+        case 'price_archive': return this.priceActor
+        default: return this.tradingActor
       }
     }
   },
-  mounted() {
+  async mounted() {
+    // Create archive actors
+    await this.createArchiveActors()
+    
     this.refreshStatus()
     this.refreshLogs()
     
@@ -355,6 +366,21 @@ export default {
     }
   },
   methods: {
+    async createArchiveActors() {
+      try {
+        // Get agent from taco store
+        const agent = this.tacoStore.agent
+        
+        // Create actors
+        this.tradingActor = createTradingActor(tradingCanisterId, { agent })
+        this.portfolioActor = createPortfolioActor(portfolioCanisterId, { agent })
+        this.priceActor = createPriceActor(priceCanisterId, { agent })
+      } catch (error) {
+        console.error('Failed to create archive actors:', error)
+        this.errorMessage = 'Failed to initialize archive actors'
+      }
+    },
+
     async onArchiveChange() {
       this.clearMessages()
       await this.refreshStatus()
