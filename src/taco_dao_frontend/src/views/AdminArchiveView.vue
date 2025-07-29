@@ -366,35 +366,35 @@ export default {
     }
   },
   methods: {
-    // Canister ID functions similar to taco.store.ts pattern
+    // Canister ID functions using actual deployed canister IDs from canister_ids.json
     tradingArchiveCanisterId() {
       switch (process.env.DFX_NETWORK) {
         case "ic":
-          return process.env.CANISTER_ID_TRADING_ARCHIVE_IC || 'rdmx6-jaaaa-aaaah-qczva-cai';
+          return process.env.CANISTER_ID_TRADING_ARCHIVE_IC || 'jmze3-hiaaa-aaaan-qz4xq-cai';
         case "staging":
-          return process.env.CANISTER_ID_TRADING_ARCHIVE_STAGING || 'be2us-64aaa-aaaaa-qaabq-cai';
+          return process.env.CANISTER_ID_TRADING_ARCHIVE_STAGING || 'jlycp-kqaaa-aaaan-qz4xa-cai';
       }
-      return 'be2us-64aaa-aaaaa-qaabq-cai'; // local canisterId
+      return 'jlycp-kqaaa-aaaan-qz4xa-cai'; // fallback to staging canisterId for local
     },
 
     portfolioArchiveCanisterId() {
       switch (process.env.DFX_NETWORK) {
         case "ic":
-          return process.env.CANISTER_ID_PORTFOLIO_ARCHIVE_IC || 'renrk-eyaaa-aaaah-qczuq-cai';
+          return process.env.CANISTER_ID_PORTFOLIO_ARCHIVE_IC || 'lrekt-uaaaa-aaaan-qz4ya-cai'; // fallback to staging as no IC deployment yet
         case "staging":  
-          return process.env.CANISTER_ID_PORTFOLIO_ARCHIVE_STAGING || 'bkyz2-fmaaa-aaaaa-qaaaq-cai';
+          return process.env.CANISTER_ID_PORTFOLIO_ARCHIVE_STAGING || 'lrekt-uaaaa-aaaan-qz4ya-cai';
       }
-      return 'bkyz2-fmaaa-aaaaa-qaaaq-cai'; // local canisterId
+      return 'lrekt-uaaaa-aaaan-qz4ya-cai'; // fallback to staging canisterId for local
     },
 
     priceArchiveCanisterId() {
       switch (process.env.DFX_NETWORK) {
         case "ic":
-          return process.env.CANISTER_ID_PRICE_ARCHIVE_IC || 'rrkah-fqaaa-aaaah-qczua-cai';
+          return process.env.CANISTER_ID_PRICE_ARCHIVE_IC || 'l7gh3-pqaaa-aaaan-qz4za-cai'; // fallback to staging as no IC deployment yet
         case "staging":
-          return process.env.CANISTER_ID_PRICE_ARCHIVE_STAGING || 'br5f7-7uaaa-aaaaa-qaaca-cai';
+          return process.env.CANISTER_ID_PRICE_ARCHIVE_STAGING || 'l7gh3-pqaaa-aaaan-qz4za-cai';
       }
-      return 'br5f7-7uaaa-aaaaa-qaaca-cai'; // local canisterId
+      return 'l7gh3-pqaaa-aaaan-qz4za-cai'; // fallback to staging canisterId for local
     },
 
     async createArchiveActors() {
