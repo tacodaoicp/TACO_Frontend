@@ -165,6 +165,14 @@
                     <button class="btn btn-secondary" @click="showConfigModal = true">
                       ⚙️ Configuration
                     </button>
+                    <button 
+                      class="btn btn-warning" 
+                      @click="resetImportTimestamps"
+                      :disabled="loading"
+                      title="Reset import timestamps to re-import all historical data"
+                    >
+                      🔄 Reset Timestamps
+                    </button>
                   </div>
                 </div>
               </div>
@@ -567,6 +575,28 @@ export default {
       this.loading = false
     },
 
+    async resetImportTimestamps() {
+      console.log('resetImportTimestamps called')
+      this.loading = true
+      this.clearMessages()
+      
+      try {
+        const result = await this.currentArchiveActor.resetImportTimestamps()
+        console.log('resetImportTimestamps result:', result)
+        if (result.ok) {
+          this.successMessage = `Import timestamps reset: ${result.ok}`
+        } else {
+          this.errorMessage = `Failed to reset timestamps: ${result.err}`
+        }
+        await this.refreshStatus()
+      } catch (error) {
+        console.error('resetImportTimestamps error:', error)
+        this.errorMessage = `Failed to reset import timestamps: ${error.message}`
+      }
+      
+      this.loading = false
+    },
+
     async stopAllTimers() {
       this.loading = true
       this.clearMessages()
@@ -680,11 +710,14 @@ export default {
       // Add archive-specific status details
       switch (this.selectedArchive) {
         case 'trading_archive':
-          return `Trades: ${this.legacyStatus.lastImportedTradeTimestamp || 0}, Alerts: ${this.legacyStatus.lastImportedPriceAlertId || 0}`
+          const tradeTime = this.legacyStatus.lastImportedTradeTimestamp || 0
+          return `Trades: ${this.formatTime(tradeTime)} (${tradeTime}), Alerts: ${this.legacyStatus.lastImportedPriceAlertId || 0}`
         case 'portfolio_archive':
-          return `Last: ${this.formatTime(this.legacyStatus.lastPortfolioImportTime)}`
+          const portfolioTime = this.legacyStatus.lastPortfolioImportTime || 0
+          return `Last: ${this.formatTime(portfolioTime)} (${portfolioTime})`
         case 'price_archive':
-          return `Last: ${this.formatTime(this.legacyStatus.lastImportedPriceTime)}`
+          const priceTime = this.legacyStatus.lastImportedPriceTime || 0
+          return `Last: ${this.formatTime(priceTime)} (${priceTime})`
         default:
           return 'Unknown'
       }
