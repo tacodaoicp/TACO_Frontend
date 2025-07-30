@@ -260,6 +260,132 @@
             </div>
           </div>
 
+          <!-- ICRC3 Block Browser -->
+          <div class="card bg-dark text-white mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+              <h3 class="mb-0">ICRC3 Block Browser</h3>
+              <div class="d-flex gap-2 align-items-center">
+                <div class="input-group input-group-sm" style="width: 200px;">
+                  <input 
+                    type="number" 
+                    class="form-control bg-dark text-white border-secondary" 
+                    placeholder="Block index" 
+                    v-model.number="blockBrowserIndex"
+                    @keyup.enter="loadSpecificBlock"
+                  >
+                  <button class="btn btn-outline-primary" @click="loadSpecificBlock">Go</button>
+                </div>
+                <button class="btn btn-sm btn-outline-primary" @click="refreshBlocks">
+                  Refresh
+                </button>
+              </div>
+            </div>
+            <div class="card-body">
+              <!-- Navigation Controls -->
+              <div class="d-flex justify-content-between align-items-center mb-3" v-if="archiveStatus?.totalBlocks > 0">
+                <div class="btn-group" role="group">
+                  <button 
+                    class="btn btn-sm btn-outline-secondary" 
+                    @click="loadFirstBlocks"
+                    :disabled="blockBrowserLoading"
+                  >
+                    ⏮️ First
+                  </button>
+                  <button 
+                    class="btn btn-sm btn-outline-secondary" 
+                    @click="loadPreviousBlocks"
+                    :disabled="blockBrowserLoading || currentBlockStart <= 0"
+                  >
+                    ⬅️ Previous
+                  </button>
+                  <button 
+                    class="btn btn-sm btn-outline-secondary" 
+                    @click="loadNextBlocks"
+                    :disabled="blockBrowserLoading || (currentBlockStart + blockBrowserPageSize >= (archiveStatus?.totalBlocks || 0))"
+                  >
+                    Next ➡️
+                  </button>
+                  <button 
+                    class="btn btn-sm btn-outline-secondary" 
+                    @click="loadLastBlocks"
+                    :disabled="blockBrowserLoading"
+                  >
+                    Last ⏭️
+                  </button>
+                </div>
+                <div class="text-muted">
+                  Showing blocks {{ currentBlockStart }}-{{ Math.min(currentBlockStart + blockBrowserPageSize - 1, (archiveStatus?.totalBlocks || 0) - 1) }} 
+                  of {{ (archiveStatus?.totalBlocks || 0) - 1 }} 
+                  ({{ blockBrowserPageSize }} per page)
+                </div>
+                <div class="input-group input-group-sm" style="width: 120px;">
+                  <span class="input-group-text bg-dark border-secondary text-white">Page Size:</span>
+                  <select class="form-select bg-dark text-white border-secondary" v-model.number="blockBrowserPageSize" @change="refreshBlocks">
+                    <option value="5">5</option>
+                    <option value="10">10</option>
+                    <option value="20">20</option>
+                    <option value="50">50</option>
+                  </select>
+                </div>
+              </div>
+
+              <!-- Loading State -->
+              <div v-if="blockBrowserLoading" class="text-center text-muted py-3">
+                <div class="spinner-border spinner-border-sm me-2" role="status"></div>
+                Loading blocks...
+              </div>
+
+              <!-- No Blocks Message -->
+              <div v-else-if="!blockBrowserBlocks || blockBrowserBlocks.length === 0" class="text-muted text-center py-3">
+                <div v-if="archiveStatus?.totalBlocks === 0">
+                  No blocks archived yet. Run an import to create blocks.
+                </div>
+                <div v-else>
+                  No blocks found at the specified range.
+                </div>
+              </div>
+
+              <!-- Block List -->
+              <div v-else class="block-list">
+                <div 
+                  v-for="block in blockBrowserBlocks" 
+                  :key="block.id"
+                  class="block-entry border border-secondary rounded p-3 mb-3"
+                >
+                  <!-- Block Header -->
+                  <div class="d-flex justify-content-between align-items-start mb-2">
+                    <div class="block-header">
+                      <h5 class="mb-1">
+                        Block #{{ block.id }}
+                        <span class="badge bg-info ms-2">{{ getBlockTypeName(block.block) }}</span>
+                      </h5>
+                      <small class="text-muted">{{ formatTime(Number(block.timestamp)) }}</small>
+                    </div>
+                    <button 
+                      class="btn btn-sm btn-outline-secondary"
+                      @click="toggleBlockExpanded(block.id)"
+                    >
+                      {{ expandedBlocks.includes(block.id) ? '▼ Collapse' : '▶️ Expand' }}
+                    </button>
+                  </div>
+
+                  <!-- Block Summary -->
+                  <div class="block-summary mb-2">
+                    {{ getBlockSummary(block.block) }}
+                  </div>
+
+                  <!-- Expanded Block Details -->
+                  <div v-if="expandedBlocks.includes(block.id)" class="block-details">
+                    <div class="border-top border-secondary pt-2">
+                      <h6>Full Block Data:</h6>
+                      <pre class="bg-secondary p-2 rounded small text-wrap">{{ formatBlockJson(block.block) }}</pre>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
           <!-- Error Messages -->
           <div v-if="errorMessage" class="alert alert-danger" role="alert">
             {{ errorMessage }}
@@ -342,7 +468,15 @@ export default {
       priceActor: null,
       
       // Refresh interval
-      refreshInterval: null
+      refreshInterval: null,
+      
+      // ICRC3 Block Browser
+      blockBrowserBlocks: [],
+      blockBrowserLoading: false,
+      blockBrowserIndex: null,
+      blockBrowserPageSize: 10,
+      currentBlockStart: 0,
+      expandedBlocks: []
     }
   },
   computed: {
@@ -366,6 +500,9 @@ export default {
     
     this.refreshStatus()
     this.refreshLogs()
+    
+    // Load the first blocks
+    await this.loadFirstBlocks()
     
     // Auto-refresh every 10 seconds
     this.refreshInterval = setInterval(() => {
@@ -476,8 +613,16 @@ export default {
 
     async onArchiveChange() {
       this.clearMessages()
+      // Reset block browser state when switching archives
+      this.blockBrowserBlocks = []
+      this.currentBlockStart = 0
+      this.expandedBlocks = []
+      this.blockBrowserIndex = null
+      
       await this.refreshStatus()
       await this.refreshLogs()
+      // Load the first blocks for the new archive
+      await this.loadFirstBlocks()
     },
 
     async refreshStatus() {
@@ -730,6 +875,167 @@ export default {
         case 'INFO': return 'log-info'
         default: return ''
       }
+    },
+
+    // ========== ICRC3 Block Browser Methods ==========
+
+    async refreshBlocks() {
+      await this.loadBlocks(this.currentBlockStart, this.blockBrowserPageSize)
+    },
+
+    async loadBlocks(start, length) {
+      if (!this.currentArchiveActor) return
+      
+      this.blockBrowserLoading = true
+      try {
+        const args = {
+          start: start,
+          length: length
+        }
+        
+        const result = await this.currentArchiveActor.icrc3_get_blocks(args)
+        
+        if (result.blocks) {
+          this.blockBrowserBlocks = result.blocks.map(block => ({
+            ...block,
+            // Convert any BigInt values to Numbers for display
+            id: typeof block.id === 'bigint' ? Number(block.id) : block.id,
+            timestamp: typeof block.timestamp === 'bigint' ? Number(block.timestamp) : block.timestamp
+          }))
+          this.currentBlockStart = start
+        } else {
+          this.blockBrowserBlocks = []
+          console.error('Unexpected block result format:', result)
+        }
+      } catch (error) {
+        console.error('Failed to load blocks:', error)
+        this.errorMessage = `Failed to load blocks: ${error.message}`
+        this.blockBrowserBlocks = []
+      }
+      this.blockBrowserLoading = false
+    },
+
+    async loadFirstBlocks() {
+      await this.loadBlocks(0, this.blockBrowserPageSize)
+    },
+
+    async loadPreviousBlocks() {
+      const newStart = Math.max(0, this.currentBlockStart - this.blockBrowserPageSize)
+      await this.loadBlocks(newStart, this.blockBrowserPageSize)
+    },
+
+    async loadNextBlocks() {
+      const newStart = this.currentBlockStart + this.blockBrowserPageSize
+      await this.loadBlocks(newStart, this.blockBrowserPageSize)
+    },
+
+    async loadLastBlocks() {
+      const totalBlocks = this.archiveStatus?.totalBlocks || 0
+      if (totalBlocks === 0) return
+      
+      const lastPageStart = Math.max(0, totalBlocks - this.blockBrowserPageSize)
+      await this.loadBlocks(lastPageStart, this.blockBrowserPageSize)
+    },
+
+    async loadSpecificBlock() {
+      if (this.blockBrowserIndex === null || this.blockBrowserIndex === undefined) {
+        this.errorMessage = 'Please enter a valid block index'
+        return
+      }
+      
+      // Load a range around the specific block
+      const start = Math.max(0, this.blockBrowserIndex - Math.floor(this.blockBrowserPageSize / 2))
+      await this.loadBlocks(start, this.blockBrowserPageSize)
+    },
+
+    toggleBlockExpanded(blockId) {
+      const index = this.expandedBlocks.indexOf(blockId)
+      if (index > -1) {
+        this.expandedBlocks.splice(index, 1)
+      } else {
+        this.expandedBlocks.push(blockId)
+      }
+    },
+
+    getBlockTypeName(blockData) {
+      if (!blockData || typeof blockData !== 'object') {
+        return 'Unknown'
+      }
+      
+      // Check for ICRC3 block type field
+      if (blockData.btype) {
+        return blockData.btype
+      }
+      
+      // Try to infer type from content
+      if (blockData.trader || blockData.tokenSold) {
+        return 'Trade'
+      }
+      if (blockData.eventType || blockData.tokensAffected) {
+        return 'Circuit Breaker'
+      }
+      if (blockData.portfolioSnapshot || blockData.totalValue) {
+        return 'Portfolio'
+      }
+      if (blockData.priceHistory || blockData.price) {
+        return 'Price'
+      }
+      
+      return 'Data'
+    },
+
+    getBlockSummary(blockData) {
+      if (!blockData || typeof blockData !== 'object') {
+        return 'Invalid block data'
+      }
+      
+      // Trading block
+      if (blockData.trader || blockData.tokenSold) {
+        const success = blockData.success ? '✅' : '❌'
+        const trader = blockData.trader ? `Trader: ${blockData.trader.toString().slice(0, 8)}...` : ''
+        const tokens = blockData.tokenSold && blockData.tokenBought 
+          ? `${blockData.tokenSold} → ${blockData.tokenBought}`
+          : ''
+        const amounts = blockData.amountSold && blockData.amountBought
+          ? `(${blockData.amountSold} → ${blockData.amountBought})`
+          : ''
+        return `${success} Trade: ${trader} ${tokens} ${amounts}`.trim()
+      }
+      
+      // Circuit breaker block
+      if (blockData.eventType || blockData.tokensAffected) {
+        const event = blockData.eventType || 'Unknown Event'
+        const tokens = blockData.tokensAffected?.length ? `Tokens: ${blockData.tokensAffected.join(', ')}` : ''
+        return `🚨 Circuit Breaker: ${event} ${tokens}`.trim()
+      }
+      
+      // Portfolio block
+      if (blockData.portfolioSnapshot || blockData.totalValue) {
+        const value = blockData.totalValue || blockData.portfolioSnapshot?.totalValue || 'Unknown'
+        const tokens = blockData.portfolioSnapshot?.holdings?.length || 0
+        return `💼 Portfolio: ${tokens} tokens, Total Value: ${value}`
+      }
+      
+      // Price block
+      if (blockData.priceHistory || blockData.price) {
+        const token = blockData.token || 'Unknown Token'
+        const price = blockData.price || blockData.priceHistory?.currentPrice || 'Unknown'
+        return `💲 Price: ${token} = ${price}`
+      }
+      
+      // Generic block
+      const keys = Object.keys(blockData).slice(0, 3).join(', ')
+      return `📄 Data Block: ${keys}${Object.keys(blockData).length > 3 ? '...' : ''}`
+    },
+
+    formatBlockJson(blockData) {
+      return JSON.stringify(blockData, (key, value) => {
+        // Convert BigInt to string for display
+        if (typeof value === 'bigint') {
+          return value.toString() + 'n'
+        }
+        return value
+      }, 2)
     }
   }
 }
