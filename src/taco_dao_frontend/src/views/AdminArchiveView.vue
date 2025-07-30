@@ -349,6 +349,10 @@ export default {
     }
   },
   async mounted() {
+    // Alternative approach: You could use JSON.stringify with a replacer like this:
+    // JSON.stringify(someObject, (key, value) => typeof value === 'bigint' ? Number(value) : value)
+    // But for Vue reactivity, it's better to convert the data upfront as we're doing
+    
     // Create archive actors
     await this.createArchiveActors()
     
@@ -435,6 +439,33 @@ export default {
       }
     },
 
+    // Helper method to recursively convert BigInt fields to regular numbers for Vue reactivity
+    convertBigIntFields(obj) {
+      if (obj === null || obj === undefined) return obj
+      
+      // Handle primitive BigInt
+      if (typeof obj === 'bigint') {
+        return Number(obj)
+      }
+      
+      // Handle arrays
+      if (Array.isArray(obj)) {
+        return obj.map(item => this.convertBigIntFields(item))
+      }
+      
+      // Handle objects
+      if (typeof obj === 'object') {
+        const converted = {}
+        for (const [key, value] of Object.entries(obj)) {
+          converted[key] = this.convertBigIntFields(value)
+        }
+        return converted
+      }
+      
+      // Return primitive values as-is
+      return obj
+    },
+
     async onArchiveChange() {
       this.clearMessages()
       await this.refreshStatus()
@@ -447,22 +478,25 @@ export default {
       
       try {
         // Get comprehensive timer status
-        this.timerStatus = await this.currentArchiveActor.getTimerStatus()
+        const rawTimerStatus = await this.currentArchiveActor.getTimerStatus()
+        this.timerStatus = this.convertBigIntFields(rawTimerStatus)
         
         // Get legacy status for compatibility
-        this.legacyStatus = await this.currentArchiveActor.getBatchImportStatus()
+        const rawLegacyStatus = await this.currentArchiveActor.getBatchImportStatus()
+        this.legacyStatus = this.convertBigIntFields(rawLegacyStatus)
         
         // Get archive status - try new public method first, fallback to old method
         try {
           if (this.currentArchiveActor.getArchiveStats) {
-            this.archiveStatus = await this.currentArchiveActor.getArchiveStats()
+            const rawStatus = await this.currentArchiveActor.getArchiveStats()
+            this.archiveStatus = this.convertBigIntFields(rawStatus)
           } else {
             const archiveStatusResult = await this.currentArchiveActor.getArchiveStatus()
             if (archiveStatusResult.ok) {
-              this.archiveStatus = archiveStatusResult.ok
+              this.archiveStatus = this.convertBigIntFields(archiveStatusResult.ok)
             } else {
               console.error('Failed to get archive status:', archiveStatusResult.err)
-              this.errorMessage = `Failed to get archive status: ${JSON.stringify(archiveStatusResult.err)}`
+              this.errorMessage = `Failed to get archive status: ${archiveStatusResult.err}`
             }
           }
         } catch (error) {
@@ -470,9 +504,9 @@ export default {
           // Fallback to old method
           const archiveStatusResult = await this.currentArchiveActor.getArchiveStatus()
           if (archiveStatusResult.ok) {
-            this.archiveStatus = archiveStatusResult.ok
+            this.archiveStatus = this.convertBigIntFields(archiveStatusResult.ok)
           } else {
-            throw new Error(`Both methods failed: ${JSON.stringify(archiveStatusResult.err)}`)
+            throw new Error(`Both methods failed: ${archiveStatusResult.err}`)
           }
         }
       } catch (error) {
