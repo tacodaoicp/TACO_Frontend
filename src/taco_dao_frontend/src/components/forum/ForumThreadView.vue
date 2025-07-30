@@ -63,6 +63,11 @@
                             :class="{ 'taco-nav-btn--active': threadNavigation === 'details' }"
                             @click="threadNavigation = 'details'">Details</button>
 
+                    <!-- settings -->
+                    <button class="btn taco-nav-btn"
+                            :class="{ 'taco-nav-btn--active': threadNavigation === 'settings' }"
+                            @click="threadNavigation = 'settings'">Settings</button>
+
                 </div>
 
             </div>
@@ -788,6 +793,184 @@
 
         </div>
 
+        <!-- ######## -->
+        <!-- settings -->
+        <!-- ######## -->
+
+        <!-- settings -->
+        <div v-if="proposalSelected && !error && threadNavigation === 'settings'" 
+            class="forum-thread-view__settings">
+
+            <!-- settings content -->
+            <div class="forum-thread-view__settings__content">
+
+                <!-- title -->
+                <span class="forum-thread-view__settings__title">⚙️ Forum Settings</span>
+
+                <!-- settings container -->
+                <div class="forum-thread-view__settings__settings-container">
+
+                    <!-- your account title -->
+                    <span class="mt-0" style="font-size: 1.5rem;">Your Account</span>
+
+                    <!-- settings key value pairs -->
+                    <div class="forum-thread-view__settings__key-value-pairs">
+
+                        <!-- settings key value pair -->
+                        <div class="forum-thread-view__settings__key-value-pair">
+
+                            <!-- key -->
+                            <span class="forum-thread-view__settings__key">
+
+                                <!-- text -->
+                                <span>Your Principal</span>
+
+                            </span>
+
+                            <!-- value -->
+                            <span class="forum-thread-view__settings__value">
+
+                                <!-- text -->
+                                <span>{{ userPrincipal }}</span>
+
+                            </span>
+
+                        </div>                     
+
+                        <!-- settings key value pair -->
+                        <div class="forum-thread-view__settings__key-value-pair">
+
+                            <!-- key -->
+                            <span class="forum-thread-view__settings__key">
+
+                                <!-- text -->
+                                <span>Your Name</span>
+
+                            </span>
+
+                            <!-- value -->
+                            <span class="forum-thread-view__settings__value">
+
+                                <!-- text -->
+                                <span v-show="!editingName" 
+                                        class="">{{ currentPrincipalName }}</span>
+
+                                <!-- edit input -->
+                                <input v-show="editingName" 
+                                        v-model="nameBeingEdited"
+                                        type="text" 
+                                        class="taco-input rounded">
+
+                                <!-- edit button -->
+                                <button @click="editingName = !editingName; nameBeingEdited = currentPrincipalName"
+                                        v-show="!editingName"
+                                        class="btn taco-text-black-to-white py-0"
+                                        style="border: none;">
+
+                                    <!-- edit icon -->
+                                    <i class="fa-solid fa-pencil"></i>
+
+                                </button>
+
+                                <!-- save button -->
+                                <button @click="saveAccountName"
+                                        v-show="editingName"
+                                        class="btn taco-text-black-to-white py-0 ms-2"
+                                        style="border: none;">
+
+                                    <!-- save icon -->
+                                    <i class="fa-solid fa-check fa-lg"></i>
+
+                                </button>
+
+                                <!-- cancel button -->
+                                <button @click="editingName = !editingName"
+                                        v-show="editingName"
+                                        class="btn taco-text-black-to-white py-0"
+                                        style="border: none;">
+
+                                    <!-- cancel icon -->
+                                    <i class="fa-solid fa-xmark fa-lg"></i>
+
+                                </button>
+
+                            </span>
+                            
+                        </div>
+
+                    </div>
+
+                    <!-- your neurons title -->
+                    <span class="mt-3" style="font-size: 1.5rem;">Your Neurons</span>
+
+                    <!-- no neurons message -->
+                    <span v-if="userNeurons.length === 0" class="fst-italic">No TACO neurons found</span>
+
+                    <!-- your neurons key value pairs -->
+                    <div v-else class="forum-thread-view__settings__key-value-pairs pt-0">
+
+                        <!-- settings key value pair -->
+                        <div v-for="neuron in userNeurons" 
+                                :key="neuron.id"
+                                class="forum-thread-view__settings__key-value-pair">
+
+                            <!-- key -->
+                            <span class="forum-thread-view__settings__key">
+
+                                <!-- text -->
+                                <span>neuron name</span>
+
+                            </span>
+
+                            <!-- value -->
+                            <span class="forum-thread-view__settings__value">
+
+                                <!-- text -->
+                                <span class="">{{ currentPrincipalName }}</span>
+
+                                <!-- edit input -->
+                                <input type="text" 
+                                        class="taco-input rounded">
+
+                                <!-- edit button -->
+                                <button class="btn taco-text-black-to-white py-0"
+                                        style="border: none;">
+
+                                    <!-- edit icon -->
+                                    <i class="fa-solid fa-pencil"></i>
+
+                                </button>
+
+                                <!-- save button -->
+                                <button class="btn taco-text-black-to-white py-0 ms-2"
+                                        style="border: none;">
+
+                                    <!-- save icon -->
+                                    <i class="fa-solid fa-check fa-lg"></i>
+
+                                </button>
+
+                                <!-- cancel button -->
+                                <button class="btn taco-text-black-to-white py-0"
+                                        style="border: none;">
+
+                                    <!-- cancel icon -->
+                                    <i class="fa-solid fa-xmark fa-lg"></i>
+
+                                </button>
+
+                            </span>
+                            
+                        </div>                         
+                        
+                    </div>
+
+                </div>
+
+            </div>
+
+        </div>
+
         <!-- ##### -->
         <!-- error -->
         <!-- ##### -->
@@ -1504,7 +1687,7 @@
     }
 
     // details
-    &__details {
+    &__details, &__settings {
         color: var(--black-to-white);
 
         // content
@@ -1515,6 +1698,7 @@
         // title
         &__title {
             line-height: 1.25;
+            font-size: 2.25rem;
 
             // title number
             &-number {
@@ -1676,6 +1860,16 @@
             
         }
 
+        // settings container
+        &__settings-container {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            margin-top: 1rem;
+            border-top: 1px solid var(--dark-orange);
+            padding: 1rem 0 1.5rem;
+        }        
+
         // key value pairs
         &__key-value-pairs {
             display: flex;
@@ -1687,7 +1881,7 @@
         // key value pair
         &__key-value-pair {
             display: flex;
-            align-items: baseline;
+            align-items: center;
             flex-wrap: wrap;
             gap: 0.25rem 0.75rem;
         }        
@@ -1742,9 +1936,24 @@
             }
 
         }
+
+        // inputs
+        input {
+            padding: 0rem 0.5rem;
+        }
         
     }
-    
+
+    // settings
+    &__settings {
+        
+        // key value pairs
+        &__key-value-pairs {
+            padding-top: 0.5rem;
+        }
+
+    }    
+
 }
 
 ///////////////////
@@ -1866,6 +2075,7 @@
 
     // user
     const { userLoggedIn } = storeToRefs(tacoStore) // reactive
+    const { userPrincipal } = storeToRefs(tacoStore) // reactive
 
     // forum
     const { threadMenuOpen } = storeToRefs(tacoStore) // reactive
@@ -1876,6 +2086,9 @@
     const { iidLogIn } = tacoStore // not reactive
     const { getPrincipalDisplayName } = tacoStore // not reactive
     const { getNeuronDisplayName } = tacoStore // not reactive
+    const { setPrincipalName } = tacoStore // not reactive
+    const { setNeuronName } = tacoStore // not reactive
+    const { getUserNeurons } = tacoStore // not reactive
 
     // forum
     const { toggleThreadMenu } = tacoStore // not reactive
@@ -1931,6 +2144,15 @@
 
     // sort by
     const sortBy = ref('newest')
+
+    // editing name
+    const editingName = ref(false)
+
+    // name being edited
+    const nameBeingEdited = ref('')
+
+    // user neurons
+    const userNeurons = ref<any[]>([])
 
     // images
     const astronautLoaderUrl = astronautLoader
@@ -2655,6 +2877,215 @@
         return getNeuronDisplayName(snsRoot, neuronIdBytes)
     }
 
+    // format status
+    const formatStatus = (status: string) => {
+      if (status === "Executed") return "PASSED"
+      if (status === "Rejected") return "FAILED"
+      return status
+    }
+
+    // save account name
+    const saveAccountName = async () => {
+
+        // log
+        console.log('saving account name')
+
+        // if name is empty, return
+        if (!nameBeingEdited.value.trim()) return     
+        
+        // if name being edited is the same as the current principal name, return
+        if (nameBeingEdited.value.trim() === currentPrincipalName.value) return
+
+        // try
+        try {
+
+            // log
+            console.log('trying to save account name', nameBeingEdited.value.trim())
+
+            // show loading curtain
+            componentLoading.value = true
+
+            // set account name
+            await setPrincipalName(nameBeingEdited.value.trim())
+
+            // log
+            console.log('account name saved successfully')
+            
+        }
+
+        // catch
+        catch (error) {
+
+            // log error
+            console.error('Error saving account name:', error)
+
+            // show error toast
+            tacoStore.addToast({
+                id: Date.now(),
+                code: 'save-account-name-error',
+                title: 'Error Saving Account Name',
+                icon: 'fa-solid fa-exclamation-triangle',
+                message: `Failed to save account name: ${error.message || 'Unknown error'}`
+            })
+
+        }
+
+        // finally
+        finally {
+
+            // close editing name
+            editingName.value = false
+
+            // hide loading curtain
+            componentLoading.value = false
+
+        }
+
+    }
+
+    // load user neurons
+    const loadUserNeurons = async () => {
+
+        // if user is not logged in, return
+        if (!userLoggedIn.value) return
+        
+        // try
+        try {
+            
+            // get user neurons
+            const neurons = await getUserNeurons()
+
+            // set user neurons
+            userNeurons.value = neurons
+            
+            // // Initialize input refs for each neuron
+            // neurons.forEach(neuron => {
+            //     const key = neuronKey(neuron)
+            //     neuronNameInputs.value[key] = ''
+            //     neuronNameSaving.value[key] = false
+            // })
+            
+            // log
+            console.log('loaded user neurons:', neurons)
+
+        } 
+        
+        // catch
+        catch (error) {
+
+            // log error
+            console.error('error loading user neurons:', error)
+
+            // set user neurons to empty array
+            userNeurons.value = []
+            
+        } 
+        
+        // finally
+        finally {
+            
+            // code
+
+        }
+
+    }
+
+    // // save neuron name (not massaged yet)
+    // const saveNeuronName = async (neuronId) => {
+
+    //     // log
+    //     console.log('saving neuron name', neuronId)
+
+    //     // get key
+    //     const key = neuronKey({ id: neuronId })
+
+    //     // get name
+    //     const name = neuronNameInputs.value[key]
+
+    //     // if name is empty, return
+    //     if (!name?.trim()) return
+        
+    //     // try
+    //     try {
+
+    //         // show loading curtain
+    //         componentLoading.value = true
+
+    //         // set neuron name saving to true
+    //         neuronNameSaving.value[key] = true
+
+    //         // get taco sns root
+    //         const tacoSnsRoot = Principal.fromText('lhdfz-wqaaa-aaaaq-aae3q-cai') // TACO SNS root
+
+    //         // set neuron name
+    //         await setNeuronName(tacoSnsRoot, neuronId.id, name.trim())
+
+    //         // set neuron name inputs to empty string
+    //         neuronNameInputs.value[key] = ''
+
+    //         // log success
+    //         console.log('neuron name saved successfully')
+
+    //     } 
+        
+    //     // catch
+    //     catch (error) {
+
+    //         // log error
+    //         console.error('error saving neuron name:', error)
+
+    //         // show error toast
+    //         tacoStore.addToast({
+    //             id: Date.now(),
+    //             code: 'save-neuron-name-error',
+    //             title: 'Error Saving Neuron Name',
+    //             icon: 'fa-solid fa-exclamation-triangle',
+    //             message: `Failed to save neuron name: ${error.message || 'Unknown error'}`
+    //         })
+
+    //     } 
+        
+    //     // finally
+    //     finally {
+
+    //         // set neuron name saving to false
+    //         neuronNameSaving.value[key] = false
+
+    //         // hide loading curtain
+    //         componentLoading.value = false
+
+    //     }
+        
+    // }
+
+    // not massaged yet
+
+    // // neuron key
+    // const neuronKey = (neuron) => {
+    //     if (neuron.id && neuron.id.id) {
+    //         return Array.from(neuron.id.id, byte => byte.toString(16).padStart(2, '0')).join('')
+    //     }
+    //     return 'unknown'
+    // }
+
+    // // format neuron id
+    // const formatNeuronId = (neuronId) => {
+    //     if (neuronId && neuronId.id) {
+    //         const hex = Array.from(neuronId.id, byte => byte.toString(16).padStart(2, '0')).join('')
+    //         return hex.length > 12 ? `${hex.substring(0, 6)}...${hex.substring(hex.length - 6)}` : hex
+    //     }
+    //     return 'Unknown'
+    // }
+
+    // // get neuron current name
+    // const getNeuronCurrentName = (neuronId) => {
+    //     if (neuronId && neuronId.id) {
+    //         const tacoSnsRoot = Principal.fromText('lhdfz-wqaaa-aaaaq-aae3q-cai') // TACO SNS root
+    //         return getNeuronDisplayName(tacoSnsRoot, neuronId.id)
+    //     }
+    //     return 'Unknown'
+    // }    
+
     // date formatting
     const formatShortDate = (date: Date) => {
         return date.toLocaleDateString('en-US', {
@@ -2807,12 +3238,13 @@
         
     })
 
-    // format status
-    const formatStatus = (status: string) => {
-      if (status === "Executed") return "PASSED"
-      if (status === "Rejected") return "FAILED"
-      return status
-    }    
+    // current principal name
+    const currentPrincipalName = computed(() => {
+        
+        // get principal display name
+        return getPrincipalDisplayName(userPrincipal.value)
+
+    })
 
     //////////////
     // watchers //
@@ -2897,6 +3329,17 @@
             // set proposal selected to false
             proposalSelected.value = false
 
+        }
+
+        // if user is logged in
+        if (userLoggedIn.value) {
+
+            // log
+            console.log('user is logged in, loading user neurons')
+
+            // load user neurons
+            await loadUserNeurons()
+            
         }
 
     })
