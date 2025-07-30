@@ -1,6 +1,6 @@
 <template>
 
-  <div class="app">
+  <div class="app" :style="{ backgroundColor: appBackgroundColor }">
 
     <!-- app loading curtain -->
     <div v-if="appLoading" class="app__loading-curtain">
@@ -79,14 +79,16 @@
 
   // app
   .app {
+
     // full dynamic window height
     height: 100dvh;
+
     // clipped overflow
     overflow: clip;
-    // light orange to dark brown
-    background-color: var(--light-orange-to-dark-brown);
+
     // default text color black
     color: var(--black);
+
   }
 
   // app loading curtain
@@ -998,7 +1000,7 @@
   // Imports //
   /////////////
 
-  import { onMounted, watch } from 'vue';
+  import { onMounted, watch, computed } from 'vue';
   import { useTacoStore } from "./stores/taco.store";
   import { storeToRefs } from "pinia";
   import { useRoute } from 'vue-router'
@@ -1047,6 +1049,62 @@
 
   // images
   const astronautLoaderUrl = astronautLoader
+
+  //////////////
+  // Computed //
+  //////////////
+
+  // date based background color
+  const appBackgroundColor = computed(() => {
+
+    // // get today's date
+    // const today = new Date()
+
+    // // get the month
+    // const month = today.getMonth() + 1 // getMonth() returns 0-11
+
+    // // get the day
+    // const day = today.getDate()
+
+    // // halloween: October 31st
+    // if (month === 10 && day === 31) {
+    //   return '#'
+    // }    
+    
+    // // christmas: December 25th
+    // if (month === 12 && day === 25) {
+    //   return '#'
+    // }
+
+    // // new years: January 1st
+    // if (month === 1 && day === 1) {
+    //   return '#'
+    // }    
+
+    // // valentines day: February 14th
+    // if (month === 2 && day === 14) {
+    //   return '#'
+    // }
+
+    // // st. patrick's day: March 17th
+    // if (month === 3 && day === 17) {
+    //   return '#'
+    // }
+    
+    // // easter: April 9th
+    // if (month === 4 && day === 9) {
+    //   return '#'
+    // }
+    
+    // // independence day: July 4th
+    // if (month === 7 && day === 4) {
+    //   return '#'
+    // }
+    
+    // default brown
+    return 'var(--light-orange-to-dark-brown)'
+
+  })
 
   ///////////////////
   // Local Methods //
