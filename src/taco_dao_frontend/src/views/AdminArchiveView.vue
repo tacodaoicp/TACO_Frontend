@@ -1070,16 +1070,48 @@ export default {
       }
 
       // Circuit breaker block details
-      if (parsedData.btype === '3circuit' || parsedData.eventType) {
-        const event = parsedData.eventType || 'Unknown Event'
-        const tokens = parsedData.tokensAffected || []
+      if (parsedData.btype === '3circuit' || parsedData.event_type || parsedData.eventType) {
+        console.log('=== Processing detailed circuit breaker block ===', parsedData)
+        
+        const eventType = parsedData.event_type || parsedData.eventType || 'Unknown Event'
+        const eventName = this.formatEventTypeName(eventType)
+        const severity = parsedData.severity || 'Unknown'
+        const thresholdValue = parsedData.threshold_value || 'N/A'
+        const actualValue = parsedData.actual_value || 'N/A'
+        const systemResponse = parsedData.system_response || 'No response recorded'
+        
+        // Format affected tokens
+        let affectedTokens = 'None specified'
+        if (parsedData.tokens_affected && Array.isArray(parsedData.tokens_affected)) {
+          const tokenNames = parsedData.tokens_affected.map(token => this.formatTokenName(token)).filter(name => name !== 'Unknown')
+          affectedTokens = tokenNames.length ? tokenNames.join(', ') : 'None specified'
+        }
+        
+        // Format trigger token
+        let triggerToken = 'N/A'
+        if (parsedData.trigger_token) {
+          triggerToken = this.formatTokenName(parsedData.trigger_token)
+        }
+        
         return `
-          <div>
-            <h6>🚨 Circuit Breaker Event</h6>
-            <table class="table table-sm table-dark">
-              <tr><td><strong>Event Type:</strong></td><td>${event}</td></tr>
-              <tr><td><strong>Affected Tokens:</strong></td><td>${tokens.length ? tokens.join(', ') : 'None specified'}</td></tr>
-            </table>
+          <div class="row">
+            <div class="col-md-6">
+              <h6>🚨 Circuit Breaker Event</h6>
+              <table class="table table-sm table-dark">
+                <tr><td><strong>Event Type:</strong></td><td>${eventName}</td></tr>
+                <tr><td><strong>Severity:</strong></td><td><span class="badge ${this.getSeverityClass(severity)}">${severity}</span></td></tr>
+                <tr><td><strong>Trigger Token:</strong></td><td>${triggerToken}</td></tr>
+                <tr><td><strong>Affected Tokens:</strong></td><td>${affectedTokens}</td></tr>
+              </table>
+            </div>
+            <div class="col-md-6">
+              <h6>📊 Event Details</h6>
+              <table class="table table-sm table-dark">
+                <tr><td><strong>Threshold:</strong></td><td>${thresholdValue}</td></tr>
+                <tr><td><strong>Actual Value:</strong></td><td>${actualValue}</td></tr>
+                <tr><td><strong>System Response:</strong></td><td><em>"${systemResponse}"</em></td></tr>
+              </table>
+            </div>
           </div>
         `
       }
@@ -1151,7 +1183,7 @@ export default {
       if (parsedData.trader || parsedData.token_sold || parsedData.tokenSold) {
         return 'Trade'
       }
-      if (parsedData.eventType || parsedData.tokensAffected) {
+      if (parsedData.event_type || parsedData.eventType || parsedData.tokensAffected || parsedData.tokens_affected) {
         return 'Circuit Breaker'
       }
       if (parsedData.portfolioSnapshot || parsedData.totalValue) {
@@ -1208,10 +1240,31 @@ export default {
       }
       
       // Circuit breaker block
-      if (parsedData.btype === '3circuit' || parsedData.eventType || parsedData.tokensAffected) {
-        const event = parsedData.eventType || 'Unknown Event'
-        const tokens = parsedData.tokensAffected?.length ? `Tokens: ${parsedData.tokensAffected.join(', ')}` : ''
-        return `🚨 Circuit Breaker: ${event} ${tokens}`.trim()
+      if (parsedData.btype === '3circuit' || parsedData.event_type || parsedData.eventType || parsedData.tokensAffected) {
+        console.log('=== Processing circuit breaker block ===', parsedData)
+        
+        const eventType = parsedData.event_type || parsedData.eventType || 'Unknown Event'
+        const eventName = this.formatEventTypeName(eventType)
+        const severity = parsedData.severity || ''
+        const thresholdValue = parsedData.threshold_value || ''
+        const actualValue = parsedData.actual_value || ''
+        
+        // Format affected tokens
+        let tokensInfo = ''
+        if (parsedData.tokens_affected && Array.isArray(parsedData.tokens_affected)) {
+          const tokenNames = parsedData.tokens_affected.map(token => this.formatTokenName(token)).filter(name => name !== 'Unknown')
+          tokensInfo = tokenNames.length ? ` affecting ${tokenNames.join(', ')}` : ''
+        }
+        
+        // Build summary with key info
+        let summary = `🚨 ${eventName}`
+        if (severity) summary += ` (${severity})`
+        if (thresholdValue && actualValue) {
+          summary += `: ${actualValue} vs ${thresholdValue} threshold`
+        }
+        summary += tokensInfo
+        
+        return summary
       }
       
       // Portfolio block
@@ -1558,6 +1611,36 @@ export default {
       } catch (error) {
         console.warn('Error formatting trader:', error, traderBlob)
         return 'Unknown'
+      }
+    },
+
+    // Format event type names for better readability
+    formatEventTypeName(eventType) {
+      if (!eventType) return 'Unknown Event'
+      
+      const eventTypeMap = {
+        'price_alert': 'Price Alert',
+        'liquidity_warning': 'Liquidity Warning',
+        'trade_halt': 'Trade Halt',
+        'system_pause': 'System Pause',
+        'volume_spike': 'Volume Spike',
+        'slippage_warning': 'Slippage Warning',
+        'circuit_breaker': 'Circuit Breaker'
+      }
+      
+      return eventTypeMap[eventType.toLowerCase()] || eventType
+    },
+
+    // Get CSS class for severity levels
+    getSeverityClass(severity) {
+      if (!severity) return 'bg-secondary'
+      
+      switch (severity.toLowerCase()) {
+        case 'critical': return 'bg-danger'
+        case 'high': return 'bg-warning'
+        case 'medium': return 'bg-info'
+        case 'low': return 'bg-success'
+        default: return 'bg-secondary'
       }
     }
   }
