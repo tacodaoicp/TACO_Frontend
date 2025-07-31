@@ -451,6 +451,7 @@ import HeaderBar from '../components/HeaderBar.vue'
 import TacoTitle from '../components/misc/TacoTitle.vue'
 import { useTacoStore } from '../stores/taco.store'
 import { mapStores } from 'pinia'
+import { Principal } from '@dfinity/principal'
 
 // Import archive actors
 import { createActor as createTradingActor } from '../../../declarations/trading_archive'
@@ -995,17 +996,35 @@ export default {
       // Trading block details
       if (parsedData.btype === '3trade' || parsedData.trader || parsedData.token_sold) {
         const success = parsedData.success === '1' || parsedData.success === 1
-        const trader = parsedData.trader || 'Unknown'
-        const traderDisplay = typeof trader === 'object' && trader.Blob ? 'Treasury' : trader.toString().slice(0, 12) + '...'
+        const traderDisplay = this.formatTraderDisplay(parsedData.trader)
         
         const tokenSold = this.formatTokenName(parsedData.token_sold)
         const tokenBought = this.formatTokenName(parsedData.token_bought)
-        const amountSold = this.formatAmount(parsedData.amount_sold)
-        const amountBought = this.formatAmount(parsedData.amount_bought)
+        const amountSold = this.formatAmount(parsedData.amount_sold, parsedData.token_sold)
+        const amountBought = this.formatAmount(parsedData.amount_bought, parsedData.token_bought)
         const exchange = parsedData.exchange || 'Unknown Exchange'
         const slippage = parsedData.slippage ? `${(parseFloat(parsedData.slippage) * 100).toFixed(4)}%` : '0%'
         const fee = this.formatAmount(parsedData.fee || '0')
         const error = parsedData.error || null
+
+        // Calculate exchange rate with proper decimal handling
+        let exchangeRate = 'N/A'
+        try {
+          const soldMetadata = this.getTokenMetadataFromBlob(parsedData.token_sold)
+          const boughtMetadata = this.getTokenMetadataFromBlob(parsedData.token_bought)
+          
+          const soldDecimals = soldMetadata?.decimals ? Number(soldMetadata.decimals) : 8
+          const boughtDecimals = boughtMetadata?.decimals ? Number(boughtMetadata.decimals) : 8
+          
+          const soldAmount = parseFloat(parsedData.amount_sold || 0) / Math.pow(10, soldDecimals)
+          const boughtAmount = parseFloat(parsedData.amount_bought || 0) / Math.pow(10, boughtDecimals)
+          
+          if (soldAmount > 0) {
+            exchangeRate = (boughtAmount / soldAmount).toFixed(6)
+          }
+        } catch (rateError) {
+          console.warn('Error calculating exchange rate:', rateError)
+        }
 
         return `
           <div class="row">
@@ -1024,7 +1043,7 @@ export default {
               <table class="table table-sm table-dark">
                 <tr><td><strong>Sold:</strong></td><td>${amountSold} ${tokenSold}</td></tr>
                 <tr><td><strong>Bought:</strong></td><td>${amountBought} ${tokenBought}</td></tr>
-                <tr><td><strong>Rate:</strong></td><td>1 ${tokenSold} = ${(parseFloat(parsedData.amount_bought || 0) / parseFloat(parsedData.amount_sold || 1)).toFixed(6)} ${tokenBought}</td></tr>
+                <tr><td><strong>Rate:</strong></td><td>1 ${tokenSold} = ${exchangeRate} ${tokenBought}</td></tr>
               </table>
             </div>
           </div>
@@ -1141,9 +1160,9 @@ export default {
         const exchange = parsedData.exchange || 'Unknown Exchange'
         const tokenSold = this.formatTokenName(parsedData.token_sold)
         const tokenBought = this.formatTokenName(parsedData.token_bought)
-        const amountSold = this.formatAmount(parsedData.amount_sold)
-        const amountBought = this.formatAmount(parsedData.amount_bought)
-        const slippage = parsedData.slippage ? `${parseFloat(parsedData.slippage) * 100}%` : '0%'
+        const amountSold = this.formatAmount(parsedData.amount_sold, parsedData.token_sold)
+        const amountBought = this.formatAmount(parsedData.amount_bought, parsedData.token_bought)
+        const slippage = parsedData.slippage ? `${(parseFloat(parsedData.slippage) * 100).toFixed(4)}%` : '0%'
         
         return `${success} ${exchange}: ${amountSold} ${tokenSold} → ${amountBought} ${tokenBought} (${slippage} slippage)`
       }
@@ -1267,53 +1286,161 @@ export default {
     formatTokenName(tokenBlob) {
       if (!tokenBlob) return 'Unknown'
       
-      // Token blob format depends on how tokens are encoded
-      // For now, try to decode common patterns
-      if (typeof tokenBlob === 'string') {
-        return tokenBlob
-      }
-      
-      if (tokenBlob.Blob) {
-        // Try to decode blob to token name
-        // This is a simplified approach - you might need more sophisticated decoding
-        const blob = tokenBlob.Blob
-        if (typeof blob === 'object') {
-          // Look for common token patterns in the blob
-          const keys = Object.keys(blob)
-          if (keys.includes('0') && blob['0'] === 0) {
-            // This might be ICP
-            return 'ICP'
-          }
-          if (keys.includes('4') && blob['4'] === 1) {
-            // Check other patterns for different tokens
-            if (blob['6'] === 154 || blob['5'] === 176) return 'MOTOKO'
-            if (blob['6'] === 35 || blob['7'] === 81) return 'BTC'  
-            if (blob['7'] === 2) return 'ETH'
+      try {
+        // Token blob format: decode Principal from blob
+        if (typeof tokenBlob === 'string') {
+          return tokenBlob
+        }
+        
+        if (tokenBlob.Blob && typeof tokenBlob.Blob === 'object') {
+          // Convert blob object to Uint8Array for Principal decoding
+          const blobData = tokenBlob.Blob
+          const uint8Array = new Uint8Array(Object.keys(blobData).map(key => blobData[key]))
+          
+          try {
+            // Decode Principal from the blob
+            const principal = Principal.fromUint8Array(uint8Array)
+            
+            // Look up token metadata using the decoded Principal
+            const tokenMetadata = this.getTokenMetadata(principal)
+            if (tokenMetadata && tokenMetadata.tokenSymbol) {
+              return tokenMetadata.tokenSymbol
+            }
+            
+            // Return truncated Principal if no metadata found
+            return principal.toString().slice(0, 8) + '...'
+          } catch (principalError) {
+            console.warn('Failed to decode Principal from blob:', principalError)
+            return 'Token'
           }
         }
-        return 'Token'
+        
+        return 'Unknown'
+      } catch (error) {
+        console.warn('Error in formatTokenName:', error)
+        return 'Unknown'
       }
-      
-      return 'Unknown'
     },
 
-    formatAmount(amount) {
+    formatAmount(amount, tokenBlob = null) {
       if (!amount) return '0'
       
-      const numAmount = typeof amount === 'string' ? parseFloat(amount) : Number(amount)
+      try {
+        // Get token metadata to determine correct decimals
+        let decimals = 8 // Default to 8 decimals (ICP standard)
+        
+        if (tokenBlob) {
+          const tokenMetadata = this.getTokenMetadataFromBlob(tokenBlob)
+          if (tokenMetadata && tokenMetadata.decimals !== undefined) {
+            decimals = Number(tokenMetadata.decimals)
+          }
+        }
+        
+        // Use the same logic as other trading logs components
+        let strAmount
+        const decimalPlaces = Number(decimals)
+        
+        if (typeof amount === 'bigint') {
+          strAmount = amount.toString()
+          // Pad with leading zeros if necessary
+          if (strAmount.length <= decimalPlaces) {
+            strAmount = '0'.repeat(decimalPlaces - strAmount.length + 1) + strAmount
+          }
+          // Insert decimal point from right
+          const insertIndex = strAmount.length - decimalPlaces
+          strAmount = strAmount.slice(0, insertIndex) + '.' + strAmount.slice(insertIndex)
+          // Remove trailing zeros and decimal point if no decimals
+          strAmount = strAmount.replace(/\.?0+$/, '')
+        } else {
+          // For regular numbers, convert using decimals
+          const numAmount = typeof amount === 'string' ? parseFloat(amount) : Number(amount)
+          const scaledAmount = numAmount / Math.pow(10, decimalPlaces)
+          strAmount = scaledAmount.toString()
+        }
+        
+        // Format for readability (add K, M, B, T suffixes)
+        const numValue = parseFloat(strAmount)
+        if (numValue >= 1e12) {
+          return (numValue / 1e12).toFixed(3) + 'T'
+        } else if (numValue >= 1e9) {
+          return (numValue / 1e9).toFixed(3) + 'B'
+        } else if (numValue >= 1e6) {
+          return (numValue / 1e6).toFixed(3) + 'M'
+        } else if (numValue >= 1e3) {
+          return (numValue / 1e3).toFixed(3) + 'K'
+        } else if (numValue >= 1) {
+          return numValue.toFixed(3).replace(/\.?0+$/, '')
+        } else {
+          return numValue.toFixed(8).replace(/\.?0+$/, '')
+        }
+      } catch (error) {
+        console.warn('Error in formatAmount:', error)
+        return amount.toString()
+      }
+    },
+
+    // Get token metadata from the taco store
+    getTokenMetadata(principal) {
+      try {
+        if (!this.tacoStore.fetchedTokenDetails || !Array.isArray(this.tacoStore.fetchedTokenDetails)) {
+          return null
+        }
+
+        const tokenEntry = this.tacoStore.fetchedTokenDetails.find(entry => {
+          if (!entry || !Array.isArray(entry) || entry.length < 2) {
+            return false
+          }
+          try {
+            return entry[0].toString() === principal.toString()
+          } catch (err) {
+            return false
+          }
+        })
+
+        return tokenEntry && tokenEntry[1] ? tokenEntry[1] : null
+      } catch (error) {
+        console.warn('Error getting token metadata:', error)
+        return null
+      }
+    },
+
+    // Helper to get token metadata from blob
+    getTokenMetadataFromBlob(tokenBlob) {
+      if (!tokenBlob || !tokenBlob.Blob) return null
       
-      if (numAmount >= 1e12) {
-        return (numAmount / 1e12).toFixed(3) + 'T'
-      } else if (numAmount >= 1e9) {
-        return (numAmount / 1e9).toFixed(3) + 'B'
-      } else if (numAmount >= 1e6) {
-        return (numAmount / 1e6).toFixed(3) + 'M'
-      } else if (numAmount >= 1e3) {
-        return (numAmount / 1e3).toFixed(3) + 'K'
-      } else if (numAmount >= 1) {
-        return numAmount.toFixed(3)
-      } else {
-        return numAmount.toFixed(8).replace(/\.?0+$/, '')
+      try {
+        const blobData = tokenBlob.Blob
+        const uint8Array = new Uint8Array(Object.keys(blobData).map(key => blobData[key]))
+        const principal = Principal.fromUint8Array(uint8Array)
+        return this.getTokenMetadata(principal)
+      } catch (error) {
+        return null
+      }
+    },
+
+    // Enhanced trader display with Principal decoding
+    formatTraderDisplay(traderBlob) {
+      if (!traderBlob) return 'Unknown'
+      
+      try {
+        if (traderBlob.Blob && typeof traderBlob.Blob === 'object') {
+          const blobData = traderBlob.Blob
+          const uint8Array = new Uint8Array(Object.keys(blobData).map(key => blobData[key]))
+          const principal = Principal.fromUint8Array(uint8Array)
+          
+          // Check if it's a known principal (like Treasury)
+          const principalStr = principal.toString()
+          if (principalStr === this.tacoStore.treasuryCanisterId()) {
+            return 'Treasury'
+          }
+          
+          return principalStr.slice(0, 12) + '...'
+        }
+        
+        return typeof traderBlob === 'string' ? traderBlob : 'Unknown'
+      } catch (error) {
+        console.warn('Error formatting trader:', error)
+        return 'Unknown'
       }
     }
   }
