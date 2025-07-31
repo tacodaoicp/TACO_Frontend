@@ -1117,23 +1117,72 @@ export default {
       }
 
       // Portfolio block details
-      if (parsedData.btype === '3portfolio' || parsedData.portfolioSnapshot || parsedData.total_value_icp || parsedData.token_count) {
+      if (parsedData.btype === '3portfolio' || parsedData.portfolioSnapshot || parsedData.total_value_icp || parsedData.token_count || parsedData.tokens) {
         console.log('=== Processing detailed portfolio block ===', parsedData)
         
         // Extract comprehensive portfolio data
-        const tokenCount = parsedData.token_count || parsedData.portfolioSnapshot?.holdings?.length || 0
+        const tokenCount = parsedData.token_count || parsedData.tokens?.length || 0
         const totalValueIcp = this.formatPortfolioAmount(parsedData.total_value_icp)
         const totalValueUsd = parsedData.total_value_usd || 'N/A'
         const reason = parsedData.reason || 'Unknown'
         
-        // Format active tokens
-        let activeTokensList = 'None'
-        if (parsedData.active_tokens && Array.isArray(parsedData.active_tokens)) {
-          const tokenNames = parsedData.active_tokens.map(token => this.formatTokenName(token)).filter(name => name !== 'Unknown')
-          activeTokensList = tokenNames.length ? tokenNames.join(', ') : 'None'
+        // Process detailed token information
+        let tokenDetailsHtml = 'No detailed token information available'
+        if (parsedData.tokens && Array.isArray(parsedData.tokens)) {
+          console.log('=== Processing detailed tokens ===', parsedData.tokens)
+          
+          const tokenRows = parsedData.tokens.map(token => {
+            console.log('=== Processing individual token ===', token)
+            
+            // Extract detailed token data from ICRC3 Map structure
+            const tokenPrincipal = this.extractTokenPrincipal(token.token)
+            const balance = this.extractBigIntValue(token.balance) || 0
+            const decimals = this.extractNatValue(token.decimals) || 8
+            const priceInICP = this.extractBigIntValue(token.price_in_icp) || 0
+            const priceInUSD = this.extractTextValue(token.price_in_usd) || '0'
+            const valueInICP = this.extractBigIntValue(token.value_in_icp) || 0
+            const valueInUSD = this.extractTextValue(token.value_in_usd) || '0'
+            
+            console.log('=== Extracted token data ===', {
+              tokenPrincipal, balance, decimals, priceInICP, priceInUSD, valueInICP, valueInUSD
+            })
+            
+            // Get token symbol (fallback to truncated principal)
+            const tokenSymbol = this.formatTokenName(tokenPrincipal)
+            
+            // Format balance with proper decimals
+            const formattedBalance = this.formatAmount(balance, { decimals: decimals })
+            const formattedPriceICP = this.formatPortfolioAmount(priceInICP)
+            const formattedValueICP = this.formatPortfolioAmount(valueInICP)
+            
+            return `
+              <tr>
+                <td><strong>${tokenSymbol}</strong></td>
+                <td>${formattedBalance}</td>
+                <td>${formattedPriceICP} ICP<br/><small class="text-muted">$${priceInUSD}</small></td>
+                <td>${formattedValueICP} ICP<br/><small class="text-muted">$${valueInUSD}</small></td>
+              </tr>
+            `
+          }).join('')
+          
+          tokenDetailsHtml = `
+            <table class="table table-sm table-dark table-striped">
+              <thead>
+                <tr>
+                  <th>Token</th>
+                  <th>Balance</th>
+                  <th>Price</th>
+                  <th>Value</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${tokenRows}
+              </tbody>
+            </table>
+          `
         }
         
-        // Format paused tokens
+        // Format paused tokens (these are still just Principal IDs)
         let pausedTokensList = 'None'
         if (parsedData.paused_tokens && Array.isArray(parsedData.paused_tokens) && parsedData.paused_tokens.length > 0) {
           const pausedNames = parsedData.paused_tokens.map(token => this.formatTokenName(token)).filter(name => name !== 'Unknown')
@@ -1142,22 +1191,19 @@ export default {
         
         return `
           <div class="row">
-            <div class="col-md-6">
-              <h6>💼 Portfolio Snapshot</h6>
+            <div class="col-md-4">
+              <h6>💼 Portfolio Summary</h6>
               <table class="table table-sm table-dark">
                 <tr><td><strong>Total Tokens:</strong></td><td>${tokenCount}</td></tr>
                 <tr><td><strong>Total Value (ICP):</strong></td><td>${totalValueIcp || 'N/A'}</td></tr>
                 <tr><td><strong>Total Value (USD):</strong></td><td>$${totalValueUsd}</td></tr>
                 <tr><td><strong>Snapshot Reason:</strong></td><td><span class="badge ${this.getSnapshotReasonClass(reason)}">${this.formatSnapshotReason(reason)}</span></td></tr>
+                ${pausedTokensList !== 'None' ? `<tr><td><strong>Paused Tokens:</strong></td><td>${pausedTokensList}</td></tr>` : ''}
               </table>
             </div>
-            <div class="col-md-6">
-              <h6>📊 Token Holdings</h6>
-              <table class="table table-sm table-dark">
-                <tr><td><strong>Active Tokens:</strong></td><td>${activeTokensList}</td></tr>
-                <tr><td><strong>Paused Tokens:</strong></td><td>${pausedTokensList}</td></tr>
-              </table>
-              ${tokenCount > 5 ? '<div class="mt-2"><small class="text-muted">Note: This portfolio contains many tokens. Only key tokens are shown above.</small></div>' : ''}
+            <div class="col-md-8">
+              <h6>📊 Detailed Token Holdings</h6>
+              ${tokenDetailsHtml}
             </div>
           </div>
         `
@@ -1217,7 +1263,7 @@ export default {
       if (parsedData.event_type || parsedData.eventType || parsedData.tokensAffected || parsedData.tokens_affected) {
         return 'Circuit Breaker'
       }
-      if (parsedData.portfolioSnapshot || parsedData.totalValue || parsedData.total_value_icp || parsedData.token_count || parsedData.active_tokens) {
+      if (parsedData.portfolioSnapshot || parsedData.totalValue || parsedData.total_value_icp || parsedData.token_count || parsedData.active_tokens || parsedData.tokens) {
         return 'Portfolio'
       }
       if (parsedData.priceHistory || parsedData.price) {
@@ -1299,20 +1345,42 @@ export default {
       }
       
       // Portfolio block
-      if (parsedData.btype === '3portfolio' || parsedData.portfolioSnapshot || parsedData.totalValue || parsedData.total_value_icp || parsedData.token_count) {
+      if (parsedData.btype === '3portfolio' || parsedData.portfolioSnapshot || parsedData.totalValue || parsedData.total_value_icp || parsedData.token_count || parsedData.tokens) {
         console.log('=== Processing portfolio block ===', parsedData)
         
         // Extract portfolio data
-        const tokenCount = parsedData.token_count || parsedData.portfolioSnapshot?.holdings?.length || 0
+        const tokenCount = parsedData.token_count || parsedData.tokens?.length || 0
         const totalValueIcp = this.formatPortfolioAmount(parsedData.total_value_icp)
         const totalValueUsd = parsedData.total_value_usd || parsedData.portfolioSnapshot?.totalValueUsd
         const reason = parsedData.reason || 'unknown'
         
-        // Format active tokens
-        let activeTokensInfo = ''
-        if (parsedData.active_tokens && Array.isArray(parsedData.active_tokens)) {
+        // Format token information - now using detailed tokens data
+        let tokensInfo = ''
+        if (parsedData.tokens && Array.isArray(parsedData.tokens)) {
+          console.log('=== Processing tokens for summary ===', parsedData.tokens)
+          
+          // Get top tokens by value for summary
+          const topTokens = parsedData.tokens
+            .map(token => {
+              // Extract data from ICRC3 Map structure
+              const tokenPrincipal = this.extractTokenPrincipal(token.token)
+              const valueICP = this.extractBigIntValue(token.value_in_icp) || 0
+              
+              return {
+                symbol: this.formatTokenName(tokenPrincipal),
+                valueICP: valueICP
+              }
+            })
+            .sort((a, b) => Number(b.valueICP) - Number(a.valueICP))
+            .slice(0, 3)
+            .filter(token => token.symbol !== 'Unknown')
+          
+          console.log('=== Top tokens for summary ===', topTokens)
+          tokensInfo = topTokens.length ? ` (${topTokens.map(t => t.symbol).join(', ')}${parsedData.tokens.length > 3 ? '...' : ''})` : ''
+        } else if (parsedData.active_tokens && Array.isArray(parsedData.active_tokens)) {
+          // Fallback to old format for backward compatibility
           const tokenNames = parsedData.active_tokens.map(token => this.formatTokenName(token)).filter(name => name !== 'Unknown')
-          activeTokensInfo = tokenNames.length ? ` (${tokenNames.slice(0, 3).join(', ')}${tokenNames.length > 3 ? '...' : ''})` : ''
+          tokensInfo = tokenNames.length ? ` (${tokenNames.slice(0, 3).join(', ')}${tokenNames.length > 3 ? '...' : ''})` : ''
         }
         
         // Build summary
@@ -1323,9 +1391,9 @@ export default {
         if (totalValueUsd) {
           summary += ` ($${totalValueUsd})`
         }
-        summary += activeTokensInfo
+        summary += tokensInfo
         if (reason && reason !== 'unknown') {
-          summary += ` - ${reason}`
+          summary += ` - ${this.formatSnapshotReason(reason)}`
         }
         
         return summary
@@ -1732,6 +1800,41 @@ export default {
         console.warn('Error formatting portfolio amount:', error, amount)
         return null
       }
+    },
+
+    // Helper methods for extracting data from ICRC3 structures
+    extractBigIntValue(field) {
+      if (!field) return 0
+      if (typeof field === 'bigint') return field
+      if (typeof field === 'string') return BigInt(field.replace('n', ''))
+      if (field.Nat) return BigInt(field.Nat.replace('n', ''))
+      if (field.Int) return BigInt(field.Int.replace('n', ''))
+      return 0
+    },
+    
+    extractNatValue(field) {
+      if (!field) return 0
+      if (typeof field === 'number') return field
+      if (typeof field === 'string') return parseInt(field.replace('n', ''))
+      if (field.Nat) return parseInt(field.Nat.replace('n', ''))
+      return 0
+    },
+    
+    extractTextValue(field) {
+      if (!field) return '0'
+      if (typeof field === 'string') return field
+      if (field.Text) return field.Text
+      return '0'
+    },
+    
+    extractTokenPrincipal(tokenBlob) {
+      if (!tokenBlob) return null
+      if (tokenBlob instanceof Uint8Array) return tokenBlob
+      if (tokenBlob.Blob && typeof tokenBlob.Blob === 'object') {
+        const blobData = tokenBlob.Blob
+        return new Uint8Array(Object.keys(blobData).map(key => blobData[key]))
+      }
+      return tokenBlob
     },
 
     // Format snapshot reason for better readability
