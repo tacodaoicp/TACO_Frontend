@@ -987,15 +987,33 @@ export default {
     },
 
     getFormattedBlockDetails(blockData) {
+      console.log('=== getFormattedBlockDetails called ===', blockData)
+      
       if (!blockData || typeof blockData !== 'object') {
         return '<p class="text-muted">Invalid block data</p>'
       }
 
       const parsedData = this.parseICRC3Value(blockData)
+      console.log('Parsed block data:', parsedData)
 
       // Trading block details
       if (parsedData.btype === '3trade' || parsedData.trader || parsedData.token_sold) {
-        const success = parsedData.success === '1' || parsedData.success === 1
+        console.log('=== Processing detailed trading block ===', parsedData)
+        
+        // Fix success detection - handle BigInt 1n, "1n", "1", 1, or BigInt 0n, "0n", "0", 0
+        const successValue = parsedData.success
+        console.log('Raw success value in details:', successValue, typeof successValue)
+        
+        let success = false
+        if (typeof successValue === 'bigint') {
+          // Handle BigInt: 1n = success, 0n = failure
+          success = successValue === 1n
+        } else if (typeof successValue === 'string') {
+          success = successValue === '1n' || successValue === '1'
+        } else if (typeof successValue === 'number') {
+          success = successValue === 1
+        }
+        
         const traderDisplay = this.formatTraderDisplay(parsedData.trader)
         
         const tokenSold = this.formatTokenName(parsedData.token_sold)
@@ -1147,16 +1165,38 @@ export default {
     },
 
     getBlockSummary(blockData) {
+      console.log('=== getBlockSummary called ===', blockData)
+      
       if (!blockData || typeof blockData !== 'object') {
         return 'Invalid block data'
       }
       
       // Parse ICRC3 Value format (Map structure)
       const parsedData = this.parseICRC3Value(blockData)
+      console.log('Parsed summary data:', parsedData)
       
       // Trading block
       if (parsedData.btype === '3trade' || parsedData.trader || parsedData.token_sold) {
-        const success = parsedData.success === '1' || parsedData.success === 1 ? '✅' : '❌'
+        console.log('=== Processing trading block ===', parsedData)
+        
+        // Fix success detection - handle BigInt 1n, "1n", "1", 1, or BigInt 0n, "0n", "0", 0
+        const successValue = parsedData.success
+        console.log('Raw success value:', successValue, typeof successValue)
+        
+        let isSuccess = false
+        if (typeof successValue === 'bigint') {
+          // Handle BigInt: 1n = success, 0n = failure
+          isSuccess = successValue === 1n
+        } else if (typeof successValue === 'string') {
+          // Handle "1n" or "1" or "0n" or "0"
+          isSuccess = successValue === '1n' || successValue === '1'
+        } else if (typeof successValue === 'number') {
+          isSuccess = successValue === 1
+        }
+        
+        const success = isSuccess ? '✅' : '❌'
+        console.log('Determined success:', success, 'from value:', successValue)
+        
         const exchange = parsedData.exchange || 'Unknown Exchange'
         const tokenSold = this.formatTokenName(parsedData.token_sold)
         const tokenBought = this.formatTokenName(parsedData.token_bought)
@@ -1205,23 +1245,28 @@ export default {
 
     // Parse ICRC3 Value format (Map structure) into a plain JavaScript object
     parseICRC3Value(blockData) {
+      console.log('=== parseICRC3Value called ===', blockData)
+      
       if (!blockData || typeof blockData !== 'object') {
         return {}
       }
 
       // If it's already a plain object, return as-is
       if (!blockData.Map && !Array.isArray(blockData)) {
+        console.log('Already plain object, returning as-is')
         return blockData
       }
 
       // Handle ICRC3 Map format: { "Map": [ ["key", value], ... ] }
       if (blockData.Map && Array.isArray(blockData.Map)) {
+        console.log('Found Map format, parsing...', blockData.Map)
         const result = {}
         for (const [key, value] of blockData.Map) {
           if (typeof key === 'string') {
             result[key] = this.parseICRC3ValueRecursive(value)
           }
         }
+        console.log('Parsed result:', result)
         return result
       }
 
@@ -1284,6 +1329,7 @@ export default {
     },
 
     formatTokenName(tokenBlob) {
+      console.log('=== formatTokenName called ===', tokenBlob)
       if (!tokenBlob) return 'Unknown'
       
       try {
@@ -1292,25 +1338,41 @@ export default {
           return tokenBlob
         }
         
-        if (tokenBlob.Blob && typeof tokenBlob.Blob === 'object') {
-          // Convert blob object to Uint8Array for Principal decoding
+        let uint8Array = null
+        
+        // Handle direct Uint8Array format (new format)
+        if (tokenBlob instanceof Uint8Array) {
+          console.log('Direct Uint8Array format detected')
+          uint8Array = tokenBlob
+        }
+        // Handle wrapped Blob format (old format)
+        else if (tokenBlob.Blob && typeof tokenBlob.Blob === 'object') {
+          console.log('Wrapped Blob format detected')
           const blobData = tokenBlob.Blob
-          const uint8Array = new Uint8Array(Object.keys(blobData).map(key => blobData[key]))
-          
+          uint8Array = new Uint8Array(Object.keys(blobData).map(key => blobData[key]))
+        }
+        
+        if (uint8Array) {
           try {
-            // Decode Principal from the blob
+            // Decode Principal from the Uint8Array
             const principal = Principal.fromUint8Array(uint8Array)
+            const principalStr = principal.toString()
+            
+            console.log('Decoded token principal:', principalStr)
+            console.log('Available token details:', this.tacoStore.fetchedTokenDetails)
             
             // Look up token metadata using the decoded Principal
             const tokenMetadata = this.getTokenMetadata(principal)
+            console.log('Found token metadata:', tokenMetadata)
+            
             if (tokenMetadata && tokenMetadata.tokenSymbol) {
               return tokenMetadata.tokenSymbol
             }
             
-            // Return truncated Principal if no metadata found
-            return principal.toString().slice(0, 8) + '...'
+            // Return full Principal if no metadata found (for debugging)
+            return principalStr
           } catch (principalError) {
-            console.warn('Failed to decode Principal from blob:', principalError)
+            console.warn('Failed to decode Principal from Uint8Array:', principalError, uint8Array)
             return 'Token'
           }
         }
@@ -1382,21 +1444,40 @@ export default {
     // Get token metadata from the taco store
     getTokenMetadata(principal) {
       try {
+        console.log('Looking for token metadata for principal:', principal.toString())
+        console.log('fetchedTokenDetails available:', !!this.tacoStore.fetchedTokenDetails)
+        console.log('fetchedTokenDetails length:', this.tacoStore.fetchedTokenDetails?.length)
+        
         if (!this.tacoStore.fetchedTokenDetails || !Array.isArray(this.tacoStore.fetchedTokenDetails)) {
+          console.log('No fetchedTokenDetails available')
           return null
         }
+
+        // Log all available token principals for debugging
+        console.log('Available token principals:', this.tacoStore.fetchedTokenDetails.map(entry => {
+          try {
+            return entry[0]?.toString()
+          } catch {
+            return 'invalid'
+          }
+        }))
 
         const tokenEntry = this.tacoStore.fetchedTokenDetails.find(entry => {
           if (!entry || !Array.isArray(entry) || entry.length < 2) {
             return false
           }
           try {
-            return entry[0].toString() === principal.toString()
+            const entryPrincipal = entry[0].toString()
+            const searchPrincipal = principal.toString()
+            console.log('Comparing:', entryPrincipal, 'vs', searchPrincipal, '=', entryPrincipal === searchPrincipal)
+            return entryPrincipal === searchPrincipal
           } catch (err) {
+            console.warn('Error comparing principals:', err)
             return false
           }
         })
 
+        console.log('Found token entry:', tokenEntry)
         return tokenEntry && tokenEntry[1] ? tokenEntry[1] : null
       } catch (error) {
         console.warn('Error getting token metadata:', error)
@@ -1406,13 +1487,27 @@ export default {
 
     // Helper to get token metadata from blob
     getTokenMetadataFromBlob(tokenBlob) {
-      if (!tokenBlob || !tokenBlob.Blob) return null
+      if (!tokenBlob) return null
       
       try {
-        const blobData = tokenBlob.Blob
-        const uint8Array = new Uint8Array(Object.keys(blobData).map(key => blobData[key]))
-        const principal = Principal.fromUint8Array(uint8Array)
-        return this.getTokenMetadata(principal)
+        let uint8Array = null
+        
+        // Handle direct Uint8Array format (new format)
+        if (tokenBlob instanceof Uint8Array) {
+          uint8Array = tokenBlob
+        }
+        // Handle wrapped Blob format (old format)
+        else if (tokenBlob.Blob) {
+          const blobData = tokenBlob.Blob
+          uint8Array = new Uint8Array(Object.keys(blobData).map(key => blobData[key]))
+        }
+        
+        if (uint8Array) {
+          const principal = Principal.fromUint8Array(uint8Array)
+          return this.getTokenMetadata(principal)
+        }
+        
+        return null
       } catch (error) {
         return null
       }
@@ -1420,26 +1515,48 @@ export default {
 
     // Enhanced trader display with Principal decoding
     formatTraderDisplay(traderBlob) {
+      console.log('=== formatTraderDisplay called ===', traderBlob)
       if (!traderBlob) return 'Unknown'
       
       try {
-        if (traderBlob.Blob && typeof traderBlob.Blob === 'object') {
+        let uint8Array = null
+        
+        // Handle direct Uint8Array format (new format)
+        if (traderBlob instanceof Uint8Array) {
+          console.log('Direct Uint8Array format detected for trader')
+          uint8Array = traderBlob
+        }
+        // Handle wrapped Blob format (old format)
+        else if (traderBlob.Blob && typeof traderBlob.Blob === 'object') {
+          console.log('Wrapped Blob format detected for trader')
           const blobData = traderBlob.Blob
-          const uint8Array = new Uint8Array(Object.keys(blobData).map(key => blobData[key]))
-          const principal = Principal.fromUint8Array(uint8Array)
-          
-          // Check if it's a known principal (like Treasury)
-          const principalStr = principal.toString()
-          if (principalStr === this.tacoStore.treasuryCanisterId()) {
-            return 'Treasury'
+          uint8Array = new Uint8Array(Object.keys(blobData).map(key => blobData[key]))
+        }
+        
+        if (uint8Array) {
+          try {
+            const principal = Principal.fromUint8Array(uint8Array)
+            const principalStr = principal.toString()
+            
+            console.log('Decoded trader principal:', principalStr)
+            console.log('Treasury canister ID:', this.tacoStore.treasuryCanisterId?.())
+            
+            // Check if it's a known principal (like Treasury)
+            if (this.tacoStore.treasuryCanisterId && principalStr === this.tacoStore.treasuryCanisterId()) {
+              return 'Treasury'
+            }
+            
+            // Return full principal for now (for debugging) - you can truncate later
+            return principalStr
+          } catch (principalError) {
+            console.warn('Failed to decode trader Principal from Uint8Array:', principalError, uint8Array)
+            return 'DecodeFailed'
           }
-          
-          return principalStr.slice(0, 12) + '...'
         }
         
         return typeof traderBlob === 'string' ? traderBlob : 'Unknown'
       } catch (error) {
-        console.warn('Error formatting trader:', error)
+        console.warn('Error formatting trader:', error, traderBlob)
         return 'Unknown'
       }
     }
