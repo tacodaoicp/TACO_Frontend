@@ -888,10 +888,13 @@ export default {
       
       this.blockBrowserLoading = true
       try {
-        const args = {
-          start: start,
-          length: length
-        }
+        // ICRC3 takes a vector of ranges, not a single range object
+        const args = [
+          {
+            start: start,
+            length: length
+          }
+        ]
         
         const result = await this.currentArchiveActor.icrc3_get_blocks(args)
         
