@@ -377,8 +377,36 @@
                   <!-- Expanded Block Details -->
                   <div v-if="expandedBlocks.includes(block.id)" class="block-details">
                     <div class="border-top border-secondary pt-2">
-                      <!-- Formatted Block Details -->
-                      <div v-html="getFormattedBlockDetails(block.block)"></div>
+                      
+                      <!-- Portfolio Block with Chart -->
+                      <div v-if="isPortfolioBlock(block.block) && !showRawJson.includes(block.id)">
+                        <div class="row">
+                          <div class="col-md-5">
+                            <h6>💼 Portfolio Summary</h6>
+                            <div v-html="getPortfolioSummary(block.block)"></div>
+                            
+                            <!-- ApexChart Component -->
+                            <div class="portfolio-chart-container mt-3" style="height: 200px;">
+                              <apexchart
+                                v-if="getPortfolioChartData(block.block)"
+                                type="pie"
+                                height="200"
+                                :options="getPortfolioChartOptions(block.block)"
+                                :series="getPortfolioChartData(block.block).series"
+                              />
+                            </div>
+                          </div>
+                          <div class="col-md-7">
+                            <h6>📊 Detailed Token Holdings</h6>
+                            <div v-html="getPortfolioTokenDetails(block.block)"></div>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <!-- Regular Formatted Block Details -->
+                      <div v-else-if="!showRawJson.includes(block.id)">
+                        <div v-html="getFormattedBlockDetails(block.block)"></div>
+                      </div>
                       
                       <!-- Raw JSON (collapsible) -->
                       <div class="mt-3">
@@ -977,6 +1005,219 @@ export default {
       }
     },
 
+    // Check if a block is a portfolio block
+    isPortfolioBlock(blockData) {
+      if (!blockData || typeof blockData !== 'object') return false
+      const parsedData = this.parseICRC3Value(blockData)
+      return parsedData.btype === '3portfolio' || parsedData.tokens
+    },
+
+    // Get portfolio summary HTML (just the table part)
+    getPortfolioSummary(blockData) {
+      const parsedData = this.parseICRC3Value(blockData)
+      
+      const tokenCount = this.extractNatValue(parsedData.token_count) || 0
+      const totalValueIcp = this.formatPortfolioAmount(this.extractBigIntValue(parsedData.total_value_icp))
+      const totalValueUsd = this.extractTextValue(parsedData.total_value_usd) || '0'
+      const reason = this.extractTextValue(parsedData.reason) || 'unknown'
+      
+      // Get paused tokens list
+      let pausedTokensList = 'None'
+      if (parsedData.paused_tokens && Array.isArray(parsedData.paused_tokens) && parsedData.paused_tokens.length > 0) {
+        const pausedNames = parsedData.paused_tokens.map(token => this.formatTokenName(token)).filter(name => name !== 'Unknown')
+        pausedTokensList = pausedNames.length ? pausedNames.join(', ') : 'None'
+      }
+
+      return `
+        <table class="table table-sm table-dark">
+          <tr><td><strong>Total Tokens:</strong></td><td>${tokenCount}</td></tr>
+          <tr><td><strong>Total Value (ICP):</strong></td><td>${totalValueIcp || 'N/A'}</td></tr>
+          <tr><td><strong>Total Value (USD):</strong></td><td>$${totalValueUsd}</td></tr>
+          <tr><td><strong>Snapshot Reason:</strong></td><td><span class="badge ${this.getSnapshotReasonClass(reason)}">${this.formatSnapshotReason(reason)}</span></td></tr>
+          ${pausedTokensList !== 'None' ? `<tr><td><strong>Paused Tokens:</strong></td><td>${pausedTokensList}</td></tr>` : ''}
+        </table>
+      `
+    },
+
+    // Get portfolio token details HTML (just the detailed table part)
+    getPortfolioTokenDetails(blockData) {
+      const parsedData = this.parseICRC3Value(blockData)
+      
+      if (!parsedData.tokens || !Array.isArray(parsedData.tokens)) {
+        return '<p class="text-muted">No token details available</p>'
+      }
+
+      const tokenRows = parsedData.tokens.map(token => {
+        const tokenPrincipal = this.extractTokenPrincipal(token.token)
+        const balance = this.extractBigIntValue(token.balance) || 0
+        const decimals = this.extractNatValue(token.decimals) || 8
+        const priceInICP = this.extractBigIntValue(token.price_in_icp) || 0
+        const priceInUSD = this.extractTextValue(token.price_in_usd) || '0'
+        const valueInICP = this.extractBigIntValue(token.value_in_icp) || 0
+        const valueInUSD = this.extractTextValue(token.value_in_usd) || '0'
+
+        const symbol = this.formatTokenName(tokenPrincipal)
+        const formattedBalance = this.formatAmount(balance, decimals)
+        const formattedPriceICP = this.formatPortfolioAmount(priceInICP)
+        const formattedValueICP = this.formatPortfolioAmount(valueInICP)
+
+        return `
+          <tr>
+            <td><strong>${symbol}</strong></td>
+            <td>${formattedBalance}</td>
+            <td>
+              ${formattedPriceICP} ICP<br/>
+              <small class="text-muted">$${priceInUSD}</small>
+            </td>
+            <td>
+              ${formattedValueICP} ICP<br/>
+              <small class="text-muted">$${valueInUSD}</small>
+            </td>
+          </tr>
+        `
+      }).join('')
+
+      return `
+        <table class="table table-sm table-dark table-striped">
+          <thead>
+            <tr>
+              <th>Token</th>
+              <th>Balance</th>
+              <th>Price</th>
+              <th>Value</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${tokenRows}
+          </tbody>
+        </table>
+      `
+    },
+
+    // Get chart data for portfolio block
+    getPortfolioChartData(blockData) {
+      const parsedData = this.parseICRC3Value(blockData)
+      
+      if (!parsedData.tokens || !Array.isArray(parsedData.tokens)) {
+        return null
+      }
+
+      // Extract and process token data
+      const tokenData = parsedData.tokens.map(token => {
+        const tokenPrincipal = this.extractTokenPrincipal(token.token)
+        const valueInICP = this.extractBigIntValue(token.value_in_icp) || 0
+        const symbol = this.formatTokenName(tokenPrincipal)
+        
+        return {
+          symbol: symbol,
+          valueICP: Number(valueInICP),
+          principal: tokenPrincipal
+        }
+      }).filter(token => token.valueICP > 0 && token.symbol !== 'Unknown')
+
+      if (tokenData.length === 0) {
+        return null
+      }
+
+      // Calculate total value for percentages
+      const totalValue = tokenData.reduce((sum, token) => sum + token.valueICP, 0)
+
+      // Create chart series
+      const series = tokenData.map(token => {
+        const percentage = (token.valueICP / totalValue) * 100
+        return Number(percentage.toFixed(2))
+      })
+
+      return { series, tokenData }
+    },
+
+    // Get chart options for portfolio block
+    getPortfolioChartOptions(blockData) {
+      const chartData = this.getPortfolioChartData(blockData)
+      if (!chartData) return {}
+
+      const labels = chartData.tokenData.map(token => token.symbol.toUpperCase())
+
+      // Create colors array based on token symbols
+      const colors = chartData.tokenData.map(token => {
+        const colorMap = {
+          'ICP': '#3b00b9',
+          'CKBTC': '#f7931a', 
+          'DKP': '#00d4ff',
+          'EXE': '#ff6b35',
+          'MOTOKO': '#ff0040',
+          'SGLDT': '#ffd700',
+          'SNEED': '#32cd32'
+        }
+        return colorMap[token.symbol.toUpperCase()] || this.generateColorFromString(token.symbol)
+      })
+
+      return {
+        chart: {
+          type: 'pie',
+          animations: {
+            enabled: true,
+            easing: 'easeout',
+            speed: 350,
+          },
+          fontFamily: 'Space Mono',
+        },
+        labels: labels,
+        colors: colors,
+        plotOptions: {
+          pie: {
+            startAngle: -90,
+            endAngle: 90,
+            customScale: 1,
+            expandOnClick: false,
+          },
+        },
+        dataLabels: {
+          enabled: true,
+          formatter: function (val, opts) {
+            return labels[opts.seriesIndex] + ' ' + val.toFixed(1) + '%'
+          },
+          style: {
+            fontSize: '12px',
+            fontFamily: 'Space Mono',
+            fontWeight: 'bold',
+            colors: ['#fff']
+          },
+          background: {
+            enabled: true,
+            foreColor: '#fff',
+            padding: 2,
+            borderRadius: 2,
+            borderWidth: 1,
+            borderColor: '#fff',
+            opacity: 0.9,
+          }
+        },
+        legend: { 
+          show: false 
+        },
+        stroke: { 
+          show: false 
+        },
+        tooltip: {
+          enabled: true,
+          style: {
+            fontSize: '12px',
+            fontFamily: 'Space Mono',
+          },
+          custom: ({ series, seriesIndex }) => {
+            const val = series[seriesIndex]
+            const symbol = labels[seriesIndex]
+            const valueICP = (chartData.tokenData[seriesIndex].valueICP / 100_000_000).toFixed(3)
+            return `<div class="chart-tooltip">
+              <strong>${symbol}</strong><br/>
+              ${val.toFixed(1)}% (${valueICP} ICP)
+            </div>`
+          }
+        }
+      }
+    },
+
     toggleRawJson(blockId) {
       const index = this.showRawJson.indexOf(blockId)
       if (index > -1) {
@@ -1111,99 +1352,6 @@ export default {
                 <tr><td><strong>Actual Value:</strong></td><td>${actualValue}</td></tr>
                 <tr><td><strong>System Response:</strong></td><td><em>"${systemResponse}"</em></td></tr>
               </table>
-            </div>
-          </div>
-        `
-      }
-
-      // Portfolio block details
-      if (parsedData.btype === '3portfolio' || parsedData.portfolioSnapshot || parsedData.total_value_icp || parsedData.token_count || parsedData.tokens) {
-        console.log('=== Processing detailed portfolio block ===', parsedData)
-        
-        // Extract comprehensive portfolio data
-        const tokenCount = parsedData.token_count || parsedData.tokens?.length || 0
-        const totalValueIcp = this.formatPortfolioAmount(parsedData.total_value_icp)
-        const totalValueUsd = parsedData.total_value_usd || 'N/A'
-        const reason = parsedData.reason || 'Unknown'
-        
-        // Process detailed token information
-        let tokenDetailsHtml = 'No detailed token information available'
-        if (parsedData.tokens && Array.isArray(parsedData.tokens)) {
-          console.log('=== Processing detailed tokens ===', parsedData.tokens)
-          
-          const tokenRows = parsedData.tokens.map(token => {
-            console.log('=== Processing individual token ===', token)
-            
-            // Extract detailed token data from ICRC3 Map structure
-            const tokenPrincipal = this.extractTokenPrincipal(token.token)
-            const balance = this.extractBigIntValue(token.balance) || 0
-            const decimals = this.extractNatValue(token.decimals) || 8
-            const priceInICP = this.extractBigIntValue(token.price_in_icp) || 0
-            const priceInUSD = this.extractTextValue(token.price_in_usd) || '0'
-            const valueInICP = this.extractBigIntValue(token.value_in_icp) || 0
-            const valueInUSD = this.extractTextValue(token.value_in_usd) || '0'
-            
-            console.log('=== Extracted token data ===', {
-              tokenPrincipal, balance, decimals, priceInICP, priceInUSD, valueInICP, valueInUSD
-            })
-            
-            // Get token symbol (fallback to truncated principal)
-            const tokenSymbol = this.formatTokenName(tokenPrincipal)
-            
-            // Format balance with proper decimals
-            const formattedBalance = this.formatAmount(balance, { decimals: decimals })
-            const formattedPriceICP = this.formatPortfolioAmount(priceInICP)
-            const formattedValueICP = this.formatPortfolioAmount(valueInICP)
-            
-            return `
-              <tr>
-                <td><strong>${tokenSymbol}</strong></td>
-                <td>${formattedBalance}</td>
-                <td>${formattedPriceICP} ICP<br/><small class="text-muted">$${priceInUSD}</small></td>
-                <td>${formattedValueICP} ICP<br/><small class="text-muted">$${valueInUSD}</small></td>
-              </tr>
-            `
-          }).join('')
-          
-          tokenDetailsHtml = `
-            <table class="table table-sm table-dark table-striped">
-              <thead>
-                <tr>
-                  <th>Token</th>
-                  <th>Balance</th>
-                  <th>Price</th>
-                  <th>Value</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${tokenRows}
-              </tbody>
-            </table>
-          `
-        }
-        
-        // Format paused tokens (these are still just Principal IDs)
-        let pausedTokensList = 'None'
-        if (parsedData.paused_tokens && Array.isArray(parsedData.paused_tokens) && parsedData.paused_tokens.length > 0) {
-          const pausedNames = parsedData.paused_tokens.map(token => this.formatTokenName(token)).filter(name => name !== 'Unknown')
-          pausedTokensList = pausedNames.length ? pausedNames.join(', ') : 'None'
-        }
-        
-        return `
-          <div class="row">
-            <div class="col-md-4">
-              <h6>💼 Portfolio Summary</h6>
-              <table class="table table-sm table-dark">
-                <tr><td><strong>Total Tokens:</strong></td><td>${tokenCount}</td></tr>
-                <tr><td><strong>Total Value (ICP):</strong></td><td>${totalValueIcp || 'N/A'}</td></tr>
-                <tr><td><strong>Total Value (USD):</strong></td><td>$${totalValueUsd}</td></tr>
-                <tr><td><strong>Snapshot Reason:</strong></td><td><span class="badge ${this.getSnapshotReasonClass(reason)}">${this.formatSnapshotReason(reason)}</span></td></tr>
-                ${pausedTokensList !== 'None' ? `<tr><td><strong>Paused Tokens:</strong></td><td>${pausedTokensList}</td></tr>` : ''}
-              </table>
-            </div>
-            <div class="col-md-8">
-              <h6>📊 Detailed Token Holdings</h6>
-              ${tokenDetailsHtml}
             </div>
           </div>
         `
@@ -1837,6 +1985,16 @@ export default {
       return tokenBlob
     },
 
+    // Generate a consistent color from a string
+    generateColorFromString(str) {
+      let hash = 0
+      for (let i = 0; i < str.length; i++) {
+        hash = str.charCodeAt(i) + ((hash << 5) - hash)
+      }
+      const hue = hash % 360
+      return `hsl(${hue}, 70%, 50%)`
+    },
+
     // Format snapshot reason for better readability
     formatSnapshotReason(reason) {
       if (!reason) return 'Unknown'
@@ -1972,5 +2130,45 @@ export default {
 
 .btn:disabled {
   opacity: 0.6;
+}
+
+/* Portfolio Chart Styles */
+.portfolio-chart-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%);
+  border-radius: 8px;
+  border: 1px solid #424242;
+}
+
+.portfolio-chart {
+  width: 100%;
+  height: 100%;
+  min-height: 180px;
+}
+
+/* Custom tooltip styles for portfolio charts */
+.chart-tooltip {
+  padding: 8px 12px !important;
+  background: rgba(0, 0, 0, 0.8) !important;
+  border: 1px solid #fff !important;
+  border-radius: 4px !important;
+  font-family: 'Space Mono', monospace !important;
+  font-size: 12px !important;
+  color: #fff !important;
+  text-align: center !important;
+}
+
+/* ApexCharts override for better dark theme integration */
+.apexcharts-tooltip {
+  background: rgba(0, 0, 0, 0.8) !important;
+  border: 1px solid #fff !important;
+  border-radius: 4px !important;
+}
+
+.apexcharts-tooltip-text {
+  color: #fff !important;
+  font-family: 'Space Mono', monospace !important;
 }
 </style> 
