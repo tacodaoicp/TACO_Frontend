@@ -6,16 +6,7 @@
       ],
       "type": "assets",
       "workspace": "taco_dao_frontend"
-    },
-    "escrow": {
-      "candid": "src/declarations/escrow/escrow.did",
-      "remote": {
-        "candid": "src/declarations/escrow/escrow.did",
-        "id": {
-          "ic": "s4yi7-yiaaa-aaaar-qacpq-cai"
-        }
-      }
-    }  
+    }
   },
   "defaults": {
     "build": {
