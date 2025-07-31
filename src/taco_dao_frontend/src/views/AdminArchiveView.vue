@@ -377,8 +377,22 @@
                   <!-- Expanded Block Details -->
                   <div v-if="expandedBlocks.includes(block.id)" class="block-details">
                     <div class="border-top border-secondary pt-2">
-                      <h6>Full Block Data:</h6>
-                      <pre class="bg-secondary p-2 rounded small text-wrap">{{ formatBlockJson(block.block) }}</pre>
+                      <!-- Formatted Block Details -->
+                      <div v-html="getFormattedBlockDetails(block.block)"></div>
+                      
+                      <!-- Raw JSON (collapsible) -->
+                      <div class="mt-3">
+                        <button 
+                          class="btn btn-sm btn-outline-secondary mb-2"
+                          @click="toggleRawJson(block.id)"
+                        >
+                          {{ showRawJson.includes(block.id) ? 'Hide Raw JSON' : 'Show Raw JSON' }}
+                        </button>
+                        <div v-if="showRawJson.includes(block.id)">
+                          <h6>Raw Block Data:</h6>
+                          <pre class="bg-secondary p-2 rounded small text-wrap">{{ formatBlockJson(block.block) }}</pre>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -476,7 +490,8 @@ export default {
       blockBrowserIndex: null,
       blockBrowserPageSize: 10,
       currentBlockStart: 0,
-      expandedBlocks: []
+      expandedBlocks: [],
+      showRawJson: []
     }
   },
   computed: {
@@ -617,6 +632,7 @@ export default {
       this.blockBrowserBlocks = []
       this.currentBlockStart = 0
       this.expandedBlocks = []
+      this.showRawJson = []
       this.blockBrowserIndex = null
       
       await this.refreshStatus()
@@ -960,27 +976,151 @@ export default {
       }
     },
 
+    toggleRawJson(blockId) {
+      const index = this.showRawJson.indexOf(blockId)
+      if (index > -1) {
+        this.showRawJson.splice(index, 1)
+      } else {
+        this.showRawJson.push(blockId)
+      }
+    },
+
+    getFormattedBlockDetails(blockData) {
+      if (!blockData || typeof blockData !== 'object') {
+        return '<p class="text-muted">Invalid block data</p>'
+      }
+
+      const parsedData = this.parseICRC3Value(blockData)
+
+      // Trading block details
+      if (parsedData.btype === '3trade' || parsedData.trader || parsedData.token_sold) {
+        const success = parsedData.success === '1' || parsedData.success === 1
+        const trader = parsedData.trader || 'Unknown'
+        const traderDisplay = typeof trader === 'object' && trader.Blob ? 'Treasury' : trader.toString().slice(0, 12) + '...'
+        
+        const tokenSold = this.formatTokenName(parsedData.token_sold)
+        const tokenBought = this.formatTokenName(parsedData.token_bought)
+        const amountSold = this.formatAmount(parsedData.amount_sold)
+        const amountBought = this.formatAmount(parsedData.amount_bought)
+        const exchange = parsedData.exchange || 'Unknown Exchange'
+        const slippage = parsedData.slippage ? `${(parseFloat(parsedData.slippage) * 100).toFixed(4)}%` : '0%'
+        const fee = this.formatAmount(parsedData.fee || '0')
+        const error = parsedData.error || null
+
+        return `
+          <div class="row">
+            <div class="col-md-6">
+              <h6>🔄 Trade Details</h6>
+              <table class="table table-sm table-dark">
+                <tr><td><strong>Status:</strong></td><td>${success ? '<span class="text-success">✅ Successful</span>' : '<span class="text-danger">❌ Failed</span>'}</td></tr>
+                <tr><td><strong>Exchange:</strong></td><td>${exchange}</td></tr>
+                <tr><td><strong>Trader:</strong></td><td><code>${traderDisplay}</code></td></tr>
+                <tr><td><strong>Slippage:</strong></td><td>${slippage}</td></tr>
+                <tr><td><strong>Fee:</strong></td><td>${fee}</td></tr>
+              </table>
+            </div>
+            <div class="col-md-6">
+              <h6>💱 Transaction</h6>
+              <table class="table table-sm table-dark">
+                <tr><td><strong>Sold:</strong></td><td>${amountSold} ${tokenSold}</td></tr>
+                <tr><td><strong>Bought:</strong></td><td>${amountBought} ${tokenBought}</td></tr>
+                <tr><td><strong>Rate:</strong></td><td>1 ${tokenSold} = ${(parseFloat(parsedData.amount_bought || 0) / parseFloat(parsedData.amount_sold || 1)).toFixed(6)} ${tokenBought}</td></tr>
+              </table>
+            </div>
+          </div>
+          ${error ? `<div class="alert alert-warning mt-2"><strong>Error:</strong> ${error}</div>` : ''}
+        `
+      }
+
+      // Circuit breaker block details
+      if (parsedData.btype === '3circuit' || parsedData.eventType) {
+        const event = parsedData.eventType || 'Unknown Event'
+        const tokens = parsedData.tokensAffected || []
+        return `
+          <div>
+            <h6>🚨 Circuit Breaker Event</h6>
+            <table class="table table-sm table-dark">
+              <tr><td><strong>Event Type:</strong></td><td>${event}</td></tr>
+              <tr><td><strong>Affected Tokens:</strong></td><td>${tokens.length ? tokens.join(', ') : 'None specified'}</td></tr>
+            </table>
+          </div>
+        `
+      }
+
+      // Portfolio block details
+      if (parsedData.btype === '3portfolio' || parsedData.portfolioSnapshot) {
+        const snapshot = parsedData.portfolioSnapshot || parsedData
+        const totalValue = snapshot.totalValue || 'Unknown'
+        const holdings = snapshot.holdings || []
+        return `
+          <div>
+            <h6>💼 Portfolio Snapshot</h6>
+            <table class="table table-sm table-dark">
+              <tr><td><strong>Total Value:</strong></td><td>${totalValue}</td></tr>
+              <tr><td><strong>Holdings:</strong></td><td>${holdings.length} tokens</td></tr>
+            </table>
+          </div>
+        `
+      }
+
+      // Price block details
+      if (parsedData.btype === '3price' || parsedData.priceHistory) {
+        const token = parsedData.token || 'Unknown Token'
+        const price = parsedData.price || parsedData.priceHistory?.currentPrice || 'Unknown'
+        return `
+          <div>
+            <h6>💲 Price Update</h6>
+            <table class="table table-sm table-dark">
+              <tr><td><strong>Token:</strong></td><td>${token}</td></tr>
+              <tr><td><strong>Price:</strong></td><td>${price}</td></tr>
+            </table>
+          </div>
+        `
+      }
+
+      // Generic block
+      const keys = Object.keys(parsedData)
+      return `
+        <div>
+          <h6>📄 Data Block</h6>
+          <table class="table table-sm table-dark">
+            ${keys.slice(0, 5).map(key => 
+              `<tr><td><strong>${key}:</strong></td><td>${JSON.stringify(parsedData[key]).slice(0, 50)}${JSON.stringify(parsedData[key]).length > 50 ? '...' : ''}</td></tr>`
+            ).join('')}
+            ${keys.length > 5 ? `<tr><td colspan="2"><em>... and ${keys.length - 5} more fields</em></td></tr>` : ''}
+          </table>
+        </div>
+      `
+    },
+
     getBlockTypeName(blockData) {
       if (!blockData || typeof blockData !== 'object') {
         return 'Unknown'
       }
       
+      // Parse ICRC3 Value format
+      const parsedData = this.parseICRC3Value(blockData)
+      
       // Check for ICRC3 block type field
-      if (blockData.btype) {
-        return blockData.btype
+      if (parsedData.btype) {
+        if (parsedData.btype === '3trade') return 'Trade'
+        if (parsedData.btype === '3circuit') return 'Circuit Breaker'
+        if (parsedData.btype === '3portfolio') return 'Portfolio'
+        if (parsedData.btype === '3price') return 'Price'
+        return parsedData.btype
       }
       
       // Try to infer type from content
-      if (blockData.trader || blockData.tokenSold) {
+      if (parsedData.trader || parsedData.token_sold || parsedData.tokenSold) {
         return 'Trade'
       }
-      if (blockData.eventType || blockData.tokensAffected) {
+      if (parsedData.eventType || parsedData.tokensAffected) {
         return 'Circuit Breaker'
       }
-      if (blockData.portfolioSnapshot || blockData.totalValue) {
+      if (parsedData.portfolioSnapshot || parsedData.totalValue) {
         return 'Portfolio'
       }
-      if (blockData.priceHistory || blockData.price) {
+      if (parsedData.priceHistory || parsedData.price) {
         return 'Price'
       }
       
@@ -992,43 +1132,46 @@ export default {
         return 'Invalid block data'
       }
       
+      // Parse ICRC3 Value format (Map structure)
+      const parsedData = this.parseICRC3Value(blockData)
+      
       // Trading block
-      if (blockData.trader || blockData.tokenSold) {
-        const success = blockData.success ? '✅' : '❌'
-        const trader = blockData.trader ? `Trader: ${blockData.trader.toString().slice(0, 8)}...` : ''
-        const tokens = blockData.tokenSold && blockData.tokenBought 
-          ? `${blockData.tokenSold} → ${blockData.tokenBought}`
-          : ''
-        const amounts = blockData.amountSold && blockData.amountBought
-          ? `(${blockData.amountSold} → ${blockData.amountBought})`
-          : ''
-        return `${success} Trade: ${trader} ${tokens} ${amounts}`.trim()
+      if (parsedData.btype === '3trade' || parsedData.trader || parsedData.token_sold) {
+        const success = parsedData.success === '1' || parsedData.success === 1 ? '✅' : '❌'
+        const exchange = parsedData.exchange || 'Unknown Exchange'
+        const tokenSold = this.formatTokenName(parsedData.token_sold)
+        const tokenBought = this.formatTokenName(parsedData.token_bought)
+        const amountSold = this.formatAmount(parsedData.amount_sold)
+        const amountBought = this.formatAmount(parsedData.amount_bought)
+        const slippage = parsedData.slippage ? `${parseFloat(parsedData.slippage) * 100}%` : '0%'
+        
+        return `${success} ${exchange}: ${amountSold} ${tokenSold} → ${amountBought} ${tokenBought} (${slippage} slippage)`
       }
       
       // Circuit breaker block
-      if (blockData.eventType || blockData.tokensAffected) {
-        const event = blockData.eventType || 'Unknown Event'
-        const tokens = blockData.tokensAffected?.length ? `Tokens: ${blockData.tokensAffected.join(', ')}` : ''
+      if (parsedData.btype === '3circuit' || parsedData.eventType || parsedData.tokensAffected) {
+        const event = parsedData.eventType || 'Unknown Event'
+        const tokens = parsedData.tokensAffected?.length ? `Tokens: ${parsedData.tokensAffected.join(', ')}` : ''
         return `🚨 Circuit Breaker: ${event} ${tokens}`.trim()
       }
       
       // Portfolio block
-      if (blockData.portfolioSnapshot || blockData.totalValue) {
-        const value = blockData.totalValue || blockData.portfolioSnapshot?.totalValue || 'Unknown'
-        const tokens = blockData.portfolioSnapshot?.holdings?.length || 0
+      if (parsedData.btype === '3portfolio' || parsedData.portfolioSnapshot || parsedData.totalValue) {
+        const value = parsedData.totalValue || parsedData.portfolioSnapshot?.totalValue || 'Unknown'
+        const tokens = parsedData.portfolioSnapshot?.holdings?.length || 0
         return `💼 Portfolio: ${tokens} tokens, Total Value: ${value}`
       }
       
       // Price block
-      if (blockData.priceHistory || blockData.price) {
-        const token = blockData.token || 'Unknown Token'
-        const price = blockData.price || blockData.priceHistory?.currentPrice || 'Unknown'
+      if (parsedData.btype === '3price' || parsedData.priceHistory || parsedData.price) {
+        const token = parsedData.token || 'Unknown Token'
+        const price = parsedData.price || parsedData.priceHistory?.currentPrice || 'Unknown'
         return `💲 Price: ${token} = ${price}`
       }
       
       // Generic block
-      const keys = Object.keys(blockData).slice(0, 3).join(', ')
-      return `📄 Data Block: ${keys}${Object.keys(blockData).length > 3 ? '...' : ''}`
+      const keys = Object.keys(parsedData).slice(0, 3).join(', ')
+      return `📄 Data Block: ${keys}${Object.keys(parsedData).length > 3 ? '...' : ''}`
     },
 
     formatBlockJson(blockData) {
@@ -1039,6 +1182,139 @@ export default {
         }
         return value
       }, 2)
+    },
+
+    // Parse ICRC3 Value format (Map structure) into a plain JavaScript object
+    parseICRC3Value(blockData) {
+      if (!blockData || typeof blockData !== 'object') {
+        return {}
+      }
+
+      // If it's already a plain object, return as-is
+      if (!blockData.Map && !Array.isArray(blockData)) {
+        return blockData
+      }
+
+      // Handle ICRC3 Map format: { "Map": [ ["key", value], ... ] }
+      if (blockData.Map && Array.isArray(blockData.Map)) {
+        const result = {}
+        for (const [key, value] of blockData.Map) {
+          if (typeof key === 'string') {
+            result[key] = this.parseICRC3ValueRecursive(value)
+          }
+        }
+        return result
+      }
+
+      // Handle array format directly
+      if (Array.isArray(blockData)) {
+        const result = {}
+        for (const [key, value] of blockData) {
+          if (typeof key === 'string') {
+            result[key] = this.parseICRC3ValueRecursive(value)
+          }
+        }
+        return result
+      }
+
+      return blockData
+    },
+
+    parseICRC3ValueRecursive(value) {
+      if (!value || typeof value !== 'object') {
+        return value
+      }
+
+      // Handle Text values
+      if (value.Text !== undefined) {
+        return value.Text
+      }
+
+      // Handle Nat values
+      if (value.Nat !== undefined) {
+        return value.Nat
+      }
+
+      // Handle Int values  
+      if (value.Int !== undefined) {
+        return value.Int
+      }
+
+      // Handle Blob values (convert to hex or keep as-is)
+      if (value.Blob !== undefined) {
+        return value.Blob
+      }
+
+      // Handle nested Maps
+      if (value.Map && Array.isArray(value.Map)) {
+        const result = {}
+        for (const [key, val] of value.Map) {
+          if (typeof key === 'string') {
+            result[key] = this.parseICRC3ValueRecursive(val)
+          }
+        }
+        return result
+      }
+
+      // Handle Arrays
+      if (value.Array && Array.isArray(value.Array)) {
+        return value.Array.map(item => this.parseICRC3ValueRecursive(item))
+      }
+
+      return value
+    },
+
+    formatTokenName(tokenBlob) {
+      if (!tokenBlob) return 'Unknown'
+      
+      // Token blob format depends on how tokens are encoded
+      // For now, try to decode common patterns
+      if (typeof tokenBlob === 'string') {
+        return tokenBlob
+      }
+      
+      if (tokenBlob.Blob) {
+        // Try to decode blob to token name
+        // This is a simplified approach - you might need more sophisticated decoding
+        const blob = tokenBlob.Blob
+        if (typeof blob === 'object') {
+          // Look for common token patterns in the blob
+          const keys = Object.keys(blob)
+          if (keys.includes('0') && blob['0'] === 0) {
+            // This might be ICP
+            return 'ICP'
+          }
+          if (keys.includes('4') && blob['4'] === 1) {
+            // Check other patterns for different tokens
+            if (blob['6'] === 154 || blob['5'] === 176) return 'MOTOKO'
+            if (blob['6'] === 35 || blob['7'] === 81) return 'BTC'  
+            if (blob['7'] === 2) return 'ETH'
+          }
+        }
+        return 'Token'
+      }
+      
+      return 'Unknown'
+    },
+
+    formatAmount(amount) {
+      if (!amount) return '0'
+      
+      const numAmount = typeof amount === 'string' ? parseFloat(amount) : Number(amount)
+      
+      if (numAmount >= 1e12) {
+        return (numAmount / 1e12).toFixed(3) + 'T'
+      } else if (numAmount >= 1e9) {
+        return (numAmount / 1e9).toFixed(3) + 'B'
+      } else if (numAmount >= 1e6) {
+        return (numAmount / 1e6).toFixed(3) + 'M'
+      } else if (numAmount >= 1e3) {
+        return (numAmount / 1e3).toFixed(3) + 'K'
+      } else if (numAmount >= 1) {
+        return numAmount.toFixed(3)
+      } else {
+        return numAmount.toFixed(8).replace(/\.?0+$/, '')
+      }
     }
   }
 }
