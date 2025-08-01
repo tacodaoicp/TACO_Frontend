@@ -1068,12 +1068,21 @@ export default {
       const parsedData = this.parseICRC3Value(blockData)
       console.log('Parsed block data:', parsedData)
 
-      // Trading block details
-      if (parsedData.btype === '3trade' || parsedData.trader || parsedData.token_sold) {
-        console.log('=== Processing detailed trading block ===', parsedData)
+      // Extract trade data from new ICRC3 nested structure
+      // New format: { tx: { data: { btype: "3trade", trader: ..., etc } } }
+      // Old format: { btype: "3trade", trader: ..., etc } (direct)
+      let tradeData = parsedData
+      if (parsedData.tx && parsedData.tx.data) {
+        tradeData = parsedData.tx.data
+        console.log('Extracted trade data from ICRC3 structure:', tradeData)
+      }
+
+      // Trading block details  
+      if (tradeData.btype === '3trade' || tradeData.trader || tradeData.token_sold) {
+        console.log('=== Processing detailed trading block ===', tradeData)
         
         // Fix success detection - handle BigInt 1n, "1n", "1", 1, or BigInt 0n, "0n", "0", 0
-        const successValue = parsedData.success
+        const successValue = tradeData.success
         console.log('Raw success value in details:', successValue, typeof successValue)
         
         let success = false
@@ -1086,28 +1095,28 @@ export default {
           success = successValue === 1
         }
         
-        const traderDisplay = this.formatTraderDisplay(parsedData.trader)
+        const traderDisplay = this.formatTraderDisplay(tradeData.trader)
         
-        const tokenSold = this.formatTokenName(parsedData.token_sold)
-        const tokenBought = this.formatTokenName(parsedData.token_bought)
-        const amountSold = this.formatAmount(parsedData.amount_sold, parsedData.token_sold)
-        const amountBought = this.formatAmount(parsedData.amount_bought, parsedData.token_bought)
-        const exchange = parsedData.exchange || 'Unknown Exchange'
-        const slippage = parsedData.slippage ? `${(parseFloat(parsedData.slippage) * 100).toFixed(4)}%` : '0%'
-        const fee = this.formatAmount(parsedData.fee || '0')
-        const error = parsedData.error || null
+        const tokenSold = this.formatTokenName(tradeData.token_sold)
+        const tokenBought = this.formatTokenName(tradeData.token_bought)
+        const amountSold = this.formatAmount(tradeData.amount_sold, tradeData.token_sold)
+        const amountBought = this.formatAmount(tradeData.amount_bought, tradeData.token_bought)
+        const exchange = tradeData.exchange || 'Unknown Exchange'
+        const slippage = tradeData.slippage ? `${(parseFloat(tradeData.slippage) * 100).toFixed(4)}%` : '0%'
+        const fee = this.formatAmount(tradeData.fee || '0')
+        const error = tradeData.error || null
 
         // Calculate exchange rate with proper decimal handling
         let exchangeRate = 'N/A'
         try {
-          const soldMetadata = this.getTokenMetadataFromBlob(parsedData.token_sold)
-          const boughtMetadata = this.getTokenMetadataFromBlob(parsedData.token_bought)
+          const soldMetadata = this.getTokenMetadataFromBlob(tradeData.token_sold)
+          const boughtMetadata = this.getTokenMetadataFromBlob(tradeData.token_bought)
           
           const soldDecimals = soldMetadata?.decimals ? Number(soldMetadata.decimals) : 8
           const boughtDecimals = boughtMetadata?.decimals ? Number(boughtMetadata.decimals) : 8
           
-          const soldAmount = parseFloat(parsedData.amount_sold || 0) / Math.pow(10, soldDecimals)
-          const boughtAmount = parseFloat(parsedData.amount_bought || 0) / Math.pow(10, boughtDecimals)
+          const soldAmount = parseFloat(tradeData.amount_sold || 0) / Math.pow(10, soldDecimals)
+          const boughtAmount = parseFloat(tradeData.amount_bought || 0) / Math.pow(10, boughtDecimals)
           
           if (soldAmount > 0) {
             exchangeRate = (boughtAmount / soldAmount).toFixed(6)
@@ -1331,26 +1340,32 @@ export default {
       // Parse ICRC3 Value format
       const parsedData = this.parseICRC3Value(blockData)
       
+      // Extract data from new ICRC3 nested structure (same logic as getFormattedBlockDetails)
+      let blockTypeData = parsedData
+      if (parsedData.tx && parsedData.tx.data) {
+        blockTypeData = parsedData.tx.data
+      }
+      
       // Check for ICRC3 block type field
-      if (parsedData.btype) {
-        if (parsedData.btype === '3trade') return 'Trade'
-        if (parsedData.btype === '3circuit') return 'Circuit Breaker'
-        if (parsedData.btype === '3portfolio') return 'Portfolio'
-        if (parsedData.btype === '3price') return 'Price'
-        return parsedData.btype
+      if (blockTypeData.btype) {
+        if (blockTypeData.btype === '3trade') return 'Trade'
+        if (blockTypeData.btype === '3circuit') return 'Circuit Breaker'
+        if (blockTypeData.btype === '3portfolio') return 'Portfolio'
+        if (blockTypeData.btype === '3price') return 'Price'
+        return blockTypeData.btype
       }
       
       // Try to infer type from content
-      if (parsedData.trader || parsedData.token_sold || parsedData.tokenSold) {
+      if (blockTypeData.trader || blockTypeData.token_sold || blockTypeData.tokenSold) {
         return 'Trade'
       }
-      if (parsedData.event_type || parsedData.eventType || parsedData.tokensAffected || parsedData.tokens_affected) {
+      if (blockTypeData.event_type || blockTypeData.eventType || blockTypeData.tokensAffected || blockTypeData.tokens_affected) {
         return 'Circuit Breaker'
       }
-      if (parsedData.portfolioSnapshot || parsedData.totalValue || parsedData.total_value_icp || parsedData.token_count || parsedData.active_tokens || parsedData.tokens) {
+      if (blockTypeData.portfolioSnapshot || blockTypeData.totalValue || blockTypeData.total_value_icp || blockTypeData.token_count || blockTypeData.active_tokens || blockTypeData.tokens) {
         return 'Portfolio'
       }
-      if (parsedData.priceHistory || parsedData.price) {
+      if (blockTypeData.priceHistory || blockTypeData.price) {
         return 'Price'
       }
       
@@ -1368,12 +1383,19 @@ export default {
       const parsedData = this.parseICRC3Value(blockData)
       console.log('Parsed summary data:', parsedData)
       
+      // Extract trade data from new ICRC3 nested structure
+      let tradeData = parsedData
+      if (parsedData.tx && parsedData.tx.data) {
+        tradeData = parsedData.tx.data
+        console.log('Extracted trade data from ICRC3 structure for summary:', tradeData)
+      }
+      
       // Trading block
-      if (parsedData.btype === '3trade' || parsedData.trader || parsedData.token_sold) {
-        console.log('=== Processing trading block ===', parsedData)
+      if (tradeData.btype === '3trade' || tradeData.trader || tradeData.token_sold) {
+        console.log('=== Processing trading block ===', tradeData)
         
         // Fix success detection - handle BigInt 1n, "1n", "1", 1, or BigInt 0n, "0n", "0", 0
-        const successValue = parsedData.success
+        const successValue = tradeData.success
         console.log('Raw success value:', successValue, typeof successValue)
         
         let isSuccess = false
@@ -1390,12 +1412,12 @@ export default {
         const success = isSuccess ? '✅' : '❌'
         console.log('Determined success:', success, 'from value:', successValue)
         
-        const exchange = parsedData.exchange || 'Unknown Exchange'
-        const tokenSold = this.formatTokenName(parsedData.token_sold)
-        const tokenBought = this.formatTokenName(parsedData.token_bought)
-        const amountSold = this.formatAmount(parsedData.amount_sold, parsedData.token_sold)
-        const amountBought = this.formatAmount(parsedData.amount_bought, parsedData.token_bought)
-        const slippage = parsedData.slippage ? `${(parseFloat(parsedData.slippage) * 100).toFixed(4)}%` : '0%'
+        const exchange = tradeData.exchange || 'Unknown Exchange'
+        const tokenSold = this.formatTokenName(tradeData.token_sold)
+        const tokenBought = this.formatTokenName(tradeData.token_bought)
+        const amountSold = this.formatAmount(tradeData.amount_sold, tradeData.token_sold)
+        const amountBought = this.formatAmount(tradeData.amount_bought, tradeData.token_bought)
+        const slippage = tradeData.slippage ? `${(parseFloat(tradeData.slippage) * 100).toFixed(4)}%` : '0%'
         
         return `${success} ${exchange}: ${amountSold} ${tokenSold} → ${amountBought} ${tokenBought} (${slippage} slippage)`
       }
