@@ -50,6 +50,14 @@
                         <!-- For -->
                         <td class="pe-3">
                             {{ formatAmount(log.amountBought, 8) }} <span style="text-transform: uppercase;">{{ getTokenInfo(log.tokenBought)?.symbol || '???' }}</span>
+
+                          <!-- failed indicator -->
+                          <span v-if="!log.success"
+                                class="dao-trading-logs__table__failed-indicator"
+                                data-bs-toggle="tooltip" 
+                                data-bs-placement="top" 
+                                title="Trades typically fail due to slippage being over the allowed threshold">Failed</span>
+
                         </td>
 
                         <!-- On -->
@@ -220,6 +228,17 @@
         opacity: 0.5;
       }
 
+    }
+
+    // failed indicator
+    &__failed-indicator {
+      color: var(--black-to-white);
+      background-color: var(--orange-to-brown);
+      border-radius: 0.25rem;
+      margin-left: 0.5rem;
+      padding: 0rem 0.325rem;
+      font-size: 0.75rem;
+      border: 1px solid var(--dark-orange);
     }
 
   }
