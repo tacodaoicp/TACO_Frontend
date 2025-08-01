@@ -29,13 +29,12 @@ export interface AdminPermission {
   'grantedBy' : Principal,
 }
 export interface Allocation { 'token' : Principal, 'basisPoints' : bigint }
-export interface Allocation__1 { 'token' : Principal, 'basisPoints' : bigint }
 export type AuthorizationError = { 'NotAllowed' : null } |
   { 'NotAdmin' : null } |
   { 'UnexpectedError' : string };
 export interface ContinuousDAO {
   'addAdmin' : ActorMethod<[Principal], Result_1>,
-  'addToken' : ActorMethod<[Principal, TokenType__1], Result_1>,
+  'addToken' : ActorMethod<[Principal, TokenType], Result_1>,
   'admin_getNeuronAllocations' : ActorMethod<
     [],
     Array<[Uint8Array | number[], NeuronAllocation]>
@@ -146,7 +145,7 @@ export interface NeuronAllocation {
   'votingPower' : bigint,
   'lastUpdate' : bigint,
   'lastAllocationMaker' : Principal,
-  'allocations' : Array<Allocation__1>,
+  'allocations' : Array<Allocation>,
 }
 export interface NeuronVP {
   'votingPower' : bigint,
@@ -225,9 +224,6 @@ export interface TokenDetails {
 export type TokenType = { 'ICP' : null } |
   { 'ICRC3' : null } |
   { 'ICRC12' : null };
-export type TokenType__1 = { 'ICP' : null } |
-  { 'ICRC3' : null } |
-  { 'ICRC12' : null };
 export type UnfollowError = { 'NotAllowed' : null } |
   { 'FollowerNotFound' : null } |
   { 'FollowUnfollowLimitReached' : null } |
@@ -278,11 +274,11 @@ export interface UserState {
     {
       'to' : bigint,
       'from' : bigint,
-      'allocation' : Array<Allocation__1>,
+      'allocation' : Array<Allocation>,
       'allocationMaker' : Principal,
     }
   >,
-  'allocations' : Array<Allocation__1>,
+  'allocations' : Array<Allocation>,
   'lastAllocationUpdate' : bigint,
   'neurons' : Array<NeuronVP>,
 }
