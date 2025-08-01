@@ -239,6 +239,7 @@
       padding: 0rem 0.325rem;
       font-size: 0.75rem;
       border: 1px solid var(--dark-orange);
+
     }
 
   }
