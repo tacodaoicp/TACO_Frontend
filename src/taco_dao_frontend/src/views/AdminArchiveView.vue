@@ -1034,8 +1034,14 @@ export default {
               if (blockIndex >= 0 && this.blockBrowserBlocks[blockIndex]) {
                 const parsedData = this.parseICRC3Value(this.blockBrowserBlocks[blockIndex].block)
                 
-                if (parsedData.tokens || parsedData.btype === '3portfolio') {
-                  const chartData = this.preparePortfolioChartData(parsedData.tokens)
+                // Extract data from new ICRC3 nested structure
+                let blockDataToProcess = parsedData
+                if (parsedData.tx && parsedData.tx.data) {
+                  blockDataToProcess = parsedData.tx.data
+                }
+                
+                if (blockDataToProcess.tokens || blockDataToProcess.btype === '3portfolio') {
+                  const chartData = this.preparePortfolioChartData(blockDataToProcess.tokens)
                   
                   if (chartData) {
                     console.log('=== Rendering portfolio chart ===', chartId, chartData)
@@ -1265,13 +1271,13 @@ export default {
         
         // Format paused tokens (these are still just Principal IDs)
         let pausedTokensList = 'None'
-        if (parsedData.paused_tokens && Array.isArray(parsedData.paused_tokens) && parsedData.paused_tokens.length > 0) {
-          const pausedNames = parsedData.paused_tokens.map(token => this.formatTokenName(token)).filter(name => name !== 'Unknown')
+        if (tradeData.paused_tokens && Array.isArray(tradeData.paused_tokens) && tradeData.paused_tokens.length > 0) {
+          const pausedNames = tradeData.paused_tokens.map(token => this.formatTokenName(token)).filter(name => name !== 'Unknown')
           pausedTokensList = pausedNames.length ? pausedNames.join(', ') : 'None'
         }
         
         // Prepare chart data for the half-pie
-        const chartData = this.preparePortfolioChartData(parsedData.tokens)
+        const chartData = this.preparePortfolioChartData(tradeData.tokens)
         
         return `
           <div class="row">
@@ -1482,10 +1488,10 @@ export default {
             .filter(token => token.symbol !== 'Unknown')
           
           console.log('=== Top tokens for summary ===', topTokens)
-          tokensInfo = topTokens.length ? ` (${topTokens.map(t => t.symbol).join(', ')}${parsedData.tokens.length > 3 ? '...' : ''})` : ''
-        } else if (parsedData.active_tokens && Array.isArray(parsedData.active_tokens)) {
+          tokensInfo = topTokens.length ? ` (${topTokens.map(t => t.symbol).join(', ')}${tradeData.tokens.length > 3 ? '...' : ''})` : ''
+        } else if (tradeData.active_tokens && Array.isArray(tradeData.active_tokens)) {
           // Fallback to old format for backward compatibility
-          const tokenNames = parsedData.active_tokens.map(token => this.formatTokenName(token)).filter(name => name !== 'Unknown')
+          const tokenNames = tradeData.active_tokens.map(token => this.formatTokenName(token)).filter(name => name !== 'Unknown')
           tokensInfo = tokenNames.length ? ` (${tokenNames.slice(0, 3).join(', ')}${tokenNames.length > 3 ? '...' : ''})` : ''
         }
         
