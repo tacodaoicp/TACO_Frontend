@@ -553,7 +553,7 @@ export default {
     portfolioArchiveCanisterId() {
       switch (process.env.DFX_NETWORK) {
         case "ic":
-          return process.env.CANISTER_ID_PORTFOLIO_ARCHIVE_IC || 'lrekt-uaaaa-aaaan-qz4ya-cai'; // fallback to staging as no IC deployment yet
+          return process.env.CANISTER_ID_PORTFOLIO_ARCHIVE_IC || 'bl7x7-wiaaa-aaaan-qz5bq-cai'; // fallback to staging as no IC deployment yet
         case "staging":  
           return process.env.CANISTER_ID_PORTFOLIO_ARCHIVE_STAGING || 'lrekt-uaaaa-aaaan-qz4ya-cai';
       }
@@ -563,7 +563,7 @@ export default {
     priceArchiveCanisterId() {
       switch (process.env.DFX_NETWORK) {
         case "ic":
-          return process.env.CANISTER_ID_PRICE_ARCHIVE_IC || 'l7gh3-pqaaa-aaaan-qz4za-cai'; // fallback to staging as no IC deployment yet
+          return process.env.CANISTER_ID_PRICE_ARCHIVE_IC || 'bm6rl-3qaaa-aaaan-qz5ba-cai'; // fallback to staging as no IC deployment yet
         case "staging":
           return process.env.CANISTER_ID_PRICE_ARCHIVE_STAGING || 'l7gh3-pqaaa-aaaan-qz4za-cai';
       }
