@@ -600,7 +600,7 @@ export default {
         this.portfolioActor = createPortfolioActor(this.portfolioArchiveCanisterId(), { agent })
         this.priceActor = createPriceActor(this.priceArchiveCanisterId(), { agent })
         
-        console.log('Archive actors created with identity:', identity.getPrincipal().toString())
+        //console.log('Archive actors created with identity:', identity.getPrincipal().toString())
       } catch (error) {
         console.error('Failed to create archive actors:', error)
         this.errorMessage = 'Failed to initialize archive actors'
@@ -703,14 +703,14 @@ export default {
     },
 
     async startBatchImportSystem() {
-      console.log('startBatchImportSystem called')
+      //console.log('startBatchImportSystem called')
       this.loading = true
       this.clearMessages()
       
       try {
-        console.log('Calling startBatchImportSystem on actor:', this.currentArchiveActor)
+        //console.log('Calling startBatchImportSystem on actor:', this.currentArchiveActor)
         const result = await this.currentArchiveActor.startBatchImportSystem()
-        console.log('startBatchImportSystem result:', result)
+        //console.log('startBatchImportSystem result:', result)
         if (result.ok) {
           this.successMessage = result.ok
         } else {
@@ -745,13 +745,13 @@ export default {
     },
 
     async resetImportTimestamps() {
-      console.log('resetImportTimestamps called')
+      //console.log('resetImportTimestamps called')
       this.loading = true
       this.clearMessages()
       
       try {
         const result = await this.currentArchiveActor.resetImportTimestamps()
-        console.log('resetImportTimestamps result:', result)
+        //console.log('resetImportTimestamps result:', result)
         if (result.ok) {
           this.successMessage = `Import timestamps reset: ${result.ok}`
         } else {
@@ -786,15 +786,15 @@ export default {
     },
 
     async runManualBatchImport() {
-      console.log('runManualBatchImport called')
+      //console.log('runManualBatchImport called')
       this.loading = true
       this.clearMessages()
       this.successMessage = 'Manual batch import started. Check logs for progress...'
       
       try {
-        console.log('Calling runManualBatchImport on actor:', this.currentArchiveActor)
+        //console.log('Calling runManualBatchImport on actor:', this.currentArchiveActor)
         const result = await this.currentArchiveActor.runManualBatchImport()
-        console.log('runManualBatchImport result:', result)
+        //console.log('runManualBatchImport result:', result)
         if (result.ok) {
           this.successMessage = result.ok
         } else {
@@ -1009,12 +1009,41 @@ export default {
 
     // Render portfolio charts for any visible portfolio blocks
     renderPortfolioChartsIfNeeded() {
+      console.log('=== renderPortfolioChartsIfNeeded called ===')
+      
       // Wait a bit to ensure all DOM updates are complete
       setTimeout(() => {
-        // Find all portfolio chart containers
+        // Process pending charts first
+        if (window.pendingPortfolioCharts && window.pendingPortfolioCharts.length > 0) {
+          console.log('=== Processing pending charts ===', window.pendingPortfolioCharts)
+          
+          window.pendingPortfolioCharts.forEach(({ chartId, chartData }) => {
+            console.log('=== Rendering pending chart ===', chartId)
+            const container = document.querySelector(`#${chartId}`)
+            if (container) {
+              console.log('=== Found container for pending chart ===', container)
+              this.renderPortfolioChart(chartData, chartId)
+            } else {
+              console.log('=== Container not found for pending chart ===', chartId)
+            }
+          })
+          
+          // Clear pending charts
+          window.pendingPortfolioCharts = []
+        }
+        
+        // Also check for any chart containers without charts (fallback)
         const chartContainers = document.querySelectorAll('.portfolio-chart')
+        console.log('=== Found chart containers ===', chartContainers.length, chartContainers)
         
         chartContainers.forEach((container, index) => {
+          console.log('=== Processing chart container ===', { 
+            container, 
+            index, 
+            hasChildren: container.children.length > 0,
+            childrenCount: container.children.length 
+          })
+          
           if (container.children.length === 0) { // Only render if empty
             // Get or create a unique ID for this container
             let chartId = container.id
@@ -1022,6 +1051,8 @@ export default {
               chartId = container.dataset.chartId || `portfolio-chart-${index}-${Date.now()}`
               container.id = chartId
             }
+            
+            console.log('=== Chart container ready for rendering ===', { chartId, container })
             
             // Find the block data by traversing up to the block container
             const blockElement = container.closest('.block-detail-content, .expanded-content')
@@ -1041,18 +1072,27 @@ export default {
                 }
                 
                 if (blockDataToProcess.tokens || blockDataToProcess.btype === '3portfolio') {
+                  console.log('=== Found portfolio block, preparing chart data ===', blockDataToProcess.tokens)
                   const chartData = this.preparePortfolioChartData(blockDataToProcess.tokens)
+                  console.log('=== Chart data prepared in renderIfNeeded ===', chartData)
                   
                   if (chartData) {
                     console.log('=== Rendering portfolio chart ===', chartId, chartData)
                     this.renderPortfolioChart(chartData, chartId)
+                  } else {
+                    console.log('=== Chart data is null, not rendering chart ===')
                   }
+                } else {
+                  console.log('=== Not a portfolio block or no tokens ===', { 
+                    hasTokens: !!blockDataToProcess.tokens, 
+                    btype: blockDataToProcess.btype 
+                  })
                 }
               }
             }
           }
         })
-      }, 100) // Small delay to ensure DOM is ready
+      }, 500) // Increased delay to ensure DOM is ready
     },
 
     toggleRawJson(blockId) {
@@ -1065,14 +1105,14 @@ export default {
     },
 
     getFormattedBlockDetails(blockData) {
-      console.log('=== getFormattedBlockDetails called ===', blockData)
+      //console.log('=== getFormattedBlockDetails called ===', blockData)
       
       if (!blockData || typeof blockData !== 'object') {
         return '<p class="text-muted">Invalid block data</p>'
       }
 
       const parsedData = this.parseICRC3Value(blockData)
-      console.log('Parsed block data:', parsedData)
+      //console.log('Parsed block data:', parsedData)
 
       // Extract trade data from new ICRC3 nested structure
       // New format: { tx: { data: { btype: "3trade", trader: ..., etc } } }
@@ -1080,16 +1120,16 @@ export default {
       let tradeData = parsedData
       if (parsedData.tx && parsedData.tx.data) {
         tradeData = parsedData.tx.data
-        console.log('Extracted trade data from ICRC3 structure:', tradeData)
+        //console.log('Extracted trade data from ICRC3 structure:', tradeData)
       }
 
       // Trading block details  
       if (tradeData.btype === '3trade' || tradeData.trader || tradeData.token_sold) {
-        console.log('=== Processing detailed trading block ===', tradeData)
+        //console.log('=== Processing detailed trading block ===', tradeData)
         
         // Fix success detection - handle BigInt 1n, "1n", "1", 1, or BigInt 0n, "0n", "0", 0
         const successValue = tradeData.success
-        console.log('Raw success value in details:', successValue, typeof successValue)
+        //console.log('Raw success value in details:', successValue, typeof successValue)
         
         let success = false
         if (typeof successValue === 'bigint') {
@@ -1158,7 +1198,7 @@ export default {
 
       // Circuit breaker block details
       if (tradeData.btype === '3circuit' || tradeData.event_type || tradeData.eventType) {
-        console.log('=== Processing detailed circuit breaker block ===', tradeData)
+        //console.log('=== Processing detailed circuit breaker block ===', tradeData)
         
         const eventType = tradeData.event_type || tradeData.eventType || 'Unknown Event'
         const eventName = this.formatEventTypeName(eventType)
@@ -1205,7 +1245,7 @@ export default {
 
       // Portfolio block details
       if (tradeData.btype === '3portfolio' || tradeData.portfolioSnapshot || tradeData.total_value_icp || tradeData.token_count || tradeData.tokens) {
-        console.log('=== Processing detailed portfolio block ===', tradeData)
+        //console.log('=== Processing detailed portfolio block ===', tradeData)
         
         // Extract comprehensive portfolio data
         const tokenCount = tradeData.token_count || tradeData.tokens?.length || 0
@@ -1216,10 +1256,10 @@ export default {
         // Process detailed token information
         let tokenDetailsHtml = 'No detailed token information available'
         if (tradeData.tokens && Array.isArray(tradeData.tokens)) {
-          console.log('=== Processing detailed tokens ===', tradeData.tokens)
+          //console.log('=== Processing detailed tokens ===', tradeData.tokens)
           
           const tokenRows = tradeData.tokens.map(token => {
-            console.log('=== Processing individual token ===', token)
+            //console.log('=== Processing individual token ===', token)
             
             // Extract detailed token data from ICRC3 Map structure
             const tokenPrincipal = this.extractTokenPrincipal(token.token)
@@ -1230,9 +1270,9 @@ export default {
             const valueInICP = this.extractBigIntValue(token.value_in_icp) || 0
             const valueInUSD = this.extractTextValue(token.value_in_usd) || '0'
             
-            console.log('=== Extracted token data ===', {
-              tokenPrincipal, balance, decimals, priceInICP, priceInUSD, valueInICP, valueInUSD
-            })
+            //console.log('=== Extracted token data ===', {
+            //  tokenPrincipal, balance, decimals, priceInICP, priceInUSD, valueInICP, valueInUSD
+            //})
             
             // Get token symbol (fallback to truncated principal)
             const tokenSymbol = this.formatTokenName(tokenPrincipal)
@@ -1278,6 +1318,19 @@ export default {
         
         // Prepare chart data for the half-pie
         const chartData = this.preparePortfolioChartData(tradeData.tokens)
+        console.log('=== Portfolio chart data prepared ===', chartData ? 'SUCCESS' : 'FAILED')
+        
+        // Generate unique chart ID
+        const chartId = `portfolio-chart-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`
+        console.log('=== Generated chart ID ===', chartId)
+        
+        // Store chart info for rendering after DOM is ready
+        if (chartData) {
+          // Store this for the chart rendering system
+          window.pendingPortfolioCharts = window.pendingPortfolioCharts || []
+          window.pendingPortfolioCharts.push({ chartId, chartData })
+          console.log('=== Added to pending charts ===', { chartId, chartData })
+        }
         
         return `
           <div class="row">
@@ -1293,7 +1346,7 @@ export default {
               
               <!-- Half-pie chart container -->
               <div class="portfolio-chart-container mt-3" style="height: 200px;">
-                <div class="portfolio-chart" data-chart-id="portfolio-chart-${Math.random().toString(36).substr(2, 9)}"></div>
+                <div class="portfolio-chart" id="${chartId}"></div>
               </div>
             </div>
             <div class="col-md-7">
@@ -1379,7 +1432,7 @@ export default {
     },
 
     getBlockSummary(blockData) {
-      console.log('=== getBlockSummary called ===', blockData)
+      //console.log('=== getBlockSummary called ===', blockData)
       
       if (!blockData || typeof blockData !== 'object') {
         return 'Invalid block data'
@@ -1387,22 +1440,22 @@ export default {
       
       // Parse ICRC3 Value format (Map structure)
       const parsedData = this.parseICRC3Value(blockData)
-      console.log('Parsed summary data:', parsedData)
+      //console.log('Parsed summary data:', parsedData)
       
       // Extract trade data from new ICRC3 nested structure
       let tradeData = parsedData
       if (parsedData.tx && parsedData.tx.data) {
         tradeData = parsedData.tx.data
-        console.log('Extracted trade data from ICRC3 structure for summary:', tradeData)
+        //console.log('Extracted trade data from ICRC3 structure for summary:', tradeData)
       }
       
       // Trading block
       if (tradeData.btype === '3trade' || tradeData.trader || tradeData.token_sold) {
-        console.log('=== Processing trading block ===', tradeData)
+        //console.log('=== Processing trading block ===', tradeData)
         
         // Fix success detection - handle BigInt 1n, "1n", "1", 1, or BigInt 0n, "0n", "0", 0
         const successValue = tradeData.success
-        console.log('Raw success value:', successValue, typeof successValue)
+        //console.log('Raw success value:', successValue, typeof successValue)
         
         let isSuccess = false
         if (typeof successValue === 'bigint') {
@@ -1416,7 +1469,7 @@ export default {
         }
         
         const success = isSuccess ? '✅' : '❌'
-        console.log('Determined success:', success, 'from value:', successValue)
+        //console.log('Determined success:', success, 'from value:', successValue)
         
         const exchange = tradeData.exchange || 'Unknown Exchange'
         const tokenSold = this.formatTokenName(tradeData.token_sold)
@@ -1430,7 +1483,7 @@ export default {
       
       // Circuit breaker block
       if (tradeData.btype === '3circuit' || tradeData.event_type || tradeData.eventType || tradeData.tokensAffected) {
-        console.log('=== Processing circuit breaker block ===', tradeData)
+        //console.log('=== Processing circuit breaker block ===', tradeData)
         
         const eventType = tradeData.event_type || tradeData.eventType || 'Unknown Event'
         const eventName = this.formatEventTypeName(eventType)
@@ -1458,7 +1511,7 @@ export default {
       
       // Portfolio block
       if (tradeData.btype === '3portfolio' || tradeData.portfolioSnapshot || tradeData.totalValue || tradeData.total_value_icp || tradeData.token_count || tradeData.tokens) {
-        console.log('=== Processing portfolio block ===', tradeData)
+        //console.log('=== Processing portfolio block ===', tradeData)
         
         // Extract portfolio data
         const tokenCount = tradeData.token_count || tradeData.tokens?.length || 0
@@ -1469,7 +1522,7 @@ export default {
         // Format token information - now using detailed tokens data
         let tokensInfo = ''
         if (tradeData.tokens && Array.isArray(tradeData.tokens)) {
-          console.log('=== Processing tokens for summary ===', tradeData.tokens)
+          //console.log('=== Processing tokens for summary ===', tradeData.tokens)
           
           // Get top tokens by value for summary
           const topTokens = tradeData.tokens
@@ -1487,7 +1540,7 @@ export default {
             .slice(0, 3)
             .filter(token => token.symbol !== 'Unknown')
           
-          console.log('=== Top tokens for summary ===', topTokens)
+          //console.log('=== Top tokens for summary ===', topTokens)
           tokensInfo = topTokens.length ? ` (${topTokens.map(t => t.symbol).join(', ')}${tradeData.tokens.length > 3 ? '...' : ''})` : ''
         } else if (tradeData.active_tokens && Array.isArray(tradeData.active_tokens)) {
           // Fallback to old format for backward compatibility
@@ -1535,7 +1588,7 @@ export default {
 
     // Parse ICRC3 Value format (Map structure) into a plain JavaScript object
     parseICRC3Value(blockData) {
-      console.log('=== parseICRC3Value called ===', blockData)
+      //console.log('=== parseICRC3Value called ===', blockData)
       
       if (!blockData || typeof blockData !== 'object') {
         return {}
@@ -1543,20 +1596,20 @@ export default {
 
       // If it's already a plain object, return as-is
       if (!blockData.Map && !Array.isArray(blockData)) {
-        console.log('Already plain object, returning as-is')
+        //console.log('Already plain object, returning as-is')
         return blockData
       }
 
       // Handle ICRC3 Map format: { "Map": [ ["key", value], ... ] }
       if (blockData.Map && Array.isArray(blockData.Map)) {
-        console.log('Found Map format, parsing...', blockData.Map)
+        //console.log('Found Map format, parsing...', blockData.Map)
         const result = {}
         for (const [key, value] of blockData.Map) {
           if (typeof key === 'string') {
             result[key] = this.parseICRC3ValueRecursive(value)
           }
         }
-        console.log('Parsed result:', result)
+        //console.log('Parsed result:', result)
         return result
       }
 
@@ -1619,7 +1672,7 @@ export default {
     },
 
     formatTokenName(tokenBlob) {
-      console.log('=== formatTokenName called ===', tokenBlob)
+      //console.log('=== formatTokenName called ===', tokenBlob)
       if (!tokenBlob) return 'Unknown'
       
       try {
@@ -1632,12 +1685,12 @@ export default {
         
         // Handle direct Uint8Array format (new format)
         if (tokenBlob instanceof Uint8Array) {
-          console.log('Direct Uint8Array format detected')
+          //console.log('Direct Uint8Array format detected')
           uint8Array = tokenBlob
         }
         // Handle wrapped Blob format (old format)
         else if (tokenBlob.Blob && typeof tokenBlob.Blob === 'object') {
-          console.log('Wrapped Blob format detected')
+          //console.log('Wrapped Blob format detected')
           const blobData = tokenBlob.Blob
           uint8Array = new Uint8Array(Object.keys(blobData).map(key => blobData[key]))
         }
@@ -1648,12 +1701,12 @@ export default {
             const principal = Principal.fromUint8Array(uint8Array)
             const principalStr = principal.toString()
             
-            console.log('Decoded token principal:', principalStr)
-            console.log('Available token details:', this.tacoStore.fetchedTokenDetails)
+            //console.log('Decoded token principal:', principalStr)
+            //console.log('Available token details:', this.tacoStore.fetchedTokenDetails)
             
             // Look up token metadata using the decoded Principal
             const tokenMetadata = this.getTokenMetadata(principal)
-            console.log('Found token metadata:', tokenMetadata)
+            //console.log('Found token metadata:', tokenMetadata)
             
             if (tokenMetadata && tokenMetadata.tokenSymbol) {
               return tokenMetadata.tokenSymbol
@@ -1734,23 +1787,23 @@ export default {
     // Get token metadata from the taco store
     getTokenMetadata(principal) {
       try {
-        console.log('Looking for token metadata for principal:', principal.toString())
-        console.log('fetchedTokenDetails available:', !!this.tacoStore.fetchedTokenDetails)
-        console.log('fetchedTokenDetails length:', this.tacoStore.fetchedTokenDetails?.length)
+        //console.log('Looking for token metadata for principal:', principal.toString())
+        //console.log('fetchedTokenDetails available:', !!this.tacoStore.fetchedTokenDetails)
+        //console.log('fetchedTokenDetails length:', this.tacoStore.fetchedTokenDetails?.length)
         
         if (!this.tacoStore.fetchedTokenDetails || !Array.isArray(this.tacoStore.fetchedTokenDetails)) {
-          console.log('No fetchedTokenDetails available')
+          //console.log('No fetchedTokenDetails available')
           return null
         }
 
         // Log all available token principals for debugging
-        console.log('Available token principals:', this.tacoStore.fetchedTokenDetails.map(entry => {
-          try {
-            return entry[0]?.toString()
-          } catch {
-            return 'invalid'
-          }
-        }))
+        //console.log('Available token principals:', this.tacoStore.fetchedTokenDetails.map(entry => {
+        //  try {
+        //    return entry[0]?.toString()
+        //  } catch {
+        //    return 'invalid'
+        //  }
+        //}))
 
         const tokenEntry = this.tacoStore.fetchedTokenDetails.find(entry => {
           if (!entry || !Array.isArray(entry) || entry.length < 2) {
@@ -1759,7 +1812,7 @@ export default {
           try {
             const entryPrincipal = entry[0].toString()
             const searchPrincipal = principal.toString()
-            console.log('Comparing:', entryPrincipal, 'vs', searchPrincipal, '=', entryPrincipal === searchPrincipal)
+            //console.log('Comparing:', entryPrincipal, 'vs', searchPrincipal, '=', entryPrincipal === searchPrincipal)
             return entryPrincipal === searchPrincipal
           } catch (err) {
             console.warn('Error comparing principals:', err)
@@ -1767,7 +1820,7 @@ export default {
           }
         })
 
-        console.log('Found token entry:', tokenEntry)
+        //console.log('Found token entry:', tokenEntry)
         return tokenEntry && tokenEntry[1] ? tokenEntry[1] : null
       } catch (error) {
         console.warn('Error getting token metadata:', error)
@@ -1805,7 +1858,7 @@ export default {
 
     // Enhanced trader display with Principal decoding
     formatTraderDisplay(traderBlob) {
-      console.log('=== formatTraderDisplay called ===', traderBlob)
+      //console.log('=== formatTraderDisplay called ===', traderBlob)
       if (!traderBlob) return 'Unknown'
       
       try {
@@ -1813,12 +1866,12 @@ export default {
         
         // Handle direct Uint8Array format (new format)
         if (traderBlob instanceof Uint8Array) {
-          console.log('Direct Uint8Array format detected for trader')
+          //console.log('Direct Uint8Array format detected for trader')
           uint8Array = traderBlob
         }
         // Handle wrapped Blob format (old format)
         else if (traderBlob.Blob && typeof traderBlob.Blob === 'object') {
-          console.log('Wrapped Blob format detected for trader')
+          //console.log('Wrapped Blob format detected for trader')
           const blobData = traderBlob.Blob
           uint8Array = new Uint8Array(Object.keys(blobData).map(key => blobData[key]))
         }
@@ -1828,8 +1881,8 @@ export default {
             const principal = Principal.fromUint8Array(uint8Array)
             const principalStr = principal.toString()
             
-            console.log('Decoded trader principal:', principalStr)
-            console.log('Treasury canister ID:', this.tacoStore.treasuryCanisterId?.())
+            //console.log('Decoded trader principal:', principalStr)
+            //console.log('Treasury canister ID:', this.tacoStore.treasuryCanisterId?.())
             
             // Check if it's a known principal (like Treasury)
             if (this.tacoStore.treasuryCanisterId && principalStr === this.tacoStore.treasuryCanisterId()) {
@@ -1952,10 +2005,9 @@ export default {
     // Prepare portfolio chart data for half-pie visualization
     preparePortfolioChartData(tokens) {
       if (!tokens || !Array.isArray(tokens)) {
+        console.log('=== Chart prep failed: No tokens or not array ===')
         return null
       }
-
-      console.log('=== Preparing chart data for tokens ===', tokens)
 
       // Extract and process token data
       const tokenData = tokens.map(token => {
@@ -2020,7 +2072,12 @@ export default {
 
     // Render portfolio chart using ApexCharts
     renderPortfolioChart(chartData, containerId) {
-      if (!chartData) return
+      console.log('=== renderPortfolioChart called ===', { chartData, containerId })
+      
+      if (!chartData) {
+        console.log('=== Chart data is null, not rendering ===')
+        return
+      }
 
       // Destroy existing chart if any
       if (this.portfolioChart) {
@@ -2095,8 +2152,22 @@ export default {
       }
 
       // Create and render chart
-      this.portfolioChart = new ApexCharts(document.querySelector(`#${containerId}`), options)
-      this.portfolioChart.render()
+      const chartContainer = document.querySelector(`#${containerId}`)
+      console.log('=== Chart container found ===', { containerId, container: chartContainer })
+      
+      if (!chartContainer) {
+        console.error('=== Chart container not found ===', containerId)
+        return
+      }
+      
+      try {
+        console.log('=== Creating ApexCharts instance ===', options)
+        this.portfolioChart = new ApexCharts(chartContainer, options)
+        this.portfolioChart.render()
+        console.log('=== Chart rendered successfully ===')
+      } catch (error) {
+        console.error('=== Error rendering chart ===', error)
+      }
     },
 
     // Format snapshot reason for better readability
