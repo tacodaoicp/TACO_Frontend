@@ -33,6 +33,15 @@ export interface DataCertificate {
   'certificate' : Uint8Array | number[],
   'hash_tree' : Uint8Array | number[],
 }
+export interface DetailedTokenSnapshot {
+  'decimals' : bigint,
+  'token' : Principal,
+  'balance' : bigint,
+  'priceInICP' : bigint,
+  'priceInUSD' : number,
+  'valueInICP' : bigint,
+  'valueInUSD' : number,
+}
 export interface GetArchivesArgs { 'from' : [] | [Principal] }
 export type GetArchivesResult = Array<
   { 'end' : bigint, 'canister_id' : Principal, 'start' : bigint }
@@ -84,10 +93,10 @@ export interface PortfolioArchiveV2 {
 export interface PortfolioBlockData {
   'totalValueICP' : bigint,
   'totalValueUSD' : number,
+  'tokens' : Array<DetailedTokenSnapshot>,
   'timestamp' : bigint,
   'tokenCount' : bigint,
   'pausedTokens' : Array<Principal>,
-  'activeTokens' : Array<Principal>,
   'reason' : SnapshotReason,
 }
 export type Result = { 'ok' : string } |

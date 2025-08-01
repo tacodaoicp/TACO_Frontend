@@ -1,6 +1,15 @@
 export const idlFactory = ({ IDL }) => {
   const GetBlocksResult = IDL.Rec();
   const Value = IDL.Rec();
+  const DetailedTokenSnapshot = IDL.Record({
+    'decimals' : IDL.Nat,
+    'token' : IDL.Principal,
+    'balance' : IDL.Nat,
+    'priceInICP' : IDL.Nat,
+    'priceInUSD' : IDL.Float64,
+    'valueInICP' : IDL.Nat,
+    'valueInUSD' : IDL.Float64,
+  });
   const SnapshotReason = IDL.Variant({
     'ManualTrigger' : IDL.Null,
     'SystemEvent' : IDL.Null,
@@ -11,10 +20,10 @@ export const idlFactory = ({ IDL }) => {
   const PortfolioBlockData = IDL.Record({
     'totalValueICP' : IDL.Nat,
     'totalValueUSD' : IDL.Float64,
+    'tokens' : IDL.Vec(DetailedTokenSnapshot),
     'timestamp' : IDL.Int,
     'tokenCount' : IDL.Nat,
     'pausedTokens' : IDL.Vec(IDL.Principal),
-    'activeTokens' : IDL.Vec(IDL.Principal),
     'reason' : SnapshotReason,
   });
   const ArchiveError = IDL.Variant({

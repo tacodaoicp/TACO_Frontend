@@ -60,11 +60,11 @@ type Result =
  };
 type PortfolioBlockData = 
  record {
-   activeTokens: vec principal;
    pausedTokens: vec principal;
    reason: SnapshotReason;
    timestamp: int;
    tokenCount: nat;
+   tokens: vec DetailedTokenSnapshot;
    totalValueICP: nat;
    totalValueUSD: float64;
  };
@@ -127,6 +127,16 @@ type GetArchivesResult =
        start: nat;
      };
 type GetArchivesArgs = record {from: opt principal;};
+type DetailedTokenSnapshot = 
+ record {
+   balance: nat;
+   decimals: nat;
+   priceInICP: nat;
+   priceInUSD: float64;
+   token: principal;
+   valueInICP: nat;
+   valueInUSD: float64;
+ };
 type DataCertificate = 
  record {
    certificate: blob;
