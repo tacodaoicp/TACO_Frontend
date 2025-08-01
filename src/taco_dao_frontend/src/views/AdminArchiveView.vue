@@ -1350,16 +1350,49 @@ export default {
       }
 
       // Price block details
-      if (tradeData.btype === '3price' || tradeData.priceHistory) {
-        const token = tradeData.token || 'Unknown Token'
-        const price = tradeData.price || tradeData.priceHistory?.currentPrice || 'Unknown'
+      if (tradeData.btype === '3price' || tradeData.price_icp || tradeData.price_usd) {
+        // Extract price data
+        const tokenSymbol = this.formatTokenName(tradeData.token) || 'Unknown Token'
+        const priceUSD = tradeData.price_usd || 'Unknown'
+        const source = tradeData.source || 'Unknown Source'
+        const timestamp = tradeData.ts || tradeData.timestamp || Date.now()
+        
+        // Calculate price ratios and trends
+        const icpAmount = this.extractBigIntValue(tradeData.price_icp) || 0
+        const usdPrice = parseFloat(priceUSD) || 0
+        
+        // Format ICP amount properly (from e8s)
+        const icpFormatted = icpAmount > 0 ? (Number(icpAmount) / 100000000).toFixed(8) + ' ICP' : 'Unknown'
+        const usdFormatted = usdPrice > 0 ? '$' + usdPrice.toFixed(6) : 'Unknown'
+        
+        // Calculate ICP/USD rate if both prices available
+        let icpUsdRate = 'Unknown'
+        if (icpAmount > 0 && usdPrice > 0) {
+          const icpValue = Number(icpAmount) / 100000000
+          const rate = usdPrice / icpValue
+          icpUsdRate = '$' + rate.toFixed(2) + ' per ICP'
+        }
+        
         return `
-          <div>
-            <h6>💲 Price Update</h6>
-            <table class="table table-sm table-dark">
-              <tr><td><strong>Token:</strong></td><td>${token}</td></tr>
-              <tr><td><strong>Price:</strong></td><td>${price}</td></tr>
-            </table>
+          <div class="row">
+            <div class="col-md-6">
+              <h6>💰 Price Update</h6>
+              <table class="table table-sm table-dark">
+                <tr><td><strong>Token:</strong></td><td><span class="badge bg-primary">${tokenSymbol}</span></td></tr>
+                <tr><td><strong>Price (ICP):</strong></td><td class="text-warning">${icpFormatted}</td></tr>
+                <tr><td><strong>Price (USD):</strong></td><td class="text-success">${usdFormatted}</td></tr>
+                <tr><td><strong>Source:</strong></td><td><span class="badge bg-secondary">${source}</span></td></tr>
+              </table>
+            </div>
+            <div class="col-md-6">
+              <h6>📊 Price Details</h6>
+              <table class="table table-sm table-dark">
+                <tr><td><strong>Timestamp:</strong></td><td>${this.formatTime(Number(timestamp))}</td></tr>
+                <tr><td><strong>ICP Rate:</strong></td><td class="text-info">${icpUsdRate}</td></tr>
+                <tr><td><strong>Data Source:</strong></td><td>${source === 'NTN' ? '🌐 NTN Network' : source}</td></tr>
+                <tr><td><strong>Block Type:</strong></td><td><span class="badge bg-info">Price Feed</span></td></tr>
+              </table>
+            </div>
           </div>
         `
       }
@@ -1416,7 +1449,7 @@ export default {
       if (blockTypeData.portfolioSnapshot || blockTypeData.totalValue || blockTypeData.total_value_icp || blockTypeData.token_count || blockTypeData.active_tokens || blockTypeData.tokens) {
         return 'Portfolio'
       }
-      if (blockTypeData.priceHistory || blockTypeData.price) {
+      if (blockTypeData.priceHistory || blockTypeData.price || blockTypeData.price_icp || blockTypeData.price_usd) {
         return 'Price'
       }
       
@@ -1557,10 +1590,19 @@ export default {
       }
       
       // Price block
-      if (tradeData.btype === '3price' || tradeData.priceHistory || tradeData.price) {
-        const token = tradeData.token || 'Unknown Token'
-        const price = tradeData.price || tradeData.priceHistory?.currentPrice || 'Unknown'
-        return `💲 Price: ${token} = ${price}`
+      if (tradeData.btype === '3price' || tradeData.price_icp || tradeData.price_usd) {
+        const tokenSymbol = this.formatTokenName(tradeData.token) || 'Unknown Token'
+        const priceUSD = tradeData.price_usd || 'Unknown'
+        const source = tradeData.source || 'Unknown'
+        
+        // Format ICP price from e8s
+        const icpAmount = this.extractBigIntValue(tradeData.price_icp) || 0
+        const icpFormatted = icpAmount > 0 ? (Number(icpAmount) / 100000000).toFixed(8) : 'Unknown'
+        
+        const usdPrice = parseFloat(priceUSD) || 0
+        const usdFormatted = usdPrice > 0 ? '$' + usdPrice.toFixed(6) : 'Unknown'
+        
+        return `💰 ${tokenSymbol}: ${icpFormatted} ICP (${usdFormatted}) via ${source}`
       }
       
       // Generic block
