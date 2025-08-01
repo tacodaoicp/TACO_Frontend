@@ -377,36 +377,8 @@
                   <!-- Expanded Block Details -->
                   <div v-if="expandedBlocks.includes(block.id)" class="block-details">
                     <div class="border-top border-secondary pt-2">
-                      
-                      <!-- Portfolio Block with Chart -->
-                      <div v-if="isPortfolioBlock(block.block) && !showRawJson.includes(block.id)">
-                        <div class="row">
-                          <div class="col-md-5">
-                            <h6>💼 Portfolio Summary</h6>
-                            <div v-html="getPortfolioSummary(block.block)"></div>
-                            
-                            <!-- ApexChart Component -->
-                            <div class="portfolio-chart-container mt-3" style="height: 200px;">
-                              <apexchart
-                                v-if="getPortfolioChartData(block.block)"
-                                type="pie"
-                                height="200"
-                                :options="getPortfolioChartOptions(block.block)"
-                                :series="getPortfolioChartData(block.block).series"
-                              />
-                            </div>
-                          </div>
-                          <div class="col-md-7">
-                            <h6>📊 Detailed Token Holdings</h6>
-                            <div v-html="getPortfolioTokenDetails(block.block)"></div>
-                          </div>
-                        </div>
-                      </div>
-                      
-                      <!-- Regular Formatted Block Details -->
-                      <div v-else-if="!showRawJson.includes(block.id)">
-                        <div v-html="getFormattedBlockDetails(block.block)"></div>
-                      </div>
+                      <!-- Formatted Block Details -->
+                      <div v-html="getFormattedBlockDetails(block.block)"></div>
                       
                       <!-- Raw JSON (collapsible) -->
                       <div class="mt-3">
@@ -480,6 +452,7 @@ import TacoTitle from '../components/misc/TacoTitle.vue'
 import { useTacoStore } from '../stores/taco.store'
 import { mapStores } from 'pinia'
 import { Principal } from '@dfinity/principal'
+import ApexCharts from 'apexcharts'
 
 // Import archive actors
 import { createActor as createTradingActor } from '../../../declarations/trading_archive'
@@ -520,7 +493,10 @@ export default {
       blockBrowserPageSize: 10,
       currentBlockStart: 0,
       expandedBlocks: [],
-      showRawJson: []
+      showRawJson: [],
+      
+      // Portfolio Chart
+      portfolioChart: null
     }
   },
   computed: {
@@ -557,6 +533,9 @@ export default {
     if (this.refreshInterval) {
       clearInterval(this.refreshInterval)
     }
+    
+    // Clean up portfolio charts
+    this.cleanupPortfolioCharts()
   },
   methods: {
     // Canister ID functions using actual deployed canister IDs from canister_ids.json
@@ -1000,222 +979,74 @@ export default {
       const index = this.expandedBlocks.indexOf(blockId)
       if (index > -1) {
         this.expandedBlocks.splice(index, 1)
+        // Clean up any charts when collapsing
+        this.cleanupPortfolioCharts()
       } else {
         this.expandedBlocks.push(blockId)
-      }
-    },
-
-    // Check if a block is a portfolio block
-    isPortfolioBlock(blockData) {
-      if (!blockData || typeof blockData !== 'object') return false
-      const parsedData = this.parseICRC3Value(blockData)
-      return parsedData.btype === '3portfolio' || parsedData.tokens
-    },
-
-    // Get portfolio summary HTML (just the table part)
-    getPortfolioSummary(blockData) {
-      const parsedData = this.parseICRC3Value(blockData)
-      
-      const tokenCount = this.extractNatValue(parsedData.token_count) || 0
-      const totalValueIcp = this.formatPortfolioAmount(this.extractBigIntValue(parsedData.total_value_icp))
-      const totalValueUsd = this.extractTextValue(parsedData.total_value_usd) || '0'
-      const reason = this.extractTextValue(parsedData.reason) || 'unknown'
-      
-      // Get paused tokens list
-      let pausedTokensList = 'None'
-      if (parsedData.paused_tokens && Array.isArray(parsedData.paused_tokens) && parsedData.paused_tokens.length > 0) {
-        const pausedNames = parsedData.paused_tokens.map(token => this.formatTokenName(token)).filter(name => name !== 'Unknown')
-        pausedTokensList = pausedNames.length ? pausedNames.join(', ') : 'None'
-      }
-
-      return `
-        <table class="table table-sm table-dark">
-          <tr><td><strong>Total Tokens:</strong></td><td>${tokenCount}</td></tr>
-          <tr><td><strong>Total Value (ICP):</strong></td><td>${totalValueIcp || 'N/A'}</td></tr>
-          <tr><td><strong>Total Value (USD):</strong></td><td>$${totalValueUsd}</td></tr>
-          <tr><td><strong>Snapshot Reason:</strong></td><td><span class="badge ${this.getSnapshotReasonClass(reason)}">${this.formatSnapshotReason(reason)}</span></td></tr>
-          ${pausedTokensList !== 'None' ? `<tr><td><strong>Paused Tokens:</strong></td><td>${pausedTokensList}</td></tr>` : ''}
-        </table>
-      `
-    },
-
-    // Get portfolio token details HTML (just the detailed table part)
-    getPortfolioTokenDetails(blockData) {
-      const parsedData = this.parseICRC3Value(blockData)
-      
-      if (!parsedData.tokens || !Array.isArray(parsedData.tokens)) {
-        return '<p class="text-muted">No token details available</p>'
-      }
-
-      const tokenRows = parsedData.tokens.map(token => {
-        const tokenPrincipal = this.extractTokenPrincipal(token.token)
-        const balance = this.extractBigIntValue(token.balance) || 0
-        const decimals = this.extractNatValue(token.decimals) || 8
-        const priceInICP = this.extractBigIntValue(token.price_in_icp) || 0
-        const priceInUSD = this.extractTextValue(token.price_in_usd) || '0'
-        const valueInICP = this.extractBigIntValue(token.value_in_icp) || 0
-        const valueInUSD = this.extractTextValue(token.value_in_usd) || '0'
-
-        const symbol = this.formatTokenName(tokenPrincipal)
-        const formattedBalance = this.formatAmount(balance, decimals)
-        const formattedPriceICP = this.formatPortfolioAmount(priceInICP)
-        const formattedValueICP = this.formatPortfolioAmount(valueInICP)
-
-        return `
-          <tr>
-            <td><strong>${symbol}</strong></td>
-            <td>${formattedBalance}</td>
-            <td>
-              ${formattedPriceICP} ICP<br/>
-              <small class="text-muted">$${priceInUSD}</small>
-            </td>
-            <td>
-              ${formattedValueICP} ICP<br/>
-              <small class="text-muted">$${valueInUSD}</small>
-            </td>
-          </tr>
-        `
-      }).join('')
-
-      return `
-        <table class="table table-sm table-dark table-striped">
-          <thead>
-            <tr>
-              <th>Token</th>
-              <th>Balance</th>
-              <th>Price</th>
-              <th>Value</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${tokenRows}
-          </tbody>
-        </table>
-      `
-    },
-
-    // Get chart data for portfolio block
-    getPortfolioChartData(blockData) {
-      const parsedData = this.parseICRC3Value(blockData)
-      
-      if (!parsedData.tokens || !Array.isArray(parsedData.tokens)) {
-        return null
-      }
-
-      // Extract and process token data
-      const tokenData = parsedData.tokens.map(token => {
-        const tokenPrincipal = this.extractTokenPrincipal(token.token)
-        const valueInICP = this.extractBigIntValue(token.value_in_icp) || 0
-        const symbol = this.formatTokenName(tokenPrincipal)
         
-        return {
-          symbol: symbol,
-          valueICP: Number(valueInICP),
-          principal: tokenPrincipal
-        }
-      }).filter(token => token.valueICP > 0 && token.symbol !== 'Unknown')
-
-      if (tokenData.length === 0) {
-        return null
+        // Wait for DOM update, then check if we need to render a portfolio chart
+        this.$nextTick(() => {
+          this.renderPortfolioChartsIfNeeded()
+        })
       }
-
-      // Calculate total value for percentages
-      const totalValue = tokenData.reduce((sum, token) => sum + token.valueICP, 0)
-
-      // Create chart series
-      const series = tokenData.map(token => {
-        const percentage = (token.valueICP / totalValue) * 100
-        return Number(percentage.toFixed(2))
-      })
-
-      return { series, tokenData }
     },
 
-    // Get chart options for portfolio block
-    getPortfolioChartOptions(blockData) {
-      const chartData = this.getPortfolioChartData(blockData)
-      if (!chartData) return {}
-
-      const labels = chartData.tokenData.map(token => token.symbol.toUpperCase())
-
-      // Create colors array based on token symbols
-      const colors = chartData.tokenData.map(token => {
-        const colorMap = {
-          'ICP': '#3b00b9',
-          'CKBTC': '#f7931a', 
-          'DKP': '#00d4ff',
-          'EXE': '#ff6b35',
-          'MOTOKO': '#ff0040',
-          'SGLDT': '#ffd700',
-          'SNEED': '#32cd32'
-        }
-        return colorMap[token.symbol.toUpperCase()] || this.generateColorFromString(token.symbol)
-      })
-
-      return {
-        chart: {
-          type: 'pie',
-          animations: {
-            enabled: true,
-            easing: 'easeout',
-            speed: 350,
-          },
-          fontFamily: 'Space Mono',
-        },
-        labels: labels,
-        colors: colors,
-        plotOptions: {
-          pie: {
-            startAngle: -90,
-            endAngle: 90,
-            customScale: 1,
-            expandOnClick: false,
-          },
-        },
-        dataLabels: {
-          enabled: true,
-          formatter: function (val, opts) {
-            return labels[opts.seriesIndex] + ' ' + val.toFixed(1) + '%'
-          },
-          style: {
-            fontSize: '12px',
-            fontFamily: 'Space Mono',
-            fontWeight: 'bold',
-            colors: ['#fff']
-          },
-          background: {
-            enabled: true,
-            foreColor: '#fff',
-            padding: 2,
-            borderRadius: 2,
-            borderWidth: 1,
-            borderColor: '#fff',
-            opacity: 0.9,
-          }
-        },
-        legend: { 
-          show: false 
-        },
-        stroke: { 
-          show: false 
-        },
-        tooltip: {
-          enabled: true,
-          style: {
-            fontSize: '12px',
-            fontFamily: 'Space Mono',
-          },
-          custom: ({ series, seriesIndex }) => {
-            const val = series[seriesIndex]
-            const symbol = labels[seriesIndex]
-            const valueICP = (chartData.tokenData[seriesIndex].valueICP / 100_000_000).toFixed(3)
-            return `<div class="chart-tooltip">
-              <strong>${symbol}</strong><br/>
-              ${val.toFixed(1)}% (${valueICP} ICP)
-            </div>`
-          }
-        }
+    // Clean up portfolio charts
+    cleanupPortfolioCharts() {
+      if (this.portfolioChart) {
+        this.portfolioChart.destroy()
+        this.portfolioChart = null
       }
+      
+      // Also clean up any orphaned charts
+      const chartContainers = document.querySelectorAll('.portfolio-chart')
+      chartContainers.forEach(container => {
+        if (container.innerHTML) {
+          container.innerHTML = '' // Clear any remaining chart content
+        }
+      })
+    },
+
+    // Render portfolio charts for any visible portfolio blocks
+    renderPortfolioChartsIfNeeded() {
+      // Wait a bit to ensure all DOM updates are complete
+      setTimeout(() => {
+        // Find all portfolio chart containers
+        const chartContainers = document.querySelectorAll('.portfolio-chart')
+        
+        chartContainers.forEach((container, index) => {
+          if (container.children.length === 0) { // Only render if empty
+            // Get or create a unique ID for this container
+            let chartId = container.id
+            if (!chartId) {
+              chartId = container.dataset.chartId || `portfolio-chart-${index}-${Date.now()}`
+              container.id = chartId
+            }
+            
+            // Find the block data by traversing up to the block container
+            const blockElement = container.closest('.block-detail-content, .expanded-content')
+            if (blockElement) {
+              // Get the block index from the expanded block
+              const blockCards = document.querySelectorAll('.card')
+              const blockCard = container.closest('.card')
+              const blockIndex = Array.from(blockCards).indexOf(blockCard)
+              
+              if (blockIndex >= 0 && this.blockBrowserBlocks[blockIndex]) {
+                const parsedData = this.parseICRC3Value(this.blockBrowserBlocks[blockIndex].block)
+                
+                if (parsedData.tokens || parsedData.btype === '3portfolio') {
+                  const chartData = this.preparePortfolioChartData(parsedData.tokens)
+                  
+                  if (chartData) {
+                    console.log('=== Rendering portfolio chart ===', chartId, chartData)
+                    this.renderPortfolioChart(chartData, chartId)
+                  }
+                }
+              }
+            }
+          }
+        })
+      }, 100) // Small delay to ensure DOM is ready
     },
 
     toggleRawJson(blockId) {
@@ -1357,6 +1188,107 @@ export default {
         `
       }
 
+      // Portfolio block details
+      if (parsedData.btype === '3portfolio' || parsedData.portfolioSnapshot || parsedData.total_value_icp || parsedData.token_count || parsedData.tokens) {
+        console.log('=== Processing detailed portfolio block ===', parsedData)
+        
+        // Extract comprehensive portfolio data
+        const tokenCount = parsedData.token_count || parsedData.tokens?.length || 0
+        const totalValueIcp = this.formatPortfolioAmount(parsedData.total_value_icp)
+        const totalValueUsd = parsedData.total_value_usd || 'N/A'
+        const reason = parsedData.reason || 'Unknown'
+        
+        // Process detailed token information
+        let tokenDetailsHtml = 'No detailed token information available'
+        if (parsedData.tokens && Array.isArray(parsedData.tokens)) {
+          console.log('=== Processing detailed tokens ===', parsedData.tokens)
+          
+          const tokenRows = parsedData.tokens.map(token => {
+            console.log('=== Processing individual token ===', token)
+            
+            // Extract detailed token data from ICRC3 Map structure
+            const tokenPrincipal = this.extractTokenPrincipal(token.token)
+            const balance = this.extractBigIntValue(token.balance) || 0
+            const decimals = this.extractNatValue(token.decimals) || 8
+            const priceInICP = this.extractBigIntValue(token.price_in_icp) || 0
+            const priceInUSD = this.extractTextValue(token.price_in_usd) || '0'
+            const valueInICP = this.extractBigIntValue(token.value_in_icp) || 0
+            const valueInUSD = this.extractTextValue(token.value_in_usd) || '0'
+            
+            console.log('=== Extracted token data ===', {
+              tokenPrincipal, balance, decimals, priceInICP, priceInUSD, valueInICP, valueInUSD
+            })
+            
+            // Get token symbol (fallback to truncated principal)
+            const tokenSymbol = this.formatTokenName(tokenPrincipal)
+            
+            // Format balance with proper decimals
+            const formattedBalance = this.formatAmount(balance, { decimals: decimals })
+            const formattedPriceICP = this.formatPortfolioAmount(priceInICP)
+            const formattedValueICP = this.formatPortfolioAmount(valueInICP)
+            
+            return `
+              <tr>
+                <td><strong>${tokenSymbol}</strong></td>
+                <td>${formattedBalance}</td>
+                <td>${formattedPriceICP} ICP<br/><small class="text-muted">$${priceInUSD}</small></td>
+                <td>${formattedValueICP} ICP<br/><small class="text-muted">$${valueInUSD}</small></td>
+              </tr>
+            `
+          }).join('')
+          
+          tokenDetailsHtml = `
+            <table class="table table-sm table-dark table-striped">
+              <thead>
+                <tr>
+                  <th>Token</th>
+                  <th>Balance</th>
+                  <th>Price</th>
+                  <th>Value</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${tokenRows}
+              </tbody>
+            </table>
+          `
+        }
+        
+        // Format paused tokens (these are still just Principal IDs)
+        let pausedTokensList = 'None'
+        if (parsedData.paused_tokens && Array.isArray(parsedData.paused_tokens) && parsedData.paused_tokens.length > 0) {
+          const pausedNames = parsedData.paused_tokens.map(token => this.formatTokenName(token)).filter(name => name !== 'Unknown')
+          pausedTokensList = pausedNames.length ? pausedNames.join(', ') : 'None'
+        }
+        
+        // Prepare chart data for the half-pie
+        const chartData = this.preparePortfolioChartData(parsedData.tokens)
+        
+        return `
+          <div class="row">
+            <div class="col-md-5">
+              <h6>💼 Portfolio Summary</h6>
+              <table class="table table-sm table-dark">
+                <tr><td><strong>Total Tokens:</strong></td><td>${tokenCount}</td></tr>
+                <tr><td><strong>Total Value (ICP):</strong></td><td>${totalValueIcp || 'N/A'}</td></tr>
+                <tr><td><strong>Total Value (USD):</strong></td><td>$${totalValueUsd}</td></tr>
+                <tr><td><strong>Snapshot Reason:</strong></td><td><span class="badge ${this.getSnapshotReasonClass(reason)}">${this.formatSnapshotReason(reason)}</span></td></tr>
+                ${pausedTokensList !== 'None' ? `<tr><td><strong>Paused Tokens:</strong></td><td>${pausedTokensList}</td></tr>` : ''}
+              </table>
+              
+              <!-- Half-pie chart container -->
+              <div class="portfolio-chart-container mt-3" style="height: 200px;">
+                <div class="portfolio-chart" data-chart-id="portfolio-chart-${Math.random().toString(36).substr(2, 9)}"></div>
+              </div>
+            </div>
+            <div class="col-md-7">
+              <h6>📊 Detailed Token Holdings</h6>
+              ${tokenDetailsHtml}
+            </div>
+          </div>
+        `
+      }
+
       // Price block details
       if (parsedData.btype === '3price' || parsedData.priceHistory) {
         const token = parsedData.token || 'Unknown Token'
@@ -1378,9 +1310,13 @@ export default {
         <div>
           <h6>📄 Data Block</h6>
           <table class="table table-sm table-dark">
-            ${keys.slice(0, 5).map(key => 
-              `<tr><td><strong>${key}:</strong></td><td>${JSON.stringify(parsedData[key]).slice(0, 50)}${JSON.stringify(parsedData[key]).length > 50 ? '...' : ''}</td></tr>`
-            ).join('')}
+            ${keys.slice(0, 5).map(key => {
+              // Use BigInt-safe JSON.stringify with replacer function
+              const jsonStr = JSON.stringify(parsedData[key], (key, value) => 
+                typeof value === 'bigint' ? value.toString() : value
+              );
+              return `<tr><td><strong>${key}:</strong></td><td>${jsonStr.slice(0, 50)}${jsonStr.length > 50 ? '...' : ''}</td></tr>`;
+            }).join('')}
             ${keys.length > 5 ? `<tr><td colspan="2"><em>... and ${keys.length - 5} more fields</em></td></tr>` : ''}
           </table>
         </div>
@@ -1985,6 +1921,65 @@ export default {
       return tokenBlob
     },
 
+    // Prepare portfolio chart data for half-pie visualization
+    preparePortfolioChartData(tokens) {
+      if (!tokens || !Array.isArray(tokens)) {
+        return null
+      }
+
+      console.log('=== Preparing chart data for tokens ===', tokens)
+
+      // Extract and process token data
+      const tokenData = tokens.map(token => {
+        const tokenPrincipal = this.extractTokenPrincipal(token.token)
+        const valueInICP = this.extractBigIntValue(token.value_in_icp) || 0
+        const symbol = this.formatTokenName(tokenPrincipal)
+        
+        return {
+          symbol: symbol,
+          valueICP: Number(valueInICP),
+          principal: tokenPrincipal
+        }
+      }).filter(token => token.valueICP > 0 && token.symbol !== 'Unknown')
+
+      if (tokenData.length === 0) {
+        return null
+      }
+
+      // Calculate total value for percentages
+      const totalValue = tokenData.reduce((sum, token) => sum + token.valueICP, 0)
+
+      // Create chart series and labels
+      const series = tokenData.map(token => {
+        const percentage = (token.valueICP / totalValue) * 100
+        return Number(percentage.toFixed(2))
+      })
+
+      const labels = tokenData.map(token => token.symbol.toUpperCase())
+
+      // Create colors array based on token symbols
+      const colors = tokenData.map(token => {
+        // Define colors for common tokens - you can expand this
+        const colorMap = {
+          'ICP': '#3b00b9',
+          'CKBTC': '#f7931a', 
+          'DKP': '#00d4ff',
+          'EXE': '#ff6b35',
+          'MOTOKO': '#ff0040',
+          'SGLDT': '#ffd700',
+          'SNEED': '#32cd32'
+        }
+        return colorMap[token.symbol.toUpperCase()] || this.generateColorFromString(token.symbol)
+      })
+
+      return {
+        series,
+        labels,
+        colors,
+        tokenData
+      }
+    },
+
     // Generate a consistent color from a string
     generateColorFromString(str) {
       let hash = 0
@@ -1993,6 +1988,87 @@ export default {
       }
       const hue = hash % 360
       return `hsl(${hue}, 70%, 50%)`
+    },
+
+    // Render portfolio chart using ApexCharts
+    renderPortfolioChart(chartData, containerId) {
+      if (!chartData) return
+
+      // Destroy existing chart if any
+      if (this.portfolioChart) {
+        this.portfolioChart.destroy()
+      }
+
+      const options = {
+        chart: {
+          type: 'pie',
+          height: 200,
+          animations: {
+            enabled: true,
+            easing: 'easeout',
+            speed: 350,
+          },
+          fontFamily: 'Space Mono',
+        },
+        series: chartData.series,
+        labels: chartData.labels,
+        colors: chartData.colors,
+        plotOptions: {
+          pie: {
+            startAngle: -90,
+            endAngle: 90,
+            customScale: 1,
+            expandOnClick: false,
+          },
+        },
+        dataLabels: {
+          enabled: true,
+          formatter: function (val, opts) {
+            return chartData.labels[opts.seriesIndex] + ' ' + val.toFixed(1) + '%'
+          },
+          style: {
+            fontSize: '12px',
+            fontFamily: 'Space Mono',
+            fontWeight: 'bold',
+            colors: ['#fff']
+          },
+          background: {
+            enabled: true,
+            foreColor: '#fff',
+            padding: 2,
+            borderRadius: 2,
+            borderWidth: 1,
+            borderColor: '#fff',
+            opacity: 0.9,
+          }
+        },
+        legend: { 
+          show: false 
+        },
+        stroke: { 
+          show: false 
+        },
+        tooltip: {
+          enabled: true,
+          style: {
+            fontSize: '12px',
+            fontFamily: 'Space Mono',
+          },
+          custom: function({ series, seriesIndex }) {
+            const val = series[seriesIndex]
+            const symbol = chartData.labels[seriesIndex]
+            const valueICP = (chartData.tokenData[seriesIndex].valueICP / 100_000_000).toFixed(3)
+            return `<div class="chart-tooltip">
+              <strong>${symbol}</strong><br/>
+              ${val.toFixed(1)}% (${valueICP} ICP)
+            </div>`
+          }
+        }
+      }
+
+      // Create and render chart
+      this.portfolioChart = new ApexCharts(document.querySelector(`#${containerId}`), options)
+      this.portfolioChart.render()
     },
 
     // Format snapshot reason for better readability
