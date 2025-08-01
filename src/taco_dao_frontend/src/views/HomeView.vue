@@ -185,16 +185,16 @@
 
     <!-- animated background -->
     <ul class="floating-tacos overflow-hidden z0">
-      <li>🌮</li>
-      <li>🌮</li>
-      <li>🌮</li>
-      <li>🌮</li>
-      <li>🌮</li>
-      <li>🌮</li>
-      <li>🌮</li>
-      <li>🌮</li>
-      <li>🌮</li>
-      <li>🌮</li>
+      <li>{{ floatingEmoji1 }}</li>
+      <li>{{ floatingEmoji2 }}</li>
+      <li>{{ floatingEmoji1 }}</li>
+      <li>{{ floatingEmoji2 }}</li>
+      <li>{{ floatingEmoji1 }}</li>
+      <li>{{ floatingEmoji2 }}</li>
+      <li>{{ floatingEmoji1 }}</li>
+      <li>{{ floatingEmoji2 }}</li>
+      <li>{{ floatingEmoji1 }}</li>
+      <li>{{ floatingEmoji2 }}</li>
     </ul> 
 
   </div>
@@ -220,7 +220,6 @@
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  background-color: var(--light-orange-to-dark-brown);
 
   .tacoshell-cs {
     position: relative;
@@ -511,7 +510,7 @@
   // Imports //
   /////////////
 
-  import { ref, onMounted } from "vue";
+  import { ref, onMounted, computed } from "vue";
   import HeaderBar from "../components/HeaderBar.vue";
   import FooterBar from "../components/FooterBar.vue";
 
@@ -521,6 +520,106 @@
 
   // random number between 1 and 3
   const randomInt = ref(0)
+
+  //////////////
+  // Computed //
+  //////////////
+
+  // date based emojis
+  const floatingEmoji1 = computed(() => {
+
+    // get today's date
+    const today = new Date()
+
+    // get the month
+    const month = today.getMonth() + 1
+
+    // get the day
+    const day = today.getDate()
+    
+    // halloween: October 31st
+    if (month === 10 && day === 31) {
+      return '🎃'
+    }
+    
+    // christmas: December 25th
+    if (month === 12 && day === 25) {
+      return '🎅'
+    }
+    
+    // new years: January 1st
+    if (month === 1 && day === 1) {
+      return '🎉'
+    }
+    
+    // valentines day: February 14th
+    if (month === 2 && day === 14) {
+      return '❤️'
+    }
+    
+    // st. patrick's day: March 17th
+    if (month === 3 && day === 17) {
+      return '☘️'
+    }
+    
+    // easter: April 9th (you can adjust this date)
+    if (month === 4 && day === 9) {
+      return '🐰'
+    }
+    
+    // independence day: July 4th
+    if (month === 7 && day === 4) {
+      return '💥'
+    }
+    
+    // default: taco
+    return '🌮'
+
+  })
+  const floatingEmoji2 = computed(() => {
+    const today = new Date()
+    const month = today.getMonth() + 1 // getMonth() returns 0-11
+    const day = today.getDate()
+    
+    // halloween: October 31st
+    if (month === 10 && day === 31) {
+      return '🎃'
+    }
+    
+    // christmas: December 25th
+    if (month === 12 && day === 25) {
+      return '🎄'
+    }
+    
+    // new years: January 1st
+    if (month === 1 && day === 1) {
+      return '🍾'
+    }
+    
+    // valentines day: February 14th
+    if (month === 2 && day === 14) {
+      return '❤️'
+    }
+    
+    // st. patrick's day: March 17th
+    if (month === 3 && day === 17) {
+      return '☘️'
+    }
+    
+    // easter: April 9th (you can adjust this date)
+    if (month === 4 && day === 9) {
+      return '🥚'
+    }
+    
+    // independence day: July 4th
+    if (month === 7 && day === 4) {
+      return '🇺🇸'
+    }
+    
+    // default: taco
+    return '🌮'
+
+  })
 
   ///////////////////
   // Local Methods //
