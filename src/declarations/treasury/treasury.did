@@ -6,19 +6,21 @@ type treasury =
    ///    * changes exceed the specified threshold within the time window.
    ///    *
    ///    * Only callable by admins with appropriate permissions.
-   addPortfolioCircuitBreakerCondition: (text, PortfolioDirection__1,
-    float64, nat, PortfolioValueType__1) -> (Result_11);
+   addPortfolioCircuitBreakerCondition: (name: text, direction:
+    PortfolioDirection, percentage: float64, timeWindowNS: nat, valueType:
+    PortfolioValueType) -> (Result_12);
    /// * Add a new price trigger condition
    ///    *
    ///    * Creates a failsafe rule that will pause tokens when price movements
    ///    * exceed the specified threshold within the time window.
    ///    *
    ///    * Only callable by admins with appropriate permissions.
-   addTriggerCondition: (text, PriceDirection__1, float64, nat,
-    vec principal) -> (Result_10);
+   addTriggerCondition: (name: text, direction: PriceDirection, percentage:
+    float64, timeWindowNS: nat, applicableTokens: vec principal) ->
+    (Result_11);
    admin_executeTradingCycle: () -> (Result_1);
-   admin_recoverPoolBalances: () -> (Result_9);
-   admin_syncWithDao: () -> (Result_9);
+   admin_recoverPoolBalances: () -> (Result_10);
+   admin_syncWithDao: () -> (Result_10);
    /// * Clear all trading pauses (emergency function)
    ///    *
    ///    * Removes all tokens from the trading pause registry.
@@ -41,13 +43,13 @@ type treasury =
                                      }) query;
    /// * Get the last N log entries
    ///    * Only accessible by master admin, controller, or DAO
-   getLogs: (nat) -> (vec LogEntry) query;
+   getLogs: (count: nat) -> (vec LogEntry) query;
    /// * Get the last N log entries for a specific context
    ///    * Only accessible by master admin, controller, or DAO
-   getLogsByContext: (text, nat) -> (vec LogEntry) query;
+   getLogsByContext: (context: text, count: nat) -> (vec LogEntry) query;
    /// * Get the last N log entries for a specific level
    ///    * Only accessible by master admin, controller, or DAO
-   getLogsByLevel: (LogLevel, nat) -> (vec LogEntry) query;
+   getLogsByLevel: (level: LogLevel, count: nat) -> (vec LogEntry) query;
    /// * Get the current maximum portfolio snapshots limit
    ///    * 
    ///    * Returns the current limit for portfolio snapshots storage.
@@ -61,10 +63,10 @@ type treasury =
    /// * Get the current paused token threshold for circuit breaker
    getPausedTokenThresholdForCircuitBreaker: () -> (nat) query;
    /// * Get a specific portfolio circuit breaker condition
-   getPortfolioCircuitBreakerCondition: (nat) ->
+   getPortfolioCircuitBreakerCondition: (conditionId: nat) ->
     (opt PortfolioCircuitBreakerCondition) query;
    /// * Get portfolio circuit breaker logs
-   getPortfolioCircuitBreakerLogs: (nat, nat) ->
+   getPortfolioCircuitBreakerLogs: (offset: nat, limit: nat) ->
     (record {
        logs: vec PortfolioCircuitBreakerLog;
        totalCount: nat;
@@ -73,12 +75,16 @@ type treasury =
    ///    * 
    ///    * Returns recent portfolio snapshots for analysis and charting.
    ///    * Accessible by authenticated users.
-   getPortfolioHistory: (nat) -> (Result_8) query;
+   getPortfolioHistory: (limit: nat) -> (Result_9) query;
+   /// * Get portfolio history filtered by timestamp (for archive efficiency)
+   ///    * Returns only snapshots newer than the specified timestamp
+   getPortfolioHistorySince: (sinceTimestamp: int, limit: nat) ->
+    (Result_9) query;
    /// * Get price alerts (paginated)
    ///    *
    ///    * Returns recent price alert events that triggered token pausing.
    ///    * Accessible by any user with query access.
-   getPriceAlerts: (nat, nat) ->
+   getPriceAlerts: (offset: nat, limit: nat) ->
     (record {
        alerts: vec PriceAlertLog;
        totalCount: nat;
@@ -87,7 +93,8 @@ type treasury =
    ///    *
    ///    * Returns price alert events for a particular token.
    ///    * Accessible by any user with query access.
-   getPriceAlertsForToken: (principal, nat) -> (vec PriceAlertLog) query;
+   getPriceAlertsForToken: (token: principal, limit: nat) ->
+    (vec PriceAlertLog) query;
    /// * Get skip metrics and breakdown
    ///    * 
    ///    * Returns detailed information about skipped trades including:
@@ -119,12 +126,19 @@ type treasury =
                                  principal;
                                  TokenDetails;
                                }) query;
-   getTokenPriceHistory: (vec principal) -> (Result_7) query;
+   /// * Get token details with price history filtered by timestamp (for archive efficiency)
+   ///    * Returns only price points newer than the specified timestamp per token
+   getTokenDetailsSince: (sinceTimestamp: int) ->
+    (vec record {
+           principal;
+           TokenDetails;
+         }) query;
+   getTokenPriceHistory: (tokens: vec principal) -> (Result_8) query;
    /// * Get trading pause record for a specific token
    ///    *
    ///    * Returns the pause record if the token is paused from trading, null otherwise.
    ///    * Accessible by any user with query access.
-   getTradingPauseInfo: (principal) -> (opt TradingPauseRecord__1) query;
+   getTradingPauseInfo: (token: principal) -> (opt TradingPauseRecord) query;
    /// * Get detailed rebalancing status information
    ///    *
    ///    * Returns:
@@ -134,11 +148,14 @@ type treasury =
    ///    * - Current vs target allocations
    ///    * - Performance metrics
    getTradingStatus: () -> (Result_6) query;
+   /// * Get trading status with trades filtered by timestamp (for archive efficiency)
+   ///    * Returns only trades newer than the specified timestamp
+   getTradingStatusSince: (sinceTimestamp: int) -> (Result_6) query;
    /// * Get a specific trigger condition by ID
    ///    *
    ///    * Returns details of a single failsafe rule.
    ///    * Accessible by any user with query access.
-   getTriggerCondition: (nat) -> (opt TriggerCondition) query;
+   getTriggerCondition: (conditionId: nat) -> (opt TriggerCondition) query;
    /// * List all portfolio circuit breaker conditions
    listPortfolioCircuitBreakerConditions: () ->
     (vec PortfolioCircuitBreakerCondition) query;
@@ -156,7 +173,8 @@ type treasury =
    ///    *
    ///    * Allows admins to pause tokens from trading with a circuit breaker reason.
    ///    * Only callable by admins with appropriate permissions.
-   pauseTokenFromTradingManual: (principal, text) -> (Result_4);
+   pauseTokenFromTradingManual: (token: principal, reason: text) ->
+    (Result_4);
    /// * Process batch transfers from the DAO
    ///    *
    ///    * Handles both immediate and queued transfers of various token types.
@@ -165,38 +183,39 @@ type treasury =
    ///    * tempTransferQueue - Array of transfer instructions
    ///    * Immediate - If true, process immediately and return block IDs
    ///    *
-   receiveTransferTasks: (vec record {
-                                TransferRecipient;
-                                nat;
-                                principal;
-                                nat8;
-                              }, bool) -> (bool,
-    opt vec record {
-              principal;
-              nat64;
-            });
+   receiveTransferTasks: (tempTransferQueue:
+    vec record {
+          TransferRecipient;
+          nat;
+          principal;
+          nat8;
+        }, Immediate: bool) -> (bool, opt vec record {
+                                                principal;
+                                                nat64;
+                                              });
    /// * Remove a portfolio circuit breaker condition
-   removePortfolioCircuitBreakerCondition: (nat) -> (Result_2);
+   removePortfolioCircuitBreakerCondition: (conditionId: nat) -> (Result_2);
    /// * Remove a trigger condition
    ///    *
    ///    * Deletes a failsafe rule permanently.
    ///    * Only callable by admins with appropriate permissions.
-   removeTriggerCondition: (nat) -> (Result);
+   removeTriggerCondition: (conditionId: nat) -> (Result);
    /// * Reset the rebalancing state to initial values
    ///    *
    ///    * Completely resets all metrics, trade history, and timers
    ///    * Only callable by DAO or controller.
    resetRebalanceState: () -> (Result_1);
    /// * Set portfolio circuit breaker condition active/inactive
-   setPortfolioCircuitBreakerConditionActive: (nat, bool) -> (Result_2);
+   setPortfolioCircuitBreakerConditionActive: (conditionId: nat, isActive:
+    bool) -> (Result_2);
    /// * Set test mode (modifies safety parameters)
    ///    * Only callable by DAO.
-   setTest: (bool) -> ();
+   setTest: (a: bool) -> ();
    /// * Activate or deactivate a trigger condition
    ///    *
    ///    * Enables or disables a failsafe rule without deleting it.
    ///    * Only callable by admins with appropriate permissions.
-   setTriggerConditionActive: (nat, bool) -> (Result);
+   setTriggerConditionActive: (conditionId: nat, isActive: bool) -> (Result);
    /// * Start the automatic rebalancing process
    ///    *
    ///    * Initializes the rebalancing engine, which will periodically:
@@ -216,41 +235,45 @@ type treasury =
    ///    * Updates token status from the DAO including:
    ///    * - Active/Inactive status
    ///    * - Paused/Unpaused state
-   syncTokenDetailsFromDAO: (vec record {
-                                   principal;
-                                   TokenDetails;
-                                 }) -> (Result_5);
+   syncTokenDetailsFromDAO: (tokenDetails:
+    vec record {
+          principal;
+          TokenDetails;
+        }) -> (Result_5);
    /// * Manually trigger a portfolio snapshot (admin function)
    takeManualPortfolioSnapshot: () -> (Result_3);
    /// * Manually unpause a token from trading
    ///    *
    ///    * Removes a token from the trading pause registry, allowing it to trade again.
    ///    * Only callable by admins with appropriate permissions.
-   unpauseTokenFromTrading: (principal) -> (Result_4);
+   unpauseTokenFromTrading: (token: principal) -> (Result_4);
    /// * Update the maximum portfolio snapshots limit
    ///    * 
    ///    * Sets the maximum number of portfolio snapshots to store.
    ///    * Older snapshots will be automatically removed when the limit is exceeded.
    ///    * Only callable by admins with appropriate permissions.
-   updateMaxPortfolioSnapshots: (nat) -> (Result_3);
+   updateMaxPortfolioSnapshots: (newLimit: nat) -> (Result_3);
    /// * Update the paused token threshold for circuit breaker
    ///    *
    ///    * Sets the number of paused tokens that will trigger the circuit breaker.
    ///    * Only callable by admins with appropriate permissions.
-   updatePausedTokenThresholdForCircuitBreaker: (nat) -> (Result_2);
+   updatePausedTokenThresholdForCircuitBreaker: (newThreshold: nat) ->
+    (Result_2);
    /// * Update an existing portfolio circuit breaker condition
-   updatePortfolioCircuitBreakerCondition: (nat,
+   updatePortfolioCircuitBreakerCondition: (conditionId: nat, updates:
     PortfolioCircuitBreakerUpdate) -> (Result_2);
    /// * Update the rebalancing configuration parameters
    ///    *
    ///    * Allows adjustment of trading intervals, sizes, and safety limits
    ///    * Only callable by DAO or controller.
-   updateRebalanceConfig: (UpdateConfig, opt bool) -> (Result_1);
+   updateRebalanceConfig: (updates: UpdateConfig, rebalanceStateNew:
+    opt bool) -> (Result_1);
    /// * Update an existing trigger condition
    ///    *
    ///    * Modifies parameters of an existing failsafe rule.
    ///    * Only callable by admins with appropriate permissions.
-   updateTriggerCondition: (nat, TriggerConditionUpdate) -> (Result);
+   updateTriggerCondition: (conditionId: nat, updates:
+    TriggerConditionUpdate) -> (Result);
  };
 type UpdateConfig = 
  record {
@@ -276,18 +299,6 @@ type TriggerPriceData =
    maxPriceInWindow: nat;
    minPriceInWindow: nat;
    windowStartTime: int;
- };
-type TriggerCondition__1 = 
- record {
-   applicableTokens: vec principal;
-   createdAt: int;
-   createdBy: principal;
-   direction: PriceDirection;
-   id: nat;
-   isActive: bool;
-   name: text;
-   percentage: float64;
-   timeWindowNS: nat;
  };
 type TriggerConditionUpdate = 
  record {
@@ -322,13 +333,6 @@ type TradingPausesResponse =
  record {
    pausedTokens: vec TradingPauseRecord;
    totalCount: nat;
- };
-type TradingPauseRecord__1 = 
- record {
-   pausedAt: int;
-   reason: TradingPauseReason;
-   token: principal;
-   tokenSymbol: text;
  };
 type TradingPauseRecord = 
  record {
@@ -420,20 +424,15 @@ type SnapshotReason =
  };
 type Result_9 = 
  variant {
-   err: text;
-   ok: text;
- };
-type Result_8 = 
- variant {
    err: PortfolioSnapshotError;
    ok: PortfolioHistoryResponse;
  };
-type Result_7 = 
+type Result_8 = 
  variant {
    err: text;
    ok: vec record {
              principal;
-             vec PricePoint__1;
+             vec PricePoint;
            };
  };
 type Result_6 = 
@@ -496,15 +495,20 @@ type Result_2 =
    err: PortfolioCircuitBreakerError;
    ok: text;
  };
-type Result_11 = 
+type Result_12 = 
  variant {
    err: PortfolioCircuitBreakerError;
    ok: nat;
  };
-type Result_10 = 
+type Result_11 = 
  variant {
    err: PriceFailsafeError;
    ok: nat;
+ };
+type Result_10 = 
+ variant {
+   err: text;
+   ok: text;
  };
 type Result_1 = 
  variant {
@@ -544,12 +548,6 @@ type RebalanceConfig =
    shortSyncIntervalNS: nat;
    tokenSyncTimeoutNS: nat;
  };
-type PricePoint__1 = 
- record {
-   icpPrice: nat;
-   time: int;
-   usdPrice: float64;
- };
 type PricePoint = 
  record {
    icpPrice: nat;
@@ -566,11 +564,6 @@ type PriceFailsafeError =
    NotAuthorized;
    SystemError: text;
  };
-type PriceDirection__1 = 
- variant {
-   Down;
-   Up;
- };
 type PriceDirection = 
  variant {
    Down;
@@ -583,12 +576,7 @@ type PriceAlertLog =
    timestamp: int;
    token: principal;
    tokenSymbol: text;
-   triggeredCondition: TriggerCondition__1;
- };
-type PortfolioValueType__1 = 
- variant {
-   ICP;
-   USD;
+   triggeredCondition: TriggerCondition;
  };
 type PortfolioValueType = 
  variant {
@@ -623,11 +611,6 @@ type PortfolioHistoryResponse =
    snapshots: vec PortfolioSnapshot;
    totalCount: nat;
  };
-type PortfolioDirection__1 = 
- variant {
-   Down;
-   Up;
- };
 type PortfolioDirection = 
  variant {
    Down;
@@ -648,7 +631,7 @@ type PortfolioCircuitBreakerLog =
    pausedTokens: vec principal;
    portfolioData: PortfolioTriggerData;
    timestamp: int;
-   triggeredCondition: PortfolioCircuitBreakerCondition__1;
+   triggeredCondition: PortfolioCircuitBreakerCondition;
  };
 type PortfolioCircuitBreakerError = 
  variant {
@@ -659,18 +642,6 @@ type PortfolioCircuitBreakerError =
    InvalidTimeWindow;
    NotAuthorized;
    SystemError: text;
- };
-type PortfolioCircuitBreakerCondition__1 = 
- record {
-   createdAt: int;
-   createdBy: principal;
-   direction: PortfolioDirection;
-   id: nat;
-   isActive: bool;
-   name: text;
-   percentage: float64;
-   timeWindowNS: nat;
-   valueType: PortfolioValueType;
  };
 type PortfolioCircuitBreakerCondition = 
  record {

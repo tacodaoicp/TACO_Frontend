@@ -28,17 +28,6 @@ export interface PortfolioCircuitBreakerCondition {
   'valueType' : PortfolioValueType,
   'percentage' : number,
 }
-export interface PortfolioCircuitBreakerCondition__1 {
-  'id' : bigint,
-  'direction' : PortfolioDirection,
-  'timeWindowNS' : bigint,
-  'name' : string,
-  'createdAt' : bigint,
-  'createdBy' : Principal,
-  'isActive' : boolean,
-  'valueType' : PortfolioValueType,
-  'percentage' : number,
-}
 export type PortfolioCircuitBreakerError = { 'InvalidTimeWindow' : null } |
   { 'DuplicateName' : null } |
   { 'SystemError' : string } |
@@ -51,7 +40,7 @@ export interface PortfolioCircuitBreakerLog {
   'portfolioData' : PortfolioTriggerData,
   'timestamp' : bigint,
   'pausedTokens' : Array<Principal>,
-  'triggeredCondition' : PortfolioCircuitBreakerCondition__1,
+  'triggeredCondition' : PortfolioCircuitBreakerCondition,
 }
 export interface PortfolioCircuitBreakerUpdate {
   'direction' : [] | [PortfolioDirection],
@@ -62,8 +51,6 @@ export interface PortfolioCircuitBreakerUpdate {
   'percentage' : [] | [number],
 }
 export type PortfolioDirection = { 'Up' : null } |
-  { 'Down' : null };
-export type PortfolioDirection__1 = { 'Up' : null } |
   { 'Down' : null };
 export interface PortfolioHistoryResponse {
   'totalCount' : bigint,
@@ -89,19 +76,15 @@ export interface PortfolioTriggerData {
 }
 export type PortfolioValueType = { 'ICP' : null } |
   { 'USD' : null };
-export type PortfolioValueType__1 = { 'ICP' : null } |
-  { 'USD' : null };
 export interface PriceAlertLog {
   'id' : bigint,
   'token' : Principal,
   'tokenSymbol' : string,
   'timestamp' : bigint,
   'priceData' : TriggerPriceData,
-  'triggeredCondition' : TriggerCondition__1,
+  'triggeredCondition' : TriggerCondition,
 }
 export type PriceDirection = { 'Up' : null } |
-  { 'Down' : null };
-export type PriceDirection__1 = { 'Up' : null } |
   { 'Down' : null };
 export type PriceFailsafeError = { 'InvalidTimeWindow' : null } |
   { 'DuplicateName' : null } |
@@ -111,11 +94,6 @@ export type PriceFailsafeError = { 'InvalidTimeWindow' : null } |
   { 'InvalidPercentage' : null } |
   { 'InvalidTokenList' : null };
 export interface PricePoint {
-  'usdPrice' : number,
-  'time' : bigint,
-  'icpPrice' : bigint,
-}
-export interface PricePoint__1 {
   'usdPrice' : number,
   'time' : bigint,
   'icpPrice' : bigint,
@@ -145,9 +123,11 @@ export type Result = { 'ok' : string } |
   { 'err' : PriceFailsafeError };
 export type Result_1 = { 'ok' : string } |
   { 'err' : RebalanceError };
-export type Result_10 = { 'ok' : bigint } |
-  { 'err' : PriceFailsafeError };
+export type Result_10 = { 'ok' : string } |
+  { 'err' : string };
 export type Result_11 = { 'ok' : bigint } |
+  { 'err' : PriceFailsafeError };
+export type Result_12 = { 'ok' : bigint } |
   { 'err' : PortfolioCircuitBreakerError };
 export type Result_2 = { 'ok' : string } |
   { 'err' : PortfolioCircuitBreakerError };
@@ -186,12 +166,10 @@ export type Result_6 = {
     }
   } |
   { 'err' : string };
-export type Result_7 = { 'ok' : Array<[Principal, Array<PricePoint__1>]> } |
+export type Result_8 = { 'ok' : Array<[Principal, Array<PricePoint>]> } |
   { 'err' : string };
-export type Result_8 = { 'ok' : PortfolioHistoryResponse } |
+export type Result_9 = { 'ok' : PortfolioHistoryResponse } |
   { 'err' : PortfolioSnapshotError };
-export type Result_9 = { 'ok' : string } |
-  { 'err' : string };
 export type SnapshotReason = { 'PreTrade' : null } |
   { 'PostTrade' : null } |
   { 'Scheduled' : null } |
@@ -265,12 +243,6 @@ export interface TradingPauseRecord {
   'tokenSymbol' : string,
   'reason' : TradingPauseReason,
 }
-export interface TradingPauseRecord__1 {
-  'pausedAt' : bigint,
-  'token' : Principal,
-  'tokenSymbol' : string,
-  'reason' : TradingPauseReason,
-}
 export interface TradingPausesResponse {
   'totalCount' : bigint,
   'pausedTokens' : Array<TradingPauseRecord>,
@@ -295,17 +267,6 @@ export interface TriggerConditionUpdate {
   'isActive' : [] | [boolean],
   'percentage' : [] | [number],
   'applicableTokens' : [] | [Array<Principal>],
-}
-export interface TriggerCondition__1 {
-  'id' : bigint,
-  'direction' : PriceDirection,
-  'timeWindowNS' : bigint,
-  'name' : string,
-  'createdAt' : bigint,
-  'createdBy' : Principal,
-  'isActive' : boolean,
-  'percentage' : number,
-  'applicableTokens' : Array<Principal>,
 }
 export interface TriggerPriceData {
   'currentPrice' : bigint,
@@ -332,16 +293,16 @@ export interface UpdateConfig {
 }
 export interface treasury {
   'addPortfolioCircuitBreakerCondition' : ActorMethod<
-    [string, PortfolioDirection__1, number, bigint, PortfolioValueType__1],
-    Result_11
+    [string, PortfolioDirection, number, bigint, PortfolioValueType],
+    Result_12
   >,
   'addTriggerCondition' : ActorMethod<
-    [string, PriceDirection__1, number, bigint, Array<Principal>],
-    Result_10
+    [string, PriceDirection, number, bigint, Array<Principal>],
+    Result_11
   >,
   'admin_executeTradingCycle' : ActorMethod<[], Result_1>,
-  'admin_recoverPoolBalances' : ActorMethod<[], Result_9>,
-  'admin_syncWithDao' : ActorMethod<[], Result_9>,
+  'admin_recoverPoolBalances' : ActorMethod<[], Result_10>,
+  'admin_syncWithDao' : ActorMethod<[], Result_10>,
   'clearAllTradingPauses' : ActorMethod<[], Result_4>,
   'clearLogs' : ActorMethod<[], undefined>,
   'clearPortfolioCircuitBreakerLogs' : ActorMethod<[], Result_2>,
@@ -361,7 +322,8 @@ export interface treasury {
     [bigint, bigint],
     { 'logs' : Array<PortfolioCircuitBreakerLog>, 'totalCount' : bigint }
   >,
-  'getPortfolioHistory' : ActorMethod<[bigint], Result_8>,
+  'getPortfolioHistory' : ActorMethod<[bigint], Result_9>,
+  'getPortfolioHistorySince' : ActorMethod<[bigint, bigint], Result_9>,
   'getPriceAlerts' : ActorMethod<
     [bigint, bigint],
     { 'alerts' : Array<PriceAlertLog>, 'totalCount' : bigint }
@@ -386,12 +348,14 @@ export interface treasury {
   >,
   'getSystemParameters' : ActorMethod<[], RebalanceConfig>,
   'getTokenDetails' : ActorMethod<[], Array<[Principal, TokenDetails]>>,
-  'getTokenPriceHistory' : ActorMethod<[Array<Principal>], Result_7>,
-  'getTradingPauseInfo' : ActorMethod<
-    [Principal],
-    [] | [TradingPauseRecord__1]
+  'getTokenDetailsSince' : ActorMethod<
+    [bigint],
+    Array<[Principal, TokenDetails]>
   >,
+  'getTokenPriceHistory' : ActorMethod<[Array<Principal>], Result_8>,
+  'getTradingPauseInfo' : ActorMethod<[Principal], [] | [TradingPauseRecord]>,
   'getTradingStatus' : ActorMethod<[], Result_6>,
+  'getTradingStatusSince' : ActorMethod<[bigint], Result_6>,
   'getTriggerCondition' : ActorMethod<[bigint], [] | [TriggerCondition]>,
   'listPortfolioCircuitBreakerConditions' : ActorMethod<
     [],
