@@ -1151,27 +1151,27 @@ export default {
       }
 
       // Circuit breaker block details
-      if (parsedData.btype === '3circuit' || parsedData.event_type || parsedData.eventType) {
-        console.log('=== Processing detailed circuit breaker block ===', parsedData)
+      if (tradeData.btype === '3circuit' || tradeData.event_type || tradeData.eventType) {
+        console.log('=== Processing detailed circuit breaker block ===', tradeData)
         
-        const eventType = parsedData.event_type || parsedData.eventType || 'Unknown Event'
+        const eventType = tradeData.event_type || tradeData.eventType || 'Unknown Event'
         const eventName = this.formatEventTypeName(eventType)
-        const severity = parsedData.severity || 'Unknown'
-        const thresholdValue = parsedData.threshold_value || 'N/A'
-        const actualValue = parsedData.actual_value || 'N/A'
-        const systemResponse = parsedData.system_response || 'No response recorded'
+        const severity = tradeData.severity || 'Unknown'
+        const thresholdValue = tradeData.threshold_value || 'N/A'
+        const actualValue = tradeData.actual_value || 'N/A'
+        const systemResponse = tradeData.system_response || 'No response recorded'
         
         // Format affected tokens
         let affectedTokens = 'None specified'
-        if (parsedData.tokens_affected && Array.isArray(parsedData.tokens_affected)) {
-          const tokenNames = parsedData.tokens_affected.map(token => this.formatTokenName(token)).filter(name => name !== 'Unknown')
+        if (tradeData.tokens_affected && Array.isArray(tradeData.tokens_affected)) {
+          const tokenNames = tradeData.tokens_affected.map(token => this.formatTokenName(token)).filter(name => name !== 'Unknown')
           affectedTokens = tokenNames.length ? tokenNames.join(', ') : 'None specified'
         }
         
         // Format trigger token
         let triggerToken = 'N/A'
-        if (parsedData.trigger_token) {
-          triggerToken = this.formatTokenName(parsedData.trigger_token)
+        if (tradeData.trigger_token) {
+          triggerToken = this.formatTokenName(tradeData.trigger_token)
         }
         
         return `
@@ -1198,21 +1198,21 @@ export default {
       }
 
       // Portfolio block details
-      if (parsedData.btype === '3portfolio' || parsedData.portfolioSnapshot || parsedData.total_value_icp || parsedData.token_count || parsedData.tokens) {
-        console.log('=== Processing detailed portfolio block ===', parsedData)
+      if (tradeData.btype === '3portfolio' || tradeData.portfolioSnapshot || tradeData.total_value_icp || tradeData.token_count || tradeData.tokens) {
+        console.log('=== Processing detailed portfolio block ===', tradeData)
         
         // Extract comprehensive portfolio data
-        const tokenCount = parsedData.token_count || parsedData.tokens?.length || 0
-        const totalValueIcp = this.formatPortfolioAmount(parsedData.total_value_icp)
-        const totalValueUsd = parsedData.total_value_usd || 'N/A'
-        const reason = parsedData.reason || 'Unknown'
+        const tokenCount = tradeData.token_count || tradeData.tokens?.length || 0
+        const totalValueIcp = this.formatPortfolioAmount(tradeData.total_value_icp)
+        const totalValueUsd = tradeData.total_value_usd || 'N/A'
+        const reason = tradeData.reason || 'Unknown'
         
         // Process detailed token information
         let tokenDetailsHtml = 'No detailed token information available'
-        if (parsedData.tokens && Array.isArray(parsedData.tokens)) {
-          console.log('=== Processing detailed tokens ===', parsedData.tokens)
+        if (tradeData.tokens && Array.isArray(tradeData.tokens)) {
+          console.log('=== Processing detailed tokens ===', tradeData.tokens)
           
-          const tokenRows = parsedData.tokens.map(token => {
+          const tokenRows = tradeData.tokens.map(token => {
             console.log('=== Processing individual token ===', token)
             
             // Extract detailed token data from ICRC3 Map structure
@@ -1299,9 +1299,9 @@ export default {
       }
 
       // Price block details
-      if (parsedData.btype === '3price' || parsedData.priceHistory) {
-        const token = parsedData.token || 'Unknown Token'
-        const price = parsedData.price || parsedData.priceHistory?.currentPrice || 'Unknown'
+      if (tradeData.btype === '3price' || tradeData.priceHistory) {
+        const token = tradeData.token || 'Unknown Token'
+        const price = tradeData.price || tradeData.priceHistory?.currentPrice || 'Unknown'
         return `
           <div>
             <h6>💲 Price Update</h6>
@@ -1423,19 +1423,19 @@ export default {
       }
       
       // Circuit breaker block
-      if (parsedData.btype === '3circuit' || parsedData.event_type || parsedData.eventType || parsedData.tokensAffected) {
-        console.log('=== Processing circuit breaker block ===', parsedData)
+      if (tradeData.btype === '3circuit' || tradeData.event_type || tradeData.eventType || tradeData.tokensAffected) {
+        console.log('=== Processing circuit breaker block ===', tradeData)
         
-        const eventType = parsedData.event_type || parsedData.eventType || 'Unknown Event'
+        const eventType = tradeData.event_type || tradeData.eventType || 'Unknown Event'
         const eventName = this.formatEventTypeName(eventType)
-        const severity = parsedData.severity || ''
-        const thresholdValue = parsedData.threshold_value || ''
-        const actualValue = parsedData.actual_value || ''
+        const severity = tradeData.severity || ''
+        const thresholdValue = tradeData.threshold_value || ''
+        const actualValue = tradeData.actual_value || ''
         
         // Format affected tokens
         let tokensInfo = ''
-        if (parsedData.tokens_affected && Array.isArray(parsedData.tokens_affected)) {
-          const tokenNames = parsedData.tokens_affected.map(token => this.formatTokenName(token)).filter(name => name !== 'Unknown')
+        if (tradeData.tokens_affected && Array.isArray(tradeData.tokens_affected)) {
+          const tokenNames = tradeData.tokens_affected.map(token => this.formatTokenName(token)).filter(name => name !== 'Unknown')
           tokensInfo = tokenNames.length ? ` affecting ${tokenNames.join(', ')}` : ''
         }
         
@@ -1451,22 +1451,22 @@ export default {
       }
       
       // Portfolio block
-      if (parsedData.btype === '3portfolio' || parsedData.portfolioSnapshot || parsedData.totalValue || parsedData.total_value_icp || parsedData.token_count || parsedData.tokens) {
-        console.log('=== Processing portfolio block ===', parsedData)
+      if (tradeData.btype === '3portfolio' || tradeData.portfolioSnapshot || tradeData.totalValue || tradeData.total_value_icp || tradeData.token_count || tradeData.tokens) {
+        console.log('=== Processing portfolio block ===', tradeData)
         
         // Extract portfolio data
-        const tokenCount = parsedData.token_count || parsedData.tokens?.length || 0
-        const totalValueIcp = this.formatPortfolioAmount(parsedData.total_value_icp)
-        const totalValueUsd = parsedData.total_value_usd || parsedData.portfolioSnapshot?.totalValueUsd
-        const reason = parsedData.reason || 'unknown'
+        const tokenCount = tradeData.token_count || tradeData.tokens?.length || 0
+        const totalValueIcp = this.formatPortfolioAmount(tradeData.total_value_icp)
+        const totalValueUsd = tradeData.total_value_usd || tradeData.portfolioSnapshot?.totalValueUsd
+        const reason = tradeData.reason || 'unknown'
         
         // Format token information - now using detailed tokens data
         let tokensInfo = ''
-        if (parsedData.tokens && Array.isArray(parsedData.tokens)) {
-          console.log('=== Processing tokens for summary ===', parsedData.tokens)
+        if (tradeData.tokens && Array.isArray(tradeData.tokens)) {
+          console.log('=== Processing tokens for summary ===', tradeData.tokens)
           
           // Get top tokens by value for summary
-          const topTokens = parsedData.tokens
+          const topTokens = tradeData.tokens
             .map(token => {
               // Extract data from ICRC3 Map structure
               const tokenPrincipal = this.extractTokenPrincipal(token.token)
@@ -1506,9 +1506,9 @@ export default {
       }
       
       // Price block
-      if (parsedData.btype === '3price' || parsedData.priceHistory || parsedData.price) {
-        const token = parsedData.token || 'Unknown Token'
-        const price = parsedData.price || parsedData.priceHistory?.currentPrice || 'Unknown'
+      if (tradeData.btype === '3price' || tradeData.priceHistory || tradeData.price) {
+        const token = tradeData.token || 'Unknown Token'
+        const price = tradeData.price || tradeData.priceHistory?.currentPrice || 'Unknown'
         return `💲 Price: ${token} = ${price}`
       }
       
