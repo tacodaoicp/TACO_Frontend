@@ -350,6 +350,7 @@
                 <div 
                   v-for="block in blockBrowserBlocks" 
                   :key="block.id"
+                  :data-block-id="block.id"
                   class="block-entry border border-secondary rounded p-3 mb-3"
                 >
                   <!-- Block Header -->
@@ -495,8 +496,8 @@ export default {
       expandedBlocks: [],
       showRawJson: [],
       
-      // Portfolio Chart
-      portfolioChart: null
+      // Portfolio Charts - store multiple instances by ID
+      portfolioCharts: new Map()
     }
   },
   computed: {
@@ -979,8 +980,8 @@ export default {
       const index = this.expandedBlocks.indexOf(blockId)
       if (index > -1) {
         this.expandedBlocks.splice(index, 1)
-        // Clean up any charts when collapsing
-        this.cleanupPortfolioCharts()
+        // Clean up charts in the collapsed block
+        this.cleanupChartsInBlock(blockId)
       } else {
         this.expandedBlocks.push(blockId)
         
@@ -991,12 +992,32 @@ export default {
       }
     },
 
-    // Clean up portfolio charts
-    cleanupPortfolioCharts() {
-      if (this.portfolioChart) {
-        this.portfolioChart.destroy()
-        this.portfolioChart = null
+    // Clean up charts in a specific block
+    cleanupChartsInBlock(blockId) {
+      // Find charts within the collapsed block and destroy them
+      const blockElement = document.querySelector(`[data-block-id="${blockId}"]`)
+      if (blockElement) {
+        const chartContainers = blockElement.querySelectorAll('.portfolio-chart')
+        chartContainers.forEach(container => {
+          const chartId = container.id
+          if (chartId && this.portfolioCharts.has(chartId)) {
+            console.log('=== Destroying chart in collapsed block ===', chartId)
+            this.portfolioCharts.get(chartId).destroy()
+            this.portfolioCharts.delete(chartId)
+          }
+          container.innerHTML = '' // Clear container
+        })
       }
+    },
+
+    // Clean up all portfolio charts
+    cleanupPortfolioCharts() {
+      // Destroy all chart instances
+      this.portfolioCharts.forEach((chart, chartId) => {
+        console.log('=== Destroying chart ===', chartId)
+        chart.destroy()
+      })
+      this.portfolioCharts.clear()
       
       // Also clean up any orphaned charts
       const chartContainers = document.querySelectorAll('.portfolio-chart')
@@ -1015,16 +1036,14 @@ export default {
       setTimeout(() => {
         // Process pending charts first
         if (window.pendingPortfolioCharts && window.pendingPortfolioCharts.length > 0) {
-          console.log('=== Processing pending charts ===', window.pendingPortfolioCharts)
+          console.log('=== Processing', window.pendingPortfolioCharts.length, 'pending charts ===')
           
           window.pendingPortfolioCharts.forEach(({ chartId, chartData }) => {
-            console.log('=== Rendering pending chart ===', chartId)
             const container = document.querySelector(`#${chartId}`)
             if (container) {
-              console.log('=== Found container for pending chart ===', container)
               this.renderPortfolioChart(chartData, chartId)
             } else {
-              console.log('=== Container not found for pending chart ===', chartId)
+              console.warn('=== Chart container not found ===', chartId)
             }
           })
           
@@ -1034,25 +1053,16 @@ export default {
         
         // Also check for any chart containers without charts (fallback)
         const chartContainers = document.querySelectorAll('.portfolio-chart')
-        console.log('=== Found chart containers ===', chartContainers.length, chartContainers)
         
         chartContainers.forEach((container, index) => {
-          console.log('=== Processing chart container ===', { 
-            container, 
-            index, 
-            hasChildren: container.children.length > 0,
-            childrenCount: container.children.length 
-          })
-          
           if (container.children.length === 0) { // Only render if empty
             // Get or create a unique ID for this container
             let chartId = container.id
             if (!chartId) {
               chartId = container.dataset.chartId || `portfolio-chart-${index}-${Date.now()}`
               container.id = chartId
+              console.log('=== Creating fallback chart ID ===', chartId)
             }
-            
-            console.log('=== Chart container ready for rendering ===', { chartId, container })
             
             // Find the block data by traversing up to the block container
             const blockElement = container.closest('.block-detail-content, .expanded-content')
@@ -1072,21 +1082,12 @@ export default {
                 }
                 
                 if (blockDataToProcess.tokens || blockDataToProcess.btype === '3portfolio') {
-                  console.log('=== Found portfolio block, preparing chart data ===', blockDataToProcess.tokens)
                   const chartData = this.preparePortfolioChartData(blockDataToProcess.tokens)
-                  console.log('=== Chart data prepared in renderIfNeeded ===', chartData)
                   
                   if (chartData) {
-                    console.log('=== Rendering portfolio chart ===', chartId, chartData)
+                    console.log('=== Rendering fallback chart ===', chartId)
                     this.renderPortfolioChart(chartData, chartId)
-                  } else {
-                    console.log('=== Chart data is null, not rendering chart ===')
                   }
-                } else {
-                  console.log('=== Not a portfolio block or no tokens ===', { 
-                    hasTokens: !!blockDataToProcess.tokens, 
-                    btype: blockDataToProcess.btype 
-                  })
                 }
               }
             }
@@ -1322,14 +1323,13 @@ export default {
         
         // Generate unique chart ID
         const chartId = `portfolio-chart-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`
-        console.log('=== Generated chart ID ===', chartId)
         
         // Store chart info for rendering after DOM is ready
         if (chartData) {
           // Store this for the chart rendering system
           window.pendingPortfolioCharts = window.pendingPortfolioCharts || []
           window.pendingPortfolioCharts.push({ chartId, chartData })
-          console.log('=== Added to pending charts ===', { chartId, chartData })
+          console.log('=== Portfolio chart queued ===', chartId)
         }
         
         return `
@@ -2072,16 +2072,16 @@ export default {
 
     // Render portfolio chart using ApexCharts
     renderPortfolioChart(chartData, containerId) {
-      console.log('=== renderPortfolioChart called ===', { chartData, containerId })
-      
       if (!chartData) {
         console.log('=== Chart data is null, not rendering ===')
         return
       }
 
-      // Destroy existing chart if any
-      if (this.portfolioChart) {
-        this.portfolioChart.destroy()
+      // Destroy existing chart with this ID if any
+      if (this.portfolioCharts.has(containerId)) {
+        console.log('=== Destroying existing chart ===', containerId)
+        this.portfolioCharts.get(containerId).destroy()
+        this.portfolioCharts.delete(containerId)
       }
 
       const options = {
@@ -2153,7 +2153,6 @@ export default {
 
       // Create and render chart
       const chartContainer = document.querySelector(`#${containerId}`)
-      console.log('=== Chart container found ===', { containerId, container: chartContainer })
       
       if (!chartContainer) {
         console.error('=== Chart container not found ===', containerId)
@@ -2161,10 +2160,12 @@ export default {
       }
       
       try {
-        console.log('=== Creating ApexCharts instance ===', options)
-        this.portfolioChart = new ApexCharts(chartContainer, options)
-        this.portfolioChart.render()
-        console.log('=== Chart rendered successfully ===')
+        const chart = new ApexCharts(chartContainer, options)
+        chart.render()
+        
+        // Store the chart instance with its unique ID
+        this.portfolioCharts.set(containerId, chart)
+        console.log('✅ Portfolio chart rendered:', containerId, '| Total active charts:', this.portfolioCharts.size)
       } catch (error) {
         console.error('=== Error rendering chart ===', error)
       }
