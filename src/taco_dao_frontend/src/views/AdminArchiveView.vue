@@ -235,12 +235,21 @@
           <!-- Recent Logs -->
           <div class="card bg-dark text-white mb-4">
             <div class="card-header d-flex justify-content-between align-items-center">
-              <h3 class="mb-0">Recent Logs</h3>
+              <div class="d-flex align-items-center">
+                <button 
+                  class="btn btn-sm btn-outline-secondary me-2" 
+                  @click="showRecentLogs = !showRecentLogs"
+                  :title="showRecentLogs ? 'Collapse Recent Logs' : 'Expand Recent Logs'"
+                >
+                  <i :class="showRecentLogs ? 'fas fa-chevron-down' : 'fas fa-chevron-right'"></i>
+                </button>
+                <h3 class="mb-0">Recent Logs</h3>
+              </div>
               <button class="btn btn-sm btn-outline-primary" @click="refreshLogs">
                 Refresh Logs
               </button>
             </div>
-            <div class="card-body">
+            <div class="card-body" v-show="showRecentLogs">
               <div v-if="logs.length === 0" class="text-muted text-center">
                 No logs available
               </div>
@@ -474,6 +483,7 @@ export default {
       legacyStatus: null,
       archiveStatus: null,
       logs: [],
+      showRecentLogs: false, // Default to collapsed
       errorMessage: '',
       successMessage: '',
       showConfigModal: false,
