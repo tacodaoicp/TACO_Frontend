@@ -1137,7 +1137,7 @@ export default {
         const amountSold = this.formatAmount(tradeData.amount_sold, tradeData.token_sold)
         const amountBought = this.formatAmount(tradeData.amount_bought, tradeData.token_bought)
         const exchange = tradeData.exchange || 'Unknown Exchange'
-        const slippage = tradeData.slippage ? `${(parseFloat(tradeData.slippage) * 100).toFixed(4)}%` : '0%'
+        const slippage = tradeData.slippage ? `${parseFloat(tradeData.slippage).toFixed(4)}%` : '0%'
         const fee = this.formatAmount(tradeData.fee || '0')
         const error = tradeData.error || null
 
@@ -1516,7 +1516,7 @@ export default {
         const tokenBought = this.formatTokenName(tradeData.token_bought)
         const amountSold = this.formatAmount(tradeData.amount_sold, tradeData.token_sold)
         const amountBought = this.formatAmount(tradeData.amount_bought, tradeData.token_bought)
-        const slippage = tradeData.slippage ? `${(parseFloat(tradeData.slippage) * 100).toFixed(4)}%` : '0%'
+        const slippage = tradeData.slippage ? `${parseFloat(tradeData.slippage).toFixed(4)}%` : '0%'
         
         // Extract and format timestamp for summary
         const timestamp = tradeData.ts || tradeData.timestamp || Date.now()
