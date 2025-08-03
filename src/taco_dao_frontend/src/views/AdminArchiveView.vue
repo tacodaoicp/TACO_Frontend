@@ -1160,6 +1160,10 @@ export default {
           console.warn('Error calculating exchange rate:', rateError)
         }
 
+        // Extract and format timestamp
+        const timestamp = tradeData.ts || tradeData.timestamp || Date.now()
+        const formattedTime = this.formatTime(Number(timestamp))
+        
         return `
           <div class="row">
             <div class="col-md-6">
@@ -1168,6 +1172,7 @@ export default {
                 <tr><td><strong>Status:</strong></td><td>${success ? '<span class="text-success">✅ Successful</span>' : '<span class="text-danger">❌ Failed</span>'}</td></tr>
                 <tr><td><strong>Exchange:</strong></td><td>${exchange}</td></tr>
                 <tr><td><strong>Trader:</strong></td><td><code>${traderDisplay}</code></td></tr>
+                <tr><td><strong>Executed:</strong></td><td><span class="text-info">🕐 ${formattedTime}</span></td></tr>
                 <tr><td><strong>Slippage:</strong></td><td>${slippage}</td></tr>
                 <tr><td><strong>Fee:</strong></td><td>${fee}</td></tr>
               </table>
@@ -1209,6 +1214,10 @@ export default {
           triggerToken = this.formatTokenName(tradeData.trigger_token)
         }
         
+        // Extract and format timestamp
+        const timestamp = tradeData.ts || tradeData.timestamp || Date.now()
+        const formattedTime = this.formatTime(Number(timestamp))
+        
         return `
           <div class="row">
             <div class="col-md-6">
@@ -1216,6 +1225,7 @@ export default {
               <table class="table table-sm table-dark">
                 <tr><td><strong>Event Type:</strong></td><td>${eventName}</td></tr>
                 <tr><td><strong>Severity:</strong></td><td><span class="badge ${this.getSeverityClass(severity)}">${severity}</span></td></tr>
+                <tr><td><strong>Triggered:</strong></td><td><span class="text-warning">🕐 ${formattedTime}</span></td></tr>
                 <tr><td><strong>Trigger Token:</strong></td><td>${triggerToken}</td></tr>
                 <tr><td><strong>Affected Tokens:</strong></td><td>${affectedTokens}</td></tr>
               </table>
@@ -1324,6 +1334,10 @@ export default {
           })
         }
         
+        // Extract and format timestamp
+        const timestamp = tradeData.ts || tradeData.timestamp || Date.now()
+        const formattedTime = this.formatTime(Number(timestamp))
+        
         return `
           <div class="row">
             <div class="col-md-5">
@@ -1332,6 +1346,7 @@ export default {
                 <tr><td><strong>Total Tokens:</strong></td><td>${tokenCount}</td></tr>
                 <tr><td><strong>Total Value (ICP):</strong></td><td>${totalValueIcp || 'N/A'}</td></tr>
                 <tr><td><strong>Total Value (USD):</strong></td><td>$${totalValueUsd}</td></tr>
+                <tr><td><strong>Snapshot Taken:</strong></td><td><span class="text-success">🕐 ${formattedTime}</span></td></tr>
                 <tr><td><strong>Snapshot Reason:</strong></td><td><span class="badge ${this.getSnapshotReasonClass(reason)}">${this.formatSnapshotReason(reason)}</span></td></tr>
                 ${pausedTokensList !== 'None' ? `<tr><td><strong>Paused Tokens:</strong></td><td>${pausedTokensList}</td></tr>` : ''}
               </table>
@@ -1387,7 +1402,7 @@ export default {
             <div class="col-md-6">
               <h6>📊 Price Details</h6>
               <table class="table table-sm table-dark">
-                <tr><td><strong>Timestamp:</strong></td><td>${this.formatTime(Number(timestamp))}</td></tr>
+                <tr><td><strong>Recorded:</strong></td><td><span class="text-primary">🕐 ${this.formatTime(Number(timestamp))}</span></td></tr>
                 <tr><td><strong>ICP Rate:</strong></td><td class="text-info">${icpUsdRate}</td></tr>
                 <tr><td><strong>Data Source:</strong></td><td>${source === 'NTN' ? '🌐 NTN Network' : source}</td></tr>
                 <tr><td><strong>Block Type:</strong></td><td><span class="badge bg-info">Price Feed</span></td></tr>
@@ -1503,7 +1518,11 @@ export default {
         const amountBought = this.formatAmount(tradeData.amount_bought, tradeData.token_bought)
         const slippage = tradeData.slippage ? `${(parseFloat(tradeData.slippage) * 100).toFixed(4)}%` : '0%'
         
-        return `${success} ${exchange}: ${amountSold} ${tokenSold} → ${amountBought} ${tokenBought} (${slippage} slippage)`
+        // Extract and format timestamp for summary
+        const timestamp = tradeData.ts || tradeData.timestamp || Date.now()
+        const formattedTime = this.formatTime(Number(timestamp))
+        
+        return `${success} ${exchange}: ${amountSold} ${tokenSold} → ${amountBought} ${tokenBought} (${slippage} slippage) • 🕐 ${formattedTime}`
       }
       
       // Circuit breaker block
@@ -1523,6 +1542,10 @@ export default {
           tokensInfo = tokenNames.length ? ` affecting ${tokenNames.join(', ')}` : ''
         }
         
+        // Extract and format timestamp for summary
+        const timestamp = tradeData.ts || tradeData.timestamp || Date.now()
+        const formattedTime = this.formatTime(Number(timestamp))
+        
         // Build summary with key info
         let summary = `🚨 ${eventName}`
         if (severity) summary += ` (${severity})`
@@ -1530,6 +1553,7 @@ export default {
           summary += `: ${actualValue} vs ${thresholdValue} threshold`
         }
         summary += tokensInfo
+        summary += ` • 🕐 ${formattedTime}`
         
         return summary
       }
@@ -1573,6 +1597,10 @@ export default {
           tokensInfo = tokenNames.length ? ` (${tokenNames.slice(0, 3).join(', ')}${tokenNames.length > 3 ? '...' : ''})` : ''
         }
         
+        // Extract and format timestamp for summary
+        const timestamp = tradeData.ts || tradeData.timestamp || Date.now()
+        const formattedTime = this.formatTime(Number(timestamp))
+        
         // Build summary
         let summary = `💼 Portfolio: ${tokenCount} tokens`
         if (totalValueIcp) {
@@ -1585,6 +1613,7 @@ export default {
         if (reason && reason !== 'unknown') {
           summary += ` - ${this.formatSnapshotReason(reason)}`
         }
+        summary += ` • 🕐 ${formattedTime}`
         
         return summary
       }
@@ -1602,7 +1631,11 @@ export default {
         const usdPrice = parseFloat(priceUSD) || 0
         const usdFormatted = usdPrice > 0 ? '$' + usdPrice.toFixed(6) : 'Unknown'
         
-        return `💰 ${tokenSymbol}: ${icpFormatted} ICP (${usdFormatted}) via ${source}`
+        // Extract and format timestamp for summary
+        const timestamp = tradeData.ts || tradeData.timestamp || Date.now()
+        const formattedTime = this.formatTime(Number(timestamp))
+        
+        return `💰 ${tokenSymbol}: ${icpFormatted} ICP (${usdFormatted}) via ${source} • 🕐 ${formattedTime}`
       }
       
       // Generic block
