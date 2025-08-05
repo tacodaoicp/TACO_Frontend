@@ -9,6 +9,14 @@ export type ArchiveError = { 'StorageFull' : null } |
   { 'BlockNotFound' : null } |
   { 'InvalidBlockType' : null } |
   { 'InvalidTimeRange' : null };
+export interface ArchiveStatus {
+  'supportedBlockTypes' : Array<string>,
+  'newestBlock' : [] | [bigint],
+  'storageUsed' : bigint,
+  'oldestBlock' : [] | [bigint],
+  'totalBlocks' : bigint,
+  'lastArchiveTime' : bigint,
+}
 export interface ArchivedBlock {
   'args' : GetBlocksArgs,
   'callback' : [Principal, string],
@@ -16,8 +24,8 @@ export interface ArchivedBlock {
 export interface Block { 'id' : bigint, 'block' : Value }
 export interface BlockType { 'url' : string, 'block_type' : string }
 export interface DAOGovernanceArchive {
-  'archiveNeuronUpdate' : ActorMethod<[NeuronUpdateBlockData], Result_3>,
-  'archiveVotingPowerChange' : ActorMethod<[VotingPowerBlockData], Result_3>,
+  'archiveNeuronUpdate' : ActorMethod<[NeuronUpdateBlockData], Result_4>,
+  'archiveVotingPowerChange' : ActorMethod<[VotingPowerBlockData], Result_4>,
   'getArchiveStats' : ActorMethod<
     [],
     {
@@ -31,6 +39,11 @@ export interface DAOGovernanceArchive {
       'totalVotingPowerGained' : bigint,
     }
   >,
+  'getArchiveStatus' : ActorMethod<[], Result_3>,
+  'getBatchImportStatus' : ActorMethod<
+    [],
+    { 'intervalSeconds' : bigint, 'isRunning' : boolean }
+  >,
   'getGovernanceMetrics' : ActorMethod<
     [],
     {
@@ -40,6 +53,7 @@ export interface DAOGovernanceArchive {
       'totalVotingPowerInSystem' : bigint,
     }
   >,
+  'getLogs' : ActorMethod<[bigint], Array<LogEntry>>,
   'getNeuronUpdatesByNeuron' : ActorMethod<
     [Uint8Array | number[], bigint],
     Result_2
@@ -52,6 +66,12 @@ export interface DAOGovernanceArchive {
   'icrc3_supported_block_types' : ActorMethod<[], Array<BlockType>>,
   'importNeuronUpdates' : ActorMethod<[], Result>,
   'importVotingPowerChanges' : ActorMethod<[], Result>,
+  'resetImportTimestamps' : ActorMethod<[], Result>,
+  'runManualBatchImport' : ActorMethod<[], Result>,
+  'setMaxInnerLoopIterations' : ActorMethod<[bigint], Result>,
+  'startBatchImportSystem' : ActorMethod<[], Result>,
+  'stopAllTimers' : ActorMethod<[], Result>,
+  'stopBatchImportSystem' : ActorMethod<[], Result>,
 }
 export interface DataCertificate {
   'certificate' : Uint8Array | number[],
@@ -67,6 +87,16 @@ export interface GetBlocksResult {
   'blocks' : Array<Block>,
   'archived_blocks' : Array<ArchivedBlock>,
 }
+export interface LogEntry {
+  'component' : string,
+  'context' : string,
+  'level' : LogLevel,
+  'message' : string,
+  'timestamp' : bigint,
+}
+export type LogLevel = { 'INFO' : null } |
+  { 'WARN' : null } |
+  { 'ERROR' : null };
 export interface NeuronUpdateBlockData {
   'id' : bigint,
   'updateType' : NeuronUpdateType,
@@ -90,7 +120,9 @@ export type Result_1 = { 'ok' : Array<VotingPowerBlockData> } |
   { 'err' : ArchiveError };
 export type Result_2 = { 'ok' : Array<NeuronUpdateBlockData> } |
   { 'err' : ArchiveError };
-export type Result_3 = { 'ok' : bigint } |
+export type Result_3 = { 'ok' : ArchiveStatus } |
+  { 'err' : ArchiveError };
+export type Result_4 = { 'ok' : bigint } |
   { 'err' : ArchiveError };
 export interface TimerStatus {
   'innerLoopRunning' : boolean,

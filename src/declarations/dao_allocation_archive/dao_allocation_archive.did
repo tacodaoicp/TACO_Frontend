@@ -30,15 +30,20 @@ type TimerStatus =
    outerLoopRunning: bool;
    outerLoopTotalRuns: nat;
  };
-type Result_3 = 
+type Result_4 = 
  variant {
    err: ArchiveError;
    ok: nat;
  };
-type Result_2 = 
+type Result_3 = 
  variant {
    err: ArchiveError;
    ok: vec AllocationChangeBlockData;
+ };
+type Result_2 = 
+ variant {
+   err: ArchiveError;
+   ok: ArchiveStatus;
  };
 type Result_1 = 
  variant {
@@ -49,6 +54,20 @@ type Result =
  variant {
    err: text;
    ok: text;
+ };
+type LogLevel = 
+ variant {
+   ERROR;
+   INFO;
+   WARN;
+ };
+type LogEntry = 
+ record {
+   component: text;
+   context: text;
+   level: LogLevel;
+   message: text;
+   timestamp: int;
  };
 type GetBlocksResult = 
  record {
@@ -90,12 +109,12 @@ type DataCertificate =
  };
 type DAOAllocationArchive = 
  service {
-   archiveAllocationChange: (change: AllocationChangeBlockData) -> (Result_3);
-   archiveFollowAction: (action: FollowActionBlockData) -> (Result_3);
+   archiveAllocationChange: (change: AllocationChangeBlockData) -> (Result_4);
+   archiveFollowAction: (action: FollowActionBlockData) -> (Result_4);
    getAllocationChangesByToken: (token: principal, limit: nat) ->
-    (Result_2) query;
+    (Result_3) query;
    getAllocationChangesByUser: (user: principal, limit: nat) ->
-    (Result_2) query;
+    (Result_3) query;
    getArchiveStats: () ->
     (record {
        lastImportedAllocationTimestamp: int;
@@ -106,7 +125,14 @@ type DAOAllocationArchive =
        totalFollowCount: nat;
        totalUnfollowCount: nat;
      }) query;
+   getArchiveStatus: () -> (Result_2) query;
+   getBatchImportStatus: () ->
+    (record {
+       intervalSeconds: nat;
+       isRunning: bool;
+     }) query;
    getFollowActionsByUser: (user: principal, limit: nat) -> (Result_1) query;
+   getLogs: (count: nat) -> (vec LogEntry) query;
    getTimerStatus: () -> (TimerStatus) query;
    icrc3_get_archives: (args: GetArchivesArgs) -> (GetArchivesResult) query;
    icrc3_get_blocks: (args: GetBlocksArgs) -> (GetBlocksResult) query;
@@ -114,6 +140,12 @@ type DAOAllocationArchive =
    icrc3_supported_block_types: () -> (vec BlockType) query;
    importAllocationChanges: () -> (Result);
    importFollowActions: () -> (Result);
+   resetImportTimestamps: () -> (Result);
+   runManualBatchImport: () -> (Result);
+   setMaxInnerLoopIterations: (iterations: nat) -> (Result);
+   startBatchImportSystem: () -> (Result);
+   stopAllTimers: () -> (Result);
+   stopBatchImportSystem: () -> (Result);
  };
 type BlockType = 
  record {
@@ -129,6 +161,15 @@ type ArchivedBlock =
  record {
    args: GetBlocksArgs;
    callback: func (GetBlocksArgs) -> (GetBlocksResult) query;
+ };
+type ArchiveStatus = 
+ record {
+   lastArchiveTime: int;
+   newestBlock: opt nat;
+   oldestBlock: opt nat;
+   storageUsed: nat;
+   supportedBlockTypes: vec text;
+   totalBlocks: nat;
  };
 type ArchiveError = 
  variant {

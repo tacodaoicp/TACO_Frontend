@@ -31,7 +31,7 @@ export const idlFactory = ({ IDL }) => {
     'InvalidBlockType' : IDL.Null,
     'InvalidTimeRange' : IDL.Null,
   });
-  const Result_3 = IDL.Variant({ 'ok' : IDL.Nat, 'err' : ArchiveError });
+  const Result_4 = IDL.Variant({ 'ok' : IDL.Nat, 'err' : ArchiveError });
   const FollowActionType = IDL.Variant({
     'Follow' : IDL.Null,
     'Unfollow' : IDL.Null,
@@ -45,13 +45,34 @@ export const idlFactory = ({ IDL }) => {
     'timestamp' : IDL.Int,
     'newFollowCount' : IDL.Nat,
   });
-  const Result_2 = IDL.Variant({
+  const Result_3 = IDL.Variant({
     'ok' : IDL.Vec(AllocationChangeBlockData),
     'err' : ArchiveError,
   });
+  const ArchiveStatus = IDL.Record({
+    'supportedBlockTypes' : IDL.Vec(IDL.Text),
+    'newestBlock' : IDL.Opt(IDL.Nat),
+    'storageUsed' : IDL.Nat,
+    'oldestBlock' : IDL.Opt(IDL.Nat),
+    'totalBlocks' : IDL.Nat,
+    'lastArchiveTime' : IDL.Int,
+  });
+  const Result_2 = IDL.Variant({ 'ok' : ArchiveStatus, 'err' : ArchiveError });
   const Result_1 = IDL.Variant({
     'ok' : IDL.Vec(FollowActionBlockData),
     'err' : ArchiveError,
+  });
+  const LogLevel = IDL.Variant({
+    'INFO' : IDL.Null,
+    'WARN' : IDL.Null,
+    'ERROR' : IDL.Null,
+  });
+  const LogEntry = IDL.Record({
+    'component' : IDL.Text,
+    'context' : IDL.Text,
+    'level' : LogLevel,
+    'message' : IDL.Text,
+    'timestamp' : IDL.Int,
   });
   const TimerStatus = IDL.Record({
     'innerLoopRunning' : IDL.Bool,
@@ -114,18 +135,18 @@ export const idlFactory = ({ IDL }) => {
   const DAOAllocationArchive = IDL.Service({
     'archiveAllocationChange' : IDL.Func(
         [AllocationChangeBlockData],
-        [Result_3],
+        [Result_4],
         [],
       ),
-    'archiveFollowAction' : IDL.Func([FollowActionBlockData], [Result_3], []),
+    'archiveFollowAction' : IDL.Func([FollowActionBlockData], [Result_4], []),
     'getAllocationChangesByToken' : IDL.Func(
         [IDL.Principal, IDL.Nat],
-        [Result_2],
+        [Result_3],
         ['query'],
       ),
     'getAllocationChangesByUser' : IDL.Func(
         [IDL.Principal, IDL.Nat],
-        [Result_2],
+        [Result_3],
         ['query'],
       ),
     'getArchiveStats' : IDL.Func(
@@ -143,11 +164,18 @@ export const idlFactory = ({ IDL }) => {
         ],
         ['query'],
       ),
+    'getArchiveStatus' : IDL.Func([], [Result_2], ['query']),
+    'getBatchImportStatus' : IDL.Func(
+        [],
+        [IDL.Record({ 'intervalSeconds' : IDL.Nat, 'isRunning' : IDL.Bool })],
+        ['query'],
+      ),
     'getFollowActionsByUser' : IDL.Func(
         [IDL.Principal, IDL.Nat],
         [Result_1],
         ['query'],
       ),
+    'getLogs' : IDL.Func([IDL.Nat], [IDL.Vec(LogEntry)], ['query']),
     'getTimerStatus' : IDL.Func([], [TimerStatus], ['query']),
     'icrc3_get_archives' : IDL.Func(
         [GetArchivesArgs],
@@ -171,6 +199,12 @@ export const idlFactory = ({ IDL }) => {
       ),
     'importAllocationChanges' : IDL.Func([], [Result], []),
     'importFollowActions' : IDL.Func([], [Result], []),
+    'resetImportTimestamps' : IDL.Func([], [Result], []),
+    'runManualBatchImport' : IDL.Func([], [Result], []),
+    'setMaxInnerLoopIterations' : IDL.Func([IDL.Nat], [Result], []),
+    'startBatchImportSystem' : IDL.Func([], [Result], []),
+    'stopAllTimers' : IDL.Func([], [Result], []),
+    'stopBatchImportSystem' : IDL.Func([], [Result], []),
   });
   return DAOAllocationArchive;
 };

@@ -25,7 +25,7 @@ export const idlFactory = ({ IDL }) => {
     'InvalidBlockType' : IDL.Null,
     'InvalidTimeRange' : IDL.Null,
   });
-  const Result_3 = IDL.Variant({ 'ok' : IDL.Nat, 'err' : ArchiveError });
+  const Result_4 = IDL.Variant({ 'ok' : IDL.Nat, 'err' : ArchiveError });
   const VotingPowerChangeType = IDL.Variant({
     'SystemUpdate' : IDL.Null,
     'NeuronSnapshot' : IDL.Null,
@@ -43,6 +43,27 @@ export const idlFactory = ({ IDL }) => {
     'timestamp' : IDL.Int,
     'newVotingPower' : IDL.Nat,
     'neurons' : IDL.Vec(NeuronVP),
+  });
+  const ArchiveStatus = IDL.Record({
+    'supportedBlockTypes' : IDL.Vec(IDL.Text),
+    'newestBlock' : IDL.Opt(IDL.Nat),
+    'storageUsed' : IDL.Nat,
+    'oldestBlock' : IDL.Opt(IDL.Nat),
+    'totalBlocks' : IDL.Nat,
+    'lastArchiveTime' : IDL.Int,
+  });
+  const Result_3 = IDL.Variant({ 'ok' : ArchiveStatus, 'err' : ArchiveError });
+  const LogLevel = IDL.Variant({
+    'INFO' : IDL.Null,
+    'WARN' : IDL.Null,
+    'ERROR' : IDL.Null,
+  });
+  const LogEntry = IDL.Record({
+    'component' : IDL.Text,
+    'context' : IDL.Text,
+    'level' : LogLevel,
+    'message' : IDL.Text,
+    'timestamp' : IDL.Int,
   });
   const Result_2 = IDL.Variant({
     'ok' : IDL.Vec(NeuronUpdateBlockData),
@@ -111,10 +132,10 @@ export const idlFactory = ({ IDL }) => {
   const BlockType = IDL.Record({ 'url' : IDL.Text, 'block_type' : IDL.Text });
   const Result = IDL.Variant({ 'ok' : IDL.Text, 'err' : IDL.Text });
   const DAOGovernanceArchive = IDL.Service({
-    'archiveNeuronUpdate' : IDL.Func([NeuronUpdateBlockData], [Result_3], []),
+    'archiveNeuronUpdate' : IDL.Func([NeuronUpdateBlockData], [Result_4], []),
     'archiveVotingPowerChange' : IDL.Func(
         [VotingPowerBlockData],
-        [Result_3],
+        [Result_4],
         [],
       ),
     'getArchiveStats' : IDL.Func(
@@ -133,6 +154,12 @@ export const idlFactory = ({ IDL }) => {
         ],
         ['query'],
       ),
+    'getArchiveStatus' : IDL.Func([], [Result_3], ['query']),
+    'getBatchImportStatus' : IDL.Func(
+        [],
+        [IDL.Record({ 'intervalSeconds' : IDL.Nat, 'isRunning' : IDL.Bool })],
+        ['query'],
+      ),
     'getGovernanceMetrics' : IDL.Func(
         [],
         [
@@ -145,6 +172,7 @@ export const idlFactory = ({ IDL }) => {
         ],
         ['query'],
       ),
+    'getLogs' : IDL.Func([IDL.Nat], [IDL.Vec(LogEntry)], ['query']),
     'getNeuronUpdatesByNeuron' : IDL.Func(
         [IDL.Vec(IDL.Nat8), IDL.Nat],
         [Result_2],
@@ -178,6 +206,12 @@ export const idlFactory = ({ IDL }) => {
       ),
     'importNeuronUpdates' : IDL.Func([], [Result], []),
     'importVotingPowerChanges' : IDL.Func([], [Result], []),
+    'resetImportTimestamps' : IDL.Func([], [Result], []),
+    'runManualBatchImport' : IDL.Func([], [Result], []),
+    'setMaxInnerLoopIterations' : IDL.Func([IDL.Nat], [Result], []),
+    'startBatchImportSystem' : IDL.Func([], [Result], []),
+    'stopAllTimers' : IDL.Func([], [Result], []),
+    'stopBatchImportSystem' : IDL.Func([], [Result], []),
   });
   return DAOGovernanceArchive;
 };

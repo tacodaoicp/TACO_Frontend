@@ -55,20 +55,39 @@ type SystemParameter =
    MaxTotalUpdates: nat;
    SnapshotInterval: nat;
  };
-type Result_2 = 
+type Result_3 = 
  variant {
    err: ArchiveError;
    ok: nat;
  };
-type Result_1 = 
+type Result_2 = 
  variant {
    err: ArchiveError;
    ok: vec AdminActionBlockData;
+ };
+type Result_1 = 
+ variant {
+   err: ArchiveError;
+   ok: ArchiveStatus;
  };
 type Result = 
  variant {
    err: text;
    ok: text;
+ };
+type LogLevel = 
+ variant {
+   ERROR;
+   INFO;
+   WARN;
+ };
+type LogEntry = 
+ record {
+   component: text;
+   context: text;
+   level: LogLevel;
+   message: text;
+   timestamp: int;
  };
 type GetBlocksResult = 
  record {
@@ -95,10 +114,10 @@ type DataCertificate =
  };
 type DAOAdminArchive = 
  service {
-   archiveAdminAction: (adminAction: AdminActionBlockData) -> (Result_2);
-   getAdminActionsByAdmin: (admin: principal, limit: nat) -> (Result_1) query;
+   archiveAdminAction: (adminAction: AdminActionBlockData) -> (Result_3);
+   getAdminActionsByAdmin: (admin: principal, limit: nat) -> (Result_2) query;
    getAdminActionsByCanister: (canister: AdminCanisterSource, limit: 
-    nat) -> (Result_1) query;
+    nat) -> (Result_2) query;
    getArchiveStats: () ->
     (record {
        lastImportedDAOActionId: nat;
@@ -109,6 +128,13 @@ type DAOAdminArchive =
        totalSuccessfulActions: nat;
        totalTreasuryActions: nat;
      }) query;
+   getArchiveStatus: () -> (Result_1) query;
+   getBatchImportStatus: () ->
+    (record {
+       intervalSeconds: nat;
+       isRunning: bool;
+     }) query;
+   getLogs: (count: nat) -> (vec LogEntry) query;
    getTimerStatus: () -> (TimerStatus) query;
    icrc3_get_archives: (args: GetArchivesArgs) -> (GetArchivesResult) query;
    icrc3_get_blocks: (args: GetBlocksArgs) -> (GetBlocksResult) query;
@@ -116,6 +142,12 @@ type DAOAdminArchive =
    icrc3_supported_block_types: () -> (vec BlockType) query;
    importDAOAdminActions: () -> (Result);
    importTreasuryAdminActions: () -> (Result);
+   resetImportTimestamps: () -> (Result);
+   runManualBatchImport: () -> (Result);
+   setMaxInnerLoopIterations: (iterations: nat) -> (Result);
+   startBatchImportSystem: () -> (Result);
+   stopAllTimers: () -> (Result);
+   stopBatchImportSystem: () -> (Result);
  };
 type BlockType = 
  record {
@@ -131,6 +163,15 @@ type ArchivedBlock =
  record {
    args: GetBlocksArgs;
    callback: func (GetBlocksArgs) -> (GetBlocksResult) query;
+ };
+type ArchiveStatus = 
+ record {
+   lastArchiveTime: int;
+   newestBlock: opt nat;
+   oldestBlock: opt nat;
+   storageUsed: nat;
+   supportedBlockTypes: vec text;
+   totalBlocks: nat;
  };
 type ArchiveError = 
  variant {

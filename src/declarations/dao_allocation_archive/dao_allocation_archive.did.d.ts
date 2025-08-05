@@ -27,6 +27,14 @@ export type ArchiveError = { 'StorageFull' : null } |
   { 'BlockNotFound' : null } |
   { 'InvalidBlockType' : null } |
   { 'InvalidTimeRange' : null };
+export interface ArchiveStatus {
+  'supportedBlockTypes' : Array<string>,
+  'newestBlock' : [] | [bigint],
+  'storageUsed' : bigint,
+  'oldestBlock' : [] | [bigint],
+  'totalBlocks' : bigint,
+  'lastArchiveTime' : bigint,
+}
 export interface ArchivedBlock {
   'args' : GetBlocksArgs,
   'callback' : [Principal, string],
@@ -36,11 +44,11 @@ export interface BlockType { 'url' : string, 'block_type' : string }
 export interface DAOAllocationArchive {
   'archiveAllocationChange' : ActorMethod<
     [AllocationChangeBlockData],
-    Result_3
+    Result_4
   >,
-  'archiveFollowAction' : ActorMethod<[FollowActionBlockData], Result_3>,
-  'getAllocationChangesByToken' : ActorMethod<[Principal, bigint], Result_2>,
-  'getAllocationChangesByUser' : ActorMethod<[Principal, bigint], Result_2>,
+  'archiveFollowAction' : ActorMethod<[FollowActionBlockData], Result_4>,
+  'getAllocationChangesByToken' : ActorMethod<[Principal, bigint], Result_3>,
+  'getAllocationChangesByUser' : ActorMethod<[Principal, bigint], Result_3>,
   'getArchiveStats' : ActorMethod<
     [],
     {
@@ -53,7 +61,13 @@ export interface DAOAllocationArchive {
       'lastImportedFollowTimestamp' : bigint,
     }
   >,
+  'getArchiveStatus' : ActorMethod<[], Result_2>,
+  'getBatchImportStatus' : ActorMethod<
+    [],
+    { 'intervalSeconds' : bigint, 'isRunning' : boolean }
+  >,
   'getFollowActionsByUser' : ActorMethod<[Principal, bigint], Result_1>,
+  'getLogs' : ActorMethod<[bigint], Array<LogEntry>>,
   'getTimerStatus' : ActorMethod<[], TimerStatus>,
   'icrc3_get_archives' : ActorMethod<[GetArchivesArgs], GetArchivesResult>,
   'icrc3_get_blocks' : ActorMethod<[GetBlocksArgs], GetBlocksResult>,
@@ -61,6 +75,12 @@ export interface DAOAllocationArchive {
   'icrc3_supported_block_types' : ActorMethod<[], Array<BlockType>>,
   'importAllocationChanges' : ActorMethod<[], Result>,
   'importFollowActions' : ActorMethod<[], Result>,
+  'resetImportTimestamps' : ActorMethod<[], Result>,
+  'runManualBatchImport' : ActorMethod<[], Result>,
+  'setMaxInnerLoopIterations' : ActorMethod<[bigint], Result>,
+  'startBatchImportSystem' : ActorMethod<[], Result>,
+  'stopAllTimers' : ActorMethod<[], Result>,
+  'stopBatchImportSystem' : ActorMethod<[], Result>,
 }
 export interface DataCertificate {
   'certificate' : Uint8Array | number[],
@@ -87,13 +107,25 @@ export interface GetBlocksResult {
   'blocks' : Array<Block>,
   'archived_blocks' : Array<ArchivedBlock>,
 }
+export interface LogEntry {
+  'component' : string,
+  'context' : string,
+  'level' : LogLevel,
+  'message' : string,
+  'timestamp' : bigint,
+}
+export type LogLevel = { 'INFO' : null } |
+  { 'WARN' : null } |
+  { 'ERROR' : null };
 export type Result = { 'ok' : string } |
   { 'err' : string };
 export type Result_1 = { 'ok' : Array<FollowActionBlockData> } |
   { 'err' : ArchiveError };
-export type Result_2 = { 'ok' : Array<AllocationChangeBlockData> } |
+export type Result_2 = { 'ok' : ArchiveStatus } |
   { 'err' : ArchiveError };
-export type Result_3 = { 'ok' : bigint } |
+export type Result_3 = { 'ok' : Array<AllocationChangeBlockData> } |
+  { 'err' : ArchiveError };
+export type Result_4 = { 'ok' : bigint } |
   { 'err' : ArchiveError };
 export interface TimerStatus {
   'innerLoopRunning' : boolean,

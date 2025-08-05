@@ -112,6 +112,14 @@ export type ArchiveError = { 'StorageFull' : null } |
   { 'BlockNotFound' : null } |
   { 'InvalidBlockType' : null } |
   { 'InvalidTimeRange' : null };
+export interface ArchiveStatus {
+  'supportedBlockTypes' : Array<string>,
+  'newestBlock' : [] | [bigint],
+  'storageUsed' : bigint,
+  'oldestBlock' : [] | [bigint],
+  'totalBlocks' : bigint,
+  'lastArchiveTime' : bigint,
+}
 export interface ArchivedBlock {
   'args' : GetBlocksArgs,
   'callback' : [Principal, string],
@@ -119,11 +127,11 @@ export interface ArchivedBlock {
 export interface Block { 'id' : bigint, 'block' : Value }
 export interface BlockType { 'url' : string, 'block_type' : string }
 export interface DAOAdminArchive {
-  'archiveAdminAction' : ActorMethod<[AdminActionBlockData], Result_2>,
-  'getAdminActionsByAdmin' : ActorMethod<[Principal, bigint], Result_1>,
+  'archiveAdminAction' : ActorMethod<[AdminActionBlockData], Result_3>,
+  'getAdminActionsByAdmin' : ActorMethod<[Principal, bigint], Result_2>,
   'getAdminActionsByCanister' : ActorMethod<
     [AdminCanisterSource, bigint],
-    Result_1
+    Result_2
   >,
   'getArchiveStats' : ActorMethod<
     [],
@@ -137,6 +145,12 @@ export interface DAOAdminArchive {
       'totalAdminActions' : bigint,
     }
   >,
+  'getArchiveStatus' : ActorMethod<[], Result_1>,
+  'getBatchImportStatus' : ActorMethod<
+    [],
+    { 'intervalSeconds' : bigint, 'isRunning' : boolean }
+  >,
+  'getLogs' : ActorMethod<[bigint], Array<LogEntry>>,
   'getTimerStatus' : ActorMethod<[], TimerStatus>,
   'icrc3_get_archives' : ActorMethod<[GetArchivesArgs], GetArchivesResult>,
   'icrc3_get_blocks' : ActorMethod<[GetBlocksArgs], GetBlocksResult>,
@@ -144,6 +158,12 @@ export interface DAOAdminArchive {
   'icrc3_supported_block_types' : ActorMethod<[], Array<BlockType>>,
   'importDAOAdminActions' : ActorMethod<[], Result>,
   'importTreasuryAdminActions' : ActorMethod<[], Result>,
+  'resetImportTimestamps' : ActorMethod<[], Result>,
+  'runManualBatchImport' : ActorMethod<[], Result>,
+  'setMaxInnerLoopIterations' : ActorMethod<[bigint], Result>,
+  'startBatchImportSystem' : ActorMethod<[], Result>,
+  'stopAllTimers' : ActorMethod<[], Result>,
+  'stopBatchImportSystem' : ActorMethod<[], Result>,
 }
 export interface DataCertificate {
   'certificate' : Uint8Array | number[],
@@ -159,11 +179,23 @@ export interface GetBlocksResult {
   'blocks' : Array<Block>,
   'archived_blocks' : Array<ArchivedBlock>,
 }
+export interface LogEntry {
+  'component' : string,
+  'context' : string,
+  'level' : LogLevel,
+  'message' : string,
+  'timestamp' : bigint,
+}
+export type LogLevel = { 'INFO' : null } |
+  { 'WARN' : null } |
+  { 'ERROR' : null };
 export type Result = { 'ok' : string } |
   { 'err' : string };
-export type Result_1 = { 'ok' : Array<AdminActionBlockData> } |
+export type Result_1 = { 'ok' : ArchiveStatus } |
   { 'err' : ArchiveError };
-export type Result_2 = { 'ok' : bigint } |
+export type Result_2 = { 'ok' : Array<AdminActionBlockData> } |
+  { 'err' : ArchiveError };
+export type Result_3 = { 'ok' : bigint } |
   { 'err' : ArchiveError };
 export type SystemParameter = { 'MaxFollowers' : bigint } |
   { 'MaxAllocationsPerDay' : bigint } |

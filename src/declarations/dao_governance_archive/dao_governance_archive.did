@@ -46,10 +46,15 @@ type TimerStatus =
    outerLoopRunning: bool;
    outerLoopTotalRuns: nat;
  };
-type Result_3 = 
+type Result_4 = 
  variant {
    err: ArchiveError;
    ok: nat;
+ };
+type Result_3 = 
+ variant {
+   err: ArchiveError;
+   ok: ArchiveStatus;
  };
 type Result_2 = 
  variant {
@@ -88,6 +93,20 @@ type NeuronUpdateBlockData =
    timestamp: int;
    updateType: NeuronUpdateType;
  };
+type LogLevel = 
+ variant {
+   ERROR;
+   INFO;
+   WARN;
+ };
+type LogEntry = 
+ record {
+   component: text;
+   context: text;
+   level: LogLevel;
+   message: text;
+   timestamp: int;
+ };
 type GetBlocksResult = 
  record {
    archived_blocks: vec ArchivedBlock;
@@ -113,8 +132,8 @@ type DataCertificate =
  };
 type DAOGovernanceArchive = 
  service {
-   archiveNeuronUpdate: (update: NeuronUpdateBlockData) -> (Result_3);
-   archiveVotingPowerChange: (change: VotingPowerBlockData) -> (Result_3);
+   archiveNeuronUpdate: (update: NeuronUpdateBlockData) -> (Result_4);
+   archiveVotingPowerChange: (change: VotingPowerBlockData) -> (Result_4);
    getArchiveStats: () ->
     (record {
        activeNeuronCount: nat;
@@ -126,6 +145,12 @@ type DAOGovernanceArchive =
        totalVotingPowerGained: nat;
        totalVotingPowerLost: nat;
      }) query;
+   getArchiveStatus: () -> (Result_3) query;
+   getBatchImportStatus: () ->
+    (record {
+       intervalSeconds: nat;
+       isRunning: bool;
+     }) query;
    getGovernanceMetrics: () ->
     (record {
        activeNeuronCount: nat;
@@ -133,6 +158,7 @@ type DAOGovernanceArchive =
        totalActiveUsers: nat;
        totalVotingPowerInSystem: nat;
      }) query;
+   getLogs: (count: nat) -> (vec LogEntry) query;
    getNeuronUpdatesByNeuron: (neuronId: blob, limit: nat) -> (Result_2) query;
    getTimerStatus: () -> (TimerStatus) query;
    getVotingPowerChangesByUser: (user: principal, limit: nat) ->
@@ -143,6 +169,12 @@ type DAOGovernanceArchive =
    icrc3_supported_block_types: () -> (vec BlockType) query;
    importNeuronUpdates: () -> (Result);
    importVotingPowerChanges: () -> (Result);
+   resetImportTimestamps: () -> (Result);
+   runManualBatchImport: () -> (Result);
+   setMaxInnerLoopIterations: (iterations: nat) -> (Result);
+   startBatchImportSystem: () -> (Result);
+   stopAllTimers: () -> (Result);
+   stopBatchImportSystem: () -> (Result);
  };
 type BlockType = 
  record {
@@ -158,6 +190,15 @@ type ArchivedBlock =
  record {
    args: GetBlocksArgs;
    callback: func (GetBlocksArgs) -> (GetBlocksResult) query;
+ };
+type ArchiveStatus = 
+ record {
+   lastArchiveTime: int;
+   newestBlock: opt nat;
+   oldestBlock: opt nat;
+   storageUsed: nat;
+   supportedBlockTypes: vec text;
+   totalBlocks: nat;
  };
 type ArchiveError = 
  variant {

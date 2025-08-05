@@ -127,10 +127,31 @@ export const idlFactory = ({ IDL }) => {
     'InvalidBlockType' : IDL.Null,
     'InvalidTimeRange' : IDL.Null,
   });
-  const Result_2 = IDL.Variant({ 'ok' : IDL.Nat, 'err' : ArchiveError });
-  const Result_1 = IDL.Variant({
+  const Result_3 = IDL.Variant({ 'ok' : IDL.Nat, 'err' : ArchiveError });
+  const Result_2 = IDL.Variant({
     'ok' : IDL.Vec(AdminActionBlockData),
     'err' : ArchiveError,
+  });
+  const ArchiveStatus = IDL.Record({
+    'supportedBlockTypes' : IDL.Vec(IDL.Text),
+    'newestBlock' : IDL.Opt(IDL.Nat),
+    'storageUsed' : IDL.Nat,
+    'oldestBlock' : IDL.Opt(IDL.Nat),
+    'totalBlocks' : IDL.Nat,
+    'lastArchiveTime' : IDL.Int,
+  });
+  const Result_1 = IDL.Variant({ 'ok' : ArchiveStatus, 'err' : ArchiveError });
+  const LogLevel = IDL.Variant({
+    'INFO' : IDL.Null,
+    'WARN' : IDL.Null,
+    'ERROR' : IDL.Null,
+  });
+  const LogEntry = IDL.Record({
+    'component' : IDL.Text,
+    'context' : IDL.Text,
+    'level' : LogLevel,
+    'message' : IDL.Text,
+    'timestamp' : IDL.Int,
   });
   const TimerStatus = IDL.Record({
     'innerLoopRunning' : IDL.Bool,
@@ -191,15 +212,15 @@ export const idlFactory = ({ IDL }) => {
   const BlockType = IDL.Record({ 'url' : IDL.Text, 'block_type' : IDL.Text });
   const Result = IDL.Variant({ 'ok' : IDL.Text, 'err' : IDL.Text });
   const DAOAdminArchive = IDL.Service({
-    'archiveAdminAction' : IDL.Func([AdminActionBlockData], [Result_2], []),
+    'archiveAdminAction' : IDL.Func([AdminActionBlockData], [Result_3], []),
     'getAdminActionsByAdmin' : IDL.Func(
         [IDL.Principal, IDL.Nat],
-        [Result_1],
+        [Result_2],
         ['query'],
       ),
     'getAdminActionsByCanister' : IDL.Func(
         [AdminCanisterSource, IDL.Nat],
-        [Result_1],
+        [Result_2],
         ['query'],
       ),
     'getArchiveStats' : IDL.Func(
@@ -217,6 +238,13 @@ export const idlFactory = ({ IDL }) => {
         ],
         ['query'],
       ),
+    'getArchiveStatus' : IDL.Func([], [Result_1], ['query']),
+    'getBatchImportStatus' : IDL.Func(
+        [],
+        [IDL.Record({ 'intervalSeconds' : IDL.Nat, 'isRunning' : IDL.Bool })],
+        ['query'],
+      ),
+    'getLogs' : IDL.Func([IDL.Nat], [IDL.Vec(LogEntry)], ['query']),
     'getTimerStatus' : IDL.Func([], [TimerStatus], ['query']),
     'icrc3_get_archives' : IDL.Func(
         [GetArchivesArgs],
@@ -240,6 +268,12 @@ export const idlFactory = ({ IDL }) => {
       ),
     'importDAOAdminActions' : IDL.Func([], [Result], []),
     'importTreasuryAdminActions' : IDL.Func([], [Result], []),
+    'resetImportTimestamps' : IDL.Func([], [Result], []),
+    'runManualBatchImport' : IDL.Func([], [Result], []),
+    'setMaxInnerLoopIterations' : IDL.Func([IDL.Nat], [Result], []),
+    'startBatchImportSystem' : IDL.Func([], [Result], []),
+    'stopAllTimers' : IDL.Func([], [Result], []),
+    'stopBatchImportSystem' : IDL.Func([], [Result], []),
   });
   return DAOAdminArchive;
 };
