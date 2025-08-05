@@ -12,7 +12,7 @@ import { Actor, AnonymousIdentity } from "@dfinity/agent"
 import { createAgent } from '@dfinity/utils'
 import { idlFactory } from "../../../declarations/ledger_canister/ledger_canister.did.js"
 import { idlFactory as daoBackendIDL } from "../../../declarations/dao_backend/DAO_backend.did.js"
-import { Result_4, Result_8, idlFactory as treasuryIDL, UpdateConfig, RebalanceConfig, _SERVICE as TreasuryService } from "../../../declarations/treasury/treasury.did.js"
+import { Result_4, idlFactory as treasuryIDL, UpdateConfig, RebalanceConfig, _SERVICE as TreasuryService } from "../../../declarations/treasury/treasury.did.js"
 import { idlFactory as neuronSnapshotIDL, _SERVICE as NeuronSnapshotService } from "../../../declarations/neuronSnapshot/neuronSnapshot.did.js"
 import { idlFactory as sneedForumIDL, _SERVICE as SneedForumService } from "../../../declarations/sneed_sns_forum/sneed_sns_forum.did.js"
 import { idlFactory as appSneedDaoIDL, _SERVICE as AppSneedDaoService } from "../../../declarations/app_sneeddao_backend/app_sneeddao_backend.did.js"
@@ -2414,7 +2414,7 @@ export const useTacoStore = defineStore('taco', () => {
                 canisterId: treasuryCanisterId(),
             });
 
-            const result = await actor.admin_recoverPoolBalances() as Result_8;
+            const result = await actor.admin_recoverPoolBalances() as any;
             if ('err' in result) {
                 throw new Error(JSON.stringify(result.err));
             }
@@ -2812,7 +2812,7 @@ export const useTacoStore = defineStore('taco', () => {
             appLoadingOff();
         }
     }
-    const pauseToken = async (principal: Principal): Promise<boolean> => {
+    const pauseToken = async (principal: Principal, reason: string): Promise<boolean> => {
         // console.log('TacoStore: pauseToken called for', principal.toText());
         try {
             // Create auth client
@@ -2842,7 +2842,7 @@ export const useTacoStore = defineStore('taco', () => {
                 canisterId,
             });
 
-            const result = await actor.pauseToken(principal) as Result_1;
+            const result = await actor.pauseTokenWithReason(principal, reason) as Result_1;
             if ('err' in result) {
                 console.error('Error pausing token:', result.err);
                 return false;
@@ -2854,7 +2854,7 @@ export const useTacoStore = defineStore('taco', () => {
             return false;
         }
     }
-    const unpauseToken = async (principal: Principal): Promise<boolean> => {
+    const unpauseToken = async (principal: Principal, reason: string): Promise<boolean> => {
         // console.log('TacoStore: unpauseToken called for', principal.toText());
         try {
             // Create auth client
@@ -2884,7 +2884,7 @@ export const useTacoStore = defineStore('taco', () => {
                 canisterId,
             });
 
-            const result = await actor.unpauseToken(principal) as Result_1;
+            const result = await actor.unpauseTokenWithReason(principal, reason) as Result_1;
             if ('err' in result) {
                 console.error('Error unpausing token:', result.err);
                 return false;

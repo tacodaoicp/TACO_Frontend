@@ -144,14 +144,14 @@
                             <button 
                               v-if="!token.isPaused" 
                               class="btn btn-warning btn-sm"
-                              @click="pauseToken(principal)"
+                              @click="showPauseConfirmation(principal, token.name)"
                             >
                               Pause
                             </button>
                             <button 
                               v-else 
                               class="btn btn-success btn-sm"
-                              @click="unpauseToken(principal)"
+                              @click="showUnpauseConfirmation(principal, token.name)"
                             >
                               Unpause
                             </button>
@@ -600,6 +600,20 @@
       </div>
     </div>
     
+    <!-- Confirmation Modal for Admin Actions -->
+    <AdminConfirmationModal
+      :show="confirmationModal.show"
+      :title="confirmationModal.title"
+      :message="confirmationModal.message"
+      :extra-data="confirmationModal.extraData"
+      :confirm-button-text="confirmationModal.confirmButtonText"
+      :confirm-button-class="confirmationModal.confirmButtonClass"
+      :reason-placeholder="confirmationModal.reasonPlaceholder"
+      :submitting="confirmationModal.submitting"
+      @confirm="handleConfirmAction"
+      @cancel="hideConfirmationModal"
+    />
+    
     <!-- footer bar -->
     <FooterBar />
   </div>
@@ -875,6 +889,7 @@ import HeaderBar from "../components/HeaderBar.vue";
 import FooterBar from "../components/FooterBar.vue";
 import TacoTitle from '../components/misc/TacoTitle.vue';
 import TradingLogs from '../components/admin/TradingLogs.vue';
+import AdminConfirmationModal from '../components/admin/AdminConfirmationModal.vue';
 import { Principal } from '@dfinity/principal';
 
 // Add interface for VotingMetrics
@@ -892,6 +907,20 @@ const isRecoveringBalances = ref(false);
 const showOnlyActive = ref(false);
 const showOnlyFollowing = ref(false);
 const refreshingVP = ref(false);
+
+// Modal state for confirmation dialogs
+const confirmationModal = ref({
+  show: false,
+  title: '',
+  message: '',
+  extraData: '',
+  confirmButtonText: 'Confirm',
+  confirmButtonClass: 'btn-primary',
+  reasonPlaceholder: 'Please provide a reason for this action...',
+  submitting: false,
+  action: null as (() => Promise<void>) | null,
+  actionData: null as { principal: string; tokenName: string } | null
+});
 
 // Get store
 const tacoStore = useTacoStore();
@@ -1314,39 +1343,75 @@ const getTokenStatusText = (token: any) => {
   return statuses.length ? `(${statuses.join(', ')})` : '';
 };
 
-async function pauseToken(principal: Principal) {
-    console.log('AdminView: pauseToken called');
-    if (confirm('Are you sure you want to pause this token?')) {
-        try {
-            const success = await tacoStore.pauseToken(principal);
-            if (success) {
-                await refreshTimerStatus();
-                console.log('AdminView: Token paused successfully');
-            } else {
-                console.error('AdminView: Failed to pause token');
-            }
-        } catch (error) {
-            console.error('AdminView: Error pausing token:', error);
-        }
-    }
-}
+// Modal helper functions
+const showPauseConfirmation = (principal: string, tokenName: string) => {
+  confirmationModal.value = {
+    show: true,
+    title: 'Pause Token',
+    message: `Are you sure you want to pause ${tokenName}?`,
+    extraData: `Principal: ${principal}`,
+    confirmButtonText: 'Pause Token',
+    confirmButtonClass: 'btn-warning',
+    reasonPlaceholder: 'Please explain why this token should be paused...',
+    submitting: false,
+    action: null,
+    actionData: { principal, tokenName }
+  };
+};
 
-async function unpauseToken(principal: Principal) {
-    console.log('AdminView: unpauseToken called');
-    if (confirm('Are you sure you want to unpause this token?')) {
-        try {
-            const success = await tacoStore.unpauseToken(principal);
-            if (success) {
-                await refreshTimerStatus();
-                console.log('AdminView: Token unpaused successfully');
-            } else {
-                console.error('AdminView: Failed to unpause token');
-            }
-        } catch (error) {
-            console.error('AdminView: Error unpausing token:', error);
-        }
+const showUnpauseConfirmation = (principal: string, tokenName: string) => {
+  confirmationModal.value = {
+    show: true,
+    title: 'Unpause Token',
+    message: `Are you sure you want to unpause ${tokenName}?`,
+    extraData: `Principal: ${principal}`,
+    confirmButtonText: 'Unpause Token',
+    confirmButtonClass: 'btn-success',
+    reasonPlaceholder: 'Please explain why this token should be unpaused...',
+    submitting: false,
+    action: null,
+    actionData: { principal, tokenName }
+  };
+};
+
+const hideConfirmationModal = () => {
+  confirmationModal.value.show = false;
+  confirmationModal.value.submitting = false;
+  confirmationModal.value.action = null;
+  confirmationModal.value.actionData = null;
+};
+
+const handleConfirmAction = async (reason: string) => {
+  if (!confirmationModal.value.actionData) return;
+  
+  const { principal, tokenName } = confirmationModal.value.actionData;
+  confirmationModal.value.submitting = true;
+  
+  try {
+    let success = false;
+    
+    if (confirmationModal.value.title === 'Pause Token') {
+      success = await tacoStore.pauseToken(Principal.fromText(principal), reason);
+    } else if (confirmationModal.value.title === 'Unpause Token') {
+      success = await tacoStore.unpauseToken(Principal.fromText(principal), reason);
     }
-}
+    
+    if (success) {
+      await refreshTimerStatus();
+      console.log(`AdminView: Token ${confirmationModal.value.title.toLowerCase()}d successfully`);
+      hideConfirmationModal();
+    } else {
+      console.error(`AdminView: Failed to ${confirmationModal.value.title.toLowerCase()} token`);
+      // Keep modal open to show error state
+      confirmationModal.value.submitting = false;
+    }
+  } catch (error) {
+    console.error(`AdminView: Error ${confirmationModal.value.title.toLowerCase()}ing token:`, error);
+    confirmationModal.value.submitting = false;
+  }
+};
+
+// Legacy pauseToken and unpauseToken functions replaced by modal approach above
 
 // Add refreshVotingMetrics function
 const refreshVotingMetrics = async () => {
