@@ -26,6 +26,9 @@
                     <option value="trading_archive">📈 Trading Archive</option>
                     <option value="portfolio_archive">💼 Portfolio Archive</option>
                     <option value="price_archive">💰 Price Archive</option>
+                    <option value="dao_admin_archive">🔑 DAO Admin Archive</option>
+                    <option value="dao_allocation_archive">📊 DAO Allocation Archive</option>
+                    <option value="dao_governance_archive">🗳️ DAO Governance Archive</option>
                   </select>
                 </div>
                 <div class="col-md-6 d-flex align-items-end">
@@ -173,6 +176,60 @@
                     >
                       🔄 Reset Timestamps
                     </button>
+                  </div>
+                  
+                  <!-- Archive-Specific Import Buttons -->
+                  <div v-if="selectedArchive === 'dao_admin_archive'" class="mt-3">
+                    <h6>DAO Admin Archive</h6>
+                    <div class="d-flex flex-wrap gap-2">
+                      <button 
+                        class="btn btn-sm btn-outline-primary" 
+                        @click="runArchiveSpecificImport('importAdminActions')"
+                        :disabled="loading"
+                      >
+                        📝 Import Admin Actions
+                      </button>
+                    </div>
+                  </div>
+                  
+                  <div v-if="selectedArchive === 'dao_allocation_archive'" class="mt-3">
+                    <h6>DAO Allocation Archive</h6>
+                    <div class="d-flex flex-wrap gap-2">
+                      <button 
+                        class="btn btn-sm btn-outline-info" 
+                        @click="runArchiveSpecificImport('importAllocationChanges')"
+                        :disabled="loading"
+                      >
+                        📊 Import Allocation Changes
+                      </button>
+                      <button 
+                        class="btn btn-sm btn-outline-info" 
+                        @click="runArchiveSpecificImport('importFollowActions')"
+                        :disabled="loading"
+                      >
+                        👥 Import Follow Actions
+                      </button>
+                    </div>
+                  </div>
+                  
+                  <div v-if="selectedArchive === 'dao_governance_archive'" class="mt-3">
+                    <h6>DAO Governance Archive</h6>
+                    <div class="d-flex flex-wrap gap-2">
+                      <button 
+                        class="btn btn-sm btn-outline-secondary" 
+                        @click="runArchiveSpecificImport('importVotingPowerChanges')"
+                        :disabled="loading"
+                      >
+                        🗳️ Import Voting Power
+                      </button>
+                      <button 
+                        class="btn btn-sm btn-outline-secondary" 
+                        @click="runArchiveSpecificImport('importNeuronUpdates')"
+                        :disabled="loading"
+                      >
+                        🧠 Import Neuron Updates
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -468,6 +525,9 @@ import ApexCharts from 'apexcharts'
 import { createActor as createTradingActor } from '../../../declarations/trading_archive'
 import { createActor as createPortfolioActor } from '../../../declarations/portfolio_archive'
 import { createActor as createPriceActor } from '../../../declarations/price_archive'
+import { createActor as createDaoAdminActor } from '../../../declarations/dao_admin_archive'
+import { createActor as createDaoAllocationActor } from '../../../declarations/dao_allocation_archive'
+import { createActor as createDaoGovernanceActor } from '../../../declarations/dao_governance_archive'
 
 export default {
   name: 'AdminArchiveView',
@@ -493,6 +553,9 @@ export default {
       tradingActor: null,
       portfolioActor: null,
       priceActor: null,
+      daoAdminActor: null,
+      daoAllocationActor: null,
+      daoGovernanceActor: null,
       
       // Refresh interval
       refreshInterval: null,
@@ -517,6 +580,9 @@ export default {
         case 'trading_archive': return this.tradingActor
         case 'portfolio_archive': return this.portfolioActor
         case 'price_archive': return this.priceActor
+        case 'dao_admin_archive': return this.daoAdminActor
+        case 'dao_allocation_archive': return this.daoAllocationActor
+        case 'dao_governance_archive': return this.daoGovernanceActor
         default: return this.tradingActor
       }
     }
@@ -580,6 +646,36 @@ export default {
       return 'l7gh3-pqaaa-aaaan-qz4za-cai'; // fallback to staging canisterId for local
     },
 
+    daoAdminArchiveCanisterId() {
+      switch (process.env.DFX_NETWORK) {
+        case "ic":
+          return process.env.CANISTER_ID_DAO_ADMIN_ARCHIVE_IC || 'b6ygs-xaaaa-aaaan-qz5ca-cai'; // fallback to staging
+        case "staging":
+          return process.env.CANISTER_ID_DAO_ADMIN_ARCHIVE_STAGING || 'b6ygs-xaaaa-aaaan-qz5ca-cai';
+      }
+      return 'b6ygs-xaaaa-aaaan-qz5ca-cai'; // fallback to staging canisterId for local
+    },
+
+    daoAllocationArchiveCanisterId() {
+      switch (process.env.DFX_NETWORK) {
+        case "ic":
+          return process.env.CANISTER_ID_DAO_ALLOCATION_ARCHIVE_IC || 'bq2l2-mqaaa-aaaan-qz5da-cai'; // fallback to staging
+        case "staging":
+          return process.env.CANISTER_ID_DAO_ALLOCATION_ARCHIVE_STAGING || 'bq2l2-mqaaa-aaaan-qz5da-cai';
+      }
+      return 'bq2l2-mqaaa-aaaan-qz5da-cai'; // fallback to staging canisterId for local
+    },
+
+    daoGovernanceArchiveCanisterId() {
+      switch (process.env.DFX_NETWORK) {
+        case "ic":
+          return process.env.CANISTER_ID_DAO_GOVERNANCE_ARCHIVE_IC || 'bzzag-2yaaa-aaaan-qz5cq-cai'; // fallback to staging
+        case "staging":
+          return process.env.CANISTER_ID_DAO_GOVERNANCE_ARCHIVE_STAGING || 'bzzag-2yaaa-aaaan-qz5cq-cai';
+      }
+      return 'bzzag-2yaaa-aaaan-qz5cq-cai'; // fallback to staging canisterId for local
+    },
+
     async createArchiveActors() {
       try {
         // Create authenticated agent (same pattern as store functions)
@@ -610,6 +706,9 @@ export default {
         this.tradingActor = createTradingActor(this.tradingArchiveCanisterId(), { agent })
         this.portfolioActor = createPortfolioActor(this.portfolioArchiveCanisterId(), { agent })
         this.priceActor = createPriceActor(this.priceArchiveCanisterId(), { agent })
+        this.daoAdminActor = createDaoAdminActor(this.daoAdminArchiveCanisterId(), { agent })
+        this.daoAllocationActor = createDaoAllocationActor(this.daoAllocationArchiveCanisterId(), { agent })
+        this.daoGovernanceActor = createDaoGovernanceActor(this.daoGovernanceArchiveCanisterId(), { agent })
         
         //console.log('Archive actors created with identity:', identity.getPrincipal().toString())
       } catch (error) {
@@ -777,6 +876,28 @@ export default {
       this.loading = false
     },
 
+    async runArchiveSpecificImport(methodName) {
+      this.loading = true
+      this.clearMessages()
+      
+      try {
+        this.successMessage = `Running ${methodName}... Check logs for progress.`
+        const result = await this.currentArchiveActor[methodName]()
+        
+        if (result.ok) {
+          this.successMessage = `${methodName} completed: ${result.ok}`
+        } else {
+          this.errorMessage = `${methodName} failed: ${result.err}`
+        }
+        await this.refreshStatus()
+      } catch (error) {
+        console.error(`${methodName} error:`, error)
+        this.errorMessage = `Failed to run ${methodName}: ${error.message}`
+      }
+      
+      this.loading = false
+    },
+
     async stopAllTimers() {
       this.loading = true
       this.clearMessages()
@@ -880,6 +1001,9 @@ export default {
         case 'trading_archive': return 'bg-success'
         case 'portfolio_archive': return 'bg-info'
         case 'price_archive': return 'bg-warning'
+        case 'dao_admin_archive': return 'bg-primary'
+        case 'dao_allocation_archive': return 'bg-info'
+        case 'dao_governance_archive': return 'bg-secondary'
         default: return 'bg-secondary'
       }
     },
@@ -898,6 +1022,15 @@ export default {
         case 'price_archive':
           const priceTime = this.legacyStatus.lastImportedPriceTime || 0
           return `Last: ${this.formatTime(priceTime)} (${priceTime})`
+        case 'dao_admin_archive':
+          // DAO admin archive status - shows admin action imports
+          return 'Admin Actions Archive - Structured logging of administrative events'
+        case 'dao_allocation_archive':
+          // DAO allocation archive status - shows allocation and follow actions
+          return 'Allocation Archive - User allocation changes and follow relationships'
+        case 'dao_governance_archive':
+          // DAO governance archive status - shows voting power and neuron updates
+          return 'Governance Archive - Voting power changes and neuron updates'
         default:
           return 'Unknown'
       }
