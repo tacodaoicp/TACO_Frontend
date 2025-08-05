@@ -1,0 +1,230 @@
+type Value = 
+ variant {
+   Array: vec Value;
+   Blob: blob;
+   Int: int;
+   Map: vec record {
+              text;
+              Value;
+            };
+   Nat: nat;
+   Text: text;
+ };
+type TokenType = 
+ variant {
+   ICP;
+   ICRC12;
+   ICRC3;
+ };
+type SystemState = 
+ variant {
+   Active;
+   Emergency;
+   Paused;
+ };
+type SystemParameter = 
+ variant {
+   AllocationWindow: nat;
+   FollowDepth: nat;
+   LogAdmin: principal;
+   MaxAllocationsPerDay: int;
+   MaxFollowUnfollowActionsPerDay: nat;
+   MaxFollowed: nat;
+   MaxFollowers: nat;
+   MaxPastAllocations: nat;
+   MaxTotalUpdates: nat;
+   SnapshotInterval: nat;
+ };
+type Result_2 = 
+ variant {
+   err: ArchiveError;
+   ok: nat;
+ };
+type Result_1 = 
+ variant {
+   err: ArchiveError;
+   ok: vec AdminActionBlockData;
+ };
+type Result = 
+ variant {
+   err: text;
+   ok: text;
+ };
+type GetBlocksResult = 
+ record {
+   archived_blocks: vec ArchivedBlock;
+   blocks: vec Block;
+   log_length: nat;
+ };
+type GetBlocksArgs = 
+ vec record {
+       length: nat;
+       start: nat;
+     };
+type GetArchivesResult = 
+ vec record {
+       canister_id: principal;
+       end: nat;
+       start: nat;
+     };
+type GetArchivesArgs = record {from: opt principal;};
+type DataCertificate = 
+ record {
+   certificate: blob;
+   hash_tree: blob;
+ };
+type DAOAdminArchive = 
+ service {
+   archiveAdminAction: (adminAction: AdminActionBlockData) -> (Result_2);
+   getAdminActionsByAdmin: (admin: principal, limit: nat) -> (Result_1) query;
+   getAdminActionsByCanister: (canister: AdminCanisterSource, limit: 
+    nat) -> (Result_1) query;
+   getArchiveStats: () ->
+    (record {
+       lastImportedDAOActionId: nat;
+       lastImportedTreasuryActionId: nat;
+       totalAdminActions: nat;
+       totalBlocks: nat;
+       totalDAOActions: nat;
+       totalSuccessfulActions: nat;
+       totalTreasuryActions: nat;
+     }) query;
+   icrc3_get_archives: (args: GetArchivesArgs) -> (GetArchivesResult) query;
+   icrc3_get_blocks: (args: GetBlocksArgs) -> (GetBlocksResult) query;
+   icrc3_get_tip_certificate: () -> (opt DataCertificate) query;
+   icrc3_supported_block_types: () -> (vec BlockType) query;
+   importDAOAdminActions: () -> (Result);
+   importTreasuryAdminActions: () -> (Result);
+ };
+type BlockType = 
+ record {
+   block_type: text;
+   url: text;
+ };
+type Block = 
+ record {
+   block: Value;
+   id: nat;
+ };
+type ArchivedBlock = 
+ record {
+   args: GetBlocksArgs;
+   callback: func (GetBlocksArgs) -> (GetBlocksResult) query;
+ };
+type ArchiveError = 
+ variant {
+   BlockNotFound;
+   InvalidBlockType;
+   InvalidData;
+   InvalidTimeRange;
+   NotAuthorized;
+   StorageFull;
+   SystemError: text;
+ };
+type AdminCanisterSource = 
+ variant {
+   DAO_backend;
+   Treasury;
+ };
+type AdminActionVariant = 
+ variant {
+   AddPortfolioCircuitBreaker:
+    record {
+      conditionId: nat;
+      conditionType: text;
+      details: text;
+    };
+   AddTriggerCondition:
+    record {
+      conditionId: nat;
+      conditionType: text;
+      details: text;
+    };
+   AdminAdd: record {newAdmin: principal;};
+   AdminPermissionGrant:
+    record {
+      durationDays: nat;
+      function: text;
+      targetAdmin: principal;
+    };
+   AdminRemove: record {removedAdmin: principal;};
+   ClearAllTradingPauses;
+   ClearPortfolioCircuitBreakerLogs;
+   ClearPriceAlerts;
+   ClearSystemLogs;
+   ParameterUpdate:
+    record {
+      newValue: text;
+      oldValue: text;
+      parameter: SystemParameter;
+    };
+   PauseTokenManual: record {
+                       pauseType: text;
+                       token: principal;
+                     };
+   RemovePortfolioCircuitBreaker: record {conditionId: nat;};
+   RemoveTriggerCondition: record {conditionId: nat;};
+   ResetRebalanceState;
+   SetPortfolioCircuitBreakerActive:
+    record {
+      conditionId: nat;
+      isActive: bool;
+    };
+   SetTestMode: record {isTestMode: bool;};
+   SetTriggerConditionActive: record {
+                                conditionId: nat;
+                                isActive: bool;
+                              };
+   StartRebalancing;
+   StopRebalancing;
+   SystemStateChange: record {
+                        newState: SystemState;
+                        oldState: SystemState;
+                      };
+   TokenAdd:
+    record {
+      token: principal;
+      tokenType: TokenType;
+      viaGovernance: bool;
+    };
+   TokenPause: record {token: principal;};
+   TokenRemove: record {token: principal;};
+   TokenUnpause: record {token: principal;};
+   UnpauseToken: record {token: principal;};
+   UpdateMaxPortfolioSnapshots: record {
+                                  newLimit: nat;
+                                  oldLimit: nat;
+                                };
+   UpdatePausedTokenThreshold: record {
+                                 newThreshold: nat;
+                                 oldThreshold: nat;
+                               };
+   UpdatePortfolioCircuitBreaker:
+    record {
+      conditionId: nat;
+      newCondition: text;
+      oldCondition: text;
+    };
+   UpdateRebalanceConfig: record {
+                            newConfig: text;
+                            oldConfig: text;
+                          };
+   UpdateTriggerCondition:
+    record {
+      conditionId: nat;
+      newCondition: text;
+      oldCondition: text;
+    };
+ };
+type AdminActionBlockData = 
+ record {
+   actionType: AdminActionVariant;
+   admin: principal;
+   canister: AdminCanisterSource;
+   errorMessage: opt text;
+   id: nat;
+   reason: text;
+   success: bool;
+   timestamp: int;
+ };
+service : () -> DAOAdminArchive

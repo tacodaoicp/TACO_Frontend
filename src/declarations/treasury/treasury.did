@@ -8,7 +8,7 @@ type treasury =
    ///    * Only callable by admins with appropriate permissions.
    addPortfolioCircuitBreakerCondition: (name: text, direction:
     PortfolioDirection, percentage: float64, timeWindowNS: nat, valueType:
-    PortfolioValueType) -> (Result_12);
+    PortfolioValueType) -> (Result_13);
    /// * Add a new price trigger condition
    ///    *
    ///    * Creates a failsafe rule that will pause tokens when price movements
@@ -17,10 +17,10 @@ type treasury =
    ///    * Only callable by admins with appropriate permissions.
    addTriggerCondition: (name: text, direction: PriceDirection, percentage:
     float64, timeWindowNS: nat, applicableTokens: vec principal) ->
-    (Result_11);
+    (Result_12);
    admin_executeTradingCycle: () -> (Result_1);
-   admin_recoverPoolBalances: () -> (Result_10);
-   admin_syncWithDao: () -> (Result_10);
+   admin_recoverPoolBalances: () -> (Result_11);
+   admin_syncWithDao: () -> (Result_11);
    /// * Clear all trading pauses (emergency function)
    ///    *
    ///    * Removes all tokens from the trading pause registry.
@@ -75,11 +75,11 @@ type treasury =
    ///    * 
    ///    * Returns recent portfolio snapshots for analysis and charting.
    ///    * Accessible by authenticated users.
-   getPortfolioHistory: (limit: nat) -> (Result_9) query;
+   getPortfolioHistory: (limit: nat) -> (Result_10) query;
    /// * Get portfolio history filtered by timestamp (for archive efficiency)
    ///    * Returns only snapshots newer than the specified timestamp
    getPortfolioHistorySince: (sinceTimestamp: int, limit: nat) ->
-    (Result_9) query;
+    (Result_10) query;
    /// * Get price alerts (paginated)
    ///    *
    ///    * Returns recent price alert events that triggered token pausing.
@@ -133,7 +133,7 @@ type treasury =
            principal;
            TokenDetails;
          }) query;
-   getTokenPriceHistory: (tokens: vec principal) -> (Result_8) query;
+   getTokenPriceHistory: (tokens: vec principal) -> (Result_9) query;
    /// * Get trading pause record for a specific token
    ///    *
    ///    * Returns the pause record if the token is paused from trading, null otherwise.
@@ -147,10 +147,12 @@ type treasury =
    ///    * - Portfolio valuation
    ///    * - Current vs target allocations
    ///    * - Performance metrics
-   getTradingStatus: () -> (Result_6) query;
+   getTradingStatus: () -> (Result_7) query;
    /// * Get trading status with trades filtered by timestamp (for archive efficiency)
    ///    * Returns only trades newer than the specified timestamp
-   getTradingStatusSince: (sinceTimestamp: int) -> (Result_6) query;
+   getTradingStatusSince: (sinceTimestamp: int) -> (Result_7) query;
+   getTreasuryAdminActionsSince: (sinceTimestamp: int, limit: nat) ->
+    (Result_6) query;
    /// * Get a specific trigger condition by ID
    ///    *
    ///    * Returns details of a single failsafe rule.
@@ -321,6 +323,84 @@ type TriggerCondition =
    percentage: float64;
    timeWindowNS: nat;
  };
+type TreasuryAdminActionsSinceResponse = 
+ record {
+   actions: vec TreasuryAdminActionRecord;
+   totalCount: nat;
+ };
+type TreasuryAdminActionType = 
+ variant {
+   AddPortfolioCircuitBreaker:
+    record {
+      conditionId: nat;
+      conditionType: text;
+      details: text;
+    };
+   AddTriggerCondition:
+    record {
+      conditionId: nat;
+      conditionType: text;
+      details: text;
+    };
+   ClearAllTradingPauses;
+   ClearPortfolioCircuitBreakerLogs;
+   ClearPriceAlerts;
+   ClearSystemLogs;
+   PauseTokenManual: record {
+                       pauseType: text;
+                       token: principal;
+                     };
+   RemovePortfolioCircuitBreaker: record {conditionId: nat;};
+   RemoveTriggerCondition: record {conditionId: nat;};
+   ResetRebalanceState;
+   SetPortfolioCircuitBreakerActive:
+    record {
+      conditionId: nat;
+      isActive: bool;
+    };
+   SetTestMode: record {isTestMode: bool;};
+   SetTriggerConditionActive: record {
+                                conditionId: nat;
+                                isActive: bool;
+                              };
+   StartRebalancing;
+   StopRebalancing;
+   UnpauseToken: record {token: principal;};
+   UpdateMaxPortfolioSnapshots: record {
+                                  newLimit: nat;
+                                  oldLimit: nat;
+                                };
+   UpdatePausedTokenThreshold: record {
+                                 newThreshold: nat;
+                                 oldThreshold: nat;
+                               };
+   UpdatePortfolioCircuitBreaker:
+    record {
+      conditionId: nat;
+      newCondition: text;
+      oldCondition: text;
+    };
+   UpdateRebalanceConfig: record {
+                            newConfig: text;
+                            oldConfig: text;
+                          };
+   UpdateTriggerCondition:
+    record {
+      conditionId: nat;
+      newCondition: text;
+      oldCondition: text;
+    };
+ };
+type TreasuryAdminActionRecord = 
+ record {
+   actionType: TreasuryAdminActionType;
+   admin: principal;
+   errorMessage: opt text;
+   id: nat;
+   reason: text;
+   success: bool;
+   timestamp: int;
+ };
 type TransferRecipient = 
  variant {
    accountId: record {
@@ -424,18 +504,13 @@ type SnapshotReason =
  };
 type Result_9 = 
  variant {
-   err: PortfolioSnapshotError;
-   ok: PortfolioHistoryResponse;
- };
-type Result_8 = 
- variant {
    err: text;
    ok: vec record {
              principal;
              vec PricePoint;
            };
  };
-type Result_6 = 
+type Result_7 = 
  variant {
    err: text;
    ok:
@@ -475,6 +550,11 @@ type Result_6 =
       rebalanceStatus: RebalanceStatus;
     };
  };
+type Result_6 = 
+ variant {
+   err: TradingPauseError;
+   ok: TreasuryAdminActionsSinceResponse;
+ };
 type Result_5 = 
  variant {
    err: SyncErrorTreasury;
@@ -495,20 +575,25 @@ type Result_2 =
    err: PortfolioCircuitBreakerError;
    ok: text;
  };
-type Result_12 = 
+type Result_13 = 
  variant {
    err: PortfolioCircuitBreakerError;
    ok: nat;
  };
-type Result_11 = 
+type Result_12 = 
  variant {
    err: PriceFailsafeError;
    ok: nat;
  };
-type Result_10 = 
+type Result_11 = 
  variant {
    err: text;
    ok: text;
+ };
+type Result_10 = 
+ variant {
+   err: PortfolioSnapshotError;
+   ok: PortfolioHistoryResponse;
  };
 type Result_1 = 
  variant {

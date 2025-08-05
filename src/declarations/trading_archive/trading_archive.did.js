@@ -146,10 +146,15 @@ export const idlFactory = ({ IDL }) => {
   });
   const BlockType = IDL.Record({ 'url' : IDL.Text, 'block_type' : IDL.Text });
   const TacoBlockType = IDL.Variant({
+    'NeuronUpdate' : IDL.Null,
+    'VotingPower' : IDL.Null,
+    'AllocationChange' : IDL.Null,
     'Pause' : IDL.Null,
     'Price' : IDL.Null,
+    'FollowAction' : IDL.Null,
     'Portfolio' : IDL.Null,
     'Trade' : IDL.Null,
+    'Admin' : IDL.Null,
     'Allocation' : IDL.Null,
     'Circuit' : IDL.Null,
   });

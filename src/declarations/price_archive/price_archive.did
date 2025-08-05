@@ -32,12 +32,17 @@ type TimerStatus =
  };
 type TacoBlockType = 
  variant {
+   Admin;
    Allocation;
+   AllocationChange;
    Circuit;
+   FollowAction;
+   NeuronUpdate;
    Pause;
    Portfolio;
    Price;
    Trade;
+   VotingPower;
  };
 type Result_6 = 
  variant {

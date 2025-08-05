@@ -1,0 +1,151 @@
+type VotingPowerChangeType = 
+ variant {
+   ManualRefresh;
+   NeuronSnapshot;
+   SystemUpdate;
+ };
+type VotingPowerBlockData = 
+ record {
+   changeType: VotingPowerChangeType;
+   id: nat;
+   neurons: vec NeuronVP;
+   newVotingPower: nat;
+   oldVotingPower: nat;
+   timestamp: int;
+   user: principal;
+ };
+type Value = 
+ variant {
+   Array: vec Value;
+   Blob: blob;
+   Int: int;
+   Map: vec record {
+              text;
+              Value;
+            };
+   Nat: nat;
+   Text: text;
+ };
+type Result_3 = 
+ variant {
+   err: ArchiveError;
+   ok: nat;
+ };
+type Result_2 = 
+ variant {
+   err: ArchiveError;
+   ok: vec NeuronUpdateBlockData;
+ };
+type Result_1 = 
+ variant {
+   err: ArchiveError;
+   ok: vec VotingPowerBlockData;
+ };
+type Result = 
+ variant {
+   err: text;
+   ok: text;
+ };
+type NeuronVP = 
+ record {
+   neuronId: blob;
+   votingPower: nat;
+ };
+type NeuronUpdateType = 
+ variant {
+   Added;
+   Removed;
+   StateChanged;
+   VotingPowerChanged;
+ };
+type NeuronUpdateBlockData = 
+ record {
+   affectedUsers: vec principal;
+   id: nat;
+   neuronId: blob;
+   newVotingPower: opt nat;
+   oldVotingPower: opt nat;
+   timestamp: int;
+   updateType: NeuronUpdateType;
+ };
+type GetBlocksResult = 
+ record {
+   archived_blocks: vec ArchivedBlock;
+   blocks: vec Block;
+   log_length: nat;
+ };
+type GetBlocksArgs = 
+ vec record {
+       length: nat;
+       start: nat;
+     };
+type GetArchivesResult = 
+ vec record {
+       canister_id: principal;
+       end: nat;
+       start: nat;
+     };
+type GetArchivesArgs = record {from: opt principal;};
+type DataCertificate = 
+ record {
+   certificate: blob;
+   hash_tree: blob;
+ };
+type DAOGovernanceArchive = 
+ service {
+   archiveNeuronUpdate: (update: NeuronUpdateBlockData) -> (Result_3);
+   archiveVotingPowerChange: (change: VotingPowerBlockData) -> (Result_3);
+   getArchiveStats: () ->
+    (record {
+       activeNeuronCount: nat;
+       lastImportedNeuronTimestamp: int;
+       lastImportedVotingPowerTimestamp: int;
+       totalBlocks: nat;
+       totalNeuronUpdates: nat;
+       totalVotingPowerChanges: nat;
+       totalVotingPowerGained: nat;
+       totalVotingPowerLost: nat;
+     }) query;
+   getGovernanceMetrics: () ->
+    (record {
+       activeNeuronCount: nat;
+       averageVotingPowerPerUser: nat;
+       totalActiveUsers: nat;
+       totalVotingPowerInSystem: nat;
+     }) query;
+   getNeuronUpdatesByNeuron: (neuronId: blob, limit: nat) -> (Result_2) query;
+   getVotingPowerChangesByUser: (user: principal, limit: nat) ->
+    (Result_1) query;
+   icrc3_get_archives: (args: GetArchivesArgs) -> (GetArchivesResult) query;
+   icrc3_get_blocks: (args: GetBlocksArgs) -> (GetBlocksResult) query;
+   icrc3_get_tip_certificate: () -> (opt DataCertificate) query;
+   icrc3_supported_block_types: () -> (vec BlockType) query;
+   importNeuronUpdates: () -> (Result);
+   importVotingPowerChanges: () -> (Result);
+ };
+type BlockType = 
+ record {
+   block_type: text;
+   url: text;
+ };
+type Block = 
+ record {
+   block: Value;
+   id: nat;
+ };
+type ArchivedBlock = 
+ record {
+   args: GetBlocksArgs;
+   callback: func (GetBlocksArgs) -> (GetBlocksResult) query;
+ };
+type ArchiveError = 
+ variant {
+   BlockNotFound;
+   InvalidBlockType;
+   InvalidData;
+   InvalidTimeRange;
+   NotAuthorized;
+   StorageFull;
+   SystemError: text;
+ };
+service : () -> DAOGovernanceArchive

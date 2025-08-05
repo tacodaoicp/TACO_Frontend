@@ -63,6 +63,66 @@ export const idlFactory = ({ IDL }) => {
     'SystemInactive' : IDL.Null,
   });
   const Result_5 = IDL.Variant({ 'ok' : IDL.Text, 'err' : FollowError });
+  const SystemState = IDL.Variant({
+    'Paused' : IDL.Null,
+    'Active' : IDL.Null,
+    'Emergency' : IDL.Null,
+  });
+  const SystemParameter = IDL.Variant({
+    'MaxFollowers' : IDL.Nat,
+    'MaxAllocationsPerDay' : IDL.Int,
+    'MaxTotalUpdates' : IDL.Nat,
+    'MaxPastAllocations' : IDL.Nat,
+    'SnapshotInterval' : IDL.Nat,
+    'FollowDepth' : IDL.Nat,
+    'MaxFollowed' : IDL.Nat,
+    'LogAdmin' : IDL.Principal,
+    'AllocationWindow' : IDL.Nat,
+    'MaxFollowUnfollowActionsPerDay' : IDL.Nat,
+  });
+  const AdminActionType = IDL.Variant({
+    'TokenAdd' : IDL.Record({
+      'token' : IDL.Principal,
+      'viaGovernance' : IDL.Bool,
+      'tokenType' : TokenType,
+    }),
+    'AdminAdd' : IDL.Record({ 'newAdmin' : IDL.Principal }),
+    'TokenUnpause' : IDL.Record({ 'token' : IDL.Principal }),
+    'AdminPermissionGrant' : IDL.Record({
+      'durationDays' : IDL.Nat,
+      'function' : IDL.Text,
+      'targetAdmin' : IDL.Principal,
+    }),
+    'TokenPause' : IDL.Record({ 'token' : IDL.Principal }),
+    'AdminRemove' : IDL.Record({ 'removedAdmin' : IDL.Principal }),
+    'SystemStateChange' : IDL.Record({
+      'oldState' : SystemState,
+      'newState' : SystemState,
+    }),
+    'ParameterUpdate' : IDL.Record({
+      'oldValue' : IDL.Text,
+      'parameter' : SystemParameter,
+      'newValue' : IDL.Text,
+    }),
+    'TokenRemove' : IDL.Record({ 'token' : IDL.Principal }),
+  });
+  const AdminActionRecord = IDL.Record({
+    'id' : IDL.Nat,
+    'admin' : IDL.Principal,
+    'errorMessage' : IDL.Opt(IDL.Text),
+    'actionType' : AdminActionType,
+    'timestamp' : IDL.Int,
+    'success' : IDL.Bool,
+    'reason' : IDL.Text,
+  });
+  const AdminActionsSinceResponse = IDL.Record({
+    'totalCount' : IDL.Nat,
+    'actions' : IDL.Vec(AdminActionRecord),
+  });
+  const Result_11 = IDL.Variant({
+    'ok' : AdminActionsSinceResponse,
+    'err' : AuthorizationError,
+  });
   const AdminFunction = IDL.Variant({
     'removeToken' : IDL.Null,
     'setTest' : IDL.Null,
@@ -70,18 +130,23 @@ export const idlFactory = ({ IDL }) => {
     'getLogs' : IDL.Null,
     'removeAdmin' : IDL.Null,
     'stopToken' : IDL.Null,
+    'getNeuronUpdates' : IDL.Null,
     'unpauseToken' : IDL.Null,
     'updateSystemParameter' : IDL.Null,
     'updateTreasuryConfig' : IDL.Null,
+    'getFollowActions' : IDL.Null,
     'updateSpamParameters' : IDL.Null,
     'addToken' : IDL.Null,
+    'getAdminActions' : IDL.Null,
     'addAdmin' : IDL.Null,
     'stopRebalancing' : IDL.Null,
     'recoverPoolBalances' : IDL.Null,
     'setTacoAddress' : IDL.Null,
     'clearLogs' : IDL.Null,
     'createAuction' : IDL.Null,
+    'getVotingPowerChanges' : IDL.Null,
     'updateMintingVaultConfig' : IDL.Null,
+    'getAllocationChanges' : IDL.Null,
     'pauseToken' : IDL.Null,
     'updateSystemState' : IDL.Null,
     'endAuctionPanic' : IDL.Null,
@@ -90,6 +155,40 @@ export const idlFactory = ({ IDL }) => {
     'function' : AdminFunction,
     'expiresAt' : IDL.Int,
     'grantedBy' : IDL.Principal,
+  });
+  const PastAllocationRecord = IDL.Record({
+    'to' : IDL.Int,
+    'from' : IDL.Int,
+    'user' : IDL.Principal,
+    'allocation' : IDL.Vec(Allocation),
+    'allocationMaker' : IDL.Principal,
+  });
+  const AllocationChangesSinceResponse = IDL.Record({
+    'totalCount' : IDL.Nat,
+    'changes' : IDL.Vec(PastAllocationRecord),
+  });
+  const Result_10 = IDL.Variant({
+    'ok' : AllocationChangesSinceResponse,
+    'err' : AuthorizationError,
+  });
+  const UnfollowRecord = IDL.Record({
+    'followed' : IDL.Principal,
+    'follower' : IDL.Principal,
+    'until' : IDL.Int,
+  });
+  const FollowRecord = IDL.Record({
+    'followed' : IDL.Principal,
+    'follower' : IDL.Principal,
+    'since' : IDL.Int,
+  });
+  const FollowActionsSinceResponse = IDL.Record({
+    'totalCount' : IDL.Nat,
+    'unfollows' : IDL.Vec(UnfollowRecord),
+    'follows' : IDL.Vec(FollowRecord),
+  });
+  const Result_9 = IDL.Variant({
+    'ok' : FollowActionsSinceResponse,
+    'err' : AuthorizationError,
   });
   const HistoricBalanceAllocation = IDL.Record({
     'allocations' : IDL.Vec(IDL.Tuple(IDL.Principal, IDL.Nat)),
@@ -109,17 +208,18 @@ export const idlFactory = ({ IDL }) => {
     'message' : IDL.Text,
     'timestamp' : IDL.Int,
   });
-  const SystemParameter = IDL.Variant({
-    'MaxFollowers' : IDL.Nat,
-    'MaxAllocationsPerDay' : IDL.Int,
-    'MaxTotalUpdates' : IDL.Nat,
-    'MaxPastAllocations' : IDL.Nat,
-    'SnapshotInterval' : IDL.Nat,
-    'FollowDepth' : IDL.Nat,
-    'MaxFollowed' : IDL.Nat,
-    'LogAdmin' : IDL.Principal,
-    'AllocationWindow' : IDL.Nat,
-    'MaxFollowUnfollowActionsPerDay' : IDL.Nat,
+  const NeuronRecord = IDL.Record({
+    'votingPower' : IDL.Nat,
+    'users' : IDL.Vec(IDL.Principal),
+    'neuronId' : IDL.Vec(IDL.Nat8),
+  });
+  const NeuronUpdatesSinceResponse = IDL.Record({
+    'totalCount' : IDL.Nat,
+    'neurons' : IDL.Vec(NeuronRecord),
+  });
+  const Result_8 = IDL.Variant({
+    'ok' : NeuronUpdatesSinceResponse,
+    'err' : AuthorizationError,
   });
   const PricePoint = IDL.Record({
     'usdPrice' : IDL.Float64,
@@ -141,6 +241,20 @@ export const idlFactory = ({ IDL }) => {
     'tokenName' : IDL.Text,
     'pausedDueToSyncFailure' : IDL.Bool,
     'tokenType' : TokenType,
+  });
+  const UserVotingPowerRecord = IDL.Record({
+    'lastVotingPowerUpdate' : IDL.Int,
+    'votingPower' : IDL.Nat,
+    'user' : IDL.Principal,
+    'neurons' : IDL.Vec(NeuronVP),
+  });
+  const VotingPowerChangesSinceResponse = IDL.Record({
+    'totalCount' : IDL.Nat,
+    'users' : IDL.Vec(UserVotingPowerRecord),
+  });
+  const Result_7 = IDL.Variant({
+    'ok' : VotingPowerChangesSinceResponse,
+    'err' : AuthorizationError,
   });
   const RefreshError = IDL.Variant({
     'NotAllowed' : IDL.Null,
@@ -193,11 +307,6 @@ export const idlFactory = ({ IDL }) => {
     'swappingEnabled' : IDL.Opt(IDL.Bool),
     'minPremium' : IDL.Opt(IDL.Float64),
   });
-  const SystemState = IDL.Variant({
-    'Paused' : IDL.Null,
-    'Active' : IDL.Null,
-    'Emergency' : IDL.Null,
-  });
   const UpdateConfig = IDL.Record({
     'maxPriceHistoryEntries' : IDL.Opt(IDL.Nat),
     'priceUpdateIntervalNS' : IDL.Opt(IDL.Nat),
@@ -226,6 +335,11 @@ export const idlFactory = ({ IDL }) => {
   const ContinuousDAO = IDL.Service({
     'addAdmin' : IDL.Func([IDL.Principal], [Result_1], []),
     'addToken' : IDL.Func([IDL.Principal, TokenType], [Result_1], []),
+    'addTokenWithReason' : IDL.Func(
+        [IDL.Principal, TokenType, IDL.Text],
+        [Result_1],
+        [],
+      ),
     'admin_getNeuronAllocations' : IDL.Func(
         [],
         [IDL.Vec(IDL.Tuple(IDL.Vec(IDL.Nat8), NeuronAllocation))],
@@ -244,6 +358,11 @@ export const idlFactory = ({ IDL }) => {
     'admin_recalculateAllVotingPower' : IDL.Func([IDL.Nat], [], []),
     'clearLogs' : IDL.Func([], [], []),
     'followAllocation' : IDL.Func([IDL.Principal], [Result_5], []),
+    'getAdminActionsSince' : IDL.Func(
+        [IDL.Int, IDL.Nat],
+        [Result_11],
+        ['query'],
+      ),
     'getAdminPermissions' : IDL.Func(
         [],
         [IDL.Vec(IDL.Tuple(IDL.Principal, IDL.Vec(AdminPermission)))],
@@ -252,6 +371,16 @@ export const idlFactory = ({ IDL }) => {
     'getAggregateAllocation' : IDL.Func(
         [],
         [IDL.Vec(IDL.Tuple(IDL.Principal, IDL.Nat))],
+        ['query'],
+      ),
+    'getAllocationChangesSince' : IDL.Func(
+        [IDL.Int, IDL.Nat],
+        [Result_10],
+        ['query'],
+      ),
+    'getFollowActionsSince' : IDL.Func(
+        [IDL.Int, IDL.Nat],
+        [Result_9],
         ['query'],
       ),
     'getFollowersWithNeuronCounts' : IDL.Func(
@@ -280,6 +409,11 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Opt(NeuronAllocation)],
         ['query'],
       ),
+    'getNeuronUpdatesSince' : IDL.Func(
+        [IDL.Int, IDL.Nat],
+        [Result_8],
+        ['query'],
+      ),
     'getSnapshotInfo' : IDL.Func(
         [],
         [
@@ -300,6 +434,11 @@ export const idlFactory = ({ IDL }) => {
         ['query'],
       ),
     'getUserAllocation' : IDL.Func([], [IDL.Opt(UserState)], ['query']),
+    'getVotingPowerChangesSince' : IDL.Func(
+        [IDL.Int, IDL.Nat],
+        [Result_7],
+        ['query'],
+      ),
     'grantAdminPermission' : IDL.Func(
         [IDL.Principal, AdminFunction, IDL.Nat],
         [Result_1],
@@ -310,11 +449,11 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Bool],
         ['query'],
       ),
-    'pauseToken' : IDL.Func([IDL.Principal], [Result_1], []),
+    'pauseToken' : IDL.Func([IDL.Principal, IDL.Text], [Result_1], []),
     'refreshUserVotingPower' : IDL.Func([], [Result_6], []),
     'removeAdmin' : IDL.Func([IDL.Principal], [Result_1], []),
     'removeFollower' : IDL.Func([IDL.Principal], [Result_5], []),
-    'removeToken' : IDL.Func([IDL.Principal], [Result_1], []),
+    'removeToken' : IDL.Func([IDL.Principal, IDL.Text], [Result_1], []),
     'setTacoAddress' : IDL.Func([IDL.Principal], [], []),
     'set_sns_governance_canister_id' : IDL.Func([IDL.Principal], [], []),
     'syncTokenDetailsFromTreasury' : IDL.Func(
@@ -323,7 +462,7 @@ export const idlFactory = ({ IDL }) => {
         [],
       ),
     'unfollowAllocation' : IDL.Func([IDL.Principal], [Result_3], []),
-    'unpauseToken' : IDL.Func([IDL.Principal], [Result_1], []),
+    'unpauseToken' : IDL.Func([IDL.Principal, IDL.Text], [Result_1], []),
     'updateAllocation' : IDL.Func([IDL.Vec(Allocation)], [Result_2], []),
     'updateMintingVaultConfig' : IDL.Func([UpdateConfig__1], [Result_1], []),
     'updateSpamParameters' : IDL.Func(
@@ -338,7 +477,7 @@ export const idlFactory = ({ IDL }) => {
         [],
       ),
     'updateSystemParameter' : IDL.Func([SystemParameter], [Result_1], []),
-    'updateSystemState' : IDL.Func([SystemState], [Result_1], []),
+    'updateSystemState' : IDL.Func([SystemState, IDL.Text], [Result_1], []),
     'updateTreasuryConfig' : IDL.Func(
         [UpdateConfig, IDL.Opt(IDL.Bool)],
         [Result_1],

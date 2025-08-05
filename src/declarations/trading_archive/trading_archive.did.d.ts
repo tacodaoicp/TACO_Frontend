@@ -95,10 +95,15 @@ export type Result_4 = { 'ok' : ArchiveStatus } |
   { 'err' : ArchiveError };
 export type Result_5 = { 'ok' : bigint } |
   { 'err' : ArchiveError };
-export type TacoBlockType = { 'Pause' : null } |
+export type TacoBlockType = { 'NeuronUpdate' : null } |
+  { 'VotingPower' : null } |
+  { 'AllocationChange' : null } |
+  { 'Pause' : null } |
   { 'Price' : null } |
+  { 'FollowAction' : null } |
   { 'Portfolio' : null } |
   { 'Trade' : null } |
+  { 'Admin' : null } |
   { 'Allocation' : null } |
   { 'Circuit' : null };
 export interface TimerStatus {

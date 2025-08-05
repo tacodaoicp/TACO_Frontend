@@ -1,0 +1,146 @@
+type Value = 
+ variant {
+   Array: vec Value;
+   Blob: blob;
+   Int: int;
+   Map: vec record {
+              text;
+              Value;
+            };
+   Nat: nat;
+   Text: text;
+ };
+type Result_3 = 
+ variant {
+   err: ArchiveError;
+   ok: nat;
+ };
+type Result_2 = 
+ variant {
+   err: ArchiveError;
+   ok: vec AllocationChangeBlockData;
+ };
+type Result_1 = 
+ variant {
+   err: ArchiveError;
+   ok: vec FollowActionBlockData;
+ };
+type Result = 
+ variant {
+   err: text;
+   ok: text;
+ };
+type GetBlocksResult = 
+ record {
+   archived_blocks: vec ArchivedBlock;
+   blocks: vec Block;
+   log_length: nat;
+ };
+type GetBlocksArgs = 
+ vec record {
+       length: nat;
+       start: nat;
+     };
+type GetArchivesResult = 
+ vec record {
+       canister_id: principal;
+       end: nat;
+       start: nat;
+     };
+type GetArchivesArgs = record {from: opt principal;};
+type FollowActionType = 
+ variant {
+   Follow;
+   Unfollow;
+ };
+type FollowActionBlockData = 
+ record {
+   action: FollowActionType;
+   followed: principal;
+   follower: principal;
+   id: nat;
+   newFollowCount: nat;
+   previousFollowCount: nat;
+   timestamp: int;
+ };
+type DataCertificate = 
+ record {
+   certificate: blob;
+   hash_tree: blob;
+ };
+type DAOAllocationArchive = 
+ service {
+   archiveAllocationChange: (change: AllocationChangeBlockData) -> (Result_3);
+   archiveFollowAction: (action: FollowActionBlockData) -> (Result_3);
+   getAllocationChangesByToken: (token: principal, limit: nat) ->
+    (Result_2) query;
+   getAllocationChangesByUser: (user: principal, limit: nat) ->
+    (Result_2) query;
+   getArchiveStats: () ->
+    (record {
+       lastImportedAllocationTimestamp: int;
+       lastImportedFollowTimestamp: int;
+       totalAllocationChanges: nat;
+       totalBlocks: nat;
+       totalFollowActions: nat;
+       totalFollowCount: nat;
+       totalUnfollowCount: nat;
+     }) query;
+   getFollowActionsByUser: (user: principal, limit: nat) -> (Result_1) query;
+   icrc3_get_archives: (args: GetArchivesArgs) -> (GetArchivesResult) query;
+   icrc3_get_blocks: (args: GetBlocksArgs) -> (GetBlocksResult) query;
+   icrc3_get_tip_certificate: () -> (opt DataCertificate) query;
+   icrc3_supported_block_types: () -> (vec BlockType) query;
+   importAllocationChanges: () -> (Result);
+   importFollowActions: () -> (Result);
+ };
+type BlockType = 
+ record {
+   block_type: text;
+   url: text;
+ };
+type Block = 
+ record {
+   block: Value;
+   id: nat;
+ };
+type ArchivedBlock = 
+ record {
+   args: GetBlocksArgs;
+   callback: func (GetBlocksArgs) -> (GetBlocksResult) query;
+ };
+type ArchiveError = 
+ variant {
+   BlockNotFound;
+   InvalidBlockType;
+   InvalidData;
+   InvalidTimeRange;
+   NotAuthorized;
+   StorageFull;
+   SystemError: text;
+ };
+type AllocationChangeType = 
+ variant {
+   FollowAction: record {followedUser: principal;};
+   SystemRebalance;
+   UserUpdate: record {userInitiated: bool;};
+   VotingPowerChange;
+ };
+type AllocationChangeBlockData = 
+ record {
+   changeType: AllocationChangeType;
+   id: nat;
+   maker: principal;
+   newAllocations: vec Allocation;
+   oldAllocations: vec Allocation;
+   reason: opt text;
+   timestamp: int;
+   user: principal;
+   votingPower: nat;
+ };
+type Allocation = 
+ record {
+   basisPoints: nat;
+   token: principal;
+ };
+service : () -> DAOAllocationArchive
