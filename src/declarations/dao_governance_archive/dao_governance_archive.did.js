@@ -48,6 +48,25 @@ export const idlFactory = ({ IDL }) => {
     'ok' : IDL.Vec(NeuronUpdateBlockData),
     'err' : ArchiveError,
   });
+  const TimerStatus = IDL.Record({
+    'innerLoopRunning' : IDL.Bool,
+    'middleLoopCurrentState' : IDL.Text,
+    'middleLoopStartTime' : IDL.Int,
+    'outerLoopLastRun' : IDL.Int,
+    'outerLoopRunning' : IDL.Bool,
+    'innerLoopCurrentType' : IDL.Text,
+    'innerLoopCurrentBatch' : IDL.Nat,
+    'middleLoopTotalRuns' : IDL.Nat,
+    'outerLoopIntervalSeconds' : IDL.Nat,
+    'innerLoopStartTime' : IDL.Int,
+    'middleLoopNextScheduled' : IDL.Int,
+    'outerLoopTotalRuns' : IDL.Nat,
+    'middleLoopLastRun' : IDL.Int,
+    'middleLoopRunning' : IDL.Bool,
+    'innerLoopLastRun' : IDL.Int,
+    'innerLoopNextScheduled' : IDL.Int,
+    'innerLoopTotalBatches' : IDL.Nat,
+  });
   const Result_1 = IDL.Variant({
     'ok' : IDL.Vec(VotingPowerBlockData),
     'err' : ArchiveError,
@@ -131,6 +150,7 @@ export const idlFactory = ({ IDL }) => {
         [Result_2],
         ['query'],
       ),
+    'getTimerStatus' : IDL.Func([], [TimerStatus], ['query']),
     'getVotingPowerChangesByUser' : IDL.Func(
         [IDL.Principal, IDL.Nat],
         [Result_1],

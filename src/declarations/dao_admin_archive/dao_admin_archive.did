@@ -16,6 +16,26 @@ type TokenType =
    ICRC12;
    ICRC3;
  };
+type TimerStatus = 
+ record {
+   innerLoopCurrentBatch: nat;
+   innerLoopCurrentType: text;
+   innerLoopLastRun: int;
+   innerLoopNextScheduled: int;
+   innerLoopRunning: bool;
+   innerLoopStartTime: int;
+   innerLoopTotalBatches: nat;
+   middleLoopCurrentState: text;
+   middleLoopLastRun: int;
+   middleLoopNextScheduled: int;
+   middleLoopRunning: bool;
+   middleLoopStartTime: int;
+   middleLoopTotalRuns: nat;
+   outerLoopIntervalSeconds: nat;
+   outerLoopLastRun: int;
+   outerLoopRunning: bool;
+   outerLoopTotalRuns: nat;
+ };
 type SystemState = 
  variant {
    Active;
@@ -89,6 +109,7 @@ type DAOAdminArchive =
        totalSuccessfulActions: nat;
        totalTreasuryActions: nat;
      }) query;
+   getTimerStatus: () -> (TimerStatus) query;
    icrc3_get_archives: (args: GetArchivesArgs) -> (GetArchivesResult) query;
    icrc3_get_blocks: (args: GetBlocksArgs) -> (GetBlocksResult) query;
    icrc3_get_tip_certificate: () -> (opt DataCertificate) query;

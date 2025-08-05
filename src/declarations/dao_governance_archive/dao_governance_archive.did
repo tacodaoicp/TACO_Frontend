@@ -26,6 +26,26 @@ type Value =
    Nat: nat;
    Text: text;
  };
+type TimerStatus = 
+ record {
+   innerLoopCurrentBatch: nat;
+   innerLoopCurrentType: text;
+   innerLoopLastRun: int;
+   innerLoopNextScheduled: int;
+   innerLoopRunning: bool;
+   innerLoopStartTime: int;
+   innerLoopTotalBatches: nat;
+   middleLoopCurrentState: text;
+   middleLoopLastRun: int;
+   middleLoopNextScheduled: int;
+   middleLoopRunning: bool;
+   middleLoopStartTime: int;
+   middleLoopTotalRuns: nat;
+   outerLoopIntervalSeconds: nat;
+   outerLoopLastRun: int;
+   outerLoopRunning: bool;
+   outerLoopTotalRuns: nat;
+ };
 type Result_3 = 
  variant {
    err: ArchiveError;
@@ -114,6 +134,7 @@ type DAOGovernanceArchive =
        totalVotingPowerInSystem: nat;
      }) query;
    getNeuronUpdatesByNeuron: (neuronId: blob, limit: nat) -> (Result_2) query;
+   getTimerStatus: () -> (TimerStatus) query;
    getVotingPowerChangesByUser: (user: principal, limit: nat) ->
     (Result_1) query;
    icrc3_get_archives: (args: GetArchivesArgs) -> (GetArchivesResult) query;

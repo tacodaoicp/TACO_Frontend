@@ -44,6 +44,7 @@ export interface DAOGovernanceArchive {
     [Uint8Array | number[], bigint],
     Result_2
   >,
+  'getTimerStatus' : ActorMethod<[], TimerStatus>,
   'getVotingPowerChangesByUser' : ActorMethod<[Principal, bigint], Result_1>,
   'icrc3_get_archives' : ActorMethod<[GetArchivesArgs], GetArchivesResult>,
   'icrc3_get_blocks' : ActorMethod<[GetBlocksArgs], GetBlocksResult>,
@@ -91,6 +92,25 @@ export type Result_2 = { 'ok' : Array<NeuronUpdateBlockData> } |
   { 'err' : ArchiveError };
 export type Result_3 = { 'ok' : bigint } |
   { 'err' : ArchiveError };
+export interface TimerStatus {
+  'innerLoopRunning' : boolean,
+  'middleLoopCurrentState' : string,
+  'middleLoopStartTime' : bigint,
+  'outerLoopLastRun' : bigint,
+  'outerLoopRunning' : boolean,
+  'innerLoopCurrentType' : string,
+  'innerLoopCurrentBatch' : bigint,
+  'middleLoopTotalRuns' : bigint,
+  'outerLoopIntervalSeconds' : bigint,
+  'innerLoopStartTime' : bigint,
+  'middleLoopNextScheduled' : bigint,
+  'outerLoopTotalRuns' : bigint,
+  'middleLoopLastRun' : bigint,
+  'middleLoopRunning' : boolean,
+  'innerLoopLastRun' : bigint,
+  'innerLoopNextScheduled' : bigint,
+  'innerLoopTotalBatches' : bigint,
+}
 export type Value = { 'Int' : bigint } |
   { 'Map' : Array<[string, Value]> } |
   { 'Nat' : bigint } |
