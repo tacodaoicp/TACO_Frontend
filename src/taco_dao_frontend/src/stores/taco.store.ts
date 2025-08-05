@@ -2842,7 +2842,7 @@ export const useTacoStore = defineStore('taco', () => {
                 canisterId,
             });
 
-            const result = await actor.pauseTokenWithReason(principal, reason) as Result_1;
+            const result = await actor.pauseToken(principal, reason) as Result_1;
             if ('err' in result) {
                 console.error('Error pausing token:', result.err);
                 return false;
@@ -2884,7 +2884,7 @@ export const useTacoStore = defineStore('taco', () => {
                 canisterId,
             });
 
-            const result = await actor.unpauseTokenWithReason(principal, reason) as Result_1;
+            const result = await actor.unpauseToken(principal, reason) as Result_1;
             if ('err' in result) {
                 console.error('Error unpausing token:', result.err);
                 return false;

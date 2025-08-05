@@ -144,14 +144,14 @@
                             <button 
                               v-if="!token.isPaused" 
                               class="btn btn-warning btn-sm"
-                              @click="showPauseConfirmation(principal, token.name)"
+                              @click="showPauseConfirmation(principal.toString(), token.tokenSymbol)"
                             >
                               Pause
                             </button>
                             <button 
                               v-else 
                               class="btn btn-success btn-sm"
-                              @click="showUnpauseConfirmation(principal, token.name)"
+                              @click="showUnpauseConfirmation(principal.toString(), token.tokenSymbol)"
                             >
                               Unpause
                             </button>
