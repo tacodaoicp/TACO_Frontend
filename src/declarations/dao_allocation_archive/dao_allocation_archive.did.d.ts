@@ -49,18 +49,7 @@ export interface DAOAllocationArchive {
   'archiveFollowAction' : ActorMethod<[FollowActionBlockData], Result_4>,
   'getAllocationChangesByToken' : ActorMethod<[Principal, bigint], Result_3>,
   'getAllocationChangesByUser' : ActorMethod<[Principal, bigint], Result_3>,
-  'getArchiveStats' : ActorMethod<
-    [],
-    {
-      'totalFollowActions' : bigint,
-      'totalBlocks' : bigint,
-      'totalFollowCount' : bigint,
-      'totalUnfollowCount' : bigint,
-      'totalAllocationChanges' : bigint,
-      'lastImportedAllocationTimestamp' : bigint,
-      'lastImportedFollowTimestamp' : bigint,
-    }
-  >,
+  'getArchiveStats' : ActorMethod<[], ArchiveStatus>,
   'getArchiveStatus' : ActorMethod<[], Result_2>,
   'getBatchImportStatus' : ActorMethod<
     [],

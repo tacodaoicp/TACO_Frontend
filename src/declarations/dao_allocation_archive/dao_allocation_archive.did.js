@@ -149,21 +149,7 @@ export const idlFactory = ({ IDL }) => {
         [Result_3],
         ['query'],
       ),
-    'getArchiveStats' : IDL.Func(
-        [],
-        [
-          IDL.Record({
-            'totalFollowActions' : IDL.Nat,
-            'totalBlocks' : IDL.Nat,
-            'totalFollowCount' : IDL.Nat,
-            'totalUnfollowCount' : IDL.Nat,
-            'totalAllocationChanges' : IDL.Nat,
-            'lastImportedAllocationTimestamp' : IDL.Int,
-            'lastImportedFollowTimestamp' : IDL.Int,
-          }),
-        ],
-        ['query'],
-      ),
+    'getArchiveStats' : IDL.Func([], [ArchiveStatus], ['query']),
     'getArchiveStatus' : IDL.Func([], [Result_2], ['query']),
     'getBatchImportStatus' : IDL.Func(
         [],

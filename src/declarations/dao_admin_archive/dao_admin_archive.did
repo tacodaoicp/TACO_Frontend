@@ -118,16 +118,7 @@ type DAOAdminArchive =
    getAdminActionsByAdmin: (admin: principal, limit: nat) -> (Result_2) query;
    getAdminActionsByCanister: (canister: AdminCanisterSource, limit: 
     nat) -> (Result_2) query;
-   getArchiveStats: () ->
-    (record {
-       lastImportedDAOActionId: nat;
-       lastImportedTreasuryActionId: nat;
-       totalAdminActions: nat;
-       totalBlocks: nat;
-       totalDAOActions: nat;
-       totalSuccessfulActions: nat;
-       totalTreasuryActions: nat;
-     }) query;
+   getArchiveStats: () -> (ArchiveStatus) query;
    getArchiveStatus: () -> (Result_1) query;
    getBatchImportStatus: () ->
     (record {

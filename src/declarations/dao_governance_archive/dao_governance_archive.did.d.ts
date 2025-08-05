@@ -26,19 +26,7 @@ export interface BlockType { 'url' : string, 'block_type' : string }
 export interface DAOGovernanceArchive {
   'archiveNeuronUpdate' : ActorMethod<[NeuronUpdateBlockData], Result_4>,
   'archiveVotingPowerChange' : ActorMethod<[VotingPowerBlockData], Result_4>,
-  'getArchiveStats' : ActorMethod<
-    [],
-    {
-      'totalNeuronUpdates' : bigint,
-      'lastImportedNeuronTimestamp' : bigint,
-      'totalVotingPowerChanges' : bigint,
-      'totalBlocks' : bigint,
-      'totalVotingPowerLost' : bigint,
-      'lastImportedVotingPowerTimestamp' : bigint,
-      'activeNeuronCount' : bigint,
-      'totalVotingPowerGained' : bigint,
-    }
-  >,
+  'getArchiveStats' : ActorMethod<[], ArchiveStatus>,
   'getArchiveStatus' : ActorMethod<[], Result_3>,
   'getBatchImportStatus' : ActorMethod<
     [],

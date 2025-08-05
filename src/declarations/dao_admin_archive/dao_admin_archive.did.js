@@ -223,21 +223,7 @@ export const idlFactory = ({ IDL }) => {
         [Result_2],
         ['query'],
       ),
-    'getArchiveStats' : IDL.Func(
-        [],
-        [
-          IDL.Record({
-            'lastImportedDAOActionId' : IDL.Nat,
-            'totalSuccessfulActions' : IDL.Nat,
-            'totalDAOActions' : IDL.Nat,
-            'lastImportedTreasuryActionId' : IDL.Nat,
-            'totalBlocks' : IDL.Nat,
-            'totalTreasuryActions' : IDL.Nat,
-            'totalAdminActions' : IDL.Nat,
-          }),
-        ],
-        ['query'],
-      ),
+    'getArchiveStats' : IDL.Func([], [ArchiveStatus], ['query']),
     'getArchiveStatus' : IDL.Func([], [Result_1], ['query']),
     'getBatchImportStatus' : IDL.Func(
         [],

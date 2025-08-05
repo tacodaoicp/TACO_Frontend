@@ -134,17 +134,7 @@ type DAOGovernanceArchive =
  service {
    archiveNeuronUpdate: (update: NeuronUpdateBlockData) -> (Result_4);
    archiveVotingPowerChange: (change: VotingPowerBlockData) -> (Result_4);
-   getArchiveStats: () ->
-    (record {
-       activeNeuronCount: nat;
-       lastImportedNeuronTimestamp: int;
-       lastImportedVotingPowerTimestamp: int;
-       totalBlocks: nat;
-       totalNeuronUpdates: nat;
-       totalVotingPowerChanges: nat;
-       totalVotingPowerGained: nat;
-       totalVotingPowerLost: nat;
-     }) query;
+   getArchiveStats: () -> (ArchiveStatus) query;
    getArchiveStatus: () -> (Result_3) query;
    getBatchImportStatus: () ->
     (record {

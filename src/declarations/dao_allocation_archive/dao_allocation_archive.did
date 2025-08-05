@@ -115,16 +115,7 @@ type DAOAllocationArchive =
     (Result_3) query;
    getAllocationChangesByUser: (user: principal, limit: nat) ->
     (Result_3) query;
-   getArchiveStats: () ->
-    (record {
-       lastImportedAllocationTimestamp: int;
-       lastImportedFollowTimestamp: int;
-       totalAllocationChanges: nat;
-       totalBlocks: nat;
-       totalFollowActions: nat;
-       totalFollowCount: nat;
-       totalUnfollowCount: nat;
-     }) query;
+   getArchiveStats: () -> (ArchiveStatus) query;
    getArchiveStatus: () -> (Result_2) query;
    getBatchImportStatus: () ->
     (record {

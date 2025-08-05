@@ -133,18 +133,7 @@ export interface DAOAdminArchive {
     [AdminCanisterSource, bigint],
     Result_2
   >,
-  'getArchiveStats' : ActorMethod<
-    [],
-    {
-      'lastImportedDAOActionId' : bigint,
-      'totalSuccessfulActions' : bigint,
-      'totalDAOActions' : bigint,
-      'lastImportedTreasuryActionId' : bigint,
-      'totalBlocks' : bigint,
-      'totalTreasuryActions' : bigint,
-      'totalAdminActions' : bigint,
-    }
-  >,
+  'getArchiveStats' : ActorMethod<[], ArchiveStatus>,
   'getArchiveStatus' : ActorMethod<[], Result_1>,
   'getBatchImportStatus' : ActorMethod<
     [],

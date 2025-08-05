@@ -138,22 +138,7 @@ export const idlFactory = ({ IDL }) => {
         [Result_4],
         [],
       ),
-    'getArchiveStats' : IDL.Func(
-        [],
-        [
-          IDL.Record({
-            'totalNeuronUpdates' : IDL.Nat,
-            'lastImportedNeuronTimestamp' : IDL.Int,
-            'totalVotingPowerChanges' : IDL.Nat,
-            'totalBlocks' : IDL.Nat,
-            'totalVotingPowerLost' : IDL.Nat,
-            'lastImportedVotingPowerTimestamp' : IDL.Int,
-            'activeNeuronCount' : IDL.Nat,
-            'totalVotingPowerGained' : IDL.Nat,
-          }),
-        ],
-        ['query'],
-      ),
+    'getArchiveStats' : IDL.Func([], [ArchiveStatus], ['query']),
     'getArchiveStatus' : IDL.Func([], [Result_3], ['query']),
     'getBatchImportStatus' : IDL.Func(
         [],
