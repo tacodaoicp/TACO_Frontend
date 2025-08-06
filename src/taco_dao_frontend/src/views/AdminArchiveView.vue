@@ -1716,6 +1716,101 @@ export default {
         `
       }
 
+      // Check for neuron update (dao_governance_archive) - detailed view
+      if ((parsedData.tx && parsedData.tx.operation === '3neuron_update') || tradeData.operation === '3neuron_update') {
+        const neuronUpdateData = parsedData.tx ? parsedData.tx.data : tradeData
+        
+        if (!neuronUpdateData) {
+          return '<div class="text-muted">No neuron update data available</div>'
+        }
+        
+        const neuronId = neuronUpdateData.neuronId ? this.formatPrincipalFromBlob(neuronUpdateData.neuronId) : 'Unknown'
+        const neuronIdShort = neuronId.length > 16 ? neuronId.substring(0, 8) + '...' + neuronId.substring(neuronId.length - 8) : neuronId
+        const updateType = neuronUpdateData.updateType || 'Unknown'
+        const oldVotingPower = Number(neuronUpdateData.oldVotingPower || 0)
+        const newVotingPower = Number(neuronUpdateData.newVotingPower || 0)
+        const timestamp = neuronUpdateData.timestamp || Date.now()
+        const formattedTime = this.formatTime(Number(timestamp))
+        
+        // Format voting power with commas
+        const formatVotingPower = (vp) => {
+          return (vp / 100000000).toLocaleString(undefined, { 
+            minimumFractionDigits: 2, 
+            maximumFractionDigits: 2 
+          }) + ' ICP'
+        }
+        
+        // Format affected users
+        let affectedUsersHtml = '<em class="text-muted">None</em>'
+        if (neuronUpdateData.affectedUsers && neuronUpdateData.affectedUsers.length > 0) {
+          affectedUsersHtml = neuronUpdateData.affectedUsers.map(userBlob => {
+            const userId = this.formatPrincipalFromBlob(userBlob)
+            const userShort = userId.length > 16 ? userId.substring(0, 6) + '...' + userId.substring(userId.length - 6) : userId
+            return `<span class="badge bg-warning text-dark me-1">${userShort}</span>`
+          }).join('')
+        }
+        
+        // Calculate change
+        const vpChange = newVotingPower - oldVotingPower
+        const changeDirection = vpChange > 0 ? '📈' : vpChange < 0 ? '📉' : '➡️'
+        const changeClass = vpChange > 0 ? 'text-success' : vpChange < 0 ? 'text-danger' : 'text-muted'
+        
+        // Update type styling
+        const updateTypeClass = updateType === 'StateChanged' ? 'bg-info' : 
+                               updateType === 'VotingPowerChanged' ? 'bg-success' : 
+                               updateType === 'Dissolved' ? 'bg-danger' : 'bg-secondary'
+        
+        return `
+          <div class="card bg-dark border-warning">
+            <div class="card-header bg-warning text-dark">
+              <h6 class="mb-0">🧠 Neuron Update</h6>
+            </div>
+            <div class="card-body">
+              <div class="row">
+                <div class="col-md-6">
+                  <h6>🔧 Update Details</h6>
+                  <table class="table table-sm table-dark table-borderless">
+                    <tr>
+                      <td><strong>Neuron ID:</strong></td>
+                      <td><code class="text-warning">${neuronIdShort}</code></td>
+                    </tr>
+                    <tr>
+                      <td><strong>Update Type:</strong></td>
+                      <td><span class="badge ${updateTypeClass}">${updateType}</span></td>
+                    </tr>
+                    <tr>
+                      <td><strong>Previous Power:</strong></td>
+                      <td>${formatVotingPower(oldVotingPower)}</td>
+                    </tr>
+                    <tr>
+                      <td><strong>New Power:</strong></td>
+                      <td><strong class="${changeClass}">${formatVotingPower(newVotingPower)}</strong></td>
+                    </tr>
+                    <tr>
+                      <td><strong>Change:</strong></td>
+                      <td><span class="${changeClass}">${changeDirection} ${formatVotingPower(Math.abs(vpChange))}</span></td>
+                    </tr>
+                    <tr>
+                      <td><strong>Timestamp:</strong></td>
+                      <td>🕐 ${formattedTime}</td>
+                    </tr>
+                  </table>
+                </div>
+                <div class="col-md-6">
+                  <h6>👥 Affected Users</h6>
+                  <div class="mb-2">
+                    ${affectedUsersHtml}
+                  </div>
+                  <small class="text-muted">
+                    ${neuronUpdateData.affectedUsers ? neuronUpdateData.affectedUsers.length : 0} user(s) affected by this neuron change
+                  </small>
+                </div>
+              </div>
+            </div>
+          </div>
+        `
+      }
+
       // Generic block
       const keys = Object.keys(parsedData)
       return `
@@ -1762,9 +1857,9 @@ export default {
       if (parsedData.tx && parsedData.tx.operation) {
         if (parsedData.tx.operation === '3allocation_change') return 'Allocation Change'
         if (parsedData.tx.operation === '3voting_power') return 'Voting Power Change'
+        if (parsedData.tx.operation === '3neuron_update') return 'Neuron Update'
         if (parsedData.tx.operation === '3admin_action') return 'Admin Action'
         if (parsedData.tx.operation === '3follow_action') return 'Follow Action'
-        if (parsedData.tx.operation === '3neuron_update') return 'Neuron Update'
         return parsedData.tx.operation
       }
       
@@ -2009,6 +2104,34 @@ export default {
         const formattedTime = this.formatTime(Number(timestamp))
         
         return `🗳️ ${userShort}: ${formatVP(oldVP)} → ${formatVP(newVP)} ICP ${changeDirection} (${changeType}) • 🕐 ${formattedTime}`
+      }
+      
+      // Neuron update block (summary)
+      if ((parsedData.tx && parsedData.tx.operation === '3neuron_update') || tradeData.operation === '3neuron_update') {
+        // Extract neuron update data from the nested structure
+        let neuronUpdateData = tradeData
+        if (parsedData.tx && parsedData.tx.data) {
+          neuronUpdateData = parsedData.tx.data
+        }
+        
+        const neuronId = neuronUpdateData.neuronId ? this.formatPrincipalFromBlob(neuronUpdateData.neuronId) : 'Unknown'
+        const neuronIdShort = neuronId.length > 16 ? neuronId.substring(0, 6) + '...' + neuronId.substring(neuronId.length - 6) : neuronId
+        const updateType = neuronUpdateData.updateType || 'Unknown'
+        const oldVP = Number(neuronUpdateData.oldVotingPower || 0)
+        const newVP = Number(neuronUpdateData.newVotingPower || 0)
+        const affectedCount = neuronUpdateData.affectedUsers ? neuronUpdateData.affectedUsers.length : 0
+        
+        // Format voting power (convert from e8s to ICP)
+        const formatVP = (vp) => (vp / 100000000).toLocaleString(undefined, { maximumFractionDigits: 2 })
+        
+        // Calculate change
+        const vpChange = newVP - oldVP
+        const changeDirection = vpChange > 0 ? '📈' : vpChange < 0 ? '📉' : '➡️'
+        
+        const timestamp = neuronUpdateData.timestamp || Date.now()
+        const formattedTime = this.formatTime(Number(timestamp))
+        
+        return `🧠 ${neuronIdShort}: ${formatVP(oldVP)} → ${formatVP(newVP)} ICP ${changeDirection} (${updateType}) affecting ${affectedCount} user(s) • 🕐 ${formattedTime}`
       }
       
       // Generic block
