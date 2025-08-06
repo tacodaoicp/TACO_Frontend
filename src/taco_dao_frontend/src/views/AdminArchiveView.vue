@@ -1811,6 +1811,109 @@ export default {
         `
       }
 
+      // Check for admin action (dao_admin_archive) - detailed view
+      if ((parsedData.tx && parsedData.tx.operation === '3admin') || tradeData.operation === '3admin') {
+        const adminData = parsedData.tx ? parsedData.tx.data : tradeData
+        
+        if (!adminData) {
+          return '<div class="text-muted">No admin action data available</div>'
+        }
+        
+        const adminId = adminData.admin ? this.formatPrincipalFromBlob(adminData.admin) : 'Unknown'
+        const adminShort = adminId.length > 16 ? adminId.substring(0, 8) + '...' + adminId.substring(adminId.length - 8) : adminId
+        const canister = adminData.canister || 'Unknown'
+        const actionType = adminData.actionType?.type || 'Unknown'
+        const reason = adminData.reason || 'No reason provided'
+        const success = adminData.success === 1n || adminData.success === '1' || adminData.success === 1
+        const errorMessage = adminData.errorMessage || ''
+        const timestamp = adminData.timestamp || Date.now()
+        const formattedTime = this.formatTime(Number(timestamp))
+        
+        // Format token if present in actionType
+        let tokenInfo = ''
+        if (adminData.actionType?.token) {
+          const tokenPrincipal = this.formatPrincipalFromBlob(adminData.actionType.token)
+          const tokenName = this.formatTokenNameFromBlob(adminData.actionType.token)
+          tokenInfo = `<tr>
+            <td><strong>Token:</strong></td>
+            <td><code class="text-info">${tokenName}</code><br><small class="text-muted">${tokenPrincipal}</small></td>
+          </tr>`
+        }
+        
+        // Action type styling
+        const getActionTypeClass = (type) => {
+          switch(type) {
+            case 'TokenPause': return 'bg-warning text-dark'
+            case 'TokenUnpause': return 'bg-success'
+            case 'TokenAdd': return 'bg-primary'
+            case 'TokenRemove': return 'bg-danger'
+            case 'SystemPause': return 'bg-danger'
+            case 'SystemUnpause': return 'bg-success'
+            case 'ParameterUpdate': return 'bg-info'
+            default: return 'bg-secondary'
+          }
+        }
+        
+        // Success/failure styling
+        const statusClass = success ? 'text-success' : 'text-danger'
+        const statusIcon = success ? '✅' : '❌'
+        const statusText = success ? 'Success' : 'Failed'
+        
+        return `
+          <div class="card bg-dark border-danger">
+            <div class="card-header bg-danger text-white">
+              <h6 class="mb-0">⚙️ Admin Action</h6>
+            </div>
+            <div class="card-body">
+              <div class="row">
+                <div class="col-md-6">
+                  <h6>🔧 Action Details</h6>
+                  <table class="table table-sm table-dark table-borderless">
+                    <tr>
+                      <td><strong>Admin:</strong></td>
+                      <td><code class="text-danger">${adminShort}</code></td>
+                    </tr>
+                    <tr>
+                      <td><strong>Canister:</strong></td>
+                      <td><span class="badge bg-dark border">${canister}</span></td>
+                    </tr>
+                    <tr>
+                      <td><strong>Action Type:</strong></td>
+                      <td><span class="badge ${getActionTypeClass(actionType)}">${actionType}</span></td>
+                    </tr>
+                    ${tokenInfo}
+                    <tr>
+                      <td><strong>Status:</strong></td>
+                      <td><span class="${statusClass}"><strong>${statusIcon} ${statusText}</strong></span></td>
+                    </tr>
+                    <tr>
+                      <td><strong>Timestamp:</strong></td>
+                      <td>🕐 ${formattedTime}</td>
+                    </tr>
+                  </table>
+                </div>
+                <div class="col-md-6">
+                  <h6>📝 Reason & Details</h6>
+                  <div class="alert alert-info">
+                    <strong>Reason:</strong><br>
+                    <em>"${reason}"</em>
+                  </div>
+                  ${!success && errorMessage ? `
+                    <div class="alert alert-danger">
+                      <strong>Error:</strong><br>
+                      <code>${errorMessage}</code>
+                    </div>
+                  ` : ''}
+                  <small class="text-muted">
+                    Admin action executed on ${canister} canister
+                  </small>
+                </div>
+              </div>
+            </div>
+          </div>
+        `
+      }
+
       // Generic block
       const keys = Object.keys(parsedData)
       return `
@@ -1858,6 +1961,7 @@ export default {
         if (parsedData.tx.operation === '3allocation_change') return 'Allocation Change'
         if (parsedData.tx.operation === '3voting_power') return 'Voting Power Change'
         if (parsedData.tx.operation === '3neuron_update') return 'Neuron Update'
+        if (parsedData.tx.operation === '3admin') return 'Admin Action'
         if (parsedData.tx.operation === '3admin_action') return 'Admin Action'
         if (parsedData.tx.operation === '3follow_action') return 'Follow Action'
         return parsedData.tx.operation
@@ -2132,6 +2236,34 @@ export default {
         const formattedTime = this.formatTime(Number(timestamp))
         
         return `🧠 ${neuronIdShort}: ${formatVP(oldVP)} → ${formatVP(newVP)} ICP ${changeDirection} (${updateType}) affecting ${affectedCount} user(s) • 🕐 ${formattedTime}`
+      }
+      
+      // Admin action block (summary)
+      if ((parsedData.tx && parsedData.tx.operation === '3admin') || tradeData.operation === '3admin') {
+        // Extract admin action data from the nested structure
+        let adminData = tradeData
+        if (parsedData.tx && parsedData.tx.data) {
+          adminData = parsedData.tx.data
+        }
+        
+        const adminId = adminData.admin ? this.formatPrincipalFromBlob(adminData.admin) : 'Unknown'
+        const adminShort = adminId.length > 16 ? adminId.substring(0, 6) + '...' + adminId.substring(adminId.length - 6) : adminId
+        const canister = adminData.canister || 'Unknown'
+        const actionType = adminData.actionType?.type || 'Unknown'
+        const success = adminData.success === 1n || adminData.success === '1' || adminData.success === 1
+        const statusIcon = success ? '✅' : '❌'
+        
+        // Get token name if present
+        let tokenInfo = ''
+        if (adminData.actionType?.token) {
+          const tokenName = this.formatTokenNameFromBlob(adminData.actionType.token)
+          tokenInfo = ` (${tokenName})`
+        }
+        
+        const timestamp = adminData.timestamp || Date.now()
+        const formattedTime = this.formatTime(Number(timestamp))
+        
+        return `⚙️ ${adminShort}: ${actionType}${tokenInfo} on ${canister} ${statusIcon} • 🕐 ${formattedTime}`
       }
       
       // Generic block
