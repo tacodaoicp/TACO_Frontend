@@ -1649,7 +1649,7 @@ export default {
           return (vp / 100000000).toLocaleString(undefined, { 
             minimumFractionDigits: 2, 
             maximumFractionDigits: 2 
-          }) + ' ICP'
+          }) + ' VP'
         }
         
         // Format neurons if available
@@ -1737,7 +1737,7 @@ export default {
           return (vp / 100000000).toLocaleString(undefined, { 
             minimumFractionDigits: 2, 
             maximumFractionDigits: 2 
-          }) + ' ICP'
+          }) + ' VP'
         }
         
         // Format affected users
@@ -2198,7 +2198,7 @@ export default {
         const oldVP = Number(votingPowerData.oldVotingPower || 0)
         const newVP = Number(votingPowerData.newVotingPower || 0)
         
-        // Format voting power (convert from e8s to ICP)
+        // Format voting power (convert from e8s to VP)
         const formatVP = (vp) => (vp / 100000000).toLocaleString(undefined, { maximumFractionDigits: 2 })
         
         // Calculate change
@@ -2208,7 +2208,7 @@ export default {
         const timestamp = votingPowerData.timestamp || Date.now()
         const formattedTime = this.formatTime(Number(timestamp))
         
-        return `🗳️ ${userShort}: ${formatVP(oldVP)} → ${formatVP(newVP)} ICP ${changeDirection} (${changeType}) • 🕐 ${formattedTime}`
+        return `🗳️ ${userShort}: ${formatVP(oldVP)} → ${formatVP(newVP)} VP ${changeDirection} (${changeType}) • 🕐 ${formattedTime}`
       }
       
       // Neuron update block (summary)
@@ -2226,7 +2226,7 @@ export default {
         const newVP = Number(neuronUpdateData.newVotingPower || 0)
         const affectedCount = neuronUpdateData.affectedUsers ? neuronUpdateData.affectedUsers.length : 0
         
-        // Format voting power (convert from e8s to ICP)
+        // Format voting power (convert from e8s to VP)
         const formatVP = (vp) => (vp / 100000000).toLocaleString(undefined, { maximumFractionDigits: 2 })
         
         // Calculate change
@@ -2236,7 +2236,7 @@ export default {
         const timestamp = neuronUpdateData.timestamp || Date.now()
         const formattedTime = this.formatTime(Number(timestamp))
         
-        return `🧠 ${neuronIdShort}: ${formatVP(oldVP)} → ${formatVP(newVP)} ICP ${changeDirection} (${updateType}) affecting ${affectedCount} user(s) • 🕐 ${formattedTime}`
+        return `🧠 ${neuronIdShort}: ${formatVP(oldVP)} → ${formatVP(newVP)} VP ${changeDirection} (${updateType}) affecting ${affectedCount} user(s) • 🕐 ${formattedTime}`
       }
       
       // Admin action block (summary)
