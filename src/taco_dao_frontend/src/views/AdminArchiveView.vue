@@ -1568,20 +1568,14 @@ export default {
         const userId = this.formatPrincipalFromBlob(allocationData.user)
         const changeType = allocationData.changeType?.type || 'Unknown'
         const userInitiated = allocationData.changeType?.userInitiated === 1n || allocationData.changeType?.userInitiated === '1'
-        const votingPower = allocationData.votingPower || 0
+        // Voting power not available in current data structure (always 0)
+        const votingPower = 0
         const reason = allocationData.reason || 'No reason provided'
         const timestamp = allocationData.timestamp || Date.now()
         const formattedTime = this.formatTime(Number(timestamp))
         
-        // Format old allocations
-        let oldAllocationsHtml = '<em class="text-muted">None</em>'
-        if (allocationData.oldAllocations && allocationData.oldAllocations.length > 0) {
-          oldAllocationsHtml = allocationData.oldAllocations.map(allocation => {
-            const tokenName = this.formatTokenNameFromBlob(allocation.token)
-            const percentage = (Number(allocation.basisPoints) / 100).toFixed(2)
-            return `<span class="badge bg-secondary me-1">${tokenName}: ${percentage}%</span>`
-          }).join('')
-        }
+        // Old allocations not available in current data structure
+        let oldAllocationsHtml = '<em class="text-muted">Not available (requires DAO migration)</em>'
         
         // Format new allocations
         let newAllocationsHtml = '<em class="text-muted">None</em>'
@@ -1631,7 +1625,94 @@ export default {
               </table>
             </div>
           </div>
-          ${reason && reason !== '' ? `<div class="alert alert-info mt-2"><strong>Reason:</strong> ${reason}</div>` : ''}
+          <!-- Allocation changes don't have reasons, only admin actions do -->
+        `
+      }
+
+      // Check for voting power change (dao_governance_archive)
+      if ((parsedData.tx && parsedData.tx.operation === '3voting_power') || tradeData.operation === '3voting_power') {
+        const votingPowerData = parsedData.tx ? parsedData.tx.data : tradeData
+        
+        if (!votingPowerData) {
+          return '<div class="text-muted">No voting power data available</div>'
+        }
+        
+        const userId = this.formatPrincipalFromBlob(votingPowerData.user)
+        const changeType = votingPowerData.changeType || 'Unknown'
+        const oldVotingPower = Number(votingPowerData.oldVotingPower || 0)
+        const newVotingPower = Number(votingPowerData.newVotingPower || 0)
+        const timestamp = votingPowerData.timestamp || Date.now()
+        const formattedTime = this.formatTime(Number(timestamp))
+        
+        // Format voting power with commas
+        const formatVotingPower = (vp) => {
+          return (vp / 100000000).toLocaleString(undefined, { 
+            minimumFractionDigits: 2, 
+            maximumFractionDigits: 2 
+          }) + ' ICP'
+        }
+        
+        // Format neurons if available
+        let neuronsHtml = '<em class="text-muted">None</em>'
+        if (votingPowerData.neurons && votingPowerData.neurons.length > 0) {
+          neuronsHtml = votingPowerData.neurons.map(neuron => {
+            const neuronId = neuron.neuronId ? this.formatPrincipalFromBlob(neuron.neuronId).slice(0, 8) + '...' : 'Unknown'
+            const neuronVP = Number(neuron.votingPower || 0)
+            const formattedNeuronVP = formatVotingPower(neuronVP)
+            return `<span class="badge bg-info me-1">${neuronId}: ${formattedNeuronVP}</span>`
+          }).join('')
+        }
+        
+        // Calculate change
+        const vpChange = newVotingPower - oldVotingPower
+        const changeDirection = vpChange > 0 ? '📈' : vpChange < 0 ? '📉' : '➡️'
+        const changeClass = vpChange > 0 ? 'text-success' : vpChange < 0 ? 'text-danger' : 'text-muted'
+        
+        return `
+          <div class="card bg-dark border-info">
+            <div class="card-header bg-info text-dark">
+              <h6 class="mb-0">🗳️ Voting Power Change</h6>
+            </div>
+            <div class="card-body">
+              <div class="row">
+                <div class="col-md-6">
+                  <h6>📊 Power Details</h6>
+                  <table class="table table-sm table-dark table-borderless">
+                    <tr>
+                      <td><strong>User:</strong></td>
+                      <td><code class="text-info">${userId}</code></td>
+                    </tr>
+                    <tr>
+                      <td><strong>Change Type:</strong></td>
+                      <td><span class="badge bg-secondary">${changeType}</span></td>
+                    </tr>
+                    <tr>
+                      <td><strong>Previous:</strong></td>
+                      <td>${formatVotingPower(oldVotingPower)}</td>
+                    </tr>
+                    <tr>
+                      <td><strong>New:</strong></td>
+                      <td><strong class="${changeClass}">${formatVotingPower(newVotingPower)}</strong></td>
+                    </tr>
+                    <tr>
+                      <td><strong>Change:</strong></td>
+                      <td><span class="${changeClass}">${changeDirection} ${formatVotingPower(Math.abs(vpChange))}</span></td>
+                    </tr>
+                    <tr>
+                      <td><strong>Timestamp:</strong></td>
+                      <td>🕐 ${formattedTime}</td>
+                    </tr>
+                  </table>
+                </div>
+                <div class="col-md-6">
+                  <h6>🧠 Neurons</h6>
+                  <div class="mb-2">
+                    ${neuronsHtml}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
         `
       }
 
@@ -1680,9 +1761,9 @@ export default {
       // Check for operation field (for DAO archive blocks)
       if (parsedData.tx && parsedData.tx.operation) {
         if (parsedData.tx.operation === '3allocation_change') return 'Allocation Change'
+        if (parsedData.tx.operation === '3voting_power') return 'Voting Power Change'
         if (parsedData.tx.operation === '3admin_action') return 'Admin Action'
         if (parsedData.tx.operation === '3follow_action') return 'Follow Action'
-        if (parsedData.tx.operation === '3voting_power') return 'Voting Power'
         if (parsedData.tx.operation === '3neuron_update') return 'Neuron Update'
         return parsedData.tx.operation
       }
@@ -1901,6 +1982,33 @@ export default {
         
         const initiator = userInitiated ? '👤' : '🤖'
         return `📊 ${initiator} ${changeType}: ${userShort} changed ${oldCount}→${newCount} allocations (${newTotal}% total) • 🕐 ${formattedTime}`
+      }
+      
+      // Voting power change block
+      if ((parsedData.tx && parsedData.tx.operation === '3voting_power') || tradeData.operation === '3voting_power') {
+        // Extract voting power data from the nested structure
+        let votingPowerData = tradeData
+        if (parsedData.tx && parsedData.tx.data) {
+          votingPowerData = parsedData.tx.data
+        }
+        
+        const userId = this.formatPrincipalFromBlob(votingPowerData.user)
+        const userShort = userId ? userId.substring(0, 8) + '...' : 'Unknown'
+        const changeType = votingPowerData.changeType || 'Unknown'
+        const oldVP = Number(votingPowerData.oldVotingPower || 0)
+        const newVP = Number(votingPowerData.newVotingPower || 0)
+        
+        // Format voting power (convert from e8s to ICP)
+        const formatVP = (vp) => (vp / 100000000).toLocaleString(undefined, { maximumFractionDigits: 2 })
+        
+        // Calculate change
+        const vpChange = newVP - oldVP
+        const changeDirection = vpChange > 0 ? '📈' : vpChange < 0 ? '📉' : '➡️'
+        
+        const timestamp = votingPowerData.timestamp || Date.now()
+        const formattedTime = this.formatTime(Number(timestamp))
+        
+        return `🗳️ ${userShort}: ${formatVP(oldVP)} → ${formatVP(newVP)} ICP ${changeDirection} (${changeType}) • 🕐 ${formattedTime}`
       }
       
       // Generic block
