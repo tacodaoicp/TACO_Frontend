@@ -2527,7 +2527,7 @@ export default {
       const oldConfig = actionType.oldConfig || ''
       const newConfig = actionType.newConfig || ''
 
-      if (!oldConfig || !newConfig || oldConfig === newConfig) {
+      if (!oldConfig || !newConfig) {
         return ''
       }
 
@@ -2539,35 +2539,89 @@ export default {
         configText.split('|').forEach(pair => {
           const [key, value] = pair.split('=')
           if (key && value !== undefined) {
-            config[key.trim()] = value.trim()
+            config[key.trim()] = value.trim().replace(/_/g, '') // Remove underscores from numbers
           }
         })
         return config
       }
 
+      // Format values for display
+      const formatConfigValue = (key, rawValue) => {
+        if (!rawValue || rawValue === 'N/A') return rawValue
+        
+        const numValue = parseInt(rawValue)
+        
+        switch (key) {
+          case 'rebalanceIntervalNS':
+            return this.formatDuration(numValue / 1_000_000_000) // Convert ns to seconds
+          case 'portfolioRebalancePeriodNS':
+            return this.formatDuration(numValue / 1_000_000_000)
+          case 'shortSyncIntervalNS':
+            return this.formatDuration(numValue / 1_000_000_000)
+          case 'longSyncIntervalNS':
+            return this.formatDuration(numValue / 1_000_000_000)
+          case 'tokenSyncTimeoutNS':
+            return this.formatDuration(numValue / 1_000_000_000)
+          case 'minTradeValueICP':
+          case 'maxTradeValueICP':
+            return `${(numValue / 100_000_000).toFixed(2)} ICP` // Convert e8s to ICP
+          case 'maxSlippageBasisPoints':
+            return `${(numValue / 100).toFixed(2)}%` // Convert basis points to percentage
+          case 'maxTradeAttemptsPerInterval':
+          case 'maxKongswapAttempts':
+            return numValue.toLocaleString() + ' attempts'
+          case 'maxTradesStored':
+            return numValue.toLocaleString() + ' trades'
+          default:
+            return rawValue
+        }
+      }
+
+      // Format field names for display
+      const formatFieldName = (key) => {
+        const fieldNames = {
+          'rebalanceIntervalNS': 'Rebalance Interval',
+          'maxTradeAttemptsPerInterval': 'Max Trade Attempts',
+          'minTradeValueICP': 'Min Trade Value',
+          'maxTradeValueICP': 'Max Trade Value',
+          'portfolioRebalancePeriodNS': 'Portfolio Rebalance Period',
+          'maxSlippageBasisPoints': 'Max Slippage',
+          'maxTradesStored': 'Max Trades Stored',
+          'maxKongswapAttempts': 'Max Kongswap Attempts',
+          'shortSyncIntervalNS': 'Short Sync Interval',
+          'longSyncIntervalNS': 'Long Sync Interval',
+          'tokenSyncTimeoutNS': 'Token Sync Timeout'
+        }
+        return fieldNames[key] || key
+      }
+
       const oldParsed = parseConfig(oldConfig)
       const newParsed = parseConfig(newConfig)
 
-      // Find changed fields
-      const changes = []
+      // Get all fields and categorize as changed/unchanged
       const allKeys = new Set([...Object.keys(oldParsed), ...Object.keys(newParsed)])
+      const changedFields = []
+      const unchangedFields = []
       
       allKeys.forEach(key => {
         const oldVal = oldParsed[key] || 'N/A'
         const newVal = newParsed[key] || 'N/A'
         
-        if (oldVal !== newVal) {
-          // Format field name for display
-          const displayName = key.replace(/([A-Z])/g, ' $1').replace(/NS$/, ' (ns)').trim()
-          changes.push({
-            field: displayName,
-            old: oldVal,
-            new: newVal
-          })
+        const fieldData = {
+          field: formatFieldName(key),
+          oldFormatted: formatConfigValue(key, oldVal),
+          newFormatted: formatConfigValue(key, newVal),
+          changed: oldVal !== newVal
+        }
+        
+        if (fieldData.changed) {
+          changedFields.push(fieldData)
+        } else {
+          unchangedFields.push(fieldData)
         }
       })
 
-      if (changes.length === 0) {
+      if (changedFields.length === 0 && unchangedFields.length === 0) {
         return ''
       }
 
@@ -2575,16 +2629,61 @@ export default {
         <div class="alert alert-warning mt-2">
           <strong>⚙️ Configuration Changes:</strong>
           <div class="mt-2">
-            ${changes.map(change => `
-              <div class="row text-sm">
-                <div class="col-4"><strong>${change.field}:</strong></div>
-                <div class="col-4 text-muted">${change.old}</div>
-                <div class="col-4 text-success">→ ${change.new}</div>
-              </div>
-            `).join('')}
+            <div class="table-responsive">
+              <table class="table table-sm table-borderless mb-0">
+                <thead>
+                  <tr class="text-muted small">
+                    <th style="width: 40%">Setting</th>
+                    <th style="width: 30%">Before</th>
+                    <th style="width: 30%">After</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${changedFields.map(field => `
+                    <tr style="background-color: #fff3cd;">
+                      <td><strong>${field.field}</strong></td>
+                      <td class="text-muted">${field.oldFormatted}</td>
+                      <td class="text-success"><strong>→ ${field.newFormatted}</strong></td>
+                    </tr>
+                  `).join('')}
+                  ${unchangedFields.length > 0 ? `
+                    <tr>
+                      <td colspan="3" class="text-muted small pt-2">
+                        <em>Unchanged settings:</em>
+                      </td>
+                    </tr>
+                    ${unchangedFields.map(field => `
+                      <tr class="text-muted small">
+                        <td>${field.field}</td>
+                        <td colspan="2">${field.oldFormatted}</td>
+                      </tr>
+                    `).join('')}
+                  ` : ''}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       `
+    },
+
+    // Helper method to format duration in seconds to human-readable format
+    formatDuration(seconds) {
+      if (seconds < 60) {
+        return `${seconds}s`
+      } else if (seconds < 3600) {
+        const minutes = Math.floor(seconds / 60)
+        const remainingSeconds = seconds % 60
+        return remainingSeconds > 0 ? `${minutes}m ${remainingSeconds}s` : `${minutes}m`
+      } else if (seconds < 86400) {
+        const hours = Math.floor(seconds / 3600)
+        const remainingMinutes = Math.floor((seconds % 3600) / 60)
+        return remainingMinutes > 0 ? `${hours}h ${remainingMinutes}m` : `${hours}h`
+      } else {
+        const days = Math.floor(seconds / 86400)
+        const remainingHours = Math.floor((seconds % 86400) / 3600)
+        return remainingHours > 0 ? `${days}d ${remainingHours}h` : `${days}d`
+      }
     },
 
     // Get token metadata from the taco store
