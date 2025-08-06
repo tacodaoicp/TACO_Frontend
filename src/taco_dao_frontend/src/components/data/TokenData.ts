@@ -271,7 +271,7 @@ export const tokenData = [
     },        
     {
         title: 'Gold DAO',
-        symbol: 'gldgov',
+        symbol: 'goldao',
         link: 'https://www.gold-dao.org',
         icpCoinsLink: 'https://neutrinite.io/currencies/GLDGov',
         icon: goldDaoToken,
