@@ -1555,6 +1555,86 @@ export default {
         `
       }
 
+      // Allocation change block details
+      if ((parsedData.tx && parsedData.tx.operation === '3allocation_change') || tradeData.operation === '3allocation_change') {
+        //console.log('=== Processing allocation change block ===', tradeData)
+        
+        // Extract allocation data from the nested structure
+        let allocationData = tradeData
+        if (parsedData.tx && parsedData.tx.data) {
+          allocationData = parsedData.tx.data
+        }
+        
+        const userId = this.formatPrincipalFromBlob(allocationData.user)
+        const changeType = allocationData.changeType?.type || 'Unknown'
+        const userInitiated = allocationData.changeType?.userInitiated === 1n || allocationData.changeType?.userInitiated === '1'
+        const votingPower = allocationData.votingPower || 0
+        const reason = allocationData.reason || 'No reason provided'
+        const timestamp = allocationData.timestamp || Date.now()
+        const formattedTime = this.formatTime(Number(timestamp))
+        
+        // Format old allocations
+        let oldAllocationsHtml = '<em class="text-muted">None</em>'
+        if (allocationData.oldAllocations && allocationData.oldAllocations.length > 0) {
+          oldAllocationsHtml = allocationData.oldAllocations.map(allocation => {
+            const tokenName = this.formatTokenNameFromBlob(allocation.token)
+            const percentage = (Number(allocation.basisPoints) / 100).toFixed(2)
+            return `<span class="badge bg-secondary me-1">${tokenName}: ${percentage}%</span>`
+          }).join('')
+        }
+        
+        // Format new allocations
+        let newAllocationsHtml = '<em class="text-muted">None</em>'
+        if (allocationData.newAllocations && allocationData.newAllocations.length > 0) {
+          newAllocationsHtml = allocationData.newAllocations.map(allocation => {
+            const tokenName = this.formatTokenNameFromBlob(allocation.token)
+            const percentage = (Number(allocation.basisPoints) / 100).toFixed(2)
+            return `<span class="badge bg-primary me-1">${tokenName}: ${percentage}%</span>`
+          }).join('')
+        }
+        
+        // Calculate total percentages
+        const oldTotal = allocationData.oldAllocations ? 
+          (allocationData.oldAllocations.reduce((sum, a) => sum + Number(a.basisPoints), 0) / 100).toFixed(2) : '0.00'
+        const newTotal = allocationData.newAllocations ? 
+          (allocationData.newAllocations.reduce((sum, a) => sum + Number(a.basisPoints), 0) / 100).toFixed(2) : '0.00'
+        
+        return `
+          <div class="row">
+            <div class="col-md-6">
+              <h6>📊 Allocation Change</h6>
+              <table class="table table-sm table-dark">
+                <tr><td><strong>User:</strong></td><td><code>${userId}</code></td></tr>
+                <tr><td><strong>Change Type:</strong></td><td><span class="badge ${userInitiated ? 'bg-success' : 'bg-warning'}">${changeType}</span></td></tr>
+                <tr><td><strong>Initiated By:</strong></td><td>${userInitiated ? '👤 User' : '🤖 System'}</td></tr>
+                <tr><td><strong>Timestamp:</strong></td><td><span class="text-info">🕐 ${formattedTime}</span></td></tr>
+                <tr><td><strong>Voting Power:</strong></td><td>${votingPower}</td></tr>
+              </table>
+            </div>
+            <div class="col-md-6">
+              <h6>🔄 Allocation Details</h6>
+              <table class="table table-sm table-dark">
+                <tr>
+                  <td><strong>Previous:</strong></td>
+                  <td>
+                    ${oldAllocationsHtml}
+                    <br><small class="text-muted">Total: ${oldTotal}%</small>
+                  </td>
+                </tr>
+                <tr>
+                  <td><strong>New:</strong></td>
+                  <td>
+                    ${newAllocationsHtml}
+                    <br><small class="text-muted">Total: ${newTotal}%</small>
+                  </td>
+                </tr>
+              </table>
+            </div>
+          </div>
+          ${reason && reason !== '' ? `<div class="alert alert-info mt-2"><strong>Reason:</strong> ${reason}</div>` : ''}
+        `
+      }
+
       // Generic block
       const keys = Object.keys(parsedData)
       return `
@@ -1597,6 +1677,16 @@ export default {
         return blockTypeData.btype
       }
       
+      // Check for operation field (for DAO archive blocks)
+      if (parsedData.tx && parsedData.tx.operation) {
+        if (parsedData.tx.operation === '3allocation_change') return 'Allocation Change'
+        if (parsedData.tx.operation === '3admin_action') return 'Admin Action'
+        if (parsedData.tx.operation === '3follow_action') return 'Follow Action'
+        if (parsedData.tx.operation === '3voting_power') return 'Voting Power'
+        if (parsedData.tx.operation === '3neuron_update') return 'Neuron Update'
+        return parsedData.tx.operation
+      }
+      
       // Try to infer type from content
       if (blockTypeData.trader || blockTypeData.token_sold || blockTypeData.tokenSold) {
         return 'Trade'
@@ -1609,6 +1699,9 @@ export default {
       }
       if (blockTypeData.priceHistory || blockTypeData.price || blockTypeData.price_icp || blockTypeData.price_usd) {
         return 'Price'
+      }
+      if (blockTypeData.user && (blockTypeData.oldAllocations || blockTypeData.newAllocations)) {
+        return 'Allocation Change'
       }
       
       return 'Data'
@@ -1779,6 +1872,35 @@ export default {
         const formattedTime = this.formatTime(Number(timestamp))
         
         return `💰 ${tokenSymbol}: ${icpFormatted} ICP (${usdFormatted}) via ${source} • 🕐 ${formattedTime}`
+      }
+      
+      // Allocation change block
+      if ((parsedData.tx && parsedData.tx.operation === '3allocation_change') || tradeData.operation === '3allocation_change') {
+        // Extract allocation data from the nested structure
+        let allocationData = tradeData
+        if (parsedData.tx && parsedData.tx.data) {
+          allocationData = parsedData.tx.data
+        }
+        
+        const userId = this.formatPrincipalFromBlob(allocationData.user)
+        const userShort = userId ? userId.substring(0, 8) + '...' : 'Unknown'
+        const changeType = allocationData.changeType?.type || 'Unknown'
+        const userInitiated = allocationData.changeType?.userInitiated === 1n || allocationData.changeType?.userInitiated === '1'
+        
+        // Count allocations
+        const oldCount = allocationData.oldAllocations ? allocationData.oldAllocations.length : 0
+        const newCount = allocationData.newAllocations ? allocationData.newAllocations.length : 0
+        
+        // Calculate total percentages
+        const newTotal = allocationData.newAllocations ? 
+          (allocationData.newAllocations.reduce((sum, a) => sum + Number(a.basisPoints), 0) / 100).toFixed(1) : '0.0'
+        
+        // Extract timestamp
+        const timestamp = allocationData.timestamp || Date.now()
+        const formattedTime = this.formatTime(Number(timestamp))
+        
+        const initiator = userInitiated ? '👤' : '🤖'
+        return `📊 ${initiator} ${changeType}: ${userShort} changed ${oldCount}→${newCount} allocations (${newTotal}% total) • 🕐 ${formattedTime}`
       }
       
       // Generic block
@@ -1991,6 +2113,45 @@ export default {
       } catch (error) {
         console.warn('Error in formatAmount:', error)
         return amount.toString()
+      }
+    },
+
+    // Helper method to format token name from blob (wrapper for formatTokenName)
+    formatTokenNameFromBlob(tokenBlob) {
+      return this.formatTokenName(tokenBlob)
+    },
+
+    // Helper method to format principal from blob
+    formatPrincipalFromBlob(principalBlob) {
+      if (!principalBlob) return 'Unknown'
+      
+      try {
+        let uint8Array = null
+        
+        // Handle direct Uint8Array format
+        if (principalBlob instanceof Uint8Array) {
+          uint8Array = principalBlob
+        }
+        // Handle wrapped Blob format
+        else if (principalBlob.Blob && typeof principalBlob.Blob === 'object') {
+          const blobData = principalBlob.Blob
+          uint8Array = new Uint8Array(Object.keys(blobData).map(key => blobData[key]))
+        }
+        // Handle object with numeric keys (like your example)
+        else if (typeof principalBlob === 'object' && !Array.isArray(principalBlob)) {
+          const keys = Object.keys(principalBlob).map(k => parseInt(k)).sort((a, b) => a - b)
+          uint8Array = new Uint8Array(keys.map(key => principalBlob[key]))
+        }
+        
+        if (uint8Array) {
+          const principal = Principal.fromUint8Array(uint8Array)
+          return principal.toString()
+        }
+        
+        return 'Unknown'
+      } catch (error) {
+        console.warn('Error in formatPrincipalFromBlob:', error)
+        return 'Unknown'
       }
     },
 
