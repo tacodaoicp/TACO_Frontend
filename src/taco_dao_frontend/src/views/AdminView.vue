@@ -962,10 +962,7 @@ async function refreshTimerStatus() {
 
 async function triggerManualSnapshot() {
     console.log('AdminView: triggerManualSnapshot called');
-    if (confirm('Are you sure you want to trigger a manual snapshot?')) {
-        await tacoStore.triggerManualSnapshot();
-        console.log('AdminView: Manual snapshot triggered');
-    }
+    showManualSnapshotConfirmation();
 }
 
 async function triggerManualSync() {
@@ -1066,20 +1063,12 @@ onMounted(async () => {
 // New functions
 async function startRebalancing() {
     console.log('AdminView: startRebalancing called');
-    if (confirm('Are you sure you want to start the trading algorithm?')) {
-        await tacoStore.startRebalancing();
-        await refreshTimerStatus();
-        console.log('AdminView: Trading started');
-    }
+    showStartRebalancingConfirmation();
 }
 
 async function stopRebalancing() {
     console.log('AdminView: stopRebalancing called');
-    if (confirm('Are you sure you want to stop the trading algorithm?')) {
-        await tacoStore.stopRebalancing();
-        await refreshTimerStatus();
-        console.log('AdminView: Trading stopped');
-    }
+    showStopRebalancingConfirmation();
 }
 
 async function recoverPoolBalances() {
@@ -1316,15 +1305,7 @@ async function refreshTradingLogs() {
 
 async function executeTradingCycle() {
   console.log('AdminView: executeTradingCycle called');
-  if (confirm('Are you sure you want to execute a trading cycle?')) {
-    try {
-      await tacoStore.executeTradingCycle();
-      await refreshTimerStatus();
-      console.log('AdminView: Trading cycle executed');
-    } catch (error) {
-      console.error('AdminView: Error executing trading cycle:', error);
-    }
-  }
+  showExecuteTradingCycleConfirmation();
 }
 
 // Add these functions
@@ -1390,6 +1371,66 @@ const showConfigUpdateConfirmation = () => {
   };
 };
 
+const showStartRebalancingConfirmation = () => {
+  confirmationModal.value = {
+    show: true,
+    title: 'Start Trading',
+    message: 'Are you sure you want to start the trading algorithm?',
+    extraData: 'This will enable automatic trading and rebalancing operations.',
+    confirmButtonText: 'Start Trading',
+    confirmButtonClass: 'btn-success',
+    reasonPlaceholder: 'Please explain why trading is being started...',
+    submitting: false,
+    action: null,
+    actionData: { type: 'startRebalancing' }
+  };
+};
+
+const showStopRebalancingConfirmation = () => {
+  confirmationModal.value = {
+    show: true,
+    title: 'Stop Trading',
+    message: 'Are you sure you want to stop the trading algorithm?',
+    extraData: 'This will disable automatic trading and rebalancing operations.',
+    confirmButtonText: 'Stop Trading',
+    confirmButtonClass: 'btn-danger',
+    reasonPlaceholder: 'Please explain why trading is being stopped...',
+    submitting: false,
+    action: null,
+    actionData: { type: 'stopRebalancing' }
+  };
+};
+
+const showManualSnapshotConfirmation = () => {
+  confirmationModal.value = {
+    show: true,
+    title: 'Trigger Manual Snapshot',
+    message: 'Are you sure you want to trigger a manual portfolio snapshot?',
+    extraData: 'This will capture the current state of all portfolio positions.',
+    confirmButtonText: 'Take Snapshot',
+    confirmButtonClass: 'btn-warning',
+    reasonPlaceholder: 'Please explain why a manual snapshot is needed...',
+    submitting: false,
+    action: null,
+    actionData: { type: 'manualSnapshot' }
+  };
+};
+
+const showExecuteTradingCycleConfirmation = () => {
+  confirmationModal.value = {
+    show: true,
+    title: 'Execute Trading Cycle',
+    message: 'Are you sure you want to execute a manual trading cycle?',
+    extraData: 'This will immediately run one complete trading cycle regardless of the current schedule.',
+    confirmButtonText: 'Execute Cycle',
+    confirmButtonClass: 'btn-warning',
+    reasonPlaceholder: 'Please explain why a manual trading cycle is needed...',
+    submitting: false,
+    action: null,
+    actionData: { type: 'executeTradingCycle' }
+  };
+};
+
 const hideConfirmationModal = () => {
   confirmationModal.value.show = false;
   confirmationModal.value.submitting = false;
@@ -1404,14 +1445,39 @@ const handleConfirmAction = async (reason: string) => {
   
   try {
     let success = false;
+    const actionData = confirmationModal.value.actionData as any;
     
     if (confirmationModal.value.title === 'Update Configuration') {
       // Handle configuration update
       await updateConfigWithReason(reason);
       success = true;
-    } else {
+    } else if (actionData.type === 'startRebalancing') {
+      // Handle start trading
+      success = await tacoStore.startRebalancing(reason);
+      if (success) {
+        await refreshTimerStatus();
+        console.log('AdminView: Trading started');
+      }
+    } else if (actionData.type === 'stopRebalancing') {
+      // Handle stop trading
+      success = await tacoStore.stopRebalancing(reason);
+      if (success) {
+        await refreshTimerStatus();
+        console.log('AdminView: Trading stopped');
+      }
+    } else if (actionData.type === 'manualSnapshot') {
+      // Handle manual snapshot
+      await tacoStore.takeManualPortfolioSnapshot(reason);
+      console.log('AdminView: Manual snapshot triggered');
+      success = true;
+    } else if (actionData.type === 'executeTradingCycle') {
+      // Handle execute trading cycle
+      await tacoStore.executeTradingCycle(reason);
+      await refreshTimerStatus();
+      console.log('AdminView: Trading cycle executed');
+      success = true;
+    } else if (actionData.principal && actionData.tokenName) {
       // Handle token pause/unpause actions
-      const actionData = confirmationModal.value.actionData as { principal: string; tokenName: string };
       const { principal, tokenName } = actionData;
       
       if (confirmationModal.value.title === 'Pause Token') {
