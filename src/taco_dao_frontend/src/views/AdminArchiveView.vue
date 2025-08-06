@@ -592,6 +592,13 @@ export default {
     // JSON.stringify(someObject, (key, value) => typeof value === 'bigint' ? Number(value) : value)
     // But for Vue reactivity, it's better to convert the data upfront as we're doing
     
+    // Load naming system data for principal and neuron names
+    try {
+      await this.tacoStore.loadAllNames()
+    } catch (error) {
+      console.warn('Failed to load naming system data:', error)
+    }
+    
     // Create archive actors
     await this.createArchiveActors()
     
@@ -1656,7 +1663,7 @@ export default {
         let neuronsHtml = '<em class="text-muted">None</em>'
         if (votingPowerData.neurons && votingPowerData.neurons.length > 0) {
           neuronsHtml = votingPowerData.neurons.map(neuron => {
-            const neuronId = neuron.neuronId ? this.formatPrincipalFromBlob(neuron.neuronId).slice(0, 8) + '...' : 'Unknown'
+            const neuronId = neuron.neuronId ? this.formatNeuronFromBlob(neuron.neuronId) : 'Unknown'
             const neuronVP = Number(neuron.votingPower || 0)
             const formattedNeuronVP = formatVotingPower(neuronVP)
             return `<span class="badge bg-info me-1">${neuronId}: ${formattedNeuronVP}</span>`
@@ -1724,8 +1731,8 @@ export default {
           return '<div class="text-muted">No neuron update data available</div>'
         }
         
-        const neuronId = neuronUpdateData.neuronId ? this.formatPrincipalFromBlob(neuronUpdateData.neuronId) : 'Unknown'
-        const neuronIdShort = neuronId.length > 16 ? neuronId.substring(0, 8) + '...' + neuronId.substring(neuronId.length - 8) : neuronId
+        const neuronId = neuronUpdateData.neuronId ? this.formatNeuronFromBlob(neuronUpdateData.neuronId) : 'Unknown'
+        const neuronIdShort = neuronId
         const updateType = neuronUpdateData.updateType || 'Unknown'
         const oldVotingPower = Number(neuronUpdateData.oldVotingPower || 0)
         const newVotingPower = Number(neuronUpdateData.newVotingPower || 0)
@@ -2219,8 +2226,8 @@ export default {
           neuronUpdateData = parsedData.tx.data
         }
         
-        const neuronId = neuronUpdateData.neuronId ? this.formatPrincipalFromBlob(neuronUpdateData.neuronId) : 'Unknown'
-        const neuronIdShort = neuronId.length > 16 ? neuronId.substring(0, 6) + '...' + neuronId.substring(neuronId.length - 6) : neuronId
+        const neuronId = neuronUpdateData.neuronId ? this.formatNeuronFromBlob(neuronUpdateData.neuronId) : 'Unknown'
+        const neuronIdShort = neuronId
         const updateType = neuronUpdateData.updateType || 'Unknown'
         const oldVP = Number(neuronUpdateData.oldVotingPower || 0)
         const newVP = Number(neuronUpdateData.newVotingPower || 0)
@@ -2485,7 +2492,7 @@ export default {
       return this.formatTokenName(tokenBlob)
     },
 
-    // Helper method to format principal from blob
+    // Helper method to format principal from blob with naming system integration
     formatPrincipalFromBlob(principalBlob) {
       if (!principalBlob) return 'Unknown'
       
@@ -2509,12 +2516,67 @@ export default {
         
         if (uint8Array) {
           const principal = Principal.fromUint8Array(uint8Array)
-          return principal.toString()
+          
+          // Use the naming system to get display name
+          const displayName = this.tacoStore.getPrincipalDisplayName(principal)
+          return displayName
         }
         
         return 'Unknown'
       } catch (error) {
         console.warn('Error in formatPrincipalFromBlob:', error)
+        return 'Unknown'
+      }
+    },
+
+    // Helper method to format neuron from blob with naming system integration
+    formatNeuronFromBlob(neuronBlob, fallbackToTruncated = true) {
+      if (!neuronBlob) return 'Unknown'
+      
+      try {
+        let uint8Array = null
+        
+        // Handle direct Uint8Array format
+        if (neuronBlob instanceof Uint8Array) {
+          uint8Array = neuronBlob
+        }
+        // Handle wrapped Blob format
+        else if (neuronBlob.Blob && typeof neuronBlob.Blob === 'object') {
+          const blobData = neuronBlob.Blob
+          uint8Array = new Uint8Array(Object.keys(blobData).map(key => blobData[key]))
+        }
+        // Handle object with numeric keys
+        else if (typeof neuronBlob === 'object' && !Array.isArray(neuronBlob)) {
+          const keys = Object.keys(neuronBlob).map(k => parseInt(k)).sort((a, b) => a - b)
+          uint8Array = new Uint8Array(keys.map(key => neuronBlob[key]))
+        }
+        
+        if (uint8Array) {
+          // For neurons, we need the SNS governance canister as the root
+          const tacoSnsRoot = Principal.fromText('lhdfz-wqaaa-aaaaq-aae3q-cai') // TACO DAO SNS governance
+          
+          // Try to get the neuron name from the naming system
+          const neuronName = this.tacoStore.getNeuronDisplayName(tacoSnsRoot, uint8Array)
+          
+          if (neuronName) {
+            return neuronName
+          }
+          
+          // Fallback to truncated neuron ID if requested
+          if (fallbackToTruncated) {
+            const principal = Principal.fromUint8Array(uint8Array)
+            const principalStr = principal.toString()
+            return principalStr.length > 16 ? 
+              principalStr.substring(0, 6) + '...' + principalStr.substring(principalStr.length - 6) : 
+              principalStr
+          }
+          
+          return 'Unknown Neuron'
+        }
+        
+        return 'Unknown'
+      } catch (error) {
+        console.warn('Error in formatNeuronFromBlob:', error)
         return 'Unknown'
       }
     },
