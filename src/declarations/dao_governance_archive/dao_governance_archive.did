@@ -49,17 +49,17 @@ type TimerStatus =
 type Result_4 = 
  variant {
    err: ArchiveError;
-   ok: nat;
+   ok: ArchiveStatus;
  };
 type Result_3 = 
  variant {
    err: ArchiveError;
-   ok: ArchiveStatus;
+   ok: vec NeuronUpdateBlockData;
  };
 type Result_2 = 
  variant {
    err: ArchiveError;
-   ok: vec NeuronUpdateBlockData;
+   ok: nat;
  };
 type Result_1 = 
  variant {
@@ -132,10 +132,10 @@ type DataCertificate =
  };
 type DAOGovernanceArchive = 
  service {
-   archiveNeuronUpdate: (update: NeuronUpdateBlockData) -> (Result_4);
-   archiveVotingPowerChange: (change: VotingPowerBlockData) -> (Result_4);
+   archiveNeuronUpdate: (update: NeuronUpdateBlockData) -> (Result_2);
+   archiveVotingPowerChange: (change: VotingPowerBlockData) -> (Result_2);
    getArchiveStats: () -> (ArchiveStatus) query;
-   getArchiveStatus: () -> (Result_3) query;
+   getArchiveStatus: () -> (Result_4) query;
    getBatchImportStatus: () ->
     (record {
        intervalSeconds: nat;
@@ -149,8 +149,10 @@ type DAOGovernanceArchive =
        totalVotingPowerInSystem: nat;
      }) query;
    getLogs: (count: nat) -> (vec LogEntry) query;
-   getNeuronUpdatesByNeuron: (neuronId: blob, limit: nat) -> (Result_2) query;
+   getNeuronUpdatesByNeuron: (neuronId: blob, limit: nat) -> (Result_3) query;
    getTimerStatus: () -> (TimerStatus) query;
+   getUserVotingPowerAtTime: (user: principal, timestamp: int) ->
+    (Result_2) query;
    getVotingPowerChangesByUser: (user: principal, limit: nat) ->
     (Result_1) query;
    icrc3_get_archives: (args: GetArchivesArgs) -> (GetArchivesResult) query;

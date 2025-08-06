@@ -24,10 +24,10 @@ export interface ArchivedBlock {
 export interface Block { 'id' : bigint, 'block' : Value }
 export interface BlockType { 'url' : string, 'block_type' : string }
 export interface DAOGovernanceArchive {
-  'archiveNeuronUpdate' : ActorMethod<[NeuronUpdateBlockData], Result_4>,
-  'archiveVotingPowerChange' : ActorMethod<[VotingPowerBlockData], Result_4>,
+  'archiveNeuronUpdate' : ActorMethod<[NeuronUpdateBlockData], Result_2>,
+  'archiveVotingPowerChange' : ActorMethod<[VotingPowerBlockData], Result_2>,
   'getArchiveStats' : ActorMethod<[], ArchiveStatus>,
-  'getArchiveStatus' : ActorMethod<[], Result_3>,
+  'getArchiveStatus' : ActorMethod<[], Result_4>,
   'getBatchImportStatus' : ActorMethod<
     [],
     { 'intervalSeconds' : bigint, 'isRunning' : boolean }
@@ -44,9 +44,10 @@ export interface DAOGovernanceArchive {
   'getLogs' : ActorMethod<[bigint], Array<LogEntry>>,
   'getNeuronUpdatesByNeuron' : ActorMethod<
     [Uint8Array | number[], bigint],
-    Result_2
+    Result_3
   >,
   'getTimerStatus' : ActorMethod<[], TimerStatus>,
+  'getUserVotingPowerAtTime' : ActorMethod<[Principal, bigint], Result_2>,
   'getVotingPowerChangesByUser' : ActorMethod<[Principal, bigint], Result_1>,
   'icrc3_get_archives' : ActorMethod<[GetArchivesArgs], GetArchivesResult>,
   'icrc3_get_blocks' : ActorMethod<[GetBlocksArgs], GetBlocksResult>,
@@ -106,11 +107,11 @@ export type Result = { 'ok' : string } |
   { 'err' : string };
 export type Result_1 = { 'ok' : Array<VotingPowerBlockData> } |
   { 'err' : ArchiveError };
-export type Result_2 = { 'ok' : Array<NeuronUpdateBlockData> } |
+export type Result_2 = { 'ok' : bigint } |
   { 'err' : ArchiveError };
-export type Result_3 = { 'ok' : ArchiveStatus } |
+export type Result_3 = { 'ok' : Array<NeuronUpdateBlockData> } |
   { 'err' : ArchiveError };
-export type Result_4 = { 'ok' : bigint } |
+export type Result_4 = { 'ok' : ArchiveStatus } |
   { 'err' : ArchiveError };
 export interface TimerStatus {
   'innerLoopRunning' : boolean,
