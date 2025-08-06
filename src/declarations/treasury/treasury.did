@@ -18,14 +18,14 @@ type treasury =
    addTriggerCondition: (name: text, direction: PriceDirection, percentage:
     float64, timeWindowNS: nat, applicableTokens: vec principal) ->
     (Result_12);
-   admin_executeTradingCycle: () -> (Result_1);
+   admin_executeTradingCycle: (reason: opt text) -> (Result_1);
    admin_recoverPoolBalances: () -> (Result_11);
    admin_syncWithDao: () -> (Result_11);
    /// * Clear all trading pauses (emergency function)
    ///    *
    ///    * Removes all tokens from the trading pause registry.
    ///    * Only callable by master admins.
-   clearAllTradingPauses: () -> (Result_4);
+   clearAllTradingPauses: (reason: opt text) -> (Result_4);
    /// * Clear all logs
    ///    * Only accessible by master admin or controller
    clearLogs: () -> ();
@@ -206,7 +206,7 @@ type treasury =
    ///    *
    ///    * Completely resets all metrics, trade history, and timers
    ///    * Only callable by DAO or controller.
-   resetRebalanceState: () -> (Result_1);
+   resetRebalanceState: (reason: opt text) -> (Result_1);
    /// * Set portfolio circuit breaker condition active/inactive
    setPortfolioCircuitBreakerConditionActive: (conditionId: nat, isActive:
     bool) -> (Result_2);
@@ -226,12 +226,12 @@ type treasury =
    ///    * 3. Execute trades on the best exchange
    ///    *
    ///    * Only callable by DAO or controller.
-   startRebalancing: () -> (Result_1);
+   startRebalancing: (reason: opt text) -> (Result_1);
    /// * Stop the automatic rebalancing process
    ///    *
    ///    * Cancels all timers and sets the system to idle state
    ///    * Only callable by DAO or controller.
-   stopRebalancing: () -> (Result_1);
+   stopRebalancing: (reason: opt text) -> (Result_1);
    /// * Synchronize token details with DAO
    ///    *
    ///    * Updates token status from the DAO including:
@@ -243,18 +243,20 @@ type treasury =
           TokenDetails;
         }) -> (Result_5);
    /// * Manually trigger a portfolio snapshot (admin function)
-   takeManualPortfolioSnapshot: () -> (Result_3);
+   takeManualPortfolioSnapshot: (reason: opt text) -> (Result_3);
    /// * Manually unpause a token from trading
    ///    *
    ///    * Removes a token from the trading pause registry, allowing it to trade again.
    ///    * Only callable by admins with appropriate permissions.
-   unpauseTokenFromTrading: (token: principal) -> (Result_4);
+   unpauseTokenFromTrading: (token: principal, reason: opt text) ->
+    (Result_4);
    /// * Update the maximum portfolio snapshots limit
    ///    * 
    ///    * Sets the maximum number of portfolio snapshots to store.
    ///    * Older snapshots will be automatically removed when the limit is exceeded.
    ///    * Only callable by admins with appropriate permissions.
-   updateMaxPortfolioSnapshots: (newLimit: nat) -> (Result_3);
+   updateMaxPortfolioSnapshots: (newLimit: nat, reason: opt text) ->
+    (Result_3);
    /// * Update the paused token threshold for circuit breaker
    ///    *
    ///    * Sets the number of paused tokens that will trigger the circuit breaker.
@@ -346,6 +348,7 @@ type TreasuryAdminActionType =
    ClearPortfolioCircuitBreakerLogs;
    ClearPriceAlerts;
    ClearSystemLogs;
+   ExecuteTradingCycle;
    PauseTokenManual: record {
                        pauseType: text;
                        token: principal;
@@ -365,6 +368,7 @@ type TreasuryAdminActionType =
                               };
    StartRebalancing;
    StopRebalancing;
+   TakeManualSnapshot;
    UnpauseToken: record {token: principal;};
    UpdateMaxPortfolioSnapshots: record {
                                   newLimit: nat;

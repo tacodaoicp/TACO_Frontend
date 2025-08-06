@@ -333,7 +333,7 @@ export const idlFactory = ({ IDL }) => {
     'err' : AuthorizationError,
   });
   const ContinuousDAO = IDL.Service({
-    'addAdmin' : IDL.Func([IDL.Principal], [Result_1], []),
+    'addAdmin' : IDL.Func([IDL.Principal, IDL.Opt(IDL.Text)], [Result_1], []),
     'addToken' : IDL.Func([IDL.Principal, TokenType], [Result_1], []),
     'addTokenWithReason' : IDL.Func(
         [IDL.Principal, TokenType, IDL.Text],
@@ -451,7 +451,11 @@ export const idlFactory = ({ IDL }) => {
       ),
     'pauseToken' : IDL.Func([IDL.Principal, IDL.Text], [Result_1], []),
     'refreshUserVotingPower' : IDL.Func([], [Result_6], []),
-    'removeAdmin' : IDL.Func([IDL.Principal], [Result_1], []),
+    'removeAdmin' : IDL.Func(
+        [IDL.Principal, IDL.Opt(IDL.Text)],
+        [Result_1],
+        [],
+      ),
     'removeFollower' : IDL.Func([IDL.Principal], [Result_5], []),
     'removeToken' : IDL.Func([IDL.Principal, IDL.Text], [Result_1], []),
     'setTacoAddress' : IDL.Func([IDL.Principal], [], []),
@@ -476,7 +480,11 @@ export const idlFactory = ({ IDL }) => {
         [Result_1],
         [],
       ),
-    'updateSystemParameter' : IDL.Func([SystemParameter], [Result_1], []),
+    'updateSystemParameter' : IDL.Func(
+        [SystemParameter, IDL.Opt(IDL.Text)],
+        [Result_1],
+        [],
+      ),
     'updateSystemState' : IDL.Func([SystemState, IDL.Text], [Result_1], []),
     'updateTreasuryConfig' : IDL.Func(
         [UpdateConfig, IDL.Opt(IDL.Bool), IDL.Opt(IDL.Text)],

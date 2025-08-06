@@ -311,7 +311,7 @@ type FollowActionsSinceResponse =
  };
 type ContinuousDAO = 
  service {
-   addAdmin: ("principal": principal) -> (Result_1);
+   addAdmin: ("principal": principal, reason: opt text) -> (Result_1);
    addToken: (token: principal, tokenType: TokenType) -> (Result_1);
    addTokenWithReason: (token: principal, tokenType: TokenType, reason:
     text) -> (Result_1);
@@ -379,7 +379,7 @@ type ContinuousDAO =
     (bool) query;
    pauseToken: (token: principal, reason: text) -> (Result_1);
    refreshUserVotingPower: () -> (Result_6);
-   removeAdmin: ("principal": principal) -> (Result_1);
+   removeAdmin: ("principal": principal, reason: opt text) -> (Result_1);
    removeFollower: (follower: principal) -> (Result_5);
    removeToken: (token: principal, reason: text) -> (Result_1);
    setTacoAddress: (address: principal) -> ();
@@ -403,7 +403,8 @@ type ContinuousDAO =
       allowedSilentWarnings: opt nat;
       timeWindowSpamCheck: opt int;
     }) -> (Result_1);
-   updateSystemParameter: (param: SystemParameter) -> (Result_1);
+   updateSystemParameter: (param: SystemParameter, reason: opt text) ->
+    (Result_1);
    updateSystemState: (newState: SystemState, reason: text) -> (Result_1);
    /// * Update treasury rebalance configuration
    ///  *

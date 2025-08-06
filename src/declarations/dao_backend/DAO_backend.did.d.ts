@@ -84,7 +84,7 @@ export type AuthorizationError = { 'NotAllowed' : null } |
   { 'NotAdmin' : null } |
   { 'UnexpectedError' : string };
 export interface ContinuousDAO {
-  'addAdmin' : ActorMethod<[Principal], Result_1>,
+  'addAdmin' : ActorMethod<[Principal, [] | [string]], Result_1>,
   'addToken' : ActorMethod<[Principal, TokenType], Result_1>,
   'addTokenWithReason' : ActorMethod<[Principal, TokenType, string], Result_1>,
   'admin_getNeuronAllocations' : ActorMethod<
@@ -138,7 +138,7 @@ export interface ContinuousDAO {
   'hasAdminPermission' : ActorMethod<[Principal, AdminFunction], boolean>,
   'pauseToken' : ActorMethod<[Principal, string], Result_1>,
   'refreshUserVotingPower' : ActorMethod<[], Result_6>,
-  'removeAdmin' : ActorMethod<[Principal], Result_1>,
+  'removeAdmin' : ActorMethod<[Principal, [] | [string]], Result_1>,
   'removeFollower' : ActorMethod<[Principal], Result_5>,
   'removeToken' : ActorMethod<[Principal, string], Result_1>,
   'setTacoAddress' : ActorMethod<[Principal], undefined>,
@@ -161,7 +161,10 @@ export interface ContinuousDAO {
     ],
     Result_1
   >,
-  'updateSystemParameter' : ActorMethod<[SystemParameter], Result_1>,
+  'updateSystemParameter' : ActorMethod<
+    [SystemParameter, [] | [string]],
+    Result_1
+  >,
   'updateSystemState' : ActorMethod<[SystemState, string], Result_1>,
   'updateTreasuryConfig' : ActorMethod<
     [UpdateConfig, [] | [boolean], [] | [string]],

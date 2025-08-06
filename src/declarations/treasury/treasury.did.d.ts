@@ -270,6 +270,7 @@ export type TreasuryAdminActionType = { 'StopRebalancing' : null } |
   } |
   { 'ClearAllTradingPauses' : null } |
   { 'UnpauseToken' : { 'token' : Principal } } |
+  { 'ExecuteTradingCycle' : null } |
   { 'PauseTokenManual' : { 'token' : Principal, 'pauseType' : string } } |
   {
     'SetPortfolioCircuitBreakerActive' : {
@@ -295,6 +296,7 @@ export type TreasuryAdminActionType = { 'StopRebalancing' : null } |
     }
   } |
   { 'RemoveTriggerCondition' : { 'conditionId' : bigint } } |
+  { 'TakeManualSnapshot' : null } |
   {
     'UpdatePausedTokenThreshold' : {
       'newThreshold' : bigint,
@@ -377,10 +379,10 @@ export interface treasury {
     [string, PriceDirection, number, bigint, Array<Principal>],
     Result_12
   >,
-  'admin_executeTradingCycle' : ActorMethod<[], Result_1>,
+  'admin_executeTradingCycle' : ActorMethod<[[] | [string]], Result_1>,
   'admin_recoverPoolBalances' : ActorMethod<[], Result_11>,
   'admin_syncWithDao' : ActorMethod<[], Result_11>,
-  'clearAllTradingPauses' : ActorMethod<[], Result_4>,
+  'clearAllTradingPauses' : ActorMethod<[[] | [string]], Result_4>,
   'clearLogs' : ActorMethod<[], undefined>,
   'clearPortfolioCircuitBreakerLogs' : ActorMethod<[], Result_2>,
   'clearPriceAlerts' : ActorMethod<[], Result>,
@@ -448,22 +450,25 @@ export interface treasury {
   >,
   'removePortfolioCircuitBreakerCondition' : ActorMethod<[bigint], Result_2>,
   'removeTriggerCondition' : ActorMethod<[bigint], Result>,
-  'resetRebalanceState' : ActorMethod<[], Result_1>,
+  'resetRebalanceState' : ActorMethod<[[] | [string]], Result_1>,
   'setPortfolioCircuitBreakerConditionActive' : ActorMethod<
     [bigint, boolean],
     Result_2
   >,
   'setTest' : ActorMethod<[boolean], undefined>,
   'setTriggerConditionActive' : ActorMethod<[bigint, boolean], Result>,
-  'startRebalancing' : ActorMethod<[], Result_1>,
-  'stopRebalancing' : ActorMethod<[], Result_1>,
+  'startRebalancing' : ActorMethod<[[] | [string]], Result_1>,
+  'stopRebalancing' : ActorMethod<[[] | [string]], Result_1>,
   'syncTokenDetailsFromDAO' : ActorMethod<
     [Array<[Principal, TokenDetails]>],
     Result_5
   >,
-  'takeManualPortfolioSnapshot' : ActorMethod<[], Result_3>,
-  'unpauseTokenFromTrading' : ActorMethod<[Principal], Result_4>,
-  'updateMaxPortfolioSnapshots' : ActorMethod<[bigint], Result_3>,
+  'takeManualPortfolioSnapshot' : ActorMethod<[[] | [string]], Result_3>,
+  'unpauseTokenFromTrading' : ActorMethod<[Principal, [] | [string]], Result_4>,
+  'updateMaxPortfolioSnapshots' : ActorMethod<
+    [bigint, [] | [string]],
+    Result_3
+  >,
   'updatePausedTokenThresholdForCircuitBreaker' : ActorMethod<
     [bigint],
     Result_2
