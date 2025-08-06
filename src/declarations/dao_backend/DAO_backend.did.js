@@ -479,7 +479,7 @@ export const idlFactory = ({ IDL }) => {
     'updateSystemParameter' : IDL.Func([SystemParameter], [Result_1], []),
     'updateSystemState' : IDL.Func([SystemState, IDL.Text], [Result_1], []),
     'updateTreasuryConfig' : IDL.Func(
-        [UpdateConfig, IDL.Opt(IDL.Bool)],
+        [UpdateConfig, IDL.Opt(IDL.Bool), IDL.Opt(IDL.Text)],
         [Result_1],
         [],
       ),

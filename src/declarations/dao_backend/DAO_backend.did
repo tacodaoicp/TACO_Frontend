@@ -409,8 +409,8 @@ type ContinuousDAO =
    ///  *
    ///  * Allows configuration of trading intervals, sizes, and safety limits
    ///  * Only callable by admins with the updateTreasuryConfig permission.
-   updateTreasuryConfig: (updates: UpdateConfig, rebalanceState: opt bool) ->
-    (Result_1);
+   updateTreasuryConfig: (updates: UpdateConfig, rebalanceState: opt bool,
+    reason: opt text) -> (Result_1);
    votingPowerMetrics: () -> (Result) query;
  };
 type AuthorizationError = 

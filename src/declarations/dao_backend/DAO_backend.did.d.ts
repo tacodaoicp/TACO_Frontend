@@ -164,7 +164,7 @@ export interface ContinuousDAO {
   'updateSystemParameter' : ActorMethod<[SystemParameter], Result_1>,
   'updateSystemState' : ActorMethod<[SystemState, string], Result_1>,
   'updateTreasuryConfig' : ActorMethod<
-    [UpdateConfig, [] | [boolean]],
+    [UpdateConfig, [] | [boolean], [] | [string]],
     Result_1
   >,
   'votingPowerMetrics' : ActorMethod<[], Result>,
