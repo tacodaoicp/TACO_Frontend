@@ -596,7 +596,7 @@ export const idlFactory = ({ IDL }) => {
         [],
       ),
     'updateRebalanceConfig' : IDL.Func(
-        [UpdateConfig, IDL.Opt(IDL.Bool)],
+        [UpdateConfig, IDL.Opt(IDL.Bool), IDL.Opt(IDL.Text)],
         [Result_1],
         [],
       ),

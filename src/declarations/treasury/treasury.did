@@ -269,7 +269,7 @@ type treasury =
    ///    * Allows adjustment of trading intervals, sizes, and safety limits
    ///    * Only callable by DAO or controller.
    updateRebalanceConfig: (updates: UpdateConfig, rebalanceStateNew:
-    opt bool) -> (Result_1);
+    opt bool, reason: opt text) -> (Result_1);
    /// * Update an existing trigger condition
    ///    *
    ///    * Modifies parameters of an existing failsafe rule.

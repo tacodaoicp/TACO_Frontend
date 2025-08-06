@@ -473,7 +473,7 @@ export interface treasury {
     Result_2
   >,
   'updateRebalanceConfig' : ActorMethod<
-    [UpdateConfig, [] | [boolean]],
+    [UpdateConfig, [] | [boolean], [] | [string]],
     Result_1
   >,
   'updateTriggerCondition' : ActorMethod<
