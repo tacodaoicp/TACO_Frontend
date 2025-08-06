@@ -579,7 +579,7 @@
               <div v-else class="text-center py-4">Loading configuration...</div>
               <div class="d-flex gap-2 mt-4">
                 <button 
-                  @click="updateConfig" 
+                  @click="showConfigUpdateConfirmation" 
                   :disabled="!isConfigValid || !hasConfigChanges"
                   class="btn btn-primary"
                 >
@@ -919,7 +919,7 @@ const confirmationModal = ref({
   reasonPlaceholder: 'Please provide a reason for this action...',
   submitting: false,
   action: null as (() => Promise<void>) | null,
-  actionData: null as { principal: string; tokenName: string } | null
+  actionData: null as { principal: string; tokenName: string } | { type: string } | null
 });
 
 // Get store
@@ -1227,38 +1227,39 @@ const validateInput = (field: string) => {
   isConfigValid.value = true; // Simplified for now
 };
 
-const updateConfig = async () => {
+const updateConfigWithReason = async (reason: string) => {
   if (!isConfigValid.value || !rebalanceConfig.value) return;
   
-  try {
-    // Update rebalance config
-    const updates = {
-      maxSlippageBasisPoints: [BigInt(Math.round(configInputs.value.maxSlippageBasisPoints * 100))],
-      minTradeValueICP: [BigInt(Math.round(configInputs.value.minTradeValueICP))],
-      maxTradeValueICP: [BigInt(Math.round(configInputs.value.maxTradeValueICP))],
-      maxTradesStored: [BigInt(Math.round(configInputs.value.maxTradesStored))],
-      maxTradeAttemptsPerInterval: [BigInt(Math.round(configInputs.value.maxTradeAttemptsPerInterval))],
-      maxKongswapAttempts: [BigInt(Math.round(configInputs.value.maxKongswapAttempts))],
-      rebalanceIntervalNS: [minutesToNs(configInputs.value.rebalanceIntervalMinutes)],
-      portfolioRebalancePeriodNS: [minutesToNs(configInputs.value.portfolioRebalancePeriodMinutes)],
-      shortSyncIntervalNS: [secondsToNs(configInputs.value.shortSyncIntervalSeconds)],
-      longSyncIntervalNS: [minutesToNs(configInputs.value.longSyncIntervalMinutes)],
-      tokenSyncTimeoutNS: [secondsToNs(configInputs.value.tokenSyncTimeoutSeconds)],
-      maxPriceHistoryEntries: configInputs.value.maxPriceHistoryEntries > 0 ? [BigInt(Math.round(configInputs.value.maxPriceHistoryEntries))] as [bigint] : [] as [],
-      priceUpdateIntervalNS: [] as []
-    };
-    
-    await tacoStore.updateRebalanceConfig(updates);
-    
-    // Update max portfolio snapshots separately if it changed
-    if (configInputs.value.maxPortfolioSnapshots !== originalMaxPortfolioSnapshots.value) {
-      await tacoStore.updateMaxPortfolioSnapshots(configInputs.value.maxPortfolioSnapshots);
-    }
-    
-    console.log('Configuration updated successfully');
-  } catch (error) {
-    console.error('Error updating configuration:', error);
+  // Update rebalance config
+  const updates = {
+    maxSlippageBasisPoints: [BigInt(Math.round(configInputs.value.maxSlippageBasisPoints * 100))] as [bigint],
+    minTradeValueICP: [BigInt(Math.round(configInputs.value.minTradeValueICP))] as [bigint],
+    maxTradeValueICP: [BigInt(Math.round(configInputs.value.maxTradeValueICP))] as [bigint],
+    maxTradesStored: [BigInt(Math.round(configInputs.value.maxTradesStored))] as [bigint],
+    maxTradeAttemptsPerInterval: [BigInt(Math.round(configInputs.value.maxTradeAttemptsPerInterval))] as [bigint],
+    maxKongswapAttempts: [BigInt(Math.round(configInputs.value.maxKongswapAttempts))] as [bigint],
+    rebalanceIntervalNS: [minutesToNs(configInputs.value.rebalanceIntervalMinutes)] as [bigint],
+    portfolioRebalancePeriodNS: [minutesToNs(configInputs.value.portfolioRebalancePeriodMinutes)] as [bigint],
+    shortSyncIntervalNS: [secondsToNs(configInputs.value.shortSyncIntervalSeconds)] as [bigint],
+    longSyncIntervalNS: [minutesToNs(configInputs.value.longSyncIntervalMinutes)] as [bigint],
+    tokenSyncTimeoutNS: configInputs.value.tokenSyncTimeoutSeconds > 0 ? [secondsToNs(configInputs.value.tokenSyncTimeoutSeconds)] as [bigint] : [] as [],
+    maxPriceHistoryEntries: configInputs.value.maxPriceHistoryEntries > 0 ? [BigInt(Math.round(configInputs.value.maxPriceHistoryEntries))] as [bigint] : [] as [],
+    priceUpdateIntervalNS: [] as []
+  };
+  
+  await tacoStore.updateRebalanceConfig(updates, reason);
+  
+  // Update max portfolio snapshots separately if it changed
+  if (configInputs.value.maxPortfolioSnapshots !== originalMaxPortfolioSnapshots.value) {
+    await tacoStore.updateMaxPortfolioSnapshots(configInputs.value.maxPortfolioSnapshots);
   }
+  
+  console.log('Configuration updated successfully');
+};
+
+const updateConfig = async () => {
+  // Legacy method - now just calls the confirmation dialog
+  showConfigUpdateConfirmation();
 };
 
 const resetConfig = () => {
@@ -1374,6 +1375,21 @@ const showUnpauseConfirmation = (principal: string, tokenName: string) => {
   };
 };
 
+const showConfigUpdateConfirmation = () => {
+  confirmationModal.value = {
+    show: true,
+    title: 'Update Configuration',
+    message: 'Are you sure you want to update the rebalance configuration?',
+    extraData: 'This will change how the Treasury manages rebalancing operations.',
+    confirmButtonText: 'Update Configuration',
+    confirmButtonClass: 'btn-primary',
+    reasonPlaceholder: 'Please explain why this configuration change is needed...',
+    submitting: false,
+    action: null,
+    actionData: { type: 'configUpdate' }
+  };
+};
+
 const hideConfirmationModal = () => {
   confirmationModal.value.show = false;
   confirmationModal.value.submitting = false;
@@ -1384,29 +1400,41 @@ const hideConfirmationModal = () => {
 const handleConfirmAction = async (reason: string) => {
   if (!confirmationModal.value.actionData) return;
   
-  const { principal, tokenName } = confirmationModal.value.actionData;
   confirmationModal.value.submitting = true;
   
   try {
     let success = false;
     
-    if (confirmationModal.value.title === 'Pause Token') {
-      success = await tacoStore.pauseToken(Principal.fromText(principal), reason);
-    } else if (confirmationModal.value.title === 'Unpause Token') {
-      success = await tacoStore.unpauseToken(Principal.fromText(principal), reason);
+    if (confirmationModal.value.title === 'Update Configuration') {
+      // Handle configuration update
+      await updateConfigWithReason(reason);
+      success = true;
+    } else {
+      // Handle token pause/unpause actions
+      const actionData = confirmationModal.value.actionData as { principal: string; tokenName: string };
+      const { principal, tokenName } = actionData;
+      
+      if (confirmationModal.value.title === 'Pause Token') {
+        success = await tacoStore.pauseToken(Principal.fromText(principal), reason);
+      } else if (confirmationModal.value.title === 'Unpause Token') {
+        success = await tacoStore.unpauseToken(Principal.fromText(principal), reason);
+      }
+      
+      if (success) {
+        await refreshTimerStatus();
+      }
     }
     
     if (success) {
-      await refreshTimerStatus();
-      console.log(`AdminView: Token ${confirmationModal.value.title.toLowerCase()}d successfully`);
+      console.log(`AdminView: ${confirmationModal.value.title} completed successfully`);
       hideConfirmationModal();
     } else {
-      console.error(`AdminView: Failed to ${confirmationModal.value.title.toLowerCase()} token`);
+      console.error(`AdminView: Failed to ${confirmationModal.value.title.toLowerCase()}`);
       // Keep modal open to show error state
       confirmationModal.value.submitting = false;
     }
   } catch (error) {
-    console.error(`AdminView: Error ${confirmationModal.value.title.toLowerCase()}ing token:`, error);
+    console.error(`AdminView: Error in ${confirmationModal.value.title}:`, error);
     confirmationModal.value.submitting = false;
   }
 };

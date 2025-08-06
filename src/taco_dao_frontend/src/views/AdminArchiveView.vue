@@ -1898,6 +1898,7 @@ export default {
                     <strong>Reason:</strong><br>
                     <em>"${reason}"</em>
                   </div>
+                  ${this.renderConfigChanges(adminData.actionType)}
                   ${!success && errorMessage ? `
                     <div class="alert alert-danger">
                       <strong>Error:</strong><br>
@@ -2516,6 +2517,74 @@ export default {
         console.warn('Error in formatPrincipalFromBlob:', error)
         return 'Unknown'
       }
+    },
+
+    renderConfigChanges(actionType) {
+      if (!actionType || actionType.type !== 'UpdateRebalanceConfig') {
+        return ''
+      }
+
+      const oldConfig = actionType.oldConfig || ''
+      const newConfig = actionType.newConfig || ''
+
+      if (!oldConfig || !newConfig || oldConfig === newConfig) {
+        return ''
+      }
+
+      // Parse the pipe-separated config format: field=value|field=value|...
+      const parseConfig = (configText) => {
+        const config = {}
+        if (!configText) return config
+        
+        configText.split('|').forEach(pair => {
+          const [key, value] = pair.split('=')
+          if (key && value !== undefined) {
+            config[key.trim()] = value.trim()
+          }
+        })
+        return config
+      }
+
+      const oldParsed = parseConfig(oldConfig)
+      const newParsed = parseConfig(newConfig)
+
+      // Find changed fields
+      const changes = []
+      const allKeys = new Set([...Object.keys(oldParsed), ...Object.keys(newParsed)])
+      
+      allKeys.forEach(key => {
+        const oldVal = oldParsed[key] || 'N/A'
+        const newVal = newParsed[key] || 'N/A'
+        
+        if (oldVal !== newVal) {
+          // Format field name for display
+          const displayName = key.replace(/([A-Z])/g, ' $1').replace(/NS$/, ' (ns)').trim()
+          changes.push({
+            field: displayName,
+            old: oldVal,
+            new: newVal
+          })
+        }
+      })
+
+      if (changes.length === 0) {
+        return ''
+      }
+
+      return `
+        <div class="alert alert-warning mt-2">
+          <strong>⚙️ Configuration Changes:</strong>
+          <div class="mt-2">
+            ${changes.map(change => `
+              <div class="row text-sm">
+                <div class="col-4"><strong>${change.field}:</strong></div>
+                <div class="col-4 text-muted">${change.old}</div>
+                <div class="col-4 text-success">→ ${change.new}</div>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      `
     },
 
     // Get token metadata from the taco store

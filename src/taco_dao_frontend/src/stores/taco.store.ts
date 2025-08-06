@@ -2600,7 +2600,7 @@ export const useTacoStore = defineStore('taco', () => {
             return false;
         }
     }
-    const updateRebalanceConfig = async (updates: UpdateConfig) => {
+    const updateRebalanceConfig = async (updates: UpdateConfig, reason?: string) => {
         // console.log('TacoStore: updateRebalanceConfig called with', updates);
         try {
             appLoadingOn();
@@ -2632,7 +2632,7 @@ export const useTacoStore = defineStore('taco', () => {
             });
             // END OF NOTE TO AI!
 
-            const result = await treasury.updateRebalanceConfig(updates, []);
+            const result = await treasury.updateRebalanceConfig(updates, [], reason ? [reason] : []);
             // console.log('TacoStore: updateRebalanceConfig result:', result);
 
             if ('ok' in result) {
