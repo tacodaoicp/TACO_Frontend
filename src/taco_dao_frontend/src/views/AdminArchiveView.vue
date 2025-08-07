@@ -3458,9 +3458,9 @@ export default {
                   isAllocationBlock &&
                   allocationData && allocationData.newAllocations) {
                 
-                // Parse the allocation data
+                // Parse the allocation data - keep raw token data for proper formatting
                 const newAllocations = allocationData.newAllocations?.map(alloc => ({
-                  token: this.formatPrincipalFromBlob(alloc.token),
+                  token: alloc.token, // Keep raw Uint8Array for token name lookup
                   basisPoints: Number(alloc.basisPoints)
                 })) || []
                 
@@ -3470,7 +3470,7 @@ export default {
                   user: blockUser,
                   newAllocations,
                   oldAllocations: allocationData.oldAllocations?.map(alloc => ({
-                    token: this.formatPrincipalFromBlob(alloc.token),
+                    token: alloc.token, // Keep raw Uint8Array for token name lookup
                     basisPoints: Number(alloc.basisPoints)
                   })) || []
                 }
@@ -3494,14 +3494,11 @@ export default {
         
         // Update reactive display (Vue 3 compatible)
         if (previousAllocation) {
-          // Debug token details availability
-          console.log('Token details available:', !!this.tacoStore.fetchedTokenDetails, 'count:', this.tacoStore.fetchedTokenDetails?.length)
-          
           // Create detailed allocation breakdown
+          // Note: allocation.token is now a raw Uint8Array, same as blue pills
           const allocDetails = previousAllocation.newAllocations.map(allocation => {
             const tokenName = this.formatTokenNameFromBlob(allocation.token)
             const percentage = (allocation.basisPoints / 100).toFixed(2)
-            console.log('Previous allocation token:', allocation.token, 'formatted as:', tokenName)
             return `${tokenName}: ${percentage}%`
           }).join(', ')
           
@@ -3589,9 +3586,9 @@ export default {
                   isAllocationBlock &&
                   allocationData && allocationData.newAllocations) {
                 
-                // Parse the allocation data
+                // Parse the allocation data - keep raw token data for proper formatting
                 const newAllocations = allocationData.newAllocations?.map(alloc => ({
-                  token: this.formatPrincipalFromBlob(alloc.token),
+                  token: alloc.token, // Keep raw Uint8Array for token name lookup
                   basisPoints: Number(alloc.basisPoints)
                 })) || []
                 
@@ -3601,7 +3598,7 @@ export default {
                   user: blockUser,
                   newAllocations,
                   oldAllocations: allocationData.oldAllocations?.map(alloc => ({
-                    token: this.formatPrincipalFromBlob(alloc.token),
+                    token: alloc.token, // Keep raw Uint8Array for token name lookup
                     basisPoints: Number(alloc.basisPoints)
                   })) || []
                 }
