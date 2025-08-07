@@ -324,12 +324,17 @@
 </style>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, watch } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 import { Principal } from '@dfinity/principal';
 import { useTacoStore } from '../stores/taco.store';
 import { storeToRefs } from "pinia";
 import HeaderBar from "../components/HeaderBar.vue";
 import TacoTitle from '../components/misc/TacoTitle.vue';
+
+// Get route and router
+const route = useRoute();
+const router = useRouter();
 
 // Get store
 const tacoStore = useTacoStore();
@@ -490,9 +495,29 @@ const sortedPastAllocations = computed(() => {
   });
 });
 
+// Handle URL parameter for principal
+const handleUrlPrincipal = () => {
+  const urlPrincipal = route.query.principal as string;
+  if (urlPrincipal) {
+    principalInput.value = urlPrincipal;
+    // Auto-search if principal is provided in URL
+    searchUserVotes();
+  }
+};
+
+// Watch for route changes
+watch(() => route.query.principal, (newPrincipal) => {
+  if (newPrincipal && typeof newPrincipal === 'string') {
+    principalInput.value = newPrincipal;
+    searchUserVotes();
+  }
+}, { immediate: true });
+
 // Lifecycle hooks
 onMounted(async () => {
   console.log('AdminVotesView: Component mounted');
   await tacoStore.fetchTokenDetails();
+  // Handle URL parameter after token details are loaded
+  handleUrlPrincipal();
 });
 </script> 

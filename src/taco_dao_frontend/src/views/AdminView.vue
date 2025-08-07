@@ -286,7 +286,17 @@
                         <td>{{ uint8ArrayToHex(neuron.neuronId) }}</td>
                         <td>{{ formatNumber(neuron.votingPower) }}</td>
                         <td>{{ formatTime(neuron.lastUpdate) }}</td>
-                        <td>{{ neuron.lastAllocationMaker.toString() }}</td>
+                        <td>
+                          <a 
+                            :href="createVoteHistoryLink(neuron.lastAllocationMaker)" 
+                            target="_blank" 
+                            class="text-decoration-none text-info fw-bold"
+                            @click.prevent="$router.push({ path: '/admin/votes', query: { principal: neuron.lastAllocationMaker.toString() } })"
+                            title="View vote history for this principal"
+                          >
+                            🗳️ {{ neuron.lastAllocationMaker.toString() }}
+                          </a>
+                        </td>
                         <td>
                           <div v-for="[token, basisPoints] in neuron.allocations" :key="token.toString()">
                             {{ getTokenSymbol(token) }}: {{ (Number(basisPoints) / 100).toFixed(2) }}%
@@ -339,7 +349,17 @@
                     </thead>
                     <tbody>
                       <tr v-for="voter in filteredVoterDetails" :key="voter.principal.toString()">
-                        <td>{{ voter.principal.toString() }}</td>
+                        <td>
+                          <a 
+                            :href="createVoteHistoryLink(voter.principal)" 
+                            target="_blank" 
+                            class="text-decoration-none text-info fw-bold"
+                            @click.prevent="$router.push({ path: '/admin/votes', query: { principal: voter.principal.toString() } })"
+                            title="View vote history for this principal"
+                          >
+                            🗳️ {{ voter.principal.toString() }}
+                          </a>
+                        </td>
                         <td>{{ formatNumber(voter.state.votingPower) }}</td>
                         <td>
                           <div v-for="neuron in voter.state.neurons" :key="neuron.neuronId">
@@ -352,7 +372,15 @@
                         <td>
                           <div v-if="voter.state.allocationFollows.length > 0">
                             <div v-for="follow in voter.state.allocationFollows" :key="follow.follow.toString()">
-                              {{ follow.follow.toString() }}<br>
+                              <a 
+                                :href="createVoteHistoryLink(follow.follow)" 
+                                target="_blank" 
+                                class="text-decoration-none text-info fw-bold"
+                                @click.prevent="$router.push({ path: '/admin/votes', query: { principal: follow.follow.toString() } })"
+                                title="View vote history for this principal"
+                              >
+                                🗳️ {{ follow.follow.toString() }}
+                              </a><br>
                               Since: {{ formatTime(follow.since) }}
                             </div>
                           </div>
@@ -1723,4 +1751,10 @@ function calculateNextExpectedSnapshot(): bigint | null {
   const intervalNS = BigInt(snapshotIntervalMinutes.value) * 60n * 1_000_000_000n;
   return snapshotStatus.value.lastSnapshotTime + intervalNS;
 }
+
+// Helper function to create vote history link
+const createVoteHistoryLink = (principal: Principal | string): string => {
+  const principalStr = typeof principal === 'string' ? principal : principal.toString();
+  return `/admin/votes?principal=${encodeURIComponent(principalStr)}`;
+};
 </script>
