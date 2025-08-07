@@ -4875,8 +4875,8 @@ also rely on off-chain components.
 
                     <!-- paragraph -->
                     <p class="taco-report-explorer__report-paragraph">
-                      Users can sign in with passkeys such as Internet Identity, NFID, email, Ethereum, Solana, Google, etc.
-                    </p>  
+                      Users can sign in directly with passkeys or with other auth providers such as Internet Identity, NFID, email, Ethereum, Solana, Google, etc.
+                    </p>
                     
                     <!-- paragraph -->
                     <p class="taco-report-explorer__report-paragraph">
