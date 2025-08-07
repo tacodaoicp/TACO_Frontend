@@ -145,9 +145,9 @@
                       <div v-for="[principal, token] in fetchedTokenDetails" :key="principal.toString()" class="token-sync-item">
                         <div class="d-flex gap-3 align-items-center justify-content-between">
                           <div class="d-flex gap-3 align-items-center">
-                            <div class="status-indicator" :class="getTokenStatusClass(token)"></div>
+                            <div class="status-indicator" :class="getTokenStatusClass(token, principal)"></div>
                             <span class="token-symbol">{{ token.tokenSymbol }}</span>
-                            <span class="token-status">{{ getTokenStatusText(token) }}</span>
+                            <span class="token-status">{{ getTokenStatusText(token, principal) }}</span>
                             <span>Last Sync: {{ formatTime(token.lastTimeSynced) }}</span>
                           </div>
                           <div class="d-flex gap-2">
@@ -669,6 +669,22 @@
   
   &.paused {
     background-color: #dc3545;
+    
+    &.price-alert {
+      background-color: #fd7e14; // Orange for price alerts
+    }
+    
+    &.circuit-breaker {
+      background-color: #dc3545; // Red for circuit breakers
+    }
+    
+    &.manual {
+      background-color: #6f42c1; // Purple for manual pauses
+    }
+    
+    &.sync-failure {
+      background-color: #ffc107; // Yellow for sync failures
+    }
   }
 
   &.sync-failed {
@@ -965,6 +981,9 @@ const showOnlyActive = ref(false);
 const showOnlyFollowing = ref(false);
 const refreshingVP = ref(false);
 
+// Trading pauses state
+const tradingPauses = ref<any[]>([]);
+
 // Modal state for confirmation dialogs
 const confirmationModal = ref({
   show: false,
@@ -994,7 +1013,7 @@ const {
 } = storeToRefs(tacoStore);
 
 // Destructure utility methods
-const { getPrincipalDisplayName } = tacoStore;
+const { getPrincipalDisplayName, listTradingPauses } = tacoStore;
 
 // Update voting metrics state with type
 const votingMetrics = ref<VotingMetrics>({
@@ -1015,9 +1034,10 @@ const uniqueComponents = computed(() => {
 
 // Timer status functions
 async function refreshTimerStatus() {
-    console.log('AdminView: refreshTimerStatus called');
-    await tacoStore.refreshTimerStatus();
-    console.log('AdminView: refreshTimerStatus completed');
+  console.log('AdminView: refreshTimerStatus called');
+  await tacoStore.refreshTimerStatus();
+  await fetchTradingPauses();
+  console.log('AdminView: refreshTimerStatus completed');
 }
 
 async function triggerManualSnapshot() {
@@ -1369,18 +1389,60 @@ async function executeTradingCycle() {
 }
 
 // Add these functions
-const getTokenStatusClass = (token: any) => {
+// Helper function to get trading pause info for a token
+const getTradingPauseInfo = (tokenPrincipal: Principal) => {
+  const pause = tradingPauses.value.find(p => p.token.toString() === tokenPrincipal.toString());
+  if (!pause) return null;
+  
+  if ('PriceAlert' in pause.reason) {
+    return {
+      type: 'PriceAlert',
+      conditionName: pause.reason.PriceAlert.conditionName,
+      triggeredAt: pause.reason.PriceAlert.triggeredAt
+    };
+  } else if ('CircuitBreaker' in pause.reason) {
+    return {
+      type: 'CircuitBreaker',
+      reason: pause.reason.CircuitBreaker.reason,
+      severity: pause.reason.CircuitBreaker.severity,
+      triggeredAt: pause.reason.CircuitBreaker.triggeredAt
+    };
+  }
+  return null;
+};
+
+const getTokenStatusClass = (token: any, principal?: Principal) => {
   if (!token.Active) return 'inactive';
-  if (token.isPaused || token.pausedDueToSyncFailure) return 'paused';
+  
+  const tradingPause = principal ? getTradingPauseInfo(principal) : null;
+  if (tradingPause) {
+    if (tradingPause.type === 'PriceAlert') return 'paused price-alert';
+    if (tradingPause.type === 'CircuitBreaker') return 'paused circuit-breaker';
+  }
+  
+  if (token.isPaused) return 'paused manual';
+  if (token.pausedDueToSyncFailure) return 'paused sync-failure';
+  
   return 'active';
 };
 
-const getTokenStatusText = (token: any) => {
+const getTokenStatusText = (token: any, principal?: Principal) => {
   if (!token.Active) return '(Inactive)';
   
   let statuses = [];
   if (token.isPaused) statuses.push('Manually Paused');
   if (token.pausedDueToSyncFailure) statuses.push('Sync Failed');
+  
+  if (principal) {
+    const tradingPause = getTradingPauseInfo(principal);
+    if (tradingPause) {
+      if (tradingPause.type === 'PriceAlert') {
+        statuses.push(`Price Alert: ${tradingPause.conditionName}`);
+      } else if (tradingPause.type === 'CircuitBreaker') {
+        statuses.push(`Circuit Breaker: ${tradingPause.reason}`);
+      }
+    }
+  }
   
   return statuses.length ? `(${statuses.join(', ')})` : '';
 };
@@ -1764,6 +1826,18 @@ async function refreshUserVotingPower() {
         refreshingVP.value = false;
     }
 }
+
+// Fetch trading pauses
+const fetchTradingPauses = async () => {
+    try {
+        const result = await listTradingPauses();
+        tradingPauses.value = result.pausedTokens;
+        console.log('AdminView: Trading pauses fetched:', result.pausedTokens.length);
+    } catch (error) {
+        console.error('AdminView: Error fetching trading pauses:', error);
+        tradingPauses.value = [];
+    }
+};
 
 async function updateSnapshotInterval() {
   if (!snapshotIntervalMinutes.value || snapshotIntervalMinutes.value < 1) return;
