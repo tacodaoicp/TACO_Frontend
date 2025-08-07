@@ -3243,7 +3243,34 @@ export default {
         const userPrincipal = Principal.fromText(user)
         console.log('Converted to Principal:', userPrincipal.toText())
         
-        const result = await this.daoGovernanceActor.getUserVotingPowerAtTime(userPrincipal, BigInt(timestamp))
+        // Convert timestamp to nanoseconds if needed
+        // The backend expects nanoseconds (19-digit numbers like 1754564244618898112)
+        let timestampNs
+        const timestampStr = timestamp.toString()
+        
+        console.log('Timestamp string length:', timestampStr.length, 'value:', timestampStr)
+        
+        if (timestampStr.length >= 18) {
+          // Already in nanoseconds (18-19 digits)
+          timestampNs = BigInt(timestamp)
+          console.log('Timestamp appears to be in nanoseconds already')
+        } else if (timestampStr.length >= 15) {
+          // Microseconds (15-16 digits), multiply by 1000
+          timestampNs = BigInt(timestamp) * 1000n
+          console.log('Converting from microseconds to nanoseconds')
+        } else if (timestampStr.length >= 12) {
+          // Milliseconds (13 digits), multiply by 1000000
+          timestampNs = BigInt(timestamp) * 1000000n
+          console.log('Converting from milliseconds to nanoseconds')
+        } else {
+          // Seconds, multiply by 1000000000
+          timestampNs = BigInt(timestamp) * 1000000000n
+          console.log('Converting from seconds to nanoseconds')
+        }
+        
+        console.log('Original timestamp:', timestamp, 'Converted to nanoseconds:', timestampNs.toString())
+        
+        const result = await this.daoGovernanceActor.getUserVotingPowerAtTime(userPrincipal, timestampNs)
         console.log('Backend result:', result)
         
         if (result.ok !== undefined) {
