@@ -33,6 +33,7 @@ interface SnapshotInfo {
 }
 interface TradingMetrics {
     lastUpdate: bigint;
+    lastRebalanceAttempt: bigint;
     totalTradesExecuted: bigint;
     totalTradesFailed: bigint;
     avgSlippage: number;
@@ -2215,7 +2216,7 @@ export const useTacoStore = defineStore('taco', () => {
                         : 'Failed',
                     rebalanceError: 'Failed' in rebalanceStatus ? rebalanceStatus.Failed : undefined,
                     tradingMetrics: {
-                        lastRebalanceAttempt: BigInt(metrics.lastUpdate),
+                        lastRebalanceAttempt: BigInt(metrics.lastRebalanceAttempt),
                         totalTradesExecuted: metrics.totalTradesExecuted,
                         totalTradesFailed: metrics.totalTradesFailed,
                         avgSlippage: metrics.avgSlippage,
