@@ -577,7 +577,10 @@ export default {
       fetchedData: new Map(),  // blockId -> { votingPower: number, previousAllocation: allocation, allPreviousAllocations: [allocations] }
       
       // Simple voting power display for each block (reactive)
-      votingPowerDisplays: {}
+      votingPowerDisplays: {},
+      
+      // Simple previous allocation display for each block (reactive)
+      previousAllocationDisplays: {}
     }
   },
   computed: {
@@ -1641,6 +1644,12 @@ export default {
         } else {
           oldAllocationsHtml = `<button class="btn btn-xs btn-outline-primary" data-action="fetchPrevious" data-block-id="${blockId}" data-user-id="${userPrincipal}" data-timestamp="${timestamp}">📊 Fetch Previous</button>`
           oldAllocationsHtml += ` <button class="btn btn-xs btn-outline-info" data-action="fetchAll" data-block-id="${blockId}" data-user-id="${userPrincipal}" data-timestamp="${timestamp}">📋 Fetch All</button>`
+        }
+        
+        // Add reactive display text (can't fail approach)
+        const prevAllocDisplayText = this.previousAllocationDisplays[blockId] || ''
+        if (prevAllocDisplayText) {
+          oldAllocationsHtml += `<br><span style="color: white; font-size: 0.85em;">${prevAllocDisplayText}</span>`
         }
         
         // Format new allocations
@@ -3323,6 +3332,9 @@ export default {
         const currentState = this.fetchStates.get(blockId) || {}
         this.fetchStates.set(blockId, { ...currentState, previousAllocation: 'loading' })
         
+        // Set loading display
+        this.previousAllocationDisplays[blockId] = 'Fetching...'
+        
         console.log('Fetching previous allocation for user:', user, 'before timestamp:', timestamp)
         
         // Get the current blocks from the block browser (more efficient than fetching all)
@@ -3479,10 +3491,33 @@ export default {
         
         // Update state to loaded
         this.fetchStates.set(blockId, { ...currentState, previousAllocation: 'loaded' })
+        
+        // Update reactive display (Vue 3 compatible)
+        if (previousAllocation) {
+          // Debug token details availability
+          console.log('Token details available:', !!this.tacoStore.fetchedTokenDetails, 'count:', this.tacoStore.fetchedTokenDetails?.length)
+          
+          // Create detailed allocation breakdown
+          const allocDetails = previousAllocation.newAllocations.map(allocation => {
+            const tokenName = this.formatTokenNameFromBlob(allocation.token)
+            const percentage = (allocation.basisPoints / 100).toFixed(2)
+            console.log('Previous allocation token:', allocation.token, 'formatted as:', tokenName)
+            return `${tokenName}: ${percentage}%`
+          }).join(', ')
+          
+          const date = new Date(previousAllocation.timestamp / 1000000).toLocaleDateString()
+          const displayText = `Found from ${date}: ${allocDetails}`
+          this.previousAllocationDisplays[blockId] = displayText
+        } else {
+          this.previousAllocationDisplays[blockId] = 'No previous allocation found'
+        }
       } catch (error) {
         console.error('Error fetching previous allocation:', error)
         const currentState = this.fetchStates.get(blockId) || {}
         this.fetchStates.set(blockId, { ...currentState, previousAllocation: 'error' })
+        
+        // Set error display
+        this.previousAllocationDisplays[blockId] = 'Error'
       }
     },
 
