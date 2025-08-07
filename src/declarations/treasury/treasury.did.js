@@ -241,6 +241,36 @@ export const idlFactory = ({ IDL }) => {
     'Idle' : IDL.Null,
     'Trading' : IDL.Null,
   });
+  const Result_8 = IDL.Variant({
+    'ok' : IDL.Record({
+      'executedTrades' : IDL.Vec(TradeRecord),
+      'metrics' : IDL.Record({
+        'avgSlippage' : IDL.Float64,
+        'successRate' : IDL.Float64,
+        'lastUpdate' : IDL.Int,
+        'totalTradesExecuted' : IDL.Nat,
+        'lastRebalanceAttempt' : IDL.Int,
+        'skipBreakdown' : IDL.Record({
+          'tokensFiltered' : IDL.Nat,
+          'insufficientCandidates' : IDL.Nat,
+          'noExecutionPath' : IDL.Nat,
+          'noPairsFound' : IDL.Nat,
+          'pausedTokens' : IDL.Nat,
+        }),
+        'skipRate' : IDL.Float64,
+        'totalTradesFailed' : IDL.Nat,
+        'totalTradesSkipped' : IDL.Nat,
+      }),
+      'rebalanceStatus' : RebalanceStatus,
+      'portfolioState' : IDL.Record({
+        'currentAllocations' : IDL.Vec(IDL.Tuple(IDL.Principal, IDL.Nat)),
+        'totalValueICP' : IDL.Nat,
+        'totalValueUSD' : IDL.Float64,
+        'targetAllocations' : IDL.Vec(IDL.Tuple(IDL.Principal, IDL.Nat)),
+      }),
+    }),
+    'err' : IDL.Text,
+  });
   const Result_7 = IDL.Variant({
     'ok' : IDL.Record({
       'executedTrades' : IDL.Vec(TradeRecord),
@@ -525,7 +555,7 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Opt(TradingPauseRecord)],
         ['query'],
       ),
-    'getTradingStatus' : IDL.Func([], [Result_7], ['query']),
+    'getTradingStatus' : IDL.Func([], [Result_8], ['query']),
     'getTradingStatusSince' : IDL.Func([IDL.Int], [Result_7], ['query']),
     'getTreasuryAdminActionsSince' : IDL.Func(
         [IDL.Int, IDL.Nat],

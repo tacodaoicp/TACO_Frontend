@@ -147,7 +147,7 @@ type treasury =
    ///    * - Portfolio valuation
    ///    * - Current vs target allocations
    ///    * - Performance metrics
-   getTradingStatus: () -> (Result_7) query;
+   getTradingStatus: () -> (Result_8) query;
    /// * Get trading status with trades filtered by timestamp (for archive efficiency)
    ///    * Returns only trades newer than the specified timestamp
    getTradingStatusSince: (sinceTimestamp: int) -> (Result_7) query;
@@ -513,6 +513,47 @@ type Result_9 =
              principal;
              vec PricePoint;
            };
+ };
+type Result_8 = 
+ variant {
+   err: text;
+   ok:
+    record {
+      executedTrades: vec TradeRecord;
+      metrics:
+       record {
+         avgSlippage: float64;
+         lastRebalanceAttempt: int;
+         lastUpdate: int;
+         skipBreakdown:
+          record {
+            insufficientCandidates: nat;
+            noExecutionPath: nat;
+            noPairsFound: nat;
+            pausedTokens: nat;
+            tokensFiltered: nat;
+          };
+         skipRate: float64;
+         successRate: float64;
+         totalTradesExecuted: nat;
+         totalTradesFailed: nat;
+         totalTradesSkipped: nat;
+       };
+      portfolioState:
+       record {
+         currentAllocations: vec record {
+                                   principal;
+                                   nat;
+                                 };
+         targetAllocations: vec record {
+                                  principal;
+                                  nat;
+                                };
+         totalValueICP: nat;
+         totalValueUSD: float64;
+       };
+      rebalanceStatus: RebalanceStatus;
+    };
  };
 type Result_7 = 
  variant {

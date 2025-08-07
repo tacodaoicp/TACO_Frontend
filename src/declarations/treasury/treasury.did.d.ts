@@ -170,6 +170,36 @@ export type Result_7 = {
     }
   } |
   { 'err' : string };
+export type Result_8 = {
+    'ok' : {
+      'executedTrades' : Array<TradeRecord>,
+      'metrics' : {
+        'avgSlippage' : number,
+        'successRate' : number,
+        'lastUpdate' : bigint,
+        'totalTradesExecuted' : bigint,
+        'lastRebalanceAttempt' : bigint,
+        'skipBreakdown' : {
+          'tokensFiltered' : bigint,
+          'insufficientCandidates' : bigint,
+          'noExecutionPath' : bigint,
+          'noPairsFound' : bigint,
+          'pausedTokens' : bigint,
+        },
+        'skipRate' : number,
+        'totalTradesFailed' : bigint,
+        'totalTradesSkipped' : bigint,
+      },
+      'rebalanceStatus' : RebalanceStatus,
+      'portfolioState' : {
+        'currentAllocations' : Array<[Principal, bigint]>,
+        'totalValueICP' : bigint,
+        'totalValueUSD' : number,
+        'targetAllocations' : Array<[Principal, bigint]>,
+      },
+    }
+  } |
+  { 'err' : string };
 export type Result_9 = { 'ok' : Array<[Principal, Array<PricePoint>]> } |
   { 'err' : string };
 export type SnapshotReason = { 'PreTrade' : null } |
@@ -433,7 +463,7 @@ export interface treasury {
   >,
   'getTokenPriceHistory' : ActorMethod<[Array<Principal>], Result_9>,
   'getTradingPauseInfo' : ActorMethod<[Principal], [] | [TradingPauseRecord]>,
-  'getTradingStatus' : ActorMethod<[], Result_7>,
+  'getTradingStatus' : ActorMethod<[], Result_8>,
   'getTradingStatusSince' : ActorMethod<[bigint], Result_7>,
   'getTreasuryAdminActionsSince' : ActorMethod<[bigint, bigint], Result_6>,
   'getTriggerCondition' : ActorMethod<[bigint], [] | [TriggerCondition]>,
