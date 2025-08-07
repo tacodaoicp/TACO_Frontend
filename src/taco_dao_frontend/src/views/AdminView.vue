@@ -123,6 +123,13 @@
                   <!-- Trading Metrics -->
                   <div v-if="timerHealth.treasury.tradingMetrics" class="trading-metrics mt-2">
                     <h5>Trading Metrics</h5>
+                    
+                    <!-- Trading Bot Warning -->
+                    <div v-if="getTradingBotWarning().level !== 'none'" 
+                         :class="['alert', 'mb-2', getTradingBotWarning().level === 'danger' ? 'alert-danger' : 'alert-warning']">
+                      <small>{{ getTradingBotWarning().message }}</small>
+                    </div>
+                    
                     <div class="d-flex flex-column gap-1">
                       <div>Last Attempt: {{ formatTime(timerHealth.treasury.tradingMetrics.lastRebalanceAttempt) }}</div>
                       <div>Total Trades: {{ timerHealth.treasury.tradingMetrics.totalTradesExecuted.toString() }}</div>
@@ -908,6 +915,25 @@
   vertical-align: top;
   white-space: normal;
   word-break: break-all;
+}
+
+/* Trading Bot Warning Alerts */
+.trading-metrics .alert {
+  padding: 0.5rem;
+  border-radius: 0.375rem;
+  font-size: 0.875rem;
+}
+
+.trading-metrics .alert-warning {
+  background-color: rgba(255, 193, 7, 0.1);
+  border: 1px solid rgba(255, 193, 7, 0.3);
+  color: #ffc107;
+}
+
+.trading-metrics .alert-danger {
+  background-color: rgba(220, 53, 69, 0.1);
+  border: 1px solid rgba(220, 53, 69, 0.3);
+  color: #dc3545;
 }
 </style>
 
@@ -1762,5 +1788,34 @@ function calculateNextExpectedSnapshot(): bigint | null {
 const createVoteHistoryLink = (principal: Principal | string): string => {
   const principalStr = typeof principal === 'string' ? principal : principal.toString();
   return `/admin/votes?principal=${encodeURIComponent(principalStr)}`;
+};
+
+// Trading bot warning logic
+const getTradingBotWarning = (): { level: 'none' | 'warning' | 'danger', message: string } => {
+  if (!timerHealth.value.treasury.tradingMetrics?.lastRebalanceAttempt || !rebalanceConfig.value?.rebalanceIntervalNS) {
+    return { level: 'none', message: '' };
+  }
+
+  const now = Date.now() * 1_000_000; // Convert to nanoseconds
+  const lastAttempt = Number(timerHealth.value.treasury.tradingMetrics.lastRebalanceAttempt);
+  const intervalNS = Number(rebalanceConfig.value.rebalanceIntervalNS);
+  const timeSinceLastAttempt = now - lastAttempt;
+  const periodsSinceLastAttempt = timeSinceLastAttempt / intervalNS;
+
+  if (periodsSinceLastAttempt > 5) {
+    const periodsOverdue = Math.floor(periodsSinceLastAttempt);
+    return { 
+      level: 'danger', 
+      message: `⚠️ Trading bot is ${periodsOverdue} periods overdue! Last attempt was ${Math.floor(periodsSinceLastAttempt)} intervals ago.` 
+    };
+  } else if (periodsSinceLastAttempt > 2) {
+    const periodsOverdue = Math.floor(periodsSinceLastAttempt);
+    return { 
+      level: 'warning', 
+      message: `⚠️ Trading bot is ${periodsOverdue} periods overdue. Last attempt was ${Math.floor(periodsSinceLastAttempt)} intervals ago.` 
+    };
+  }
+
+  return { level: 'none', message: '' };
 };
 </script>
