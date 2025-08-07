@@ -20,6 +20,9 @@
               <router-link to="/admin/price" class="btn btn-warning">
                 🚨 Price Failsafe Admin
               </router-link>
+              <router-link to="/admin/pricehistory" class="btn btn-secondary">
+                📊 Price History
+              </router-link>
               <router-link to="/admin/neuron" class="btn btn-success">
                 🧠 Neuron Snapshot Admin
               </router-link>
