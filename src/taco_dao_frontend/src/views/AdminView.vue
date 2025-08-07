@@ -141,8 +141,8 @@
                   <!-- Token Sync Status -->
                   <div class="token-sync-status mt-2">
                     <h5>Token Sync Status</h5>
-                    <div v-if="fetchedTokenDetails && fetchedTokenDetails.length" class="token-list">
-                      <div v-for="[principal, token] in fetchedTokenDetails" :key="principal.toString()" class="token-sync-item">
+                    <div v-if="sortedTokenDetails.length" class="token-list">
+                      <div v-for="[principal, token] in sortedTokenDetails" :key="principal.toString()" class="token-sync-item">
                         <div class="d-flex gap-3 align-items-center justify-content-between">
                           <div class="d-flex gap-3 align-items-center">
                             <div class="status-indicator" :class="getTokenStatusClass(token, principal)"></div>
@@ -983,6 +983,33 @@ const refreshingVP = ref(false);
 
 // Trading pauses state
 const tradingPauses = ref<any[]>([]);
+
+// Computed property to sort tokens with paused/inactive tokens first
+const sortedTokenDetails = computed(() => {
+  if (!fetchedTokenDetails.value || !fetchedTokenDetails.value.length) return [];
+  
+  return [...fetchedTokenDetails.value].sort(([principalA, tokenA], [principalB, tokenB]) => {
+    const statusA = getTokenStatusClass(tokenA, principalA);
+    const statusB = getTokenStatusClass(tokenB, principalB);
+    
+    // Priority: inactive > paused > active
+    const getPriority = (status: string) => {
+      if (status.includes('inactive')) return 0;
+      if (status.includes('paused')) return 1;
+      return 2; // active
+    };
+    
+    const priorityA = getPriority(statusA);
+    const priorityB = getPriority(statusB);
+    
+    if (priorityA !== priorityB) {
+      return priorityA - priorityB;
+    }
+    
+    // If same priority, sort by token symbol alphabetically
+    return tokenA.tokenSymbol.localeCompare(tokenB.tokenSymbol);
+  });
+});
 
 // Modal state for confirmation dialogs
 const confirmationModal = ref({
