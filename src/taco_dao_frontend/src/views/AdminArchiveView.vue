@@ -3328,6 +3328,8 @@ export default {
         // Get the current blocks from the block browser (more efficient than fetching all)
         const currentBlocks = this.blockBrowserBlocks || []
         console.log('Searching through', currentBlocks.length, 'blocks for previous allocations')
+        console.log('Raw blockBrowserBlocks:', JSON.stringify(this.blockBrowserBlocks?.slice(0, 2), (key, value) => 
+          typeof value === 'bigint' ? value.toString() + 'n' : value, 2))
         
         let previousAllocation = null
         let mostRecentTimestamp = -1
@@ -3340,30 +3342,109 @@ export default {
               const blockData = block.block
               
               console.log('Checking block ID:', block.id, 'structure:', Object.keys(blockData))
+              console.log('Raw block data:', JSON.stringify(blockData, (key, value) => 
+                typeof value === 'bigint' ? value.toString() + 'n' : value, 2))
+              console.log('Full raw block:', JSON.stringify(block, (key, value) => 
+                typeof value === 'bigint' ? value.toString() + 'n' : value, 2))
               
-              // Try to extract user and timestamp from nested structure (like voting power)
+              // Parse ICRC3 Map structure
               let blockUser = null
               let blockTimestamp = 0
               let allocationData = null
+              let isAllocationBlock = false
               
-              if (blockData.tx && blockData.tx.data) {
-                // Data is nested in tx.data (like voting power)
-                allocationData = blockData.tx.data
-                blockUser = allocationData.user ? Principal.fromUint8Array(new Uint8Array(allocationData.user)).toText() : null
-                blockTimestamp = allocationData.timestamp ? Number(allocationData.timestamp) : 0
-                console.log('Found nested data - user:', blockUser, 'timestamp:', blockTimestamp)
+              // Handle nested Map structure from ICRC3
+              if (blockData.Map && Array.isArray(blockData.Map)) {
+                console.log('Parsing ICRC3 Map structure with', blockData.Map.length, 'entries')
+                
+                // Parse the top-level Map entries
+                for (const [key, value] of blockData.Map) {
+                  if (key === 'tx' && value.Map && Array.isArray(value.Map)) {
+                    // Found tx entry, parse its Map
+                    for (const [txKey, txValue] of value.Map) {
+                      if (txKey === 'operation' && txValue.Text === '3allocation_change') {
+                        isAllocationBlock = true
+                        console.log('Found allocation change operation')
+                      } else if (txKey === 'data' && txValue.Map && Array.isArray(txValue.Map)) {
+                        // Found data entry, parse the data Map
+                        const parsedData = {}
+                        for (const [dataKey, dataValue] of txValue.Map) {
+                          if (dataKey === 'user' && dataValue.Blob) {
+                            // Convert Blob object to Uint8Array
+                            const blobArray = Object.values(dataValue.Blob)
+                            blockUser = Principal.fromUint8Array(new Uint8Array(blobArray)).toText()
+                            parsedData.user = new Uint8Array(blobArray)
+                            console.log('Parsed user:', blockUser)
+                          } else if (dataKey === 'timestamp' && dataValue.Int) {
+                            // Handle both string and BigInt forms
+                            if (typeof dataValue.Int === 'string') {
+                              blockTimestamp = Number(dataValue.Int.replace('n', ''))
+                            } else {
+                              blockTimestamp = Number(dataValue.Int)
+                            }
+                            parsedData.timestamp = blockTimestamp
+                            console.log('Parsed timestamp:', blockTimestamp, 'from:', dataValue.Int)
+                          } else if (dataKey === 'newAllocations' && dataValue.Array) {
+                            // Parse newAllocations array
+                            const newAllocations = dataValue.Array.map(allocMap => {
+                              const alloc = {}
+                              if (allocMap.Map) {
+                                for (const [allocKey, allocValue] of allocMap.Map) {
+                                  if (allocKey === 'token' && allocValue.Blob) {
+                                    alloc.token = new Uint8Array(Object.values(allocValue.Blob))
+                                  } else if (allocKey === 'basisPoints' && allocValue.Nat) {
+                                    // Handle both string and BigInt forms
+                                    if (typeof allocValue.Nat === 'string') {
+                                      alloc.basisPoints = Number(allocValue.Nat.replace('n', ''))
+                                    } else {
+                                      alloc.basisPoints = Number(allocValue.Nat)
+                                    }
+                                  }
+                                }
+                              }
+                              return alloc
+                            })
+                            parsedData.newAllocations = newAllocations
+                            console.log('Parsed newAllocations:', newAllocations.length, 'items')
+                          } else if (dataKey === 'oldAllocations' && dataValue.Array) {
+                            // Parse oldAllocations array (similar to newAllocations)
+                            const oldAllocations = dataValue.Array.map(allocMap => {
+                              const alloc = {}
+                              if (allocMap.Map) {
+                                for (const [allocKey, allocValue] of allocMap.Map) {
+                                  if (allocKey === 'token' && allocValue.Blob) {
+                                    alloc.token = new Uint8Array(Object.values(allocValue.Blob))
+                                  } else if (allocKey === 'basisPoints' && allocValue.Nat) {
+                                    // Handle both string and BigInt forms
+                                    if (typeof allocValue.Nat === 'string') {
+                                      alloc.basisPoints = Number(allocValue.Nat.replace('n', ''))
+                                    } else {
+                                      alloc.basisPoints = Number(allocValue.Nat)
+                                    }
+                                  }
+                                }
+                              }
+                              return alloc
+                            })
+                            parsedData.oldAllocations = oldAllocations
+                          }
+                        }
+                        allocationData = parsedData
+                      }
+                    }
+                  }
+                }
+                
+                console.log('Parsed ICRC3 Map - user:', blockUser, 'timestamp:', blockTimestamp, 'isAllocation:', isAllocationBlock)
               } else {
-                // Try direct access (fallback)
-                blockUser = blockData.user ? Principal.fromUint8Array(new Uint8Array(blockData.user)).toText() : null
-                blockTimestamp = blockData.timestamp ? Number(blockData.timestamp) : 0
-                allocationData = blockData
-                console.log('Using direct access - user:', blockUser, 'timestamp:', blockTimestamp)
+                console.log('Unknown block structure, skipping')
               }
               
               if (blockUser === user && 
                   blockTimestamp < timestamp && 
                   blockTimestamp > mostRecentTimestamp &&
-                  allocationData.newAllocations) {
+                  isAllocationBlock &&
+                  allocationData && allocationData.newAllocations) {
                 
                 // Parse the allocation data
                 const newAllocations = allocationData.newAllocations?.map(alloc => ({
@@ -3372,11 +3453,11 @@ export default {
                 })) || []
                 
                 previousAllocation = {
-                  id: Number(blockData.id || 0),
+                  id: Number(block.id || 0),
                   timestamp: blockTimestamp,
                   user: blockUser,
                   newAllocations,
-                  oldAllocations: blockData.oldAllocations?.map(alloc => ({
+                  oldAllocations: allocationData.oldAllocations?.map(alloc => ({
                     token: this.formatPrincipalFromBlob(alloc.token),
                     basisPoints: Number(alloc.basisPoints)
                   })) || []
@@ -3425,26 +3506,66 @@ export default {
             if (block.block && typeof block.block === 'object') {
               const blockData = block.block
               
-              // Extract user and timestamp (get raw principal, not display name)
-              const blockUser = blockData.user ? Principal.fromUint8Array(new Uint8Array(blockData.user)).toText() : null
-              const blockTimestamp = blockData.timestamp ? Number(blockData.timestamp) : 0
+              // Parse ICRC3 Map structure (same as single fetch)
+              let blockUser = null
+              let blockTimestamp = 0
+              let allocationData = null
+              let isAllocationBlock = false
+              
+              // Handle Map structure from ICRC3
+              if (Array.isArray(blockData) && blockData.length > 0) {
+                // This is a Map array structure
+                for (const [key, value] of blockData) {
+                  if (key === 'tx' && Array.isArray(value)) {
+                    // Found tx entry, look for data and operation
+                    for (const [txKey, txValue] of value) {
+                      if (txKey === 'data' && Array.isArray(txValue)) {
+                        // Found data entry
+                        const parsedData = {}
+                        for (const [dataKey, dataValue] of txValue) {
+                          if (dataKey === 'user' && dataValue instanceof Uint8Array) {
+                            blockUser = Principal.fromUint8Array(dataValue).toText()
+                            parsedData.user = dataValue
+                          } else if (dataKey === 'timestamp') {
+                            blockTimestamp = Number(dataValue)
+                            parsedData.timestamp = dataValue
+                          } else if (dataKey === 'newAllocations') {
+                            parsedData.newAllocations = dataValue
+                          } else if (dataKey === 'oldAllocations') {
+                            parsedData.oldAllocations = dataValue
+                          }
+                        }
+                        allocationData = parsedData
+                      } else if (txKey === 'operation' && txValue === '3allocation_change') {
+                        isAllocationBlock = true
+                      }
+                    }
+                  }
+                }
+              } else {
+                // Fallback for non-Map structure
+                blockUser = blockData.user ? Principal.fromUint8Array(new Uint8Array(blockData.user)).toText() : null
+                blockTimestamp = blockData.timestamp ? Number(blockData.timestamp) : 0
+                allocationData = blockData
+              }
               
               if (blockUser === user && 
                   blockTimestamp < timestamp &&
-                  blockData.newAllocations) {
+                  isAllocationBlock &&
+                  allocationData && allocationData.newAllocations) {
                 
                 // Parse the allocation data
-                const newAllocations = blockData.newAllocations?.map(alloc => ({
+                const newAllocations = allocationData.newAllocations?.map(alloc => ({
                   token: this.formatPrincipalFromBlob(alloc.token),
                   basisPoints: Number(alloc.basisPoints)
                 })) || []
                 
                 const allocation = {
-                  id: Number(blockData.id || 0),
+                  id: Number(block.id || 0),
                   timestamp: blockTimestamp,
                   user: blockUser,
                   newAllocations,
-                  oldAllocations: blockData.oldAllocations?.map(alloc => ({
+                  oldAllocations: allocationData.oldAllocations?.map(alloc => ({
                     token: this.formatPrincipalFromBlob(alloc.token),
                     basisPoints: Number(alloc.basisPoints)
                   })) || []
