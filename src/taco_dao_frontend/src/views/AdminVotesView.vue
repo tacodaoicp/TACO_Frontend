@@ -62,7 +62,7 @@
           <!-- User Vote History -->
           <div v-if="userData" class="card bg-dark text-white mb-4">
             <div class="card-header">
-              <h3 class="mb-0">Vote History for {{ searchedPrincipal }}</h3>
+              <h3 class="mb-0">Vote History for {{ formatPrincipalWithName(Principal.fromText(searchedPrincipal)) }}</h3>
             </div>
             <div class="card-body">
               
@@ -138,7 +138,8 @@
                       <tbody>
                         <tr v-for="neuron in userData.neurons" :key="uint8ArrayToHex(neuron.neuronId)">
                           <td>
-                            <code style="font-size: 0.8em;">{{ uint8ArrayToHex(neuron.neuronId) }}</code>
+                            <div>{{ formatNeuronWithName(neuron.neuronId) }}</div>
+                            <small class="text-muted">{{ uint8ArrayToHex(neuron.neuronId) }}</small>
                           </td>
                           <td>{{ neuron.votingPower.toString() }}</td>
                           <td>{{ formatVotingPower(neuron.votingPower) }}</td>
@@ -188,7 +189,8 @@
                             </div>
                           </td>
                           <td>
-                            <code style="font-size: 0.8em;">{{ pastAllocation.allocationMaker.toString() }}</code>
+                            <div>{{ formatPrincipalWithName(pastAllocation.allocationMaker) }}</div>
+                            <small class="text-muted">{{ pastAllocation.allocationMaker.toString() }}</small>
                           </td>
                         </tr>
                       </tbody>
@@ -216,7 +218,8 @@
                         <tbody>
                           <tr v-for="follow in userData.allocationFollows" :key="follow.follow.toString()">
                             <td>
-                              <code style="font-size: 0.8em;">{{ follow.follow.toString() }}</code>
+                              <div>{{ formatPrincipalWithName(follow.follow) }}</div>
+                              <small class="text-muted">{{ follow.follow.toString() }}</small>
                             </td>
                             <td>{{ formatTime(follow.since) }}</td>
                           </tr>
@@ -243,7 +246,8 @@
                         <tbody>
                           <tr v-for="follower in userData.allocationFollowedBy" :key="follower.follow.toString()">
                             <td>
-                              <code style="font-size: 0.8em;">{{ follower.follow.toString() }}</code>
+                              <div>{{ formatPrincipalWithName(follower.follow) }}</div>
+                              <small class="text-muted">{{ follower.follow.toString() }}</small>
                             </td>
                             <td>{{ formatTime(follower.since) }}</td>
                           </tr>
@@ -331,6 +335,9 @@ import TacoTitle from '../components/misc/TacoTitle.vue';
 const tacoStore = useTacoStore();
 const { fetchedTokenDetails } = storeToRefs(tacoStore);
 
+// Destructure utility methods
+const { getPrincipalDisplayName, getNeuronDisplayName } = tacoStore;
+
 // Component state
 const principalInput = ref('');
 const searchedPrincipal = ref('');
@@ -380,6 +387,26 @@ const formatTime = (timestamp: number | bigint | null): string => {
   const milliseconds = Number(nanoseconds / BigInt(1_000_000));
   const date = new Date(milliseconds);
   return date.toLocaleString();
+};
+
+const formatPrincipalWithName = (principal: Principal): string => {
+  if (!principal) return 'Unknown';
+  const displayName = getPrincipalDisplayName(principal);
+  return displayName;
+};
+
+const formatNeuronWithName = (neuronId: Uint8Array): string => {
+  if (!neuronId) return 'Unknown';
+  const tacoSnsRoot = Principal.fromText('lhdfz-wqaaa-aaaaq-aae3q-cai'); // TACO DAO SNS governance
+  const neuronName = getNeuronDisplayName(tacoSnsRoot, neuronId);
+  
+  if (neuronName) {
+    return neuronName;
+  }
+  
+  // Fallback to truncated neuron ID
+  const hex = Array.from(neuronId, byte => byte.toString(16).padStart(2, '0')).join('');
+  return hex.length > 12 ? `${hex.substring(0, 6)}...${hex.substring(hex.length - 6)}` : hex;
 };
 
 const formatVotingPower = (votingPower: number | bigint): string => {
