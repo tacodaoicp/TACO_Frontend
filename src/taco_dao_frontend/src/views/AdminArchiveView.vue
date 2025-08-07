@@ -3327,6 +3327,7 @@ export default {
         
         // Get the current blocks from the block browser (more efficient than fetching all)
         const currentBlocks = this.blockBrowserBlocks || []
+        console.log('Searching through', currentBlocks.length, 'blocks for previous allocations')
         
         let previousAllocation = null
         let mostRecentTimestamp = -1
@@ -3338,17 +3339,34 @@ export default {
             if (block.block && typeof block.block === 'object') {
               const blockData = block.block
               
-              // Extract user and timestamp (get raw principal, not display name)
-              const blockUser = blockData.user ? Principal.fromUint8Array(new Uint8Array(blockData.user)).toText() : null
-              const blockTimestamp = blockData.timestamp ? Number(blockData.timestamp) : 0
+              console.log('Checking block ID:', block.id, 'structure:', Object.keys(blockData))
+              
+              // Try to extract user and timestamp from nested structure (like voting power)
+              let blockUser = null
+              let blockTimestamp = 0
+              let allocationData = null
+              
+              if (blockData.tx && blockData.tx.data) {
+                // Data is nested in tx.data (like voting power)
+                allocationData = blockData.tx.data
+                blockUser = allocationData.user ? Principal.fromUint8Array(new Uint8Array(allocationData.user)).toText() : null
+                blockTimestamp = allocationData.timestamp ? Number(allocationData.timestamp) : 0
+                console.log('Found nested data - user:', blockUser, 'timestamp:', blockTimestamp)
+              } else {
+                // Try direct access (fallback)
+                blockUser = blockData.user ? Principal.fromUint8Array(new Uint8Array(blockData.user)).toText() : null
+                blockTimestamp = blockData.timestamp ? Number(blockData.timestamp) : 0
+                allocationData = blockData
+                console.log('Using direct access - user:', blockUser, 'timestamp:', blockTimestamp)
+              }
               
               if (blockUser === user && 
                   blockTimestamp < timestamp && 
                   blockTimestamp > mostRecentTimestamp &&
-                  blockData.newAllocations) {
+                  allocationData.newAllocations) {
                 
                 // Parse the allocation data
-                const newAllocations = blockData.newAllocations?.map(alloc => ({
+                const newAllocations = allocationData.newAllocations?.map(alloc => ({
                   token: this.formatPrincipalFromBlob(alloc.token),
                   basisPoints: Number(alloc.basisPoints)
                 })) || []
