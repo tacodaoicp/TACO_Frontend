@@ -574,7 +574,10 @@ export default {
       
       // Fetch states for allocation cards
       fetchStates: new Map(), // blockId -> { votingPower: 'loading'|'loaded'|'error', previousAllocation: 'loading'|'loaded'|'error' }
-      fetchedData: new Map()  // blockId -> { votingPower: number, previousAllocation: allocation, allPreviousAllocations: [allocations] }
+      fetchedData: new Map(),  // blockId -> { votingPower: number, previousAllocation: allocation, allPreviousAllocations: [allocations] }
+      
+      // Simple voting power display for each block (reactive)
+      votingPowerDisplays: {}
     }
   },
   computed: {
@@ -1599,6 +1602,9 @@ export default {
         const fetchState = this.fetchStates.get(blockId) || {}
         const fetchedData = this.fetchedData.get(blockId) || {}
         
+        // Simple voting power display using reactive data
+        const vpDisplayText = this.votingPowerDisplays[blockId] || '0 VP'
+        
         // Voting power - show fetched data or fetch button
         let votingPowerHtml = ''
         if (fetchState.votingPower === 'loading') {
@@ -1662,7 +1668,7 @@ export default {
                 <tr><td><strong>Change Type:</strong></td><td><span class="badge ${userInitiated ? 'bg-success' : 'bg-warning'}">${changeType}</span></td></tr>
                 <tr><td><strong>Initiated By:</strong></td><td>${userInitiated ? '👤 User' : '🤖 System'}</td></tr>
                 <tr><td><strong>Timestamp:</strong></td><td><span class="text-info">🕐 ${formattedTime}</span></td></tr>
-                <tr><td><strong>Voting Power:</strong></td><td>${votingPowerHtml}</td></tr>
+                <tr><td><strong>Voting Power:</strong></td><td>${votingPowerHtml} <span style="color: white;">${vpDisplayText}</span></td></tr>
               </table>
             </div>
             <div class="col-md-6">
@@ -3232,6 +3238,9 @@ export default {
         const currentState = this.fetchStates.get(blockId) || {}
         this.fetchStates.set(blockId, { ...currentState, votingPower: 'loading' })
         
+        // Update display text
+        this.votingPowerDisplays[blockId] = 'Fetching...'
+        
         // Call the dao_governance_archive method
         // The user parameter should already be a valid principal string
         console.log('Fetching voting power for user:', user, 'at timestamp:', timestamp)
@@ -3281,8 +3290,12 @@ export default {
           // Update state to loaded
           this.fetchStates.set(blockId, { ...currentState, votingPower: 'loaded' })
           
-          // Force reactivity update
-          this.$forceUpdate()
+          // Update display text with formatted voting power
+          const vp = Number(result.ok)
+          const formattedVP = (vp / 100000000).toLocaleString(undefined, { maximumFractionDigits: 2 })
+          this.votingPowerDisplays[blockId] = formattedVP + ' VP'
+          
+          console.log('Updated voting power display for block', blockId, 'to:', formattedVP + ' VP')
         } else {
           throw new Error(`Backend returned error: ${JSON.stringify(result.err) || 'Unknown error'}`)
         }
@@ -3297,6 +3310,9 @@ export default {
         })
         const currentState = this.fetchStates.get(blockId) || {}
         this.fetchStates.set(blockId, { ...currentState, votingPower: 'error' })
+        
+        // Update display text for error
+        this.votingPowerDisplays[blockId] = 'Error'
       }
     },
 
