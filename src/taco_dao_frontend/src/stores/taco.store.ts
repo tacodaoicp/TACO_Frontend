@@ -3108,7 +3108,7 @@ export const useTacoStore = defineStore('taco', () => {
             appLoadingOff();
         }
     }
-    const updateSnapshotInterval = async (intervalNS: bigint): Promise<boolean> => {
+    const updateSnapshotInterval = async (intervalNS: bigint, reason?: string): Promise<boolean> => {
         // console.log('TacoStore: updateSnapshotInterval called with', intervalNS);
         try {
             appLoadingOn();
@@ -3148,7 +3148,7 @@ export const useTacoStore = defineStore('taco', () => {
             //    snapshotIntervalNS: [intervalNS]
             //};
 
-            const result = await backend.updateSystemParameter({ SnapshotInterval: intervalNS }) as SystemParameterResult;
+            const result = await backend.updateSystemParameter({ SnapshotInterval: intervalNS }, reason ? [reason] : []) as SystemParameterResult;
             
             if ('ok' in result) {
                 addToast({

@@ -62,7 +62,7 @@
                   />
                   <button 
                     class="btn btn-primary" 
-                    @click="updateSnapshotInterval"
+                    @click="showUpdateSnapshotIntervalConfirmation"
                     :disabled="!snapshotIntervalMinutes || snapshotIntervalMinutes < 1"
                   >
                     Update Interval
@@ -1625,6 +1625,11 @@ const handleConfirmAction = async (reason: string) => {
       await refreshTimerStatus();
       console.log('AdminView: Trading cycle executed');
       success = true;
+    } else if (actionData.type === 'updateSnapshotInterval') {
+      // Handle update snapshot interval
+      await updateSnapshotInterval(reason);
+      console.log('AdminView: Snapshot interval updated');
+      success = true;
     } else if (actionData.principal && actionData.tokenName) {
       // Handle token pause/unpause actions
       const { principal, tokenName } = actionData;
@@ -1866,13 +1871,28 @@ const fetchTradingPauses = async () => {
     }
 };
 
-async function updateSnapshotInterval() {
+const showUpdateSnapshotIntervalConfirmation = () => {
+  if (!snapshotIntervalMinutes.value || snapshotIntervalMinutes.value < 1) return;
+  
+  confirmationModal.value = {
+    show: true,
+    title: 'Update Snapshot Interval',
+    message: `Are you sure you want to update the snapshot interval to ${snapshotIntervalMinutes.value} minutes?`,
+    extraData: 'This will change how frequently the system takes snapshots of token balances and prices.',
+    confirmText: 'Update Interval',
+    cancelText: 'Cancel',
+    requireReason: true,
+    actionData: { type: 'updateSnapshotInterval' }
+  };
+};
+
+async function updateSnapshotInterval(reason?: string) {
   if (!snapshotIntervalMinutes.value || snapshotIntervalMinutes.value < 1) return;
   
   try {
     // Convert minutes to nanoseconds
     const intervalNS = BigInt(snapshotIntervalMinutes.value) * 60n * 1_000_000_000n;
-    await tacoStore.updateSnapshotInterval(intervalNS);
+    await tacoStore.updateSnapshotInterval(intervalNS, reason);
     await refreshTimerStatus();
   } catch (error) {
     console.error('Error updating snapshot interval:', error);
