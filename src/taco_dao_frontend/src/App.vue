@@ -1,6 +1,8 @@
 <template>
 
-  <div class="app" :style="{ backgroundColor: appBackgroundColor }">
+  <div class="app" 
+      :class="{ 'overflow-hidden': appLoading }"
+      :style="{ backgroundColor: appBackgroundColor }">
 
     <!-- app loading curtain -->
     <div v-if="appLoading" class="app__loading-curtain">
