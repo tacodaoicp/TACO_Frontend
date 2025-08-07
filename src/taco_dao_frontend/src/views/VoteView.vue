@@ -2265,9 +2265,9 @@
     // safely extract token data - now an array of [principal, basisPoints] tuples
     const allTokens = tokenDetails || []
 
-    // filter out tokens that are paused or inactive
-    const extractedTokens = allTokens.filter((token: [any, { Active: boolean, isPaused: boolean }]) => {
-      return token[1].Active === true && token[1].isPaused === false
+    // filter out tokens that are inactive
+    const extractedTokens = allTokens.filter((token: [any, { Active: boolean }]) => {
+      return token[1].Active === true
     })
 
     // log
