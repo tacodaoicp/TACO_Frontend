@@ -570,7 +570,11 @@ export default {
       showRawJson: [],
       
       // Portfolio Charts - store multiple instances by ID
-      portfolioCharts: new Map()
+      portfolioCharts: new Map(),
+      
+      // Fetch states for allocation cards
+      fetchStates: new Map(), // blockId -> { votingPower: 'loading'|'loaded'|'error', previousAllocation: 'loading'|'loaded'|'error' }
+      fetchedData: new Map()  // blockId -> { votingPower: number, previousAllocation: allocation, allPreviousAllocations: [allocations] }
     }
   },
   computed: {
@@ -612,11 +616,17 @@ export default {
     this.refreshInterval = setInterval(() => {
       this.refreshStatus()
     }, 10000)
+    
+    // Add event delegation for fetch buttons
+    document.addEventListener('click', this.handleFetchButtonClick)
   },
   beforeUnmount() {
     if (this.refreshInterval) {
       clearInterval(this.refreshInterval)
     }
+    
+    // Remove event delegation
+    document.removeEventListener('click', this.handleFetchButtonClick)
     
     // Clean up portfolio charts
     this.cleanupPortfolioCharts()
@@ -1575,14 +1585,52 @@ export default {
         const userId = this.formatPrincipalFromBlob(allocationData.user)
         const changeType = allocationData.changeType?.type || 'Unknown'
         const userInitiated = allocationData.changeType?.userInitiated === 1n || allocationData.changeType?.userInitiated === '1'
-        // Voting power not available in current data structure (always 0)
-        const votingPower = 0
         const reason = allocationData.reason || 'No reason provided'
         const timestamp = allocationData.timestamp || Date.now()
         const formattedTime = this.formatTime(Number(timestamp))
+        const blockId = allocationData.id || 'unknown'
         
-        // Old allocations not available in current data structure
-        let oldAllocationsHtml = '<em class="text-muted">Not available (requires DAO migration)</em>'
+        // Get fetch states and data for this block
+        const fetchState = this.fetchStates.get(blockId) || {}
+        const fetchedData = this.fetchedData.get(blockId) || {}
+        
+        // Voting power - show fetched data or fetch button
+        let votingPowerHtml = ''
+        if (fetchState.votingPower === 'loading') {
+          votingPowerHtml = '<span class="text-info">⏳ Loading...</span>'
+        } else if (fetchState.votingPower === 'loaded') {
+          const vp = fetchedData.votingPower || 0
+          votingPowerHtml = `<strong>${vp} VP</strong> <button class="btn btn-xs btn-outline-secondary ms-1" data-action="fetchVP" data-block-id="${blockId}" data-user-id="${userId}" data-timestamp="${timestamp}">🔄 Refresh</button>`
+        } else if (fetchState.votingPower === 'error') {
+          votingPowerHtml = `<span class="text-danger">❌ Error</span> <button class="btn btn-xs btn-outline-primary ms-1" data-action="fetchVP" data-block-id="${blockId}" data-user-id="${userId}" data-timestamp="${timestamp}">🔄 Retry</button>`
+        } else {
+          votingPowerHtml = `<button class="btn btn-xs btn-outline-primary" data-action="fetchVP" data-block-id="${blockId}" data-user-id="${userId}" data-timestamp="${timestamp}">📊 Fetch VP</button>`
+        }
+        
+        // Previous allocations - show fetched data or fetch button
+        let oldAllocationsHtml = ''
+        if (fetchState.previousAllocation === 'loading') {
+          oldAllocationsHtml = '<span class="text-info">⏳ Loading...</span>'
+        } else if (fetchState.previousAllocation === 'loaded') {
+          const prevAlloc = fetchedData.previousAllocation
+          if (prevAlloc && prevAlloc.newAllocations && prevAlloc.newAllocations.length > 0) {
+            const allocBadges = prevAlloc.newAllocations.map(allocation => {
+              const tokenName = this.formatTokenName(allocation.token)
+              const percentage = (allocation.basisPoints / 100).toFixed(2)
+              return `<span class="badge bg-secondary me-1">${tokenName}: ${percentage}%</span>`
+            }).join('')
+            oldAllocationsHtml = `${allocBadges}<br><small class="text-muted">From: ${this.formatTime(prevAlloc.timestamp)}</small>`
+          } else {
+            oldAllocationsHtml = '<em class="text-muted">No previous allocation found</em>'
+          }
+          oldAllocationsHtml += `<br><button class="btn btn-xs btn-outline-secondary mt-1" data-action="fetchPrevious" data-block-id="${blockId}" data-user-id="${userId}" data-timestamp="${timestamp}">🔄 Refresh</button>`
+          oldAllocationsHtml += ` <button class="btn btn-xs btn-outline-info mt-1" data-action="fetchAll" data-block-id="${blockId}" data-user-id="${userId}" data-timestamp="${timestamp}">📋 Fetch All</button>`
+        } else if (fetchState.previousAllocation === 'error') {
+          oldAllocationsHtml = `<span class="text-danger">❌ Error</span><br><button class="btn btn-xs btn-outline-primary mt-1" data-action="fetchPrevious" data-block-id="${blockId}" data-user-id="${userId}" data-timestamp="${timestamp}">🔄 Retry</button>`
+        } else {
+          oldAllocationsHtml = `<button class="btn btn-xs btn-outline-primary" data-action="fetchPrevious" data-block-id="${blockId}" data-user-id="${userId}" data-timestamp="${timestamp}">📊 Fetch Previous</button>`
+          oldAllocationsHtml += ` <button class="btn btn-xs btn-outline-info" data-action="fetchAll" data-block-id="${blockId}" data-user-id="${userId}" data-timestamp="${timestamp}">📋 Fetch All</button>`
+        }
         
         // Format new allocations
         let newAllocationsHtml = '<em class="text-muted">None</em>'
@@ -1609,7 +1657,7 @@ export default {
                 <tr><td><strong>Change Type:</strong></td><td><span class="badge ${userInitiated ? 'bg-success' : 'bg-warning'}">${changeType}</span></td></tr>
                 <tr><td><strong>Initiated By:</strong></td><td>${userInitiated ? '👤 User' : '🤖 System'}</td></tr>
                 <tr><td><strong>Timestamp:</strong></td><td><span class="text-info">🕐 ${formattedTime}</span></td></tr>
-                <tr><td><strong>Voting Power:</strong></td><td>${votingPower}</td></tr>
+                <tr><td><strong>Voting Power:</strong></td><td>${votingPowerHtml}</td></tr>
               </table>
             </div>
             <div class="col-md-6">
@@ -3168,6 +3216,189 @@ export default {
         case 'trade_trigger': return 'bg-info'
         case 'rebalance': return 'bg-primary'
         default: return 'bg-secondary'
+      }
+    },
+
+    // Fetch voting power for a specific user at a specific timestamp
+    async fetchVotingPower(blockId, user, timestamp) {
+      try {
+        // Set loading state
+        const currentState = this.fetchStates.get(blockId) || {}
+        this.fetchStates.set(blockId, { ...currentState, votingPower: 'loading' })
+        
+        // Call the dao_governance_archive method
+        // Convert user string back to Principal
+        const userPrincipal = Principal.fromText(user)
+        const result = await this.daoGovernanceActor.getUserVotingPowerAtTime(userPrincipal, BigInt(timestamp))
+        
+        if (result.Ok !== undefined) {
+          // Update fetched data
+          const currentData = this.fetchedData.get(blockId) || {}
+          this.fetchedData.set(blockId, { ...currentData, votingPower: Number(result.Ok) })
+          
+          // Update state to loaded
+          this.fetchStates.set(blockId, { ...currentState, votingPower: 'loaded' })
+        } else {
+          throw new Error(result.Err || 'Unknown error')
+        }
+      } catch (error) {
+        console.error('Error fetching voting power:', error)
+        const currentState = this.fetchStates.get(blockId) || {}
+        this.fetchStates.set(blockId, { ...currentState, votingPower: 'error' })
+      }
+    },
+
+    // Fetch previous allocation for a specific user before a specific timestamp
+    async fetchPreviousAllocation(blockId, user, timestamp) {
+      try {
+        // Set loading state
+        const currentState = this.fetchStates.get(blockId) || {}
+        this.fetchStates.set(blockId, { ...currentState, previousAllocation: 'loading' })
+        
+        // Get user's allocation block indices from dao_allocation_archive
+        const userIndexResult = await this.daoAllocationActor.icrc3_get_blocks([{ start: 0, length: 1000 }])
+        
+        let previousAllocation = null
+        let mostRecentTimestamp = -1
+        
+        // Parse blocks to find allocation changes for this user before the timestamp
+        for (const block of userIndexResult.blocks) {
+          try {
+            const blockData = this.parseAllocationChangeFromBlock(block)
+            if (blockData && 
+                blockData.user === user && 
+                blockData.timestamp < timestamp && 
+                blockData.timestamp > mostRecentTimestamp) {
+              previousAllocation = blockData
+              mostRecentTimestamp = blockData.timestamp
+            }
+          } catch (parseError) {
+            // Skip blocks that can't be parsed
+            continue
+          }
+        }
+        
+        // Update fetched data
+        const currentData = this.fetchedData.get(blockId) || {}
+        this.fetchedData.set(blockId, { ...currentData, previousAllocation })
+        
+        // Update state to loaded
+        this.fetchStates.set(blockId, { ...currentState, previousAllocation: 'loaded' })
+      } catch (error) {
+        console.error('Error fetching previous allocation:', error)
+        const currentState = this.fetchStates.get(blockId) || {}
+        this.fetchStates.set(blockId, { ...currentState, previousAllocation: 'error' })
+      }
+    },
+
+    // Fetch all previous allocations for a specific user before a specific timestamp
+    async fetchAllPreviousAllocations(blockId, user, timestamp) {
+      try {
+        // Set loading state
+        const currentState = this.fetchStates.get(blockId) || {}
+        this.fetchStates.set(blockId, { ...currentState, allPreviousAllocations: 'loading' })
+        
+        // Get user's allocation block indices from dao_allocation_archive
+        const userIndexResult = await this.daoAllocationActor.icrc3_get_blocks([{ start: 0, length: 1000 }])
+        
+        const allPreviousAllocations = []
+        
+        // Parse blocks to find all allocation changes for this user before the timestamp
+        for (const block of userIndexResult.blocks) {
+          try {
+            const blockData = this.parseAllocationChangeFromBlock(block)
+            if (blockData && 
+                blockData.user === user && 
+                blockData.timestamp < timestamp) {
+              allPreviousAllocations.push(blockData)
+            }
+          } catch (parseError) {
+            // Skip blocks that can't be parsed
+            continue
+          }
+        }
+        
+        // Sort by timestamp (oldest first)
+        allPreviousAllocations.sort((a, b) => a.timestamp - b.timestamp)
+        
+        // Update fetched data
+        const currentData = this.fetchedData.get(blockId) || {}
+        this.fetchedData.set(blockId, { ...currentData, allPreviousAllocations })
+        
+        // Update state to loaded
+        this.fetchStates.set(blockId, { ...currentState, allPreviousAllocations: 'loaded' })
+      } catch (error) {
+        console.error('Error fetching all previous allocations:', error)
+        const currentState = this.fetchStates.get(blockId) || {}
+        this.fetchStates.set(blockId, { ...currentState, allPreviousAllocations: 'error' })
+      }
+    },
+
+    // Helper method to parse allocation change data from ICRC3 block
+    parseAllocationChangeFromBlock(block) {
+      try {
+        // Check if this is an allocation change block
+        if (!block.block || typeof block.block !== 'object') {
+          return null
+        }
+        
+        // The block structure should be a Map with allocation change data
+        const blockData = block.block
+        if (!blockData || !blockData.user || !blockData.newAllocations) {
+          return null
+        }
+        
+        // Extract user principal from blob
+        const userPrincipal = this.formatPrincipalFromBlob(blockData.user)
+        
+        // Parse allocations
+        const newAllocations = blockData.newAllocations?.map(alloc => ({
+          token: this.formatPrincipalFromBlob(alloc.token),
+          basisPoints: Number(alloc.basisPoints)
+        })) || []
+        
+        const oldAllocations = blockData.oldAllocations?.map(alloc => ({
+          token: this.formatPrincipalFromBlob(alloc.token),
+          basisPoints: Number(alloc.basisPoints)
+        })) || []
+        
+        return {
+          id: Number(blockData.id),
+          timestamp: Number(blockData.timestamp),
+          user: userPrincipal,
+          changeType: blockData.changeType,
+          oldAllocations,
+          newAllocations,
+          votingPower: Number(blockData.votingPower || 0),
+          maker: blockData.maker ? this.formatPrincipalFromBlob(blockData.maker) : null,
+          reason: blockData.reason || null
+        }
+      } catch (error) {
+        console.error('Error parsing allocation change block:', error)
+        return null
+      }
+    },
+
+    // Handle clicks on fetch buttons using event delegation
+    handleFetchButtonClick(event) {
+      const button = event.target.closest('[data-action]')
+      if (!button) return
+      
+      const action = button.dataset.action
+      const blockId = button.dataset.blockId
+      const userId = button.dataset.userId
+      const timestamp = parseInt(button.dataset.timestamp)
+      
+      switch (action) {
+        case 'fetchVP':
+          this.fetchVotingPower(blockId, userId, timestamp)
+          break
+        case 'fetchPrevious':
+          this.fetchPreviousAllocation(blockId, userId, timestamp)
+          break
+        case 'fetchAll':
+          this.fetchAllPreviousAllocations(blockId, userId, timestamp)
+          break
       }
     }
   }
