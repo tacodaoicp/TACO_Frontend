@@ -290,11 +290,11 @@
                           <a 
                             :href="createVoteHistoryLink(neuron.lastAllocationMaker)" 
                             target="_blank" 
-                            class="text-decoration-none text-info fw-bold"
+                            class="text-decoration-none text-info"
                             @click.prevent="$router.push({ path: '/admin/votes', query: { principal: neuron.lastAllocationMaker.toString() } })"
                             title="View vote history for this principal"
                           >
-                            🗳️ {{ neuron.lastAllocationMaker.toString() }}
+                            🗳️ {{ getPrincipalDisplayName(neuron.lastAllocationMaker) }}
                           </a>
                         </td>
                         <td>
@@ -353,11 +353,11 @@
                           <a 
                             :href="createVoteHistoryLink(voter.principal)" 
                             target="_blank" 
-                            class="text-decoration-none text-info fw-bold"
+                            class="text-decoration-none text-info"
                             @click.prevent="$router.push({ path: '/admin/votes', query: { principal: voter.principal.toString() } })"
                             title="View vote history for this principal"
                           >
-                            🗳️ {{ voter.principal.toString() }}
+                            🗳️ {{ getPrincipalDisplayName(voter.principal) }}
                           </a>
                         </td>
                         <td>{{ formatNumber(voter.state.votingPower) }}</td>
@@ -375,11 +375,11 @@
                               <a 
                                 :href="createVoteHistoryLink(follow.follow)" 
                                 target="_blank" 
-                                class="text-decoration-none text-info fw-bold"
+                                class="text-decoration-none text-info"
                                 @click.prevent="$router.push({ path: '/admin/votes', query: { principal: follow.follow.toString() } })"
                                 title="View vote history for this principal"
                               >
-                                🗳️ {{ follow.follow.toString() }}
+                                🗳️ {{ getPrincipalDisplayName(follow.follow) }}
                               </a><br>
                               Since: {{ formatTime(follow.since) }}
                             </div>
@@ -963,6 +963,9 @@ const {
   fetchedVoterDetails,
   fetchedNeuronAllocations
 } = storeToRefs(tacoStore);
+
+// Destructure utility methods
+const { getPrincipalDisplayName } = tacoStore;
 
 // Update voting metrics state with type
 const votingMetrics = ref<VotingMetrics>({
