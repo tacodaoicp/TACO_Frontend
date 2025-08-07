@@ -60,7 +60,7 @@
           </div>
 
           <!-- User Vote History -->
-          <div v-if="userVoteHistory" class="card bg-dark text-white mb-4">
+          <div v-if="userData" class="card bg-dark text-white mb-4">
             <div class="card-header">
               <h3 class="mb-0">Vote History for {{ searchedPrincipal }}</h3>
             </div>
@@ -71,25 +71,25 @@
                 <div class="col-md-3">
                   <div class="metric-item">
                     <label>Current Voting Power</label>
-                    <div class="value">{{ formatVotingPower(userVoteHistory.votingPower) }}</div>
+                    <div class="value">{{ formatVotingPower(userData.votingPower) }}</div>
                   </div>
                 </div>
                 <div class="col-md-3">
                   <div class="metric-item">
                     <label>Active Neurons</label>
-                    <div class="value">{{ userVoteHistory.neurons.length }}</div>
+                    <div class="value">{{ userData.neurons?.length || 0 }}</div>
                   </div>
                 </div>
                 <div class="col-md-3">
                   <div class="metric-item">
                     <label>Total Past Votes</label>
-                    <div class="value">{{ userVoteHistory.pastAllocations.length }}</div>
+                    <div class="value">{{ userData.pastAllocations?.length || 0 }}</div>
                   </div>
                 </div>
                 <div class="col-md-3">
                   <div class="metric-item">
                     <label>Last Vote</label>
-                    <div class="value">{{ formatTime(userVoteHistory.lastAllocationUpdate) }}</div>
+                    <div class="value">{{ formatTime(userData.lastAllocationUpdate) }}</div>
                   </div>
                 </div>
               </div>
@@ -97,7 +97,7 @@
               <!-- Current Allocation -->
               <div class="mb-4">
                 <h4>Current Allocation</h4>
-                <div v-if="userVoteHistory.allocations.length > 0">
+                <div v-if="userData.allocations?.length > 0">
                   <div class="table-responsive">
                     <table class="table table-dark table-striped">
                       <thead>
@@ -108,7 +108,7 @@
                         </tr>
                       </thead>
                       <tbody>
-                        <tr v-for="allocation in userVoteHistory.allocations" :key="allocation.token.toString()">
+                        <tr v-for="allocation in userData.allocations" :key="allocation.token.toString()">
                           <td>{{ getTokenSymbol(allocation.token) }}</td>
                           <td>{{ (Number(allocation.basisPoints) / 100).toFixed(2) }}%</td>
                           <td>{{ calculateVotingPowerUsed(allocation.basisPoints) }}</td>
@@ -125,7 +125,7 @@
               <!-- Neurons Information -->
               <div class="mb-4">
                 <h4>Neurons Used for Voting</h4>
-                <div v-if="userVoteHistory.neurons.length > 0">
+                <div v-if="userData.neurons?.length > 0">
                   <div class="table-responsive">
                     <table class="table table-dark table-striped">
                       <thead>
@@ -136,7 +136,7 @@
                         </tr>
                       </thead>
                       <tbody>
-                        <tr v-for="neuron in userVoteHistory.neurons" :key="uint8ArrayToHex(neuron.neuronId)">
+                        <tr v-for="neuron in userData.neurons" :key="uint8ArrayToHex(neuron.neuronId)">
                           <td>
                             <code style="font-size: 0.8em;">{{ uint8ArrayToHex(neuron.neuronId) }}</code>
                           </td>
@@ -154,8 +154,8 @@
 
               <!-- Past Allocations / Vote History -->
               <div class="mb-4">
-                <h4>Vote History ({{ userVoteHistory.pastAllocations.length }} past votes)</h4>
-                <div v-if="userVoteHistory.pastAllocations.length > 0">
+                <h4>Vote History ({{ userData.pastAllocations?.length || 0 }} past votes)</h4>
+                <div v-if="userData.pastAllocations?.length > 0">
                   <div class="table-responsive">
                     <table class="table table-dark table-striped">
                       <thead>
@@ -203,8 +203,8 @@
               <!-- Following Information -->
               <div class="row">
                 <div class="col-md-6">
-                  <h4>Following ({{ userVoteHistory.allocationFollows.length }})</h4>
-                  <div v-if="userVoteHistory.allocationFollows.length > 0">
+                  <h4>Following ({{ userData.allocationFollows?.length || 0 }})</h4>
+                  <div v-if="userData.allocationFollows?.length > 0">
                     <div class="table-responsive">
                       <table class="table table-dark table-striped table-sm">
                         <thead>
@@ -214,7 +214,7 @@
                           </tr>
                         </thead>
                         <tbody>
-                          <tr v-for="follow in userVoteHistory.allocationFollows" :key="follow.follow.toString()">
+                          <tr v-for="follow in userData.allocationFollows" :key="follow.follow.toString()">
                             <td>
                               <code style="font-size: 0.8em;">{{ follow.follow.toString() }}</code>
                             </td>
@@ -230,8 +230,8 @@
                 </div>
                 
                 <div class="col-md-6">
-                  <h4>Followed By ({{ userVoteHistory.allocationFollowedBy.length }})</h4>
-                  <div v-if="userVoteHistory.allocationFollowedBy.length > 0">
+                  <h4>Followed By ({{ userData.allocationFollowedBy?.length || 0 }})</h4>
+                  <div v-if="userData.allocationFollowedBy?.length > 0">
                     <div class="table-responsive">
                       <table class="table table-dark table-striped table-sm">
                         <thead>
@@ -241,7 +241,7 @@
                           </tr>
                         </thead>
                         <tbody>
-                          <tr v-for="follower in userVoteHistory.allocationFollowedBy" :key="follower.follow.toString()">
+                          <tr v-for="follower in userData.allocationFollowedBy" :key="follower.follow.toString()">
                             <td>
                               <code style="font-size: 0.8em;">{{ follower.follow.toString() }}</code>
                             </td>
@@ -422,11 +422,11 @@ const getTokenSymbol = (principal: Principal): string => {
 };
 
 const calculateVotingPowerUsed = (basisPoints: number | bigint): string => {
-  if (!userVoteHistory.value) return '0';
+  if (!userData.value) return '0';
   const bp = typeof basisPoints === 'bigint' ? Number(basisPoints) : basisPoints;
-  const totalVP = typeof userVoteHistory.value.votingPower === 'bigint' 
-    ? Number(userVoteHistory.value.votingPower) 
-    : userVoteHistory.value.votingPower;
+  const totalVP = typeof userData.value.votingPower === 'bigint' 
+    ? Number(userData.value.votingPower) 
+    : userData.value.votingPower;
   const usedVP = (totalVP * bp) / 10000;
   return (usedVP / Math.pow(10, 8)).toFixed(2);
 };
@@ -446,10 +446,17 @@ const calculateDuration = (from: number | bigint, to: number | bigint): string =
 };
 
 // Computed properties
+const userData = computed(() => {
+  // The API returns an array with the user data at index 0, or null if not found
+  return Array.isArray(userVoteHistory.value) && userVoteHistory.value.length > 0 
+    ? userVoteHistory.value[0] 
+    : null;
+});
+
 const sortedPastAllocations = computed(() => {
-  if (!userVoteHistory.value || !userVoteHistory.value.pastAllocations) return [];
+  if (!userData.value || !userData.value.pastAllocations) return [];
   
-  return [...userVoteHistory.value.pastAllocations].sort((a, b) => {
+  return [...userData.value.pastAllocations].sort((a, b) => {
     const aTime = typeof a.from === 'bigint' ? Number(a.from) : a.from;
     const bTime = typeof b.from === 'bigint' ? Number(b.from) : b.from;
     return bTime - aTime; // Sort by most recent first
