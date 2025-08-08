@@ -2804,7 +2804,7 @@ export default {
         return ''
       }
 
-      const formatValue = (key, value, actionType) => {
+      const formatValue = (key, value, actionType, parameter) => {
         if (value === null || value === undefined) return 'N/A'
         
         const numValue = parseInt(value)
@@ -2825,6 +2825,13 @@ export default {
           case 'oldCondition':
           case 'newCondition':
             return value // Keep as text for conditions
+          case 'oldValue':
+          case 'newValue':
+            // Format parameter values based on parameter type
+            if (parameter && actionType === 'ParameterUpdate') {
+              return this.formatParameterValue(parameter, value)
+            }
+            return value.toString()
           default:
             return value.toString()
         }
@@ -2844,6 +2851,35 @@ export default {
             return 'Portfolio Snapshot Interval'
           default:
             return 'Setting'
+        }
+      }
+
+      const getParameterName = (parameter) => {
+        if (!parameter || !parameter.type) return 'System Parameter'
+        
+        switch (parameter.type) {
+          case 'FollowDepth':
+            return 'Follow Depth'
+          case 'MaxFollowers':
+            return 'Max Followers'
+          case 'MaxPastAllocations':
+            return 'Max Past Allocations'
+          case 'SnapshotInterval':
+            return 'Snapshot Interval'
+          case 'MaxTotalUpdates':
+            return 'Max Total Updates'
+          case 'MaxAllocationsPerDay':
+            return 'Max Allocations Per Day'
+          case 'AllocationWindow':
+            return 'Allocation Window'
+          case 'MaxFollowUnfollowActionsPerDay':
+            return 'Max Follow/Unfollow Actions Per Day'
+          case 'MaxFollowed':
+            return 'Max Followed'
+          case 'LogAdmin':
+            return 'Log Admin Principal'
+          default:
+            return parameter.type || 'System Parameter'
         }
       }
 
@@ -2890,6 +2926,14 @@ export default {
           }
           break
           
+        case 'ParameterUpdate':
+          if (actionType.oldValue !== undefined && actionType.newValue !== undefined && actionType.parameter !== undefined) {
+            oldValue = formatValue('oldValue', actionType.oldValue, actionType.type, actionType.parameter)
+            newValue = formatValue('newValue', actionType.newValue, actionType.type, actionType.parameter)
+            fieldName = getParameterName(actionType.parameter)
+          }
+          break
+          
         default:
           return ''
       }
@@ -2923,6 +2967,42 @@ export default {
           </div>
         </div>
       `
+    },
+
+    // Helper method to format parameter values based on parameter type
+    formatParameterValue(parameter, value) {
+      if (!parameter || !parameter.type) return value
+      
+      const numValue = parseInt(value)
+      
+      switch (parameter.type) {
+        case 'FollowDepth':
+        case 'MaxFollowers':
+        case 'MaxPastAllocations':
+        case 'MaxTotalUpdates':
+        case 'MaxAllocationsPerDay':
+        case 'MaxFollowUnfollowActionsPerDay':
+        case 'MaxFollowed':
+          return numValue.toLocaleString()
+          
+        case 'SnapshotInterval':
+        case 'AllocationWindow':
+          // These are likely in nanoseconds, convert to human readable
+          if (numValue > 1_000_000_000) {
+            return this.formatDuration(numValue / 1_000_000_000)
+          }
+          return numValue.toLocaleString() + ' ns'
+          
+        case 'LogAdmin':
+          // Principal ID - keep as text but truncate if too long
+          if (value.length > 30) {
+            return value.substring(0, 15) + '...' + value.substring(value.length - 10)
+          }
+          return value
+          
+        default:
+          return value
+      }
     },
 
     // Helper method to format duration in seconds to human-readable format
