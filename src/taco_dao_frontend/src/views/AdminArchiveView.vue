@@ -2855,9 +2855,19 @@ export default {
       }
 
       const getParameterName = (parameter) => {
-        if (!parameter || !parameter.type) return 'System Parameter'
+        // Handle both string format "MaxFollowers(550)" and object format {type: "MaxFollowers"}
+        let paramType;
+        if (typeof parameter === 'string') {
+          // Extract parameter name from string like "MaxFollowers(550)"
+          const match = parameter.match(/^([^(]+)/);
+          paramType = match ? match[1] : parameter;
+        } else if (parameter && parameter.type) {
+          paramType = parameter.type;
+        } else {
+          return 'System Parameter';
+        }
         
-        switch (parameter.type) {
+        switch (paramType) {
           case 'FollowDepth':
             return 'Follow Depth'
           case 'MaxFollowers':
@@ -2879,7 +2889,7 @@ export default {
           case 'LogAdmin':
             return 'Log Admin Principal'
           default:
-            return parameter.type || 'System Parameter'
+            return paramType || 'System Parameter'
         }
       }
 
