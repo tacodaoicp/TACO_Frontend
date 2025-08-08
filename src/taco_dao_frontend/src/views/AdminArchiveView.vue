@@ -1975,6 +1975,7 @@ export default {
                     <em>"${reason}"</em>
                   </div>
                   ${this.renderConfigChanges(adminData.actionType)}
+                  ${this.renderOldNewValues(adminData.actionType)}
                   ${!success && errorMessage ? `
                     <div class="alert alert-danger">
                       <strong>Error:</strong><br>
@@ -2790,6 +2791,132 @@ export default {
                       </tr>
                     `).join('')}
                   ` : ''}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      `
+    },
+
+    renderOldNewValues(actionType) {
+      if (!actionType || !actionType.type) {
+        return ''
+      }
+
+      const formatValue = (key, value, actionType) => {
+        if (value === null || value === undefined) return 'N/A'
+        
+        const numValue = parseInt(value)
+        
+        switch (key) {
+          case 'oldIntervalNS':
+          case 'newIntervalNS':
+            return this.formatDuration(numValue / 1_000_000_000) // Convert ns to seconds
+          case 'oldThreshold':
+          case 'newThreshold':
+            return numValue.toLocaleString() + ' tokens'
+          case 'oldLimit':
+          case 'newLimit':
+            if (actionType === 'UpdateMaxPortfolioSnapshots') {
+              return numValue.toLocaleString() + ' snapshots'
+            }
+            return numValue.toLocaleString()
+          case 'oldCondition':
+          case 'newCondition':
+            return value // Keep as text for conditions
+          default:
+            return value.toString()
+        }
+      }
+
+      const getFieldName = (actionType) => {
+        switch (actionType) {
+          case 'UpdateTriggerCondition':
+            return 'Price Alert Condition'
+          case 'UpdatePortfolioCircuitBreaker':
+            return 'Circuit Breaker Condition'
+          case 'UpdatePausedTokenThreshold':
+            return 'Paused Token Threshold'
+          case 'UpdateMaxPortfolioSnapshots':
+            return 'Max Portfolio Snapshots'
+          case 'UpdatePortfolioSnapshotInterval':
+            return 'Portfolio Snapshot Interval'
+          default:
+            return 'Setting'
+        }
+      }
+
+      let oldValue, newValue, fieldName
+      
+      switch (actionType.type) {
+        case 'UpdateTriggerCondition':
+          if (actionType.oldCondition !== undefined && actionType.newCondition !== undefined) {
+            oldValue = formatValue('oldCondition', actionType.oldCondition, actionType.type)
+            newValue = formatValue('newCondition', actionType.newCondition, actionType.type)
+            fieldName = getFieldName(actionType.type)
+          }
+          break
+          
+        case 'UpdatePortfolioCircuitBreaker':
+          if (actionType.oldCondition !== undefined && actionType.newCondition !== undefined) {
+            oldValue = formatValue('oldCondition', actionType.oldCondition, actionType.type)
+            newValue = formatValue('newCondition', actionType.newCondition, actionType.type)
+            fieldName = getFieldName(actionType.type)
+          }
+          break
+          
+        case 'UpdatePausedTokenThreshold':
+          if (actionType.oldThreshold !== undefined && actionType.newThreshold !== undefined) {
+            oldValue = formatValue('oldThreshold', actionType.oldThreshold, actionType.type)
+            newValue = formatValue('newThreshold', actionType.newThreshold, actionType.type)
+            fieldName = getFieldName(actionType.type)
+          }
+          break
+          
+        case 'UpdateMaxPortfolioSnapshots':
+          if (actionType.oldLimit !== undefined && actionType.newLimit !== undefined) {
+            oldValue = formatValue('oldLimit', actionType.oldLimit, actionType.type)
+            newValue = formatValue('newLimit', actionType.newLimit, actionType.type)
+            fieldName = getFieldName(actionType.type)
+          }
+          break
+          
+        case 'UpdatePortfolioSnapshotInterval':
+          if (actionType.oldIntervalNS !== undefined && actionType.newIntervalNS !== undefined) {
+            oldValue = formatValue('oldIntervalNS', actionType.oldIntervalNS, actionType.type)
+            newValue = formatValue('newIntervalNS', actionType.newIntervalNS, actionType.type)
+            fieldName = getFieldName(actionType.type)
+          }
+          break
+          
+        default:
+          return ''
+      }
+
+      if (!oldValue || !newValue || !fieldName) {
+        return ''
+      }
+
+      return `
+        <div class="alert alert-secondary mt-2">
+          <strong>📊 Value Change:</strong>
+          <div class="mt-2">
+            <div class="table-responsive">
+              <table class="table table-sm table-borderless mb-0">
+                <thead>
+                  <tr class="text-muted small">
+                    <th style="width: 40%">Setting</th>
+                    <th style="width: 30%">Before</th>
+                    <th style="width: 30%">After</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr style="background-color: #e2e3e5;">
+                    <td><strong>${fieldName}</strong></td>
+                    <td class="text-muted">${oldValue}</td>
+                    <td class="text-primary"><strong>→ ${newValue}</strong></td>
+                  </tr>
                 </tbody>
               </table>
             </div>
