@@ -27,6 +27,7 @@ export type AdminActionType = {
       'targetAdmin' : Principal,
     }
   } |
+  { 'CanisterStart' : null } |
   { 'TokenPause' : { 'token' : Principal } } |
   { 'AdminRemove' : { 'removedAdmin' : Principal } } |
   {
@@ -39,7 +40,9 @@ export type AdminActionType = {
       'newValue' : string,
     }
   } |
-  { 'TokenRemove' : { 'token' : Principal } };
+  { 'TokenRemove' : { 'token' : Principal } } |
+  { 'TokenDelete' : { 'token' : Principal } } |
+  { 'CanisterStop' : null };
 export interface AdminActionsSinceResponse {
   'totalCount' : bigint,
   'actions' : Array<AdminActionRecord>,
@@ -60,6 +63,7 @@ export type AdminFunction = { 'removeToken' : null } |
   { 'getAdminActions' : null } |
   { 'addAdmin' : null } |
   { 'stopRebalancing' : null } |
+  { 'deleteToken' : null } |
   { 'recoverPoolBalances' : null } |
   { 'setTacoAddress' : null } |
   { 'clearLogs' : null } |
@@ -95,6 +99,7 @@ export interface ContinuousDAO {
   'admin_getUserAllocations' : ActorMethod<[], Array<[Principal, UserState]>>,
   'admin_recalculateAllVotingPower' : ActorMethod<[bigint], undefined>,
   'clearLogs' : ActorMethod<[], undefined>,
+  'deleteToken' : ActorMethod<[Principal, string], Result_1>,
   'followAllocation' : ActorMethod<[Principal], Result_5>,
   'getAdminActionsSince' : ActorMethod<[bigint, bigint], Result_11>,
   'getAdminPermissions' : ActorMethod<

@@ -93,6 +93,7 @@ export const idlFactory = ({ IDL }) => {
       'function' : IDL.Text,
       'targetAdmin' : IDL.Principal,
     }),
+    'CanisterStart' : IDL.Null,
     'TokenPause' : IDL.Record({ 'token' : IDL.Principal }),
     'AdminRemove' : IDL.Record({ 'removedAdmin' : IDL.Principal }),
     'SystemStateChange' : IDL.Record({
@@ -105,6 +106,8 @@ export const idlFactory = ({ IDL }) => {
       'newValue' : IDL.Text,
     }),
     'TokenRemove' : IDL.Record({ 'token' : IDL.Principal }),
+    'TokenDelete' : IDL.Record({ 'token' : IDL.Principal }),
+    'CanisterStop' : IDL.Null,
   });
   const AdminActionRecord = IDL.Record({
     'id' : IDL.Nat,
@@ -140,6 +143,7 @@ export const idlFactory = ({ IDL }) => {
     'getAdminActions' : IDL.Null,
     'addAdmin' : IDL.Null,
     'stopRebalancing' : IDL.Null,
+    'deleteToken' : IDL.Null,
     'recoverPoolBalances' : IDL.Null,
     'setTacoAddress' : IDL.Null,
     'clearLogs' : IDL.Null,
@@ -357,6 +361,7 @@ export const idlFactory = ({ IDL }) => {
       ),
     'admin_recalculateAllVotingPower' : IDL.Func([IDL.Nat], [], []),
     'clearLogs' : IDL.Func([], [], []),
+    'deleteToken' : IDL.Func([IDL.Principal, IDL.Text], [Result_1], []),
     'followAllocation' : IDL.Func([IDL.Principal], [Result_5], []),
     'getAdminActionsSince' : IDL.Func(
         [IDL.Int, IDL.Nat],

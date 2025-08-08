@@ -246,6 +246,7 @@ type AdminActionVariant =
       tokenType: TokenType;
       viaGovernance: bool;
     };
+   TokenDelete: record {token: principal;};
    TokenPause: record {token: principal;};
    TokenRemove: record {token: principal;};
    TokenUnpause: record {token: principal;};

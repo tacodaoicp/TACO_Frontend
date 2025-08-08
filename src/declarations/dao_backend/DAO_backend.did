@@ -327,6 +327,7 @@ type ContinuousDAO =
                                         }) query;
    admin_recalculateAllVotingPower: (id: nat) -> ();
    clearLogs: () -> ();
+   deleteToken: (token: principal, reason: text) -> (Result_1);
    followAllocation: (followee: principal) -> (Result_5);
    getAdminActionsSince: (sinceTimestamp: int, limit: nat) ->
     (Result_11) query;
@@ -442,6 +443,7 @@ type AdminFunction =
    addToken;
    clearLogs;
    createAuction;
+   deleteToken;
    endAuctionPanic;
    getAdminActions;
    getAllocationChanges;
@@ -480,6 +482,8 @@ type AdminActionType =
       targetAdmin: principal;
     };
    AdminRemove: record {removedAdmin: principal;};
+   CanisterStart;
+   CanisterStop;
    ParameterUpdate:
     record {
       newValue: text;
@@ -496,6 +500,7 @@ type AdminActionType =
       tokenType: TokenType;
       viaGovernance: bool;
     };
+   TokenDelete: record {token: principal;};
    TokenPause: record {token: principal;};
    TokenRemove: record {token: principal;};
    TokenUnpause: record {token: principal;};

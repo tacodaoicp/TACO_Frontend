@@ -112,6 +112,7 @@ export const idlFactory = ({ IDL }) => {
     'ResetRebalanceState' : IDL.Null,
     'ClearSystemLogs' : IDL.Null,
     'ClearPriceAlerts' : IDL.Null,
+    'TokenDelete' : IDL.Record({ 'token' : IDL.Principal }),
     'CanisterStop' : IDL.Null,
   });
   const AdminCanisterSource = IDL.Variant({

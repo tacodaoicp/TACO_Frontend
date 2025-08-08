@@ -114,6 +114,7 @@ export type AdminActionVariant = { 'StopRebalancing' : null } |
   { 'ResetRebalanceState' : null } |
   { 'ClearSystemLogs' : null } |
   { 'ClearPriceAlerts' : null } |
+  { 'TokenDelete' : { 'token' : Principal } } |
   { 'CanisterStop' : null };
 export type AdminCanisterSource = { 'DAO_backend' : null } |
   { 'Treasury' : null };
