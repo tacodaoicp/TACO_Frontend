@@ -43,22 +43,15 @@
             <span class="cs__h2__line3 taco-text-brown-to-white">Decided & Allocated via DAO</span> -->
           </h2>
 
-          <!-- coming soon h3  -->
+          <!-- version  -->
           <h3 class="cs__h3 spacemono mt-2">v1.0.4</h3>
 
-          <!-- sale link -->
-          <span class="d-inline text-center px-3 lh-on-mobile" style="font-size: 1.5rem; font-weight: bold;">
-            <span class="taco-text-brown-to-white
-              small-on-mobile">🎉 We're officially a DAO! 🎉</span>
-            <br>
-            <span class="taco-text-brown-to-white
-            small-on-mobile d-inline-flex mt-2">Next Steps: </span>
-          </span>
-          <ul class="list-unstyled mb-5 mt-2">
-            <li><span class="taco-text-brown-to-white small-on-mobile">✅ Trust at least two tokens</span></li>            
-            <li><span class="taco-text-brown-to-white small-on-mobile">✅ Vote on initial portfolio funding</span></li>
-            <li><span class="taco-text-brown-to-white small-on-mobile">🌮 Now let's perfect the recipe!</span></li>
-          </ul>
+          <!-- what is taco dao video -->
+          <button @click="videoModalOpen = !videoModalOpen"
+                  class="btn btn-link btn-lg fw-bold my-4" 
+                  style="color: var(--blue-to-light-blue); font-size: 1.625rem;">
+            What is Taco Dao?
+          </button>
 
           <!-- random link 1 -->
           <!-- <span v-if="randomInt === 1" class="d-none d-sm-inline mb-5 text-center px-3" style="font-size: 1.5rem;">
@@ -183,6 +176,52 @@
     <!-- footer bar -->
     <FooterBar />
 
+    <!-- video modal -->
+    <div v-if="videoModalOpen" class="video__modal" @click="videoModalOpen = false">
+      
+      <!-- message -->
+      <div class="video__modal__dialog" @click.stop>
+        
+        <!-- message top -->
+        <div class="video__modal__dialog__top px-2 p-2">
+
+          <!-- message top left -->
+          <div class="taco-text-white ps-2" style="font-size: 1.5rem;">What is Taco Dao?</div>
+
+          <!-- message top right -->
+          <div class="taco-text-black-to-white">
+
+            <!-- close button -->
+            <button class="btn taco-nav-btn"
+                    @click="videoModalOpen = false">
+              
+              <!-- close icon -->
+              <i class="fa-solid fa-xmark"></i>
+
+            </button>
+
+          </div>
+
+        </div>
+
+        <!-- message middle -->
+        <div class="video__modal__dialog__middle">
+
+          <!-- video -->
+          <div class="video__modal__dialog__middle__video">
+            <iframe src="https://www.youtube.com/embed/ikNBuHYMkNs"
+                    title="YouTube video player" 
+                    frameborder="0" 
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+                    allowfullscreen></iframe>
+          </div>
+
+        </div>
+
+      </div>
+      
+    </div>     
+
     <!-- animated background -->
     <ul class="floating-tacos overflow-hidden z0">
       <li>{{ floatingEmoji1 }}</li>
@@ -278,7 +317,6 @@
     }
     &__h3 {
       margin: 0;
-      margin-bottom: 3rem;
       padding: 0 1rem;
       font-size: 1.5rem;
       font-weight: 100;
@@ -393,13 +431,15 @@
     }
     .cs__h3 {
       font-size: 1.25rem;
-      margin-bottom: 1.25rem;
     }
     .cs__p {
       font-size: 1rem;
     }
     .cs__social-links {
       padding: 1.5rem;
+    }
+    .btn-lg {
+      font-size: 1.25rem !important;
     }
   }
 
@@ -417,14 +457,65 @@
 
 }
 
-///////////////////////
-// container queries //
-///////////////////////
+.video__modal {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  height: 100%;
+  background-color: var(--curtain-bg);
+  z-index: 1000;
+  margin: 0;
+  padding: 0;
+  overflow: auto;
 
-@container magic-content (inline-size < 600px) {
-  .home-view__welcome-container__right {
+  // dialog
+  &__dialog {
     width: 100%;
+    max-width: 60rem;
+    border-radius: 0.5rem;
+    background-color: var(--light-orange-to-dark-brown);
+    border: 1px solid var(--dark-orange);
+    overflow: clip;
+    margin: 2rem 2rem 2rem;
+
+    // top
+    &__top {
+      display: flex;
+      align-items: center;
+      width: 100%;
+      justify-content: space-between;
+      gap: 1rem;
+      background-color: var(--dark-orange);
+    }
+
+    // middle
+    &__middle {
+      display: flex;
+      flex-direction: row;
+      align-items: start;
+      gap: 2rem;
+      width: 100%;
+
+      // video
+      &__video {
+        width: 100%;
+        aspect-ratio: 16/9;
+
+        iframe {
+          width: 100%;
+          height: 100%;
+        }
+
+      }
+
+    }
+
   }
+
 }
 
 .lh-on-mobile {
@@ -437,6 +528,16 @@
 
 .smaller-on-mobile {
   font-size: 1.25rem;
+}
+
+///////////////////////
+// container queries //
+///////////////////////
+
+@container magic-content (inline-size < 600px) {
+  .home-view__welcome-container__right {
+    width: 100%;
+  }
 }
 
 ///////////////////
@@ -520,6 +621,9 @@
 
   // random number between 1 and 3
   const randomInt = ref(0)
+
+  // video modal open
+  const videoModalOpen = ref(false)
 
   //////////////
   // Computed //
