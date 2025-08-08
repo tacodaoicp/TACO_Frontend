@@ -1989,6 +1989,11 @@
         justify-content: center;
     }
 
+    // forum thread view
+    .forum-thread-view {
+        border-radius: 0.5rem;
+    }    
+
 }
 
 // phone landscape
@@ -2010,6 +2015,11 @@
         align-items: center;
         justify-content: center;
     }
+
+    // forum thread view
+    .forum-thread-view {
+        border-radius: 0.5rem;
+    }    
     
 }
 
@@ -2023,6 +2033,11 @@
     // show wiggly arrow
     .wiggly-arrow {
         display: block !important;
+    }
+
+    // forum thread view
+    .forum-thread-view {
+        border-radius: 0.5rem;
     }
 
     // show hamburger menu
