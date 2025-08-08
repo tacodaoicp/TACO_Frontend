@@ -3719,6 +3719,136 @@ export const useTacoStore = defineStore('taco', () => {
         }
     }
 
+    // Portfolio snapshot status and management
+    const getPortfolioSnapshotStatus = async () => {
+        try {
+            const host = process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app";
+            const agent = await createAgent({
+                identity: new AnonymousIdentity(),
+                host,
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            });
+
+            const treasury = Actor.createActor<TreasuryService>(treasuryIDL, {
+                agent,
+                canisterId: treasuryCanisterId()
+            });
+
+            const status = await treasury.getPortfolioSnapshotStatus();
+            return {
+                status: status.status,
+                intervalMinutes: Number(status.intervalMinutes),
+                lastSnapshotTime: Number(status.lastSnapshotTime)
+            };
+        } catch (error: any) {
+            console.error('Error getting portfolio snapshot status:', error);
+            return {
+                status: { Stopped: null },
+                intervalMinutes: 60,
+                lastSnapshotTime: 0
+            };
+        }
+    }
+
+    const startPortfolioSnapshots = async (reason?: string) => {
+        try {
+            const authClient = await getAuthClient();
+            
+            if (!await authClient.isAuthenticated()) {
+                throw new Error('User not authenticated');
+            }
+
+            const identity = await authClient.getIdentity();
+            const agent = await createAgent({
+                identity,
+                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            });
+
+            const treasury = Actor.createActor<TreasuryService>(treasuryIDL, {
+                agent,
+                canisterId: treasuryCanisterId()
+            });
+
+            const result = await treasury.startPortfolioSnapshots(reason ? [reason] : []);
+            if ('ok' in result) {
+                return true;
+            } else {
+                console.error('Error starting portfolio snapshots:', result.err);
+                throw new Error(result.err);
+            }
+        } catch (error: any) {
+            console.error('Error starting portfolio snapshots:', error);
+            throw error;
+        }
+    }
+
+    const stopPortfolioSnapshots = async (reason?: string) => {
+        try {
+            const authClient = await getAuthClient();
+            
+            if (!await authClient.isAuthenticated()) {
+                throw new Error('User not authenticated');
+            }
+
+            const identity = await authClient.getIdentity();
+            const agent = await createAgent({
+                identity,
+                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            });
+
+            const treasury = Actor.createActor<TreasuryService>(treasuryIDL, {
+                agent,
+                canisterId: treasuryCanisterId()
+            });
+
+            const result = await treasury.stopPortfolioSnapshots(reason ? [reason] : []);
+            if ('ok' in result) {
+                return true;
+            } else {
+                console.error('Error stopping portfolio snapshots:', result.err);
+                throw new Error(result.err);
+            }
+        } catch (error: any) {
+            console.error('Error stopping portfolio snapshots:', error);
+            throw error;
+        }
+    }
+
+    const updatePortfolioSnapshotInterval = async (intervalMinutes: number, reason?: string) => {
+        try {
+            const authClient = await getAuthClient();
+            
+            if (!await authClient.isAuthenticated()) {
+                throw new Error('User not authenticated');
+            }
+
+            const identity = await authClient.getIdentity();
+            const agent = await createAgent({
+                identity,
+                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            });
+
+            const treasury = Actor.createActor<TreasuryService>(treasuryIDL, {
+                agent,
+                canisterId: treasuryCanisterId()
+            });
+
+            const result = await treasury.updatePortfolioSnapshotInterval(BigInt(intervalMinutes), reason ? [reason] : []);
+            if ('ok' in result) {
+                return true;
+            } else {
+                console.error('Error updating portfolio snapshot interval:', result.err);
+                throw new Error(result.err);
+            }
+        } catch (error: any) {
+            console.error('Error updating portfolio snapshot interval:', error);
+            throw error;
+        }
+    }
+
     // portfolio circuit breaker
     const listPortfolioCircuitBreakerConditions = async () => {
         try {
@@ -5165,5 +5295,11 @@ export const useTacoStore = defineStore('taco', () => {
         setNeuronName,
         getUserNeurons,
         toggleThreadMenu,
+        
+        // Portfolio snapshot management
+        getPortfolioSnapshotStatus,
+        startPortfolioSnapshots,
+        stopPortfolioSnapshots,
+        updatePortfolioSnapshotInterval,
     }
 })

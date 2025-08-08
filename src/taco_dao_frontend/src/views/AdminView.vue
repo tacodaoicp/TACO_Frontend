@@ -44,7 +44,7 @@
             <div class="card-body">
               <!-- Snapshot Timer Status -->
               <div class="timer-section mb-4">
-                <h4>Snapshot Timer</h4>
+                <h4>Neuron Snapshot Timer</h4>
                 <div class="d-flex gap-3 align-items-center mb-2">
                   <div class="status-indicator" :class="snapshotStatus.active ? 'active' : 'inactive'"></div>
                   <span>Last Snapshot: {{ formatTime(snapshotStatus.lastSnapshotTime) }}</span>
@@ -192,6 +192,68 @@
                       Restart Syncs
                     </button>
                   </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Portfolio Snapshot Management -->
+          <div class="card bg-dark text-white mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+              <h3 class="mb-0">Portfolio Snapshot Management</h3>
+              <button class="btn btn-primary" @click="refreshPortfolioSnapshotStatus">
+                Refresh Status
+              </button>
+            </div>
+            
+            <div class="card-body">
+              <div class="timer-section">
+                <div class="d-flex gap-3 align-items-center mb-3">
+                  <div class="status-indicator" :class="'Running' in portfolioSnapshotStatus.status ? 'active' : 'inactive'"></div>
+                  <span><strong>Status:</strong> {{ 'Running' in portfolioSnapshotStatus.status ? 'Running' : 'Stopped' }}</span>
+                  <span><strong>Interval:</strong> {{ portfolioSnapshotStatus.intervalMinutes }} minutes</span>
+                  <span><strong>Last Snapshot:</strong> {{ formatTime(portfolioSnapshotStatus.lastSnapshotTime) }}</span>
+                </div>
+                
+                <!-- Interval Control -->
+                <div class="d-flex gap-3 align-items-center mb-3">
+                  <label>Snapshot Interval (minutes):</label>
+                  <input 
+                    type="number" 
+                    v-model="newPortfolioSnapshotInterval" 
+                    class="form-control" 
+                    style="width: 100px;"
+                    min="1"
+                    max="1440"
+                  />
+                  <button 
+                    class="btn btn-primary" 
+                    @click="showUpdatePortfolioSnapshotIntervalConfirmation"
+                    :disabled="!newPortfolioSnapshotInterval || newPortfolioSnapshotInterval < 1 || newPortfolioSnapshotInterval > 1440"
+                  >
+                    Update Interval
+                  </button>
+                </div>
+                
+                <!-- Control Buttons -->
+                <div class="d-flex gap-2">
+                  <button 
+                    class="btn btn-success" 
+                    @click="showStartPortfolioSnapshotsConfirmation"
+                    :disabled="'Running' in portfolioSnapshotStatus.status">
+                    Start Portfolio Snapshots
+                  </button>
+                  <button 
+                    class="btn btn-danger" 
+                    @click="showStopPortfolioSnapshotsConfirmation"
+                    :disabled="'Stopped' in portfolioSnapshotStatus.status">
+                    Stop Portfolio Snapshots
+                  </button>
+                  <button 
+                    class="btn btn-warning" 
+                    @click="triggerManualSnapshot">
+                    Take Manual Snapshot
+                  </button>
                 </div>
               </div>
             </div>
@@ -1022,7 +1084,7 @@ const confirmationModal = ref({
   reasonPlaceholder: 'Please provide a reason for this action...',
   submitting: false,
   action: null as (() => Promise<void>) | null,
-  actionData: null as { principal: string; tokenName: string } | { type: string } | null
+  actionData: null as { principal: string; tokenName: string } | { type: string } | { type: string; intervalMinutes: number } | null
 });
 
 // Get store
@@ -1162,7 +1224,8 @@ onMounted(async () => {
         refreshLogs(),
         refreshVotingMetrics(),
         refreshVoterDetails(),
-        refreshNeuronAllocations()
+        refreshNeuronAllocations(),
+        refreshPortfolioSnapshotStatus()
     ]);
     console.log('AdminView: Initial data loaded');
 });
@@ -1630,6 +1693,27 @@ const handleConfirmAction = async (reason: string) => {
       await updateSnapshotInterval(reason);
       console.log('AdminView: Snapshot interval updated');
       success = true;
+    } else if (actionData.type === 'startPortfolioSnapshots') {
+      // Handle start portfolio snapshots
+      success = await tacoStore.startPortfolioSnapshots(reason);
+      if (success) {
+        await refreshPortfolioSnapshotStatus();
+        console.log('AdminView: Portfolio snapshots started');
+      }
+    } else if (actionData.type === 'stopPortfolioSnapshots') {
+      // Handle stop portfolio snapshots
+      success = await tacoStore.stopPortfolioSnapshots(reason);
+      if (success) {
+        await refreshPortfolioSnapshotStatus();
+        console.log('AdminView: Portfolio snapshots stopped');
+      }
+    } else if (actionData.type === 'updatePortfolioSnapshotInterval') {
+      // Handle update portfolio snapshot interval
+      success = await tacoStore.updatePortfolioSnapshotInterval(actionData.intervalMinutes, reason);
+      if (success) {
+        await refreshPortfolioSnapshotStatus();
+        console.log('AdminView: Portfolio snapshot interval updated');
+      }
     } else if (actionData.principal && actionData.tokenName) {
       // Handle token pause/unpause actions
       const { principal, tokenName } = actionData;
@@ -1846,6 +1930,14 @@ function uint8ArrayToHex(array: Uint8Array): string {
 // Add new function for updating snapshot interval
 const snapshotIntervalMinutes = ref(15); // Default to 15 minutes
 
+// Portfolio snapshot management
+const portfolioSnapshotStatus = ref({
+  status: { Stopped: null } as { Running: null } | { Stopped: null },
+  intervalMinutes: 60,
+  lastSnapshotTime: 0
+});
+const newPortfolioSnapshotInterval = ref(60);
+
 // Add refresh user voting power function
 async function refreshUserVotingPower() {
     refreshingVP.value = true;
@@ -1857,6 +1949,66 @@ async function refreshUserVotingPower() {
     } finally {
         refreshingVP.value = false;
     }
+}
+
+// Portfolio snapshot management functions
+async function refreshPortfolioSnapshotStatus() {
+    try {
+        const status = await tacoStore.getPortfolioSnapshotStatus();
+        portfolioSnapshotStatus.value = status;
+        newPortfolioSnapshotInterval.value = status.intervalMinutes;
+        console.log('AdminView: Portfolio snapshot status refreshed');
+    } catch (error) {
+        console.error('AdminView: Error refreshing portfolio snapshot status:', error);
+    }
+}
+
+function showStartPortfolioSnapshotsConfirmation() {
+    confirmationModal.value = {
+        show: true,
+        title: 'Start Portfolio Snapshots',
+        message: 'Are you sure you want to start automatic portfolio snapshots?',
+        extraData: '',
+        confirmButtonText: 'Start',
+        confirmButtonClass: 'btn-success',
+        reasonPlaceholder: 'Please provide a reason for starting portfolio snapshots...',
+        submitting: false,
+        action: null,
+        actionData: { type: 'startPortfolioSnapshots' }
+    };
+}
+
+function showStopPortfolioSnapshotsConfirmation() {
+    confirmationModal.value = {
+        show: true,
+        title: 'Stop Portfolio Snapshots',
+        message: 'Are you sure you want to stop automatic portfolio snapshots?',
+        extraData: '',
+        confirmButtonText: 'Stop',
+        confirmButtonClass: 'btn-danger',
+        reasonPlaceholder: 'Please provide a reason for stopping portfolio snapshots...',
+        submitting: false,
+        action: null,
+        actionData: { type: 'stopPortfolioSnapshots' }
+    };
+}
+
+function showUpdatePortfolioSnapshotIntervalConfirmation() {
+    confirmationModal.value = {
+        show: true,
+        title: 'Update Portfolio Snapshot Interval',
+        message: `Are you sure you want to update the portfolio snapshot interval to ${newPortfolioSnapshotInterval.value} minutes?`,
+        extraData: '',
+        confirmButtonText: 'Update',
+        confirmButtonClass: 'btn-primary',
+        reasonPlaceholder: 'Please provide a reason for updating the interval...',
+        submitting: false,
+        action: null,
+        actionData: { 
+            type: 'updatePortfolioSnapshotInterval',
+            intervalMinutes: newPortfolioSnapshotInterval.value
+        }
+    };
 }
 
 // Fetch trading pauses
