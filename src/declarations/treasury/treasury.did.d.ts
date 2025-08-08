@@ -123,25 +123,27 @@ export type Result = { 'ok' : string } |
   { 'err' : PriceFailsafeError };
 export type Result_1 = { 'ok' : string } |
   { 'err' : RebalanceError };
-export type Result_10 = { 'ok' : PortfolioHistoryResponse } |
-  { 'err' : PortfolioSnapshotError };
-export type Result_11 = { 'ok' : string } |
+export type Result_10 = { 'ok' : Array<[Principal, Array<PricePoint>]> } |
   { 'err' : string };
+export type Result_11 = { 'ok' : PortfolioHistoryResponse } |
+  { 'err' : PortfolioSnapshotError };
 export type Result_12 = { 'ok' : bigint } |
   { 'err' : PriceFailsafeError };
 export type Result_13 = { 'ok' : bigint } |
   { 'err' : PortfolioCircuitBreakerError };
 export type Result_2 = { 'ok' : string } |
-  { 'err' : PortfolioCircuitBreakerError };
+  { 'err' : string };
 export type Result_3 = { 'ok' : string } |
-  { 'err' : PortfolioSnapshotError };
+  { 'err' : PortfolioCircuitBreakerError };
 export type Result_4 = { 'ok' : string } |
-  { 'err' : TradingPauseError };
+  { 'err' : PortfolioSnapshotError };
 export type Result_5 = { 'ok' : string } |
-  { 'err' : SyncErrorTreasury };
-export type Result_6 = { 'ok' : TreasuryAdminActionsSinceResponse } |
   { 'err' : TradingPauseError };
-export type Result_7 = {
+export type Result_6 = { 'ok' : string } |
+  { 'err' : SyncErrorTreasury };
+export type Result_7 = { 'ok' : TreasuryAdminActionsSinceResponse } |
+  { 'err' : TradingPauseError };
+export type Result_8 = {
     'ok' : {
       'executedTrades' : Array<TradeRecord>,
       'metrics' : {
@@ -170,7 +172,7 @@ export type Result_7 = {
     }
   } |
   { 'err' : string };
-export type Result_8 = {
+export type Result_9 = {
     'ok' : {
       'executedTrades' : Array<TradeRecord>,
       'metrics' : {
@@ -199,8 +201,6 @@ export type Result_8 = {
       },
     }
   } |
-  { 'err' : string };
-export type Result_9 = { 'ok' : Array<[Principal, Array<PricePoint>]> } |
   { 'err' : string };
 export type SnapshotReason = { 'PreTrade' : null } |
   { 'PostTrade' : null } |
@@ -302,6 +302,7 @@ export type TreasuryAdminActionType = { 'StopRebalancing' : null } |
   { 'UnpauseToken' : { 'token' : Principal } } |
   { 'ExecuteTradingCycle' : null } |
   { 'PauseTokenManual' : { 'token' : Principal, 'pauseType' : string } } |
+  { 'CanisterStart' : null } |
   {
     'SetPortfolioCircuitBreakerActive' : {
       'conditionId' : bigint,
@@ -334,6 +335,14 @@ export type TreasuryAdminActionType = { 'StopRebalancing' : null } |
     }
   } |
   { 'UpdateRebalanceConfig' : { 'newConfig' : string, 'oldConfig' : string } } |
+  { 'StartPortfolioSnapshots' : null } |
+  {
+    'UpdatePortfolioSnapshotInterval' : {
+      'newIntervalNS' : bigint,
+      'oldIntervalNS' : bigint,
+    }
+  } |
+  { 'StopPortfolioSnapshots' : null } |
   {
     'AddTriggerCondition' : {
       'conditionId' : bigint,
@@ -353,7 +362,8 @@ export type TreasuryAdminActionType = { 'StopRebalancing' : null } |
   } |
   { 'ResetRebalanceState' : null } |
   { 'ClearSystemLogs' : null } |
-  { 'ClearPriceAlerts' : null };
+  { 'ClearPriceAlerts' : null } |
+  { 'CanisterStop' : null };
 export interface TreasuryAdminActionsSinceResponse {
   'totalCount' : bigint,
   'actions' : Array<TreasuryAdminActionRecord>,
@@ -410,11 +420,11 @@ export interface treasury {
     Result_12
   >,
   'admin_executeTradingCycle' : ActorMethod<[[] | [string]], Result_1>,
-  'admin_recoverPoolBalances' : ActorMethod<[], Result_11>,
-  'admin_syncWithDao' : ActorMethod<[], Result_11>,
-  'clearAllTradingPauses' : ActorMethod<[[] | [string]], Result_4>,
+  'admin_recoverPoolBalances' : ActorMethod<[], Result_2>,
+  'admin_syncWithDao' : ActorMethod<[], Result_2>,
+  'clearAllTradingPauses' : ActorMethod<[[] | [string]], Result_5>,
   'clearLogs' : ActorMethod<[], undefined>,
-  'clearPortfolioCircuitBreakerLogs' : ActorMethod<[], Result_2>,
+  'clearPortfolioCircuitBreakerLogs' : ActorMethod<[], Result_3>,
   'clearPriceAlerts' : ActorMethod<[], Result>,
   'getCurrentAllocations' : ActorMethod<[], Array<[Principal, bigint]>>,
   'getLogs' : ActorMethod<[bigint], Array<LogEntry>>,
@@ -431,8 +441,17 @@ export interface treasury {
     [bigint, bigint],
     { 'logs' : Array<PortfolioCircuitBreakerLog>, 'totalCount' : bigint }
   >,
-  'getPortfolioHistory' : ActorMethod<[bigint], Result_10>,
-  'getPortfolioHistorySince' : ActorMethod<[bigint, bigint], Result_10>,
+  'getPortfolioHistory' : ActorMethod<[bigint], Result_11>,
+  'getPortfolioHistorySince' : ActorMethod<[bigint, bigint], Result_11>,
+  'getPortfolioSnapshotStatus' : ActorMethod<
+    [],
+    {
+      'status' : { 'Stopped' : null } |
+        { 'Running' : null },
+      'lastSnapshotTime' : bigint,
+      'intervalMinutes' : bigint,
+    }
+  >,
   'getPriceAlerts' : ActorMethod<
     [bigint, bigint],
     { 'alerts' : Array<PriceAlertLog>, 'totalCount' : bigint }
@@ -461,11 +480,11 @@ export interface treasury {
     [bigint],
     Array<[Principal, TokenDetails]>
   >,
-  'getTokenPriceHistory' : ActorMethod<[Array<Principal>], Result_9>,
+  'getTokenPriceHistory' : ActorMethod<[Array<Principal>], Result_10>,
   'getTradingPauseInfo' : ActorMethod<[Principal], [] | [TradingPauseRecord]>,
-  'getTradingStatus' : ActorMethod<[], Result_8>,
-  'getTradingStatusSince' : ActorMethod<[bigint], Result_7>,
-  'getTreasuryAdminActionsSince' : ActorMethod<[bigint, bigint], Result_6>,
+  'getTradingStatus' : ActorMethod<[], Result_9>,
+  'getTradingStatusSince' : ActorMethod<[bigint], Result_8>,
+  'getTreasuryAdminActionsSince' : ActorMethod<[bigint, bigint], Result_7>,
   'getTriggerCondition' : ActorMethod<[bigint], [] | [TriggerCondition]>,
   'listPortfolioCircuitBreakerConditions' : ActorMethod<
     [],
@@ -473,38 +492,44 @@ export interface treasury {
   >,
   'listTradingPauses' : ActorMethod<[], TradingPausesResponse>,
   'listTriggerConditions' : ActorMethod<[], Array<TriggerCondition>>,
-  'pauseTokenFromTradingManual' : ActorMethod<[Principal, string], Result_4>,
+  'pauseTokenFromTradingManual' : ActorMethod<[Principal, string], Result_5>,
   'receiveTransferTasks' : ActorMethod<
     [Array<[TransferRecipient, bigint, Principal, number]>, boolean],
     [boolean, [] | [Array<[Principal, bigint]>]]
   >,
-  'removePortfolioCircuitBreakerCondition' : ActorMethod<[bigint], Result_2>,
+  'removePortfolioCircuitBreakerCondition' : ActorMethod<[bigint], Result_3>,
   'removeTriggerCondition' : ActorMethod<[bigint], Result>,
   'resetRebalanceState' : ActorMethod<[[] | [string]], Result_1>,
   'setPortfolioCircuitBreakerConditionActive' : ActorMethod<
     [bigint, boolean],
-    Result_2
+    Result_3
   >,
   'setTest' : ActorMethod<[boolean], undefined>,
   'setTriggerConditionActive' : ActorMethod<[bigint, boolean], Result>,
+  'startPortfolioSnapshots' : ActorMethod<[[] | [string]], Result_2>,
   'startRebalancing' : ActorMethod<[[] | [string]], Result_1>,
+  'stopPortfolioSnapshots' : ActorMethod<[[] | [string]], Result_2>,
   'stopRebalancing' : ActorMethod<[[] | [string]], Result_1>,
   'syncTokenDetailsFromDAO' : ActorMethod<
     [Array<[Principal, TokenDetails]>],
-    Result_5
+    Result_6
   >,
-  'takeManualPortfolioSnapshot' : ActorMethod<[[] | [string]], Result_3>,
-  'unpauseTokenFromTrading' : ActorMethod<[Principal, [] | [string]], Result_4>,
+  'takeManualPortfolioSnapshot' : ActorMethod<[[] | [string]], Result_4>,
+  'unpauseTokenFromTrading' : ActorMethod<[Principal, [] | [string]], Result_5>,
   'updateMaxPortfolioSnapshots' : ActorMethod<
     [bigint, [] | [string]],
-    Result_3
+    Result_4
   >,
   'updatePausedTokenThresholdForCircuitBreaker' : ActorMethod<
     [bigint],
-    Result_2
+    Result_3
   >,
   'updatePortfolioCircuitBreakerCondition' : ActorMethod<
     [bigint, PortfolioCircuitBreakerUpdate],
+    Result_3
+  >,
+  'updatePortfolioSnapshotInterval' : ActorMethod<
+    [bigint, [] | [string]],
     Result_2
   >,
   'updateRebalanceConfig' : ActorMethod<

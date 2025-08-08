@@ -30,6 +30,7 @@ export type AdminActionVariant = { 'StopRebalancing' : null } |
   { 'AdminAdd' : { 'newAdmin' : Principal } } |
   { 'ClearAllTradingPauses' : null } |
   { 'UnpauseToken' : { 'token' : Principal } } |
+  { 'ExecuteTradingCycle' : null } |
   { 'PauseTokenManual' : { 'token' : Principal, 'pauseType' : string } } |
   { 'TokenUnpause' : { 'token' : Principal } } |
   {
@@ -39,6 +40,7 @@ export type AdminActionVariant = { 'StopRebalancing' : null } |
       'targetAdmin' : Principal,
     }
   } |
+  { 'CanisterStart' : null } |
   { 'TokenPause' : { 'token' : Principal } } |
   {
     'SetPortfolioCircuitBreakerActive' : {
@@ -76,6 +78,7 @@ export type AdminActionVariant = { 'StopRebalancing' : null } |
   } |
   { 'TokenRemove' : { 'token' : Principal } } |
   { 'RemoveTriggerCondition' : { 'conditionId' : bigint } } |
+  { 'TakeManualSnapshot' : null } |
   {
     'UpdatePausedTokenThreshold' : {
       'newThreshold' : bigint,
@@ -83,6 +86,14 @@ export type AdminActionVariant = { 'StopRebalancing' : null } |
     }
   } |
   { 'UpdateRebalanceConfig' : { 'newConfig' : string, 'oldConfig' : string } } |
+  { 'StartPortfolioSnapshots' : null } |
+  {
+    'UpdatePortfolioSnapshotInterval' : {
+      'newIntervalNS' : bigint,
+      'oldIntervalNS' : bigint,
+    }
+  } |
+  { 'StopPortfolioSnapshots' : null } |
   {
     'AddTriggerCondition' : {
       'conditionId' : bigint,
@@ -102,7 +113,8 @@ export type AdminActionVariant = { 'StopRebalancing' : null } |
   } |
   { 'ResetRebalanceState' : null } |
   { 'ClearSystemLogs' : null } |
-  { 'ClearPriceAlerts' : null };
+  { 'ClearPriceAlerts' : null } |
+  { 'CanisterStop' : null };
 export type AdminCanisterSource = { 'DAO_backend' : null } |
   { 'Treasury' : null };
 export type ArchiveError = { 'StorageFull' : null } |

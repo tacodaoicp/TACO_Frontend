@@ -201,10 +201,13 @@ type AdminActionVariant =
       targetAdmin: principal;
     };
    AdminRemove: record {removedAdmin: principal;};
+   CanisterStart;
+   CanisterStop;
    ClearAllTradingPauses;
    ClearPortfolioCircuitBreakerLogs;
    ClearPriceAlerts;
    ClearSystemLogs;
+   ExecuteTradingCycle;
    ParameterUpdate:
     record {
       newValue: text;
@@ -228,12 +231,15 @@ type AdminActionVariant =
                                 conditionId: nat;
                                 isActive: bool;
                               };
+   StartPortfolioSnapshots;
    StartRebalancing;
+   StopPortfolioSnapshots;
    StopRebalancing;
    SystemStateChange: record {
                         newState: SystemState;
                         oldState: SystemState;
                       };
+   TakeManualSnapshot;
    TokenAdd:
     record {
       token: principal;
@@ -257,6 +263,11 @@ type AdminActionVariant =
       conditionId: nat;
       newCondition: text;
       oldCondition: text;
+    };
+   UpdatePortfolioSnapshotInterval:
+    record {
+      newIntervalNS: nat;
+      oldIntervalNS: nat;
     };
    UpdateRebalanceConfig: record {
                             newConfig: text;
