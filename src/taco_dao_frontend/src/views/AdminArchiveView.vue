@@ -672,7 +672,7 @@ export default {
     daoAdminArchiveCanisterId() {
       switch (process.env.DFX_NETWORK) {
         case "ic":
-          return process.env.CANISTER_ID_DAO_ADMIN_ARCHIVE_IC || 'b6ygs-xaaaa-aaaan-qz5ca-cai'; // fallback to staging
+          return process.env.CANISTER_ID_DAO_ADMIN_ARCHIVE_IC || 'cspwf-4aaaa-aaaan-qz5ia-cai'; // fallback to staging
         case "staging":
           return process.env.CANISTER_ID_DAO_ADMIN_ARCHIVE_STAGING || 'b6ygs-xaaaa-aaaan-qz5ca-cai';
       }
@@ -682,7 +682,7 @@ export default {
     daoAllocationArchiveCanisterId() {
       switch (process.env.DFX_NETWORK) {
         case "ic":
-          return process.env.CANISTER_ID_DAO_ALLOCATION_ARCHIVE_IC || 'bq2l2-mqaaa-aaaan-qz5da-cai'; // fallback to staging
+          return process.env.CANISTER_ID_DAO_ALLOCATION_ARCHIVE_IC || 'cvoqr-ryaaa-aaaan-qz5iq-cai'; // fallback to staging
         case "staging":
           return process.env.CANISTER_ID_DAO_ALLOCATION_ARCHIVE_STAGING || 'bq2l2-mqaaa-aaaan-qz5da-cai';
       }
@@ -692,7 +692,7 @@ export default {
     daoGovernanceArchiveCanisterId() {
       switch (process.env.DFX_NETWORK) {
         case "ic":
-          return process.env.CANISTER_ID_DAO_GOVERNANCE_ARCHIVE_IC || 'bzzag-2yaaa-aaaan-qz5cq-cai'; // fallback to staging
+          return process.env.CANISTER_ID_DAO_GOVERNANCE_ARCHIVE_IC || 'c4n3n-hqaaa-aaaan-qz5ja-cai'; // fallback to staging
         case "staging":
           return process.env.CANISTER_ID_DAO_GOVERNANCE_ARCHIVE_STAGING || 'bzzag-2yaaa-aaaan-qz5cq-cai';
       }
