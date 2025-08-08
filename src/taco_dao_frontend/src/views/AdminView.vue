@@ -696,6 +696,141 @@
             </div>
           </div>
 
+          <!-- System Parameters -->
+          <div class="card bg-dark text-white mt-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+              <h3 class="mb-0">System Parameters</h3>
+              <button class="btn btn-primary btn-sm" @click="refreshSystemParameters">
+                Refresh Parameters
+              </button>
+            </div>
+            <div class="card-body">
+              <div v-if="systemParametersData" class="config-grid">
+                <div class="config-item">
+                  <label>Follow Depth</label>
+                  <input 
+                    type="number" 
+                    v-model="systemParametersInputs.FollowDepth" 
+                    step="1" 
+                    min="1" 
+                    max="3"
+                    @input="validateSystemParameterInput('FollowDepth')"
+                    class="form-control"
+                  />
+                  <div class="help-text text-muted">Range: 1-3. Max depth for following allocation strategies.</div>
+                </div>
+                <div class="config-item">
+                  <label>Max Followed</label>
+                  <input 
+                    type="number" 
+                    v-model="systemParametersInputs.MaxFollowed" 
+                    step="1" 
+                    min="1" 
+                    max="10"
+                    @input="validateSystemParameterInput('MaxFollowed')"
+                    class="form-control"
+                  />
+                  <div class="help-text text-muted">Range: 1-10. Max users a single user can follow.</div>
+                </div>
+                <div class="config-item">
+                  <label>Max Follow/Unfollow Actions Per Day</label>
+                  <input 
+                    type="number" 
+                    v-model="systemParametersInputs.MaxFollowUnfollowActionsPerDay" 
+                    step="1" 
+                    min="9" 
+                    max="100"
+                    @input="validateSystemParameterInput('MaxFollowUnfollowActionsPerDay')"
+                    class="form-control"
+                  />
+                  <div class="help-text text-muted">Range: 9-100. Max follow/unfollow actions per day.</div>
+                </div>
+                <div class="config-item">
+                  <label>Max Allocations Per Window</label>
+                  <input 
+                    type="number" 
+                    v-model="systemParametersInputs.MaxAllocationsPerDay" 
+                    step="1" 
+                    min="1" 
+                    max="10"
+                    @input="validateSystemParameterInput('MaxAllocationsPerDay')"
+                    class="form-control"
+                  />
+                  <div class="help-text text-muted">Range: 1-10. Max allocation updates per allocation window.</div>
+                </div>
+                <div class="config-item">
+                  <label>Allocation Window (hours)</label>
+                  <input 
+                    type="number" 
+                    v-model="systemParametersInputs.AllocationWindowHours" 
+                    step="1" 
+                    min="1" 
+                    max="168"
+                    @input="validateSystemParameterInput('AllocationWindowHours')"
+                    class="form-control"
+                  />
+                  <div class="help-text text-muted">Range: 1-168 hours (1 hour - 7 days). Time window for allocation rate limiting.</div>
+                </div>
+                <div class="config-item">
+                  <label>Max Followers</label>
+                  <input 
+                    type="number" 
+                    v-model="systemParametersInputs.MaxFollowers" 
+                    step="1" 
+                    min="50" 
+                    max="5000"
+                    @input="validateSystemParameterInput('MaxFollowers')"
+                    class="form-control"
+                  />
+                  <div class="help-text text-muted">Range: 50-5000. Max followers a single user can have.</div>
+                </div>
+                <div class="config-item">
+                  <label>Max Total Updates</label>
+                  <input 
+                    type="number" 
+                    v-model="systemParametersInputs.MaxTotalUpdates" 
+                    step="1" 
+                    min="200" 
+                    max="10000"
+                    @input="validateSystemParameterInput('MaxTotalUpdates')"
+                    class="form-control"
+                  />
+                  <div class="help-text text-muted">Range: 200-10000. Max neuron updates per allocation operation.</div>
+                </div>
+                <div class="config-item">
+                  <label>Max Past Allocations</label>
+                  <input 
+                    type="number" 
+                    v-model="systemParametersInputs.MaxPastAllocations" 
+                    step="1" 
+                    min="20" 
+                    max="500"
+                    @input="validateSystemParameterInput('MaxPastAllocations')"
+                    class="form-control"
+                  />
+                  <div class="help-text text-muted">Range: 20-500. Max past allocations stored per user.</div>
+                </div>
+              </div>
+              
+              <div class="d-flex gap-2 mt-4">
+                <button 
+                  @click="showSystemParametersUpdateConfirmation" 
+                  :disabled="!isSystemParametersValid || !hasSystemParametersChanges"
+                  class="btn btn-primary"
+                >
+                  Update System Parameters
+                </button>
+                <button 
+                  @click="resetSystemParameters" 
+                  :disabled="!hasSystemParametersChanges"
+                  class="btn btn-secondary"
+                >
+                  Reset Changes
+                </button>
+              </div>
+            </div>
+          </div>
+
         </div>
       </div>
     </div>
@@ -1225,7 +1360,8 @@ onMounted(async () => {
         refreshVotingMetrics(),
         refreshVoterDetails(),
         refreshNeuronAllocations(),
-        refreshPortfolioSnapshotStatus()
+        refreshPortfolioSnapshotStatus(),
+        refreshSystemParameters()
     ]);
     console.log('AdminView: Initial data loaded');
 });
@@ -1714,6 +1850,12 @@ const handleConfirmAction = async (reason: string) => {
         await refreshPortfolioSnapshotStatus();
         console.log('AdminView: Portfolio snapshot interval updated');
       }
+    } else if (actionData.type === 'updateSystemParameters') {
+      // Handle system parameters update
+      success = await updateSystemParameters(reason);
+      if (success) {
+        console.log('AdminView: System parameters updated');
+      }
     } else if (actionData.principal && actionData.tokenName) {
       // Handle token pause/unpause actions
       const { principal, tokenName } = actionData;
@@ -1938,6 +2080,22 @@ const portfolioSnapshotStatus = ref({
 });
 const newPortfolioSnapshotInterval = ref(60);
 
+// System Parameters
+const systemParametersData = ref(null as any);
+const systemParametersInputs = ref({
+  FollowDepth: 1,
+  MaxFollowed: 3,
+  MaxFollowUnfollowActionsPerDay: 10,
+  MaxAllocationsPerDay: 5,
+  AllocationWindowHours: 24,
+  MaxFollowers: 500,
+  MaxTotalUpdates: 2000,
+  MaxPastAllocations: 100
+});
+const originalSystemParameters = ref({} as any);
+const isSystemParametersValid = ref(true);
+const hasSystemParametersChanges = ref(false);
+
 // Add refresh user voting power function
 async function refreshUserVotingPower() {
     refreshingVP.value = true;
@@ -2091,4 +2249,180 @@ const getTradingBotWarning = (): { level: 'none' | 'warning' | 'danger', message
 
   return { level: 'none', message: '' };
 };
+
+// System Parameters Functions
+async function refreshSystemParameters() {
+  try {
+    const params = await tacoStore.getSystemParameters();
+    systemParametersData.value = params;
+    
+    // Convert parameters to input format
+    const inputs = { ...systemParametersInputs.value };
+    
+    if (params && Array.isArray(params)) {
+      params.forEach((param: any) => {
+        if ('FollowDepth' in param) inputs.FollowDepth = Number(param.FollowDepth);
+        else if ('MaxFollowed' in param) inputs.MaxFollowed = Number(param.MaxFollowed);
+        else if ('MaxFollowUnfollowActionsPerDay' in param) inputs.MaxFollowUnfollowActionsPerDay = Number(param.MaxFollowUnfollowActionsPerDay);
+        else if ('MaxAllocationsPerDay' in param) inputs.MaxAllocationsPerDay = Number(param.MaxAllocationsPerDay);
+        else if ('AllocationWindow' in param) inputs.AllocationWindowHours = Number(param.AllocationWindow) / (60 * 60 * 1_000_000_000);
+        else if ('MaxFollowers' in param) inputs.MaxFollowers = Number(param.MaxFollowers);
+        else if ('MaxTotalUpdates' in param) inputs.MaxTotalUpdates = Number(param.MaxTotalUpdates);
+        else if ('MaxPastAllocations' in param) inputs.MaxPastAllocations = Number(param.MaxPastAllocations);
+      });
+    }
+    
+    systemParametersInputs.value = inputs;
+    originalSystemParameters.value = { ...inputs };
+    hasSystemParametersChanges.value = false;
+    
+    console.log('AdminView: System parameters refreshed');
+  } catch (error) {
+    console.error('AdminView: Error refreshing system parameters:', error);
+  }
+}
+
+function validateSystemParameterInput(field: string) {
+  const value = (systemParametersInputs.value as any)[field];
+  let isValid = true;
+  
+  switch (field) {
+    case 'FollowDepth':
+      isValid = value >= 1 && value <= 3;
+      break;
+    case 'MaxFollowed':
+      isValid = value >= 1 && value <= 10;
+      break;
+    case 'MaxFollowUnfollowActionsPerDay':
+      isValid = value >= 9 && value <= 100;
+      break;
+    case 'MaxAllocationsPerDay':
+      isValid = value >= 1 && value <= 10;
+      break;
+    case 'AllocationWindowHours':
+      isValid = value >= 1 && value <= 168;
+      break;
+    case 'MaxFollowers':
+      isValid = value >= 50 && value <= 5000;
+      break;
+    case 'MaxTotalUpdates':
+      isValid = value >= 200 && value <= 10000;
+      break;
+    case 'MaxPastAllocations':
+      isValid = value >= 20 && value <= 500;
+      break;
+  }
+  
+  // Update validation state
+  checkSystemParametersChanges();
+  
+  return isValid;
+}
+
+function checkSystemParametersChanges() {
+  const current = systemParametersInputs.value as any;
+  const original = originalSystemParameters.value as any;
+  
+  hasSystemParametersChanges.value = Object.keys(current).some(key => current[key] !== original[key]);
+  
+  // Validate all fields
+  isSystemParametersValid.value = 
+    current.FollowDepth >= 1 && current.FollowDepth <= 3 &&
+    current.MaxFollowed >= 1 && current.MaxFollowed <= 10 &&
+    current.MaxFollowUnfollowActionsPerDay >= 9 && current.MaxFollowUnfollowActionsPerDay <= 100 &&
+    current.MaxAllocationsPerDay >= 1 && current.MaxAllocationsPerDay <= 10 &&
+    current.AllocationWindowHours >= 1 && current.AllocationWindowHours <= 168 &&
+    current.MaxFollowers >= 50 && current.MaxFollowers <= 5000 &&
+    current.MaxTotalUpdates >= 200 && current.MaxTotalUpdates <= 10000 &&
+    current.MaxPastAllocations >= 20 && current.MaxPastAllocations <= 500;
+}
+
+function resetSystemParameters() {
+  systemParametersInputs.value = { ...originalSystemParameters.value as any };
+  hasSystemParametersChanges.value = false;
+  isSystemParametersValid.value = true;
+}
+
+function showSystemParametersUpdateConfirmation() {
+  if (!isSystemParametersValid.value || !hasSystemParametersChanges.value) return;
+  
+  const changes: string[] = [];
+  const current = systemParametersInputs.value as any;
+  const original = originalSystemParameters.value as any;
+  
+  Object.keys(current).forEach(key => {
+    if (current[key] !== original[key]) {
+      changes.push(`${key}: ${original[key]} → ${current[key]}`);
+    }
+  });
+  
+  confirmationModal.value = {
+    show: true,
+    title: 'Update System Parameters',
+    message: `Are you sure you want to update these system parameters?\n\n${changes.join('\n')}`,
+    extraData: '',
+    confirmButtonText: 'Update Parameters',
+    confirmButtonClass: 'btn-primary',
+    reasonPlaceholder: 'Please provide a reason for updating system parameters...',
+    submitting: false,
+    action: null,
+    actionData: { type: 'updateSystemParameters' }
+  };
+}
+
+async function updateSystemParameters(reason?: string) {
+  try {
+    const current = systemParametersInputs.value as any;
+    const original = originalSystemParameters.value as any;
+    
+    // Update each changed parameter
+    for (const [key, value] of Object.entries(current)) {
+      if (value !== original[key]) {
+        let success = false;
+        
+        switch (key) {
+          case 'FollowDepth':
+            success = await tacoStore.updateSystemParameter({ FollowDepth: BigInt(value) }, reason);
+            break;
+          case 'MaxFollowed':
+            success = await tacoStore.updateSystemParameter({ MaxFollowed: BigInt(value) }, reason);
+            break;
+          case 'MaxFollowUnfollowActionsPerDay':
+            success = await tacoStore.updateSystemParameter({ MaxFollowUnfollowActionsPerDay: BigInt(value) }, reason);
+            break;
+          case 'MaxAllocationsPerDay':
+            success = await tacoStore.updateSystemParameter({ MaxAllocationsPerDay: BigInt(value) }, reason);
+            break;
+          case 'AllocationWindowHours':
+            const windowNS = BigInt(value) * 60n * 60n * 1_000_000_000n;
+            success = await tacoStore.updateSystemParameter({ AllocationWindow: windowNS }, reason);
+            break;
+          case 'MaxFollowers':
+            success = await tacoStore.updateSystemParameter({ MaxFollowers: BigInt(value) }, reason);
+            break;
+          case 'MaxTotalUpdates':
+            success = await tacoStore.updateSystemParameter({ MaxTotalUpdates: BigInt(value) }, reason);
+            break;
+          case 'MaxPastAllocations':
+            success = await tacoStore.updateSystemParameter({ MaxPastAllocations: BigInt(value) }, reason);
+            break;
+        }
+        
+        if (!success) {
+          throw new Error(`Failed to update ${key}`);
+        }
+      }
+    }
+    
+    // Refresh parameters after successful update
+    await refreshSystemParameters();
+    
+    console.log('AdminView: System parameters updated successfully');
+    return true;
+    
+  } catch (error) {
+    console.error('AdminView: Error updating system parameters:', error);
+    return false;
+  }
+}
 </script>

@@ -3037,8 +3037,8 @@ export const useTacoStore = defineStore('taco', () => {
             throw error;
         }
     }
-    const updateSystemParameter = async (paramName: string, value: bigint): Promise<boolean> => {
-        // console.log('TacoStore: updateSystemParameter called with', paramName, value);
+    const updateSystemParameter = async (param: any, reason?: string): Promise<boolean> => {
+        // console.log('TacoStore: updateSystemParameter called with', param, reason);
         try {
             appLoadingOn();
 
@@ -3064,13 +3064,13 @@ export const useTacoStore = defineStore('taco', () => {
             let canisterId = daoBackendCanisterId();
 
 
-            // Create treasury actor with authenticated identity
+            // Create DAO backend actor with authenticated identity
             const backend = Actor.createActor(daoBackendIDL, {
                 agent,
                 canisterId
             });
 
-            const result = await backend.updateSystemParameter(paramName, value) as SystemParameterResult;
+            const result = await backend.updateSystemParameter(param, reason ? [reason] : []) as SystemParameterResult;
             
             if ('ok' in result) {
                 addToast({
