@@ -16,6 +16,7 @@ export const idlFactory = ({ IDL }) => {
     'change24h' : IDL.Opt(IDL.Float64),
     'source' : PriceSource,
     'volume24h' : IDL.Opt(IDL.Nat),
+    'timestamp' : IDL.Int,
     'priceICP' : IDL.Nat,
     'priceUSD' : IDL.Float64,
   });

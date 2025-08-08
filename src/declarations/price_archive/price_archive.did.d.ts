@@ -107,6 +107,7 @@ export interface PriceBlockData {
   'change24h' : [] | [number],
   'source' : PriceSource,
   'volume24h' : [] | [bigint],
+  'timestamp' : bigint,
   'priceICP' : bigint,
   'priceUSD' : number,
 }

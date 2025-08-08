@@ -12,6 +12,7 @@ export const idlFactory = ({ IDL }) => {
     'systemResponse' : IDL.Text,
     'triggerToken' : IDL.Opt(IDL.Principal),
     'actualValue' : IDL.Float64,
+    'timestamp' : IDL.Int,
     'severity' : IDL.Text,
     'thresholdValue' : IDL.Float64,
     'eventType' : CircuitBreakerEventType,
@@ -36,6 +37,7 @@ export const idlFactory = ({ IDL }) => {
     'error' : IDL.Opt(IDL.Text),
     'amountSold' : IDL.Nat,
     'amountBought' : IDL.Nat,
+    'timestamp' : IDL.Int,
     'tokenSold' : IDL.Principal,
     'success' : IDL.Bool,
     'exchange' : ExchangeType,
@@ -53,6 +55,7 @@ export const idlFactory = ({ IDL }) => {
     'token' : IDL.Principal,
     'duration' : IDL.Opt(IDL.Int),
     'tokenSymbol' : IDL.Text,
+    'timestamp' : IDL.Int,
     'reason' : TradingPauseReason,
   });
   const Result_1 = IDL.Variant({ 'ok' : IDL.Text, 'err' : IDL.Text });

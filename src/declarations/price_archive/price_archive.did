@@ -96,6 +96,7 @@ type PriceBlockData =
    priceICP: nat;
    priceUSD: float64;
    source: PriceSource;
+   timestamp: int;
    token: principal;
    volume24h: opt nat;
  };

@@ -22,6 +22,7 @@ type TradingPauseBlockData =
  record {
    duration: opt int;
    reason: TradingPauseReason;
+   timestamp: int;
    token: principal;
    tokenSymbol: text;
  };
@@ -85,6 +86,7 @@ type TradeBlockData =
    fee: nat;
    slippage: float64;
    success: bool;
+   timestamp: int;
    tokenBought: principal;
    tokenSold: principal;
    trader: principal;
@@ -209,6 +211,7 @@ type CircuitBreakerBlockData =
    severity: text;
    systemResponse: text;
    thresholdValue: float64;
+   timestamp: int;
    tokensAffected: vec principal;
    triggerToken: opt principal;
  };
