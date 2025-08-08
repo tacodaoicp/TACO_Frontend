@@ -49,6 +49,7 @@ export interface CircuitBreakerBlockData {
   'systemResponse' : string,
   'triggerToken' : [] | [Principal],
   'actualValue' : number,
+  'timestamp' : bigint,
   'severity' : string,
   'thresholdValue' : number,
   'eventType' : CircuitBreakerEventType,
@@ -95,10 +96,15 @@ export type Result_4 = { 'ok' : ArchiveStatus } |
   { 'err' : ArchiveError };
 export type Result_5 = { 'ok' : bigint } |
   { 'err' : ArchiveError };
-export type TacoBlockType = { 'Pause' : null } |
+export type TacoBlockType = { 'NeuronUpdate' : null } |
+  { 'VotingPower' : null } |
+  { 'AllocationChange' : null } |
+  { 'Pause' : null } |
   { 'Price' : null } |
+  { 'FollowAction' : null } |
   { 'Portfolio' : null } |
   { 'Trade' : null } |
+  { 'Admin' : null } |
   { 'Allocation' : null } |
   { 'Circuit' : null };
 export interface TimerStatus {
@@ -126,6 +132,7 @@ export interface TradeBlockData {
   'error' : [] | [string],
   'amountSold' : bigint,
   'amountBought' : bigint,
+  'timestamp' : bigint,
   'tokenSold' : Principal,
   'success' : boolean,
   'exchange' : ExchangeType,
@@ -183,6 +190,7 @@ export interface TradingPauseBlockData {
   'token' : Principal,
   'duration' : [] | [bigint],
   'tokenSymbol' : string,
+  'timestamp' : bigint,
   'reason' : TradingPauseReason,
 }
 export type TradingPauseReason = { 'PriceVolatility' : null } |

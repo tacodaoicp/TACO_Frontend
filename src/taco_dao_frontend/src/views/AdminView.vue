@@ -20,6 +20,9 @@
               <router-link to="/admin/price" class="btn btn-warning">
                 🚨 Price Failsafe Admin
               </router-link>
+              <router-link to="/admin/pricehistory" class="btn btn-secondary">
+                📊 Price History
+              </router-link>
               <router-link to="/admin/neuron" class="btn btn-success">
                 🧠 Neuron Snapshot Admin
               </router-link>
@@ -41,7 +44,7 @@
             <div class="card-body">
               <!-- Snapshot Timer Status -->
               <div class="timer-section mb-4">
-                <h4>Snapshot Timer</h4>
+                <h4>Neuron Snapshot Timer</h4>
                 <div class="d-flex gap-3 align-items-center mb-2">
                   <div class="status-indicator" :class="snapshotStatus.active ? 'active' : 'inactive'"></div>
                   <span>Last Snapshot: {{ formatTime(snapshotStatus.lastSnapshotTime) }}</span>
@@ -59,7 +62,7 @@
                   />
                   <button 
                     class="btn btn-primary" 
-                    @click="updateSnapshotInterval"
+                    @click="showUpdateSnapshotIntervalConfirmation"
                     :disabled="!snapshotIntervalMinutes || snapshotIntervalMinutes < 1"
                   >
                     Update Interval
@@ -120,6 +123,13 @@
                   <!-- Trading Metrics -->
                   <div v-if="timerHealth.treasury.tradingMetrics" class="trading-metrics mt-2">
                     <h5>Trading Metrics</h5>
+                    
+                    <!-- Trading Bot Warning -->
+                    <div v-if="getTradingBotWarning().level !== 'none'" 
+                         :class="['alert', 'mb-2', getTradingBotWarning().level === 'danger' ? 'alert-danger' : 'alert-warning']">
+                      <small>{{ getTradingBotWarning().message }}</small>
+                    </div>
+                    
                     <div class="d-flex flex-column gap-1">
                       <div>Last Attempt: {{ formatTime(timerHealth.treasury.tradingMetrics.lastRebalanceAttempt) }}</div>
                       <div>Total Trades: {{ timerHealth.treasury.tradingMetrics.totalTradesExecuted.toString() }}</div>
@@ -131,27 +141,27 @@
                   <!-- Token Sync Status -->
                   <div class="token-sync-status mt-2">
                     <h5>Token Sync Status</h5>
-                    <div v-if="fetchedTokenDetails && fetchedTokenDetails.length" class="token-list">
-                      <div v-for="[principal, token] in fetchedTokenDetails" :key="principal.toString()" class="token-sync-item">
+                    <div v-if="sortedTokenDetails.length" class="token-list">
+                      <div v-for="[principal, token] in sortedTokenDetails" :key="principal.toString()" class="token-sync-item">
                         <div class="d-flex gap-3 align-items-center justify-content-between">
                           <div class="d-flex gap-3 align-items-center">
-                            <div class="status-indicator" :class="getTokenStatusClass(token)"></div>
+                            <div class="status-indicator" :class="getTokenStatusClass(token, principal)"></div>
                             <span class="token-symbol">{{ token.tokenSymbol }}</span>
-                            <span class="token-status">{{ getTokenStatusText(token) }}</span>
+                            <span class="token-status">{{ getTokenStatusText(token, principal) }}</span>
                             <span>Last Sync: {{ formatTime(token.lastTimeSynced) }}</span>
                           </div>
                           <div class="d-flex gap-2">
                             <button 
                               v-if="!token.isPaused" 
                               class="btn btn-warning btn-sm"
-                              @click="pauseToken(principal)"
+                              @click="showPauseConfirmation(principal.toString(), token.tokenSymbol)"
                             >
                               Pause
                             </button>
                             <button 
                               v-else 
                               class="btn btn-success btn-sm"
-                              @click="unpauseToken(principal)"
+                              @click="showUnpauseConfirmation(principal.toString(), token.tokenSymbol)"
                             >
                               Unpause
                             </button>
@@ -182,6 +192,68 @@
                       Restart Syncs
                     </button>
                   </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Portfolio Snapshot Management -->
+          <div class="card bg-dark text-white mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+              <h3 class="mb-0">Portfolio Snapshot Management</h3>
+              <button class="btn btn-primary" @click="refreshPortfolioSnapshotStatus">
+                Refresh Status
+              </button>
+            </div>
+            
+            <div class="card-body">
+              <div class="timer-section">
+                <div class="d-flex gap-3 align-items-center mb-3">
+                  <div class="status-indicator" :class="'Running' in portfolioSnapshotStatus.status ? 'active' : 'inactive'"></div>
+                  <span><strong>Status:</strong> {{ 'Running' in portfolioSnapshotStatus.status ? 'Running' : 'Stopped' }}</span>
+                  <span><strong>Interval:</strong> {{ portfolioSnapshotStatus.intervalMinutes }} minutes</span>
+                  <span><strong>Last Snapshot:</strong> {{ formatTime(portfolioSnapshotStatus.lastSnapshotTime) }}</span>
+                </div>
+                
+                <!-- Interval Control -->
+                <div class="d-flex gap-3 align-items-center mb-3">
+                  <label>Snapshot Interval (minutes):</label>
+                  <input 
+                    type="number" 
+                    v-model="newPortfolioSnapshotInterval" 
+                    class="form-control" 
+                    style="width: 100px;"
+                    min="1"
+                    max="1440"
+                  />
+                  <button 
+                    class="btn btn-primary" 
+                    @click="showUpdatePortfolioSnapshotIntervalConfirmation"
+                    :disabled="!newPortfolioSnapshotInterval || newPortfolioSnapshotInterval < 1 || newPortfolioSnapshotInterval > 1440"
+                  >
+                    Update Interval
+                  </button>
+                </div>
+                
+                <!-- Control Buttons -->
+                <div class="d-flex gap-2">
+                  <button 
+                    class="btn btn-success" 
+                    @click="showStartPortfolioSnapshotsConfirmation"
+                    :disabled="'Running' in portfolioSnapshotStatus.status">
+                    Start Portfolio Snapshots
+                  </button>
+                  <button 
+                    class="btn btn-danger" 
+                    @click="showStopPortfolioSnapshotsConfirmation"
+                    :disabled="'Stopped' in portfolioSnapshotStatus.status">
+                    Stop Portfolio Snapshots
+                  </button>
+                  <button 
+                    class="btn btn-warning" 
+                    @click="triggerManualSnapshot">
+                    Take Manual Snapshot
+                  </button>
                 </div>
               </div>
             </div>
@@ -286,7 +358,17 @@
                         <td>{{ uint8ArrayToHex(neuron.neuronId) }}</td>
                         <td>{{ formatNumber(neuron.votingPower) }}</td>
                         <td>{{ formatTime(neuron.lastUpdate) }}</td>
-                        <td>{{ neuron.lastAllocationMaker.toString() }}</td>
+                        <td>
+                          <a 
+                            :href="createVoteHistoryLink(neuron.lastAllocationMaker)" 
+                            target="_blank" 
+                            class="text-decoration-none text-info"
+                            @click.prevent="$router.push({ path: '/admin/votes', query: { principal: neuron.lastAllocationMaker.toString() } })"
+                            title="View vote history for this principal"
+                          >
+                            🗳️ {{ getPrincipalDisplayName(neuron.lastAllocationMaker) }}
+                          </a>
+                        </td>
                         <td>
                           <div v-for="[token, basisPoints] in neuron.allocations" :key="token.toString()">
                             {{ getTokenSymbol(token) }}: {{ (Number(basisPoints) / 100).toFixed(2) }}%
@@ -339,7 +421,17 @@
                     </thead>
                     <tbody>
                       <tr v-for="voter in filteredVoterDetails" :key="voter.principal.toString()">
-                        <td>{{ voter.principal.toString() }}</td>
+                        <td>
+                          <a 
+                            :href="createVoteHistoryLink(voter.principal)" 
+                            target="_blank" 
+                            class="text-decoration-none text-info"
+                            @click.prevent="$router.push({ path: '/admin/votes', query: { principal: voter.principal.toString() } })"
+                            title="View vote history for this principal"
+                          >
+                            🗳️ {{ getPrincipalDisplayName(voter.principal) }}
+                          </a>
+                        </td>
                         <td>{{ formatNumber(voter.state.votingPower) }}</td>
                         <td>
                           <div v-for="neuron in voter.state.neurons" :key="neuron.neuronId">
@@ -352,7 +444,15 @@
                         <td>
                           <div v-if="voter.state.allocationFollows.length > 0">
                             <div v-for="follow in voter.state.allocationFollows" :key="follow.follow.toString()">
-                              {{ follow.follow.toString() }}<br>
+                              <a 
+                                :href="createVoteHistoryLink(follow.follow)" 
+                                target="_blank" 
+                                class="text-decoration-none text-info"
+                                @click.prevent="$router.push({ path: '/admin/votes', query: { principal: follow.follow.toString() } })"
+                                title="View vote history for this principal"
+                              >
+                                🗳️ {{ getPrincipalDisplayName(follow.follow) }}
+                              </a><br>
                               Since: {{ formatTime(follow.since) }}
                             </div>
                           </div>
@@ -579,7 +679,7 @@
               <div v-else class="text-center py-4">Loading configuration...</div>
               <div class="d-flex gap-2 mt-4">
                 <button 
-                  @click="updateConfig" 
+                  @click="showConfigUpdateConfirmation" 
                   :disabled="!isConfigValid || !hasConfigChanges"
                   class="btn btn-primary"
                 >
@@ -596,9 +696,158 @@
             </div>
           </div>
 
+          <!-- System Parameters -->
+          <div class="card bg-dark text-white mt-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+              <h3 class="mb-0">System Parameters</h3>
+              <button class="btn btn-primary btn-sm" @click="refreshSystemParameters">
+                Refresh Parameters
+              </button>
+            </div>
+            <div class="card-body">
+              <div v-if="systemParametersData" class="config-grid">
+                <div class="config-item">
+                  <label>Follow Depth</label>
+                  <input 
+                    type="number" 
+                    v-model="systemParametersInputs.FollowDepth" 
+                    step="1" 
+                    min="1" 
+                    max="3"
+                    @input="validateSystemParameterInput('FollowDepth')"
+                    class="form-control"
+                  />
+                  <div class="help-text text-muted">Range: 1-3. Max depth for following allocation strategies.</div>
+                </div>
+                <div class="config-item">
+                  <label>Max Followed</label>
+                  <input 
+                    type="number" 
+                    v-model="systemParametersInputs.MaxFollowed" 
+                    step="1" 
+                    min="1" 
+                    max="10"
+                    @input="validateSystemParameterInput('MaxFollowed')"
+                    class="form-control"
+                  />
+                  <div class="help-text text-muted">Range: 1-10. Max users a single user can follow.</div>
+                </div>
+                <div class="config-item">
+                  <label>Max Follow/Unfollow Actions Per Day</label>
+                  <input 
+                    type="number" 
+                    v-model="systemParametersInputs.MaxFollowUnfollowActionsPerDay" 
+                    step="1" 
+                    min="9" 
+                    max="100"
+                    @input="validateSystemParameterInput('MaxFollowUnfollowActionsPerDay')"
+                    class="form-control"
+                  />
+                  <div class="help-text text-muted">Range: 9-100. Max follow/unfollow actions per day.</div>
+                </div>
+                <div class="config-item">
+                  <label>Max Allocations Per Window</label>
+                  <input 
+                    type="number" 
+                    v-model="systemParametersInputs.MaxAllocationsPerDay" 
+                    step="1" 
+                    min="1" 
+                    max="10"
+                    @input="validateSystemParameterInput('MaxAllocationsPerDay')"
+                    class="form-control"
+                  />
+                  <div class="help-text text-muted">Range: 1-10. Max allocation updates per allocation window.</div>
+                </div>
+                <div class="config-item">
+                  <label>Allocation Window (hours)</label>
+                  <input 
+                    type="number" 
+                    v-model="systemParametersInputs.AllocationWindowHours" 
+                    step="1" 
+                    min="1" 
+                    max="168"
+                    @input="validateSystemParameterInput('AllocationWindowHours')"
+                    class="form-control"
+                  />
+                  <div class="help-text text-muted">Range: 1-168 hours (1 hour - 7 days). Time window for allocation rate limiting.</div>
+                </div>
+                <div class="config-item">
+                  <label>Max Followers</label>
+                  <input 
+                    type="number" 
+                    v-model="systemParametersInputs.MaxFollowers" 
+                    step="1" 
+                    min="50" 
+                    max="5000"
+                    @input="validateSystemParameterInput('MaxFollowers')"
+                    class="form-control"
+                  />
+                  <div class="help-text text-muted">Range: 50-5000. Max followers a single user can have.</div>
+                </div>
+                <div class="config-item">
+                  <label>Max Total Updates</label>
+                  <input 
+                    type="number" 
+                    v-model="systemParametersInputs.MaxTotalUpdates" 
+                    step="1" 
+                    min="200" 
+                    max="10000"
+                    @input="validateSystemParameterInput('MaxTotalUpdates')"
+                    class="form-control"
+                  />
+                  <div class="help-text text-muted">Range: 200-10000. Max neuron updates per allocation operation.</div>
+                </div>
+                <div class="config-item">
+                  <label>Max Past Allocations</label>
+                  <input 
+                    type="number" 
+                    v-model="systemParametersInputs.MaxPastAllocations" 
+                    step="1" 
+                    min="20" 
+                    max="500"
+                    @input="validateSystemParameterInput('MaxPastAllocations')"
+                    class="form-control"
+                  />
+                  <div class="help-text text-muted">Range: 20-500. Max past allocations stored per user.</div>
+                </div>
+              </div>
+              
+              <div class="d-flex gap-2 mt-4">
+                <button 
+                  @click="showSystemParametersUpdateConfirmation" 
+                  :disabled="!isSystemParametersValid || !hasSystemParametersChanges"
+                  class="btn btn-primary"
+                >
+                  Update System Parameters
+                </button>
+                <button 
+                  @click="resetSystemParameters" 
+                  :disabled="!hasSystemParametersChanges"
+                  class="btn btn-secondary"
+                >
+                  Reset Changes
+                </button>
+              </div>
+            </div>
+          </div>
+
         </div>
       </div>
     </div>
+    
+    <!-- Confirmation Modal for Admin Actions -->
+    <AdminConfirmationModal
+      :show="confirmationModal.show"
+      :title="confirmationModal.title"
+      :message="confirmationModal.message"
+      :extra-data="confirmationModal.extraData"
+      :confirm-button-text="confirmationModal.confirmButtonText"
+      :confirm-button-class="confirmationModal.confirmButtonClass"
+      :reason-placeholder="confirmationModal.reasonPlaceholder"
+      :submitting="confirmationModal.submitting"
+      @confirm="handleConfirmAction"
+      @cancel="hideConfirmationModal"
+    />
     
     <!-- footer bar -->
     <FooterBar />
@@ -617,6 +866,22 @@
   
   &.paused {
     background-color: #dc3545;
+    
+    &.price-alert {
+      background-color: #fd7e14; // Orange for price alerts
+    }
+    
+    &.circuit-breaker {
+      background-color: #dc3545; // Red for circuit breakers
+    }
+    
+    &.manual {
+      background-color: #6f42c1; // Purple for manual pauses
+    }
+    
+    &.sync-failure {
+      background-color: #ffc107; // Yellow for sync failures
+    }
   }
 
   &.sync-failed {
@@ -864,6 +1129,25 @@
   white-space: normal;
   word-break: break-all;
 }
+
+/* Trading Bot Warning Alerts */
+.trading-metrics .alert {
+  padding: 0.5rem;
+  border-radius: 0.375rem;
+  font-size: 0.875rem;
+}
+
+.trading-metrics .alert-warning {
+  background-color: rgba(255, 193, 7, 0.1);
+  border: 1px solid rgba(255, 193, 7, 0.3);
+  color: #ffc107;
+}
+
+.trading-metrics .alert-danger {
+  background-color: rgba(220, 53, 69, 0.1);
+  border: 1px solid rgba(220, 53, 69, 0.3);
+  color: #dc3545;
+}
 </style>
 
 <script setup lang="ts">
@@ -875,6 +1159,7 @@ import HeaderBar from "../components/HeaderBar.vue";
 import FooterBar from "../components/FooterBar.vue";
 import TacoTitle from '../components/misc/TacoTitle.vue';
 import TradingLogs from '../components/admin/TradingLogs.vue';
+import AdminConfirmationModal from '../components/admin/AdminConfirmationModal.vue';
 import { Principal } from '@dfinity/principal';
 
 // Add interface for VotingMetrics
@@ -893,6 +1178,50 @@ const showOnlyActive = ref(false);
 const showOnlyFollowing = ref(false);
 const refreshingVP = ref(false);
 
+// Trading pauses state
+const tradingPauses = ref<any[]>([]);
+
+// Computed property to sort tokens with paused/inactive tokens first
+const sortedTokenDetails = computed(() => {
+  if (!fetchedTokenDetails.value || !fetchedTokenDetails.value.length) return [];
+  
+  return [...fetchedTokenDetails.value].sort(([principalA, tokenA], [principalB, tokenB]) => {
+    const statusA = getTokenStatusClass(tokenA, principalA);
+    const statusB = getTokenStatusClass(tokenB, principalB);
+    
+    // Priority: inactive > paused > active
+    const getPriority = (status: string) => {
+      if (status.includes('inactive')) return 0;
+      if (status.includes('paused')) return 1;
+      return 2; // active
+    };
+    
+    const priorityA = getPriority(statusA);
+    const priorityB = getPriority(statusB);
+    
+    if (priorityA !== priorityB) {
+      return priorityA - priorityB;
+    }
+    
+    // If same priority, sort by token symbol alphabetically
+    return tokenA.tokenSymbol.localeCompare(tokenB.tokenSymbol);
+  });
+});
+
+// Modal state for confirmation dialogs
+const confirmationModal = ref({
+  show: false,
+  title: '',
+  message: '',
+  extraData: '',
+  confirmButtonText: 'Confirm',
+  confirmButtonClass: 'btn-primary',
+  reasonPlaceholder: 'Please provide a reason for this action...',
+  submitting: false,
+  action: null as (() => Promise<void>) | null,
+  actionData: null as { principal: string; tokenName: string } | { type: string } | { type: string; intervalMinutes: number } | null
+});
+
 // Get store
 const tacoStore = useTacoStore();
 const { 
@@ -906,6 +1235,9 @@ const {
   fetchedVoterDetails,
   fetchedNeuronAllocations
 } = storeToRefs(tacoStore);
+
+// Destructure utility methods
+const { getPrincipalDisplayName, listTradingPauses } = tacoStore;
 
 // Update voting metrics state with type
 const votingMetrics = ref<VotingMetrics>({
@@ -926,17 +1258,15 @@ const uniqueComponents = computed(() => {
 
 // Timer status functions
 async function refreshTimerStatus() {
-    console.log('AdminView: refreshTimerStatus called');
-    await tacoStore.refreshTimerStatus();
-    console.log('AdminView: refreshTimerStatus completed');
+  console.log('AdminView: refreshTimerStatus called');
+  await tacoStore.refreshTimerStatus();
+  await fetchTradingPauses();
+  console.log('AdminView: refreshTimerStatus completed');
 }
 
 async function triggerManualSnapshot() {
     console.log('AdminView: triggerManualSnapshot called');
-    if (confirm('Are you sure you want to trigger a manual snapshot?')) {
-        await tacoStore.triggerManualSnapshot();
-        console.log('AdminView: Manual snapshot triggered');
-    }
+    showManualSnapshotConfirmation();
 }
 
 async function triggerManualSync() {
@@ -1029,7 +1359,9 @@ onMounted(async () => {
         refreshLogs(),
         refreshVotingMetrics(),
         refreshVoterDetails(),
-        refreshNeuronAllocations()
+        refreshNeuronAllocations(),
+        refreshPortfolioSnapshotStatus(),
+        refreshSystemParameters()
     ]);
     console.log('AdminView: Initial data loaded');
 });
@@ -1037,20 +1369,12 @@ onMounted(async () => {
 // New functions
 async function startRebalancing() {
     console.log('AdminView: startRebalancing called');
-    if (confirm('Are you sure you want to start the trading algorithm?')) {
-        await tacoStore.startRebalancing();
-        await refreshTimerStatus();
-        console.log('AdminView: Trading started');
-    }
+    showStartRebalancingConfirmation();
 }
 
 async function stopRebalancing() {
     console.log('AdminView: stopRebalancing called');
-    if (confirm('Are you sure you want to stop the trading algorithm?')) {
-        await tacoStore.stopRebalancing();
-        await refreshTimerStatus();
-        console.log('AdminView: Trading stopped');
-    }
+    showStopRebalancingConfirmation();
 }
 
 async function recoverPoolBalances() {
@@ -1198,38 +1522,39 @@ const validateInput = (field: string) => {
   isConfigValid.value = true; // Simplified for now
 };
 
-const updateConfig = async () => {
+const updateConfigWithReason = async (reason: string) => {
   if (!isConfigValid.value || !rebalanceConfig.value) return;
   
-  try {
-    // Update rebalance config
-    const updates = {
-      maxSlippageBasisPoints: [BigInt(Math.round(configInputs.value.maxSlippageBasisPoints * 100))],
-      minTradeValueICP: [BigInt(Math.round(configInputs.value.minTradeValueICP))],
-      maxTradeValueICP: [BigInt(Math.round(configInputs.value.maxTradeValueICP))],
-      maxTradesStored: [BigInt(Math.round(configInputs.value.maxTradesStored))],
-      maxTradeAttemptsPerInterval: [BigInt(Math.round(configInputs.value.maxTradeAttemptsPerInterval))],
-      maxKongswapAttempts: [BigInt(Math.round(configInputs.value.maxKongswapAttempts))],
-      rebalanceIntervalNS: [minutesToNs(configInputs.value.rebalanceIntervalMinutes)],
-      portfolioRebalancePeriodNS: [minutesToNs(configInputs.value.portfolioRebalancePeriodMinutes)],
-      shortSyncIntervalNS: [secondsToNs(configInputs.value.shortSyncIntervalSeconds)],
-      longSyncIntervalNS: [minutesToNs(configInputs.value.longSyncIntervalMinutes)],
-      tokenSyncTimeoutNS: [secondsToNs(configInputs.value.tokenSyncTimeoutSeconds)],
-      maxPriceHistoryEntries: configInputs.value.maxPriceHistoryEntries > 0 ? [BigInt(Math.round(configInputs.value.maxPriceHistoryEntries))] as [bigint] : [] as [],
-      priceUpdateIntervalNS: [] as []
-    };
-    
-    await tacoStore.updateRebalanceConfig(updates);
-    
-    // Update max portfolio snapshots separately if it changed
-    if (configInputs.value.maxPortfolioSnapshots !== originalMaxPortfolioSnapshots.value) {
-      await tacoStore.updateMaxPortfolioSnapshots(configInputs.value.maxPortfolioSnapshots);
-    }
-    
-    console.log('Configuration updated successfully');
-  } catch (error) {
-    console.error('Error updating configuration:', error);
+  // Update rebalance config
+  const updates = {
+    maxSlippageBasisPoints: [BigInt(Math.round(configInputs.value.maxSlippageBasisPoints * 100))] as [bigint],
+    minTradeValueICP: [BigInt(Math.round(configInputs.value.minTradeValueICP))] as [bigint],
+    maxTradeValueICP: [BigInt(Math.round(configInputs.value.maxTradeValueICP))] as [bigint],
+    maxTradesStored: [BigInt(Math.round(configInputs.value.maxTradesStored))] as [bigint],
+    maxTradeAttemptsPerInterval: [BigInt(Math.round(configInputs.value.maxTradeAttemptsPerInterval))] as [bigint],
+    maxKongswapAttempts: [BigInt(Math.round(configInputs.value.maxKongswapAttempts))] as [bigint],
+    rebalanceIntervalNS: [minutesToNs(configInputs.value.rebalanceIntervalMinutes)] as [bigint],
+    portfolioRebalancePeriodNS: [minutesToNs(configInputs.value.portfolioRebalancePeriodMinutes)] as [bigint],
+    shortSyncIntervalNS: [secondsToNs(configInputs.value.shortSyncIntervalSeconds)] as [bigint],
+    longSyncIntervalNS: [minutesToNs(configInputs.value.longSyncIntervalMinutes)] as [bigint],
+    tokenSyncTimeoutNS: configInputs.value.tokenSyncTimeoutSeconds > 0 ? [secondsToNs(configInputs.value.tokenSyncTimeoutSeconds)] as [bigint] : [] as [],
+    maxPriceHistoryEntries: configInputs.value.maxPriceHistoryEntries > 0 ? [BigInt(Math.round(configInputs.value.maxPriceHistoryEntries))] as [bigint] : [] as [],
+    priceUpdateIntervalNS: [] as []
+  };
+  
+  await tacoStore.updateRebalanceConfig(updates, reason);
+  
+  // Update max portfolio snapshots separately if it changed
+  if (configInputs.value.maxPortfolioSnapshots !== originalMaxPortfolioSnapshots.value) {
+    await tacoStore.updateMaxPortfolioSnapshots(configInputs.value.maxPortfolioSnapshots);
   }
+  
+  console.log('Configuration updated successfully');
+};
+
+const updateConfig = async () => {
+  // Legacy method - now just calls the confirmation dialog
+  showConfigUpdateConfirmation();
 };
 
 const resetConfig = () => {
@@ -1286,67 +1611,281 @@ async function refreshTradingLogs() {
 
 async function executeTradingCycle() {
   console.log('AdminView: executeTradingCycle called');
-  if (confirm('Are you sure you want to execute a trading cycle?')) {
-    try {
-      await tacoStore.executeTradingCycle();
-      await refreshTimerStatus();
-      console.log('AdminView: Trading cycle executed');
-    } catch (error) {
-      console.error('AdminView: Error executing trading cycle:', error);
-    }
-  }
+  showExecuteTradingCycleConfirmation();
 }
 
 // Add these functions
-const getTokenStatusClass = (token: any) => {
+// Helper function to get trading pause info for a token
+const getTradingPauseInfo = (tokenPrincipal: Principal) => {
+  const pause = tradingPauses.value.find(p => p.token.toString() === tokenPrincipal.toString());
+  if (!pause) return null;
+  
+  if ('PriceAlert' in pause.reason) {
+    return {
+      type: 'PriceAlert',
+      conditionName: pause.reason.PriceAlert.conditionName,
+      triggeredAt: pause.reason.PriceAlert.triggeredAt
+    };
+  } else if ('CircuitBreaker' in pause.reason) {
+    return {
+      type: 'CircuitBreaker',
+      reason: pause.reason.CircuitBreaker.reason,
+      severity: pause.reason.CircuitBreaker.severity,
+      triggeredAt: pause.reason.CircuitBreaker.triggeredAt
+    };
+  }
+  return null;
+};
+
+const getTokenStatusClass = (token: any, principal?: Principal) => {
   if (!token.Active) return 'inactive';
-  if (token.isPaused || token.pausedDueToSyncFailure) return 'paused';
+  
+  const tradingPause = principal ? getTradingPauseInfo(principal) : null;
+  if (tradingPause) {
+    if (tradingPause.type === 'PriceAlert') return 'paused price-alert';
+    if (tradingPause.type === 'CircuitBreaker') return 'paused circuit-breaker';
+  }
+  
+  if (token.isPaused) return 'paused manual';
+  if (token.pausedDueToSyncFailure) return 'paused sync-failure';
+  
   return 'active';
 };
 
-const getTokenStatusText = (token: any) => {
+const getTokenStatusText = (token: any, principal?: Principal) => {
   if (!token.Active) return '(Inactive)';
   
   let statuses = [];
   if (token.isPaused) statuses.push('Manually Paused');
   if (token.pausedDueToSyncFailure) statuses.push('Sync Failed');
   
+  if (principal) {
+    const tradingPause = getTradingPauseInfo(principal);
+    if (tradingPause) {
+      if (tradingPause.type === 'PriceAlert') {
+        statuses.push(`Price Alert: ${tradingPause.conditionName}`);
+      } else if (tradingPause.type === 'CircuitBreaker') {
+        statuses.push(`Circuit Breaker: ${tradingPause.reason}`);
+      }
+    }
+  }
+  
   return statuses.length ? `(${statuses.join(', ')})` : '';
 };
 
-async function pauseToken(principal: Principal) {
-    console.log('AdminView: pauseToken called');
-    if (confirm('Are you sure you want to pause this token?')) {
-        try {
-            const success = await tacoStore.pauseToken(principal);
-            if (success) {
-                await refreshTimerStatus();
-                console.log('AdminView: Token paused successfully');
-            } else {
-                console.error('AdminView: Failed to pause token');
-            }
-        } catch (error) {
-            console.error('AdminView: Error pausing token:', error);
-        }
-    }
-}
+// Modal helper functions
+const showPauseConfirmation = (principal: string, tokenName: string) => {
+  confirmationModal.value = {
+    show: true,
+    title: 'Pause Token',
+    message: `Are you sure you want to pause ${tokenName}?`,
+    extraData: `Principal: ${principal}`,
+    confirmButtonText: 'Pause Token',
+    confirmButtonClass: 'btn-warning',
+    reasonPlaceholder: 'Please explain why this token should be paused...',
+    submitting: false,
+    action: null,
+    actionData: { principal, tokenName }
+  };
+};
 
-async function unpauseToken(principal: Principal) {
-    console.log('AdminView: unpauseToken called');
-    if (confirm('Are you sure you want to unpause this token?')) {
-        try {
-            const success = await tacoStore.unpauseToken(principal);
-            if (success) {
-                await refreshTimerStatus();
-                console.log('AdminView: Token unpaused successfully');
-            } else {
-                console.error('AdminView: Failed to unpause token');
-            }
-        } catch (error) {
-            console.error('AdminView: Error unpausing token:', error);
-        }
+const showUnpauseConfirmation = (principal: string, tokenName: string) => {
+  confirmationModal.value = {
+    show: true,
+    title: 'Unpause Token',
+    message: `Are you sure you want to unpause ${tokenName}?`,
+    extraData: `Principal: ${principal}`,
+    confirmButtonText: 'Unpause Token',
+    confirmButtonClass: 'btn-success',
+    reasonPlaceholder: 'Please explain why this token should be unpaused...',
+    submitting: false,
+    action: null,
+    actionData: { principal, tokenName }
+  };
+};
+
+const showConfigUpdateConfirmation = () => {
+  confirmationModal.value = {
+    show: true,
+    title: 'Update Configuration',
+    message: 'Are you sure you want to update the rebalance configuration?',
+    extraData: 'This will change how the Treasury manages rebalancing operations.',
+    confirmButtonText: 'Update Configuration',
+    confirmButtonClass: 'btn-primary',
+    reasonPlaceholder: 'Please explain why this configuration change is needed...',
+    submitting: false,
+    action: null,
+    actionData: { type: 'configUpdate' }
+  };
+};
+
+const showStartRebalancingConfirmation = () => {
+  confirmationModal.value = {
+    show: true,
+    title: 'Start Trading',
+    message: 'Are you sure you want to start the trading algorithm?',
+    extraData: 'This will enable automatic trading and rebalancing operations.',
+    confirmButtonText: 'Start Trading',
+    confirmButtonClass: 'btn-success',
+    reasonPlaceholder: 'Please explain why trading is being started...',
+    submitting: false,
+    action: null,
+    actionData: { type: 'startRebalancing' }
+  };
+};
+
+const showStopRebalancingConfirmation = () => {
+  confirmationModal.value = {
+    show: true,
+    title: 'Stop Trading',
+    message: 'Are you sure you want to stop the trading algorithm?',
+    extraData: 'This will disable automatic trading and rebalancing operations.',
+    confirmButtonText: 'Stop Trading',
+    confirmButtonClass: 'btn-danger',
+    reasonPlaceholder: 'Please explain why trading is being stopped...',
+    submitting: false,
+    action: null,
+    actionData: { type: 'stopRebalancing' }
+  };
+};
+
+const showManualSnapshotConfirmation = () => {
+  confirmationModal.value = {
+    show: true,
+    title: 'Trigger Manual Snapshot',
+    message: 'Are you sure you want to trigger a manual portfolio snapshot?',
+    extraData: 'This will capture the current state of all portfolio positions.',
+    confirmButtonText: 'Take Snapshot',
+    confirmButtonClass: 'btn-warning',
+    reasonPlaceholder: 'Please explain why a manual snapshot is needed...',
+    submitting: false,
+    action: null,
+    actionData: { type: 'manualSnapshot' }
+  };
+};
+
+const showExecuteTradingCycleConfirmation = () => {
+  confirmationModal.value = {
+    show: true,
+    title: 'Execute Trading Cycle',
+    message: 'Are you sure you want to execute a manual trading cycle?',
+    extraData: 'This will immediately run one complete trading cycle regardless of the current schedule.',
+    confirmButtonText: 'Execute Cycle',
+    confirmButtonClass: 'btn-warning',
+    reasonPlaceholder: 'Please explain why a manual trading cycle is needed...',
+    submitting: false,
+    action: null,
+    actionData: { type: 'executeTradingCycle' }
+  };
+};
+
+const hideConfirmationModal = () => {
+  confirmationModal.value.show = false;
+  confirmationModal.value.submitting = false;
+  confirmationModal.value.action = null;
+  confirmationModal.value.actionData = null;
+};
+
+const handleConfirmAction = async (reason: string) => {
+  if (!confirmationModal.value.actionData) return;
+  
+  confirmationModal.value.submitting = true;
+  
+  try {
+    let success = false;
+    const actionData = confirmationModal.value.actionData as any;
+    
+    if (confirmationModal.value.title === 'Update Configuration') {
+      // Handle configuration update
+      await updateConfigWithReason(reason);
+      success = true;
+    } else if (actionData.type === 'startRebalancing') {
+      // Handle start trading
+      success = await tacoStore.startRebalancing(reason);
+      if (success) {
+        await refreshTimerStatus();
+        console.log('AdminView: Trading started');
+      }
+    } else if (actionData.type === 'stopRebalancing') {
+      // Handle stop trading
+      success = await tacoStore.stopRebalancing(reason);
+      if (success) {
+        await refreshTimerStatus();
+        console.log('AdminView: Trading stopped');
+      }
+    } else if (actionData.type === 'manualSnapshot') {
+      // Handle manual snapshot
+      await tacoStore.takeManualPortfolioSnapshot(reason);
+      console.log('AdminView: Manual snapshot triggered');
+      success = true;
+    } else if (actionData.type === 'executeTradingCycle') {
+      // Handle execute trading cycle
+      await tacoStore.executeTradingCycle(reason);
+      await refreshTimerStatus();
+      console.log('AdminView: Trading cycle executed');
+      success = true;
+    } else if (actionData.type === 'updateSnapshotInterval') {
+      // Handle update snapshot interval
+      await updateSnapshotInterval(reason);
+      console.log('AdminView: Snapshot interval updated');
+      success = true;
+    } else if (actionData.type === 'startPortfolioSnapshots') {
+      // Handle start portfolio snapshots
+      success = await tacoStore.startPortfolioSnapshots(reason);
+      if (success) {
+        await refreshPortfolioSnapshotStatus();
+        console.log('AdminView: Portfolio snapshots started');
+      }
+    } else if (actionData.type === 'stopPortfolioSnapshots') {
+      // Handle stop portfolio snapshots
+      success = await tacoStore.stopPortfolioSnapshots(reason);
+      if (success) {
+        await refreshPortfolioSnapshotStatus();
+        console.log('AdminView: Portfolio snapshots stopped');
+      }
+    } else if (actionData.type === 'updatePortfolioSnapshotInterval') {
+      // Handle update portfolio snapshot interval
+      success = await tacoStore.updatePortfolioSnapshotInterval(actionData.intervalMinutes, reason);
+      if (success) {
+        await refreshPortfolioSnapshotStatus();
+        console.log('AdminView: Portfolio snapshot interval updated');
+      }
+    } else if (actionData.type === 'updateSystemParameters') {
+      // Handle system parameters update
+      success = await updateSystemParameters(reason);
+      if (success) {
+        console.log('AdminView: System parameters updated');
+      }
+    } else if (actionData.principal && actionData.tokenName) {
+      // Handle token pause/unpause actions
+      const { principal, tokenName } = actionData;
+      
+      if (confirmationModal.value.title === 'Pause Token') {
+        success = await tacoStore.pauseToken(Principal.fromText(principal), reason);
+      } else if (confirmationModal.value.title === 'Unpause Token') {
+        success = await tacoStore.unpauseToken(Principal.fromText(principal), reason);
+      }
+      
+      if (success) {
+        await refreshTimerStatus();
+      }
     }
-}
+    
+    if (success) {
+      console.log(`AdminView: ${confirmationModal.value.title} completed successfully`);
+      hideConfirmationModal();
+    } else {
+      console.error(`AdminView: Failed to ${confirmationModal.value.title.toLowerCase()}`);
+      // Keep modal open to show error state
+      confirmationModal.value.submitting = false;
+    }
+  } catch (error) {
+    console.error(`AdminView: Error in ${confirmationModal.value.title}:`, error);
+    confirmationModal.value.submitting = false;
+  }
+};
+
+// Legacy pauseToken and unpauseToken functions replaced by modal approach above
 
 // Add refreshVotingMetrics function
 const refreshVotingMetrics = async () => {
@@ -1533,6 +2072,30 @@ function uint8ArrayToHex(array: Uint8Array): string {
 // Add new function for updating snapshot interval
 const snapshotIntervalMinutes = ref(15); // Default to 15 minutes
 
+// Portfolio snapshot management
+const portfolioSnapshotStatus = ref({
+  status: { Stopped: null } as { Running: null } | { Stopped: null },
+  intervalMinutes: 60,
+  lastSnapshotTime: 0
+});
+const newPortfolioSnapshotInterval = ref(60);
+
+// System Parameters
+const systemParametersData = ref(null as any);
+const systemParametersInputs = ref({
+  FollowDepth: 1,
+  MaxFollowed: 3,
+  MaxFollowUnfollowActionsPerDay: 10,
+  MaxAllocationsPerDay: 5,
+  AllocationWindowHours: 24,
+  MaxFollowers: 500,
+  MaxTotalUpdates: 2000,
+  MaxPastAllocations: 100
+});
+const originalSystemParameters = ref({} as any);
+const isSystemParametersValid = ref(true);
+const hasSystemParametersChanges = ref(false);
+
 // Add refresh user voting power function
 async function refreshUserVotingPower() {
     refreshingVP.value = true;
@@ -1546,13 +2109,100 @@ async function refreshUserVotingPower() {
     }
 }
 
-async function updateSnapshotInterval() {
+// Portfolio snapshot management functions
+async function refreshPortfolioSnapshotStatus() {
+    try {
+        const status = await tacoStore.getPortfolioSnapshotStatus();
+        portfolioSnapshotStatus.value = status;
+        newPortfolioSnapshotInterval.value = status.intervalMinutes;
+        console.log('AdminView: Portfolio snapshot status refreshed');
+    } catch (error) {
+        console.error('AdminView: Error refreshing portfolio snapshot status:', error);
+    }
+}
+
+function showStartPortfolioSnapshotsConfirmation() {
+    confirmationModal.value = {
+        show: true,
+        title: 'Start Portfolio Snapshots',
+        message: 'Are you sure you want to start automatic portfolio snapshots?',
+        extraData: '',
+        confirmButtonText: 'Start',
+        confirmButtonClass: 'btn-success',
+        reasonPlaceholder: 'Please provide a reason for starting portfolio snapshots...',
+        submitting: false,
+        action: null,
+        actionData: { type: 'startPortfolioSnapshots' }
+    };
+}
+
+function showStopPortfolioSnapshotsConfirmation() {
+    confirmationModal.value = {
+        show: true,
+        title: 'Stop Portfolio Snapshots',
+        message: 'Are you sure you want to stop automatic portfolio snapshots?',
+        extraData: '',
+        confirmButtonText: 'Stop',
+        confirmButtonClass: 'btn-danger',
+        reasonPlaceholder: 'Please provide a reason for stopping portfolio snapshots...',
+        submitting: false,
+        action: null,
+        actionData: { type: 'stopPortfolioSnapshots' }
+    };
+}
+
+function showUpdatePortfolioSnapshotIntervalConfirmation() {
+    confirmationModal.value = {
+        show: true,
+        title: 'Update Portfolio Snapshot Interval',
+        message: `Are you sure you want to update the portfolio snapshot interval to ${newPortfolioSnapshotInterval.value} minutes?`,
+        extraData: '',
+        confirmButtonText: 'Update',
+        confirmButtonClass: 'btn-primary',
+        reasonPlaceholder: 'Please provide a reason for updating the interval...',
+        submitting: false,
+        action: null,
+        actionData: { 
+            type: 'updatePortfolioSnapshotInterval',
+            intervalMinutes: newPortfolioSnapshotInterval.value
+        }
+    };
+}
+
+// Fetch trading pauses
+const fetchTradingPauses = async () => {
+    try {
+        const result = await listTradingPauses();
+        tradingPauses.value = result.pausedTokens;
+        console.log('AdminView: Trading pauses fetched:', result.pausedTokens.length);
+    } catch (error) {
+        console.error('AdminView: Error fetching trading pauses:', error);
+        tradingPauses.value = [];
+    }
+};
+
+const showUpdateSnapshotIntervalConfirmation = () => {
+  if (!snapshotIntervalMinutes.value || snapshotIntervalMinutes.value < 1) return;
+  
+  confirmationModal.value = {
+    show: true,
+    title: 'Update Snapshot Interval',
+    message: `Are you sure you want to update the snapshot interval to ${snapshotIntervalMinutes.value} minutes?`,
+    extraData: 'This will change how frequently the system takes snapshots of token balances and prices.',
+    confirmText: 'Update Interval',
+    cancelText: 'Cancel',
+    requireReason: true,
+    actionData: { type: 'updateSnapshotInterval' }
+  };
+};
+
+async function updateSnapshotInterval(reason?: string) {
   if (!snapshotIntervalMinutes.value || snapshotIntervalMinutes.value < 1) return;
   
   try {
     // Convert minutes to nanoseconds
     const intervalNS = BigInt(snapshotIntervalMinutes.value) * 60n * 1_000_000_000n;
-    await tacoStore.updateSnapshotInterval(intervalNS);
+    await tacoStore.updateSnapshotInterval(intervalNS, reason);
     await refreshTimerStatus();
   } catch (error) {
     console.error('Error updating snapshot interval:', error);
@@ -1563,5 +2213,216 @@ function calculateNextExpectedSnapshot(): bigint | null {
   if (!snapshotStatus.value.lastSnapshotTime) return null;
   const intervalNS = BigInt(snapshotIntervalMinutes.value) * 60n * 1_000_000_000n;
   return snapshotStatus.value.lastSnapshotTime + intervalNS;
+}
+
+// Helper function to create vote history link
+const createVoteHistoryLink = (principal: Principal | string): string => {
+  const principalStr = typeof principal === 'string' ? principal : principal.toString();
+  return `/admin/votes?principal=${encodeURIComponent(principalStr)}`;
+};
+
+// Trading bot warning logic
+const getTradingBotWarning = (): { level: 'none' | 'warning' | 'danger', message: string } => {
+  if (!timerHealth.value.treasury.tradingMetrics?.lastRebalanceAttempt || !rebalanceConfig.value?.rebalanceIntervalNS) {
+    return { level: 'none', message: '' };
+  }
+
+  const now = Date.now() * 1_000_000; // Convert to nanoseconds
+  const lastAttempt = Number(timerHealth.value.treasury.tradingMetrics.lastRebalanceAttempt);
+  const intervalNS = Number(rebalanceConfig.value.rebalanceIntervalNS);
+  const timeSinceLastAttempt = now - lastAttempt;
+  const periodsSinceLastAttempt = timeSinceLastAttempt / intervalNS;
+
+  if (periodsSinceLastAttempt > 5) {
+    const periodsOverdue = Math.floor(periodsSinceLastAttempt);
+    return { 
+      level: 'danger', 
+      message: `⚠️ Trading bot is ${periodsOverdue} periods overdue! Last attempt was ${Math.floor(periodsSinceLastAttempt)} intervals ago.` 
+    };
+  } else if (periodsSinceLastAttempt > 2) {
+    const periodsOverdue = Math.floor(periodsSinceLastAttempt);
+    return { 
+      level: 'warning', 
+      message: `⚠️ Trading bot is ${periodsOverdue} periods overdue. Last attempt was ${Math.floor(periodsSinceLastAttempt)} intervals ago.` 
+    };
+  }
+
+  return { level: 'none', message: '' };
+};
+
+// System Parameters Functions
+async function refreshSystemParameters() {
+  try {
+    const params = await tacoStore.getSystemParameters();
+    systemParametersData.value = params;
+    
+    // Convert parameters to input format
+    const inputs = { ...systemParametersInputs.value };
+    
+    if (params && Array.isArray(params)) {
+      params.forEach((param: any) => {
+        if ('FollowDepth' in param) inputs.FollowDepth = Number(param.FollowDepth);
+        else if ('MaxFollowed' in param) inputs.MaxFollowed = Number(param.MaxFollowed);
+        else if ('MaxFollowUnfollowActionsPerDay' in param) inputs.MaxFollowUnfollowActionsPerDay = Number(param.MaxFollowUnfollowActionsPerDay);
+        else if ('MaxAllocationsPerDay' in param) inputs.MaxAllocationsPerDay = Number(param.MaxAllocationsPerDay);
+        else if ('AllocationWindow' in param) inputs.AllocationWindowHours = Number(param.AllocationWindow) / (60 * 60 * 1_000_000_000);
+        else if ('MaxFollowers' in param) inputs.MaxFollowers = Number(param.MaxFollowers);
+        else if ('MaxTotalUpdates' in param) inputs.MaxTotalUpdates = Number(param.MaxTotalUpdates);
+        else if ('MaxPastAllocations' in param) inputs.MaxPastAllocations = Number(param.MaxPastAllocations);
+      });
+    }
+    
+    systemParametersInputs.value = inputs;
+    originalSystemParameters.value = { ...inputs };
+    hasSystemParametersChanges.value = false;
+    
+    console.log('AdminView: System parameters refreshed');
+  } catch (error) {
+    console.error('AdminView: Error refreshing system parameters:', error);
+  }
+}
+
+function validateSystemParameterInput(field: string) {
+  const value = (systemParametersInputs.value as any)[field];
+  let isValid = true;
+  
+  switch (field) {
+    case 'FollowDepth':
+      isValid = value >= 1 && value <= 3;
+      break;
+    case 'MaxFollowed':
+      isValid = value >= 1 && value <= 10;
+      break;
+    case 'MaxFollowUnfollowActionsPerDay':
+      isValid = value >= 9 && value <= 100;
+      break;
+    case 'MaxAllocationsPerDay':
+      isValid = value >= 1 && value <= 10;
+      break;
+    case 'AllocationWindowHours':
+      isValid = value >= 1 && value <= 168;
+      break;
+    case 'MaxFollowers':
+      isValid = value >= 50 && value <= 5000;
+      break;
+    case 'MaxTotalUpdates':
+      isValid = value >= 200 && value <= 10000;
+      break;
+    case 'MaxPastAllocations':
+      isValid = value >= 20 && value <= 500;
+      break;
+  }
+  
+  // Update validation state
+  checkSystemParametersChanges();
+  
+  return isValid;
+}
+
+function checkSystemParametersChanges() {
+  const current = systemParametersInputs.value as any;
+  const original = originalSystemParameters.value as any;
+  
+  hasSystemParametersChanges.value = Object.keys(current).some(key => current[key] !== original[key]);
+  
+  // Validate all fields
+  isSystemParametersValid.value = 
+    current.FollowDepth >= 1 && current.FollowDepth <= 3 &&
+    current.MaxFollowed >= 1 && current.MaxFollowed <= 10 &&
+    current.MaxFollowUnfollowActionsPerDay >= 9 && current.MaxFollowUnfollowActionsPerDay <= 100 &&
+    current.MaxAllocationsPerDay >= 1 && current.MaxAllocationsPerDay <= 10 &&
+    current.AllocationWindowHours >= 1 && current.AllocationWindowHours <= 168 &&
+    current.MaxFollowers >= 50 && current.MaxFollowers <= 5000 &&
+    current.MaxTotalUpdates >= 200 && current.MaxTotalUpdates <= 10000 &&
+    current.MaxPastAllocations >= 20 && current.MaxPastAllocations <= 500;
+}
+
+function resetSystemParameters() {
+  systemParametersInputs.value = { ...originalSystemParameters.value as any };
+  hasSystemParametersChanges.value = false;
+  isSystemParametersValid.value = true;
+}
+
+function showSystemParametersUpdateConfirmation() {
+  if (!isSystemParametersValid.value || !hasSystemParametersChanges.value) return;
+  
+  const changes: string[] = [];
+  const current = systemParametersInputs.value as any;
+  const original = originalSystemParameters.value as any;
+  
+  Object.keys(current).forEach(key => {
+    if (current[key] !== original[key]) {
+      changes.push(`${key}: ${original[key]} → ${current[key]}`);
+    }
+  });
+  
+  confirmationModal.value = {
+    show: true,
+    title: 'Update System Parameters',
+    message: `Are you sure you want to update these system parameters?\n\n${changes.join('\n')}`,
+    extraData: '',
+    confirmButtonText: 'Update Parameters',
+    confirmButtonClass: 'btn-primary',
+    reasonPlaceholder: 'Please provide a reason for updating system parameters...',
+    submitting: false,
+    action: null,
+    actionData: { type: 'updateSystemParameters' }
+  };
+}
+
+async function updateSystemParameters(reason?: string) {
+  try {
+    const current = systemParametersInputs.value as any;
+    const original = originalSystemParameters.value as any;
+    
+    // Update each changed parameter
+    for (const [key, value] of Object.entries(current)) {
+      if (value !== original[key]) {
+        let success = false;
+        
+        switch (key) {
+          case 'FollowDepth':
+            success = await tacoStore.updateSystemParameter({ FollowDepth: BigInt(value) }, reason);
+            break;
+          case 'MaxFollowed':
+            success = await tacoStore.updateSystemParameter({ MaxFollowed: BigInt(value) }, reason);
+            break;
+          case 'MaxFollowUnfollowActionsPerDay':
+            success = await tacoStore.updateSystemParameter({ MaxFollowUnfollowActionsPerDay: BigInt(value) }, reason);
+            break;
+          case 'MaxAllocationsPerDay':
+            success = await tacoStore.updateSystemParameter({ MaxAllocationsPerDay: BigInt(value) }, reason);
+            break;
+          case 'AllocationWindowHours':
+            const windowNS = BigInt(value) * 60n * 60n * 1_000_000_000n;
+            success = await tacoStore.updateSystemParameter({ AllocationWindow: windowNS }, reason);
+            break;
+          case 'MaxFollowers':
+            success = await tacoStore.updateSystemParameter({ MaxFollowers: BigInt(value) }, reason);
+            break;
+          case 'MaxTotalUpdates':
+            success = await tacoStore.updateSystemParameter({ MaxTotalUpdates: BigInt(value) }, reason);
+            break;
+          case 'MaxPastAllocations':
+            success = await tacoStore.updateSystemParameter({ MaxPastAllocations: BigInt(value) }, reason);
+            break;
+        }
+        
+        if (!success) {
+          throw new Error(`Failed to update ${key}`);
+        }
+      }
+    }
+    
+    // Refresh parameters after successful update
+    await refreshSystemParameters();
+    
+    console.log('AdminView: System parameters updated successfully');
+    return true;
+    
+  } catch (error) {
+    console.error('AdminView: Error updating system parameters:', error);
+    return false;
+  }
 }
 </script>

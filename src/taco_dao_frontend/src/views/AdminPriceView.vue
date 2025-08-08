@@ -555,6 +555,20 @@
       </div>
     </div>
   </div>
+  
+  <!-- Confirmation Modal for Admin Actions -->
+  <AdminConfirmationModal
+    :show="confirmationModal.show"
+    :title="confirmationModal.title"
+    :message="confirmationModal.message"
+    :extra-data="confirmationModal.extraData"
+    :confirm-button-text="confirmationModal.confirmButtonText"
+    :confirm-button-class="confirmationModal.confirmButtonClass"
+    :reason-placeholder="confirmationModal.reasonPlaceholder"
+    :submitting="confirmationModal.submitting"
+    @confirm="handleConfirmAction"
+    @cancel="hideConfirmationModal"
+  />
 </template>
 
 <script setup lang="ts">
@@ -562,6 +576,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useTacoStore } from '../stores/taco.store'
 import HeaderBar from '../components/HeaderBar.vue'
 import TacoTitle from '../components/misc/TacoTitle.vue'
+import AdminConfirmationModal from '../components/admin/AdminConfirmationModal.vue'
 import { Principal } from '@dfinity/principal'
 
 interface PriceDirection {
@@ -620,6 +635,20 @@ const submittingPortfolio = ref(false)
 const showAddModal = ref(false)
 const showManualPauseModal = ref(false)
 const showAddPortfolioModal = ref(false)
+
+// Confirmation modal state
+const confirmationModal = ref({
+  show: false,
+  title: '',
+  message: '',
+  extraData: '',
+  confirmButtonText: '',
+  confirmButtonClass: '',
+  reasonPlaceholder: '',
+  submitting: false,
+  action: null,
+  actionData: null
+})
 const newCondition = ref({
   name: '',
   direction: 'Up',
@@ -769,25 +798,11 @@ const refreshTradingPauses = async () => {
 }
 
 const unpauseToken = async (token: any) => {
-  if (!confirm('Are you sure you want to unpause this token from trading?')) return
-  
-  try {
-    await store.unpauseTokenFromTrading(token)
-    await refreshTradingPauses()
-  } catch (error) {
-    console.error('Failed to unpause token:', error)
-  }
+  showUnpauseTokenConfirmation(token)
 }
 
 const clearAllTradingPauses = async () => {
-  if (!confirm('Are you sure you want to clear ALL trading pauses?')) return
-  
-  try {
-    await store.clearAllTradingPauses()
-    tradingPauses.value = []
-  } catch (error) {
-    console.error('Failed to clear all trading pauses:', error)
-  }
+  showClearAllTradingPausesConfirmation()
 }
 
 const getPauseReasonText = (reason: any) => {
@@ -934,6 +949,81 @@ const closePortfolioModal = () => {
     timeValue: 2,
     timeUnit: 'hours',
     valueType: 'USD'
+  }
+}
+
+// Confirmation modal functions
+const showUnpauseTokenConfirmation = (token: any) => {
+  const tokenSymbol = getTokenSymbol(token)
+  confirmationModal.value = {
+    show: true,
+    title: 'Unpause Token',
+    message: `Are you sure you want to unpause ${tokenSymbol} from trading?`,
+    extraData: 'This will allow the token to resume trading operations.',
+    confirmButtonText: 'Unpause Token',
+    confirmButtonClass: 'btn-success',
+    reasonPlaceholder: 'Please explain why this token is being unpaused...',
+    submitting: false,
+    action: null,
+    actionData: { type: 'unpauseToken', token, tokenSymbol }
+  }
+}
+
+const showClearAllTradingPausesConfirmation = () => {
+  confirmationModal.value = {
+    show: true,
+    title: 'Clear All Trading Pauses',
+    message: 'Are you sure you want to clear ALL trading pauses?',
+    extraData: `This will unpause ${tradingPauses.value.length} token(s) and allow them to resume trading.`,
+    confirmButtonText: 'Clear All Pauses',
+    confirmButtonClass: 'btn-danger',
+    reasonPlaceholder: 'Please explain why all trading pauses are being cleared...',
+    submitting: false,
+    action: null,
+    actionData: { type: 'clearAllTradingPauses' }
+  }
+}
+
+const hideConfirmationModal = () => {
+  confirmationModal.value.show = false
+  confirmationModal.value.submitting = false
+  confirmationModal.value.action = null
+  confirmationModal.value.actionData = null
+}
+
+const handleConfirmAction = async (reason: string) => {
+  if (!confirmationModal.value.actionData) return
+  
+  confirmationModal.value.submitting = true
+  
+  try {
+    let success = false
+    const actionData = confirmationModal.value.actionData as any
+    
+    if (actionData.type === 'unpauseToken') {
+      // Handle unpause token
+      await store.unpauseTokenFromTrading(actionData.token, reason)
+      await refreshTradingPauses()
+      console.log('Token unpaused successfully')
+      success = true
+    } else if (actionData.type === 'clearAllTradingPauses') {
+      // Handle clear all trading pauses
+      await store.clearAllTradingPauses(reason)
+      tradingPauses.value = []
+      console.log('All trading pauses cleared successfully')
+      success = true
+    }
+    
+    if (success) {
+      console.log(`AdminPriceView: ${confirmationModal.value.title} completed successfully`)
+      hideConfirmationModal()
+    } else {
+      console.error(`AdminPriceView: Failed to ${confirmationModal.value.title.toLowerCase()}`)
+      confirmationModal.value.submitting = false
+    }
+  } catch (error) {
+    console.error(`AdminPriceView: Error in ${confirmationModal.value.title}:`, error)
+    confirmationModal.value.submitting = false
   }
 }
 

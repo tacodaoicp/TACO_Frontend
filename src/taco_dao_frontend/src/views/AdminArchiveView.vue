@@ -26,6 +26,9 @@
                     <option value="trading_archive">📈 Trading Archive</option>
                     <option value="portfolio_archive">💼 Portfolio Archive</option>
                     <option value="price_archive">💰 Price Archive</option>
+                    <option value="dao_admin_archive">🔑 DAO Admin Archive</option>
+                    <option value="dao_allocation_archive">📊 DAO Allocation Archive</option>
+                    <option value="dao_governance_archive">🗳️ DAO Governance Archive</option>
                   </select>
                 </div>
                 <div class="col-md-6 d-flex align-items-end">
@@ -174,6 +177,60 @@
                       🔄 Reset Timestamps
                     </button>
                   </div>
+                  
+                  <!-- Archive-Specific Import Buttons -->
+                  <div v-if="selectedArchive === 'dao_admin_archive'" class="mt-3">
+                    <h6>DAO Admin Archive</h6>
+                    <div class="d-flex flex-wrap gap-2">
+                      <button 
+                        class="btn btn-sm btn-outline-primary" 
+                        @click="runArchiveSpecificImport('importAdminActions')"
+                        :disabled="loading"
+                      >
+                        📝 Import Admin Actions
+                      </button>
+                    </div>
+                  </div>
+                  
+                  <div v-if="selectedArchive === 'dao_allocation_archive'" class="mt-3">
+                    <h6>DAO Allocation Archive</h6>
+                    <div class="d-flex flex-wrap gap-2">
+                      <button 
+                        class="btn btn-sm btn-outline-info" 
+                        @click="runArchiveSpecificImport('importAllocationChanges')"
+                        :disabled="loading"
+                      >
+                        📊 Import Allocation Changes
+                      </button>
+                      <button 
+                        class="btn btn-sm btn-outline-info" 
+                        @click="runArchiveSpecificImport('importFollowActions')"
+                        :disabled="loading"
+                      >
+                        👥 Import Follow Actions
+                      </button>
+                    </div>
+                  </div>
+                  
+                  <div v-if="selectedArchive === 'dao_governance_archive'" class="mt-3">
+                    <h6>DAO Governance Archive</h6>
+                    <div class="d-flex flex-wrap gap-2">
+                      <button 
+                        class="btn btn-sm btn-outline-secondary" 
+                        @click="runArchiveSpecificImport('importVotingPowerChanges')"
+                        :disabled="loading"
+                      >
+                        🗳️ Import Voting Power
+                      </button>
+                      <button 
+                        class="btn btn-sm btn-outline-secondary" 
+                        @click="runArchiveSpecificImport('importNeuronUpdates')"
+                        :disabled="loading"
+                      >
+                        🧠 Import Neuron Updates
+                      </button>
+                    </div>
+                  </div>
                 </div>
               </div>
 
@@ -235,12 +292,21 @@
           <!-- Recent Logs -->
           <div class="card bg-dark text-white mb-4">
             <div class="card-header d-flex justify-content-between align-items-center">
-              <h3 class="mb-0">Recent Logs</h3>
+              <div class="d-flex align-items-center">
+                <button 
+                  class="btn btn-sm btn-outline-secondary me-2" 
+                  @click="showRecentLogs = !showRecentLogs"
+                  :title="showRecentLogs ? 'Collapse Recent Logs' : 'Expand Recent Logs'"
+                >
+                  <i :class="showRecentLogs ? 'fas fa-chevron-down' : 'fas fa-chevron-right'"></i>
+                </button>
+                <h3 class="mb-0">Recent Logs</h3>
+              </div>
               <button class="btn btn-sm btn-outline-primary" @click="refreshLogs">
                 Refresh Logs
               </button>
             </div>
-            <div class="card-body">
+            <div class="card-body" v-show="showRecentLogs">
               <div v-if="logs.length === 0" class="text-muted text-center">
                 No logs available
               </div>
@@ -459,6 +525,9 @@ import ApexCharts from 'apexcharts'
 import { createActor as createTradingActor } from '../../../declarations/trading_archive'
 import { createActor as createPortfolioActor } from '../../../declarations/portfolio_archive'
 import { createActor as createPriceActor } from '../../../declarations/price_archive'
+import { createActor as createDaoAdminActor } from '../../../declarations/dao_admin_archive'
+import { createActor as createDaoAllocationActor } from '../../../declarations/dao_allocation_archive'
+import { createActor as createDaoGovernanceActor } from '../../../declarations/dao_governance_archive'
 
 export default {
   name: 'AdminArchiveView',
@@ -474,6 +543,7 @@ export default {
       legacyStatus: null,
       archiveStatus: null,
       logs: [],
+      showRecentLogs: false, // Default to collapsed
       errorMessage: '',
       successMessage: '',
       showConfigModal: false,
@@ -483,6 +553,9 @@ export default {
       tradingActor: null,
       portfolioActor: null,
       priceActor: null,
+      daoAdminActor: null,
+      daoAllocationActor: null,
+      daoGovernanceActor: null,
       
       // Refresh interval
       refreshInterval: null,
@@ -497,7 +570,17 @@ export default {
       showRawJson: [],
       
       // Portfolio Charts - store multiple instances by ID
-      portfolioCharts: new Map()
+      portfolioCharts: new Map(),
+      
+      // Fetch states for allocation cards
+      fetchStates: new Map(), // blockId -> { votingPower: 'loading'|'loaded'|'error', previousAllocation: 'loading'|'loaded'|'error' }
+      fetchedData: new Map(),  // blockId -> { votingPower: number, previousAllocation: allocation, allPreviousAllocations: [allocations] }
+      
+      // Simple voting power display for each block (reactive)
+      votingPowerDisplays: {},
+      
+      // Simple previous allocation display for each block (reactive)
+      previousAllocationDisplays: {}
     }
   },
   computed: {
@@ -507,6 +590,9 @@ export default {
         case 'trading_archive': return this.tradingActor
         case 'portfolio_archive': return this.portfolioActor
         case 'price_archive': return this.priceActor
+        case 'dao_admin_archive': return this.daoAdminActor
+        case 'dao_allocation_archive': return this.daoAllocationActor
+        case 'dao_governance_archive': return this.daoGovernanceActor
         default: return this.tradingActor
       }
     }
@@ -515,6 +601,13 @@ export default {
     // Alternative approach: You could use JSON.stringify with a replacer like this:
     // JSON.stringify(someObject, (key, value) => typeof value === 'bigint' ? Number(value) : value)
     // But for Vue reactivity, it's better to convert the data upfront as we're doing
+    
+    // Load naming system data for principal and neuron names
+    try {
+      await this.tacoStore.loadAllNames()
+    } catch (error) {
+      console.warn('Failed to load naming system data:', error)
+    }
     
     // Create archive actors
     await this.createArchiveActors()
@@ -529,11 +622,17 @@ export default {
     this.refreshInterval = setInterval(() => {
       this.refreshStatus()
     }, 10000)
+    
+    // Add event delegation for fetch buttons
+    document.addEventListener('click', this.handleFetchButtonClick)
   },
   beforeUnmount() {
     if (this.refreshInterval) {
       clearInterval(this.refreshInterval)
     }
+    
+    // Remove event delegation
+    document.removeEventListener('click', this.handleFetchButtonClick)
     
     // Clean up portfolio charts
     this.cleanupPortfolioCharts()
@@ -570,6 +669,36 @@ export default {
       return 'l7gh3-pqaaa-aaaan-qz4za-cai'; // fallback to staging canisterId for local
     },
 
+    daoAdminArchiveCanisterId() {
+      switch (process.env.DFX_NETWORK) {
+        case "ic":
+          return process.env.CANISTER_ID_DAO_ADMIN_ARCHIVE_IC || 'b6ygs-xaaaa-aaaan-qz5ca-cai'; // fallback to staging
+        case "staging":
+          return process.env.CANISTER_ID_DAO_ADMIN_ARCHIVE_STAGING || 'b6ygs-xaaaa-aaaan-qz5ca-cai';
+      }
+      return 'b6ygs-xaaaa-aaaan-qz5ca-cai'; // fallback to staging canisterId for local
+    },
+
+    daoAllocationArchiveCanisterId() {
+      switch (process.env.DFX_NETWORK) {
+        case "ic":
+          return process.env.CANISTER_ID_DAO_ALLOCATION_ARCHIVE_IC || 'bq2l2-mqaaa-aaaan-qz5da-cai'; // fallback to staging
+        case "staging":
+          return process.env.CANISTER_ID_DAO_ALLOCATION_ARCHIVE_STAGING || 'bq2l2-mqaaa-aaaan-qz5da-cai';
+      }
+      return 'bq2l2-mqaaa-aaaan-qz5da-cai'; // fallback to staging canisterId for local
+    },
+
+    daoGovernanceArchiveCanisterId() {
+      switch (process.env.DFX_NETWORK) {
+        case "ic":
+          return process.env.CANISTER_ID_DAO_GOVERNANCE_ARCHIVE_IC || 'bzzag-2yaaa-aaaan-qz5cq-cai'; // fallback to staging
+        case "staging":
+          return process.env.CANISTER_ID_DAO_GOVERNANCE_ARCHIVE_STAGING || 'bzzag-2yaaa-aaaan-qz5cq-cai';
+      }
+      return 'bzzag-2yaaa-aaaan-qz5cq-cai'; // fallback to staging canisterId for local
+    },
+
     async createArchiveActors() {
       try {
         // Create authenticated agent (same pattern as store functions)
@@ -600,6 +729,9 @@ export default {
         this.tradingActor = createTradingActor(this.tradingArchiveCanisterId(), { agent })
         this.portfolioActor = createPortfolioActor(this.portfolioArchiveCanisterId(), { agent })
         this.priceActor = createPriceActor(this.priceArchiveCanisterId(), { agent })
+        this.daoAdminActor = createDaoAdminActor(this.daoAdminArchiveCanisterId(), { agent })
+        this.daoAllocationActor = createDaoAllocationActor(this.daoAllocationArchiveCanisterId(), { agent })
+        this.daoGovernanceActor = createDaoGovernanceActor(this.daoGovernanceArchiveCanisterId(), { agent })
         
         //console.log('Archive actors created with identity:', identity.getPrincipal().toString())
       } catch (error) {
@@ -767,6 +899,28 @@ export default {
       this.loading = false
     },
 
+    async runArchiveSpecificImport(methodName) {
+      this.loading = true
+      this.clearMessages()
+      
+      try {
+        this.successMessage = `Running ${methodName}... Check logs for progress.`
+        const result = await this.currentArchiveActor[methodName]()
+        
+        if (result.ok) {
+          this.successMessage = `${methodName} completed: ${result.ok}`
+        } else {
+          this.errorMessage = `${methodName} failed: ${result.err}`
+        }
+        await this.refreshStatus()
+      } catch (error) {
+        console.error(`${methodName} error:`, error)
+        this.errorMessage = `Failed to run ${methodName}: ${error.message}`
+      }
+      
+      this.loading = false
+    },
+
     async stopAllTimers() {
       this.loading = true
       this.clearMessages()
@@ -870,6 +1024,9 @@ export default {
         case 'trading_archive': return 'bg-success'
         case 'portfolio_archive': return 'bg-info'
         case 'price_archive': return 'bg-warning'
+        case 'dao_admin_archive': return 'bg-primary'
+        case 'dao_allocation_archive': return 'bg-info'
+        case 'dao_governance_archive': return 'bg-secondary'
         default: return 'bg-secondary'
       }
     },
@@ -888,6 +1045,15 @@ export default {
         case 'price_archive':
           const priceTime = this.legacyStatus.lastImportedPriceTime || 0
           return `Last: ${this.formatTime(priceTime)} (${priceTime})`
+        case 'dao_admin_archive':
+          // DAO admin archive status - shows admin action imports
+          return 'Admin Actions Archive - Structured logging of administrative events'
+        case 'dao_allocation_archive':
+          // DAO allocation archive status - shows allocation and follow actions
+          return 'Allocation Archive - User allocation changes and follow relationships'
+        case 'dao_governance_archive':
+          // DAO governance archive status - shows voting power and neuron updates
+          return 'Governance Archive - Voting power changes and neuron updates'
         default:
           return 'Unknown'
       }
@@ -1137,7 +1303,7 @@ export default {
         const amountSold = this.formatAmount(tradeData.amount_sold, tradeData.token_sold)
         const amountBought = this.formatAmount(tradeData.amount_bought, tradeData.token_bought)
         const exchange = tradeData.exchange || 'Unknown Exchange'
-        const slippage = tradeData.slippage ? `${(parseFloat(tradeData.slippage) * 100).toFixed(4)}%` : '0%'
+        const slippage = tradeData.slippage ? `${parseFloat(tradeData.slippage).toFixed(4)}%` : '0%'
         const fee = this.formatAmount(tradeData.fee || '0')
         const error = tradeData.error || null
 
@@ -1160,6 +1326,10 @@ export default {
           console.warn('Error calculating exchange rate:', rateError)
         }
 
+        // Extract and format timestamp
+        const timestamp = tradeData.ts || tradeData.timestamp || Date.now()
+        const formattedTime = this.formatTime(Number(timestamp))
+        
         return `
           <div class="row">
             <div class="col-md-6">
@@ -1168,6 +1338,7 @@ export default {
                 <tr><td><strong>Status:</strong></td><td>${success ? '<span class="text-success">✅ Successful</span>' : '<span class="text-danger">❌ Failed</span>'}</td></tr>
                 <tr><td><strong>Exchange:</strong></td><td>${exchange}</td></tr>
                 <tr><td><strong>Trader:</strong></td><td><code>${traderDisplay}</code></td></tr>
+                <tr><td><strong>Executed:</strong></td><td><span class="text-info">🕐 ${formattedTime}</span></td></tr>
                 <tr><td><strong>Slippage:</strong></td><td>${slippage}</td></tr>
                 <tr><td><strong>Fee:</strong></td><td>${fee}</td></tr>
               </table>
@@ -1209,6 +1380,10 @@ export default {
           triggerToken = this.formatTokenName(tradeData.trigger_token)
         }
         
+        // Extract and format timestamp
+        const timestamp = tradeData.ts || tradeData.timestamp || Date.now()
+        const formattedTime = this.formatTime(Number(timestamp))
+        
         return `
           <div class="row">
             <div class="col-md-6">
@@ -1216,6 +1391,7 @@ export default {
               <table class="table table-sm table-dark">
                 <tr><td><strong>Event Type:</strong></td><td>${eventName}</td></tr>
                 <tr><td><strong>Severity:</strong></td><td><span class="badge ${this.getSeverityClass(severity)}">${severity}</span></td></tr>
+                <tr><td><strong>Triggered:</strong></td><td><span class="text-warning">🕐 ${formattedTime}</span></td></tr>
                 <tr><td><strong>Trigger Token:</strong></td><td>${triggerToken}</td></tr>
                 <tr><td><strong>Affected Tokens:</strong></td><td>${affectedTokens}</td></tr>
               </table>
@@ -1324,6 +1500,10 @@ export default {
           })
         }
         
+        // Extract and format timestamp
+        const timestamp = tradeData.ts || tradeData.timestamp || Date.now()
+        const formattedTime = this.formatTime(Number(timestamp))
+        
         return `
           <div class="row">
             <div class="col-md-5">
@@ -1332,6 +1512,7 @@ export default {
                 <tr><td><strong>Total Tokens:</strong></td><td>${tokenCount}</td></tr>
                 <tr><td><strong>Total Value (ICP):</strong></td><td>${totalValueIcp || 'N/A'}</td></tr>
                 <tr><td><strong>Total Value (USD):</strong></td><td>$${totalValueUsd}</td></tr>
+                <tr><td><strong>Snapshot Taken:</strong></td><td><span class="text-success">🕐 ${formattedTime}</span></td></tr>
                 <tr><td><strong>Snapshot Reason:</strong></td><td><span class="badge ${this.getSnapshotReasonClass(reason)}">${this.formatSnapshotReason(reason)}</span></td></tr>
                 ${pausedTokensList !== 'None' ? `<tr><td><strong>Paused Tokens:</strong></td><td>${pausedTokensList}</td></tr>` : ''}
               </table>
@@ -1387,11 +1568,425 @@ export default {
             <div class="col-md-6">
               <h6>📊 Price Details</h6>
               <table class="table table-sm table-dark">
-                <tr><td><strong>Timestamp:</strong></td><td>${this.formatTime(Number(timestamp))}</td></tr>
+                <tr><td><strong>Recorded:</strong></td><td><span class="text-primary">🕐 ${this.formatTime(Number(timestamp))}</span></td></tr>
                 <tr><td><strong>ICP Rate:</strong></td><td class="text-info">${icpUsdRate}</td></tr>
                 <tr><td><strong>Data Source:</strong></td><td>${source === 'NTN' ? '🌐 NTN Network' : source}</td></tr>
                 <tr><td><strong>Block Type:</strong></td><td><span class="badge bg-info">Price Feed</span></td></tr>
               </table>
+            </div>
+          </div>
+        `
+      }
+
+      // Allocation change block details
+      if ((parsedData.tx && parsedData.tx.operation === '3allocation_change') || tradeData.operation === '3allocation_change') {
+        //console.log('=== Processing allocation change block ===', tradeData)
+        
+        // Extract allocation data from the nested structure
+        let allocationData = tradeData
+        if (parsedData.tx && parsedData.tx.data) {
+          allocationData = parsedData.tx.data
+        }
+        
+        // Extract the raw principal ID from the blob (not the display name)
+        const userPrincipal = Principal.fromUint8Array(new Uint8Array(allocationData.user)).toText()
+        const userDisplayName = this.formatPrincipalFromBlob(allocationData.user) // For display only
+        const changeType = allocationData.changeType?.type || 'Unknown'
+        const userInitiated = allocationData.changeType?.userInitiated === 1n || allocationData.changeType?.userInitiated === '1'
+        const reason = allocationData.reason || 'No reason provided'
+        const timestamp = allocationData.timestamp || Date.now()
+        const formattedTime = this.formatTime(Number(timestamp))
+        const blockId = allocationData.id || 'unknown'
+        
+        // Debug logging
+        console.log('Allocation card - userPrincipal:', userPrincipal, 'userDisplayName:', userDisplayName, 'blockId:', blockId, 'timestamp:', timestamp)
+        
+        // Get fetch states and data for this block
+        const fetchState = this.fetchStates.get(blockId) || {}
+        const fetchedData = this.fetchedData.get(blockId) || {}
+        
+        // Simple voting power display using reactive data
+        const vpDisplayText = this.votingPowerDisplays[blockId] || '0 VP'
+        
+        // Voting power - show fetched data or fetch button
+        let votingPowerHtml = ''
+        if (fetchState.votingPower === 'loading') {
+          votingPowerHtml = '<span class="text-info">⏳ Loading...</span>'
+        } else if (fetchState.votingPower === 'loaded') {
+          const vp = fetchedData.votingPower || 0
+          votingPowerHtml = `<strong>${vp} VP</strong> <button class="btn btn-xs btn-outline-secondary ms-1" data-action="fetchVP" data-block-id="${blockId}" data-user-id="${userPrincipal}" data-timestamp="${timestamp}">🔄 Refresh</button>`
+        } else if (fetchState.votingPower === 'error') {
+          votingPowerHtml = `<span class="text-danger">❌ Error</span> <button class="btn btn-xs btn-outline-primary ms-1" data-action="fetchVP" data-block-id="${blockId}" data-user-id="${userPrincipal}" data-timestamp="${timestamp}">🔄 Retry</button>`
+        } else {
+          votingPowerHtml = `<button class="btn btn-xs btn-outline-primary" data-action="fetchVP" data-block-id="${blockId}" data-user-id="${userPrincipal}" data-timestamp="${timestamp}">📊 Fetch VP</button>`
+        }
+        
+        // Previous allocations - show fetched data or fetch button
+        let oldAllocationsHtml = ''
+        if (fetchState.previousAllocation === 'loading') {
+          oldAllocationsHtml = '<span class="text-info">⏳ Loading...</span>'
+        } else if (fetchState.previousAllocation === 'loaded') {
+          const prevAlloc = fetchedData.previousAllocation
+          if (prevAlloc && prevAlloc.newAllocations && prevAlloc.newAllocations.length > 0) {
+            const allocBadges = prevAlloc.newAllocations.map(allocation => {
+              const tokenName = this.formatTokenName(allocation.token)
+              const percentage = (allocation.basisPoints / 100).toFixed(2)
+              return `<span class="badge bg-secondary me-1">${tokenName}: ${percentage}%</span>`
+            }).join('')
+            oldAllocationsHtml = `${allocBadges}<br><small class="text-muted">From: ${this.formatTime(prevAlloc.timestamp)}</small>`
+          } else {
+            oldAllocationsHtml = '<em class="text-muted">No previous allocation found</em>'
+          }
+          oldAllocationsHtml += `<br><button class="btn btn-xs btn-outline-secondary mt-1" data-action="fetchPrevious" data-block-id="${blockId}" data-user-id="${userPrincipal}" data-timestamp="${timestamp}">🔄 Refresh</button>`
+          oldAllocationsHtml += ` <button class="btn btn-xs btn-outline-info mt-1" data-action="fetchAll" data-block-id="${blockId}" data-user-id="${userPrincipal}" data-timestamp="${timestamp}">📋 Fetch All</button>`
+        } else if (fetchState.previousAllocation === 'error') {
+          oldAllocationsHtml = `<span class="text-danger">❌ Error</span><br><button class="btn btn-xs btn-outline-primary mt-1" data-action="fetchPrevious" data-block-id="${blockId}" data-user-id="${userPrincipal}" data-timestamp="${timestamp}">🔄 Retry</button>`
+        } else {
+          oldAllocationsHtml = `<button class="btn btn-xs btn-outline-primary" data-action="fetchPrevious" data-block-id="${blockId}" data-user-id="${userPrincipal}" data-timestamp="${timestamp}">📊 Fetch Previous</button>`
+          oldAllocationsHtml += ` <button class="btn btn-xs btn-outline-info" data-action="fetchAll" data-block-id="${blockId}" data-user-id="${userPrincipal}" data-timestamp="${timestamp}">📋 Fetch All</button>`
+        }
+        
+        // Add reactive display text (can't fail approach)
+        const prevAllocDisplayText = this.previousAllocationDisplays[blockId] || ''
+        if (prevAllocDisplayText) {
+          oldAllocationsHtml += `<br><span style="color: white; font-size: 0.85em;">${prevAllocDisplayText}</span>`
+        }
+        
+        // Format new allocations
+        let newAllocationsHtml = '<em class="text-muted">None</em>'
+        if (allocationData.newAllocations && allocationData.newAllocations.length > 0) {
+          newAllocationsHtml = allocationData.newAllocations.map(allocation => {
+            const tokenName = this.formatTokenNameFromBlob(allocation.token)
+            const percentage = (Number(allocation.basisPoints) / 100).toFixed(2)
+            return `<span class="badge bg-primary me-1">${tokenName}: ${percentage}%</span>`
+          }).join('')
+        }
+        
+        // Calculate total percentages
+        const oldTotal = allocationData.oldAllocations ? 
+          (allocationData.oldAllocations.reduce((sum, a) => sum + Number(a.basisPoints), 0) / 100).toFixed(2) : '0.00'
+        const newTotal = allocationData.newAllocations ? 
+          (allocationData.newAllocations.reduce((sum, a) => sum + Number(a.basisPoints), 0) / 100).toFixed(2) : '0.00'
+        
+        return `
+          <div class="row">
+            <div class="col-md-6">
+              <h6>📊 Allocation Change</h6>
+              <table class="table table-sm table-dark">
+                <tr><td><strong>User:</strong></td><td><code>${userDisplayName}</code></td></tr>
+                <tr><td><strong>Change Type:</strong></td><td><span class="badge ${userInitiated ? 'bg-success' : 'bg-warning'}">${changeType}</span></td></tr>
+                <tr><td><strong>Initiated By:</strong></td><td>${userInitiated ? '👤 User' : '🤖 System'}</td></tr>
+                <tr><td><strong>Timestamp:</strong></td><td><span class="text-info">🕐 ${formattedTime}</span></td></tr>
+                <tr><td><strong>Voting Power:</strong></td><td>${votingPowerHtml} <span style="color: white;">${vpDisplayText}</span></td></tr>
+              </table>
+            </div>
+            <div class="col-md-6">
+              <h6>🔄 Allocation Details</h6>
+              <table class="table table-sm table-dark">
+                <tr>
+                  <td><strong>Previous:</strong></td>
+                  <td>
+                    ${oldAllocationsHtml}
+                    <br><small class="text-muted">Total: ${oldTotal}%</small>
+                  </td>
+                </tr>
+                <tr>
+                  <td><strong>New:</strong></td>
+                  <td>
+                    ${newAllocationsHtml}
+                    <br><small class="text-muted">Total: ${newTotal}%</small>
+                  </td>
+                </tr>
+              </table>
+            </div>
+          </div>
+          <!-- Allocation changes don't have reasons, only admin actions do -->
+        `
+      }
+
+      // Check for voting power change (dao_governance_archive)
+      if ((parsedData.tx && parsedData.tx.operation === '3voting_power') || tradeData.operation === '3voting_power') {
+        const votingPowerData = parsedData.tx ? parsedData.tx.data : tradeData
+        
+        if (!votingPowerData) {
+          return '<div class="text-muted">No voting power data available</div>'
+        }
+        
+        const userId = this.formatPrincipalFromBlob(votingPowerData.user)
+        const changeType = votingPowerData.changeType || 'Unknown'
+        const oldVotingPower = Number(votingPowerData.oldVotingPower || 0)
+        const newVotingPower = Number(votingPowerData.newVotingPower || 0)
+        const timestamp = votingPowerData.timestamp || Date.now()
+        const formattedTime = this.formatTime(Number(timestamp))
+        
+        // Format voting power with commas
+        const formatVotingPower = (vp) => {
+          return (vp / 100000000).toLocaleString(undefined, { 
+            minimumFractionDigits: 2, 
+            maximumFractionDigits: 2 
+          }) + ' VP'
+        }
+        
+        // Format neurons if available
+        let neuronsHtml = '<em class="text-muted">None</em>'
+        if (votingPowerData.neurons && votingPowerData.neurons.length > 0) {
+          neuronsHtml = votingPowerData.neurons.map(neuron => {
+            const neuronId = neuron.neuronId ? this.formatNeuronFromBlob(neuron.neuronId) : 'Unknown'
+            const neuronVP = Number(neuron.votingPower || 0)
+            const formattedNeuronVP = formatVotingPower(neuronVP)
+            return `<span class="badge bg-info me-1">${neuronId}: ${formattedNeuronVP}</span>`
+          }).join('')
+        }
+        
+        // Calculate change
+        const vpChange = newVotingPower - oldVotingPower
+        const changeDirection = vpChange > 0 ? '📈' : vpChange < 0 ? '📉' : '➡️'
+        const changeClass = vpChange > 0 ? 'text-success' : vpChange < 0 ? 'text-danger' : 'text-muted'
+        
+        return `
+          <div class="card bg-dark border-info">
+            <div class="card-header bg-info text-dark">
+              <h6 class="mb-0">🗳️ Voting Power Change</h6>
+            </div>
+            <div class="card-body">
+              <div class="row">
+                <div class="col-md-6">
+                  <h6>📊 Power Details</h6>
+                  <table class="table table-sm table-dark table-borderless">
+                    <tr>
+                      <td><strong>User:</strong></td>
+                      <td><code class="text-info">${userId}</code><br><small class="text-muted">${Principal.fromUint8Array(new Uint8Array(votingPowerData.user)).toText()}</small></td>
+                    </tr>
+                    <tr>
+                      <td><strong>Change Type:</strong></td>
+                      <td><span class="badge bg-secondary">${changeType}</span></td>
+                    </tr>
+                    <tr>
+                      <td><strong>Previous:</strong></td>
+                      <td>${formatVotingPower(oldVotingPower)}</td>
+                    </tr>
+                    <tr>
+                      <td><strong>New:</strong></td>
+                      <td><strong class="${changeClass}">${formatVotingPower(newVotingPower)}</strong></td>
+                    </tr>
+                    <tr>
+                      <td><strong>Change:</strong></td>
+                      <td><span class="${changeClass}">${changeDirection} ${formatVotingPower(Math.abs(vpChange))}</span></td>
+                    </tr>
+                    <tr>
+                      <td><strong>Timestamp:</strong></td>
+                      <td>🕐 ${formattedTime}</td>
+                    </tr>
+                  </table>
+                </div>
+                <div class="col-md-6">
+                  <h6>🧠 Neurons</h6>
+                  <div class="mb-2">
+                    ${neuronsHtml}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        `
+      }
+
+      // Check for neuron update (dao_governance_archive) - detailed view
+      if ((parsedData.tx && parsedData.tx.operation === '3neuron_update') || tradeData.operation === '3neuron_update') {
+        const neuronUpdateData = parsedData.tx ? parsedData.tx.data : tradeData
+        
+        if (!neuronUpdateData) {
+          return '<div class="text-muted">No neuron update data available</div>'
+        }
+        
+        const neuronId = neuronUpdateData.neuronId ? this.formatNeuronFromBlob(neuronUpdateData.neuronId) : 'Unknown'
+        const neuronIdShort = neuronId
+        const updateType = neuronUpdateData.updateType || 'Unknown'
+        const oldVotingPower = Number(neuronUpdateData.oldVotingPower || 0)
+        const newVotingPower = Number(neuronUpdateData.newVotingPower || 0)
+        const timestamp = neuronUpdateData.timestamp || Date.now()
+        const formattedTime = this.formatTime(Number(timestamp))
+        
+        // Format voting power with commas
+        const formatVotingPower = (vp) => {
+          return (vp / 100000000).toLocaleString(undefined, { 
+            minimumFractionDigits: 2, 
+            maximumFractionDigits: 2 
+          }) + ' VP'
+        }
+        
+        // Format affected users
+        let affectedUsersHtml = '<em class="text-muted">None</em>'
+        if (neuronUpdateData.affectedUsers && neuronUpdateData.affectedUsers.length > 0) {
+          affectedUsersHtml = neuronUpdateData.affectedUsers.map(userBlob => {
+            const userId = this.formatPrincipalFromBlob(userBlob)
+            const userPrincipal = Principal.fromUint8Array(new Uint8Array(userBlob)).toText()
+            const userShort = userId.length > 16 ? userId.substring(0, 6) + '...' + userId.substring(userId.length - 6) : userId
+            return `<div class="mb-1"><span class="badge bg-warning text-dark me-1">${userShort}</span><br><small class="text-muted">${userPrincipal}</small></div>`
+          }).join('')
+        }
+        
+        // Calculate change
+        const vpChange = newVotingPower - oldVotingPower
+        const changeDirection = vpChange > 0 ? '📈' : vpChange < 0 ? '📉' : '➡️'
+        const changeClass = vpChange > 0 ? 'text-success' : vpChange < 0 ? 'text-danger' : 'text-muted'
+        
+        // Update type styling
+        const updateTypeClass = updateType === 'StateChanged' ? 'bg-info' : 
+                               updateType === 'VotingPowerChanged' ? 'bg-success' : 
+                               updateType === 'Dissolved' ? 'bg-danger' : 'bg-secondary'
+        
+        return `
+          <div class="card bg-dark border-warning">
+            <div class="card-header bg-warning text-dark">
+              <h6 class="mb-0">🧠 Neuron Update</h6>
+            </div>
+            <div class="card-body">
+              <div class="row">
+                <div class="col-md-6">
+                  <h6>🔧 Update Details</h6>
+                  <table class="table table-sm table-dark table-borderless">
+                    <tr>
+                      <td><strong>Neuron ID:</strong></td>
+                      <td><code class="text-warning">${neuronIdShort}</code></td>
+                    </tr>
+                    <tr>
+                      <td><strong>Update Type:</strong></td>
+                      <td><span class="badge ${updateTypeClass}">${updateType}</span></td>
+                    </tr>
+                    <tr>
+                      <td><strong>Previous Power:</strong></td>
+                      <td>${formatVotingPower(oldVotingPower)}</td>
+                    </tr>
+                    <tr>
+                      <td><strong>New Power:</strong></td>
+                      <td><strong class="${changeClass}">${formatVotingPower(newVotingPower)}</strong></td>
+                    </tr>
+                    <tr>
+                      <td><strong>Change:</strong></td>
+                      <td><span class="${changeClass}">${changeDirection} ${formatVotingPower(Math.abs(vpChange))}</span></td>
+                    </tr>
+                    <tr>
+                      <td><strong>Timestamp:</strong></td>
+                      <td>🕐 ${formattedTime}</td>
+                    </tr>
+                  </table>
+                </div>
+                <div class="col-md-6">
+                  <h6>👥 Affected Users</h6>
+                  <div class="mb-2">
+                    ${affectedUsersHtml}
+                  </div>
+                  <small class="text-muted">
+                    ${neuronUpdateData.affectedUsers ? neuronUpdateData.affectedUsers.length : 0} user(s) affected by this neuron change
+                  </small>
+                </div>
+              </div>
+            </div>
+          </div>
+        `
+      }
+
+      // Check for admin action (dao_admin_archive) - detailed view
+      if ((parsedData.tx && parsedData.tx.operation === '3admin') || tradeData.operation === '3admin') {
+        const adminData = parsedData.tx ? parsedData.tx.data : tradeData
+        
+        if (!adminData) {
+          return '<div class="text-muted">No admin action data available</div>'
+        }
+        
+        const adminId = adminData.admin ? this.formatPrincipalFromBlob(adminData.admin) : 'Unknown'
+        const adminShort = adminId.length > 16 ? adminId.substring(0, 8) + '...' + adminId.substring(adminId.length - 8) : adminId
+        const canister = adminData.canister || 'Unknown'
+        const actionType = adminData.actionType?.type || 'Unknown'
+        const reason = adminData.reason || 'No reason provided'
+        const success = adminData.success === 1n || adminData.success === '1' || adminData.success === 1
+        const errorMessage = adminData.errorMessage || ''
+        const timestamp = adminData.timestamp || Date.now()
+        const formattedTime = this.formatTime(Number(timestamp))
+        
+        // Format token if present in actionType
+        let tokenInfo = ''
+        if (adminData.actionType?.token) {
+          const tokenPrincipal = this.formatPrincipalFromBlob(adminData.actionType.token)
+          const tokenName = this.formatTokenNameFromBlob(adminData.actionType.token)
+          tokenInfo = `<tr>
+            <td><strong>Token:</strong></td>
+            <td><code class="text-info">${tokenName}</code><br><small class="text-muted">${tokenPrincipal}</small></td>
+          </tr>`
+        }
+        
+        // Action type styling
+        const getActionTypeClass = (type) => {
+          switch(type) {
+            case 'TokenPause': return 'bg-warning text-dark'
+            case 'TokenUnpause': return 'bg-success'
+            case 'TokenAdd': return 'bg-primary'
+            case 'TokenRemove': return 'bg-danger'
+            case 'SystemPause': return 'bg-danger'
+            case 'SystemUnpause': return 'bg-success'
+            case 'ParameterUpdate': return 'bg-info'
+            default: return 'bg-secondary'
+          }
+        }
+        
+        // Success/failure styling
+        const statusClass = success ? 'text-success' : 'text-danger'
+        const statusIcon = success ? '✅' : '❌'
+        const statusText = success ? 'Success' : 'Failed'
+        
+        return `
+          <div class="card bg-dark border-danger">
+            <div class="card-header bg-danger text-white">
+              <h6 class="mb-0">⚙️ Admin Action</h6>
+            </div>
+            <div class="card-body">
+              <div class="row">
+                <div class="col-md-6">
+                  <h6>🔧 Action Details</h6>
+                  <table class="table table-sm table-dark table-borderless">
+                    <tr>
+                      <td><strong>Admin:</strong></td>
+                      <td><code class="text-danger">${adminShort}</code></td>
+                    </tr>
+                    <tr>
+                      <td><strong>Canister:</strong></td>
+                      <td><span class="badge bg-dark border">${canister}</span></td>
+                    </tr>
+                    <tr>
+                      <td><strong>Action Type:</strong></td>
+                      <td><span class="badge ${getActionTypeClass(actionType)}">${actionType}</span></td>
+                    </tr>
+                    ${tokenInfo}
+                    <tr>
+                      <td><strong>Status:</strong></td>
+                      <td><span class="${statusClass}"><strong>${statusIcon} ${statusText}</strong></span></td>
+                    </tr>
+                    <tr>
+                      <td><strong>Timestamp:</strong></td>
+                      <td>🕐 ${formattedTime}</td>
+                    </tr>
+                  </table>
+                </div>
+                <div class="col-md-6">
+                  <h6>📝 Reason & Details</h6>
+                  <div class="alert alert-info">
+                    <strong>Reason:</strong><br>
+                    <em>"${reason}"</em>
+                  </div>
+                  ${this.renderConfigChanges(adminData.actionType)}
+                  ${this.renderOldNewValues(adminData.actionType)}
+                  ${!success && errorMessage ? `
+                    <div class="alert alert-danger">
+                      <strong>Error:</strong><br>
+                      <code>${errorMessage}</code>
+                    </div>
+                  ` : ''}
+                  <small class="text-muted">
+                    Admin action executed on ${canister} canister
+                  </small>
+                </div>
+              </div>
             </div>
           </div>
         `
@@ -1439,6 +2034,17 @@ export default {
         return blockTypeData.btype
       }
       
+      // Check for operation field (for DAO archive blocks)
+      if (parsedData.tx && parsedData.tx.operation) {
+        if (parsedData.tx.operation === '3allocation_change') return 'Allocation Change'
+        if (parsedData.tx.operation === '3voting_power') return 'Voting Power Change'
+        if (parsedData.tx.operation === '3neuron_update') return 'Neuron Update'
+        if (parsedData.tx.operation === '3admin') return 'Admin Action'
+        if (parsedData.tx.operation === '3admin_action') return 'Admin Action'
+        if (parsedData.tx.operation === '3follow_action') return 'Follow Action'
+        return parsedData.tx.operation
+      }
+      
       // Try to infer type from content
       if (blockTypeData.trader || blockTypeData.token_sold || blockTypeData.tokenSold) {
         return 'Trade'
@@ -1451,6 +2057,9 @@ export default {
       }
       if (blockTypeData.priceHistory || blockTypeData.price || blockTypeData.price_icp || blockTypeData.price_usd) {
         return 'Price'
+      }
+      if (blockTypeData.user && (blockTypeData.oldAllocations || blockTypeData.newAllocations)) {
+        return 'Allocation Change'
       }
       
       return 'Data'
@@ -1501,9 +2110,13 @@ export default {
         const tokenBought = this.formatTokenName(tradeData.token_bought)
         const amountSold = this.formatAmount(tradeData.amount_sold, tradeData.token_sold)
         const amountBought = this.formatAmount(tradeData.amount_bought, tradeData.token_bought)
-        const slippage = tradeData.slippage ? `${(parseFloat(tradeData.slippage) * 100).toFixed(4)}%` : '0%'
+        const slippage = tradeData.slippage ? `${parseFloat(tradeData.slippage).toFixed(4)}%` : '0%'
         
-        return `${success} ${exchange}: ${amountSold} ${tokenSold} → ${amountBought} ${tokenBought} (${slippage} slippage)`
+        // Extract and format timestamp for summary
+        const timestamp = tradeData.ts || tradeData.timestamp || Date.now()
+        const formattedTime = this.formatTime(Number(timestamp))
+        
+        return `${success} ${exchange}: ${amountSold} ${tokenSold} → ${amountBought} ${tokenBought} (${slippage} slippage) • 🕐 ${formattedTime}`
       }
       
       // Circuit breaker block
@@ -1523,6 +2136,10 @@ export default {
           tokensInfo = tokenNames.length ? ` affecting ${tokenNames.join(', ')}` : ''
         }
         
+        // Extract and format timestamp for summary
+        const timestamp = tradeData.ts || tradeData.timestamp || Date.now()
+        const formattedTime = this.formatTime(Number(timestamp))
+        
         // Build summary with key info
         let summary = `🚨 ${eventName}`
         if (severity) summary += ` (${severity})`
@@ -1530,6 +2147,7 @@ export default {
           summary += `: ${actualValue} vs ${thresholdValue} threshold`
         }
         summary += tokensInfo
+        summary += ` • 🕐 ${formattedTime}`
         
         return summary
       }
@@ -1573,6 +2191,10 @@ export default {
           tokensInfo = tokenNames.length ? ` (${tokenNames.slice(0, 3).join(', ')}${tokenNames.length > 3 ? '...' : ''})` : ''
         }
         
+        // Extract and format timestamp for summary
+        const timestamp = tradeData.ts || tradeData.timestamp || Date.now()
+        const formattedTime = this.formatTime(Number(timestamp))
+        
         // Build summary
         let summary = `💼 Portfolio: ${tokenCount} tokens`
         if (totalValueIcp) {
@@ -1585,6 +2207,7 @@ export default {
         if (reason && reason !== 'unknown') {
           summary += ` - ${this.formatSnapshotReason(reason)}`
         }
+        summary += ` • 🕐 ${formattedTime}`
         
         return summary
       }
@@ -1602,7 +2225,123 @@ export default {
         const usdPrice = parseFloat(priceUSD) || 0
         const usdFormatted = usdPrice > 0 ? '$' + usdPrice.toFixed(6) : 'Unknown'
         
-        return `💰 ${tokenSymbol}: ${icpFormatted} ICP (${usdFormatted}) via ${source}`
+        // Extract and format timestamp for summary
+        const timestamp = tradeData.ts || tradeData.timestamp || Date.now()
+        const formattedTime = this.formatTime(Number(timestamp))
+        
+        return `💰 ${tokenSymbol}: ${icpFormatted} ICP (${usdFormatted}) via ${source} • 🕐 ${formattedTime}`
+      }
+      
+      // Allocation change block
+      if ((parsedData.tx && parsedData.tx.operation === '3allocation_change') || tradeData.operation === '3allocation_change') {
+        // Extract allocation data from the nested structure
+        let allocationData = tradeData
+        if (parsedData.tx && parsedData.tx.data) {
+          allocationData = parsedData.tx.data
+        }
+        
+        const userId = this.formatPrincipalFromBlob(allocationData.user)
+        const userShort = userId ? userId.substring(0, 8) + '...' : 'Unknown'
+        const changeType = allocationData.changeType?.type || 'Unknown'
+        const userInitiated = allocationData.changeType?.userInitiated === 1n || allocationData.changeType?.userInitiated === '1'
+        
+        // Count allocations
+        const oldCount = allocationData.oldAllocations ? allocationData.oldAllocations.length : 0
+        const newCount = allocationData.newAllocations ? allocationData.newAllocations.length : 0
+        
+        // Calculate total percentages
+        const newTotal = allocationData.newAllocations ? 
+          (allocationData.newAllocations.reduce((sum, a) => sum + Number(a.basisPoints), 0) / 100).toFixed(1) : '0.0'
+        
+        // Extract timestamp
+        const timestamp = allocationData.timestamp || Date.now()
+        const formattedTime = this.formatTime(Number(timestamp))
+        
+        const initiator = userInitiated ? '👤' : '🤖'
+        return `📊 ${initiator} ${changeType}: ${userShort} changed ${oldCount}→${newCount} allocations (${newTotal}% total) • 🕐 ${formattedTime}`
+      }
+      
+      // Voting power change block
+      if ((parsedData.tx && parsedData.tx.operation === '3voting_power') || tradeData.operation === '3voting_power') {
+        // Extract voting power data from the nested structure
+        let votingPowerData = tradeData
+        if (parsedData.tx && parsedData.tx.data) {
+          votingPowerData = parsedData.tx.data
+        }
+        
+        const userId = this.formatPrincipalFromBlob(votingPowerData.user)
+        const userShort = userId ? userId.substring(0, 8) + '...' : 'Unknown'
+        const changeType = votingPowerData.changeType || 'Unknown'
+        const oldVP = Number(votingPowerData.oldVotingPower || 0)
+        const newVP = Number(votingPowerData.newVotingPower || 0)
+        
+        // Format voting power (convert from e8s to VP)
+        const formatVP = (vp) => (vp / 100000000).toLocaleString(undefined, { maximumFractionDigits: 2 })
+        
+        // Calculate change
+        const vpChange = newVP - oldVP
+        const changeDirection = vpChange > 0 ? '📈' : vpChange < 0 ? '📉' : '➡️'
+        
+        const timestamp = votingPowerData.timestamp || Date.now()
+        const formattedTime = this.formatTime(Number(timestamp))
+        
+        return `🗳️ ${userShort}: ${formatVP(oldVP)} → ${formatVP(newVP)} VP ${changeDirection} (${changeType}) • 🕐 ${formattedTime}`
+      }
+      
+      // Neuron update block (summary)
+      if ((parsedData.tx && parsedData.tx.operation === '3neuron_update') || tradeData.operation === '3neuron_update') {
+        // Extract neuron update data from the nested structure
+        let neuronUpdateData = tradeData
+        if (parsedData.tx && parsedData.tx.data) {
+          neuronUpdateData = parsedData.tx.data
+        }
+        
+        const neuronId = neuronUpdateData.neuronId ? this.formatNeuronFromBlob(neuronUpdateData.neuronId) : 'Unknown'
+        const neuronIdShort = neuronId
+        const updateType = neuronUpdateData.updateType || 'Unknown'
+        const oldVP = Number(neuronUpdateData.oldVotingPower || 0)
+        const newVP = Number(neuronUpdateData.newVotingPower || 0)
+        const affectedCount = neuronUpdateData.affectedUsers ? neuronUpdateData.affectedUsers.length : 0
+        
+        // Format voting power (convert from e8s to VP)
+        const formatVP = (vp) => (vp / 100000000).toLocaleString(undefined, { maximumFractionDigits: 2 })
+        
+        // Calculate change
+        const vpChange = newVP - oldVP
+        const changeDirection = vpChange > 0 ? '📈' : vpChange < 0 ? '📉' : '➡️'
+        
+        const timestamp = neuronUpdateData.timestamp || Date.now()
+        const formattedTime = this.formatTime(Number(timestamp))
+        
+        return `🧠 ${neuronIdShort}: ${formatVP(oldVP)} → ${formatVP(newVP)} VP ${changeDirection} (${updateType}) affecting ${affectedCount} user(s) • 🕐 ${formattedTime}`
+      }
+      
+      // Admin action block (summary)
+      if ((parsedData.tx && parsedData.tx.operation === '3admin') || tradeData.operation === '3admin') {
+        // Extract admin action data from the nested structure
+        let adminData = tradeData
+        if (parsedData.tx && parsedData.tx.data) {
+          adminData = parsedData.tx.data
+        }
+        
+        const adminId = adminData.admin ? this.formatPrincipalFromBlob(adminData.admin) : 'Unknown'
+        const adminShort = adminId.length > 16 ? adminId.substring(0, 6) + '...' + adminId.substring(adminId.length - 6) : adminId
+        const canister = adminData.canister || 'Unknown'
+        const actionType = adminData.actionType?.type || 'Unknown'
+        const success = adminData.success === 1n || adminData.success === '1' || adminData.success === 1
+        const statusIcon = success ? '✅' : '❌'
+        
+        // Get token name if present
+        let tokenInfo = ''
+        if (adminData.actionType?.token) {
+          const tokenName = this.formatTokenNameFromBlob(adminData.actionType.token)
+          tokenInfo = ` (${tokenName})`
+        }
+        
+        const timestamp = adminData.timestamp || Date.now()
+        const formattedTime = this.formatTime(Number(timestamp))
+        
+        return `⚙️ ${adminShort}: ${actionType}${tokenInfo} on ${canister} ${statusIcon} • 🕐 ${formattedTime}`
       }
       
       // Generic block
@@ -1815,6 +2554,483 @@ export default {
       } catch (error) {
         console.warn('Error in formatAmount:', error)
         return amount.toString()
+      }
+    },
+
+    // Helper method to format token name from blob (wrapper for formatTokenName)
+    formatTokenNameFromBlob(tokenBlob) {
+      return this.formatTokenName(tokenBlob)
+    },
+
+    // Helper method to format principal from blob with naming system integration
+    formatPrincipalFromBlob(principalBlob) {
+      if (!principalBlob) return 'Unknown'
+      
+      try {
+        let uint8Array = null
+        
+        // Handle direct Uint8Array format
+        if (principalBlob instanceof Uint8Array) {
+          uint8Array = principalBlob
+        }
+        // Handle wrapped Blob format
+        else if (principalBlob.Blob && typeof principalBlob.Blob === 'object') {
+          const blobData = principalBlob.Blob
+          uint8Array = new Uint8Array(Object.keys(blobData).map(key => blobData[key]))
+        }
+        // Handle object with numeric keys (like your example)
+        else if (typeof principalBlob === 'object' && !Array.isArray(principalBlob)) {
+          const keys = Object.keys(principalBlob).map(k => parseInt(k)).sort((a, b) => a - b)
+          uint8Array = new Uint8Array(keys.map(key => principalBlob[key]))
+        }
+        
+        if (uint8Array) {
+          const principal = Principal.fromUint8Array(uint8Array)
+          
+          // Use the naming system to get display name
+          const displayName = this.tacoStore.getPrincipalDisplayName(principal)
+          return displayName
+        }
+        
+        return 'Unknown'
+      } catch (error) {
+        console.warn('Error in formatPrincipalFromBlob:', error)
+        return 'Unknown'
+      }
+    },
+
+    // Helper method to format neuron from blob with naming system integration
+    formatNeuronFromBlob(neuronBlob, fallbackToTruncated = true) {
+      if (!neuronBlob) return 'Unknown'
+      
+      try {
+        let uint8Array = null
+        
+        // Handle direct Uint8Array format
+        if (neuronBlob instanceof Uint8Array) {
+          uint8Array = neuronBlob
+        }
+        // Handle wrapped Blob format
+        else if (neuronBlob.Blob && typeof neuronBlob.Blob === 'object') {
+          const blobData = neuronBlob.Blob
+          uint8Array = new Uint8Array(Object.keys(blobData).map(key => blobData[key]))
+        }
+        // Handle object with numeric keys
+        else if (typeof neuronBlob === 'object' && !Array.isArray(neuronBlob)) {
+          const keys = Object.keys(neuronBlob).map(k => parseInt(k)).sort((a, b) => a - b)
+          uint8Array = new Uint8Array(keys.map(key => neuronBlob[key]))
+        }
+        
+        if (uint8Array) {
+          // For neurons, we need the SNS governance canister as the root
+          const tacoSnsRoot = Principal.fromText('lhdfz-wqaaa-aaaaq-aae3q-cai') // TACO DAO SNS governance
+          
+          // Try to get the neuron name from the naming system
+          const neuronName = this.tacoStore.getNeuronDisplayName(tacoSnsRoot, uint8Array)
+          
+          if (neuronName) {
+            return neuronName
+          }
+          
+          // Fallback to truncated neuron ID if requested
+          if (fallbackToTruncated) {
+            const principal = Principal.fromUint8Array(uint8Array)
+            const principalStr = principal.toString()
+            return principalStr.length > 16 ? 
+              principalStr.substring(0, 6) + '...' + principalStr.substring(principalStr.length - 6) : 
+              principalStr
+          }
+          
+          return 'Unknown Neuron'
+        }
+        
+        return 'Unknown'
+      } catch (error) {
+        console.warn('Error in formatNeuronFromBlob:', error)
+        return 'Unknown'
+      }
+    },
+
+    renderConfigChanges(actionType) {
+      if (!actionType || actionType.type !== 'UpdateRebalanceConfig') {
+        return ''
+      }
+
+      const oldConfig = actionType.oldConfig || ''
+      const newConfig = actionType.newConfig || ''
+
+      if (!oldConfig || !newConfig) {
+        return ''
+      }
+
+      // Parse the pipe-separated config format: field=value|field=value|...
+      const parseConfig = (configText) => {
+        const config = {}
+        if (!configText) return config
+        
+        configText.split('|').forEach(pair => {
+          const [key, value] = pair.split('=')
+          if (key && value !== undefined) {
+            config[key.trim()] = value.trim().replace(/_/g, '') // Remove underscores from numbers
+          }
+        })
+        return config
+      }
+
+      // Format values for display
+      const formatConfigValue = (key, rawValue) => {
+        if (!rawValue || rawValue === 'N/A') return rawValue
+        
+        const numValue = parseInt(rawValue)
+        
+        switch (key) {
+          case 'rebalanceIntervalNS':
+            return this.formatDuration(numValue / 1_000_000_000) // Convert ns to seconds
+          case 'portfolioRebalancePeriodNS':
+            return this.formatDuration(numValue / 1_000_000_000)
+          case 'shortSyncIntervalNS':
+            return this.formatDuration(numValue / 1_000_000_000)
+          case 'longSyncIntervalNS':
+            return this.formatDuration(numValue / 1_000_000_000)
+          case 'tokenSyncTimeoutNS':
+            return this.formatDuration(numValue / 1_000_000_000)
+          case 'minTradeValueICP':
+          case 'maxTradeValueICP':
+            return `${(numValue / 100_000_000).toFixed(2)} ICP` // Convert e8s to ICP
+          case 'maxSlippageBasisPoints':
+            return `${(numValue / 100).toFixed(2)}%` // Convert basis points to percentage
+          case 'maxTradeAttemptsPerInterval':
+          case 'maxKongswapAttempts':
+            return numValue.toLocaleString() + ' attempts'
+          case 'maxTradesStored':
+            return numValue.toLocaleString() + ' trades'
+          default:
+            return rawValue
+        }
+      }
+
+      // Format field names for display
+      const formatFieldName = (key) => {
+        const fieldNames = {
+          'rebalanceIntervalNS': 'Rebalance Interval',
+          'maxTradeAttemptsPerInterval': 'Max Trade Attempts',
+          'minTradeValueICP': 'Min Trade Value',
+          'maxTradeValueICP': 'Max Trade Value',
+          'portfolioRebalancePeriodNS': 'Portfolio Rebalance Period',
+          'maxSlippageBasisPoints': 'Max Slippage',
+          'maxTradesStored': 'Max Trades Stored',
+          'maxKongswapAttempts': 'Max Kongswap Attempts',
+          'shortSyncIntervalNS': 'Short Sync Interval',
+          'longSyncIntervalNS': 'Long Sync Interval',
+          'tokenSyncTimeoutNS': 'Token Sync Timeout'
+        }
+        return fieldNames[key] || key
+      }
+
+      const oldParsed = parseConfig(oldConfig)
+      const newParsed = parseConfig(newConfig)
+
+      // Get all fields and categorize as changed/unchanged
+      const allKeys = new Set([...Object.keys(oldParsed), ...Object.keys(newParsed)])
+      const changedFields = []
+      const unchangedFields = []
+      
+      allKeys.forEach(key => {
+        const oldVal = oldParsed[key] || 'N/A'
+        const newVal = newParsed[key] || 'N/A'
+        
+        const fieldData = {
+          field: formatFieldName(key),
+          oldFormatted: formatConfigValue(key, oldVal),
+          newFormatted: formatConfigValue(key, newVal),
+          changed: oldVal !== newVal
+        }
+        
+        if (fieldData.changed) {
+          changedFields.push(fieldData)
+        } else {
+          unchangedFields.push(fieldData)
+        }
+      })
+
+      if (changedFields.length === 0 && unchangedFields.length === 0) {
+        return ''
+      }
+
+      return `
+        <div class="alert alert-warning mt-2">
+          <strong>⚙️ Configuration Changes:</strong>
+          <div class="mt-2">
+            <div class="table-responsive">
+              <table class="table table-sm table-borderless mb-0">
+                <thead>
+                  <tr class="text-muted small">
+                    <th style="width: 40%">Setting</th>
+                    <th style="width: 30%">Before</th>
+                    <th style="width: 30%">After</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${changedFields.map(field => `
+                    <tr style="background-color: #fff3cd;">
+                      <td><strong>${field.field}</strong></td>
+                      <td class="text-muted">${field.oldFormatted}</td>
+                      <td class="text-success"><strong>→ ${field.newFormatted}</strong></td>
+                    </tr>
+                  `).join('')}
+                  ${unchangedFields.length > 0 ? `
+                    <tr>
+                      <td colspan="3" class="text-muted small pt-2">
+                        <em>Unchanged settings:</em>
+                      </td>
+                    </tr>
+                    ${unchangedFields.map(field => `
+                      <tr class="text-muted small">
+                        <td>${field.field}</td>
+                        <td colspan="2">${field.oldFormatted}</td>
+                      </tr>
+                    `).join('')}
+                  ` : ''}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      `
+    },
+
+    renderOldNewValues(actionType) {
+      if (!actionType || !actionType.type) {
+        return ''
+      }
+
+      const formatValue = (key, value, actionType, parameter) => {
+        if (value === null || value === undefined) return 'N/A'
+        
+        const numValue = parseInt(value)
+        
+        switch (key) {
+          case 'oldIntervalNS':
+          case 'newIntervalNS':
+            return this.formatDuration(numValue / 1_000_000_000) // Convert ns to seconds
+          case 'oldThreshold':
+          case 'newThreshold':
+            return numValue.toLocaleString() + ' tokens'
+          case 'oldLimit':
+          case 'newLimit':
+            if (actionType === 'UpdateMaxPortfolioSnapshots') {
+              return numValue.toLocaleString() + ' snapshots'
+            }
+            return numValue.toLocaleString()
+          case 'oldCondition':
+          case 'newCondition':
+            return value // Keep as text for conditions
+          case 'oldValue':
+          case 'newValue':
+            // Format parameter values based on parameter type
+            if (parameter && actionType === 'ParameterUpdate') {
+              return this.formatParameterValue(parameter, value)
+            }
+            return value.toString()
+          default:
+            return value.toString()
+        }
+      }
+
+      const getFieldName = (actionType) => {
+        switch (actionType) {
+          case 'UpdateTriggerCondition':
+            return 'Price Alert Condition'
+          case 'UpdatePortfolioCircuitBreaker':
+            return 'Circuit Breaker Condition'
+          case 'UpdatePausedTokenThreshold':
+            return 'Paused Token Threshold'
+          case 'UpdateMaxPortfolioSnapshots':
+            return 'Max Portfolio Snapshots'
+          case 'UpdatePortfolioSnapshotInterval':
+            return 'Portfolio Snapshot Interval'
+          default:
+            return 'Setting'
+        }
+      }
+
+      const getParameterName = (parameter) => {
+        // Handle both string format "MaxFollowers(550)" and object format {type: "MaxFollowers"}
+        let paramType;
+        if (typeof parameter === 'string') {
+          // Extract parameter name from string like "MaxFollowers(550)"
+          const match = parameter.match(/^([^(]+)/);
+          paramType = match ? match[1] : parameter;
+        } else if (parameter && parameter.type) {
+          paramType = parameter.type;
+        } else {
+          return 'System Parameter';
+        }
+        
+        switch (paramType) {
+          case 'FollowDepth':
+            return 'Follow Depth'
+          case 'MaxFollowers':
+            return 'Max Followers'
+          case 'MaxPastAllocations':
+            return 'Max Past Allocations'
+          case 'SnapshotInterval':
+            return 'Snapshot Interval'
+          case 'MaxTotalUpdates':
+            return 'Max Total Updates'
+          case 'MaxAllocationsPerDay':
+            return 'Max Allocations Per Day'
+          case 'AllocationWindow':
+            return 'Allocation Window'
+          case 'MaxFollowUnfollowActionsPerDay':
+            return 'Max Follow/Unfollow Actions Per Day'
+          case 'MaxFollowed':
+            return 'Max Followed'
+          case 'LogAdmin':
+            return 'Log Admin Principal'
+          default:
+            return paramType || 'System Parameter'
+        }
+      }
+
+      let oldValue, newValue, fieldName
+      
+      switch (actionType.type) {
+        case 'UpdateTriggerCondition':
+          if (actionType.oldCondition !== undefined && actionType.newCondition !== undefined) {
+            oldValue = formatValue('oldCondition', actionType.oldCondition, actionType.type)
+            newValue = formatValue('newCondition', actionType.newCondition, actionType.type)
+            fieldName = getFieldName(actionType.type)
+          }
+          break
+          
+        case 'UpdatePortfolioCircuitBreaker':
+          if (actionType.oldCondition !== undefined && actionType.newCondition !== undefined) {
+            oldValue = formatValue('oldCondition', actionType.oldCondition, actionType.type)
+            newValue = formatValue('newCondition', actionType.newCondition, actionType.type)
+            fieldName = getFieldName(actionType.type)
+          }
+          break
+          
+        case 'UpdatePausedTokenThreshold':
+          if (actionType.oldThreshold !== undefined && actionType.newThreshold !== undefined) {
+            oldValue = formatValue('oldThreshold', actionType.oldThreshold, actionType.type)
+            newValue = formatValue('newThreshold', actionType.newThreshold, actionType.type)
+            fieldName = getFieldName(actionType.type)
+          }
+          break
+          
+        case 'UpdateMaxPortfolioSnapshots':
+          if (actionType.oldLimit !== undefined && actionType.newLimit !== undefined) {
+            oldValue = formatValue('oldLimit', actionType.oldLimit, actionType.type)
+            newValue = formatValue('newLimit', actionType.newLimit, actionType.type)
+            fieldName = getFieldName(actionType.type)
+          }
+          break
+          
+        case 'UpdatePortfolioSnapshotInterval':
+          if (actionType.oldIntervalNS !== undefined && actionType.newIntervalNS !== undefined) {
+            oldValue = formatValue('oldIntervalNS', actionType.oldIntervalNS, actionType.type)
+            newValue = formatValue('newIntervalNS', actionType.newIntervalNS, actionType.type)
+            fieldName = getFieldName(actionType.type)
+          }
+          break
+          
+        case 'ParameterUpdate':
+          if (actionType.oldValue !== undefined && actionType.newValue !== undefined && actionType.parameter !== undefined) {
+            oldValue = formatValue('oldValue', actionType.oldValue, actionType.type, actionType.parameter)
+            newValue = formatValue('newValue', actionType.newValue, actionType.type, actionType.parameter)
+            fieldName = getParameterName(actionType.parameter)
+          }
+          break
+          
+        default:
+          return ''
+      }
+
+      if (!oldValue || !newValue || !fieldName) {
+        return ''
+      }
+
+      return `
+        <div class="alert alert-secondary mt-2">
+          <strong>📊 Value Change:</strong>
+          <div class="mt-2">
+            <div class="table-responsive">
+              <table class="table table-sm table-borderless mb-0">
+                <thead>
+                  <tr class="text-muted small">
+                    <th style="width: 40%">Setting</th>
+                    <th style="width: 30%">Before</th>
+                    <th style="width: 30%">After</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr style="background-color: #e2e3e5;">
+                    <td><strong>${fieldName}</strong></td>
+                    <td class="text-muted">${oldValue}</td>
+                    <td class="text-primary"><strong>→ ${newValue}</strong></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      `
+    },
+
+    // Helper method to format parameter values based on parameter type
+    formatParameterValue(parameter, value) {
+      if (!parameter || !parameter.type) return value
+      
+      const numValue = parseInt(value)
+      
+      switch (parameter.type) {
+        case 'FollowDepth':
+        case 'MaxFollowers':
+        case 'MaxPastAllocations':
+        case 'MaxTotalUpdates':
+        case 'MaxAllocationsPerDay':
+        case 'MaxFollowUnfollowActionsPerDay':
+        case 'MaxFollowed':
+          return numValue.toLocaleString()
+          
+        case 'SnapshotInterval':
+        case 'AllocationWindow':
+          // These are likely in nanoseconds, convert to human readable
+          if (numValue > 1_000_000_000) {
+            return this.formatDuration(numValue / 1_000_000_000)
+          }
+          return numValue.toLocaleString() + ' ns'
+          
+        case 'LogAdmin':
+          // Principal ID - keep as text but truncate if too long
+          if (value.length > 30) {
+            return value.substring(0, 15) + '...' + value.substring(value.length - 10)
+          }
+          return value
+          
+        default:
+          return value
+      }
+    },
+
+    // Helper method to format duration in seconds to human-readable format
+    formatDuration(seconds) {
+      if (seconds < 60) {
+        return `${seconds}s`
+      } else if (seconds < 3600) {
+        const minutes = Math.floor(seconds / 60)
+        const remainingSeconds = seconds % 60
+        return remainingSeconds > 0 ? `${minutes}m ${remainingSeconds}s` : `${minutes}m`
+      } else if (seconds < 86400) {
+        const hours = Math.floor(seconds / 3600)
+        const remainingMinutes = Math.floor((seconds % 3600) / 60)
+        return remainingMinutes > 0 ? `${hours}h ${remainingMinutes}m` : `${hours}h`
+      } else {
+        const days = Math.floor(seconds / 86400)
+        const remainingHours = Math.floor((seconds % 86400) / 3600)
+        return remainingHours > 0 ? `${days}d ${remainingHours}h` : `${days}d`
       }
     },
 
@@ -2238,6 +3454,463 @@ export default {
         case 'trade_trigger': return 'bg-info'
         case 'rebalance': return 'bg-primary'
         default: return 'bg-secondary'
+      }
+    },
+
+    // Fetch voting power for a specific user at a specific timestamp
+    async fetchVotingPower(blockId, user, timestamp) {
+      try {
+        // Set loading state
+        const currentState = this.fetchStates.get(blockId) || {}
+        this.fetchStates.set(blockId, { ...currentState, votingPower: 'loading' })
+        
+        // Update display text
+        this.votingPowerDisplays[blockId] = 'Fetching...'
+        
+        // Call the dao_governance_archive method
+        // The user parameter should already be a valid principal string
+        console.log('Fetching voting power for user:', user, 'at timestamp:', timestamp)
+        console.log('Timestamp type:', typeof timestamp, 'value:', timestamp)
+        console.log('Current time for reference:', Date.now(), 'vs', Date.now() * 1000000, '(nanoseconds)')
+        console.log('daoGovernanceActor available:', !!this.daoGovernanceActor)
+        console.log('getUserVotingPowerAtTime method available:', !!this.daoGovernanceActor?.getUserVotingPowerAtTime)
+        
+        const userPrincipal = Principal.fromText(user)
+        console.log('Converted to Principal:', userPrincipal.toText())
+        
+        // Convert timestamp to nanoseconds if needed
+        // The backend expects nanoseconds (19-digit numbers like 1754564244618898112)
+        let timestampNs
+        const timestampStr = timestamp.toString()
+        
+        console.log('Timestamp string length:', timestampStr.length, 'value:', timestampStr)
+        
+        if (timestampStr.length >= 18) {
+          // Already in nanoseconds (18-19 digits)
+          timestampNs = BigInt(timestamp)
+          console.log('Timestamp appears to be in nanoseconds already')
+        } else if (timestampStr.length >= 15) {
+          // Microseconds (15-16 digits), multiply by 1000
+          timestampNs = BigInt(timestamp) * 1000n
+          console.log('Converting from microseconds to nanoseconds')
+        } else if (timestampStr.length >= 12) {
+          // Milliseconds (13 digits), multiply by 1000000
+          timestampNs = BigInt(timestamp) * 1000000n
+          console.log('Converting from milliseconds to nanoseconds')
+        } else {
+          // Seconds, multiply by 1000000000
+          timestampNs = BigInt(timestamp) * 1000000000n
+          console.log('Converting from seconds to nanoseconds')
+        }
+        
+        console.log('Original timestamp:', timestamp, 'Converted to nanoseconds:', timestampNs.toString())
+        
+        const result = await this.daoGovernanceActor.getUserVotingPowerAtTime(userPrincipal, timestampNs)
+        console.log('Backend result:', result)
+        
+        if (result.ok !== undefined) {
+          // Update fetched data
+          const currentData = this.fetchedData.get(blockId) || {}
+          this.fetchedData.set(blockId, { ...currentData, votingPower: Number(result.ok) })
+          
+          // Update state to loaded
+          this.fetchStates.set(blockId, { ...currentState, votingPower: 'loaded' })
+          
+          // Update display text with formatted voting power
+          const vp = Number(result.ok)
+          const formattedVP = (vp / 100000000).toLocaleString(undefined, { maximumFractionDigits: 2 })
+          this.votingPowerDisplays[blockId] = formattedVP + ' VP'
+          
+          console.log('Updated voting power display for block', blockId, 'to:', formattedVP + ' VP')
+        } else {
+          throw new Error(`Backend returned error: ${JSON.stringify(result.err) || 'Unknown error'}`)
+        }
+      } catch (error) {
+        console.error('Error fetching voting power:', error)
+        console.error('Error details:', {
+          message: error.message,
+          stack: error.stack,
+          user: user,
+          timestamp: timestamp,
+          blockId: blockId
+        })
+        const currentState = this.fetchStates.get(blockId) || {}
+        this.fetchStates.set(blockId, { ...currentState, votingPower: 'error' })
+        
+        // Update display text for error
+        this.votingPowerDisplays[blockId] = 'Error'
+      }
+    },
+
+    // Fetch previous allocation for a specific user before a specific timestamp
+    async fetchPreviousAllocation(blockId, user, timestamp) {
+      try {
+        // Set loading state
+        const currentState = this.fetchStates.get(blockId) || {}
+        this.fetchStates.set(blockId, { ...currentState, previousAllocation: 'loading' })
+        
+        // Set loading display
+        this.previousAllocationDisplays[blockId] = 'Fetching...'
+        
+        console.log('Fetching previous allocation for user:', user, 'before timestamp:', timestamp)
+        
+        // Get the current blocks from the block browser (more efficient than fetching all)
+        const currentBlocks = this.blockBrowserBlocks || []
+        console.log('Searching through', currentBlocks.length, 'blocks for previous allocations')
+        console.log('Raw blockBrowserBlocks:', JSON.stringify(this.blockBrowserBlocks?.slice(0, 2), (key, value) => 
+          typeof value === 'bigint' ? value.toString() + 'n' : value, 2))
+        
+        let previousAllocation = null
+        let mostRecentTimestamp = -1
+        
+        // Parse blocks to find allocation changes for this user before the timestamp
+        for (const block of currentBlocks) {
+          try {
+            // Check if this is an allocation change block
+            if (block.block && typeof block.block === 'object') {
+              const blockData = block.block
+              
+              console.log('Checking block ID:', block.id, 'structure:', Object.keys(blockData))
+              console.log('Raw block data:', JSON.stringify(blockData, (key, value) => 
+                typeof value === 'bigint' ? value.toString() + 'n' : value, 2))
+              console.log('Full raw block:', JSON.stringify(block, (key, value) => 
+                typeof value === 'bigint' ? value.toString() + 'n' : value, 2))
+              
+              // Parse ICRC3 Map structure
+              let blockUser = null
+              let blockTimestamp = 0
+              let allocationData = null
+              let isAllocationBlock = false
+              
+              // Handle nested Map structure from ICRC3
+              if (blockData.Map && Array.isArray(blockData.Map)) {
+                console.log('Parsing ICRC3 Map structure with', blockData.Map.length, 'entries')
+                
+                // Parse the top-level Map entries
+                for (const [key, value] of blockData.Map) {
+                  if (key === 'tx' && value.Map && Array.isArray(value.Map)) {
+                    // Found tx entry, parse its Map
+                    for (const [txKey, txValue] of value.Map) {
+                      if (txKey === 'operation' && txValue.Text === '3allocation_change') {
+                        isAllocationBlock = true
+                        console.log('Found allocation change operation')
+                      } else if (txKey === 'data' && txValue.Map && Array.isArray(txValue.Map)) {
+                        // Found data entry, parse the data Map
+                        const parsedData = {}
+                        for (const [dataKey, dataValue] of txValue.Map) {
+                          if (dataKey === 'user' && dataValue.Blob) {
+                            // Convert Blob object to Uint8Array
+                            const blobArray = Object.values(dataValue.Blob)
+                            blockUser = Principal.fromUint8Array(new Uint8Array(blobArray)).toText()
+                            parsedData.user = new Uint8Array(blobArray)
+                            console.log('Parsed user:', blockUser)
+                          } else if (dataKey === 'timestamp' && dataValue.Int) {
+                            // Handle both string and BigInt forms
+                            if (typeof dataValue.Int === 'string') {
+                              blockTimestamp = Number(dataValue.Int.replace('n', ''))
+                            } else {
+                              blockTimestamp = Number(dataValue.Int)
+                            }
+                            parsedData.timestamp = blockTimestamp
+                            console.log('Parsed timestamp:', blockTimestamp, 'from:', dataValue.Int)
+                          } else if (dataKey === 'newAllocations' && dataValue.Array) {
+                            // Parse newAllocations array
+                            const newAllocations = dataValue.Array.map(allocMap => {
+                              const alloc = {}
+                              if (allocMap.Map) {
+                                for (const [allocKey, allocValue] of allocMap.Map) {
+                                  if (allocKey === 'token' && allocValue.Blob) {
+                                    alloc.token = new Uint8Array(Object.values(allocValue.Blob))
+                                  } else if (allocKey === 'basisPoints' && allocValue.Nat) {
+                                    // Handle both string and BigInt forms
+                                    if (typeof allocValue.Nat === 'string') {
+                                      alloc.basisPoints = Number(allocValue.Nat.replace('n', ''))
+                                    } else {
+                                      alloc.basisPoints = Number(allocValue.Nat)
+                                    }
+                                  }
+                                }
+                              }
+                              return alloc
+                            })
+                            parsedData.newAllocations = newAllocations
+                            console.log('Parsed newAllocations:', newAllocations.length, 'items')
+                          } else if (dataKey === 'oldAllocations' && dataValue.Array) {
+                            // Parse oldAllocations array (similar to newAllocations)
+                            const oldAllocations = dataValue.Array.map(allocMap => {
+                              const alloc = {}
+                              if (allocMap.Map) {
+                                for (const [allocKey, allocValue] of allocMap.Map) {
+                                  if (allocKey === 'token' && allocValue.Blob) {
+                                    alloc.token = new Uint8Array(Object.values(allocValue.Blob))
+                                  } else if (allocKey === 'basisPoints' && allocValue.Nat) {
+                                    // Handle both string and BigInt forms
+                                    if (typeof allocValue.Nat === 'string') {
+                                      alloc.basisPoints = Number(allocValue.Nat.replace('n', ''))
+                                    } else {
+                                      alloc.basisPoints = Number(allocValue.Nat)
+                                    }
+                                  }
+                                }
+                              }
+                              return alloc
+                            })
+                            parsedData.oldAllocations = oldAllocations
+                          }
+                        }
+                        allocationData = parsedData
+                      }
+                    }
+                  }
+                }
+                
+                console.log('Parsed ICRC3 Map - user:', blockUser, 'timestamp:', blockTimestamp, 'isAllocation:', isAllocationBlock)
+              } else {
+                console.log('Unknown block structure, skipping')
+              }
+              
+              if (blockUser === user && 
+                  blockTimestamp < timestamp && 
+                  blockTimestamp > mostRecentTimestamp &&
+                  isAllocationBlock &&
+                  allocationData && allocationData.newAllocations) {
+                
+                // Parse the allocation data - keep raw token data for proper formatting
+                const newAllocations = allocationData.newAllocations?.map(alloc => ({
+                  token: alloc.token, // Keep raw Uint8Array for token name lookup
+                  basisPoints: Number(alloc.basisPoints)
+                })) || []
+                
+                previousAllocation = {
+                  id: Number(block.id || 0),
+                  timestamp: blockTimestamp,
+                  user: blockUser,
+                  newAllocations,
+                  oldAllocations: allocationData.oldAllocations?.map(alloc => ({
+                    token: alloc.token, // Keep raw Uint8Array for token name lookup
+                    basisPoints: Number(alloc.basisPoints)
+                  })) || []
+                }
+                mostRecentTimestamp = blockTimestamp
+              }
+            }
+          } catch (parseError) {
+            console.warn('Error parsing block:', parseError)
+            continue
+          }
+        }
+        
+        console.log('Found previous allocation:', previousAllocation)
+        
+        // Update fetched data
+        const currentData = this.fetchedData.get(blockId) || {}
+        this.fetchedData.set(blockId, { ...currentData, previousAllocation })
+        
+        // Update state to loaded
+        this.fetchStates.set(blockId, { ...currentState, previousAllocation: 'loaded' })
+        
+        // Update reactive display (Vue 3 compatible)
+        if (previousAllocation) {
+          // Create detailed allocation breakdown
+          // Note: allocation.token is now a raw Uint8Array, same as blue pills
+          const allocDetails = previousAllocation.newAllocations.map(allocation => {
+            const tokenName = this.formatTokenNameFromBlob(allocation.token)
+            const percentage = (allocation.basisPoints / 100).toFixed(2)
+            return `${tokenName}: ${percentage}%`
+          }).join(', ')
+          
+          const date = new Date(previousAllocation.timestamp / 1000000).toLocaleDateString()
+          const displayText = `Found from ${date}: ${allocDetails}`
+          this.previousAllocationDisplays[blockId] = displayText
+        } else {
+          this.previousAllocationDisplays[blockId] = 'No previous allocation found'
+        }
+      } catch (error) {
+        console.error('Error fetching previous allocation:', error)
+        const currentState = this.fetchStates.get(blockId) || {}
+        this.fetchStates.set(blockId, { ...currentState, previousAllocation: 'error' })
+        
+        // Set error display
+        this.previousAllocationDisplays[blockId] = 'Error'
+      }
+    },
+
+    // Fetch all previous allocations for a specific user before a specific timestamp
+    async fetchAllPreviousAllocations(blockId, user, timestamp) {
+      try {
+        // Set loading state
+        const currentState = this.fetchStates.get(blockId) || {}
+        this.fetchStates.set(blockId, { ...currentState, allPreviousAllocations: 'loading' })
+        
+        console.log('Fetching all previous allocations for user:', user, 'before timestamp:', timestamp)
+        
+        // Get the current blocks from the block browser
+        const currentBlocks = this.blockBrowserBlocks || []
+        const allPreviousAllocations = []
+        
+        // Parse blocks to find all allocation changes for this user before the timestamp
+        for (const block of currentBlocks) {
+          try {
+            // Check if this is an allocation change block
+            if (block.block && typeof block.block === 'object') {
+              const blockData = block.block
+              
+              // Parse ICRC3 Map structure (same as single fetch)
+              let blockUser = null
+              let blockTimestamp = 0
+              let allocationData = null
+              let isAllocationBlock = false
+              
+              // Handle Map structure from ICRC3
+              if (Array.isArray(blockData) && blockData.length > 0) {
+                // This is a Map array structure
+                for (const [key, value] of blockData) {
+                  if (key === 'tx' && Array.isArray(value)) {
+                    // Found tx entry, look for data and operation
+                    for (const [txKey, txValue] of value) {
+                      if (txKey === 'data' && Array.isArray(txValue)) {
+                        // Found data entry
+                        const parsedData = {}
+                        for (const [dataKey, dataValue] of txValue) {
+                          if (dataKey === 'user' && dataValue instanceof Uint8Array) {
+                            blockUser = Principal.fromUint8Array(dataValue).toText()
+                            parsedData.user = dataValue
+                          } else if (dataKey === 'timestamp') {
+                            blockTimestamp = Number(dataValue)
+                            parsedData.timestamp = dataValue
+                          } else if (dataKey === 'newAllocations') {
+                            parsedData.newAllocations = dataValue
+                          } else if (dataKey === 'oldAllocations') {
+                            parsedData.oldAllocations = dataValue
+                          }
+                        }
+                        allocationData = parsedData
+                      } else if (txKey === 'operation' && txValue === '3allocation_change') {
+                        isAllocationBlock = true
+                      }
+                    }
+                  }
+                }
+              } else {
+                // Fallback for non-Map structure
+                blockUser = blockData.user ? Principal.fromUint8Array(new Uint8Array(blockData.user)).toText() : null
+                blockTimestamp = blockData.timestamp ? Number(blockData.timestamp) : 0
+                allocationData = blockData
+              }
+              
+              if (blockUser === user && 
+                  blockTimestamp < timestamp &&
+                  isAllocationBlock &&
+                  allocationData && allocationData.newAllocations) {
+                
+                // Parse the allocation data - keep raw token data for proper formatting
+                const newAllocations = allocationData.newAllocations?.map(alloc => ({
+                  token: alloc.token, // Keep raw Uint8Array for token name lookup
+                  basisPoints: Number(alloc.basisPoints)
+                })) || []
+                
+                const allocation = {
+                  id: Number(block.id || 0),
+                  timestamp: blockTimestamp,
+                  user: blockUser,
+                  newAllocations,
+                  oldAllocations: allocationData.oldAllocations?.map(alloc => ({
+                    token: alloc.token, // Keep raw Uint8Array for token name lookup
+                    basisPoints: Number(alloc.basisPoints)
+                  })) || []
+                }
+                allPreviousAllocations.push(allocation)
+              }
+            }
+          } catch (parseError) {
+            console.warn('Error parsing block:', parseError)
+            continue
+          }
+        }
+        
+        // Sort by timestamp (oldest first)
+        allPreviousAllocations.sort((a, b) => a.timestamp - b.timestamp)
+        
+        console.log('Found all previous allocations:', allPreviousAllocations)
+        
+        // Update fetched data
+        const currentData = this.fetchedData.get(blockId) || {}
+        this.fetchedData.set(blockId, { ...currentData, allPreviousAllocations })
+        
+        // Update state to loaded
+        this.fetchStates.set(blockId, { ...currentState, allPreviousAllocations: 'loaded' })
+      } catch (error) {
+        console.error('Error fetching all previous allocations:', error)
+        const currentState = this.fetchStates.get(blockId) || {}
+        this.fetchStates.set(blockId, { ...currentState, allPreviousAllocations: 'error' })
+      }
+    },
+
+    // Helper method to parse allocation change data from ICRC3 block
+    parseAllocationChangeFromBlock(block) {
+      try {
+        // Check if this is an allocation change block
+        if (!block.block || typeof block.block !== 'object') {
+          return null
+        }
+        
+        // The block structure should be a Map with allocation change data
+        const blockData = block.block
+        if (!blockData || !blockData.user || !blockData.newAllocations) {
+          return null
+        }
+        
+        // Extract user principal from blob
+        const userPrincipal = this.formatPrincipalFromBlob(blockData.user)
+        
+        // Parse allocations
+        const newAllocations = blockData.newAllocations?.map(alloc => ({
+          token: this.formatPrincipalFromBlob(alloc.token),
+          basisPoints: Number(alloc.basisPoints)
+        })) || []
+        
+        const oldAllocations = blockData.oldAllocations?.map(alloc => ({
+          token: this.formatPrincipalFromBlob(alloc.token),
+          basisPoints: Number(alloc.basisPoints)
+        })) || []
+        
+        return {
+          id: Number(blockData.id),
+          timestamp: Number(blockData.timestamp),
+          user: userPrincipal,
+          changeType: blockData.changeType,
+          oldAllocations,
+          newAllocations,
+          votingPower: Number(blockData.votingPower || 0),
+          maker: blockData.maker ? this.formatPrincipalFromBlob(blockData.maker) : null,
+          reason: blockData.reason || null
+        }
+      } catch (error) {
+        console.error('Error parsing allocation change block:', error)
+        return null
+      }
+    },
+
+    // Handle clicks on fetch buttons using event delegation
+    handleFetchButtonClick(event) {
+      const button = event.target.closest('[data-action]')
+      if (!button) return
+      
+      const action = button.dataset.action
+      const blockId = button.dataset.blockId
+      const userId = button.dataset.userId
+      const timestamp = parseInt(button.dataset.timestamp)
+      
+      switch (action) {
+        case 'fetchVP':
+          this.fetchVotingPower(blockId, userId, timestamp)
+          break
+        case 'fetchPrevious':
+          this.fetchPreviousAllocation(blockId, userId, timestamp)
+          break
+        case 'fetchAll':
+          this.fetchAllPreviousAllocations(blockId, userId, timestamp)
+          break
       }
     }
   }

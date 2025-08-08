@@ -12,7 +12,7 @@ import { Actor, AnonymousIdentity } from "@dfinity/agent"
 import { createAgent } from '@dfinity/utils'
 import { idlFactory } from "../../../declarations/ledger_canister/ledger_canister.did.js"
 import { idlFactory as daoBackendIDL } from "../../../declarations/dao_backend/DAO_backend.did.js"
-import { Result_4, Result_8, idlFactory as treasuryIDL, UpdateConfig, RebalanceConfig, _SERVICE as TreasuryService } from "../../../declarations/treasury/treasury.did.js"
+import { Result_4, idlFactory as treasuryIDL, UpdateConfig, RebalanceConfig, _SERVICE as TreasuryService } from "../../../declarations/treasury/treasury.did.js"
 import { idlFactory as neuronSnapshotIDL, _SERVICE as NeuronSnapshotService } from "../../../declarations/neuronSnapshot/neuronSnapshot.did.js"
 import { idlFactory as sneedForumIDL, _SERVICE as SneedForumService } from "../../../declarations/sneed_sns_forum/sneed_sns_forum.did.js"
 import { idlFactory as appSneedDaoIDL, _SERVICE as AppSneedDaoService } from "../../../declarations/app_sneeddao_backend/app_sneeddao_backend.did.js"
@@ -33,6 +33,7 @@ interface SnapshotInfo {
 }
 interface TradingMetrics {
     lastUpdate: bigint;
+    lastRebalanceAttempt: bigint;
     totalTradesExecuted: bigint;
     totalTradesFailed: bigint;
     avgSlippage: number;
@@ -2215,7 +2216,7 @@ export const useTacoStore = defineStore('taco', () => {
                         : 'Failed',
                     rebalanceError: 'Failed' in rebalanceStatus ? rebalanceStatus.Failed : undefined,
                     tradingMetrics: {
-                        lastRebalanceAttempt: BigInt(metrics.lastUpdate),
+                        lastRebalanceAttempt: BigInt(metrics.lastRebalanceAttempt),
                         totalTradesExecuted: metrics.totalTradesExecuted,
                         totalTradesFailed: metrics.totalTradesFailed,
                         avgSlippage: metrics.avgSlippage,
@@ -2414,7 +2415,7 @@ export const useTacoStore = defineStore('taco', () => {
                 canisterId: treasuryCanisterId(),
             });
 
-            const result = await actor.admin_recoverPoolBalances() as Result_8;
+            const result = await actor.admin_recoverPoolBalances() as any;
             if ('err' in result) {
                 throw new Error(JSON.stringify(result.err));
             }
@@ -2514,7 +2515,7 @@ export const useTacoStore = defineStore('taco', () => {
             console.error('fetchSystemLogs: Error fetching system logs:', error);
         }
     }
-    const startRebalancing = async () => {
+    const startRebalancing = async (reason?: string) => {
         try {
             // create auth client
             const authClient = await getAuthClient();
@@ -2546,7 +2547,7 @@ export const useTacoStore = defineStore('taco', () => {
                 canisterId: treasuryCanisterId(),
             })
 
-            const result = await actor.startRebalancing() as RebalanceResult;
+            const result = await actor.startRebalancing(reason ? [reason] : []) as RebalanceResult;
             if ('err' in result) {
                 console.error('Error starting rebalancing:', result.err);
                 return false;
@@ -2557,7 +2558,7 @@ export const useTacoStore = defineStore('taco', () => {
             return false;
         }
     }
-    const stopRebalancing = async () => {
+    const stopRebalancing = async (reason?: string) => {
         try {
             // create auth client
             const authClient = await getAuthClient();
@@ -2589,7 +2590,7 @@ export const useTacoStore = defineStore('taco', () => {
                 canisterId: treasuryCanisterId(),
             })
 
-            const result = await actor.stopRebalancing() as RebalanceResult;
+            const result = await actor.stopRebalancing(reason ? [reason] : []) as RebalanceResult;
             if ('err' in result) {
                 console.error('Error stopping rebalancing:', result.err);
                 return false;
@@ -2600,7 +2601,7 @@ export const useTacoStore = defineStore('taco', () => {
             return false;
         }
     }
-    const updateRebalanceConfig = async (updates: UpdateConfig) => {
+    const updateRebalanceConfig = async (updates: UpdateConfig, reason?: string) => {
         // console.log('TacoStore: updateRebalanceConfig called with', updates);
         try {
             appLoadingOn();
@@ -2632,7 +2633,7 @@ export const useTacoStore = defineStore('taco', () => {
             });
             // END OF NOTE TO AI!
 
-            const result = await treasury.updateRebalanceConfig(updates, []);
+            const result = await treasury.updateRebalanceConfig(updates, [], reason ? [reason] : []);
             // console.log('TacoStore: updateRebalanceConfig result:', result);
 
             if ('ok' in result) {
@@ -2778,7 +2779,7 @@ export const useTacoStore = defineStore('taco', () => {
             appLoadingOff();
         }
     }
-    const executeTradingCycle = async () => {
+    const executeTradingCycle = async (reason?: string) => {
         appLoadingOn();
         try {
             // create auth client
@@ -2804,7 +2805,7 @@ export const useTacoStore = defineStore('taco', () => {
                 canisterId: treasuryCanisterId()
             });
 
-            await treasury.admin_executeTradingCycle();
+            await treasury.admin_executeTradingCycle(reason ? [reason] : []);
         } catch (error) {
             console.error('Error executing trading cycle:', error);
             throw error;
@@ -2812,7 +2813,7 @@ export const useTacoStore = defineStore('taco', () => {
             appLoadingOff();
         }
     }
-    const pauseToken = async (principal: Principal): Promise<boolean> => {
+    const pauseToken = async (principal: Principal, reason: string): Promise<boolean> => {
         // console.log('TacoStore: pauseToken called for', principal.toText());
         try {
             // Create auth client
@@ -2842,7 +2843,7 @@ export const useTacoStore = defineStore('taco', () => {
                 canisterId,
             });
 
-            const result = await actor.pauseToken(principal) as Result_1;
+            const result = await actor.pauseToken(principal, reason) as Result_1;
             if ('err' in result) {
                 console.error('Error pausing token:', result.err);
                 return false;
@@ -2854,7 +2855,7 @@ export const useTacoStore = defineStore('taco', () => {
             return false;
         }
     }
-    const unpauseToken = async (principal: Principal): Promise<boolean> => {
+    const unpauseToken = async (principal: Principal, reason: string): Promise<boolean> => {
         // console.log('TacoStore: unpauseToken called for', principal.toText());
         try {
             // Create auth client
@@ -2884,7 +2885,7 @@ export const useTacoStore = defineStore('taco', () => {
                 canisterId,
             });
 
-            const result = await actor.unpauseToken(principal) as Result_1;
+            const result = await actor.unpauseToken(principal, reason) as Result_1;
             if ('err' in result) {
                 console.error('Error unpausing token:', result.err);
                 return false;
@@ -3036,8 +3037,8 @@ export const useTacoStore = defineStore('taco', () => {
             throw error;
         }
     }
-    const updateSystemParameter = async (paramName: string, value: bigint): Promise<boolean> => {
-        // console.log('TacoStore: updateSystemParameter called with', paramName, value);
+    const updateSystemParameter = async (param: any, reason?: string): Promise<boolean> => {
+        // console.log('TacoStore: updateSystemParameter called with', param, reason);
         try {
             appLoadingOn();
 
@@ -3063,13 +3064,13 @@ export const useTacoStore = defineStore('taco', () => {
             let canisterId = daoBackendCanisterId();
 
 
-            // Create treasury actor with authenticated identity
+            // Create DAO backend actor with authenticated identity
             const backend = Actor.createActor(daoBackendIDL, {
                 agent,
                 canisterId
             });
 
-            const result = await backend.updateSystemParameter(paramName, value) as SystemParameterResult;
+            const result = await backend.updateSystemParameter(param, reason ? [reason] : []) as SystemParameterResult;
             
             if ('ok' in result) {
                 addToast({
@@ -3107,7 +3108,7 @@ export const useTacoStore = defineStore('taco', () => {
             appLoadingOff();
         }
     }
-    const updateSnapshotInterval = async (intervalNS: bigint): Promise<boolean> => {
+    const updateSnapshotInterval = async (intervalNS: bigint, reason?: string): Promise<boolean> => {
         // console.log('TacoStore: updateSnapshotInterval called with', intervalNS);
         try {
             appLoadingOn();
@@ -3147,7 +3148,7 @@ export const useTacoStore = defineStore('taco', () => {
             //    snapshotIntervalNS: [intervalNS]
             //};
 
-            const result = await backend.updateSystemParameter({ SnapshotInterval: intervalNS }) as SystemParameterResult;
+            const result = await backend.updateSystemParameter({ SnapshotInterval: intervalNS }, reason ? [reason] : []) as SystemParameterResult;
             
             if ('ok' in result) {
                 addToast({
@@ -3515,7 +3516,7 @@ export const useTacoStore = defineStore('taco', () => {
             throw error;
         }
     }
-    const unpauseTokenFromTrading = async (token: Principal) => {
+    const unpauseTokenFromTrading = async (token: Principal, reason?: string) => {
         try {
             const authClient = await getAuthClient();
             
@@ -3535,7 +3536,7 @@ export const useTacoStore = defineStore('taco', () => {
                 canisterId: treasuryCanisterId()
             });
 
-            return await treasury.unpauseTokenFromTrading(token);
+            return await treasury.unpauseTokenFromTrading(token, reason ? [reason] : []);
         } catch (error: any) {
             console.error('Error unpausing token from trading:', error);
             throw error;
@@ -3567,7 +3568,7 @@ export const useTacoStore = defineStore('taco', () => {
             throw error;
         }
     }
-    const clearAllTradingPauses = async () => {
+    const clearAllTradingPauses = async (reason?: string) => {
         try {
             const authClient = await getAuthClient();
             
@@ -3587,7 +3588,7 @@ export const useTacoStore = defineStore('taco', () => {
                 canisterId: treasuryCanisterId()
             });
 
-            return await treasury.clearAllTradingPauses();
+            return await treasury.clearAllTradingPauses(reason ? [reason] : []);
         } catch (error: any) {
             console.error('Error clearing all trading pauses:', error);
             throw error;
@@ -3684,7 +3685,7 @@ export const useTacoStore = defineStore('taco', () => {
             return { snapshots: [], totalCount: BigInt(0) };
         }
     }
-    const takeManualPortfolioSnapshot = async () => {
+    const takeManualPortfolioSnapshot = async (reason?: string) => {
         try {
             const authClient = await getAuthClient();
             
@@ -3704,7 +3705,7 @@ export const useTacoStore = defineStore('taco', () => {
                 canisterId: treasuryCanisterId()
             });
 
-            const result = await treasury.takeManualPortfolioSnapshot();
+            const result = await treasury.takeManualPortfolioSnapshot(reason ? [reason] : []);
             if ('ok' in result) {
                 // console.log('Manual portfolio snapshot taken:', result.ok);
                 return result.ok;
@@ -3714,6 +3715,136 @@ export const useTacoStore = defineStore('taco', () => {
             }
         } catch (error: any) {
             console.error('Error taking manual portfolio snapshot:', error);
+            throw error;
+        }
+    }
+
+    // Portfolio snapshot status and management
+    const getPortfolioSnapshotStatus = async () => {
+        try {
+            const host = process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app";
+            const agent = await createAgent({
+                identity: new AnonymousIdentity(),
+                host,
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            });
+
+            const treasury = Actor.createActor<TreasuryService>(treasuryIDL, {
+                agent,
+                canisterId: treasuryCanisterId()
+            });
+
+            const status = await treasury.getPortfolioSnapshotStatus();
+            return {
+                status: status.status,
+                intervalMinutes: Number(status.intervalMinutes),
+                lastSnapshotTime: Number(status.lastSnapshotTime)
+            };
+        } catch (error: any) {
+            console.error('Error getting portfolio snapshot status:', error);
+            return {
+                status: { Stopped: null },
+                intervalMinutes: 60,
+                lastSnapshotTime: 0
+            };
+        }
+    }
+
+    const startPortfolioSnapshots = async (reason?: string) => {
+        try {
+            const authClient = await getAuthClient();
+            
+            if (!await authClient.isAuthenticated()) {
+                throw new Error('User not authenticated');
+            }
+
+            const identity = await authClient.getIdentity();
+            const agent = await createAgent({
+                identity,
+                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            });
+
+            const treasury = Actor.createActor<TreasuryService>(treasuryIDL, {
+                agent,
+                canisterId: treasuryCanisterId()
+            });
+
+            const result = await treasury.startPortfolioSnapshots(reason ? [reason] : []);
+            if ('ok' in result) {
+                return true;
+            } else {
+                console.error('Error starting portfolio snapshots:', result.err);
+                throw new Error(result.err);
+            }
+        } catch (error: any) {
+            console.error('Error starting portfolio snapshots:', error);
+            throw error;
+        }
+    }
+
+    const stopPortfolioSnapshots = async (reason?: string) => {
+        try {
+            const authClient = await getAuthClient();
+            
+            if (!await authClient.isAuthenticated()) {
+                throw new Error('User not authenticated');
+            }
+
+            const identity = await authClient.getIdentity();
+            const agent = await createAgent({
+                identity,
+                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            });
+
+            const treasury = Actor.createActor<TreasuryService>(treasuryIDL, {
+                agent,
+                canisterId: treasuryCanisterId()
+            });
+
+            const result = await treasury.stopPortfolioSnapshots(reason ? [reason] : []);
+            if ('ok' in result) {
+                return true;
+            } else {
+                console.error('Error stopping portfolio snapshots:', result.err);
+                throw new Error(result.err);
+            }
+        } catch (error: any) {
+            console.error('Error stopping portfolio snapshots:', error);
+            throw error;
+        }
+    }
+
+    const updatePortfolioSnapshotInterval = async (intervalMinutes: number, reason?: string) => {
+        try {
+            const authClient = await getAuthClient();
+            
+            if (!await authClient.isAuthenticated()) {
+                throw new Error('User not authenticated');
+            }
+
+            const identity = await authClient.getIdentity();
+            const agent = await createAgent({
+                identity,
+                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            });
+
+            const treasury = Actor.createActor<TreasuryService>(treasuryIDL, {
+                agent,
+                canisterId: treasuryCanisterId()
+            });
+
+            const result = await treasury.updatePortfolioSnapshotInterval(BigInt(intervalMinutes), reason ? [reason] : []);
+            if ('ok' in result) {
+                return true;
+            } else {
+                console.error('Error updating portfolio snapshot interval:', result.err);
+                throw new Error(result.err);
+            }
+        } catch (error: any) {
+            console.error('Error updating portfolio snapshot interval:', error);
             throw error;
         }
     }
@@ -4132,7 +4263,7 @@ export const useTacoStore = defineStore('taco', () => {
             throw error;
         }
     }
-    const updateMaxPortfolioSnapshots = async (newLimit: number) => {
+    const updateMaxPortfolioSnapshots = async (newLimit: number, reason?: string) => {
         try {
             const authClient = await getAuthClient();
             
@@ -4152,7 +4283,7 @@ export const useTacoStore = defineStore('taco', () => {
                 canisterId: treasuryCanisterId()
             });
 
-            const result = await (treasury as any).updateMaxPortfolioSnapshots(BigInt(newLimit));
+            const result = await (treasury as any).updateMaxPortfolioSnapshots(BigInt(newLimit), reason ? [reason] : []);
             if ('ok' in result) {
                 // console.log('Successfully updated max portfolio snapshots:', result.ok);
                 return result.ok;
@@ -5164,5 +5295,11 @@ export const useTacoStore = defineStore('taco', () => {
         setNeuronName,
         getUserNeurons,
         toggleThreadMenu,
+        
+        // Portfolio snapshot management
+        getPortfolioSnapshotStatus,
+        startPortfolioSnapshots,
+        stopPortfolioSnapshots,
+        updatePortfolioSnapshotInterval,
     }
 })

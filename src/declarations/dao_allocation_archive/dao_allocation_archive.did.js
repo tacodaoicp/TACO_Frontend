@@ -1,24 +1,26 @@
 export const idlFactory = ({ IDL }) => {
   const GetBlocksResult = IDL.Rec();
   const Value = IDL.Rec();
-  const ExchangeType = IDL.Variant({
-    'KongSwap' : IDL.Null,
-    'ICPSwap' : IDL.Null,
-  });
-  const PriceSource = IDL.Variant({
-    'NTN' : IDL.Null,
-    'Aggregated' : IDL.Null,
-    'Oracle' : IDL.Null,
-    'Exchange' : ExchangeType,
-  });
-  const PriceBlockData = IDL.Record({
+  const Allocation = IDL.Record({
     'token' : IDL.Principal,
-    'change24h' : IDL.Opt(IDL.Float64),
-    'source' : PriceSource,
-    'volume24h' : IDL.Opt(IDL.Nat),
+    'basisPoints' : IDL.Nat,
+  });
+  const AllocationChangeType = IDL.Variant({
+    'FollowAction' : IDL.Record({ 'followedUser' : IDL.Principal }),
+    'UserUpdate' : IDL.Record({ 'userInitiated' : IDL.Bool }),
+    'SystemRebalance' : IDL.Null,
+    'VotingPowerChange' : IDL.Null,
+  });
+  const AllocationChangeBlockData = IDL.Record({
+    'id' : IDL.Nat,
+    'maker' : IDL.Principal,
+    'oldAllocations' : IDL.Vec(Allocation),
+    'changeType' : AllocationChangeType,
+    'votingPower' : IDL.Nat,
+    'newAllocations' : IDL.Vec(Allocation),
+    'user' : IDL.Principal,
     'timestamp' : IDL.Int,
-    'priceICP' : IDL.Nat,
-    'priceUSD' : IDL.Float64,
+    'reason' : IDL.Opt(IDL.Text),
   });
   const ArchiveError = IDL.Variant({
     'StorageFull' : IDL.Null,
@@ -29,8 +31,24 @@ export const idlFactory = ({ IDL }) => {
     'InvalidBlockType' : IDL.Null,
     'InvalidTimeRange' : IDL.Null,
   });
-  const Result_6 = IDL.Variant({ 'ok' : IDL.Nat, 'err' : ArchiveError });
-  const Result_1 = IDL.Variant({ 'ok' : IDL.Text, 'err' : IDL.Text });
+  const Result_4 = IDL.Variant({ 'ok' : IDL.Nat, 'err' : ArchiveError });
+  const FollowActionType = IDL.Variant({
+    'Follow' : IDL.Null,
+    'Unfollow' : IDL.Null,
+  });
+  const FollowActionBlockData = IDL.Record({
+    'id' : IDL.Nat,
+    'previousFollowCount' : IDL.Nat,
+    'action' : FollowActionType,
+    'followed' : IDL.Principal,
+    'follower' : IDL.Principal,
+    'timestamp' : IDL.Int,
+    'newFollowCount' : IDL.Nat,
+  });
+  const Result_3 = IDL.Variant({
+    'ok' : IDL.Vec(AllocationChangeBlockData),
+    'err' : ArchiveError,
+  });
   const ArchiveStatus = IDL.Record({
     'supportedBlockTypes' : IDL.Vec(IDL.Text),
     'newestBlock' : IDL.Opt(IDL.Nat),
@@ -39,15 +57,9 @@ export const idlFactory = ({ IDL }) => {
     'totalBlocks' : IDL.Nat,
     'lastArchiveTime' : IDL.Int,
   });
-  const Result_5 = IDL.Variant({ 'ok' : ArchiveStatus, 'err' : ArchiveError });
-  const Result_4 = IDL.Variant({
-    'ok' : IDL.Opt(
-      IDL.Record({
-        'usdPrice' : IDL.Float64,
-        'timestamp' : IDL.Int,
-        'icpPrice' : IDL.Nat,
-      })
-    ),
+  const Result_2 = IDL.Variant({ 'ok' : ArchiveStatus, 'err' : ArchiveError });
+  const Result_1 = IDL.Variant({
+    'ok' : IDL.Vec(FollowActionBlockData),
     'err' : ArchiveError,
   });
   const LogLevel = IDL.Variant({
@@ -61,10 +73,6 @@ export const idlFactory = ({ IDL }) => {
     'level' : LogLevel,
     'message' : IDL.Text,
     'timestamp' : IDL.Int,
-  });
-  const Result_3 = IDL.Variant({
-    'ok' : IDL.Vec(PriceBlockData),
-    'err' : ArchiveError,
   });
   const TimerStatus = IDL.Record({
     'innerLoopRunning' : IDL.Bool,
@@ -123,68 +131,37 @@ export const idlFactory = ({ IDL }) => {
     'hash_tree' : IDL.Vec(IDL.Nat8),
   });
   const BlockType = IDL.Record({ 'url' : IDL.Text, 'block_type' : IDL.Text });
-  const TacoBlockType = IDL.Variant({
-    'NeuronUpdate' : IDL.Null,
-    'VotingPower' : IDL.Null,
-    'AllocationChange' : IDL.Null,
-    'Pause' : IDL.Null,
-    'Price' : IDL.Null,
-    'FollowAction' : IDL.Null,
-    'Portfolio' : IDL.Null,
-    'Trade' : IDL.Null,
-    'Admin' : IDL.Null,
-    'Allocation' : IDL.Null,
-    'Circuit' : IDL.Null,
-  });
-  const BlockFilter = IDL.Record({
-    'maxAmount' : IDL.Opt(IDL.Nat),
-    'startTime' : IDL.Opt(IDL.Int),
-    'minAmount' : IDL.Opt(IDL.Nat),
-    'endTime' : IDL.Opt(IDL.Int),
-    'traders' : IDL.Opt(IDL.Vec(IDL.Principal)),
-    'tokens' : IDL.Opt(IDL.Vec(IDL.Principal)),
-    'blockTypes' : IDL.Opt(IDL.Vec(TacoBlockType)),
-  });
-  const ArchiveQueryResult = IDL.Record({
-    'hasMore' : IDL.Bool,
-    'totalCount' : IDL.Nat,
-    'nextIndex' : IDL.Opt(IDL.Nat),
-    'blocks' : IDL.Vec(Block),
-  });
-  const Result_2 = IDL.Variant({
-    'ok' : ArchiveQueryResult,
-    'err' : ArchiveError,
-  });
-  const ArchiveConfig = IDL.Record({
-    'maxBlocksPerCanister' : IDL.Nat,
-    'blockRetentionPeriodNS' : IDL.Int,
-    'autoArchiveEnabled' : IDL.Bool,
-    'enableCompression' : IDL.Bool,
-  });
-  const Result = IDL.Variant({ 'ok' : IDL.Text, 'err' : ArchiveError });
-  const PriceArchiveV2 = IDL.Service({
-    'archivePriceBlock' : IDL.Func([PriceBlockData], [Result_6], []),
-    'catchUpImport' : IDL.Func([], [Result_1], []),
-    'getArchiveStats' : IDL.Func([], [ArchiveStatus], ['query']),
-    'getArchiveStatus' : IDL.Func([], [Result_5], ['query']),
-    'getBatchImportStatus' : IDL.Func(
+  const Result = IDL.Variant({ 'ok' : IDL.Text, 'err' : IDL.Text });
+  const DAOAllocationArchive = IDL.Service({
+    'archiveAllocationChange' : IDL.Func(
+        [AllocationChangeBlockData],
+        [Result_4],
         [],
-        [
-          IDL.Record({
-            'lastImportedPriceTime' : IDL.Int,
-            'intervalSeconds' : IDL.Nat,
-            'isRunning' : IDL.Bool,
-          }),
-        ],
-        ['query'],
       ),
-    'getLatestPrice' : IDL.Func([IDL.Principal], [Result_4], ['query']),
-    'getLogs' : IDL.Func([IDL.Nat], [IDL.Vec(LogEntry)], ['query']),
-    'getPriceHistory' : IDL.Func(
-        [IDL.Principal, IDL.Int, IDL.Int],
+    'archiveFollowAction' : IDL.Func([FollowActionBlockData], [Result_4], []),
+    'getAllocationChangesByToken' : IDL.Func(
+        [IDL.Principal, IDL.Nat],
         [Result_3],
         ['query'],
       ),
+    'getAllocationChangesByUser' : IDL.Func(
+        [IDL.Principal, IDL.Nat],
+        [Result_3],
+        ['query'],
+      ),
+    'getArchiveStats' : IDL.Func([], [ArchiveStatus], ['query']),
+    'getArchiveStatus' : IDL.Func([], [Result_2], ['query']),
+    'getBatchImportStatus' : IDL.Func(
+        [],
+        [IDL.Record({ 'intervalSeconds' : IDL.Nat, 'isRunning' : IDL.Bool })],
+        ['query'],
+      ),
+    'getFollowActionsByUser' : IDL.Func(
+        [IDL.Principal, IDL.Nat],
+        [Result_1],
+        ['query'],
+      ),
+    'getLogs' : IDL.Func([IDL.Nat], [IDL.Vec(LogEntry)], ['query']),
     'getTimerStatus' : IDL.Func([], [TimerStatus], ['query']),
     'icrc3_get_archives' : IDL.Func(
         [GetArchivesArgs],
@@ -206,17 +183,15 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Vec(BlockType)],
         ['query'],
       ),
-    'queryBlocks' : IDL.Func([BlockFilter], [Result_2], ['query']),
-    'resetImportTimestamps' : IDL.Func([], [Result_1], []),
-    'runLegacyManualBatchImport' : IDL.Func([], [Result_1], []),
-    'runManualBatchImport' : IDL.Func([], [Result_1], []),
-    'setMaxInnerLoopIterations' : IDL.Func([IDL.Nat], [Result_1], []),
-    'startBatchImportSystem' : IDL.Func([], [Result_1], []),
-    'startLegacyBatchImportSystem' : IDL.Func([], [Result_1], []),
-    'stopAllTimers' : IDL.Func([], [Result_1], []),
-    'stopBatchImportSystem' : IDL.Func([], [Result_1], []),
-    'updateConfig' : IDL.Func([ArchiveConfig], [Result], []),
+    'importAllocationChanges' : IDL.Func([], [Result], []),
+    'importFollowActions' : IDL.Func([], [Result], []),
+    'resetImportTimestamps' : IDL.Func([], [Result], []),
+    'runManualBatchImport' : IDL.Func([], [Result], []),
+    'setMaxInnerLoopIterations' : IDL.Func([IDL.Nat], [Result], []),
+    'startBatchImportSystem' : IDL.Func([], [Result], []),
+    'stopAllTimers' : IDL.Func([], [Result], []),
+    'stopBatchImportSystem' : IDL.Func([], [Result], []),
   });
-  return PriceArchiveV2;
+  return DAOAllocationArchive;
 };
 export const init = ({ IDL }) => { return []; };
