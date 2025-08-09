@@ -775,11 +775,11 @@
 
                                 <span class="mt-2"><strong>Immediate majority decision:</strong></span>
 
-                                <span>A proposal is immediately adopted or rejected if, before the voting period ends, more than half of the total voting power votes Yes (indicated by the yellow marker), or at least half votes No, respectively.</span>
+                                <span>A proposal is immediately adopted or rejected if, before the voting period ends, either a simple majority or a super majority of yes votes is reached, depending on the proposal type.</span>
 
                                 <span class="mt-2"><strong>Standard majority decision:</strong></span>
 
-                                <span>At the end of the voting period, a proposal is adopted if more than half of the votes cast are Yes votes, provided these votes represent at least 3% of the total voting power (indicated by the orange marker). Otherwise, it is rejected. Before a proposal is decided, the voting period can be extended in order to "wait for quiet". Such voting period extensions occur when a proposal's voting results turn from either a Yes majority to a No majority or vice versa.</span>
+                                <span>At the end of the voting period, a proposal is adopted if either a simple majority or a super majority of yes votes is reached, depending on the proposal type, provided these votes represent at least 3% of the total voting power. Otherwise, it is rejected. Before a proposal is decided, the voting period can be extended in order to "wait for quiet". Such voting period extensions occur when a proposal's voting results turn from either a Yes majority to a No majority or vice versa.</span>
 
                             </span>
 
@@ -901,13 +901,14 @@
                     </div>
 
                     <!-- your neurons title -->
-                    <span class="mt-3" style="font-size: 1.5rem;">Your Neurons</span>
+                    <!-- <span class="mt-3" style="font-size: 1.5rem;">Your Neurons</span> -->
 
                     <!-- no neurons message -->
-                    <span v-if="userNeurons.length === 0" class="fst-italic">No TACO neurons found</span>
+                    <!-- <span v-if="userNeurons.length === 0" class="fst-italic">No TACO neurons found</span> -->
 
                     <!-- your neurons key value pairs -->
-                    <div v-else class="forum-thread-view__settings__key-value-pairs pt-0">
+                    <!-- v-else -->
+                    <div v-if="false" class="forum-thread-view__settings__key-value-pairs pt-0">
 
                         <!-- settings key value pair -->
                         <div v-for="neuron in userNeurons" 

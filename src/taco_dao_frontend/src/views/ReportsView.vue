@@ -52,7 +52,30 @@
               <div class="taco-report-explorer__list-container">
                 
                 <!-- reports list -->
-                <ul class="taco-report-explorer__list">    
+                <ul class="taco-report-explorer__list">  
+                  
+                  <!-- kong swap - report item -->
+                  <li class="taco-report-explorer__list-item" @click="toggleReportMenuOnMobile(); router.push('/reports/kongswap')">
+                    
+                    <!-- report -->
+                    <div class="taco-report-explorer__list-report"
+                    :class="{ 'taco-report-explorer__list-report--active': reportId === 7 }">
+                      
+                      <!-- report title icon -->              
+                      <div class="taco-report-explorer__list-report__icon"
+                          :style="{ backgroundImage: `url(${kongSwapIconUrl})` }"></div>            
+                      
+                      <!-- report title container -->
+                      <div class="taco-report-explorer__list-report__title-container">
+                        
+                        <!-- report title -->
+                        <span class="taco-report-explorer__list-report__title">DUE DILIGENCE PROCESS KongSwap (KONG)</span>
+                        
+                      </div>
+                      
+                    </div>
+                    
+                  </li>
 
                   <!-- open chat - report item -->
                   <li class="taco-report-explorer__list-item" @click="toggleReportMenuOnMobile(); router.push('/reports/openchat')">
@@ -78,7 +101,7 @@
                   </li>
 
                   <!-- wrapped gold dao - report item -->
-                  <li class="taco-report-explorer__list-item" @click="toggleReportMenuOnMobile(); router.push('/reports/ddsgldt')">
+                  <li class="taco-report-explorer__list-item" @click="toggleReportMenuOnMobile(); router.push('/reports/sgldt')">
                     
                     <!-- report -->
                     <div class="taco-report-explorer__list-report"
@@ -101,7 +124,7 @@
                   </li>
 
                   <!-- gold dao - report item -->
-                  <li class="taco-report-explorer__list-item" @click="toggleReportMenuOnMobile(); router.push('/reports/ddgolddao')">
+                  <li class="taco-report-explorer__list-item" @click="toggleReportMenuOnMobile(); router.push('/reports/golddao')">
                     
                     <!-- report -->
                     <div class="taco-report-explorer__list-report"
@@ -124,7 +147,7 @@
                   </li>                  
                   
                   <!-- motoko - report item -->
-                  <li class="taco-report-explorer__list-item" @click="toggleReportMenuOnMobile(); router.push('/reports/ddmotoko')">
+                  <li class="taco-report-explorer__list-item" @click="toggleReportMenuOnMobile(); router.push('/reports/motoko')">
                     
                     <!-- report -->
                     <div class="taco-report-explorer__list-report"
@@ -148,7 +171,7 @@
                   </li>
 
                   <!-- sneed - report item -->
-                  <li class="taco-report-explorer__list-item" @click="toggleReportMenuOnMobile(); router.push('/reports/ddsneed')">
+                  <li class="taco-report-explorer__list-item" @click="toggleReportMenuOnMobile(); router.push('/reports/sneed')">
                     
                     <!-- report -->
                     <div class="taco-report-explorer__list-report"
@@ -171,7 +194,7 @@
                   </li>                     
                     
                   <!-- ckbtc - report item -->
-                  <li class="taco-report-explorer__list-item" @click="toggleReportMenuOnMobile(); router.push('/reports/ddckbtc')">
+                  <li class="taco-report-explorer__list-item" @click="toggleReportMenuOnMobile(); router.push('/reports/ckbtc')">
                     
                     <!-- report -->
                     <div class="taco-report-explorer__list-report"
@@ -246,7 +269,7 @@
 
                     <!-- heading 2 -->
                     <h4 class="taco-report-explorer__report-heading
-                              taco-report-explorer__report-heading--h2">
+                              taco-report-explorer__report-heading--h2 mt-4">
                       Heading 2
                       <i class="fa-solid fa-circle-info" 
                         data-bs-toggle="tooltip" 
@@ -750,7 +773,7 @@
 
                           <a href="https://nns.ic0.app/proposal/?u=lacdn-3iaaa-aaaaq-aae3a-cai&proposal=13" class="taco-text-blue-to-light-blue text-end" target="_blank">NNS</a>                        
 
-                          <a href="https://app.sneeddao.com/proposal?proposalid=13&sns=lacdn-3iaaa-aaaaq-aae3a-cai" class="taco-text-blue-to-light-blue text-end" target="_blank">Sneed Hub</a>
+                          <a href="https://tacodao.com/chat/forum/13" class="taco-text-blue-to-light-blue text-end">Taco Forum</a>
 
                         </span>
                         
@@ -1062,7 +1085,7 @@
                     <hr>
 
                     <!-- anon container -->
-                    <div class="d-flex flex-wrap gap-5">
+                    <div class="d-flex flex-wrap" style="gap: 1rem 3rem;">
 
                       <!-- left -->
                       <div>
@@ -1517,7 +1540,7 @@
 
                           <a href="https://nns.ic0.app/proposal/?u=lacdn-3iaaa-aaaaq-aae3a-cai&proposal=18" class="taco-text-blue-to-light-blue text-end" target="_blank">NNS</a>                        
 
-                          <a href="https://app.sneeddao.com/proposal?proposalid=18&sns=lacdn-3iaaa-aaaaq-aae3a-cai" class="taco-text-blue-to-light-blue text-end" target="_blank">Sneed Hub</a>
+                          <a href="https://tacodao.com/chat/forum/18" class="taco-text-blue-to-light-blue text-end">Taco Forum</a>
 
                         </span>
                         
@@ -1532,7 +1555,7 @@
 
                           <a href="https://nns.ic0.app/proposal/?u=lacdn-3iaaa-aaaaq-aae3a-cai&proposal=15" class="taco-text-blue-to-light-blue text-end" target="_blank">NNS</a>                        
 
-                          <a href="https://app.sneeddao.com/proposal?proposalid=15&sns=lacdn-3iaaa-aaaaq-aae3a-cai" class="taco-text-blue-to-light-blue text-end" target="_blank">Sneed Hub</a>
+                          <a href="https://tacodao.com/chat/forum/15" class="taco-text-blue-to-light-blue text-end">Taco Forum</a>
 
                         </span>
                         
@@ -1547,7 +1570,7 @@
 
                           <a href="https://nns.ic0.app/proposal/?u=lacdn-3iaaa-aaaaq-aae3a-cai&proposal=12" class="taco-text-blue-to-light-blue text-end" target="_blank">NNS</a>                        
 
-                          <a href="https://app.sneeddao.com/proposal?proposalid=12&sns=lacdn-3iaaa-aaaaq-aae3a-cai" class="taco-text-blue-to-light-blue text-end" target="_blank">Sneed Hub</a>
+                          <a href="https://tacodao.com/chat/forum/12" class="taco-text-blue-to-light-blue text-end">Taco Forum</a>
 
                         </span>
                         
@@ -2214,7 +2237,7 @@
                     <hr>
 
                     <!-- anon container -->
-                    <div class="d-flex flex-wrap gap-5">
+                    <div class="d-flex flex-wrap" style="gap: 1rem 3rem;">
 
                       <!-- left -->
                       <div>
@@ -2734,7 +2757,7 @@
 
                           <a href="https://nns.ic0.app/proposal/?u=lacdn-3iaaa-aaaaq-aae3a-cai&proposal=45" class="taco-text-blue-to-light-blue text-end" target="_blank">NNS</a>                        
 
-                          <a href="https://app.sneeddao.com/proposal?proposalid=45&sns=lacdn-3iaaa-aaaaq-aae3a-cai" class="taco-text-blue-to-light-blue text-end" target="_blank">Sneed Hub</a>
+                          <a href="https://tacodao.com/chat/forum/45" class="taco-text-blue-to-light-blue text-end">Taco Forum</a>
 
                         </span>
                         
@@ -2749,7 +2772,7 @@
 
                           <a href="https://nns.ic0.app/proposal/?u=lacdn-3iaaa-aaaaq-aae3a-cai&proposal=14" class="taco-text-blue-to-light-blue text-end" target="_blank">NNS</a>                        
 
-                          <a href="https://app.sneeddao.com/proposal?proposalid=14&sns=lacdn-3iaaa-aaaaq-aae3a-cai" class="taco-text-blue-to-light-blue text-end" target="_blank">Sneed Hub</a>
+                          <a href="https://tacodao.com/chat/forum/14" class="taco-text-blue-to-light-blue text-end">Taco Forum</a>
 
                         </span>
                         
@@ -3041,7 +3064,7 @@
                     <hr>
 
                     <!-- anon container -->
-                    <div class="d-flex flex-wrap gap-5">
+                    <div class="d-flex flex-wrap" style="gap: 1rem 3rem;">
 
                       <!-- section 1 - GLDT -->
                       <div>
@@ -3844,17 +3867,47 @@
                       <!-- link group -->
                       <span class="d-flex flex-column align-items-end">
 
+                        <span class="text-end">#81 Motion to Add Token</span>
+
+                        <span class="d-flex gap-2">
+
+                          <a href="https://nns.ic0.app/proposal/?u=lacdn-3iaaa-aaaaq-aae3a-cai&proposal=81" class="taco-text-blue-to-light-blue text-end" target="_blank">NNS</a>                        
+
+                          <a href="https://tacodao.com/chat/forum/81" class="taco-text-blue-to-light-blue text-end">Taco Forum</a>
+
+                        </span>
+                        
+                      </span>  
+                      
+                      <!-- link group -->
+                      <span class="d-flex flex-column align-items-end">
+
+                        <span class="text-end">#53 Motion to Discuss</span>
+
+                        <span class="d-flex gap-2">
+
+                          <a href="https://nns.ic0.app/proposal/?u=lacdn-3iaaa-aaaaq-aae3a-cai&proposal=53" class="taco-text-blue-to-light-blue text-end" target="_blank">NNS</a>                        
+
+                          <a href="https://tacodao.com/chat/forum/53" class="taco-text-blue-to-light-blue text-end">Taco Forum</a>
+
+                        </span>
+                        
+                      </span>  
+
+                      <!-- link group -->
+                      <span class="d-flex flex-column align-items-end">
+
                         <span class="text-end">#25 Motion to Discuss</span>
 
                         <span class="d-flex gap-2">
 
                           <a href="https://nns.ic0.app/proposal/?u=lacdn-3iaaa-aaaaq-aae3a-cai&proposal=25" class="taco-text-blue-to-light-blue text-end" target="_blank">NNS</a>                        
 
-                          <a href="https://app.sneeddao.com/proposal?proposalid=25&sns=lacdn-3iaaa-aaaaq-aae3a-cai" class="taco-text-blue-to-light-blue text-end" target="_blank">Sneed Hub</a>
+                          <a href="https://tacodao.com/chat/forum/25" class="taco-text-blue-to-light-blue text-end">Taco Forum</a>
 
                         </span>
                         
-                      </span>                      
+                      </span>  
                       
                     </div>
                     
@@ -4166,7 +4219,7 @@
 
                           <a href="https://nns.ic0.app/proposal/?u=lacdn-3iaaa-aaaaq-aae3a-cai&proposal=65" class="taco-text-blue-to-light-blue text-end" target="_blank">NNS</a>                        
 
-                          <a href="https://app.sneeddao.com/proposal?proposalid=65&sns=lacdn-3iaaa-aaaaq-aae3a-cai" class="taco-text-blue-to-light-blue text-end" target="_blank">Sneed Hub</a>
+                          <a href="https://tacodao.com/chat/forum/65" class="taco-text-blue-to-light-blue text-end">Taco Forum</a>
 
                         </span>
                         
@@ -4181,7 +4234,7 @@
 
                           <a href="https://nns.ic0.app/proposal/?u=lacdn-3iaaa-aaaaq-aae3a-cai&proposal=56" class="taco-text-blue-to-light-blue text-end" target="_blank">NNS</a>                        
 
-                          <a href="https://app.sneeddao.com/proposal?proposalid=56&sns=lacdn-3iaaa-aaaaq-aae3a-cai" class="taco-text-blue-to-light-blue text-end" target="_blank">Sneed Hub</a>
+                          <a href="https://tacodao.com/chat/forum/56" class="taco-text-blue-to-light-blue text-end">Taco Forum</a>
 
                         </span>
                         
@@ -4888,7 +4941,7 @@ transmission.
                     <hr>
 
                     <!-- anon container -->
-                    <div class="d-flex flex-wrap gap-5">
+                    <div class="d-flex flex-wrap" style="gap: 1rem 3rem;">
 
                       <!-- left -->
                       <div>
@@ -5262,7 +5315,7 @@ impact
                     </h3>
 
                     <h4 class="taco-report-explorer__report-heading
-                              taco-report-explorer__report-heading--h2">
+                              taco-report-explorer__report-heading--h2 mt-4">
                       Web2
                     </h4>
 
@@ -5339,7 +5392,7 @@ crypto-native use cases that Element's non-blockchain model can't replicate in a
                     </p> 
                     
                     <h4 class="taco-report-explorer__report-heading
-                              taco-report-explorer__report-heading--h2">
+                              taco-report-explorer__report-heading--h2 mt-4">
                       Web3
                     </h4>
 
@@ -5394,7 +5447,7 @@ appears to offer much more than its few competitors.
                     </p> 
 
                     <h4 class="taco-report-explorer__report-heading
-                              taco-report-explorer__report-heading--h2">
+                              taco-report-explorer__report-heading--h2 mt-4">
                       Profitability
                     </h4>
 
@@ -5623,6 +5676,1659 @@ employing the core development team.
                     <div class="taco-report-explorer__report-footer__right">
 
                       <!-- link group -->
+                      <span class="d-flex flex-column align-items-end">
+
+                        <span class="text-end">#72 Add Token</span>
+
+                        <span class="d-flex gap-2">
+
+                          <a href="https://nns.ic0.app/proposal/?u=lacdn-3iaaa-aaaaq-aae3a-cai&proposal=72" class="taco-text-blue-to-light-blue text-end" target="_blank">NNS</a>                        
+
+                          <a href="https://tacodao.com/chat/forum/72" class="taco-text-blue-to-light-blue text-end">Taco Forum</a>
+
+                        </span>
+                        
+                      </span>
+                      
+                      <!-- link group -->
+                      <span class="d-flex flex-column align-items-end">
+
+                        <span class="text-end">#24 Motion to Discuss</span>
+
+                        <span class="d-flex gap-2">
+
+                          <a href="https://nns.ic0.app/proposal/?u=lacdn-3iaaa-aaaaq-aae3a-cai&proposal=24" class="taco-text-blue-to-light-blue text-end" target="_blank">NNS</a>                        
+
+                          <a href="https://tacodao.com/chat/forum/24" class="taco-text-blue-to-light-blue text-end">Taco Forum</a>
+
+                        </span>
+                        
+                      </span>
+
+                    </div>
+                    
+                  </div>
+
+                </div>
+                
+              </div>
+
+              <!-- kongswap dd report -->
+              <div v-if="reportId === 7" class="taco-report-explorer__report-container">
+
+                <!-- inner -->
+                <div class="taco-report-explorer__report-container__inner">
+                
+                  <!-- report header -->
+                  <div class="taco-report-explorer__report-header">
+                    
+                    <!-- report title -->
+                    <h2 class="taco-report-explorer__report-header__title">DUE DILIGENCE PROCESS KongSwap (KONG)</h2>
+
+                    <!-- report metadata continer -->
+                    <div class="taco-report-explorer__report-header__metadata-container">
+
+                      <!-- report metadata -->
+                      <span class="taco-report-explorer__report-header__metadata">
+                        <i class="fa-solid fa-luchador-mask"></i> 
+                        <span> Written by Tirex & TrickyVik</span>
+                        <span class="small"> 08/2025</span>
+                      </span>
+
+                    </div>        
+                    
+                  </div>
+
+                  <!-- report body -->
+                  <div class="taco-report-explorer__report-body">
+                    
+                    <!-- heading -->
+                    <h3 class="taco-report-explorer__report-heading
+                              taco-report-explorer__report-heading--h1">
+                      Team Background
+                      <i class="fa-solid fa-circle-info" 
+                        data-bs-toggle="tooltip" 
+                        data-bs-placement="top" 
+                        title="Assess the founding team's transparency, credibility, experience, and any past contributions to the ICP ecosystem"></i>
+                    </h3>
+                    
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      In KongSwap's <a href="https://forum.dfinity.org/t/introducing-kongswap/35607" target="_blank" class="taco-report-explorer__report-link">introductory forum post</a> and <a href="https://github.com/KongSwap/documentation/blob/main/kong_whitepaper.md" target="_blank" class="taco-report-explorer__report-link">whitepaper</a>, it was stated that the team's combined
+experience included roles and successful projects within Sygnum Bank, UBS, Deutsche Bank, DFINITY,
+and others. Other than this, we could not find public information on KongSwap's team. All of the
+following was sourced from one of the team members:
+                    </p>
+
+                    <!-- unordered list -->
+                    <ul class="taco-report-explorer__report-ul">
+                      
+                      <!-- list item -->
+                      <li class="taco-report-explorer__report-li">
+
+                        <!-- paragraph -->
+                        <p class="taco-report-explorer__report-paragraph">
+                          Gorazd is on the business side of things and does some backend. He has experience in finance.
+He co-created Helix Markets
+                        </p>
+
+                      </li>
+
+                      <!-- list item -->
+                      <li class="taco-report-explorer__report-li">
+
+                        <!-- paragraph -->
+                        <p class="taco-report-explorer__report-paragraph">
+                          Jon is the backend lead. He was a developer at Microsoft in the 90s before moving into finance.
+He co-created Helix Markets
+                        </p>
+
+                      </li>
+
+                      <!-- list item -->
+                      <li class="taco-report-explorer__report-li">
+
+                        <!-- paragraph -->
+                        <p class="taco-report-explorer__report-paragraph">
+                          Shillgatesy works on the front end. He has been developing for 7 years, first in logistics for 3
+years, and then running a small crew of developers for projects in different industries. He created
+Windoge98 and was well-involved in SNS-1
+                        </p>
+
+                      </li>
+
+                      <!-- list item -->
+                      <li class="taco-report-explorer__report-li">
+
+                        <!-- paragraph -->
+                        <p class="taco-report-explorer__report-paragraph">
+                          Gladiator has been working on the backend, specifically on Solana functionality. He has been
+working professionally for 2 years, starting on Windoge98
+                        </p>
+
+                      </li>
+
+                      <!-- list item -->
+                      <li class="taco-report-explorer__report-li">
+
+                        <!-- paragraph -->
+                        <p class="taco-report-explorer__report-paragraph">
+                          Theo works on the front end. He previously worked on the Harmony blockchain. He made dApps
+for the partyhats project on ICP
+                        </p>
+
+                      </li>
+
+                      <!-- list item -->
+                      <li class="taco-report-explorer__report-li">
+
+                        <!-- paragraph -->
+                        <p class="taco-report-explorer__report-paragraph">
+                          Illya recently joined to work on the backend
+                        </p>
+
+                      </li>
+
+                    </ul>
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      <a href="https://app.sneeddao.com/proposal?proposalid=64&sns=ormnc-tiaaa-aaaaq-aadyq-cai" target="_blank" class="taco-report-explorer__report-link">Via proposal 64</a>, the team was paid 25000 ICP from the treasury for work in Q4 2024 and Q1 2025.
+                    </p>
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      <a href="https://app.sneeddao.com/proposal?proposalid=262&sns=ormnc-tiaaa-aaaaq-aadyq-cai" target="_blank" class="taco-report-explorer__report-link">Via proposal 262</a>, the team was paid 50000 ICP from the treasury for work in Q2 2025.
+                    </p>
+
+                    <hr>
+
+                    <!-- heading -->
+                    <h3 class="taco-report-explorer__report-heading
+                              taco-report-explorer__report-heading--h1">
+                      Token Utility
+                      <i class="fa-solid fa-circle-info" 
+                        data-bs-toggle="tooltip" 
+                        data-bs-placement="top" 
+                        title="Examine the token's purpose and functionality within its ecosystem to ensure it provides tangible value and practical use cases"></i>
+                    </h3>  
+                    
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      The KONG token serves as the governance token for KongSwap, enabling members to submit and vote
+on proposals that are implemented if approved.
+                    </p>
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      <a href="https://kongswap.io/" target="_blank" class="taco-report-explorer__report-link">KongSwap is a decentralized exchange (DEX) offering trading on ICP and Solana</a>. Intelligent routing
+enables any token to be swapped for any other token on the platform. Average swap time is claimed to be
+2.5 seconds with a 99.9% success rate on their dApp. An official KongSwap <a href="https://kongswap.io/kb/articles/icp-eco-dex-comparison" target="_blank" class="taco-report-explorer__report-link">article</a> states a different swap
+time, 8 seconds. Swap fees start at 0.3%, but will double or triple depending on additional steps in the
+trading route. All of the swap fees are distributed to liquidity providers. Trading fees that go to the
+treasury are planned.
+                    </p>
+                    
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      <a href="https://kongswap.io/predict/faq" target="_blank" class="taco-report-explorer__report-link">Users can create and bet on future outcomes via prediction markets</a>. Winnings come from losing bets. A
+time-weighted rewards system determines payouts, with the multiplier being 10x at the start of the market
+and 1x at its end. Markets can have two or more outcomes. <a href="https://kongswap.io/predict/faq" target="_blank" class="taco-report-explorer__report-link">Prediction markets</a> are activated with one
+token, incurring a fee that varies between tokens. Current supported tokens include KONG, ICP, ckBTC,
+ckETH, ckUSDT, DKP, and GLDT. Activation fees with $KONG are burned, and activation fees with
+other tokens go to the treasury. Users can bet with any of the supported tokens, which are automatically
+converted to the token with which the market was activated. Each bet incurs a platform fee.
+                    </p>
+                    
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      The <a href="https://kongswap.io/stats" target="_blank" class="taco-report-explorer__report-link">token index and token pages</a> display general statistics for listed tokens and their associated platform
+metrics. The <a href="https://kongswap.io/stats/bubbles" target="_blank" class="taco-report-explorer__report-link">bubble page</a> visualises gainers and losers of the last 24-hour period. The <a href="https://kongswap.io/stats/leaderboard" target="_blank" class="taco-report-explorer__report-link">volume leaderboard</a>
+highlights which users have the most trading volume.
+                    </p>
+                    
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      A third-party service, Onramper, is integrated to enable the purchase of ICP with fiat.
+                    </p>
+                    
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      A team member has stated that arbitrage bots that balance out prices between different protocols bring
+revenue to the treasury.
+                    </p>
+                    
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      Roadmap items include <a href="https://app.sneeddao.com/proposal?proposalid=64&sns=ormnc-tiaaa-aaaaq-aadyq-cai" target="_blank" class="taco-report-explorer__report-link">[1]</a><a href="https://app.sneeddao.com/proposal?proposalid=262&sns=ormnc-tiaaa-aaaaq-aadyq-cai" target="_blank" class="taco-report-explorer__report-link">[2]</a><a href="https://forum.dfinity.org/t/kongswap-q1-25-recap/43043" target="_blank" class="taco-report-explorer__report-link">[3]</a>:
+                    </p>
+
+                    <!-- unordered list -->
+                    <ul class="taco-report-explorer__report-ul">
+                      
+                      <!-- list item -->
+                      <li class="taco-report-explorer__report-li">
+
+                        <!-- paragraph -->
+                        <p class="taco-report-explorer__report-paragraph">
+                          Staking pools for LP tokens
+                        </p>
+
+                      </li>
+
+                      <!-- list item -->
+                      <li class="taco-report-explorer__report-li">
+
+                        <!-- paragraph -->
+                        <p class="taco-report-explorer__report-paragraph">
+                          Concentrated and single-sided liquidity
+                        </p>
+
+                      </li>
+
+                      <!-- list item -->
+                      <li class="taco-report-explorer__report-li">
+
+                        <!-- paragraph -->
+                        <p class="taco-report-explorer__report-paragraph">
+                          Lending Markets
+                        </p>
+
+                      </li>
+
+                      <!-- list item -->
+                      <li class="taco-report-explorer__report-li">
+
+                        <!-- paragraph -->
+                        <p class="taco-report-explorer__report-paragraph">
+                          Referral program
+                        </p>
+
+                      </li>
+
+                      <!-- list item -->
+                      <li class="taco-report-explorer__report-li">
+
+                        <!-- paragraph -->
+                        <p class="taco-report-explorer__report-paragraph">
+                          Predict AI, which will be similar to prediction markets but tailored to price predictions
+                        </p>
+
+                      </li>
+
+                      <!-- list item -->
+                      <li class="taco-report-explorer__report-li">
+
+                        <!-- paragraph -->
+                        <p class="taco-report-explorer__report-paragraph">
+                          Data aggregators integration
+                        </p>
+
+                      </li>
+
+                      <!-- list item -->
+                      <li class="taco-report-explorer__report-li">
+
+                        <!-- paragraph -->
+                        <p class="taco-report-explorer__report-paragraph">
+                          Limit orders
+                        </p>
+
+                      </li>
+
+                      <!-- list item -->
+                      <li class="taco-report-explorer__report-li">
+
+                        <!-- paragraph -->
+                        <p class="taco-report-explorer__report-paragraph">
+                          Automated trading strategies
+                        </p>
+
+                      </li>
+
+                      <!-- list item -->
+                      <li class="taco-report-explorer__report-li">
+
+                        <!-- paragraph -->
+                        <p class="taco-report-explorer__report-paragraph">
+                          User-generated airdrops
+                        </p>
+
+                      </li>
+
+                      <!-- list item -->
+                      <li class="taco-report-explorer__report-li">
+
+                        <!-- paragraph -->
+                        <p class="taco-report-explorer__report-paragraph">
+                          Native integrations for Bitcoin, Ethereum and SUI
+                        </p>
+
+                      </li>
+
+                      <!-- list item -->
+                      <li class="taco-report-explorer__report-li">
+
+                        <!-- paragraph -->
+                        <p class="taco-report-explorer__report-paragraph">
+                          KongSwap Proof-of-Work Launchpad
+                        </p>
+
+                      </li>
+
+                    </ul>
+                    
+                    <hr>
+
+                    <!-- heading -->
+                    <h3 class="taco-report-explorer__report-heading
+                              taco-report-explorer__report-heading--h1">
+                      Ecosystem Alignment
+                      <i class="fa-solid fa-circle-info" 
+                        data-bs-toggle="tooltip" 
+                        data-bs-placement="top" 
+                        title="Evaluate the token's synergy with other ICP projects, including any existing collaborations and suitability for inclusion in the Salsa Season rewards program."></i>
+                    </h3>  
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      KongSwap maintains strong synergy with the rest of the ICP ecosystem. Beyond being a top ICP DEX,
+examples of ecosystem alignment include:
+                    </p>
+
+                    <!-- unordered list -->
+                    <ul class="taco-report-explorer__report-ul">
+                      
+                      <!-- list item -->
+                      <li class="taco-report-explorer__report-li">
+
+                        <!-- paragraph -->
+                        <p class="taco-report-explorer__report-paragraph">
+                          Integration into the Windoge98 dApp
+                        </p>
+
+                      </li>
+
+                      <!-- list item -->
+                      <li class="taco-report-explorer__report-li">
+
+                        <!-- paragraph -->
+                        <p class="taco-report-explorer__report-paragraph">
+                          <a href="https://dashboard.internetcomputer.org/sns/ormnc-tiaaa-aaaaq-aadyq-cai/proposal/332" target="_blank" class="taco-report-explorer__report-link">Via a treasury swap</a>, 0.5% of KONG's token supply was swapped for EXE
+                        </p>
+
+                      </li>
+
+                      <!-- list item -->
+                      <li class="taco-report-explorer__report-li">
+
+                        <!-- paragraph -->
+                        <p class="taco-report-explorer__report-paragraph">
+                          <a href="https://x.com/dragginzgame/status/1920829593272901724" target="_blank" class="taco-report-explorer__report-link">Dragginz</a> and Windoge98 background themes
+                        </p>
+
+                      </li>
+
+                      <!-- list item -->
+                      <li class="taco-report-explorer__report-li">
+
+                        <!-- paragraph -->
+                        <p class="taco-report-explorer__report-paragraph">
+                          <a href="https://dashboard.internetcomputer.org/sns/ormnc-tiaaa-aaaaq-aadyq-cai/proposal/266" target="_blank" class="taco-report-explorer__report-link">Social mining partnership with Insane Clown Protocol</a>
+                        </p>
+
+                      </li>
+
+                      <!-- list item -->
+                      <li class="taco-report-explorer__report-li">
+
+                        <!-- paragraph -->
+                        <p class="taco-report-explorer__report-paragraph">
+                          <a href="https://x.com/KongSwapX/status/1931493877879570765" target="_blank" class="taco-report-explorer__report-link"></a>Co-hosted X space with Insane Clown Protocol
+                        </p>
+
+                      </li>
+
+                      <!-- list item -->
+                      <li class="taco-report-explorer__report-li">
+
+                        <!-- paragraph -->
+                        <p class="taco-report-explorer__report-paragraph">
+                          <a href="https://x.com/KongSwapX/status/1929327101997462011" target="_blank" class="taco-report-explorer__report-link">Enabled swapping on KongSwap for some Odin.Fun memecoins</a>
+                        </p>
+
+                      </li>
+
+                      <!-- list item -->
+                      <li class="taco-report-explorer__report-li">
+
+                        <!-- paragraph -->
+                        <p class="taco-report-explorer__report-paragraph">
+                          <a href="https://x.com/swaprunner/status/1911911263598227711" target="_blank" class="taco-report-explorer__report-link">Sponsored achievements on SwapRunner</a>
+                        </p>
+
+                      </li>
+
+                      <!-- list item -->
+                      <li class="taco-report-explorer__report-li">
+
+                        <!-- paragraph -->
+                        <p class="taco-report-explorer__report-paragraph">
+                          Integration into OISY, NFID, Plug, SwapRunner, OpenChat, and <a href="https://x.com/KongSwapX/status/1940766369152487465" target="_blank" class="taco-report-explorer__report-link">Gold DAO</a> as a swap provider
+                        </p>
+
+                      </li>
+
+                      <!-- list item -->
+                      <li class="taco-report-explorer__report-li">
+
+                        <!-- paragraph -->
+                        <p class="taco-report-explorer__report-paragraph">
+                          OpenChat uses KONG for tipping
+                        </p>
+
+                      </li>
+
+                      <!-- list item -->
+                      <li class="taco-report-explorer__report-li">
+
+                        <!-- paragraph -->
+                        <p class="taco-report-explorer__report-paragraph">
+                          <a href="https://x.com/alexandria_lbry/status/1930569526485127534" target="_blank" class="taco-report-explorer__report-link">Used for auto-locking LP by Alexandria Library</a>
+                        </p>
+
+                      </li>
+
+                      <!-- list item -->
+                      <li class="taco-report-explorer__report-li">
+
+                        <!-- paragraph -->
+                        <p class="taco-report-explorer__report-paragraph">
+                          <a href="https://x.com/NeuronPool/status/1910686826190287019" target="_blank" class="taco-report-explorer__report-link">Collaborated with NeuronPool to enable sending tokens to vectors from KongSwap</a>
+                        </p>
+
+                      </li>
+
+                      <!-- list item -->
+                      <li class="taco-report-explorer__report-li">
+
+                        <!-- paragraph -->
+                        <p class="taco-report-explorer__report-paragraph">
+                          Several prediction markets centred around other ICP projects have been created, and highlighted
+on X
+                        </p>
+
+                      </li>
+
+                    </ul>
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      The KongSwap team has indicated interest in getting involved in Salsa Season. Salsa Season will have
+off-seasons and active seasons to create hype around the active seasons, so projects that integrate their
+rewards programs would do so in order to join in on the seasonal hype and hot-points of engagement.
+                    </p>
+
+                    <hr>
+
+                    <!-- heading -->
+                    <h3 class="taco-report-explorer__report-heading
+                              taco-report-explorer__report-heading--h1">
+                      Community
+                      <i class="fa-solid fa-circle-info" 
+                        data-bs-toggle="tooltip" 
+                        data-bs-placement="top" 
+                        title="Assess the size and engagement of the token's community to gauge long-term adoption potential"></i>
+                    </h3>  
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      The Telegram group has 654 members and the OpenChat community has 2088 members
+                    </p>
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      On X, <a href="https://x.com/KongSwapX" target="_blank" class="taco-report-explorer__report-link">KongSwap has 2031 followers</a>
+                    </p>
+                    
+                    <hr>
+
+                    <!-- heading -->
+                    <h3 class="taco-report-explorer__report-heading
+                              taco-report-explorer__report-heading--h1">
+                      Technology
+                      <i class="fa-solid fa-circle-info" 
+                        data-bs-toggle="tooltip" 
+                        data-bs-placement="top" 
+                        title="Review the project's technical foundation, focusing on code quality, scalability, and how effectively it leverages ICP's capabilities"></i>
+                    </h3>  
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      The SNS framework is regularly updated and vetted by the Network Nervous System (NNS) community,
+which oversees the entire ICP ecosystem. This vigilance ensures the adherence of KONG's governance
+framework to the most rigorous standards of security and efficiency.
+                    </p>
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      <a href="https://forum.dfinity.org/t/introducing-kongswap/35607" target="_blank" class="taco-report-explorer__report-link">KongSwap operates entirely on-chain with both frontend and backend hosted within smart contracts</a>. The
+frontend canister hosts the user interface, handling all user interactions, and communicating them to the
+backend canister. The backend canister manages wallet logins, liquidity operations, token swaps, and
+claims. The DEX's single canister architecture reduces the overhead of managing multiple contracts, and
+ensures that all operations are tightly integrated and consistent.
+                    </p>
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      KongSwap is an Automated Market Maker (AMM) DEX. AMMs enable token swaps automatically
+without the need for matching buyers and sellers. They achieve this through liquidity pools, which users
+provide tokens to and receive trading fees from. These pools hold pairs of tokens and set prices based on
+their balances. Trades happen directly against the pool's reserves. When a user swaps one token for
+another, the system uses a fixed number called the constant product, which is just the two token reserves
+multiplied together. The swap adds the user's input token to one side and removes some of the other
+token, but the contract adjusts the output amount so that the constant product stays the same after the
+trade. This adjustment is called slippage, and makes traders get a worse deal. Liquidity providers face a
+risk called impermanent loss, where the value of their deposited tokens can drop compared to just holding
+them outside the pool. If the relative prices of the tokens change, the pool's automatic rebalancing means
+LP tokens will be worth less upon withdrawal, though trading fees can offset this.
+                    </p>
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      Intelligent multi-step trading automatically finds the most efficient swap routes for users. Rather than
+forcing direct token-to-token trades, the system can execute multi-hop transactions - for example,
+converting ICP to ckUSDT by routing through ckBTC (ICP → ckBTC → ckUSDT) if this path offers
+better value than a direct swap. This built-in arbitrage mechanism continuously optimizes pricing across
+the platform's liquidity pools. The single canister architecture provides a significant advantage here, as all
+route calculations, price comparisons, and multi-step executions happen within one smart contract without
+the coordination overhead and potential inconsistencies of cross-canister calls. This enables real-time
+route optimization while maintaining atomic transaction guarantees - either the entire multi-step trade
+succeeds or fails as one unit.
+                    </p>
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      To manage computational complexity and prevent excessive gas consumption, KongSwap limits the
+maximum number of steps in any trading route. The system's token pairing structure is strategically
+designed around two base pairs: ckUSDT and ICP. All supported tokens can be paired with either
+ckUSDT or ICP, creating a hub-and-spoke model that simplifies routing logic while ensuring liquidity
+concentration in these core trading pairs. This constraint reduces the computational overhead of
+pathfinding algorithms while still enabling efficient price discovery across the entire token ecosystem.
+                    </p>
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      This automated route optimization essentially provides users with built-in MEV (Maximum Extractable
+Value) protection, as the platform captures arbitrage opportunities on behalf of traders rather than leaving
+them to external arbitrageurs.
+                    </p>
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      KongSwap achieves bridgeless multichain interoperability with Solana through <a href="https://medium.com/dfinity/icp-reaches-the-shores-of-solana-0f373a886dce" target="_blank" class="taco-report-explorer__report-link">threshold EdDSA</a>, which
+is used to securely generate and manage keys for Solana with Internet Identity, or inversely, generate an
+Internet Identity with Solana keys. The SOL RPC canister enables the execution of transactions on the
+Solana network from an Internet Computer dApp. Liquidity pools connect across chains through synthetic
+swaps, where trades are processed on-chain by calculating exchange rates and signing cross-chain
+transfers, effectively aggregating liquidity from ICP and Solana and enabling seamless swapping between
+the two ecosystems. To illustrate with an example, once this is fully implemented, users will be able to
+swap an ICP-native memecoin for a SOL-native memecoin in one swap. KongSwap plans to expand to
+additional chains.
+                    </p>
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      Prediction markets use a simple pari mutuel pool design. Users stake into outcome pools and, at
+settlement, the winners split the losers' pool pro-rata by weighted stake (time-weighting described in
+Token Utility). Prediction markets are resolved when platform admins and market creators agree on the
+resolution. If there is disagreement, the market is voided, all bets are refunded, and the creator's deposit is
+burned. A team member has stated that admins can force resolutions.
+                    </p>
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      Stable memory is utilised for all state and operations. <a href="https://internetcomputer.org/docs/references/ic-interface-spec" target="_blank" class="taco-report-explorer__report-link">Stable memory is a persistent storage mechanism in
+ICP canister smart contracts that preserves data across code upgrades and lifecycle events</a>, ensuring that
+information, which would otherwise be discarded in standard WebAssembly memory and require manual
+saving and restoration, remains intact and accessible. This enables large-scale, on-chain storage of vast
+amounts of data without the need for constant snapshots, frequent upgrades, external databases, or
+oracles.
+                    </p>
+                    
+                    <hr>
+
+                    <!-- anon container -->
+                    <div class="d-flex flex-wrap" style="gap: 1rem 3rem;">
+
+                      <!-- left -->
+                      <div>
+
+                        <!-- heading -->
+                        <h3 class="taco-report-explorer__report-heading
+                                  taco-report-explorer__report-heading--h1">
+                          Tokenomics
+                          <i class="fa-solid fa-circle-info" 
+                            data-bs-toggle="tooltip" 
+                            data-bs-placement="top" 
+                            title="Analyse the supply and distribution of the token; any inflationary/deflationary mechanisms; and any incentive structures, to ensure sustainability and fair distribution"></i>
+                        </h3>
+
+                        <!-- unordered list -->
+                        <ul class="taco-report-explorer__report-ul">
+
+                          <!-- list item -->
+                          <li class="taco-report-explorer__report-li">
+                            
+                            <!-- paragraph -->
+                            <p class="taco-report-explorer__report-paragraph">
+                              Total Supply: 1,019,307,896
+                            </p>
+                            
+                          </li>
+
+                          <!-- list item -->
+                          <li class="taco-report-explorer__report-li">
+                            
+                            <!-- paragraph -->
+                            <p class="taco-report-explorer__report-paragraph">
+
+                              <!-- link -->
+                              <a href="https://app.sneeddao.com/sneedlock" target="_blank" class="taco-report-explorer__report-link">
+                                Circulating Supply: 474,925,678
+                              </a>
+
+                            </p>
+                            
+                          </li>
+
+                          <!-- list item -->
+                          <li class="taco-report-explorer__report-li">
+                            
+                            <!-- paragraph -->
+                            <p class="taco-report-explorer__report-paragraph">
+                              Unlocked Circulating Supply: 106,702,890
+                            </p>
+                            
+                          </li>                          
+                          
+                          <!-- list item -->
+                          <li class="taco-report-explorer__report-li">
+                            
+                            <!-- paragraph -->
+                            <p class="taco-report-explorer__report-paragraph">
+                              Burn per transaction: 0.0001 KONG
+                            </p>
+                            
+                          </li>
+                          
+                          <!-- holders -->
+                          <li class="taco-report-explorer__report-li">
+                            
+                            <!-- paragraph -->
+                            <p class="taco-report-explorer__report-paragraph">
+                              Holders:
+                            </p>
+
+                            <!-- unordered list -->
+                            <ul class="taco-report-explorer__report-ul" style="list-style-type: disc">
+
+                              <!-- list item -->
+                              <li class="taco-report-explorer__report-li">
+                                
+                                <!-- paragraph -->
+                                <p class="taco-report-explorer__report-paragraph">
+                                  Top - 54.25% (Treasury)
+                                </p>
+
+                              </li>
+
+                              <!-- list item -->
+                              <li class="taco-report-explorer__report-li">
+                                
+                                <!-- paragraph -->
+                                <p class="taco-report-explorer__report-paragraph">
+                                  Second - 1.99% (SNS:KONG GOVERNANCE)
+                                </p>
+                                
+                              </li>
+                              
+                              <!-- list item -->
+                              <li class="taco-report-explorer__report-li">
+                                
+                                <!-- paragraph -->
+                                <p class="taco-report-explorer__report-paragraph">
+                                  Third - 1.84%
+                                </p>
+                                
+                              </li>
+                              
+                              <!-- list item -->
+                              <li class="taco-report-explorer__report-li">
+                                
+                                <!-- paragraph -->
+                                <p class="taco-report-explorer__report-paragraph">
+                                  Mean of Top 25 - 3.2508%
+                                </p>
+                                
+                              </li>
+                              
+                              <!-- list item -->
+                              <li class="taco-report-explorer__report-li">
+                                
+                                <!-- paragraph -->
+                                <p class="taco-report-explorer__report-paragraph">
+                                  Median of Top 25 - 1.34%
+                                </p>
+                                
+                              </li>
+                              
+                              <!-- list item -->
+                              <li class="taco-report-explorer__report-li">
+                                
+                                <!-- paragraph -->
+                                <p class="taco-report-explorer__report-paragraph">
+                                  Mode of Top 25 - 0.69%
+                                </p>
+                                
+                              </li>
+                              
+                              <!-- list item -->
+                              <li class="taco-report-explorer__report-li">
+                                
+                                <!-- paragraph -->
+                                <p class="taco-report-explorer__report-paragraph">
+                                  Top 25 Total - 81.27%
+                                </p>
+                                
+                              </li>
+                              
+                              <!-- list item -->
+                              <li class="taco-report-explorer__report-li">
+                                
+                                <!-- paragraph -->
+                                <p class="taco-report-explorer__report-paragraph">
+                                  Mean of Top 100 - 0.934%
+                                </p>
+                                
+                              </li>
+                              
+                              <!-- list item -->
+                              <li class="taco-report-explorer__report-li">
+                                
+                                <!-- paragraph -->
+                                <p class="taco-report-explorer__report-paragraph">
+                                  Median of Top 100 - 0.24%
+                                </p>
+                                
+                              </li>
+                              
+                              <!-- list item -->
+                              <li class="taco-report-explorer__report-li">
+                                
+                                <!-- paragraph -->
+                                <p class="taco-report-explorer__report-paragraph">
+                                  Mode of Top 100 - 0.03%
+                                </p>
+                                
+                              </li>
+                              
+                              <!-- list item -->
+                              <li class="taco-report-explorer__report-li">
+                                
+                                <!-- paragraph -->
+                                <p class="taco-report-explorer__report-paragraph">
+                                  Top 100 Total - 93.4%
+                                </p>
+                                
+                              </li>                          
+
+                            </ul>
+                            
+                          </li> 
+                          
+                          <!-- treasury -->
+                          <li class="taco-report-explorer__report-li">
+                            
+                            <!-- paragraph -->
+                            <p class="taco-report-explorer__report-paragraph">
+                              Treasury:
+                            </p>
+
+                            <!-- unordered list -->
+                            <ul class="taco-report-explorer__report-ul" style="list-style-type: disc">
+
+                              <!-- list item -->
+                              <li class="taco-report-explorer__report-li">
+                                
+                                <!-- paragraph -->
+                                <p class="taco-report-explorer__report-paragraph">
+                                  <a href="https://dashboard.internetcomputer.org/account/f39d9b22c382c25f832fd1d3e6ad5216249623b204a7fc5498f991f4cf2df1e1" target="_blank" class="taco-report-explorer__report-link">160242 ICP ($842, 872.92)</a>
+                                </p>
+
+                              </li>  
+                              
+                              <!-- list item -->
+                              <li class="taco-report-explorer__report-li">
+                                
+                                <!-- paragraph -->
+                                <p class="taco-report-explorer__report-paragraph">
+                                  According to <a href="https://dashboard.internetcomputer.org/sns/ormnc-tiaaa-aaaaq-aadyq-cai/proposal/262" target="_blank" class="taco-report-explorer__report-link">proposal 262</a>, there was 45700 ICP in liquidity as at 22/04/2025
+                                </p>
+
+                              </li>  
+
+                              <!-- list item -->
+                              <li class="taco-report-explorer__report-li">
+                                
+                                <!-- paragraph -->
+                                <p class="taco-report-explorer__report-paragraph">
+                                  544,382,219.84 KONG (~ $7.55m)
+                                </p>
+
+                              </li>  
+
+                              <!-- list item -->
+                              <li class="taco-report-explorer__report-li">
+                                
+                                <!-- paragraph -->
+                                <p class="taco-report-explorer__report-paragraph">
+                                  ~ $9.5k worth of EXE
+                                </p>
+
+                              </li>  
+
+                            </ul>
+
+                            <!-- paragraph -->
+                            <p class="taco-report-explorer__report-paragraph">
+                              Inflationary mechanisms do exist in the forms of APY from staking rewards. For a 1 year old neuron with
+a 1 year, 182 day dissolve delay, a staker will earn 6.25% APY
+                            </p>
+                            
+                          </li>  
+
+                        </ul>
+
+                      </div>
+
+                      <!-- center -->
+                      <div>
+
+                        <!-- heading -->
+                        <h3 class="taco-report-explorer__report-heading
+                                  taco-report-explorer__report-heading--h1">
+                          Market Metrics
+                          <i class="fa-solid fa-circle-info" 
+                            data-bs-toggle="tooltip" 
+                            data-bs-placement="top" 
+                            title="Review key indicators such as trading volume and historical market performance."></i>
+                        </h3>
+
+                        <!-- unordered list -->
+                        <ul class="taco-report-explorer__report-ul">
+
+                          <!-- list item -->
+                          <li class="taco-report-explorer__report-li">
+                            
+                            <!-- paragraph -->
+                            <p class="taco-report-explorer__report-paragraph">
+                              All Time High (USD): 0.08806
+                            </p>
+                            
+                          </li>
+
+                          <!-- list item -->
+                          <li class="taco-report-explorer__report-li">
+                            
+                            <!-- paragraph -->
+                            <p class="taco-report-explorer__report-paragraph">
+                              All Time Low (USD): 0.00582
+                            </p>
+                            
+                          </li>
+                          
+                          <!-- list item -->
+                          <li class="taco-report-explorer__report-li">
+                            
+                            <!-- paragraph -->
+                            <p class="taco-report-explorer__report-paragraph">
+                              As at 07/08/25(USD): 0.02264
+                            </p>
+                            
+                          </li>
+                          
+                          <!-- list item -->
+                          <li class="taco-report-explorer__report-li">
+                            
+                            <!-- paragraph -->
+                            <p class="taco-report-explorer__report-paragraph">
+                              Change from ATH USD: -74.2903%
+                            </p>
+                            
+                          </li>                      
+
+                          <!-- list item -->
+                          <li class="taco-report-explorer__report-li">
+                            
+                            <!-- paragraph -->
+                            <p class="taco-report-explorer__report-paragraph">
+                              Change from ATL USD: 289.003%
+                            </p>
+
+                          </li>
+
+                          <!-- list item -->
+                          <li class="taco-report-explorer__report-li">
+                            
+                            <!-- paragraph -->
+                            <p class="taco-report-explorer__report-paragraph">
+                              USD Volume 24H as at 07/08/25: 15180
+                            </p>
+                            
+                          </li>
+
+                        </ul> 
+
+                      </div>
+
+                      <!-- right -->
+                      <div>
+
+                        <!-- heading -->
+                        <h3 class="taco-report-explorer__report-heading
+                                  taco-report-explorer__report-heading--h1">
+                          Liquidity
+                        </h3>
+
+                        <!-- paragraph -->
+                        <p class="taco-report-explorer__report-paragraph">
+                          As per <a href="https://swaprunner.com" target="_blank" class="taco-report-explorer__report-link">SwapRunner</a> on the 7th of August, a single transaction of:
+                        </p>
+
+                        <!-- unordered list -->
+                        <ul class="taco-report-explorer__report-ul">
+
+                          <!-- list item -->
+                          <li class="taco-report-explorer__report-li">
+                            
+                            <!-- paragraph -->
+                            <p class="taco-report-explorer__report-paragraph">
+                              20000 ICP ($102607.20) will result in a trade to 4577963.284 KONG ($64659.28). 36.984% lost
+to price impact
+                            </p>
+                            
+                          </li>
+
+                          <!-- list item -->
+                          <li class="taco-report-explorer__report-li">
+                            
+                            <!-- paragraph -->
+                            <p class="taco-report-explorer__report-paragraph">
+                              10000 ICP ($51303.60) will result in a trade to 20810696.04 KONG ($39698.35). 22.62% lost to
+price impact
+                            </p>
+                            
+                          </li>
+                          
+                          <!-- list item -->
+                          <li class="taco-report-explorer__report-li">
+                            
+                            <!-- paragraph -->
+                            <p class="taco-report-explorer__report-paragraph">
+                              1000 ICP ($5130.36) will result in a trade to 353503.45 KONG ($4992.89). 2.68% lost to price
+impact
+                            </p>
+                            
+                          </li>
+                          
+                          <!-- list item -->
+                          <li class="taco-report-explorer__report-li">
+                            
+                            <!-- paragraph -->
+                            <p class="taco-report-explorer__report-paragraph">
+                              250 ICP ($1282.59) will result in a trade to 90307.95 KONG ($1275.51) 0.55% lost to price
+impact
+                            </p>
+                            
+                          </li>
+
+                        </ul>
+
+                        <!-- paragraph -->
+                        <p class="taco-report-explorer__report-paragraph">
+                          As can be seen, liquidity for KONG remains limited. If liquidity is not recycled, and there are no 'sells'
+between the DAO's 'buys', the effective slippage rate will be identical regardless of whether multiple
+small transactions or one large one take place.
+                        </p>
+
+                      </div>                      
+
+                    </div>
+
+                    <hr>
+
+                    <!-- headings -->
+                    <h3 class="taco-report-explorer__report-heading
+                              taco-report-explorer__report-heading--h1">
+                      Competitors
+                      <i class="fa-solid fa-circle-info" 
+                        data-bs-toggle="tooltip" 
+                        data-bs-placement="top" 
+                        title="Identify similar projects and assess the token's differentiators alongside the perceived competitive positioning within its niche"></i>
+                    </h3>
+
+                    <h4 class="taco-report-explorer__report-heading
+                              taco-report-explorer__report-heading--h2 mt-4">
+                      ICPSwap
+                    </h4>
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      KongSwap's primary competitor is ICPSwap, the main other AMM DEX in the ICP ecosystem. One
+obvious differentiator is the branding; KongSwap's is fun.
+                    </p>
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      ICPSwap already has some features KongSwap intends to have, those being concentrated liquidity,
+single-sided liquidity, limit orders, and staking pools. <a href="https://app.icpswap.com/ck-bridge?tokenId=xevnm-gaaaa-aaaar-qafnq-cai&chain=Ethereum" target="_blank" class="taco-report-explorer__report-link">ICPSwap houses the ck-Bridge</a>, which facilitates
+the minting and redemption of various chain-key tokens.
+                    </p>
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      Concentrated liquidity is a feature that enables liquidity providers to achieve greater capital efficiency and
+higher fee yields by concentrating their assets within specific price ranges. These price ranges define
+where the provided liquidity is active, virtualizing the deposited reserves as if a larger amount was
+provided, thereby reducing slippage for trades in that range. This concentration amplifies the risk of
+impermanent loss, as price movements cause the position to rebalance more aggressively. This risk is
+offset by the virtualization granting liquidity providers a proportionally larger share of the active depth in
+their range, enabling them to capture a greater portion of trading fees.
+                    </p>
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      Both dApps charge the same trading fees, but KongSwap gives 100% to LPs, <a href="https://iloveics.gitbook.io/icpswap/ics/how-much-are-icpswap-fees" target="_blank" class="taco-report-explorer__report-link">while ICPSwap gives 80%
+to LPs and uses the rest to buy back and burn $ICS</a>. 22442998 ICS tokens (~ $165k) have been burned.
+                    </p>
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      ICPSwap does not have intelligent routing; users can only swap where there is direct liquidity. ICPSwap's
+architecture is inter-canister, so intelligent routing would be harder to achieve. Tokens can be deposited to
+ICPSwap, and if done so, <a href="https://x.com/SnassyIcp/status/1894369040895729879" target="_blank" class="taco-report-explorer__report-link">the swap time is slightly faster than it is on KongSwap</a>. If tokens are not
+deposited, the swap time is slower and there are higher risks of sandwich bot attacks (bots copying your
+trade and executing first) compared to KongSwap.
+                    </p>
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      ICPSwap's <a href="https://iloveics.gitbook.io/icpswap/icpswaps-next-phase-roadmap-and-potential-product-directions-updated-on-april-3-2025" target="_blank" class="taco-report-explorer__report-link">near-term roadmap</a> includes items such as:
+                    </p>
+
+                    <!-- unordered list -->
+                    <ul class="taco-report-explorer__report-ul">
+                      
+                      <!-- list item -->
+                      <li class="taco-report-explorer__report-li">
+
+                        <!-- paragraph -->
+                        <p class="taco-report-explorer__report-paragraph">
+                          Speeding up swap times
+                        </p>
+
+                      </li>
+
+                      <!-- list item -->
+                      <li class="taco-report-explorer__report-li">
+
+                        <!-- paragraph -->
+                        <p class="taco-report-explorer__report-paragraph">
+                          Preventing sandwich bot attacks
+                        </p>
+
+                      </li>
+
+                      <!-- list item -->
+                      <li class="taco-report-explorer__report-li">
+
+                        <!-- paragraph -->
+                        <p class="taco-report-explorer__report-paragraph">
+                          Launching a <a href="https://x.com/ICPSwap/status/1903108129572917454" target="_blank" class="taco-report-explorer__report-link">leverage trading platform</a>
+                        </p>
+
+                      </li>
+
+                      <!-- list item -->
+                      <li class="taco-report-explorer__report-li">
+
+                        <!-- paragraph -->
+                        <p class="taco-report-explorer__report-paragraph">
+                          Several new features, optimizations, and upgrades: one-click liquidity adjustment, seamless
+liquidity provision, smart price range recommendations, price alerts, batch trading, enhanced
+ckBridge functionality, wallet labeling, trading competitions, and UI/UX improvements
+                        </p>
+
+                      </li>
+
+                      <!-- list item -->
+                      <li class="taco-report-explorer__report-li">
+
+                        <!-- paragraph -->
+                        <p class="taco-report-explorer__report-paragraph">
+                          Considering AI agents for analysis, multi-chain, P2P, NFT mining, and social features
+                        </p>
+
+                      </li>
+
+                    </ul>                    
+                    
+                    <h4 class="taco-report-explorer__report-heading
+                              taco-report-explorer__report-heading--h2 mt-4">
+                      Neutrinite DEX
+                    </h4>
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      Neutrinite's vectors automate DeFi operations. They are designed with DAOs in mind as key users, as
+they autonomously perform tasks without the need for constant manual oversight or repeated governance
+votes. The Neutrinite DEX was built for vectors which conduct exchange operations. The user-facing end
+of the Neutrinite DEX could be considered a by-product of its primary use case, and it is unknown if the
+NTN devs intend to focus their efforts to cater it to users. It currently only supports tokens that are vector
+ready, which primarily consist of SNS tokens.
+                    </p>
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      It is another AMM DEX. Like KongSwap, it offers intelligent routing for token swaps, and like ICPSwap,
+it has concentrated liquidity (which is on KongSwap's roadmap).
+                    </p>
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      Neutrinite DEX does not route trading fees to LP providers, so liquidity is currently limited compared to
+KongSwap and ICPSwap; executing large trades incurs high slippage. NTN devs have created arbitrage
+bots that, rather than aiming for profit, only aim to break even on trades that synchronize Neutrinite
+DEX's prices with KongSwap and ICPSwap. These bots make smaller trades over time advantageous,
+which users could set up with a vector. Such a vector would currently charge a one-time creation fee of 2
+NTN (currently ~ $10.9), and be refunded upon its deletion.
+                    </p>
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      The Neutrinite project is much broader than its DEX.
+                    </p>
+
+                    <h4 class="taco-report-explorer__report-heading
+                              taco-report-explorer__report-heading--h2 mt-4">
+                      ICDex
+                    </h4>
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      <a href="https://iclight.house/whitepaper.pdf" target="_blank" class="taco-report-explorer__report-link">ICLighthouse DAO's ICDEX is a hybrid AMM-Orderbook (OAMM) DEX</a>. A grid strategy is used for
+market making, which automates and manages buy and sell orders at regular intervals around the market
+price. It offers a suite of order types, many of which are catered to sophisticated traders, these include
+Market, Limit, Fill and Kill, Fill or Kill, Stop-Limit, and Pro Orders. Pro-Orders consist of Grid, Iceberg,
+Time-Weighted Average Price, and Volume-Weighted Average Price.
+                    </p>
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      The Initial DEX Offering (IDO) is a DAO-authorized token sale for new pairs, set up by a Funder.
+Pre-IDO, the Funder places sell-limit orders. During the active period (from opening to closing time),
+users buy via fill-or-kill orders. Post-closing, unfilled orders cancel, transitioning to normal trading. This
+ensures controlled distribution.
+                    </p>
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      ICLighthouse's dApp also houses icRouter, a bridgeless cross-chain network, leveraging threshold
+signature technology to connect Bitcoin, IC, and EVM networks.
+                    </p>
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      Revenue streams include token pair creation fees, OAMM/LP creation fees, LP withdrawal fees, trading
+(taker) fees, cancelling order fees, and strategic order fees.
+                    </p>
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      ICDex achieves task atomicity via the <a href="https://iclighthouse.gitbook.io/iclighthouse/products/ictc" target="_blank" class="taco-report-explorer__report-link">IC Transaction Coordinator (ICTC)</a>, though this is limited by its
+inter-canister architecture.
+                    </p>
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      We couldn't find a roadmap for ICDex. It is important to note that ICL has very limited liquidity on the
+DEXes where TACO DAO conducts its trading operations, making it non-viable for addition to the
+portfolio without technical upgrades.
+                    </p>
+
+                    <h4 class="taco-report-explorer__report-heading
+                              taco-report-explorer__report-heading--h2 mt-4">
+                      Sonic
+                    </h4>
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      Sonic is another ICP AMM DEX. It lacks KongSwap's and ICPSwap's distinguishing features; no Solana
+integration, no intelligent swap routing, and no concentrated liquidity.
+                    </p>
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      Their <a href="https://docs.sonic.ooo/product/liquidity-bootstrapping-pool/overview" target="_blank" class="taco-report-explorer__report-link">Liquidity Boot Strapping Pool (LBP)</a> feature enables projects to raise funds and bootstrap liquidity
+on ICP. It starts with a high token price that gradually decreases over time before transitioning to a normal
+DEX pair. This feature was last used a year ago.
+                    </p>
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      Sonic has integrated with the Bitfinity EVM chain through <a href="https://sonic-ooo.medium.com/sonic-bitfinity-dex-your-gateway-to-bitfinity-evm-chain-0c44c4271038" target="_blank" class="taco-report-explorer__report-link">Sonic Bitfinity DEX</a>, serving as a gateway for
+bridging assets from ICP via Omnity Bridge.
+                    </p>
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      The <a href="https://hyperlaunch.fun/" target="_blank" class="taco-report-explorer__report-link">hyperlaunch.fun</a> platform linked from their dApp appears to be a pump.fun-esque memecoin
+launcher with some form of tie to ELNA AI agents. It does not have any tokens with a MCAP bigger than
+$12k.
+                    </p>
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      <a href="https://sonicdex.gitbook.io/sonic-whitepaper/future-of-sonic-roadmap" target="_blank" class="taco-report-explorer__report-link">Sonic's roadmap</a> includes items such as:
+                    </p>
+
+                    <!-- unordered list -->
+                    <ul class="taco-report-explorer__report-ul">
+                      
+                      <!-- list item -->
+                      <li class="taco-report-explorer__report-li">
+
+                        <!-- paragraph -->
+                        <p class="taco-report-explorer__report-paragraph">
+                          Perpetual contracts, enabling users to trade with leverage. This was marked for Q2-Q4 of 2024
+and we could find no updates on its current status
+                        </p>
+
+                      </li>
+
+                      <!-- list item -->
+                      <li class="taco-report-explorer__report-li">
+
+                        <!-- paragraph -->
+                        <p class="taco-report-explorer__report-paragraph">
+                          <a href="https://app.sonic.ooo/swap/recurring" target="_blank" class="taco-report-explorer__report-link">Recurring trade feature</a>
+                        </p>
+
+                      </li>
+
+                      <!-- list item -->
+                      <li class="taco-report-explorer__report-li">
+
+                        <!-- paragraph -->
+                        <p class="taco-report-explorer__report-paragraph">
+                          Dark pools
+                        </p>
+
+                      </li>
+
+                    </ul> 
+
+                    <h4 class="taco-report-explorer__report-heading
+                              taco-report-explorer__report-heading--h2 mt-4">
+                      SwapRunner
+                    </h4>
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      Sneed DAO's <a href="https://swaprunner.com/help" target="_blank" class="taco-report-explorer__report-link">SwapRunner</a> is a DEX aggregator that enables users to split trade orders between ICPSwap
+and KongSwap to optimize execution. A planned Time-Distributed Trading feature will enable users to
+break down large trades into smaller ones over time. SwapRunner includes a <a href="https://swaprunner.com/help/rewards" target="_blank" class="taco-report-explorer__report-link">rewards system</a> that lets
+project teams sponsor specific achievements, offering users incentives for completing various trading
+activities. Fees from sponsored achievements go to the Sneed DAO.
+                    </p>
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      For now, SwapRunner's canister is not under Sneed DAO's governance. The Sneed DAO project is much
+broader than SwapRunner.
+                    </p>
+
+                    <h4 class="taco-report-explorer__report-heading
+                              taco-report-explorer__report-heading--h2 mt-4">
+                      DEXes Beyond ICP
+                    </h4>
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      KongSwap inherits ICP's technological advancements, giving it the potential to rival and surpass leading
+DEXes.
+                    </p>
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      KongSwap is entirely on-chain, front-end to back-end. ICP enables full-stack decentralized applications
+to run natively on the blockchain, serving web content directly without relying on centralized servers or
+external hosting. It is the only blockchain capable of this. This ensures complete tamper-proof
+decentralization, eliminating single points of failure like off-chain frontends that could be censored,
+hacked, or taken offline. In contrast, leading DEXes like Uniswap cannot achieve this unless they put
+their frontend on ICP. Currently, only their backend logic resides on-chain, leaving them vulnerable to
+downtime, regulatory takedowns, or frontend manipulations.
+                    </p>
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      ICP's canister smart contracts have properties that enable dApps to run at web speed and execute complex
+operations, incurring computational costs low enough to be competitive with Web2. This is, theoretically,
+infinitely scalable as more subnets are added. Once again, it is the only blockchain capable of this, others
+burden users with variable gas fees, and are limited to simpler operations. ICP's reverse gas model, where
+developers pre-pay computational fees, does away with charging users for gas altogether.
+                    </p>
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      KongSwap's use of stable memory, a persistent storage mechanism, allows all operational state, liquidity
+pools, transaction histories, user positions, and analytics to be stored and queried entirely on-chain
+without external databases or oracles. DEXes on other chains face prohibitive storage costs and limits,
+forcing reliance on off-chain indexers or APIs for data.
+                    </p>
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      Chain-Key technology enables bridgeless multichain interoperability, which KongSwap takes advantage
+of to position itself favourably against non-ICP DEXes reliant on bridges. Bridges are notorious for
+having vulnerabilities. <a href="https://chain.link/education-hub/cross-chain-bridge-vulnerabilities" target="_blank" class="taco-report-explorer__report-link">According to DefiLlama</a>, cross-chain bridges have been hacked for more than $2.8
+billion, representing almost 40% of the entire value hacked in Web3. By generating and managing
+cross-chain keys, KongSwap securely aggregates liquidity across the chains it intergrates.
+                    </p>
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      With all this in mind, we identify 1inch Network as KongSwap's primary non-ICP competitor. As a
+leading decentralized exchange aggregator (<a href="https://medium.com/@biosioidongesit/1inch-reclaims-dex-aggregator-crown-with-60-market-share-a43657d965c8" target="_blank" class="taco-report-explorer__report-link">60% market share as of June</a>), 1inch routes user trades across
+hundreds of liquidity sources on over 13 chains, including Ethereum, Solana, and various Layer-2
+networks, to deliver optimal rates and minimize slippage. It enables seamless cross-chain swaps through
+its <a href="https://1inch.io/assets/1inch-fusion-plus.pdf" target="_blank" class="taco-report-explorer__report-link">Fusion+</a> mode, an intent-based atomic swap protocol that avoids traditional bridges by using escrow
+contracts for trustless execution. In Fusion+, users express swap intents (e.g., minimum return across
+chains), and professional resolvers compete in Dutch auctions to fulfill them by creating escrow contracts
+with cryptographic hashlocks (tied to a secret) and timelocks (deadlines) on both source and destination
+chains, ensuring atomic execution where the swap either completes fully or reverts entirely. This design is
+trustless because it relies solely on on-chain cryptography and smart contract logic—no intermediaries or
+custodians hold funds, users maintain self-custody throughout, and failures trigger automatic refunds
+without external trust. 1inch also features gasless execution, MEV protection, limit orders, and DAO
+governance.
+                    </p>
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      KongSwap aims to be a one-stop-shop DEX, enabling seamless, trustless swaps of any token for any
+other across integrated ecosystems, regardless of their native chains. 1inch has already largely achieved
+all of this. KongSwap's potential to catch up is limited by a few factors, the primary of which being the
+fact that it is not a DEX aggregator. Even when it has made the necessary implementations to enable
+support of tokens from other ecosystems, such as SPL tokens (Solana's token standard), its potential to be
+a one-stop-shop will be contingent on liquidity being provided for them on the platform, a contingency
+which 1inch is not limited by. Another limitation is KongSwap's dependence upon rollouts of Chain-Key
+implementations for new chains, while 1inch has already integrated DEXes on 13 chains, allowing
+immediate access to their ecosystems without waiting for protocol-level Chain-Key rollouts on ICP. A
+third factor is ICP's smaller ecosystem adoption, which hampers liquidity growth compared to 1inch's
+established DeFi hubs.
+                    </p>
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      If KongSwap can overcome these limiting factors through adoption, it will have a technical edge. By
+handling swaps internally, it could achieve faster execution than 1inch's Fusion+ auctions, which
+generally take multiple minutes. By not relying on multiple external DEXes and resolvers, KongSwap
+would likely have a lower rate of failure. KongSwap's fully on-chain architecture ensures tamper-proof
+decentralization, eliminating off-chain vulnerabilities like 1inch's reliance on external services for DAO
+voting (e.g., Snapshot for off-chain tallies), off-chain data indexing, and frontend hosting that could
+introduce points of failure, censorship, or hacks. For <a href="https://x.com/1inch/status/1851832307746742686" target="_blank" class="taco-report-explorer__report-link">example</a>, a recent supply chain attack on 1inch's web
+dApp (via a compromised third-party JS library) led to malicious wallet connect requests that could drain
+user funds for about 2 hours, though the team resolved it with refunds and advised revoking approvals.
+Beyond security, ICP's canister smart contracts, which KongSwap is composed of, offer a cornucopia of
+unique, decentralized features waiting to be built, features that other chains could only dream of.
+                    </p>
+
+                    <h4 class="taco-report-explorer__report-heading
+                              taco-report-explorer__report-heading--h2 mt-4">
+                      Prediction Markets
+                    </h4>
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      While KongSwap's core focus is the DEX, its prediction markets feature puts it up against specialized
+platforms in the broader crypto space. We assess the KongSwap prediction markets system as not yet
+competitive.
+                    </p>
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      To illustrate our logic behind this statement, we will start by explaining V1 of their prediction markets. In
+V1, the prediction markets used a straightforward pool-based mechanism; bettors would send their tokens
+to one of the outcome pools. At the market's end, all losing bets would be distributed to the winning
+bettors. The system had a critical flaw, it did not take the evolving nature of information into account. For
+example, if the prediction market's topic was 'Will x token's price be above y as of z date?', it did not
+matter if you bet early or late into that market, these bets would count the same, even though those who
+would bet late would have a far greater advantage in predicting the outcome. This was easily-gameable.
+                    </p>
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      V2 introduced time-weighted decay as a solution to this problem. This system added multipliers based on
+how early bettors entered into the market, with the multiplier being 10x at the start of the market and 1x at
+its end. We perceive this to be a band-aid solution to an already flawed system, rather than a fix. Even if
+the multiplier is 1x at the market's end, if it is easy to deduce its outcome, late bettors with enough capital
+could still put a big stake into the imminently-victorious pool to drown out the rewards of their
+forerunners, and such an opportunity would only be limited by how much capital the bettor has. The
+arbitrary 10x early bonus also invites coordination (creators ping associates to front-load). Finally, the
+market's resolution is centralized as it, reportedly, can be forced by admins.
+                    </p>
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      By contrast, leading crypto prediction markets like Polymarket typically price outcomes via AMMs or
+order books. For example, in Polymarket, traders buy/sell “Yes/No” shares that trade between 0 and 1 in a
+stablecoin, so the price at any moment reflects the crowd's implied probability. Prices adjust as
+information arrives, rewarding correct early positions through price movement alone, without arbitrary
+time-decay multipliers. Resolution is generally decentralized using oracle or vote-based dispute
+mechanisms.
+                    </p>
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      Competitors avoid KongSwap's centralization risks and offer scalable mechanics suited for high-volume
+events (e.g., Polymarket's $1B+ in election bets). KongSwap's approach may suit low-stakes ICP fun but
+is functionally behind the state of the art.
+                    </p>
+
+                    <h4 class="taco-report-explorer__report-heading
+                              taco-report-explorer__report-heading--h2 mt-4">
+                      Statistics
+                    </h4>
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      According to <a href="https://icptokens.net/dex" target="_blank" class="taco-report-explorer__report-link">icptokens</a> and <a href="https://v3.data.sonic.ooo/" target="_blank" class="taco-report-explorer__report-link">Sonic</a>, as at 07/08/2025:
+                    </p>
+
+                    <!-- unordered list -->
+                    <ul class="taco-report-explorer__report-ul">
+                      
+                      <!-- list item -->
+                      <li class="taco-report-explorer__report-li">
+
+                        <!-- paragraph -->
+                        <p class="taco-report-explorer__report-paragraph">
+                          KongSwap's TVL was $5.82m and 24h volume was $577.02k
+                        </p>
+
+                      </li>
+
+                      <!-- list item -->
+                      <li class="taco-report-explorer__report-li">
+
+                        <!-- paragraph -->
+                        <p class="taco-report-explorer__report-paragraph">
+                          ICPSwap's TVL was $8.63m and 24h volume was $579.77k
+                        </p>
+
+                      </li>
+
+                      <!-- list item -->
+                      <li class="taco-report-explorer__report-li">
+
+                        <!-- paragraph -->
+                        <p class="taco-report-explorer__report-paragraph">
+                          ICDex's TVL was $1.17m and 24h volume was $4.98k
+                        </p>
+
+                      </li>
+
+                      <!-- list item -->
+                      <li class="taco-report-explorer__report-li">
+
+                        <!-- paragraph -->
+                        <p class="taco-report-explorer__report-paragraph">
+                          Sonic's TVL was $3.46m and 24h volume was 0
+                        </p>
+
+                      </li>
+
+                    </ul> 
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      According to <a href="https://defillama.com/protocol/uniswap?dexVolume=true&groupBy=daily" target="_blank" class="taco-report-explorer__report-link">DefiLlama</a>, as at 06/08/2025:
+                    </p>
+
+                    <!-- unordered list -->
+                    <ul class="taco-report-explorer__report-ul">
+                      
+                      <!-- list item -->
+                      <li class="taco-report-explorer__report-li">
+
+                        <!-- paragraph -->
+                        <p class="taco-report-explorer__report-paragraph">
+                          1inch's DEX Aggregator Volume was $364.43m
+                        </p>
+
+                      </li>
+
+                      <!-- list item -->
+                      <li class="taco-report-explorer__report-li">
+
+                        <!-- paragraph -->
+                        <p class="taco-report-explorer__report-paragraph">
+                          Uniswap's TVL was $5.471b and 24h volume was $2.635b
+                        </p>
+
+                      </li>
+
+                      <!-- list item -->
+                      <li class="taco-report-explorer__report-li">
+
+                        <!-- paragraph -->
+                        <p class="taco-report-explorer__report-paragraph">
+                          Polymarket's TVL was $112.97m and 24h volume was $32.1m
+                        </p>
+
+                      </li>
+
+                    </ul> 
+
+                    <hr>
+                   
+                    <!-- heading -->
+                    <h3 class="taco-report-explorer__report-heading
+                              taco-report-explorer__report-heading--h1">
+                      Security Risks
+                      <i class="fa-solid fa-circle-info" 
+                        data-bs-toggle="tooltip" 
+                        data-bs-placement="top" 
+                        title="Investigate perceived vulnerabilities, any audit reports, and adherence to security and regulatory standards"></i>
+                    </h3> 
+                    
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      KongSwap <a href="https://github.com/KongSwap/documentation/blob/main/sig9_kongswap_audit_report.pdf" target="_blank" class="taco-report-explorer__report-link">was audited by sig9</a>. The audit had two medium severity findings, two low severity findings
+that were acknowledged, and four informational findings that were acknowledged. One medium severity
+finding was partially addressed, one medium severity finding was fixed, one low severity remained
+unfixed, one low severity finding was fixed, two informational findings were fixed, and two informational
+findings remained unfixed.
+                    </p>
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      The fact that platform admins can force prediction market outcomes is not stated on the KongSwap dApp,
+this was only discovered through discussion with one of the team members. Their FAQ explicitly states:
+“Neither creator nor admin can unilaterally resolve.”
+                    </p>
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      Leading decentralized prediction markets like Polymarket, Augur, and Omen (Gnosis) do not hold
+gambling licenses, as they position themselves as information aggregation tools or DeFi protocols rather
+than pure betting sites. This framing helps them navigate regulations, but they've still faced scrutiny under
+derivatives laws (e.g., from the CFTC in the US), treating markets as binary options or swaps. None have
+obtained gambling-specific licenses from bodies like state gaming commissions or international
+authorities, which are common for centralized sportsbooks or casinos. Instead, they rely on blockchain's
+pseudonymous, global nature, with varying compliance strategies.
+                    </p>
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      In 2022, <a href="https://www.dlapiper.com/en-us/insights/publications/2022/1/cftc-settles-enforcement-action-against-defi-platform-polymarket" target="_blank" class="taco-report-explorer__report-link">the CFTC fined Polymarket $1.4 million for offering unregistered event-based binary options</a>,
+ordering them to wind down non-compliant markets, refund users, and cease violations. As part of the
+settlement, <a href="https://www.coindesk.com/business/2022/01/24/polymarket-relaunches-site-after-cftc-shutdown-but-not-for-us-traders" target="_blank" class="taco-report-explorer__report-link">Polymarket implemented IP geoblocking to exclude US users</a>, effectively banning them from
+trading. However, <a href="https://www.cryptopolitan.com/polymarket-strikes-deal-to-return-to-u-s/" target="_blank" class="taco-report-explorer__report-link">updates</a> in 2025 show a turnaround: Polymarket acquired QCX (a CFTC-licensed
+derivatives exchange) for $112 million in July, allowing them to re-enter the US market compliantly
+under QCX's regulatory umbrella. The DOJ and CFTC also closed their civil/criminal investigations
+(initiated under Biden) without charges, amid a more crypto-friendly Trump administration shift.
+                    </p>
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      KongSwap has not reported holding any licenses or authorizations for its prediction markets, aligning
+with the unlicensed status of peers like Augur and Omen, which have avoided major enforcement by
+emphasizing decentralization and operating as trustless protocols. This lack of formal approval does not
+appear inherently alarming for a smaller platform with limited volume, as regulators often prioritize
+high-profile cases. However, Polymarket's 2022 CFTC fine and subsequent geoblocking highlight
+potential risks if KongSwap scales.
+                    </p>
+
+                    <hr>
+                    
+                    <!-- back to top link -->
+                    <a href="#" @click.prevent="scrollToTop" class="taco-report-explorer__report-link text-center w-100 d-inline-block mt-2">Back to top</a>
+                    
+                  </div>
+
+                  <!-- report footer -->
+                  <div class="taco-report-explorer__report-footer">
+                    
+                    <!-- left -->
+                    <div class="taco-report-explorer__report-footer__left">
+                      
+                      ❤️🌮
+                      
+                    </div>
+                    
+                    <!-- center -->
+                    <div class="taco-report-explorer__report-footer__center text-center">
+                      
+                      &copy;2025 Taco Dao
+                      
+                    </div>
+                    
+                    <!-- right -->
+                    <div class="taco-report-explorer__report-footer__right">
+
+                      <!-- link group -->
                       <!-- <span class="d-flex flex-column align-items-end">
 
                         <span class="text-end">#45 Add Token</span>
@@ -5638,32 +7344,19 @@ employing the core development team.
                       </span> -->
                       
                       <!-- link group -->
-                      <!-- <span class="d-flex flex-column align-items-end">
-
-                        <span class="text-end">#14 Motion to Discuss</span>
-
-                        <span class="d-flex gap-2">
-
-                          <a href="https://nns.ic0.app/proposal/?u=lacdn-3iaaa-aaaaq-aae3a-cai&proposal=14" class="taco-text-blue-to-light-blue text-end" target="_blank">NNS</a>                        
-
-                          <a href="https://app.sneeddao.com/proposal?proposalid=14&sns=lacdn-3iaaa-aaaaq-aae3a-cai" class="taco-text-blue-to-light-blue text-end" target="_blank">Sneed Hub</a>
-
-                        </span>
-                        
-                      </span> -->
-                      
-                      <!-- link group -->
                       <span class="d-flex flex-column align-items-end">
 
-                        <span class="text-end">Motion to Discuss</span>
+                        <span class="text-end">#26 Motion to Discuss</span>
 
                         <span class="d-flex gap-2">
 
-                          <span style="font-style: italic;">Not Started Yet</span>
+                          <a href="https://nns.ic0.app/proposal/?u=lacdn-3iaaa-aaaaq-aae3a-cai&proposal=26" class="taco-text-blue-to-light-blue text-end" target="_blank">NNS</a>                        
+
+                          <a href="https://tacodao.com/chat/forum/26" class="taco-text-blue-to-light-blue text-end">Taco Forum</a>
 
                         </span>
                         
-                      </span> 
+                      </span>
 
                     </div>
                     
@@ -5671,7 +7364,7 @@ employing the core development team.
 
                 </div>
                 
-              </div>                    
+              </div>
               
             </div>
             
@@ -6200,6 +7893,7 @@ employing the core development team.
   import goldDaoIcon from '../assets/tokens/snspng/gold-dao.png'
   import sgldtIcon from '../assets/tokens/sgldt.png'
   import openChatIcon from '../assets/tokens/snspng/openchat.png'
+  import kongSwapIcon from '../assets/tokens/snspng/kongswap.png'
   
   ///////////
   // store //
@@ -6234,6 +7928,7 @@ employing the core development team.
   const goldDaoIconUrl = goldDaoIcon
   const sgldtIconUrl = sgldtIcon
   const openChatIconUrl = openChatIcon
+  const kongSwapIconUrl = kongSwapIcon
 
   // show report menu on mobile
   const showReportMenuOnMobile = ref(false)
@@ -6321,6 +8016,8 @@ employing the core development team.
       reportId.value = 5
     } else if (newPath === '/reports/openchat') {
       reportId.value = 6
+    } else if (newPath === '/reports/kongswap') {
+      reportId.value = 7
     } else if (newPath === '/reports/example') {
       reportId.value = 0
     }
