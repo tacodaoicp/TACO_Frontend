@@ -839,119 +839,6 @@
     }
   }
 
-  //////////////////////////
-  // Animated Backgrounds //
-  //////////////////////////
-
-  // animated background container
-  .floating-tacos {
-    display: none; // remove to show
-    position: absolute;
-    top: 0%;
-    left: 0%;
-    width: 100%;
-    height: 100%;
-    list-style: none;
-
-    li {
-      position: absolute;
-      width: fit-content;
-      height: fit-content;
-      opacity: 1;
-      bottom: -3rem;
-      font-size: 2rem;
-      transform-origin: 50% 70%;
-      user-select: none;
-      animation-timing-function: linear;
-      animation-iteration-count: infinite;
-
-      &:nth-child(1) {
-        left: 10%;
-        animation-delay: 4s;
-        animation-duration: 15s;
-        animation-name: turnTacosClockwise;
-      }
-
-      &:nth-child(2) {
-        left: 20%;
-        animation-delay: 7s;
-        animation-duration: 15s;
-        animation-name: turnTacosCounterClockwise;
-      }
-      &:nth-child(3) {
-        left: 28%;
-        animation-delay: 6s;
-        animation-duration: 12s;
-        animation-name: turnTacosClockwise;
-      }
-      &:nth-child(4) {
-        left: 35%;
-        animation-delay: 10s;
-        animation-duration: 10s;
-        animation-name: turnTacosCounterClockwise;
-      }
-      &:nth-child(5) {
-        left: 43%;
-        animation-delay: 1s;
-        animation-duration: 12s;
-        animation-name: turnTacosClockwise;
-      }
-      &:nth-child(6) {
-        left: 50%;
-        animation-delay: 3s;
-        animation-duration: 8s;
-        animation-name: turnTacosCounterClockwise;
-      }
-      &:nth-child(7) {
-        left: 60%;
-        animation-delay: 6s;
-        animation-duration: 13s;
-        animation-name: turnTacosClockwise;
-      }
-      &:nth-child(8) {
-        left: 70%;
-        animation-delay: 4s;
-        animation-duration: 20s;
-        animation-name: turnTacosCounterClockwise;
-      }
-      &:nth-child(9) {
-        left: 77%;
-        animation-delay: 8s;
-        animation-duration: 16s;
-        animation-name: turnTacosClockwise;
-      }
-      &:nth-child(10) {
-        left: 85%;
-        animation-delay: 6s;
-        animation-duration: 19s;
-        animation-name: turnTacosCounterClockwise;
-      }
-    }
-
-  }
-
-  @keyframes turnTacosClockwise {
-    0% {
-      transform: translateY(0rem) rotate(0);
-      opacity: 0.5;
-    }
-    100% {
-      transform: translateY(-15rem) rotate(360deg);
-      opacity: 0;
-    }
-  }
-
-  @keyframes turnTacosCounterClockwise {
-    0% {
-      transform: translateY(0rem) rotate(0);
-      opacity: 0.5;
-    }
-    100% {
-      transform: translateY(-15rem) rotate(-360deg);
-      opacity: 0;
-    }
-  }
-
   ////////////////////////
   // Transition Classes //
   ////////////////////////
@@ -1162,7 +1049,6 @@
     // // console.log('app mounted')
 
     // friendly log
-    // console.log('👨‍🍳 Weclome to \033[33mTaco Dao\033[0m!')
     console.log(
       "👨‍🍳 Welcome to %cTaco Dao",
       "color: yellow;",

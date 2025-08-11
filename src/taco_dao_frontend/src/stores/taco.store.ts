@@ -680,6 +680,7 @@ export const useTacoStore = defineStore('taco', () => {
             root.style.setProperty("--light-orange-to-light-brown", "#C16D33") // light brown
             root.style.setProperty("--light-orange-to-brown", "#934A17") // brown
             root.style.setProperty("--light-orange-to-dark-brown", "#512100") // dark brown
+            root.style.setProperty("--orange-to-dark-orange", "#DA8D28") // dark orange
             root.style.setProperty("--orange-to-brown", "#934a17") // brown
             root.style.setProperty("--orange-to-dark-brown", "#512100") // dark brown
             root.style.setProperty("--orange-to-light-brown", "#c16d33") // light brown
@@ -719,8 +720,10 @@ export const useTacoStore = defineStore('taco', () => {
             root.style.setProperty("--brown-to-white", "#ffffff") // white
             root.style.setProperty("--brown-to-orange", "#FED66C") // orange
             root.style.setProperty("--brown-to-dark-orange", "#DA8D28") // dark orange
+            root.style.setProperty("--brown-to-dark-brown", "#512100") // dark brown
             root.style.setProperty("--brown-to-green", "#934a17") // brown
             root.style.setProperty("--dark-brown-to-white", "#ffffff") // white
+            root.style.setProperty("--dark-brown-to-brown", "#934A17") // brown
             root.style.setProperty("--red-to-light-red", "#FF7575") // light red
             root.style.setProperty("--light-red-to-red", "#EB0000") // red
             root.style.setProperty("--red-to-red-hover", "#EB0000") // error red hover
@@ -751,6 +754,7 @@ export const useTacoStore = defineStore('taco', () => {
             root.style.setProperty("--light-orange-to-light-brown", "#feeac1") // light orange
             root.style.setProperty("--light-orange-to-brown", "#feeac1") // light orange
             root.style.setProperty("--light-orange-to-dark-brown", "#feeac1") // light orange
+            root.style.setProperty("--orange-to-dark-orange", "#FED66C") // orange
             root.style.setProperty("--orange-to-brown", "#FEd66c") // orange
             root.style.setProperty("--orange-to-dark-brown", "#FEd66c") // orange
             root.style.setProperty("--orange-to-light-brown", "#FEd66c") // orange
@@ -790,8 +794,10 @@ export const useTacoStore = defineStore('taco', () => {
             root.style.setProperty("--brown-to-white", "#934a17") // brown
             root.style.setProperty("--brown-to-orange", "#934a17") // brown
             root.style.setProperty("--brown-to-dark-orange", "#934a17") // brown
+            root.style.setProperty("--brown-to-dark-brown", "#934A17") // brown
             root.style.setProperty("--brown-to-green", "#B7CD02") // green
             root.style.setProperty("--dark-brown-to-white", "#512100") // dark brown
+            root.style.setProperty("--dark-brown-to-brown", "#512100") // dark brown
             root.style.setProperty("--red-to-light-red", "#EB0000") // red
             root.style.setProperty("--light-red-to-red", "#FF7575") // light red
             root.style.setProperty("--red-to-red-hover", "#D40000") // error red hover
