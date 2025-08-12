@@ -417,7 +417,7 @@
               <!-- bottom -->
               <img :src="kongSwapText" 
                     alt="placeholder" 
-                    class="home-view__speedbump__exchange__text"
+                    class="home-view__speedbump__exchange__text sbt-kong"
                     style="width: 16rem;">
 
             </a>
@@ -435,8 +435,8 @@
               <!-- bottom -->
               <img :src="swapRunnerText" 
                     alt="placeholder" 
-                    class="home-view__speedbump__exchange__text"
-                    style="width: 18rem; padding-top: 0.25rem;">
+                    class="home-view__speedbump__exchange__text sbt-sw"
+                    style="width: 18rem;">
 
             </a>
 
@@ -453,7 +453,7 @@
               <!-- bottom -->
               <img :src="icpSwapText" 
                     alt="placeholder" 
-                    class="home-view__speedbump__exchange__text"
+                    class="home-view__speedbump__exchange__text sbt-icpswap"
                     style="width: 11rem;">
 
             </a>
@@ -469,7 +469,7 @@
           <div class="home-view__cta__top">
 
             <span>
-              We've also got <router-link to="/chat/oc" class="home-view__cta__link">Chat Rooms</router-link>, <router-link to="/chat/forum" class="home-view__cta__link">Forums</router-link>, <router-link to="/reports" class="home-view__cta__link">Reports</router-link>, <router-link to="/vote" class="home-view__cta__link">Voting</router-link>, and more to come!
+              We've also got <router-link to="/chat/oc" class="home-view__cta__link">Chat Rooms</router-link>, <router-link to="/chat/forum" class="home-view__cta__link">Forums</router-link>, <router-link to="/reports" class="home-view__cta__link">Reports</router-link>, <router-link to="/vote" class="home-view__cta__link">Voting</router-link>, and more!
             </span>
 
           </div>
@@ -693,6 +693,7 @@
 
   &__title {
     display: inline-flex;
+    align-items: center;
     margin: 0;
     font-size: 1.5rem;
     font-weight: 500;
@@ -763,13 +764,14 @@
     &__title {
       font-size: 1.5rem;
       color: var(--brown-to-light-orange);
-      white-space: nowrap;
+      // white-space: nowrap;
+      text-align: center;
     }
 
     &__link {
       font-size: 1.5rem;
       color: var(--blue-to-light-blue);
-      white-space: nowrap;
+      text-align: center;
     }
 
   }
@@ -888,6 +890,8 @@
     &__title {
       color: var(--brown-to-dark-brown);
       margin-bottom: 2.5rem;
+      text-align: center;
+      padding: 0 1rem;
     }
 
     &__exchanges {
@@ -927,6 +931,8 @@
     }
 
     &__top {
+      text-align: center;
+      padding: 0 2rem;
       
       span {
         font-size: 1.75rem;
@@ -965,7 +971,7 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    margin: 5rem 0 2rem;
+    margin: 6rem 0 2rem;
     gap: 0.25rem;
     z-index: 2;
     text-decoration: none;
@@ -1132,58 +1138,389 @@
 // media queries //
 ///////////////////
 
+// extra small
+@media (max-width: 459.98px) {
+  .home-view__pitch-point {
+    flex-direction: column !important;
+    align-items: center !important;
+    gap: 1rem !important;
+  }
+  .home-view__pitch-point__title {
+    text-align: center !important;
+  }
+  .home-view__pitch-point__description {
+    text-align: center !important;
+  }
+  .home-view__pitch-points {
+    gap: 2rem;
+  }
+  .home-view__pitch-point__image {
+    width: 9rem !important;
+  }
+}
+
 // phone protrait
 @media (max-width: 575.98px) {
-  .home-view__center__top {
-    flex-wrap: wrap;
+  .home-view__above-the-fold__upper__middle {
+    flex-direction: column;
+    align-items: center;
   }
-  .home-view__center__bottom {
-    flex-wrap: wrap;
-  }
-  .lh-on-mobile {
-    line-height: 1;
+  .home-view__above-the-fold__upper__middle__left,
+  .home-view__above-the-fold__upper__middle__center,
+  .home-view__above-the-fold__upper__middle__right {
+    width: 80%;
   }  
-  .small-on-mobile {
+  .home-view__above-the-fold__upper__middle__center {
+    order: 1;
+  }
+  .home-view__above-the-fold__upper__middle__left {
+    order: 2;
+  }
+  .home-view__above-the-fold__upper__middle__right {
+    order: 3;
+  }
+  .container {
+    max-width: 100%;
+    padding: 0 1rem;
+  }  
+  .home-view__canted__title {
     font-size: 1.125rem;
   }
-  .smaller-on-mobile {
+  .home-view__canted__link {
     font-size: 1rem;
+  }  
+  .home-view__title__text {
+    font-size: 1rem;
+  }  
+  .home-view__tile {
+    padding: 0.5rem 0.5rem 0.5rem;
+    gap: 0.5rem;
+  }
+  .home-view__taco-dao-slogan {
+    line-height: 1;
+  }
+  .home-view__taco-dao-slogan span {
+    font-size: 1.5rem;
+  }
+  .home-view__taco-dao-logo {
+    width: 100px;
+    min-width: 100px;
+    min-height: 57px;
+    margin-bottom: 0.5rem;
+  }
+  .home-view__pitch-point__title {
+    font-size: 1.5rem;
+  }
+  .home-view__pitch-point__description {
+    font-size: 1.125rem;
+  }
+  .home-view__pitch-point__image--lg {
+    width: 9rem !important;
+  }
+  .home-view__pitch-point__image {
+    width: 7rem;
+  }
+  .home-view__pitch-points {
+    padding: 0 1rem;
+  }
+  .home-view__pitch-point {
+    padding: 0;
+    gap: 1.5rem;
+    align-items: start;
+  }
+  .home-view__pitch-point__description {
+    padding-right: 0;
+    padding-left: 0 !important;
+  }
+  .home-view__pitch-point__description:nth-child(even) {
+    padding-left: 0;
+  }  
+  .home-view__above-the-fold {
+    min-height: 1380px;
+  }  
+  .home-view__above-the-fold__upper {
+    justify-content: start;
+    margin-top: 3rem;
+  }
+  .home-view__above-the-fold__lower {
+    display: none;
+  }
+  .floating-tacos {
+    display: none;
+  }
+  .home-view__tagline__container span {
+    font-size: 1.125rem;
   }    
+  .home-view__speedbump {
+    padding: 2rem 0 1.75rem;
+    margin-top: 3rem;
+  }
+  .home-view__speedbump__exchanges {
+    gap: 2rem 3rem;
+  }
+  .home-view__speedbump__exchange {
+    min-width: 140px;
+    gap: 0.5rem;
+  }
+  .home-view__speedbump__exchange__logo {
+    width: 5rem;
+  }  
+  .home-view__speedbump__title {
+    font-size: 1.25rem;
+    margin-bottom: 1.5rem;
+  }
+  .sbt-kong {
+    width: 7rem !important;
+  }
+  .sbt-sw {
+    width: 8.5rem !important;
+  }
+  .sbt-icpswap {
+    width: 5rem !important;
+  } 
+  .home-view__cta {
+    margin-top: 4rem;
+  }
+  .home-view__cta__top span {
+    font-size: 1.25rem;
+  }
+  .home-view__cta__bottom {
+    margin-top: 3rem;
+    gap: 0.5rem;
+  }  
+  .home-view__cta__bottom span {
+    font-size: 1.25rem;
+  }
+  .home-view__cta__bottom .taco-btn {
+    font-size: 1.25rem;
+  }
+  .home-view__powered-by {
+    margin: 5rem 0 1.5rem;
+  }  
 }
 
 // phone landscape
 @media (min-width: 576px) and (max-width: 767.98px) {
-  .home-view__center__top {
-    flex-wrap: wrap;
-  }
-  .home-view__center__bottom {
-    flex-wrap: wrap;
-  }
-  .lh-on-mobile {
-    line-height: 1.25;
-  }  
-  .small-on-mobile {
-    font-size: 1.25rem;
-    line-height: 1;
-  }  
-  .smaller-on-mobile {
-    font-size: 1.125rem;
-  }  
   .home-view__pitch-points {
     max-width: 540px;
   }
+  .home-view__above-the-fold__upper__middle {
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  .home-view__above-the-fold__upper__middle__left,
+  .home-view__above-the-fold__upper__middle__center,
+  .home-view__above-the-fold__upper__middle__right {
+    width: 40%;
+  }
+  .container {
+    max-width: 100%;
+    padding: 0 1rem;
+  }
+  .home-view__canted__title {
+    font-size: 1.125rem;
+  }
+  .home-view__canted__link {
+    font-size: 1rem;
+  }  
+  .home-view__title__text {
+    font-size: 1rem;
+  }
+  .home-view__tile {
+    padding: 0.5rem 0.5rem 0.5rem;
+    gap: 0.5rem;
+  }
+  .home-view__taco-dao-slogan {
+    line-height: 1;
+  }
+  .home-view__taco-dao-slogan span {
+    font-size: 1.5rem;
+  }
+  .home-view__taco-dao-logo {
+    width: 100px;
+    min-width: 100px;
+    min-height: 57px;
+    margin-bottom: 0.5rem;
+  }
+  .home-view__pitch-point__title {
+    font-size: 1.5rem;
+  }
+  .home-view__pitch-point__description {
+    font-size: 1.125rem;
+  }
+  .home-view__pitch-point__image--lg {
+    width: 9rem !important;
+  }
+  .home-view__pitch-point__image {
+    width: 7rem;
+  }
+  .home-view__pitch-point {
+    padding: 0;
+    align-items: start;
+  }
+  .home-view__pitch-point__description {
+    padding-right: 0;
+    padding-left: 0 !important;
+  }
+  .home-view__pitch-point__description:nth-child(even) {
+    padding-left: 0;
+  }
+  .home-view__below-the-fold {
+    margin-top: 5rem;
+  }
+  .home-view__above-the-fold {
+    min-height: 908px;
+  }
+  .home-view__tagline__container span {
+    font-size: 1.125rem;
+  }  
+  .home-view__speedbump {
+    padding: 2rem 0 1.75rem;
+    margin-top: 4rem;
+  }
+  .home-view__speedbump__exchanges {
+    gap: 2rem 3rem;
+  }
+  .home-view__speedbump__exchange {
+    min-width: 140px;
+    gap: 0.5rem;
+  }
+  .home-view__speedbump__exchange__logo {
+    width: 5rem;
+  }  
+  .home-view__speedbump__title {
+    font-size: 1.25rem;
+    margin-bottom: 1.5rem;
+  }
+  .sbt-kong {
+    width: 7rem !important;
+  }
+  .sbt-sw {
+    width: 8.5rem !important;
+  }
+  .sbt-icpswap {
+    width: 5rem !important;
+  }  
+  .home-view__cta {
+    margin-top: 4rem;
+  }
+  .home-view__cta__top span {
+    font-size: 1.25rem;
+  }
+  .home-view__cta__bottom {
+    margin-top: 3rem;
+    gap: 0.5rem;
+  }
+  .home-view__cta__bottom span {
+    font-size: 1.25rem;
+  }
+  .home-view__cta__bottom .taco-btn {
+    font-size: 1.25rem;
+  }
+  .home-view__powered-by {
+    margin: 4rem 0 2rem;
+  }  
 }
 
 // tablet
 @media (min-width: 767px) and (max-width: 991.98px) {
-  .home-view__center__top {
-    flex-wrap: wrap;
-  }
-  .home-view__center__bottom {
-    flex-wrap: wrap;
-  }
   .home-view__pitch-points {
     max-width: 720px;
+  }
+  .container {
+    max-width: 100%;
+    padding: 0 1rem;
+  }
+  .home-view__canted__title {
+    font-size: 1.125rem;
+  }
+  .home-view__canted__link {
+    font-size: 1.125rem;
+  }  
+  .home-view__title__text {
+    font-size: 1.125rem;
+  }
+  .home-view__tile {
+    padding: 0.5rem 0.5rem 0.5rem;
+    gap: 0.5rem;
+  }
+  .home-view__taco-dao-slogan {
+    line-height: 1.125;
+  }
+  .home-view__taco-dao-slogan span {
+    font-size: 1.75rem;
+  }
+  .home-view__taco-dao-logo {
+    width: 120px;
+    min-width: 120px;
+    min-height: 68px;
+    margin-bottom: 1rem;
+  }
+  .home-view__pitch-point__title {
+    font-size: 2rem;
+  }
+  .home-view__pitch-point__description {
+    font-size: 1.25rem;
+  }
+  .home-view__pitch-point__image--lg {
+    width: 11rem !important;
+  }
+  .home-view__pitch-point__image {
+    width: 9rem;
+  }
+  .home-view__pitch-point {
+    padding: 0 2rem;
+  }
+  .home-view__pitch-point__description {
+    padding-right: 0;
+    padding-left: 0 !important;
+  }
+  .home-view__pitch-point__description:nth-child(even) {
+    padding-left: 0;
+  }
+  .home-view__tagline__container span {
+    font-size: 1.25rem;
+  }
+  .home-view__speedbump {
+    padding: 2rem 0 2rem;
+    margin-top: 5rem;
+  }
+  .home-view__speedbump__exchanges {
+    gap: 2rem 4rem;
+  }
+  .home-view__speedbump__exchange {
+    min-width: 225px;
+  }  
+  .home-view__speedbump__exchange__logo {
+    width: 6rem;
+  }  
+  .home-view__speedbump__title {
+    font-size: 1.5rem;
+    margin-bottom: 1.5rem;
+  }
+  .sbt-kong {
+    width: 12rem !important;
+  }
+  .sbt-sw {
+    width: 14rem !important;
+  }
+  .sbt-icpswap {
+    width: 8rem !important;
+  }
+  .home-view__cta__top span {
+    font-size: 1.5rem;
+  }
+  .home-view__cta__bottom {
+    gap: 0.75rem;
+  }
+  .home-view__cta__bottom span {
+    font-size: 1.5rem;
+  }
+  .home-view__cta__bottom .taco-btn {
+    font-size: 1.5rem;
+  }
+  .home-view__powered-by {
+    margin: 5rem 0 2rem;
   }
 }
 
@@ -1192,12 +1529,72 @@
   .home-view__pitch-points {
     max-width: 960px;
   }
+  .home-view__canted__title {
+    font-size: 1.25rem;
+  }
+  .home-view__canted__link {
+    font-size: 1.25rem;
+  }
+  .home-view__title__text {
+    font-size: 1.25rem;
+  }
+  .home-view__tile {
+    padding: 0.75rem 0.5rem 0.5rem;
+    gap: 0.75rem;
+  }
+  .home-view__pitch-point__title {
+    font-size: 2.25rem;
+  }
+  .home-view__pitch-point__description {
+    font-size: 1.5rem;
+  }
+  .home-view__pitch-point__image--lg {
+    width: 13rem;
+  }
+  .home-view__pitch-point__image {
+    width: 11rem;
+  }
+  .home-view__pitch-point {
+    padding: 0 2rem;
+  }
+  .home-view__pitch-point__description {
+    padding-right: 3rem;
+    padding-left: 0 !important;
+  }
+  .home-view__pitch-point__description:nth-child(even) {
+    padding-left: 3rem;
+  }
+  .home-view__speedbump {
+    padding: 2rem 0 2rem;
+    margin-top: 5rem;
+  }
+  .home-view__speedbump__title {
+    margin-bottom: 2rem;
+  }
+  .home-view__speedbump__exchange__logo {
+    width: 7rem;
+  }
+  .home-view__cta__top span {
+    font-size: 1.75rem;
+  }
+  .home-view__cta__bottom span {
+    font-size: 1.75rem;
+  }
 }
 
 // medium desktop
 @media (min-width: 1200px) and (max-width: 1399.98px) {
   .home-view__pitch-points {
     max-width: 1140px;
+  }
+  .home-view__pitch-point__title {
+    font-size: 2.25rem;
+  }
+  .home-view__pitch-point__description {
+    font-size: 1.5rem;
+  }  
+  .home-view__speedbump {
+    margin-top: 5rem;
   }
 }
 
@@ -1206,6 +1603,12 @@
   .home-view__pitch-points {
     max-width: 1320px;
   }
+  .home-view__pitch-point__title {
+    font-size: 2.25rem;
+  }
+  .home-view__pitch-point__description {
+    font-size: 1.5rem;
+  }    
 }
 
 </style>
