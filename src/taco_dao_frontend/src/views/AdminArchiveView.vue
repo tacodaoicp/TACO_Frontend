@@ -28,6 +28,7 @@
                     <option value="price_archive">💰 Price Archive</option>
                     <option value="dao_admin_archive">🔑 DAO Admin Archive</option>
                     <option value="dao_allocation_archive">📊 DAO Allocation Archive</option>
+                    <option value="dao_neuron_allocation_archive">🧠 DAO Neuron Allocation Archive</option>
                     <option value="dao_governance_archive">🗳️ DAO Governance Archive</option>
                   </select>
                 </div>
@@ -208,6 +209,19 @@
                         :disabled="loading"
                       >
                         👥 Import Follow Actions
+                      </button>
+                    </div>
+                  </div>
+                  
+                  <div v-if="selectedArchive === 'dao_neuron_allocation_archive'" class="mt-3">
+                    <h6>DAO Neuron Allocation Archive</h6>
+                    <div class="d-flex flex-wrap gap-2">
+                      <button 
+                        class="btn btn-sm btn-outline-success" 
+                        @click="runArchiveSpecificImport('importNeuronAllocationChanges')"
+                        :disabled="loading"
+                      >
+                        🧠 Import Neuron Allocations
                       </button>
                     </div>
                   </div>
@@ -527,6 +541,7 @@ import { createActor as createPortfolioActor } from '../../../declarations/portf
 import { createActor as createPriceActor } from '../../../declarations/price_archive'
 import { createActor as createDaoAdminActor } from '../../../declarations/dao_admin_archive'
 import { createActor as createDaoAllocationActor } from '../../../declarations/dao_allocation_archive'
+import { createActor as createDaoNeuronAllocationActor } from '../../../declarations/dao_neuron_allocation_archive'
 import { createActor as createDaoGovernanceActor } from '../../../declarations/dao_governance_archive'
 
 export default {
@@ -555,6 +570,7 @@ export default {
       priceActor: null,
       daoAdminActor: null,
       daoAllocationActor: null,
+      daoNeuronAllocationActor: null,
       daoGovernanceActor: null,
       
       // Refresh interval
@@ -592,6 +608,7 @@ export default {
         case 'price_archive': return this.priceActor
         case 'dao_admin_archive': return this.daoAdminActor
         case 'dao_allocation_archive': return this.daoAllocationActor
+        case 'dao_neuron_allocation_archive': return this.daoNeuronAllocationActor
         case 'dao_governance_archive': return this.daoGovernanceActor
         default: return this.tradingActor
       }
@@ -689,6 +706,16 @@ export default {
       return 'bq2l2-mqaaa-aaaan-qz5da-cai'; // fallback to staging canisterId for local
     },
 
+    daoNeuronAllocationArchiveCanisterId() {
+      switch (process.env.DFX_NETWORK) {
+        case "ic":
+          return process.env.CANISTER_ID_DAO_NEURON_ALLOCATION_ARCHIVE_IC || 'placeholder-neuron-allocation-ic';
+        case "staging":
+          return process.env.CANISTER_ID_DAO_NEURON_ALLOCATION_ARCHIVE_STAGING || 'placeholder-neuron-allocation-staging';
+      }
+      return 'placeholder-neuron-allocation-local'; // fallback for local
+    },
+
     daoGovernanceArchiveCanisterId() {
       switch (process.env.DFX_NETWORK) {
         case "ic":
@@ -731,6 +758,7 @@ export default {
         this.priceActor = createPriceActor(this.priceArchiveCanisterId(), { agent })
         this.daoAdminActor = createDaoAdminActor(this.daoAdminArchiveCanisterId(), { agent })
         this.daoAllocationActor = createDaoAllocationActor(this.daoAllocationArchiveCanisterId(), { agent })
+        this.daoNeuronAllocationActor = createDaoNeuronAllocationActor(this.daoNeuronAllocationArchiveCanisterId(), { agent })
         this.daoGovernanceActor = createDaoGovernanceActor(this.daoGovernanceArchiveCanisterId(), { agent })
         
         //console.log('Archive actors created with identity:', identity.getPrincipal().toString())
@@ -1026,6 +1054,7 @@ export default {
         case 'price_archive': return 'bg-warning'
         case 'dao_admin_archive': return 'bg-primary'
         case 'dao_allocation_archive': return 'bg-info'
+        case 'dao_neuron_allocation_archive': return 'bg-success'
         case 'dao_governance_archive': return 'bg-secondary'
         default: return 'bg-secondary'
       }
@@ -1051,6 +1080,9 @@ export default {
         case 'dao_allocation_archive':
           // DAO allocation archive status - shows allocation and follow actions
           return 'Allocation Archive - User allocation changes and follow relationships'
+        case 'dao_neuron_allocation_archive':
+          // DAO neuron allocation archive status - shows neuron-level allocation changes
+          return 'Neuron Allocation Archive - Neuron-level allocation changes for rewards tracking'
         case 'dao_governance_archive':
           // DAO governance archive status - shows voting power and neuron updates
           return 'Governance Archive - Voting power changes and neuron updates'
