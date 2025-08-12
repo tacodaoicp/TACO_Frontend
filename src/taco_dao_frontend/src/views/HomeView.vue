@@ -1173,6 +1173,10 @@
   .home-view__tagline__container {
     margin-top: 1.75rem;
   }
+  .home-view__above-the-fold__upper {
+    justify-content: start;
+    margin-top: 1.25rem;
+  }
   .home-view__above-the-fold__upper__middle__center {
     width: 80%;
   }  
