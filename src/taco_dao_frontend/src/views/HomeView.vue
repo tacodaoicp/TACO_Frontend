@@ -28,7 +28,7 @@
                 <span class="home-view__canted__title">Current Discussion</span>
 
                 <!-- current discussion link -->
-                <router-link to="/chat/forum/26" 
+                <router-link to="/chat/forum/88" 
                             class="home-view__canted__link">
                   Trusting Kong Swap
                 </router-link>
