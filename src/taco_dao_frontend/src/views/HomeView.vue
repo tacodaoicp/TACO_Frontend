@@ -537,7 +537,7 @@
         <FooterBar style="width: 100%;" />
 
         <!-- taco dao background taco -->
-        <img :src="TacoDaoTaco" 
+        <img :src="TacoDaoTacoSimple" 
               alt="placeholder" 
               class="home-view__background-taco">        
         
@@ -1624,7 +1624,7 @@
   import TacoChefTaco from '../assets/images/chef/chef-taco.png'
   import TacoChefFriends from '../assets/images/chef/chef-friends.png'
   import TacoChefRead from '../assets/images/chef/chef-read.png'
-  import TacoDaoTaco from '../assets/images/tacoDaoTaco.svg'
+  import TacoDaoTacoSimple from '../assets/images/tacoDaoTacoSimple.svg'
   import icpSwapLogo from '../assets/images/exchanges/icpswap-logo.svg'
   import icpSwapText from '../assets/images/exchanges/icpswap-text.svg'
   import kongSwapLogo from '../assets/images/exchanges/kongswap-logo.svg'
