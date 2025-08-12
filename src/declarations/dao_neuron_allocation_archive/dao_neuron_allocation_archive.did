@@ -38,6 +38,11 @@ type Result_4 =
 type Result_3 = 
  variant {
    err: ArchiveError;
+   ok: ArchiveStatus;
+ };
+type Result_2 = 
+ variant {
+   err: ArchiveError;
    ok:
     record {
       makerCount: nat;
@@ -45,11 +50,6 @@ type Result_3 =
       totalBlocks: nat;
       totalNeuronAllocationChanges: nat;
     };
- };
-type Result_2 = 
- variant {
-   err: ArchiveError;
-   ok: ArchiveStatus;
  };
 type Result_1 = 
  variant {
@@ -114,13 +114,14 @@ type DAONeuronAllocationArchive =
  service {
    archiveNeuronAllocationChange: (change:
     NeuronAllocationChangeBlockData) -> (Result_4);
-   getArchiveStats: () -> (Result_3);
-   getArchiveStatus: () -> (Result_2) query;
+   getArchiveStats: () -> (ArchiveStatus) query;
+   getArchiveStatus: () -> (Result_3) query;
    getBatchImportStatus: () ->
     (record {
        intervalSeconds: nat;
        isRunning: bool;
      }) query;
+   getDetailedArchiveStats: () -> (Result_2);
    getLogs: (count: nat) -> (vec LogEntry) query;
    getNeuronAllocationChangesByMaker: (maker: principal, limit: nat) ->
     (Result_1) query;

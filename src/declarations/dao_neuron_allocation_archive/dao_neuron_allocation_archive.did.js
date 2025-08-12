@@ -32,15 +32,6 @@ export const idlFactory = ({ IDL }) => {
     'InvalidTimeRange' : IDL.Null,
   });
   const Result_4 = IDL.Variant({ 'ok' : IDL.Nat, 'err' : ArchiveError });
-  const Result_3 = IDL.Variant({
-    'ok' : IDL.Record({
-      'totalBlocks' : IDL.Nat,
-      'totalNeuronAllocationChanges' : IDL.Nat,
-      'makerCount' : IDL.Nat,
-      'neuronCount' : IDL.Nat,
-    }),
-    'err' : ArchiveError,
-  });
   const ArchiveStatus = IDL.Record({
     'supportedBlockTypes' : IDL.Vec(IDL.Text),
     'newestBlock' : IDL.Opt(IDL.Nat),
@@ -49,7 +40,16 @@ export const idlFactory = ({ IDL }) => {
     'totalBlocks' : IDL.Nat,
     'lastArchiveTime' : IDL.Int,
   });
-  const Result_2 = IDL.Variant({ 'ok' : ArchiveStatus, 'err' : ArchiveError });
+  const Result_3 = IDL.Variant({ 'ok' : ArchiveStatus, 'err' : ArchiveError });
+  const Result_2 = IDL.Variant({
+    'ok' : IDL.Record({
+      'totalBlocks' : IDL.Nat,
+      'totalNeuronAllocationChanges' : IDL.Nat,
+      'makerCount' : IDL.Nat,
+      'neuronCount' : IDL.Nat,
+    }),
+    'err' : ArchiveError,
+  });
   const LogLevel = IDL.Variant({
     'INFO' : IDL.Null,
     'WARN' : IDL.Null,
@@ -130,13 +130,14 @@ export const idlFactory = ({ IDL }) => {
         [Result_4],
         [],
       ),
-    'getArchiveStats' : IDL.Func([], [Result_3], []),
-    'getArchiveStatus' : IDL.Func([], [Result_2], ['query']),
+    'getArchiveStats' : IDL.Func([], [ArchiveStatus], ['query']),
+    'getArchiveStatus' : IDL.Func([], [Result_3], ['query']),
     'getBatchImportStatus' : IDL.Func(
         [],
         [IDL.Record({ 'intervalSeconds' : IDL.Nat, 'isRunning' : IDL.Bool })],
         ['query'],
       ),
+    'getDetailedArchiveStats' : IDL.Func([], [Result_2], []),
     'getLogs' : IDL.Func([IDL.Nat], [IDL.Vec(LogEntry)], ['query']),
     'getNeuronAllocationChangesByMaker' : IDL.Func(
         [IDL.Principal, IDL.Nat],

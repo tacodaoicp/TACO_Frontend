@@ -35,12 +35,13 @@ export interface DAONeuronAllocationArchive {
     [NeuronAllocationChangeBlockData],
     Result_4
   >,
-  'getArchiveStats' : ActorMethod<[], Result_3>,
-  'getArchiveStatus' : ActorMethod<[], Result_2>,
+  'getArchiveStats' : ActorMethod<[], ArchiveStatus>,
+  'getArchiveStatus' : ActorMethod<[], Result_3>,
   'getBatchImportStatus' : ActorMethod<
     [],
     { 'intervalSeconds' : bigint, 'isRunning' : boolean }
   >,
+  'getDetailedArchiveStats' : ActorMethod<[], Result_2>,
   'getLogs' : ActorMethod<[bigint], Array<LogEntry>>,
   'getNeuronAllocationChangesByMaker' : ActorMethod<
     [Principal, bigint],
@@ -106,9 +107,7 @@ export type Result = { 'ok' : string } |
   { 'err' : string };
 export type Result_1 = { 'ok' : Array<NeuronAllocationChangeBlockData> } |
   { 'err' : ArchiveError };
-export type Result_2 = { 'ok' : ArchiveStatus } |
-  { 'err' : ArchiveError };
-export type Result_3 = {
+export type Result_2 = {
     'ok' : {
       'totalBlocks' : bigint,
       'totalNeuronAllocationChanges' : bigint,
@@ -116,6 +115,8 @@ export type Result_3 = {
       'neuronCount' : bigint,
     }
   } |
+  { 'err' : ArchiveError };
+export type Result_3 = { 'ok' : ArchiveStatus } |
   { 'err' : ArchiveError };
 export type Result_4 = { 'ok' : bigint } |
   { 'err' : ArchiveError };
