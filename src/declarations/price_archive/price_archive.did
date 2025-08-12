@@ -44,12 +44,12 @@ type TacoBlockType =
    Trade;
    VotingPower;
  };
-type Result_6 = 
+type Result_7 = 
  variant {
    err: ArchiveError;
    ok: nat;
  };
-type Result_5 = 
+type Result_6 = 
  variant {
    err: ArchiveError;
    ok: ArchiveStatus;
@@ -102,10 +102,10 @@ type PriceBlockData =
  };
 type PriceArchiveV2 = 
  service {
-   archivePriceBlock: (price: PriceBlockData) -> (Result_6);
+   archivePriceBlock: (price: PriceBlockData) -> (Result_7);
    catchUpImport: () -> (Result_1);
    getArchiveStats: () -> (ArchiveStatus) query;
-   getArchiveStatus: () -> (Result_5) query;
+   getArchiveStatus: () -> (Result_6) query;
    getBatchImportStatus: () ->
     (record {
        intervalSeconds: nat;
@@ -114,6 +114,7 @@ type PriceArchiveV2 =
      }) query;
    getLatestPrice: (token: principal) -> (Result_4) query;
    getLogs: (count: nat) -> (vec LogEntry) query;
+   getPriceAtTime: (token: principal, timestamp: int) -> (Result_4) query;
    getPriceHistory: (token: principal, startTime: int, endTime: int) ->
     (Result_3) query;
    getTimerStatus: () -> (TimerStatus) query;

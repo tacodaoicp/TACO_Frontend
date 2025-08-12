@@ -139,7 +139,7 @@ type SyncError =
 type Result_9 = 
  variant {
    err: AuthorizationError;
-   ok: FollowActionsSinceResponse;
+   ok: NeuronAllocationChangesSinceResponse;
  };
 type Result_8 = 
  variant {
@@ -182,15 +182,20 @@ type Result_2 =
    err: UpdateError;
    ok: text;
  };
-type Result_11 = 
+type Result_12 = 
  variant {
    err: AuthorizationError;
    ok: AdminActionsSinceResponse;
  };
-type Result_10 = 
+type Result_11 = 
  variant {
    err: AuthorizationError;
    ok: AllocationChangesSinceResponse;
+ };
+type Result_10 = 
+ variant {
+   err: AuthorizationError;
+   ok: FollowActionsSinceResponse;
  };
 type Result_1 = 
  variant {
@@ -245,6 +250,22 @@ type NeuronRecord =
  record {
    neuronId: blob;
    users: vec principal;
+   votingPower: nat;
+ };
+type NeuronAllocationChangesSinceResponse = 
+ record {
+   changes: vec NeuronAllocationChangeRecord;
+   totalCount: nat;
+ };
+type NeuronAllocationChangeRecord = 
+ record {
+   changeType: AllocationChangeType;
+   maker: principal;
+   neuronId: blob;
+   newAllocations: vec Allocation;
+   oldAllocations: vec Allocation;
+   reason: opt text;
+   timestamp: int;
    votingPower: nat;
  };
 type NeuronAllocation = 
@@ -330,7 +351,7 @@ type ContinuousDAO =
    deleteToken: (token: principal, reason: text) -> (Result_1);
    followAllocation: (followee: principal) -> (Result_5);
    getAdminActionsSince: (sinceTimestamp: int, limit: nat) ->
-    (Result_11) query;
+    (Result_12) query;
    getAdminPermissions: () ->
     (vec record {
            principal;
@@ -341,9 +362,9 @@ type ContinuousDAO =
                                         nat;
                                       }) query;
    getAllocationChangesSince: (sinceTimestamp: int, limit: nat) ->
-    (Result_10) query;
+    (Result_11) query;
    getFollowActionsSince: (sinceTimestamp: int, limit: nat) ->
-    (Result_9) query;
+    (Result_10) query;
    getFollowersWithNeuronCounts: () -> (vec record {
                                               principal;
                                               nat;
@@ -357,6 +378,8 @@ type ContinuousDAO =
    getLogsByContext: (context: text, count: nat) -> (vec LogEntry) query;
    getLogsByLevel: (level: LogLevel, count: nat) -> (vec LogEntry) query;
    getNeuronAllocation: (neuronId: blob) -> (opt NeuronAllocation) query;
+   getNeuronAllocationChangesSince: (sinceTimestamp: int, limit: nat) ->
+    (Result_9) query;
    getNeuronUpdatesSince: (sinceTimestamp: int, limit: nat) ->
     (Result_8) query;
    getSnapshotInfo: () ->
@@ -425,6 +448,13 @@ type AllocationChangesSinceResponse =
  record {
    changes: vec PastAllocationRecord;
    totalCount: nat;
+ };
+type AllocationChangeType = 
+ variant {
+   FollowAction: record {followedUser: principal;};
+   SystemRebalance;
+   UserUpdate: record {userInitiated: bool;};
+   VotingPowerChange;
  };
 type Allocation = 
  record {

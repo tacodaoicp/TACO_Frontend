@@ -115,6 +115,8 @@ type DAOAllocationArchive =
     (Result_3) query;
    getAllocationChangesByUser: (user: principal, limit: nat) ->
     (Result_3) query;
+   getAllocationChangesByUserInTimeRange: (user: principal, startTime: 
+    int, endTime: int) -> (Result_3) query;
    getArchiveStats: () -> (ArchiveStatus) query;
    getArchiveStatus: () -> (Result_2) query;
    getBatchImportStatus: () ->

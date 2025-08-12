@@ -149,6 +149,11 @@ export const idlFactory = ({ IDL }) => {
         [Result_3],
         ['query'],
       ),
+    'getAllocationChangesByUserInTimeRange' : IDL.Func(
+        [IDL.Principal, IDL.Int, IDL.Int],
+        [Result_3],
+        ['query'],
+      ),
     'getArchiveStats' : IDL.Func([], [ArchiveStatus], ['query']),
     'getArchiveStatus' : IDL.Func([], [Result_2], ['query']),
     'getBatchImportStatus' : IDL.Func(
