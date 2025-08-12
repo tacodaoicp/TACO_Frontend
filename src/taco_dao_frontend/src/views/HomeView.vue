@@ -1165,6 +1165,9 @@
 
 // phone protrait
 @media (max-width: 575.98px) {
+  .home-view__above-the-fold {
+    min-height: 780px;
+  }
   .home-view__above-the-fold__upper__middle {
     flex-direction: column;
     align-items: center;
