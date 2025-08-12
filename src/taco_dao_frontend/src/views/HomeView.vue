@@ -330,7 +330,7 @@
               <h3 class="home-view__pitch-point__title">Welcome to Taco DAO!</h3>
 
               <!-- description -->
-              <p class="home-view__pitch-point__description">You've found the most exciting place in crypto! Together we vote on how our portfolio should be allocated, and what tokens we should include</p>
+              <p class="home-view__pitch-point__description">You've found the most exciting place in crypto! Together we vote on how our portfolio should be allocated, and what tokens we should include.</p>
 
             </div>
 
@@ -349,7 +349,7 @@
               <h3 class="home-view__pitch-point__title">Together we perfect the recipe</h3>
 
               <!-- description -->
-              <p class="home-view__pitch-point__description">We're a DAO, that means no one person is in control. Every choice we make is decided by consensus, putting the power in your hands</p>
+              <p class="home-view__pitch-point__description">We're a DAO, that means no one person is in control. Every choice we make is decided by consensus, putting the power in your hands.</p>
 
             </div>
 
@@ -368,7 +368,7 @@
               <h3 class="home-view__pitch-point__title">Using the Wisdom of the Crowd</h3>
 
               <!-- description -->
-              <p class="home-view__pitch-point__description">We believe crowd-sourcing decisions leads to the best outcomes, and ensures the platform always benefits the users instead of a select few</p>
+              <p class="home-view__pitch-point__description">We believe crowd-sourcing decisions leads to the best outcomes, and ensures the platform always benefits the users instead of a select few.</p>
 
             </div>
 
