@@ -1190,11 +1190,11 @@
     gap: 0.25rem;
   }
   .home-view__canted__title {
-    font-size: 1.125rem;
+    font-size: 0.875rem;
     line-height: 1.25;
   }
   .home-view__canted__link {
-    font-size: 1rem;
+    font-size: 0.875rem;
     line-height: 1.25;
   }  
   .home-view__title__text {
@@ -1314,7 +1314,7 @@
     padding: 0 1rem;
   }
   .home-view__canted__title {
-    font-size: 1.125rem;
+    font-size: 1rem;
   }
   .home-view__canted__link {
     font-size: 1rem;
