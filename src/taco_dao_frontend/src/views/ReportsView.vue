@@ -7408,7 +7408,7 @@ potential risks if KongSwap scales.
 
             <!-- title -->
             <span class="taco-text-black-to-white d-inline-block text-center px-2 pt-2 pb-1"
-              style="font-weight: 600; z-index: 99999;">
+              style="font-weight: 600;">
               Legal Disclaimer
             </span>
 
@@ -7783,7 +7783,7 @@ potential risks if KongSwap scales.
     width: 100%;
     height: 100%;
     background-color: var(--curtain-bg);
-    z-index: 1000;
+    z-index: 99999;
     margin: 0;
     padding: 0;
     overflow: auto;
