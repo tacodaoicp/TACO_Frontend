@@ -2035,7 +2035,25 @@ export default {
         }
         
         // Extract basic information
-        const neuronId = neuronAllocationData.neuronId ? this.formatNeuronFromBlob(neuronAllocationData.neuronId) : 'Unknown'
+        let neuronId = 'Unknown'
+        if (neuronAllocationData.neuronId) {
+          // Try the blob formatter first
+          neuronId = this.formatNeuronFromBlob(neuronAllocationData.neuronId)
+          // If still unknown, try direct conversion
+          if (neuronId === 'Unknown' || neuronId === 'Unknown Neuron') {
+            try {
+              const uint8Array = new Uint8Array(Object.keys(neuronAllocationData.neuronId).map(key => neuronAllocationData.neuronId[key]))
+              const principal = Principal.fromUint8Array(uint8Array)
+              const principalStr = principal.toString()
+              neuronId = principalStr.length > 16 ? 
+                principalStr.substring(0, 6) + '...' + principalStr.substring(principalStr.length - 6) : 
+                principalStr
+            } catch (e) {
+              console.warn('Failed to parse neuron ID:', e)
+              neuronId = 'Unknown'
+            }
+          }
+        }
         const userPrincipal = Principal.fromUint8Array(new Uint8Array(neuronAllocationData.user)).toText()
         const userDisplayName = this.formatPrincipalFromBlob(neuronAllocationData.user)
         const changeType = neuronAllocationData.changeType?.type || 'Unknown'
@@ -2115,7 +2133,7 @@ export default {
             <div class="card-body">
               <div class="row">
                 <div class="col-md-6">
-                  <h6>🔧 Change Details</h6>
+                  <h6 class="text-light">🔧 Change Details</h6>
                   <table class="table table-sm table-dark table-borderless">
                     <tr>
                       <td><strong>Neuron ID:</strong></td>
@@ -2144,19 +2162,19 @@ export default {
                   </table>
                 </div>
                 <div class="col-md-6">
-                  <h6>📊 Allocation Changes</h6>
+                  <h6 class="text-light">📊 Allocation Changes</h6>
                   <div class="mb-3">
-                    <strong>Previous Allocations:</strong><br>
+                    <strong class="text-light">Previous Allocations:</strong><br>
                     <div class="mt-1">${oldAllocationsHtml}</div>
                     <small class="text-muted">Total: ${oldTotal}%</small>
                   </div>
                   <div class="mb-3">
-                    <strong>New Allocations:</strong><br>
+                    <strong class="text-light">New Allocations:</strong><br>
                     <div class="mt-1">${newAllocationsHtml}</div>
                     <small class="text-muted">Total: ${newTotal}%</small>
                   </div>
                   <div>
-                    <strong>Changes:</strong><br>
+                    <strong class="text-light">Changes:</strong><br>
                     <div class="mt-1">${changesHtml}</div>
                   </div>
                 </div>
@@ -2457,7 +2475,19 @@ export default {
           neuronAllocationData = parsedData.tx.data
         }
         
-        const neuronId = neuronAllocationData.neuronId ? this.formatNeuronFromBlob(neuronAllocationData.neuronId) : 'Unknown'
+        let neuronId = 'Unknown'
+        if (neuronAllocationData.neuronId) {
+          neuronId = this.formatNeuronFromBlob(neuronAllocationData.neuronId)
+          if (neuronId === 'Unknown' || neuronId === 'Unknown Neuron') {
+            try {
+              const uint8Array = new Uint8Array(Object.keys(neuronAllocationData.neuronId).map(key => neuronAllocationData.neuronId[key]))
+              const principal = Principal.fromUint8Array(uint8Array)
+              neuronId = principal.toString()
+            } catch (e) {
+              neuronId = 'Unknown'
+            }
+          }
+        }
         const neuronShort = neuronId.length > 12 ? neuronId.substring(0, 6) + '...' + neuronId.substring(neuronId.length - 6) : neuronId
         const userId = this.formatPrincipalFromBlob(neuronAllocationData.user)
         const userShort = userId ? userId.substring(0, 8) + '...' : 'Unknown'
