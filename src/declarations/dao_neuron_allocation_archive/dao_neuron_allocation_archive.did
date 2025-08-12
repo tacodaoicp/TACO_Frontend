@@ -10,12 +10,32 @@ type Value =
    Nat: nat;
    Text: text;
  };
-type Result_2 = 
+type TimerStatus = 
+ record {
+   innerLoopCurrentBatch: nat;
+   innerLoopCurrentType: text;
+   innerLoopLastRun: int;
+   innerLoopNextScheduled: int;
+   innerLoopRunning: bool;
+   innerLoopStartTime: int;
+   innerLoopTotalBatches: nat;
+   middleLoopCurrentState: text;
+   middleLoopLastRun: int;
+   middleLoopNextScheduled: int;
+   middleLoopRunning: bool;
+   middleLoopStartTime: int;
+   middleLoopTotalRuns: nat;
+   outerLoopIntervalSeconds: nat;
+   outerLoopLastRun: int;
+   outerLoopRunning: bool;
+   outerLoopTotalRuns: nat;
+ };
+type Result_4 = 
  variant {
    err: ArchiveError;
    ok: nat;
  };
-type Result_1 = 
+type Result_3 = 
  variant {
    err: ArchiveError;
    ok:
@@ -26,10 +46,20 @@ type Result_1 =
       totalNeuronAllocationChanges: nat;
     };
  };
-type Result = 
+type Result_2 = 
+ variant {
+   err: ArchiveError;
+   ok: ArchiveStatus;
+ };
+type Result_1 = 
  variant {
    err: ArchiveError;
    ok: vec NeuronAllocationChangeBlockData;
+ };
+type Result = 
+ variant {
+   err: text;
+   ok: text;
  };
 type NeuronAllocationChangeBlockData = 
  record {
@@ -42,6 +72,20 @@ type NeuronAllocationChangeBlockData =
    reason: opt text;
    timestamp: int;
    votingPower: nat;
+ };
+type LogLevel = 
+ variant {
+   ERROR;
+   INFO;
+   WARN;
+ };
+type LogEntry = 
+ record {
+   component: text;
+   context: text;
+   level: LogLevel;
+   message: text;
+   timestamp: int;
  };
 type GetBlocksResult = 
  record {
@@ -69,18 +113,33 @@ type DataCertificate =
 type DAONeuronAllocationArchive = 
  service {
    archiveNeuronAllocationChange: (change:
-    NeuronAllocationChangeBlockData) -> (Result_2);
-   getArchiveStats: () -> (Result_1);
+    NeuronAllocationChangeBlockData) -> (Result_4);
+   getArchiveStats: () -> (Result_3);
+   getArchiveStatus: () -> (Result_2) query;
+   getBatchImportStatus: () ->
+    (record {
+       intervalSeconds: nat;
+       isRunning: bool;
+     }) query;
+   getLogs: (count: nat) -> (vec LogEntry) query;
    getNeuronAllocationChangesByMaker: (maker: principal, limit: nat) ->
-    (Result) query;
+    (Result_1) query;
    getNeuronAllocationChangesByNeuron: (neuronId: blob, limit: nat) ->
-    (Result) query;
+    (Result_1) query;
    getNeuronAllocationChangesByNeuronInTimeRange: (neuronId: blob, startTime:
-    int, endTime: int, limit: nat) -> (Result) query;
+    int, endTime: int, limit: nat) -> (Result_1) query;
+   getTimerStatus: () -> (TimerStatus) query;
    icrc3_get_archives: (args: GetArchivesArgs) -> (GetArchivesResult) query;
    icrc3_get_blocks: (args: GetBlocksArgs) -> (GetBlocksResult) query;
    icrc3_get_tip_certificate: () -> (opt DataCertificate) query;
    icrc3_supported_block_types: () -> (vec BlockType) query;
+   importNeuronAllocationChanges: () -> (Result);
+   resetImportTimestamps: () -> (Result);
+   runManualBatchImport: () -> (Result);
+   setMaxInnerLoopIterations: (iterations: nat) -> (Result);
+   startBatchImportSystem: () -> (Result);
+   stopAllTimers: () -> (Result);
+   stopBatchImportSystem: () -> (Result);
  };
 type BlockType = 
  record {
@@ -96,6 +155,15 @@ type ArchivedBlock =
  record {
    args: GetBlocksArgs;
    callback: func (GetBlocksArgs) -> (GetBlocksResult) query;
+ };
+type ArchiveStatus = 
+ record {
+   lastArchiveTime: int;
+   newestBlock: opt nat;
+   oldestBlock: opt nat;
+   storageUsed: nat;
+   supportedBlockTypes: vec text;
+   totalBlocks: nat;
  };
 type ArchiveError = 
  variant {

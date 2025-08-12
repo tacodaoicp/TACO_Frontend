@@ -16,6 +16,14 @@ export type ArchiveError = { 'StorageFull' : null } |
   { 'BlockNotFound' : null } |
   { 'InvalidBlockType' : null } |
   { 'InvalidTimeRange' : null };
+export interface ArchiveStatus {
+  'supportedBlockTypes' : Array<string>,
+  'newestBlock' : [] | [bigint],
+  'storageUsed' : bigint,
+  'oldestBlock' : [] | [bigint],
+  'totalBlocks' : bigint,
+  'lastArchiveTime' : bigint,
+}
 export interface ArchivedBlock {
   'args' : GetBlocksArgs,
   'callback' : [Principal, string],
@@ -25,25 +33,39 @@ export interface BlockType { 'url' : string, 'block_type' : string }
 export interface DAONeuronAllocationArchive {
   'archiveNeuronAllocationChange' : ActorMethod<
     [NeuronAllocationChangeBlockData],
-    Result_2
+    Result_4
   >,
-  'getArchiveStats' : ActorMethod<[], Result_1>,
+  'getArchiveStats' : ActorMethod<[], Result_3>,
+  'getArchiveStatus' : ActorMethod<[], Result_2>,
+  'getBatchImportStatus' : ActorMethod<
+    [],
+    { 'intervalSeconds' : bigint, 'isRunning' : boolean }
+  >,
+  'getLogs' : ActorMethod<[bigint], Array<LogEntry>>,
   'getNeuronAllocationChangesByMaker' : ActorMethod<
     [Principal, bigint],
-    Result
+    Result_1
   >,
   'getNeuronAllocationChangesByNeuron' : ActorMethod<
     [Uint8Array | number[], bigint],
-    Result
+    Result_1
   >,
   'getNeuronAllocationChangesByNeuronInTimeRange' : ActorMethod<
     [Uint8Array | number[], bigint, bigint, bigint],
-    Result
+    Result_1
   >,
+  'getTimerStatus' : ActorMethod<[], TimerStatus>,
   'icrc3_get_archives' : ActorMethod<[GetArchivesArgs], GetArchivesResult>,
   'icrc3_get_blocks' : ActorMethod<[GetBlocksArgs], GetBlocksResult>,
   'icrc3_get_tip_certificate' : ActorMethod<[], [] | [DataCertificate]>,
   'icrc3_supported_block_types' : ActorMethod<[], Array<BlockType>>,
+  'importNeuronAllocationChanges' : ActorMethod<[], Result>,
+  'resetImportTimestamps' : ActorMethod<[], Result>,
+  'runManualBatchImport' : ActorMethod<[], Result>,
+  'setMaxInnerLoopIterations' : ActorMethod<[bigint], Result>,
+  'startBatchImportSystem' : ActorMethod<[], Result>,
+  'stopAllTimers' : ActorMethod<[], Result>,
+  'stopBatchImportSystem' : ActorMethod<[], Result>,
 }
 export interface DataCertificate {
   'certificate' : Uint8Array | number[],
@@ -59,6 +81,16 @@ export interface GetBlocksResult {
   'blocks' : Array<Block>,
   'archived_blocks' : Array<ArchivedBlock>,
 }
+export interface LogEntry {
+  'component' : string,
+  'context' : string,
+  'level' : LogLevel,
+  'message' : string,
+  'timestamp' : bigint,
+}
+export type LogLevel = { 'INFO' : null } |
+  { 'WARN' : null } |
+  { 'ERROR' : null };
 export interface NeuronAllocationChangeBlockData {
   'id' : bigint,
   'maker' : Principal,
@@ -70,9 +102,13 @@ export interface NeuronAllocationChangeBlockData {
   'neuronId' : Uint8Array | number[],
   'reason' : [] | [string],
 }
-export type Result = { 'ok' : Array<NeuronAllocationChangeBlockData> } |
+export type Result = { 'ok' : string } |
+  { 'err' : string };
+export type Result_1 = { 'ok' : Array<NeuronAllocationChangeBlockData> } |
   { 'err' : ArchiveError };
-export type Result_1 = {
+export type Result_2 = { 'ok' : ArchiveStatus } |
+  { 'err' : ArchiveError };
+export type Result_3 = {
     'ok' : {
       'totalBlocks' : bigint,
       'totalNeuronAllocationChanges' : bigint,
@@ -81,8 +117,27 @@ export type Result_1 = {
     }
   } |
   { 'err' : ArchiveError };
-export type Result_2 = { 'ok' : bigint } |
+export type Result_4 = { 'ok' : bigint } |
   { 'err' : ArchiveError };
+export interface TimerStatus {
+  'innerLoopRunning' : boolean,
+  'middleLoopCurrentState' : string,
+  'middleLoopStartTime' : bigint,
+  'outerLoopLastRun' : bigint,
+  'outerLoopRunning' : boolean,
+  'innerLoopCurrentType' : string,
+  'innerLoopCurrentBatch' : bigint,
+  'middleLoopTotalRuns' : bigint,
+  'outerLoopIntervalSeconds' : bigint,
+  'innerLoopStartTime' : bigint,
+  'middleLoopNextScheduled' : bigint,
+  'outerLoopTotalRuns' : bigint,
+  'middleLoopLastRun' : bigint,
+  'middleLoopRunning' : boolean,
+  'innerLoopLastRun' : bigint,
+  'innerLoopNextScheduled' : bigint,
+  'innerLoopTotalBatches' : bigint,
+}
 export type Value = { 'Int' : bigint } |
   { 'Map' : Array<[string, Value]> } |
   { 'Nat' : bigint } |
