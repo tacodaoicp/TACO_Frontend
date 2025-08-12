@@ -182,7 +182,7 @@
       <div class="list-group">
 
         <!-- home - router link -->
-        <router-link to="/" class="list-group-item">
+        <router-link @click="togglePagesMenu()" to="/" class="list-group-item">
 
           <!-- item text -->
           <span>Home</span>
@@ -190,7 +190,7 @@
         </router-link>
 
         <!-- dao - router link -->
-        <router-link to="/dao" class="list-group-item">
+        <router-link @click="togglePagesMenu()" to="/dao" class="list-group-item">
 
           <!-- item text -->
           <span>DAO</span>
@@ -198,7 +198,7 @@
         </router-link>
 
         <!-- vote - router link -->
-        <router-link to="/vote" class="list-group-item">
+        <router-link @click="togglePagesMenu()" to="/vote" class="list-group-item">
 
           <!-- item text -->
           <span>Vote</span>
@@ -206,7 +206,7 @@
         </router-link>
 
         <!-- chat - router link -->
-        <router-link to="/chat/oc" 
+        <router-link @click="togglePagesMenu()" to="/chat/oc" 
                     class="list-group-item">
 
           <!-- item text -->
@@ -215,7 +215,7 @@
         </router-link>
 
         <!-- forum - router link -->
-        <router-link to="/chat/forum" 
+        <router-link @click="togglePagesMenu()" to="/chat/forum" 
                     class="list-group-item">
 
           <!-- item text -->
@@ -224,7 +224,7 @@
         </router-link>        
 
         <!-- reports - router link -->
-        <router-link to="/reports" 
+        <router-link @click="togglePagesMenu()" to="/reports" 
                     class="list-group-item"
                     :class="{ 'router-link-active': $route.path.startsWith('/reports/') }">
 
@@ -234,7 +234,7 @@
         </router-link>         
         
         <!-- sales - router link -->
-        <router-link to="/sales" class="list-group-item">
+        <router-link @click="togglePagesMenu()" to="/sales" class="list-group-item">
 
           <!-- item text -->
           <span>Sales</span>
@@ -242,7 +242,7 @@
         </router-link>    
         
         <!-- info - router link -->
-        <router-link to="/info" class="list-group-item">
+        <router-link @click="togglePagesMenu()" to="/info" class="list-group-item">
 
           <!-- item text -->
           <span>Info</span>
