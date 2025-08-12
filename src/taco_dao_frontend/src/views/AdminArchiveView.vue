@@ -709,11 +709,11 @@ export default {
     daoNeuronAllocationArchiveCanisterId() {
       switch (process.env.DFX_NETWORK) {
         case "ic":
-          return process.env.CANISTER_ID_DAO_NEURON_ALLOCATION_ARCHIVE_IC || 'placeholder-neuron-allocation-ic';
+          return process.env.CANISTER_ID_DAO_NEURON_ALLOCATION_ARCHIVE_IC || 'cajb4-qqaaa-aaaan-qz5la-cai';
         case "staging":
-          return process.env.CANISTER_ID_DAO_NEURON_ALLOCATION_ARCHIVE_STAGING || 'placeholder-neuron-allocation-staging';
+          return process.env.CANISTER_ID_DAO_NEURON_ALLOCATION_ARCHIVE_STAGING || 'cajb4-qqaaa-aaaan-qz5la-cai';
       }
-      return 'placeholder-neuron-allocation-local'; // fallback for local
+      return 'cajb4-qqaaa-aaaan-qz5la-cai'; // fallback for local
     },
 
     daoGovernanceArchiveCanisterId() {
