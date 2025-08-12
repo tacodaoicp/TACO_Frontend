@@ -2037,27 +2037,8 @@ export default {
         // Extract basic information
         let neuronId = 'Unknown'
         
-        // The neuronId should be directly in the neuronAllocationData now
-        if (neuronAllocationData.neuronId) {
-          try {
-            // Handle different blob formats
-            let blobData = neuronAllocationData.neuronId
-            if (blobData.Blob) {
-              blobData = blobData.Blob
-            }
-            const uint8Array = new Uint8Array(Object.keys(blobData).map(key => blobData[key]))
-            // Convert neuron ID blob to hex string (NOT Principal!)
-            neuronId = Array.from(uint8Array)
-              .map(b => b.toString(16).padStart(2, '0'))
-              .join('')
-          } catch (e) {
-            console.warn('Failed to parse neuronId:', e, neuronAllocationData.neuronId)
-            neuronId = 'Parse Error'
-          }
-        } else {
-          console.warn('No neuronId field found in data:', neuronAllocationData)
-          neuronId = 'Missing Neuron ID'
-        }
+        // Use the global neuron naming utility method
+        neuronId = neuronAllocationData.neuronId ? this.formatNeuronFromBlob(neuronAllocationData.neuronId) : 'Unknown'
         const userPrincipal = Principal.fromUint8Array(new Uint8Array(neuronAllocationData.user)).toText()
         const userDisplayName = this.formatPrincipalFromBlob(neuronAllocationData.user)
         const changeType = neuronAllocationData.changeType?.type || 'Unknown'
@@ -2479,24 +2460,8 @@ export default {
           neuronAllocationData = parsedData.tx.data
         }
         
-        let neuronId = 'Unknown'
-        if (neuronAllocationData.neuronId) {
-          try {
-            // Handle different blob formats
-            let blobData = neuronAllocationData.neuronId
-            if (blobData.Blob) {
-              blobData = blobData.Blob
-            }
-            const uint8Array = new Uint8Array(Object.keys(blobData).map(key => blobData[key]))
-            // Convert neuron ID blob to hex string (NOT Principal!)
-            neuronId = Array.from(uint8Array)
-              .map(b => b.toString(16).padStart(2, '0'))
-              .join('')
-          } catch (e) {
-            console.warn('Failed to parse neuron ID in summary:', e, neuronAllocationData.neuronId)
-            neuronId = 'Parse Error'
-          }
-        }
+        // Use the global neuron naming utility method
+        let neuronId = neuronAllocationData.neuronId ? this.formatNeuronFromBlob(neuronAllocationData.neuronId) : 'Unknown'
         const neuronShort = neuronId.length > 12 ? neuronId.substring(0, 6) + '...' + neuronId.substring(neuronId.length - 6) : neuronId
         const userId = this.formatPrincipalFromBlob(neuronAllocationData.user)
         const userShort = userId ? userId.substring(0, 8) + '...' : 'Unknown'
@@ -2894,13 +2859,14 @@ export default {
             return neuronName
           }
           
-          // Fallback to truncated neuron ID if requested
+          // Fallback to truncated neuron ID hex string if requested
           if (fallbackToTruncated) {
-            const principal = Principal.fromUint8Array(uint8Array)
-            const principalStr = principal.toString()
-            return principalStr.length > 16 ? 
-              principalStr.substring(0, 6) + '...' + principalStr.substring(principalStr.length - 6) : 
-              principalStr
+            const hexStr = Array.from(uint8Array)
+              .map(b => b.toString(16).padStart(2, '0'))
+              .join('')
+            return hexStr.length > 16 ? 
+              hexStr.substring(0, 8) + '...' + hexStr.substring(hexStr.length - 8) : 
+              hexStr
           }
           
           return 'Unknown Neuron'
