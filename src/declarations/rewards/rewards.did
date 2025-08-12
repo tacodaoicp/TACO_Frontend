@@ -1,0 +1,42 @@
+type RewardsError = 
+ variant {
+   AllocationDataMissing;
+   InvalidTimeRange;
+   PriceDataMissing: record {
+                       timestamp: int;
+                       token: principal;
+                     };
+   SystemError: text;
+   UserNotFound;
+ };
+type Rewards = 
+ service {
+   calculateUserPerformance: (user: principal, startTime: int, endTime: 
+    int, priceType: PriceType) -> (Result) query;
+   getCanisterStatus: () ->
+    (record {
+       allocationArchiveId: principal;
+       environment: text;
+       priceArchiveId: principal;
+     });
+ };
+type Result = 
+ variant {
+   err: RewardsError;
+   ok: PerformanceResult;
+ };
+type PriceType = 
+ variant {
+   ICP;
+   USD;
+ };
+type PerformanceResult = 
+ record {
+   allocationChanges: nat;
+   endTime: int;
+   finalValue: float64;
+   initialValue: float64;
+   startTime: int;
+   user: principal;
+ };
+service : () -> Rewards
