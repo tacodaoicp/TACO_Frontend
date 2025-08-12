@@ -1,0 +1,122 @@
+type Value = 
+ variant {
+   Array: vec Value;
+   Blob: blob;
+   Int: int;
+   Map: vec record {
+              text;
+              Value;
+            };
+   Nat: nat;
+   Text: text;
+ };
+type Result_2 = 
+ variant {
+   err: ArchiveError;
+   ok: nat;
+ };
+type Result_1 = 
+ variant {
+   err: ArchiveError;
+   ok:
+    record {
+      makerCount: nat;
+      neuronCount: nat;
+      totalBlocks: nat;
+      totalNeuronAllocationChanges: nat;
+    };
+ };
+type Result = 
+ variant {
+   err: ArchiveError;
+   ok: vec NeuronAllocationChangeBlockData;
+ };
+type NeuronAllocationChangeBlockData = 
+ record {
+   changeType: AllocationChangeType;
+   id: nat;
+   maker: principal;
+   neuronId: blob;
+   newAllocations: vec Allocation;
+   oldAllocations: vec Allocation;
+   reason: opt text;
+   timestamp: int;
+   votingPower: nat;
+ };
+type GetBlocksResult = 
+ record {
+   archived_blocks: vec ArchivedBlock;
+   blocks: vec Block;
+   log_length: nat;
+ };
+type GetBlocksArgs = 
+ vec record {
+       length: nat;
+       start: nat;
+     };
+type GetArchivesResult = 
+ vec record {
+       canister_id: principal;
+       end: nat;
+       start: nat;
+     };
+type GetArchivesArgs = record {from: opt principal;};
+type DataCertificate = 
+ record {
+   certificate: blob;
+   hash_tree: blob;
+ };
+type DAONeuronAllocationArchive = 
+ service {
+   archiveNeuronAllocationChange: (change:
+    NeuronAllocationChangeBlockData) -> (Result_2);
+   getArchiveStats: () -> (Result_1);
+   getNeuronAllocationChangesByMaker: (maker: principal, limit: nat) ->
+    (Result) query;
+   getNeuronAllocationChangesByNeuron: (neuronId: blob, limit: nat) ->
+    (Result) query;
+   getNeuronAllocationChangesByNeuronInTimeRange: (neuronId: blob, startTime:
+    int, endTime: int, limit: nat) -> (Result) query;
+   icrc3_get_archives: (args: GetArchivesArgs) -> (GetArchivesResult) query;
+   icrc3_get_blocks: (args: GetBlocksArgs) -> (GetBlocksResult) query;
+   icrc3_get_tip_certificate: () -> (opt DataCertificate) query;
+   icrc3_supported_block_types: () -> (vec BlockType) query;
+ };
+type BlockType = 
+ record {
+   block_type: text;
+   url: text;
+ };
+type Block = 
+ record {
+   block: Value;
+   id: nat;
+ };
+type ArchivedBlock = 
+ record {
+   args: GetBlocksArgs;
+   callback: func (GetBlocksArgs) -> (GetBlocksResult) query;
+ };
+type ArchiveError = 
+ variant {
+   BlockNotFound;
+   InvalidBlockType;
+   InvalidData;
+   InvalidTimeRange;
+   NotAuthorized;
+   StorageFull;
+   SystemError: text;
+ };
+type AllocationChangeType = 
+ variant {
+   FollowAction: record {followedUser: principal;};
+   SystemRebalance;
+   UserUpdate: record {userInitiated: bool;};
+   VotingPowerChange;
+ };
+type Allocation = 
+ record {
+   basisPoints: nat;
+   token: principal;
+ };
+service : () -> DAONeuronAllocationArchive
