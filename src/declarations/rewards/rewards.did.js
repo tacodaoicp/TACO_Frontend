@@ -160,6 +160,11 @@ export const idlFactory = ({ IDL }) => {
     'startDistributionTimer' : IDL.Func([], [Result], []),
     'stopDistributionTimer' : IDL.Func([], [Result], []),
     'triggerDistribution' : IDL.Func([], [Result], []),
+    'triggerDistributionCustom' : IDL.Func(
+        [IDL.Int, IDL.Int, PriceType],
+        [Result],
+        [],
+      ),
   });
   return Rewards;
 };

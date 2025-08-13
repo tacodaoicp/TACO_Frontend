@@ -58,6 +58,8 @@ type Rewards =
    startDistributionTimer: () -> (Result);
    stopDistributionTimer: () -> (Result);
    triggerDistribution: () -> (Result);
+   triggerDistributionCustom: (startTime: int, endTime: int, priceType:
+    PriceType) -> (Result);
  };
 type Result_1 = 
  variant {

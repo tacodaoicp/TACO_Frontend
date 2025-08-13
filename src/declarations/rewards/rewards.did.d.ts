@@ -126,6 +126,10 @@ export interface Rewards {
   'startDistributionTimer' : ActorMethod<[], Result>,
   'stopDistributionTimer' : ActorMethod<[], Result>,
   'triggerDistribution' : ActorMethod<[], Result>,
+  'triggerDistributionCustom' : ActorMethod<
+    [bigint, bigint, PriceType],
+    Result
+  >,
 }
 export type RewardsError = { 'AllocationDataMissing' : null } |
   { 'SystemError' : string } |
