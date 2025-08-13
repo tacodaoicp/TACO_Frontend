@@ -81,31 +81,31 @@
           <div v-if="performanceResult" class="card bg-dark text-white mb-4">
             <div class="card-header d-flex justify-content-between align-items-center">
               <h3 class="mb-0">Performance Results</h3>
-              <span class="badge" :class="performanceResult.performanceScore >= 1.0 ? 'bg-success' : 'bg-warning'">
-                {{ (performanceResult.performanceScore * 100).toFixed(2) }}%
+              <span class="badge" :class="Number(performanceResult.performanceScore) >= 1.0 ? 'bg-success' : 'bg-warning'">
+                {{ performanceScorePercent }}%
               </span>
             </div>
             <div class="card-body">
               <div class="row">
                 <div class="col-md-3">
                   <strong>Initial Value:</strong><br>
-                  <span class="text-success">{{ performanceResult.initialValue.toFixed(6) }}</span>
+                  <span class="text-success">{{ initialValueDisplay }}</span>
                 </div>
                 <div class="col-md-3">
                   <strong>Final Value:</strong><br>
-                  <span :class="performanceResult.finalValue >= performanceResult.initialValue ? 'text-success' : 'text-danger'">
-                    {{ performanceResult.finalValue.toFixed(6) }}
+                  <span :class="Number(performanceResult.finalValue) >= Number(performanceResult.initialValue) ? 'text-success' : 'text-danger'">
+                    {{ finalValueDisplay }}
                   </span>
                 </div>
                 <div class="col-md-3">
                   <strong>Performance Score:</strong><br>
-                  <span :class="performanceResult.performanceScore >= 1.0 ? 'text-success' : 'text-warning'">
-                    {{ performanceResult.performanceScore.toFixed(6) }}
+                  <span :class="Number(performanceResult.performanceScore) >= 1.0 ? 'text-success' : 'text-warning'">
+                    {{ performanceScoreDisplay }}
                   </span>
                 </div>
                 <div class="col-md-3">
                   <strong>Allocation Changes:</strong><br>
-                  <span class="text-info">{{ performanceResult.allocationChanges }}</span>
+                  <span class="text-info">{{ allocationChangesDisplay }}</span>
                 </div>
               </div>
 
@@ -130,8 +130,8 @@
                     <span class="badge bg-primary me-2">{{ index + 1 }}</span>
                     {{ formatTimestamp(checkpoint.timestamp) }}
                   </h5>
-                  <span class="badge" :class="checkpoint.totalPortfolioValue >= 1.0 ? 'bg-success' : 'bg-warning'">
-                    Portfolio Value: {{ checkpoint.totalPortfolioValue.toFixed(6) }}
+                  <span class="badge" :class="Number(checkpoint.totalPortfolioValue) >= 1.0 ? 'bg-success' : 'bg-warning'">
+                    Portfolio Value: {{ formatPortfolioValue(checkpoint.totalPortfolioValue) }}
                   </span>
                 </div>
 
@@ -142,7 +142,7 @@
                     <div class="allocation-list">
                       <div v-for="allocation in checkpoint.allocations" :key="allocation.token" class="d-flex justify-content-between">
                         <span class="text-truncate me-2" :title="allocation.token">{{ getTokenSymbol(allocation.token) }}</span>
-                        <span>{{ (allocation.basisPoints / 100).toFixed(2) }}%</span>
+                        <span>{{ formatBasisPoints(allocation.basisPoints) }}%</span>
                       </div>
                     </div>
                   </div>
@@ -151,7 +151,7 @@
                     <div class="token-values">
                       <div v-for="[token, value] in checkpoint.tokenValues" :key="token" class="d-flex justify-content-between">
                         <span class="text-truncate me-2" :title="token">{{ getTokenSymbol(token) }}</span>
-                        <span>{{ value.toFixed(6) }}</span>
+                        <span>{{ formatTokenValue(value) }}</span>
                       </div>
                     </div>
                   </div>
@@ -165,8 +165,8 @@
                       <div v-for="[token, priceInfo] in checkpoint.pricesUsed" :key="token" class="price-info mb-1">
                         <small class="text-muted">
                           {{ getTokenSymbol(token) }}: 
-                          <span v-if="priceType === 'USD'">${{ priceInfo.usdPrice.toFixed(6) }}</span>
-                          <span v-else>{{ (priceInfo.icpPrice / 100000000).toFixed(8) }} ICP</span>
+                          <span v-if="priceType === 'USD'">${{ formatUsdPrice(priceInfo.usdPrice) }}</span>
+                          <span v-else>{{ formatIcpPrice(priceInfo.icpPrice) }} ICP</span>
                           <span class="text-muted ms-2">({{ formatTimestamp(priceInfo.timestamp) }})</span>
                         </small>
                       </div>
@@ -226,13 +226,43 @@ export default {
              this.endTime && 
              this.neuronId.length >= 10 && // Basic validation
              new Date(this.startTime) < new Date(this.endTime)
+    },
+    
+    // Safe numeric conversions for display
+    performanceScorePercent() {
+      if (!this.performanceResult?.performanceScore) return '0.00'
+      const score = Number(this.performanceResult.performanceScore)
+      return (score * 100).toFixed(2)
+    },
+    
+    initialValueDisplay() {
+      if (!this.performanceResult?.initialValue) return '0.000000'
+      return Number(this.performanceResult.initialValue).toFixed(6)
+    },
+    
+    finalValueDisplay() {
+      if (!this.performanceResult?.finalValue) return '0.000000'
+      return Number(this.performanceResult.finalValue).toFixed(6)
+    },
+    
+    performanceScoreDisplay() {
+      if (!this.performanceResult?.performanceScore) return '0.000000'
+      return Number(this.performanceResult.performanceScore).toFixed(6)
+    },
+    
+    allocationChangesDisplay() {
+      if (!this.performanceResult?.allocationChanges) return '0'
+      return Number(this.performanceResult.allocationChanges).toString()
     }
   },
   data() {
+    const now = new Date()
+    const twoHoursAgo = new Date(now.getTime() - (2 * 60 * 60 * 1000)) // 2 hours ago
+    
     return {
-      neuronId: '0075df8981c4c2d1c2e2e429fe65d62c3a4a251fd733e4f6692d5949add5b9', // Default example
-      startTime: '2024-12-08T10:00',
-      endTime: '2024-12-08T12:00',
+      neuronId: '0075df898135c4c2d1c2e2e429fe65d62c3a4a251fd733e4f6692d5949add5b9', // Default example
+      startTime: twoHoursAgo.toISOString().slice(0, 16), // Format for datetime-local input
+      endTime: now.toISOString().slice(0, 16), // Format for datetime-local input
       priceType: 'USD',
       isLoading: false,
       errorMessage: '',
@@ -320,26 +350,104 @@ export default {
     },
 
     formatTimestamp(nanoseconds) {
-      // Convert nanoseconds to milliseconds
-      const milliseconds = Number(BigInt(nanoseconds) / BigInt(1000000))
-      const date = new Date(milliseconds)
-      return date.toLocaleString()
+      try {
+        // Handle both BigInt and regular numbers
+        let ns
+        if (typeof nanoseconds === 'bigint') {
+          ns = nanoseconds
+        } else {
+          ns = BigInt(nanoseconds)
+        }
+        
+        // Convert nanoseconds to milliseconds
+        const milliseconds = Number(ns / BigInt(1000000))
+        const date = new Date(milliseconds)
+        return date.toLocaleString()
+      } catch (error) {
+        console.warn('Error formatting timestamp:', error, nanoseconds)
+        return 'Invalid Date'
+      }
     },
 
     getTokenSymbol(tokenPrincipal) {
       try {
-        const principal = Principal.fromText(tokenPrincipal)
+        let principal
+        let principalString
+        
+        // Handle both Principal objects and strings
+        if (typeof tokenPrincipal === 'string') {
+          principal = Principal.fromText(tokenPrincipal)
+          principalString = tokenPrincipal
+        } else if (tokenPrincipal && typeof tokenPrincipal.toString === 'function') {
+          // Assume it's a Principal object
+          principal = tokenPrincipal
+          principalString = tokenPrincipal.toString()
+        } else {
+          console.warn('Invalid tokenPrincipal type:', typeof tokenPrincipal, tokenPrincipal)
+          return 'Unknown Token'
+        }
+        
         const tokenMetadata = this.getTokenMetadata(principal)
         
         if (tokenMetadata && tokenMetadata.tokenSymbol) {
           return tokenMetadata.tokenSymbol
         }
         
-        // Fallback to truncated principal
-        return tokenPrincipal.substring(0, 8) + '...'
+        // Fallback to truncated principal string
+        return principalString.substring(0, 8) + '...'
       } catch (error) {
-        console.warn('Error getting token symbol:', error)
-        return tokenPrincipal.substring(0, 8) + '...'
+        console.warn('Error getting token symbol:', error, tokenPrincipal)
+        // Safe fallback
+        const fallbackString = tokenPrincipal?.toString?.() || 'Unknown'
+        return fallbackString.substring(0, 8) + '...'
+      }
+    },
+
+    // Safe numeric display helpers
+    formatBasisPoints(basisPoints) {
+      try {
+        const bp = Number(basisPoints)
+        return (bp / 100).toFixed(2)
+      } catch (error) {
+        console.warn('Error formatting basis points:', error, basisPoints)
+        return '0.00'
+      }
+    },
+
+    formatTokenValue(value) {
+      try {
+        return Number(value).toFixed(6)
+      } catch (error) {
+        console.warn('Error formatting token value:', error, value)
+        return '0.000000'
+      }
+    },
+
+    formatUsdPrice(price) {
+      try {
+        return Number(price).toFixed(6)
+      } catch (error) {
+        console.warn('Error formatting USD price:', error, price)
+        return '0.000000'
+      }
+    },
+
+    formatIcpPrice(price) {
+      try {
+        const icpPrice = Number(price) / 100000000
+        return icpPrice.toFixed(8)
+      } catch (error) {
+        console.warn('Error formatting ICP price:', error, price)
+        return '0.00000000'
+      }
+    },
+
+    formatPortfolioValue(value) {
+      try {
+        return Number(value).toFixed(6)
+      } catch (error) {
+        console.warn('Error formatting portfolio value:', error, value)
+        return '0.000000'
       }
     },
 
