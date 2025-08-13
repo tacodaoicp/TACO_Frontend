@@ -29,6 +29,9 @@
               <router-link to="/admin/votes" class="btn btn-primary">
                 🗳️ Vote History Admin
               </router-link>
+              <router-link to="/admin/rewards" class="btn btn-success">
+                🏆 Neuron Performance Rewards
+              </router-link>
             </div>
           </div>
           

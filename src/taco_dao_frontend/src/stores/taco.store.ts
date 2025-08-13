@@ -1127,6 +1127,18 @@ export const useTacoStore = defineStore('taco', () => {
         }        
         return 'tgqd4-eqaaa-aaaai-atifa-cai'; // local canisterId
     }
+    const rewardsCanisterId = () => {
+
+        switch (process.env.DFX_NETWORK) {
+            case "ic":
+                return process.env.CANISTER_ID_TREASURY_IC || 'cjkka-gyaaa-aaaan-qz5kq-cai';
+                break;
+            case "staging":
+                return  process.env.CANISTER_ID_TREASURY_STAGING || 'cjkka-gyaaa-aaaan-qz5kq-cai';
+                break;
+        }        
+        return 'cjkka-gyaaa-aaaan-qz5kq-cai'; // local canisterId
+    }
 
     // crypto prices
     const fetchCryptoPrices = async () => {
@@ -5295,6 +5307,12 @@ export const useTacoStore = defineStore('taco', () => {
         setNeuronName,
         getUserNeurons,
         toggleThreadMenu,
+        
+        // Canister ID functions
+        daoBackendCanisterId,
+        treasuryCanisterId,
+        neuronSnapshotCanisterId,
+        rewardsCanisterId,
         
         // Portfolio snapshot management
         getPortfolioSnapshotStatus,

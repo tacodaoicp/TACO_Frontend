@@ -17,6 +17,7 @@ import AdminPriceView from "./views/AdminPriceView.vue"
 import AdminPriceHistoryView from "./views/AdminPriceHistoryView.vue"
 import AdminNeuronView from "./views/AdminNeuronView.vue"
 import AdminVotesView from "./views/AdminVotesView.vue"
+import AdminRewardsView from "./views/AdminRewardsView.vue"
 import ChatView from "./views/ChatView.vue"
 import ReportsView from "./views/ReportsView.vue"
 import ForumView from "./views/ForumView.vue"
@@ -61,6 +62,7 @@ const routes = [
     { path: "/admin/pricehistory", name: "AdminPriceHistory", component: AdminPriceHistoryView, meta: { robots: 'noindex' } },
     { path: "/admin/neuron", name: "AdminNeuron", component: AdminNeuronView, meta: { robots: 'noindex' } },
     { path: "/admin/votes", name: "AdminVotes", component: AdminVotesView, meta: { robots: 'noindex' } },
+    { path: "/admin/rewards", name: "AdminRewards", component: AdminRewardsView, meta: { robots: 'noindex' } },
     { path: "/forum", name: "Forum", component: ForumView, meta: { robots: 'noindex' } },
     { path: "/forum/thread/:id", name: "Thread", component: ThreadView, meta: { robots: 'noindex' } },
     { path: "/names", name: "Names", component: NamesView, meta: { robots: 'noindex' } }, //remove once integrated
