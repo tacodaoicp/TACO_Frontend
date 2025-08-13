@@ -14,7 +14,8 @@
               <h3 class="mb-0">Distribution Controls</h3>
             </div>
             <div class="card-body">
-              <div class="row">
+              <!-- Quick Actions -->
+              <div class="row mb-4">
                 <div class="col-md-4">
                   <button 
                     class="btn btn-success w-100 mb-3" 
@@ -22,7 +23,7 @@
                     :disabled="isLoading || distributionInProgress"
                   >
                     <span v-if="isLoading && currentAction === 'trigger'" class="spinner-border spinner-border-sm me-2" role="status"></span>
-                    🚀 Trigger Distribution Now
+                    🚀 Trigger Default Distribution
                   </button>
                 </div>
                 <div class="col-md-4">
@@ -44,6 +45,57 @@
                     <span v-if="isLoading && currentAction === 'stop'" class="spinner-border spinner-border-sm me-2" role="status"></span>
                     ⏹️ Stop Auto Timer
                   </button>
+                </div>
+              </div>
+
+              <!-- Custom Distribution Parameters -->
+              <div class="border-top pt-3">
+                <h5 class="mb-3">Custom Distribution</h5>
+                <div class="row">
+                  <div class="col-md-4">
+                    <label for="customStartTime" class="form-label">Start Time:</label>
+                    <input 
+                      id="customStartTime" 
+                      type="datetime-local" 
+                      class="form-control bg-dark text-white" 
+                      v-model="customStartTime"
+                    />
+                  </div>
+                  <div class="col-md-4">
+                    <label for="customEndTime" class="form-label">End Time:</label>
+                    <input 
+                      id="customEndTime" 
+                      type="datetime-local" 
+                      class="form-control bg-dark text-white" 
+                      v-model="customEndTime"
+                    />
+                  </div>
+                  <div class="col-md-4">
+                    <label for="priceType" class="form-label">Price Denomination:</label>
+                    <select 
+                      id="priceType" 
+                      class="form-select bg-dark text-white" 
+                      v-model="selectedPriceType"
+                    >
+                      <option value="USD">USD</option>
+                      <option value="ICP">ICP</option>
+                    </select>
+                  </div>
+                </div>
+                <div class="row mt-3">
+                  <div class="col-md-12">
+                    <button 
+                      class="btn btn-info w-100" 
+                      @click="triggerCustomDistribution"
+                      :disabled="isLoading || distributionInProgress || !isValidCustomInput"
+                    >
+                      <span v-if="isLoading && currentAction === 'triggerCustom'" class="spinner-border spinner-border-sm me-2" role="status"></span>
+                      🎯 Trigger Custom Distribution
+                    </button>
+                    <small v-if="!isValidCustomInput" class="text-warning">
+                      Please set valid start and end times (start must be before end)
+                    </small>
+                  </div>
                 </div>
               </div>
               
@@ -115,7 +167,7 @@
                 <div class="col-md-3">
                   <strong>Next Scheduled:</strong><br>
                   <span class="text-info">
-                    {{ formatTimestamp(distributionStatus.nextDistributionTime) }}
+                    {{ formatTimestamp(nextDistributionTime) }}
                   </span>
                 </div>
                 <div class="col-md-3">
@@ -130,7 +182,7 @@
                 </div>
                 <div class="col-md-4">
                   <strong>Distribution Period:</strong><br>
-                  <span class="text-info">{{ Math.round(configuration.distributionPeriodNS / (24 * 60 * 60 * 1_000_000_000)) }} days</span>
+                  <span class="text-info">{{ Math.round(Number(configuration.distributionPeriodNS) / (24 * 60 * 60 * 1_000_000_000)) }} days</span>
                 </div>
                 <div class="col-md-4">
                   <strong>Auto Timer:</strong><br>
@@ -308,7 +360,10 @@ export default {
       showRewardDetails: {},
       newRewardPot: 1000,
       newDistributionPeriod: 7,
-      timerRunning: false
+      timerRunning: false,
+      customStartTime: '',
+      customEndTime: '',
+      selectedPriceType: 'USD'
     }
   },
 
@@ -319,11 +374,24 @@ export default {
 
     distributionInProgress() {
       return this.distributionStatus?.inProgress || false
+    },
+
+    nextDistributionTime() {
+      if (!this.distributionStatus || !this.configuration) return 0
+      return Number(this.distributionStatus.lastDistributionTime) + Number(this.configuration.distributionPeriodNS)
+    },
+
+    isValidCustomInput() {
+      if (!this.customStartTime || !this.customEndTime) return false
+      const startDate = new Date(this.customStartTime)
+      const endDate = new Date(this.customEndTime)
+      return startDate < endDate
     }
   },
 
   async mounted() {
     await this.loadData()
+    this.setDefaultCustomTimes()
     // Auto-refresh every 30 seconds
     this.refreshInterval = setInterval(() => {
       this.loadData()
@@ -383,7 +451,7 @@ export default {
         const actor = await this.getRewardsActor()
         this.configuration = await actor.getConfiguration()
         this.newRewardPot = this.configuration.weeklyRewardPot
-        this.newDistributionPeriod = Math.round(this.configuration.distributionPeriodNS / (24 * 60 * 60 * 1_000_000_000))
+        this.newDistributionPeriod = Math.round(Number(this.configuration.distributionPeriodNS) / (24 * 60 * 60 * 1_000_000_000))
       } catch (error) {
         console.error('Error loading configuration:', error)
         throw error
@@ -502,7 +570,7 @@ export default {
       
       try {
         const actor = await this.getRewardsActor()
-        const periodNS = BigInt(this.newDistributionPeriod * 24 * 60 * 60 * 1_000_000_000)
+        const periodNS = BigInt(Math.round(this.newDistributionPeriod * 24 * 60 * 60 * 1_000_000_000))
         const result = await actor.setDistributionPeriod(periodNS)
         
         if ('ok' in result) {
@@ -517,6 +585,50 @@ export default {
       } finally {
         this.isLoading = false
       }
+    },
+
+    async triggerCustomDistribution() {
+      this.clearMessages()
+      this.isLoading = true
+      this.currentAction = 'triggerCustom'
+      
+      try {
+        const actor = await this.getRewardsActor()
+        
+        // Convert datetime-local to nanosecond timestamps
+        const startDate = new Date(this.customStartTime)
+        const endDate = new Date(this.customEndTime)
+        const startTimeNS = BigInt(startDate.getTime() * 1_000_000)
+        const endTimeNS = BigInt(endDate.getTime() * 1_000_000)
+        
+        // Convert price type to backend format
+        const priceType = this.selectedPriceType === 'USD' ? { USD: null } : { ICP: null }
+        
+        const result = await actor.triggerDistributionCustom(startTimeNS, endTimeNS, priceType)
+        
+        if ('ok' in result) {
+          this.successMessage = result.ok
+          await this.loadData()
+        } else {
+          this.errorMessage = this.formatError(result.err)
+        }
+      } catch (error) {
+        console.error('Error triggering custom distribution:', error)
+        this.errorMessage = 'Failed to trigger custom distribution: ' + error.message
+      } finally {
+        this.isLoading = false
+        this.currentAction = ''
+      }
+    },
+
+    setDefaultCustomTimes() {
+      // Set default to last 7 days
+      const now = new Date()
+      const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
+      
+      // Format for datetime-local input (YYYY-MM-DDTHH:MM)
+      this.customEndTime = now.toISOString().slice(0, 16)
+      this.customStartTime = weekAgo.toISOString().slice(0, 16)
     },
 
     async refreshHistory() {
@@ -558,7 +670,9 @@ export default {
 
     formatTimestamp(timestamp) {
       try {
-        const date = new Date(Number(timestamp) / 1_000_000)
+        // Handle both BigInt and regular numbers
+        const timestampNum = typeof timestamp === 'bigint' ? Number(timestamp) : Number(timestamp)
+        const date = new Date(timestampNum / 1_000_000)
         return date.toLocaleString()
       } catch (error) {
         return 'Invalid date'
