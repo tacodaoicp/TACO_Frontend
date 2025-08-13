@@ -2,21 +2,21 @@ type RewardsError =
  variant {
    AllocationDataMissing;
    InvalidTimeRange;
+   NeuronNotFound;
    PriceDataMissing: record {
                        timestamp: int;
                        token: principal;
                      };
    SystemError: text;
-   UserNotFound;
  };
 type Rewards = 
  service {
-   calculateUserPerformance: (user: principal, startTime: int, endTime: 
-    int, priceType: PriceType) -> (Result) query;
+   calculateNeuronPerformance: (neuronId: blob, startTime: int, endTime: 
+    int, priceType: PriceType) -> (Result);
    getCanisterStatus: () ->
     (record {
-       allocationArchiveId: principal;
        environment: text;
+       neuronAllocationArchiveId: principal;
        priceArchiveId: principal;
      });
  };
@@ -30,13 +30,61 @@ type PriceType =
    ICP;
    USD;
  };
+type PriceInfo = 
+ record {
+   icpPrice: nat;
+   timestamp: int;
+   usdPrice: float64;
+ };
 type PerformanceResult = 
  record {
    allocationChanges: nat;
+   checkpoints: vec CheckpointData;
    endTime: int;
    finalValue: float64;
+   inTimespanChanges: vec NeuronAllocationChangeBlockData;
    initialValue: float64;
+   neuronId: blob;
+   performanceScore: float64;
+   preTimespanAllocation: opt NeuronAllocationChangeBlockData;
    startTime: int;
-   user: principal;
+ };
+type NeuronAllocationChangeBlockData = 
+ record {
+   changeType: AllocationChangeType;
+   id: nat;
+   maker: principal;
+   neuronId: blob;
+   newAllocations: vec Allocation;
+   oldAllocations: vec Allocation;
+   reason: opt text;
+   timestamp: int;
+   votingPower: nat;
+ };
+type CheckpointData = 
+ record {
+   allocations: vec Allocation;
+   pricesUsed: vec record {
+                     principal;
+                     PriceInfo;
+                   };
+   timestamp: int;
+   tokenValues: vec record {
+                      principal;
+                      float64;
+                    };
+   totalPortfolioValue: float64;
+ };
+type AllocationChangeType = 
+ variant {
+   FollowAction: record {followedUser: principal;};
+   SystemRebalance;
+   UserUpdate: record {userInitiated: bool;};
+   VotingPowerChange;
+ };
+type Allocation = 
+ record {
+   basisPoints: nat;
+   token: principal;
  };
 service : () -> Rewards

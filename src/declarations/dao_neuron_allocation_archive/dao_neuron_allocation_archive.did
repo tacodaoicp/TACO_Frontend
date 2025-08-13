@@ -30,17 +30,17 @@ type TimerStatus =
    outerLoopRunning: bool;
    outerLoopTotalRuns: nat;
  };
-type Result_4 = 
+type Result_5 = 
  variant {
    err: ArchiveError;
    ok: nat;
  };
-type Result_3 = 
+type Result_4 = 
  variant {
    err: ArchiveError;
    ok: ArchiveStatus;
  };
-type Result_2 = 
+type Result_3 = 
  variant {
    err: ArchiveError;
    ok:
@@ -51,10 +51,19 @@ type Result_2 =
       totalNeuronAllocationChanges: nat;
     };
  };
-type Result_1 = 
+type Result_2 = 
  variant {
    err: ArchiveError;
    ok: vec NeuronAllocationChangeBlockData;
+ };
+type Result_1 = 
+ variant {
+   err: ArchiveError;
+   ok:
+    record {
+      inTimespanChanges: vec NeuronAllocationChangeBlockData;
+      preTimespanAllocation: opt NeuronAllocationChangeBlockData;
+    };
  };
 type Result = 
  variant {
@@ -113,21 +122,23 @@ type DataCertificate =
 type DAONeuronAllocationArchive = 
  service {
    archiveNeuronAllocationChange: (change:
-    NeuronAllocationChangeBlockData) -> (Result_4);
+    NeuronAllocationChangeBlockData) -> (Result_5);
    getArchiveStats: () -> (ArchiveStatus) query;
-   getArchiveStatus: () -> (Result_3) query;
+   getArchiveStatus: () -> (Result_4) query;
    getBatchImportStatus: () ->
     (record {
        intervalSeconds: nat;
        isRunning: bool;
      }) query;
-   getDetailedArchiveStats: () -> (Result_2);
+   getDetailedArchiveStats: () -> (Result_3);
    getLogs: (count: nat) -> (vec LogEntry) query;
    getNeuronAllocationChangesByMaker: (maker: principal, limit: nat) ->
-    (Result_1) query;
+    (Result_2) query;
    getNeuronAllocationChangesByNeuron: (neuronId: blob, limit: nat) ->
-    (Result_1) query;
+    (Result_2) query;
    getNeuronAllocationChangesByNeuronInTimeRange: (neuronId: blob, startTime:
+    int, endTime: int, limit: nat) -> (Result_2) query;
+   getNeuronAllocationChangesWithContext: (neuronId: blob, startTime: 
     int, endTime: int, limit: nat) -> (Result_1) query;
    getTimerStatus: () -> (TimerStatus) query;
    icrc3_get_archives: (args: GetArchivesArgs) -> (GetArchivesResult) query;

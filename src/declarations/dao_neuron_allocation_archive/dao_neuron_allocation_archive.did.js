@@ -31,7 +31,7 @@ export const idlFactory = ({ IDL }) => {
     'InvalidBlockType' : IDL.Null,
     'InvalidTimeRange' : IDL.Null,
   });
-  const Result_4 = IDL.Variant({ 'ok' : IDL.Nat, 'err' : ArchiveError });
+  const Result_5 = IDL.Variant({ 'ok' : IDL.Nat, 'err' : ArchiveError });
   const ArchiveStatus = IDL.Record({
     'supportedBlockTypes' : IDL.Vec(IDL.Text),
     'newestBlock' : IDL.Opt(IDL.Nat),
@@ -40,8 +40,8 @@ export const idlFactory = ({ IDL }) => {
     'totalBlocks' : IDL.Nat,
     'lastArchiveTime' : IDL.Int,
   });
-  const Result_3 = IDL.Variant({ 'ok' : ArchiveStatus, 'err' : ArchiveError });
-  const Result_2 = IDL.Variant({
+  const Result_4 = IDL.Variant({ 'ok' : ArchiveStatus, 'err' : ArchiveError });
+  const Result_3 = IDL.Variant({
     'ok' : IDL.Record({
       'totalBlocks' : IDL.Nat,
       'totalNeuronAllocationChanges' : IDL.Nat,
@@ -62,8 +62,15 @@ export const idlFactory = ({ IDL }) => {
     'message' : IDL.Text,
     'timestamp' : IDL.Int,
   });
-  const Result_1 = IDL.Variant({
+  const Result_2 = IDL.Variant({
     'ok' : IDL.Vec(NeuronAllocationChangeBlockData),
+    'err' : ArchiveError,
+  });
+  const Result_1 = IDL.Variant({
+    'ok' : IDL.Record({
+      'preTimespanAllocation' : IDL.Opt(NeuronAllocationChangeBlockData),
+      'inTimespanChanges' : IDL.Vec(NeuronAllocationChangeBlockData),
+    }),
     'err' : ArchiveError,
   });
   const TimerStatus = IDL.Record({
@@ -127,29 +134,34 @@ export const idlFactory = ({ IDL }) => {
   const DAONeuronAllocationArchive = IDL.Service({
     'archiveNeuronAllocationChange' : IDL.Func(
         [NeuronAllocationChangeBlockData],
-        [Result_4],
+        [Result_5],
         [],
       ),
     'getArchiveStats' : IDL.Func([], [ArchiveStatus], ['query']),
-    'getArchiveStatus' : IDL.Func([], [Result_3], ['query']),
+    'getArchiveStatus' : IDL.Func([], [Result_4], ['query']),
     'getBatchImportStatus' : IDL.Func(
         [],
         [IDL.Record({ 'intervalSeconds' : IDL.Nat, 'isRunning' : IDL.Bool })],
         ['query'],
       ),
-    'getDetailedArchiveStats' : IDL.Func([], [Result_2], []),
+    'getDetailedArchiveStats' : IDL.Func([], [Result_3], []),
     'getLogs' : IDL.Func([IDL.Nat], [IDL.Vec(LogEntry)], ['query']),
     'getNeuronAllocationChangesByMaker' : IDL.Func(
         [IDL.Principal, IDL.Nat],
-        [Result_1],
+        [Result_2],
         ['query'],
       ),
     'getNeuronAllocationChangesByNeuron' : IDL.Func(
         [IDL.Vec(IDL.Nat8), IDL.Nat],
-        [Result_1],
+        [Result_2],
         ['query'],
       ),
     'getNeuronAllocationChangesByNeuronInTimeRange' : IDL.Func(
+        [IDL.Vec(IDL.Nat8), IDL.Int, IDL.Int, IDL.Nat],
+        [Result_2],
+        ['query'],
+      ),
+    'getNeuronAllocationChangesWithContext' : IDL.Func(
         [IDL.Vec(IDL.Nat8), IDL.Int, IDL.Int, IDL.Nat],
         [Result_1],
         ['query'],

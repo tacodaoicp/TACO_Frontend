@@ -33,25 +33,29 @@ export interface BlockType { 'url' : string, 'block_type' : string }
 export interface DAONeuronAllocationArchive {
   'archiveNeuronAllocationChange' : ActorMethod<
     [NeuronAllocationChangeBlockData],
-    Result_4
+    Result_5
   >,
   'getArchiveStats' : ActorMethod<[], ArchiveStatus>,
-  'getArchiveStatus' : ActorMethod<[], Result_3>,
+  'getArchiveStatus' : ActorMethod<[], Result_4>,
   'getBatchImportStatus' : ActorMethod<
     [],
     { 'intervalSeconds' : bigint, 'isRunning' : boolean }
   >,
-  'getDetailedArchiveStats' : ActorMethod<[], Result_2>,
+  'getDetailedArchiveStats' : ActorMethod<[], Result_3>,
   'getLogs' : ActorMethod<[bigint], Array<LogEntry>>,
   'getNeuronAllocationChangesByMaker' : ActorMethod<
     [Principal, bigint],
-    Result_1
+    Result_2
   >,
   'getNeuronAllocationChangesByNeuron' : ActorMethod<
     [Uint8Array | number[], bigint],
-    Result_1
+    Result_2
   >,
   'getNeuronAllocationChangesByNeuronInTimeRange' : ActorMethod<
+    [Uint8Array | number[], bigint, bigint, bigint],
+    Result_2
+  >,
+  'getNeuronAllocationChangesWithContext' : ActorMethod<
     [Uint8Array | number[], bigint, bigint, bigint],
     Result_1
   >,
@@ -105,9 +109,16 @@ export interface NeuronAllocationChangeBlockData {
 }
 export type Result = { 'ok' : string } |
   { 'err' : string };
-export type Result_1 = { 'ok' : Array<NeuronAllocationChangeBlockData> } |
+export type Result_1 = {
+    'ok' : {
+      'preTimespanAllocation' : [] | [NeuronAllocationChangeBlockData],
+      'inTimespanChanges' : Array<NeuronAllocationChangeBlockData>,
+    }
+  } |
   { 'err' : ArchiveError };
-export type Result_2 = {
+export type Result_2 = { 'ok' : Array<NeuronAllocationChangeBlockData> } |
+  { 'err' : ArchiveError };
+export type Result_3 = {
     'ok' : {
       'totalBlocks' : bigint,
       'totalNeuronAllocationChanges' : bigint,
@@ -116,9 +127,9 @@ export type Result_2 = {
     }
   } |
   { 'err' : ArchiveError };
-export type Result_3 = { 'ok' : ArchiveStatus } |
+export type Result_4 = { 'ok' : ArchiveStatus } |
   { 'err' : ArchiveError };
-export type Result_4 = { 'ok' : bigint } |
+export type Result_5 = { 'ok' : bigint } |
   { 'err' : ArchiveError };
 export interface TimerStatus {
   'innerLoopRunning' : boolean,
