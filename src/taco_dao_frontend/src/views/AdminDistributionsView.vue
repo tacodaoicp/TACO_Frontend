@@ -830,38 +830,72 @@ export default {
 
     formatNeuronId(neuronId) {
       try {
+        // Handle different neuron ID formats
         if (Array.isArray(neuronId)) {
+          // Convert byte array to hex string
           const hex = neuronId.map(b => b.toString(16).padStart(2, '0')).join('')
-          return hex.substring(0, 8) + '...'
+          return hex.substring(0, 8) + '...' + hex.substring(hex.length - 4)
+        } else if (typeof neuronId === 'string') {
+          // Already a string, just truncate
+          return neuronId.length > 12 ? neuronId.substring(0, 8) + '...' + neuronId.substring(neuronId.length - 4) : neuronId
+        } else if (neuronId && neuronId._arr) {
+          // Handle Uint8Array format
+          const hex = Array.from(neuronId._arr).map(b => b.toString(16).padStart(2, '0')).join('')
+          return hex.substring(0, 8) + '...' + hex.substring(hex.length - 4)
+        } else if (neuronId && typeof neuronId === 'object' && neuronId.constructor === Uint8Array) {
+          // Handle Uint8Array directly
+          const hex = Array.from(neuronId).map(b => b.toString(16).padStart(2, '0')).join('')
+          return hex.substring(0, 8) + '...' + hex.substring(hex.length - 4)
         }
-        return 'Invalid ID'
+        
+        console.log('Unknown neuron ID format:', neuronId)
+        return 'Unknown Format'
       } catch (error) {
-        return 'Invalid ID'
+        console.error('Error formatting neuron ID:', error, neuronId)
+        return 'Format Error'
       }
     },
 
     getStatusText(status) {
-      if (status.InProgress) return 'In Progress'
-      if (status.Completed) return 'Completed'
-      if (status.Failed) return 'Failed'
+      if (!status) return 'Unknown'
+      
+      // Handle different status formats
+      if (status.InProgress || status['InProgress']) return 'In Progress'
+      if (status.Completed || status['Completed']) return 'Completed'
+      if (status.Failed || status['Failed']) return 'Failed'
+      
+      // Check if it's a string status
+      if (typeof status === 'string') {
+        return status.charAt(0).toUpperCase() + status.slice(1)
+      }
+      
+      console.log('Unknown status format:', status)
       return 'Unknown'
     },
 
     getStatusBadgeClass(status) {
-      if (status.InProgress) return 'bg-warning'
-      if (status.Completed) return 'bg-success'
-      if (status.Failed) return 'bg-danger'
+      if (!status) return 'bg-secondary'
+      
+      // Handle different status formats
+      if (status.InProgress || status['InProgress']) return 'bg-warning'
+      if (status.Completed || status['Completed']) return 'bg-success'
+      if (status.Failed || status['Failed']) return 'bg-danger'
+      
       return 'bg-secondary'
     },
 
     isInProgress(status) {
-      return status && status.InProgress
+      return status && (status.InProgress || status['InProgress'])
     },
 
     getProgressPercent(status) {
-      if (!status.InProgress) return 0
-      const current = Number(status.InProgress.currentNeuron || 0)
-      const total = Number(status.InProgress.totalNeurons || 1)
+      if (!status) return 0
+      
+      const inProgress = status.InProgress || status['InProgress']
+      if (!inProgress) return 0
+      
+      const current = Number(inProgress.currentNeuron || 0)
+      const total = Number(inProgress.totalNeurons || 1)
       return (current / total) * 100
     }
   }
@@ -945,6 +979,34 @@ export default {
   border-color: #63b3ed;
   color: #e2e8f0;
   box-shadow: 0 0 0 0.2rem rgba(99, 179, 237, 0.25);
+}
+
+/* Fix text visibility issues */
+.text-muted {
+  color: #a0aec0 !important;
+}
+
+.card-body small.text-muted {
+  color: #a0aec0 !important;
+}
+
+/* Summary card text */
+.card .text-muted {
+  color: #9ca3af !important;
+}
+
+.card .h6 {
+  color: #f7fafc !important;
+}
+
+/* Timestamp and other muted text */
+small.text-muted {
+  color: #cbd5e0 !important;
+}
+
+/* Bottom status text */
+.mt-2.d-block.text-muted {
+  color: #a0aec0 !important;
 }
 
 /* Ranking badges */
