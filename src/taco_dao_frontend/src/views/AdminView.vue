@@ -32,6 +32,12 @@
               <router-link to="/admin/rewards" class="btn btn-success">
                 🏆 Neuron Performance Rewards
               </router-link>
+              <router-link to="/admin/rewards/balances" class="btn btn-outline-success">
+                💰 Reward Balances
+              </router-link>
+              <router-link to="/admin/distributions" class="btn btn-outline-primary">
+                🎯 Distribution Management
+              </router-link>
             </div>
           </div>
           
