@@ -318,15 +318,46 @@ export default {
       this.isLoading = true
 
       try {
+        console.log('Starting refreshBalances...')
         const actor = await this.getRewardsActor()
+        console.log('Actor created successfully:', actor)
+        
+        console.log('Calling getAllNeuronRewardBalances...')
         const balancesResult = await actor.getAllNeuronRewardBalances()
+        console.log('Method call completed successfully')
         
         // Process the balances data
-        this.balances = balancesResult.map(([neuronId, balance]) => ({
-          neuronId,
-          balance: Number(balance),
-          rank: 0 // Will be set in computed property
-        }))
+        console.log('Raw balances result:', balancesResult)
+        
+        this.balances = balancesResult.map((item) => {
+          // Handle different response formats
+          let neuronId, balance
+          
+          if (Array.isArray(item) && item.length === 2) {
+            // Format: [neuronId, balance]
+            [neuronId, balance] = item
+          } else if (typeof item === 'object' && item !== null) {
+            // Format: { neuronId: blob, balance: number } or record format
+            const keys = Object.keys(item)
+            if (keys.length === 2) {
+              // Assuming first key is neuronId, second is balance
+              neuronId = item[keys[0]]
+              balance = item[keys[1]]
+            } else {
+              console.error('Unexpected item format:', item)
+              return null
+            }
+          } else {
+            console.error('Unexpected item format:', item)
+            return null
+          }
+          
+          return {
+            neuronId,
+            balance: Number(balance),
+            rank: 0 // Will be set in computed property
+          }
+        }).filter(Boolean) // Remove null entries
 
         // Sort by balance descending initially
         this.balances.sort((a, b) => b.balance - a.balance)
@@ -342,16 +373,26 @@ export default {
 
     async getRewardsActor() {
       try {
+        console.log('Getting rewards canister ID...')
         const canisterId = this.tacoStore.rewardsCanisterId()
+        console.log('Canister ID:', canisterId)
+        
         if (!canisterId) {
           throw new Error('Rewards canister ID not found')
         }
-        return createRewardsActor(canisterId, {
+        
+        console.log('TacoStore identity:', this.tacoStore.identity)
+        console.log('TacoStore host:', this.tacoStore.host)
+        
+        const actor = createRewardsActor(canisterId, {
           agentOptions: {
             identity: this.tacoStore.identity,
             host: this.tacoStore.host
           }
         })
+        
+        console.log('Created actor:', actor)
+        return actor
       } catch (error) {
         console.error('Error creating rewards actor:', error)
         throw error
