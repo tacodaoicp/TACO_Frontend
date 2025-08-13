@@ -857,16 +857,34 @@ export default {
     },
 
     getStatusText(status) {
-      if (!status) return 'Unknown'
+      if (!status) {
+        console.log('Status is null/undefined')
+        return 'Unknown'
+      }
+      
+      // Debug: log the actual status object
+      console.log('Status object:', status, 'Type:', typeof status, 'Keys:', Object.keys(status))
       
       // Handle different status formats
       if (status.InProgress || status['InProgress']) return 'In Progress'
-      if (status.Completed || status['Completed']) return 'Completed'
+      if (status.Completed || status['Completed']) return 'Completed'  
       if (status.Failed || status['Failed']) return 'Failed'
       
       // Check if it's a string status
       if (typeof status === 'string') {
         return status.charAt(0).toUpperCase() + status.slice(1)
+      }
+      
+      // Check for variant-style status (Motoko/Candid format)
+      const keys = Object.keys(status)
+      if (keys.length === 1) {
+        const key = keys[0]
+        if (key.toLowerCase().includes('progress')) return 'In Progress'
+        if (key.toLowerCase().includes('completed')) return 'Completed'
+        if (key.toLowerCase().includes('failed')) return 'Failed'
+        
+        // Return the key as-is, formatted
+        return key.charAt(0).toUpperCase() + key.slice(1).replace(/([A-Z])/g, ' $1')
       }
       
       console.log('Unknown status format:', status)
