@@ -244,9 +244,7 @@ export default {
   async mounted() {
     try {
       // Create rewards actor with the proper canister ID from store
-      this.rewardsActor = createRewardsActor({
-        canisterId: this.tacoStore.rewardsCanisterId()
-      })
+      this.rewardsActor = createRewardsActor(this.tacoStore.rewardsCanisterId())
       // Load token metadata
       await this.tacoStore.loadAllNames()
     } catch (error) {
