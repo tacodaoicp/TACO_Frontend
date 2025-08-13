@@ -44,17 +44,17 @@ type TacoBlockType =
    Trade;
    VotingPower;
  };
-type Result_7 = 
+type Result_8 = 
  variant {
    err: ArchiveError;
    ok: nat;
  };
-type Result_6 = 
+type Result_7 = 
  variant {
    err: ArchiveError;
    ok: ArchiveStatus;
  };
-type Result_4 = 
+type Result_5 = 
  variant {
    err: ArchiveError;
    ok: opt record {
@@ -63,10 +63,24 @@ type Result_4 =
              usdPrice: float64;
            };
  };
-type Result_3 = 
+type Result_4 = 
  variant {
    err: ArchiveError;
    ok: vec PriceBlockData;
+ };
+type Result_3 = 
+ variant {
+   err: ArchiveError;
+   ok:
+    vec
+     record {
+       principal;
+       opt record {
+             icpPrice: nat;
+             timestamp: int;
+             usdPrice: float64;
+           };
+     };
  };
 type Result_2 = 
  variant {
@@ -102,20 +116,22 @@ type PriceBlockData =
  };
 type PriceArchiveV2 = 
  service {
-   archivePriceBlock: (price: PriceBlockData) -> (Result_7);
+   archivePriceBlock: (price: PriceBlockData) -> (Result_8);
    catchUpImport: () -> (Result_1);
    getArchiveStats: () -> (ArchiveStatus) query;
-   getArchiveStatus: () -> (Result_6) query;
+   getArchiveStatus: () -> (Result_7) query;
    getBatchImportStatus: () ->
     (record {
        intervalSeconds: nat;
        isRunning: bool;
        lastImportedPriceTime: int;
      }) query;
-   getLatestPrice: (token: principal) -> (Result_4) query;
+   getLatestPrice: (token: principal) -> (Result_5) query;
    getLogs: (count: nat) -> (vec LogEntry) query;
-   getPriceAtTime: (token: principal, timestamp: int) -> (Result_4) query;
+   getPriceAtTime: (token: principal, timestamp: int) -> (Result_5) query;
    getPriceHistory: (token: principal, startTime: int, endTime: int) ->
+    (Result_4) query;
+   getPricesAtTime: (tokens: vec principal, timestamp: int) ->
     (Result_3) query;
    getTimerStatus: () -> (TimerStatus) query;
    icrc3_get_archives: (args: GetArchivesArgs) -> (GetArchivesResult) query;
