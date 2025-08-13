@@ -340,7 +340,6 @@ import { useTacoStore } from '../stores/taco.store'
 import HeaderBar from '../components/HeaderBar.vue'
 import TacoTitle from '../components/misc/TacoTitle.vue'
 import { createActor as createRewardsActor } from '../../../declarations/rewards'
-import { AuthClient } from '@dfinity/auth-client'
 
 export default {
   name: 'AdminDistributionsView',
@@ -425,23 +424,9 @@ export default {
         if (!canisterId) {
           throw new Error('Rewards canister ID not found')
         }
-        
-        // Get the authenticated identity from authClient directly
-        const authClient = await AuthClient.create()
-        const identity = await authClient.getIdentity()
-        
-        // Debug logging
-        console.log('Creating rewards actor with:', {
-          canisterId,
-          identity,
-          identityPrincipal: identity?.getPrincipal()?.toString(),
-          isAuthenticated: await authClient.isAuthenticated(),
-          host: this.tacoStore.host
-        })
-        
         return createRewardsActor(canisterId, {
           agentOptions: {
-            identity,
+            identity: this.tacoStore.identity,
             host: this.tacoStore.host
           }
         })
@@ -728,8 +713,8 @@ export default {
 
     getProgressPercent(status) {
       if (!status.InProgress) return 0
-      const current = status.InProgress.currentNeuron || 0
-      const total = status.InProgress.totalNeurons || 1
+      const current = Number(status.InProgress.currentNeuron || 0)
+      const total = Number(status.InProgress.totalNeurons || 1)
       return (current / total) * 100
     }
   }
