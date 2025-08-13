@@ -1,8 +1,11 @@
 type RewardsError = 
  variant {
    AllocationDataMissing;
+   DistributionInProgress;
+   InsufficientRewardPot;
    InvalidTimeRange;
    NeuronNotFound;
+   NotAuthorized;
    PriceDataMissing: record {
                        timestamp: int;
                        token: principal;
@@ -12,18 +15,59 @@ type RewardsError =
 type Rewards = 
  service {
    calculateNeuronPerformance: (neuronId: blob, startTime: int, endTime: 
-    int, priceType: PriceType) -> (Result);
+    int, priceType: PriceType) -> (Result_1);
+   getAllNeuronRewardBalances: () -> (vec record {
+                                            blob;
+                                            float64;
+                                          }) query;
    getCanisterStatus: () ->
     (record {
+       daoId: principal;
+       distributionStatus:
+        record {
+          inProgress: bool;
+          lastDistribution: int;
+          nextDistribution: int;
+          totalDistributions: nat;
+          totalRewardsDistributed: float64;
+        };
        environment: text;
        neuronAllocationArchiveId: principal;
        priceArchiveId: principal;
      });
+   getConfiguration: () ->
+    (record {
+       distributionEnabled: bool;
+       distributionPeriodNS: nat;
+       maxDistributionHistory: nat;
+       weeklyRewardPot: float64;
+     }) query;
+   getCurrentDistributionStatus: () ->
+    (record {
+       currentDistributionId: opt nat;
+       distributionEnabled: bool;
+       inProgress: bool;
+       lastDistributionTime: int;
+       nextDistributionTime: int;
+     }) query;
+   getDistributionHistory: (limit: opt nat) -> (vec DistributionRecord) query;
+   getNeuronRewardBalance: (neuronId: blob) -> (float64) query;
+   setDistributionEnabled: (enabled: bool) -> (Result);
+   setDistributionPeriod: (periodNS: nat) -> (Result);
+   setWeeklyRewardPot: (amount: float64) -> (Result);
+   startDistributionTimer: () -> (Result);
+   stopDistributionTimer: () -> (Result);
+   triggerDistribution: () -> (Result);
+ };
+type Result_1 = 
+ variant {
+   err: RewardsError;
+   ok: PerformanceResult;
  };
 type Result = 
  variant {
    err: RewardsError;
-   ok: PerformanceResult;
+   ok: text;
  };
 type PriceType = 
  variant {
@@ -49,6 +93,14 @@ type PerformanceResult =
    preTimespanAllocation: opt NeuronAllocationChangeBlockData;
    startTime: int;
  };
+type NeuronReward = 
+ record {
+   neuronId: blob;
+   performanceScore: float64;
+   rewardAmount: float64;
+   rewardScore: float64;
+   votingPower: nat;
+ };
 type NeuronAllocationChangeBlockData = 
  record {
    changeType: AllocationChangeType;
@@ -60,6 +112,27 @@ type NeuronAllocationChangeBlockData =
    reason: opt text;
    timestamp: int;
    votingPower: nat;
+ };
+type DistributionStatus = 
+ variant {
+   Completed;
+   Failed: text;
+   InProgress: record {
+                 currentNeuron: nat;
+                 totalNeurons: nat;
+               };
+ };
+type DistributionRecord = 
+ record {
+   distributionTime: int;
+   endTime: int;
+   id: nat;
+   neuronRewards: vec NeuronReward;
+   neuronsProcessed: nat;
+   startTime: int;
+   status: DistributionStatus;
+   totalRewardPot: float64;
+   totalRewardScore: float64;
  };
 type CheckpointData = 
  record {

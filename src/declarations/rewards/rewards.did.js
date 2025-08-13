@@ -48,22 +48,57 @@ export const idlFactory = ({ IDL }) => {
   const RewardsError = IDL.Variant({
     'AllocationDataMissing' : IDL.Null,
     'SystemError' : IDL.Text,
+    'NotAuthorized' : IDL.Null,
+    'DistributionInProgress' : IDL.Null,
     'PriceDataMissing' : IDL.Record({
       'token' : IDL.Principal,
       'timestamp' : IDL.Int,
     }),
     'NeuronNotFound' : IDL.Null,
     'InvalidTimeRange' : IDL.Null,
+    'InsufficientRewardPot' : IDL.Null,
   });
-  const Result = IDL.Variant({
+  const Result_1 = IDL.Variant({
     'ok' : PerformanceResult,
     'err' : RewardsError,
   });
+  const DistributionStatus = IDL.Variant({
+    'Failed' : IDL.Text,
+    'InProgress' : IDL.Record({
+      'currentNeuron' : IDL.Nat,
+      'totalNeurons' : IDL.Nat,
+    }),
+    'Completed' : IDL.Null,
+  });
+  const NeuronReward = IDL.Record({
+    'rewardAmount' : IDL.Float64,
+    'performanceScore' : IDL.Float64,
+    'votingPower' : IDL.Nat,
+    'rewardScore' : IDL.Float64,
+    'neuronId' : IDL.Vec(IDL.Nat8),
+  });
+  const DistributionRecord = IDL.Record({
+    'id' : IDL.Nat,
+    'startTime' : IDL.Int,
+    'status' : DistributionStatus,
+    'distributionTime' : IDL.Int,
+    'neuronsProcessed' : IDL.Nat,
+    'endTime' : IDL.Int,
+    'totalRewardPot' : IDL.Float64,
+    'totalRewardScore' : IDL.Float64,
+    'neuronRewards' : IDL.Vec(NeuronReward),
+  });
+  const Result = IDL.Variant({ 'ok' : IDL.Text, 'err' : RewardsError });
   const Rewards = IDL.Service({
     'calculateNeuronPerformance' : IDL.Func(
         [IDL.Vec(IDL.Nat8), IDL.Int, IDL.Int, PriceType],
-        [Result],
+        [Result_1],
         [],
+      ),
+    'getAllNeuronRewardBalances' : IDL.Func(
+        [],
+        [IDL.Vec(IDL.Tuple(IDL.Vec(IDL.Nat8), IDL.Float64))],
+        ['query'],
       ),
     'getCanisterStatus' : IDL.Func(
         [],
@@ -71,11 +106,60 @@ export const idlFactory = ({ IDL }) => {
           IDL.Record({
             'priceArchiveId' : IDL.Principal,
             'environment' : IDL.Text,
+            'distributionStatus' : IDL.Record({
+              'lastDistribution' : IDL.Int,
+              'totalRewardsDistributed' : IDL.Float64,
+              'totalDistributions' : IDL.Nat,
+              'inProgress' : IDL.Bool,
+              'nextDistribution' : IDL.Int,
+            }),
+            'daoId' : IDL.Principal,
             'neuronAllocationArchiveId' : IDL.Principal,
           }),
         ],
         [],
       ),
+    'getConfiguration' : IDL.Func(
+        [],
+        [
+          IDL.Record({
+            'distributionEnabled' : IDL.Bool,
+            'distributionPeriodNS' : IDL.Nat,
+            'maxDistributionHistory' : IDL.Nat,
+            'weeklyRewardPot' : IDL.Float64,
+          }),
+        ],
+        ['query'],
+      ),
+    'getCurrentDistributionStatus' : IDL.Func(
+        [],
+        [
+          IDL.Record({
+            'nextDistributionTime' : IDL.Int,
+            'distributionEnabled' : IDL.Bool,
+            'currentDistributionId' : IDL.Opt(IDL.Nat),
+            'lastDistributionTime' : IDL.Int,
+            'inProgress' : IDL.Bool,
+          }),
+        ],
+        ['query'],
+      ),
+    'getDistributionHistory' : IDL.Func(
+        [IDL.Opt(IDL.Nat)],
+        [IDL.Vec(DistributionRecord)],
+        ['query'],
+      ),
+    'getNeuronRewardBalance' : IDL.Func(
+        [IDL.Vec(IDL.Nat8)],
+        [IDL.Float64],
+        ['query'],
+      ),
+    'setDistributionEnabled' : IDL.Func([IDL.Bool], [Result], []),
+    'setDistributionPeriod' : IDL.Func([IDL.Nat], [Result], []),
+    'setWeeklyRewardPot' : IDL.Func([IDL.Float64], [Result], []),
+    'startDistributionTimer' : IDL.Func([], [Result], []),
+    'stopDistributionTimer' : IDL.Func([], [Result], []),
+    'triggerDistribution' : IDL.Func([], [Result], []),
   });
   return Rewards;
 };
