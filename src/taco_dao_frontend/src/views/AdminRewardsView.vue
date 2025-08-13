@@ -163,11 +163,11 @@
                     <h6>Prices Used:</h6>
                     <div class="prices-used">
                       <div v-for="[token, priceInfo] in checkpoint.pricesUsed" :key="token" class="price-info mb-1">
-                        <small class="text-muted">
+                        <small class="text-white">
                           {{ getTokenSymbol(token) }}: 
                           <span v-if="priceType === 'USD'">${{ formatUsdPrice(priceInfo.usdPrice) }}</span>
                           <span v-else>{{ formatIcpPrice(priceInfo.icpPrice) }} ICP</span>
-                          <span class="text-muted ms-2">({{ formatTimestamp(priceInfo.timestamp) }})</span>
+                          <span class="text-light ms-2">({{ formatTimestamp(priceInfo.timestamp) }})</span>
                         </small>
                       </div>
                     </div>
