@@ -273,41 +273,124 @@
                     </div>
                   </div>
 
-                  <!-- Neuron Rewards Details (for completed distributions) -->
-                  <div v-if="distribution.status.Completed && distribution.neuronRewards && distribution.neuronRewards.length > 0" class="mt-3">
+                  <!-- Neuron Details Expansion -->
+                  <div v-if="distribution.neuronRewards && distribution.neuronRewards.length > 0" class="mt-3">
                     <button 
                       class="btn btn-outline-info btn-sm" 
                       @click="toggleRewardDetails(index)"
                     >
-                      {{ showRewardDetails[index] ? '🔽 Hide' : '🔼 Show' }} Neuron Rewards ({{ distribution.neuronRewards.length }})
+                      {{ showRewardDetails[index] ? '🔽 Hide' : '🔼 Show' }} Neuron Details ({{ distribution.neuronRewards.length }})
                     </button>
                     
                     <div v-if="showRewardDetails[index]" class="mt-3">
-                      <div class="table-responsive">
+                      <!-- Controls for pagination -->
+                      <div class="row mb-3">
+                        <div class="col-md-6">
+                          <div class="input-group input-group-sm">
+                            <span class="input-group-text">Show</span>
+                            <select v-model="rewardDisplayLimits[index]" class="form-select">
+                              <option value="10">10</option>
+                              <option value="20">20</option>
+                              <option value="50">50</option>
+                              <option value="100">100</option>
+                              <option :value="distribution.neuronRewards.length">All ({{ distribution.neuronRewards.length }})</option>
+                            </select>
+                            <span class="input-group-text">entries</span>
+                          </div>
+                        </div>
+                        <div class="col-md-6">
+                          <input 
+                            v-model="rewardSearchTerms[index]" 
+                            type="text" 
+                            class="form-control form-control-sm" 
+                            placeholder="Search by Neuron ID..."
+                          >
+                        </div>
+                      </div>
+
+                      <!-- Neuron Rewards Table -->
+                      <div class="table-responsive" style="max-height: 500px; overflow-y: auto;">
                         <table class="table table-dark table-striped table-sm">
-                          <thead>
+                          <thead class="sticky-top">
                             <tr>
                               <th>Neuron ID</th>
                               <th>Performance Score</th>
                               <th>Voting Power</th>
                               <th>Reward Score</th>
                               <th>Reward Amount</th>
+                              <th>% of Total</th>
                             </tr>
                           </thead>
                           <tbody>
-                            <tr v-for="reward in distribution.neuronRewards.slice(0, 20)" :key="reward.neuronId">
-                              <td class="font-monospace">{{ formatNeuronId(reward.neuronId) }}</td>
-                              <td>{{ reward.performanceScore.toFixed(6) }}</td>
-                              <td>{{ reward.votingPower }}</td>
+                            <tr v-for="(reward, rewardIndex) in getFilteredRewards(distribution, index)" :key="reward.neuronId">
+                              <td class="font-monospace">
+                                <span class="badge bg-secondary me-2">{{ rewardIndex + 1 }}</span>
+                                {{ formatNeuronId(reward.neuronId) }}
+                              </td>
+                              <td>
+                                <span :class="getPerformanceScoreClass(reward.performanceScore)">
+                                  {{ reward.performanceScore.toFixed(6) }}
+                                </span>
+                              </td>
+                              <td>
+                                <span class="badge bg-info">
+                                  {{ formatVotingPower(reward.votingPower) }}
+                                </span>
+                              </td>
                               <td>{{ reward.rewardScore.toFixed(6) }}</td>
-                              <td class="text-success">{{ reward.rewardAmount.toFixed(6) }}</td>
+                              <td class="text-success">
+                                <strong>{{ reward.rewardAmount.toFixed(6) }}</strong>
+                              </td>
+                              <td>
+                                <span class="badge bg-warning text-dark">
+                                  {{ ((reward.rewardAmount / distribution.totalRewardPot) * 100).toFixed(2) }}%
+                                </span>
+                              </td>
                             </tr>
                           </tbody>
                         </table>
-                        <small v-if="distribution.neuronRewards.length > 20" class="text-muted">
-                          Showing first 20 of {{ distribution.neuronRewards.length }} rewards
-                        </small>
                       </div>
+
+                      <!-- Summary Statistics -->
+                      <div class="row mt-3">
+                        <div class="col-md-3">
+                          <div class="card bg-dark border-info">
+                            <div class="card-body text-center py-2">
+                              <small class="text-muted">Total Neurons</small>
+                              <div class="h6 mb-0 text-info">{{ distribution.neuronRewards.length }}</div>
+                            </div>
+                          </div>
+                        </div>
+                        <div class="col-md-3">
+                          <div class="card bg-dark border-success">
+                            <div class="card-body text-center py-2">
+                              <small class="text-muted">Avg Performance</small>
+                              <div class="h6 mb-0 text-success">{{ getAveragePerformance(distribution.neuronRewards).toFixed(4) }}</div>
+                            </div>
+                          </div>
+                        </div>
+                        <div class="col-md-3">
+                          <div class="card bg-dark border-warning">
+                            <div class="card-body text-center py-2">
+                              <small class="text-muted">Total Voting Power</small>
+                              <div class="h6 mb-0 text-warning">{{ getTotalVotingPower(distribution.neuronRewards).toLocaleString() }}</div>
+                            </div>
+                          </div>
+                        </div>
+                        <div class="col-md-3">
+                          <div class="card bg-dark border-primary">
+                            <div class="card-body text-center py-2">
+                              <small class="text-muted">Rewards Distributed</small>
+                              <div class="h6 mb-0 text-primary">{{ distribution.totalRewardPot.toFixed(2) }}</div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      <small class="text-muted mt-2 d-block">
+                        Showing {{ getFilteredRewards(distribution, index).length }} of {{ distribution.neuronRewards.length }} neurons
+                        {{ rewardSearchTerms[index] ? ` (filtered by "${rewardSearchTerms[index]}")` : '' }}
+                      </small>
                     </div>
                   </div>
 
@@ -358,6 +441,8 @@ export default {
       configuration: null,
       distributionHistory: [],
       showRewardDetails: {},
+      rewardDisplayLimits: {},
+      rewardSearchTerms: {},
       newRewardPot: 1000,
       newDistributionPeriod: 7,
       timerRunning: false,
@@ -653,6 +738,68 @@ export default {
         ...this.showRewardDetails,
         [index]: !this.showRewardDetails[index]
       }
+      
+      // Initialize display limit and search term if not already set
+      if (!this.rewardDisplayLimits[index]) {
+        this.rewardDisplayLimits = {
+          ...this.rewardDisplayLimits,
+          [index]: 20
+        }
+      }
+      if (!this.rewardSearchTerms[index]) {
+        this.rewardSearchTerms = {
+          ...this.rewardSearchTerms,
+          [index]: ''
+        }
+      }
+    },
+
+    getFilteredRewards(distribution, index) {
+      if (!distribution.neuronRewards) return []
+      
+      let rewards = [...distribution.neuronRewards]
+      
+      // Apply search filter
+      const searchTerm = this.rewardSearchTerms[index] || ''
+      if (searchTerm) {
+        rewards = rewards.filter(reward => 
+          this.formatNeuronId(reward.neuronId).toLowerCase().includes(searchTerm.toLowerCase())
+        )
+      }
+      
+      // Apply limit
+      const limit = this.rewardDisplayLimits[index] || 20
+      return rewards.slice(0, Number(limit))
+    },
+
+    getPerformanceScoreClass(score) {
+      if (score > 1.1) return 'text-success fw-bold'
+      if (score > 1.0) return 'text-success'
+      if (score > 0.9) return 'text-warning'
+      return 'text-danger'
+    },
+
+    formatVotingPower(votingPower) {
+      const vp = Number(votingPower)
+      if (vp >= 1000000000) {
+        return (vp / 1000000000).toFixed(1) + 'B VP'
+      } else if (vp >= 1000000) {
+        return (vp / 1000000).toFixed(1) + 'M VP'
+      } else if (vp >= 1000) {
+        return (vp / 1000).toFixed(1) + 'K VP'
+      }
+      return vp.toLocaleString() + ' VP'
+    },
+
+    getAveragePerformance(rewards) {
+      if (!rewards || rewards.length === 0) return 0
+      const total = rewards.reduce((sum, reward) => sum + reward.performanceScore, 0)
+      return total / rewards.length
+    },
+
+    getTotalVotingPower(rewards) {
+      if (!rewards || rewards.length === 0) return 0
+      return rewards.reduce((sum, reward) => sum + Number(reward.votingPower), 0)
     },
 
     clearMessages() {
@@ -737,10 +884,20 @@ export default {
 .table th {
   font-size: 0.9em;
   font-weight: 600;
+  background-color: #2d3748 !important;
+}
+
+.table th.sticky-top {
+  background-color: #2d3748 !important;
+  z-index: 10;
 }
 
 .table td {
   font-size: 0.85em;
+}
+
+.table tbody tr:hover {
+  background-color: rgba(255, 255, 255, 0.05) !important;
 }
 
 .font-monospace {
@@ -749,5 +906,67 @@ export default {
 
 .alert {
   font-size: 0.9em;
+}
+
+/* Enhanced neuron details styling */
+.table-responsive {
+  border-radius: 6px;
+  border: 1px solid #444;
+}
+
+.badge {
+  font-size: 0.7rem;
+}
+
+.card.bg-dark {
+  background-color: #1a202c !important;
+}
+
+.card.border-info { border-color: #3182ce !important; }
+.card.border-success { border-color: #38a169 !important; }
+.card.border-warning { border-color: #d69e2e !important; }
+.card.border-primary { border-color: #3182ce !important; }
+
+/* Search and pagination controls */
+.input-group-text {
+  background-color: #2d3748;
+  border-color: #4a5568;
+  color: #e2e8f0;
+}
+
+.form-select, .form-control {
+  background-color: #2d3748;
+  border-color: #4a5568;
+  color: #e2e8f0;
+}
+
+.form-select:focus, .form-control:focus {
+  background-color: #2d3748;
+  border-color: #63b3ed;
+  color: #e2e8f0;
+  box-shadow: 0 0 0 0.2rem rgba(99, 179, 237, 0.25);
+}
+
+/* Ranking badges */
+.badge.bg-secondary {
+  background-color: #4a5568 !important;
+}
+
+/* Performance score colors */
+.text-success.fw-bold {
+  color: #38a169 !important;
+  font-weight: 700 !important;
+}
+
+.text-success {
+  color: #68d391 !important;
+}
+
+.text-warning {
+  color: #f6e05e !important;
+}
+
+.text-danger {
+  color: #fc8181 !important;
 }
 </style>
