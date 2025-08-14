@@ -51,7 +51,7 @@
                   <div class="card bg-dark border-success">
                     <div class="card-body text-center py-2">
                       <small class="text-muted">Total Rewards</small>
-                      <div class="h5 mb-0 text-success">{{ getTotalRewards().toFixed(2) }}</div>
+                      <div class="h5 mb-0 text-success">{{ formatTacoFromTokens(getTotalRewards()) }} TACO</div>
                     </div>
                   </div>
                 </div>
@@ -67,7 +67,7 @@
                   <div class="card bg-dark border-primary">
                     <div class="card-body text-center py-2">
                       <small class="text-muted">Avg Balance</small>
-                      <div class="h5 mb-0 text-primary">{{ getAverageBalance().toFixed(2) }}</div>
+                      <div class="h5 mb-0 text-primary">{{ formatTacoFromTokens(getAverageBalance()) }} TACO</div>
                     </div>
                   </div>
                 </div>
@@ -161,12 +161,12 @@
                       </td>
                       <td>
                         <span :class="getBalanceClass(balance.balance)">
-                          <strong>{{ balance.balance.toFixed(6) }}</strong>
+                          <strong>{{ formatTacoPrecise(balance.balance) }}</strong>
                         </span>
                       </td>
                       <td>
                         <span class="badge bg-info">
-                          {{ ((balance.balance / getTotalRewards()) * 100).toFixed(2) }}%
+                          {{ adminStore.calculatePercentage(adminStore.tacoSatoshisToTokens(balance.balance), getTotalRewards()) }}%
                         </span>
                       </td>
                       <td>
@@ -236,6 +236,7 @@
 
 <script>
 import { useTacoStore } from '../stores/taco.store'
+import { useAdminStore } from '../stores/admin.store'
 import HeaderBar from '../components/HeaderBar.vue'
 import TacoTitle from '../components/misc/TacoTitle.vue'
 import { createActor as createRewardsActor } from '../../../declarations/rewards'
@@ -265,6 +266,10 @@ export default {
   computed: {
     tacoStore() {
       return useTacoStore()
+    },
+
+    adminStore() {
+      return useAdminStore()
     },
 
     filteredBalances() {
@@ -479,8 +484,30 @@ export default {
       }
     },
 
+    // TACO token formatting functions - now using admin store
+    formatTacoAmount(satoshis) {
+      return this.adminStore.formatTacoFixed(satoshis, 8)
+    },
+
+    formatTacoAmountShort(satoshis) {
+      return this.adminStore.formatTacoShort(satoshis)
+    },
+
+    formatTacoPrecise(satoshis) {
+      return this.adminStore.formatTacoPrecise(satoshis)
+    },
+
+    formatTacoFromTokens(tacoTokens) {
+      return this.adminStore.formatTacoFromTokens(tacoTokens)
+    },
+
     getTotalRewards() {
-      return this.balances.reduce((sum, balance) => sum + balance.balance, 0)
+      const totalSatoshis = this.balances.reduce((sum, balance) => {
+        const balanceNum = typeof balance.balance === 'bigint' ? Number(balance.balance) : Number(balance.balance || 0)
+        return sum + balanceNum
+      }, 0)
+      // Convert from satoshis to TACO tokens
+      return totalSatoshis / 100_000_000
     },
 
     getNeuronsWithBalance() {
@@ -489,6 +516,7 @@ export default {
 
     getAverageBalance() {
       if (this.balances.length === 0) return 0
+      // getTotalRewards() already returns TACO tokens, so this is correct
       return this.getTotalRewards() / this.balances.length
     },
 

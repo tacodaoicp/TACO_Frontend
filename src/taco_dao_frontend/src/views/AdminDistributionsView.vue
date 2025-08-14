@@ -488,6 +488,7 @@
 
 <script>
 import { useTacoStore } from '../stores/taco.store'
+import { useAdminStore } from '../stores/admin.store'
 import HeaderBar from '../components/HeaderBar.vue'
 import TacoTitle from '../components/misc/TacoTitle.vue'
 import { createActor as createRewardsActor } from '../../../declarations/rewards'
@@ -525,6 +526,10 @@ export default {
   computed: {
     tacoStore() {
       return useTacoStore()
+    },
+
+    adminStore() {
+      return useAdminStore()
     },
 
     distributionInProgress() {
@@ -1132,14 +1137,8 @@ export default {
 
     formatPrincipal(principal) {
       try {
-        // Convert principal to string if it's not already
         const principalStr = typeof principal === 'string' ? principal : principal.toString()
-        
-        // Return first 8 characters + ... + last 4 characters for readability
-        if (principalStr.length > 12) {
-          return principalStr.substring(0, 8) + '...' + principalStr.substring(principalStr.length - 4)
-        }
-        return principalStr
+        return this.adminStore.formatPrincipal(principalStr)
       } catch (error) {
         console.error('Error formatting principal:', error, principal)
         return 'Invalid Principal'
@@ -1148,27 +1147,11 @@ export default {
 
     // TACO token formatting functions
     formatTacoAmount(satoshis) {
-      try {
-        // Convert BigInt satoshis to TACO tokens with 8 decimals
-        const satoshisBI = typeof satoshis === 'bigint' ? satoshis : BigInt(satoshis || 0)
-        const tacoTokens = Number(satoshisBI) / 100_000_000 // Convert from satoshis to TACO
-        return tacoTokens.toFixed(8)
-      } catch (error) {
-        console.error('Error formatting TACO amount:', error, satoshis)
-        return '0.00000000'
-      }
+      return this.adminStore.formatTacoFixed(satoshis, 8)
     },
 
     formatTacoAmountShort(satoshis) {
-      try {
-        // Convert BigInt satoshis to TACO tokens with 6 decimals (shorter display)
-        const satoshisBI = typeof satoshis === 'bigint' ? satoshis : BigInt(satoshis || 0)
-        const tacoTokens = Number(satoshisBI) / 100_000_000
-        return tacoTokens.toFixed(6)
-      } catch (error) {
-        console.error('Error formatting TACO amount:', error, satoshis)
-        return '0.000000'
-      }
+      return this.adminStore.formatTacoPrecise(satoshis)
     },
 
     calculateRewardPercentage(rewardAmount, totalRewardPot) {
@@ -1178,11 +1161,10 @@ export default {
         const totalBI = typeof totalRewardPot === 'bigint' ? totalRewardPot : BigInt(totalRewardPot || 1)
         
         // Convert to TACO tokens for calculation
-        const rewardTaco = Number(rewardBI) / 100_000_000
+        const rewardTaco = this.adminStore.tacoSatoshisToTokens(rewardBI)
         const totalTaco = Number(totalBI) * 1 // totalRewardPot is already in whole TACO tokens
         
-        if (totalTaco === 0) return '0.00'
-        return ((rewardTaco / totalTaco) * 100).toFixed(2)
+        return this.adminStore.calculatePercentage(rewardTaco, totalTaco)
       } catch (error) {
         console.error('Error calculating reward percentage:', error, rewardAmount, totalRewardPot)
         return '0.00'
