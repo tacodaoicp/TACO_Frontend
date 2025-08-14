@@ -423,7 +423,7 @@
                           <div class="card bg-dark border-primary">
                             <div class="card-body text-center py-2">
                               <small class="text-muted">Rewards Distributed</small>
-                              <div class="h6 mb-0 text-primary">{{ Number(distribution.totalRewardPot || 0).toFixed(2) }} TACO</div>
+                              <div class="h6 mb-0 text-primary">{{ adminStore.formatTacoPrecise(distribution.actualDistributed || 0) }} TACO</div>
                             </div>
                           </div>
                         </div>
