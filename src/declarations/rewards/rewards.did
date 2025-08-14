@@ -18,7 +18,7 @@ type Rewards =
     int, priceType: PriceType) -> (Result_1);
    getAllNeuronRewardBalances: () -> (vec record {
                                             blob;
-                                            float64;
+                                            nat;
                                           }) query;
    getCanisterStatus: () ->
     (record {
@@ -29,7 +29,7 @@ type Rewards =
           lastDistribution: int;
           nextDistribution: int;
           totalDistributions: nat;
-          totalRewardsDistributed: float64;
+          totalRewardsDistributed: nat;
         };
        environment: text;
        neuronAllocationArchiveId: principal;
@@ -40,7 +40,7 @@ type Rewards =
        distributionEnabled: bool;
        distributionPeriodNS: nat;
        maxDistributionHistory: nat;
-       weeklyRewardPot: float64;
+       weeklyRewardPot: nat;
      }) query;
    getCurrentDistributionStatus: () ->
     (record {
@@ -51,10 +51,11 @@ type Rewards =
        nextDistributionTime: int;
      }) query;
    getDistributionHistory: (limit: opt nat) -> (vec DistributionRecord) query;
-   getNeuronRewardBalance: (neuronId: blob) -> (float64) query;
+   getNeuronRewardBalance: (neuronId: blob) -> (nat) query;
+   getTotalDistributed: () -> (nat) query;
    setDistributionEnabled: (enabled: bool) -> (Result);
    setDistributionPeriod: (periodNS: nat) -> (Result);
-   setWeeklyRewardPot: (amount: float64) -> (Result);
+   setWeeklyRewardPot: (amount: nat) -> (Result);
    startDistributionTimer: () -> (Result);
    stopDistributionTimer: () -> (Result);
    triggerDistribution: () -> (Result);
@@ -97,9 +98,10 @@ type PerformanceResult =
  };
 type NeuronReward = 
  record {
+   checkpoints: vec CheckpointData;
    neuronId: blob;
    performanceScore: float64;
-   rewardAmount: float64;
+   rewardAmount: nat;
    rewardScore: float64;
    votingPower: nat;
  };
@@ -143,12 +145,13 @@ type DistributionRecord =
    neuronsProcessed: nat;
    startTime: int;
    status: DistributionStatus;
-   totalRewardPot: float64;
+   totalRewardPot: nat;
    totalRewardScore: float64;
  };
 type CheckpointData = 
  record {
    allocations: vec Allocation;
+   maker: opt principal;
    pricesUsed: vec record {
                      principal;
                      PriceInfo;

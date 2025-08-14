@@ -10,6 +10,7 @@ export type AllocationChangeType = {
   { 'SystemRebalance' : null } |
   { 'VotingPowerChange' : null };
 export interface CheckpointData {
+  'maker' : [] | [Principal],
   'totalPortfolioValue' : number,
   'pricesUsed' : Array<[Principal, PriceInfo]>,
   'timestamp' : bigint,
@@ -23,7 +24,7 @@ export interface DistributionRecord {
   'distributionTime' : bigint,
   'neuronsProcessed' : bigint,
   'endTime' : bigint,
-  'totalRewardPot' : number,
+  'totalRewardPot' : bigint,
   'totalRewardScore' : number,
   'neuronRewards' : Array<NeuronReward>,
   'failedNeurons' : Array<FailedNeuron>,
@@ -53,10 +54,11 @@ export interface NeuronAllocationChangeBlockData {
   'reason' : [] | [string],
 }
 export interface NeuronReward {
-  'rewardAmount' : number,
+  'rewardAmount' : bigint,
   'performanceScore' : number,
   'votingPower' : bigint,
   'rewardScore' : number,
+  'checkpoints' : Array<CheckpointData>,
   'neuronId' : Uint8Array | number[],
 }
 export interface PerformanceResult {
@@ -89,7 +91,7 @@ export interface Rewards {
   >,
   'getAllNeuronRewardBalances' : ActorMethod<
     [],
-    Array<[Uint8Array | number[], number]>
+    Array<[Uint8Array | number[], bigint]>
   >,
   'getCanisterStatus' : ActorMethod<
     [],
@@ -98,7 +100,7 @@ export interface Rewards {
       'environment' : string,
       'distributionStatus' : {
         'lastDistribution' : bigint,
-        'totalRewardsDistributed' : number,
+        'totalRewardsDistributed' : bigint,
         'totalDistributions' : bigint,
         'inProgress' : boolean,
         'nextDistribution' : bigint,
@@ -113,7 +115,7 @@ export interface Rewards {
       'distributionEnabled' : boolean,
       'distributionPeriodNS' : bigint,
       'maxDistributionHistory' : bigint,
-      'weeklyRewardPot' : number,
+      'weeklyRewardPot' : bigint,
     }
   >,
   'getCurrentDistributionStatus' : ActorMethod<
@@ -130,10 +132,11 @@ export interface Rewards {
     [[] | [bigint]],
     Array<DistributionRecord>
   >,
-  'getNeuronRewardBalance' : ActorMethod<[Uint8Array | number[]], number>,
+  'getNeuronRewardBalance' : ActorMethod<[Uint8Array | number[]], bigint>,
+  'getTotalDistributed' : ActorMethod<[], bigint>,
   'setDistributionEnabled' : ActorMethod<[boolean], Result>,
   'setDistributionPeriod' : ActorMethod<[bigint], Result>,
-  'setWeeklyRewardPot' : ActorMethod<[number], Result>,
+  'setWeeklyRewardPot' : ActorMethod<[bigint], Result>,
   'startDistributionTimer' : ActorMethod<[], Result>,
   'stopDistributionTimer' : ActorMethod<[], Result>,
   'triggerDistribution' : ActorMethod<[], Result>,

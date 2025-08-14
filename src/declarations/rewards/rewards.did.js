@@ -27,6 +27,7 @@ export const idlFactory = ({ IDL }) => {
     'icpPrice' : IDL.Nat,
   });
   const CheckpointData = IDL.Record({
+    'maker' : IDL.Opt(IDL.Principal),
     'totalPortfolioValue' : IDL.Float64,
     'pricesUsed' : IDL.Vec(IDL.Tuple(IDL.Principal, PriceInfo)),
     'timestamp' : IDL.Int,
@@ -75,10 +76,11 @@ export const idlFactory = ({ IDL }) => {
     'Completed' : IDL.Null,
   });
   const NeuronReward = IDL.Record({
-    'rewardAmount' : IDL.Float64,
+    'rewardAmount' : IDL.Nat,
     'performanceScore' : IDL.Float64,
     'votingPower' : IDL.Nat,
     'rewardScore' : IDL.Float64,
+    'checkpoints' : IDL.Vec(CheckpointData),
     'neuronId' : IDL.Vec(IDL.Nat8),
   });
   const FailedNeuron = IDL.Record({
@@ -92,7 +94,7 @@ export const idlFactory = ({ IDL }) => {
     'distributionTime' : IDL.Int,
     'neuronsProcessed' : IDL.Nat,
     'endTime' : IDL.Int,
-    'totalRewardPot' : IDL.Float64,
+    'totalRewardPot' : IDL.Nat,
     'totalRewardScore' : IDL.Float64,
     'neuronRewards' : IDL.Vec(NeuronReward),
     'failedNeurons' : IDL.Vec(FailedNeuron),
@@ -106,7 +108,7 @@ export const idlFactory = ({ IDL }) => {
       ),
     'getAllNeuronRewardBalances' : IDL.Func(
         [],
-        [IDL.Vec(IDL.Tuple(IDL.Vec(IDL.Nat8), IDL.Float64))],
+        [IDL.Vec(IDL.Tuple(IDL.Vec(IDL.Nat8), IDL.Nat))],
         ['query'],
       ),
     'getCanisterStatus' : IDL.Func(
@@ -117,7 +119,7 @@ export const idlFactory = ({ IDL }) => {
             'environment' : IDL.Text,
             'distributionStatus' : IDL.Record({
               'lastDistribution' : IDL.Int,
-              'totalRewardsDistributed' : IDL.Float64,
+              'totalRewardsDistributed' : IDL.Nat,
               'totalDistributions' : IDL.Nat,
               'inProgress' : IDL.Bool,
               'nextDistribution' : IDL.Int,
@@ -135,7 +137,7 @@ export const idlFactory = ({ IDL }) => {
             'distributionEnabled' : IDL.Bool,
             'distributionPeriodNS' : IDL.Nat,
             'maxDistributionHistory' : IDL.Nat,
-            'weeklyRewardPot' : IDL.Float64,
+            'weeklyRewardPot' : IDL.Nat,
           }),
         ],
         ['query'],
@@ -160,12 +162,13 @@ export const idlFactory = ({ IDL }) => {
       ),
     'getNeuronRewardBalance' : IDL.Func(
         [IDL.Vec(IDL.Nat8)],
-        [IDL.Float64],
+        [IDL.Nat],
         ['query'],
       ),
+    'getTotalDistributed' : IDL.Func([], [IDL.Nat], ['query']),
     'setDistributionEnabled' : IDL.Func([IDL.Bool], [Result], []),
     'setDistributionPeriod' : IDL.Func([IDL.Nat], [Result], []),
-    'setWeeklyRewardPot' : IDL.Func([IDL.Float64], [Result], []),
+    'setWeeklyRewardPot' : IDL.Func([IDL.Nat], [Result], []),
     'startDistributionTimer' : IDL.Func([], [Result], []),
     'stopDistributionTimer' : IDL.Func([], [Result], []),
     'triggerDistribution' : IDL.Func([], [Result], []),
