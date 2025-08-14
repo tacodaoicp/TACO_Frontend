@@ -115,6 +115,11 @@ type NeuronAllocationChangeBlockData =
    timestamp: int;
    votingPower: nat;
  };
+type FailedNeuron = 
+ record {
+   errorMessage: text;
+   neuronId: blob;
+ };
 type DistributionStatus = 
  variant {
    Completed;
@@ -123,11 +128,16 @@ type DistributionStatus =
                  currentNeuron: nat;
                  totalNeurons: nat;
                };
+   PartiallyCompleted: record {
+                         failedNeurons: nat;
+                         successfulNeurons: nat;
+                       };
  };
 type DistributionRecord = 
  record {
    distributionTime: int;
    endTime: int;
+   failedNeurons: vec FailedNeuron;
    id: nat;
    neuronRewards: vec NeuronReward;
    neuronsProcessed: nat;

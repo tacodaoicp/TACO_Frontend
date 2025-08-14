@@ -64,6 +64,10 @@ export const idlFactory = ({ IDL }) => {
   });
   const DistributionStatus = IDL.Variant({
     'Failed' : IDL.Text,
+    'PartiallyCompleted' : IDL.Record({
+      'successfulNeurons' : IDL.Nat,
+      'failedNeurons' : IDL.Nat,
+    }),
     'InProgress' : IDL.Record({
       'currentNeuron' : IDL.Nat,
       'totalNeurons' : IDL.Nat,
@@ -77,6 +81,10 @@ export const idlFactory = ({ IDL }) => {
     'rewardScore' : IDL.Float64,
     'neuronId' : IDL.Vec(IDL.Nat8),
   });
+  const FailedNeuron = IDL.Record({
+    'errorMessage' : IDL.Text,
+    'neuronId' : IDL.Vec(IDL.Nat8),
+  });
   const DistributionRecord = IDL.Record({
     'id' : IDL.Nat,
     'startTime' : IDL.Int,
@@ -87,6 +95,7 @@ export const idlFactory = ({ IDL }) => {
     'totalRewardPot' : IDL.Float64,
     'totalRewardScore' : IDL.Float64,
     'neuronRewards' : IDL.Vec(NeuronReward),
+    'failedNeurons' : IDL.Vec(FailedNeuron),
   });
   const Result = IDL.Variant({ 'ok' : IDL.Text, 'err' : RewardsError });
   const Rewards = IDL.Service({

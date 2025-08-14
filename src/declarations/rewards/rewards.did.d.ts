@@ -26,10 +26,21 @@ export interface DistributionRecord {
   'totalRewardPot' : number,
   'totalRewardScore' : number,
   'neuronRewards' : Array<NeuronReward>,
+  'failedNeurons' : Array<FailedNeuron>,
 }
 export type DistributionStatus = { 'Failed' : string } |
+  {
+    'PartiallyCompleted' : {
+      'successfulNeurons' : bigint,
+      'failedNeurons' : bigint,
+    }
+  } |
   { 'InProgress' : { 'currentNeuron' : bigint, 'totalNeurons' : bigint } } |
   { 'Completed' : null };
+export interface FailedNeuron {
+  'errorMessage' : string,
+  'neuronId' : Uint8Array | number[],
+}
 export interface NeuronAllocationChangeBlockData {
   'id' : bigint,
   'maker' : Principal,
