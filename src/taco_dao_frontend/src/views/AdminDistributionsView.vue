@@ -8,6 +8,21 @@
         <div class="row">
           <TacoTitle level="h2" emoji="🎯" title="Rewards Distribution Management" class="mt-4" style="padding-left: 1rem !important;"/>
           
+          <!-- Navigation Bar -->
+          <div class="mb-4">
+            <div class="d-flex gap-3 flex-wrap">
+              <router-link to="/admin" class="btn btn-dark">
+                🔑 Admin Panel
+              </router-link>
+              <router-link to="/admin/rewards" class="btn btn-outline-success">
+                🏆 Neuron Performance Rewards
+              </router-link>
+              <router-link to="/admin/rewards/balances" class="btn btn-outline-success">
+                💰 Reward Balances
+              </router-link>
+            </div>
+          </div>
+          
           <!-- Distribution Controls -->
           <div class="card bg-dark text-white mb-4">
             <div class="card-header">
