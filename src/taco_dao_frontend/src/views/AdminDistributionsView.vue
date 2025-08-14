@@ -319,6 +319,7 @@
                               <th>Reward Score</th>
                               <th>Reward Amount</th>
                               <th>% of Total</th>
+                              <th>Actions</th>
                             </tr>
                           </thead>
                           <tbody>
@@ -345,6 +346,15 @@
                                 <span class="badge bg-warning text-dark">
                                   {{ ((reward.rewardAmount / distribution.totalRewardPot) * 100).toFixed(2) }}%
                                 </span>
+                              </td>
+                              <td>
+                                <button 
+                                  class="btn btn-outline-success btn-xs" 
+                                  @click="viewNeuronPerformance(reward.neuronId, distribution)"
+                                  title="View Performance Details"
+                                >
+                                  👁️ Details
+                                </button>
                               </td>
                             </tr>
                           </tbody>
@@ -915,6 +925,59 @@ export default {
       const current = Number(inProgress.currentNeuron || 0)
       const total = Number(inProgress.totalNeurons || 1)
       return (current / total) * 100
+    },
+
+    viewNeuronPerformance(neuronId, distribution) {
+      try {
+        // Convert neuron ID to full hex format
+        const fullHexId = this.neuronIdToFullHex(neuronId)
+        
+        // Get the distribution period and price type from the distribution
+        const startTimeNS = distribution.startTime
+        const endTimeNS = distribution.endTime
+        
+        // Determine price type - check if the distribution has price type info
+        // For now, default to USD as it seems to be the most common
+        const priceType = distribution.priceType || 'USD'
+        
+        // Navigate to the rewards page with all parameters
+        this.$router.push({
+          path: '/admin/rewards',
+          query: {
+            neuronId: fullHexId,
+            startTime: startTimeNS.toString(),
+            endTime: endTimeNS.toString(),
+            priceType: priceType
+          }
+        })
+      } catch (error) {
+        console.error('Error navigating to neuron performance:', error)
+        this.errorMessage = 'Failed to navigate to neuron performance details'
+      }
+    },
+
+    neuronIdToFullHex(neuronId) {
+      try {
+        // Convert neuron ID to full hex string (not truncated)
+        if (Array.isArray(neuronId)) {
+          // Convert byte array to hex string
+          return neuronId.map(b => b.toString(16).padStart(2, '0')).join('')
+        } else if (typeof neuronId === 'string') {
+          // If it's already a hex string, return as-is (remove any 0x prefix if present)
+          return neuronId.replace(/^0x/, '')
+        } else if (neuronId && neuronId._arr) {
+          // Handle Uint8Array format
+          return Array.from(neuronId._arr).map(b => b.toString(16).padStart(2, '0')).join('')
+        } else if (neuronId && typeof neuronId === 'object' && neuronId.constructor === Uint8Array) {
+          // Handle Uint8Array directly
+          return Array.from(neuronId).map(b => b.toString(16).padStart(2, '0')).join('')
+        }
+        
+        throw new Error('Unknown neuron ID format')
+      } catch (error) {
+        console.error('Error converting neuron ID to hex:', error, neuronId)
+        throw error
+      }
     }
   }
 }
@@ -1048,5 +1111,11 @@ small.text-muted {
 
 .text-danger {
   color: #fc8181 !important;
+}
+
+/* Button styles */
+.btn-xs {
+  padding: 0.15rem 0.3rem;
+  font-size: 0.7rem;
 }
 </style>

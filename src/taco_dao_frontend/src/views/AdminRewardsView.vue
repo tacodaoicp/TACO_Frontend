@@ -278,13 +278,30 @@ export default {
       // Load token metadata
       await this.tacoStore.loadAllNames()
       
-      // Check for neuron ID in URL parameters
+      // Check for URL parameters and populate fields
       if (this.$route.query.neuronId) {
         this.neuronId = this.$route.query.neuronId
-        // Auto-calculate if we have a valid neuron ID
-        if (this.isValidInput) {
-          await this.calculatePerformance()
-        }
+      }
+      
+      if (this.$route.query.startTime) {
+        // Convert timestamp to datetime-local format
+        const startDate = new Date(parseInt(this.$route.query.startTime) / 1000000) // Convert nanoseconds to milliseconds
+        this.startTime = startDate.toISOString().slice(0, 16)
+      }
+      
+      if (this.$route.query.endTime) {
+        // Convert timestamp to datetime-local format
+        const endDate = new Date(parseInt(this.$route.query.endTime) / 1000000) // Convert nanoseconds to milliseconds
+        this.endTime = endDate.toISOString().slice(0, 16)
+      }
+      
+      if (this.$route.query.priceType) {
+        this.priceType = this.$route.query.priceType
+      }
+      
+      // Auto-calculate if we have valid inputs
+      if (this.isValidInput) {
+        await this.calculatePerformance()
       }
     } catch (error) {
       console.error('Failed to create rewards actor:', error)
