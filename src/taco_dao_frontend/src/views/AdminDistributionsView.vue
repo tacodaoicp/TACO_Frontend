@@ -267,7 +267,7 @@
                     </div>
                     <div class="col-md-3">
                       <strong>Total Reward Pot:</strong><br>
-                      <span class="text-success">{{ distribution.totalRewardPot }} tokens</span>
+                      <span class="text-success">{{ Number(distribution.totalRewardPot || 0) }} TACO tokens</span>
                     </div>
                     <div class="col-md-3">
                       <strong>Total Reward Score:</strong><br>
@@ -334,6 +334,7 @@
                               <th>Reward Score</th>
                               <th>Reward Amount</th>
                               <th>% of Total</th>
+                              <th>Makers</th>
                               <th>Actions</th>
                             </tr>
                           </thead>
@@ -355,12 +356,28 @@
                               </td>
                               <td>{{ reward.rewardScore.toFixed(6) }}</td>
                               <td class="text-success">
-                                <strong>{{ reward.rewardAmount.toFixed(6) }}</strong>
+                                <strong>{{ formatTacoAmountShort(reward.rewardAmount) }}</strong>
                               </td>
                               <td>
                                 <span class="badge bg-warning text-dark">
-                                  {{ ((reward.rewardAmount / distribution.totalRewardPot) * 100).toFixed(2) }}%
+                                  {{ calculateRewardPercentage(reward.rewardAmount, distribution.totalRewardPot) }}%
                                 </span>
+                              </td>
+                              <td>
+                                <div v-if="getMakersFromReward(reward).length > 0" class="makers-list">
+                                  <span 
+                                    v-for="(maker, makerIndex) in getMakersFromReward(reward)" 
+                                    :key="maker"
+                                    class="badge bg-primary me-1 mb-1"
+                                    :title="maker"
+                                  >
+                                    {{ formatPrincipal(maker) }}
+                                    <small v-if="makerIndex === 0" class="ms-1" title="First/Oldest allocation maker">📅</small>
+                                  </span>
+                                </div>
+                                <div v-else class="text-muted">
+                                  <small>No makers</small>
+                                </div>
                               </td>
                               <td>
                                 <button 
@@ -406,7 +423,7 @@
                           <div class="card bg-dark border-primary">
                             <div class="card-body text-center py-2">
                               <small class="text-muted">Rewards Distributed</small>
-                              <div class="h6 mb-0 text-primary">{{ distribution.totalRewardPot.toFixed(2) }}</div>
+                              <div class="h6 mb-0 text-primary">{{ Number(distribution.totalRewardPot || 0).toFixed(2) }} TACO</div>
                             </div>
                           </div>
                         </div>
@@ -492,6 +509,7 @@ export default {
       distributionStatus: null,
       configuration: null,
       distributionHistory: [],
+      totalDistributed: 0,
       showRewardDetails: {},
       rewardDisplayLimits: {},
       rewardSearchTerms: {},
@@ -528,6 +546,7 @@ export default {
 
   async mounted() {
     await this.loadData()
+    await this.loadTotalDistributed()
     this.setDefaultCustomTimes()
     // Auto-refresh every 30 seconds
     this.refreshInterval = setInterval(() => {
@@ -954,7 +973,7 @@ export default {
       
       // Handle different status formats
       if (status.InProgress || status['InProgress']) return 'In Progress'
-      if (status.Completed || status['Completed']) return 'Completed'
+      if (status.Completed || status['Completed']) return 'Completed'  
       if (status.PartiallyCompleted || status['PartiallyCompleted']) {
         const partial = status.PartiallyCompleted || status['PartiallyCompleted']
         return `Partially Completed (${partial.successfulNeurons}/${partial.successfulNeurons + partial.failedNeurons})`
@@ -1073,6 +1092,100 @@ export default {
       } catch (error) {
         console.error('Error converting neuron ID to hex:', error, neuronId)
         throw error
+      }
+    },
+
+    getMakersFromReward(reward) {
+      try {
+        if (!reward.checkpoints || !Array.isArray(reward.checkpoints)) {
+          return []
+        }
+
+        // Extract unique makers from checkpoints in chronological order
+        const makers = []
+        const seenMakers = new Set()
+        
+        for (const checkpoint of reward.checkpoints) {
+          if (checkpoint.maker && !seenMakers.has(checkpoint.maker.toString())) {
+            makers.push(checkpoint.maker)
+            seenMakers.add(checkpoint.maker.toString())
+          }
+        }
+        
+        return makers
+      } catch (error) {
+        console.error('Error extracting makers from reward:', error, reward)
+        return []
+      }
+    },
+
+    async loadTotalDistributed() {
+      try {
+        const actor = await this.getRewardsActor()
+        const total = await actor.getTotalDistributed()
+        this.totalDistributed = total
+      } catch (error) {
+        console.error('Error loading total distributed:', error)
+        // Don't show error message to user for this non-critical data
+      }
+    },
+
+    formatPrincipal(principal) {
+      try {
+        // Convert principal to string if it's not already
+        const principalStr = typeof principal === 'string' ? principal : principal.toString()
+        
+        // Return first 8 characters + ... + last 4 characters for readability
+        if (principalStr.length > 12) {
+          return principalStr.substring(0, 8) + '...' + principalStr.substring(principalStr.length - 4)
+        }
+        return principalStr
+      } catch (error) {
+        console.error('Error formatting principal:', error, principal)
+        return 'Invalid Principal'
+      }
+    },
+
+    // TACO token formatting functions
+    formatTacoAmount(satoshis) {
+      try {
+        // Convert BigInt satoshis to TACO tokens with 8 decimals
+        const satoshisBI = typeof satoshis === 'bigint' ? satoshis : BigInt(satoshis || 0)
+        const tacoTokens = Number(satoshisBI) / 100_000_000 // Convert from satoshis to TACO
+        return tacoTokens.toFixed(8)
+      } catch (error) {
+        console.error('Error formatting TACO amount:', error, satoshis)
+        return '0.00000000'
+      }
+    },
+
+    formatTacoAmountShort(satoshis) {
+      try {
+        // Convert BigInt satoshis to TACO tokens with 6 decimals (shorter display)
+        const satoshisBI = typeof satoshis === 'bigint' ? satoshis : BigInt(satoshis || 0)
+        const tacoTokens = Number(satoshisBI) / 100_000_000
+        return tacoTokens.toFixed(6)
+      } catch (error) {
+        console.error('Error formatting TACO amount:', error, satoshis)
+        return '0.000000'
+      }
+    },
+
+    calculateRewardPercentage(rewardAmount, totalRewardPot) {
+      try {
+        // Both amounts are now in whole TACO tokens (BigInt), convert to numbers for percentage calculation
+        const rewardBI = typeof rewardAmount === 'bigint' ? rewardAmount : BigInt(rewardAmount || 0)
+        const totalBI = typeof totalRewardPot === 'bigint' ? totalRewardPot : BigInt(totalRewardPot || 1)
+        
+        // Convert to TACO tokens for calculation
+        const rewardTaco = Number(rewardBI) / 100_000_000
+        const totalTaco = Number(totalBI) * 1 // totalRewardPot is already in whole TACO tokens
+        
+        if (totalTaco === 0) return '0.00'
+        return ((rewardTaco / totalTaco) * 100).toFixed(2)
+      } catch (error) {
+        console.error('Error calculating reward percentage:', error, rewardAmount, totalRewardPot)
+        return '0.00'
       }
     }
   }
@@ -1213,5 +1326,19 @@ small.text-muted {
 .btn-xs {
   padding: 0.15rem 0.3rem;
   font-size: 0.7rem;
+}
+
+/* Makers list styling */
+.makers-list {
+  max-width: 200px;
+}
+
+.makers-list .badge {
+  font-size: 0.6rem;
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: inline-block;
 }
 </style>
