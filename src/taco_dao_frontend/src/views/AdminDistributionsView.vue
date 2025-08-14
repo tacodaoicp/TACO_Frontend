@@ -621,7 +621,9 @@ export default {
     async loadDistributionHistory() {
       try {
         const actor = await this.getRewardsActor()
-        this.distributionHistory = await actor.getDistributionHistory([10]) // Get last 10
+        const history = await actor.getDistributionHistory([10]) // Get last 10
+        // Reverse to show newest distributions first
+        this.distributionHistory = history.reverse()
       } catch (error) {
         console.error('Error loading distribution history:', error)
         throw error
