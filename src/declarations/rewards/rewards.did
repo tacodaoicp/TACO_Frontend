@@ -52,6 +52,7 @@ type Rewards =
      }) query;
    getDistributionHistory: (limit: opt nat) -> (vec DistributionRecord) query;
    getNeuronRewardBalance: (neuronId: blob) -> (nat) query;
+   getTacoBalance: () -> (nat);
    getTotalDistributed: () -> (nat) query;
    setDistributionEnabled: (enabled: bool) -> (Result);
    setDistributionPeriod: (periodNS: nat) -> (Result);

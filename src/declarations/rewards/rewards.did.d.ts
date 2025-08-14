@@ -134,6 +134,7 @@ export interface Rewards {
     Array<DistributionRecord>
   >,
   'getNeuronRewardBalance' : ActorMethod<[Uint8Array | number[]], bigint>,
+  'getTacoBalance' : ActorMethod<[], bigint>,
   'getTotalDistributed' : ActorMethod<[], bigint>,
   'setDistributionEnabled' : ActorMethod<[boolean], Result>,
   'setDistributionPeriod' : ActorMethod<[bigint], Result>,

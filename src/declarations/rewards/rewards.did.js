@@ -166,6 +166,7 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Nat],
         ['query'],
       ),
+    'getTacoBalance' : IDL.Func([], [IDL.Nat], []),
     'getTotalDistributed' : IDL.Func([], [IDL.Nat], ['query']),
     'setDistributionEnabled' : IDL.Func([IDL.Bool], [Result], []),
     'setDistributionPeriod' : IDL.Func([IDL.Nat], [Result], []),
