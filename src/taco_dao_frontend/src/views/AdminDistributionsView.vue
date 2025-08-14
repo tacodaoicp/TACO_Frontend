@@ -474,6 +474,7 @@ import { useTacoStore } from '../stores/taco.store'
 import HeaderBar from '../components/HeaderBar.vue'
 import TacoTitle from '../components/misc/TacoTitle.vue'
 import { createActor as createRewardsActor } from '../../../declarations/rewards'
+import { AuthClient } from '@dfinity/auth-client'
 
 export default {
   name: 'AdminDistributionsView',
@@ -556,16 +557,39 @@ export default {
 
     async getRewardsActor() {
       try {
+        console.log('Getting rewards canister ID...')
         const canisterId = this.tacoStore.rewardsCanisterId()
+        console.log('Canister ID:', canisterId)
+        
         if (!canisterId) {
           throw new Error('Rewards canister ID not found')
         }
-        return createRewardsActor(canisterId, {
+
+        // Ensure authenticated identity like other admin pages
+        const authClient = await AuthClient.create({
+          idleOptions: { disableIdle: true }
+        })
+
+        if (!await authClient.isAuthenticated()) {
+          throw new Error('User not authenticated')
+        }
+
+        const identity = await authClient.getIdentity()
+        const host = process.env.DFX_NETWORK === 'local' ? 'http://localhost:4943' : 'https://ic0.app'
+
+        console.log('Identity principal:', identity?.getPrincipal?.().toString?.())
+        console.log('Is identity anonymous:', identity?.getPrincipal?.().isAnonymous?.())
+        console.log('Using host:', host)
+
+        const actor = createRewardsActor(canisterId, {
           agentOptions: {
-            identity: this.tacoStore.identity,
-            host: this.tacoStore.host
+            identity,
+            host
           }
         })
+        
+        console.log('Created actor:', actor)
+        return actor
       } catch (error) {
         console.error('Error creating rewards actor:', error)
         throw error
