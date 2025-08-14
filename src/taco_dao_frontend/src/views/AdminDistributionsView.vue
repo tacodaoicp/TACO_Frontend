@@ -536,7 +536,8 @@ export default {
       timerRunning: false,
       customStartTime: '',
       customEndTime: '',
-      selectedPriceType: 'USD'
+      selectedPriceType: 'USD',
+      refreshInterval: null
     }
   },
 
@@ -577,6 +578,7 @@ export default {
   async mounted() {
     await this.loadData()
     await this.loadTotalDistributed()
+    await this.loadTacoBalance()
     this.setDefaultCustomTimes()
     // Auto-refresh every 30 seconds
     this.refreshInterval = setInterval(() => {
@@ -1217,11 +1219,7 @@ export default {
     }
   },
 
-  async mounted() {
-    this.setDefaultCustomTimes()
-    await this.loadTotalDistributed()
-    await this.loadTacoBalance()
-  }
+
 }
 </script>
 
