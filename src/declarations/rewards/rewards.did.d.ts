@@ -24,6 +24,7 @@ export interface DistributionRecord {
   'distributionTime' : bigint,
   'neuronsProcessed' : bigint,
   'endTime' : bigint,
+  'actualDistributed' : bigint,
   'totalRewardPot' : bigint,
   'totalRewardScore' : number,
   'neuronRewards' : Array<NeuronReward>,

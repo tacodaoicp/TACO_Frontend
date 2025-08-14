@@ -137,6 +137,7 @@ type DistributionStatus =
  };
 type DistributionRecord = 
  record {
+   actualDistributed: nat;
    distributionTime: int;
    endTime: int;
    failedNeurons: vec FailedNeuron;

@@ -94,6 +94,7 @@ export const idlFactory = ({ IDL }) => {
     'distributionTime' : IDL.Int,
     'neuronsProcessed' : IDL.Nat,
     'endTime' : IDL.Int,
+    'actualDistributed' : IDL.Nat,
     'totalRewardPot' : IDL.Nat,
     'totalRewardScore' : IDL.Float64,
     'neuronRewards' : IDL.Vec(NeuronReward),
