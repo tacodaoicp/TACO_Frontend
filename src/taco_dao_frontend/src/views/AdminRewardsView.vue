@@ -363,7 +363,7 @@ export default {
           this.performanceResult = result.ok
           console.log('Performance result:', this.performanceResult)
         } else {
-          this.errorMessage = `Calculation failed: ${JSON.stringify(result.err)}`
+          this.errorMessage = `Calculation failed: ${this.formatRewardsError(result.err)}`
         }
       } catch (error) {
         console.error('Error calculating performance:', error)
@@ -518,6 +518,27 @@ export default {
         console.warn('Error getting token metadata:', error)
         return null
       }
+    },
+
+    // Format rewards-specific errors
+    formatRewardsError(error) {
+      if (typeof error === 'string') return error
+      
+      // Handle different error types from the rewards backend
+      if (error.SystemError) return `System Error: ${error.SystemError}`
+      if (error.NotAuthorized) return 'Not authorized to perform this action'
+      if (error.InvalidTimeRange) return 'Invalid time range: start time must be before end time'
+      if (error.NeuronNotFound) return 'Neuron not found or has no allocation data'
+      if (error.AllocationDataMissing) return 'Allocation data missing for this neuron in the specified time period'
+      if (error.PriceDataMissing) {
+        return `Price data missing for token ${error.PriceDataMissing.token} at timestamp ${error.PriceDataMissing.timestamp}`
+      }
+      if (error.DistributionInProgress) return 'Distribution currently in progress'
+      if (error.InsufficientRewardPot) return 'Insufficient reward pot'
+      
+      // Log the unknown error for debugging
+      console.error('Unknown rewards error format:', error)
+      return JSON.stringify(error)
     }
   }
 }

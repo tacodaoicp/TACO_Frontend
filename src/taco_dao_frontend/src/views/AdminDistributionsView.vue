@@ -416,6 +416,32 @@
                         Showing {{ getFilteredRewards(distribution, index).length }} of {{ distribution.neuronRewards.length }} neurons
                         {{ rewardSearchTerms[index] ? ` (filtered by "${rewardSearchTerms[index]}")` : '' }}
                       </small>
+
+                      <!-- Failed Neurons Section -->
+                      <div v-if="distribution.failedNeurons && distribution.failedNeurons.length > 0" class="mt-4">
+                        <h6 class="text-warning">⚠️ Failed Neurons ({{ distribution.failedNeurons.length }})</h6>
+                        <div class="table-responsive" style="max-height: 300px; overflow-y: auto;">
+                          <table class="table table-dark table-striped table-sm">
+                            <thead class="sticky-top">
+                              <tr>
+                                <th>Neuron ID</th>
+                                <th>Error Message</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              <tr v-for="(failedNeuron, failedIndex) in distribution.failedNeurons" :key="failedNeuron.neuronId">
+                                <td class="font-monospace">
+                                  <span class="badge bg-danger me-2">{{ failedIndex + 1 }}</span>
+                                  {{ formatNeuronId(failedNeuron.neuronId) }}
+                                </td>
+                                <td class="text-warning">
+                                  <small>{{ failedNeuron.errorMessage }}</small>
+                                </td>
+                              </tr>
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
                     </div>
                   </div>
 
@@ -834,12 +860,22 @@ export default {
 
     formatError(error) {
       if (typeof error === 'string') return error
-      if (error.SystemError) return error.SystemError
-      if (error.NotAuthorized) return 'Not authorized'
+      
+      // Handle different error types from the backend
+      if (error.SystemError) return `System Error: ${error.SystemError}`
+      if (error.NotAuthorized) return 'Not authorized to perform this action'
       if (error.DistributionInProgress) return 'Distribution already in progress'
       if (error.InvalidTimeRange) return 'Invalid time range: start time must be before end time'
       if (error.InsufficientRewardPot) return 'Insufficient reward pot'
-      return 'Unknown error'
+      if (error.NeuronNotFound) return 'Neuron not found'
+      if (error.AllocationDataMissing) return 'Allocation data missing for this neuron'
+      if (error.PriceDataMissing) {
+        return `Price data missing for token ${error.PriceDataMissing.token} at timestamp ${error.PriceDataMissing.timestamp}`
+      }
+      
+      // Log the unknown error for debugging
+      console.error('Unknown error format:', error)
+      return `Unknown error: ${JSON.stringify(error)}`
     },
 
     formatTimestamp(timestamp) {
@@ -892,7 +928,11 @@ export default {
       
       // Handle different status formats
       if (status.InProgress || status['InProgress']) return 'In Progress'
-      if (status.Completed || status['Completed']) return 'Completed'  
+      if (status.Completed || status['Completed']) return 'Completed'
+      if (status.PartiallyCompleted || status['PartiallyCompleted']) {
+        const partial = status.PartiallyCompleted || status['PartiallyCompleted']
+        return `Partially Completed (${partial.successfulNeurons}/${partial.successfulNeurons + partial.failedNeurons})`
+      }
       if (status.Failed || status['Failed']) return 'Failed'
       
       // Check if it's a string status
@@ -906,6 +946,10 @@ export default {
         const key = keys[0]
         if (key.toLowerCase().includes('progress')) return 'In Progress'
         if (key.toLowerCase().includes('completed')) return 'Completed'
+        if (key.toLowerCase().includes('partiallycompleted')) {
+          const partial = status[key]
+          return `Partially Completed (${partial.successfulNeurons}/${partial.successfulNeurons + partial.failedNeurons})`
+        }
         if (key.toLowerCase().includes('failed')) return 'Failed'
         
         // Return the key as-is, formatted
@@ -922,7 +966,18 @@ export default {
       // Handle different status formats
       if (status.InProgress || status['InProgress']) return 'bg-warning'
       if (status.Completed || status['Completed']) return 'bg-success'
+      if (status.PartiallyCompleted || status['PartiallyCompleted']) return 'bg-warning'
       if (status.Failed || status['Failed']) return 'bg-danger'
+      
+      // Check for variant-style status (Motoko/Candid format)
+      const keys = Object.keys(status)
+      if (keys.length === 1) {
+        const key = keys[0]
+        if (key.toLowerCase().includes('progress')) return 'bg-warning'
+        if (key.toLowerCase().includes('completed')) return 'bg-success'
+        if (key.toLowerCase().includes('partiallycompleted')) return 'bg-warning'
+        if (key.toLowerCase().includes('failed')) return 'bg-danger'
+      }
       
       return 'bg-secondary'
     },
