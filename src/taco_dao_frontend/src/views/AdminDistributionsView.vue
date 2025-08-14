@@ -206,6 +206,22 @@
                   </span>
                 </div>
               </div>
+              <div class="row mt-3">
+                <div class="col-md-4">
+                  <strong>Total Distributed:</strong><br>
+                  <span class="text-warning">{{ adminStore.formatTacoPrecise(totalDistributed) }} TACO</span>
+                </div>
+                <div class="col-md-4">
+                  <strong>Canister TACO Balance:</strong><br>
+                  <span class="text-primary">{{ adminStore.formatTacoPrecise(tacoBalance) }} TACO</span>
+                </div>
+                <div class="col-md-4">
+                  <strong>Available for Distribution:</strong><br>
+                  <span :class="availableBalance >= 0 ? 'text-success' : 'text-danger'">
+                    {{ adminStore.formatTacoPrecise(availableBalance) }} TACO
+                  </span>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -511,6 +527,7 @@ export default {
       configuration: null,
       distributionHistory: [],
       totalDistributed: 0,
+      tacoBalance: 0,
       showRewardDetails: {},
       rewardDisplayLimits: {},
       rewardSearchTerms: {},
@@ -534,6 +551,14 @@ export default {
 
     distributionInProgress() {
       return this.distributionStatus?.inProgress || false
+    },
+
+    availableBalance() {
+      // Calculate balance available for distribution (canister balance - total distributed)
+      // Convert BigInt values to Number for calculation
+      const balance = typeof this.tacoBalance === 'bigint' ? Number(this.tacoBalance) : Number(this.tacoBalance || 0)
+      const distributed = typeof this.totalDistributed === 'bigint' ? Number(this.totalDistributed) : Number(this.totalDistributed || 0)
+      return balance - distributed
     },
 
     nextDistributionTime() {
@@ -1135,6 +1160,26 @@ export default {
       }
     },
 
+    async loadTacoBalance() {
+      try {
+        const actor = await this.getRewardsActor()
+        const balance = await actor.getTacoBalance()
+        this.tacoBalance = balance
+      } catch (error) {
+        console.error('Error loading TACO balance:', error)
+        // Don't show error message to user for this non-critical data
+      }
+    },
+
+    setDefaultCustomTimes() {
+      const now = new Date()
+      const sevenDaysAgo = new Date(now.getTime() - (7 * 24 * 60 * 60 * 1000))
+      
+      // Format for datetime-local input (YYYY-MM-DDTHH:MM)
+      this.customEndTime = now.toISOString().slice(0, 16)
+      this.customStartTime = sevenDaysAgo.toISOString().slice(0, 16)
+    },
+
     formatPrincipal(principal) {
       try {
         const principalStr = typeof principal === 'string' ? principal : principal.toString()
@@ -1170,6 +1215,12 @@ export default {
         return '0.00'
       }
     }
+  },
+
+  async mounted() {
+    this.setDefaultCustomTimes()
+    await this.loadTotalDistributed()
+    await this.loadTacoBalance()
   }
 }
 </script>
