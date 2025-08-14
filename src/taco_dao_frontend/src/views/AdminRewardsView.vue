@@ -277,6 +277,15 @@ export default {
       this.rewardsActor = createRewardsActor(this.tacoStore.rewardsCanisterId())
       // Load token metadata
       await this.tacoStore.loadAllNames()
+      
+      // Check for neuron ID in URL parameters
+      if (this.$route.query.neuronId) {
+        this.neuronId = this.$route.query.neuronId
+        // Auto-calculate if we have a valid neuron ID
+        if (this.isValidInput) {
+          await this.calculatePerformance()
+        }
+      }
     } catch (error) {
       console.error('Failed to create rewards actor:', error)
       this.errorMessage = 'Failed to connect to rewards canister'

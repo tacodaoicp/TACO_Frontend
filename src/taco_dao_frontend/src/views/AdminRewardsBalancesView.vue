@@ -440,6 +440,30 @@ export default {
       }
     },
 
+    neuronIdToFullHex(neuronId) {
+      try {
+        // Convert neuron ID to full hex string (not truncated)
+        if (Array.isArray(neuronId)) {
+          // Convert byte array to hex string
+          return neuronId.map(b => b.toString(16).padStart(2, '0')).join('')
+        } else if (typeof neuronId === 'string') {
+          // If it's already a hex string, return as-is (remove any 0x prefix if present)
+          return neuronId.replace(/^0x/, '')
+        } else if (neuronId && neuronId._arr) {
+          // Handle Uint8Array format
+          return Array.from(neuronId._arr).map(b => b.toString(16).padStart(2, '0')).join('')
+        } else if (neuronId && typeof neuronId === 'object' && neuronId.constructor === Uint8Array) {
+          // Handle Uint8Array directly
+          return Array.from(neuronId).map(b => b.toString(16).padStart(2, '0')).join('')
+        }
+        
+        throw new Error('Unknown neuron ID format')
+      } catch (error) {
+        console.error('Error converting neuron ID to hex:', error, neuronId)
+        throw error
+      }
+    },
+
     getTotalRewards() {
       return this.balances.reduce((sum, balance) => sum + balance.balance, 0)
     },
@@ -493,9 +517,19 @@ export default {
     },
 
     viewNeuronDetails(neuronId) {
-      // TODO: Navigate to neuron details page or show modal
-      console.log('View details for neuron:', neuronId)
-      this.successMessage = 'Neuron details view - Coming soon!'
+      try {
+        // Convert neuron ID to full hex format for the rewards page
+        const fullHexId = this.neuronIdToFullHex(neuronId)
+        
+        // Navigate to the rewards page with the neuron ID parameter
+        this.$router.push({
+          path: '/admin/rewards',
+          query: { neuronId: fullHexId }
+        })
+      } catch (error) {
+        console.error('Error navigating to neuron details:', error)
+        this.errorMessage = 'Failed to navigate to neuron details'
+      }
     },
 
     async copyNeuronId(neuronId) {
