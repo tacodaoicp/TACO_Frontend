@@ -1137,10 +1137,10 @@ export const useTacoStore = defineStore('taco', () => {
 
         switch (process.env.DFX_NETWORK) {
             case "ic":
-                return process.env.CANISTER_ID_TREASURY_IC || 'cjkka-gyaaa-aaaan-qz5kq-cai';
+                return process.env.CANISTER_ID_REWARDS_IC || 'dkgdg-saaaa-aaaan-qz5ma-cai';
                 break;
             case "staging":
-                return  process.env.CANISTER_ID_TREASURY_STAGING || 'cjkka-gyaaa-aaaan-qz5kq-cai';
+                return  process.env.CANISTER_ID_REWARDS_STAGING || 'cjkka-gyaaa-aaaan-qz5kq-cai';
                 break;
         }        
         return 'cjkka-gyaaa-aaaan-qz5kq-cai'; // local canisterId
