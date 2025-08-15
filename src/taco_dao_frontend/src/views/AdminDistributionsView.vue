@@ -117,7 +117,7 @@
               <!-- Configuration Controls -->
               <div class="row">
                 <div class="col-md-6">
-                  <label for="rewardPot" class="form-label">Weekly Reward Pot:</label>
+                  <label for="rewardPot" class="form-label">Periodic Reward Pot:</label>
                   <div class="input-group">
                     <input 
                       id="rewardPot" 
@@ -157,6 +157,56 @@
                   </div>
                 </div>
               </div>
+              
+              <!-- Power Factor Controls -->
+              <div class="row mt-3">
+                <div class="col-md-6">
+                  <label for="performanceScorePower" class="form-label">Performance Score Power:</label>
+                  <div class="input-group">
+                    <input 
+                      id="performanceScorePower" 
+                      type="number" 
+                      class="form-control bg-dark text-white" 
+                      v-model.number="newPerformanceScorePower"
+                      step="0.1"
+                      min="0"
+                    />
+                    <button 
+                      class="btn btn-outline-primary" 
+                      @click="updatePerformanceScorePower"
+                      :disabled="isLoading"
+                    >
+                      Update
+                    </button>
+                  </div>
+                  <small class="text-muted">
+                    0 = no effect, 1 = linear, 2 = quadratic, etc.
+                  </small>
+                </div>
+                <div class="col-md-6">
+                  <label for="votingPowerPower" class="form-label">Voting Power Power:</label>
+                  <div class="input-group">
+                    <input 
+                      id="votingPowerPower" 
+                      type="number" 
+                      class="form-control bg-dark text-white" 
+                      v-model.number="newVotingPowerPower"
+                      step="0.1"
+                      min="0"
+                    />
+                    <button 
+                      class="btn btn-outline-primary" 
+                      @click="updateVotingPowerPower"
+                      :disabled="isLoading"
+                    >
+                      Update
+                    </button>
+                  </div>
+                  <small class="text-muted">
+                    0 = no effect, 1 = linear, 2 = quadratic, etc.
+                  </small>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -193,7 +243,7 @@
               <div class="row mt-3" v-if="configuration">
                 <div class="col-md-4">
                   <strong>Current Reward Pot:</strong><br>
-                  <span class="text-success">{{ configuration.weeklyRewardPot }} tokens</span>
+                  <span class="text-success">{{ configuration.periodicRewardPot }} tokens</span>
                 </div>
                 <div class="col-md-4">
                   <strong>Distribution Period:</strong><br>
@@ -533,6 +583,8 @@ export default {
       rewardSearchTerms: {},
       newRewardPot: 1000,
       newDistributionPeriod: 7,
+      newPerformanceScorePower: 1.0,
+      newVotingPowerPower: 1.0,
       timerRunning: false,
       customStartTime: '',
       customEndTime: '',
@@ -661,8 +713,10 @@ export default {
       try {
         const actor = await this.getRewardsActor()
         this.configuration = await actor.getConfiguration()
-        this.newRewardPot = this.configuration.weeklyRewardPot
+        this.newRewardPot = this.configuration.periodicRewardPot
         this.newDistributionPeriod = Math.round(Number(this.configuration.distributionPeriodNS) / (24 * 60 * 60 * 1_000_000_000))
+        this.newPerformanceScorePower = this.configuration.performanceScorePower
+        this.newVotingPowerPower = this.configuration.votingPowerPower
       } catch (error) {
         console.error('Error loading configuration:', error)
         throw error
@@ -761,7 +815,7 @@ export default {
       
       try {
         const actor = await this.getRewardsActor()
-        const result = await actor.setWeeklyRewardPot(this.newRewardPot)
+        const result = await actor.setPeriodicRewardPot(this.newRewardPot)
         
         if ('ok' in result) {
           this.successMessage = result.ok
@@ -795,6 +849,50 @@ export default {
       } catch (error) {
         console.error('Error updating distribution period:', error)
         this.errorMessage = 'Failed to update distribution period: ' + error.message
+      } finally {
+        this.isLoading = false
+      }
+    },
+
+    async updatePerformanceScorePower() {
+      this.clearMessages()
+      this.isLoading = true
+      
+      try {
+        const actor = await this.getRewardsActor()
+        const result = await actor.setPerformanceScorePower(this.newPerformanceScorePower)
+        
+        if ('ok' in result) {
+          this.successMessage = result.ok
+          await this.loadConfiguration()
+        } else {
+          this.errorMessage = this.formatError(result.err)
+        }
+      } catch (error) {
+        console.error('Error updating performance score power:', error)
+        this.errorMessage = 'Failed to update performance score power: ' + error.message
+      } finally {
+        this.isLoading = false
+      }
+    },
+
+    async updateVotingPowerPower() {
+      this.clearMessages()
+      this.isLoading = true
+      
+      try {
+        const actor = await this.getRewardsActor()
+        const result = await actor.setVotingPowerPower(this.newVotingPowerPower)
+        
+        if ('ok' in result) {
+          this.successMessage = result.ok
+          await this.loadConfiguration()
+        } else {
+          this.errorMessage = this.formatError(result.err)
+        }
+      } catch (error) {
+        console.error('Error updating voting power power:', error)
+        this.errorMessage = 'Failed to update voting power power: ' + error.message
       } finally {
         this.isLoading = false
       }
