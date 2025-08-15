@@ -1291,6 +1291,28 @@ export default {
       }
     },
 
+    startPeriodicUpdates() {
+      // Start periodic updates every 10 seconds for active distributions
+      if (this.refreshInterval) {
+        clearInterval(this.refreshInterval)
+      }
+      
+      this.refreshInterval = setInterval(async () => {
+        try {
+          // Only refresh status and history if there's an active distribution
+          if (this.distributionInProgress) {
+            await Promise.all([
+              this.loadDistributionStatus(),
+              this.loadDistributionHistory()
+            ])
+          }
+        } catch (error) {
+          console.error('Error in periodic update:', error)
+          // Don't show error to user for background updates
+        }
+      }, 10000) // Update every 10 seconds
+    },
+
     setDefaultCustomTimes() {
       const now = new Date()
       const sevenDaysAgo = new Date(now.getTime() - (7 * 24 * 60 * 60 * 1000))
