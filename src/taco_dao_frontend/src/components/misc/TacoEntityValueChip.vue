@@ -253,7 +253,6 @@
     import { ref, onMounted, onUnmounted, computed } from 'vue'
     import { useTacoStore } from "../../stores/taco.store"
     import { storeToRefs } from "pinia"
-    import { Principal } from '@dfinity/principal'
     import icpLogo from "../../assets/tokens/snspng/icp.png"
     import TacoCoinIcon from "../../assets/tokens/tacoCoinIcon.vue"
 

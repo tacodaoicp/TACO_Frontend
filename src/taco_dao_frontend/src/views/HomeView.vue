@@ -113,9 +113,9 @@
                 </h2>
 
                 <!-- tile container inner -->
-                <div class="home-view__tile__inner taco-container taco-container--l2">
+                <div class="home-view__tile__inner home-view__taco-token-chart taco-container taco-container--l2 p-0">
 
-                  chart
+                  <iframe style="border-radius: 0.5rem;" src="https://dexscreener.com/icp/vhoia-myaaa-aaaar-qbmja-cai?embed=1&loadChartSettings=0&trades=0&tabs=0&info=0&chartLeftToolbar=0&chartTheme=dark&theme=dark&chartStyle=1&chartType=usd&interval=15"></iframe>
 
                 </div>
 
@@ -161,9 +161,95 @@
                 </h2>
 
                 <!-- tile container inner -->
-                <div class="home-view__tile__inner taco-container taco-container--l2">
+                <div class="home-view__tile__inner taco-container taco-container--l2 p-0">
 
-                  chart
+                  <!-- taco assets -->
+                  <div class="home-view__taco-assets">
+
+                    <!-- kvp (treasury) -->
+                    <div class="home-view__taco-assets__kvp">
+
+                        <!-- key -->
+                        <span class="home-view__taco-assets__kvp__key 
+                            taco-text-black-to-white">
+                            <i class="fa-solid fa-building-columns home-view__taco-assets__fa-icon"></i>
+                            Treasury
+                        </span>
+
+                        <!-- value -->
+                        <span class="home-view__taco-assets__kvp__value 
+                            taco-text-black-to-white">${{formatNumber(totalTreasuryValueInUsd)}}</span>
+
+                    </div>               
+
+                    <!-- kvp (taco) -->
+                    <div class="home-view__taco-assets__kvp">
+
+                        <!-- key -->
+                        <span class="home-view__taco-assets__kvp__key 
+                            taco-text-black-to-white"
+                            style="padding-left: 0.5rem">
+                            <TacoCoinIcon class="home-view__taco-assets__svg"/>
+                            Taco
+                        </span>
+
+                        <!-- value -->
+                        <span class="home-view__taco-assets__kvp__value 
+                            taco-text-black-to-white">${{formatNumber(snsTreasuryTacoValueInUsd)}}</span>
+
+                    </div>
+
+                    <!-- kvp (icp) -->
+                    <div class="home-view__taco-assets__kvp">
+
+                        <!-- key -->
+                        <span class="home-view__taco-assets__kvp__key 
+                            taco-text-black-to-white"
+                            style="padding-left: 0.5rem">
+                            <img :src="icpLogo" class="home-view__taco-assets__svg"/>
+                            ICP
+                        </span>
+
+                        <!-- value -->
+                        <span class="home-view__taco-assets__kvp__value 
+                            taco-text-black-to-white">${{formatNumber(snsTreasuryIcpValueInUsd)}}</span>
+
+                    </div>        
+                    
+                    <hr class="m-0 p-0"></hr>
+
+                    <!-- kvp (portfolio) -->
+                    <div class="home-view__taco-assets__kvp">
+
+                        <!-- key -->
+                        <span class="home-view__taco-assets__kvp__key 
+                            taco-text-black-to-white">
+                            <i class="fa-solid fa-chart-pie  home-view__taco-assets__fa-icon"></i>
+                            Portfolio
+                        </span>
+
+                        <!-- value -->
+                        <span class="home-view__taco-assets__kvp__value 
+                            taco-text-black-to-white">${{formatNumber(totalPortfolioValueInUsd)}}</span>
+
+                    </div>
+
+                    <hr class="m-0 p-0"></hr>
+
+                    <!-- kvp (total) -->
+                    <div class="home-view__taco-assets__kvp">
+
+                        <!-- key -->
+                        <span class="home-view__taco-assets__kvp__key 
+                            taco-text-black-to-white">Total</span>
+
+                        <!-- value -->
+                        <span class="home-view__taco-assets__kvp__value 
+                            taco-text-black-to-white">${{formatNumber(totalTreasuryValueInUsd + totalPortfolioValueInUsd)}}</span>
+
+                    </div>
+
+                  </div>
 
                 </div>
                 
@@ -536,10 +622,10 @@
         <!-- footer bar -->
         <FooterBar style="width: 100%;" />
 
-        <!-- taco dao background taco -->
-        <img :src="TacoDaoTacoSimple" 
+        <!-- upper taco dao background taco -->
+        <img :src="TacoDaoTaco" 
               alt="placeholder" 
-              class="home-view__background-taco">        
+              class="home-view__upper-background-taco"> 
         
       </div>
       
@@ -928,7 +1014,12 @@
   &__cta {
     color: var(--brown-to-white);
     margin-top: 5rem;
+    padding: 3rem 0;
     z-index: 2;
+    background-image: url("../assets/images/tacoDaoTacoTranslucent.svg");
+    background-repeat: no-repeat;
+    background-position: center;
+    background-size: 100% 100%;
 
     * {
       font-family: "Rubik";
@@ -975,7 +1066,7 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    margin: 6rem 0 2rem;
+    margin: 4rem 0 2rem;
     gap: 0.25rem;
     z-index: 2;
     text-decoration: none;
@@ -997,7 +1088,7 @@
     }
   }
 
-  &__background-taco {
+  &__upper-background-taco {
     position: absolute;
     top: -6.5rem;
     width: 1120px;
@@ -1007,6 +1098,72 @@
     z-index: 0;
     pointer-events: none;
     user-select: none;
+  }
+
+  &__taco-token-chart {
+    zoom: 0.5;
+  }
+
+  &__taco-assets {
+    padding: 0.5rem 0 0.375rem 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-around;
+    gap: 0;
+    aspect-ratio: 16 / 9;
+
+    hr {
+        border-top: 1px solid var(--dark-orange) !important;
+        opacity: 1;
+        border: none;
+        height: 1px;
+      }    
+
+    // token icon
+    &__svg {
+      width: 1.25rem;
+    }
+
+    // fa icon
+    &__fa-icon {
+      font-size: 1.125rem;
+    }
+
+    // price
+    span {
+      white-space: nowrap;
+      line-height: 1;
+      font-size: 1rem;
+      font-family: 'rubik';
+      font-weight: bold;
+    }
+
+    // kvp
+    &__kvp {
+      display: flex;
+      justify-content: space-between;
+      gap: 0.625rem;
+      padding: 0 1.125rem 0;
+
+      // key
+      &__key {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-size: 0.875rem;
+        font-weight: 500;
+      }
+
+      // value
+      &__value {
+        text-align: right;
+        font-size: 0.875rem;
+        font-family: 'rubik';
+        font-weight: 700;        
+      }
+
+    }
+
   }
 
   .floating-tacos {
@@ -1298,7 +1455,7 @@
     font-size: 1.25rem;
   }
   .home-view__powered-by {
-    margin: 5rem 0 1.5rem;
+    margin: 3rem 0 1.5rem;
   }  
 }
 
@@ -1421,7 +1578,19 @@
     font-size: 1.25rem;
   }
   .home-view__powered-by {
-    margin: 4rem 0 2rem;
+    margin: 3rem 0 2rem;
+  }  
+  .taco-token-chart {
+    zoom: 0.4 !important;
+  }  
+  .home-view__taco-assets span {
+    font-size: 0.75rem;
+  }  
+  .home-view__taco-assets__fa-icon {
+    font-size: 1rem;
+  }
+  .home-view__taco-assets__svg {
+    width: 1rem;
   }  
 }
 
@@ -1523,8 +1692,20 @@
     font-size: 1.5rem;
   }
   .home-view__powered-by {
-    margin: 5rem 0 2rem;
+    margin: 3rem 0 2rem;
   }
+  .taco-token-chart {
+    zoom: 0.4 !important;
+  }
+  .home-view__taco-assets span {
+    font-size: 0.75rem;
+  }  
+  .home-view__taco-assets__fa-icon {
+    font-size: 1rem;
+  }
+  .home-view__taco-assets__svg {
+    width: 1rem;
+  }  
 }
 
 // small daktop
@@ -1583,6 +1764,15 @@
   .home-view__cta__bottom span {
     font-size: 1.75rem;
   }
+  .home-view__taco-assets span {
+    font-size: 0.875rem;
+  }
+  .home-view__taco-assets__fa-icon {
+    font-size: 1rem;
+  }
+  .home-view__taco-assets__svg {
+    width: 1rem;
+  }
 }
 
 // medium desktop
@@ -1625,19 +1815,34 @@
   import { ref, onMounted, computed, onUnmounted } from "vue";
   import HeaderBar from "../components/HeaderBar.vue";
   import FooterBar from "../components/FooterBar.vue";
+  import { useTacoStore } from "../stores/taco.store"
+  import { storeToRefs } from "pinia"  
   import TacoCoinIcon from "../assets/tokens/tacoCoinIcon.vue"
   import TacoDaoLogo from "../assets/images/tacoDaoLogo.vue"
   import TacoChefWave from '../assets/images/chef/chef-wave.png'
   import TacoChefTaco from '../assets/images/chef/chef-taco.png'
   import TacoChefFriends from '../assets/images/chef/chef-friends.png'
   import TacoChefRead from '../assets/images/chef/chef-read.png'
-  import TacoDaoTacoSimple from '../assets/images/tacoDaoTacoSimple.svg'
+  import TacoDaoTaco from '../assets/images/tacoDaoTaco.svg'
   import icpSwapLogo from '../assets/images/exchanges/icpswap-logo.svg'
-  import icpSwapText from '../assets/images/exchanges/icpswap-text.svg'
   import kongSwapLogo from '../assets/images/exchanges/kongswap-logo.svg'
-  import kongSwapText from '../assets/images/exchanges/kongswap-text.svg'
   import swapRunnerLogo from '../assets/images/exchanges/swaprunner-logo.svg'
-  import swapRunnerText from '../assets/images/exchanges/swaprunner-text.svg'
+  import icpLogo from "../assets/tokens/snspng/icp.png"
+
+  ///////////
+  // Store //
+  ///////////
+
+  // # SETUP #
+  const tacoStore = useTacoStore()
+
+  // # ACTIONS #
+  const { fetchTokenDetails, fetchTotalTreasuryValueInUsd } = tacoStore
+
+  // # STATE #
+
+  // dao
+  const { totalPortfolioValueInUsd, totalTreasuryValueInUsd, snsTreasuryTacoValueInUsd, snsTreasuryIcpValueInUsd } = storeToRefs(tacoStore)  
 
   /////////////////////
   // Local Variables //
@@ -1649,6 +1854,9 @@
   ///////////////////
   // Local Methods //
   ///////////////////
+
+  //////////////
+  // handlers //
 
   // handle intersection changes
   const handleIntersection = (entries: IntersectionObserverEntry[]) => {
@@ -1765,6 +1973,25 @@
 
   })
 
+  // format number
+  const formatNumber = computed(() => {
+    return (num) => {
+      if (typeof num !== 'number') {
+        return num
+      }
+      if (num >= 10000000) {
+        return '10m+'
+      }
+      if (num >= 1000) {
+        return new Intl.NumberFormat('en-US', {
+            notation: 'compact',
+            compactDisplay: 'short'
+        }).format(num).toLowerCase();
+      }
+      return num.toFixed(2)
+    }
+  })  
+
   ///////////////////
   // Local Methods //
   ///////////////////
@@ -1779,7 +2006,7 @@
   /////////////////////
 
   // on mounted
-  onMounted(() => {
+  onMounted(async () => {
     
     // log
     // console.log('homepage mounted')
@@ -1813,6 +2040,12 @@
       console.error('Could not find below the fold')
 
     }
+
+    // fetch token details from dao backend
+    await fetchTokenDetails()
+
+    // fetch total treasury value in usd
+    await fetchTotalTreasuryValueInUsd()    
     
   })
 
