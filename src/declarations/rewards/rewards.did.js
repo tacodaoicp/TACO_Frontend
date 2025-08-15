@@ -159,7 +159,9 @@ export const idlFactory = ({ IDL }) => {
             'maxDistributionHistory' : IDL.Nat,
             'periodicRewardPot' : IDL.Nat,
             'performanceScorePower' : IDL.Float64,
+            'nextScheduledDistribution' : IDL.Opt(IDL.Int),
             'votingPowerPower' : IDL.Float64,
+            'timerRunning' : IDL.Bool,
           }),
         ],
         ['query'],
@@ -201,6 +203,7 @@ export const idlFactory = ({ IDL }) => {
     'setPeriodicRewardPot' : IDL.Func([IDL.Nat], [Result__1], []),
     'setVotingPowerPower' : IDL.Func([IDL.Float64], [Result__1], []),
     'startDistributionTimer' : IDL.Func([], [Result__1], []),
+    'startDistributionTimerAt' : IDL.Func([IDL.Int], [Result__1], []),
     'stopDistributionTimer' : IDL.Func([], [Result__1], []),
     'triggerDistribution' : IDL.Func([], [Result__1], []),
     'triggerDistributionCustom' : IDL.Func(

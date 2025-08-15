@@ -125,7 +125,9 @@ export interface Rewards {
       'maxDistributionHistory' : bigint,
       'periodicRewardPot' : bigint,
       'performanceScorePower' : number,
+      'nextScheduledDistribution' : [] | [bigint],
       'votingPowerPower' : number,
+      'timerRunning' : boolean,
     }
   >,
   'getCurrentDistributionStatus' : ActorMethod<
@@ -156,6 +158,7 @@ export interface Rewards {
   'setPeriodicRewardPot' : ActorMethod<[bigint], Result__1>,
   'setVotingPowerPower' : ActorMethod<[number], Result__1>,
   'startDistributionTimer' : ActorMethod<[], Result__1>,
+  'startDistributionTimerAt' : ActorMethod<[bigint], Result__1>,
   'stopDistributionTimer' : ActorMethod<[], Result__1>,
   'triggerDistribution' : ActorMethod<[], Result__1>,
   'triggerDistributionCustom' : ActorMethod<

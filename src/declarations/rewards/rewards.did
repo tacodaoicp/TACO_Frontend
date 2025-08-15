@@ -55,8 +55,10 @@ type Rewards =
        distributionEnabled: bool;
        distributionPeriodNS: nat;
        maxDistributionHistory: nat;
+       nextScheduledDistribution: opt int;
        performanceScorePower: float64;
        periodicRewardPot: nat;
+       timerRunning: bool;
        votingPowerPower: float64;
      }) query;
    getCurrentDistributionStatus: () ->
@@ -83,6 +85,7 @@ type Rewards =
    setPeriodicRewardPot: (amount: nat) -> (Result__1);
    setVotingPowerPower: (power: float64) -> (Result__1);
    startDistributionTimer: () -> (Result__1);
+   startDistributionTimerAt: (targetTime: int) -> (Result__1);
    stopDistributionTimer: () -> (Result__1);
    triggerDistribution: () -> (Result__1);
    triggerDistributionCustom: (startTime: int, endTime: int, priceType:

@@ -232,7 +232,7 @@
                 <div class="col-md-3">
                   <strong>Next Scheduled:</strong><br>
                   <span class="text-info">
-                    {{ formatTimestamp(nextDistributionTime) }}
+                    {{ configuration?.nextScheduledDistribution ? formatTimestamp(Number(configuration.nextScheduledDistribution)) : 'Not scheduled' }}
                   </span>
                 </div>
                 <div class="col-md-3">
@@ -251,8 +251,8 @@
                 </div>
                 <div class="col-md-4">
                   <strong>Auto Timer:</strong><br>
-                  <span :class="distributionStatus?.distributionEnabled ? 'text-success' : 'text-warning'">
-                    {{ distributionStatus?.distributionEnabled ? '✅ Enabled' : '⚠️ Disabled' }}
+                  <span :class="configuration?.timerRunning ? 'text-success' : 'text-warning'">
+                    {{ configuration?.timerRunning ? '✅ Running' : '⚠️ Stopped' }}
                   </span>
                 </div>
               </div>
