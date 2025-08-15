@@ -3,17 +3,6 @@ import type { ActorMethod } from '@dfinity/agent';
 import type { IDL } from '@dfinity/candid';
 
 export interface Allocation { 'token' : Principal, 'basisPoints' : bigint }
-export interface AllocationChangeBlockData {
-  'id' : bigint,
-  'maker' : Principal,
-  'oldAllocations' : Array<Allocation>,
-  'changeType' : AllocationChangeType,
-  'votingPower' : bigint,
-  'newAllocations' : Array<Allocation>,
-  'user' : Principal,
-  'timestamp' : bigint,
-  'reason' : [] | [string],
-}
 export type AllocationChangeType = {
     'FollowAction' : { 'followedUser' : Principal }
   } |
@@ -41,33 +30,41 @@ export interface ArchivedBlock {
 }
 export interface Block { 'id' : bigint, 'block' : Value }
 export interface BlockType { 'url' : string, 'block_type' : string }
-export interface DAOAllocationArchive {
-  'archiveAllocationChange' : ActorMethod<
-    [AllocationChangeBlockData],
-    Result_4
-  >,
-  'archiveFollowAction' : ActorMethod<[FollowActionBlockData], Result_4>,
-  'getAllocationChangesByToken' : ActorMethod<[Principal, bigint], Result_3>,
-  'getAllocationChangesByUser' : ActorMethod<[Principal, bigint], Result_3>,
-  'getAllocationChangesByUserInTimeRange' : ActorMethod<
-    [Principal, bigint, bigint],
-    Result_3
+export interface DAONeuronAllocationArchive {
+  'archiveNeuronAllocationChange' : ActorMethod<
+    [NeuronAllocationChangeBlockData],
+    Result_5
   >,
   'getArchiveStats' : ActorMethod<[], ArchiveStatus>,
-  'getArchiveStatus' : ActorMethod<[], Result_2>,
+  'getArchiveStatus' : ActorMethod<[], Result_4>,
   'getBatchImportStatus' : ActorMethod<
     [],
     { 'intervalSeconds' : bigint, 'isRunning' : boolean }
   >,
-  'getFollowActionsByUser' : ActorMethod<[Principal, bigint], Result_1>,
+  'getDetailedArchiveStats' : ActorMethod<[], Result_3>,
   'getLogs' : ActorMethod<[bigint], Array<LogEntry>>,
+  'getNeuronAllocationChangesByMaker' : ActorMethod<
+    [Principal, bigint],
+    Result_2
+  >,
+  'getNeuronAllocationChangesByNeuron' : ActorMethod<
+    [Uint8Array | number[], bigint],
+    Result_2
+  >,
+  'getNeuronAllocationChangesByNeuronInTimeRange' : ActorMethod<
+    [Uint8Array | number[], bigint, bigint, bigint],
+    Result_2
+  >,
+  'getNeuronAllocationChangesWithContext' : ActorMethod<
+    [Uint8Array | number[], bigint, bigint, bigint],
+    Result_1
+  >,
   'getTimerStatus' : ActorMethod<[], TimerStatus>,
   'icrc3_get_archives' : ActorMethod<[GetArchivesArgs], GetArchivesResult>,
   'icrc3_get_blocks' : ActorMethod<[GetBlocksArgs], GetBlocksResult>,
   'icrc3_get_tip_certificate' : ActorMethod<[], [] | [DataCertificate]>,
   'icrc3_supported_block_types' : ActorMethod<[], Array<BlockType>>,
-  'importAllocationChanges' : ActorMethod<[], Result>,
-  'importFollowActions' : ActorMethod<[], Result>,
+  'importNeuronAllocationChanges' : ActorMethod<[], Result>,
   'resetImportTimestamps' : ActorMethod<[], Result>,
   'runManualBatchImport' : ActorMethod<[], Result>,
   'setMaxInnerLoopIterations' : ActorMethod<[bigint], Result>,
@@ -79,17 +76,6 @@ export interface DataCertificate {
   'certificate' : Uint8Array | number[],
   'hash_tree' : Uint8Array | number[],
 }
-export interface FollowActionBlockData {
-  'id' : bigint,
-  'previousFollowCount' : bigint,
-  'action' : FollowActionType,
-  'followed' : Principal,
-  'follower' : Principal,
-  'timestamp' : bigint,
-  'newFollowCount' : bigint,
-}
-export type FollowActionType = { 'Follow' : null } |
-  { 'Unfollow' : null };
 export interface GetArchivesArgs { 'from' : [] | [Principal] }
 export type GetArchivesResult = Array<
   { 'end' : bigint, 'canister_id' : Principal, 'start' : bigint }
@@ -110,15 +96,40 @@ export interface LogEntry {
 export type LogLevel = { 'INFO' : null } |
   { 'WARN' : null } |
   { 'ERROR' : null };
+export interface NeuronAllocationChangeBlockData {
+  'id' : bigint,
+  'maker' : Principal,
+  'oldAllocations' : Array<Allocation>,
+  'changeType' : AllocationChangeType,
+  'votingPower' : bigint,
+  'newAllocations' : Array<Allocation>,
+  'timestamp' : bigint,
+  'neuronId' : Uint8Array | number[],
+  'reason' : [] | [string],
+}
 export type Result = { 'ok' : string } |
   { 'err' : string };
-export type Result_1 = { 'ok' : Array<FollowActionBlockData> } |
+export type Result_1 = {
+    'ok' : {
+      'preTimespanAllocation' : [] | [NeuronAllocationChangeBlockData],
+      'inTimespanChanges' : Array<NeuronAllocationChangeBlockData>,
+    }
+  } |
   { 'err' : ArchiveError };
-export type Result_2 = { 'ok' : ArchiveStatus } |
+export type Result_2 = { 'ok' : Array<NeuronAllocationChangeBlockData> } |
   { 'err' : ArchiveError };
-export type Result_3 = { 'ok' : Array<AllocationChangeBlockData> } |
+export type Result_3 = {
+    'ok' : {
+      'totalBlocks' : bigint,
+      'totalNeuronAllocationChanges' : bigint,
+      'makerCount' : bigint,
+      'neuronCount' : bigint,
+    }
+  } |
   { 'err' : ArchiveError };
-export type Result_4 = { 'ok' : bigint } |
+export type Result_4 = { 'ok' : ArchiveStatus } |
+  { 'err' : ArchiveError };
+export type Result_5 = { 'ok' : bigint } |
   { 'err' : ArchiveError };
 export interface TimerStatus {
   'innerLoopRunning' : boolean,
@@ -145,6 +156,6 @@ export type Value = { 'Int' : bigint } |
   { 'Blob' : Uint8Array | number[] } |
   { 'Text' : string } |
   { 'Array' : Array<Value> };
-export interface _SERVICE extends DAOAllocationArchive {}
+export interface _SERVICE extends DAONeuronAllocationArchive {}
 export declare const idlFactory: IDL.InterfaceFactory;
 export declare const init: (args: { IDL: typeof IDL }) => IDL.Type[];

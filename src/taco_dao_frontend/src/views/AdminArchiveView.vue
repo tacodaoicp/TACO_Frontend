@@ -28,6 +28,7 @@
                     <option value="price_archive">💰 Price Archive</option>
                     <option value="dao_admin_archive">🔑 DAO Admin Archive</option>
                     <option value="dao_allocation_archive">📊 DAO Allocation Archive</option>
+                    <option value="dao_neuron_allocation_archive">🧠 DAO Neuron Allocation Archive</option>
                     <option value="dao_governance_archive">🗳️ DAO Governance Archive</option>
                   </select>
                 </div>
@@ -208,6 +209,19 @@
                         :disabled="loading"
                       >
                         👥 Import Follow Actions
+                      </button>
+                    </div>
+                  </div>
+                  
+                  <div v-if="selectedArchive === 'dao_neuron_allocation_archive'" class="mt-3">
+                    <h6>DAO Neuron Allocation Archive</h6>
+                    <div class="d-flex flex-wrap gap-2">
+                      <button 
+                        class="btn btn-sm btn-outline-success" 
+                        @click="runArchiveSpecificImport('importNeuronAllocationChanges')"
+                        :disabled="loading"
+                      >
+                        🧠 Import Neuron Allocations
                       </button>
                     </div>
                   </div>
@@ -527,6 +541,7 @@ import { createActor as createPortfolioActor } from '../../../declarations/portf
 import { createActor as createPriceActor } from '../../../declarations/price_archive'
 import { createActor as createDaoAdminActor } from '../../../declarations/dao_admin_archive'
 import { createActor as createDaoAllocationActor } from '../../../declarations/dao_allocation_archive'
+import { createActor as createDaoNeuronAllocationActor } from '../../../declarations/dao_neuron_allocation_archive'
 import { createActor as createDaoGovernanceActor } from '../../../declarations/dao_governance_archive'
 
 export default {
@@ -555,6 +570,7 @@ export default {
       priceActor: null,
       daoAdminActor: null,
       daoAllocationActor: null,
+      daoNeuronAllocationActor: null,
       daoGovernanceActor: null,
       
       // Refresh interval
@@ -592,6 +608,7 @@ export default {
         case 'price_archive': return this.priceActor
         case 'dao_admin_archive': return this.daoAdminActor
         case 'dao_allocation_archive': return this.daoAllocationActor
+        case 'dao_neuron_allocation_archive': return this.daoNeuronAllocationActor
         case 'dao_governance_archive': return this.daoGovernanceActor
         default: return this.tradingActor
       }
@@ -689,6 +706,16 @@ export default {
       return 'bq2l2-mqaaa-aaaan-qz5da-cai'; // fallback to staging canisterId for local
     },
 
+    daoNeuronAllocationArchiveCanisterId() {
+      switch (process.env.DFX_NETWORK) {
+        case "ic":
+          return process.env.CANISTER_ID_DAO_NEURON_ALLOCATION_ARCHIVE_IC || 'cajb4-qqaaa-aaaan-qz5la-cai';
+        case "staging":
+          return process.env.CANISTER_ID_DAO_NEURON_ALLOCATION_ARCHIVE_STAGING || 'cajb4-qqaaa-aaaan-qz5la-cai';
+      }
+      return 'cajb4-qqaaa-aaaan-qz5la-cai'; // fallback for local
+    },
+
     daoGovernanceArchiveCanisterId() {
       switch (process.env.DFX_NETWORK) {
         case "ic":
@@ -731,6 +758,7 @@ export default {
         this.priceActor = createPriceActor(this.priceArchiveCanisterId(), { agent })
         this.daoAdminActor = createDaoAdminActor(this.daoAdminArchiveCanisterId(), { agent })
         this.daoAllocationActor = createDaoAllocationActor(this.daoAllocationArchiveCanisterId(), { agent })
+        this.daoNeuronAllocationActor = createDaoNeuronAllocationActor(this.daoNeuronAllocationArchiveCanisterId(), { agent })
         this.daoGovernanceActor = createDaoGovernanceActor(this.daoGovernanceArchiveCanisterId(), { agent })
         
         //console.log('Archive actors created with identity:', identity.getPrincipal().toString())
@@ -1026,6 +1054,7 @@ export default {
         case 'price_archive': return 'bg-warning'
         case 'dao_admin_archive': return 'bg-primary'
         case 'dao_allocation_archive': return 'bg-info'
+        case 'dao_neuron_allocation_archive': return 'bg-success'
         case 'dao_governance_archive': return 'bg-secondary'
         default: return 'bg-secondary'
       }
@@ -1051,6 +1080,9 @@ export default {
         case 'dao_allocation_archive':
           // DAO allocation archive status - shows allocation and follow actions
           return 'Allocation Archive - User allocation changes and follow relationships'
+        case 'dao_neuron_allocation_archive':
+          // DAO neuron allocation archive status - shows neuron-level allocation changes
+          return 'Neuron Allocation Archive - Neuron-level allocation changes for rewards tracking'
         case 'dao_governance_archive':
           // DAO governance archive status - shows voting power and neuron updates
           return 'Governance Archive - Voting power changes and neuron updates'
@@ -1992,6 +2024,160 @@ export default {
         `
       }
 
+      // Neuron allocation change block details
+      if ((parsedData.tx && parsedData.tx.operation === '3neuron_allocation_change') || tradeData.operation === '3neuron_allocation_change') {
+        //console.log('=== Processing neuron allocation change block ===', tradeData)
+        
+        // Extract neuron allocation data from the nested structure
+        let neuronAllocationData = tradeData
+        if (parsedData.tx && parsedData.tx.data) {
+          neuronAllocationData = parsedData.tx.data
+        }
+        
+        // Extract basic information
+        let neuronId = 'Unknown'
+        
+        // Use the global neuron naming utility method
+        neuronId = neuronAllocationData.neuronId ? this.formatNeuronFromBlob(neuronAllocationData.neuronId) : 'Unknown'
+        const userPrincipal = Principal.fromUint8Array(new Uint8Array(neuronAllocationData.user)).toText()
+        const userDisplayName = this.formatPrincipalFromBlob(neuronAllocationData.user)
+        const changeType = neuronAllocationData.changeType?.type || 'Unknown'
+        const userInitiated = neuronAllocationData.changeType?.userInitiated === 1n || neuronAllocationData.changeType?.userInitiated === '1'
+        const reason = neuronAllocationData.reason || 'No reason provided'
+        const timestamp = neuronAllocationData.timestamp || Date.now()
+        const formattedTime = this.formatTime(Number(timestamp))
+        const votingPower = Number(neuronAllocationData.votingPower || 0)
+        
+        // Format voting power with commas
+        const formatVotingPower = (vp) => {
+          return (vp / 100000000).toLocaleString(undefined, { 
+            minimumFractionDigits: 2, 
+            maximumFractionDigits: 2 
+          }) + ' VP'
+        }
+        
+        // Format old allocations
+        let oldAllocationsHtml = '<em class="text-muted">None</em>'
+        if (neuronAllocationData.oldAllocations && neuronAllocationData.oldAllocations.length > 0) {
+          oldAllocationsHtml = neuronAllocationData.oldAllocations.map(allocation => {
+            const tokenName = this.formatTokenNameFromBlob(allocation.token)
+            const percentage = (Number(allocation.basisPoints) / 100).toFixed(2)
+            return `<span class="badge bg-secondary me-1 mb-1">${tokenName}: ${percentage}%</span>`
+          }).join('')
+        }
+        
+        // Format new allocations
+        let newAllocationsHtml = '<em class="text-muted">None</em>'
+        if (neuronAllocationData.newAllocations && neuronAllocationData.newAllocations.length > 0) {
+          newAllocationsHtml = neuronAllocationData.newAllocations.map(allocation => {
+            const tokenName = this.formatTokenNameFromBlob(allocation.token)
+            const percentage = (Number(allocation.basisPoints) / 100).toFixed(2)
+            return `<span class="badge bg-success me-1 mb-1">${tokenName}: ${percentage}%</span>`
+          }).join('')
+        }
+        
+        // Calculate total percentages
+        const oldTotal = neuronAllocationData.oldAllocations ? 
+          (neuronAllocationData.oldAllocations.reduce((sum, a) => sum + Number(a.basisPoints), 0) / 100).toFixed(2) : '0.00'
+        const newTotal = neuronAllocationData.newAllocations ? 
+          (neuronAllocationData.newAllocations.reduce((sum, a) => sum + Number(a.basisPoints), 0) / 100).toFixed(2) : '0.00'
+        
+        // Calculate allocation changes
+        const allocationChanges = []
+        if (neuronAllocationData.oldAllocations && neuronAllocationData.newAllocations) {
+          // Create a map of old allocations by token
+          const oldMap = new Map()
+          neuronAllocationData.oldAllocations.forEach(alloc => {
+            const tokenKey = this.formatTokenNameFromBlob(alloc.token)
+            oldMap.set(tokenKey, Number(alloc.basisPoints))
+          })
+          
+          // Calculate changes
+          neuronAllocationData.newAllocations.forEach(newAlloc => {
+            const tokenName = this.formatTokenNameFromBlob(newAlloc.token)
+            const newBP = Number(newAlloc.basisPoints)
+            const oldBP = oldMap.get(tokenName) || 0
+            const change = newBP - oldBP
+            const changePercent = (change / 100).toFixed(2)
+            
+            if (Math.abs(change) > 0) {
+              const changeClass = change > 0 ? 'text-success' : 'text-danger'
+              const changeIcon = change > 0 ? '📈' : '📉'
+              allocationChanges.push(`<div class="mb-1"><span class="badge bg-info">${tokenName}</span> <span class="${changeClass}">${changeIcon} ${changePercent}%</span></div>`)
+            }
+          })
+        }
+        
+        const changesHtml = allocationChanges.length > 0 ? allocationChanges.join('') : '<em class="text-muted">No changes detected</em>'
+        
+        return `
+          <div class="card bg-dark border-primary">
+            <div class="card-header bg-primary text-white">
+              <h6 class="mb-0">🧠 Neuron Allocation Change</h6>
+            </div>
+            <div class="card-body">
+              <div class="row">
+                <div class="col-md-6">
+                  <h6 class="text-light">🔧 Change Details</h6>
+                  <table class="table table-sm table-dark table-borderless">
+                    <tr>
+                      <td><strong>Neuron ID:</strong></td>
+                      <td><code class="text-primary">${neuronId}</code></td>
+                    </tr>
+                    <tr>
+                      <td><strong>User:</strong></td>
+                      <td><code class="text-info">${userDisplayName}</code></td>
+                    </tr>
+                    <tr>
+                      <td><strong>Change Type:</strong></td>
+                      <td><span class="badge ${userInitiated ? 'bg-success' : 'bg-warning text-dark'}">${changeType}</span></td>
+                    </tr>
+                    <tr>
+                      <td><strong>Initiated By:</strong></td>
+                      <td>${userInitiated ? '👤 User' : '🤖 System'}</td>
+                    </tr>
+                    <tr>
+                      <td><strong>Voting Power:</strong></td>
+                      <td><strong class="text-warning">${formatVotingPower(votingPower)}</strong></td>
+                    </tr>
+                    <tr>
+                      <td><strong>Timestamp:</strong></td>
+                      <td><span class="text-info">🕐 ${formattedTime}</span></td>
+                    </tr>
+                  </table>
+                </div>
+                <div class="col-md-6">
+                  <h6 class="text-light">📊 Allocation Changes</h6>
+                  <div class="mb-3">
+                    <strong class="text-light">Previous Allocations:</strong><br>
+                    <div class="mt-1">${oldAllocationsHtml}</div>
+                    <small class="text-muted">Total: ${oldTotal}%</small>
+                  </div>
+                  <div class="mb-3">
+                    <strong class="text-light">New Allocations:</strong><br>
+                    <div class="mt-1">${newAllocationsHtml}</div>
+                    <small class="text-muted">Total: ${newTotal}%</small>
+                  </div>
+                  <div>
+                    <strong class="text-light">Changes:</strong><br>
+                    <div class="mt-1">${changesHtml}</div>
+                  </div>
+                </div>
+              </div>
+              ${reason && reason !== 'No reason provided' && reason.trim() !== '' ? `
+                <div class="row mt-3">
+                  <div class="col-12">
+                    <div class="alert alert-info">
+                      <strong>Reason:</strong> ${reason}
+                    </div>
+                  </div>
+                </div>
+              ` : ''}
+            </div>
+          </div>
+        `
+      }
+
       // Generic block
       const keys = Object.keys(parsedData)
       return `
@@ -2037,6 +2223,7 @@ export default {
       // Check for operation field (for DAO archive blocks)
       if (parsedData.tx && parsedData.tx.operation) {
         if (parsedData.tx.operation === '3allocation_change') return 'Allocation Change'
+        if (parsedData.tx.operation === '3neuron_allocation_change') return 'Neuron Allocation Change'
         if (parsedData.tx.operation === '3voting_power') return 'Voting Power Change'
         if (parsedData.tx.operation === '3neuron_update') return 'Neuron Update'
         if (parsedData.tx.operation === '3admin') return 'Admin Action'
@@ -2059,6 +2246,10 @@ export default {
         return 'Price'
       }
       if (blockTypeData.user && (blockTypeData.oldAllocations || blockTypeData.newAllocations)) {
+        // Check if it's a neuron allocation change by looking for neuronId
+        if (blockTypeData.neuronId) {
+          return 'Neuron Allocation Change'
+        }
         return 'Allocation Change'
       }
       
@@ -2259,6 +2450,42 @@ export default {
         
         const initiator = userInitiated ? '👤' : '🤖'
         return `📊 ${initiator} ${changeType}: ${userShort} changed ${oldCount}→${newCount} allocations (${newTotal}% total) • 🕐 ${formattedTime}`
+      }
+      
+      // Neuron allocation change block
+      if ((parsedData.tx && parsedData.tx.operation === '3neuron_allocation_change') || tradeData.operation === '3neuron_allocation_change') {
+        // Extract neuron allocation data from the nested structure
+        let neuronAllocationData = tradeData
+        if (parsedData.tx && parsedData.tx.data) {
+          neuronAllocationData = parsedData.tx.data
+        }
+        
+        // Use the global neuron naming utility method
+        let neuronId = neuronAllocationData.neuronId ? this.formatNeuronFromBlob(neuronAllocationData.neuronId) : 'Unknown'
+        const neuronShort = neuronId.length > 12 ? neuronId.substring(0, 6) + '...' + neuronId.substring(neuronId.length - 6) : neuronId
+        const userId = this.formatPrincipalFromBlob(neuronAllocationData.user)
+        const userShort = userId ? userId.substring(0, 8) + '...' : 'Unknown'
+        const changeType = neuronAllocationData.changeType?.type || 'Unknown'
+        const userInitiated = neuronAllocationData.changeType?.userInitiated === 1n || neuronAllocationData.changeType?.userInitiated === '1'
+        
+        // Count allocations
+        const oldCount = neuronAllocationData.oldAllocations ? neuronAllocationData.oldAllocations.length : 0
+        const newCount = neuronAllocationData.newAllocations ? neuronAllocationData.newAllocations.length : 0
+        
+        // Calculate total percentages
+        const newTotal = neuronAllocationData.newAllocations ? 
+          (neuronAllocationData.newAllocations.reduce((sum, a) => sum + Number(a.basisPoints), 0) / 100).toFixed(1) : '0.0'
+        
+        // Format voting power
+        const votingPower = Number(neuronAllocationData.votingPower || 0)
+        const formattedVP = (votingPower / 100000000).toLocaleString(undefined, { maximumFractionDigits: 2 })
+        
+        // Extract timestamp
+        const timestamp = neuronAllocationData.timestamp || Date.now()
+        const formattedTime = this.formatTime(Number(timestamp))
+        
+        const initiator = userInitiated ? '👤' : '🤖'
+        return `🧠 ${initiator} Neuron ${changeType}: ${neuronShort} (${userShort}) ${oldCount}→${newCount} allocations (${newTotal}%, ${formattedVP} VP) • 🕐 ${formattedTime}`
       }
       
       // Voting power change block
@@ -2632,13 +2859,14 @@ export default {
             return neuronName
           }
           
-          // Fallback to truncated neuron ID if requested
+          // Fallback to truncated neuron ID hex string if requested
           if (fallbackToTruncated) {
-            const principal = Principal.fromUint8Array(uint8Array)
-            const principalStr = principal.toString()
-            return principalStr.length > 16 ? 
-              principalStr.substring(0, 6) + '...' + principalStr.substring(principalStr.length - 6) : 
-              principalStr
+            const hexStr = Array.from(uint8Array)
+              .map(b => b.toString(16).padStart(2, '0'))
+              .join('')
+            return hexStr.length > 16 ? 
+              hexStr.substring(0, 8) + '...' + hexStr.substring(hexStr.length - 8) : 
+              hexStr
           }
           
           return 'Unknown Neuron'

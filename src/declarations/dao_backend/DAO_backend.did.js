@@ -122,7 +122,7 @@ export const idlFactory = ({ IDL }) => {
     'totalCount' : IDL.Nat,
     'actions' : IDL.Vec(AdminActionRecord),
   });
-  const Result_11 = IDL.Variant({
+  const Result_12 = IDL.Variant({
     'ok' : AdminActionsSinceResponse,
     'err' : AuthorizationError,
   });
@@ -171,7 +171,7 @@ export const idlFactory = ({ IDL }) => {
     'totalCount' : IDL.Nat,
     'changes' : IDL.Vec(PastAllocationRecord),
   });
-  const Result_10 = IDL.Variant({
+  const Result_11 = IDL.Variant({
     'ok' : AllocationChangesSinceResponse,
     'err' : AuthorizationError,
   });
@@ -190,7 +190,7 @@ export const idlFactory = ({ IDL }) => {
     'unfollows' : IDL.Vec(UnfollowRecord),
     'follows' : IDL.Vec(FollowRecord),
   });
-  const Result_9 = IDL.Variant({
+  const Result_10 = IDL.Variant({
     'ok' : FollowActionsSinceResponse,
     'err' : AuthorizationError,
   });
@@ -211,6 +211,30 @@ export const idlFactory = ({ IDL }) => {
     'level' : LogLevel,
     'message' : IDL.Text,
     'timestamp' : IDL.Int,
+  });
+  const AllocationChangeType = IDL.Variant({
+    'FollowAction' : IDL.Record({ 'followedUser' : IDL.Principal }),
+    'UserUpdate' : IDL.Record({ 'userInitiated' : IDL.Bool }),
+    'SystemRebalance' : IDL.Null,
+    'VotingPowerChange' : IDL.Null,
+  });
+  const NeuronAllocationChangeRecord = IDL.Record({
+    'maker' : IDL.Principal,
+    'oldAllocations' : IDL.Vec(Allocation),
+    'changeType' : AllocationChangeType,
+    'votingPower' : IDL.Nat,
+    'newAllocations' : IDL.Vec(Allocation),
+    'timestamp' : IDL.Int,
+    'neuronId' : IDL.Vec(IDL.Nat8),
+    'reason' : IDL.Opt(IDL.Text),
+  });
+  const NeuronAllocationChangesSinceResponse = IDL.Record({
+    'totalCount' : IDL.Nat,
+    'changes' : IDL.Vec(NeuronAllocationChangeRecord),
+  });
+  const Result_9 = IDL.Variant({
+    'ok' : NeuronAllocationChangesSinceResponse,
+    'err' : AuthorizationError,
   });
   const NeuronRecord = IDL.Record({
     'votingPower' : IDL.Nat,
@@ -365,7 +389,7 @@ export const idlFactory = ({ IDL }) => {
     'followAllocation' : IDL.Func([IDL.Principal], [Result_5], []),
     'getAdminActionsSince' : IDL.Func(
         [IDL.Int, IDL.Nat],
-        [Result_11],
+        [Result_12],
         ['query'],
       ),
     'getAdminPermissions' : IDL.Func(
@@ -380,12 +404,12 @@ export const idlFactory = ({ IDL }) => {
       ),
     'getAllocationChangesSince' : IDL.Func(
         [IDL.Int, IDL.Nat],
-        [Result_10],
+        [Result_11],
         ['query'],
       ),
     'getFollowActionsSince' : IDL.Func(
         [IDL.Int, IDL.Nat],
-        [Result_9],
+        [Result_10],
         ['query'],
       ),
     'getFollowersWithNeuronCounts' : IDL.Func(
@@ -412,6 +436,11 @@ export const idlFactory = ({ IDL }) => {
     'getNeuronAllocation' : IDL.Func(
         [IDL.Vec(IDL.Nat8)],
         [IDL.Opt(NeuronAllocation)],
+        ['query'],
+      ),
+    'getNeuronAllocationChangesSince' : IDL.Func(
+        [IDL.Int, IDL.Nat],
+        [Result_9],
         ['query'],
       ),
     'getNeuronUpdatesSince' : IDL.Func(

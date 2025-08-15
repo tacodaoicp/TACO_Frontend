@@ -30,30 +30,57 @@ type TimerStatus =
    outerLoopRunning: bool;
    outerLoopTotalRuns: nat;
  };
-type Result_4 = 
+type Result_5 = 
  variant {
    err: ArchiveError;
    ok: nat;
  };
-type Result_3 = 
- variant {
-   err: ArchiveError;
-   ok: vec AllocationChangeBlockData;
- };
-type Result_2 = 
+type Result_4 = 
  variant {
    err: ArchiveError;
    ok: ArchiveStatus;
  };
+type Result_3 = 
+ variant {
+   err: ArchiveError;
+   ok:
+    record {
+      makerCount: nat;
+      neuronCount: nat;
+      totalBlocks: nat;
+      totalNeuronAllocationChanges: nat;
+    };
+ };
+type Result_2 = 
+ variant {
+   err: ArchiveError;
+   ok: vec NeuronAllocationChangeBlockData;
+ };
 type Result_1 = 
  variant {
    err: ArchiveError;
-   ok: vec FollowActionBlockData;
+   ok:
+    record {
+      inTimespanChanges: vec NeuronAllocationChangeBlockData;
+      preTimespanAllocation: opt NeuronAllocationChangeBlockData;
+    };
  };
 type Result = 
  variant {
    err: text;
    ok: text;
+ };
+type NeuronAllocationChangeBlockData = 
+ record {
+   changeType: AllocationChangeType;
+   id: nat;
+   maker: principal;
+   neuronId: blob;
+   newAllocations: vec Allocation;
+   oldAllocations: vec Allocation;
+   reason: opt text;
+   timestamp: int;
+   votingPower: nat;
  };
 type LogLevel = 
  variant {
@@ -87,52 +114,38 @@ type GetArchivesResult =
        start: nat;
      };
 type GetArchivesArgs = record {from: opt principal;};
-type FollowActionType = 
- variant {
-   Follow;
-   Unfollow;
- };
-type FollowActionBlockData = 
- record {
-   action: FollowActionType;
-   followed: principal;
-   follower: principal;
-   id: nat;
-   newFollowCount: nat;
-   previousFollowCount: nat;
-   timestamp: int;
- };
 type DataCertificate = 
  record {
    certificate: blob;
    hash_tree: blob;
  };
-type DAOAllocationArchive = 
+type DAONeuronAllocationArchive = 
  service {
-   archiveAllocationChange: (change: AllocationChangeBlockData) -> (Result_4);
-   archiveFollowAction: (action: FollowActionBlockData) -> (Result_4);
-   getAllocationChangesByToken: (token: principal, limit: nat) ->
-    (Result_3) query;
-   getAllocationChangesByUser: (user: principal, limit: nat) ->
-    (Result_3) query;
-   getAllocationChangesByUserInTimeRange: (user: principal, startTime: 
-    int, endTime: int) -> (Result_3) query;
+   archiveNeuronAllocationChange: (change:
+    NeuronAllocationChangeBlockData) -> (Result_5);
    getArchiveStats: () -> (ArchiveStatus) query;
-   getArchiveStatus: () -> (Result_2) query;
+   getArchiveStatus: () -> (Result_4) query;
    getBatchImportStatus: () ->
     (record {
        intervalSeconds: nat;
        isRunning: bool;
      }) query;
-   getFollowActionsByUser: (user: principal, limit: nat) -> (Result_1) query;
+   getDetailedArchiveStats: () -> (Result_3);
    getLogs: (count: nat) -> (vec LogEntry) query;
+   getNeuronAllocationChangesByMaker: (maker: principal, limit: nat) ->
+    (Result_2) query;
+   getNeuronAllocationChangesByNeuron: (neuronId: blob, limit: nat) ->
+    (Result_2) query;
+   getNeuronAllocationChangesByNeuronInTimeRange: (neuronId: blob, startTime:
+    int, endTime: int, limit: nat) -> (Result_2) query;
+   getNeuronAllocationChangesWithContext: (neuronId: blob, startTime: 
+    int, endTime: int, limit: nat) -> (Result_1) query;
    getTimerStatus: () -> (TimerStatus) query;
    icrc3_get_archives: (args: GetArchivesArgs) -> (GetArchivesResult) query;
    icrc3_get_blocks: (args: GetBlocksArgs) -> (GetBlocksResult) query;
    icrc3_get_tip_certificate: () -> (opt DataCertificate) query;
    icrc3_supported_block_types: () -> (vec BlockType) query;
-   importAllocationChanges: () -> (Result);
-   importFollowActions: () -> (Result);
+   importNeuronAllocationChanges: () -> (Result);
    resetImportTimestamps: () -> (Result);
    runManualBatchImport: () -> (Result);
    setMaxInnerLoopIterations: (iterations: nat) -> (Result);
@@ -181,21 +194,9 @@ type AllocationChangeType =
    UserUpdate: record {userInitiated: bool;};
    VotingPowerChange;
  };
-type AllocationChangeBlockData = 
- record {
-   changeType: AllocationChangeType;
-   id: nat;
-   maker: principal;
-   newAllocations: vec Allocation;
-   oldAllocations: vec Allocation;
-   reason: opt text;
-   timestamp: int;
-   user: principal;
-   votingPower: nat;
- };
 type Allocation = 
  record {
    basisPoints: nat;
    token: principal;
  };
-service : () -> DAOAllocationArchive
+service : () -> DAONeuronAllocationArchive

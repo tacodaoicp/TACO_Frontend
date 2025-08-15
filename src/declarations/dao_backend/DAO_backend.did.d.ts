@@ -80,6 +80,12 @@ export interface AdminPermission {
   'grantedBy' : Principal,
 }
 export interface Allocation { 'token' : Principal, 'basisPoints' : bigint }
+export type AllocationChangeType = {
+    'FollowAction' : { 'followedUser' : Principal }
+  } |
+  { 'UserUpdate' : { 'userInitiated' : boolean } } |
+  { 'SystemRebalance' : null } |
+  { 'VotingPowerChange' : null };
 export interface AllocationChangesSinceResponse {
   'totalCount' : bigint,
   'changes' : Array<PastAllocationRecord>,
@@ -101,14 +107,14 @@ export interface ContinuousDAO {
   'clearLogs' : ActorMethod<[], undefined>,
   'deleteToken' : ActorMethod<[Principal, string], Result_1>,
   'followAllocation' : ActorMethod<[Principal], Result_5>,
-  'getAdminActionsSince' : ActorMethod<[bigint, bigint], Result_11>,
+  'getAdminActionsSince' : ActorMethod<[bigint, bigint], Result_12>,
   'getAdminPermissions' : ActorMethod<
     [],
     Array<[Principal, Array<AdminPermission>]>
   >,
   'getAggregateAllocation' : ActorMethod<[], Array<[Principal, bigint]>>,
-  'getAllocationChangesSince' : ActorMethod<[bigint, bigint], Result_10>,
-  'getFollowActionsSince' : ActorMethod<[bigint, bigint], Result_9>,
+  'getAllocationChangesSince' : ActorMethod<[bigint, bigint], Result_11>,
+  'getFollowActionsSince' : ActorMethod<[bigint, bigint], Result_10>,
   'getFollowersWithNeuronCounts' : ActorMethod<[], Array<[Principal, bigint]>>,
   'getHistoricBalanceAndAllocation' : ActorMethod<
     [bigint],
@@ -121,6 +127,7 @@ export interface ContinuousDAO {
     [Uint8Array | number[]],
     [] | [NeuronAllocation]
   >,
+  'getNeuronAllocationChangesSince' : ActorMethod<[bigint, bigint], Result_9>,
   'getNeuronUpdatesSince' : ActorMethod<[bigint, bigint], Result_8>,
   'getSnapshotInfo' : ActorMethod<
     [],
@@ -222,6 +229,20 @@ export interface NeuronAllocation {
   'lastAllocationMaker' : Principal,
   'allocations' : Array<Allocation>,
 }
+export interface NeuronAllocationChangeRecord {
+  'maker' : Principal,
+  'oldAllocations' : Array<Allocation>,
+  'changeType' : AllocationChangeType,
+  'votingPower' : bigint,
+  'newAllocations' : Array<Allocation>,
+  'timestamp' : bigint,
+  'neuronId' : Uint8Array | number[],
+  'reason' : [] | [string],
+}
+export interface NeuronAllocationChangesSinceResponse {
+  'totalCount' : bigint,
+  'changes' : Array<NeuronAllocationChangeRecord>,
+}
 export interface NeuronRecord {
   'votingPower' : bigint,
   'users' : Array<Principal>,
@@ -264,9 +285,11 @@ export type Result = {
   { 'err' : AuthorizationError };
 export type Result_1 = { 'ok' : string } |
   { 'err' : AuthorizationError };
-export type Result_10 = { 'ok' : AllocationChangesSinceResponse } |
+export type Result_10 = { 'ok' : FollowActionsSinceResponse } |
   { 'err' : AuthorizationError };
-export type Result_11 = { 'ok' : AdminActionsSinceResponse } |
+export type Result_11 = { 'ok' : AllocationChangesSinceResponse } |
+  { 'err' : AuthorizationError };
+export type Result_12 = { 'ok' : AdminActionsSinceResponse } |
   { 'err' : AuthorizationError };
 export type Result_2 = { 'ok' : string } |
   { 'err' : UpdateError };
@@ -289,7 +312,7 @@ export type Result_7 = { 'ok' : VotingPowerChangesSinceResponse } |
   { 'err' : AuthorizationError };
 export type Result_8 = { 'ok' : NeuronUpdatesSinceResponse } |
   { 'err' : AuthorizationError };
-export type Result_9 = { 'ok' : FollowActionsSinceResponse } |
+export type Result_9 = { 'ok' : NeuronAllocationChangesSinceResponse } |
   { 'err' : AuthorizationError };
 export type SyncError = { 'NotTreasury' : null } |
   { 'UnexpectedError' : string };

@@ -17,6 +17,10 @@ import AdminPriceView from "./views/AdminPriceView.vue"
 import AdminPriceHistoryView from "./views/AdminPriceHistoryView.vue"
 import AdminNeuronView from "./views/AdminNeuronView.vue"
 import AdminVotesView from "./views/AdminVotesView.vue"
+import AdminRewardsView from "./views/AdminRewardsView.vue"
+import AdminDistributionsView from "./views/AdminDistributionsView.vue"
+import AdminRewardsBalancesView from "./views/AdminRewardsBalancesView.vue"
+import RewardsView from "./views/RewardsView.vue"
 import ChatView from "./views/ChatView.vue"
 import ReportsView from "./views/ReportsView.vue"
 import ForumView from "./views/ForumView.vue"
@@ -35,6 +39,7 @@ const routes = [
     { path: "/sales", name: "Sales", component: SalesView, meta: { robots: 'index' } },
     { path: "/sales/dkp-swap", name: "Sale1", component: SaleDKPSwap, meta: { robots: 'index' } },
     { path: "/info", name: "Info", component: InfoView, meta: { robots: 'index' } },
+    { path: "/rewards", name: "Rewards", component: RewardsView, meta: { robots: 'index' } },
     { path: "/chat/oc", name: "ChatOC", component: ChatView, meta: { robots: 'index' } },
     { path: "/chat/sneed", redirect: "/chat/forum", meta: { robots: 'noindex' } }, // keep for historical linking
     { path: "/chat/forum", name: "ChatForum", component: ChatView, meta: { robots: 'index' } },
@@ -61,6 +66,9 @@ const routes = [
     { path: "/admin/pricehistory", name: "AdminPriceHistory", component: AdminPriceHistoryView, meta: { robots: 'noindex' } },
     { path: "/admin/neuron", name: "AdminNeuron", component: AdminNeuronView, meta: { robots: 'noindex' } },
     { path: "/admin/votes", name: "AdminVotes", component: AdminVotesView, meta: { robots: 'noindex' } },
+    { path: "/admin/rewards", name: "AdminRewards", component: AdminRewardsView, meta: { robots: 'noindex' } },
+    { path: "/admin/rewards/balances", name: "AdminRewardsBalances", component: AdminRewardsBalancesView, meta: { robots: 'noindex' } },
+    { path: "/admin/distributions", name: "AdminDistributions", component: AdminDistributionsView, meta: { robots: 'noindex' } },
     { path: "/forum", name: "Forum", component: ForumView, meta: { robots: 'noindex' } },
     { path: "/forum/thread/:id", name: "Thread", component: ThreadView, meta: { robots: 'noindex' } },
     { path: "/names", name: "Names", component: NamesView, meta: { robots: 'noindex' } }, //remove once integrated
