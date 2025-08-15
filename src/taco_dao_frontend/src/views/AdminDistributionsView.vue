@@ -702,7 +702,17 @@ export default {
     async loadDistributionStatus() {
       try {
         const actor = await this.getRewardsActor()
-        this.distributionStatus = await actor.getCurrentDistributionStatus()
+        const [canisterStatus, config] = await Promise.all([
+          actor.getCanisterStatus(),
+          actor.getConfiguration()
+        ])
+        
+        // Combine distribution status from canister status with config info
+        this.distributionStatus = {
+          ...canisterStatus.distributionStatus,
+          distributionEnabled: config.distributionEnabled,
+          currentDistributionId: null // This field isn't available in getCanisterStatus
+        }
       } catch (error) {
         console.error('Error loading distribution status:', error)
         throw error
