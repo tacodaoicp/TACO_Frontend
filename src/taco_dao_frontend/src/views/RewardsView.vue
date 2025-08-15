@@ -1,42 +1,70 @@
 <template>
-  <div class="container-fluid py-4">
-    <div class="row">
-      <div class="col-12">
-        <div class="d-flex justify-content-between align-items-center mb-4">
-          <h1 class="h3 text-white mb-0">🎁 My Rewards</h1>
-          <div class="d-flex gap-2">
-            <router-link to="/admin" class="btn btn-outline-secondary btn-sm">
-              🔧 Admin
-            </router-link>
-          </div>
-        </div>
+  <div class="standard-view">
+    <!-- header bar -->
+    <HeaderBar />
+    
+    <!-- scroll container -->
+    <div class="scroll-y-container h-100">
+      <!-- bootstrap container -->
+      <div class="container p-0">
+        <!-- bootstrap row -->
+        <div class="row h-100 d-flex flex-column flex-nowrap overflow-hidden px-2 px-sm-0">
+          
+          <!-- rewards page -->
+          <div class="rewards-view">
+            
+            <!-- title container -->
+            <div class="d-flex align-items-center">
+              <!-- rewards title -->
+              <h1 class="taco-title mb-4 mt-4 px-3">
+                <span class="taco-title__icon">🎁</span>
+                <span class="taco-title__title">My Rewards</span>
+              </h1>
+            </div>
 
-        <!-- Loading State -->
-        <div v-if="isLoading" class="text-center py-5">
-          <div class="spinner-border text-primary" role="status">
-            <span class="visually-hidden">Loading...</span>
-          </div>
-          <p class="text-muted mt-3">Loading your neurons and rewards...</p>
-        </div>
+            <!-- top bar -->
+            <div class="rewards-view__top-bar gap-2 mb-3 shadow">
+              <!-- left-->
+              <div class="d-flex align-items-center">
+                <!-- if logged out, log in title -->
+                <h2 v-if="!userLoggedIn" class="rewards-view__top-bar__title py-2">Log in to view your rewards</h2>                
+                
+                <!-- if logged in, welcome title -->
+                <h2 v-if="userLoggedIn" class="rewards-view__top-bar__title py-2">
+                  <span class="whitespace-nowrap">Welcome, &hellip;{{ truncatedPrincipal }}&nbsp;</span>
+                </h2>               
+              </div>
 
-        <!-- Error State -->
-        <div v-if="errorMessage" class="alert alert-danger" role="alert">
-          <strong>Error:</strong> {{ errorMessage }}
-        </div>
+              <!-- right -->
+              <div class="d-flex gap-2 flex-wrap ms-auto">
+                <!-- if logged out, login button -->
+                <button v-if="!userLoggedIn" class="btn iid-login m-2 me-2" @click="iidLogIn">
+                  <!-- dfinity logo -->
+                  <DfinityLogo />
+                  <!-- login text -->
+                   <span class="taco-text-white">Login</span>
+                </button>
 
-        <!-- Not Authenticated -->
-        <div v-if="!isLoading && !isAuthenticated" class="card bg-dark text-white">
-          <div class="card-body text-center py-5">
-            <h4>🔐 Authentication Required</h4>
-            <p class="text-muted">Please log in to view your neuron rewards.</p>
-            <button @click="login" class="btn btn-primary">
-              Login with Internet Identity
-            </button>
-          </div>
-        </div>
+                <!-- if logged in, refresh button -->
+                <button v-if="userLoggedIn" 
+                  class="btn taco-nav-btn taco-nav-btn--active" 
+                  @click="refreshData"
+                  :disabled="isLoading">
+                  <span class="taco-text-black">
+                    <i v-if="isLoading" class="fas fa-spinner fa-spin me-1"></i>
+                    🔄 Refresh
+                  </span>
+                </button>
+              </div>
+            </div>
 
-        <!-- Main Content -->
-        <div v-if="!isLoading && isAuthenticated && neurons.length > 0">
+            <!-- Error State -->
+            <div v-if="errorMessage" class="alert alert-danger mx-3" role="alert">
+              <strong>Error:</strong> {{ errorMessage }}
+            </div>
+
+            <!-- Main Content -->
+            <div v-if="userLoggedIn && neurons.length > 0" class="mx-3">
           
           <!-- Summary Cards -->
           <div class="row mb-4">
@@ -61,7 +89,7 @@
                   <div class="d-flex justify-content-between align-items-center">
                     <div>
                       <h6 class="card-title text-muted mb-1">Total Rewards</h6>
-                      <div class="h4 mb-0 text-success">{{ adminStore.formatTacoPrecise(totalRewards) }} TACO</div>
+                      <div class="h4 mb-0 text-success">{{ formatTacoPrecise(totalRewards) }} TACO</div>
                     </div>
                     <div class="text-success">
                       <i class="fas fa-coins fa-2x"></i>
@@ -138,7 +166,7 @@
                           :class="getBalanceClass(getNeuronBalance(neuron.id))"
                           class="fw-bold"
                         >
-                          {{ adminStore.formatTacoPrecise(getNeuronBalance(neuron.id)) }} TACO
+                          {{ formatTacoPrecise(getNeuronBalance(neuron.id)) }} TACO
                         </span>
                       </td>
                       <td>
@@ -170,159 +198,143 @@
                 class="btn btn-primary"
               >
                 <span v-if="isLoading" class="spinner-border spinner-border-sm me-2"></span>
-                💎 Claim All Rewards ({{ adminStore.formatTacoPrecise(totalRewards) }} TACO)
+                💎 Claim All Rewards ({{ formatTacoPrecise(totalRewards) }} TACO)
               </button>
             </div>
           </div>
 
-        </div>
+            </div>
 
-        <!-- No Neurons State -->
-        <div v-if="!isLoading && isAuthenticated && neurons.length === 0" class="card bg-dark text-white">
-          <div class="card-body text-center py-5">
-            <h4>🧠 No Neurons Found</h4>
-            <p class="text-muted">You don't have any hotkeyed neurons in the TACO SNS.</p>
-            <p class="text-muted">
-              To earn rewards, you need to have neurons that vote on TACO DAO proposals.
-            </p>
+            <!-- No Neurons State -->
+            <div v-if="userLoggedIn && neurons.length === 0" class="mx-3">
+              <div class="card bg-dark text-white">
+                <div class="card-body text-center py-5">
+                  <h4>🧠 No Neurons Found</h4>
+                  <p class="text-muted">You don't have any hotkeyed neurons in the TACO SNS.</p>
+                  <p class="text-muted">
+                    To earn rewards, you need to have neurons that vote on TACO DAO proposals.
+                  </p>
+                </div>
+              </div>
+            </div>
+
           </div>
         </div>
-
       </div>
     </div>
   </div>
 </template>
 
 <script>
+/////////////
+// Imports //
+/////////////
+
+import HeaderBar from "../components/HeaderBar.vue"
+import { ref, onMounted, computed, watch } from "vue"
+import { useTacoStore } from "../stores/taco.store"
+import { storeToRefs } from "pinia"
+import DfinityLogo from "../assets/images/dfinityLogo.vue"
 import { AuthClient } from '@dfinity/auth-client'
 import { Actor } from '@dfinity/agent'
 import { createAgent } from '@dfinity/utils'
-import { useTacoStore } from '@/stores/taco.store'
-import { useAdminStore } from '@/stores/admin.store'
+import { Principal } from '@dfinity/principal'
 import { idlFactory as rewardsIDL } from '../../../declarations/rewards/rewards.did.js'
 
 export default {
   name: 'RewardsView',
-
-  data() {
-    return {
-      isLoading: false,
-      errorMessage: '',
-      isAuthenticated: false,
-      neurons: [],
-      neuronBalances: new Map(), // neuronId -> balance
-      authClient: null,
-      userPrincipal: null
-    }
+  components: {
+    HeaderBar,
+    DfinityLogo
   },
 
-  computed: {
-    tacoStore() {
-      return useTacoStore()
-    },
-
-    adminStore() {
-      return useAdminStore()
-    },
-
-    totalRewards() {
+  setup() {
+    /////////////
+    // Imports //
+    /////////////
+    
+    const tacoStore = useTacoStore()
+    
+    // user authentication state from taco store
+    const { userLoggedIn } = storeToRefs(tacoStore)
+    const { userPrincipal } = storeToRefs(tacoStore)
+    const { truncatedPrincipal } = storeToRefs(tacoStore)
+    
+    /////////////////
+    // Reactive Data //
+    /////////////////
+    
+    const isLoading = ref(false)
+    const errorMessage = ref('')
+    const neurons = ref([])
+    const neuronBalances = ref(new Map()) // neuronId -> balance
+    
+    ///////////////
+    // Computed //
+    ///////////////
+    
+    const totalRewards = computed(() => {
       let total = 0
-      for (const balance of this.neuronBalances.values()) {
+      for (const balance of neuronBalances.value.values()) {
         total += Number(balance)
       }
       return total
-    },
+    })
 
-    claimableNeurons() {
+    const claimableNeurons = computed(() => {
       let count = 0
-      for (const balance of this.neuronBalances.values()) {
+      for (const balance of neuronBalances.value.values()) {
         if (balance > 0) count++
       }
       return count
+    })
+    
+    /////////////
+    // Methods //
+    /////////////
+    
+    const iidLogIn = () => {
+      tacoStore.iidLogIn()
     }
-  },
 
-  async mounted() {
-    await this.initAuth()
-    if (this.isAuthenticated) {
-      await this.loadUserNeurons()
-    }
-  },
-
-  methods: {
-    async initAuth() {
-      try {
-        this.authClient = await AuthClient.create({
-          idleOptions: { disableIdle: true }
-        })
-        
-        this.isAuthenticated = await this.authClient.isAuthenticated()
-        
-        if (this.isAuthenticated) {
-          const identity = await this.authClient.getIdentity()
-          this.userPrincipal = identity.getPrincipal()
-        }
-      } catch (error) {
-        console.error('Auth initialization error:', error)
-        this.errorMessage = 'Failed to initialize authentication'
-      }
-    },
-
-    async login() {
-      try {
-        await this.authClient.login({
-          identityProvider: process.env.DFX_NETWORK === 'local' 
-            ? `http://localhost:4943/?canisterId=${process.env.INTERNET_IDENTITY_CANISTER_ID}`
-            : 'https://identity.ic0.app',
-          onSuccess: async () => {
-            this.isAuthenticated = true
-            const identity = await this.authClient.getIdentity()
-            this.userPrincipal = identity.getPrincipal()
-            await this.loadUserNeurons()
-          },
-        })
-      } catch (error) {
-        console.error('Login error:', error)
-        this.errorMessage = 'Login failed: ' + error.message
-      }
-    },
-
-    async loadUserNeurons() {
-      this.isLoading = true
-      this.errorMessage = ''
+    const loadUserNeurons = async () => {
+      if (!userLoggedIn.value) return
+      
+      isLoading.value = true
+      errorMessage.value = ''
 
       try {
         // Call SNS Governance to get user's neurons
         const snsGovId = 'lhdfz-wqaaa-aaaaq-aae3q-cai' // TACO SNS Governance
-        const snsGov = await this.createSnsGovernanceActor(snsGovId)
+        const snsGov = await createSnsGovernanceActor(snsGovId)
         
         const neuronsResult = await snsGov.list_neurons({
-          of_principal: [this.userPrincipal],
+          of_principal: [Principal.fromText(userPrincipal.value)],
           limit: 1000,
           start_page_at: []
         })
 
-        this.neurons = neuronsResult.neurons || []
+        neurons.value = neuronsResult.neurons || []
         
         // Get balances for all neurons
-        await this.loadNeuronBalances()
+        await loadNeuronBalances()
 
       } catch (error) {
         console.error('Error loading neurons:', error)
-        this.errorMessage = 'Failed to load neurons: ' + error.message
+        errorMessage.value = 'Failed to load neurons: ' + error.message
       } finally {
-        this.isLoading = false
+        isLoading.value = false
       }
-    },
+    }
 
-    async loadNeuronBalances() {
-      if (this.neurons.length === 0) return
+    const loadNeuronBalances = async () => {
+      if (neurons.value.length === 0) return
 
       try {
-        const rewardsActor = await this.getRewardsActor()
+        const rewardsActor = await getRewardsActor()
         
         // Extract neuron IDs (handle optional IDs)
-        const neuronIds = this.neurons
+        const neuronIds = neurons.value
           .filter(neuron => neuron.id && neuron.id.length > 0)
           .map(neuron => neuron.id[0].id)
 
@@ -332,19 +344,22 @@ export default {
         const balances = await rewardsActor.getNeuronRewardBalances(neuronIds)
         
         // Store in map for quick lookup
-        this.neuronBalances.clear()
+        neuronBalances.value.clear()
         for (const [neuronId, balance] of balances) {
-          this.neuronBalances.set(this.formatNeuronIdForMap(neuronId), balance)
+          neuronBalances.value.set(formatNeuronIdForMap(neuronId), balance)
         }
 
       } catch (error) {
         console.error('Error loading neuron balances:', error)
-        this.errorMessage = 'Failed to load neuron balances: ' + error.message
+        errorMessage.value = 'Failed to load neuron balances: ' + error.message
       }
-    },
+    }
 
-    async createSnsGovernanceActor(canisterId) {
-      const identity = await this.authClient.getIdentity()
+    const createSnsGovernanceActor = async (canisterId) => {
+      const authClient = await AuthClient.create({
+        idleOptions: { disableIdle: true }
+      })
+      const identity = await authClient.getIdentity()
       const host = process.env.DFX_NETWORK === 'local' ? 'http://localhost:4943' : 'https://ic0.app'
       
       const agent = await createAgent({
@@ -383,15 +398,18 @@ export default {
         agent,
         canisterId
       })
-    },
+    }
 
-    async getRewardsActor() {
-      const canisterId = this.tacoStore.rewardsCanisterId()
+    const getRewardsActor = async () => {
+      const canisterId = tacoStore.rewardsCanisterId()
       if (!canisterId) {
         throw new Error('Rewards canister ID not found')
       }
 
-      const identity = await this.authClient.getIdentity()
+      const authClient = await AuthClient.create({
+        idleOptions: { disableIdle: true }
+      })
+      const identity = await authClient.getIdentity()
       const host = process.env.DFX_NETWORK === 'local' ? 'http://localhost:4943' : 'https://ic0.app'
 
       const agent = await createAgent({
@@ -404,26 +422,26 @@ export default {
         agent,
         canisterId
       })
-    },
+    }
 
-    async refreshData() {
-      await this.loadUserNeurons()
-    },
+    const refreshData = async () => {
+      await loadUserNeurons()
+    }
 
-    async claimRewards(neuronIds) {
+    const claimRewards = async (neuronIds) => {
       // TODO: Implement claim functionality
       console.log('Claiming rewards for neurons:', neuronIds)
-    },
+    }
 
-    async claimAllRewards() {
-      const claimableNeuronIds = this.neurons
-        .filter(neuron => this.getNeuronBalance(neuron.id) > 0)
+    const claimAllRewards = async () => {
+      const claimableNeuronIds = neurons.value
+        .filter(neuron => getNeuronBalance(neuron.id) > 0)
         .map(neuron => neuron.id[0].id)
       
-      await this.claimRewards(claimableNeuronIds)
-    },
+      await claimRewards(claimableNeuronIds)
+    }
 
-    formatNeuronId(neuronId) {
+    const formatNeuronId = (neuronId) => {
       try {
         if (!neuronId || neuronId.length === 0) return 'Unknown'
         
@@ -434,55 +452,148 @@ export default {
         console.error('Error formatting neuron ID:', error)
         return 'Format Error'
       }
-    },
+    }
 
-    formatNeuronIdForMap(neuronId) {
+    const formatNeuronIdForMap = (neuronId) => {
       try {
         return Array.from(neuronId).map(b => b.toString(16).padStart(2, '0')).join('')
       } catch (error) {
         return 'unknown'
       }
-    },
+    }
 
-    getNeuronBalance(neuronId) {
+    const getNeuronBalance = (neuronId) => {
       if (!neuronId || neuronId.length === 0) return 0
-      const key = this.formatNeuronIdForMap(neuronId[0].id)
-      return this.neuronBalances.get(key) || 0
-    },
+      const key = formatNeuronIdForMap(neuronId[0].id)
+      return neuronBalances.value.get(key) || 0
+    }
 
-    getBalanceClass(balance) {
+    const getBalanceClass = (balance) => {
       if (balance > 0) return 'text-success'
       return 'text-muted'
-    },
+    }
 
-    formatVotingPower(multiplier) {
+    const formatVotingPower = (multiplier) => {
       try {
         return (Number(multiplier) / 100).toFixed(0)
       } catch (error) {
         return '0'
       }
-    },
+    }
 
-    formatStake(stakeE8s) {
+    const formatStake = (stakeE8s) => {
       try {
         return (Number(stakeE8s) / 100_000_000).toFixed(2)
       } catch (error) {
         return '0.00'
       }
-    },
+    }
 
-    formatMaturity(maturityE8s) {
+    const formatMaturity = (maturityE8s) => {
       try {
         return (Number(maturityE8s) / 100_000_000).toFixed(2)
       } catch (error) {
         return '0.00'
       }
     }
+
+    // Format TACO amount from satoshis with full precision
+    const formatTacoPrecise = (satoshis) => {
+      try {
+        const TACO_SATOSHIS_PER_TOKEN = 100_000_000 // 10^8
+        const satoshisBI = typeof satoshis === 'bigint' ? satoshis : BigInt(satoshis || 0)
+        const tacoTokens = Number(satoshisBI) / TACO_SATOSHIS_PER_TOKEN
+        const formatted = tacoTokens.toFixed(8)
+        return formatted.replace(/\.?0+$/, '') || '0'
+      } catch (error) {
+        console.error('Error formatting TACO amount:', error, satoshis)
+        return '0'
+      }
+    }
+
+    ///////////
+    // Watchers //
+    ///////////
+    
+    // Watch for changes in user logged in state
+    watch(userLoggedIn, (newState) => {
+      if (newState) {
+        loadUserNeurons()
+      } else {
+        // Clear data when user logs out
+        neurons.value = []
+        neuronBalances.value.clear()
+        errorMessage.value = ''
+      }
+    }, { immediate: true })
+
+    /////////////
+    // Lifecycle //
+    /////////////
+    
+    onMounted(() => {
+      if (userLoggedIn.value) {
+        loadUserNeurons()
+      }
+    })
+
+    ////////////
+    // Return //
+    ////////////
+    
+    return {
+      // reactive data
+      userLoggedIn,
+      truncatedPrincipal,
+      isLoading,
+      errorMessage,
+      neurons,
+      totalRewards,
+      claimableNeurons,
+      
+      // methods
+      iidLogIn,
+      refreshData,
+      claimRewards,
+      claimAllRewards,
+      formatNeuronId,
+      getNeuronBalance,
+      getBalanceClass,
+      formatVotingPower,
+      formatStake,
+      formatMaturity,
+      formatTacoPrecise
+    }
   }
 }
 </script>
 
 <style scoped>
+/* Rewards view specific styles */
+.rewards-view {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.rewards-view__top-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--dark-orange-to-light-orange);
+  border-radius: 10px;
+  padding: 0 1rem;
+  margin: 0 1rem;
+}
+
+.rewards-view__top-bar__title {
+  color: var(--black-to-white);
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin: 0;
+}
+
+/* Table styles */
 .table th {
   font-size: 0.9em;
   font-weight: 600;
@@ -507,5 +618,16 @@ code {
 
 .badge {
   font-size: 0.7rem;
+}
+
+/* Ensure consistent styling with other views */
+.standard-view {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.scroll-y-container {
+  overflow-y: auto;
 }
 </style>
