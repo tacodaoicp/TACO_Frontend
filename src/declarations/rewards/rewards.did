@@ -1,3 +1,17 @@
+type TransferError = 
+ variant {
+   BadBurn: record {min_burn_amount: nat;};
+   BadFee: record {expected_fee: nat;};
+   CreatedInFuture: record {ledger_time: nat64;};
+   Duplicate: record {duplicate_of: nat;};
+   GenericError: record {
+                   error_code: nat;
+                   message: text;
+                 };
+   InsufficientFunds: record {balance: nat;};
+   TemporarilyUnavailable;
+   TooOld;
+ };
 type RewardsError = 
  variant {
    AllocationDataMissing;
@@ -15,7 +29,7 @@ type RewardsError =
 type Rewards = 
  service {
    calculateNeuronPerformance: (neuronId: blob, startTime: int, endTime: 
-    int, priceType: PriceType) -> (Result_1);
+    int, priceType: PriceType) -> (Result__1_1);
    getAllNeuronRewardBalances: () -> (vec record {
                                             blob;
                                             nat;
@@ -56,26 +70,32 @@ type Rewards =
    getNeuronRewardBalance: (neuronId: blob) -> (nat) query;
    getTacoBalance: () -> (nat);
    getTotalDistributed: () -> (nat) query;
-   setDistributionEnabled: (enabled: bool) -> (Result);
-   setDistributionPeriod: (periodNS: nat) -> (Result);
-   setPerformanceScorePower: (power: float64) -> (Result);
-   setPeriodicRewardPot: (amount: nat) -> (Result);
-   setVotingPowerPower: (power: float64) -> (Result);
-   startDistributionTimer: () -> (Result);
-   stopDistributionTimer: () -> (Result);
-   triggerDistribution: () -> (Result);
+   setDistributionEnabled: (enabled: bool) -> (Result__1);
+   setDistributionPeriod: (periodNS: nat) -> (Result__1);
+   setPerformanceScorePower: (power: float64) -> (Result__1);
+   setPeriodicRewardPot: (amount: nat) -> (Result__1);
+   setVotingPowerPower: (power: float64) -> (Result__1);
+   startDistributionTimer: () -> (Result__1);
+   stopDistributionTimer: () -> (Result__1);
+   triggerDistribution: () -> (Result__1);
    triggerDistributionCustom: (startTime: int, endTime: int, priceType:
-    PriceType) -> (Result);
+    PriceType) -> (Result__1);
+   withdraw: (account: Account, amount: nat) -> (Result);
  };
-type Result_1 = 
+type Result__1_1 = 
  variant {
    err: RewardsError;
    ok: PerformanceResult;
  };
-type Result = 
+type Result__1 = 
  variant {
    err: RewardsError;
    ok: text;
+ };
+type Result = 
+ variant {
+   Err: TransferError;
+   Ok: nat;
  };
 type PriceType = 
  variant {
@@ -180,5 +200,10 @@ type Allocation =
  record {
    basisPoints: nat;
    token: principal;
+ };
+type Account = 
+ record {
+   owner: principal;
+   subaccount: opt vec nat8;
  };
 service : () -> Rewards

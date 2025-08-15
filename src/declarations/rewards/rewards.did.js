@@ -59,7 +59,7 @@ export const idlFactory = ({ IDL }) => {
     'InvalidTimeRange' : IDL.Null,
     'InsufficientRewardPot' : IDL.Null,
   });
-  const Result_1 = IDL.Variant({
+  const Result__1_1 = IDL.Variant({
     'ok' : PerformanceResult,
     'err' : RewardsError,
   });
@@ -100,11 +100,29 @@ export const idlFactory = ({ IDL }) => {
     'neuronRewards' : IDL.Vec(NeuronReward),
     'failedNeurons' : IDL.Vec(FailedNeuron),
   });
-  const Result = IDL.Variant({ 'ok' : IDL.Text, 'err' : RewardsError });
+  const Result__1 = IDL.Variant({ 'ok' : IDL.Text, 'err' : RewardsError });
+  const Account = IDL.Record({
+    'owner' : IDL.Principal,
+    'subaccount' : IDL.Opt(IDL.Vec(IDL.Nat8)),
+  });
+  const TransferError = IDL.Variant({
+    'GenericError' : IDL.Record({
+      'message' : IDL.Text,
+      'error_code' : IDL.Nat,
+    }),
+    'TemporarilyUnavailable' : IDL.Null,
+    'BadBurn' : IDL.Record({ 'min_burn_amount' : IDL.Nat }),
+    'Duplicate' : IDL.Record({ 'duplicate_of' : IDL.Nat }),
+    'BadFee' : IDL.Record({ 'expected_fee' : IDL.Nat }),
+    'CreatedInFuture' : IDL.Record({ 'ledger_time' : IDL.Nat64 }),
+    'TooOld' : IDL.Null,
+    'InsufficientFunds' : IDL.Record({ 'balance' : IDL.Nat }),
+  });
+  const Result = IDL.Variant({ 'Ok' : IDL.Nat, 'Err' : TransferError });
   const Rewards = IDL.Service({
     'calculateNeuronPerformance' : IDL.Func(
         [IDL.Vec(IDL.Nat8), IDL.Int, IDL.Int, PriceType],
-        [Result_1],
+        [Result__1_1],
         [],
       ),
     'getAllNeuronRewardBalances' : IDL.Func(
@@ -170,19 +188,20 @@ export const idlFactory = ({ IDL }) => {
       ),
     'getTacoBalance' : IDL.Func([], [IDL.Nat], []),
     'getTotalDistributed' : IDL.Func([], [IDL.Nat], ['query']),
-    'setDistributionEnabled' : IDL.Func([IDL.Bool], [Result], []),
-    'setDistributionPeriod' : IDL.Func([IDL.Nat], [Result], []),
-    'setPerformanceScorePower' : IDL.Func([IDL.Float64], [Result], []),
-    'setPeriodicRewardPot' : IDL.Func([IDL.Nat], [Result], []),
-    'setVotingPowerPower' : IDL.Func([IDL.Float64], [Result], []),
-    'startDistributionTimer' : IDL.Func([], [Result], []),
-    'stopDistributionTimer' : IDL.Func([], [Result], []),
-    'triggerDistribution' : IDL.Func([], [Result], []),
+    'setDistributionEnabled' : IDL.Func([IDL.Bool], [Result__1], []),
+    'setDistributionPeriod' : IDL.Func([IDL.Nat], [Result__1], []),
+    'setPerformanceScorePower' : IDL.Func([IDL.Float64], [Result__1], []),
+    'setPeriodicRewardPot' : IDL.Func([IDL.Nat], [Result__1], []),
+    'setVotingPowerPower' : IDL.Func([IDL.Float64], [Result__1], []),
+    'startDistributionTimer' : IDL.Func([], [Result__1], []),
+    'stopDistributionTimer' : IDL.Func([], [Result__1], []),
+    'triggerDistribution' : IDL.Func([], [Result__1], []),
     'triggerDistributionCustom' : IDL.Func(
         [IDL.Int, IDL.Int, PriceType],
-        [Result],
+        [Result__1],
         [],
       ),
+    'withdraw' : IDL.Func([Account, IDL.Nat], [Result], []),
   });
   return Rewards;
 };
