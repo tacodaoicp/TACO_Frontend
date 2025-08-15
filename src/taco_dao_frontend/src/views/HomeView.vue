@@ -170,15 +170,13 @@
                     <div class="home-view__taco-assets__kvp">
 
                         <!-- key -->
-                        <span class="home-view__taco-assets__kvp__key 
-                            taco-text-black-to-white">
+                        <span class="home-view__taco-assets__kvp__key">
                             <i class="fa-solid fa-building-columns home-view__taco-assets__fa-icon"></i>
                             Treasury
                         </span>
 
                         <!-- value -->
-                        <span class="home-view__taco-assets__kvp__value 
-                            taco-text-black-to-white">${{formatNumber(totalTreasuryValueInUsd)}}</span>
+                        <span class="home-view__taco-assets__kvp__value">${{formatNumber(totalTreasuryValueInUsd)}}</span>
 
                     </div>               
 
@@ -186,16 +184,14 @@
                     <div class="home-view__taco-assets__kvp">
 
                         <!-- key -->
-                        <span class="home-view__taco-assets__kvp__key 
-                            taco-text-black-to-white"
+                        <span class="home-view__taco-assets__kvp__key"
                             style="padding-left: 0.5rem">
                             <TacoCoinIcon class="home-view__taco-assets__svg"/>
                             Taco
                         </span>
 
                         <!-- value -->
-                        <span class="home-view__taco-assets__kvp__value 
-                            taco-text-black-to-white">${{formatNumber(snsTreasuryTacoValueInUsd)}}</span>
+                        <span class="home-view__taco-assets__kvp__value">${{formatNumber(snsTreasuryTacoValueInUsd)}}</span>
 
                     </div>
 
@@ -203,16 +199,14 @@
                     <div class="home-view__taco-assets__kvp">
 
                         <!-- key -->
-                        <span class="home-view__taco-assets__kvp__key 
-                            taco-text-black-to-white"
+                        <span class="home-view__taco-assets__kvp__key"
                             style="padding-left: 0.5rem">
                             <img :src="icpLogo" class="home-view__taco-assets__svg"/>
                             ICP
                         </span>
 
                         <!-- value -->
-                        <span class="home-view__taco-assets__kvp__value 
-                            taco-text-black-to-white">${{formatNumber(snsTreasuryIcpValueInUsd)}}</span>
+                        <span class="home-view__taco-assets__kvp__value">${{formatNumber(snsTreasuryIcpValueInUsd)}}</span>
 
                     </div>        
                     
@@ -222,15 +216,13 @@
                     <div class="home-view__taco-assets__kvp">
 
                         <!-- key -->
-                        <span class="home-view__taco-assets__kvp__key 
-                            taco-text-black-to-white">
+                        <span class="home-view__taco-assets__kvp__key">
                             <i class="fa-solid fa-chart-pie  home-view__taco-assets__fa-icon"></i>
                             Portfolio
                         </span>
 
                         <!-- value -->
-                        <span class="home-view__taco-assets__kvp__value 
-                            taco-text-black-to-white">${{formatNumber(totalPortfolioValueInUsd)}}</span>
+                        <span class="home-view__taco-assets__kvp__value">${{formatNumber(totalPortfolioValueInUsd)}}</span>
 
                     </div>
 
@@ -240,12 +232,10 @@
                     <div class="home-view__taco-assets__kvp">
 
                         <!-- key -->
-                        <span class="home-view__taco-assets__kvp__key 
-                            taco-text-black-to-white">Total</span>
+                        <span class="home-view__taco-assets__kvp__key">Total</span>
 
                         <!-- value -->
-                        <span class="home-view__taco-assets__kvp__value 
-                            taco-text-black-to-white">${{formatNumber(totalTreasuryValueInUsd + totalPortfolioValueInUsd)}}</span>
+                        <span class="home-view__taco-assets__kvp__value">${{formatNumber(totalTreasuryValueInUsd + totalPortfolioValueInUsd)}}</span>
 
                     </div>
 
@@ -1111,13 +1101,17 @@
     justify-content: space-around;
     gap: 0;
     aspect-ratio: 16 / 9;
+    background-image: url("../assets/images/tacoDaoTacoTranslucent2.svg");
+    background-repeat: no-repeat;
+    background-position: center;
+    background-size: 75% 75%;
 
     hr {
-        border-top: 1px solid var(--dark-orange) !important;
-        opacity: 1;
-        border: none;
-        height: 1px;
-      }    
+      border-top: 1px solid var(--dark-orange) !important;
+      opacity: 1;
+      border: none;
+      height: 1px;
+    }
 
     // token icon
     &__svg {
@@ -1147,6 +1141,7 @@
 
       // key
       &__key {
+        color: var(--brown-to-white);
         display: flex;
         align-items: center;
         gap: 0.5rem;
@@ -1156,6 +1151,7 @@
 
       // value
       &__value {
+        color: var(--dark-brown-to-white);
         text-align: right;
         font-size: 0.875rem;
         font-family: 'rubik';
