@@ -333,20 +333,27 @@ export default {
       try {
         const rewardsActor = await getRewardsActor()
         
-        // Extract neuron IDs (handle optional IDs)
-        const neuronIds = neurons.value
+        // Extract neuron IDs (handle optional IDs) for filtering
+        const userNeuronIds = new Set()
+        neurons.value
           .filter(neuron => neuron.id && neuron.id.length > 0)
-          .map(neuron => neuron.id[0].id)
+          .forEach(neuron => {
+            const neuronIdHex = formatNeuronIdForMap(neuron.id[0].id)
+            userNeuronIds.add(neuronIdHex)
+          })
 
-        if (neuronIds.length === 0) return
+        if (userNeuronIds.size === 0) return
 
-        // Batch fetch balances
-        const balances = await rewardsActor.getNeuronRewardBalances(neuronIds)
+        // Get all balances from the canister
+        const allBalances = await rewardsActor.getAllNeuronRewardBalances()
         
-        // Store in map for quick lookup
+        // Filter for only the user's neurons and store in map
         neuronBalances.value.clear()
-        for (const [neuronId, balance] of balances) {
-          neuronBalances.value.set(formatNeuronIdForMap(neuronId), balance)
+        for (const [neuronId, balance] of allBalances) {
+          const neuronIdHex = formatNeuronIdForMap(neuronId)
+          if (userNeuronIds.has(neuronIdHex)) {
+            neuronBalances.value.set(neuronIdHex, balance)
+          }
         }
 
       } catch (error) {
