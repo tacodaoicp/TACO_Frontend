@@ -20,6 +20,7 @@ import AdminVotesView from "./views/AdminVotesView.vue"
 import AdminRewardsView from "./views/AdminRewardsView.vue"
 import AdminDistributionsView from "./views/AdminDistributionsView.vue"
 import AdminRewardsBalancesView from "./views/AdminRewardsBalancesView.vue"
+import RewardsView from "./views/RewardsView.vue"
 import ChatView from "./views/ChatView.vue"
 import ReportsView from "./views/ReportsView.vue"
 import ForumView from "./views/ForumView.vue"
@@ -38,6 +39,7 @@ const routes = [
     { path: "/sales", name: "Sales", component: SalesView, meta: { robots: 'index' } },
     { path: "/sales/dkp-swap", name: "Sale1", component: SaleDKPSwap, meta: { robots: 'index' } },
     { path: "/info", name: "Info", component: InfoView, meta: { robots: 'index' } },
+    { path: "/rewards", name: "Rewards", component: RewardsView, meta: { robots: 'index' } },
     { path: "/chat/oc", name: "ChatOC", component: ChatView, meta: { robots: 'index' } },
     { path: "/chat/sneed", redirect: "/chat/forum", meta: { robots: 'noindex' } }, // keep for historical linking
     { path: "/chat/forum", name: "ChatForum", component: ChatView, meta: { robots: 'index' } },
