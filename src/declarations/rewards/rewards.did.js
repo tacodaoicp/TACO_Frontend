@@ -130,6 +130,7 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Vec(IDL.Tuple(IDL.Vec(IDL.Nat8), IDL.Nat))],
         ['query'],
       ),
+    'getAvailableBalance' : IDL.Func([], [IDL.Nat], []),
     'getCanisterStatus' : IDL.Func(
         [],
         [
@@ -176,6 +177,7 @@ export const idlFactory = ({ IDL }) => {
         ],
         ['query'],
       ),
+    'getCurrentTotalNeuronBalances' : IDL.Func([], [IDL.Nat], ['query']),
     'getDistributionHistory' : IDL.Func(
         [IDL.Opt(IDL.Nat)],
         [IDL.Vec(DistributionRecord)],
@@ -184,6 +186,11 @@ export const idlFactory = ({ IDL }) => {
     'getNeuronRewardBalance' : IDL.Func(
         [IDL.Vec(IDL.Nat8)],
         [IDL.Nat],
+        ['query'],
+      ),
+    'getNeuronRewardBalances' : IDL.Func(
+        [IDL.Vec(IDL.Vec(IDL.Nat8))],
+        [IDL.Vec(IDL.Tuple(IDL.Vec(IDL.Nat8), IDL.Nat))],
         ['query'],
       ),
     'getTacoBalance' : IDL.Func([], [IDL.Nat], []),
@@ -201,7 +208,7 @@ export const idlFactory = ({ IDL }) => {
         [Result__1],
         [],
       ),
-    'withdraw' : IDL.Func([Account, IDL.Nat], [Result], []),
+    'withdraw' : IDL.Func([Account, IDL.Vec(IDL.Vec(IDL.Nat8))], [Result], []),
   });
   return Rewards;
 };

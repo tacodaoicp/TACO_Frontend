@@ -100,6 +100,7 @@ export interface Rewards {
     [],
     Array<[Uint8Array | number[], bigint]>
   >,
+  'getAvailableBalance' : ActorMethod<[], bigint>,
   'getCanisterStatus' : ActorMethod<
     [],
     {
@@ -137,11 +138,16 @@ export interface Rewards {
       'inProgress' : boolean,
     }
   >,
+  'getCurrentTotalNeuronBalances' : ActorMethod<[], bigint>,
   'getDistributionHistory' : ActorMethod<
     [[] | [bigint]],
     Array<DistributionRecord>
   >,
   'getNeuronRewardBalance' : ActorMethod<[Uint8Array | number[]], bigint>,
+  'getNeuronRewardBalances' : ActorMethod<
+    [Array<Uint8Array | number[]>],
+    Array<[Uint8Array | number[], bigint]>
+  >,
   'getTacoBalance' : ActorMethod<[], bigint>,
   'getTotalDistributed' : ActorMethod<[], bigint>,
   'setDistributionEnabled' : ActorMethod<[boolean], Result__1>,
@@ -156,7 +162,7 @@ export interface Rewards {
     [bigint, bigint, PriceType],
     Result__1
   >,
-  'withdraw' : ActorMethod<[Account, bigint], Result>,
+  'withdraw' : ActorMethod<[Account, Array<Uint8Array | number[]>], Result>,
 }
 export type RewardsError = { 'AllocationDataMissing' : null } |
   { 'SystemError' : string } |

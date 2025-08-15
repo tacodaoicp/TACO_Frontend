@@ -34,6 +34,7 @@ type Rewards =
                                             blob;
                                             nat;
                                           }) query;
+   getAvailableBalance: () -> (nat);
    getCanisterStatus: () ->
     (record {
        daoId: principal;
@@ -66,8 +67,14 @@ type Rewards =
        lastDistributionTime: int;
        nextDistributionTime: int;
      }) query;
+   getCurrentTotalNeuronBalances: () -> (nat) query;
    getDistributionHistory: (limit: opt nat) -> (vec DistributionRecord) query;
    getNeuronRewardBalance: (neuronId: blob) -> (nat) query;
+   getNeuronRewardBalances: (neuronIds: vec blob) ->
+    (vec record {
+           blob;
+           nat;
+         }) query;
    getTacoBalance: () -> (nat);
    getTotalDistributed: () -> (nat) query;
    setDistributionEnabled: (enabled: bool) -> (Result__1);
@@ -80,7 +87,7 @@ type Rewards =
    triggerDistribution: () -> (Result__1);
    triggerDistributionCustom: (startTime: int, endTime: int, priceType:
     PriceType) -> (Result__1);
-   withdraw: (account: Account, amount: nat) -> (Result);
+   withdraw: (account: Account, neuronIds: vec blob) -> (Result);
  };
 type Result__1_1 = 
  variant {
