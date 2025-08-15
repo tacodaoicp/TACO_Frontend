@@ -612,13 +612,7 @@ export default {
       return this.distributionStatus?.inProgress || false
     },
 
-    availableBalance() {
-      // Calculate balance available for distribution (canister balance - total distributed)
-      // Convert BigInt values to Number for calculation
-      const balance = typeof this.tacoBalance === 'bigint' ? Number(this.tacoBalance) : Number(this.tacoBalance || 0)
-      const distributed = typeof this.totalDistributed === 'bigint' ? Number(this.totalDistributed) : Number(this.totalDistributed || 0)
-      return balance - distributed
-    },
+
 
     nextDistributionTime() {
       if (!this.distributionStatus || !this.configuration) return 0
