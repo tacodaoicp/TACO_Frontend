@@ -116,7 +116,9 @@ export interface Rewards {
       'distributionEnabled' : boolean,
       'distributionPeriodNS' : bigint,
       'maxDistributionHistory' : bigint,
-      'weeklyRewardPot' : bigint,
+      'periodicRewardPot' : bigint,
+      'performanceScorePower' : number,
+      'votingPowerPower' : number,
     }
   >,
   'getCurrentDistributionStatus' : ActorMethod<
@@ -138,7 +140,9 @@ export interface Rewards {
   'getTotalDistributed' : ActorMethod<[], bigint>,
   'setDistributionEnabled' : ActorMethod<[boolean], Result>,
   'setDistributionPeriod' : ActorMethod<[bigint], Result>,
-  'setWeeklyRewardPot' : ActorMethod<[bigint], Result>,
+  'setPerformanceScorePower' : ActorMethod<[number], Result>,
+  'setPeriodicRewardPot' : ActorMethod<[bigint], Result>,
+  'setVotingPowerPower' : ActorMethod<[number], Result>,
   'startDistributionTimer' : ActorMethod<[], Result>,
   'stopDistributionTimer' : ActorMethod<[], Result>,
   'triggerDistribution' : ActorMethod<[], Result>,
