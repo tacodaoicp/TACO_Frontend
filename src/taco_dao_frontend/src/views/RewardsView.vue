@@ -195,9 +195,11 @@
 
 <script>
 import { AuthClient } from '@dfinity/auth-client'
+import { Actor } from '@dfinity/agent'
+import { createAgent } from '@dfinity/utils'
 import { useTacoStore } from '@/stores/taco.store'
 import { useAdminStore } from '@/stores/admin.store'
-import { createRewardsActor } from '@/api/rewards'
+import { idlFactory as rewardsIDL } from '../../../declarations/rewards/rewards.did.js'
 
 export default {
   name: 'RewardsView',
@@ -345,37 +347,41 @@ export default {
       const identity = await this.authClient.getIdentity()
       const host = process.env.DFX_NETWORK === 'local' ? 'http://localhost:4943' : 'https://ic0.app'
       
-      return await window.ic.plug.createActor({
-        canisterId,
-        interfaceFactory: ({ IDL }) => {
-          const NeuronId = IDL.Record({ 'id': IDL.Vec(IDL.Nat8) })
-          const ListNeurons = IDL.Record({
-            'of_principal': IDL.Opt(IDL.Principal),
-            'limit': IDL.Nat32,
-            'start_page_at': IDL.Opt(NeuronId)
-          })
-          
-          // Simplified neuron type for our needs
-          const Neuron = IDL.Record({
-            'id': IDL.Opt(NeuronId),
-            'cached_neuron_stake_e8s': IDL.Nat64,
-            'maturity_e8s_equivalent': IDL.Nat64,
-            'voting_power_percentage_multiplier': IDL.Nat64
-          })
-          
-          const ListNeuronsResponse = IDL.Record({
-            'neurons': IDL.Vec(Neuron)
-          })
-
-          return IDL.Service({
-            'list_neurons': IDL.Func([ListNeurons], [ListNeuronsResponse], ['query'])
-          })
-        },
+      const agent = await createAgent({
+        identity,
         host,
-        agent: {
-          identity,
-          host
-        }
+        fetchRootKey: process.env.DFX_NETWORK === 'local',
+      })
+
+      // Create a simplified IDL for list_neurons
+      const snsGovernanceIDL = ({ IDL }) => {
+        const NeuronId = IDL.Record({ 'id': IDL.Vec(IDL.Nat8) })
+        const ListNeurons = IDL.Record({
+          'of_principal': IDL.Opt(IDL.Principal),
+          'limit': IDL.Nat32,
+          'start_page_at': IDL.Opt(NeuronId)
+        })
+        
+        // Simplified neuron type for our needs
+        const Neuron = IDL.Record({
+          'id': IDL.Opt(NeuronId),
+          'cached_neuron_stake_e8s': IDL.Nat64,
+          'maturity_e8s_equivalent': IDL.Nat64,
+          'voting_power_percentage_multiplier': IDL.Nat64
+        })
+        
+        const ListNeuronsResponse = IDL.Record({
+          'neurons': IDL.Vec(Neuron)
+        })
+
+        return IDL.Service({
+          'list_neurons': IDL.Func([ListNeurons], [ListNeuronsResponse], ['query'])
+        })
+      }
+
+      return Actor.createActor(snsGovernanceIDL, {
+        agent,
+        canisterId
       })
     },
 
@@ -388,11 +394,15 @@ export default {
       const identity = await this.authClient.getIdentity()
       const host = process.env.DFX_NETWORK === 'local' ? 'http://localhost:4943' : 'https://ic0.app'
 
-      return createRewardsActor(canisterId, {
-        agentOptions: {
-          identity,
-          host
-        }
+      const agent = await createAgent({
+        identity,
+        host,
+        fetchRootKey: process.env.DFX_NETWORK === 'local',
+      })
+
+      return Actor.createActor(rewardsIDL, {
+        agent,
+        canisterId
       })
     },
 

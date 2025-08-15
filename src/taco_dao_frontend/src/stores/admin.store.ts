@@ -25,10 +25,10 @@ export const useAdminStore = defineStore('admin', () => {
    * Shows all significant digits, removes trailing zeros
    * Never rounds - preserves exact blockchain amounts
    * 
-   * @param {bigint|number|string} satoshis - Amount in TACO satoshis
-   * @returns {string} Formatted TACO amount (e.g., "999.99999999", "12.34", "1000")
+   * @param satoshis - Amount in TACO satoshis
+   * @returns Formatted TACO amount (e.g., "999.99999999", "12.34", "1000")
    */
-  const formatTacoPrecise = (satoshis) => {
+  const formatTacoPrecise = (satoshis: bigint | number | string): string => {
     try {
       // Convert to BigInt for consistent handling
       const satoshisBI = typeof satoshis === 'bigint' ? satoshis : BigInt(satoshis || 0)
@@ -49,10 +49,10 @@ export const useAdminStore = defineStore('admin', () => {
    * Format TACO tokens (already converted from satoshis) with full precision
    * Shows all significant digits, removes trailing zeros
    * 
-   * @param {number|string} tacoTokens - Amount in TACO tokens
-   * @returns {string} Formatted TACO amount (e.g., "999.99999999", "12.34", "1000")
+   * @param tacoTokens - Amount in TACO tokens
+   * @returns Formatted TACO amount (e.g., "999.99999999", "12.34", "1000")
    */
-  const formatTacoFromTokens = (tacoTokens) => {
+  const formatTacoFromTokens = (tacoTokens: number | string): string => {
     try {
       const tokenNum = Number(tacoTokens || 0)
       
@@ -69,11 +69,11 @@ export const useAdminStore = defineStore('admin', () => {
    * Format TACO amount from satoshis with fixed decimals (for display consistency)
    * Always shows the specified number of decimal places
    * 
-   * @param {bigint|number|string} satoshis - Amount in TACO satoshis
-   * @param {number} decimals - Number of decimal places to show (default: 8)
-   * @returns {string} Formatted TACO amount with fixed decimals
+   * @param satoshis - Amount in TACO satoshis
+   * @param decimals - Number of decimal places to show (default: 8)
+   * @returns Formatted TACO amount with fixed decimals
    */
-  const formatTacoFixed = (satoshis, decimals = TACO_DECIMALS) => {
+  const formatTacoFixed = (satoshis: bigint | number | string, decimals: number = TACO_DECIMALS): string => {
     try {
       const satoshisBI = typeof satoshis === 'bigint' ? satoshis : BigInt(satoshis || 0)
       const tacoTokens = Number(satoshisBI) / TACO_SATOSHIS_PER_TOKEN
@@ -88,10 +88,10 @@ export const useAdminStore = defineStore('admin', () => {
    * Format TACO amount from satoshis for short display (6 decimals max)
    * Removes trailing zeros but caps at 6 decimal places for UI space
    * 
-   * @param {bigint|number|string} satoshis - Amount in TACO satoshis
-   * @returns {string} Formatted TACO amount (shorter version)
+   * @param satoshis - Amount in TACO satoshis
+   * @returns Formatted TACO amount (shorter version)
    */
-  const formatTacoShort = (satoshis) => {
+  const formatTacoShort = (satoshis: bigint | number | string): string => {
     try {
       const satoshisBI = typeof satoshis === 'bigint' ? satoshis : BigInt(satoshis || 0)
       const tacoTokens = Number(satoshisBI) / TACO_SATOSHIS_PER_TOKEN
@@ -108,20 +108,20 @@ export const useAdminStore = defineStore('admin', () => {
   /**
    * Convert TACO tokens to satoshis
    * 
-   * @param {number} tokens - Amount in TACO tokens
-   * @returns {bigint} Amount in TACO satoshis
+   * @param tokens - Amount in TACO tokens
+   * @returns Amount in TACO satoshis
    */
-  const tacoTokensToSatoshis = (tokens) => {
+  const tacoTokensToSatoshis = (tokens: number): bigint => {
     return BigInt(Math.floor(tokens * TACO_SATOSHIS_PER_TOKEN))
   }
 
   /**
    * Convert TACO satoshis to tokens
    * 
-   * @param {bigint|number|string} satoshis - Amount in TACO satoshis
-   * @returns {number} Amount in TACO tokens
+   * @param satoshis - Amount in TACO satoshis
+   * @returns Amount in TACO tokens
    */
-  const tacoSatoshisToTokens = (satoshis) => {
+  const tacoSatoshisToTokens = (satoshis: bigint | number | string): number => {
     const satoshisBI = typeof satoshis === 'bigint' ? satoshis : BigInt(satoshis || 0)
     return Number(satoshisBI) / TACO_SATOSHIS_PER_TOKEN
   }
@@ -131,10 +131,10 @@ export const useAdminStore = defineStore('admin', () => {
   /**
    * Format a principal ID for display (truncated)
    * 
-   * @param {string} principal - Principal ID string
-   * @returns {string} Truncated principal for display
+   * @param principal - Principal ID string
+   * @returns Truncated principal for display
    */
-  const formatPrincipal = (principal) => {
+  const formatPrincipal = (principal: string): string => {
     if (!principal) return 'Unknown'
     
     // Remove dashes and truncate
@@ -147,12 +147,12 @@ export const useAdminStore = defineStore('admin', () => {
   /**
    * Calculate percentage with proper precision
    * 
-   * @param {number|bigint} part - The part value
-   * @param {number|bigint} total - The total value
-   * @param {number} decimals - Number of decimal places (default: 2)
-   * @returns {string} Formatted percentage
+   * @param part - The part value
+   * @param total - The total value
+   * @param decimals - Number of decimal places (default: 2)
+   * @returns Formatted percentage
    */
-  const calculatePercentage = (part, total, decimals = 2) => {
+  const calculatePercentage = (part: number | bigint, total: number | bigint, decimals: number = 2): string => {
     try {
       const partNum = typeof part === 'bigint' ? Number(part) : Number(part || 0)
       const totalNum = typeof total === 'bigint' ? Number(total) : Number(total || 0)
