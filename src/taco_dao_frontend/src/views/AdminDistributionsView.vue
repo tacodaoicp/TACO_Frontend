@@ -257,15 +257,19 @@
                 </div>
               </div>
               <div class="row mt-3">
-                <div class="col-md-4">
+                <div class="col-md-3">
                   <strong>Total Distributed:</strong><br>
                   <span class="text-warning">{{ adminStore.formatTacoPrecise(totalDistributed) }} TACO</span>
                 </div>
-                <div class="col-md-4">
+                <div class="col-md-3">
                   <strong>Canister TACO Balance:</strong><br>
                   <span class="text-primary">{{ adminStore.formatTacoPrecise(tacoBalance) }} TACO</span>
                 </div>
-                <div class="col-md-4">
+                <div class="col-md-3">
+                  <strong>Current Neuron Balances:</strong><br>
+                  <span class="text-info">{{ adminStore.formatTacoPrecise(currentNeuronBalances) }} TACO</span>
+                </div>
+                <div class="col-md-3">
                   <strong>Available for Distribution:</strong><br>
                   <span :class="availableBalance >= 0 ? 'text-success' : 'text-danger'">
                     {{ adminStore.formatTacoPrecise(availableBalance) }} TACO
@@ -578,6 +582,8 @@ export default {
       distributionHistory: [],
       totalDistributed: 0,
       tacoBalance: 0,
+      currentNeuronBalances: 0,
+      availableBalance: 0,
       showRewardDetails: {},
       rewardDisplayLimits: {},
       rewardSearchTerms: {},
@@ -1271,6 +1277,26 @@ export default {
       }
     },
 
+    async loadCurrentNeuronBalances() {
+      try {
+        const actor = await this.getRewardsActor()
+        this.currentNeuronBalances = await actor.getCurrentTotalNeuronBalances()
+      } catch (error) {
+        console.error('Error loading current neuron balances:', error)
+        // Don't show error message to user for this non-critical data
+      }
+    },
+
+    async loadAvailableBalance() {
+      try {
+        const actor = await this.getRewardsActor()
+        this.availableBalance = await actor.getAvailableBalance()
+      } catch (error) {
+        console.error('Error loading available balance:', error)
+        // Don't show error message to user for this non-critical data
+      }
+    },
+
     setDefaultCustomTimes() {
       const now = new Date()
       const sevenDaysAgo = new Date(now.getTime() - (7 * 24 * 60 * 60 * 1000))
@@ -1314,6 +1340,55 @@ export default {
         console.error('Error calculating reward percentage:', error, rewardAmount, totalRewardPot)
         return '0.00'
       }
+    },
+
+    async refreshHistory() {
+      this.clearMessages()
+      this.isLoading = true
+      this.currentAction = 'refresh'
+      
+      try {
+        await Promise.all([
+          this.loadDistributionStatus(),
+          this.loadDistributionHistory(),
+          this.loadTotalDistributed(),
+          this.loadTacoBalance(),
+          this.loadCurrentNeuronBalances(),
+          this.loadAvailableBalance()
+        ])
+      } catch (error) {
+        console.error('Error refreshing data:', error)
+        this.errorMessage = 'Failed to refresh distribution data'
+      } finally {
+        this.isLoading = false
+        this.currentAction = ''
+      }
+    }
+  },
+
+  async mounted() {
+    this.setDefaultCustomTimes()
+    
+    try {
+      await Promise.all([
+        this.loadDistributionStatus(),
+        this.loadConfiguration(),
+        this.loadDistributionHistory(),
+        this.loadTotalDistributed(),
+        this.loadTacoBalance(),
+        this.loadCurrentNeuronBalances(),
+        this.loadAvailableBalance()
+      ])
+      this.startPeriodicUpdates()
+    } catch (error) {
+      console.error('Error loading initial data:', error)
+      this.errorMessage = 'Failed to load distribution data'
+    }
+  },
+
+  beforeUnmount() {
+    if (this.refreshInterval) {
+      clearInterval(this.refreshInterval)
     }
   },
 

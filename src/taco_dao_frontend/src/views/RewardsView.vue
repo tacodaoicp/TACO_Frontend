@@ -115,6 +115,60 @@
             </div>
           </div>
 
+          <!-- Success Message -->
+          <div v-if="successMessage" class="alert alert-success" role="alert">
+            <strong>Success:</strong> {{ successMessage }}
+          </div>
+
+          <!-- Target Account Configuration -->
+          <div class="card bg-dark text-white mb-4">
+            <div class="card-header">
+              <h5 class="mb-0">
+                <i class="fas fa-wallet me-2"></i>
+                Withdrawal Account
+              </h5>
+            </div>
+            <div class="card-body">
+              <div class="row">
+                <div class="col-md-8">
+                  <label for="targetPrincipal" class="form-label">Target Principal <span class="text-danger">*</span></label>
+                  <input 
+                    id="targetPrincipal"
+                    v-model="targetPrincipal"
+                    @blur="saveAccount"
+                    type="text" 
+                    class="form-control bg-secondary text-white" 
+                    placeholder="Enter the principal ID where you want to receive TACO tokens"
+                  />
+                  <div class="form-text text-muted">
+                    This is where your claimed TACO tokens will be sent
+                  </div>
+                </div>
+                <div class="col-md-4">
+                  <label for="targetSubaccount" class="form-label">Subaccount (Optional)</label>
+                  <input 
+                    id="targetSubaccount"
+                    v-model="targetSubaccount"
+                    @blur="saveAccount"
+                    type="text" 
+                    class="form-control bg-secondary text-white" 
+                    placeholder="64 hex characters"
+                    maxlength="64"
+                  />
+                  <div class="form-text text-muted">
+                    Leave empty for default account
+                  </div>
+                </div>
+              </div>
+              <div class="mt-2">
+                <small class="text-info">
+                  <i class="fas fa-info-circle me-1"></i>
+                  Your account details are saved locally for convenience
+                </small>
+              </div>
+            </div>
+          </div>
+
           <!-- Neurons Table -->
           <div class="card bg-dark text-white">
             <div class="card-header d-flex justify-content-between align-items-center">
@@ -172,11 +226,12 @@
                       <td>
                         <button 
                           v-if="getNeuronBalance(neuron.id) > 0"
-                          @click="claimRewards([neuron.id])"
-                          :disabled="isLoading"
+                          @click="claimRewards([neuron.id[0].id])"
+                          :disabled="isLoading || isNeuronClaiming(neuron.id)"
                           class="btn btn-success btn-sm"
                         >
-                          💰 Claim
+                          <span v-if="isNeuronClaiming(neuron.id)" class="spinner-border spinner-border-sm me-1"></span>
+                          💰 {{ isNeuronClaiming(neuron.id) ? 'Claiming...' : 'Claim' }}
                         </button>
                         <span v-else class="text-muted">No rewards</span>
                       </td>
@@ -194,11 +249,11 @@
               <p class="text-muted">Claim rewards from multiple neurons at once to save on fees.</p>
               <button 
                 @click="claimAllRewards"
-                :disabled="isLoading"
+                :disabled="isLoading || claimingNeurons.size > 0"
                 class="btn btn-primary"
               >
-                <span v-if="isLoading" class="spinner-border spinner-border-sm me-2"></span>
-                💎 Claim All Rewards ({{ formatTacoPrecise(totalRewards) }} TACO)
+                <span v-if="isLoading || claimingNeurons.size > 0" class="spinner-border spinner-border-sm me-2"></span>
+                💎 {{ (claimingNeurons.size > 0) ? 'Claiming...' : 'Claim All Rewards' }} ({{ formatTacoPrecise(totalRewards) }} TACO)
               </button>
             </div>
           </div>
@@ -267,7 +322,13 @@ export default {
     const isLoading = ref(false)
     const errorMessage = ref('')
     const neurons = ref([])
-    const neuronBalances = ref(new Map()) // neuronId -> balance
+    const neuronBalances = ref(new Map())
+    const claimingNeurons = ref(new Set())
+    const successMessage = ref('')
+    
+    // Account fields with localStorage persistence
+    const targetPrincipal = ref('')
+    const targetSubaccount = ref('') // neuronId -> balance
     
     ///////////////
     // Computed //
@@ -295,6 +356,64 @@ export default {
     
     const iidLogIn = () => {
       tacoStore.iidLogIn()
+    }
+
+    // Account management with localStorage
+    const loadSavedAccount = () => {
+      try {
+        const savedPrincipal = localStorage.getItem('taco-rewards-target-principal')
+        const savedSubaccount = localStorage.getItem('taco-rewards-target-subaccount')
+        
+        if (savedPrincipal) {
+          targetPrincipal.value = savedPrincipal
+        }
+        if (savedSubaccount) {
+          targetSubaccount.value = savedSubaccount
+        }
+      } catch (error) {
+        console.warn('Failed to load saved account from localStorage:', error)
+      }
+    }
+    
+    const saveAccount = () => {
+      try {
+        if (targetPrincipal.value.trim()) {
+          localStorage.setItem('taco-rewards-target-principal', targetPrincipal.value.trim())
+        } else {
+          localStorage.removeItem('taco-rewards-target-principal')
+        }
+        
+        if (targetSubaccount.value.trim()) {
+          localStorage.setItem('taco-rewards-target-subaccount', targetSubaccount.value.trim())
+        } else {
+          localStorage.removeItem('taco-rewards-target-subaccount')
+        }
+      } catch (error) {
+        console.warn('Failed to save account to localStorage:', error)
+      }
+    }
+    
+    const validateAccount = () => {
+      if (!targetPrincipal.value.trim()) {
+        return { valid: false, error: 'Target principal is required' }
+      }
+      
+      try {
+        // Validate principal format
+        Principal.fromText(targetPrincipal.value.trim())
+      } catch (error) {
+        return { valid: false, error: 'Invalid principal format' }
+      }
+      
+      // Validate subaccount if provided (should be hex string, 32 bytes = 64 hex chars)
+      if (targetSubaccount.value.trim()) {
+        const subaccountHex = targetSubaccount.value.trim()
+        if (!/^[0-9a-fA-F]{64}$/.test(subaccountHex)) {
+          return { valid: false, error: 'Subaccount must be 64 hex characters (32 bytes) or empty' }
+        }
+      }
+      
+      return { valid: true }
     }
 
     const loadUserNeurons = async () => {
@@ -436,8 +555,67 @@ export default {
     }
 
     const claimRewards = async (neuronIds) => {
-      // TODO: Implement claim functionality
-      console.log('Claiming rewards for neurons:', neuronIds)
+      const validation = validateAccount()
+      if (!validation.valid) {
+        errorMessage.value = validation.error
+        return
+      }
+      
+      // Save account for future use
+      saveAccount()
+      
+      // Clear messages
+      errorMessage.value = ''
+      successMessage.value = ''
+      
+      // Mark neurons as being claimed
+      neuronIds.forEach(id => {
+        const key = formatNeuronIdForMap(id)
+        claimingNeurons.value.add(key)
+      })
+      
+      try {
+        const rewardsActor = await getRewardsActor()
+        
+        // Build ICRC1 Account object
+        const account = {
+          owner: Principal.fromText(targetPrincipal.value.trim()),
+          subaccount: targetSubaccount.value.trim() ? 
+            [hexStringToUint8Array(targetSubaccount.value.trim())] : []
+        }
+        
+        // Call withdraw with account and neuron IDs
+        const result = await rewardsActor.withdraw(account, neuronIds)
+        
+        if ('Ok' in result) {
+          const transactionId = result.Ok
+          successMessage.value = `Successfully claimed rewards! Transaction ID: ${transactionId}`
+          
+          // Refresh balances to show updated amounts
+          await loadNeuronBalances()
+        } else {
+          // Handle ICRC1 transfer errors
+          const error = result.Err
+          if ('InsufficientFunds' in error) {
+            errorMessage.value = `Insufficient funds: Balance is ${error.InsufficientFunds.balance}`
+          } else if ('BadFee' in error) {
+            errorMessage.value = `Bad fee: Expected ${error.BadFee.expected_fee}`
+          } else if ('GenericError' in error) {
+            errorMessage.value = `Error ${error.GenericError.error_code}: ${error.GenericError.message}`
+          } else {
+            errorMessage.value = `Claim failed: ${JSON.stringify(error)}`
+          }
+        }
+      } catch (error) {
+        console.error('Error claiming rewards:', error)
+        errorMessage.value = 'Failed to claim rewards: ' + error.message
+      } finally {
+        // Remove neurons from claiming set
+        neuronIds.forEach(id => {
+          const key = formatNeuronIdForMap(id)
+          claimingNeurons.value.delete(key)
+        })
+      }
     }
 
     const claimAllRewards = async () => {
@@ -479,6 +657,12 @@ export default {
       if (balance > 0) return 'text-success'
       return 'text-muted'
     }
+    
+    const isNeuronClaiming = (neuronId) => {
+      if (!neuronId || neuronId.length === 0) return false
+      const key = formatNeuronIdForMap(neuronId[0].id)
+      return claimingNeurons.value.has(key)
+    }
 
     const formatVotingPower = (multiplier) => {
       try {
@@ -517,6 +701,15 @@ export default {
         return '0'
       }
     }
+    
+    // Convert hex string to Uint8Array for subaccount
+    const hexStringToUint8Array = (hexString) => {
+      const result = new Uint8Array(hexString.length / 2)
+      for (let i = 0; i < hexString.length; i += 2) {
+        result[i / 2] = parseInt(hexString.substr(i, 2), 16)
+      }
+      return result
+    }
 
     ///////////
     // Watchers //
@@ -539,6 +732,7 @@ export default {
     /////////////
     
     onMounted(() => {
+      loadSavedAccount()
       if (userLoggedIn.value) {
         loadUserNeurons()
       }
@@ -554,9 +748,13 @@ export default {
       truncatedPrincipal,
       isLoading,
       errorMessage,
+      successMessage,
       neurons,
       totalRewards,
       claimableNeurons,
+      targetPrincipal,
+      targetSubaccount,
+      claimingNeurons,
       
       // methods
       iidLogIn,
@@ -569,7 +767,9 @@ export default {
       formatVotingPower,
       formatStake,
       formatMaturity,
-      formatTacoPrecise
+      formatTacoPrecise,
+      isNeuronClaiming,
+      saveAccount
     }
   }
 }
