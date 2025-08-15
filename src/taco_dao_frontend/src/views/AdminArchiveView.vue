@@ -709,7 +709,7 @@ export default {
     daoNeuronAllocationArchiveCanisterId() {
       switch (process.env.DFX_NETWORK) {
         case "ic":
-          return process.env.CANISTER_ID_DAO_NEURON_ALLOCATION_ARCHIVE_IC || 'cajb4-qqaaa-aaaan-qz5la-cai';
+          return process.env.CANISTER_ID_DAO_NEURON_ALLOCATION_ARCHIVE_IC || 'dnhfs-7yaaa-aaaan-qz5mq-cai';
         case "staging":
           return process.env.CANISTER_ID_DAO_NEURON_ALLOCATION_ARCHIVE_STAGING || 'cajb4-qqaaa-aaaan-qz5la-cai';
       }
