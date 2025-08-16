@@ -1105,6 +1105,7 @@
     background-repeat: no-repeat;
     background-position: center;
     background-size: 75% 75%;
+    width: 100%;
 
     hr {
       border-top: 1px solid var(--dark-orange) !important;
