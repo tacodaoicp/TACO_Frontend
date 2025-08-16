@@ -8,6 +8,17 @@
             <!-- changelog item -->
             <div class="changelog-content__item">
                 <h3 class="changelog-content__title">
+                    v1.0.5
+                </h3>
+                <span class="changelog-content__date">🍽️ August 16, 2025</span>
+                <p class="changelog-content__text">
+                    - Updates the homepage to include more info about the DAO
+                </p>
+            </div>
+
+            <!-- changelog item -->
+            <div class="changelog-content__item">
+                <h3 class="changelog-content__title">
                     v1.0.4
                 </h3>
                 <span class="changelog-content__date">🍽️ July 26, 2025</span>
