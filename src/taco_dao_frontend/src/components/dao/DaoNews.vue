@@ -41,10 +41,11 @@
       </div>
 
       <!-- taco container - l2 -->
-      <div class="dao-news__content overflow-auto">
+      <div class="dao-news__content">
 
         <!-- news -->
-        <div v-show="selectedNav === 'news'">
+        <div v-show="selectedNav === 'news'"
+            class="dao-news__content__news">
 
           <!-- news content -->
           <NewsContent />
@@ -53,7 +54,7 @@
 
         <!-- trade log -->
         <div v-show="selectedNav === 'trade-log'"
-            class="dao-news__content__trade-log overflow-hidden">
+            class="dao-news__content__trade-log">
 
           <!-- trade log content -->
           <DaoTradingLogs />
@@ -62,7 +63,7 @@
 
         <!-- change log -->
         <div v-show="selectedNav === 'change-log'"
-            class="dao-news__content__change-log overflow-hidden">
+            class="dao-news__content__change-log">
 
           <!-- change log content -->
           <ChangelogContent />
@@ -96,6 +97,9 @@
   &__content {
     display: flex;
     flex-direction: column;
+    overflow: auto;
+    border: 1px solid var(--dark-orange-to-light-brown);
+    border-radius: 0.5rem;
 
     // trade log
     &__trade-log {
