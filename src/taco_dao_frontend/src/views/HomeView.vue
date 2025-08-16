@@ -115,7 +115,13 @@
                 <!-- tile container inner -->
                 <div class="home-view__tile__inner home-view__taco-token-chart taco-container taco-container--l2 p-0">
 
-                  <iframe style="border-radius: 0.5rem;" src="https://dexscreener.com/icp/vhoia-myaaa-aaaar-qbmja-cai?embed=1&loadChartSettings=0&trades=0&tabs=0&info=0&chartLeftToolbar=0&chartTheme=dark&theme=dark&chartStyle=1&chartType=usd&interval=15"></iframe>
+                  <iframe v-if="!isMobile" style="border-radius: 0.5rem;" src="https://dexscreener.com/icp/vhoia-myaaa-aaaar-qbmja-cai?embed=1&loadChartSettings=0&trades=0&tabs=0&info=0&chartLeftToolbar=0&chartTheme=dark&theme=dark&chartStyle=1&chartType=usd&interval=15"></iframe>
+
+                  <div v-else @click="viewingChartModal = true" class="home-view__taco-token-chart__mobile">
+                    
+                    <span>Touch to View</span>
+                    
+                  </div>
 
                 </div>
 
@@ -636,6 +642,53 @@
       <li>{{ floatingEmoji2 }}</li>
     </ul> 
 
+    <!-- chart modal -->
+    <div v-show="viewingChartModal" class="home-view__chart-modal">
+      
+      <!-- message -->
+      <div class="home-view__chart-modal__dialog">
+        
+        <!-- message top -->
+        <div class="home-view__chart-modal__dialog__top px-2 p-2">
+
+          <!-- message top left -->
+          <div class="taco-text-white">Taco Token Chart</div>
+
+          <!-- message top right -->
+          <div class="taco-text-black-to-white"></div>
+
+        </div>
+
+        <!-- message middle -->
+        <div class="home-view__chart-modal__dialog__middle" style="width: 100%; height: 100%;">
+
+            <iframe style="width: 100%; height: 100%;" src="https://dexscreener.com/icp/vhoia-myaaa-aaaar-qbmja-cai?embed=1&loadChartSettings=0&trades=0&tabs=0&info=0&chartLeftToolbar=0&chartTheme=dark&theme=dark&chartStyle=1&chartType=usd&interval=15"></iframe>
+
+        </div>
+
+        <!-- message bottom -->
+        <div class="home-view__chart-modal__dialog__bottom p-2">
+
+          <!-- message bottom left -->
+          <div class="taco-text-black-to-white"></div>
+
+          <!-- message bottom right -->
+          <div class="taco-text-black-to-white">
+
+            <!-- close button -->
+            <button class="btn taco-nav-btn"
+                    @click="viewingChartModal = false">
+              Close
+            </button>
+
+          </div>
+
+        </div>
+
+      </div> 
+      
+    </div>    
+
   </div>
 
 </template>
@@ -1092,7 +1145,92 @@
 
   &__taco-token-chart {
     zoom: 0.5;
+    border-radius: 1rem;
+
+    &__mobile {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      background-image: url("../assets/images/smallchartplaceholder.png");
+      background-size: cover;
+      background-position: center;
+      background-repeat: no-repeat;
+      aspect-ratio: 16 / 9;
+      border-radius: 1rem;
+      position: relative;
+      cursor: pointer;
+
+      &:after {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0, 0, 0, 0.5);
+        border-radius: 1rem;
+        z-index: 1;
+      }
+
+      span {
+        font-size: 1rem;
+        color: var(--white);
+        z-index: 2;
+        text-align: center;
+      }
+
+    }
+
   }
+
+  &__chart-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    display: flex;
+    justify-content: center;
+    align-items: start;
+    width: 100%;
+    height: 100%;
+    background-color: var(--curtain-bg);
+    z-index: 99999;
+    margin: 0;
+    padding: 2rem;
+    overflow: auto;
+
+    // dialog
+    &__dialog {
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      align-items: center;
+      width: 100%;
+      height: 100%;
+      border-radius: 0.5rem;
+      background-color: var(--light-orange-to-dark-brown);
+      border: 1px solid var(--dark-orange);
+      overflow: auto;
+
+      // top and bottom
+      &__top, &__bottom {
+        display: flex;
+        width: 100%;
+        justify-content: space-between;
+        background-color: var(--dark-orange);
+      }
+
+      // middle
+      &__middle {
+        display: flex;
+        flex-direction: row;
+        align-items: start;
+        gap: 2rem;
+      }
+
+    }
+
+  }  
 
   &__taco-assets {
     padding: 0.5rem 0 0.375rem 0;
@@ -1454,6 +1592,9 @@
   .home-view__powered-by {
     margin: 3rem 0 1.5rem;
   }  
+  .home-view__chart-modal {
+    padding: 1rem;
+  }  
 }
 
 // phone landscape
@@ -1589,6 +1730,9 @@
   .home-view__taco-assets__svg {
     width: 1rem;
   }  
+  .home-view__chart-modal {
+    padding: 1rem;
+  }  
 }
 
 // tablet
@@ -1703,6 +1847,9 @@
   .home-view__taco-assets__svg {
     width: 1rem;
   }  
+  .home-view__chart-modal {
+    padding: 1rem;
+  }
 }
 
 // small daktop
@@ -1848,27 +1995,11 @@
   // Track intersection state
   const isBelowTheFoldVisible = ref(false)
 
-  ///////////////////
-  // Local Methods //
-  ///////////////////
+  // mobile check
+  const isMobile = ref(false)
 
-  //////////////
-  // handlers //
-
-  // handle intersection changes
-  const handleIntersection = (entries: IntersectionObserverEntry[]) => {
-
-    // loop through entries
-    entries.forEach(entry => {
-
-      // set is below the fold visible
-      isBelowTheFoldVisible.value = entry.isIntersecting
-      
-      // log
-      // console.log('.home-view__below-the-fold is visible:', entry.isIntersecting)
-
-    })
-  }
+  // viewing chart modal
+  const viewingChartModal = ref(false)
 
   //////////////
   // Computed //
@@ -1993,6 +2124,24 @@
   // Local Methods //
   ///////////////////
 
+  //////////////
+  // handlers //
+
+  // handle intersection changes
+  const handleIntersection = (entries: IntersectionObserverEntry[]) => {
+
+    // loop through entries
+    entries.forEach(entry => {
+
+      // set is below the fold visible
+      isBelowTheFoldVisible.value = entry.isIntersecting
+      
+      // log
+      // console.log('.home-view__below-the-fold is visible:', entry.isIntersecting)
+
+    })
+  }  
+
   // redirect to dao page
   const redirectToDao = () => {
     window.location.href = '/dao'
@@ -2010,6 +2159,9 @@
 
     // get the below the fold element
     const belowTheFold = document.querySelector('.home-view__below-the-fold')
+
+    // check for mobile
+    isMobile.value = /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
     
     // if below the fold exists
     if (belowTheFold) {
@@ -2046,7 +2198,7 @@
     
   })
 
-  // Clean up observer
+  // clean up observer
   onUnmounted(() => {
 
     // get the observer
