@@ -139,7 +139,7 @@
 
                   <!-- loader container -->
                   <div class="position-absolute top-0 start-0 w-100 h-100"
-                        style="z-index: 1; background-color: var(--orange-to-light-brown); border: 1px solid var(--dark-orange);">
+                        style="z-index: 1; background-color: var(--orange-to-light-brown); border: 1px solid var(--dark-orange); border-radius: 0.5rem;">
 
                     <!-- astronaut -->
                     <img :src="astronautLoaderUrl" class="loading-img">
