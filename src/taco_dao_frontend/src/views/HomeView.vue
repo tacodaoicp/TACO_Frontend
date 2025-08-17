@@ -107,20 +107,43 @@
               <!-- tile container -->
               <div class="home-view__tile taco-container taco-container--l1">
 
+                <!-- title -->
                 <h2 class="home-view__title">
                   <TacoCoinIcon class="home-view__title__icon"/>
                   <span class="home-view__title__text">TACO Token</span>
                 </h2>
 
-                <!-- tile container inner -->
-                <div class="home-view__tile__inner home-view__taco-token-chart taco-container taco-container--l2 p-0">
+                <!-- chart and loader container -->
+                <div class="position-relative w-100">
 
-                  <iframe v-if="!isMobile" style="border-radius: 0.5rem;" src="https://dexscreener.com/icp/vhoia-myaaa-aaaar-qbmja-cai?embed=1&loadChartSettings=0&trades=0&tabs=0&info=0&chartLeftToolbar=0&chartTheme=dark&theme=dark&chartStyle=1&chartType=usd&interval=15"></iframe>
+                  <!-- tile container inner -->
+                  <div class="home-view__tile__inner home-view__taco-token-chart taco-container taco-container--l2 p-0"
+                        style="z-index: 2;">
 
-                  <div v-else @click="viewingChartModal = true" class="home-view__taco-token-chart__mobile">
-                    
-                    <span>Touch to View</span>
-                    
+                    <!-- chart iframe -->
+                    <iframe v-if="!isMobile" 
+                            style="border-radius: 0.5rem; z-index: 1;" 
+                            src="https://dexscreener.com/icp/vhoia-myaaa-aaaar-qbmja-cai?embed=1&loadChartSettings=0&trades=0&tabs=0&info=0&chartLeftToolbar=0&chartTheme=dark&theme=dark&chartStyle=1&chartType=usd&interval=15"></iframe>
+
+                    <!-- mobile -->
+                    <div v-else @click="viewingChartModal = true" 
+                          class="home-view__taco-token-chart__mobile"
+                          style="z-index: 2;">
+                      
+                      <!-- text -->
+                      <span>Touch to View</span>
+                      
+                    </div>
+
+                  </div>
+
+                  <!-- loader container -->
+                  <div class="position-absolute top-0 start-0 w-100 h-100"
+                        style="z-index: 1; background-color: var(--orange-to-light-brown); border: 1px solid var(--dark-orange);">
+
+                    <!-- astronaut -->
+                    <img :src="astronautLoaderUrl" class="loading-img">
+
                   </div>
 
                 </div>
@@ -135,6 +158,7 @@
               <!-- tile container -->
               <div class="home-view__tile taco-container taco-container--l1">
 
+                <!-- title -->
                 <h2 class="home-view__title">
                   <span class="home-view__title__icon home-view__title__icon--i">📚</span>
                   <span class="home-view__title__text">Getting Started</span>
@@ -143,11 +167,17 @@
                 <!-- tile container inner -->
                 <div class="home-view__tile__inner taco-container taco-container--l2 p-0">
 
+                  <!-- video iframe -->
                   <iframe src="https://www.youtube.com/embed/ikNBuHYMkNs"
                     title="YouTube video player" 
                     frameborder="0" 
                     allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
-                    allowfullscreen></iframe>
+                    allowfullscreen
+                    style="z-index: 2;"
+                    ></iframe>
+
+                  <!-- astronaut -->
+                  <img :src="astronautLoaderUrl" class="loading-img">
 
                 </div>
                 
@@ -1301,6 +1331,15 @@
 
   }
 
+  .loading-img {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 10rem;
+    z-index: 1;
+  }
+
   .floating-tacos {
     position: absolute;
     top: 0%;
@@ -1972,6 +2011,7 @@
   import kongSwapLogo from '../assets/images/exchanges/kongswap-logo.svg'
   import swapRunnerLogo from '../assets/images/exchanges/swaprunner-logo.svg'
   import icpLogo from "../assets/tokens/snspng/icp.png"
+  import astronautLoader from '../assets/images/astonautLoader.webp'
 
   ///////////
   // Store //
@@ -2000,6 +2040,9 @@
 
   // viewing chart modal
   const viewingChartModal = ref(false)
+
+  // images
+  const astronautLoaderUrl =  astronautLoader 
 
   //////////////
   // Computed //
