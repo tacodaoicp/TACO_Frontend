@@ -30,6 +30,8 @@
                     <option value="dao_allocation_archive">📊 DAO Allocation Archive</option>
                     <option value="dao_neuron_allocation_archive">🧠 DAO Neuron Allocation Archive</option>
                     <option value="dao_governance_archive">🗳️ DAO Governance Archive</option>
+                    <option value="reward_distribution_archive">🎁 Reward Distribution Archive</option>
+                    <option value="reward_withdrawal_archive">💸 Reward Withdrawal Archive</option>
                   </select>
                 </div>
                 <div class="col-md-6 d-flex align-items-end">
@@ -242,6 +244,32 @@
                         :disabled="loading"
                       >
                         🧠 Import Neuron Updates
+                      </button>
+                    </div>
+                  </div>
+                  
+                  <div v-if="selectedArchive === 'reward_distribution_archive'" class="mt-3">
+                    <h6>Reward Distribution Archive</h6>
+                    <div class="d-flex flex-wrap gap-2">
+                      <button 
+                        class="btn btn-sm btn-outline-primary" 
+                        @click="runArchiveSpecificImport('importRewardDistributions')"
+                        :disabled="loading"
+                      >
+                        🎁 Import Reward Distributions
+                      </button>
+                    </div>
+                  </div>
+                  
+                  <div v-if="selectedArchive === 'reward_withdrawal_archive'" class="mt-3">
+                    <h6>Reward Withdrawal Archive</h6>
+                    <div class="d-flex flex-wrap gap-2">
+                      <button 
+                        class="btn btn-sm btn-outline-warning" 
+                        @click="runArchiveSpecificImport('importRewardWithdrawals')"
+                        :disabled="loading"
+                      >
+                        💸 Import Reward Withdrawals
                       </button>
                     </div>
                   </div>
@@ -543,6 +571,8 @@ import { createActor as createDaoAdminActor } from '../../../declarations/dao_ad
 import { createActor as createDaoAllocationActor } from '../../../declarations/dao_allocation_archive'
 import { createActor as createDaoNeuronAllocationActor } from '../../../declarations/dao_neuron_allocation_archive'
 import { createActor as createDaoGovernanceActor } from '../../../declarations/dao_governance_archive'
+import { createActor as createRewardDistributionActor } from '../../../declarations/reward_distribution_archive'
+import { createActor as createRewardWithdrawalActor } from '../../../declarations/reward_withdrawal_archive'
 
 export default {
   name: 'AdminArchiveView',
@@ -572,6 +602,8 @@ export default {
       daoAllocationActor: null,
       daoNeuronAllocationActor: null,
       daoGovernanceActor: null,
+      rewardDistributionActor: null,
+      rewardWithdrawalActor: null,
       
       // Refresh interval
       refreshInterval: null,
@@ -610,6 +642,8 @@ export default {
         case 'dao_allocation_archive': return this.daoAllocationActor
         case 'dao_neuron_allocation_archive': return this.daoNeuronAllocationActor
         case 'dao_governance_archive': return this.daoGovernanceActor
+        case 'reward_distribution_archive': return this.rewardDistributionActor
+        case 'reward_withdrawal_archive': return this.rewardWithdrawalActor
         default: return this.tradingActor
       }
     }
@@ -709,7 +743,7 @@ export default {
     daoNeuronAllocationArchiveCanisterId() {
       switch (process.env.DFX_NETWORK) {
         case "ic":
-          return process.env.CANISTER_ID_DAO_NEURON_ALLOCATION_ARCHIVE_IC || 'dnhfs-7yaaa-aaaan-qz5mq-cai';
+          return process.env.CANISTER_ID_DAO_NEURON_ALLOCATION_ARCHIVE_IC || 'cajb4-qqaaa-aaaan-qz5la-cai';
         case "staging":
           return process.env.CANISTER_ID_DAO_NEURON_ALLOCATION_ARCHIVE_STAGING || 'cajb4-qqaaa-aaaan-qz5la-cai';
       }
@@ -724,6 +758,26 @@ export default {
           return process.env.CANISTER_ID_DAO_GOVERNANCE_ARCHIVE_STAGING || 'bzzag-2yaaa-aaaan-qz5cq-cai';
       }
       return 'bzzag-2yaaa-aaaan-qz5cq-cai'; // fallback to staging canisterId for local
+    },
+
+    rewardDistributionArchiveCanisterId() {
+      switch (process.env.DFX_NETWORK) {
+        case "ic":
+          return process.env.CANISTER_ID_REWARD_DISTRIBUTION_ARCHIVE_IC || 'placeholder-reward-distribution-ic';
+        case "staging":
+          return process.env.CANISTER_ID_REWARD_DISTRIBUTION_ARCHIVE_STAGING || 'placeholder-reward-distribution-staging';
+      }
+      return 'placeholder-reward-distribution-staging'; // fallback for local
+    },
+
+    rewardWithdrawalArchiveCanisterId() {
+      switch (process.env.DFX_NETWORK) {
+        case "ic":
+          return process.env.CANISTER_ID_REWARD_WITHDRAWAL_ARCHIVE_IC || 'placeholder-reward-withdrawal-ic';
+        case "staging":
+          return process.env.CANISTER_ID_REWARD_WITHDRAWAL_ARCHIVE_STAGING || 'placeholder-reward-withdrawal-staging';
+      }
+      return 'placeholder-reward-withdrawal-staging'; // fallback for local
     },
 
     async createArchiveActors() {
@@ -760,6 +814,8 @@ export default {
         this.daoAllocationActor = createDaoAllocationActor(this.daoAllocationArchiveCanisterId(), { agent })
         this.daoNeuronAllocationActor = createDaoNeuronAllocationActor(this.daoNeuronAllocationArchiveCanisterId(), { agent })
         this.daoGovernanceActor = createDaoGovernanceActor(this.daoGovernanceArchiveCanisterId(), { agent })
+        this.rewardDistributionActor = createRewardDistributionActor(this.rewardDistributionArchiveCanisterId(), { agent })
+        this.rewardWithdrawalActor = createRewardWithdrawalActor(this.rewardWithdrawalArchiveCanisterId(), { agent })
         
         //console.log('Archive actors created with identity:', identity.getPrincipal().toString())
       } catch (error) {
@@ -1056,6 +1112,8 @@ export default {
         case 'dao_allocation_archive': return 'bg-info'
         case 'dao_neuron_allocation_archive': return 'bg-success'
         case 'dao_governance_archive': return 'bg-secondary'
+        case 'reward_distribution_archive': return 'bg-success'
+        case 'reward_withdrawal_archive': return 'bg-warning'
         default: return 'bg-secondary'
       }
     },
@@ -1086,6 +1144,12 @@ export default {
         case 'dao_governance_archive':
           // DAO governance archive status - shows voting power and neuron updates
           return 'Governance Archive - Voting power changes and neuron updates'
+        case 'reward_distribution_archive':
+          // Reward distribution archive status - shows reward distribution records
+          return 'Reward Distribution Archive - Periodic reward distribution records and neuron rewards'
+        case 'reward_withdrawal_archive':
+          // Reward withdrawal archive status - shows reward withdrawal records
+          return 'Reward Withdrawal Archive - User reward withdrawals and transaction records'
         default:
           return 'Unknown'
       }
