@@ -1,0 +1,219 @@
+type Value = 
+ variant {
+   Array: vec Value;
+   Blob: blob;
+   Int: int;
+   Map: vec record {
+              text;
+              Value;
+            };
+   Nat: nat;
+   Text: text;
+ };
+type TimerStatus = 
+ record {
+   innerLoopCurrentBatch: nat;
+   innerLoopCurrentType: text;
+   innerLoopLastRun: int;
+   innerLoopNextScheduled: int;
+   innerLoopRunning: bool;
+   innerLoopStartTime: int;
+   innerLoopTotalBatches: nat;
+   middleLoopCurrentState: text;
+   middleLoopLastRun: int;
+   middleLoopNextScheduled: int;
+   middleLoopRunning: bool;
+   middleLoopStartTime: int;
+   middleLoopTotalRuns: nat;
+   outerLoopIntervalSeconds: nat;
+   outerLoopLastRun: int;
+   outerLoopRunning: bool;
+   outerLoopTotalRuns: nat;
+ };
+type RewardDistributionBlockData = 
+ record {
+   actualDistributed: nat;
+   endTime: int;
+   failedNeurons: vec FailedNeuron;
+   id: nat;
+   neuronRewards: vec NeuronReward;
+   neuronsProcessed: nat;
+   startTime: int;
+   status: DistributionStatus;
+   timestamp: int;
+   totalRewardPot: nat;
+   totalRewardScore: float64;
+ };
+type RewardDistributionArchive = 
+ service {
+   archiveRewardDistribution: (distribution: RewardDistributionBlockData) ->
+    (Result_3);
+   getArchiveStats: () -> (ArchiveStatus) query;
+   getArchiveStatus: () -> (Result_2) query;
+   getBatchImportStatus: () ->
+    (record {
+       intervalSeconds: nat;
+       isRunning: bool;
+     }) query;
+   getLogs: (count: nat) -> (vec LogEntry) query;
+   getRewardDistributionsByDistributionId: (distributionId: nat, startIndex:
+    opt nat, length: nat) -> (Result_1) query;
+   getRewardDistributionsByTimeRange: (startTime: int, endTime: int, limit:
+    nat) -> (Result_1) query;
+   getTimerStatus: () -> (TimerStatus) query;
+   icrc3_get_archives: (args: GetArchivesArgs) -> (GetArchivesResult) query;
+   icrc3_get_blocks: (args: GetBlocksArgs) -> (GetBlocksResult) query;
+   icrc3_get_tip_certificate: () -> (opt DataCertificate) query;
+   icrc3_supported_block_types: () -> (vec BlockType) query;
+   resetImportTimestamps: () -> (Result);
+   runManualBatchImport: () -> (Result);
+   setMaxInnerLoopIterations: (iterations: nat) -> (Result);
+   startBatchImportSystem: () -> (Result);
+   stopAllTimers: () -> (Result);
+   stopBatchImportSystem: () -> (Result);
+ };
+type Result_3 = 
+ variant {
+   err: ArchiveError;
+   ok: nat;
+ };
+type Result_2 = 
+ variant {
+   err: ArchiveError;
+   ok: ArchiveStatus;
+ };
+type Result_1 = 
+ variant {
+   err: ArchiveError;
+   ok: vec RewardDistributionBlockData;
+ };
+type Result = 
+ variant {
+   err: text;
+   ok: text;
+ };
+type PriceInfo = 
+ record {
+   icpPrice: nat;
+   timestamp: int;
+   usdPrice: float64;
+ };
+type NeuronReward = 
+ record {
+   checkpoints: vec CheckpointData;
+   neuronId: blob;
+   performanceScore: float64;
+   rewardAmount: nat;
+   rewardScore: float64;
+   votingPower: nat;
+ };
+type LogLevel = 
+ variant {
+   ERROR;
+   INFO;
+   WARN;
+ };
+type LogEntry = 
+ record {
+   component: text;
+   context: text;
+   level: LogLevel;
+   message: text;
+   timestamp: int;
+ };
+type GetBlocksResult = 
+ record {
+   archived_blocks: vec ArchivedBlock;
+   blocks: vec Block;
+   log_length: nat;
+ };
+type GetBlocksArgs = 
+ vec record {
+       length: nat;
+       start: nat;
+     };
+type GetArchivesResult = 
+ vec record {
+       canister_id: principal;
+       end: nat;
+       start: nat;
+     };
+type GetArchivesArgs = record {from: opt principal;};
+type FailedNeuron = 
+ record {
+   errorMessage: text;
+   neuronId: blob;
+ };
+type DistributionStatus = 
+ variant {
+   Completed;
+   Failed: text;
+   InProgress: record {
+                 currentNeuron: nat;
+                 totalNeurons: nat;
+               };
+   PartiallyCompleted: record {
+                         failedNeurons: nat;
+                         successfulNeurons: nat;
+                       };
+ };
+type DataCertificate = 
+ record {
+   certificate: blob;
+   hash_tree: blob;
+ };
+type CheckpointData = 
+ record {
+   allocations: vec Allocation;
+   maker: opt principal;
+   pricesUsed: vec record {
+                     principal;
+                     PriceInfo;
+                   };
+   timestamp: int;
+   tokenValues: vec record {
+                      principal;
+                      float64;
+                    };
+   totalPortfolioValue: float64;
+ };
+type BlockType = 
+ record {
+   block_type: text;
+   url: text;
+ };
+type Block = 
+ record {
+   block: Value;
+   id: nat;
+ };
+type ArchivedBlock = 
+ record {
+   args: GetBlocksArgs;
+   callback: func (GetBlocksArgs) -> (GetBlocksResult) query;
+ };
+type ArchiveStatus = 
+ record {
+   lastArchiveTime: int;
+   newestBlock: opt nat;
+   oldestBlock: opt nat;
+   storageUsed: nat;
+   supportedBlockTypes: vec text;
+   totalBlocks: nat;
+ };
+type ArchiveError = 
+ variant {
+   BlockNotFound;
+   InvalidBlockType;
+   InvalidData;
+   InvalidTimeRange;
+   NotAuthorized;
+   StorageFull;
+   SystemError: text;
+ };
+type Allocation = 
+ record {
+   basisPoints: nat;
+   token: principal;
+ };
+service : () -> RewardDistributionArchive

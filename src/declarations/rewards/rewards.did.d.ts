@@ -90,6 +90,10 @@ export type Result = { 'Ok' : bigint } |
 export type Result__1 = { 'ok' : string } |
   { 'err' : RewardsError };
 export type Result__1_1 = {
+    'ok' : { 'withdrawals' : Array<WithdrawalRecord> }
+  } |
+  { 'err' : RewardsError };
+export type Result__1_2 = {
     'ok' : {
       'totalRecordsInHistory' : bigint,
       'totalWithdrawn' : bigint,
@@ -97,20 +101,24 @@ export type Result__1_1 = {
     }
   } |
   { 'err' : RewardsError };
-export type Result__1_2 = { 'ok' : Array<WithdrawalRecord> } |
+export type Result__1_3 = { 'ok' : Array<WithdrawalRecord> } |
   { 'err' : RewardsError };
-export type Result__1_3 = { 'ok' : PerformanceResult } |
+export type Result__1_4 = {
+    'ok' : { 'distributions' : Array<DistributionRecord> }
+  } |
+  { 'err' : RewardsError };
+export type Result__1_5 = { 'ok' : PerformanceResult } |
   { 'err' : RewardsError };
 export interface Rewards {
   'calculateNeuronPerformance' : ActorMethod<
     [Uint8Array | number[], bigint, bigint, PriceType],
-    Result__1_3
+    Result__1_5
   >,
   'getAllNeuronRewardBalances' : ActorMethod<
     [],
     Array<[Uint8Array | number[], bigint]>
   >,
-  'getAllWithdrawalHistory' : ActorMethod<[[] | [bigint]], Result__1_2>,
+  'getAllWithdrawalHistory' : ActorMethod<[[] | [bigint]], Result__1_3>,
   'getAvailableBalance' : ActorMethod<[], bigint>,
   'getCanisterStatus' : ActorMethod<
     [],
@@ -158,6 +166,7 @@ export interface Rewards {
     [[] | [bigint]],
     Array<DistributionRecord>
   >,
+  'getDistributionsSince' : ActorMethod<[bigint, bigint], Result__1_4>,
   'getNeuronRewardBalance' : ActorMethod<[Uint8Array | number[]], bigint>,
   'getNeuronRewardBalances' : ActorMethod<
     [Array<Uint8Array | number[]>],
@@ -165,8 +174,9 @@ export interface Rewards {
   >,
   'getTacoBalance' : ActorMethod<[], bigint>,
   'getTotalDistributed' : ActorMethod<[], bigint>,
-  'getUserWithdrawalHistory' : ActorMethod<[[] | [bigint]], Result__1_2>,
-  'getWithdrawalStats' : ActorMethod<[], Result__1_1>,
+  'getUserWithdrawalHistory' : ActorMethod<[[] | [bigint]], Result__1_3>,
+  'getWithdrawalStats' : ActorMethod<[], Result__1_2>,
+  'getWithdrawalsSince' : ActorMethod<[bigint, bigint], Result__1_1>,
   'setDistributionEnabled' : ActorMethod<[boolean], Result__1>,
   'setDistributionPeriod' : ActorMethod<[bigint], Result__1>,
   'setPerformanceScorePower' : ActorMethod<[number], Result__1>,

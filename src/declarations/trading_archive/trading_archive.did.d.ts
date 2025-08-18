@@ -98,12 +98,14 @@ export type Result_5 = { 'ok' : bigint } |
   { 'err' : ArchiveError };
 export type TacoBlockType = { 'NeuronUpdate' : null } |
   { 'VotingPower' : null } |
+  { 'RewardDistribution' : null } |
   { 'AllocationChange' : null } |
   { 'Pause' : null } |
   { 'Price' : null } |
   { 'FollowAction' : null } |
   { 'Portfolio' : null } |
   { 'Trade' : null } |
+  { 'RewardWithdrawal' : null } |
   { 'Admin' : null } |
   { 'Allocation' : null } |
   { 'Circuit' : null };

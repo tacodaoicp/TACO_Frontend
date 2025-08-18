@@ -44,12 +44,12 @@ type RewardsError =
 type Rewards = 
  service {
    calculateNeuronPerformance: (neuronId: blob, startTime: int, endTime: 
-    int, priceType: PriceType) -> (Result__1_3);
+    int, priceType: PriceType) -> (Result__1_5);
    getAllNeuronRewardBalances: () -> (vec record {
                                             blob;
                                             nat;
                                           }) query;
-   getAllWithdrawalHistory: (limit: opt nat) -> (Result__1_2);
+   getAllWithdrawalHistory: (limit: opt nat) -> (Result__1_3);
    getAvailableBalance: () -> (nat);
    getCanisterStatus: () ->
     (record {
@@ -89,6 +89,8 @@ type Rewards =
      }) query;
    getCurrentTotalNeuronBalances: () -> (nat) query;
    getDistributionHistory: (limit: opt nat) -> (vec DistributionRecord) query;
+   getDistributionsSince: (sinceTimestamp: int, limit: nat) ->
+    (Result__1_4) query;
    getNeuronRewardBalance: (neuronId: blob) -> (nat) query;
    getNeuronRewardBalances: (neuronIds: vec blob) ->
     (vec record {
@@ -97,8 +99,10 @@ type Rewards =
          }) query;
    getTacoBalance: () -> (nat);
    getTotalDistributed: () -> (nat) query;
-   getUserWithdrawalHistory: (limit: opt nat) -> (Result__1_2);
-   getWithdrawalStats: () -> (Result__1_1);
+   getUserWithdrawalHistory: (limit: opt nat) -> (Result__1_3);
+   getWithdrawalStats: () -> (Result__1_2);
+   getWithdrawalsSince: (sinceTimestamp: int, limit: nat) ->
+    (Result__1_1) query;
    setDistributionEnabled: (enabled: bool) -> (Result__1);
    setDistributionPeriod: (periodNS: nat) -> (Result__1);
    setPerformanceScorePower: (power: float64) -> (Result__1);
@@ -112,17 +116,22 @@ type Rewards =
     PriceType) -> (Result__1);
    withdraw: (account: Account, neuronIds: vec blob) -> (Result);
  };
-type Result__1_3 = 
+type Result__1_5 = 
  variant {
    err: RewardsError;
    ok: PerformanceResult;
  };
-type Result__1_2 = 
+type Result__1_4 = 
+ variant {
+   err: RewardsError;
+   ok: record {distributions: vec DistributionRecord;};
+ };
+type Result__1_3 = 
  variant {
    err: RewardsError;
    ok: vec WithdrawalRecord;
  };
-type Result__1_1 = 
+type Result__1_2 = 
  variant {
    err: RewardsError;
    ok:
@@ -131,6 +140,11 @@ type Result__1_1 =
       totalWithdrawals: nat;
       totalWithdrawn: nat;
     };
+ };
+type Result__1_1 = 
+ variant {
+   err: RewardsError;
+   ok: record {withdrawals: vec WithdrawalRecord;};
  };
 type Result__1 = 
  variant {
