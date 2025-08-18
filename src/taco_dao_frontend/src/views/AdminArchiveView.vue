@@ -2088,6 +2088,267 @@ export default {
         `
       }
 
+      // Reward distribution block details
+      if ((parsedData.tx && parsedData.tx.operation === '3reward_distribution') || tradeData.operation === '3reward_distribution') {
+        // Extract reward distribution data from the nested structure
+        let distributionData = tradeData
+        if (parsedData.tx && parsedData.tx.data) {
+          distributionData = parsedData.tx.data
+        }
+        
+        if (!distributionData) {
+          return '<div class="text-muted">No reward distribution data available</div>'
+        }
+        
+        // Extract key metrics
+        const distributionId = distributionData.id || 'Unknown'
+        const totalRewardPot = Number(distributionData.totalRewardPot || 0)
+        const actualDistributed = Number(distributionData.actualDistributed || 0)
+        const neuronsProcessed = Number(distributionData.neuronsProcessed || 0)
+        const totalRewardScore = parseFloat(distributionData.totalRewardScore || '0')
+        const status = distributionData.status || {}
+        const neuronRewards = distributionData.neuronRewards || []
+        const failedNeurons = distributionData.failedNeurons || []
+        
+        // Format amounts (convert from satoshis to TACO)
+        const distributedTACO = (actualDistributed / 100000000).toLocaleString(undefined, { maximumFractionDigits: 2 })
+        const potTACO = totalRewardPot.toLocaleString()
+        
+        // Status formatting
+        const statusType = status.type || 'Unknown'
+        const successfulNeurons = Number(status.successfulNeurons || neuronsProcessed - failedNeurons.length)
+        const failedCount = failedNeurons.length
+        
+        const statusClass = statusType === 'Completed' ? 'bg-success' : 
+                           statusType === 'PartiallyCompleted' ? 'bg-warning text-dark' : 
+                           statusType === 'Failed' ? 'bg-danger' : 'bg-secondary'
+        
+        // Top 3 reward recipients
+        const topRewards = neuronRewards
+          .sort((a, b) => Number(b.rewardAmount || 0) - Number(a.rewardAmount || 0))
+          .slice(0, 3)
+          .map(reward => {
+            const neuronId = this.formatNeuronFromBlob(reward.neuronId)
+            const amount = (Number(reward.rewardAmount || 0) / 100000000).toLocaleString(undefined, { maximumFractionDigits: 2 })
+            const votingPower = (Number(reward.votingPower || 0) / 100000000).toLocaleString(undefined, { maximumFractionDigits: 0 })
+            return { neuronId, amount, votingPower }
+          })
+        
+        // Time formatting
+        const distributionTime = this.formatTime(Number(distributionData.timestamp))
+        const startTime = this.formatTime(Number(distributionData.startTime))
+        const endTime = this.formatTime(Number(distributionData.endTime))
+        
+        return `
+          <div class="card bg-dark border-success">
+            <div class="card-header bg-success text-white">
+              <div class="d-flex justify-content-between align-items-center">
+                <h6 class="mb-0">🎁 Reward Distribution #${distributionId}</h6>
+                <span class="badge ${statusClass}">${statusType}</span>
+              </div>
+            </div>
+            <div class="card-body">
+              <div class="row">
+                <div class="col-md-6">
+                  <h6>💰 Distribution Summary</h6>
+                  <table class="table table-sm table-dark">
+                    <tr>
+                      <td><strong>Reward Pot:</strong></td>
+                      <td><span class="text-warning">${potTACO} TACO</span></td>
+                    </tr>
+                    <tr>
+                      <td><strong>Distributed:</strong></td>
+                      <td><span class="text-success">${distributedTACO} TACO</span></td>
+                    </tr>
+                    <tr>
+                      <td><strong>Total Score:</strong></td>
+                      <td><span class="text-info">${totalRewardScore.toLocaleString()}</span></td>
+                    </tr>
+                    <tr>
+                      <td><strong>Neurons:</strong></td>
+                      <td>
+                        <span class="text-success">${successfulNeurons} ✅</span>
+                        ${failedCount > 0 ? `<span class="text-danger ms-2">${failedCount} ❌</span>` : ''}
+                      </td>
+                    </tr>
+                  </table>
+                </div>
+                <div class="col-md-6">
+                  <h6>📅 Timing</h6>
+                  <table class="table table-sm table-dark">
+                    <tr>
+                      <td><strong>Period Start:</strong></td>
+                      <td>🕐 ${startTime}</td>
+                    </tr>
+                    <tr>
+                      <td><strong>Period End:</strong></td>
+                      <td>🕐 ${endTime}</td>
+                    </tr>
+                    <tr>
+                      <td><strong>Distribution Time:</strong></td>
+                      <td>🕐 ${distributionTime}</td>
+                    </tr>
+                  </table>
+                </div>
+              </div>
+              
+              ${topRewards.length > 0 ? `
+                <div class="mt-3">
+                  <h6>🏆 Top Rewards</h6>
+                  <div class="row">
+                    ${topRewards.map((reward, index) => `
+                      <div class="col-md-4">
+                        <div class="alert alert-success">
+                          <strong>#${index + 1}</strong><br>
+                          <code class="text-light">${reward.neuronId}</code><br>
+                          <span class="text-warning">${reward.amount} TACO</span><br>
+                          <small class="text-muted">${reward.votingPower} VP</small>
+                        </div>
+                      </div>
+                    `).join('')}
+                  </div>
+                </div>
+              ` : ''}
+              
+              ${failedNeurons.length > 0 ? `
+                <div class="mt-3">
+                  <h6 class="text-danger">❌ Failed Neurons (${failedNeurons.length})</h6>
+                  <div class="alert alert-danger">
+                    ${failedNeurons.slice(0, 3).map(failed => {
+                      const neuronId = this.formatNeuronFromBlob(failed.neuronId)
+                      return `<div><code>${neuronId}</code>: ${failed.errorMessage}</div>`
+                    }).join('')}
+                    ${failedNeurons.length > 3 ? `<div><em>... and ${failedNeurons.length - 3} more</em></div>` : ''}
+                  </div>
+                </div>
+              ` : ''}
+              
+              <small class="text-muted">
+                Distribution processed ${neuronsProcessed} neurons with ${totalRewardScore.toLocaleString()} total reward score
+              </small>
+            </div>
+          </div>
+        `
+      }
+
+      // Reward withdrawal block details
+      if ((parsedData.tx && parsedData.tx.operation === '3reward_withdrawal') || tradeData.operation === '3reward_withdrawal') {
+        // Extract reward withdrawal data from the nested structure
+        let withdrawalData = tradeData
+        if (parsedData.tx && parsedData.tx.data) {
+          withdrawalData = parsedData.tx.data
+        }
+        
+        if (!withdrawalData) {
+          return '<div class="text-muted">No reward withdrawal data available</div>'
+        }
+        
+        // Extract key information
+        const withdrawalId = withdrawalData.id || 'Unknown'
+        const owner = withdrawalData.owner ? this.formatPrincipalFromBlob(withdrawalData.owner) : 'Unknown'
+        const subaccount = withdrawalData.subaccount || null
+        const amount = Number(withdrawalData.amount || 0)
+        const fee = Number(withdrawalData.fee || 0)
+        const status = withdrawalData.status || 'Unknown'
+        const blockIndex = withdrawalData.blockIndex || null
+        const errorMessage = withdrawalData.errorMessage || null
+        
+        // Format amounts (convert from satoshis to TACO)
+        const withdrawnTACO = (amount / 100000000).toLocaleString(undefined, { maximumFractionDigits: 8 })
+        const feeTACO = (fee / 100000000).toLocaleString(undefined, { maximumFractionDigits: 8 })
+        const netAmount = ((amount - fee) / 100000000).toLocaleString(undefined, { maximumFractionDigits: 8 })
+        
+        // Status formatting
+        const statusClass = status === 'Completed' ? 'bg-success' : 
+                           status === 'Failed' ? 'bg-danger' : 'bg-secondary'
+        const statusIcon = status === 'Completed' ? '✅' : 
+                          status === 'Failed' ? '❌' : '❓'
+        
+        // Format owner display
+        const ownerShort = owner.length > 16 ? owner.substring(0, 8) + '...' + owner.substring(owner.length - 8) : owner
+        
+        // Format subaccount if present
+        const subaccountDisplay = subaccount ? 
+          `<tr>
+            <td><strong>Subaccount:</strong></td>
+            <td><code class="text-info">${Array.from(subaccount).map(b => b.toString(16).padStart(2, '0')).join('')}</code></td>
+          </tr>` : ''
+        
+        // Time formatting
+        const withdrawalTime = this.formatTime(Number(withdrawalData.timestamp))
+        
+        return `
+          <div class="card bg-dark border-warning">
+            <div class="card-header bg-warning text-dark">
+              <div class="d-flex justify-content-between align-items-center">
+                <h6 class="mb-0">💸 Reward Withdrawal #${withdrawalId}</h6>
+                <span class="badge ${statusClass}">${statusIcon} ${status}</span>
+              </div>
+            </div>
+            <div class="card-body">
+              <div class="row">
+                <div class="col-md-6">
+                  <h6>💰 Withdrawal Details</h6>
+                  <table class="table table-sm table-dark">
+                    <tr>
+                      <td><strong>Owner:</strong></td>
+                      <td>
+                        <code class="text-info">${ownerShort}</code><br>
+                        <small class="text-muted">${owner}</small>
+                      </td>
+                    </tr>
+                    ${subaccountDisplay}
+                    <tr>
+                      <td><strong>Amount:</strong></td>
+                      <td><span class="text-warning">${withdrawnTACO} TACO</span></td>
+                    </tr>
+                    <tr>
+                      <td><strong>Fee:</strong></td>
+                      <td><span class="text-muted">${feeTACO} TACO</span></td>
+                    </tr>
+                    <tr>
+                      <td><strong>Net Amount:</strong></td>
+                      <td><span class="text-success">${netAmount} TACO</span></td>
+                    </tr>
+                  </table>
+                </div>
+                <div class="col-md-6">
+                  <h6>📋 Transaction Info</h6>
+                  <table class="table table-sm table-dark">
+                    <tr>
+                      <td><strong>Status:</strong></td>
+                      <td><span class="badge ${statusClass}">${statusIcon} ${status}</span></td>
+                    </tr>
+                    ${blockIndex !== null ? `
+                      <tr>
+                        <td><strong>Block Index:</strong></td>
+                        <td><code class="text-success">${blockIndex}</code></td>
+                      </tr>
+                    ` : ''}
+                    <tr>
+                      <td><strong>Timestamp:</strong></td>
+                      <td>🕐 ${withdrawalTime}</td>
+                    </tr>
+                  </table>
+                  
+                  ${errorMessage ? `
+                    <div class="alert alert-danger mt-3">
+                      <h6 class="alert-heading">❌ Error</h6>
+                      <code>${errorMessage}</code>
+                    </div>
+                  ` : ''}
+                </div>
+              </div>
+              
+              <small class="text-muted">
+                Withdrawal ${status === 'Completed' ? 'successfully processed' : status === 'Failed' ? 'failed' : 'pending'}
+                ${blockIndex !== null ? ` with block index ${blockIndex}` : ''}
+              </small>
+            </div>
+          </div>
+        `
+      }
+
       // Neuron allocation change block details
       if ((parsedData.tx && parsedData.tx.operation === '3neuron_allocation_change') || tradeData.operation === '3neuron_allocation_change') {
         //console.log('=== Processing neuron allocation change block ===', tradeData)
@@ -2293,6 +2554,8 @@ export default {
         if (parsedData.tx.operation === '3admin') return 'Admin Action'
         if (parsedData.tx.operation === '3admin_action') return 'Admin Action'
         if (parsedData.tx.operation === '3follow_action') return 'Follow Action'
+        if (parsedData.tx.operation === '3reward_distribution') return 'Reward Distribution'
+        if (parsedData.tx.operation === '3reward_withdrawal') return 'Reward Withdrawal'
         return parsedData.tx.operation
       }
       
@@ -2633,6 +2896,52 @@ export default {
         const formattedTime = this.formatTime(Number(timestamp))
         
         return `⚙️ ${adminShort}: ${actionType}${tokenInfo} on ${canister} ${statusIcon} • 🕐 ${formattedTime}`
+      }
+      
+      // Reward distribution summary
+      if ((parsedData.tx && parsedData.tx.operation === '3reward_distribution') || tradeData.operation === '3reward_distribution') {
+        let distributionData = tradeData
+        if (parsedData.tx && parsedData.tx.data) {
+          distributionData = parsedData.tx.data
+        }
+        
+        const distributionId = distributionData.id || 'Unknown'
+        const actualDistributed = Number(distributionData.actualDistributed || 0)
+        const neuronsProcessed = Number(distributionData.neuronsProcessed || 0)
+        const status = distributionData.status?.type || 'Unknown'
+        const failedCount = (distributionData.failedNeurons || []).length
+        
+        const distributedTACO = (actualDistributed / 100000000).toFixed(2)
+        const statusIcon = status === 'Completed' ? '✅' : 
+                          status === 'PartiallyCompleted' ? '⚠️' : 
+                          status === 'Failed' ? '❌' : '❓'
+        
+        const timestamp = distributionData.timestamp || Date.now()
+        const formattedTime = this.formatTime(Number(timestamp))
+        
+        return `🎁 Distribution #${distributionId}: ${distributedTACO} TACO to ${neuronsProcessed} neurons ${statusIcon}${failedCount > 0 ? ` (${failedCount} failed)` : ''} • 🕐 ${formattedTime}`
+      }
+      
+      // Reward withdrawal summary
+      if ((parsedData.tx && parsedData.tx.operation === '3reward_withdrawal') || tradeData.operation === '3reward_withdrawal') {
+        let withdrawalData = tradeData
+        if (parsedData.tx && parsedData.tx.data) {
+          withdrawalData = parsedData.tx.data
+        }
+        
+        const owner = withdrawalData.owner ? this.formatPrincipalFromBlob(withdrawalData.owner) : 'Unknown'
+        const amount = Number(withdrawalData.amount || 0)
+        const status = withdrawalData.status || 'Unknown'
+        
+        const withdrawnTACO = (amount / 100000000).toFixed(2)
+        const statusIcon = status === 'Completed' ? '✅' : 
+                          status === 'Failed' ? '❌' : '❓'
+        
+        const timestamp = withdrawalData.timestamp || Date.now()
+        const formattedTime = this.formatTime(Number(timestamp))
+        const ownerShort = owner.length > 16 ? owner.substring(0, 8) + '...' + owner.substring(owner.length - 8) : owner
+        
+        return `💸 ${ownerShort}: ${withdrawnTACO} TACO withdrawal ${statusIcon} • 🕐 ${formattedTime}`
       }
       
       // Generic block
