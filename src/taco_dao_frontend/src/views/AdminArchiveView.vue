@@ -2207,6 +2207,48 @@ export default {
                       </div>
                     `).join('')}
                   </div>
+                  
+                  ${neuronRewards.length > 3 ? `
+                    <div class="mt-3">
+                      <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#allNeurons${distributionId}" aria-expanded="false">
+                        <i class="fas fa-list"></i> View All ${neuronRewards.length} Neurons
+                      </button>
+                      <div class="collapse mt-3" id="allNeurons${distributionId}">
+                        <div class="card bg-secondary">
+                          <div class="card-header">
+                            <h6 class="mb-0 text-light">🧠 All Neuron Rewards</h6>
+                          </div>
+                          <div class="card-body" style="max-height: 400px; overflow-y: auto;">
+                            <div class="row">
+                              ${neuronRewards.map((reward, index) => {
+                                const neuronId = this.formatNeuronFromBlob(reward.neuronId)
+                                const amount = (Number(reward.rewardAmount || 0) / 100000000).toLocaleString(undefined, { maximumFractionDigits: 2 })
+                                const votingPower = (Number(reward.votingPower || 0) / 100000000).toLocaleString(undefined, { maximumFractionDigits: 0 })
+                                const performanceScore = parseFloat(reward.performanceScore || '0').toFixed(6)
+                                const rewardScore = parseFloat(reward.rewardScore || '0').toLocaleString()
+                                
+                                return `
+                                  <div class="col-md-6 col-lg-4 mb-2">
+                                    <div class="alert alert-dark mb-2">
+                                      <div class="d-flex justify-content-between align-items-start">
+                                        <small class="text-muted">#${index + 1}</small>
+                                        <small class="text-info">${performanceScore} perf</small>
+                                      </div>
+                                      <code class="text-light" style="font-size: 0.8em;">${neuronId}</code><br>
+                                      <div class="mt-1">
+                                        <span class="text-warning"><strong>${amount} TACO</strong></span><br>
+                                        <small class="text-muted">${votingPower} VP • ${rewardScore} score</small>
+                                      </div>
+                                    </div>
+                                  </div>
+                                `
+                              }).join('')}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ` : ''}
                 </div>
               ` : ''}
               
