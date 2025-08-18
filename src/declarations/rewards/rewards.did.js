@@ -59,8 +59,27 @@ export const idlFactory = ({ IDL }) => {
     'InvalidTimeRange' : IDL.Null,
     'InsufficientRewardPot' : IDL.Null,
   });
-  const Result__1_1 = IDL.Variant({
+  const Result__1_3 = IDL.Variant({
     'ok' : PerformanceResult,
+    'err' : RewardsError,
+  });
+  const Account = IDL.Record({
+    'owner' : IDL.Principal,
+    'subaccount' : IDL.Opt(IDL.Vec(IDL.Nat8)),
+  });
+  const WithdrawalRecord = IDL.Record({
+    'id' : IDL.Nat,
+    'fee' : IDL.Nat,
+    'amountSent' : IDL.Nat,
+    'neuronWithdrawals' : IDL.Vec(IDL.Tuple(IDL.Vec(IDL.Nat8), IDL.Nat)),
+    'totalAmount' : IDL.Nat,
+    'timestamp' : IDL.Int,
+    'caller' : IDL.Principal,
+    'targetAccount' : Account,
+    'transactionId' : IDL.Opt(IDL.Nat),
+  });
+  const Result__1_2 = IDL.Variant({
+    'ok' : IDL.Vec(WithdrawalRecord),
     'err' : RewardsError,
   });
   const DistributionStatus = IDL.Variant({
@@ -100,11 +119,15 @@ export const idlFactory = ({ IDL }) => {
     'neuronRewards' : IDL.Vec(NeuronReward),
     'failedNeurons' : IDL.Vec(FailedNeuron),
   });
-  const Result__1 = IDL.Variant({ 'ok' : IDL.Text, 'err' : RewardsError });
-  const Account = IDL.Record({
-    'owner' : IDL.Principal,
-    'subaccount' : IDL.Opt(IDL.Vec(IDL.Nat8)),
+  const Result__1_1 = IDL.Variant({
+    'ok' : IDL.Record({
+      'totalRecordsInHistory' : IDL.Nat,
+      'totalWithdrawn' : IDL.Nat,
+      'totalWithdrawals' : IDL.Nat,
+    }),
+    'err' : RewardsError,
   });
+  const Result__1 = IDL.Variant({ 'ok' : IDL.Text, 'err' : RewardsError });
   const TransferError = IDL.Variant({
     'GenericError' : IDL.Record({
       'message' : IDL.Text,
@@ -122,7 +145,7 @@ export const idlFactory = ({ IDL }) => {
   const Rewards = IDL.Service({
     'calculateNeuronPerformance' : IDL.Func(
         [IDL.Vec(IDL.Nat8), IDL.Int, IDL.Int, PriceType],
-        [Result__1_1],
+        [Result__1_3],
         [],
       ),
     'getAllNeuronRewardBalances' : IDL.Func(
@@ -130,6 +153,7 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Vec(IDL.Tuple(IDL.Vec(IDL.Nat8), IDL.Nat))],
         ['query'],
       ),
+    'getAllWithdrawalHistory' : IDL.Func([IDL.Opt(IDL.Nat)], [Result__1_2], []),
     'getAvailableBalance' : IDL.Func([], [IDL.Nat], []),
     'getCanisterStatus' : IDL.Func(
         [],
@@ -199,6 +223,12 @@ export const idlFactory = ({ IDL }) => {
       ),
     'getTacoBalance' : IDL.Func([], [IDL.Nat], []),
     'getTotalDistributed' : IDL.Func([], [IDL.Nat], ['query']),
+    'getUserWithdrawalHistory' : IDL.Func(
+        [IDL.Opt(IDL.Nat)],
+        [Result__1_2],
+        [],
+      ),
+    'getWithdrawalStats' : IDL.Func([], [Result__1_1], []),
     'setDistributionEnabled' : IDL.Func([IDL.Bool], [Result__1], []),
     'setDistributionPeriod' : IDL.Func([IDL.Nat], [Result__1], []),
     'setPerformanceScorePower' : IDL.Func([IDL.Float64], [Result__1], []),

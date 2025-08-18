@@ -89,17 +89,28 @@ export type Result = { 'Ok' : bigint } |
   { 'Err' : TransferError };
 export type Result__1 = { 'ok' : string } |
   { 'err' : RewardsError };
-export type Result__1_1 = { 'ok' : PerformanceResult } |
+export type Result__1_1 = {
+    'ok' : {
+      'totalRecordsInHistory' : bigint,
+      'totalWithdrawn' : bigint,
+      'totalWithdrawals' : bigint,
+    }
+  } |
+  { 'err' : RewardsError };
+export type Result__1_2 = { 'ok' : Array<WithdrawalRecord> } |
+  { 'err' : RewardsError };
+export type Result__1_3 = { 'ok' : PerformanceResult } |
   { 'err' : RewardsError };
 export interface Rewards {
   'calculateNeuronPerformance' : ActorMethod<
     [Uint8Array | number[], bigint, bigint, PriceType],
-    Result__1_1
+    Result__1_3
   >,
   'getAllNeuronRewardBalances' : ActorMethod<
     [],
     Array<[Uint8Array | number[], bigint]>
   >,
+  'getAllWithdrawalHistory' : ActorMethod<[[] | [bigint]], Result__1_2>,
   'getAvailableBalance' : ActorMethod<[], bigint>,
   'getCanisterStatus' : ActorMethod<
     [],
@@ -154,6 +165,8 @@ export interface Rewards {
   >,
   'getTacoBalance' : ActorMethod<[], bigint>,
   'getTotalDistributed' : ActorMethod<[], bigint>,
+  'getUserWithdrawalHistory' : ActorMethod<[[] | [bigint]], Result__1_2>,
+  'getWithdrawalStats' : ActorMethod<[], Result__1_1>,
   'setDistributionEnabled' : ActorMethod<[boolean], Result__1>,
   'setDistributionPeriod' : ActorMethod<[bigint], Result__1>,
   'setPerformanceScorePower' : ActorMethod<[number], Result__1>,
@@ -187,6 +200,17 @@ export type TransferError = {
   { 'CreatedInFuture' : { 'ledger_time' : bigint } } |
   { 'TooOld' : null } |
   { 'InsufficientFunds' : { 'balance' : bigint } };
+export interface WithdrawalRecord {
+  'id' : bigint,
+  'fee' : bigint,
+  'amountSent' : bigint,
+  'neuronWithdrawals' : Array<[Uint8Array | number[], bigint]>,
+  'totalAmount' : bigint,
+  'timestamp' : bigint,
+  'caller' : Principal,
+  'targetAccount' : Account,
+  'transactionId' : [] | [bigint],
+}
 export interface _SERVICE extends Rewards {}
 export declare const idlFactory: IDL.InterfaceFactory;
 export declare const init: (args: { IDL: typeof IDL }) => IDL.Type[];

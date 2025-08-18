@@ -1,3 +1,18 @@
+type WithdrawalRecord = 
+ record {
+   amountSent: nat;
+   caller: principal;
+   fee: nat;
+   id: nat;
+   neuronWithdrawals: vec record {
+                            blob;
+                            nat;
+                          };
+   targetAccount: Account;
+   timestamp: int;
+   totalAmount: nat;
+   transactionId: opt nat;
+ };
 type TransferError = 
  variant {
    BadBurn: record {min_burn_amount: nat;};
@@ -29,11 +44,12 @@ type RewardsError =
 type Rewards = 
  service {
    calculateNeuronPerformance: (neuronId: blob, startTime: int, endTime: 
-    int, priceType: PriceType) -> (Result__1_1);
+    int, priceType: PriceType) -> (Result__1_3);
    getAllNeuronRewardBalances: () -> (vec record {
                                             blob;
                                             nat;
                                           }) query;
+   getAllWithdrawalHistory: (limit: opt nat) -> (Result__1_2);
    getAvailableBalance: () -> (nat);
    getCanisterStatus: () ->
     (record {
@@ -81,6 +97,8 @@ type Rewards =
          }) query;
    getTacoBalance: () -> (nat);
    getTotalDistributed: () -> (nat) query;
+   getUserWithdrawalHistory: (limit: opt nat) -> (Result__1_2);
+   getWithdrawalStats: () -> (Result__1_1);
    setDistributionEnabled: (enabled: bool) -> (Result__1);
    setDistributionPeriod: (periodNS: nat) -> (Result__1);
    setPerformanceScorePower: (power: float64) -> (Result__1);
@@ -94,10 +112,25 @@ type Rewards =
     PriceType) -> (Result__1);
    withdraw: (account: Account, neuronIds: vec blob) -> (Result);
  };
-type Result__1_1 = 
+type Result__1_3 = 
  variant {
    err: RewardsError;
    ok: PerformanceResult;
+ };
+type Result__1_2 = 
+ variant {
+   err: RewardsError;
+   ok: vec WithdrawalRecord;
+ };
+type Result__1_1 = 
+ variant {
+   err: RewardsError;
+   ok:
+    record {
+      totalRecordsInHistory: nat;
+      totalWithdrawals: nat;
+      totalWithdrawn: nat;
+    };
  };
 type Result__1 = 
  variant {

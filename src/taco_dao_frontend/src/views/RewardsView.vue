@@ -273,6 +273,99 @@
               </div>
             </div>
 
+            <!-- Claims History Section -->
+            <div v-if="userLoggedIn" class="mx-3 mt-4">
+              <div class="card bg-dark text-white">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                  <h5 class="mb-0">📋 Your Claims History</h5>
+                  <button 
+                    class="btn btn-outline-light btn-sm"
+                    @click="loadUserWithdrawalHistory"
+                    :disabled="isLoadingHistory"
+                  >
+                    <span v-if="isLoadingHistory" class="spinner-border spinner-border-sm me-1"></span>
+                    🔄 Refresh
+                  </button>
+                </div>
+                <div class="card-body">
+                  <div v-if="isLoadingHistory && userWithdrawalHistory.length === 0" class="text-center py-4">
+                    <div class="spinner-border text-primary" role="status">
+                      <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <p class="mt-2 text-muted">Loading your claims history...</p>
+                  </div>
+
+                  <div v-else-if="userWithdrawalHistory.length === 0" class="text-center py-4">
+                    <p class="text-muted">No claims history found.</p>
+                    <p class="text-muted">Your successful reward claims will appear here.</p>
+                  </div>
+
+                  <div v-else>
+                    <div class="table-responsive">
+                      <table class="table table-dark table-striped">
+                        <thead>
+                          <tr>
+                            <th>Date</th>
+                            <th>Neurons</th>
+                            <th>Amount Claimed</th>
+                            <th>Fee</th>
+                            <th>Received</th>
+                            <th>Status</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <tr v-for="claim in userWithdrawalHistory" :key="claim.id">
+                            <td>
+                              <small>{{ formatTimestamp(claim.timestamp) }}</small>
+                            </td>
+                            <td>
+                              <span class="badge bg-secondary me-1">{{ claim.neuronWithdrawals.length }}</span>
+                              <div class="mt-1">
+                                <small 
+                                  v-for="[neuronId, amount] in claim.neuronWithdrawals.slice(0, 2)" 
+                                  :key="neuronId"
+                                  class="d-block text-muted"
+                                >
+                                  {{ formatNeuronId(neuronId) }}: {{ formatTacoPrecise(amount) }}
+                                </small>
+                                <small 
+                                  v-if="claim.neuronWithdrawals.length > 2" 
+                                  class="d-block text-muted"
+                                >
+                                  +{{ claim.neuronWithdrawals.length - 2 }} more...
+                                </small>
+                              </div>
+                            </td>
+                            <td>
+                              <span class="text-info">{{ formatTacoPrecise(claim.totalAmount) }} TACO</span>
+                            </td>
+                            <td>
+                              <span class="text-warning">{{ formatTacoPrecise(claim.fee) }} TACO</span>
+                            </td>
+                            <td>
+                              <span class="text-success">{{ formatTacoPrecise(claim.amountSent) }} TACO</span>
+                            </td>
+                            <td>
+                              <span v-if="claim.transactionId" class="badge bg-success">
+                                ✅ Success
+                              </span>
+                              <span v-else class="badge bg-danger">❌ Failed</span>
+                            </td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+
+                    <div v-if="userWithdrawalHistory.length >= 20" class="text-center mt-3">
+                      <small class="text-muted">
+                        Showing your 20 most recent claims. Contact support if you need older records.
+                      </small>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
           </div>
         </div>
       </div>
@@ -329,6 +422,10 @@ export default {
     // Account fields with localStorage persistence
     const targetPrincipal = ref('')
     const targetSubaccount = ref('') // neuronId -> balance
+    
+    // Withdrawal history
+    const userWithdrawalHistory = ref([])
+    const isLoadingHistory = ref(false)
     
     ///////////////
     // Computed //
@@ -591,8 +688,9 @@ export default {
           const transactionId = result.Ok
           successMessage.value = `Successfully claimed rewards! Transaction ID: ${transactionId}`
           
-          // Refresh balances to show updated amounts
+          // Refresh balances and withdrawal history to show updated amounts
           await loadNeuronBalances()
+          await loadUserWithdrawalHistory()
         } else {
           // Handle ICRC1 transfer errors
           const error = result.Err
@@ -711,6 +809,46 @@ export default {
       return result
     }
 
+    // Load user's withdrawal history
+    const loadUserWithdrawalHistory = async () => {
+      isLoadingHistory.value = true
+      try {
+        const rewardsActor = await getRewardsActor()
+        const result = await rewardsActor.getUserWithdrawalHistory([20]) // Get last 20 records
+        
+        if ('Ok' in result) {
+          userWithdrawalHistory.value = result.Ok
+        } else {
+          console.error('Error loading withdrawal history:', result.Err)
+        }
+      } catch (error) {
+        console.error('Failed to load withdrawal history:', error)
+      } finally {
+        isLoadingHistory.value = false
+      }
+    }
+
+    // Format timestamp from nanoseconds
+    const formatTimestamp = (timestampNS) => {
+      try {
+        if (!timestampNS || timestampNS === 0) {
+          return 'Never'
+        }
+        
+        const timestampMS = Number(timestampNS) / 1_000_000
+        const date = new Date(timestampMS)
+        
+        if (isNaN(date.getTime())) {
+          return 'Invalid Date'
+        }
+        
+        return date.toLocaleString()
+      } catch (error) {
+        console.error('Error formatting timestamp:', error, timestampNS)
+        return 'Format Error'
+      }
+    }
+
     ///////////
     // Watchers //
     ///////////
@@ -719,10 +857,12 @@ export default {
     watch(userLoggedIn, (newState) => {
       if (newState) {
         loadUserNeurons()
+        loadUserWithdrawalHistory()
       } else {
         // Clear data when user logs out
         neurons.value = []
         neuronBalances.value.clear()
+        userWithdrawalHistory.value = []
         errorMessage.value = ''
       }
     }, { immediate: true })
@@ -735,6 +875,7 @@ export default {
       loadSavedAccount()
       if (userLoggedIn.value) {
         loadUserNeurons()
+        loadUserWithdrawalHistory()
       }
     })
 
@@ -755,6 +896,8 @@ export default {
       targetPrincipal,
       targetSubaccount,
       claimingNeurons,
+      userWithdrawalHistory,
+      isLoadingHistory,
       
       // methods
       iidLogIn,
@@ -769,7 +912,9 @@ export default {
       formatMaturity,
       formatTacoPrecise,
       isNeuronClaiming,
-      saveAccount
+      saveAccount,
+      loadUserWithdrawalHistory,
+      formatTimestamp
     }
   }
 }
