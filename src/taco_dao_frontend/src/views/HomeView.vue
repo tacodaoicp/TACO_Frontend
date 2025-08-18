@@ -120,6 +120,13 @@
                   <div class="home-view__tile__inner home-view__taco-token-chart taco-container taco-container--l2 p-0"
                         style="z-index: 2;">
 
+                    <!-- expand button -->
+                    <button v-if="!isMobile"
+                            class="btn taco-nav-btn home-view__taco-token-chart__expand-btn"
+                            @click="viewingChartModal = true">
+                      <i class="fa-solid fa-expand"></i>
+                    </button>
+
                     <!-- chart iframe -->
                     <iframe v-if="!isMobile" 
                             style="border-radius: 0.5rem; z-index: 1;" 
@@ -131,7 +138,7 @@
                           style="z-index: 2;">
                       
                       <!-- text -->
-                      <span>Touch to View</span>
+                      <span>Tap to View</span>
                       
                     </div>
 
@@ -1176,6 +1183,17 @@
   &__taco-token-chart {
     zoom: 0.5;
     border-radius: 1rem;
+
+    &__expand-btn {
+      position: absolute;
+      top: 0.5rem;
+      right: 0.5rem;
+      z-index: 1000;
+      color: var(--);
+      background-color: var(--yellow-to-dark-orange);
+      border: 1px solid var(--dark-orange);
+      zoom: 2;
+    }
 
     &__mobile {
       display: flex;
