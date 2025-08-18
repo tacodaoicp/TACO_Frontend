@@ -2218,32 +2218,39 @@ export default {
                           <div class="card-header">
                             <h6 class="mb-0 text-light">🧠 All Neuron Rewards</h6>
                           </div>
-                          <div class="card-body" style="max-height: 400px; overflow-y: auto;">
-                            <div class="row">
-                              ${neuronRewards.map((reward, index) => {
-                                const neuronId = this.formatNeuronFromBlob(reward.neuronId)
-                                const amount = (Number(reward.rewardAmount || 0) / 100000000).toLocaleString(undefined, { maximumFractionDigits: 2 })
-                                const votingPower = (Number(reward.votingPower || 0) / 100000000).toLocaleString(undefined, { maximumFractionDigits: 0 })
-                                const performanceScore = parseFloat(reward.performanceScore || '0').toFixed(6)
-                                const rewardScore = parseFloat(reward.rewardScore || '0').toLocaleString()
-                                
-                                return `
-                                  <div class="col-md-6 col-lg-4 mb-2">
-                                    <div class="alert alert-dark mb-2">
-                                      <div class="d-flex justify-content-between align-items-start">
-                                        <small class="text-muted">#${index + 1}</small>
-                                        <small class="text-info">${performanceScore} perf</small>
-                                      </div>
-                                      <code class="text-light" style="font-size: 0.8em;">${neuronId}</code><br>
-                                      <div class="mt-1">
-                                        <span class="text-warning"><strong>${amount} TACO</strong></span><br>
-                                        <small class="text-muted">${votingPower} VP • ${rewardScore} score</small>
-                                      </div>
-                                    </div>
-                                  </div>
-                                `
-                              }).join('')}
-                            </div>
+                          <div class="card-body p-0" style="max-height: 400px; overflow-y: auto;">
+                            <table class="table table-sm table-dark table-striped mb-0">
+                              <thead class="table-secondary">
+                                <tr>
+                                  <th>#</th>
+                                  <th>Neuron ID</th>
+                                  <th>Reward</th>
+                                  <th>Voting Power</th>
+                                  <th>Performance</th>
+                                  <th>Score</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                ${neuronRewards.map((reward, index) => {
+                                  const neuronId = this.formatNeuronFromBlob(reward.neuronId)
+                                  const amount = (Number(reward.rewardAmount || 0) / 100000000).toLocaleString(undefined, { maximumFractionDigits: 2 })
+                                  const votingPower = (Number(reward.votingPower || 0) / 100000000).toLocaleString(undefined, { maximumFractionDigits: 0 })
+                                  const performanceScore = parseFloat(reward.performanceScore || '0').toFixed(3)
+                                  const rewardScore = parseFloat(reward.rewardScore || '0').toLocaleString(undefined, { maximumFractionDigits: 0 })
+                                  
+                                  return `
+                                    <tr>
+                                      <td><span class="text-muted">${index + 1}</span></td>
+                                      <td><code class="text-info" style="font-size: 0.75em;">${neuronId}</code></td>
+                                      <td><span class="text-warning"><strong>${amount}</strong></span></td>
+                                      <td><span class="text-light">${votingPower}</span></td>
+                                      <td><span class="text-success">${performanceScore}</span></td>
+                                      <td><span class="text-muted">${rewardScore}</span></td>
+                                    </tr>
+                                  `
+                                }).join('')}
+                              </tbody>
+                            </table>
                           </div>
                         </div>
                       </div>
@@ -2383,7 +2390,7 @@ export default {
               
               ${neuronWithdrawals.length > 0 ? `
                 <div class="mt-3">
-                  <h6>🧠 Neuron Withdrawals</h6>
+                  <h6 class="text-light">🧠 Neuron Withdrawals</h6>
                   <div class="row">
                     ${neuronWithdrawals.slice(0, 3).map(withdrawal => {
                       const neuronId = this.formatNeuronFromBlob(withdrawal.neuronId)
