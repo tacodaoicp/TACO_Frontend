@@ -125,8 +125,10 @@ export interface Rewards {
       'maxDistributionHistory' : bigint,
       'periodicRewardPot' : bigint,
       'performanceScorePower' : number,
+      'totalDistributions' : bigint,
       'nextScheduledDistribution' : [] | [bigint],
       'votingPowerPower' : number,
+      'lastDistributionTime' : bigint,
       'timerRunning' : boolean,
     }
   >,

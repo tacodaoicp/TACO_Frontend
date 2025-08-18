@@ -54,11 +54,13 @@ type Rewards =
     (record {
        distributionEnabled: bool;
        distributionPeriodNS: nat;
+       lastDistributionTime: int;
        maxDistributionHistory: nat;
        nextScheduledDistribution: opt int;
        performanceScorePower: float64;
        periodicRewardPot: nat;
        timerRunning: bool;
+       totalDistributions: nat;
        votingPowerPower: float64;
      }) query;
    getCurrentDistributionStatus: () ->

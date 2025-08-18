@@ -45,7 +45,7 @@
                   <button 
                     class="btn btn-primary w-100 mb-3" 
                     @click="startDistributionTimer"
-                    :disabled="isLoading || timerRunning"
+                    :disabled="isLoading || !shouldShowStartButton"
                   >
                     <span v-if="isLoading && currentAction === 'start'" class="spinner-border spinner-border-sm me-2" role="status"></span>
                     ⏰ Start Auto Timer
@@ -55,7 +55,7 @@
                   <button 
                     class="btn btn-warning w-100 mb-3" 
                     @click="stopDistributionTimer"
-                    :disabled="isLoading || !timerRunning"
+                    :disabled="isLoading || !shouldShowStopButton"
                   >
                     <span v-if="isLoading && currentAction === 'stop'" class="spinner-border spinner-border-sm me-2" role="status"></span>
                     ⏹️ Stop Auto Timer
@@ -615,8 +615,39 @@ export default {
 
 
     nextDistributionTime() {
+      // Use actual scheduled time from backend, fallback to computed time
+      if (this.configuration?.nextScheduledDistribution) {
+        return Number(this.configuration.nextScheduledDistribution)
+      }
       if (!this.distributionStatus || !this.configuration) return 0
       return Number(this.distributionStatus.lastDistributionTime) + Number(this.configuration.distributionPeriodNS)
+    },
+
+    // Timer is running if there's a scheduled time in the future
+    timerRunning() {
+      if (!this.configuration?.nextScheduledDistribution) return false
+      const scheduledTimeNS = Number(this.configuration.nextScheduledDistribution)
+      const nowNS = Date.now() * 1_000_000 // Convert milliseconds to nanoseconds
+      
+      console.log('Timer check:', {
+        scheduledTimeNS,
+        nowNS,
+        scheduledDate: new Date(scheduledTimeNS / 1_000_000).toLocaleString(),
+        nowDate: new Date().toLocaleString(),
+        isRunning: scheduledTimeNS > nowNS
+      })
+      
+      return scheduledTimeNS > nowNS
+    },
+
+    // Start button should be active when timer is NOT running
+    shouldShowStartButton() {
+      return !this.timerRunning
+    },
+
+    // Stop button should be active when timer IS running  
+    shouldShowStopButton() {
+      return this.timerRunning
     },
 
     isValidCustomInput() {
@@ -702,16 +733,20 @@ export default {
     async loadDistributionStatus() {
       try {
         const actor = await this.getRewardsActor()
-        const [canisterStatus, config] = await Promise.all([
-          actor.getCanisterStatus(),
-          actor.getConfiguration()
-        ])
+        const config = await actor.getConfiguration()
         
-        // Combine distribution status from canister status with config info
+        console.log('Distribution status data:', {
+          config,
+          lastDistributionTime: 'Not available in current backend'
+        })
+        
+        // Use configuration data directly
         this.distributionStatus = {
-          ...canisterStatus.distributionStatus,
+          lastDistributionTime: config.lastDistributionTime,
+          totalDistributions: config.totalDistributions,
           distributionEnabled: config.distributionEnabled,
-          currentDistributionId: null // This field isn't available in getCanisterStatus
+          currentDistributionId: null,
+          inProgress: false
         }
       } catch (error) {
         console.error('Error loading distribution status:', error)
@@ -780,8 +815,7 @@ export default {
         
         if ('ok' in result) {
           this.successMessage = result.ok
-          this.timerRunning = true
-          await this.loadData()
+          await this.loadConfiguration() // Refresh to get new timer status
         } else {
           this.errorMessage = this.formatError(result.err)
         }
@@ -805,8 +839,7 @@ export default {
         
         if ('ok' in result) {
           this.successMessage = result.ok
-          this.timerRunning = false
-          await this.loadData()
+          await this.loadConfiguration() // Refresh to get new timer status
         } else {
           this.errorMessage = this.formatError(result.err)
         }
@@ -1365,6 +1398,27 @@ export default {
       } catch (error) {
         console.error('Error calculating reward percentage:', error, rewardAmount, totalRewardPot)
         return '0.00'
+      }
+    },
+
+    formatTimestamp(timestampNS) {
+      try {
+        if (!timestampNS || timestampNS === 0) {
+          return 'Never'
+        }
+        
+        // Convert nanoseconds to milliseconds for JavaScript Date
+        const timestampMS = Number(timestampNS) / 1_000_000
+        const date = new Date(timestampMS)
+        
+        if (isNaN(date.getTime())) {
+          return 'Invalid Date'
+        }
+        
+        return date.toLocaleString()
+      } catch (error) {
+        console.error('Error formatting timestamp:', error, timestampNS)
+        return 'Format Error'
       }
     },
 
