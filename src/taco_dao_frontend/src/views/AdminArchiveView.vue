@@ -2243,39 +2243,40 @@ export default {
           return '<div class="text-muted">No reward withdrawal data available</div>'
         }
         
-        // Extract key information
+        // Extract key information from the actual structure
         const withdrawalId = withdrawalData.id || 'Unknown'
-        const owner = withdrawalData.owner ? this.formatPrincipalFromBlob(withdrawalData.owner) : 'Unknown'
-        const subaccount = withdrawalData.subaccount || null
-        const amount = Number(withdrawalData.amount || 0)
+        const caller = withdrawalData.caller ? this.formatPrincipalFromBlob(withdrawalData.caller) : 'Unknown'
+        const totalAmount = Number(withdrawalData.totalAmount || 0)
+        const amountSent = Number(withdrawalData.amountSent || 0)
         const fee = Number(withdrawalData.fee || 0)
-        const status = withdrawalData.status || 'Unknown'
-        const blockIndex = withdrawalData.blockIndex || null
-        const errorMessage = withdrawalData.errorMessage || null
+        const targetAccountOwner = withdrawalData.targetAccountOwner ? this.formatPrincipalFromBlob(withdrawalData.targetAccountOwner) : 'Unknown'
+        const targetAccountSubaccount = withdrawalData.targetAccountSubaccount || ''
+        const transactionId = withdrawalData.transactionId || null
+        const neuronWithdrawals = withdrawalData.neuronWithdrawals || []
         
         // Format amounts (convert from satoshis to TACO)
-        const withdrawnTACO = (amount / 100000000).toLocaleString(undefined, { maximumFractionDigits: 8 })
+        const totalTACO = (totalAmount / 100000000).toLocaleString(undefined, { maximumFractionDigits: 8 })
+        const sentTACO = (amountSent / 100000000).toLocaleString(undefined, { maximumFractionDigits: 8 })
         const feeTACO = (fee / 100000000).toLocaleString(undefined, { maximumFractionDigits: 8 })
-        const netAmount = ((amount - fee) / 100000000).toLocaleString(undefined, { maximumFractionDigits: 8 })
         
-        // Status formatting
-        const statusClass = status === 'Completed' ? 'bg-success' : 
-                           status === 'Failed' ? 'bg-danger' : 'bg-secondary'
-        const statusIcon = status === 'Completed' ? '✅' : 
-                          status === 'Failed' ? '❌' : '❓'
-        
-        // Format owner display
-        const ownerShort = owner.length > 16 ? owner.substring(0, 8) + '...' + owner.substring(owner.length - 8) : owner
+        // Format caller and target displays
+        const callerShort = caller.length > 16 ? caller.substring(0, 8) + '...' + caller.substring(caller.length - 8) : caller
+        const targetShort = targetAccountOwner.length > 16 ? targetAccountOwner.substring(0, 8) + '...' + targetAccountOwner.substring(targetAccountOwner.length - 8) : targetAccountOwner
         
         // Format subaccount if present
-        const subaccountDisplay = subaccount ? 
+        const subaccountDisplay = targetAccountSubaccount && targetAccountSubaccount !== '' ? 
           `<tr>
             <td><strong>Subaccount:</strong></td>
-            <td><code class="text-info">${Array.from(subaccount).map(b => b.toString(16).padStart(2, '0')).join('')}</code></td>
+            <td><code class="text-info">${targetAccountSubaccount}</code></td>
           </tr>` : ''
         
         // Time formatting
         const withdrawalTime = this.formatTime(Number(withdrawalData.timestamp))
+        
+        // Status is always completed if we have a transaction ID
+        const status = transactionId ? 'Completed' : 'Unknown'
+        const statusClass = 'bg-success'
+        const statusIcon = '✅'
         
         return `
           <div class="card bg-dark border-warning">
@@ -2291,24 +2292,27 @@ export default {
                   <h6>💰 Withdrawal Details</h6>
                   <table class="table table-sm table-dark">
                     <tr>
-                      <td><strong>Owner:</strong></td>
+                      <td><strong>Caller:</strong></td>
                       <td>
-                        <code class="text-info">${ownerShort}</code><br>
-                        <small class="text-muted">${owner}</small>
+                        <code class="text-info">${callerShort}</code><br>
+                        <small class="text-muted">${caller}</small>
                       </td>
                     </tr>
-                    ${subaccountDisplay}
                     <tr>
-                      <td><strong>Amount:</strong></td>
-                      <td><span class="text-warning">${withdrawnTACO} TACO</span></td>
+                      <td><strong>Total Amount:</strong></td>
+                      <td><span class="text-warning">${totalTACO} TACO</span></td>
+                    </tr>
+                    <tr>
+                      <td><strong>Amount Sent:</strong></td>
+                      <td><span class="text-success">${sentTACO} TACO</span></td>
                     </tr>
                     <tr>
                       <td><strong>Fee:</strong></td>
                       <td><span class="text-muted">${feeTACO} TACO</span></td>
                     </tr>
                     <tr>
-                      <td><strong>Net Amount:</strong></td>
-                      <td><span class="text-success">${netAmount} TACO</span></td>
+                      <td><strong>Neurons:</strong></td>
+                      <td><span class="text-info">${neuronWithdrawals.length} withdrawal${neuronWithdrawals.length !== 1 ? 's' : ''}</span></td>
                     </tr>
                   </table>
                 </div>
@@ -2316,13 +2320,17 @@ export default {
                   <h6>📋 Transaction Info</h6>
                   <table class="table table-sm table-dark">
                     <tr>
-                      <td><strong>Status:</strong></td>
-                      <td><span class="badge ${statusClass}">${statusIcon} ${status}</span></td>
+                      <td><strong>Target Account:</strong></td>
+                      <td>
+                        <code class="text-success">${targetShort}</code><br>
+                        <small class="text-muted">${targetAccountOwner}</small>
+                      </td>
                     </tr>
-                    ${blockIndex !== null ? `
+                    ${subaccountDisplay}
+                    ${transactionId !== null ? `
                       <tr>
-                        <td><strong>Block Index:</strong></td>
-                        <td><code class="text-success">${blockIndex}</code></td>
+                        <td><strong>Transaction ID:</strong></td>
+                        <td><code class="text-success">${transactionId}</code></td>
                       </tr>
                     ` : ''}
                     <tr>
@@ -2330,19 +2338,37 @@ export default {
                       <td>🕐 ${withdrawalTime}</td>
                     </tr>
                   </table>
-                  
-                  ${errorMessage ? `
-                    <div class="alert alert-danger mt-3">
-                      <h6 class="alert-heading">❌ Error</h6>
-                      <code>${errorMessage}</code>
-                    </div>
-                  ` : ''}
                 </div>
               </div>
               
+              ${neuronWithdrawals.length > 0 ? `
+                <div class="mt-3">
+                  <h6>🧠 Neuron Withdrawals</h6>
+                  <div class="row">
+                    ${neuronWithdrawals.slice(0, 3).map(withdrawal => {
+                      const neuronId = this.formatNeuronFromBlob(withdrawal.neuronId)
+                      const amount = (Number(withdrawal.amount || 0) / 100000000).toLocaleString(undefined, { maximumFractionDigits: 8 })
+                      return `
+                        <div class="col-md-4">
+                          <div class="alert alert-info">
+                            <code class="text-light">${neuronId}</code><br>
+                            <span class="text-warning">${amount} TACO</span>
+                          </div>
+                        </div>
+                      `
+                    }).join('')}
+                    ${neuronWithdrawals.length > 3 ? `
+                      <div class="col-md-12">
+                        <small class="text-muted">... and ${neuronWithdrawals.length - 3} more neuron withdrawals</small>
+                      </div>
+                    ` : ''}
+                  </div>
+                </div>
+              ` : ''}
+              
               <small class="text-muted">
-                Withdrawal ${status === 'Completed' ? 'successfully processed' : status === 'Failed' ? 'failed' : 'pending'}
-                ${blockIndex !== null ? ` with block index ${blockIndex}` : ''}
+                Withdrawal processed ${neuronWithdrawals.length} neuron${neuronWithdrawals.length !== 1 ? 's' : ''}
+                ${transactionId ? ` with transaction ID ${transactionId}` : ''}
               </small>
             </div>
           </div>
@@ -2929,19 +2955,19 @@ export default {
           withdrawalData = parsedData.tx.data
         }
         
-        const owner = withdrawalData.owner ? this.formatPrincipalFromBlob(withdrawalData.owner) : 'Unknown'
-        const amount = Number(withdrawalData.amount || 0)
-        const status = withdrawalData.status || 'Unknown'
+        const caller = withdrawalData.caller ? this.formatPrincipalFromBlob(withdrawalData.caller) : 'Unknown'
+        const totalAmount = Number(withdrawalData.totalAmount || 0)
+        const neuronCount = (withdrawalData.neuronWithdrawals || []).length
+        const transactionId = withdrawalData.transactionId
         
-        const withdrawnTACO = (amount / 100000000).toFixed(2)
-        const statusIcon = status === 'Completed' ? '✅' : 
-                          status === 'Failed' ? '❌' : '❓'
+        const withdrawnTACO = (totalAmount / 100000000).toFixed(2)
+        const statusIcon = transactionId ? '✅' : '❓'
         
         const timestamp = withdrawalData.timestamp || Date.now()
         const formattedTime = this.formatTime(Number(timestamp))
-        const ownerShort = owner.length > 16 ? owner.substring(0, 8) + '...' + owner.substring(owner.length - 8) : owner
+        const callerShort = caller.length > 16 ? caller.substring(0, 8) + '...' + caller.substring(caller.length - 8) : caller
         
-        return `💸 ${ownerShort}: ${withdrawnTACO} TACO withdrawal ${statusIcon} • 🕐 ${formattedTime}`
+        return `💸 ${callerShort}: ${withdrawnTACO} TACO from ${neuronCount} neuron${neuronCount !== 1 ? 's' : ''} ${statusIcon} • 🕐 ${formattedTime}`
       }
       
       // Generic block
