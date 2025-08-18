@@ -689,10 +689,26 @@
         <div class="home-view__chart-modal__dialog__top px-2 p-2">
 
           <!-- message top left -->
-          <div class="taco-text-white">Taco Token Chart</div>
+          <div class="taco-text-white d-flex align-items-center gap-1 ms-1">
+
+            <!-- taco token icon -->
+            <TacoCoinIcon class="home-view__taco-token-chart__icon"/>
+
+            <!-- text -->
+            <span>Taco Token Chart</span>  
+          
+          </div>
 
           <!-- message top right -->
-          <div class="taco-text-black-to-white"></div>
+          <div class="taco-text-black-to-white">
+
+            <!-- close button -->
+            <button class="btn btn-sm p-0 text-white pe-2"
+                    @click="viewingChartModal = false">
+              <i class="fa-solid fa-xmark"></i>
+            </button>
+
+          </div>
 
         </div>
 
@@ -1183,6 +1199,11 @@
   &__taco-token-chart {
     zoom: 0.5;
     border-radius: 1rem;
+
+    &__icon {
+      width: 1rem;
+      height: 1rem;
+    }
 
     &__expand-btn {
       position: absolute;
