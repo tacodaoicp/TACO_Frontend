@@ -816,10 +816,22 @@ export default {
         const rewardsActor = await getRewardsActor()
         const result = await rewardsActor.getUserWithdrawalHistory([20]) // Get last 20 records
         
-        if ('Ok' in result) {
-          userWithdrawalHistory.value = result.Ok
+        if ('ok' in result) {
+          // Convert BigInt values to regular numbers to avoid JSON.stringify issues
+          userWithdrawalHistory.value = result.ok.map(record => ({
+            ...record,
+            totalAmount: Number(record.totalAmount),
+            amountSent: Number(record.amountSent),
+            fee: Number(record.fee),
+            timestamp: Number(record.timestamp),
+            transactionId: record.transactionId ? Number(record.transactionId) : null,
+            neuronWithdrawals: record.neuronWithdrawals.map(([neuronId, amount]) => [
+              neuronId,
+              Number(amount)
+            ])
+          }))
         } else {
-          console.error('Error loading withdrawal history:', result.Err)
+          console.error('Error loading withdrawal history:', result.err)
         }
       } catch (error) {
         console.error('Failed to load withdrawal history:', error)
