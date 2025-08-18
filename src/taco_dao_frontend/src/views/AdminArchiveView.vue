@@ -763,21 +763,21 @@ export default {
     rewardDistributionArchiveCanisterId() {
       switch (process.env.DFX_NETWORK) {
         case "ic":
-          return process.env.CANISTER_ID_REWARD_DISTRIBUTION_ARCHIVE_IC || 'placeholder-reward-distribution-ic';
+          return process.env.CANISTER_ID_REWARD_DISTRIBUTION_ARCHIVE_IC || 'ddfi2-eiaaa-aaaan-qz5nq-cai';
         case "staging":
-          return process.env.CANISTER_ID_REWARD_DISTRIBUTION_ARCHIVE_STAGING || 'placeholder-reward-distribution-staging';
+          return process.env.CANISTER_ID_REWARD_DISTRIBUTION_ARCHIVE_STAGING || 'ddfi2-eiaaa-aaaan-qz5nq-cai';
       }
-      return 'placeholder-reward-distribution-staging'; // fallback for local
+      return 'ddfi2-eiaaa-aaaan-qz5nq-cai'; // fallback for local
     },
 
     rewardWithdrawalArchiveCanisterId() {
       switch (process.env.DFX_NETWORK) {
         case "ic":
-          return process.env.CANISTER_ID_REWARD_WITHDRAWAL_ARCHIVE_IC || 'placeholder-reward-withdrawal-ic';
+          return process.env.CANISTER_ID_REWARD_WITHDRAWAL_ARCHIVE_IC || 'dwczx-faaaa-aaaan-qz5oa-cai';
         case "staging":
-          return process.env.CANISTER_ID_REWARD_WITHDRAWAL_ARCHIVE_STAGING || 'placeholder-reward-withdrawal-staging';
+          return process.env.CANISTER_ID_REWARD_WITHDRAWAL_ARCHIVE_STAGING || 'dwczx-faaaa-aaaan-qz5oa-cai';
       }
-      return 'placeholder-reward-withdrawal-staging'; // fallback for local
+      return 'dwczx-faaaa-aaaan-qz5oa-cai'; // fallback for local
     },
 
     async createArchiveActors() {
