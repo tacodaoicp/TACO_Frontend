@@ -2289,13 +2289,12 @@ export default {
             <div class="card-body">
               <div class="row">
                 <div class="col-md-6">
-                  <h6>💰 Withdrawal Details</h6>
+                  <h6 class="text-light">💰 Withdrawal Details</h6>
                   <table class="table table-sm table-dark">
                     <tr>
                       <td><strong>Caller:</strong></td>
                       <td>
-                        <code class="text-info">${callerShort}</code><br>
-                        <small class="text-muted">${caller}</small>
+                        <code class="text-info">${callerShort}</code>
                       </td>
                     </tr>
                     <tr>
@@ -2308,7 +2307,7 @@ export default {
                     </tr>
                     <tr>
                       <td><strong>Fee:</strong></td>
-                      <td><span class="text-muted">${feeTACO} TACO</span></td>
+                      <td><span class="text-light">${feeTACO} TACO</span></td>
                     </tr>
                     <tr>
                       <td><strong>Neurons:</strong></td>
@@ -2317,13 +2316,12 @@ export default {
                   </table>
                 </div>
                 <div class="col-md-6">
-                  <h6>📋 Transaction Info</h6>
+                  <h6 class="text-light">📋 Transaction Info</h6>
                   <table class="table table-sm table-dark">
                     <tr>
                       <td><strong>Target Account:</strong></td>
                       <td>
-                        <code class="text-success">${targetShort}</code><br>
-                        <small class="text-muted">${targetAccountOwner}</small>
+                        <code class="text-success">${targetShort}</code>
                       </td>
                     </tr>
                     ${subaccountDisplay}
