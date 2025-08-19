@@ -73,7 +73,7 @@
                 <div class="card-body">
                   <div class="d-flex justify-content-between align-items-center">
                     <div>
-                      <h6 class="card-title text-muted mb-1">Total Neurons</h6>
+                      <h6 class="card-title text-light mb-1">Total Neurons</h6>
                       <div class="h4 mb-0 text-primary">{{ neurons.length }}</div>
                     </div>
                     <div class="text-primary">
@@ -88,7 +88,7 @@
                 <div class="card-body">
                   <div class="d-flex justify-content-between align-items-center">
                     <div>
-                      <h6 class="card-title text-muted mb-1">Total Rewards</h6>
+                      <h6 class="card-title text-light mb-1">Total Rewards</h6>
                       <div class="h4 mb-0 text-success">{{ formatTacoPrecise(totalRewards) }} TACO</div>
                     </div>
                     <div class="text-success">
@@ -103,7 +103,7 @@
                 <div class="card-body">
                   <div class="d-flex justify-content-between align-items-center">
                     <div>
-                      <h6 class="card-title text-muted mb-1">Claimable Neurons</h6>
+                      <h6 class="card-title text-light mb-1">Claimable Neurons</h6>
                       <div class="h4 mb-0 text-warning">{{ claimableNeurons }}</div>
                     </div>
                     <div class="text-warning">
