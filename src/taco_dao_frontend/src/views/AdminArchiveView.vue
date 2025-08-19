@@ -2245,7 +2245,7 @@ export default {
                                       <td><span class="text-warning"><strong>${amount}</strong></span></td>
                                       <td><span class="text-light">${votingPower}</span></td>
                                       <td><span class="text-success">${performanceScore}</span></td>
-                                      <td><span class="text-muted">${rewardScore}</span></td>
+                                      <td><span class="text-light">${rewardScore}</span></td>
                                     </tr>
                                   `
                                 }).join('')}
