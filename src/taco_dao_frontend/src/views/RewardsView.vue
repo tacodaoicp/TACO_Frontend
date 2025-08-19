@@ -206,12 +206,12 @@
                         </span>
                       </td>
                       <td>
-                        <span class="text-muted">
+                        <span class="text-light">
                           {{ formatStake(neuron.cached_neuron_stake_e8s) }} ICP
                         </span>
                       </td>
                       <td>
-                        <span class="text-muted">
+                        <span class="text-light">
                           {{ formatMaturity(neuron.maturity_e8s_equivalent) }} ICP
                         </span>
                       </td>
