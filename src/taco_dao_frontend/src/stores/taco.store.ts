@@ -5510,19 +5510,29 @@ export const useTacoStore = defineStore('taco', () => {
             });
 
             // Try to fetch individual ICRC1 properties (more reliable than metadata)
-            const [name, symbol, decimals, fee] = await Promise.allSettled([
+            const [name, symbol, decimals, fee, metadataResult] = await Promise.allSettled([
                 (tokenActor as any).icrc1_name(),
                 (tokenActor as any).icrc1_symbol(), 
                 (tokenActor as any).icrc1_decimals(),
-                (tokenActor as any).icrc1_fee()
+                (tokenActor as any).icrc1_fee(),
+                (tokenActor as any).icrc1_metadata()
             ]);
+
+            // Try to extract logo from metadata
+            let logo = null;
+            if (metadataResult.status === 'fulfilled' && Array.isArray(metadataResult.value)) {
+                const logoEntry = metadataResult.value.find(([key, _]: [string, any]) => key === 'icrc1:logo');
+                if (logoEntry && logoEntry[1] && 'Text' in logoEntry[1]) {
+                    logo = logoEntry[1].Text;
+                }
+            }
 
             const metadata = {
                 name: name.status === 'fulfilled' ? name.value : `Token ${tokenPrincipal.slice(0, 5)}...`,
                 symbol: symbol.status === 'fulfilled' ? symbol.value : 'CUSTOM',
                 decimals: decimals.status === 'fulfilled' ? Number(decimals.value) : 8,
                 fee: fee.status === 'fulfilled' ? fee.value : 10000n,
-                logo: null
+                logo: logo
             };
 
             console.log(`Fetched real metadata for ${tokenPrincipal}:`, metadata);
