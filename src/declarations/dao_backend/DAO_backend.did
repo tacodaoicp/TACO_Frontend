@@ -95,6 +95,16 @@ type TokenType =
    ICRC12;
    ICRC3;
  };
+type TokenRegistrationError = 
+ variant {
+   MaxTokensReached;
+   NotAllowed;
+   SystemInactive;
+   TokenAlreadyRegistered;
+   TokenNotFound;
+   TokenNotRegistered;
+   UnexpectedError: text;
+ };
 type TokenDetails = 
  record {
    Active: bool;
@@ -139,19 +149,14 @@ type SyncError =
 type Result_9 = 
  variant {
    err: AuthorizationError;
-   ok: NeuronAllocationChangesSinceResponse;
+   ok: NeuronUpdatesSinceResponse;
  };
 type Result_8 = 
  variant {
    err: AuthorizationError;
-   ok: NeuronUpdatesSinceResponse;
- };
-type Result_7 = 
- variant {
-   err: AuthorizationError;
    ok: VotingPowerChangesSinceResponse;
  };
-type Result_6 = 
+type Result_7 = 
  variant {
    err: RefreshError;
    ok:
@@ -162,19 +167,24 @@ type Result_6 =
       oldVotingPower: nat;
     };
  };
-type Result_5 = 
+type Result_6 = 
  variant {
    err: FollowError;
    ok: text;
  };
-type Result_4 = 
+type Result_5 = 
  variant {
    err: SyncError;
    ok: text;
  };
-type Result_3 = 
+type Result_4 = 
  variant {
    err: UnfollowError;
+   ok: text;
+ };
+type Result_3 = 
+ variant {
+   err: TokenRegistrationError;
    ok: text;
  };
 type Result_2 = 
@@ -182,20 +192,25 @@ type Result_2 =
    err: UpdateError;
    ok: text;
  };
-type Result_12 = 
+type Result_13 = 
  variant {
    err: AuthorizationError;
    ok: AdminActionsSinceResponse;
  };
-type Result_11 = 
+type Result_12 = 
  variant {
    err: AuthorizationError;
    ok: AllocationChangesSinceResponse;
  };
-type Result_10 = 
+type Result_11 = 
  variant {
    err: AuthorizationError;
    ok: FollowActionsSinceResponse;
+ };
+type Result_10 = 
+ variant {
+   err: AuthorizationError;
+   ok: NeuronAllocationChangesSinceResponse;
  };
 type Result_1 = 
  variant {
@@ -349,9 +364,9 @@ type ContinuousDAO =
    admin_recalculateAllVotingPower: (id: nat) -> ();
    clearLogs: () -> ();
    deleteToken: (token: principal, reason: text) -> (Result_1);
-   followAllocation: (followee: principal) -> (Result_5);
+   followAllocation: (followee: principal) -> (Result_6);
    getAdminActionsSince: (sinceTimestamp: int, limit: nat) ->
-    (Result_12) query;
+    (Result_13) query;
    getAdminPermissions: () ->
     (vec record {
            principal;
@@ -362,9 +377,9 @@ type ContinuousDAO =
                                         nat;
                                       }) query;
    getAllocationChangesSince: (sinceTimestamp: int, limit: nat) ->
-    (Result_11) query;
+    (Result_12) query;
    getFollowActionsSince: (sinceTimestamp: int, limit: nat) ->
-    (Result_10) query;
+    (Result_11) query;
    getFollowersWithNeuronCounts: () -> (vec record {
                                               principal;
                                               nat;
@@ -379,9 +394,9 @@ type ContinuousDAO =
    getLogsByLevel: (level: LogLevel, count: nat) -> (vec LogEntry) query;
    getNeuronAllocation: (neuronId: blob) -> (opt NeuronAllocation) query;
    getNeuronAllocationChangesSince: (sinceTimestamp: int, limit: nat) ->
-    (Result_9) query;
+    (Result_10) query;
    getNeuronUpdatesSince: (sinceTimestamp: int, limit: nat) ->
-    (Result_8) query;
+    (Result_9) query;
    getSnapshotInfo: () ->
     (opt
       record {
@@ -395,16 +410,18 @@ type ContinuousDAO =
                                  TokenDetails;
                                }) query;
    getUserAllocation: () -> (opt UserState) query;
+   getUserRegisteredTokens: () -> (vec principal) query;
    getVotingPowerChangesSince: (sinceTimestamp: int, limit: nat) ->
-    (Result_7) query;
+    (Result_8) query;
    grantAdminPermission: (admin: principal, function: AdminFunction,
     durationDays: nat) -> (Result_1);
    hasAdminPermission: ("principal": principal, function: AdminFunction) ->
     (bool) query;
    pauseToken: (token: principal, reason: text) -> (Result_1);
-   refreshUserVotingPower: () -> (Result_6);
+   refreshUserVotingPower: () -> (Result_7);
+   registerUserToken: (tokenPrincipal: principal) -> (Result_3);
    removeAdmin: ("principal": principal, reason: opt text) -> (Result_1);
-   removeFollower: (follower: principal) -> (Result_5);
+   removeFollower: (follower: principal) -> (Result_6);
    removeToken: (token: principal, reason: text) -> (Result_1);
    setTacoAddress: (address: principal) -> ();
    set_sns_governance_canister_id: (p: principal) -> ();
@@ -412,9 +429,10 @@ type ContinuousDAO =
     vec record {
           principal;
           TokenDetails;
-        }) -> (Result_4);
-   unfollowAllocation: (followee: principal) -> (Result_3);
+        }) -> (Result_5);
+   unfollowAllocation: (followee: principal) -> (Result_4);
    unpauseToken: (token: principal, reason: text) -> (Result_1);
+   unregisterUserToken: (tokenPrincipal: principal) -> (Result_3);
    updateAllocation: (newAllocations: vec Allocation) -> (Result_2);
    /// * Update Minting Vault configuration
    ///  *
