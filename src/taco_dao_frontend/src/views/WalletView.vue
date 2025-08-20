@@ -458,25 +458,36 @@ onMounted(async () => {
 }
 
 .card {
-  background: var(--card-bg);
-  border: 1px solid var(--border-color);
+  background: #2d3748 !important;
+  border: 1px solid #4a5568 !important;
   border-radius: 12px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  color: white !important;
 }
 
 .card-header {
-  background: var(--card-header-bg);
-  border-bottom: 1px solid var(--border-color);
+  background: #1a202c !important;
+  border-bottom: 1px solid #4a5568 !important;
   padding: 1rem 1.5rem;
 }
 
 .card-header h5 {
   font-weight: 600;
-  color: var(--text-primary);
+  color: white !important;
 }
 
 .card-body {
   padding: 1.5rem;
+  color: white !important;
+}
+
+/* Ensure all text in cards is white */
+.card * {
+  color: white !important;
+}
+
+.card .text-muted {
+  color: #a0aec0 !important;
 }
 
 .spinner-border {
