@@ -69,12 +69,31 @@
                   <TokenCard 
                     :token="token" 
                     @send="openSendDialog"
-                    @register="registerToken"
-                    @unregister="unregisterToken"
                   />
                 </div>
               </div>
             </div>
+          </div>
+
+          <!-- Register Custom Token Section -->
+          <div>
+            <h3>Register Custom ICRC1 Token</h3>
+            <p>Enter the principal of an ICRC1 token to add it to your wallet:</p>
+            <div>
+              <input 
+                v-model="newTokenPrincipal"
+                placeholder="Token principal (e.g., rdmx6-jaaaa-aaaah-qcaiq-cai)"
+                style="width: 400px; padding: 8px; margin-right: 10px;"
+              />
+              <button 
+                @click="registerCustomToken" 
+                :disabled="!newTokenPrincipal.trim() || registeringToken"
+                style="padding: 8px 16px;"
+              >
+                {{ registeringToken ? 'Registering...' : 'Register Token' }}
+              </button>
+            </div>
+            <br>
           </div>
 
           <!-- User Registered Tokens Section -->
@@ -105,7 +124,7 @@
             <div class="card-body text-center py-5">
               <i class="fa fa-plus-circle fa-3x text-muted mb-3"></i>
               <h6 class="text-muted">No registered tokens yet</h6>
-              <p class="text-muted">You can register additional tokens by browsing the trusted tokens above and clicking "Register"</p>
+              <p class="text-muted">Register ICRC1 tokens using the form above to track and manage them in your wallet</p>
             </div>
           </div>
 
@@ -153,6 +172,8 @@ const showSendDialog = ref(false)
 const selectedToken = ref<WalletToken | null>(null)
 const allTokenBalances = ref<Map<string, bigint>>(new Map())
 const userRegisteredTokenPrincipals = ref<string[]>([])
+const newTokenPrincipal = ref('')
+const registeringToken = ref(false)
 
 // Core tokens (ICP and TACO)
 const coreTokens = computed<WalletToken[]>(() => {
@@ -221,17 +242,32 @@ const userRegisteredTokens = computed<WalletToken[]>(() => {
   return userRegisteredTokenPrincipals.value
     .map(principal => {
       const details = tokenDetailsMap.get(principal)
-      if (!details) return null
       
+      // If token is in trusted tokens, use those details
+      if (details) {
+        return {
+          principal,
+          name: details.tokenName,
+          symbol: details.tokenSymbol,
+          logo: tokenImages[details.tokenName] || tokenImages['Default'],
+          balance: allTokenBalances.value.get(principal) || 0n,
+          decimals: Number(details.tokenDecimals),
+          fee: details.tokenTransferFee,
+          priceUSD: parseFloat(details.priceInUSD) || 0,
+          isRegistered: true
+        }
+      }
+      
+      // For custom ICRC1 tokens not in trusted list, create a basic entry
       return {
         principal,
-        name: details.tokenName,
-        symbol: details.tokenSymbol,
-        logo: tokenImages[details.tokenName] || tokenImages['Default'],
+        name: `Custom Token (${principal.slice(0, 5)}...)`,
+        symbol: 'UNKNOWN',
+        logo: tokenImages['Default'],
         balance: allTokenBalances.value.get(principal) || 0n,
-        decimals: Number(details.tokenDecimals),
-        fee: details.tokenTransferFee,
-        priceUSD: parseFloat(details.priceInUSD) || 0,
+        decimals: 8, // Default for ICRC1
+        fee: 10000n, // Default fee
+        priceUSD: 0,
         isRegistered: true
       }
     })
@@ -332,16 +368,7 @@ const handleSendToken = async (params: { recipient: string; amount: bigint; memo
   }
 }
 
-const registerToken = async (token: WalletToken) => {
-  try {
-    await tacoStore.registerUserToken(token.principal)
-    tacoStore.addToast('success', 'Token Registered', `${token.symbol} added to your wallet`)
-    await fetchUserRegisteredTokens() // Refresh
-  } catch (error) {
-    console.error('Error registering token:', error)
-    tacoStore.addToast('error', 'Registration Failed', 'Failed to register token')
-  }
-}
+
 
 const unregisterToken = async (token: WalletToken) => {
   try {
@@ -351,6 +378,46 @@ const unregisterToken = async (token: WalletToken) => {
   } catch (error) {
     console.error('Error unregistering token:', error)
     tacoStore.addToast('error', 'Unregistration Failed', 'Failed to unregister token')
+  }
+}
+
+const registerCustomToken = async () => {
+  if (!newTokenPrincipal.value.trim()) return
+  
+  try {
+    registeringToken.value = true
+    
+    // Validate principal format
+    try {
+      Principal.fromText(newTokenPrincipal.value.trim())
+    } catch (error) {
+      tacoStore.addToast('error', 'Invalid Principal', 'Please enter a valid principal ID')
+      return
+    }
+    
+    // Check if token is already registered
+    if (userRegisteredTokenPrincipals.value.includes(newTokenPrincipal.value.trim())) {
+      tacoStore.addToast('error', 'Already Registered', 'This token is already in your wallet')
+      return
+    }
+    
+    // Register the token
+    await tacoStore.registerUserToken(newTokenPrincipal.value.trim())
+    
+    // Clear input and refresh
+    newTokenPrincipal.value = ''
+    await fetchUserRegisteredTokens()
+    
+    // Load balance for the new token
+    await loadAllBalances()
+    
+    tacoStore.addToast('success', 'Token Registered', 'Custom ICRC1 token added to your wallet')
+    
+  } catch (error) {
+    console.error('Error registering custom token:', error)
+    tacoStore.addToast('error', 'Registration Failed', 'Failed to register custom token')
+  } finally {
+    registeringToken.value = false
   }
 }
 
