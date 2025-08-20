@@ -5413,7 +5413,13 @@ export const useTacoStore = defineStore('taco', () => {
                 return null;
             }
             
-            return tokenCache.metadata;
+            // Convert fee string back to BigInt
+            const metadata = {
+                ...tokenCache.metadata,
+                fee: tokenCache.metadata.fee ? BigInt(tokenCache.metadata.fee) : 10000n
+            };
+            
+            return metadata;
         } catch (error) {
             console.error('Error reading token metadata cache:', error);
             return null;
@@ -5425,14 +5431,39 @@ export const useTacoStore = defineStore('taco', () => {
             const cached = localStorage.getItem(TOKEN_METADATA_CACHE_KEY);
             const cache = cached ? JSON.parse(cached) : {};
             
+            // Convert BigInt to string for JSON serialization
+            const serializableMetadata = {
+                ...metadata,
+                fee: metadata.fee ? metadata.fee.toString() : '10000'
+            };
+            
             cache[tokenPrincipal] = {
-                metadata,
+                metadata: serializableMetadata,
                 timestamp: Date.now()
             };
             
             localStorage.setItem(TOKEN_METADATA_CACHE_KEY, JSON.stringify(cache));
         } catch (error) {
             console.error('Error caching token metadata:', error);
+        }
+    };
+
+    const clearTokenMetadataCache = (tokenPrincipal?: string) => {
+        try {
+            if (tokenPrincipal) {
+                // Clear cache for specific token
+                const cached = localStorage.getItem(TOKEN_METADATA_CACHE_KEY);
+                if (cached) {
+                    const cache = JSON.parse(cached);
+                    delete cache[tokenPrincipal];
+                    localStorage.setItem(TOKEN_METADATA_CACHE_KEY, JSON.stringify(cache));
+                }
+            } else {
+                // Clear all cache
+                localStorage.removeItem(TOKEN_METADATA_CACHE_KEY);
+            }
+        } catch (error) {
+            console.error('Error clearing token metadata cache:', error);
         }
     };
 
@@ -5444,38 +5475,62 @@ export const useTacoStore = defineStore('taco', () => {
         }
 
         try {
-            // Use a simple fetch approach to get ICRC1 metadata
-            // This avoids complex IDL definitions and actor creation issues
+            // Create a basic ICRC1 token actor using existing patterns
+            const icrc1IDL = ({ IDL }: any) => {
+                const MetadataValue = IDL.Variant({
+                    'Nat': IDL.Nat,
+                    'Int': IDL.Int,
+                    'Text': IDL.Text,
+                    'Blob': IDL.Vec(IDL.Nat8),
+                });
+                return IDL.Service({
+                    'icrc1_metadata': IDL.Func([], [IDL.Vec(IDL.Tuple(IDL.Text, MetadataValue))], ['query']),
+                    'icrc1_name': IDL.Func([], [IDL.Text], ['query']),
+                    'icrc1_symbol': IDL.Func([], [IDL.Text], ['query']),
+                    'icrc1_decimals': IDL.Func([], [IDL.Nat8], ['query']),
+                    'icrc1_fee': IDL.Func([], [IDL.Nat], ['query']),
+                });
+            };
+
+            // Create agent
             const host = process.env.DFX_NETWORK === "local"
                 ? getLocalHost()
                 : "https://ic0.app";
-            
-            // Make a direct canister call for ICRC1 metadata
-            const response = await fetch(`${host}/api/v2/canister/${tokenPrincipal}/call`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/cbor',
-                },
-                body: new Uint8Array([
-                    // CBOR-encoded call to icrc1_metadata method
-                    // This is a simplified approach for demo purposes
-                ])
+                
+            const authClientInst = await getAuthClient();
+            const agent = await createAgent({
+                identity: new AnonymousIdentity(), // Use anonymous for metadata queries
+                host,
+                fetchRootKey: process.env.DFX_NETWORK === "local",
             });
 
-            // For now, let's use a fallback approach and return default metadata
-            // In a production system, you'd want to properly implement the ICRC1 call
-            const defaultMetadata = {
-                name: `Token ${tokenPrincipal.slice(0, 5)}...`,
-                symbol: 'CUSTOM',
-                decimals: 8,
-                fee: 10000n,
+            const tokenActor = Actor.createActor(icrc1IDL, {
+                agent,
+                canisterId: tokenPrincipal,
+            });
+
+            // Try to fetch individual ICRC1 properties (more reliable than metadata)
+            const [name, symbol, decimals, fee] = await Promise.allSettled([
+                (tokenActor as any).icrc1_name(),
+                (tokenActor as any).icrc1_symbol(), 
+                (tokenActor as any).icrc1_decimals(),
+                (tokenActor as any).icrc1_fee()
+            ]);
+
+            const metadata = {
+                name: name.status === 'fulfilled' ? name.value : `Token ${tokenPrincipal.slice(0, 5)}...`,
+                symbol: symbol.status === 'fulfilled' ? symbol.value : 'CUSTOM',
+                decimals: decimals.status === 'fulfilled' ? Number(decimals.value) : 8,
+                fee: fee.status === 'fulfilled' ? fee.value : 10000n,
                 logo: null
             };
 
-            // Cache the default metadata
-            setCachedTokenMetadata(tokenPrincipal, defaultMetadata);
+            console.log(`Fetched real metadata for ${tokenPrincipal}:`, metadata);
+
+            // Cache the metadata
+            setCachedTokenMetadata(tokenPrincipal, metadata);
             
-            return defaultMetadata;
+            return metadata;
         } catch (error) {
             console.error('Error fetching token metadata:', error);
             // Return default metadata if fetch fails
@@ -5656,6 +5711,7 @@ export const useTacoStore = defineStore('taco', () => {
         sendToken,
         fetchTokenMetadata,
         getCachedTokenMetadata,
+        clearTokenMetadataCache,
         
         // Canister ID functions
         daoBackendCanisterId,

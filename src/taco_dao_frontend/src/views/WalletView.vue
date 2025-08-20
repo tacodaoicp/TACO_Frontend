@@ -312,34 +312,39 @@ const fetchUserRegisteredTokens = async () => {
 }
 
 const loadCustomTokenMetadata = async () => {
+  console.log('Loading custom token metadata for:', userRegisteredTokenPrincipals.value)
   const tokenDetailsMap = new Map(tacoStore.fetchedTokenDetails.map(([p, d]) => [p.toString(), d]))
   
   // Load metadata for tokens not in trusted list
   for (const principal of userRegisteredTokenPrincipals.value) {
+    console.log(`Processing token: ${principal}`)
     if (!tokenDetailsMap.has(principal)) {
+      console.log(`Token ${principal} not in trusted list, loading custom metadata`)
       try {
-        // Check cache first
-        const cachedMetadata = tacoStore.getCachedTokenMetadata(principal)
-        if (cachedMetadata) {
-          customTokenMetadata.value.set(principal, cachedMetadata)
-        } else {
-          // Fetch metadata from canister
-          const metadata = await tacoStore.fetchTokenMetadata(principal)
-          customTokenMetadata.value.set(principal, metadata)
-        }
+        // Clear cache and fetch fresh metadata to get real ICRC1 data
+        console.log(`Clearing cache and fetching fresh metadata for ${principal}`)
+        tacoStore.clearTokenMetadataCache(principal)
+        const metadata = await tacoStore.fetchTokenMetadata(principal)
+        console.log(`Fetched fresh metadata for ${principal}:`, metadata)
+        customTokenMetadata.value.set(principal, metadata)
       } catch (error) {
         console.error(`Error loading metadata for token ${principal}:`, error)
         // Set default metadata
-        customTokenMetadata.value.set(principal, {
+        const defaultMetadata = {
           name: `Custom Token (${principal.slice(0, 5)}...)`,
           symbol: 'UNKNOWN',
           decimals: 8,
           fee: 10000n,
           logo: null
-        })
+        }
+        customTokenMetadata.value.set(principal, defaultMetadata)
+        console.log(`Set default metadata for ${principal}:`, defaultMetadata)
       }
+    } else {
+      console.log(`Token ${principal} is in trusted list, skipping`)
     }
   }
+  console.log('Final customTokenMetadata:', customTokenMetadata.value)
 }
 
 const loadAllBalances = async () => {
