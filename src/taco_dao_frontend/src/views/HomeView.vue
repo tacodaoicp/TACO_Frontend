@@ -680,7 +680,7 @@
     </ul> 
 
     <!-- chart modal -->
-    <div v-show="viewingChartModal" class="home-view__chart-modal">
+    <div v-if="viewingChartModal" class="home-view__chart-modal">
       
       <!-- message -->
       <div class="home-view__chart-modal__dialog">
@@ -703,7 +703,7 @@
           <div class="taco-text-black-to-white">
 
             <!-- close button -->
-            <button class="btn btn-sm p-0 text-white pe-2"
+            <button class="btn btn-sm p-0 text-white px-2"
                     @click="viewingChartModal = false">
               <i class="fa-solid fa-xmark"></i>
             </button>
