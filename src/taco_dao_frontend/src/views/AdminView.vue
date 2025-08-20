@@ -38,6 +38,9 @@
               <router-link to="/admin/distributions" class="btn btn-outline-primary">
                 🎯 Distribution Management
               </router-link>
+              <router-link to="/admin/alarm" class="btn btn-danger">
+                🚨 Alarm Management
+              </router-link>
             </div>
           </div>
           

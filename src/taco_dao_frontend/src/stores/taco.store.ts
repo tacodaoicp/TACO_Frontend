@@ -17,6 +17,7 @@ import { idlFactory as neuronSnapshotIDL, _SERVICE as NeuronSnapshotService } fr
 import { idlFactory as sneedForumIDL, _SERVICE as SneedForumService } from "../../../declarations/sneed_sns_forum/sneed_sns_forum.did.js"
 import { idlFactory as appSneedDaoIDL, _SERVICE as AppSneedDaoService } from "../../../declarations/app_sneeddao_backend/app_sneeddao_backend.did.js"
 import { idlFactory as snsGovernanceIDL } from "../../../declarations/sns_governance/sns_governance.did.js"
+import { idlFactory as alarmIDL, _SERVICE as AlarmService } from "../../../declarations/alarm/alarm.did.js"
 import { Principal } from '@dfinity/principal'
 import { AccountIdentifier } from '@dfinity/ledger-icp'
 import { canisterId as iiCanisterId } from "../../../declarations/internet_identity/index.js"
@@ -1144,6 +1145,10 @@ export const useTacoStore = defineStore('taco', () => {
                 break;
         }        
         return 'cjkka-gyaaa-aaaan-qz5kq-cai'; // local canisterId
+    }
+    const alarmCanisterId = () => {
+        // Alarm canister ID - same for all environments
+        return 'b2cwp-6qaaa-aaaad-qhn6a-cai';
     }
 
     // crypto prices
@@ -5155,6 +5160,681 @@ export const useTacoStore = defineStore('taco', () => {
         }
     }
 
+    // # ALARM MANAGEMENT FUNCTIONS #
+
+    // Helper function to create alarm actor
+    const createAlarmActor = async (useAuth: boolean = true) => {
+        try {
+            let identity;
+            
+            if (useAuth) {
+                const authClient = await getAuthClient();
+                if (!(await authClient.isAuthenticated())) {
+                    throw new Error('User must be authenticated');
+                }
+                identity = authClient.getIdentity();
+            } else {
+                identity = new AnonymousIdentity();
+            }
+
+            const agent = await createAgent({
+                identity,
+                host: "https://ic0.app",
+                fetchRootKey: false,
+            });
+
+            return Actor.createActor<AlarmService>(alarmIDL, {
+                agent,
+                canisterId: alarmCanisterId()
+            });
+        } catch (error) {
+            console.error('Error creating alarm actor:', error);
+            throw error;
+        }
+    }
+
+    const performSystemHealthCheck = async () => {
+        try {
+            const actor = await createAlarmActor();
+            const result = await actor.performSystemHealthCheckManual();
+            
+            if ('err' in result) {
+                throw new Error(JSON.stringify(result.err));
+            }
+            
+            showSuccess('System health check completed successfully');
+            return result.ok;
+        } catch (error) {
+            console.error('Error performing system health check:', error);
+            showError(`Error performing system health check: ${error instanceof Error ? error.message : String(error)}`);
+            throw error;
+        }
+    }
+
+    const getEnhancedAlarmSystemStatus = async () => {
+        try {
+            const actor = await createAlarmActor();
+            const result = await actor.getEnhancedAlarmSystemStatus();
+            
+            if ('err' in result) {
+                throw new Error(JSON.stringify(result.err));
+            }
+            
+            return result.ok;
+        } catch (error) {
+            console.error('Error getting enhanced alarm system status:', error);
+            showError(`Error getting alarm system status: ${error instanceof Error ? error.message : String(error)}`);
+            throw error;
+        }
+    }
+
+    const getMonitoringStatus = async () => {
+        try {
+            const actor = await createAlarmActor();
+            const result = await actor.getMonitoringStatus();
+            
+            if ('err' in result) {
+                throw new Error(JSON.stringify(result.err));
+            }
+            
+            return result.ok;
+        } catch (error) {
+            console.error('Error getting monitoring status:', error);
+            showError(`Error getting monitoring status: ${error instanceof Error ? error.message : String(error)}`);
+            throw error;
+        }
+    }
+
+    const addAlarmAdmin = async (principalId: string) => {
+        try {
+            const actor = await createAlarmActor();
+            const result = await actor.addAdmin(Principal.fromText(principalId),[{ Admin: null }]);
+            
+            if ('err' in result) {
+                throw new Error(JSON.stringify(result.err));
+            }
+            
+            showSuccess('Admin added successfully');
+            return result.ok;
+        } catch (error) {
+            console.error('Error adding alarm admin:', error);
+            showError(`Error adding admin: ${error instanceof Error ? error.message : String(error)}`);
+            throw error;
+        }
+    }
+
+    const addAlarmContact = async (name: string, type: string, value: string) => {
+        try {
+            const actor = await createAlarmActor();
+            const contactType = type === 'SMS' ? { SMS: value } : { Email: value };
+            const result = await actor.addContact(name,contactType);
+            
+            if ('err' in result) {
+                throw new Error(JSON.stringify(result.err));
+            }
+            
+            showSuccess('Contact added successfully');
+            return result.ok;
+        } catch (error) {
+            console.error('Error adding alarm contact:', error);
+            showError(`Error adding contact: ${error instanceof Error ? error.message : String(error)}`);
+            throw error;
+        }
+    }
+
+    const getAlarmContacts = async () => {
+        try {
+            const actor = await createAlarmActor();
+            const result = await actor.getContacts();
+            
+            if ('err' in result) {
+                throw new Error(JSON.stringify(result.err));
+            }
+            
+            return result.ok;
+        } catch (error) {
+            console.error('Error getting alarm contacts:', error);
+            showError(`Error getting contacts: ${error instanceof Error ? error.message : String(error)}`);
+            throw error;
+        }
+    }
+
+    const updateContactStatus = async (contactId: number, active: boolean) => {
+        try {
+            const actor = await createAlarmActor();
+            const result = await actor.updateContactStatus(BigInt(contactId), active);
+            
+            if ('err' in result) {
+                throw new Error(JSON.stringify(result.err));
+            }
+            
+            showSuccess(`Contact ${active ? 'activated' : 'deactivated'} successfully`);
+            return result.ok;
+        } catch (error) {
+            console.error('Error updating contact status:', error);
+            showError(`Error updating contact status: ${error instanceof Error ? error.message : String(error)}`);
+            throw error;
+        }
+    }
+
+    const removeAlarmContact = async (contactId: number) => {
+        try {
+            const actor = await createAlarmActor();
+            const result = await actor.removeContact(BigInt(contactId));
+            
+            if ('err' in result) {
+                throw new Error(JSON.stringify(result.err));
+            }
+            
+            showSuccess('Contact removed successfully');
+            return result.ok;
+        } catch (error) {
+            console.error('Error removing alarm contact:', error);
+            showError(`Error removing contact: ${error instanceof Error ? error.message : String(error)}`);
+            throw error;
+        }
+    }
+
+    const testAlarmContact = async (contactIds: number[]) => {
+        try {
+            const actor = await createAlarmActor();
+            const bigIntContactIds = contactIds.map(id => BigInt(id));
+            
+            // Send test SMS first
+            const smsResult = await actor.sendTestSMS(bigIntContactIds);
+            if ('err' in smsResult) {
+                throw new Error(`SMS test error: ${JSON.stringify(smsResult.err)}`);
+            }
+            
+            // Then send test email
+            const emailResult = await actor.sendTestEmail(bigIntContactIds);
+            if ('err' in emailResult) {
+                throw new Error(`Email test error: ${JSON.stringify(emailResult.err)}`);
+            }
+            
+            showSuccess('Test messages sent successfully');
+            return { sms: smsResult.ok, email: emailResult.ok };
+        } catch (error) {
+            console.error('Error testing alarm contact:', error);
+            showError(`Error testing contact: ${error instanceof Error ? error.message : String(error)}`);
+            throw error;
+        }
+    }
+
+    const getPendingAlarms = async () => {
+        try {
+            const actor = await createAlarmActor();
+            const result = await actor.getPendingAlarms();
+            
+            if ('err' in result) {
+                throw new Error(JSON.stringify(result.err));
+            }
+            
+            return result.ok;
+        } catch (error) {
+            console.error('Error getting pending alarms:', error);
+            showError(`Error getting pending alarms: ${error instanceof Error ? error.message : String(error)}`);
+            throw error;
+        }
+    }
+
+    const acknowledgeAlarm = async (alarmId: number) => {
+        try {
+            const actor = await createAlarmActor();
+            const result = await actor.acknowledgeAlarm(BigInt(alarmId));
+            
+            if ('err' in result) {
+                throw new Error(JSON.stringify(result.err));
+            }
+            
+            showSuccess('Alarm acknowledged successfully');
+            return result.ok;
+        } catch (error) {
+            console.error('Error acknowledging alarm:', error);
+            showError(`Error acknowledging alarm: ${error instanceof Error ? error.message : String(error)}`);
+            throw error;
+        }
+    }
+
+    const getSystemErrors = async (limit?: number) => {
+        try {
+            const actor = await createAlarmActor();
+            const result = await actor.getSystemErrors(limit ? [BigInt(limit)] : []);
+            
+            if ('err' in result) {
+                throw new Error(JSON.stringify(result.err));
+            }
+            
+            return result.ok;
+        } catch (error) {
+            console.error('Error getting system errors:', error);
+            showError(`Error getting system errors: ${error instanceof Error ? error.message : String(error)}`);
+            throw error;
+        }
+    }
+
+    const resolveSystemError = async (errorId: number) => {
+        try {
+            const actor = await createAlarmActor();
+            const result = await actor.resolveSystemErrorById(BigInt(errorId));
+            
+            if ('err' in result) {
+                throw new Error(JSON.stringify(result.err));
+            }
+            
+            showSuccess('System error resolved successfully');
+            return result.ok;
+        } catch (error) {
+            console.error('Error resolving system error:', error);
+            showError(`Error resolving system error: ${error instanceof Error ? error.message : String(error)}`);
+            throw error;
+        }
+    }
+
+    const setCheckInterval = async (intervalMinutes: number) => {
+        try {
+            const actor = await createAlarmActor();
+            const result = await actor.setCheckInterval(BigInt(intervalMinutes));
+            
+            if ('err' in result) {
+                throw new Error(JSON.stringify(result.err));
+            }
+            
+            showSuccess('Check interval updated successfully');
+            return result.ok;
+        } catch (error) {
+            console.error('Error setting check interval:', error);
+            showError(`Error setting check interval: ${error instanceof Error ? error.message : String(error)}`);
+            throw error;
+        }
+    }
+
+    const startMonitoring = async () => {
+        try {
+            const actor = await createAlarmActor();
+            const result = await actor.startMonitoring();
+            
+            if ('err' in result) {
+                throw new Error(JSON.stringify(result.err));
+            }
+            
+            showSuccess('Monitoring started successfully');
+            return result.ok;
+        } catch (error) {
+            console.error('Error starting monitoring:', error);
+            showError(`Error starting monitoring: ${error instanceof Error ? error.message : String(error)}`);
+            throw error;
+        }
+    }
+
+    const stopMonitoring = async () => {
+        try {
+            const actor = await createAlarmActor();
+            const result = await actor.stopMonitoring();
+            
+            if ('err' in result) {
+                throw new Error(JSON.stringify(result.err));
+            }
+            
+            showSuccess('Monitoring stopped successfully');
+            return result.ok;
+        } catch (error) {
+            console.error('Error stopping monitoring:', error);
+            showError(`Error stopping monitoring: ${error instanceof Error ? error.message : String(error)}`);
+            throw error;
+        }
+    }
+
+    const addMonitoredCanister = async (canisterId: string, name: string, isSNSControlled: boolean, snsRootCanisterId: string | null, minimumCycles: bigint, cyclesAlertLevel: string, timersAlertLevel: string, statusAlertLevel: string) => {
+        try {
+            const actor = await createAlarmActor();
+            const result = await actor.addMonitoredCanister(
+    Principal.fromText(canisterId),
+    name,
+    isSNSControlled,
+    snsRootCanisterId ? [Principal.fromText(snsRootCanisterId)] : [],
+    minimumCycles,
+    cyclesAlertLevel === 'Level2DelayedSMS'
+        ? { Level2DelayedSMS: null }
+        : { Level1Immediate: null },
+        timersAlertLevel === 'Level2DelayedSMS'
+        ? { Level2DelayedSMS: null }
+        : { Level1Immediate: null },
+        statusAlertLevel === 'Level2DelayedSMS'
+        ? { Level2DelayedSMS: null }
+        : { Level1Immediate: null },
+);
+            
+            if ('err' in result) {
+                throw new Error(JSON.stringify(result.err));
+            }
+            
+            showSuccess('Monitored canister added successfully');
+            return result.ok;
+        } catch (error) {
+            console.error('Error adding monitored canister:', error);
+            showError(`Error adding monitored canister: ${error instanceof Error ? error.message : String(error)}`);
+            throw error;
+        }
+    }
+
+    const getMonitoredCanisters = async () => {
+        try {
+            const actor = await createAlarmActor();
+            const result = await actor.getMonitoredCanisters();
+            
+            if ('err' in result) {
+                throw new Error(JSON.stringify(result.err));
+            }
+            
+            return result.ok;
+        } catch (error) {
+            console.error('Error getting monitored canisters:', error);
+            showError(`Error getting monitored canisters: ${error instanceof Error ? error.message : String(error)}`);
+            throw error;
+        }
+    }
+
+    const removeMonitoredCanister = async (configId: number) => {
+        try {
+            const actor = await createAlarmActor();
+            const result = await actor.removeMonitoredCanister(BigInt(configId));
+            
+            if ('err' in result) {
+                throw new Error(JSON.stringify(result.err));
+            }
+            
+            showSuccess('Monitored canister removed successfully');
+            return result.ok;
+        } catch (error) {
+            console.error('Error removing monitored canister:', error);
+            showError(`Error removing monitored canister: ${error instanceof Error ? error.message : String(error)}`);
+            throw error;
+        }
+    }
+
+    const updateMonitoredCanisterStatus = async (configId: number, enabled: boolean) => {
+        try {
+            const actor = await createAlarmActor();
+            const result = await actor.updateMonitoredCanisterStatus(BigInt(configId), enabled);
+            
+            if ('err' in result) {
+                throw new Error(JSON.stringify(result.err));
+            }
+            
+            showSuccess(`Monitored canister ${enabled ? 'enabled' : 'disabled'} successfully`);
+            return result.ok;
+        } catch (error) {
+            console.error('Error updating monitored canister status:', error);
+            showError(`Error updating monitored canister status: ${error instanceof Error ? error.message : String(error)}`);
+            throw error;
+        }
+    }
+
+    const startCanisterMonitoring = async () => {
+        try {
+            const actor = await createAlarmActor();
+            const result = await actor.startCanisterMonitoring();
+            
+            if ('err' in result) {
+                throw new Error(JSON.stringify(result.err));
+            }
+            
+            showSuccess('Canister monitoring started successfully');
+            return result.ok;
+        } catch (error) {
+            console.error('Error starting canister monitoring:', error);
+            showError(`Error starting canister monitoring: ${error instanceof Error ? error.message : String(error)}`);
+            throw error;
+        }
+    }
+
+    const stopCanisterMonitoring = async () => {
+        try {
+            const actor = await createAlarmActor();
+            const result = await actor.stopCanisterMonitoring();
+            
+            if ('err' in result) {
+                throw new Error(JSON.stringify(result.err));
+            }
+            
+            showSuccess('Canister monitoring stopped successfully');
+            return result.ok;
+        } catch (error) {
+            console.error('Error stopping canister monitoring:', error);
+            showError(`Error stopping canister monitoring: ${error instanceof Error ? error.message : String(error)}`);
+            throw error;
+        }
+    }
+
+    const getCanisterHealthStatus = async () => {
+        try {
+            const actor = await createAlarmActor();
+            const result = await actor.getCanisterHealthStatus();
+            
+            if ('err' in result) {
+                throw new Error(JSON.stringify(result.err));
+            }
+            
+            return result.ok;
+        } catch (error) {
+            console.error('Error getting canister health status:', error);
+            showError(`Error getting canister health status: ${error instanceof Error ? error.message : String(error)}`);
+            throw error;
+        }
+    }
+
+    const getQueueStatus = async () => {
+        try {
+            const actor = await createAlarmActor();
+            const result = await actor.getQueueStatus();
+            
+            if ('err' in result) {
+                throw new Error(JSON.stringify(result.err));
+            }
+            
+            return result.ok;
+        } catch (error) {
+            console.error('Error getting queue status:', error);
+            showError(`Error getting queue status: ${error instanceof Error ? error.message : String(error)}`);
+            throw error;
+        }
+    }
+
+    const clearQueues = async () => {
+        try {
+            const actor = await createAlarmActor();
+            const result = await actor.clearQueues();
+            
+            if ('err' in result) {
+                throw new Error(JSON.stringify(result.err));
+            }
+            
+            showSuccess('Queues cleared successfully');
+            return result.ok;
+        } catch (error) {
+            console.error('Error clearing queues:', error);
+            showError(`Error clearing queues: ${error instanceof Error ? error.message : String(error)}`);
+            throw error;
+        }
+    }
+
+    const getSentMessages = async (limit?: number) => {
+        try {
+            const actor = await createAlarmActor();
+            const result = await actor.getSentMessages(limit ? [BigInt(limit)] : []);
+            
+            if ('err' in result) {
+                throw new Error(JSON.stringify(result.err));
+            }
+            
+            return result.ok;
+        } catch (error) {
+            console.error('Error getting sent messages:', error);
+            showError(`Error getting sent messages: ${error instanceof Error ? error.message : String(error)}`);
+            throw error;
+        }
+    }
+
+    const getSentSMSMessages = async (limit?: number) => {
+        try {
+            const actor = await createAlarmActor();
+            const result = await actor.getSentSMSMessages(limit ? [BigInt(limit)] : []);
+            
+            if ('err' in result) {
+                throw new Error(JSON.stringify(result.err));
+            }
+            
+            return result.ok;
+        } catch (error) {
+            console.error('Error getting sent SMS messages:', error);
+            showError(`Error getting sent SMS messages: ${error instanceof Error ? error.message : String(error)}`);
+            throw error;
+        }
+    }
+
+    const getSentEmailMessages = async (limit?: number) => {
+        try {
+            const actor = await createAlarmActor();
+            const result = await actor.getSentEmailMessages(limit ? [BigInt(limit)] : []);
+            
+            if ('err' in result) {
+                throw new Error(JSON.stringify(result.err));
+            }
+            
+            return result.ok;
+        } catch (error) {
+            console.error('Error getting sent email messages:', error);
+            showError(`Error getting sent email messages: ${error instanceof Error ? error.message : String(error)}`);
+            throw error;
+        }
+    }
+
+    const setCanisterMonitoringInterval = async (intervalMinutes: number) => {
+        try {
+            const actor = await createAlarmActor();
+            const result = await actor.setCanisterMonitoringInterval(BigInt(intervalMinutes));
+            
+            if ('err' in result) {
+                throw new Error(JSON.stringify(result.err));
+            }
+            
+            showSuccess('Canister monitoring interval updated successfully');
+            return result.ok;
+        } catch (error) {
+            console.error('Error setting canister monitoring interval:', error);
+            showError(`Error setting canister monitoring interval: ${error instanceof Error ? error.message : String(error)}`);
+            throw error;
+        }
+    }
+
+    const setLevel2SMSCheckInterval = async (intervalMinutes: number) => {
+        try {
+            const actor = await createAlarmActor();
+            const result = await actor.setLevel2SMSCheckInterval(BigInt(intervalMinutes));
+            
+            if ('err' in result) {
+                throw new Error(JSON.stringify(result.err));
+            }
+            
+            showSuccess('Level 2 SMS check interval updated successfully');
+            return result.ok;
+        } catch (error) {
+            console.error('Error setting level 2 SMS check interval:', error);
+            showError(`Error setting level 2 SMS check interval: ${error instanceof Error ? error.message : String(error)}`);
+            throw error;
+        }
+    }
+
+    const getConfigurationIntervals = async () => {
+        try {
+            const actor = await createAlarmActor();
+            const result = await actor.getConfigurationIntervals();
+            
+            if ('err' in result) {
+                throw new Error(JSON.stringify(result.err));
+            }
+            
+            return result.ok;
+        } catch (error) {
+            console.error('Error getting configuration intervals:', error);
+            showError(`Error getting configuration intervals: ${error instanceof Error ? error.message : String(error)}`);
+            throw error;
+        }
+    }
+
+    const getAdminActionLogs = async (limit?: number) => {
+        try {
+            const actor = await createAlarmActor();
+            const result = await actor.getAdminActionLogs(limit ? [BigInt(limit)] : []);
+            
+            if ('err' in result) {
+                throw new Error(JSON.stringify(result.err));
+            }
+            
+            return result.ok;
+        } catch (error) {
+            console.error('Error getting admin action logs:', error);
+            showError(`Error getting admin action logs: ${error instanceof Error ? error.message : String(error)}`);
+            throw error;
+        }
+    }
+
+    const getAlarmAcknowledgments = async (limit?: number) => {
+        try {
+            const actor = await createAlarmActor();
+            const result = await actor.getAlarmAcknowledgments(limit ? [BigInt(limit)] : []);
+            
+            if ('err' in result) {
+                throw new Error(JSON.stringify(result.err));
+            }
+            
+            return result.ok;
+        } catch (error) {
+            console.error('Error getting alarm acknowledgments:', error);
+            showError(`Error getting alarm acknowledgments: ${error instanceof Error ? error.message : String(error)}`);
+            throw error;
+        }
+    }
+
+    const sendTestEmailSingle = async (email: string, subject: string) => {
+        try {
+            const actor = await createAlarmActor();
+            const result = await actor.sendTestEmailSingle(email, subject);
+            
+            if ('err' in result) {
+                throw new Error(JSON.stringify(result.err));
+            }
+            
+            showSuccess('Test email sent successfully');
+            return result.ok;
+        } catch (error) {
+            console.error('Error sending test email:', error);
+            showError(`Error sending test email: ${error instanceof Error ? error.message : String(error)}`);
+            throw error;
+        }
+    }
+
+    const showSuccess = (message: string) => {
+        addToast({
+            id: Date.now(),
+            code: 'success',
+            title: 'Success',
+            message: message,
+            icon: 'fa-solid fa-exclamation-triangle'
+        });
+    }
+
+    const showError = (message: string) => {
+        addToast({
+            id: Date.now(),
+            code: 'error',
+            title: 'Error',
+            message: message,
+            icon: 'fa-solid fa-exclamation-triangle'
+        });
+    }
+
     // # RETURN #
     return {
         // state
@@ -5319,11 +5999,51 @@ export const useTacoStore = defineStore('taco', () => {
         treasuryCanisterId,
         neuronSnapshotCanisterId,
         rewardsCanisterId,
+        alarmCanisterId,
         
         // Portfolio snapshot management
         getPortfolioSnapshotStatus,
         startPortfolioSnapshots,
         stopPortfolioSnapshots,
         updatePortfolioSnapshotInterval,
+
+        // Alarm management functions
+        createAlarmActor,
+        performSystemHealthCheck,
+        getEnhancedAlarmSystemStatus,
+        getMonitoringStatus,
+        addAlarmAdmin,
+        addAlarmContact,
+        getAlarmContacts,
+        updateContactStatus,
+        removeAlarmContact,
+        testAlarmContact,
+        getPendingAlarms,
+        acknowledgeAlarm,
+        getSystemErrors,
+        resolveSystemError,
+        setCheckInterval,
+        startMonitoring,
+        stopMonitoring,
+        addMonitoredCanister,
+        getMonitoredCanisters,
+        removeMonitoredCanister,
+        updateMonitoredCanisterStatus,
+        startCanisterMonitoring,
+        stopCanisterMonitoring,
+        getCanisterHealthStatus,
+        getQueueStatus,
+        clearQueues,
+        getSentMessages,
+        getSentSMSMessages,
+        getSentEmailMessages,
+        setCanisterMonitoringInterval,
+        setLevel2SMSCheckInterval,
+        getConfigurationIntervals,
+        getAdminActionLogs,
+        getAlarmAcknowledgments,
+        sendTestEmailSingle,
+        showSuccess,
+        showError,
     }
 })
