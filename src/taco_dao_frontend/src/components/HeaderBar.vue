@@ -241,6 +241,14 @@
 
         </router-link>    
         
+        <!-- wallet - router link -->
+        <router-link @click="togglePagesMenu()" to="/wallet" class="list-group-item">
+
+          <!-- item text -->
+          <span>Wallet</span>
+
+        </router-link>
+
         <!-- info - router link -->
         <router-link @click="togglePagesMenu()" to="/info" class="list-group-item">
 

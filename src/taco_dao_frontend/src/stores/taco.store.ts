@@ -5155,6 +5155,245 @@ export const useTacoStore = defineStore('taco', () => {
         }
     }
 
+    // Wallet methods
+    const registerUserToken = async (tokenPrincipal: string) => {
+        try {
+            if (!userLoggedIn.value) {
+                throw new Error('User must be logged in to register tokens');
+            }
+
+            const authClient = await getAuthClient();
+            const identity = authClient.getIdentity();
+            
+            const agent = await createAgent({
+                identity,
+                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            });
+
+            const daoActor = Actor.createActor(daoBackendIDL, {
+                agent,
+                canisterId: daoBackendCanisterId()
+            });
+
+            const result = await daoActor.registerUserToken(Principal.fromText(tokenPrincipal)) as { ok?: string; err?: any };
+            
+            if ('ok' in result) {
+                return (result as any).ok;
+            } else {
+                throw new Error(JSON.stringify((result as any).err));
+            }
+        } catch (error: any) {
+            console.error('Error registering token:', error);
+            throw error;
+        }
+    }
+
+    const unregisterUserToken = async (tokenPrincipal: string) => {
+        try {
+            if (!userLoggedIn.value) {
+                throw new Error('User must be logged in to unregister tokens');
+            }
+
+            const authClient = await getAuthClient();
+            const identity = authClient.getIdentity();
+            
+            const agent = await createAgent({
+                identity,
+                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            });
+
+            const daoActor = Actor.createActor(daoBackendIDL, {
+                agent,
+                canisterId: daoBackendCanisterId()
+            });
+
+            const result = await daoActor.unregisterUserToken(Principal.fromText(tokenPrincipal)) as { ok?: string; err?: any };
+            
+            if ('ok' in result) {
+                return (result as any).ok;
+            } else {
+                throw new Error(JSON.stringify((result as any).err));
+            }
+        } catch (error: any) {
+            console.error('Error unregistering token:', error);
+            throw error;
+        }
+    }
+
+    const getUserRegisteredTokens = async (): Promise<Principal[]> => {
+        try {
+            if (!userLoggedIn.value) {
+                return [];
+            }
+
+            const authClient = await getAuthClient();
+            const identity = authClient.getIdentity();
+            
+            const agent = await createAgent({
+                identity,
+                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            });
+
+            const daoActor = Actor.createActor(daoBackendIDL, {
+                agent,
+                canisterId: daoBackendCanisterId()
+            });
+
+            return await daoActor.getUserRegisteredTokens() as Principal[];
+        } catch (error: any) {
+            console.error('Error fetching user registered tokens:', error);
+            return [];
+        }
+    }
+
+    const fetchUserTokenBalance = async (tokenPrincipal: string, decimals: number): Promise<bigint> => {
+        try {
+            if (!userLoggedIn.value) {
+                return 0n;
+            }
+
+            const authClient = await getAuthClient();
+            const identity = authClient.getIdentity();
+            
+            const agent = await createAgent({
+                identity,
+                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            });
+
+            // Handle ICP differently
+            if (tokenPrincipal === 'ryjl3-tyaaa-aaaaa-aaaba-cai') {
+                const ledgerActor = Actor.createActor(idlFactory, {
+                    agent,
+                    canisterId: tokenPrincipal
+                });
+                
+                const accountId = AccountIdentifier.fromPrincipal({
+                    principal: Principal.fromText(userPrincipal.value)
+                });
+                const result = await ledgerActor.account_balance({ account: accountId.toUint8Array() });
+                return (result as any).e8s;
+            } else {
+                // ICRC1 token - use generic interface
+                const icrc1IDL = ({ IDL }: any) => {
+                    return IDL.Service({
+                        'icrc1_balance_of': IDL.Func(
+                            [IDL.Record({ 'owner': IDL.Principal, 'subaccount': IDL.Opt(IDL.Vec(IDL.Nat8)) })],
+                            [IDL.Nat],
+                            ['query']
+                        ),
+                    });
+                };
+
+                const tokenActor = Actor.createActor(icrc1IDL, {
+                    agent,
+                    canisterId: tokenPrincipal
+                });
+                
+                return await tokenActor.icrc1_balance_of({
+                    owner: Principal.fromText(userPrincipal.value),
+                    subaccount: []
+                }) as bigint;
+            }
+        } catch (error: any) {
+            console.error(`Error fetching balance for token ${tokenPrincipal}:`, error);
+            return 0n;
+        }
+    }
+
+    const sendToken = async (
+        tokenPrincipal: string,
+        recipient: string,
+        amount: bigint,
+        fee: bigint,
+        memo?: string
+    ) => {
+        try {
+            if (!userLoggedIn.value) {
+                throw new Error('User must be logged in to send tokens');
+            }
+
+            const authClient = await getAuthClient();
+            const identity = authClient.getIdentity();
+            
+            const agent = await createAgent({
+                identity,
+                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            });
+
+            // Handle ICP differently
+            if (tokenPrincipal === 'ryjl3-tyaaa-aaaaa-aaaba-cai') {
+                const ledgerActor = Actor.createActor(idlFactory, {
+                    agent,
+                    canisterId: tokenPrincipal
+                });
+
+                const result = await ledgerActor.transfer({
+                    to: AccountIdentifier.fromHex(recipient).toUint8Array(),
+                    fee: { e8s: fee },
+                    memo: memo ? BigInt(memo.charCodeAt(0)) : 0n,
+                    from_subaccount: [],
+                    created_at_time: [],
+                    amount: { e8s: amount }
+                }) as { Ok?: any; Err?: any };
+
+                if ('Ok' in result) {
+                    return (result as any).Ok;
+                } else {
+                    throw new Error(JSON.stringify((result as any).Err));
+                }
+            } else {
+                // ICRC1 token
+                const icrc1IDL = ({ IDL }: any) => {
+                    return IDL.Service({
+                        'icrc1_transfer': IDL.Func(
+                            [IDL.Record({
+                                'to': IDL.Record({ 'owner': IDL.Principal, 'subaccount': IDL.Opt(IDL.Vec(IDL.Nat8)) }),
+                                'fee': IDL.Opt(IDL.Nat),
+                                'memo': IDL.Opt(IDL.Vec(IDL.Nat8)),
+                                'from_subaccount': IDL.Opt(IDL.Vec(IDL.Nat8)),
+                                'created_at_time': IDL.Opt(IDL.Nat64),
+                                'amount': IDL.Nat,
+                            })],
+                            [IDL.Variant({ 'Ok': IDL.Nat, 'Err': IDL.Text })],
+                            []
+                        ),
+                    });
+                };
+
+                const tokenActor = Actor.createActor(icrc1IDL, {
+                    agent,
+                    canisterId: tokenPrincipal
+                });
+
+                const result = await tokenActor.icrc1_transfer({
+                    to: {
+                        owner: Principal.fromText(recipient),
+                        subaccount: []
+                    },
+                    fee: [fee],
+                    memo: memo ? [new TextEncoder().encode(memo)] : [],
+                    from_subaccount: [],
+                    created_at_time: [],
+                    amount: amount
+                }) as { Ok?: any; Err?: any };
+
+                if ('Ok' in result) {
+                    return (result as any).Ok;
+                } else {
+                    throw new Error(JSON.stringify((result as any).Err));
+                }
+            }
+        } catch (error: any) {
+            console.error('Error sending token:', error);
+            throw error;
+        }
+    }
+
     // # RETURN #
     return {
         // state
@@ -5313,6 +5552,13 @@ export const useTacoStore = defineStore('taco', () => {
         setNeuronName,
         getUserNeurons,
         toggleThreadMenu,
+        
+        // Wallet methods
+        registerUserToken,
+        unregisterUserToken,
+        getUserRegisteredTokens,
+        fetchUserTokenBalance,
+        sendToken,
         
         // Canister ID functions
         daoBackendCanisterId,
