@@ -722,7 +722,7 @@
     -moz-appearance: none;
     -ms-appearance: none;
   }
-  
+
 }
 
 .container {
@@ -1404,8 +1404,54 @@ import FooterBar from '../components/FooterBar.vue'
 import TacoTitle from '../components/misc/TacoTitle.vue'
 import AdminConfirmationModal from '../components/admin/AdminConfirmationModal.vue'
 
+///////////
+// store //
+///////////
+
+// # SETUP #
 const tacoStore = useTacoStore()
-const userStore = tacoStore // Assuming user functions are in taco store
+const userStore = tacoStore
+
+// # STATE #
+
+// none
+
+// # ACTIONS #
+
+const { 
+  performSystemHealthCheck,
+  getEnhancedAlarmSystemStatus,
+  getMonitoringStatus,
+  addAlarmAdmin,
+  addAlarmContact,
+  getAlarmContacts,
+  updateContactStatus,
+  removeAlarmContact,
+  testAlarmContact,
+  getPendingAlarms,
+  acknowledgeAlarm,
+  getSystemErrors,
+  resolveSystemError,
+  setCheckInterval,
+  startMonitoring,
+  stopMonitoring,
+  addMonitoredCanister,
+  getMonitoredCanisters,
+  removeMonitoredCanister,
+  updateMonitoredCanisterStatus,
+  startCanisterMonitoring,
+  stopCanisterMonitoring,
+  getCanisterHealthStatus,
+  getQueueStatus,
+  clearQueues,
+  getSentMessages,
+  getSentSMSMessages,
+  getSentEmailMessages,
+  setCanisterMonitoringInterval,
+  setLevel2SMSCheckInterval,
+  getConfigurationIntervals,
+  getAdminActionLogs
+} = tacoStore 
 
 // Reactive state
 const loading = ref(false)
