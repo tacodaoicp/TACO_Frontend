@@ -324,13 +324,13 @@
                                 <small 
                                   v-for="[neuronId, amount] in claim.neuronWithdrawals.slice(0, 2)" 
                                   :key="neuronId"
-                                  class="d-block text-muted"
+                                  class="d-block text-light"
                                 >
                                   {{ formatNeuronId(neuronId) }}: {{ formatTacoPrecise(amount) }}
                                 </small>
                                 <small 
                                   v-if="claim.neuronWithdrawals.length > 2" 
-                                  class="d-block text-muted"
+                                  class="d-block text-light"
                                 >
                                   +{{ claim.neuronWithdrawals.length - 2 }} more...
                                 </small>
@@ -726,13 +726,26 @@ export default {
 
     const formatNeuronId = (neuronId) => {
       try {
-        if (!neuronId || neuronId.length === 0) return 'Unknown'
+        if (!neuronId) return 'Unknown'
         
-        const id = neuronId[0].id
+        let id
+        // Handle different neuronId formats
+        if (Array.isArray(neuronId) && neuronId.length > 0 && neuronId[0].id) {
+          // Format from SNS governance: [{ id: Uint8Array }]
+          id = neuronId[0].id
+        } else if (neuronId instanceof Uint8Array || Array.isArray(neuronId)) {
+          // Direct Uint8Array or array format (from withdrawal history)
+          id = neuronId
+        } else {
+          return 'Unknown Format'
+        }
+        
+        if (!id || id.length === 0) return 'Unknown'
+        
         const hex = Array.from(id).map(b => b.toString(16).padStart(2, '0')).join('')
         return hex.length > 12 ? hex.substring(0, 8) + '...' + hex.substring(hex.length - 4) : hex
       } catch (error) {
-        console.error('Error formatting neuron ID:', error)
+        console.error('Error formatting neuron ID:', error, neuronId)
         return 'Format Error'
       }
     }
