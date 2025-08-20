@@ -17,6 +17,24 @@
           <p class="mt-2">Loading wallet...</p>
         </div>
 
+        <!-- login required state -->
+        <div v-else-if="!tacoStore.userLoggedIn" class="text-center py-5">
+          <div class="card">
+            <div class="card-body py-5">
+              <i class="fa fa-lock fa-4x text-muted mb-4"></i>
+              <h3 class="mb-3">Login Required</h3>
+              <p class="text-muted mb-4">You need to log in to view and manage your wallet.</p>
+              <button 
+                @click="tacoStore.login()" 
+                class="btn btn-primary btn-lg"
+              >
+                <i class="fa fa-sign-in-alt me-2"></i>
+                Login with Internet Identity
+              </button>
+            </div>
+          </div>
+        </div>
+
         <!-- wallet content -->
         <div v-else>
           
@@ -338,12 +356,24 @@ const unregisterToken = async (token: WalletToken) => {
 
 // Lifecycle
 onMounted(async () => {
-  if (!tacoStore.userLoggedIn) {
-    tacoStore.router.push('/')
-    return
+  try {
+    // Wait for authentication to be checked first
+    await tacoStore.checkIfLoggedIn()
+    
+    // Small delay to ensure state is fully updated
+    await new Promise(resolve => setTimeout(resolve, 100))
+    
+    if (tacoStore.userLoggedIn) {
+      console.log('User is logged in, loading wallet data')
+      await loadWalletData()
+    } else {
+      console.log('User not logged in, showing login prompt')
+      loading.value = false
+    }
+  } catch (error) {
+    console.error('Error in wallet onMounted:', error)
+    loading.value = false
   }
-  
-  await loadWalletData()
 })
 </script>
 
@@ -387,6 +417,24 @@ onMounted(async () => {
   height: 3rem;
 }
 
+.btn-lg {
+  padding: 0.75rem 2rem;
+  font-size: 1.125rem;
+  border-radius: 8px;
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, var(--primary-color), var(--primary-hover));
+  border: none;
+  transition: all 0.3s ease;
+}
+
+.btn-primary:hover {
+  background: linear-gradient(135deg, var(--primary-hover), var(--primary-color));
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 123, 255, 0.3);
+}
+
 @media (max-width: 768px) {
   .page-title h1 {
     font-size: 2rem;
@@ -394,6 +442,11 @@ onMounted(async () => {
   
   .card-body {
     padding: 1rem;
+  }
+  
+  .btn-lg {
+    padding: 0.625rem 1.5rem;
+    font-size: 1rem;
   }
 }
 </style>

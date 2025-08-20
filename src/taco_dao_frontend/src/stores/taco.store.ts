@@ -5566,6 +5566,9 @@ export const useTacoStore = defineStore('taco', () => {
         neuronSnapshotCanisterId,
         rewardsCanisterId,
         
+        // Router
+        router,
+        
         // Portfolio snapshot management
         getPortfolioSnapshotStatus,
         startPortfolioSnapshots,
