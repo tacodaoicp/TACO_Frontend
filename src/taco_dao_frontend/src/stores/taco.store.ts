@@ -5394,6 +5394,131 @@ export const useTacoStore = defineStore('taco', () => {
         }
     }
 
+    // Token metadata cache (stored in localStorage)
+    const TOKEN_METADATA_CACHE_KEY = 'taco_token_metadata_cache';
+    const CACHE_EXPIRY_MS = 24 * 60 * 60 * 1000; // 24 hours
+
+    const getCachedTokenMetadata = (tokenPrincipal: string): any => {
+        try {
+            const cached = localStorage.getItem(TOKEN_METADATA_CACHE_KEY);
+            if (!cached) return null;
+            
+            const cache = JSON.parse(cached);
+            const tokenCache = cache[tokenPrincipal];
+            
+            if (!tokenCache) return null;
+            
+            // Check if cache is expired
+            if (Date.now() - tokenCache.timestamp > CACHE_EXPIRY_MS) {
+                return null;
+            }
+            
+            return tokenCache.metadata;
+        } catch (error) {
+            console.error('Error reading token metadata cache:', error);
+            return null;
+        }
+    };
+
+    const setCachedTokenMetadata = (tokenPrincipal: string, metadata: any) => {
+        try {
+            const cached = localStorage.getItem(TOKEN_METADATA_CACHE_KEY);
+            const cache = cached ? JSON.parse(cached) : {};
+            
+            cache[tokenPrincipal] = {
+                metadata,
+                timestamp: Date.now()
+            };
+            
+            localStorage.setItem(TOKEN_METADATA_CACHE_KEY, JSON.stringify(cache));
+        } catch (error) {
+            console.error('Error caching token metadata:', error);
+        }
+    };
+
+    const fetchTokenMetadata = async (tokenPrincipal: string): Promise<any> => {
+        // Check cache first
+        const cached = getCachedTokenMetadata(tokenPrincipal);
+        if (cached) {
+            return cached;
+        }
+
+        try {
+            // Create a basic ICRC1 token actor
+            // We'll use a minimal IDL for ICRC1 metadata
+            const icrc1IDL = ({ IDL }: any) => {
+                const MetadataValue = IDL.Variant({
+                    'Nat': IDL.Nat,
+                    'Int': IDL.Int,
+                    'Text': IDL.Text,
+                    'Blob': IDL.Vec(IDL.Nat8),
+                });
+                return IDL.Service({
+                    'icrc1_metadata': IDL.Func([], [IDL.Vec(IDL.Tuple(IDL.Text, MetadataValue))], ['query']),
+                });
+            };
+
+            // Create agent
+            const host = process.env.DFX_NETWORK === "local"
+                ? getLocalHost()
+                : "https://ic0.app";
+                
+            const authClientInst = await getAuthClient();
+            const agent = await createAgent({
+                identity: authClientInst.getIdentity() || new AnonymousIdentity(),
+                host,
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            });
+
+            const tokenActor = Actor.createActor(icrc1IDL, {
+                agent,
+                canisterId: tokenPrincipal,
+            });
+
+            // Fetch ICRC1 metadata
+            const metadata = await (tokenActor as any).icrc1_metadata();
+            
+            // Parse metadata into a more usable format
+            const parsedMetadata = {
+                name: '',
+                symbol: '',
+                decimals: 8,
+                fee: 0n,
+                logo: null
+            };
+
+            // Parse the metadata array
+            for (const [key, value] of metadata) {
+                if (key === 'icrc1:name' && 'Text' in value) {
+                    parsedMetadata.name = value.Text;
+                } else if (key === 'icrc1:symbol' && 'Text' in value) {
+                    parsedMetadata.symbol = value.Text;
+                } else if (key === 'icrc1:decimals' && 'Nat' in value) {
+                    parsedMetadata.decimals = Number(value.Nat);
+                } else if (key === 'icrc1:fee' && 'Nat' in value) {
+                    parsedMetadata.fee = value.Nat;
+                } else if (key === 'icrc1:logo' && 'Text' in value) {
+                    parsedMetadata.logo = value.Text;
+                }
+            }
+
+            // Cache the parsed metadata
+            setCachedTokenMetadata(tokenPrincipal, parsedMetadata);
+            
+            return parsedMetadata;
+        } catch (error) {
+            console.error('Error fetching token metadata:', error);
+            // Return default metadata if fetch fails
+            return {
+                name: `Custom Token (${tokenPrincipal.slice(0, 5)}...)`,
+                symbol: 'CUSTOM',
+                decimals: 8,
+                fee: 10000n,
+                logo: null
+            };
+        }
+    };
+
     // # RETURN #
     return {
         // state
@@ -5559,6 +5684,8 @@ export const useTacoStore = defineStore('taco', () => {
         getUserRegisteredTokens,
         fetchUserTokenBalance,
         sendToken,
+        fetchTokenMetadata,
+        getCachedTokenMetadata,
         
         // Canister ID functions
         daoBackendCanisterId,

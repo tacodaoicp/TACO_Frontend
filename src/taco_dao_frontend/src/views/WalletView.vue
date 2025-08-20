@@ -172,6 +172,7 @@ const showSendDialog = ref(false)
 const selectedToken = ref<WalletToken | null>(null)
 const allTokenBalances = ref<Map<string, bigint>>(new Map())
 const userRegisteredTokenPrincipals = ref<string[]>([])
+const customTokenMetadata = ref<Map<string, any>>(new Map())
 const newTokenPrincipal = ref('')
 const registeringToken = ref(false)
 
@@ -258,16 +259,17 @@ const userRegisteredTokens = computed<WalletToken[]>(() => {
         }
       }
       
-      // For custom ICRC1 tokens not in trusted list, create a basic entry
+      // For custom ICRC1 tokens not in trusted list, use cached metadata or defaults
+      const metadata = customTokenMetadata.value.get(principal)
       return {
         principal,
-        name: `Custom Token (${principal.slice(0, 5)}...)`,
-        symbol: 'UNKNOWN',
-        logo: tokenImages['Default'],
+        name: metadata?.name || `Custom Token (${principal.slice(0, 5)}...)`,
+        symbol: metadata?.symbol || 'UNKNOWN',
+        logo: metadata?.logo || tokenImages['Default'],
         balance: allTokenBalances.value.get(principal) || 0n,
-        decimals: 8, // Default for ICRC1
-        fee: 10000n, // Default fee
-        priceUSD: 0,
+        decimals: metadata?.decimals || 8,
+        fee: metadata?.fee || 10000n,
+        priceUSD: 0, // Custom tokens don't have price data
         isRegistered: true
       }
     })
@@ -300,9 +302,43 @@ const fetchUserRegisteredTokens = async () => {
   try {
     const registeredTokens = await tacoStore.getUserRegisteredTokens()
     userRegisteredTokenPrincipals.value = registeredTokens.map(p => p.toString())
+    
+    // Load metadata for custom tokens
+    await loadCustomTokenMetadata()
   } catch (error) {
     console.error('Error fetching user registered tokens:', error)
     userRegisteredTokenPrincipals.value = []
+  }
+}
+
+const loadCustomTokenMetadata = async () => {
+  const tokenDetailsMap = new Map(tacoStore.fetchedTokenDetails.map(([p, d]) => [p.toString(), d]))
+  
+  // Load metadata for tokens not in trusted list
+  for (const principal of userRegisteredTokenPrincipals.value) {
+    if (!tokenDetailsMap.has(principal)) {
+      try {
+        // Check cache first
+        const cachedMetadata = tacoStore.getCachedTokenMetadata(principal)
+        if (cachedMetadata) {
+          customTokenMetadata.value.set(principal, cachedMetadata)
+        } else {
+          // Fetch metadata from canister
+          const metadata = await tacoStore.fetchTokenMetadata(principal)
+          customTokenMetadata.value.set(principal, metadata)
+        }
+      } catch (error) {
+        console.error(`Error loading metadata for token ${principal}:`, error)
+        // Set default metadata
+        customTokenMetadata.value.set(principal, {
+          name: `Custom Token (${principal.slice(0, 5)}...)`,
+          symbol: 'UNKNOWN',
+          decimals: 8,
+          fee: 10000n,
+          logo: null
+        })
+      }
+    }
   }
 }
 
@@ -405,13 +441,20 @@ const registerCustomToken = async () => {
     await tacoStore.registerUserToken(newTokenPrincipal.value.trim())
     
     // Clear input and refresh
+    const registeredPrincipal = newTokenPrincipal.value.trim()
     newTokenPrincipal.value = ''
+    
+    // Refresh registered tokens list
     await fetchUserRegisteredTokens()
     
     // Load balance for the new token
     await loadAllBalances()
     
-    tacoStore.addToast('success', 'Token Registered', 'Custom ICRC1 token added to your wallet')
+    // Get the metadata for the registered token for the toast
+    const metadata = customTokenMetadata.value.get(registeredPrincipal)
+    const tokenName = metadata?.symbol || 'Custom Token'
+    
+    tacoStore.addToast('success', 'Token Registered', `${tokenName} added to your wallet`)
     
   } catch (error) {
     console.error('Error registering custom token:', error)
