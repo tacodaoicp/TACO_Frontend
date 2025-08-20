@@ -2,5 +2,9 @@
   "taco_dao_frontend": {
     "ic": "lx7ws-diaaa-aaaag-aubda-cai",
     "staging": "wxunf-maaaa-aaaab-qbzga-cai"
+  },
+  "alarm": {
+    "ic": "b2cwp-6qaaa-aaaad-qhn6a-cai",
+    "staging": "b2cwp-6qaaa-aaaad-qhn6a-cai"
   }
 }
