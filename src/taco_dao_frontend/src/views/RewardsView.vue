@@ -130,41 +130,21 @@
             </div>
             <div class="card-body">
               <div class="row">
-                <div class="col-md-8">
-                  <label for="targetPrincipal" class="form-label">Target Principal <span class="text-danger">*</span></label>
-                  <input 
-                    id="targetPrincipal"
-                    v-model="targetPrincipal"
-                    @blur="saveAccount"
-                    type="text" 
-                    class="form-control bg-secondary text-white" 
-                    placeholder="Enter the principal ID where you want to receive TACO tokens"
-                  />
+                <div class="col-12">
+                  <label class="form-label">Target Principal</label>
+                  <div class="form-control bg-secondary text-white" style="min-height: 38px; display: flex; align-items: center;">
+                    <span v-if="debugAuthState.isReady">
+                      {{ debugAuthState.userPrincipal }}
+                    </span>
+                    <span v-else class="text-warning">
+                      <i class="fas fa-exclamation-triangle me-2"></i>
+                      Please log in to see your principal
+                    </span>
+                  </div>
                   <div class="form-text text-muted">
-                    This is where your claimed TACO tokens will be sent
+                    Tokens will be sent to your logged-in principal
                   </div>
                 </div>
-                <div class="col-md-4">
-                  <label for="targetSubaccount" class="form-label">Subaccount (Optional)</label>
-                  <input 
-                    id="targetSubaccount"
-                    v-model="targetSubaccount"
-                    @blur="saveAccount"
-                    type="text" 
-                    class="form-control bg-secondary text-white" 
-                    placeholder="64 hex characters"
-                    maxlength="64"
-                  />
-                  <div class="form-text text-muted">
-                    Leave empty for default account
-                  </div>
-                </div>
-              </div>
-              <div class="mt-2">
-                <small class="text-info">
-                  <i class="fas fa-info-circle me-1"></i>
-                  Your account details are saved locally for convenience
-                </small>
               </div>
             </div>
           </div>
@@ -404,9 +384,7 @@ export default {
     const tacoStore = useTacoStore()
     
     // user authentication state from taco store
-    const { userLoggedIn } = storeToRefs(tacoStore)
-    const { userPrincipal } = storeToRefs(tacoStore)
-    const { truncatedPrincipal } = storeToRefs(tacoStore)
+    const { userLoggedIn, userPrincipal, truncatedPrincipal } = storeToRefs(tacoStore)
     
     /////////////////
     // Reactive Data //
@@ -430,6 +408,15 @@ export default {
     ///////////////
     // Computed //
     ///////////////
+    
+    // Debug computed to force reactivity
+    const debugAuthState = computed(() => {
+      return {
+        userLoggedIn: userLoggedIn.value,
+        userPrincipal: userPrincipal.value,
+        isReady: userLoggedIn.value && userPrincipal.value
+      }
+    })
     
     const totalRewards = computed(() => {
       let total = 0
@@ -896,12 +883,33 @@ export default {
     // Lifecycle //
     /////////////
     
-    onMounted(() => {
+    onMounted(async () => {
+      console.log('RewardsView onMounted - BEFORE checkIfLoggedIn:', {
+        userLoggedIn: userLoggedIn.value,
+        userPrincipal: userPrincipal.value
+      })
+      
       loadSavedAccount()
-      if (userLoggedIn.value) {
-        loadUserNeurons()
-        loadUserWithdrawalHistory()
-      }
+      
+      // Check authentication state first
+      await tacoStore.checkIfLoggedIn()
+      
+      console.log('RewardsView onMounted - AFTER checkIfLoggedIn:', {
+        userLoggedIn: userLoggedIn.value,
+        userPrincipal: userPrincipal.value
+      })
+      
+      // Small delay to ensure state is fully updated
+      setTimeout(() => {
+        console.log('RewardsView onMounted - AFTER setTimeout:', {
+          userLoggedIn: userLoggedIn.value,
+          userPrincipal: userPrincipal.value
+        })
+        if (userLoggedIn.value) {
+          loadUserNeurons()
+          loadUserWithdrawalHistory()
+        }
+      }, 100)
     })
 
     ////////////
@@ -916,6 +924,7 @@ export default {
       errorMessage,
       successMessage,
       neurons,
+      debugAuthState,
       totalRewards,
       claimableNeurons,
       targetPrincipal,
