@@ -6,10 +6,6 @@
       ],
       "type": "assets",
       "workspace": "taco_dao_frontend"
-    },
-    "alarm": {
-      "main": "src/alarm.mo",
-      "type": "motoko"
     }
   },
   "defaults": {
