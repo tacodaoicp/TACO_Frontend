@@ -47,7 +47,7 @@
             </div>
           </div>
           <div class="actions">
-            <button @click="performSystemHealthCheck" :disabled="loading" class="btn btn-primary">
+            <button @click="localPerformSystemHealthCheck" :disabled="loading" class="btn btn-primary">
               {{ loading ? 'Checking...' : 'Run Health Check' }}
             </button>
             <button @click="refreshSystemStatus" class="btn btn-secondary">Refresh Status</button>
@@ -203,7 +203,7 @@
               <div class="alarm-message">{{ alarm.message }}</div>
               <div class="alarm-actions">
                 <button 
-                  @click="acknowledgeAlarm(alarm.id)" 
+                  @click="localAcknowledgeAlarm(alarm.id)" 
                   class="btn btn-primary"
                   :disabled="loading"
                 >
@@ -540,7 +540,7 @@
               </div>
               
               <div class="form-actions">
-                <button @click="addMonitoredCanister" :disabled="!isCanisterFormValid || loading" class="btn btn-primary">
+                <button @click="localAddMonitoredCanister" :disabled="!isCanisterFormValid || loading" class="btn btn-primary">
                   Add Canister
                 </button>
               </div>
@@ -593,7 +593,7 @@
                       >
                         {{ canister.enabled ? 'Disable' : 'Enable' }}
                       </button>
-                      <button @click="removeMonitoredCanister(canister.id)" class="btn btn-sm btn-danger">
+                      <button @click="localRemoveMonitoredCanister(canister.id)" class="btn btn-sm btn-danger">
                         Remove
                       </button>
                     </td>
@@ -1551,7 +1551,7 @@ watch([activeHistoryTab, messageLimit], () => {
 })
 
 // Methods
-async function performSystemHealthCheck() {
+async function localPerformSystemHealthCheck() {
   loading.value = true
   try {
     await tacoStore.performSystemHealthCheck()
@@ -1676,7 +1676,7 @@ async function fetchPendingAlarms() {
   }
 }
 
-async function acknowledgeAlarm(alarmId: number) {
+async function localAcknowledgeAlarm(alarmId: number) {
   loading.value = true
   try {
     await tacoStore.acknowledgeAlarm(alarmId)
@@ -1795,7 +1795,7 @@ function handleConfirm() {
 }
 
 // Canister monitoring methods
-async function addMonitoredCanister() {
+async function localAddMonitoredCanister() {
   if (!isCanisterFormValid.value) return
   
   loading.value = true
@@ -1856,7 +1856,7 @@ async function toggleCanisterStatus(configId: number, enabled: boolean) {
   }
 }
 
-async function removeMonitoredCanister(configId: number) {
+async function localRemoveMonitoredCanister(configId: number) {
   confirmModal.value = {
     title: 'Remove Monitored Canister',
     message: 'Are you sure you want to remove this canister from monitoring? This action cannot be undone.',
