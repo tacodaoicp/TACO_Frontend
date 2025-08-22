@@ -1,6 +1,6 @@
 <template>
   <div v-if="show" class="modal-overlay" @click.self="closeDialog">
-    <div class="modal-dialog">
+    <div class="modal-dialog" @click.stop>
       <div class="modal-header">
         <h5 class="modal-title">
           <i class="fa fa-clock me-2"></i>
@@ -23,52 +23,41 @@
         </div>
 
         <div class="form-group">
-          <label for="dissolve-months" class="form-label">Dissolve Period (Months)</label>
+          <label for="dissolve-days" class="form-label">Dissolve Period (Days)</label>
           <input
-            id="dissolve-months"
-            v-model.number="dissolveMonths"
+            id="dissolve-days"
+            v-model.number="dissolveDays"
             type="number"
             class="form-control"
-            :class="{ 'is-invalid': dissolveMonths < 1 }"
-            min="1"
-            max="96"
+            :class="{ 'is-invalid': dissolveDays < 28 || dissolveDays > 180 }"
+            min="28"
+            max="180"
             step="1"
-            placeholder="Enter months (e.g., 6, 12, 24)"
+            placeholder="Enter days (e.g., 28, 60, 90)"
           />
           <div class="form-text">
             <i class="fa fa-info-circle me-1"></i>
-            Recommended: 6-24 months for optimal voting rewards
+            Recommended: 28 days minimum for voting rewards. Range: 28-180 days (6 months)
           </div>
-          <div v-if="dissolveMonths < 1" class="invalid-feedback">
-            Please enter at least 1 month
+          <div v-if="dissolveDays < 28 || dissolveDays > 180" class="invalid-feedback">
+            Please enter between 28 and 180 days
           </div>
         </div>
 
-        <div v-if="dissolveMonths >= 1" class="dissolve-preview">
+        <div v-if="dissolveDays >= 28 && dissolveDays <= 180" class="dissolve-preview">
           <h6>Preview:</h6>
           <div class="preview-item">
             <span class="label">Dissolve Period:</span>
-            <span class="value">{{ dissolveMonths }} months (≈{{ Math.round(dissolveMonths * 30) }} days)</span>
+            <span class="value">{{ dissolveDays }} days ({{ Math.round(dissolveDays / 30 * 10) / 10 }} months)</span>
           </div>
           <div class="preview-item">
             <span class="label">New Dissolve Date:</span>
-            <span class="value">{{ formatFutureDate(dissolveMonths) }}</span>
+            <span class="value">{{ formatFutureDate(dissolveDays) }}</span>
           </div>
           <div class="preview-item">
             <span class="label">Age Bonus:</span>
             <span class="value">✅ Will continue accruing (neuron stops dissolving)</span>
           </div>
-        </div>
-
-        <div class="alert alert-info">
-          <i class="fa fa-lightbulb me-2"></i>
-          <strong>How it works:</strong>
-          <ul class="mb-0 mt-2">
-            <li>Sets the dissolve timestamp to {{ dissolveMonths }} months from now</li>
-            <li>Stops the neuron from dissolving (preserves age bonus)</li>
-            <li>Neuron will be locked and earn maximum voting rewards</li>
-            <li>You can start dissolving later if needed</li>
-          </ul>
         </div>
       </div>
 
@@ -85,7 +74,7 @@
           type="button" 
           class="btn btn-primary" 
           @click="setDissolveDelay"
-          :disabled="loading || dissolveMonths < 1"
+          :disabled="loading || dissolveDays < 28 || dissolveDays > 180"
         >
           <span v-if="loading" class="spinner-border spinner-border-sm me-2"></span>
           <i v-else class="fa fa-clock me-2"></i>
@@ -126,7 +115,7 @@ const emit = defineEmits<Emits>()
 const tacoStore = useTacoStore()
 
 // Form state
-const dissolveMonths = ref(6) // Default to 6 months
+const dissolveDays = ref(28) // Default to 28 days
 const loading = ref(false)
 const successMessage = ref('')
 const errorMessage = ref('')
@@ -134,16 +123,16 @@ const errorMessage = ref('')
 // Reset form when dialog opens
 watch(() => props.show, (newShow) => {
   if (newShow) {
-    dissolveMonths.value = 6
+    dissolveDays.value = 28
     loading.value = false
     successMessage.value = ''
     errorMessage.value = ''
   }
 })
 
-const formatFutureDate = (months: number) => {
+const formatFutureDate = (days: number) => {
   const futureDate = new Date()
-  futureDate.setMonth(futureDate.getMonth() + months)
+  futureDate.setDate(futureDate.getDate() + days)
   return futureDate.toLocaleDateString('en-US', {
     year: 'numeric',
     month: 'long',
@@ -152,20 +141,22 @@ const formatFutureDate = (months: number) => {
 }
 
 const setDissolveDelay = async () => {
-  if (!props.neuron || dissolveMonths.value < 1) return
+  if (!props.neuron || dissolveDays.value < 28 || dissolveDays.value > 180) return
 
   loading.value = true
   errorMessage.value = ''
   successMessage.value = ''
 
   try {
-    console.log('Setting dissolve delay for neuron:', props.neuron.idHex, 'to', dissolveMonths.value, 'months')
+    console.log('Setting dissolve delay for neuron:', props.neuron.idHex, 'to', dissolveDays.value, 'days')
     
-    const result = await tacoStore.setNeuronDissolveDelay(props.neuron.id, dissolveMonths.value)
+    // Convert days to months for the backend function
+    const delayMonths = dissolveDays.value / 30
+    const result = await tacoStore.setNeuronDissolveDelay(props.neuron.id, delayMonths)
     
     console.log('Dissolve delay set successfully:', result)
     
-    successMessage.value = `Dissolve period set to ${dissolveMonths.value} months successfully! The neuron is now locked and will stop dissolving.`
+    successMessage.value = `Dissolve period set to ${dissolveDays.value} days successfully! The neuron is now locked and will stop dissolving.`
     
     // Auto-close after 3 seconds
     setTimeout(() => {
@@ -204,14 +195,15 @@ const closeDialog = () => {
 }
 
 .modal-dialog {
-  background: var(--card-background);
+  background: #1a1a1a;
   border-radius: 12px;
-  border: 1px solid var(--border-color);
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+  border: 1px solid #333;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
   max-width: 500px;
   width: 90%;
   max-height: 90vh;
   overflow-y: auto;
+  color: #ffffff;
 }
 
 .modal-header {
@@ -219,12 +211,12 @@ const closeDialog = () => {
   align-items: center;
   justify-content: space-between;
   padding: 1.25rem;
-  border-bottom: 1px solid var(--border-color);
+  border-bottom: 1px solid #333;
 }
 
 .modal-title {
   margin: 0;
-  color: var(--text-primary);
+  color: #ffffff;
   font-size: 1.1rem;
   font-weight: 600;
 }
@@ -232,7 +224,7 @@ const closeDialog = () => {
 .btn-close {
   background: none;
   border: none;
-  color: var(--text-secondary);
+  color: #999;
   font-size: 1.2rem;
   cursor: pointer;
   padding: 0.25rem;
@@ -241,7 +233,7 @@ const closeDialog = () => {
 }
 
 .btn-close:hover {
-  color: var(--text-primary);
+  color: #ffffff;
   background: rgba(255, 255, 255, 0.1);
 }
 
@@ -254,18 +246,19 @@ const closeDialog = () => {
   padding: 1rem;
   border-radius: 8px;
   margin-bottom: 1.5rem;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid #333;
 }
 
 .neuron-info-header h6 {
   margin: 0 0 0.5rem 0;
-  color: var(--text-primary);
+  color: #ffffff;
   font-weight: 600;
 }
 
 .neuron-info-header p {
   margin: 0;
   font-size: 0.9rem;
+  color: #cccccc;
 }
 
 .form-group {
@@ -275,24 +268,24 @@ const closeDialog = () => {
 .form-label {
   display: block;
   margin-bottom: 0.5rem;
-  color: var(--text-primary);
+  color: #ffffff;
   font-weight: 500;
 }
 
 .form-control {
   width: 100%;
   padding: 0.75rem;
-  background: var(--input-background);
-  border: 1px solid var(--border-color);
+  background: #2a2a2a;
+  border: 1px solid #444;
   border-radius: 6px;
-  color: var(--text-primary);
+  color: #ffffff;
   font-size: 0.9rem;
   transition: all 0.2s ease;
 }
 
 .form-control:focus {
   outline: none;
-  border-color: var(--primary-color);
+  border-color: #007bff;
   box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
 }
 
@@ -302,7 +295,7 @@ const closeDialog = () => {
 
 .form-text {
   font-size: 0.8rem;
-  color: var(--text-secondary);
+  color: #999;
   margin-top: 0.25rem;
 }
 
@@ -322,7 +315,7 @@ const closeDialog = () => {
 
 .dissolve-preview h6 {
   margin: 0 0 0.75rem 0;
-  color: var(--text-primary);
+  color: #ffffff;
   font-weight: 600;
 }
 
@@ -339,12 +332,12 @@ const closeDialog = () => {
 }
 
 .preview-item .label {
-  color: var(--text-secondary);
+  color: #cccccc;
   font-weight: 500;
 }
 
 .preview-item .value {
-  color: var(--text-primary);
+  color: #ffffff;
   font-weight: 500;
   text-align: right;
   max-width: 60%;
@@ -385,7 +378,7 @@ const closeDialog = () => {
   justify-content: flex-end;
   gap: 0.75rem;
   padding: 1.25rem;
-  border-top: 1px solid var(--border-color);
+  border-top: 1px solid #333;
 }
 
 .btn {
@@ -406,25 +399,25 @@ const closeDialog = () => {
 }
 
 .btn-secondary {
-  background: var(--secondary-color);
-  border-color: var(--secondary-color);
-  color: var(--text-primary);
+  background: #6c757d;
+  border-color: #6c757d;
+  color: #ffffff;
 }
 
 .btn-secondary:hover:not(:disabled) {
-  background: var(--secondary-hover);
-  border-color: var(--secondary-hover);
+  background: #5a6268;
+  border-color: #5a6268;
 }
 
 .btn-primary {
-  background: var(--primary-color);
-  border-color: var(--primary-color);
+  background: #007bff;
+  border-color: #007bff;
   color: white;
 }
 
 .btn-primary:hover:not(:disabled) {
-  background: var(--primary-hover);
-  border-color: var(--primary-hover);
+  background: #0056b3;
+  border-color: #0056b3;
 }
 
 .spinner-border {
