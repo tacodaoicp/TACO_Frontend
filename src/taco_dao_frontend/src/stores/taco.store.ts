@@ -5315,6 +5315,190 @@ export const useTacoStore = defineStore('taco', () => {
         };
     }
 
+    // Stake TACO tokens to a neuron
+    const stakeToNeuron = async (neuronId: Uint8Array, amount: bigint) => {
+        try {
+            if (!userLoggedIn.value) {
+                throw new Error('User must be logged in');
+            }
+
+            const tacoTokenPrincipal = 'kknbx-zyaaa-aaaaq-aae4a-cai'; // TACO token canister
+            const snsGovernancePrincipal = 'lhdfz-wqaaa-aaaaq-aae3q-cai'; // TACO SNS Governance
+
+            // Step 1: Transfer TACO tokens to SNS Governance with neuron ID as subaccount
+            console.log('Transferring TACO tokens to neuron subaccount...');
+            await transferToNeuronSubaccount(tacoTokenPrincipal, snsGovernancePrincipal, neuronId, amount);
+
+            // Step 2: Claim/refresh the neuron to recognize the new stake
+            console.log('Claiming/refreshing neuron...');
+            await claimOrRefreshNeuron(neuronId);
+
+            console.log('Staking completed successfully!');
+            return true;
+        } catch (error: any) {
+            console.error('Error staking to neuron:', error);
+            throw error;
+        }
+    }
+
+    // Transfer tokens to neuron subaccount
+    const transferToNeuronSubaccount = async (
+        tokenPrincipal: string,
+        governancePrincipal: string,
+        neuronId: Uint8Array,
+        amount: bigint
+    ) => {
+        const authClient = await getAuthClient();
+        const identity = authClient.getIdentity();
+        
+        const agent = await createAgent({
+            identity,
+            host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+            fetchRootKey: process.env.DFX_NETWORK === "local",
+        });
+
+        // Create ICRC1 actor for TACO token
+        const icrc1IDL = ({ IDL }: any) => {
+            return IDL.Service({
+                'icrc1_transfer': IDL.Func(
+                    [IDL.Record({
+                        'to': IDL.Record({ 'owner': IDL.Principal, 'subaccount': IDL.Opt(IDL.Vec(IDL.Nat8)) }),
+                        'fee': IDL.Opt(IDL.Nat),
+                        'memo': IDL.Opt(IDL.Vec(IDL.Nat8)),
+                        'from_subaccount': IDL.Opt(IDL.Vec(IDL.Nat8)),
+                        'created_at_time': IDL.Opt(IDL.Nat64),
+                        'amount': IDL.Nat
+                    })],
+                    [IDL.Variant({
+                        'Ok': IDL.Nat,
+                        'Err': IDL.Record({
+                            'InsufficientFunds': IDL.Record({ 'balance': IDL.Nat }),
+                            'BadFee': IDL.Record({ 'expected_fee': IDL.Nat }),
+                            'TemporarilyUnavailable': IDL.Null,
+                            'GenericError': IDL.Record({ 'message': IDL.Text, 'error_code': IDL.Nat }),
+                            'TooOld': IDL.Null,
+                            'CreatedInFuture': IDL.Record({ 'ledger_time': IDL.Nat64 }),
+                            'Duplicate': IDL.Record({ 'duplicate_of': IDL.Nat }),
+                            'BadBurn': IDL.Record({ 'min_burn_amount': IDL.Nat })
+                        })
+                    })]
+                )
+            });
+        };
+
+        const tokenActor = Actor.createActor(icrc1IDL, {
+            agent,
+            canisterId: tokenPrincipal
+        });
+
+        // Convert neuronId to proper subaccount (32 bytes)
+        const subaccount = new Uint8Array(32);
+        subaccount.set(neuronId, 0);
+
+        const transferArgs = {
+            to: {
+                owner: Principal.fromText(governancePrincipal),
+                subaccount: [Array.from(subaccount)]
+            },
+            fee: [],
+            memo: [],
+            from_subaccount: [],
+            created_at_time: [],
+            amount: amount
+        };
+
+        const result = await tokenActor.icrc1_transfer(transferArgs) as any;
+
+        if ('Ok' in result) {
+            return result.Ok;
+        } else {
+            throw new Error(`Transfer failed: ${JSON.stringify(result.Err)}`);
+        }
+    }
+
+    // Claim or refresh neuron after staking
+    const claimOrRefreshNeuron = async (neuronId: Uint8Array) => {
+        const authClient = await getAuthClient();
+        const identity = authClient.getIdentity();
+        
+        const agent = await createAgent({
+            identity,
+            host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+            fetchRootKey: process.env.DFX_NETWORK === "local",
+        });
+
+        // Create SNS Governance actor with manage_neuron capability
+        const snsGovernanceIDL = ({ IDL }: any) => {
+            const NeuronId = IDL.Record({ 'id': IDL.Vec(IDL.Nat8) });
+            const By = IDL.Variant({
+                'NeuronIdOrSubaccount': IDL.Record({
+                    'NeuronId': IDL.Opt(NeuronId),
+                    'Subaccount': IDL.Opt(IDL.Vec(IDL.Nat8))
+                }),
+                'MemoAndController': IDL.Record({
+                    'controller': IDL.Opt(IDL.Principal),
+                    'memo': IDL.Nat64
+                })
+            });
+            const ClaimOrRefresh = IDL.Record({
+                'by': IDL.Opt(By)
+            });
+            const Command = IDL.Variant({
+                'ClaimOrRefresh': ClaimOrRefresh,
+                // Add other commands as needed
+            });
+            const ManageNeuron = IDL.Record({
+                'subaccount': IDL.Vec(IDL.Nat8),
+                'command': IDL.Opt(Command)
+            });
+            const ClaimOrRefreshResponse = IDL.Record({
+                'refreshed_neuron_id': IDL.Opt(NeuronId)
+            });
+            const Command_1 = IDL.Variant({
+                'ClaimOrRefresh': ClaimOrRefreshResponse,
+                // Add other response commands as needed
+            });
+            const ManageNeuronResponse = IDL.Record({
+                'command': IDL.Opt(Command_1)
+            });
+
+            return IDL.Service({
+                'manage_neuron': IDL.Func([ManageNeuron], [ManageNeuronResponse], [])
+            });
+        };
+
+        const governanceActor = Actor.createActor(snsGovernanceIDL, {
+            agent,
+            canisterId: 'lhdfz-wqaaa-aaaaq-aae3q-cai'
+        });
+
+        // Convert neuronId to proper subaccount (32 bytes)
+        const subaccount = new Uint8Array(32);
+        subaccount.set(neuronId, 0);
+
+        const manageNeuronRequest = {
+            subaccount: Array.from(subaccount),
+            command: [{
+                ClaimOrRefresh: {
+                    by: [{
+                        NeuronIdOrSubaccount: {
+                            Subaccount: [Array.from(subaccount)],
+                            NeuronId: []
+                        }
+                    }]
+                }
+            }]
+        };
+
+        const result = await governanceActor.manage_neuron(manageNeuronRequest) as any;
+        
+        if (result.command && result.command.length > 0 && 'ClaimOrRefresh' in result.command[0]) {
+            return result.command[0].ClaimOrRefresh;
+        } else {
+            throw new Error(`ClaimOrRefresh failed: ${JSON.stringify(result)}`);
+        }
+    }
+
     // Wallet methods
     const registerUserToken = async (tokenPrincipal: string) => {
         try {
@@ -6292,6 +6476,7 @@ export const useTacoStore = defineStore('taco', () => {
         getUserNeurons,
         getTacoNeurons,
         formatNeuronForDisplay,
+        stakeToNeuron,
         toggleThreadMenu,
         
         // Wallet methods

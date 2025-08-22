@@ -142,6 +142,15 @@
       @send="handleSendToken"
     />
 
+    <!-- Stake to Neuron Dialog -->
+    <StakeToNeuronDialog
+      :show="showStakeDialog"
+      :neuron="selectedNeuron"
+      :taco-balance="getTacoBalance()"
+      @close="closeStakeDialog"
+      @staked="handleStakeCompleted"
+    />
+
   </div>
 </template>
 
@@ -151,6 +160,7 @@ import { useTacoStore } from '../stores/taco.store'
 import { Principal } from '@dfinity/principal'
 import TokenCard from '../components/wallet/TokenCard.vue'
 import SendTokenDialog from '../components/wallet/SendTokenDialog.vue'
+import StakeToNeuronDialog from '../components/wallet/StakeToNeuronDialog.vue'
 import { tokenImages } from '../components/data/TokenData'
 
 interface WalletToken {
@@ -171,6 +181,8 @@ const tacoStore = useTacoStore()
 const loading = ref(true)
 const showSendDialog = ref(false)
 const selectedToken = ref<WalletToken | null>(null)
+const showStakeDialog = ref(false)
+const selectedNeuron = ref<any | null>(null)
 const allTokenBalances = ref<Map<string, bigint>>(new Map())
 const userRegisteredTokenPrincipals = ref<string[]>([])
 const customTokenMetadata = ref<Map<string, any>>(new Map())
@@ -425,8 +437,24 @@ const unregisterToken = async (token: WalletToken) => {
 
 const handleStakeToNeuron = (neuron: any) => {
   console.log('Stake to neuron:', neuron)
-  // TODO: Implement staking functionality
-  // This will be implemented in future iterations
+  selectedNeuron.value = neuron
+  showStakeDialog.value = true
+}
+
+const closeStakeDialog = () => {
+  showStakeDialog.value = false
+  selectedNeuron.value = null
+}
+
+const handleStakeCompleted = async (neuron: any) => {
+  console.log('Staking completed for neuron:', neuron)
+  // Refresh wallet data to show updated balances
+  await loadWalletData()
+}
+
+const getTacoBalance = (): bigint => {
+  const tacoPrincipal = 'kknbx-zyaaa-aaaaq-aae4a-cai'
+  return allTokenBalances.value.get(tacoPrincipal) || 0n
 }
 
 const registerCustomToken = async () => {
