@@ -5315,6 +5315,127 @@ export const useTacoStore = defineStore('taco', () => {
         };
     }
 
+    // Generate neuron subaccount using the correct SNS formula
+    // SHA256(0x0c, "neuron-stake", principal-bytes, nonce-u64-be)
+    const generateNeuronSubaccount = async (principal: string, nonce: bigint): Promise<Uint8Array> => {
+        // Helper function to convert bigint to 8-byte big-endian
+        const u64be = (value: bigint): Uint8Array => {
+            const bytes = new Uint8Array(8);
+            for (let i = 7; i >= 0; i--) {
+                bytes[i] = Number(value & 0xFFn);
+                value = value >> 8n;
+            }
+            return bytes;
+        };
+
+        // Build the data to hash
+        const chunks = [
+            Uint8Array.from([0x0c]),                                    // len("neuron-stake")
+            new TextEncoder().encode("neuron-stake"),                   // "neuron-stake"
+            Principal.fromText(principal).toUint8Array(),               // principal bytes
+            u64be(nonce),                                               // nonce as u64 big-endian
+        ];
+        
+        // Concatenate all chunks
+        const totalLength = chunks.reduce((sum, chunk) => sum + chunk.length, 0);
+        const data = new Uint8Array(totalLength);
+        let offset = 0;
+        for (const chunk of chunks) {
+            data.set(chunk, offset);
+            offset += chunk.length;
+        }
+        
+        // Hash with SHA-256
+        const digest = await crypto.subtle.digest("SHA-256", data);
+        return new Uint8Array(digest);
+    }
+
+    // Find next available subaccount for neuron creation
+    const findFreeSubaccount = async (): Promise<{ subaccount: Uint8Array, index: number }> => {
+        if (!userLoggedIn.value) {
+            throw new Error('User must be logged in');
+        }
+
+        const authClient = await getAuthClient();
+        const identity = authClient.getIdentity();
+        
+        const agent = await createAgent({
+            identity,
+            host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+            fetchRootKey: process.env.DFX_NETWORK === "local",
+        });
+
+        // Use the existing SNS governance IDL
+        const { idlFactory } = await import('../../../declarations/sns_governance');
+        
+        const governanceActor = Actor.createActor(idlFactory, {
+            agent,
+            canisterId: 'lhdfz-wqaaa-aaaaq-aae3q-cai'
+        });
+
+        // Try nonces starting from 0
+        for (let nonce = 0n; nonce < 1000n; nonce++) {  // Reasonable upper limit
+            const subaccount = await generateNeuronSubaccount(userPrincipal.value, nonce);
+            
+            try {
+                // Try to get neuron with this subaccount
+                const getNeuronRequest = {
+                    neuron_id: [{
+                        id: Array.from(subaccount)
+                    }]
+                };
+                
+                const result = await governanceActor.get_neuron(getNeuronRequest) as any;
+                
+                // If result.result is empty/null, this subaccount is free
+                if (!result.result || result.result.length === 0) {
+                    return { subaccount, index: Number(nonce) };
+                }
+                
+                // If we get an error or the neuron doesn't exist, this subaccount is free
+                if (result.result[0] && 'Error' in result.result[0]) {
+                    return { subaccount, index: Number(nonce) };
+                }
+                
+            } catch (error) {
+                // If there's an error calling get_neuron, assume this subaccount is free
+                console.log(`Nonce ${nonce} appears to be free (error calling get_neuron):`, error);
+                return { subaccount, index: Number(nonce) };
+            }
+        }
+        
+        throw new Error('Could not find a free subaccount for neuron creation');
+    }
+
+    // Create a new neuron
+    const createNeuron = async (amount: bigint) => {
+        try {
+            if (!userLoggedIn.value) {
+                throw new Error('User must be logged in');
+            }
+
+            console.log('Finding free subaccount for new neuron...');
+            const { subaccount } = await findFreeSubaccount();
+            
+            const tacoTokenPrincipal = 'kknbx-zyaaa-aaaaq-aae4a-cai'; // TACO token canister
+            const snsGovernancePrincipal = 'lhdfz-wqaaa-aaaaq-aae3q-cai'; // TACO SNS Governance
+
+            // Step 1: Transfer TACO tokens to SNS Governance with the new subaccount
+            console.log('Transferring TACO tokens to new neuron subaccount...');
+            await transferToNeuronSubaccount(tacoTokenPrincipal, snsGovernancePrincipal, subaccount, amount);
+
+            // Step 2: Claim/refresh the neuron to create it
+            console.log('Claiming new neuron...');
+            await claimOrRefreshNeuron(subaccount);
+
+            console.log('Neuron created successfully!');
+            return { subaccount, success: true };
+        } catch (error: any) {
+            console.error('Error creating neuron:', error);
+            throw error;
+        }
+    }
+
     // Stake TACO tokens to a neuron
     const stakeToNeuron = async (neuronId: Uint8Array, amount: bigint) => {
         try {
@@ -6437,6 +6558,7 @@ export const useTacoStore = defineStore('taco', () => {
         getTacoNeurons,
         formatNeuronForDisplay,
         stakeToNeuron,
+        createNeuron,
         toggleThreadMenu,
         
         // Wallet methods

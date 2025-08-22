@@ -45,13 +45,23 @@
           <i class="fa fa-brain me-2"></i>
           Neurons
         </h6>
-        <button 
-          @click="loadNeurons"
-          class="btn btn-outline-secondary btn-sm"
-          :disabled="loadingNeurons"
-        >
-          <i class="fa fa-refresh" :class="{ 'fa-spin': loadingNeurons }"></i>
-        </button>
+        <div class="neurons-actions">
+          <button 
+            @click="$emit('create-neuron')"
+            class="btn btn-outline-primary btn-sm me-2"
+            title="Create new neuron"
+          >
+            <i class="fa fa-plus"></i>
+          </button>
+          <button 
+            @click="loadNeurons"
+            class="btn btn-outline-secondary btn-sm"
+            :disabled="loadingNeurons"
+            title="Refresh neurons"
+          >
+            <i class="fa fa-refresh" :class="{ 'fa-spin': loadingNeurons }"></i>
+          </button>
+        </div>
       </div>
       
       <div v-if="loadingNeurons" class="neurons-loading">
@@ -129,6 +139,7 @@ interface TokenCardEmits {
   (e: 'register', token: TokenCardProps['token']): void
   (e: 'unregister', token: TokenCardProps['token']): void
   (e: 'stake-to-neuron', neuron: any): void
+  (e: 'create-neuron'): void
 }
 
 const props = withDefaults(defineProps<TokenCardProps>(), {
@@ -358,6 +369,11 @@ const formatUSDValue = (balance: bigint, decimals: number, priceUSD: number): st
   font-weight: 600;
   margin: 0;
   color: var(--text-primary);
+  display: flex;
+  align-items: center;
+}
+
+.neurons-actions {
   display: flex;
   align-items: center;
 }

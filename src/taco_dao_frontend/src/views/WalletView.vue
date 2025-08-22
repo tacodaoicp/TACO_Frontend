@@ -52,6 +52,7 @@
                     @register="registerToken"
                     @unregister="unregisterToken"
                     @stake-to-neuron="handleStakeToNeuron"
+                    @create-neuron="handleCreateNeuron"
                   />
                 </div>
               </div>
@@ -151,6 +152,14 @@
       @staked="handleStakeCompleted"
     />
 
+    <!-- Create Neuron Dialog -->
+    <CreateNeuronDialog
+      :show="showCreateDialog"
+      :taco-balance="getTacoBalance()"
+      @close="closeCreateDialog"
+      @created="handleNeuronCreated"
+    />
+
   </div>
 </template>
 
@@ -161,6 +170,7 @@ import { Principal } from '@dfinity/principal'
 import TokenCard from '../components/wallet/TokenCard.vue'
 import SendTokenDialog from '../components/wallet/SendTokenDialog.vue'
 import StakeToNeuronDialog from '../components/wallet/StakeToNeuronDialog.vue'
+import CreateNeuronDialog from '../components/wallet/CreateNeuronDialog.vue'
 import { tokenImages } from '../components/data/TokenData'
 
 interface WalletToken {
@@ -183,6 +193,7 @@ const showSendDialog = ref(false)
 const selectedToken = ref<WalletToken | null>(null)
 const showStakeDialog = ref(false)
 const selectedNeuron = ref<any | null>(null)
+const showCreateDialog = ref(false)
 const allTokenBalances = ref<Map<string, bigint>>(new Map())
 const userRegisteredTokenPrincipals = ref<string[]>([])
 const customTokenMetadata = ref<Map<string, any>>(new Map())
@@ -455,6 +466,21 @@ const handleStakeCompleted = async (neuron: any) => {
 const getTacoBalance = (): bigint => {
   const tacoPrincipal = 'kknbx-zyaaa-aaaaq-aae4a-cai'
   return allTokenBalances.value.get(tacoPrincipal) || 0n
+}
+
+const handleCreateNeuron = () => {
+  console.log('Create neuron clicked')
+  showCreateDialog.value = true
+}
+
+const closeCreateDialog = () => {
+  showCreateDialog.value = false
+}
+
+const handleNeuronCreated = async () => {
+  console.log('Neuron created successfully')
+  // Refresh wallet data to show updated balances
+  await loadWalletData()
 }
 
 const registerCustomToken = async () => {
