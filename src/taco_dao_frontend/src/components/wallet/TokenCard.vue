@@ -71,30 +71,68 @@
         <span class="ms-2">Loading neurons...</span>
       </div>
       
-      <div v-else-if="neurons.length === 0" class="neurons-empty">
+      <div v-else-if="categorizedNeurons.all.length === 0" class="neurons-empty">
         <i class="fa fa-info-circle me-2"></i>
         <span>No neurons found</span>
       </div>
       
-      <div v-else class="neurons-list">
-        <div 
-          v-for="neuron in neurons" 
-          :key="neuron.idHex"
-          class="neuron-item"
-        >
-          <div class="neuron-info">
-            <div class="neuron-name">{{ neuron.displayName }}</div>
-            <div class="neuron-stake">
-              {{ formatBalance(neuron.stake, 8) }} TACO
+      <div v-else class="neurons-sections">
+        <!-- Owned Neurons Section -->
+        <div v-if="categorizedNeurons.owned.length > 0" class="neuron-section">
+          <div class="section-header">
+            <i class="fa fa-crown me-2"></i>
+            <span class="section-title">Owned ({{ categorizedNeurons.owned.length }})</span>
+          </div>
+          <div class="neurons-list">
+            <div 
+              v-for="neuron in categorizedNeurons.owned" 
+              :key="neuron.idHex"
+              class="neuron-item owned"
+            >
+              <div class="neuron-info">
+                <div class="neuron-name">{{ neuron.displayName }}</div>
+                <div class="neuron-stake">
+                  {{ formatBalance(neuron.stake, 8) }} TACO
+                </div>
+              </div>
+              <button 
+                @click="$emit('stake-to-neuron', neuron)"
+                class="btn btn-primary btn-sm"
+                title="Stake to this neuron"
+              >
+                <i class="fa fa-plus"></i>
+              </button>
             </div>
           </div>
-          <button 
-            @click="$emit('stake-to-neuron', neuron)"
-            class="btn btn-primary btn-sm"
-            title="Stake to this neuron"
-          >
-            <i class="fa fa-plus"></i>
-          </button>
+        </div>
+
+        <!-- Hotkeyed Neurons Section -->
+        <div v-if="categorizedNeurons.hotkeyed.length > 0" class="neuron-section">
+          <div class="section-header">
+            <i class="fa fa-key me-2"></i>
+            <span class="section-title">Hotkeyed ({{ categorizedNeurons.hotkeyed.length }})</span>
+          </div>
+          <div class="neurons-list">
+            <div 
+              v-for="neuron in categorizedNeurons.hotkeyed" 
+              :key="neuron.idHex"
+              class="neuron-item hotkeyed"
+            >
+              <div class="neuron-info">
+                <div class="neuron-name">{{ neuron.displayName }}</div>
+                <div class="neuron-stake">
+                  {{ formatBalance(neuron.stake, 8) }} TACO
+                </div>
+              </div>
+              <button 
+                @click="$emit('stake-to-neuron', neuron)"
+                class="btn btn-primary btn-sm"
+                title="Stake to this neuron"
+              >
+                <i class="fa fa-plus"></i>
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -154,6 +192,7 @@ const tacoStore = useTacoStore()
 // Neurons state
 const neurons = ref<any[]>([])
 const loadingNeurons = ref(false)
+const categorizedNeurons = ref<{owned: any[], hotkeyed: any[], all: any[]}>({owned: [], hotkeyed: [], all: []})
 
 // Load neurons for TACO token
 const loadNeurons = async () => {
@@ -164,10 +203,12 @@ const loadNeurons = async () => {
   loadingNeurons.value = true
   try {
     const rawNeurons = await tacoStore.getTacoNeurons()
-    neurons.value = rawNeurons.map(neuron => tacoStore.formatNeuronForDisplay(neuron))
+    categorizedNeurons.value = tacoStore.categorizeNeurons(rawNeurons)
+    neurons.value = categorizedNeurons.value.all // Keep for backward compatibility
   } catch (error) {
     console.error('Error loading neurons:', error)
     neurons.value = []
+    categorizedNeurons.value = {owned: [], hotkeyed: [], all: []}
   } finally {
     loadingNeurons.value = false
   }
@@ -388,6 +429,29 @@ const formatUSDValue = (balance: bigint, decimals: number, priceUSD: number): st
   color: var(--text-secondary);
 }
 
+.neurons-sections {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.neuron-section {
+  border-radius: 6px;
+}
+
+.section-header {
+  display: flex;
+  align-items: center;
+  margin-bottom: 0.5rem;
+  padding: 0.25rem 0;
+}
+
+.section-title {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
 .neurons-list {
   display: flex;
   flex-direction: column;
@@ -408,6 +472,14 @@ const formatUSDValue = (balance: bigint, decimals: number, priceUSD: number): st
 .neuron-item:hover {
   background: rgba(255, 255, 255, 0.08);
   border-color: rgba(255, 255, 255, 0.2);
+}
+
+.neuron-item.owned {
+  border-left: 3px solid #ffd700; /* Gold for owned */
+}
+
+.neuron-item.hotkeyed {
+  border-left: 3px solid #87ceeb; /* Light blue for hotkeyed */
 }
 
 .neuron-info {

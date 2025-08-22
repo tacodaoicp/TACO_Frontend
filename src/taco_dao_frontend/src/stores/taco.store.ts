@@ -5268,42 +5268,73 @@ export const useTacoStore = defineStore('taco', () => {
     }
 
     const createSnsGovernanceActor = async (agent: any, canisterId: string) => {
-        // Create a simplified IDL for list_neurons
-        const snsGovernanceIDL = ({ IDL }: any) => {
-            const NeuronId = IDL.Record({ 'id': IDL.Vec(IDL.Nat8) });
-            const ListNeurons = IDL.Record({
-                'of_principal': IDL.Opt(IDL.Principal),
-                'limit': IDL.Nat32,
-                'start_page_at': IDL.Opt(NeuronId)
-            });
-            
-            // Simplified neuron type for our needs
-            const Neuron = IDL.Record({
-                'id': IDL.Opt(NeuronId),
-                'cached_neuron_stake_e8s': IDL.Nat64,
-                'maturity_e8s_equivalent': IDL.Nat64,
-                'voting_power_percentage_multiplier': IDL.Nat64
-            });
-            
-            const ListNeuronsResponse = IDL.Record({
-                'neurons': IDL.Vec(Neuron)
-            });
-
-            return IDL.Service({
-                'list_neurons': IDL.Func([ListNeurons], [ListNeuronsResponse], ['query'])
-            });
-        };
-
-        return Actor.createActor(snsGovernanceIDL, {
+        // Import the full SNS governance IDL that includes permissions
+        const { idlFactory } = await import('../../../declarations/sns_governance');
+        
+        return Actor.createActor(idlFactory, {
             agent,
             canisterId
         });
     }
 
-    // Format neuron for display
+    // Determine neuron relationship to user
+    const getNeuronRelationship = (neuron: any, userPrincipalStr: string) => {
+        const userPrincipal = Principal.fromText(userPrincipalStr);
+        
+        let isOwner = false;
+        let isHotkey = false;
+        
+        const neuronIdBytes = neuron.id && neuron.id.length > 0 && neuron.id[0].id ? neuron.id[0].id : null;
+        const neuronIdHex = neuronIdBytes ? Array.from(neuronIdBytes as Uint8Array).map((b: number) => b.toString(16).padStart(2, '0')).join('').substring(0, 8) : 'unknown';
+        
+        console.log('Checking permissions for neuron:', {
+            neuronId: neuronIdHex,
+            userPrincipal: userPrincipal.toText(),
+            permissions: neuron.permissions
+        });
+        
+        // Check permissions for the user's principal
+        if (neuron.permissions && Array.isArray(neuron.permissions)) {
+            for (const permission of neuron.permissions) {
+                console.log('Checking permission:', permission);
+                
+                if (permission.principal && permission.principal.length > 0) {
+                    const permissionPrincipal = permission.principal[0];
+                    console.log('Permission principal:', permissionPrincipal.toText());
+                    
+                    // Check if this permission is for the current user
+                    if (permissionPrincipal.toText() === userPrincipal.toText()) {
+                        const permissionTypes = permission.permission_type || [];
+                        console.log('User permission types:', permissionTypes);
+                        
+                        // Check for owner permissions (typically includes permission type 1)
+                        // Owner usually has multiple permissions including 1 (configure), 2 (disburse), 3 (vote), 4 (submit proposal)
+                        if (permissionTypes.includes(1) || permissionTypes.includes(2)) {
+                            isOwner = true;
+                            console.log('User is OWNER');
+                        }
+                        
+                        // Check for hotkey permissions [4, 3] or [3, 4] (vote and submit proposal)
+                        const hasVote = permissionTypes.includes(3);
+                        const hasSubmitProposal = permissionTypes.includes(4);
+                        if (hasVote && hasSubmitProposal && !isOwner) {
+                            isHotkey = true;
+                            console.log('User is HOTKEY');
+                        }
+                    }
+                }
+            }
+        }
+        
+        console.log('Final relationship:', { isOwner, isHotkey });
+        return { isOwner, isHotkey };
+    }
+
+    // Format neuron for display with relationship info
     const formatNeuronForDisplay = (neuron: any) => {
         const neuronId = neuron.id && neuron.id.length > 0 ? neuron.id[0].id : null;
         const neuronIdHex = neuronId ? Array.from(neuronId as Uint8Array).map((b: number) => b.toString(16).padStart(2, '0')).join('') : 'Unknown';
+        const relationship = getNeuronRelationship(neuron, userPrincipal.value);
         
         return {
             id: neuronId,
@@ -5311,8 +5342,42 @@ export const useTacoStore = defineStore('taco', () => {
             stake: neuron.cached_neuron_stake_e8s,
             maturity: neuron.maturity_e8s_equivalent,
             votingPowerMultiplier: neuron.voting_power_percentage_multiplier,
-            displayName: `Neuron ${neuronIdHex.substring(0, 8)}...`
+            displayName: `Neuron ${neuronIdHex.substring(0, 8)}...`,
+            isOwner: relationship.isOwner,
+            isHotkey: relationship.isHotkey,
+            relationship: relationship.isOwner ? 'owned' : relationship.isHotkey ? 'hotkeyed' : 'unknown'
         };
+    }
+
+    // Categorize neurons into owned and hotkeyed
+    const categorizeNeurons = (neurons: any[]) => {
+        console.log('Categorizing neurons:', neurons.length, 'neurons');
+        
+        const formatted = neurons.map(neuron => {
+            const result = formatNeuronForDisplay(neuron);
+            console.log('Formatted neuron:', {
+                id: result.idHex,
+                relationship: result.relationship,
+                isOwner: result.isOwner,
+                isHotkey: result.isHotkey,
+                permissions: neuron.permissions
+            });
+            return result;
+        });
+        
+        const categorized = {
+            owned: formatted.filter(neuron => neuron.isOwner),
+            hotkeyed: formatted.filter(neuron => neuron.isHotkey && !neuron.isOwner),
+            all: formatted
+        };
+        
+        console.log('Categorized result:', {
+            owned: categorized.owned.length,
+            hotkeyed: categorized.hotkeyed.length,
+            all: categorized.all.length
+        });
+        
+        return categorized;
     }
 
     // Generate neuron subaccount using the correct SNS formula
@@ -6598,6 +6663,7 @@ export const useTacoStore = defineStore('taco', () => {
         getUserNeurons,
         getTacoNeurons,
         formatNeuronForDisplay,
+        categorizeNeurons,
         stakeToNeuron,
         createNeuron,
         toggleThreadMenu,
