@@ -152,6 +152,70 @@
                     <span class="detail-value neuron-id">{{ neuron.idHex }}</span>
                   </div>
                 </div>
+                
+                <!-- Permissions Section -->
+                <div v-if="neuron.permissions && neuron.permissions.length > 0" class="detail-section">
+                  <h6 class="section-title">
+                    <i class="fa fa-key me-2"></i>
+                    Permissions ({{ neuron.permissions.length }})
+                  </h6>
+                  <div class="permissions-list">
+                    <div 
+                      v-for="permission in neuron.permissions" 
+                      :key="permission.principal"
+                      class="permission-item"
+                      :class="{ 'current-user': permission.isCurrentUser }"
+                    >
+                      <div class="permission-principal">
+                        <span class="principal-text" :title="permission.principal">
+                          {{ permission.principalShort }}
+                        </span>
+                        <span v-if="permission.isCurrentUser" class="user-badge">
+                          <i class="fa fa-user"></i> You
+                        </span>
+                      </div>
+                      <div class="permission-types">
+                        <span 
+                          v-for="permName in permission.permissionNames" 
+                          :key="permName"
+                          class="permission-badge"
+                        >
+                          {{ permName }}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                
+                <!-- Followings Section -->
+                <div v-if="neuron.followings && neuron.followings.length > 0" class="detail-section">
+                  <h6 class="section-title">
+                    <i class="fa fa-users me-2"></i>
+                    Following ({{ neuron.followings.reduce((acc, f) => acc + f.followedCount, 0) }} neurons)
+                  </h6>
+                  <div class="followings-list">
+                    <div 
+                      v-for="following in neuron.followings" 
+                      :key="following.functionId"
+                      class="following-item"
+                    >
+                      <div class="following-function">
+                        <span class="function-name">{{ following.functionName }}</span>
+                        <span class="function-count">({{ following.followedCount }})</span>
+                      </div>
+                      <div class="followed-neurons">
+                        <span 
+                          v-for="followedNeuron in following.followedNeurons" 
+                          :key="followedNeuron.idHex"
+                          class="followed-neuron"
+                          :title="followedNeuron.idHex"
+                        >
+                          {{ followedNeuron.idShort }}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -230,6 +294,70 @@
                   <div class="detail-item">
                     <span class="detail-label">Neuron ID:</span>
                     <span class="detail-value neuron-id">{{ neuron.idHex }}</span>
+                  </div>
+                </div>
+                
+                <!-- Permissions Section -->
+                <div v-if="neuron.permissions && neuron.permissions.length > 0" class="detail-section">
+                  <h6 class="section-title">
+                    <i class="fa fa-key me-2"></i>
+                    Permissions ({{ neuron.permissions.length }})
+                  </h6>
+                  <div class="permissions-list">
+                    <div 
+                      v-for="permission in neuron.permissions" 
+                      :key="permission.principal"
+                      class="permission-item"
+                      :class="{ 'current-user': permission.isCurrentUser }"
+                    >
+                      <div class="permission-principal">
+                        <span class="principal-text" :title="permission.principal">
+                          {{ permission.principalShort }}
+                        </span>
+                        <span v-if="permission.isCurrentUser" class="user-badge">
+                          <i class="fa fa-user"></i> You
+                        </span>
+                      </div>
+                      <div class="permission-types">
+                        <span 
+                          v-for="permName in permission.permissionNames" 
+                          :key="permName"
+                          class="permission-badge"
+                        >
+                          {{ permName }}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                
+                <!-- Followings Section -->
+                <div v-if="neuron.followings && neuron.followings.length > 0" class="detail-section">
+                  <h6 class="section-title">
+                    <i class="fa fa-users me-2"></i>
+                    Following ({{ neuron.followings.reduce((acc, f) => acc + f.followedCount, 0) }} neurons)
+                  </h6>
+                  <div class="followings-list">
+                    <div 
+                      v-for="following in neuron.followings" 
+                      :key="following.functionId"
+                      class="following-item"
+                    >
+                      <div class="following-function">
+                        <span class="function-name">{{ following.functionName }}</span>
+                        <span class="function-count">({{ following.followedCount }})</span>
+                      </div>
+                      <div class="followed-neurons">
+                        <span 
+                          v-for="followedNeuron in following.followedNeurons" 
+                          :key="followedNeuron.idHex"
+                          class="followed-neuron"
+                          :title="followedNeuron.idHex"
+                        >
+                          {{ followedNeuron.idShort }}
+                        </span>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -667,6 +795,129 @@ const formatUSDValue = (balance: bigint, decimals: number, priceUSD: number): st
 
 .dissolve-unknown {
   color: #6c757d; /* Gray for unknown */
+}
+
+/* Detail sections for permissions and followings */
+.detail-section {
+  margin-top: 1rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.detail-section .section-title {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 0.5rem;
+  display: flex;
+  align-items: center;
+}
+
+/* Permissions styling */
+.permissions-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.permission-item {
+  padding: 0.5rem;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.permission-item.current-user {
+  border-color: #007bff;
+  background: rgba(0, 123, 255, 0.1);
+}
+
+.permission-principal {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.25rem;
+}
+
+.principal-text {
+  font-family: monospace;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.user-badge {
+  background: #007bff;
+  color: white;
+  padding: 0.1rem 0.4rem;
+  border-radius: 12px;
+  font-size: 0.7rem;
+  font-weight: 500;
+}
+
+.permission-types {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+
+.permission-badge {
+  background: rgba(40, 167, 69, 0.2);
+  color: #28a745;
+  padding: 0.1rem 0.4rem;
+  border-radius: 12px;
+  font-size: 0.7rem;
+  font-weight: 500;
+  border: 1px solid rgba(40, 167, 69, 0.3);
+}
+
+/* Followings styling */
+.followings-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.following-item {
+  padding: 0.5rem;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.following-function {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.25rem;
+}
+
+.function-name {
+  font-weight: 500;
+  color: var(--text-primary);
+  font-size: 0.85rem;
+}
+
+.function-count {
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+}
+
+.followed-neurons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+
+.followed-neuron {
+  background: rgba(135, 206, 235, 0.2);
+  color: #87ceeb;
+  padding: 0.1rem 0.4rem;
+  border-radius: 12px;
+  font-size: 0.7rem;
+  font-weight: 500;
+  font-family: monospace;
+  border: 1px solid rgba(135, 206, 235, 0.3);
+  cursor: help;
 }
 
 .neuron-info {

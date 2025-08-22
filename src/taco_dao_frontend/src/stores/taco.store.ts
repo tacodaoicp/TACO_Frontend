@@ -5395,6 +5395,75 @@ export const useTacoStore = defineStore('taco', () => {
         const neuronFees = Number(neuron.neuron_fees_e8s || 0);
         const autoStakeMaturity = neuron.auto_stake_maturity && neuron.auto_stake_maturity.length > 0 ? neuron.auto_stake_maturity[0] : false;
         
+        // Parse permissions
+        const permissions = (neuron.permissions || []).map((permission: any) => {
+            const principal = permission.principal && permission.principal.length > 0 ? permission.principal[0] : null;
+            const permissionTypes = permission.permission_type || [];
+            
+            // Map permission types to readable names
+            const permissionNames = permissionTypes.map((type: number) => {
+                switch (type) {
+                    case 1: return 'Configure';
+                    case 2: return 'Disburse';
+                    case 3: return 'Vote';
+                    case 4: return 'Submit Proposal';
+                    case 5: return 'Split';
+                    case 6: return 'Merge Maturity';
+                    case 7: return 'Disburse Maturity';
+                    case 8: return 'Stake Maturity';
+                    case 9: return 'Manage Voting Permission';
+                    default: return `Unknown (${type})`;
+                }
+            });
+            
+            return {
+                principal: principal ? principal.toText() : 'Unknown',
+                principalShort: principal ? `${principal.toText().substring(0, 8)}...${principal.toText().slice(-6)}` : 'Unknown',
+                permissionTypes,
+                permissionNames,
+                isCurrentUser: principal ? principal.toText() === userPrincipal.value : false
+            };
+        });
+        
+        // Parse followings
+        const followings = (neuron.followees || []).map((followee: any) => {
+            const functionId = followee[0]; // The function ID (governance function)
+            const followeeList = followee[1]?.followees || [];
+            
+            // Map function IDs to readable names
+            const getFunctionName = (id: number) => {
+                switch (id) {
+                    case 0: return 'All Functions';
+                    case 1: return 'Motion';
+                    case 2: return 'ManageNervousSystemParameters';
+                    case 3: return 'UpgradeRootToVersion';
+                    case 4: return 'ExecuteGenericNervousSystemFunction';
+                    case 5: return 'ManageDappCanisterSettings';
+                    case 6: return 'TransferSnsTreasuryFunds';
+                    case 7: return 'RegisterDappCanisters';
+                    case 8: return 'DeregisterDappCanisters';
+                    default: return `Function ${id}`;
+                }
+            };
+            
+            const followedNeurons = followeeList.map((followedNeuron: any) => {
+                const neuronId = followedNeuron.id;
+                const neuronIdHex = neuronId ? Array.from(neuronId as Uint8Array).map((b: number) => b.toString(16).padStart(2, '0')).join('') : 'Unknown';
+                return {
+                    id: neuronId,
+                    idHex: neuronIdHex,
+                    idShort: neuronIdHex !== 'Unknown' ? `${neuronIdHex.substring(0, 8)}...` : 'Unknown'
+                };
+            });
+            
+            return {
+                functionId,
+                functionName: getFunctionName(functionId),
+                followedNeurons,
+                followedCount: followedNeurons.length
+            };
+        });
+        
         return {
             id: neuronId,
             idHex: neuronIdHex,
@@ -5415,7 +5484,11 @@ export const useTacoStore = defineStore('taco', () => {
             createdDate: new Date(createdTimestamp * 1000),
             autoStakeMaturity,
             followeesCount: neuron.followees ? neuron.followees.length : 0,
-            permissionsCount: neuron.permissions ? neuron.permissions.length : 0
+            permissionsCount: neuron.permissions ? neuron.permissions.length : 0,
+            
+            // Detailed permissions and followings
+            permissions,
+            followings
         };
     }
 
