@@ -5638,7 +5638,7 @@ export const useTacoStore = defineStore('taco', () => {
             const snsGov = await createSnsGovernanceActor(agent, 'lhdfz-wqaaa-aaaaq-aae3q-cai');
             
             // Get nervous system parameters
-            const params = await snsGov.get_nervous_system_parameters({}) as any;
+            const params = await snsGov.get_nervous_system_parameters(null) as any;
             const minToVoteSeconds = params.neuron_minimum_dissolve_delay_to_vote_seconds && 
                                    params.neuron_minimum_dissolve_delay_to_vote_seconds.length > 0 ? 
                                    params.neuron_minimum_dissolve_delay_to_vote_seconds[0] : 0n;
@@ -5657,8 +5657,8 @@ export const useTacoStore = defineStore('taco', () => {
 
             await setDissolveTimestamp(neuronId, dissolveTimestamp);
 
-            // 4) Stop dissolving so it can accrue age
-            await stopDissolving(neuronId);
+            // Note: No need to call stopDissolving - setting a future dissolve timestamp
+            // automatically puts the neuron in a locked state that accrues age bonuses
 
             return {
                 targetDelaySeconds: targetDelay,

@@ -175,9 +175,7 @@ const setDissolveDelay = async () => {
 }
 
 const closeDialog = () => {
-  console.log('Close dialog clicked, loading:', loading.value)
   if (!loading.value) {
-    console.log('Emitting close event')
     emit('close')
   }
 }
