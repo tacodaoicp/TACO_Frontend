@@ -58,6 +58,11 @@
             </div>
           </div>
 
+          <div v-if="successMessage" class="alert alert-success">
+            <i class="fa fa-check-circle me-2"></i>
+            {{ successMessage }}
+          </div>
+
           <div v-if="error" class="alert alert-danger">
             <i class="fa fa-exclamation-triangle me-2"></i>
             {{ error }}
@@ -65,10 +70,26 @@
         </div>
         
         <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" @click="close" :disabled="isStaking">
+          <button 
+            v-if="!isSuccess"
+            type="button" 
+            class="btn btn-secondary" 
+            @click="close" 
+            :disabled="isStaking"
+          >
             Cancel
           </button>
           <button 
+            v-if="isSuccess"
+            type="button" 
+            class="btn btn-success" 
+            @click="close"
+          >
+            <i class="fa fa-check me-2"></i>
+            Close
+          </button>
+          <button 
+            v-if="!isSuccess"
             type="button" 
             class="btn btn-primary" 
             @click="handleStake"
@@ -111,6 +132,8 @@ const tacoStore = useTacoStore()
 const stakeAmount = ref('')
 const isStaking = ref(false)
 const error = ref('')
+const successMessage = ref('')
+const isSuccess = ref(false)
 
 // Constants
 const tacoFee = 10000n // 0.0001 TACO
@@ -143,7 +166,9 @@ watch(() => props.show, (newShow) => {
 const resetForm = () => {
   stakeAmount.value = ''
   error.value = ''
+  successMessage.value = ''
   isStaking.value = false
+  isSuccess.value = false
 }
 
 const close = () => {
@@ -167,11 +192,19 @@ const handleStake = async () => {
   try {
     await tacoStore.stakeToNeuron(props.neuron.id, stakeAmountBigInt.value)
     
-    // Show success message
+    // Show success state in dialog
+    isSuccess.value = true
+    successMessage.value = `Successfully staked ${formatBalance(stakeAmountBigInt.value, 8)} TACO to ${props.neuron.displayName}!`
+    
+    // Also show toast notification
     tacoStore.addToast('success', 'Staking Successful', `Successfully staked ${formatBalance(stakeAmountBigInt.value, 8)} TACO to ${props.neuron.displayName}`)
     
     emit('staked', props.neuron)
-    close()
+    
+    // Auto-close after 3 seconds
+    setTimeout(() => {
+      close()
+    }, 3000)
   } catch (err: any) {
     console.error('Staking error:', err)
     error.value = err.message || 'Failed to stake TACO. Please try again.'
@@ -299,6 +332,12 @@ const formatBalance = (balance: bigint, decimals: number): string => {
 
 .preview-item:last-child {
   margin-bottom: 0;
+}
+
+.alert-success {
+  background: rgba(25, 135, 84, 0.1);
+  border: 1px solid rgba(25, 135, 84, 0.3);
+  color: #d1e7dd;
 }
 
 .alert-danger {
