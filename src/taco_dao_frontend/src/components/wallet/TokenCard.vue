@@ -89,19 +89,70 @@
               :key="neuron.idHex"
               class="neuron-item owned"
             >
-              <div class="neuron-info">
-                <div class="neuron-name">{{ neuron.displayName }}</div>
-                <div class="neuron-stake">
-                  {{ formatBalance(neuron.stake, 8) }} TACO
+              <div class="neuron-header" @click="toggleNeuronExpansion(neuron.idHex)">
+                <div class="neuron-info">
+                  <div class="neuron-name">
+                    <i 
+                      :class="expandedNeurons.has(neuron.idHex) ? 'fa fa-chevron-down' : 'fa fa-chevron-right'" 
+                      class="expand-icon"
+                    ></i>
+                    {{ neuron.displayName }}
+                  </div>
+                  <div class="neuron-stake">
+                    {{ formatBalance(neuron.stake, 8) }} TACO
+                  </div>
+                </div>
+                <button 
+                  @click.stop="$emit('stake-to-neuron', neuron)"
+                  class="btn btn-primary btn-sm"
+                  title="Stake to this neuron"
+                >
+                  <i class="fa fa-plus"></i>
+                </button>
+              </div>
+              
+              <!-- Expanded details -->
+              <div v-if="expandedNeurons.has(neuron.idHex)" class="neuron-details">
+                <div class="detail-grid">
+                  <div class="detail-item">
+                    <span class="detail-label">Dissolve Period:</span>
+                    <span class="detail-value" :class="'dissolve-' + neuron.dissolveState.type">
+                      {{ neuron.dissolveState.display }}
+                    </span>
+                  </div>
+                  <div class="detail-item">
+                    <span class="detail-label">Age:</span>
+                    <span class="detail-value">{{ neuron.age }}</span>
+                  </div>
+                  <div class="detail-item">
+                    <span class="detail-label">Maturity:</span>
+                    <span class="detail-value">{{ formatBalance(neuron.maturity, 8) }} TACO</span>
+                  </div>
+                  <div v-if="neuron.stakedMaturity > 0" class="detail-item">
+                    <span class="detail-label">Staked Maturity:</span>
+                    <span class="detail-value">{{ formatBalance(neuron.stakedMaturity, 8) }} TACO</span>
+                  </div>
+                  <div class="detail-item">
+                    <span class="detail-label">Voting Power:</span>
+                    <span class="detail-value">{{ neuron.votingPowerMultiplier }}%</span>
+                  </div>
+                  <div class="detail-item">
+                    <span class="detail-label">Auto-stake:</span>
+                    <span class="detail-value">
+                      <i :class="neuron.autoStakeMaturity ? 'fa fa-check text-success' : 'fa fa-times text-muted'"></i>
+                      {{ neuron.autoStakeMaturity ? 'Enabled' : 'Disabled' }}
+                    </span>
+                  </div>
+                  <div class="detail-item">
+                    <span class="detail-label">Created:</span>
+                    <span class="detail-value">{{ neuron.createdDate.toLocaleDateString() }}</span>
+                  </div>
+                  <div class="detail-item">
+                    <span class="detail-label">Neuron ID:</span>
+                    <span class="detail-value neuron-id">{{ neuron.idHex }}</span>
+                  </div>
                 </div>
               </div>
-              <button 
-                @click="$emit('stake-to-neuron', neuron)"
-                class="btn btn-primary btn-sm"
-                title="Stake to this neuron"
-              >
-                <i class="fa fa-plus"></i>
-              </button>
             </div>
           </div>
         </div>
@@ -118,19 +169,70 @@
               :key="neuron.idHex"
               class="neuron-item hotkeyed"
             >
-              <div class="neuron-info">
-                <div class="neuron-name">{{ neuron.displayName }}</div>
-                <div class="neuron-stake">
-                  {{ formatBalance(neuron.stake, 8) }} TACO
+              <div class="neuron-header" @click="toggleNeuronExpansion(neuron.idHex)">
+                <div class="neuron-info">
+                  <div class="neuron-name">
+                    <i 
+                      :class="expandedNeurons.has(neuron.idHex) ? 'fa fa-chevron-down' : 'fa fa-chevron-right'" 
+                      class="expand-icon"
+                    ></i>
+                    {{ neuron.displayName }}
+                  </div>
+                  <div class="neuron-stake">
+                    {{ formatBalance(neuron.stake, 8) }} TACO
+                  </div>
+                </div>
+                <button 
+                  @click.stop="$emit('stake-to-neuron', neuron)"
+                  class="btn btn-primary btn-sm"
+                  title="Stake to this neuron"
+                >
+                  <i class="fa fa-plus"></i>
+                </button>
+              </div>
+              
+              <!-- Expanded details -->
+              <div v-if="expandedNeurons.has(neuron.idHex)" class="neuron-details">
+                <div class="detail-grid">
+                  <div class="detail-item">
+                    <span class="detail-label">Dissolve Period:</span>
+                    <span class="detail-value" :class="'dissolve-' + neuron.dissolveState.type">
+                      {{ neuron.dissolveState.display }}
+                    </span>
+                  </div>
+                  <div class="detail-item">
+                    <span class="detail-label">Age:</span>
+                    <span class="detail-value">{{ neuron.age }}</span>
+                  </div>
+                  <div class="detail-item">
+                    <span class="detail-label">Maturity:</span>
+                    <span class="detail-value">{{ formatBalance(neuron.maturity, 8) }} TACO</span>
+                  </div>
+                  <div v-if="neuron.stakedMaturity > 0" class="detail-item">
+                    <span class="detail-label">Staked Maturity:</span>
+                    <span class="detail-value">{{ formatBalance(neuron.stakedMaturity, 8) }} TACO</span>
+                  </div>
+                  <div class="detail-item">
+                    <span class="detail-label">Voting Power:</span>
+                    <span class="detail-value">{{ neuron.votingPowerMultiplier }}%</span>
+                  </div>
+                  <div class="detail-item">
+                    <span class="detail-label">Auto-stake:</span>
+                    <span class="detail-value">
+                      <i :class="neuron.autoStakeMaturity ? 'fa fa-check text-success' : 'fa fa-times text-muted'"></i>
+                      {{ neuron.autoStakeMaturity ? 'Enabled' : 'Disabled' }}
+                    </span>
+                  </div>
+                  <div class="detail-item">
+                    <span class="detail-label">Created:</span>
+                    <span class="detail-value">{{ neuron.createdDate.toLocaleDateString() }}</span>
+                  </div>
+                  <div class="detail-item">
+                    <span class="detail-label">Neuron ID:</span>
+                    <span class="detail-value neuron-id">{{ neuron.idHex }}</span>
+                  </div>
                 </div>
               </div>
-              <button 
-                @click="$emit('stake-to-neuron', neuron)"
-                class="btn btn-primary btn-sm"
-                title="Stake to this neuron"
-              >
-                <i class="fa fa-plus"></i>
-              </button>
             </div>
           </div>
         </div>
@@ -193,6 +295,7 @@ const tacoStore = useTacoStore()
 const neurons = ref<any[]>([])
 const loadingNeurons = ref(false)
 const categorizedNeurons = ref<{owned: any[], hotkeyed: any[], all: any[]}>({owned: [], hotkeyed: [], all: []})
+const expandedNeurons = ref<Set<string>>(new Set())
 
 // Load neurons for TACO token
 const loadNeurons = async () => {
@@ -211,6 +314,15 @@ const loadNeurons = async () => {
     categorizedNeurons.value = {owned: [], hotkeyed: [], all: []}
   } finally {
     loadingNeurons.value = false
+  }
+}
+
+// Toggle neuron expansion
+const toggleNeuronExpansion = (neuronId: string) => {
+  if (expandedNeurons.value.has(neuronId)) {
+    expandedNeurons.value.delete(neuronId)
+  } else {
+    expandedNeurons.value.add(neuronId)
   }
 }
 
@@ -459,14 +571,11 @@ const formatUSDValue = (balance: bigint, decimals: number, priceUSD: number): st
 }
 
 .neuron-item {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 0.75rem;
   background: rgba(255, 255, 255, 0.05);
   border-radius: 6px;
   border: 1px solid rgba(255, 255, 255, 0.1);
   transition: all 0.2s ease;
+  overflow: hidden;
 }
 
 .neuron-item:hover {
@@ -480,6 +589,84 @@ const formatUSDValue = (balance: bigint, decimals: number, priceUSD: number): st
 
 .neuron-item.hotkeyed {
   border-left: 3px solid #87ceeb; /* Light blue for hotkeyed */
+}
+
+.neuron-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.neuron-header:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.expand-icon {
+  margin-right: 0.5rem;
+  font-size: 0.7rem;
+  color: var(--text-secondary);
+  transition: transform 0.2s ease;
+}
+
+.neuron-details {
+  padding: 0 0.75rem 0.75rem 0.75rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(0, 0, 0, 0.1);
+}
+
+.detail-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.5rem;
+}
+
+.detail-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.25rem 0;
+  font-size: 0.85rem;
+}
+
+.detail-label {
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.detail-value {
+  color: var(--text-primary);
+  font-weight: 400;
+}
+
+.detail-value.neuron-id {
+  font-family: monospace;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  word-break: break-all;
+}
+
+/* Dissolve state colors */
+.dissolve-none {
+  color: #6c757d; /* Gray for not dissolving */
+}
+
+.dissolve-delay {
+  color: #28a745; /* Green for locked */
+}
+
+.dissolve-dissolving {
+  color: #ffc107; /* Yellow for dissolving */
+}
+
+.dissolve-dissolved {
+  color: #dc3545; /* Red for dissolved */
+}
+
+.dissolve-unknown {
+  color: #6c757d; /* Gray for unknown */
 }
 
 .neuron-info {

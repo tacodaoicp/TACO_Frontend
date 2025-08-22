@@ -5284,34 +5284,20 @@ export const useTacoStore = defineStore('taco', () => {
         let isOwner = false;
         let isHotkey = false;
         
-        const neuronIdBytes = neuron.id && neuron.id.length > 0 && neuron.id[0].id ? neuron.id[0].id : null;
-        const neuronIdHex = neuronIdBytes ? Array.from(neuronIdBytes as Uint8Array).map((b: number) => b.toString(16).padStart(2, '0')).join('').substring(0, 8) : 'unknown';
-        
-        console.log('Checking permissions for neuron:', {
-            neuronId: neuronIdHex,
-            userPrincipal: userPrincipal.toText(),
-            permissions: neuron.permissions
-        });
-        
         // Check permissions for the user's principal
         if (neuron.permissions && Array.isArray(neuron.permissions)) {
             for (const permission of neuron.permissions) {
-                console.log('Checking permission:', permission);
-                
                 if (permission.principal && permission.principal.length > 0) {
                     const permissionPrincipal = permission.principal[0];
-                    console.log('Permission principal:', permissionPrincipal.toText());
                     
                     // Check if this permission is for the current user
                     if (permissionPrincipal.toText() === userPrincipal.toText()) {
                         const permissionTypes = permission.permission_type || [];
-                        console.log('User permission types:', permissionTypes);
                         
                         // Check for owner permissions (typically includes permission type 1)
                         // Owner usually has multiple permissions including 1 (configure), 2 (disburse), 3 (vote), 4 (submit proposal)
                         if (permissionTypes.includes(1) || permissionTypes.includes(2)) {
                             isOwner = true;
-                            console.log('User is OWNER');
                         }
                         
                         // Check for hotkey permissions [4, 3] or [3, 4] (vote and submit proposal)
@@ -5319,65 +5305,129 @@ export const useTacoStore = defineStore('taco', () => {
                         const hasSubmitProposal = permissionTypes.includes(4);
                         if (hasVote && hasSubmitProposal && !isOwner) {
                             isHotkey = true;
-                            console.log('User is HOTKEY');
                         }
                     }
                 }
             }
         }
         
-        console.log('Final relationship:', { isOwner, isHotkey });
         return { isOwner, isHotkey };
     }
 
-    // Format neuron for display with relationship info
+    // Helper function to format dissolve state
+    const formatDissolveState = (dissolveState: any) => {
+        if (!dissolveState || dissolveState.length === 0) {
+            return { type: 'none', display: 'Not dissolving', seconds: 0 };
+        }
+        
+        const state = dissolveState[0];
+        if (state.DissolveDelaySeconds !== undefined) {
+            const seconds = Number(state.DissolveDelaySeconds);
+            const days = Math.floor(seconds / (24 * 60 * 60));
+            const hours = Math.floor((seconds % (24 * 60 * 60)) / (60 * 60));
+            const minutes = Math.floor((seconds % (60 * 60)) / 60);
+            
+            let display = '';
+            if (days > 0) display += `${days}d `;
+            if (hours > 0) display += `${hours}h `;
+            if (minutes > 0) display += `${minutes}m`;
+            if (!display) display = `${seconds}s`;
+            
+            return { type: 'delay', display: display.trim(), seconds };
+        }
+        
+        if (state.WhenDissolvedTimestampSeconds !== undefined) {
+            const timestamp = Number(state.WhenDissolvedTimestampSeconds) * 1000; // Convert to milliseconds
+            const dissolveDate = new Date(timestamp);
+            const now = new Date();
+            
+            if (dissolveDate <= now) {
+                return { type: 'dissolved', display: 'Dissolved', seconds: 0 };
+            } else {
+                const remainingMs = dissolveDate.getTime() - now.getTime();
+                const remainingSeconds = Math.floor(remainingMs / 1000);
+                const days = Math.floor(remainingSeconds / (24 * 60 * 60));
+                const hours = Math.floor((remainingSeconds % (24 * 60 * 60)) / (60 * 60));
+                
+                let display = '';
+                if (days > 0) display += `${days}d `;
+                if (hours > 0) display += `${hours}h`;
+                
+                return { type: 'dissolving', display: `Dissolving in ${display.trim()}`, seconds: remainingSeconds };
+            }
+        }
+        
+        return { type: 'unknown', display: 'Unknown', seconds: 0 };
+    };
+
+    // Helper function to calculate neuron age
+    const calculateNeuronAge = (createdTimestamp: number, agingSinceTimestamp: number) => {
+        const now = Math.floor(Date.now() / 1000); // Current time in seconds
+        const ageSeconds = now - agingSinceTimestamp;
+        const days = Math.floor(ageSeconds / (24 * 60 * 60));
+        const hours = Math.floor((ageSeconds % (24 * 60 * 60)) / (60 * 60));
+        
+        if (days > 0) {
+            return `${days}d ${hours}h`;
+        } else if (hours > 0) {
+            return `${hours}h`;
+        } else {
+            return '< 1h';
+        }
+    };
+
+    // Format neuron for display with relationship info and detailed stats
     const formatNeuronForDisplay = (neuron: any) => {
         const neuronId = neuron.id && neuron.id.length > 0 ? neuron.id[0].id : null;
         const neuronIdHex = neuronId ? Array.from(neuronId as Uint8Array).map((b: number) => b.toString(16).padStart(2, '0')).join('') : 'Unknown';
         const relationship = getNeuronRelationship(neuron, userPrincipal.value);
+        
+        // Parse dissolve state
+        const dissolveInfo = formatDissolveState(neuron.dissolve_state);
+        
+        // Calculate age
+        const createdTimestamp = Number(neuron.created_timestamp_seconds || 0);
+        const agingSinceTimestamp = Number(neuron.aging_since_timestamp_seconds || createdTimestamp);
+        const ageDisplay = calculateNeuronAge(createdTimestamp, agingSinceTimestamp);
+        
+        // Parse other stats
+        const stakedMaturity = Number(neuron.staked_maturity_e8s_equivalent || 0);
+        const neuronFees = Number(neuron.neuron_fees_e8s || 0);
+        const autoStakeMaturity = neuron.auto_stake_maturity && neuron.auto_stake_maturity.length > 0 ? neuron.auto_stake_maturity[0] : false;
         
         return {
             id: neuronId,
             idHex: neuronIdHex,
             stake: neuron.cached_neuron_stake_e8s,
             maturity: neuron.maturity_e8s_equivalent,
+            stakedMaturity,
+            neuronFees,
             votingPowerMultiplier: neuron.voting_power_percentage_multiplier,
             displayName: `Neuron ${neuronIdHex.substring(0, 8)}...`,
             isOwner: relationship.isOwner,
             isHotkey: relationship.isHotkey,
-            relationship: relationship.isOwner ? 'owned' : relationship.isHotkey ? 'hotkeyed' : 'unknown'
+            relationship: relationship.isOwner ? 'owned' : relationship.isHotkey ? 'hotkeyed' : 'unknown',
+            
+            // Detailed stats for expanded view
+            dissolveState: dissolveInfo,
+            age: ageDisplay,
+            ageSeconds: Math.floor(Date.now() / 1000) - agingSinceTimestamp,
+            createdDate: new Date(createdTimestamp * 1000),
+            autoStakeMaturity,
+            followeesCount: neuron.followees ? neuron.followees.length : 0,
+            permissionsCount: neuron.permissions ? neuron.permissions.length : 0
         };
     }
 
     // Categorize neurons into owned and hotkeyed
     const categorizeNeurons = (neurons: any[]) => {
-        console.log('Categorizing neurons:', neurons.length, 'neurons');
+        const formatted = neurons.map(neuron => formatNeuronForDisplay(neuron));
         
-        const formatted = neurons.map(neuron => {
-            const result = formatNeuronForDisplay(neuron);
-            console.log('Formatted neuron:', {
-                id: result.idHex,
-                relationship: result.relationship,
-                isOwner: result.isOwner,
-                isHotkey: result.isHotkey,
-                permissions: neuron.permissions
-            });
-            return result;
-        });
-        
-        const categorized = {
+        return {
             owned: formatted.filter(neuron => neuron.isOwner),
             hotkeyed: formatted.filter(neuron => neuron.isHotkey && !neuron.isOwner),
             all: formatted
         };
-        
-        console.log('Categorized result:', {
-            owned: categorized.owned.length,
-            hotkeyed: categorized.hotkeyed.length,
-            all: categorized.all.length
-        });
-        
-        return categorized;
     }
 
     // Generate neuron subaccount using the correct SNS formula
