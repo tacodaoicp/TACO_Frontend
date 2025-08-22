@@ -5503,6 +5503,174 @@ export const useTacoStore = defineStore('taco', () => {
         };
     }
 
+    // Set dissolve timestamp for a neuron (dissolve period setting)
+    const setDissolveTimestamp = async (neuronId: Uint8Array, dissolveTimestampSeconds: bigint) => {
+        try {
+            if (!userLoggedIn.value) {
+                throw new Error('User must be logged in');
+            }
+
+            console.log('Setting dissolve timestamp for neuron:', {
+                neuronId: Array.from(neuronId).map(b => b.toString(16).padStart(2, '0')).join(''),
+                dissolveTimestamp: dissolveTimestampSeconds.toString(),
+                dissolveDate: new Date(Number(dissolveTimestampSeconds) * 1000)
+            });
+
+            const authClient = await getAuthClient();
+            const identity = authClient.getIdentity();
+            
+            const agent = await createAgent({
+                identity,
+                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            });
+
+            // Create SNS Governance actor
+            const snsGov = await createSnsGovernanceActor(agent, 'lhdfz-wqaaa-aaaaq-aae3q-cai');
+            
+            // Prepare the manage neuron request for SetDissolveTimestamp
+            const manageNeuronRequest = {
+                subaccount: Array.from(neuronId),
+                command: [{
+                    Configure: {
+                        operation: [{
+                            SetDissolveTimestamp: {
+                                dissolve_timestamp_seconds: dissolveTimestampSeconds
+                            }
+                        }]
+                    }
+                }]
+            };
+
+            console.log('SetDissolveTimestamp request:', JSON.stringify(manageNeuronRequest, (key, value) =>
+                typeof value === 'bigint' ? value.toString() : value, 2));
+
+            const result = await snsGov.manage_neuron(manageNeuronRequest) as any;
+            console.log('SetDissolveTimestamp result:', result);
+
+            if (result.command && result.command.length > 0) {
+                const command = result.command[0];
+                if (command.Error) {
+                    throw new Error(`SetDissolveTimestamp failed: ${JSON.stringify(command)}`);
+                }
+                if (command.Configure) {
+                    console.log('Dissolve timestamp set successfully');
+                    return true;
+                }
+            }
+
+            throw new Error('Unexpected response format from manage_neuron');
+        } catch (error: any) {
+            console.error('Error setting dissolve timestamp:', error);
+            throw error;
+        }
+    }
+
+    // Stop dissolving for a neuron
+    const stopDissolving = async (neuronId: Uint8Array) => {
+        try {
+            if (!userLoggedIn.value) {
+                throw new Error('User must be logged in');
+            }
+
+            console.log('Stopping dissolving for neuron:', Array.from(neuronId).map(b => b.toString(16).padStart(2, '0')).join(''));
+
+            const authClient = await getAuthClient();
+            const identity = authClient.getIdentity();
+            
+            const agent = await createAgent({
+                identity,
+                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            });
+
+            // Create SNS Governance actor
+            const snsGov = await createSnsGovernanceActor(agent, 'lhdfz-wqaaa-aaaaq-aae3q-cai');
+            
+            // Prepare the manage neuron request for StopDissolving
+            const manageNeuronRequest = {
+                subaccount: Array.from(neuronId),
+                command: [{
+                    Configure: {
+                        operation: [{
+                            StopDissolving: {}
+                        }]
+                    }
+                }]
+            };
+
+            console.log('StopDissolving request:', JSON.stringify(manageNeuronRequest));
+
+            const result = await snsGov.manage_neuron(manageNeuronRequest) as any;
+            console.log('StopDissolving result:', result);
+
+            if (result.command && result.command.length > 0) {
+                const command = result.command[0];
+                if (command.Error) {
+                    throw new Error(`StopDissolving failed: ${JSON.stringify(command)}`);
+                }
+                if (command.Configure) {
+                    console.log('Dissolving stopped successfully');
+                    return true;
+                }
+            }
+
+            throw new Error('Unexpected response format from manage_neuron');
+        } catch (error: any) {
+            console.error('Error stopping dissolving:', error);
+            throw error;
+        }
+    }
+
+    // Set dissolve period for a neuron (high-level function)
+    const setNeuronDissolveDelay = async (neuronId: Uint8Array, delayMonths: number) => {
+        try {
+            // 1) Read DAO parameters to respect the minimum dissolve delay
+            const authClient = await getAuthClient();
+            const identity = authClient.getIdentity();
+            
+            const agent = await createAgent({
+                identity,
+                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            });
+
+            const snsGov = await createSnsGovernanceActor(agent, 'lhdfz-wqaaa-aaaaq-aae3q-cai');
+            
+            // Get nervous system parameters
+            const params = await snsGov.get_nervous_system_parameters({}) as any;
+            const minToVoteSeconds = params.neuron_minimum_dissolve_delay_to_vote_seconds && 
+                                   params.neuron_minimum_dissolve_delay_to_vote_seconds.length > 0 ? 
+                                   params.neuron_minimum_dissolve_delay_to_vote_seconds[0] : 0n;
+
+            console.log('Minimum dissolve delay to vote:', minToVoteSeconds.toString(), 'seconds');
+
+            // 2) Calculate target dissolve delay
+            const desiredSeconds = BigInt(delayMonths * 30 * 24 * 60 * 60); // approx months→seconds
+            const targetDelay = desiredSeconds > minToVoteSeconds ? desiredSeconds : minToVoteSeconds;
+            
+            console.log('Target dissolve delay:', targetDelay.toString(), 'seconds');
+
+            // 3) Set dissolve timestamp = now + targetDelay
+            const nowSeconds = BigInt(Math.floor(Date.now() / 1000));
+            const dissolveTimestamp = nowSeconds + targetDelay;
+
+            await setDissolveTimestamp(neuronId, dissolveTimestamp);
+
+            // 4) Stop dissolving so it can accrue age
+            await stopDissolving(neuronId);
+
+            return {
+                targetDelaySeconds: targetDelay,
+                dissolveTimestamp,
+                delayMonths
+            };
+        } catch (error: any) {
+            console.error('Error setting neuron dissolve delay:', error);
+            throw error;
+        }
+    }
+
     // Generate neuron subaccount using the correct SNS formula
     // SHA256(0x0c, "neuron-stake", principal-bytes, nonce-u64-be)
     const generateNeuronSubaccount = async (controller: Principal, nonce: bigint): Promise<Uint8Array> => {
@@ -6789,6 +6957,7 @@ export const useTacoStore = defineStore('taco', () => {
         categorizeNeurons,
         stakeToNeuron,
         createNeuron,
+        setNeuronDissolveDelay,
         toggleThreadMenu,
         
         // Wallet methods

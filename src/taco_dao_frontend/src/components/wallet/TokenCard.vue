@@ -102,13 +102,22 @@
                     {{ formatBalance(neuron.stake, 8) }} TACO
                   </div>
                 </div>
-                <button 
-                  @click.stop="$emit('stake-to-neuron', neuron)"
-                  class="btn btn-primary btn-sm"
-                  title="Stake to this neuron"
-                >
-                  <i class="fa fa-plus"></i>
-                </button>
+                <div class="neuron-actions">
+                  <button 
+                    @click.stop="$emit('stake-to-neuron', neuron)"
+                    class="btn btn-primary btn-sm"
+                    title="Stake to this neuron"
+                  >
+                    <i class="fa fa-plus"></i>
+                  </button>
+                  <button 
+                    @click.stop="$emit('set-dissolve', neuron)"
+                    class="btn btn-secondary btn-sm"
+                    title="Set dissolve period"
+                  >
+                    <i class="fa fa-clock"></i>
+                  </button>
+                </div>
               </div>
               
               <!-- Expanded details -->
@@ -408,6 +417,7 @@ interface TokenCardEmits {
   (e: 'unregister', token: TokenCardProps['token']): void
   (e: 'stake-to-neuron', neuron: any): void
   (e: 'create-neuron'): void
+  (e: 'set-dissolve', neuron: any): void
 }
 
 const props = withDefaults(defineProps<TokenCardProps>(), {
@@ -737,6 +747,18 @@ const formatUSDValue = (balance: bigint, decimals: number, priceUSD: number): st
   font-size: 0.7rem;
   color: var(--text-secondary);
   transition: transform 0.2s ease;
+}
+
+.neuron-actions {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.neuron-actions .btn {
+  padding: 0.4rem 0.6rem;
+  font-size: 0.8rem;
+  min-width: auto;
 }
 
 .neuron-details {

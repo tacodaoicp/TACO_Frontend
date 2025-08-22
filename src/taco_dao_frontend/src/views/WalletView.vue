@@ -51,8 +51,9 @@
                     @send="openSendDialog" 
                     @register="registerToken"
                     @unregister="unregisterToken"
-                    @stake-to-neuron="handleStakeToNeuron"
-                    @create-neuron="handleCreateNeuron"
+                          @stake-to-neuron="handleStakeToNeuron"
+      @create-neuron="handleCreateNeuron"
+      @set-dissolve="handleSetDissolve"
                   />
                 </div>
               </div>
@@ -160,6 +161,14 @@
       @created="handleNeuronCreated"
     />
 
+    <!-- Set Dissolve Dialog -->
+    <SetDissolveDialog
+      :show="showDissolveDialog"
+      :neuron="selectedNeuron"
+      @close="closeDissolveDialog"
+      @dissolve-set="handleDissolveSet"
+    />
+
   </div>
 </template>
 
@@ -171,6 +180,7 @@ import TokenCard from '../components/wallet/TokenCard.vue'
 import SendTokenDialog from '../components/wallet/SendTokenDialog.vue'
 import StakeToNeuronDialog from '../components/wallet/StakeToNeuronDialog.vue'
 import CreateNeuronDialog from '../components/wallet/CreateNeuronDialog.vue'
+import SetDissolveDialog from '../components/wallet/SetDissolveDialog.vue'
 import { tokenImages } from '../components/data/TokenData'
 
 interface WalletToken {
@@ -194,6 +204,7 @@ const selectedToken = ref<WalletToken | null>(null)
 const showStakeDialog = ref(false)
 const selectedNeuron = ref<any | null>(null)
 const showCreateDialog = ref(false)
+const showDissolveDialog = ref(false)
 const allTokenBalances = ref<Map<string, bigint>>(new Map())
 const userRegisteredTokenPrincipals = ref<string[]>([])
 const customTokenMetadata = ref<Map<string, any>>(new Map())
@@ -481,6 +492,22 @@ const handleNeuronCreated = async () => {
   console.log('Neuron created successfully')
   // Refresh wallet data to show updated balances
   await loadWalletData()
+}
+
+// Dissolve dialog handlers
+const handleSetDissolve = (neuron: any) => {
+  selectedNeuron.value = neuron
+  showDissolveDialog.value = true
+}
+
+const closeDissolveDialog = () => {
+  showDissolveDialog.value = false
+  selectedNeuron.value = null
+}
+
+const handleDissolveSet = () => {
+  // Refresh the wallet data to show updated neuron info
+  loadWalletData()
 }
 
 const registerCustomToken = async () => {
