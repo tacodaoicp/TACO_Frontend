@@ -5589,7 +5589,7 @@ export const useTacoStore = defineStore('taco', () => {
                     by: [{
                         MemoAndController: {
                             controller: [Principal.fromText(userPrincipal.value)],
-                            memo: memo
+                            memo: Number(memo)  // Convert BigInt to Number for IDL
                         }
                     }]
                 }
@@ -5606,7 +5606,11 @@ export const useTacoStore = defineStore('taco', () => {
             }]
         };
 
-        console.log('ManageNeuron request:', JSON.stringify(manageNeuronRequest, null, 2));
+        // Convert BigInt to string for logging
+        const requestForLogging = JSON.parse(JSON.stringify(manageNeuronRequest, (key, value) =>
+            typeof value === 'bigint' ? value.toString() : value
+        ));
+        console.log('ManageNeuron request:', JSON.stringify(requestForLogging, null, 2));
 
         const result = await governanceActor.manage_neuron(manageNeuronRequest) as any;
         
