@@ -17,6 +17,7 @@ import { idlFactory as neuronSnapshotIDL, _SERVICE as NeuronSnapshotService } fr
 import { idlFactory as sneedForumIDL, _SERVICE as SneedForumService } from "../../../declarations/sneed_sns_forum/sneed_sns_forum.did.js"
 import { idlFactory as appSneedDaoIDL, _SERVICE as AppSneedDaoService } from "../../../declarations/app_sneeddao_backend/app_sneeddao_backend.did.js"
 import { idlFactory as snsGovernanceIDL } from "../../../declarations/sns_governance/sns_governance.did.js"
+import { idlFactory as alarmIDL, _SERVICE as AlarmService } from "../../../declarations/alarm/alarm.did.js"
 import { Principal } from '@dfinity/principal'
 import { AccountIdentifier } from '@dfinity/ledger-icp'
 import { canisterId as iiCanisterId } from "../../../declarations/internet_identity/index.js"
@@ -332,17 +333,14 @@ interface NeuronNameKey {
         id: Uint8Array;
     };
 }
-
 interface NeuronNameEntry {
     name: string;
     verified: boolean;
 }
-
 interface PrincipalNameEntry {
     name: string;
     verified: boolean;
 }
-
 interface NamesCache {
     principals: Map<string, PrincipalNameEntry>;
     neurons: Map<string, NeuronNameEntry>; // key format: "snsRoot:neuronIdHex"
@@ -372,7 +370,6 @@ interface ProposalData {
     is_eligible_for_rewards: boolean;
     ballots: [string, { vote: any; voting_power: bigint; cast_timestamp_seconds: bigint }][];
 }
-
 interface TacoProposal {
     id: bigint;
     title: string;
@@ -387,21 +384,86 @@ interface TacoProposal {
     noVotes: bigint;
     totalVotes: bigint;
 }
-
 interface ListProposalsResponse {
     proposals: ProposalData[];
     include_ballots_by_caller?: boolean;
     include_topic_filtering?: boolean;
 }
-
 interface GovernanceError {
     error_message: string;
     error_type: number;
 }
-
 interface ListProposalsResult {
     Ok?: ListProposalsResponse;
     Err?: GovernanceError;
+}
+
+// Alarm interfaces
+export interface AlarmCanisterActor {
+
+    // System Health
+    performSystemHealthCheckManual(): Promise<{ ok: string } | { err: string }>
+    getEnhancedAlarmSystemStatus(): Promise<{ ok: any } | { err: string }>
+    getMonitoringStatus(): Promise<{ ok: any } | { err: string }>
+
+    // Admin Management
+    addAdmin(admin: Principal, permissions: Array<{ Admin: null }>): Promise<{ ok: string } | { err: string }>
+
+    // Contact Management
+    addContact(name: string, contactType: { Email: string } | { SMS: string }): Promise<{ ok: number } | { err: string }>
+    getContacts(): Promise<{ ok: any[] } | { err: string }>
+    updateContactStatus(contactId: number, active: boolean): Promise<{ ok: string } | { err: string }>
+    removeContact(contactId: number): Promise<{ ok: number } | { err: string }>
+    sendTestSMS(contactIds: number[]): Promise<{ ok: string } | { err: string }>
+    sendTestEmail(contactIds: number[]): Promise<{ ok: string } | { err: string }>
+
+    // Alarm Management
+    getPendingAlarms(): Promise<{ ok: any[] } | { err: string }>
+    acknowledgeAlarm(alarmId: number): Promise<{ ok: string } | { err: string }>
+    getSystemErrors(limit: number[]): Promise<{ ok: any[] } | { err: string }>
+    resolveSystemErrorById(errorId: number): Promise<{ ok: string } | { err: string }>
+
+    // Monitoring Configuration
+    setCheckInterval(minutes: number): Promise<{ ok: string } | { err: string }>
+    startMonitoring(): Promise<{ ok: string } | { err: string }>
+    stopMonitoring(): Promise<{ ok: string } | { err: string }>
+
+    // Canister Monitoring
+    addMonitoredCanister(
+        canisterId: Principal,
+        name: string,
+        isSNSControlled: boolean,
+        snsRootCanisterId: Principal[],
+        minimumCycles: bigint,
+        cyclesAlertLevel: { Level1Immediate: null } | { Level2DelayedSMS: null },
+        timersAlertLevel: { Level1Immediate: null } | { Level2DelayedSMS: null },
+        statusAlertLevel: { Level1Immediate: null } | { Level2DelayedSMS: null }
+    ): Promise<{ ok: number } | { err: string }>
+
+    getMonitoredCanisters(): Promise<{ ok: any[] } | { err: string }>
+    removeMonitoredCanister(configId: number): Promise<{ ok: string } | { err: string }>
+    updateMonitoredCanisterStatus(configId: number, enabled: boolean): Promise<{ ok: string } | { err: string }>
+    startCanisterMonitoring(): Promise<{ ok: string } | { err: string }>
+    stopCanisterMonitoring(): Promise<{ ok: string } | { err: string }>
+    getCanisterHealthStatus(): Promise<{ ok: any[] } | { err: string }>
+
+    // Queue Management
+    getQueueStatus(): Promise<{ ok: any } | { err: string }>
+    clearQueues(): Promise<{ ok: string } | { err: string }>
+
+    // Sent Message History
+    getSentMessages(limit: number[]): Promise<{ ok: any[] } | { err: string }>
+    getSentSMSMessages(limit: number[]): Promise<{ ok: any[] } | { err: string }>
+    getSentEmailMessages(limit: number[]): Promise<{ ok: any[] } | { err: string }>
+
+    // Configuration Functions
+    setCanisterMonitoringInterval(minutes: number): Promise<{ ok: string } | { err: string }>
+    setLevel2SMSCheckInterval(minutes: number): Promise<{ ok: string } | { err: string }>
+    getConfigurationIntervals(): Promise<{ ok: any } | { err: string }>
+
+    // Admin Action Logs
+    getAdminActionLogs(limit: number[]): Promise<{ ok: any[] } | { err: string }>
+
 }
 
 /////////////
@@ -538,6 +600,9 @@ export const useTacoStore = defineStore('taco', () => {
         nextExpectedSnapshot: null as bigint | null,
         inProgress: false
     })
+
+    // alarm
+    let alarmActor: AlarmCanisterActor | null = null
 
     // # ACTIONS #
 
@@ -885,6 +950,9 @@ export const useTacoStore = defineStore('taco', () => {
             // Load names cache in background (non-blocking)
             loadAllNames().catch(console.error)
 
+            // Initialize alarm actor in background (non-blocking)
+            initializeAlarmActor().catch(console.error)
+
 
         } else {
 
@@ -1008,6 +1076,9 @@ export const useTacoStore = defineStore('taco', () => {
             // Load names cache in background (non-blocking)
             // console.log('🔍 Triggering loadAllNames() from iidLogIn - after successful login');
             loadAllNames().catch(console.error);
+
+            // Initialize alarm actor in background (non-blocking)
+            initializeAlarmActor().catch(console.error);
 
             // turn app loading off
             appLoadingOff()
@@ -1144,6 +1215,15 @@ export const useTacoStore = defineStore('taco', () => {
                 break;
         }        
         return 'cjkka-gyaaa-aaaan-qz5kq-cai'; // local canisterId
+    }
+    const alarmCanisterId = () => {
+        switch (process.env.DFX_NETWORK) {
+            case "ic":
+                return process.env.CANISTER_ID_ALARM_IC || 'b2cwp-6qaaa-aaaad-qhn6a-cai'
+            case "staging":
+                return process.env.CANISTER_ID_ALARM_STAGING || 'b2cwp-6qaaa-aaaad-qhn6a-cai'
+        }        
+        return 'b2cwp-6qaaa-aaaad-qhn6a-cai' // if not ic or staging, use local (all the same for now)
     }
 
     // crypto prices
@@ -5554,6 +5634,425 @@ export const useTacoStore = defineStore('taco', () => {
         }
     };
 
+    // Alarm Management Functions
+    async function performSystemHealthCheck(): Promise<void> {
+    if (!alarmActor) {
+        throw new Error('Alarm actor not initialized')
+    }
+    
+    const result = await alarmActor.performSystemHealthCheckManual()
+    if ('err' in result) {
+        throw new Error(result.err)
+    }
+    }
+    async function getEnhancedAlarmSystemStatus(): Promise<any> {
+    if (!alarmActor) {
+        throw new Error('Alarm actor not initialized')
+    }
+    
+    const result = await alarmActor.getEnhancedAlarmSystemStatus()
+    if ('err' in result) {
+        throw new Error(result.err)
+    }
+    
+    return result.ok
+    }
+    async function getMonitoringStatus(): Promise<any> {
+    if (!alarmActor) {
+        throw new Error('Alarm actor not initialized')
+    }
+    
+    const result = await alarmActor.getMonitoringStatus()
+    if ('err' in result) {
+        throw new Error(result.err)
+    }
+    
+    return result.ok
+    }
+    async function addAlarmAdmin(principalId: string): Promise<void> {
+    if (!alarmActor) {
+        throw new Error('Alarm actor not initialized')
+    }
+    
+    const principal = Principal.fromText(principalId)
+    const result = await alarmActor.addAdmin(principal, [{ Admin: null }])
+    if ('err' in result) {
+        throw new Error(result.err)
+    }
+    }
+    async function addAlarmContact(name: string, type: string, value: string): Promise<void> {
+    if (!alarmActor) {
+        throw new Error('Alarm actor not initialized')
+    }
+    
+    const contactType = type === 'Email' ? { Email: value } : { SMS: value }
+    const result = await alarmActor.addContact(name, contactType)
+    if ('err' in result) {
+        throw new Error(result.err)
+    }
+    }
+    async function getAlarmContacts(): Promise<any[]> {
+    if (!alarmActor) {
+        throw new Error('Alarm actor not initialized')
+    }
+    
+    const result = await alarmActor.getContacts()
+    if ('err' in result) {
+        throw new Error(result.err)
+    }
+    
+    return result.ok
+    }
+    async function updateContactStatus(contactId: number, active: boolean): Promise<void> {
+    if (!alarmActor) {
+        throw new Error('Alarm actor not initialized')
+    }
+    
+    const result = await alarmActor.updateContactStatus(contactId, active)
+    if ('err' in result) {
+        throw new Error(result.err)
+    }
+    }
+    async function removeAlarmContact(contactId: number): Promise<void> {
+    if (!alarmActor) {
+        throw new Error('Alarm actor not initialized')
+    }
+    
+    const result = await alarmActor.removeContact(contactId)
+    if ('err' in result) {
+        throw new Error(result.err)
+    }
+    }
+    async function testAlarmContact(contactIds: number[]): Promise<void> {
+    if (!alarmActor) {
+        throw new Error('Alarm actor not initialized')
+    }
+    
+    // Try SMS first, then email
+    try {
+        const smsResult = await alarmActor.sendTestSMS(contactIds)
+        if ('err' in smsResult) {
+        // If SMS fails, try email
+        const emailResult = await alarmActor.sendTestEmail(contactIds)
+        if ('err' in emailResult) {
+            throw new Error(emailResult.err)
+        }
+        }
+    } catch (error) {
+        // Try email as fallback
+        const emailResult = await alarmActor.sendTestEmail(contactIds)
+        if ('err' in emailResult) {
+        throw new Error(emailResult.err)
+        }
+    }
+    }
+    async function getPendingAlarms(): Promise<any[]> {
+    if (!alarmActor) {
+        throw new Error('Alarm actor not initialized')
+    }
+    
+    const result = await alarmActor.getPendingAlarms()
+    if ('err' in result) {
+        throw new Error(result.err)
+    }
+    
+    return result.ok
+    }
+    async function acknowledgeAlarm(alarmId: number): Promise<void> {
+    if (!alarmActor) {
+        throw new Error('Alarm actor not initialized')
+    }
+    
+    const result = await alarmActor.acknowledgeAlarm(alarmId)
+    if ('err' in result) {
+        throw new Error(result.err)
+    }
+    }
+    async function getSystemErrors(limit?: number): Promise<any[]> {
+    if (!alarmActor) {
+        throw new Error('Alarm actor not initialized')
+    }
+    
+    const result = await alarmActor.getSystemErrors(limit ? [limit] : [])
+    if ('err' in result) {
+        throw new Error(result.err)
+    }
+    
+    return result.ok
+    }
+    async function resolveSystemError(errorId: number): Promise<void> {
+    if (!alarmActor) {
+        throw new Error('Alarm actor not initialized')
+    }
+    
+    const result = await alarmActor.resolveSystemErrorById(errorId)
+    if ('err' in result) {
+        throw new Error(result.err)
+    }
+    }
+    async function setCheckInterval(minutes: number): Promise<void> {
+    if (!alarmActor) {
+        throw new Error('Alarm actor not initialized')
+    }
+    
+    const result = await alarmActor.setCheckInterval(minutes)
+    if ('err' in result) {
+        throw new Error(result.err)
+    }
+    }
+    async function startMonitoring(): Promise<void> {
+    if (!alarmActor) {
+        throw new Error('Alarm actor not initialized')
+    }
+    
+    const result = await alarmActor.startMonitoring()
+    if ('err' in result) {
+        throw new Error(result.err)
+    }
+    }
+    async function stopMonitoring(): Promise<void> {
+    if (!alarmActor) {
+        throw new Error('Alarm actor not initialized')
+    }
+    
+    const result = await alarmActor.stopMonitoring()
+    if ('err' in result) {
+        throw new Error(result.err)
+    }
+    }
+
+    // Alarm Canister Monitoring Functions
+    async function addMonitoredCanister(
+        canisterId: string,
+        name: string,
+        isSNSControlled: boolean,
+        snsRootCanisterId: string | null,
+        minimumCycles: bigint,
+        cyclesAlertLevel: string,
+        timersAlertLevel: string,
+        statusAlertLevel: string
+    ): Promise<void> {
+        if (!alarmActor) {
+            throw new Error('Alarm actor not initialized')
+        }
+        
+        const principal = Principal.fromText(canisterId)
+        const snsRoot = snsRootCanisterId ? [Principal.fromText(snsRootCanisterId)] : []
+        
+        const cyclesLevel = cyclesAlertLevel === 'Level1Immediate' ? { Level1Immediate: null } : { Level2DelayedSMS: null }
+        const timersLevel = timersAlertLevel === 'Level1Immediate' ? { Level1Immediate: null } : { Level2DelayedSMS: null }
+        const statusLevel = statusAlertLevel === 'Level1Immediate' ? { Level1Immediate: null } : { Level2DelayedSMS: null }
+        
+        const result = await alarmActor.addMonitoredCanister(
+            principal,
+            name,
+            isSNSControlled,
+            snsRoot,
+            minimumCycles,
+            cyclesLevel,
+            timersLevel,
+            statusLevel
+        )
+        
+        if ('err' in result) {
+            throw new Error(result.err)
+        }
+    }
+    async function getMonitoredCanisters(): Promise<any[]> {
+        if (!alarmActor) {
+            throw new Error('Alarm actor not initialized')
+        }
+        
+        const result = await alarmActor.getMonitoredCanisters()
+        if ('err' in result) {
+            throw new Error(result.err)
+        }
+        
+        return result.ok
+    }
+    async function removeMonitoredCanister(configId: number): Promise<void> {
+        if (!alarmActor) {
+            throw new Error('Alarm actor not initialized')
+        }
+        
+        const result = await alarmActor.removeMonitoredCanister(configId)
+        if ('err' in result) {
+            throw new Error(result.err)
+        }
+    }
+    async function updateMonitoredCanisterStatus(configId: number, enabled: boolean): Promise<void> {
+        if (!alarmActor) {
+            throw new Error('Alarm actor not initialized')
+        }
+        
+        const result = await alarmActor.updateMonitoredCanisterStatus(configId, enabled)
+        if ('err' in result) {
+            throw new Error(result.err)
+        }
+    }
+    async function startCanisterMonitoring(): Promise<void> {
+        if (!alarmActor) {
+            throw new Error('Alarm actor not initialized')
+        }
+        
+        const result = await alarmActor.startCanisterMonitoring()
+        if ('err' in result) {
+            throw new Error(result.err)
+        }
+    }
+    async function stopCanisterMonitoring(): Promise<void> {
+        if (!alarmActor) {
+            throw new Error('Alarm actor not initialized')
+        }
+        
+        const result = await alarmActor.stopCanisterMonitoring()
+        if ('err' in result) {
+            throw new Error(result.err)
+        }
+    }
+    async function getCanisterHealthStatus(): Promise<any[]> {
+        if (!alarmActor) {
+            throw new Error('Alarm actor not initialized')
+        }
+        
+        const result = await alarmActor.getCanisterHealthStatus()
+        if ('err' in result) {
+            throw new Error(result.err)
+        }
+        
+        return result.ok
+    }
+    async function getQueueStatus(): Promise<any> {
+        if (!alarmActor) {
+            throw new Error('Alarm actor not initialized')
+        }
+        
+        const result = await alarmActor.getQueueStatus()
+        if ('err' in result) {
+            throw new Error(result.err)
+        }
+        
+        return result.ok
+    }
+    async function clearQueues(): Promise<void> {
+        if (!alarmActor) {
+            throw new Error('Alarm actor not initialized')
+        }
+        
+        const result = await alarmActor.clearQueues()
+        if ('err' in result) {
+            throw new Error(result.err)
+        }
+    }
+
+    // Alarm sent message history functions
+    async function getSentMessages(limit?: number): Promise<any[]> {
+        if (!alarmActor) {
+            throw new Error('Alarm actor not initialized')
+        }
+        
+        const result = await alarmActor.getSentMessages(limit ? [limit] : [])
+        if ('err' in result) {
+            throw new Error(result.err)
+        }
+        
+        return result.ok
+    }
+    async function getSentSMSMessages(limit?: number): Promise<any[]> {
+        if (!alarmActor) {
+            throw new Error('Alarm actor not initialized')
+        }
+        
+        const result = await alarmActor.getSentSMSMessages(limit ? [limit] : [])
+        if ('err' in result) {
+            throw new Error(result.err)
+        }
+        
+        return result.ok
+    }
+    async function getSentEmailMessages(limit?: number): Promise<any[]> {
+        if (!alarmActor) {
+            throw new Error('Alarm actor not initialized')
+        }
+        
+        const result = await alarmActor.getSentEmailMessages(limit ? [limit] : [])
+        if ('err' in result) {
+            throw new Error(result.err)
+        }
+        
+        return result.ok
+    }
+
+    // Alarm configuration functions
+    async function setCanisterMonitoringInterval(minutes: number): Promise<void> {
+        if (!alarmActor) {
+            throw new Error('Alarm actor not initialized')
+        }
+        
+        const result = await alarmActor.setCanisterMonitoringInterval(minutes)
+        if ('err' in result) {
+            throw new Error(result.err)
+        }
+    }
+    async function setLevel2SMSCheckInterval(minutes: number): Promise<void> {
+        if (!alarmActor) {
+            throw new Error('Alarm actor not initialized')
+        }
+        
+        const result = await alarmActor.setLevel2SMSCheckInterval(minutes)
+        if ('err' in result) {
+            throw new Error(result.err)
+        }
+    }
+    async function getConfigurationIntervals(): Promise<any> {
+        if (!alarmActor) {
+            throw new Error('Alarm actor not initialized')
+        }
+        
+        const result = await alarmActor.getConfigurationIntervals()
+        if ('err' in result) {
+            throw new Error(result.err)
+        }
+        
+        return result.ok
+    }
+    async function getAdminActionLogs(limit?: number): Promise<any[]> {
+        if (!alarmActor) {
+            throw new Error('Alarm actor not initialized')
+        }
+        
+        const result = await alarmActor.getAdminActionLogs(limit ? [limit] : [])
+        if ('err' in result) {
+            throw new Error(result.err)
+        }
+        
+        return result.ok
+    }
+
+    // Initialize alarm actor
+    const initializeAlarmActor = async () => {
+        try {
+            const authClient = await getAuthClient()
+            
+            if (await authClient.isAuthenticated() && !alarmActor) {
+                const identity = authClient.getIdentity()
+                
+                const agent = await createAgent({
+                    identity,
+                    host: process.env.DFX_NETWORK === "local" ? getLocalHost() : "https://ic0.app",
+                    fetchRootKey: process.env.DFX_NETWORK === "local",
+                })
+    
+                alarmActor = Actor.createActor(alarmIDL, {
+                    agent,
+                    canisterId: alarmCanisterId(),
+                }) as AlarmCanisterActor
+            }
+        } catch (error) {
+            console.error('Error initializing alarm actor:', error)
+        }
+    }
+
     // # RETURN #
     return {
         // state
@@ -5731,11 +6230,52 @@ export const useTacoStore = defineStore('taco', () => {
         
         // Router
         router,
+        alarmCanisterId,
         
         // Portfolio snapshot management
         getPortfolioSnapshotStatus,
         startPortfolioSnapshots,
         stopPortfolioSnapshots,
         updatePortfolioSnapshotInterval,
+
+        // Alarm Management Functions
+        performSystemHealthCheck,
+        getEnhancedAlarmSystemStatus,
+        getMonitoringStatus,
+        addAlarmAdmin,
+        addAlarmContact,
+        getAlarmContacts,
+        updateContactStatus,
+        removeAlarmContact,
+        testAlarmContact,
+        getPendingAlarms,
+        acknowledgeAlarm,
+        getSystemErrors,
+        resolveSystemError,
+        setCheckInterval,
+        startMonitoring,
+        stopMonitoring,
+        
+        // Alarm canister monitoring functions
+        addMonitoredCanister,
+        getMonitoredCanisters,
+        removeMonitoredCanister,
+        updateMonitoredCanisterStatus,
+        startCanisterMonitoring,
+        stopCanisterMonitoring,
+        getCanisterHealthStatus,
+        getQueueStatus,
+        clearQueues,
+        
+        // Alarm sent message history functions
+        getSentMessages,
+        getSentSMSMessages,
+        getSentEmailMessages,
+        
+        // Alarm configuration functions
+        setCanisterMonitoringInterval,
+        setLevel2SMSCheckInterval,
+        getConfigurationIntervals,
+        getAdminActionLogs,
     }
 })

@@ -20,6 +20,7 @@ import AdminVotesView from "./views/AdminVotesView.vue"
 import AdminRewardsView from "./views/AdminRewardsView.vue"
 import AdminDistributionsView from "./views/AdminDistributionsView.vue"
 import AdminRewardsBalancesView from "./views/AdminRewardsBalancesView.vue"
+import AdminAlarmView from "./views/AdminAlarmView.vue"
 import AdminClaimsView from "./views/AdminClaimsView.vue"
 import RewardsView from "./views/RewardsView.vue"
 import ChatView from "./views/ChatView.vue"
@@ -72,6 +73,7 @@ const routes = [
     { path: "/admin/rewards", name: "AdminRewards", component: AdminRewardsView, meta: { robots: 'noindex' } },
     { path: "/admin/rewards/balances", name: "AdminRewardsBalances", component: AdminRewardsBalancesView, meta: { robots: 'noindex' } },
     { path: "/admin/distributions", name: "AdminDistributions", component: AdminDistributionsView, meta: { robots: 'noindex' } },
+    { path: "/admin/alarm", name: "AdminAlarm", component: AdminAlarmView, meta: { robots: 'noindex' } },
     { path: "/admin/claims", name: "AdminClaims", component: AdminClaimsView, meta: { robots: 'noindex' } },
     { path: "/forum", name: "Forum", component: ForumView, meta: { robots: 'noindex' } },
     { path: "/forum/thread/:id", name: "Thread", component: ThreadView, meta: { robots: 'noindex' } },

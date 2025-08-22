@@ -112,13 +112,15 @@
         background-color: var(--light-orange-to-dark-brown);
         border-bottom: 1px solid var(--dark-orange);
         padding: 1rem;
+
         &:first-of-type {
-            border-top: 1px solid var(--dark-orange);
+            border-top: 0;
             border-top-left-radius: 0.5rem;
             border-top-right-radius: 0.5rem;
         }
 
         &:last-of-type {
+            border-bottom: 0;
             border-bottom-left-radius: 0.5rem;
             border-bottom-right-radius: 0.5rem;
         }

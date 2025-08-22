@@ -62,7 +62,9 @@
 
                         <!-- On -->
                         <td>
-                            {{ formatTimestamp(Number(log.timestamp)) }}
+                            
+                          <span class="pe-3">{{ formatTimestamp(Number(log.timestamp)) }}</span>
+
                         </td>
 
                     </tr>
@@ -193,7 +195,7 @@
 
           // data
           td {
-            // border-bottom: 0;
+            border-bottom: 0;
 
             // first data
             &:first-of-type {

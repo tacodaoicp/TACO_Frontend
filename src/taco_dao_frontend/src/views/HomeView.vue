@@ -107,15 +107,51 @@
               <!-- tile container -->
               <div class="home-view__tile taco-container taco-container--l1">
 
+                <!-- title -->
                 <h2 class="home-view__title">
                   <TacoCoinIcon class="home-view__title__icon"/>
                   <span class="home-view__title__text">TACO Token</span>
                 </h2>
 
-                <!-- tile container inner -->
-                <div class="home-view__tile__inner home-view__taco-token-chart taco-container taco-container--l2 p-0">
+                <!-- chart and loader container -->
+                <div class="position-relative w-100">
 
-                  <iframe style="border-radius: 0.5rem;" src="https://dexscreener.com/icp/vhoia-myaaa-aaaar-qbmja-cai?embed=1&loadChartSettings=0&trades=0&tabs=0&info=0&chartLeftToolbar=0&chartTheme=dark&theme=dark&chartStyle=1&chartType=usd&interval=15"></iframe>
+                  <!-- tile container inner -->
+                  <div class="home-view__tile__inner home-view__taco-token-chart taco-container taco-container--l2 p-0"
+                        style="z-index: 2;">
+
+                    <!-- expand button -->
+                    <button v-if="!isMobile"
+                            class="btn taco-nav-btn home-view__taco-token-chart__expand-btn"
+                            @click="viewingChartModal = true">
+                      <i class="fa-solid fa-expand"></i>
+                    </button>
+
+                    <!-- chart iframe -->
+                    <iframe v-if="!isMobile" 
+                            style="border-radius: 0.5rem; z-index: 1;" 
+                            src="https://dexscreener.com/icp/vhoia-myaaa-aaaar-qbmja-cai?embed=1&loadChartSettings=0&trades=0&tabs=0&info=0&chartLeftToolbar=0&chartTheme=dark&theme=dark&chartStyle=1&chartType=usd&interval=15"></iframe>
+
+                    <!-- mobile -->
+                    <div v-else @click="viewingChartModal = true" 
+                          class="home-view__taco-token-chart__mobile"
+                          style="z-index: 2;">
+                      
+                      <!-- text -->
+                      <span>Tap to View</span>
+                      
+                    </div>
+
+                  </div>
+
+                  <!-- loader container -->
+                  <div class="position-absolute top-0 start-0 w-100 h-100"
+                        style="z-index: 1; background-color: var(--orange-to-light-brown); border: 1px solid var(--dark-orange); border-radius: 0.5rem;">
+
+                    <!-- astronaut -->
+                    <img :src="astronautLoaderUrl" class="loading-img">
+
+                  </div>
 
                 </div>
 
@@ -129,6 +165,7 @@
               <!-- tile container -->
               <div class="home-view__tile taco-container taco-container--l1">
 
+                <!-- title -->
                 <h2 class="home-view__title">
                   <span class="home-view__title__icon home-view__title__icon--i">📚</span>
                   <span class="home-view__title__text">Getting Started</span>
@@ -137,11 +174,17 @@
                 <!-- tile container inner -->
                 <div class="home-view__tile__inner taco-container taco-container--l2 p-0">
 
+                  <!-- video iframe -->
                   <iframe src="https://www.youtube.com/embed/ikNBuHYMkNs"
                     title="YouTube video player" 
                     frameborder="0" 
                     allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
-                    allowfullscreen></iframe>
+                    allowfullscreen
+                    style="z-index: 2;"
+                    ></iframe>
+
+                  <!-- astronaut -->
+                  <img :src="astronautLoaderUrl" class="loading-img">
 
                 </div>
                 
@@ -636,6 +679,69 @@
       <li>{{ floatingEmoji2 }}</li>
     </ul> 
 
+    <!-- chart modal -->
+    <div v-if="viewingChartModal" class="home-view__chart-modal">
+      
+      <!-- message -->
+      <div class="home-view__chart-modal__dialog">
+        
+        <!-- message top -->
+        <div class="home-view__chart-modal__dialog__top px-2 p-2">
+
+          <!-- message top left -->
+          <div class="taco-text-white d-flex align-items-center gap-1 ms-1">
+
+            <!-- taco token icon -->
+            <TacoCoinIcon class="home-view__taco-token-chart__icon"/>
+
+            <!-- text -->
+            <span>Taco Token Chart</span>  
+          
+          </div>
+
+          <!-- message top right -->
+          <div class="taco-text-black-to-white">
+
+            <!-- close button -->
+            <button class="btn btn-sm p-0 text-white px-2"
+                    @click="viewingChartModal = false">
+              <i class="fa-solid fa-xmark"></i>
+            </button>
+
+          </div>
+
+        </div>
+
+        <!-- message middle -->
+        <div class="home-view__chart-modal__dialog__middle" style="width: 100%; height: 100%;">
+
+            <iframe style="width: 100%; height: 100%;" src="https://dexscreener.com/icp/vhoia-myaaa-aaaar-qbmja-cai?embed=1&loadChartSettings=0&trades=0&tabs=0&info=0&chartLeftToolbar=0&chartTheme=dark&theme=dark&chartStyle=1&chartType=usd&interval=15"></iframe>
+
+        </div>
+
+        <!-- message bottom -->
+        <div class="home-view__chart-modal__dialog__bottom p-2">
+
+          <!-- message bottom left -->
+          <div class="taco-text-black-to-white"></div>
+
+          <!-- message bottom right -->
+          <div class="taco-text-black-to-white">
+
+            <!-- close button -->
+            <button class="btn taco-nav-btn"
+                    @click="viewingChartModal = false">
+              Close
+            </button>
+
+          </div>
+
+        </div>
+
+      </div> 
+      
+    </div>    
+
   </div>
 
 </template>
@@ -1092,7 +1198,108 @@
 
   &__taco-token-chart {
     zoom: 0.5;
+    border-radius: 1rem;
+
+    &__icon {
+      width: 1rem;
+      height: 1rem;
+    }
+
+    &__expand-btn {
+      position: absolute;
+      top: 0.5rem;
+      right: 0.5rem;
+      z-index: 1000;
+      color: var(--);
+      background-color: var(--yellow-to-dark-orange);
+      border: 1px solid var(--dark-orange);
+      zoom: 2;
+    }
+
+    &__mobile {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      background-image: url("../assets/images/smallchartplaceholder.png");
+      background-size: cover;
+      background-position: center;
+      background-repeat: no-repeat;
+      aspect-ratio: 16 / 9;
+      border-radius: 1rem;
+      position: relative;
+      cursor: pointer;
+
+      &:after {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0, 0, 0, 0.5);
+        border-radius: 1rem;
+        z-index: 1;
+      }
+
+      span {
+        font-size: 1rem;
+        color: var(--white);
+        z-index: 2;
+        text-align: center;
+      }
+
+    }
+
   }
+
+  &__chart-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    display: flex;
+    justify-content: center;
+    align-items: start;
+    width: 100%;
+    height: 100%;
+    background-color: var(--curtain-bg);
+    z-index: 99999;
+    margin: 0;
+    padding: 2rem;
+    overflow: auto;
+
+    // dialog
+    &__dialog {
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      align-items: center;
+      width: 100%;
+      height: 100%;
+      border-radius: 0.5rem;
+      background-color: var(--light-orange-to-dark-brown);
+      border: 1px solid var(--dark-orange);
+      overflow: auto;
+
+      // top and bottom
+      &__top, &__bottom {
+        display: flex;
+        width: 100%;
+        justify-content: space-between;
+        background-color: var(--dark-orange);
+      }
+
+      // middle
+      &__middle {
+        display: flex;
+        flex-direction: row;
+        align-items: start;
+        gap: 2rem;
+      }
+
+    }
+
+  }  
 
   &__taco-assets {
     padding: 0.5rem 0 0.375rem 0;
@@ -1105,6 +1312,7 @@
     background-repeat: no-repeat;
     background-position: center;
     background-size: 75% 75%;
+    width: 100%;
 
     hr {
       border-top: 1px solid var(--dark-orange) !important;
@@ -1160,6 +1368,15 @@
 
     }
 
+  }
+
+  .loading-img {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 10rem;
+    z-index: 1;
   }
 
   .floating-tacos {
@@ -1453,6 +1670,9 @@
   .home-view__powered-by {
     margin: 3rem 0 1.5rem;
   }  
+  .home-view__chart-modal {
+    padding: 1rem;
+  }  
 }
 
 // phone landscape
@@ -1588,6 +1808,9 @@
   .home-view__taco-assets__svg {
     width: 1rem;
   }  
+  .home-view__chart-modal {
+    padding: 1rem;
+  }  
 }
 
 // tablet
@@ -1702,6 +1925,9 @@
   .home-view__taco-assets__svg {
     width: 1rem;
   }  
+  .home-view__chart-modal {
+    padding: 1rem;
+  }
 }
 
 // small daktop
@@ -1824,6 +2050,7 @@
   import kongSwapLogo from '../assets/images/exchanges/kongswap-logo.svg'
   import swapRunnerLogo from '../assets/images/exchanges/swaprunner-logo.svg'
   import icpLogo from "../assets/tokens/snspng/icp.png"
+  import astronautLoader from '../assets/images/astonautLoader.webp'
 
   ///////////
   // Store //
@@ -1847,27 +2074,14 @@
   // Track intersection state
   const isBelowTheFoldVisible = ref(false)
 
-  ///////////////////
-  // Local Methods //
-  ///////////////////
+  // mobile check
+  const isMobile = ref(false)
 
-  //////////////
-  // handlers //
+  // viewing chart modal
+  const viewingChartModal = ref(false)
 
-  // handle intersection changes
-  const handleIntersection = (entries: IntersectionObserverEntry[]) => {
-
-    // loop through entries
-    entries.forEach(entry => {
-
-      // set is below the fold visible
-      isBelowTheFoldVisible.value = entry.isIntersecting
-      
-      // log
-      // console.log('.home-view__below-the-fold is visible:', entry.isIntersecting)
-
-    })
-  }
+  // images
+  const astronautLoaderUrl =  astronautLoader 
 
   //////////////
   // Computed //
@@ -1992,6 +2206,24 @@
   // Local Methods //
   ///////////////////
 
+  //////////////
+  // handlers //
+
+  // handle intersection changes
+  const handleIntersection = (entries: IntersectionObserverEntry[]) => {
+
+    // loop through entries
+    entries.forEach(entry => {
+
+      // set is below the fold visible
+      isBelowTheFoldVisible.value = entry.isIntersecting
+      
+      // log
+      // console.log('.home-view__below-the-fold is visible:', entry.isIntersecting)
+
+    })
+  }  
+
   // redirect to dao page
   const redirectToDao = () => {
     window.location.href = '/dao'
@@ -2009,6 +2241,9 @@
 
     // get the below the fold element
     const belowTheFold = document.querySelector('.home-view__below-the-fold')
+
+    // check for mobile
+    isMobile.value = /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
     
     // if below the fold exists
     if (belowTheFold) {
@@ -2045,7 +2280,7 @@
     
   })
 
-  // Clean up observer
+  // clean up observer
   onUnmounted(() => {
 
     // get the observer

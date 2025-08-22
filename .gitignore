@@ -23,5 +23,8 @@ dist/
 
 # environment variables
 .env
+*.env
+toadd/
+.mops/
 
 notes.txt

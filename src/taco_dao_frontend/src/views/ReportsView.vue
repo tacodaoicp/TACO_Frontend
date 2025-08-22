@@ -1614,7 +1614,12 @@
                   </div>
 
                   <!-- report body -->
-                  <div class="taco-report-explorer__report-body">
+                  <div class="taco-report-explorer__report-body pt-3">
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph fst-italic">
+                      Much information herein is out of date as it has been announced that the Toko NFT Marketplace will establish its own SNS DAO instead of transitioning under Motoko DAO. This page will be updated when more details are available.
+                    </p>
                     
                     <!-- heading -->
                     <h3 class="taco-report-explorer__report-heading
@@ -5648,6 +5653,327 @@ domain and intellectual property, managing app store contracts, funding in-app v
 employing the core development team.
                     </p>
 
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      The OpenChat team has claimed that they have 3 years of runway, though a community member has posited that it may in fact be 1.5 years. In our analysis:
+                    </p>
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      The total ICP that they hold is ~ 579, 774 ($2, 974, 242). The total ICP revenue that they are
+receiving from their neurons is ~ 41, 310.82 ($211, 924). They have received 110k in fees in the
+past year, though this form of revenue can be expected to taper off as it is 'low-hanging fruit' for
+the existing ICP community which has not been growing. Other forms of revenue have not been
+reported on.
+                    </p>
+
+                    <!-- paragraph -->
+                    <p class="taco-report-explorer__report-paragraph">
+                      The team has been requesting ~ $1,216,000 worth of ICP a year. If adding up all funds that are
+readily liquidatable within a 6-month time window, we estimate them to have a runway of ~ 2.3
+years, a figure that does not consider price changes or other changes. Their 8-year neuron exists
+as a fail-safe to keep the platform funded with cycles if run-way ends up running out.
+                    </p>
+
+                    <!-- button -->
+                    <button @click="showOpenChatCalculations = !showOpenChatCalculations" class="btn taco-btn taco-btn--green">
+                      Calculations
+                    </button>
+
+                    <div v-show="showOpenChatCalculations">
+
+                      <!-- paragraph -->
+                      <p class="taco-report-explorer__report-paragraph mt-4">
+                        OpenChat's holdings:
+                      </p>
+
+                      <!-- list -->
+                      <ul class="taco-report-explorer__report-ul">
+
+                        <!-- list item -->
+                        <li class="taco-report-explorer__report-li">
+
+                          <!-- paragraph -->
+                          <p class="taco-report-explorer__report-paragraph">
+                            Liquid: 35981.54 ICP
+                          </p>
+
+                        </li>
+
+                        <!-- list item -->
+                        <li class="taco-report-explorer__report-li">
+
+                          <!-- paragraph -->
+                          <p class="taco-report-explorer__report-paragraph">
+                            Neurons, non-dissolving: 405,114.74 ICP
+                          </p>
+
+                        </li>
+
+                        <!-- list item -->
+                        <li class="taco-report-explorer__report-li">
+
+                          <!-- paragraph -->
+                          <p class="taco-report-explorer__report-paragraph">
+                            Neurons, dissolving: 100,000 ICP
+                          </p>
+
+                        </li>
+
+                        <!-- list item -->
+                        <li class="taco-report-explorer__report-li">
+
+                          <!-- paragraph -->
+                          <p class="taco-report-explorer__report-paragraph">
+                            WaterNeuron: 38,678 ICP
+                          </p>
+
+                        </li>
+
+                        <!-- list item -->
+                        <li class="taco-report-explorer__report-li">
+
+                          <!-- paragraph -->
+                          <p class="taco-report-explorer__report-paragraph">
+                            TOTAL ILLIQUID: 443,792.74 ICP = $2,276,656.76
+                          </p>
+
+                        </li>
+
+                        <!-- list item -->
+                        <li class="taco-report-explorer__report-li">
+
+                          <!-- paragraph -->
+                          <p class="taco-report-explorer__report-paragraph">
+                            SEMI-LIQUID: 100,000 ICP = $513,000
+                          </p>
+
+                        </li>
+
+                        <!-- list item -->
+                        <li class="taco-report-explorer__report-li">
+
+                          <!-- paragraph -->
+                          <p class="taco-report-explorer__report-paragraph">
+                            TOTAL: 579,774.28 ICP = $2,974,242.06
+                          </p>
+
+                        </li>
+                        
+                      </ul>
+
+                      <!-- heading -->
+                      <h3 class="taco-report-explorer__report-heading
+                                taco-report-explorer__report-heading--h2">
+                        Asset Revenue
+                      </h3>
+
+                      <!-- paragraph -->
+                      <p class="taco-report-explorer__report-paragraph">
+                        Yearly Rewards presuming 0 yield reinvestment: ~ 41,310.82 ICP = ~$211,924.49 USD
+                      </p>
+
+                      <!-- paragraph -->
+                      <p class="taco-report-explorer__report-paragraph">
+                        It has been stated that the 6 month is slowly being whittled away and thus the earnings from this
+will only decrease over time. The 8-year neuron is said to be untouchable and will always be a
+back up to keep OC running presuming all other revenue dries up.
+                      </p>
+
+                      <!-- paragraph -->
+                      <p class="taco-report-explorer__report-paragraph">
+                        <a href="https://klgza-cqaaa-aaaak-qcz5a-cai.icp0.io/" target="_blank" class="taco-report-explorer__report-link">Using the NNS neuron sandbox</a>, we can roughly calculate the revenue that OpenChat can earn.
+                      </p>
+
+                      <!-- paragraph -->
+                      <p class="taco-report-explorer__report-paragraph">
+                        The following presumes that the price of ICP will remain constant at its 04.08.25 price of $5.13,
+and that the minting of maturity will result in a 1:1 spawn of ICP (with it being virtually
+guaranteed that neither of these things will occur). Each neuron will be presented with extreme
+scenarios - full yield reinvestment, or no yield reinvestment. The likely scenario likes
+somewhere between the two:
+                      </p>
+
+                      <!-- paragraph -->
+                      <p class="taco-report-explorer__report-paragraph">
+                        <span class="fw-bold">8-year Neuron:</span> If auto-stake maturity is on, 74707.27 maturity is earned in 4 years. OpenChat
+will have increased its assets (albeit illiquid) by $383,248.30, or $95812.07 per year (though
+gains are not equally spread).
+                      </p>
+
+                      <!-- paragraph -->
+                      <p class="taco-report-explorer__report-paragraph">
+                        If 100% of maturity is instantly spawned and sold off (i.e no rewards are reinvested), then
+56447.84 is earned over four years. Presuming 1:1 minting with ICP, this results in $289,577.42
+earned over 4 years, or $72,394.35.
+                      </p>
+
+                      <!-- paragraph -->
+                      <p class="taco-report-explorer__report-paragraph">
+                        <span class="fw-bold">6-month Neuron:</span> If auto-staking maturity is on, the neuron earns 99035.32 maturity in 4 years,
+or $508,051.1 ($127,012.80 per year), albeit wholly illiquid.
+                      </p>
+
+                      <!-- paragraph -->
+                      <p class="taco-report-explorer__report-paragraph">
+                        If 100% of maturity is instantly spawned and sold, 85588.63 maturity in 4 years, or $439,069.67
+($109,767.42 per year)
+                      </p>
+
+                      <!-- paragraph -->
+                      <p class="taco-report-explorer__report-paragraph">
+                        <span class="fw-bold">Others:</span> 100,000 ICP will be dissolved on the 8th of October, netting the team (at current price)
+$513,000. How much they plan to sell is unknown, alongside the potential ICP price.
+                      </p>
+
+                      <!-- paragraph -->
+                      <p class="taco-report-explorer__report-paragraph">
+                        38,678 ICP in a WaterNeuron (with an APY of 15%) which results in 5801.7 ICP ($29762.72) per
+year presuming no compounding, though a WaterNeuron dissolves after 6 months. Whether this
+will be reinvested after dissolving is unknown.
+                      </p>
+
+                      <!-- paragraph -->
+                      <p class="taco-report-explorer__report-paragraph">
+                        Ergo, presuming all the maturity is not reinvested and instead sold, and that the WaterNeuron
+principal is reinvested and the yield sold (this scenario is the one of maximum short term
+income) $211,924.49 is earned per year, roughly a sixth of what is needed to cover the yearly
+running costs of OC if we extrapolate out the Q3 data from $304,000 per quarter to $1,216,000
+per year.
+                      </p>
+
+                      <!-- paragraph -->
+                      <p class="taco-report-explorer__report-paragraph">
+                        ICP needs to sextuple in price to allow for a break-even point via OC's passive income, and to
+more than sextuple for OC to comfortably operate via passive income. This does not take into
+account cycles, extraordinary costs, and other unforeseen windfalls.
+                      </p>
+
+                      <!-- paragraph -->
+                      <p class="taco-report-explorer__report-paragraph mb-5">
+                        <span class="fw-bold">TOTAL:</span> $211,924.49 per year
+                      </p>
+
+                      <!-- heading -->
+                      <h3 class="taco-report-explorer__report-heading
+                                taco-report-explorer__report-heading--h2">
+                        NON-ASSET REVENUE
+                      </h3>
+
+                      <!-- paragraph -->
+                      <p class="taco-report-explorer__report-paragraph">
+                        The only openly recorded revenue is the Diamond Membership which earned $110,000 in the
+previous 12 months. Other forms of revenue, like streak insurance, have not been recorded
+openly.
+                      </p>
+
+                      <!-- paragraph -->
+                      <p class="taco-report-explorer__report-paragraph mb-5">
+                        TOTAL: $110,000 per year
+                      </p>
+
+                      <!-- heading -->
+                      <h3 class="taco-report-explorer__report-heading
+                                taco-report-explorer__report-heading--h2">
+                        HOLDINGS
+                      </h3>
+
+                      <!-- paragraph -->
+                      <p class="taco-report-explorer__report-paragraph">
+                        The Treasury of OpenChat holds 48,343,162.39 CHAT, or roughly $6.59 million USD. However,
+liquidity does not exist for this to be converted into USD at its full value. Per SwapRunner as at
+04.08.25, the full amount of CHAT will convert into 19467.84 ICP, or just over $100,000 USD. The
+true value of the OpenChat treasury can therefore not be considered to be reasonably more
+than a few hundred thousand USD, if we take into account the possibility of liquidity recycling. A
+full value dump is impossible at current.
+                      </p>
+
+                      <!-- paragraph -->
+                      <p class="taco-report-explorer__report-paragraph">
+                        35,981.54 ICP is liquid, soon to become 135,981.53 ICP. This gives a liquid holdings value of
+$697,585.25 in ICP, and one or two hundred thousand in CHAT.
+                      </p>
+
+                      <!-- paragraph -->
+                      <p class="taco-report-explorer__report-paragraph mb-5">
+                        TOTAL: Between $797,585.25 and $897,585.25 USD
+                      </p>
+
+                      <!-- heading -->
+                      <h3 class="taco-report-explorer__report-heading
+                                taco-report-explorer__report-heading--h2">
+                        SUMMARY
+                      </h3>
+
+                      <!-- paragraph -->
+                      <p class="taco-report-explorer__report-paragraph">
+                        <span class="fw-bold font-rubik">Revenue per year: $321,924.49</span>
+                      </p>
+
+                      <!-- paragraph -->
+                      <p class="taco-report-explorer__report-paragraph">
+                        <span class="fw-bold font-rubik">Holdings: ~$845,000 liquid and semi-liquid, $2,276,656.76 illiquid</span>
+                      </p>
+
+                      <!-- paragraph -->
+                      <p class="taco-report-explorer__report-paragraph">
+                        <span class="fw-bold font-rubik">Yearly costs: $1,216,000</span>
+                      </p>
+
+                      <!-- paragraph -->
+                      <p class="taco-report-explorer__report-paragraph">
+                        <span class="fw-bold font-rubik">Yearly Profit: -$894,075.51</span>
+                      </p>
+
+                      <!-- paragraph -->
+                      <p class="taco-report-explorer__report-paragraph">
+                        OpenChat, based on the openly recorded revenues and without an increase in the price of ICP,
+will exhaust its liquid and semi-liquid holdings in slightly under a year. OpenChat currently relies
+on membership increases and, more significantly, an increase in the price of USD, to survive
+without touching its illiquid assets.
+                      </p>
+
+                      <!-- paragraph -->
+                      <p class="taco-report-explorer__report-paragraph">
+                        <span class="fst-italic" style="font-family: 'rubik'">Presuming the 6 month neuron is dissolved, this timer extends significantly with the increase of
+$1539005.13 to the holdings, but a loss of $109,767.42 to the revenue. In that scenario:</span>
+                      </p>
+
+                      <!-- paragraph -->
+                      <p class="taco-report-explorer__report-paragraph">
+                        <span class="fw-bold font-rubik">Revenue per year: $212157.07</span>
+                      </p>
+
+                      <!-- paragraph -->
+                      <p class="taco-report-explorer__report-paragraph">
+                        <span class="fw-bold font-rubik">Holdings: $2,384,005.13 liquid, $737.651.63 illiquid</span>
+                      </p>
+
+                      <!-- paragraph -->
+                      <p class="taco-report-explorer__report-paragraph">
+                        <span class="fw-bold font-rubik">Year costs: $1,216,000</span>
+                      </p>
+
+                      <!-- paragraph -->
+                      <p class="taco-report-explorer__report-paragraph">
+                        <span class="fw-bold font-rubik">Yearly profit: -$1,003,842.98</span>
+                      </p>
+
+                      <!-- paragraph -->
+                      <p class="taco-report-explorer__report-paragraph">
+                        OpenChat will exhaust its liquid assets in just over 2.3 years.
+                      </p>
+
+                      <!-- paragraph -->
+                      <p class="taco-report-explorer__report-paragraph">
+                        The 3 year runway claim is likely based on extra revenues not otherwise stated, or was
+calculated when ICP had a different price. Ergo, OpenChat relies on the price of ICP increasing,
+increased memberships, an increase in the liquidity and price of CHAT, and future development
+of OpenChat.
+                      </p>
+
+                    </div>
+
                     <hr>
                     
                     <!-- back to top link -->
@@ -6539,14 +6865,17 @@ oracles.
                               </li>  
 
                             </ul>
+                            
+                          </li>  
+
+                          <li class="taco-report-explorer__report-li">
 
                             <!-- paragraph -->
                             <p class="taco-report-explorer__report-paragraph">
-                              Inflationary mechanisms do exist in the forms of APY from staking rewards. For a 1 year old neuron with
-a 1 year, 182 day dissolve delay, a staker will earn 6.25% APY
+                            Inflationary mechanisms do exist in the forms of APY from staking rewards. For a 1 year old neuron with a 1 year, 182 day dissolve delay, a staker will earn 6.25% APY
                             </p>
-                            
-                          </li>  
+
+                          </li>
 
                         </ul>
 
@@ -6847,12 +7176,7 @@ it has concentrated liquidity (which is on KongSwap's roadmap).
 
                     <!-- paragraph -->
                     <p class="taco-report-explorer__report-paragraph">
-                      Neutrinite DEX does not route trading fees to LP providers, so liquidity is currently limited compared to
-KongSwap and ICPSwap; executing large trades incurs high slippage. NTN devs have created arbitrage
-bots that, rather than aiming for profit, only aim to break even on trades that synchronize Neutrinite
-DEX's prices with KongSwap and ICPSwap. These bots make smaller trades over time advantageous,
-which users could set up with a vector. Such a vector would currently charge a one-time creation fee of 2
-NTN (currently ~ $10.9), and be refunded upon its deletion.
+                      Liquidity is currently limited compared to KongSwap and ICPSwap; executing large trades incurs high slippage. NTN devs have created arbitrage bots that, rather than aiming for profit, only aim to break even on trades that synchronize Neutrinite DEX's prices with KongSwap and ICPSwap. These bots make smaller trades over time advantageous, which users could set up with a vector. Such a vector would currently charge a one-time creation fee of 2 NTN (currently ~ $10.9), and be refunded upon its deletion.
                     </p>
 
                     <!-- paragraph -->
@@ -7935,6 +8259,9 @@ potential risks if KongSwap scales.
 
   // disclaimer
   const userReshownReportsDisclaimer = ref(false)
+
+  // misc
+  const showOpenChatCalculations = ref(false)
 
   ///////////////////
   // local methods //
