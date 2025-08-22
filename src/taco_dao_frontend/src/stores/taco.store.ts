@@ -5317,22 +5317,19 @@ export const useTacoStore = defineStore('taco', () => {
 
     // Generate neuron subaccount using the correct SNS formula
     // SHA256(0x0c, "neuron-stake", principal-bytes, nonce-u64-be)
-    const generateNeuronSubaccount = async (principal: string, nonce: bigint): Promise<Uint8Array> => {
-        // Helper function to convert bigint to 8-byte big-endian
+    const generateNeuronSubaccount = async (controller: Principal, nonce: bigint): Promise<Uint8Array> => {
+        // u64 → big-endian 8 bytes using DataView (more reliable)
         const u64be = (value: bigint): Uint8Array => {
-            const bytes = new Uint8Array(8);
-            for (let i = 7; i >= 0; i--) {
-                bytes[i] = Number(value & 0xFFn);
-                value = value >> 8n;
-            }
-            return bytes;
+            const buffer = new ArrayBuffer(8);
+            new DataView(buffer).setBigUint64(0, value);
+            return new Uint8Array(buffer);
         };
 
         // Build the data to hash
         const chunks = [
             Uint8Array.from([0x0c]),                                    // len("neuron-stake")
             new TextEncoder().encode("neuron-stake"),                   // "neuron-stake"
-            Principal.fromText(principal).toUint8Array(),               // principal bytes
+            controller.toUint8Array(),                                  // controller principal bytes
             u64be(nonce),                                               // nonce as u64 big-endian
         ];
         
@@ -5375,7 +5372,8 @@ export const useTacoStore = defineStore('taco', () => {
 
         // Try nonces starting from 0
         for (let nonce = 0n; nonce < 1000n; nonce++) {  // Reasonable upper limit
-            const subaccount = await generateNeuronSubaccount(userPrincipal.value, nonce);
+            const controllerPrincipal = Principal.fromText(userPrincipal.value);
+            const subaccount = await generateNeuronSubaccount(controllerPrincipal, nonce);
             
             try {
                 // Try to get neuron with this subaccount
@@ -5415,18 +5413,27 @@ export const useTacoStore = defineStore('taco', () => {
             }
 
             console.log('Finding free subaccount for new neuron...');
-            const { subaccount } = await findFreeSubaccount();
+            const { subaccount, index } = await findFreeSubaccount();
+            const nonce = BigInt(index);
             
             const tacoTokenPrincipal = 'kknbx-zyaaa-aaaaq-aae4a-cai'; // TACO token canister
             const snsGovernancePrincipal = 'lhdfz-wqaaa-aaaaq-aae3q-cai'; // TACO SNS Governance
 
-            // Step 1: Transfer TACO tokens to SNS Governance with the new subaccount
-            console.log('Transferring TACO tokens to new neuron subaccount...');
-            await transferToNeuronSubaccount(tacoTokenPrincipal, snsGovernancePrincipal, subaccount, amount);
+            // Step 1: Transfer TACO tokens to SNS Governance with the new subaccount and memo
+            console.log(`Transferring TACO tokens to new neuron subaccount (nonce: ${nonce})...`);
+            console.log(`Subaccount (hex): ${Array.from(subaccount).map(b => b.toString(16).padStart(2, '0')).join('')}`);
+            console.log(`Controller principal: ${userPrincipal.value}`);
+            
+            const transferResult = await transferToNeuronSubaccount(tacoTokenPrincipal, snsGovernancePrincipal, subaccount, amount, nonce);
+            console.log(`Transfer completed with block index: ${transferResult}`);
 
-            // Step 2: Claim/refresh the neuron to create it
+            // Step 2: Wait a moment for the transfer to be processed
+            console.log('Waiting for transfer to be processed...');
+            await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds
+
+            // Step 3: Claim/refresh the neuron to create it
             console.log('Claiming new neuron...');
-            await claimOrRefreshNeuron(subaccount);
+            await claimOrRefreshNeuron(subaccount, nonce);
 
             console.log('Neuron created successfully!');
             return { subaccount, success: true };
@@ -5467,7 +5474,8 @@ export const useTacoStore = defineStore('taco', () => {
         tokenPrincipal: string,
         governancePrincipal: string,
         neuronId: Uint8Array,
-        amount: bigint
+        amount: bigint,
+        memo?: bigint  // Optional memo for neuron creation traceability
     ) => {
         const authClient = await getAuthClient();
         const identity = authClient.getIdentity();
@@ -5516,13 +5524,20 @@ export const useTacoStore = defineStore('taco', () => {
         const subaccount = new Uint8Array(32);
         subaccount.set(neuronId, 0);
 
+        // Convert memo to bytes if provided
+        const memoBytes = memo ? (() => {
+            const buffer = new ArrayBuffer(8);
+            new DataView(buffer).setBigUint64(0, memo);
+            return Array.from(new Uint8Array(buffer));
+        })() : [];
+
         const transferArgs = {
             to: {
                 owner: Principal.fromText(governancePrincipal),
                 subaccount: [Array.from(subaccount)]
             },
             fee: [],
-            memo: [],
+            memo: memo ? [memoBytes] : [],
             from_subaccount: [],
             created_at_time: [],
             amount: amount
@@ -5538,7 +5553,7 @@ export const useTacoStore = defineStore('taco', () => {
     }
 
     // Claim or refresh neuron after staking
-    const claimOrRefreshNeuron = async (neuronId: Uint8Array) => {
+    const claimOrRefreshNeuron = async (neuronId: Uint8Array, memo?: bigint) => {
         const authClient = await getAuthClient();
         const identity = authClient.getIdentity();
         
@@ -5560,16 +5575,38 @@ export const useTacoStore = defineStore('taco', () => {
         const subaccount = new Uint8Array(32);
         subaccount.set(neuronId, 0);
 
-        const manageNeuronRequest = {
+        // Debug logging
+        console.log(`ClaimOrRefresh request details:`);
+        console.log(`- Subaccount: ${Array.from(subaccount).map(b => b.toString(16).padStart(2, '0')).join('')}`);
+        console.log(`- Memo: ${memo}`);
+        console.log(`- Controller: ${userPrincipal.value}`);
+
+        // For neuron creation, we need to use MemoAndController variant
+        const manageNeuronRequest = memo !== undefined ? {
             subaccount: Array.from(subaccount),
             command: [{
                 ClaimOrRefresh: {
                     by: [{
-                        NeuronId: {}  // Use NeuronId variant with empty record
+                        MemoAndController: {
+                            controller: [Principal.fromText(userPrincipal.value)],
+                            memo: memo
+                        }
+                    }]
+                }
+            }]
+        } : {
+            // For existing neurons, use NeuronId variant
+            subaccount: Array.from(subaccount),
+            command: [{
+                ClaimOrRefresh: {
+                    by: [{
+                        NeuronId: {}
                     }]
                 }
             }]
         };
+
+        console.log('ManageNeuron request:', JSON.stringify(manageNeuronRequest, null, 2));
 
         const result = await governanceActor.manage_neuron(manageNeuronRequest) as any;
         
