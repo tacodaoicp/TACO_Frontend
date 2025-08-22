@@ -5427,47 +5427,10 @@ export const useTacoStore = defineStore('taco', () => {
             fetchRootKey: process.env.DFX_NETWORK === "local",
         });
 
-        // Create SNS Governance actor with manage_neuron capability
-        const snsGovernanceIDL = ({ IDL }: any) => {
-            const NeuronId = IDL.Record({ 'id': IDL.Vec(IDL.Nat8) });
-            const By = IDL.Variant({
-                'NeuronIdOrSubaccount': IDL.Record({
-                    'NeuronId': IDL.Opt(NeuronId),
-                    'Subaccount': IDL.Opt(IDL.Vec(IDL.Nat8))
-                }),
-                'MemoAndController': IDL.Record({
-                    'controller': IDL.Opt(IDL.Principal),
-                    'memo': IDL.Nat64
-                })
-            });
-            const ClaimOrRefresh = IDL.Record({
-                'by': IDL.Opt(By)
-            });
-            const Command = IDL.Variant({
-                'ClaimOrRefresh': ClaimOrRefresh,
-                // Add other commands as needed
-            });
-            const ManageNeuron = IDL.Record({
-                'subaccount': IDL.Vec(IDL.Nat8),
-                'command': IDL.Opt(Command)
-            });
-            const ClaimOrRefreshResponse = IDL.Record({
-                'refreshed_neuron_id': IDL.Opt(NeuronId)
-            });
-            const Command_1 = IDL.Variant({
-                'ClaimOrRefresh': ClaimOrRefreshResponse,
-                // Add other response commands as needed
-            });
-            const ManageNeuronResponse = IDL.Record({
-                'command': IDL.Opt(Command_1)
-            });
-
-            return IDL.Service({
-                'manage_neuron': IDL.Func([ManageNeuron], [ManageNeuronResponse], [])
-            });
-        };
-
-        const governanceActor = Actor.createActor(snsGovernanceIDL, {
+        // Use the existing SNS governance IDL
+        const { idlFactory } = await import('../../../declarations/sns_governance');
+        
+        const governanceActor = Actor.createActor(idlFactory, {
             agent,
             canisterId: 'lhdfz-wqaaa-aaaaq-aae3q-cai'
         });
@@ -5481,10 +5444,7 @@ export const useTacoStore = defineStore('taco', () => {
             command: [{
                 ClaimOrRefresh: {
                     by: [{
-                        NeuronIdOrSubaccount: {
-                            Subaccount: [Array.from(subaccount)],
-                            NeuronId: []
-                        }
+                        NeuronId: {}  // Use NeuronId variant with empty record
                     }]
                 }
             }]
