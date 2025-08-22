@@ -5235,6 +5235,86 @@ export const useTacoStore = defineStore('taco', () => {
         }
     }
 
+    // TACO Neuron methods for staking
+    const getTacoNeurons = async () => {
+        try {
+            if (!userLoggedIn.value) {
+                throw new Error('User must be logged in');
+            }
+
+            const authClient = await getAuthClient();
+            const identity = authClient.getIdentity();
+            
+            const agent = await createAgent({
+                identity,
+                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            });
+
+            // Create SNS Governance actor
+            const snsGov = await createSnsGovernanceActor(agent, 'lhdfz-wqaaa-aaaaq-aae3q-cai');
+            
+            const neuronsResult = await snsGov.list_neurons({
+                of_principal: [Principal.fromText(userPrincipal.value)],
+                limit: 1000,
+                start_page_at: []
+            }) as any;
+
+            return neuronsResult.neurons || [];
+        } catch (error: any) {
+            console.error('Error getting TACO neurons:', error);
+            throw error;
+        }
+    }
+
+    const createSnsGovernanceActor = async (agent: any, canisterId: string) => {
+        // Create a simplified IDL for list_neurons
+        const snsGovernanceIDL = ({ IDL }: any) => {
+            const NeuronId = IDL.Record({ 'id': IDL.Vec(IDL.Nat8) });
+            const ListNeurons = IDL.Record({
+                'of_principal': IDL.Opt(IDL.Principal),
+                'limit': IDL.Nat32,
+                'start_page_at': IDL.Opt(NeuronId)
+            });
+            
+            // Simplified neuron type for our needs
+            const Neuron = IDL.Record({
+                'id': IDL.Opt(NeuronId),
+                'cached_neuron_stake_e8s': IDL.Nat64,
+                'maturity_e8s_equivalent': IDL.Nat64,
+                'voting_power_percentage_multiplier': IDL.Nat64
+            });
+            
+            const ListNeuronsResponse = IDL.Record({
+                'neurons': IDL.Vec(Neuron)
+            });
+
+            return IDL.Service({
+                'list_neurons': IDL.Func([ListNeurons], [ListNeuronsResponse], ['query'])
+            });
+        };
+
+        return Actor.createActor(snsGovernanceIDL, {
+            agent,
+            canisterId
+        });
+    }
+
+    // Format neuron for display
+    const formatNeuronForDisplay = (neuron: any) => {
+        const neuronId = neuron.id && neuron.id.length > 0 ? neuron.id[0].id : null;
+        const neuronIdHex = neuronId ? Array.from(neuronId as Uint8Array).map((b: number) => b.toString(16).padStart(2, '0')).join('') : 'Unknown';
+        
+        return {
+            id: neuronId,
+            idHex: neuronIdHex,
+            stake: neuron.cached_neuron_stake_e8s,
+            maturity: neuron.maturity_e8s_equivalent,
+            votingPowerMultiplier: neuron.voting_power_percentage_multiplier,
+            displayName: `Neuron ${neuronIdHex.substring(0, 8)}...`
+        };
+    }
+
     // Wallet methods
     const registerUserToken = async (tokenPrincipal: string) => {
         try {
@@ -6210,6 +6290,8 @@ export const useTacoStore = defineStore('taco', () => {
         setPrincipalName,
         setNeuronName,
         getUserNeurons,
+        getTacoNeurons,
+        formatNeuronForDisplay,
         toggleThreadMenu,
         
         // Wallet methods

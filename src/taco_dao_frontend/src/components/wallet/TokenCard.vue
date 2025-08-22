@@ -38,6 +38,57 @@
       </div>
     </div>
     
+    <!-- Neurons section for TACO token -->
+    <div v-if="token.symbol === 'TACO'" class="neurons-section">
+      <div class="neurons-header">
+        <h6 class="neurons-title">
+          <i class="fa fa-brain me-2"></i>
+          Neurons
+        </h6>
+        <button 
+          @click="loadNeurons"
+          class="btn btn-outline-secondary btn-sm"
+          :disabled="loadingNeurons"
+        >
+          <i class="fa fa-refresh" :class="{ 'fa-spin': loadingNeurons }"></i>
+        </button>
+      </div>
+      
+      <div v-if="loadingNeurons" class="neurons-loading">
+        <div class="spinner-border spinner-border-sm" role="status">
+          <span class="visually-hidden">Loading...</span>
+        </div>
+        <span class="ms-2">Loading neurons...</span>
+      </div>
+      
+      <div v-else-if="neurons.length === 0" class="neurons-empty">
+        <i class="fa fa-info-circle me-2"></i>
+        <span>No neurons found</span>
+      </div>
+      
+      <div v-else class="neurons-list">
+        <div 
+          v-for="neuron in neurons" 
+          :key="neuron.idHex"
+          class="neuron-item"
+        >
+          <div class="neuron-info">
+            <div class="neuron-name">{{ neuron.displayName }}</div>
+            <div class="neuron-stake">
+              {{ formatBalance(neuron.stake, 8) }} TACO
+            </div>
+          </div>
+          <button 
+            @click="$emit('stake-to-neuron', neuron)"
+            class="btn btn-primary btn-sm"
+            title="Stake to this neuron"
+          >
+            <i class="fa fa-plus"></i>
+          </button>
+        </div>
+      </div>
+    </div>
+
     <div class="token-footer">
       <button 
         @click="$emit('send', token)"
@@ -55,7 +106,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { ref, onMounted } from 'vue'
+import { useTacoStore } from '../../stores/taco.store'
 
 interface TokenCardProps {
   token: {
@@ -76,6 +128,7 @@ interface TokenCardEmits {
   (e: 'send', token: TokenCardProps['token']): void
   (e: 'register', token: TokenCardProps['token']): void
   (e: 'unregister', token: TokenCardProps['token']): void
+  (e: 'stake-to-neuron', neuron: any): void
 }
 
 const props = withDefaults(defineProps<TokenCardProps>(), {
@@ -83,6 +136,38 @@ const props = withDefaults(defineProps<TokenCardProps>(), {
 })
 
 defineEmits<TokenCardEmits>()
+
+// Taco store for neuron operations
+const tacoStore = useTacoStore()
+
+// Neurons state
+const neurons = ref<any[]>([])
+const loadingNeurons = ref(false)
+
+// Load neurons for TACO token
+const loadNeurons = async () => {
+  if (!tacoStore.userLoggedIn || props.token.symbol !== 'TACO') {
+    return
+  }
+  
+  loadingNeurons.value = true
+  try {
+    const rawNeurons = await tacoStore.getTacoNeurons()
+    neurons.value = rawNeurons.map(neuron => tacoStore.formatNeuronForDisplay(neuron))
+  } catch (error) {
+    console.error('Error loading neurons:', error)
+    neurons.value = []
+  } finally {
+    loadingNeurons.value = false
+  }
+}
+
+// Auto-load neurons on mount for TACO token
+onMounted(() => {
+  if (props.token.symbol === 'TACO' && tacoStore.userLoggedIn) {
+    loadNeurons()
+  }
+})
 
 const formatBalance = (balance: bigint, decimals: number): string => {
   const divisor = BigInt(10 ** decimals)
@@ -250,6 +335,80 @@ const formatUSDValue = (balance: bigint, decimals: number, priceUSD: number): st
   padding: 0.25rem;
   background: var(--bg-secondary);
   border-radius: 6px;
+}
+
+/* Neurons section styles */
+.neurons-section {
+  margin-bottom: 1.5rem;
+  padding: 1rem;
+  background: rgba(0, 0, 0, 0.1);
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+}
+
+.neurons-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.75rem;
+}
+
+.neurons-title {
+  font-size: 0.9rem;
+  font-weight: 600;
+  margin: 0;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+}
+
+.neurons-loading,
+.neurons-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem 0;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.neurons-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.neuron-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  transition: all 0.2s ease;
+}
+
+.neuron-item:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.neuron-info {
+  flex-grow: 1;
+}
+
+.neuron-name {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 0.25rem;
+}
+
+.neuron-stake {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  font-family: monospace;
 }
 
 /* Dark mode adjustments */

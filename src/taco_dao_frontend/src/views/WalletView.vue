@@ -51,6 +51,7 @@
                     @send="openSendDialog" 
                     @register="registerToken"
                     @unregister="unregisterToken"
+                    @stake-to-neuron="handleStakeToNeuron"
                   />
                 </div>
               </div>
@@ -420,6 +421,12 @@ const unregisterToken = async (token: WalletToken) => {
     console.error('Error unregistering token:', error)
     tacoStore.addToast('error', 'Unregistration Failed', 'Failed to unregister token')
   }
+}
+
+const handleStakeToNeuron = (neuron: any) => {
+  console.log('Stake to neuron:', neuron)
+  // TODO: Implement staking functionality
+  // This will be implemented in future iterations
 }
 
 const registerCustomToken = async () => {
