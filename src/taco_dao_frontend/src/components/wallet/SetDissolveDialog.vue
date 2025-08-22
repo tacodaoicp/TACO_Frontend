@@ -1,6 +1,6 @@
 <template>
-  <div v-if="show" class="modal-overlay" @click.self="closeDialog">
-    <div class="modal-dialog" @click.stop>
+  <div v-if="show" class="modal-overlay">
+    <div class="modal-dialog">
       <div class="modal-header">
         <h5 class="modal-title">
           <i class="fa fa-clock me-2"></i>
@@ -114,6 +114,8 @@ const emit = defineEmits<Emits>()
 
 const tacoStore = useTacoStore()
 
+
+
 // Form state
 const dissolveDays = ref(28) // Default to 28 days
 const loading = ref(false)
@@ -173,7 +175,9 @@ const setDissolveDelay = async () => {
 }
 
 const closeDialog = () => {
+  console.log('Close dialog clicked, loading:', loading.value)
   if (!loading.value) {
+    console.log('Emitting close event')
     emit('close')
   }
 }
@@ -192,6 +196,7 @@ const closeDialog = () => {
   justify-content: center;
   z-index: 1050;
   backdrop-filter: blur(4px);
+  pointer-events: auto;
 }
 
 .modal-dialog {
@@ -204,6 +209,8 @@ const closeDialog = () => {
   max-height: 90vh;
   overflow-y: auto;
   color: #ffffff;
+  pointer-events: auto;
+  position: relative;
 }
 
 .modal-header {
