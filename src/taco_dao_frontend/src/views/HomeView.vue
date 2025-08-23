@@ -2133,6 +2133,16 @@
     if (month === 7 && day === 4) {
       return '💥'
     }
+
+    // cinco de mayo: May 5th
+    if (month === 5 && day === 5) {
+      return '🇲🇽'
+    }
+
+    // 420: April 20th
+    if (month === 4 && day === 20) {
+      return '🌿'
+    }
     
     // default: taco
     return '🌮'
@@ -2176,6 +2186,16 @@
     // independence day: July 4th
     if (month === 7 && day === 4) {
       return '🇺🇸'
+    }
+
+    // cinco de mayo: May 5th
+    if (month === 5 && day === 5) {
+      return '🌮'
+    }
+
+    // 420: April 20th
+    if (month === 4 && day === 20) {
+      return '🌿'
     }
     
     // default: taco

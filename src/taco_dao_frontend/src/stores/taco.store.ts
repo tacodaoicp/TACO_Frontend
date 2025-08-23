@@ -2172,7 +2172,7 @@ export const useTacoStore = defineStore('taco', () => {
     const getTradingStatus = async () => {
 
         // log
-        // console.log('taco.store: unfollowAllocation()')   
+        // console.log('taco.store: getTradingStatus()')   
 
         try {
 
@@ -2202,6 +2202,9 @@ export const useTacoStore = defineStore('taco', () => {
 
             // set fetched token details
             fetchedTradingStatus.value = tradingStatus
+
+            // log
+            // console.log('store fetched trading status:', fetchedTradingStatus.value)
 
             // return
             return true
