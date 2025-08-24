@@ -751,6 +751,7 @@ export const useTacoStore = defineStore('taco', () => {
             root.style.setProperty("--orange-to-light-brown", "#c16d33") // light brown
             root.style.setProperty("--light-brown-to-white", "#ffffff") // white
             root.style.setProperty("--light-brown-to-yellow", "#FEC800") // yellow
+            root.style.setProperty("--light-brown-to-brown", "#934A17") // brown
             root.style.setProperty("--light-brown-to-orange", "#FED66C") // orange
             root.style.setProperty("--light-brown-to-dark-orange", "#DA8D28") // dark orange
             root.style.setProperty("--light-brown-to-dark-brown", "#512100") // dark brown
@@ -824,6 +825,7 @@ export const useTacoStore = defineStore('taco', () => {
             root.style.setProperty("--orange-to-dark-brown", "#FEd66c") // orange
             root.style.setProperty("--orange-to-light-brown", "#FEd66c") // orange
             root.style.setProperty("--light-brown-to-white", "#C16D33") // light brown
+            root.style.setProperty("--light-brown-to-brown", "#C16D33") // light brown
             root.style.setProperty("--light-brown-to-yellow", "#C16D33") // light brown
             root.style.setProperty("--light-brown-to-orange", "#c16d33") // light brown
             root.style.setProperty("--light-brown-to-dark-orange", "#c16d33") // light brown

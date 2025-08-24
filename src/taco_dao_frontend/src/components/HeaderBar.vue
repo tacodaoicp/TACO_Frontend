@@ -30,6 +30,13 @@
         
         </router-link>
 
+        <!-- performance - router link -->
+        <router-link to="/performance" class="header-bar__rl">
+                      
+          <span class="header-bar__rl-span">Performance</span>
+        
+        </router-link>        
+
         <!-- vote - router link -->
         <router-link to="/vote" class="header-bar__rl">
                       
@@ -81,7 +88,7 @@
           
           <span class="header-bar__rl-span">Code</span>
         
-        </a>        
+        </a>
 
       </div>
 
@@ -196,6 +203,14 @@
           <span>DAO</span>
 
         </router-link>
+
+        <!-- performance - router link -->
+        <router-link @click="togglePagesMenu()" to="/performance" class="list-group-item">
+
+          <!-- item text -->
+          <span>Performance</span>
+
+        </router-link>        
 
         <!-- vote - router link -->
         <router-link @click="togglePagesMenu()" to="/vote" class="list-group-item">

@@ -6,6 +6,7 @@ import 'font-awesome/css/font-awesome.min.css'
 import App from './App.vue'
 import HomeView from "./views/HomeView.vue"
 import DaoView from "./views/DaoView.vue"
+import PerformanceView from "./views/PerformanceView.vue"
 import VoteView from "./views/VoteView.vue"
 import SalesView from "./views/SalesView.vue"
 import SaleDKPSwap from "./components/sales/SaleDKPSwap.vue"
@@ -36,6 +37,7 @@ import 'animate.css'
 const routes = [
     { path: "/", name: "Home", component: HomeView, meta: { robots: 'index' } },
     { path: "/dao", name: "Dao", component: DaoView, meta: { robots: 'index' } },
+    { path: "/performance", name: "Performance", component: PerformanceView, meta: { robots: 'index' } },
     { path: "/vote", name: "Vote", component: VoteView, meta: { robots: 'index' } },      
     { path: "/sales", name: "Sales", component: SalesView, meta: { robots: 'index' } },
     { path: "/sales/dkp-swap", name: "Sale1", component: SaleDKPSwap, meta: { robots: 'index' } },
