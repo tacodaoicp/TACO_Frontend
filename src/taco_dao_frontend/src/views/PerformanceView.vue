@@ -1666,7 +1666,7 @@
   const selectedView = ref('allTacoDaoAssets')
 
   // selected chart range
-  const selectedChartRange = ref('5m')
+  const selectedChartRange = ref('24h')
 
   // available tokens
   const availableTokens = ref<any[]>([])
