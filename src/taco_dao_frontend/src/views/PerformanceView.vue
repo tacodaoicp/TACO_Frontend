@@ -1648,11 +1648,17 @@
 
   // user
   const { userLoggedIn } = storeToRefs(tacoStore)
+
+  // dap
+  const { fetchedTokenDetails } = storeToRefs(tacoStore)
   
   // # ACTIONS #
 
   // user
   const { iidLogIn } = tacoStore
+
+  // misc
+  const { fetchTokenDetails } = tacoStore
 
   /////////////////////
   // Local Varialbes //
@@ -1666,6 +1672,9 @@
 
   // selected chart range
   const selectedChartRange = ref('5m')
+
+  // available tokens
+  const availableTokens = ref<any[]>([])
 
   ///////////////////
   // Local Methods //
@@ -1681,6 +1690,40 @@
 
   /////////////
   // RETURNS //
+
+  // load available tokens
+  const loadAvailableTokens = async () => {
+
+    // try
+    try {
+
+      // if fetched token details is empty
+      if (fetchedTokenDetails.value.length === 0) {
+
+        // fetch token details
+        await fetchTokenDetails()
+
+      }
+
+      // set token details
+      const tokenDetails = fetchedTokenDetails || []
+
+      // filter token details
+      availableTokens.value = tokenDetails.value.filter(([_, details]: any) => 
+        details.Active && !details.isPaused
+      )
+      
+    } 
+    
+    // catch
+    catch (error) {
+
+      // log error
+      console.error('Failed to load available tokens:', error)
+
+    }
+    
+  }
 
   // get pos neg class
   const getPosNegClass = (value: number) => {
@@ -1701,10 +1744,14 @@
   // watch for selected view to update
   watch(selectedView, (newVal) => {
 
-    // if new value is not the same as the current value
-    if (newVal !== selectedView.value) {
+    // log
+    console.log('selected view changed', newVal)
 
-      // do something
+    // if new value is all taco dao assets
+    if (newVal === 'All Taco Dao Assets') {
+
+      // fetch price history for portfolio and treasury
+      
       
     }
 
@@ -1917,10 +1964,14 @@
 
   // watch for dark mode to update
   watch(darkModeToggled, (newVal) => {
+
+    // if light mode
     if (newVal) {
-      // light mode
-      console.log('light mode')
+
+      // set theme
       theme.value = 'light'
+
+      // set options
       option.value = {
         ...lightTheme,
         xAxis: {
@@ -1929,10 +1980,16 @@
         },
         series: chartData.series
       }
-    } else {
-      // dark mode
-      console.log('dark mode')
+
+    } 
+    
+    // else dark mode
+    else {
+
+      // set theme
       theme.value = 'dark'
+
+      // set options
       option.value = {
         ...darkTheme,
         xAxis: {
@@ -1941,7 +1998,9 @@
         },
         series: chartData.series
       }
+
     }
+
   }, { immediate: true })    
 
   /////////////////////
@@ -1952,7 +2011,22 @@
   onMounted(async () => {
 
     // set selected view
-    selectedView.value = 'All Taco Dao Assets'
+    selectedView.value = 'All Taco Dao Assets'  
+
+    // load available tokens
+    await loadAvailableTokens()
+
+    // log
+    console.log('available tokens', availableTokens.value)
+
+    // 
+    const treasuryPortfolioHistory = await tacoStore.getTreasuryPortfolioHistory(1000).catch(e => {
+        console.error('Failed to load treasury portfolio:', e)
+        return { snapshots: [] }
+      })
+
+    // log
+    console.log('treasury portfolio history', treasuryPortfolioHistory)
 
   })
 
