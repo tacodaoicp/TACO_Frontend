@@ -131,30 +131,25 @@
               <!-- range selector -->
               <div v-if="selectedView !== 'Leaderboard'" class="performance__range-selector btn-group">
 
-                <button @click="handleSetChartRange('5m')" 
+                <button @click="handleSetChartRange('24h')" 
                         type="button" 
-                        :class="{'taco-nav-btn--active': selectedChartRange === '5m'}" 
-                        class="btn taco-nav-btn">5m</button>
+                        :class="{'taco-nav-btn--active': selectedChartRange === '24h'}" 
+                        class="btn taco-nav-btn">24h</button>
 
-                <button @click="handleSetChartRange('1h')" 
+                <button @click="handleSetChartRange('7d')" 
                         type="button" 
-                        :class="{'taco-nav-btn--active': selectedChartRange === '1h'}" 
-                        class="btn taco-nav-btn">1h</button>
+                        :class="{'taco-nav-btn--active': selectedChartRange === '7d'}" 
+                        class="btn taco-nav-btn">7d</button>
 
-                <button @click="handleSetChartRange('4h')" 
+                <button @click="handleSetChartRange('30d')" 
                         type="button" 
-                        :class="{'taco-nav-btn--active': selectedChartRange === '4h'}" 
-                        class="btn taco-nav-btn">4h</button>
+                        :class="{'taco-nav-btn--active': selectedChartRange === '30d'}" 
+                        class="btn taco-nav-btn">30d</button>
 
-                <button @click="handleSetChartRange('1D')" 
+                <button @click="handleSetChartRange('all')" 
                         type="button" 
-                        :class="{'taco-nav-btn--active': selectedChartRange === '1D'}" 
-                        class="btn taco-nav-btn">1D</button>        
-                        
-                <button @click="handleSetChartRange('1W')" 
-                        type="button" 
-                        :class="{'taco-nav-btn--active': selectedChartRange === '1W'}" 
-                        class="btn taco-nav-btn">1W</button>                            
+                        :class="{'taco-nav-btn--active': selectedChartRange === 'all'}" 
+                        class="btn taco-nav-btn">All</button>                          
 
               </div>
 
