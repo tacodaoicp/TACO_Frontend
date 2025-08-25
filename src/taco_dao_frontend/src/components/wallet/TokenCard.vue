@@ -38,6 +38,31 @@
       </div>
     </div>
     
+    <!-- ICP Account section for ICP token -->
+    <div v-if="token.symbol === 'ICP'" class="icp-account-section">
+      <div class="icp-account-header">
+        <h6 class="icp-account-title">
+          <i class="fa fa-wallet me-2"></i>
+          ICP Account
+        </h6>
+      </div>
+      <div class="icp-account-content">
+        <div class="account-id-display">
+          <small class="account-label">Account ID:</small>
+          <div class="account-id-value">
+            <code class="account-id-text">{{ icpAccountId.dashed }}</code>
+            <button 
+              @click="copyToClipboard(icpAccountId.hex)"
+              class="btn btn-outline-secondary btn-sm ms-2"
+              title="Copy full hex to clipboard"
+            >
+              <i class="fa fa-copy"></i>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+    
     <!-- Neurons section for TACO token -->
     <div v-if="token.symbol === 'TACO'" class="neurons-section">
       <div class="neurons-header">
@@ -393,8 +418,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { useTacoStore } from '../../stores/taco.store'
+import { getLegacyAccountId } from '../../utils/accountUtils'
+import { useClipboard } from '@vueuse/core'
 
 interface TokenCardProps {
   token: {
@@ -428,6 +455,40 @@ defineEmits<TokenCardEmits>()
 
 // Taco store for neuron operations
 const tacoStore = useTacoStore()
+
+// Clipboard functionality
+const { copy } = useClipboard()
+
+// ICP Account ID computation
+const icpAccountId = computed(() => {
+  if (props.token.symbol === 'ICP' && tacoStore.userLoggedIn && tacoStore.userPrincipal) {
+    return getLegacyAccountId(tacoStore.userPrincipal)
+  }
+  return { hex: '', dashed: '' }
+})
+
+// Copy to clipboard function
+const copyToClipboard = async (text: string) => {
+  try {
+    await copy(text)
+    tacoStore.addToast({
+      id: Date.now(),
+      code: 'copy-success',
+      title: 'Copied!',
+      icon: 'fa-solid fa-check',
+      message: 'Account ID copied to clipboard'
+    })
+  } catch (error) {
+    console.error('Failed to copy to clipboard:', error)
+    tacoStore.addToast({
+      id: Date.now() + 1,
+      code: 'copy-error',
+      title: 'Copy Failed',
+      icon: 'fa-solid fa-exclamation-triangle',
+      message: 'Failed to copy to clipboard'
+    })
+  }
+}
 
 // Neurons state
 const neurons = ref<any[]>([])
@@ -637,6 +698,71 @@ const formatUSDValue = (balance: bigint, decimals: number, priceUSD: number): st
   padding: 0.25rem;
   background: var(--bg-secondary);
   border-radius: 6px;
+}
+
+/* ICP Account section styles */
+.icp-account-section {
+  margin-bottom: 1.5rem;
+  padding: 1rem;
+  background: rgba(0, 0, 0, 0.05);
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+}
+
+.icp-account-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.75rem;
+}
+
+.icp-account-title {
+  font-size: 0.9rem;
+  font-weight: 600;
+  margin: 0;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+}
+
+.icp-account-content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.account-id-display {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.account-label {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.account-id-value {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.account-id-text {
+  font-size: 0.8rem;
+  font-family: 'Courier New', monospace;
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  padding: 0.25rem 0.5rem;
+  color: var(--text-primary);
+  word-break: break-all;
+  flex: 1;
+  min-width: 0;
 }
 
 /* Neurons section styles */
