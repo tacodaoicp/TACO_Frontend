@@ -177,7 +177,7 @@ export const tokenData = [
         icpCoinsLink: 'https://neutrinite.io/currencies/ckBTC',
         icon: ckbtcToken,
         description: `ckBTC is a pair of ICP smart contracts building on the Bitcoin canister and ckECDSA services. The contracts work together to enable users and canister smart contracts on ICP to send and receive BTC value within seconds — far faster than is possible with native BTC chain transactions, while also always allowing users and smart contracts to send and receive value to and from native BTC network addresses.`,
-        color: '#5122b5'
+        color: '#6a44bd'
     },    
     {
         title: 'CYCLES-TRANSFER-STATION',

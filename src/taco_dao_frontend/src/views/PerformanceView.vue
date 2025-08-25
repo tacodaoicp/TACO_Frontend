@@ -41,19 +41,19 @@
 
                 <!-- view item text -->
                 <span>
-                  All Taco Dao Assets
+                  Total Assets Under Management
                 </span>
 
               </div>
 
               <!-- view item -->
               <div class="performance__views__item"
-                   @click="selectedView = 'Treasury vs Portfilio'"
-                   :class="{ active: selectedView === 'Treasury vs Portfilio' }">
+                   @click="selectedView = 'Treasury vs Portfolio'"
+                   :class="{ active: selectedView === 'Treasury vs Portfolio' }">
 
                 <!-- view item text -->
                 <span>
-                  Treasury vs Portfilio
+                  Treasury vs Portfolio
                 </span>
 
               </div>
@@ -78,18 +78,6 @@
                 <!-- view item text -->
                 <span>
                   All Portfolio Assets
-                </span>
-
-              </div>
-
-              <!-- view item -->
-              <div class="performance__views__item"
-                   @click="selectedView = 'DAO vs Me'"
-                   :class="{ active: selectedView === 'DAO vs Me' }">
-
-                <!-- view item text -->
-                <span>
-                  DAO vs Me
                 </span>
 
               </div>
@@ -159,6 +147,22 @@
             <div ref="chartContainer"
                   class="performance__chart__cont
                         taco-container taco-container--l2 p-0">
+
+              <!-- logged out, curtain -->
+              <div v-if="!userLoggedIn" class="login-curtain">
+
+                <!-- login button -->
+                <button class="btn iid-login" @click="iidLogIn()">
+
+                  <!-- dfinity logo -->
+                  <DfinityLogo />
+
+                  <!-- login text -->
+                  <span class="taco-text-white">Login to view</span>
+
+                </button>
+
+              </div>
 
               <!-- chart inner container -->
               <div v-if="selectedView !== 'Leaderboard'" class="performance__chart__cont__inner">
@@ -599,290 +603,167 @@
                   <!-- table body -->
                   <tbody>
 
-                    <!-- row -->
-                    <tr>
+<!-- total aum row -->
+<tr>
+  <td class="taco-text-black-to-white">
+    <span class="taco-text-black-to-white">Total AUM</span>
+  </td>
+  <td class="taco-text-black-to-white">
+    <span class="d-flex flex-column align-items-end">
+      <span class="taco-text-black-to-white">
+        ${{ statisticsData.totalAUM.current.toFixed(2) }}
+      </span>
+    </span>
+  </td>
+  <td class="taco-text-black-to-white">
+    <span class="d-flex flex-column align-items-end">
+      <span :class="getPosNegClass(statisticsData.totalAUM.change24h.value)">
+        ${{ statisticsData.totalAUM.change24h.value.toFixed(2) }}
+      </span>
+      <span :class="getPosNegClass(statisticsData.totalAUM.change24h.percentage)">
+        {{ statisticsData.totalAUM.change24h.percentage.toFixed(2) }}%
+      </span>
+    </span>
+  </td>
+  <td class="taco-text-black-to-white">
+    <span class="d-flex flex-column align-items-end">
+      <span :class="getPosNegClass(statisticsData.totalAUM.change7d.value)">
+        ${{ statisticsData.totalAUM.change7d.value.toFixed(2) }}
+      </span>
+      <span :class="getPosNegClass(statisticsData.totalAUM.change7d.percentage)">
+        {{ statisticsData.totalAUM.change7d.percentage.toFixed(2) }}%
+      </span>
+    </span>
+  </td>
+  <td class="taco-text-black-to-white">
+    <span class="d-flex flex-column align-items-end">
+      <span :class="getPosNegClass(statisticsData.totalAUM.change30d.value)">
+        ${{ statisticsData.totalAUM.change30d.value.toFixed(2) }}
+      </span>
+      <span :class="getPosNegClass(statisticsData.totalAUM.change30d.percentage)">
+        {{ statisticsData.totalAUM.change30d.percentage.toFixed(2) }}%
+      </span>
+    </span>
+  </td>
+  <td class="taco-text-black-to-white">
+    <span class="d-flex flex-column align-items-end">
+      <span :class="getPosNegClass(statisticsData.totalAUM.changeAll.value)">
+        ${{ statisticsData.totalAUM.changeAll.value.toFixed(2) }}
+      </span>
+      <span :class="getPosNegClass(statisticsData.totalAUM.changeAll.percentage)">
+        {{ statisticsData.totalAUM.changeAll.percentage.toFixed(2) }}%
+      </span>
+    </span>
+  </td>
+</tr>
 
-                      <!-- data -->
-                      <td class="taco-text-black-to-white">
+<!-- portfolio row -->
+<tr>
+  <td class="taco-text-black-to-white">
+    <span class="taco-text-black-to-white">Portfolio</span>
+  </td>
+  <td class="taco-text-black-to-white">
+    <span class="d-flex flex-column align-items-end">
+      <span class="taco-text-black-to-white">
+        ${{ statisticsData.portfolio.current.toFixed(2) }}
+      </span>
+    </span>
+  </td>
+  <td class="taco-text-black-to-white">
+    <span class="d-flex flex-column align-items-end">
+      <span :class="getPosNegClass(statisticsData.portfolio.change24h.value)">
+        ${{ statisticsData.portfolio.change24h.value.toFixed(2) }}
+      </span>
+      <span :class="getPosNegClass(statisticsData.portfolio.change24h.percentage)">
+        {{ statisticsData.portfolio.change24h.percentage.toFixed(2) }}%
+      </span>
+    </span>
+  </td>
+  <td class="taco-text-black-to-white">
+    <span class="d-flex flex-column align-items-end">
+      <span :class="getPosNegClass(statisticsData.portfolio.change7d.value)">
+        ${{ statisticsData.portfolio.change7d.value.toFixed(2) }}
+      </span>
+      <span :class="getPosNegClass(statisticsData.portfolio.change7d.percentage)">
+        {{ statisticsData.portfolio.change7d.percentage.toFixed(2) }}%
+      </span>
+    </span>
+  </td>
+  <td class="taco-text-black-to-white">
+    <span class="d-flex flex-column align-items-end">
+      <span :class="getPosNegClass(statisticsData.portfolio.change30d.value)">
+        ${{ statisticsData.portfolio.change30d.value.toFixed(2) }}
+      </span>
+      <span :class="getPosNegClass(statisticsData.portfolio.change30d.percentage)">
+        {{ statisticsData.portfolio.change30d.percentage.toFixed(2) }}%
+      </span>
+    </span>
+  </td>
+  <td class="taco-text-black-to-white">
+    <span class="d-flex flex-column align-items-end">
+      <span :class="getPosNegClass(statisticsData.portfolio.changeAll.value)">
+        ${{ statisticsData.portfolio.changeAll.value.toFixed(2) }}
+      </span>
+      <span :class="getPosNegClass(statisticsData.portfolio.changeAll.percentage)">
+        {{ statisticsData.portfolio.changeAll.percentage.toFixed(2) }}%
+      </span>
+    </span>
+  </td>
+</tr>
 
-                        <!-- entry -->
-                        <span class="taco-text-black-to-white">
-                          Total AUM
-                        </span>
-                        
-                      </td>
-
-                      <!-- data -->
-                      <td class="taco-text-black-to-white">
-
-                        <!-- entry -->
-                        <span class="d-flex flex-column align-items-end">
-                          
-                          <!-- dollar amount -->
-                          <span :class="getPosNegClass(100)">$0.00</span>
-
-                          <!-- percentage -->
-                          <span :class="getPosNegClass(100)">0.00%</span>
-                          
-                        </span>
-                        
-                      </td>
-
-                      <!-- data -->
-                      <td class="taco-text-black-to-white">
-
-                        <!-- entry -->
-                        <span class="d-flex flex-column align-items-end">
-                          
-                          <!-- dollar amount -->
-                          <span :class="getPosNegClass(100)">$0.00</span>
-
-                          <!-- percentage -->
-                          <span :class="getPosNegClass(100)">0.00%</span>
-                          
-                        </span>
-                        
-                      </td>
-
-                      <!-- data -->
-                      <td class="taco-text-black-to-white">
-
-                        <!-- entry -->
-                        <span class="d-flex flex-column align-items-end">
-                          
-                          <!-- dollar amount -->
-                          <span :class="getPosNegClass(100)">$0.00</span>
-
-                          <!-- percentage -->
-                          <span :class="getPosNegClass(100)">0.00%</span>
-                          
-                        </span>
-                        
-                      </td>
-
-                      <!-- data -->
-                      <td class="taco-text-black-to-white">
-
-                        <!-- entry -->
-                        <span class="d-flex flex-column align-items-end">
-                          
-                          <!-- dollar amount -->
-                          <span :class="getPosNegClass(100)">$0.00</span>
-
-                          <!-- percentage -->
-                          <span :class="getPosNegClass(100)">0.00%</span>
-                          
-                        </span>
-                        
-                      </td>
-
-                      <!-- data -->
-                      <td class="taco-text-black-to-white">
-
-                        <!-- entry -->
-                        <span class="d-flex flex-column align-items-end">
-                          
-                          <!-- dollar amount -->
-                          <span :class="getPosNegClass(100)">$0.00</span>
-
-                          <!-- percentage -->
-                          <span :class="getPosNegClass(100)">0.00%</span>
-                          
-                        </span>
-                        
-                      </td>
-
-                    </tr>  
-                    
-                    <!-- row -->
-                    <tr>
-
-                      <!-- data -->
-                      <td class="taco-text-black-to-white">
-
-                        <!-- entry -->
-                        <span class="taco-text-black-to-white">
-                          Portfolio
-                        </span>
-                        
-                      </td>
-
-                      <!-- data -->
-                      <td class="taco-text-black-to-white">
-
-                        <!-- entry -->
-                        <span class="d-flex flex-column align-items-end">
-                          
-                          <!-- dollar amount -->
-                          <span :class="getPosNegClass(-100)">$0.00</span>
-
-                          <!-- percentage -->
-                          <span :class="getPosNegClass(-100)">0.00%</span>
-                          
-                        </span>
-                        
-                      </td>
-
-                      <!-- data -->
-                      <td class="taco-text-black-to-white">
-
-                        <!-- entry -->
-                        <span class="d-flex flex-column align-items-end">
-                          
-                          <!-- dollar amount -->
-                          <span :class="getPosNegClass(-100)">$0.00</span>
-
-                          <!-- percentage -->
-                          <span :class="getPosNegClass(-100)">0.00%</span>
-                          
-                        </span>
-                        
-                      </td>
-
-                      <!-- data -->
-                      <td class="taco-text-black-to-white">
-
-                        <!-- entry -->
-                        <span class="d-flex flex-column align-items-end">
-                          
-                          <!-- dollar amount -->
-                          <span :class="getPosNegClass(-100)">$0.00</span>
-
-                          <!-- percentage -->
-                          <span :class="getPosNegClass(-100)">0.00%</span>
-                          
-                        </span>
-                        
-                      </td>
-
-                      <!-- data -->
-                      <td class="taco-text-black-to-white">
-
-                        <!-- entry -->
-                        <span class="d-flex flex-column align-items-end">
-                          
-                          <!-- dollar amount -->
-                          <span :class="getPosNegClass(-100)">$0.00</span>
-
-                          <!-- percentage -->
-                          <span :class="getPosNegClass(-100)">0.00%</span>
-                          
-                        </span>
-                        
-                      </td>
-
-                      <!-- data -->
-                      <td class="taco-text-black-to-white">
-
-                        <!-- entry -->
-                        <span class="d-flex flex-column align-items-end">
-                          
-                          <!-- dollar amount -->
-                          <span :class="getPosNegClass(-100)">$0.00</span>
-
-                          <!-- percentage -->
-                          <span :class="getPosNegClass(-100)">0.00%</span>
-                          
-                        </span>
-                        
-                      </td>
-
-                    </tr>  
-                    
-                    <!-- row -->
-                    <tr>
-
-                      <!-- data -->
-                      <td class="taco-text-black-to-white">
-
-                        <!-- entry -->
-                        <span class="taco-text-black-to-white">
-                          Treasury
-                        </span>
-                        
-                      </td>
-
-                      <!-- data -->
-                      <td class="taco-text-black-to-white">
-
-                        <!-- entry -->
-                        <span class="d-flex flex-column align-items-end">
-                          
-                          <!-- dollar amount -->
-                          <span :class="getPosNegClass(100)">$0.00</span>
-
-                          <!-- percentage -->
-                          <span :class="getPosNegClass(100)">0.00%</span>
-                          
-                        </span>
-                        
-                      </td>
-
-                      <!-- data -->
-                      <td class="taco-text-black-to-white">
-
-                        <!-- entry -->
-                        <span class="d-flex flex-column align-items-end">
-                          
-                          <!-- dollar amount -->
-                          <span :class="getPosNegClass(-100)">$0.00</span>
-
-                          <!-- percentage -->
-                          <span :class="getPosNegClass(-100)">0.00%</span>
-                          
-                        </span>
-                        
-                      </td>
-
-                      <!-- data -->
-                      <td class="taco-text-black-to-white">
-
-                        <!-- entry -->
-                        <span class="d-flex flex-column align-items-end">
-                          
-                          <!-- dollar amount -->
-                          <span :class="getPosNegClass(100)">$0.00</span>
-
-                          <!-- percentage -->
-                          <span :class="getPosNegClass(100)">0.00%</span>
-                          
-                        </span>
-                        
-                      </td>
-
-                      <!-- data -->
-                      <td class="taco-text-black-to-white">
-
-                        <!-- entry -->
-                        <span class="d-flex flex-column align-items-end">
-                          
-                          <!-- dollar amount -->
-                          <span :class="getPosNegClass(-100)">$0.00</span>
-
-                          <!-- percentage -->
-                          <span :class="getPosNegClass(-100)">0.00%</span>
-                          
-                        </span>
-                        
-                      </td>
-
-                      <!-- data -->
-                      <td class="taco-text-black-to-white">
-
-                        <!-- entry -->
-                        <span class="d-flex flex-column align-items-end">
-                          
-                          <!-- dollar amount -->
-                          <span :class="getPosNegClass(100)">$0.00</span>
-
-                          <!-- percentage -->
-                          <span :class="getPosNegClass(100)">0.00%</span>
-                          
-                        </span>
-                        
-                      </td>
-
-                    </tr>                      
+<!-- treasury row -->
+<tr>
+  <td class="taco-text-black-to-white">
+    <span class="taco-text-black-to-white">Treasury</span>
+  </td>
+  <td class="taco-text-black-to-white">
+    <span class="d-flex flex-column align-items-end">
+      <span class="taco-text-black-to-white">
+        ${{ statisticsData.treasury.current.toFixed(2) }}
+      </span>
+    </span>
+  </td>
+  <td class="taco-text-black-to-white">
+    <span class="d-flex flex-column align-items-end">
+      <span :class="getPosNegClass(statisticsData.treasury.change24h.value)">
+        ${{ statisticsData.treasury.change24h.value.toFixed(2) }}
+      </span>
+      <span :class="getPosNegClass(statisticsData.treasury.change24h.percentage)">
+        {{ statisticsData.treasury.change24h.percentage.toFixed(2) }}%
+      </span>
+    </span>
+  </td>
+  <td class="taco-text-black-to-white">
+    <span class="d-flex flex-column align-items-end">
+      <span :class="getPosNegClass(statisticsData.treasury.change7d.value)">
+        ${{ statisticsData.treasury.change7d.value.toFixed(2) }}
+      </span>
+      <span :class="getPosNegClass(statisticsData.treasury.change7d.percentage)">
+        {{ statisticsData.treasury.change7d.percentage.toFixed(2) }}%
+      </span>
+    </span>
+  </td>
+  <td class="taco-text-black-to-white">
+    <span class="d-flex flex-column align-items-end">
+      <span :class="getPosNegClass(statisticsData.treasury.change30d.value)">
+        ${{ statisticsData.treasury.change30d.value.toFixed(2) }}
+      </span>
+      <span :class="getPosNegClass(statisticsData.treasury.change30d.percentage)">
+        {{ statisticsData.treasury.change30d.percentage.toFixed(2) }}%
+      </span>
+    </span>
+  </td>
+  <td class="taco-text-black-to-white">
+    <span class="d-flex flex-column align-items-end">
+      <span :class="getPosNegClass(statisticsData.treasury.changeAll.value)">
+        ${{ statisticsData.treasury.changeAll.value.toFixed(2) }}
+      </span>
+      <span :class="getPosNegClass(statisticsData.treasury.changeAll.percentage)">
+        {{ statisticsData.treasury.changeAll.percentage.toFixed(2) }}%
+      </span>
+    </span>
+  </td>
+</tr>                   
 
                   </tbody>
 
@@ -930,7 +811,7 @@
                     <!-- row -->
                     <tr>
 
-                      <!-- data -->
+                      <!-- tokendata -->
                       <td class="taco-text-black-to-white">
 
                         <!-- entry -->
@@ -940,7 +821,20 @@
                         
                       </td>
 
-                      <!-- data -->
+                      <!-- price data -->
+                      <td class="taco-text-black-to-white">
+
+                        <!-- entry -->
+                        <span class="d-flex flex-column align-items-end">
+                          
+                          <!-- dollar amount -->
+                          <span :class="getPosNegClass(0)">$0.00</span>
+                          
+                        </span>
+                        
+                      </td>
+
+                      <!-- 24h data -->
                       <td class="taco-text-black-to-white">
 
                         <!-- entry -->
@@ -956,7 +850,7 @@
                         
                       </td>
 
-                      <!-- data -->
+                      <!-- 7d data -->
                       <td class="taco-text-black-to-white">
 
                         <!-- entry -->
@@ -972,7 +866,7 @@
                         
                       </td>
 
-                      <!-- data -->
+                      <!-- 30d data -->
                       <td class="taco-text-black-to-white">
 
                         <!-- entry -->
@@ -988,23 +882,7 @@
                         
                       </td>
 
-                      <!-- data -->
-                      <td class="taco-text-black-to-white">
-
-                        <!-- entry -->
-                        <span class="d-flex flex-column align-items-end">
-                          
-                          <!-- dollar amount -->
-                          <span :class="getPosNegClass(0)">$0.00</span>
-
-                          <!-- percentage -->
-                          <span :class="getPosNegClass(0)">0.00%</span>
-                          
-                        </span>
-                        
-                      </td>
-
-                      <!-- data -->
+                      <!-- all data -->
                       <td class="taco-text-black-to-white">
 
                         <!-- entry -->
@@ -1526,6 +1404,45 @@
       }
 
     }
+
+    // login curtain
+    .login-curtain {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      width: 100%;
+      height: 100%;
+      position: absolute;
+      top: 0;
+      left: 0;
+      background-color: var(--curtain-bg);
+      padding: 0 3rem;
+      border-radius: 0.5rem;
+      z-index: 1000;
+
+      // login
+      .iid-login {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.325rem;
+
+        svg {
+          width: 1.375rem;
+        }
+
+        span {
+          font-size: 1rem;
+          font-family: 'Space Mono', monospace;
+        }
+
+        &:active {
+          border-color: transparent;
+        }
+
+      }
+
+    }
     
   }
 
@@ -1614,12 +1531,13 @@
 
   import HeaderBar from "../components/HeaderBar.vue"
   import FooterBar from "../components/FooterBar.vue"
-  import { ref, onMounted, onUnmounted, computed, onUpdated, watch, provide } from "vue"
+  import { ref, onMounted, onUnmounted, computed, onUpdated, watch, provide, nextTick } from "vue"
   import TacoTitle from '../components/misc/TacoTitle.vue'
   import TacoExchangeLogo from "../assets/images/tacoExchangeLogo.vue"
   import DfinityLogo from "../assets/images/dfinityLogo.vue"
   import { useTacoStore } from "../stores/taco.store"
   import { storeToRefs } from "pinia"
+  import { tokenData } from '../components/data/TokenData'
   import { use } from 'echarts/core'
   import { CanvasRenderer } from 'echarts/renderers'
   import { LineChart } from 'echarts/charts'
@@ -1663,13 +1581,19 @@
   const chartLoaded = ref(false)
 
   // selected view
-  const selectedView = ref('allTacoDaoAssets')
+  const selectedView = ref('All Taco Dao Assets')
 
   // selected chart range
-  const selectedChartRange = ref('24h')
+  const selectedChartRange = ref('all')
 
   // available tokens
   const availableTokens = ref<any[]>([])
+
+  // treasury portfolio data
+  const treasuryPortfolioData = ref<any[]>([])
+
+  // dao portfolio data
+  const daoPortfolioData = ref<any[]>([])
 
   ///////////////////
   // Local Methods //
@@ -1720,6 +1644,81 @@
     
   }
 
+  // load price history
+  const loadPriceHistory = async () => {
+
+    // try
+    try {
+
+      // load both portfolio and treasury data
+      const [treasuryResult, daoResult] = await Promise.all([
+        tacoStore.getTreasuryPortfolioHistory(1000).catch(e => {
+          console.error('Failed to load treasury portfolio:', e)
+          return { snapshots: [] }
+        }),
+        tacoStore.getPortfolioHistory(2000).catch(e => {
+          console.error('Failed to load DAO portfolio:', e)
+          return []
+        })
+      ])
+      
+      // process treasury data
+      if (treasuryResult && treasuryResult.snapshots) {
+        treasuryPortfolioData.value = treasuryResult.snapshots.map((snapshot: any) => ({
+          time: snapshot.timestamp,
+          icpPrice: snapshot.totalValueICP,
+          usdPrice: snapshot.totalValueUSD,
+          tokens: snapshot.tokens
+        }))
+      } else {
+        treasuryPortfolioData.value = []
+      }
+      
+      // process DAO data
+      if (Array.isArray(daoResult)) {
+        daoPortfolioData.value = daoResult.map(([timestamp, data]: any) => ({
+          time: timestamp,
+          icpPrice: typeof data.totalWorthInICP === 'bigint' ? data.totalWorthInICP : BigInt(data.totalWorthInICP || 0),
+          usdPrice: typeof data.totalWorthInUSD === 'bigint' ? Number(data.totalWorthInUSD) : (data.totalWorthInUSD || 0),
+          balances: data.balances || [],
+          allocations: data.allocations || []
+        })).reverse()
+      } else {
+        daoPortfolioData.value = []
+      }
+      
+    } catch (error) {
+      console.error('Failed to load price history:', error)
+    }
+
+  }
+
+  // filter data by time range
+  const filterDataByTimeRange = (data: any[], range: string) => {
+    if (range === 'all') return data
+    
+    const now = Date.now()
+    const rangeInMs = {
+      '24h': 24 * 60 * 60 * 1000,
+      '7d': 7 * 24 * 60 * 60 * 1000,
+      '30d': 30 * 24 * 60 * 60 * 1000
+    }
+    
+    const cutoffTime = now - rangeInMs[range as keyof typeof rangeInMs]
+    
+    return data.filter(item => {
+      const itemTime = Number(item.time) / 1_000_000 // convert from nanoseconds to milliseconds
+      return itemTime >= cutoffTime
+    })
+  }
+
+  // check for data variation
+  const hasDataVariation = (seriesData: number[]) => {
+    if (seriesData.length <= 1) return false
+    const firstValue = seriesData[0]
+    return seriesData.some(value => value !== firstValue)
+  }  
+
   // get pos neg class
   const getPosNegClass = (value: number) => {
     if (value === 0) return "taco-text-dark-gray-to-gray"
@@ -1730,27 +1729,82 @@
   // Computed //
   //////////////
 
-  //   
-
-  //////////////
-  // Watchers //
-  //////////////
-
-  // watch for selected view to update
-  watch(selectedView, (newVal) => {
-
-    // log
-    console.log('selected view changed', newVal)
-
-    // if new value is all taco dao assets
-    if (newVal === 'All Taco Dao Assets') {
-
-      // fetch price history for portfolio and treasury
-      
-      
+  const statisticsData = computed(() => {
+    if (treasuryPortfolioData.value.length === 0 || daoPortfolioData.value.length === 0) {
+      return {
+        totalAUM: { current: 999999, change24h: { value: 999999, percentage: 999999 }, change7d: { value: 999999, percentage: 999999 }, change30d: { value: 999999, percentage: 999999 }, changeAll: { value: 999999, percentage: 999999 } },
+        portfolio: { current: 999999, change24h: { value: 999999, percentage: 999999 }, change7d: { value: 999999, percentage: 999999 }, change30d: { value: 999999, percentage: 999999 }, changeAll: { value: 999999, percentage: 999999 } },
+        treasury: { current: 999999, change24h: { value: 999999, percentage: 999999 }, change7d: { value: 999999, percentage: 999999 }, change30d: { value: 999999, percentage: 999999 }, changeAll: { value: 999999, percentage: 999999 } }
+      }
     }
 
-  }, { immediate: true })
+    // get current values (most recent - LAST index)
+    const currentTreasury = Number(treasuryPortfolioData.value[treasuryPortfolioData.value.length - 1]?.usdPrice || 0)
+    const currentPortfolio = Number(daoPortfolioData.value[daoPortfolioData.value.length - 1]?.usdPrice || 0)
+    const currentTotal = currentTreasury + currentPortfolio
+
+    // get values for different time periods
+    const getValueAtTime = (data: any[], hoursAgo: number) => {
+      const cutoffTime = Date.now() - (hoursAgo * 60 * 60 * 1000)
+      const item = data.find(item => {
+        const itemTime = Number(item.time) / 1_000_000
+        return itemTime >= cutoffTime
+      })
+      return item ? Number(item.usdPrice) : 0
+    }
+
+    // calculate changes for different periods
+    const calculateChange = (current: number, previous: number) => {
+      if (previous === 0) return { value: 0, percentage: 0 }
+      const change = current - previous
+      const percentage = (change / previous) * 100
+      return { value: change, percentage }
+    }
+
+    // 24h changes
+    const treasury24h = getValueAtTime(treasuryPortfolioData.value, 24)
+    const portfolio24h = getValueAtTime(daoPortfolioData.value, 24)
+    const total24h = treasury24h + portfolio24h
+
+    // 7d changes
+    const treasury7d = getValueAtTime(treasuryPortfolioData.value, 24 * 7)
+    const portfolio7d = getValueAtTime(daoPortfolioData.value, 24 * 7)
+    const total7d = treasury7d + portfolio7d
+
+    // 30d changes
+    const treasury30d = getValueAtTime(treasuryPortfolioData.value, 24 * 30)
+    const portfolio30d = getValueAtTime(daoPortfolioData.value, 24 * 30)
+    const total30d = treasury30d + portfolio30d
+
+    // all time changes (oldest data - FIRST index)
+    const oldestTreasury = Number(treasuryPortfolioData.value[0]?.usdPrice || 0)
+    const oldestPortfolio = Number(daoPortfolioData.value[0]?.usdPrice || 0)
+    const oldestTotal = oldestTreasury + oldestPortfolio
+
+    return {
+      totalAUM: {
+        current: currentTotal,
+        change24h: calculateChange(currentTotal, total24h),
+        change7d: calculateChange(currentTotal, total7d),
+        change30d: calculateChange(currentTotal, total30d),
+        changeAll: calculateChange(currentTotal, oldestTotal)
+      },
+      portfolio: {
+        current: currentPortfolio,
+        change24h: calculateChange(currentPortfolio, portfolio24h),
+        change7d: calculateChange(currentPortfolio, portfolio7d),
+        change30d: calculateChange(currentPortfolio, portfolio30d),
+        changeAll: calculateChange(currentPortfolio, oldestPortfolio)
+      },
+      treasury: {
+        current: currentTreasury,
+        change24h: calculateChange(currentTreasury, treasury24h),
+        change7d: calculateChange(currentTreasury, treasury7d),
+        change30d: calculateChange(currentTreasury, treasury30d),
+        changeAll: calculateChange(currentTreasury, oldestTreasury)
+      }
+    }
+  })
   
   /////////////
   // eCharts //
@@ -1764,77 +1818,36 @@
     GridComponent
   ])
 
-  // chart data - separate from themes
-  const chartData = {
-    xAxisData: ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"],
-    series: [
-      {
-        name: "ABC",
-        type: "line",
-        data: [120, 200, 150, 80, 70, 110, 130, 180, 220, 190, 250, 300],
-        smooth: false,
-        label: {
-          show: false
+  // update chart data
+  const updateChartData = (newChartData: { xAxisData: string[], series: any[] }) => {
+
+    // set series data with common settings
+    const processedSeries = newChartData.series.map(series => ({
+      ...series,
+      type: "line",
+      smooth: false,
+      label: { show: false },
+      showSymbol: false,
+    }))
+    
+    // update the chart
+    option.value = {
+      ...option.value,
+      tooltip: {
+        ...option.value.tooltip,
+        trigger: 'axis', // shows tooltip anywhere on the line
+        axisPointer: {
+          type: 'line' // shows a vertical line indicator
         },
-        endLabel: {
-          show: true,
-          color: '#EB0000',
-          fontSize: 12,
-          fontWeight: 'bold',
-          formatter: '{a}'
-        },
-        lineStyle: {
-          color: "#EB0000"
-        },
-        itemStyle: {
-          color: "#EB0000"
-        }
+        valueFormatter: (value: number) => `$${value.toFixed(2)}` // format to 2 decimal places
       },
-      {
-        name: "DEF",
-        type: "line",
-        data: [100, 150, 120, 90, 85, 95, 110, 140, 160, 145, 180, 200],
-        smooth: false,
-        label: {
-          show: false
-        },
-        endLabel: {
-          show: true,
-          color: '#4CAF50',
-          fontSize: 12,
-          fontWeight: 'bold',
-          formatter: '{a}'
-        },
-        lineStyle: {
-          color: "#4CAF50"
-        },
-        itemStyle: {
-          color: "#4CAF50"
-        }
+      xAxis: {
+        ...option.value.xAxis,
+        data: newChartData.xAxisData
       },
-      {
-        name: "GHI",
-        type: "line",
-        data: [110, 130, 100, 85, 80, 90, 105, 125, 140, 130, 160, 175],
-        smooth: false,
-        label: {
-          show: false
-        },
-        endLabel: {
-          show: true,
-          color: '#9C27B0',
-          fontSize: 12,
-          fontWeight: 'bold',
-          formatter: '{a}'
-        },
-        lineStyle: {
-          color: "#9C27B0"
-        },
-        itemStyle: {
-          color: "#9C27B0"
-        }
-      }
-    ]
+      series: processedSeries
+    }
+
   }
 
   // provide theme
@@ -1852,11 +1865,12 @@
       borderColor: "#e0e0e0",
       textStyle: {
         color: "#333333"
-      }
+      },
+      valueFormatter: (value: number) => `$${value}`
     },
     grid: {
       left: '40px',
-      right: '25px',
+      right: '10px',
       top: '25px',
       bottom: '30px'
     },
@@ -1879,7 +1893,8 @@
         }
       },
       axisLabel: {
-        color: "#512100"
+        color: "#512100",
+        formatter: (value: number) => `$${value}`
       },
       splitLine: {
         lineStyle: {
@@ -1905,11 +1920,12 @@
       borderColor: "#4a5568",
       textStyle: {
         color: "#ffffff"
-      }
+      },
+      valueFormatter: (value: number) => `$${value}`
     },
     grid: {
       left: '40px',
-      right: '25px',
+      right: '10px',
       top: '25px',
       bottom: '30px'
     },
@@ -1932,7 +1948,8 @@
         }
       },
       axisLabel: {
-        color: "#FEEAC1"
+        color: "#FEEAC1",
+        formatter: (value: number) => `$${value}`
       },
       splitLine: {
         lineStyle: {
@@ -1947,22 +1964,329 @@
     ]
   }
 
-  // echart option - initialize based on current dark mode state
-  const option = ref({
+  // echart option
+  const option = ref<any>({
     ...(darkModeToggled.value ? lightTheme : darkTheme),
     xAxis: {
       ...(darkModeToggled.value ? lightTheme : darkTheme).xAxis,
-      data: chartData.xAxisData
+      data: []
     },
-    series: chartData.series
+    series: []
   })
 
+  // watch for selected view to update
+  watch(selectedView, async (newVal) => {
+
+    // log
+    console.log('selected view changed')
+
+    // if newVal is All Taco Dao Assets
+    if (newVal === 'All Taco Dao Assets') {
+
+      // log
+      console.log('All Taco Dao Assets')
+
+      // load price history only if data is not already loaded
+      if (treasuryPortfolioData.value.length === 0 || daoPortfolioData.value.length === 0) {
+        await loadPriceHistory()
+      }
+
+      // filter data by selected time range
+      const filteredTreasuryData = filterDataByTimeRange(treasuryPortfolioData.value, selectedChartRange.value)
+      const filteredDaoData = filterDataByTimeRange(daoPortfolioData.value, selectedChartRange.value)
+
+      // check if the combined data has variation in the selected timeframe
+      const combinedData = filteredTreasuryData.map((item, index) => {
+        const treasuryValue = Number(item.usdPrice)
+        const daoValue = filteredDaoData[index] ? Number(filteredDaoData[index].usdPrice) : 0
+        return treasuryValue + daoValue
+      })
+      
+      const hasVariation = hasDataVariation(combinedData)
+
+      if (!hasVariation) {
+        // show "No data variation in selected timeframe" message
+        const newChartData = { 
+          xAxisData: ['No Data'], 
+          series: [{
+            name: "No Variation",
+            data: [0],
+            lineStyle: { color: "#808080" },
+            itemStyle: { color: "#808080" }
+          }]
+        }
+        updateChartData(newChartData)
+        return
+      }
+
+      const newChartData = {
+        xAxisData: filteredTreasuryData.map(item => {
+          // convert bigint time to readable date
+          const timestamp = Number(item.time) / 1_000_000 // convert from nanoseconds to milliseconds
+          return new Date(timestamp).toLocaleDateString()
+        }),
+        series: [
+          {
+            name: "Total AUM",
+            data: filteredTreasuryData.map((item, index) => {
+              const treasuryValue = Number(item.usdPrice)
+              const daoValue = filteredDaoData[index] ? Number(filteredDaoData[index].usdPrice) : 0
+              return treasuryValue + daoValue
+            }),
+            lineStyle: { color: "#FEA000" },
+            itemStyle: { color: "#FEA000" }
+          }
+        ]
+      }
+
+      updateChartData(newChartData)
+
+    }
+
+    // else if newVal is Treasury vs Portfolio
+    else if (newVal === 'Treasury vs Portfolio') {
+
+      // log
+      console.log('Treasury vs Portfolio')
+
+      // load price history only if data is not already loaded
+      if (treasuryPortfolioData.value.length === 0 || daoPortfolioData.value.length === 0) {
+        await loadPriceHistory()
+      }
+
+      // filter data by selected time range
+      const filteredTreasuryData = filterDataByTimeRange(treasuryPortfolioData.value, selectedChartRange.value)
+      const filteredDaoData = filterDataByTimeRange(daoPortfolioData.value, selectedChartRange.value)
+
+      // check if either treasury or portfolio has variation in the selected timeframe
+      const treasuryData = filteredTreasuryData.map(item => Number(item.usdPrice))
+      const portfolioData = filteredDaoData.map(item => Number(item.usdPrice))
+      
+      const hasTreasuryVariation = hasDataVariation(treasuryData)
+      const hasPortfolioVariation = hasDataVariation(portfolioData)
+
+      if (!hasTreasuryVariation && !hasPortfolioVariation) {
+        // show "No data variation in selected timeframe" message
+        const newChartData = { 
+          xAxisData: ['No Data'], 
+          series: [{
+            name: "No Variation",
+            data: [0],
+            lineStyle: { color: "#808080" },
+            itemStyle: { color: "#808080" }
+          }]
+        }
+        updateChartData(newChartData)
+        return
+      }
+
+      const newChartData = {
+        xAxisData: filteredTreasuryData.map(item => {
+          // convert bigint time to readable date
+          const timestamp = Number(item.time) / 1_000_000 // convert from nanoseconds to milliseconds
+          return new Date(timestamp).toLocaleDateString()
+        }),
+        series: [
+          {
+            name: "Treasury",
+            data: filteredTreasuryData.map(item => Number(item.usdPrice)),
+            lineStyle: { color: "#FEA000" },
+            itemStyle: { color: "#FEA000" }
+          },
+          {
+            name: "Portfolio", 
+            data: filteredDaoData.map(item => Number(item.usdPrice)),
+            lineStyle: { color: "#4CAF50" },
+            itemStyle: { color: "#4CAF50" }
+          }
+        ]
+      }
+
+      updateChartData(newChartData) 
+
+    }
+
+    // else if newVal is All Treasury Assets
+    else if (newVal === 'All Treasury Assets') {
+
+      // log
+      console.log('All Treasury Assets')
+
+      // load price history only if data is not already loaded
+      if (treasuryPortfolioData.value.length === 0 || daoPortfolioData.value.length === 0) {
+        await loadPriceHistory()
+      }      
+
+      // get unique token names from the first snapshot
+      const firstSnapshot = treasuryPortfolioData.value[0]
+      if (!firstSnapshot || !firstSnapshot.tokens) {
+        const newChartData = { xAxisData: [], series: [] }
+        updateChartData(newChartData)
+        return
+      }
+
+      // filter data by selected time range
+      const filteredTreasuryData = filterDataByTimeRange(treasuryPortfolioData.value, selectedChartRange.value)
+
+      const tokenNames = firstSnapshot.tokens.map((token: any) => token.symbol || 'Unknown')
+      
+      // check if any token has variation in the selected timeframe
+      const hasAnyVariation = tokenNames.some((tokenName: string, tokenIndex: number) => {
+        const tokenData = filteredTreasuryData.map(item => {
+          const token = item.tokens[tokenIndex]
+          return token ? Number(token.valueInUSD || 0) : 0
+        })
+        return hasDataVariation(tokenData)
+      })
+
+      if (!hasAnyVariation) {
+        // show "No data variation in selected timeframe" message
+        const newChartData = { 
+          xAxisData: ['No Data'], 
+          series: [{
+            name: "No Variation",
+            data: [0],
+            lineStyle: { color: "#808080" },
+            itemStyle: { color: "#808080" }
+          }]
+        }
+        updateChartData(newChartData)
+        return
+      }
+
+      const newChartData = {
+        xAxisData: filteredTreasuryData.map(item => {
+          const timestamp = Number(item.time) / 1_000_000
+          return new Date(timestamp).toLocaleDateString()
+        }),
+        series: tokenNames.map((tokenName: string, tokenIndex: number) => {
+          // find token in TokenData to get the color
+          const tokenInfo = tokenData.find((t: any) => t.symbol.toLowerCase() === tokenName.toLowerCase())
+          const color = tokenInfo?.color || '#808080' // fallback to gray if not found
+          
+          return {
+            name: tokenName,
+            data: filteredTreasuryData.map(item => {
+              const token = item.tokens[tokenIndex]
+              return token ? Number(token.valueInUSD || 0) : 0
+            }),
+            lineStyle: { color: color },
+            itemStyle: { color: color }
+          }
+        })
+      }
+
+      updateChartData(newChartData) 
+
+    }
+        
+    else if (newVal === 'All Portfolio Assets') {
+
+      // log
+      console.log('All Portfolio Assets')
+
+      // load price history only if data is not already loaded
+      if (treasuryPortfolioData.value.length === 0 || daoPortfolioData.value.length === 0) {
+        await loadPriceHistory()
+      }
+
+      // get unique token principals from the first snapshot
+      const firstSnapshot = daoPortfolioData.value[0]
+      if (!firstSnapshot || !firstSnapshot.balances) {
+        const newChartData = { xAxisData: [], series: [] }
+        updateChartData(newChartData)
+        return
+      }
+
+      // filter data by selected time range
+      const filteredDaoData = filterDataByTimeRange(daoPortfolioData.value, selectedChartRange.value)
+
+      // map token principals to symbols (you'll need to implement this mapping)
+      const tokenPrincipals = firstSnapshot.balances.map((balance: any) => balance[0])
+      
+      // check if any token has variation in the selected timeframe
+      const hasAnyVariation = tokenPrincipals.some((tokenPrincipal: any, tokenIndex: number) => {
+        const tokenData = filteredDaoData.map(item => {
+          const balance = item.balances[tokenIndex]
+          if (balance && balance[1]) {
+            // convert from cents to dollars (divide by 100)
+            const balanceValue = Number(balance[1]) / 100
+            return balanceValue
+          }
+          return 0
+        })
+        return hasDataVariation(tokenData)
+      })
+
+      if (!hasAnyVariation) {
+        // show "No data variation in selected timeframe" message
+        const newChartData = { 
+          xAxisData: ['No Data'], 
+          series: [{
+            name: "No Variation",
+            data: [0],
+            lineStyle: { color: "#808080" },
+            itemStyle: { color: "#808080" }
+          }]
+        }
+        updateChartData(newChartData)
+        return
+      }
+
+      const newChartData = {
+        xAxisData: filteredDaoData.map(item => {
+          const timestamp = Number(item.time) / 1_000_000
+          return new Date(timestamp).toLocaleDateString()
+        }),
+        series: tokenPrincipals.map((tokenPrincipal: any, tokenIndex: number) => {
+          // you'll need to implement a way to get the token symbol from the principal
+          // for now, using a placeholder
+          const tokenName = `Token ${tokenIndex + 1}`
+          
+          // find token in TokenData to get the color
+          const tokenInfo = tokenData.find((t: any) => t.symbol.toLowerCase() === tokenName.toLowerCase())
+          const color = tokenInfo?.color || '#808080' // fallback to gray if not found
+          
+          return {
+            name: tokenName,
+            data: filteredDaoData.map(item => {
+              const balance = item.balances[tokenIndex]
+              if (balance && balance[1]) {
+                // convert from cents to dollars (divide by 100)
+                const balanceValue = Number(balance[1]) / 100
+                return balanceValue
+              }
+              return 0
+            }),
+            lineStyle: { color: color },
+            itemStyle: { color: color }
+          }
+        })
+      }
+
+      updateChartData(newChartData) 
+
+    }
+
+  }, { immediate: true })
+
+  // watch for chart range changes to update the current chart
+  watch(selectedChartRange, async (newRange) => {
+    // only update if we have a view selected and data loaded
+    if (selectedView.value && (treasuryPortfolioData.value.length > 0 || daoPortfolioData.value.length > 0)) {
+      // trigger the view update logic again with the new range
+      const currentView = selectedView.value
+      selectedView.value = '' // temporarily clear to trigger change
+      await nextTick()
+      selectedView.value = currentView // set back to trigger the watch
+    }
+  })  
+
   // watch for dark mode to update
-  watch(darkModeToggled, (newVal) => {
+  watch(darkModeToggled, async (newVal) => {
 
     // if light mode
     if (newVal) {
-
       // set theme
       theme.value = 'light'
 
@@ -1971,16 +2295,15 @@
         ...lightTheme,
         xAxis: {
           ...lightTheme.xAxis,
-          data: chartData.xAxisData
+          data: option.value.xAxis?.data || []
         },
-        series: chartData.series
+        series: option.value.series || []
       }
 
     } 
     
     // else dark mode
     else {
-
       // set theme
       theme.value = 'dark'
 
@@ -1989,14 +2312,22 @@
         ...darkTheme,
         xAxis: {
           ...darkTheme.xAxis,
-          data: chartData.xAxisData
+          data: option.value.xAxis?.data || []
         },
-        series: chartData.series
+        series: option.value.series || []
       }
 
     }
 
-  }, { immediate: true })    
+    // reload the current chart data to reapply tooltip settings
+    if (selectedView.value && selectedView.value !== 'Leaderboard') {
+      const currentView = selectedView.value
+      selectedView.value = '' // temporarily clear
+      await nextTick()
+      selectedView.value = currentView // set back to trigger the watch and reload
+    }
+
+  }, { immediate: true }) 
 
   /////////////////////
   // Lifecycle Hooks //
@@ -2013,29 +2344,6 @@
 
     // log
     console.log('available tokens', availableTokens.value)
-
-    // 
-    const treasuryPortfolioHistory = await tacoStore.getTreasuryPortfolioHistory(1000).catch(e => {
-        console.error('Failed to load treasury portfolio:', e)
-        return { snapshots: [] }
-      })
-
-    // log
-    console.log('treasury portfolio history', treasuryPortfolioHistory)
-
-  })
-
-  // on unmounted
-  onUnmounted(() => {
-
-    // 
-
-  })
-
-  // on updated
-  onUpdated(() => {
-
-    // 
 
   })
 
