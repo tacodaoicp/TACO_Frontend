@@ -50,7 +50,7 @@
         <div class="account-id-display">
           <small class="account-label">Account ID:</small>
           <div class="account-id-value">
-            <code class="account-id-text">{{ icpAccountId.dashed }}</code>
+            <code class="account-id-text">{{ icpAccountId.hex }}</code>
             <button 
               @click="copyToClipboard(icpAccountId.hex)"
               class="btn btn-outline-secondary btn-sm ms-2"
@@ -587,7 +587,7 @@ const formatUSDValue = (balance: bigint, decimals: number, priceUSD: number): st
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  margin-bottom: 1rem;
+  margin-bottom: 0.5rem;
 }
 
 .token-info {
@@ -640,18 +640,18 @@ const formatUSDValue = (balance: bigint, decimals: number, priceUSD: number): st
 }
 
 .token-balance {
-  margin-bottom: 1.5rem;
+  margin-bottom: 0.5rem;
   flex-grow: 1;
   display: flex;
   flex-direction: column;
-  justify-content: center;
+  justify-content: flex-start;
 }
 
 .balance-amount {
   font-size: 1.25rem;
   font-weight: 700;
   color: var(--text-primary);
-  margin-bottom: 0.25rem;
+  margin-bottom: 0.125rem;
   word-break: break-all;
 }
 
@@ -671,7 +671,8 @@ const formatUSDValue = (balance: bigint, decimals: number, priceUSD: number): st
 .token-footer {
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  gap: 0.5rem;
+  margin-top: auto;
 }
 
 .btn-send {
@@ -702,8 +703,8 @@ const formatUSDValue = (balance: bigint, decimals: number, priceUSD: number): st
 
 /* ICP Account section styles */
 .icp-account-section {
-  margin-bottom: 1.5rem;
-  padding: 1rem;
+  margin-bottom: 0.5rem;
+  padding: 0.75rem;
   background: rgba(0, 0, 0, 0.05);
   border-radius: 8px;
   border: 1px solid var(--border-color);
@@ -713,7 +714,7 @@ const formatUSDValue = (balance: bigint, decimals: number, priceUSD: number): st
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 0.75rem;
+  margin-bottom: 0.5rem;
 }
 
 .icp-account-title {
@@ -767,8 +768,8 @@ const formatUSDValue = (balance: bigint, decimals: number, priceUSD: number): st
 
 /* Neurons section styles */
 .neurons-section {
-  margin-bottom: 1.5rem;
-  padding: 1rem;
+  margin-bottom: 0.5rem;
+  padding: 0.75rem;
   background: rgba(0, 0, 0, 0.1);
   border-radius: 8px;
   border: 1px solid var(--border-color);
@@ -778,7 +779,7 @@ const formatUSDValue = (balance: bigint, decimals: number, priceUSD: number): st
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 0.75rem;
+  margin-bottom: 0.5rem;
 }
 
 .neurons-title {
