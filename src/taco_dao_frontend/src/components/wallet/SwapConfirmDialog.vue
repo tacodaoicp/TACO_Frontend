@@ -1,6 +1,6 @@
 <template>
-  <div v-if="show" class="modal-overlay" @click="closeModal">
-    <div class="modal-dialog" @click.stop>
+  <div v-if="show" class="modal-overlay">
+    <div class="modal-dialog">
       <div class="modal-header">
         <h5 class="modal-title">
           <i class="fa fa-check-circle me-2"></i>
@@ -350,17 +350,20 @@ const getPriceImpactClass = (slippage: number): string => {
   justify-content: center;
   z-index: 1050;
   padding: 1rem;
+  pointer-events: none;
 }
 
 .modal-dialog {
-  background: var(--card-bg);
+  background: #2d3748;
   border-radius: 12px;
-  border: 1px solid var(--border-color);
+  border: 1px solid #4a5568;
   width: 100%;
   max-width: 500px;
   max-height: 90vh;
   overflow-y: auto;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  color: white;
+  pointer-events: auto;
 }
 
 .modal-header {
@@ -374,7 +377,7 @@ const getPriceImpactClass = (slippage: number): string => {
 .modal-title {
   font-size: 1.25rem;
   font-weight: 600;
-  color: var(--text-primary);
+  color: white;
   margin: 0;
 }
 
@@ -406,8 +409,8 @@ const getPriceImpactClass = (slippage: number): string => {
   display: flex;
   align-items: center;
   gap: 1rem;
-  background: var(--bg-secondary);
-  border: 1px solid var(--border-color);
+  background: #1a202c;
+  border: 1px solid #4a5568;
   border-radius: 12px;
   padding: 1.5rem;
 }

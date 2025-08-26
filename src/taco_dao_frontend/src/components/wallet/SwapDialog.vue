@@ -1,6 +1,6 @@
 <template>
-  <div v-if="show" class="modal-overlay" @click="closeModal">
-    <div class="modal-dialog" @click.stop>
+  <div v-if="show" class="modal-overlay">
+    <div class="modal-dialog">
       <div class="modal-header">
         <h5 class="modal-title">
           <i class="fa fa-exchange-alt me-2"></i>
@@ -161,8 +161,8 @@
     </div>
 
     <!-- Token Selector Modal -->
-    <div v-if="showTokenSelector" class="token-selector-overlay" @click="showTokenSelector = false">
-      <div class="token-selector-dialog" @click.stop>
+    <div v-if="showTokenSelector" class="token-selector-overlay">
+      <div class="token-selector-dialog">
         <div class="token-selector-header">
           <h6>Select Token</h6>
           <button @click="showTokenSelector = false" class="btn-close">
@@ -526,17 +526,20 @@ onMounted(() => {
   justify-content: center;
   z-index: 1050;
   padding: 1rem;
+  pointer-events: none;
 }
 
 .modal-dialog {
-  background: var(--card-bg);
+  background: #2d3748;
   border-radius: 12px;
-  border: 1px solid var(--border-color);
+  border: 1px solid #4a5568;
   width: 100%;
   max-width: 500px;
   max-height: 90vh;
   overflow-y: auto;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  color: white;
+  pointer-events: auto;
 }
 
 .modal-header {
@@ -550,7 +553,7 @@ onMounted(() => {
 .modal-title {
   font-size: 1.25rem;
   font-weight: 600;
-  color: var(--text-primary);
+  color: white;
   margin: 0;
 }
 
@@ -589,8 +592,8 @@ onMounted(() => {
 }
 
 .token-input-group {
-  background: var(--bg-secondary);
-  border: 1px solid var(--border-color);
+  background: #1a202c;
+  border: 1px solid #4a5568;
   border-radius: 12px;
   padding: 1rem;
   display: flex;
@@ -603,8 +606,8 @@ onMounted(() => {
   align-items: center;
   justify-content: space-between;
   padding: 0.75rem;
-  background: var(--card-bg);
-  border: 1px solid var(--border-color);
+  background: #2d3748;
+  border: 1px solid #4a5568;
   border-radius: 8px;
   cursor: pointer;
   transition: all 0.2s ease;
@@ -642,7 +645,7 @@ onMounted(() => {
 .token-name {
   font-size: 0.95rem;
   font-weight: 600;
-  color: var(--text-primary);
+  color: white;
 }
 
 .token-balance {
@@ -662,7 +665,7 @@ onMounted(() => {
   border: none;
   font-size: 1.5rem;
   font-weight: 600;
-  color: var(--text-primary);
+  color: white;
   outline: none;
 }
 
@@ -728,8 +731,8 @@ onMounted(() => {
 }
 
 .token-output-group {
-  background: var(--bg-secondary);
-  border: 1px solid var(--border-color);
+  background: #1a202c;
+  border: 1px solid #4a5568;
   border-radius: 12px;
   padding: 1rem;
   display: flex;
@@ -744,7 +747,7 @@ onMounted(() => {
 .amount-display {
   font-size: 1.5rem;
   font-weight: 600;
-  color: var(--text-primary);
+  color: white;
 }
 
 .quotes-section {
@@ -754,7 +757,7 @@ onMounted(() => {
 .quotes-title {
   font-size: 1rem;
   font-weight: 600;
-  color: var(--text-primary);
+  color: white;
   margin-bottom: 0.75rem;
 }
 
@@ -765,8 +768,8 @@ onMounted(() => {
 }
 
 .quote-item {
-  background: var(--bg-secondary);
-  border: 1px solid var(--border-color);
+  background: #1a202c;
+  border: 1px solid #4a5568;
   border-radius: 8px;
   padding: 1rem;
   cursor: pointer;
@@ -799,7 +802,7 @@ onMounted(() => {
 .exchange-name {
   font-size: 0.95rem;
   font-weight: 600;
-  color: var(--text-primary);
+  color: white;
 }
 
 .best-badge {
@@ -814,7 +817,7 @@ onMounted(() => {
 .quote-amount {
   font-size: 1.1rem;
   font-weight: 600;
-  color: var(--text-primary);
+  color: white;
 }
 
 .quote-details {
@@ -889,16 +892,18 @@ onMounted(() => {
   align-items: center;
   justify-content: center;
   z-index: 1060;
+  pointer-events: none;
 }
 
 .token-selector-dialog {
-  background: var(--card-bg);
+  background: #2d3748;
   border-radius: 12px;
-  border: 1px solid var(--border-color);
+  border: 1px solid #4a5568;
   width: 90%;
   max-width: 400px;
   max-height: 500px;
   overflow: hidden;
+  pointer-events: auto;
 }
 
 .token-selector-header {
@@ -911,7 +916,7 @@ onMounted(() => {
 
 .token-selector-header h6 {
   margin: 0;
-  color: var(--text-primary);
+  color: white;
   font-weight: 600;
 }
 
