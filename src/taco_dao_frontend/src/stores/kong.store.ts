@@ -22,7 +22,7 @@ interface KongSwapArgs {
   receive_token: string
   receive_amount?: bigint | null
   receive_address?: Principal | null
-  max_slippage?: number | null
+  max_slippage?: number[] | null
   referred_by?: Principal | null
 }
 
@@ -341,7 +341,7 @@ export const useKongStore = defineStore('kong', () => {
         receive_token: formatTokenSymbolForKong(params.buyTokenSymbol),
         receive_amount: null,
         receive_address: params.recipient || null,
-        max_slippage: params.slippageTolerance,
+        max_slippage: [params.slippageTolerance],
         referred_by: null,
       }
 
@@ -415,7 +415,7 @@ export const useKongStore = defineStore('kong', () => {
         receive_token: formatTokenSymbolForKong(params.buyTokenSymbol),
         receive_amount: null,
         receive_address: params.recipient || null,
-        max_slippage: params.slippageTolerance,
+        max_slippage: [params.slippageTolerance],
         referred_by: null,
       }
 

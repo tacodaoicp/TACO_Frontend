@@ -92,6 +92,40 @@
           </div>
         </div>
 
+        <!-- Slippage Tolerance Section -->
+        <div class="slippage-section">
+          <label class="section-label">Slippage Tolerance</label>
+          <div class="slippage-controls">
+            <div class="slippage-presets">
+              <button 
+                v-for="preset in slippagePresets" 
+                :key="preset"
+                @click="setSlippageTolerance(preset)"
+                class="slippage-preset-btn"
+                :class="{ 'active': slippageTolerance === preset }"
+              >
+                {{ (preset * 100).toFixed(1) }}%
+              </button>
+            </div>
+            <div class="slippage-custom">
+              <input
+                v-model.number="customSlippage"
+                @input="setCustomSlippage"
+                type="number"
+                class="slippage-input"
+                placeholder="0.5"
+                min="0.1"
+                max="50"
+                step="0.1"
+              />
+              <span class="slippage-unit">%</span>
+            </div>
+          </div>
+          <div class="slippage-info">
+            <small>Current: {{ (slippageTolerance * 100).toFixed(1) }}% - Higher slippage allows faster execution but worse prices</small>
+          </div>
+        </div>
+
         <!-- Quotes Section -->
         <div v-if="quotes.length > 0" class="quotes-section">
           <h6 class="quotes-title">Available Quotes</h6>
@@ -100,7 +134,10 @@
               v-for="(quote, index) in sortedQuotes" 
               :key="quote.exchange"
               class="quote-item"
-              :class="{ 'best-quote': index === 0 }"
+              :class="{ 
+                'best-quote': index === 0, 
+                'selected-quote': selectedQuote && selectedQuote.exchange === quote.exchange 
+              }"
               @click="selectQuote(quote)"
             >
               <div class="quote-header">
@@ -225,7 +262,7 @@ interface SwapDialogProps {
 
 interface SwapDialogEmits {
   (e: 'close'): void
-  (e: 'confirm', data: { inputToken: Token; outputToken: Token; amount: string; selectedQuote: Quote }): void
+  (e: 'confirm', data: { inputToken: Token; outputToken: Token; amount: string; selectedQuote: Quote; slippageTolerance: number }): void
 }
 
 const props = withDefaults(defineProps<SwapDialogProps>(), {
@@ -244,9 +281,15 @@ const selectedInputToken = ref<Token | null>(null)
 const inputAmount = ref('')
 const showTokenSelector = ref(false)
 const quotes = ref<Quote[]>([])
+const selectedQuote = ref<Quote | null>(null)
 const loadingQuotes = ref(false)
 const quotesError = ref<string | null>(null)
 const quoteTimeout = ref<NodeJS.Timeout | null>(null)
+
+// Slippage tolerance state
+const slippageTolerance = ref(0.01) // 1% default
+const customSlippage = ref('')
+const slippagePresets = [0.001, 0.005, 0.01, 0.03] // 0.1%, 0.5%, 1%, 3%
 
 // TACO token (always the output)
 const tacoToken = computed<Token>(() => {
@@ -351,6 +394,7 @@ const onAmountChange = () => {
 const fetchQuotes = async () => {
   if (!selectedInputToken.value || !inputAmount.value || parseFloat(inputAmount.value) <= 0) {
     quotes.value = []
+    selectedQuote.value = null
     return
   }
 
@@ -380,6 +424,9 @@ const fetchQuotes = async () => {
     }
 
     quotes.value = newQuotes
+    
+    // Reset selected quote when new quotes are fetched
+    selectedQuote.value = null
 
     if (newQuotes.length === 0) {
       quotesError.value = 'No quotes available for this token pair'
@@ -442,20 +489,34 @@ const fetchICPSwapQuote = async (amountIn: bigint): Promise<Quote | null> => {
 }
 
 const selectQuote = (quote: Quote) => {
-  // Visual feedback could be added here
+  selectedQuote.value = quote
   console.log('Selected quote:', quote)
+}
+
+const setSlippageTolerance = (value: number) => {
+  slippageTolerance.value = value
+  customSlippage.value = '' // Clear custom input when preset is selected
+}
+
+const setCustomSlippage = () => {
+  const value = parseFloat(customSlippage.value)
+  if (!isNaN(value) && value >= 0.1 && value <= 50) {
+    slippageTolerance.value = value / 100 // Convert percentage to decimal
+  }
 }
 
 const proceedWithSwap = () => {
   if (!canProceed.value || !selectedInputToken.value) return
   
-  const bestQuote = sortedQuotes.value[0]
+  // Use selected quote if available, otherwise fall back to best quote
+  const quoteToUse = selectedQuote.value || sortedQuotes.value[0]
   
   emit('confirm', {
     inputToken: selectedInputToken.value,
     outputToken: tacoToken.value,
     amount: inputAmount.value,
-    selectedQuote: bestQuote
+    selectedQuote: quoteToUse,
+    slippageTolerance: slippageTolerance.value
   })
 }
 
@@ -968,5 +1029,175 @@ onMounted(() => {
     flex-direction: column;
     gap: 0.5rem;
   }
+}
+
+/* Quote selection styles */
+.quotes-section {
+  margin-top: 1rem;
+}
+
+.quotes-title {
+  color: white;
+  font-size: 0.9rem;
+  font-weight: 600;
+  margin-bottom: 0.75rem;
+}
+
+.quotes-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.quote-item {
+  background: #1a202c;
+  border: 1px solid #4a5568;
+  border-radius: 8px;
+  padding: 0.75rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.quote-item:hover {
+  border-color: #63b3ed;
+  background: #2d3748;
+}
+
+.quote-item.best-quote {
+  border-color: #48bb78;
+  background: #1a2e1a;
+}
+
+.quote-item.selected-quote {
+  border-color: #3182ce;
+  background: #1a2a3a;
+  box-shadow: 0 0 0 2px rgba(49, 130, 206, 0.2);
+}
+
+.quote-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 0.5rem;
+}
+
+.exchange-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.exchange-name {
+  color: white;
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.best-badge {
+  background: #48bb78;
+  color: white;
+  font-size: 0.7rem;
+  padding: 0.2rem 0.5rem;
+  border-radius: 12px;
+  font-weight: 500;
+}
+
+.quote-amount {
+  color: white;
+  font-weight: 600;
+  font-size: 1rem;
+}
+
+.quote-details {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+  font-size: 0.8rem;
+}
+
+.quote-detail {
+  color: #a0aec0;
+}
+
+.quotes-error {
+  color: #fc8181;
+  background: #2d1b1b;
+  border: 1px solid #e53e3e;
+  border-radius: 6px;
+  padding: 0.75rem;
+  font-size: 0.9rem;
+  margin-top: 1rem;
+}
+
+/* Slippage tolerance styles */
+.slippage-section {
+  margin: 1rem 0;
+}
+
+.slippage-controls {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.slippage-presets {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.slippage-preset-btn {
+  background: #1a202c;
+  border: 1px solid #4a5568;
+  border-radius: 6px;
+  color: white;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.slippage-preset-btn:hover {
+  border-color: #63b3ed;
+  background: #2d3748;
+}
+
+.slippage-preset-btn.active {
+  background: #3182ce;
+  border-color: #3182ce;
+  color: white;
+}
+
+.slippage-custom {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.slippage-input {
+  background: #1a202c;
+  border: 1px solid #4a5568;
+  border-radius: 6px;
+  color: white;
+  padding: 0.5rem;
+  width: 60px;
+  font-size: 0.8rem;
+  text-align: center;
+}
+
+.slippage-input:focus {
+  outline: none;
+  border-color: #3182ce;
+  box-shadow: 0 0 0 2px rgba(49, 130, 206, 0.2);
+}
+
+.slippage-unit {
+  color: #a0aec0;
+  font-size: 0.8rem;
+}
+
+.slippage-info {
+  color: #a0aec0;
+  font-size: 0.75rem;
 }
 </style>
