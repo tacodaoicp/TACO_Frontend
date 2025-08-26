@@ -6,7 +6,7 @@
 import { ref, computed } from 'vue'
 import { defineStore } from 'pinia'
 import { Actor } from '@dfinity/agent'
-import { createAgent } from '@dfinity/utils'
+import { createAgent, principalToSubAccount } from '@dfinity/utils'
 import { Principal } from '@dfinity/principal'
 import { AuthClient } from '@dfinity/auth-client'
 import { useTacoStore } from './taco.store'
@@ -151,6 +151,11 @@ export const useICPSwapStore = defineStore('icpswap', () => {
         'token': IDL.Text,
       })
 
+      const DepositFromArgs = IDL.Record({
+        'amount': IDL.Nat,
+        'token': IDL.Text,
+      })
+
       const WithdrawArgs = IDL.Record({
         'amount': IDL.Nat,
         'fee': IDL.Nat,
@@ -217,7 +222,7 @@ export const useICPSwapStore = defineStore('icpswap', () => {
       return IDL.Service({
         'swap': IDL.Func([SwapArgs], [SwapResult], []),
         'deposit': IDL.Func([DepositArgs], [DepositResult], []),
-        'depositFrom': IDL.Func([Account, DepositArgs], [DepositResult], []),
+        'depositFrom': IDL.Func([Account, DepositFromArgs], [DepositResult], []),
         'withdraw': IDL.Func([WithdrawArgs], [WithdrawResult], []),
         'getUserUnusedBalance': IDL.Func([IDL.Principal], [BalanceResult], ['query']),
         'metadata': IDL.Func([], [MetadataResult], ['query']),
@@ -253,6 +258,15 @@ export const useICPSwapStore = defineStore('icpswap', () => {
         'fee': IDL.Opt(IDL.Nat),
         'memo': IDL.Opt(IDL.Vec(IDL.Nat8)),
         'from_subaccount': IDL.Opt(IDL.Vec(IDL.Nat8)),
+        'created_at_time': IDL.Opt(IDL.Nat64),
+        'amount': IDL.Nat,
+      })
+
+      const TransferFromArg = IDL.Record({
+        'from': Account,
+        'to': Account,
+        'fee': IDL.Opt(IDL.Nat),
+        'memo': IDL.Opt(IDL.Vec(IDL.Nat8)),
         'created_at_time': IDL.Opt(IDL.Nat64),
         'amount': IDL.Nat,
       })
@@ -310,7 +324,9 @@ export const useICPSwapStore = defineStore('icpswap', () => {
       return IDL.Service({
         'icrc1_transfer': IDL.Func([TransferArg], [TransferResult], []),
         'icrc2_approve': IDL.Func([ApproveArgs], [ApproveResult], []),
+        'icrc2_transfer_from': IDL.Func([TransferFromArg], [TransferResult], []),
         'icrc1_balance_of': IDL.Func([Account], [IDL.Nat], ['query']),
+        'icrc1_fee': IDL.Func([], [IDL.Nat], ['query']),
       })
     }
 
@@ -322,15 +338,8 @@ export const useICPSwapStore = defineStore('icpswap', () => {
 
   // # HELPER FUNCTIONS #
   
-  /**
-   * Generate subaccount from user principal for ICPSwap
-   */
-  const principalToSubaccount = (principal: Principal): Uint8Array => {
-    const principalBytes = principal.toUint8Array()
-    const subaccount = new Uint8Array(32)
-    subaccount.set(principalBytes.slice(0, Math.min(32, principalBytes.length)))
-    return subaccount
-  }
+  // Using the standard DFINITY utility for subaccount generation
+  // This matches the backend implementation exactly
 
   /**
    * Get pool canister ID for a token pair
@@ -479,7 +488,7 @@ export const useICPSwapStore = defineStore('icpswap', () => {
 
   /**
    * Execute ICRC2-based swap on ICPSwap
-   * Approves amount, then calls depositFrom, swap, and withdraw
+   * Since ICPSwap doesn't support depositFrom, we use ICRC2 approve + transfer + deposit flow
    */
   const icrc2_swap = async (params: SwapParams): Promise<any> => {
     if (!userLoggedIn.value || !userPrincipal.value) {
@@ -523,27 +532,51 @@ export const useICPSwapStore = defineStore('icpswap', () => {
         throw new Error(`Approval failed: ${JSON.stringify(approvalResult.Err)}`)
       }
 
-      // Step 3: DepositFrom
-      console.log('Step 3: Calling depositFrom...')
+      // Step 3: Transfer tokens using the approval
+      console.log('Step 3: Transferring tokens to pool subaccount using approval...')
       const poolActor = await createPoolActor(poolId)
       
-      // Get the input token metadata to determine the correct fee
+      // Generate pool subaccount for the user
+      const userSubaccount = principalToSubAccount(Principal.fromText(userPrincipal.value!))
+      
+      const transferFromArgs = {
+        from: {
+          owner: Principal.fromText(userPrincipal.value!),
+          subaccount: [],
+        },
+        to: {
+          owner: Principal.fromText(poolId),
+          subaccount: [Array.from(userSubaccount)],
+        },
+        amount: params.amountIn,
+        fee: [],
+        memo: [],
+        created_at_time: [],
+      }
+
+      console.log('TransferFrom args:', transferFromArgs)
+      const transferResult = await tokenActor.icrc2_transfer_from(transferFromArgs) as any
+      console.log('TransferFrom result:', transferResult)
+
+      if ('Err' in transferResult) {
+        throw new Error(`Transfer failed: ${JSON.stringify(transferResult.Err)}`)
+      }
+
+      // Step 4: Deposit the transferred tokens
+      console.log('Step 4: Calling deposit...')
+      
+      // Get the token fee for the deposit
       const inputTokenActor = await createTokenActor(params.sellTokenPrincipal)
       const feeResult = await inputTokenActor.icrc1_fee() as any
       const tokenFee = typeof feeResult === 'bigint' ? feeResult : BigInt(feeResult)
-
+      
       const depositArgs = {
         amount: params.amountIn,
         fee: tokenFee,
         token: params.sellTokenPrincipal,
       }
 
-      const userAccount = {
-        owner: Principal.fromText(userPrincipal.value!),
-        subaccount: [],
-      }
-
-      const depositResult = await poolActor.depositFrom(userAccount, depositArgs) as any
+      const depositResult = await poolActor.deposit(depositArgs) as any
       console.log('DepositFrom result:', depositResult)
 
       if ('err' in depositResult) {
@@ -575,9 +608,15 @@ export const useICPSwapStore = defineStore('icpswap', () => {
 
       // Step 6: Withdraw the received tokens
       console.log('Step 5: Withdrawing received tokens...')
+      
+      // Get the output token fee for withdrawal
+      const outputTokenActor = await createTokenActor(params.buyTokenPrincipal)
+      const outputFeeResult = await outputTokenActor.icrc1_fee() as any
+      const outputTokenFee = typeof outputFeeResult === 'bigint' ? outputFeeResult : BigInt(outputFeeResult)
+      
       const withdrawArgs = {
         amount: amountOut,
-        fee: 0n, // Will be determined by the pool
+        fee: outputTokenFee,
         token: params.buyTokenPrincipal,
       }
 
@@ -625,11 +664,15 @@ export const useICPSwapStore = defineStore('icpswap', () => {
       const poolId = await getPoolCanister(params.sellTokenPrincipal, params.buyTokenPrincipal)
       console.log('Pool canister ID:', poolId)
 
-      // Step 2: Transfer tokens to pool subaccount
+            // Step 2: Transfer tokens to pool subaccount
       console.log('Step 2: Transferring tokens to pool subaccount...')
       const tokenActor = await createTokenActor(params.sellTokenPrincipal)
-      const userSubaccount = principalToSubaccount(Principal.fromText(userPrincipal.value!))
-
+      const userSubaccount = principalToSubAccount(Principal.fromText(userPrincipal.value!))
+      
+      console.log('User principal:', userPrincipal.value)
+      console.log('Pool canister ID:', poolId)
+      console.log('Generated user subaccount:', Array.from(userSubaccount))
+      
       const transferArgs = {
         to: {
           owner: Principal.fromText(poolId),
@@ -654,12 +697,18 @@ export const useICPSwapStore = defineStore('icpswap', () => {
       console.log('Step 3: Calling deposit...')
       const poolActor = await createPoolActor(poolId)
       
+      // Get the token fee for the deposit
+      const inputTokenActor = await createTokenActor(params.sellTokenPrincipal)
+      const feeResult = await inputTokenActor.icrc1_fee() as any
+      const tokenFee = typeof feeResult === 'bigint' ? feeResult : BigInt(feeResult)
+      
       const depositArgs = {
         amount: params.amountIn,
-        fee: 0n, // Will be determined by the pool
+        fee: tokenFee,
         token: params.sellTokenPrincipal,
       }
 
+      console.log('Deposit args:', depositArgs)
       const depositResult = await poolActor.deposit(depositArgs) as any
       console.log('Deposit result:', depositResult)
 
@@ -692,9 +741,15 @@ export const useICPSwapStore = defineStore('icpswap', () => {
 
       // Step 6: Withdraw the received tokens
       console.log('Step 5: Withdrawing received tokens...')
+      
+      // Get the output token fee for withdrawal
+      const outputTokenActor = await createTokenActor(params.buyTokenPrincipal)
+      const outputFeeResult = await outputTokenActor.icrc1_fee() as any
+      const outputTokenFee = typeof outputFeeResult === 'bigint' ? outputFeeResult : BigInt(outputFeeResult)
+      
       const withdrawArgs = {
         amount: amountOut,
-        fee: 0n, // Will be determined by the pool
+        fee: outputTokenFee,
         token: params.buyTokenPrincipal,
       }
 
@@ -786,7 +841,7 @@ export const useICPSwapStore = defineStore('icpswap', () => {
 
       // Step 2: Check subaccount balances and deposit if needed
       console.log('Step 2: Checking subaccount balances...')
-      const userSubaccount = principalToSubaccount(userPrincipalObj)
+      const userSubaccount = principalToSubAccount(userPrincipalObj)
       
       // Check token0 balance in subaccount
       try {
