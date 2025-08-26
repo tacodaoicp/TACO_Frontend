@@ -317,7 +317,7 @@ const setMaxAmount = () => {
   }
   
   const decimals = selectedInputToken.value.decimals
-  const divisor = BigInt(10 ** decimals)
+  const divisor = BigInt(Math.pow(10, decimals))
   const wholePart = maxAmount / divisor
   const fractionalPart = maxAmount % divisor
   
@@ -405,7 +405,7 @@ const fetchKongQuote = async (amountIn: bigint): Promise<Quote | null> => {
 
     return {
       exchange: 'Kong',
-      amountOut: BigInt(result.receive_amount),
+      amountOut: typeof result.receive_amount === 'bigint' ? result.receive_amount : BigInt(result.receive_amount),
       slippage: result.slippage,
       price: result.price,
       fee: 0, // Kong doesn't have separate pool fees
@@ -429,10 +429,10 @@ const fetchICPSwapQuote = async (amountIn: bigint): Promise<Quote | null> => {
 
     return {
       exchange: 'ICPSwap',
-      amountOut: result.amountOut,
+      amountOut: typeof result.amountOut === 'bigint' ? result.amountOut : BigInt(result.amountOut),
       slippage: result.slippage,
       price: result.effectivePrice,
-      fee: result.fee,
+      fee: typeof result.fee === 'bigint' ? Number(result.fee) : result.fee,
       rawData: result
     }
   } catch (error) {
@@ -463,16 +463,21 @@ const parseAmountToBigInt = (amount: string, decimals: number): bigint => {
   const num = parseFloat(amount)
   if (isNaN(num)) return 0n
   
-  const multiplier = BigInt(10 ** decimals)
-  const wholePart = BigInt(Math.floor(num))
-  const fractionalPart = num - Math.floor(num)
-  const fractionalBigInt = BigInt(Math.round(fractionalPart * (10 ** decimals)))
+  // Convert to string with proper decimal places to avoid floating point precision issues
+  const fixedAmount = num.toFixed(decimals)
+  const [wholePart, fractionalPart = ''] = fixedAmount.split('.')
   
-  return wholePart * multiplier + fractionalBigInt
+  // Pad fractional part to match decimals
+  const paddedFractional = fractionalPart.padEnd(decimals, '0')
+  
+  // Combine whole and fractional parts as a single integer string
+  const combinedString = wholePart + paddedFractional
+  
+  return BigInt(combinedString)
 }
 
 const formatBalance = (balance: bigint, decimals: number): string => {
-  const divisor = BigInt(10 ** decimals)
+  const divisor = BigInt(Math.pow(10, decimals))
   const wholePart = balance / divisor
   const fractionalPart = balance % divisor
   
