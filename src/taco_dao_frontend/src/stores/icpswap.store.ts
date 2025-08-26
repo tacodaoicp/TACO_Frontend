@@ -716,18 +716,23 @@ export const useICPSwapStore = defineStore('icpswap', () => {
         throw new Error(`Deposit failed: ${JSON.stringify(depositResult.err)}`)
       }
 
-      // Step 4: Get pool data for zeroForOne determination
+      // Step 5: Get pool data for zeroForOne determination
       const poolData = poolCache.value.get(`${params.sellTokenPrincipal}-${params.buyTokenPrincipal}`)!
       const zeroForOne = isZeroForOne(params.sellTokenPrincipal, poolData)
 
-      // Step 5: Execute swap
-      console.log('Step 4: Executing swap...')
+      // Step 6: Execute swap
+      console.log('Step 5: Executing swap...')
+      
+      // The actual amount available for swap is the deposit result (amountIn - deposit fee)
+      const availableAmount = depositResult.ok
+      
       const swapArgs = {
-        amountIn: params.amountIn.toString(),
+        amountIn: availableAmount.toString(),
         amountOutMinimum: params.minAmountOut.toString(),
         zeroForOne: zeroForOne,
       }
 
+      console.log('Swap args:', swapArgs)
       const swapResult = await poolActor.swap(swapArgs) as any
       console.log('Swap result:', swapResult)
 
