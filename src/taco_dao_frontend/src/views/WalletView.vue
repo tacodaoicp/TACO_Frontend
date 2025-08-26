@@ -25,7 +25,7 @@
               <h3 class="mb-3">Login Required</h3>
               <p class="text-muted mb-4">You need to log in to view and manage your wallet.</p>
               <button 
-                @click="tacoStore.login()" 
+                @click="tacoStore.iidLogIn()" 
                 class="btn btn-primary btn-lg"
               >
                 <i class="fa fa-sign-in-alt me-2"></i>
@@ -48,8 +48,9 @@
                 <div v-for="token in coreTokens" :key="token.principal" class="col-md-6 col-lg-4 mb-3">
                   <TokenCard 
                     :token="token" 
-                    @send="openSendDialog" 
-                    @register="registerToken"
+                    @send="openSendDialog"
+                    @swap="openSwapDialog" 
+
                     @unregister="unregisterToken"
                           @stake-to-neuron="handleStakeToNeuron"
       @create-neuron="handleCreateNeuron"
@@ -72,6 +73,7 @@
                   <TokenCard 
                     :token="token" 
                     @send="openSendDialog"
+                    @swap="openSwapDialog"
                   />
                 </div>
               </div>
@@ -111,7 +113,8 @@
                   <TokenCard 
                     :token="token" 
                     @send="openSendDialog"
-                    @register="registerToken"
+                    @swap="openSwapDialog"
+
                     @unregister="unregisterToken"
                   />
                 </div>
@@ -169,6 +172,24 @@
       @dissolve-set="handleDissolveSet"
     />
 
+    <!-- Swap Dialog -->
+    <SwapDialog
+      :show="showSwapDialog"
+      :preselected-token="selectedTokenForSwap"
+      :available-tokens="allTokens"
+      @close="closeSwapDialog"
+      @confirm="handleSwapConfirm"
+    />
+
+    <!-- Swap Confirm Dialog -->
+    <SwapConfirmDialog
+      :show="showSwapConfirmDialog"
+      :swap-data="swapConfirmData"
+      @close="closeSwapConfirmDialog"
+      @success="handleSwapSuccess"
+      @error="handleSwapError"
+    />
+
   </div>
 </template>
 
@@ -178,6 +199,8 @@ import { useTacoStore } from '../stores/taco.store'
 import { Principal } from '@dfinity/principal'
 import TokenCard from '../components/wallet/TokenCard.vue'
 import SendTokenDialog from '../components/wallet/SendTokenDialog.vue'
+import SwapDialog from '../components/wallet/SwapDialog.vue'
+import SwapConfirmDialog from '../components/wallet/SwapConfirmDialog.vue'
 import StakeToNeuronDialog from '../components/wallet/StakeToNeuronDialog.vue'
 import CreateNeuronDialog from '../components/wallet/CreateNeuronDialog.vue'
 import SetDissolveDialog from '../components/wallet/SetDissolveDialog.vue'
@@ -205,6 +228,10 @@ const showStakeDialog = ref(false)
 const selectedNeuron = ref<any | null>(null)
 const showCreateDialog = ref(false)
 const showDissolveDialog = ref(false)
+const showSwapDialog = ref(false)
+const showSwapConfirmDialog = ref(false)
+const selectedTokenForSwap = ref<WalletToken | null>(null)
+const swapConfirmData = ref<any | null>(null)
 const allTokenBalances = ref<Map<string, bigint>>(new Map())
 const userRegisteredTokenPrincipals = ref<string[]>([])
 const customTokenMetadata = ref<Map<string, any>>(new Map())
@@ -225,7 +252,7 @@ const coreTokens = computed<WalletToken[]>(() => {
     balance: allTokenBalances.value.get(icpPrincipal) || 0n,
     decimals: 8,
     fee: 10000n, // 0.0001 ICP
-    priceUSD: tacoStore.icpPriceUsd,
+    priceUSD: tacoStore.icpPriceUsd || 0,
     isRegistered: false
   })
 
@@ -239,7 +266,7 @@ const coreTokens = computed<WalletToken[]>(() => {
     balance: allTokenBalances.value.get(tacoPrincipal) || 0n,
     decimals: 8,
     fee: 10000n, // 0.0001 TACO
-    priceUSD: tacoStore.tacoPriceUsd,
+    priceUSD: tacoStore.tacoPriceUsd || 0,
     isRegistered: false
   })
 
@@ -252,13 +279,18 @@ const trustedTokens = computed<WalletToken[]>(() => {
   const userRegisteredPrincipals = new Set(userRegisteredTokenPrincipals.value)
   
   return tacoStore.fetchedTokenDetails
-    .filter(([principal, details]) => 
-      !coreTokenPrincipals.has(principal.toString()) && 
-      !userRegisteredPrincipals.has(principal.toString()) &&
-      details.Active && 
-      !details.isPaused
-    )
-    .map(([principal, details]) => ({
+    .filter((entry) => {
+      const principal = entry[0]
+      const details = entry[1]
+      return !coreTokenPrincipals.has(principal.toString()) && 
+             !userRegisteredPrincipals.has(principal.toString()) &&
+             details.Active && 
+             !details.isPaused
+    })
+    .map((entry) => {
+      const principal = entry[0]
+      const details = entry[1]
+      return {
       principal: principal.toString(),
       name: details.tokenName,
       symbol: details.tokenSymbol,
@@ -266,14 +298,15 @@ const trustedTokens = computed<WalletToken[]>(() => {
       balance: allTokenBalances.value.get(principal.toString()) || 0n,
       decimals: Number(details.tokenDecimals),
       fee: details.tokenTransferFee,
-      priceUSD: parseFloat(details.priceInUSD) || 0,
-      isRegistered: false
-    }))
+        priceUSD: parseFloat(details.priceInUSD) || 0,
+        isRegistered: false
+      }
+    })
 })
 
 // User registered tokens
 const userRegisteredTokens = computed<WalletToken[]>(() => {
-  const tokenDetailsMap = new Map(tacoStore.fetchedTokenDetails.map(([p, d]) => [p.toString(), d]))
+  const tokenDetailsMap = new Map(tacoStore.fetchedTokenDetails.map((entry) => [entry[0].toString(), entry[1]]))
   
   return userRegisteredTokenPrincipals.value
     .map(principal => {
@@ -308,7 +341,15 @@ const userRegisteredTokens = computed<WalletToken[]>(() => {
         isRegistered: true
       }
     })
-    .filter((token): token is WalletToken => token !== null)
+})
+
+// All tokens for swap dialog
+const allTokens = computed<WalletToken[]>(() => {
+  return [
+    ...coreTokens.value,
+    ...trustedTokens.value,
+    ...userRegisteredTokens.value
+  ]
 })
 
 // Methods
@@ -327,7 +368,13 @@ const loadWalletData = async () => {
     
   } catch (error) {
     console.error('Error loading wallet data:', error)
-    tacoStore.addToast('error', 'Error', 'Failed to load wallet data')
+    tacoStore.addToast({
+      id: Date.now(),
+      code: 'wallet-error',
+      title: 'Error',
+      icon: 'fa-solid fa-exclamation-triangle',
+      message: 'Failed to load wallet data'
+    })
   } finally {
     loading.value = false
   }
@@ -348,7 +395,7 @@ const fetchUserRegisteredTokens = async () => {
 
 const loadCustomTokenMetadata = async () => {
   console.log('Loading custom token metadata for:', userRegisteredTokenPrincipals.value)
-  const tokenDetailsMap = new Map(tacoStore.fetchedTokenDetails.map(([p, d]) => [p.toString(), d]))
+      const tokenDetailsMap = new Map(tacoStore.fetchedTokenDetails.map((entry) => [entry[0].toString(), entry[1]]))
   
   // Load metadata for tokens not in trusted list
   for (const principal of userRegisteredTokenPrincipals.value) {
@@ -424,11 +471,13 @@ const handleSendToken = async (params: { recipient: string; amount: bigint; memo
       params.memo
     )
     
-    tacoStore.addToast(
-      'success', 
-      'Transaction Sent', 
-      `Successfully sent ${params.amount} ${selectedToken.value.symbol}`
-    )
+    tacoStore.addToast({
+      id: Date.now(),
+      code: 'send-success',
+      title: 'Transaction Sent',
+      icon: 'fa-solid fa-check',
+      message: `Successfully sent ${params.amount} ${selectedToken.value.symbol}`
+    })
     
     // Refresh balance
     const newBalance = await tacoStore.fetchUserTokenBalance(
@@ -440,7 +489,13 @@ const handleSendToken = async (params: { recipient: string; amount: bigint; memo
     closeSendDialog()
   } catch (error) {
     console.error('Error sending token:', error)
-    tacoStore.addToast('error', 'Transaction Failed', 'Failed to send token')
+    tacoStore.addToast({
+      id: Date.now(),
+      code: 'send-error',
+      title: 'Transaction Failed',
+      icon: 'fa-solid fa-exclamation-triangle',
+      message: 'Failed to send token'
+    })
   }
 }
 
@@ -449,11 +504,23 @@ const handleSendToken = async (params: { recipient: string; amount: bigint; memo
 const unregisterToken = async (token: WalletToken) => {
   try {
     await tacoStore.unregisterUserToken(token.principal)
-    tacoStore.addToast('success', 'Token Unregistered', `${token.symbol} removed from your wallet`)
+    tacoStore.addToast({
+      id: Date.now(),
+      code: 'unregister-success',
+      title: 'Token Unregistered',
+      icon: 'fa-solid fa-check',
+      message: `${token.symbol} removed from your wallet`
+    })
     await fetchUserRegisteredTokens() // Refresh
   } catch (error) {
     console.error('Error unregistering token:', error)
-    tacoStore.addToast('error', 'Unregistration Failed', 'Failed to unregister token')
+    tacoStore.addToast({
+      id: Date.now(),
+      code: 'unregister-error',
+      title: 'Unregistration Failed',
+      icon: 'fa-solid fa-exclamation-triangle',
+      message: 'Failed to unregister token'
+    })
   }
 }
 
@@ -520,13 +587,25 @@ const registerCustomToken = async () => {
     try {
       Principal.fromText(newTokenPrincipal.value.trim())
     } catch (error) {
-      tacoStore.addToast('error', 'Invalid Principal', 'Please enter a valid principal ID')
+      tacoStore.addToast({
+        id: Date.now(),
+        code: 'invalid-principal',
+        title: 'Invalid Principal',
+        icon: 'fa-solid fa-exclamation-triangle',
+        message: 'Please enter a valid principal ID'
+      })
       return
     }
     
     // Check if token is already registered
     if (userRegisteredTokenPrincipals.value.includes(newTokenPrincipal.value.trim())) {
-      tacoStore.addToast('error', 'Already Registered', 'This token is already in your wallet')
+      tacoStore.addToast({
+        id: Date.now(),
+        code: 'already-registered',
+        title: 'Already Registered',
+        icon: 'fa-solid fa-exclamation-triangle',
+        message: 'This token is already in your wallet'
+      })
       return
     }
     
@@ -547,14 +626,80 @@ const registerCustomToken = async () => {
     const metadata = customTokenMetadata.value.get(registeredPrincipal)
     const tokenName = metadata?.symbol || 'Custom Token'
     
-    tacoStore.addToast('success', 'Token Registered', `${tokenName} added to your wallet`)
+    tacoStore.addToast({
+      id: Date.now(),
+      code: 'register-success',
+      title: 'Token Registered',
+      icon: 'fa-solid fa-check',
+      message: `${tokenName} added to your wallet`
+    })
     
   } catch (error) {
     console.error('Error registering custom token:', error)
-    tacoStore.addToast('error', 'Registration Failed', 'Failed to register custom token')
+    tacoStore.addToast({
+      id: Date.now(),
+      code: 'register-error',
+      title: 'Registration Failed',
+      icon: 'fa-solid fa-exclamation-triangle',
+      message: 'Failed to register custom token'
+    })
   } finally {
     registeringToken.value = false
   }
+}
+
+// Swap-related methods
+const openSwapDialog = (token: WalletToken) => {
+  selectedTokenForSwap.value = token.symbol === 'TACO' ? null : token
+  showSwapDialog.value = true
+}
+
+const closeSwapDialog = () => {
+  showSwapDialog.value = false
+  selectedTokenForSwap.value = null
+}
+
+const handleSwapConfirm = (swapData: any) => {
+  swapConfirmData.value = swapData
+  showSwapDialog.value = false
+  showSwapConfirmDialog.value = true
+}
+
+const closeSwapConfirmDialog = () => {
+  showSwapConfirmDialog.value = false
+  swapConfirmData.value = null
+}
+
+const handleSwapSuccess = async (result: any) => {
+  console.log('Swap successful:', result)
+  
+  // Close the confirm dialog
+  closeSwapConfirmDialog()
+  
+  // Show success message
+  tacoStore.addToast({
+    id: Date.now(),
+    code: 'swap-success',
+    title: 'Swap Successful',
+    icon: 'fa-solid fa-check',
+    message: `Successfully swapped to TACO`
+  })
+  
+  // Refresh wallet data to show updated balances
+  await loadWalletData()
+}
+
+const handleSwapError = (error: string) => {
+  console.error('Swap failed:', error)
+  
+  // Show error message
+  tacoStore.addToast({
+    id: Date.now(),
+    code: 'swap-error',
+    title: 'Swap Failed',
+    icon: 'fa-solid fa-exclamation-triangle',
+    message: error
+  })
 }
 
 // Lifecycle

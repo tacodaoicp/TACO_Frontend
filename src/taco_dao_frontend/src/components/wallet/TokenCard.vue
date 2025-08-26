@@ -225,7 +225,7 @@
                 <div v-if="neuron.followings && neuron.followings.length > 0" class="detail-section">
                   <h6 class="section-title">
                     <i class="fa fa-users me-2"></i>
-                    Following ({{ neuron.followings.reduce((acc, f) => acc + f.followedCount, 0) }} neurons)
+                    Following ({{ neuron.followings.reduce((acc: number, f: any) => acc + f.followedCount, 0) }} neurons)
                   </h6>
                   <div class="followings-list">
                     <div 
@@ -369,7 +369,7 @@
                 <div v-if="neuron.followings && neuron.followings.length > 0" class="detail-section">
                   <h6 class="section-title">
                     <i class="fa fa-users me-2"></i>
-                    Following ({{ neuron.followings.reduce((acc, f) => acc + f.followedCount, 0) }} neurons)
+                    Following ({{ neuron.followings.reduce((acc: number, f: any) => acc + f.followedCount, 0) }} neurons)
                   </h6>
                   <div class="followings-list">
                     <div 
@@ -402,14 +402,23 @@
     </div>
 
     <div class="token-footer">
-      <button 
-        @click="$emit('send', token)"
-        class="btn btn-primary btn-send"
-        :disabled="token.balance <= token.fee"
-      >
-        <i class="fa fa-paper-plane me-1"></i>
-        Send
-      </button>
+      <div class="token-actions-row">
+        <button 
+          @click="$emit('send', token)"
+          class="btn btn-primary btn-send"
+          :disabled="token.balance <= token.fee"
+        >
+          <i class="fa fa-paper-plane me-1"></i>
+          Send
+        </button>
+        <button 
+          @click="$emit('swap', token)"
+          class="btn btn-secondary btn-swap"
+        >
+          <i class="fa fa-exchange-alt me-1"></i>
+          Swap
+        </button>
+      </div>
       <div class="token-fee">
         Fee: {{ formatBalance(token.fee, token.decimals) }} {{ token.symbol }}
       </div>
@@ -440,6 +449,7 @@ interface TokenCardProps {
 
 interface TokenCardEmits {
   (e: 'send', token: TokenCardProps['token']): void
+  (e: 'swap', token: TokenCardProps['token']): void
   (e: 'register', token: TokenCardProps['token']): void
   (e: 'unregister', token: TokenCardProps['token']): void
   (e: 'stake-to-neuron', neuron: any): void
@@ -675,15 +685,21 @@ const formatUSDValue = (balance: bigint, decimals: number, priceUSD: number): st
   margin-top: auto;
 }
 
-.btn-send {
-  width: 100%;
+.token-actions-row {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.btn-send, .btn-swap {
+  flex: 1;
   font-weight: 600;
   padding: 0.5rem;
   border-radius: 8px;
   transition: all 0.2s ease;
 }
 
-.btn-send:hover:not(:disabled) {
+.btn-send:hover:not(:disabled),
+.btn-swap:hover:not(:disabled) {
   transform: translateY(-1px);
 }
 
