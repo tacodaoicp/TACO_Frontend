@@ -527,9 +527,14 @@ export const useICPSwapStore = defineStore('icpswap', () => {
       console.log('Step 3: Calling depositFrom...')
       const poolActor = await createPoolActor(poolId)
       
+      // Get the input token metadata to determine the correct fee
+      const inputTokenActor = await createTokenActor(params.sellTokenPrincipal)
+      const feeResult = await inputTokenActor.icrc1_fee() as any
+      const tokenFee = typeof feeResult === 'bigint' ? feeResult : BigInt(feeResult)
+
       const depositArgs = {
         amount: params.amountIn,
-        fee: 0n, // Will be determined by the pool
+        fee: tokenFee,
         token: params.sellTokenPrincipal,
       }
 
