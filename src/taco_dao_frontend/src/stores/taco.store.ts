@@ -1036,10 +1036,8 @@ export const useTacoStore = defineStore('taco', () => {
                 authClient.login({
                     maxTimeToLive: BigInt(30 * 24 * 60 * 60 * 1000 * 1000 * 1000),
                     identityProvider:
-                        process.env.DFX_NETWORK === "ic"
+                        process.env.DFX_NETWORK === "ic" || process.env.DFX_NETWORK === "staging"
                             ? 'https://identity.ic0.app'
-                            : process.env.DFX_NETWORK === "staging"
-                            ? `http://${iiCanisterId}.localhost:8080/`
                             : `http://${iiCanisterId}.localhost:4943/`,
                     onSuccess: resolve,
                     onError: reject,
