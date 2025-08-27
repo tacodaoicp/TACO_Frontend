@@ -20,10 +20,10 @@ interface KongSwapArgs {
   pay_amount: bigint
   pay_tx_id?: { BlockIndex: bigint } | null
   receive_token: string
-  receive_amount?: bigint | null
-  receive_address?: Principal | null
+  receive_amount?: bigint[] | null
+  receive_address?: Principal[] | null
   max_slippage?: number[] | null
-  referred_by?: Principal | null
+  referred_by?: Principal[] | null
 }
 
 interface SwapResult {
@@ -339,10 +339,10 @@ export const useKongStore = defineStore('kong', () => {
         pay_amount: params.amountIn,
         pay_tx_id: null, // No tx_id means Kong will use ICRC2
         receive_token: formatTokenSymbolForKong(params.buyTokenSymbol),
-        receive_amount: null,
-        receive_address: params.recipient || null,
+        receive_amount: [],
+        receive_address: params.recipient ? [params.recipient] : [],
         max_slippage: [params.slippageTolerance],
-        referred_by: null,
+        referred_by: [],
       }
 
       console.log('Kong swap args:', swapArgs)
@@ -411,12 +411,12 @@ export const useKongStore = defineStore('kong', () => {
       const swapArgs: KongSwapArgs = {
         pay_token: formatTokenSymbolForKong(params.sellTokenSymbol),
         pay_amount: params.amountIn,
-        pay_tx_id: { BlockIndex: BigInt(blockIndex) },
+        pay_tx_id: { BlockIndex: blockIndex },
         receive_token: formatTokenSymbolForKong(params.buyTokenSymbol),
-        receive_amount: null,
-        receive_address: params.recipient || null,
+        receive_amount: [],
+        receive_address: params.recipient ? [params.recipient] : [],
         max_slippage: [params.slippageTolerance],
-        referred_by: null,
+        referred_by: [],
       }
 
       console.log('Kong swap args:', swapArgs)
