@@ -65,12 +65,19 @@
     
     <!-- Neurons section for TACO token -->
     <div v-if="token.symbol === 'TACO'" class="neurons-section">
-      <div class="neurons-header">
+      <div class="neurons-header" @click="toggleNeuronsSection">
         <h6 class="neurons-title">
+          <i 
+            :class="neuronsExpanded ? 'fa fa-chevron-down' : 'fa fa-chevron-right'" 
+            class="expand-icon me-2"
+          ></i>
           <i class="fa fa-brain me-2"></i>
           Neurons
+          <span v-if="!neuronsExpanded && categorizedNeurons.all.length > 0" class="neuron-count-badge">
+            {{ categorizedNeurons.all.length }}
+          </span>
         </h6>
-        <div class="neurons-actions">
+        <div class="neurons-actions" @click.stop>
           <button 
             @click="$emit('create-neuron')"
             class="btn btn-outline-primary btn-sm me-2"
@@ -89,19 +96,20 @@
         </div>
       </div>
       
-      <div v-if="loadingNeurons" class="neurons-loading">
-        <div class="spinner-border spinner-border-sm" role="status">
-          <span class="visually-hidden">Loading...</span>
+      <div v-if="neuronsExpanded" class="neurons-content">
+        <div v-if="loadingNeurons" class="neurons-loading">
+          <div class="spinner-border spinner-border-sm" role="status">
+            <span class="visually-hidden">Loading...</span>
+          </div>
+          <span class="ms-2">Loading neurons...</span>
         </div>
-        <span class="ms-2">Loading neurons...</span>
-      </div>
-      
-      <div v-else-if="categorizedNeurons.all.length === 0" class="neurons-empty">
-        <i class="fa fa-info-circle me-2"></i>
-        <span>No neurons found</span>
-      </div>
-      
-      <div v-else class="neurons-sections">
+        
+        <div v-else-if="categorizedNeurons.all.length === 0" class="neurons-empty">
+          <i class="fa fa-info-circle me-2"></i>
+          <span>No neurons found</span>
+        </div>
+        
+        <div v-else class="neurons-sections">
         <!-- Owned Neurons Section -->
         <div v-if="categorizedNeurons.owned.length > 0" class="neuron-section">
           <div class="section-header">
@@ -398,6 +406,7 @@
             </div>
           </div>
         </div>
+        </div>
       </div>
     </div>
 
@@ -505,6 +514,7 @@ const neurons = ref<any[]>([])
 const loadingNeurons = ref(false)
 const categorizedNeurons = ref<{owned: any[], hotkeyed: any[], all: any[]}>({owned: [], hotkeyed: [], all: []})
 const expandedNeurons = ref<Set<string>>(new Set())
+const neuronsExpanded = ref(false) // Default to collapsed
 
 // Load neurons for TACO token
 const loadNeurons = async () => {
@@ -533,6 +543,11 @@ const toggleNeuronExpansion = (neuronId: string) => {
   } else {
     expandedNeurons.value.add(neuronId)
   }
+}
+
+// Toggle neurons section expansion
+const toggleNeuronsSection = () => {
+  neuronsExpanded.value = !neuronsExpanded.value
 }
 
 // Auto-load neurons on mount for TACO token
@@ -796,6 +811,14 @@ const formatUSDValue = (balance: bigint, decimals: number, priceUSD: number): st
   justify-content: space-between;
   align-items: center;
   margin-bottom: 0.5rem;
+  cursor: pointer;
+  padding: 0.25rem;
+  border-radius: 6px;
+  transition: background-color 0.2s ease;
+}
+
+.neurons-header:hover {
+  background: rgba(255, 255, 255, 0.05);
 }
 
 .neurons-title {
@@ -805,6 +828,20 @@ const formatUSDValue = (balance: bigint, decimals: number, priceUSD: number): st
   color: var(--text-primary);
   display: flex;
   align-items: center;
+}
+
+.neuron-count-badge {
+  background: var(--bs-primary);
+  color: white;
+  padding: 0.1rem 0.4rem;
+  border-radius: 12px;
+  font-size: 0.7rem;
+  font-weight: 500;
+  margin-left: 0.5rem;
+}
+
+.neurons-content {
+  margin-top: 0.5rem;
 }
 
 .neurons-actions {
@@ -886,10 +923,13 @@ const formatUSDValue = (balance: bigint, decimals: number, priceUSD: number): st
 }
 
 .expand-icon {
-  margin-right: 0.5rem;
   font-size: 0.7rem;
   color: var(--text-secondary);
   transition: transform 0.2s ease;
+}
+
+.neurons-title .expand-icon {
+  margin-right: 0.5rem;
 }
 
 .neuron-actions {
