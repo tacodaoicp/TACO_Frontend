@@ -541,51 +541,27 @@ export const useICPSwapStore = defineStore('icpswap', () => {
         throw new Error(`Approval failed: ${JSON.stringify(approvalResult.Err)}`)
       }
 
-      // Step 4: Transfer tokens using the approval
-      // Reduce transfer amount by fee since transfer_from will deduct fee
-      params.onStep?.('Transferring tokens...')
-      console.log('Step 4: Transferring tokens to pool subaccount using approval...')
+      // Step 4: Deposit tokens using ICRC2 approval (depositFrom)
+      // The pool canister will call icrc2_transfer_from internally
+      params.onStep?.('Depositing tokens...')
+      console.log('Step 4: Calling depositFrom (pool will handle transfer_from)...')
       const poolActor = await createPoolActor(poolId)
-      const transferAmount = params.amountIn - tokenFee
-      console.log('Transfer amount after fee deduction:', transferAmount)
       
       // Generate pool subaccount for the user
       const userSubaccount = principalToSubAccount(Principal.fromText(userPrincipal.value!))
       
-      const transferFromArgs = {
-        from: {
-          owner: Principal.fromText(userPrincipal.value!),
-          subaccount: [],
-        },
-        to: {
-          owner: Principal.fromText(poolId),
-          subaccount: [Array.from(userSubaccount)],
-        },
-        amount: transferAmount,
-        fee: [],
-        memo: [],
-        created_at_time: [],
+      const userAccount = {
+        owner: Principal.fromText(userPrincipal.value!),
+        subaccount: [],
       }
-
-      console.log('TransferFrom args:', transferFromArgs)
-      const transferResult = await tokenActor.icrc2_transfer_from(transferFromArgs) as any
-      console.log('TransferFrom result:', transferResult)
-
-      if ('Err' in transferResult) {
-        throw new Error(`Transfer failed: ${JSON.stringify(transferResult.Err)}`)
-      }
-
-      // Step 5: Deposit the transferred tokens
-      params.onStep?.('Depositing tokens...')
-      console.log('Step 5: Calling deposit...')
       
-      const depositArgs = {
-        amount: transferAmount,
-        fee: tokenFee,
+      const depositFromArgs = {
+        amount: params.amountIn,
         token: params.sellTokenPrincipal,
       }
 
-      const depositResult = await poolActor.deposit(depositArgs) as any
+      console.log('DepositFrom args:', { userAccount, depositFromArgs })
+      const depositResult = await poolActor.depositFrom(userAccount, depositFromArgs) as any
       console.log('DepositFrom result:', depositResult)
 
       if ('err' in depositResult) {
@@ -596,11 +572,13 @@ export const useICPSwapStore = defineStore('icpswap', () => {
       const poolData = poolCache.value.get(`${params.sellTokenPrincipal}-${params.buyTokenPrincipal}`)!
       const zeroForOne = isZeroForOne(params.sellTokenPrincipal, poolData)
 
-      // Step 7: Execute swap
+      // Step 5: Execute swap
       params.onStep?.('Executing swap...')
-      console.log('Step 6: Executing swap...')
+      console.log('Step 5: Executing swap...')
+      // Use the actual deposited amount from depositFrom result
+      const depositedAmount = depositResult.ok
       const swapArgs = {
-        amountIn: params.amountIn.toString(),
+        amountIn: depositedAmount.toString(),
         amountOutMinimum: params.minAmountOut.toString(),
         zeroForOne: zeroForOne,
       }
@@ -616,9 +594,9 @@ export const useICPSwapStore = defineStore('icpswap', () => {
 
       const amountOut = swapResult.ok
 
-      // Step 8: Withdraw the received tokens
+      // Step 6: Withdraw the received tokens
       params.onStep?.('Withdrawing tokens...')
-      console.log('Step 7: Withdrawing received tokens...')
+      console.log('Step 6: Withdrawing received tokens...')
       
       // Get the output token fee for withdrawal
       const outputTokenActor = await createTokenActor(params.buyTokenPrincipal)
