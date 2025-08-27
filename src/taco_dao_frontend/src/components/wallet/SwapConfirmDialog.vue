@@ -247,44 +247,43 @@ const executeSwap = async () => {
 
     let result: any
 
-    if (selectedQuote.exchange === 'Kong') {
-      executionStep.value = swapMethod.value === 'icrc2' ? 'Approving tokens...' : 'Transferring tokens...'
-      
-      const swapParams = {
-        sellTokenPrincipal: inputToken.principal,
-        sellTokenSymbol: inputToken.symbol,
-        buyTokenPrincipal: outputToken.principal,
-        buyTokenSymbol: outputToken.symbol,
-        amountIn,
-        minAmountOut,
-        slippageTolerance: userSlippageTolerance,
-      }
+    const swapParams = {
+      sellTokenPrincipal: inputToken.principal,
+      sellTokenSymbol: inputToken.symbol,
+      buyTokenPrincipal: outputToken.principal,
+      buyTokenSymbol: outputToken.symbol,
+      amountIn,
+      minAmountOut,
+      slippageTolerance: userSlippageTolerance,
+    }
 
+    // Create a step update callback
+    const updateStep = (step: string) => {
+      executionStep.value = step
+    }
+
+    // Add step callback to swap params
+    const swapParamsWithCallback = {
+      ...swapParams,
+      onStep: updateStep
+    }
+
+    if (selectedQuote.exchange === 'Kong') {
       if (swapMethod.value === 'icrc2') {
-        executionStep.value = 'Executing swap...'
-        result = await kongStore.icrc2_swap(swapParams)
+        executionStep.value = 'Starting ICRC2 swap...'
+        result = await kongStore.icrc2_swap(swapParamsWithCallback)
       } else {
-        executionStep.value = 'Executing swap...'
-        result = await kongStore.icrc1_swap(swapParams)
+        executionStep.value = 'Starting ICRC1 swap...'
+        result = await kongStore.icrc1_swap(swapParamsWithCallback)
       }
     } else {
       // ICPSwap
-      executionStep.value = swapMethod.value === 'icrc2' ? 'Approving tokens...' : 'Transferring tokens...'
-      
-      const swapParams = {
-        sellTokenPrincipal: inputToken.principal,
-        buyTokenPrincipal: outputToken.principal,
-        amountIn,
-        minAmountOut,
-        slippageTolerance: userSlippageTolerance,
-      }
-
       if (swapMethod.value === 'icrc2') {
-        executionStep.value = 'Depositing tokens...'
-        result = await icpswapStore.icrc2_swap(swapParams)
+        executionStep.value = 'Starting ICRC2 swap...'
+        result = await icpswapStore.icrc2_swap(swapParamsWithCallback)
       } else {
-        executionStep.value = 'Depositing tokens...'
-        result = await icpswapStore.icrc1_swap(swapParams)
+        executionStep.value = 'Starting ICRC1 swap...'
+        result = await icpswapStore.icrc1_swap(swapParamsWithCallback)
       }
     }
 

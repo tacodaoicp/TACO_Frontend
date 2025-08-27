@@ -40,6 +40,7 @@ interface SwapParams {
   minAmountOut: bigint
   slippageTolerance: number
   recipient?: Principal
+  onStep?: (step: string) => void
 }
 
 interface QuoteParams {
@@ -304,10 +305,17 @@ export const useKongStore = defineStore('kong', () => {
     try {
       console.log('Kong ICRC2 swap starting with params:', params)
 
-      // Step 1: Create ICRC2 approval for Kong
-      console.log('Step 1: Creating ICRC2 approval...')
+      // Step 1: Get token fee for proper amount calculations
+      params.onStep?.('Getting token fee...')
+      console.log('Step 1: Getting token fee...')
       const tokenActor = await createTokenActor(params.sellTokenPrincipal)
-      
+      const feeResult = await tokenActor.icrc1_fee() as any
+      const tokenFee = typeof feeResult === 'bigint' ? feeResult : BigInt(feeResult)
+      console.log('Token fee:', tokenFee)
+
+      // Step 2: Create ICRC2 approval for Kong
+      params.onStep?.('Approving tokens...')
+      console.log('Step 2: Creating ICRC2 approval...')
       const approvalArgs = {
         spender: {
           owner: Principal.fromText(KONG_CANISTER_ID),
@@ -330,13 +338,17 @@ export const useKongStore = defineStore('kong', () => {
         throw new Error(`Approval failed: ${JSON.stringify(approvalResult.Err)}`)
       }
 
-      // Step 2: Execute Kong swap without tx_id (will use ICRC2)
-      console.log('Step 2: Executing Kong swap...')
+      // Step 3: Execute Kong swap without tx_id (will use ICRC2)
+      // Reduce swap amount by transfer fee since Kong will do a transfer_from
+      params.onStep?.('Executing swap...')
+      console.log('Step 3: Executing Kong swap...')
       const kongActor = await createKongActor()
+      const swapAmount = params.amountIn - tokenFee
+      console.log('Swap amount after fee deduction:', swapAmount)
 
       const swapArgs: KongSwapArgs = {
         pay_token: formatTokenSymbolForKong(params.sellTokenSymbol),
-        pay_amount: params.amountIn,
+        pay_amount: swapAmount,
         pay_tx_id: [], // No tx_id means Kong will use ICRC2
         receive_token: formatTokenSymbolForKong(params.buyTokenSymbol),
         receive_amount: [],
@@ -379,6 +391,7 @@ export const useKongStore = defineStore('kong', () => {
       console.log('Kong ICRC1 swap starting with params:', params)
 
       // Step 1: Transfer tokens to Kong
+      params.onStep?.('Transferring tokens...')
       console.log('Step 1: Transferring tokens to Kong...')
       const tokenActor = await createTokenActor(params.sellTokenPrincipal)
 
@@ -405,6 +418,7 @@ export const useKongStore = defineStore('kong', () => {
       const blockIndex = transferResult.Ok
 
       // Step 2: Execute Kong swap with tx_id
+      params.onStep?.('Executing swap...')
       console.log('Step 2: Executing Kong swap with tx_id...')
       const kongActor = await createKongActor()
 
