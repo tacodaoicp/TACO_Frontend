@@ -66,6 +66,13 @@
                 {{ swapData.selectedQuote.slippage.toFixed(2) }}%
               </span>
             </div>
+
+            <div class="detail-row">
+              <span class="detail-label">Slippage Tolerance:</span>
+              <span class="detail-value text-primary">
+                {{ (swapData.slippageTolerance * 100).toFixed(1) }}%
+              </span>
+            </div>
             
             <div v-if="swapData.selectedQuote.exchange === 'Kong'" class="detail-row">
               <span class="detail-label">Execution Price:</span>

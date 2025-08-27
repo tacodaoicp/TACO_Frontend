@@ -10,6 +10,7 @@ import { createAgent } from '@dfinity/utils'
 import { Principal } from '@dfinity/principal'
 import { AuthClient } from '@dfinity/auth-client'
 import { useTacoStore } from './taco.store'
+import { idlFactory as kongIdlFactory } from '../../../declarations/kongswap/kongswap.did.js'
 
 // Kong canister ID
 const KONG_CANISTER_ID = '2ipq2-uqaaa-aaaar-qailq-cai'
@@ -18,7 +19,7 @@ const KONG_CANISTER_ID = '2ipq2-uqaaa-aaaar-qailq-cai'
 interface KongSwapArgs {
   pay_token: string
   pay_amount: bigint
-  pay_tx_id?: { BlockIndex: bigint }[] | []
+  pay_tx_id: { BlockIndex: bigint }[] | [] // Array with value for ICRC1, empty array for ICRC2
   receive_token: string
   receive_amount?: bigint[] | []
   receive_address?: Principal[] | []
@@ -86,71 +87,9 @@ export const useKongStore = defineStore('kong', () => {
       fetchRootKey: process.env.DFX_NETWORK === "local",
     })
 
-    const kongIDL = ({ IDL }: any) => {
-      const TxId = IDL.Variant({
-        'BlockIndex': IDL.Nat,
-        'TransactionId': IDL.Text,
-      })
 
-      const KongSwapArgs = IDL.Record({
-        'pay_token': IDL.Text,
-        'pay_amount': IDL.Nat,
-        'pay_tx_id': IDL.Opt(TxId),
-        'receive_token': IDL.Text,
-        'receive_amount': IDL.Opt(IDL.Nat),
-        'receive_address': IDL.Opt(IDL.Principal),
-        'max_slippage': IDL.Opt(IDL.Float64),
-        'referred_by': IDL.Opt(IDL.Principal),
-      })
 
-      const SwapReply = IDL.Record({
-        'txid': IDL.Nat,
-        'request_id': IDL.Nat64,
-        'status': IDL.Text,
-        'pay_chain': IDL.Text,
-        'pay_symbol': IDL.Text,
-        'pay_amount': IDL.Nat,
-        'receive_chain': IDL.Text,
-        'receive_symbol': IDL.Text,
-        'receive_amount': IDL.Nat,
-        'mid_price': IDL.Float64,
-        'price': IDL.Float64,
-        'slippage': IDL.Float64,
-        'ts': IDL.Nat64,
-      })
-
-      const SwapResult = IDL.Variant({
-        'Ok': SwapReply,
-        'Err': IDL.Text,
-      })
-
-      const SwapAmountsReply = IDL.Record({
-        'pay_chain': IDL.Text,
-        'pay_symbol': IDL.Text,
-        'pay_address': IDL.Text,
-        'pay_amount': IDL.Nat,
-        'receive_chain': IDL.Text,
-        'receive_symbol': IDL.Text,
-        'receive_address': IDL.Text,
-        'receive_amount': IDL.Nat,
-        'price': IDL.Float64,
-        'mid_price': IDL.Float64,
-        'slippage': IDL.Float64,
-        'txs': IDL.Vec(IDL.Record({})), // Simplified for now
-      })
-
-      const SwapAmountsResult = IDL.Variant({
-        'Ok': SwapAmountsReply,
-        'Err': IDL.Text,
-      })
-
-      return IDL.Service({
-        'swap': IDL.Func([KongSwapArgs], [SwapResult], []),
-        'swap_amounts': IDL.Func([IDL.Text, IDL.Nat, IDL.Text], [SwapAmountsResult], ['query']),
-      })
-    }
-
-    return Actor.createActor(kongIDL, {
+    return Actor.createActor(kongIdlFactory, {
       agent,
       canisterId: KONG_CANISTER_ID,
     })
@@ -235,6 +174,7 @@ export const useKongStore = defineStore('kong', () => {
       return IDL.Service({
         'icrc1_transfer': IDL.Func([TransferArg], [TransferResult], []),
         'icrc2_approve': IDL.Func([ApproveArgs], [ApproveResult], []),
+        'icrc1_fee': IDL.Func([], [IDL.Nat], ['query']),
       })
     }
 
@@ -342,7 +282,11 @@ export const useKongStore = defineStore('kong', () => {
         throw new Error(`Approval failed: ${JSON.stringify(approvalResult.Err)}`)
       }
 
-      // Step 3: Execute Kong swap without tx_id (will use ICRC2)
+      // Extract approval transaction ID
+      const approvalTxId = approvalResult.Ok
+      console.log('Approval transaction ID:', approvalTxId)
+
+      // Step 3: Execute Kong swap with approval tx_id (ICRC2 flow)
       // Reduce swap amount by transfer fee since Kong will do a transfer_from
       params.onStep?.('Executing swap...')
       console.log('Step 3: Executing Kong swap...')
@@ -353,11 +297,11 @@ export const useKongStore = defineStore('kong', () => {
       const swapArgs: KongSwapArgs = {
         pay_token: formatTokenSymbolForKong(params.sellTokenSymbol),
         pay_amount: swapAmount,
-        pay_tx_id: [], // No tx_id means Kong will use ICRC2
+        pay_tx_id: [], // Empty array for ICRC2 (null optional)
         receive_token: formatTokenSymbolForKong(params.buyTokenSymbol),
         receive_amount: [],
         receive_address: params.recipient ? [params.recipient] : [],
-        max_slippage: [params.slippageTolerance],
+        max_slippage: [params.slippageTolerance * 100],
         referred_by: [],
       }
 
@@ -433,7 +377,7 @@ export const useKongStore = defineStore('kong', () => {
         receive_token: formatTokenSymbolForKong(params.buyTokenSymbol),
         receive_amount: [],
         receive_address: params.recipient ? [params.recipient] : [],
-        max_slippage: [params.slippageTolerance],
+        max_slippage: [params.slippageTolerance * 100],
         referred_by: [],
       }
 
