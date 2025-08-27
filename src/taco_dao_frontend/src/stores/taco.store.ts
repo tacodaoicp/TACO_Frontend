@@ -18,6 +18,7 @@ import { idlFactory as sneedForumIDL, _SERVICE as SneedForumService } from "../.
 import { idlFactory as appSneedDaoIDL, _SERVICE as AppSneedDaoService } from "../../../declarations/app_sneeddao_backend/app_sneeddao_backend.did.js"
 import { idlFactory as snsGovernanceIDL } from "../../../declarations/sns_governance/sns_governance.did.js"
 import { idlFactory as alarmIDL, _SERVICE as AlarmService } from "../../../declarations/alarm/alarm.did.js"
+import { idlFactory as rewardsIDL } from "../../../declarations/rewards/rewards.did.js"
 import { Principal } from '@dfinity/principal'
 import { AccountIdentifier } from '@dfinity/ledger-icp'
 import { canisterId as iiCanisterId } from "../../../declarations/internet_identity/index.js"
@@ -5503,6 +5504,194 @@ export const useTacoStore = defineStore('taco', () => {
         };
     }
 
+    // Create rewards actor
+    const createRewardsActor = async () => {
+        const canisterId = rewardsCanisterId()
+        if (!canisterId) {
+            throw new Error('Rewards canister ID not found')
+        }
+
+        const authClient = await AuthClient.create({
+            idleOptions: { disableIdle: true }
+        })
+        const identity = await authClient.getIdentity()
+        const host = process.env.DFX_NETWORK === 'local' ? 'http://localhost:4943' : 'https://ic0.app'
+
+        const agent = await createAgent({
+            identity,
+            host,
+            fetchRootKey: process.env.DFX_NETWORK === 'local',
+        })
+
+        return Actor.createActor(rewardsIDL, {
+            agent,
+            canisterId
+        })
+    }
+
+    // Format neuron ID for map key
+    const formatNeuronIdForMap = (neuronId: Uint8Array): string => {
+        try {
+            return Array.from(neuronId).map(b => b.toString(16).padStart(2, '0')).join('')
+        } catch (error) {
+            return 'unknown'
+        }
+    }
+
+    // Load neuron reward balances
+    const loadNeuronRewardBalances = async (neurons: any[]): Promise<Map<string, number>> => {
+        if (!userLoggedIn.value || neurons.length === 0) {
+            return new Map()
+        }
+
+        try {
+            const rewardsActor = await createRewardsActor()
+            
+            // Extract neuron IDs for filtering
+            const userNeuronIds = new Set<string>()
+            neurons
+                .filter(neuron => neuron.id && neuron.id.length > 0)
+                .forEach(neuron => {
+                    const neuronIdHex = formatNeuronIdForMap(neuron.id[0].id)
+                    userNeuronIds.add(neuronIdHex)
+                })
+
+            if (userNeuronIds.size === 0) {
+                return new Map()
+            }
+
+            // Get all balances from the canister
+            const allBalances = await rewardsActor.getAllNeuronRewardBalances() as [Uint8Array, bigint][]
+            
+            // Filter for only the user's neurons and store in map
+            const neuronBalances = new Map<string, number>()
+            for (const [neuronId, balance] of allBalances) {
+                const neuronIdHex = formatNeuronIdForMap(neuronId)
+                if (userNeuronIds.has(neuronIdHex)) {
+                    neuronBalances.set(neuronIdHex, Number(balance))
+                }
+            }
+
+            return neuronBalances
+
+        } catch (error) {
+            console.error('Error loading neuron balances:', error)
+            return new Map()
+        }
+    }
+
+    // Claim rewards for specific neurons
+    const claimNeuronRewards = async (neuronIds: Uint8Array[]): Promise<boolean> => {
+        if (!userLoggedIn.value || !userPrincipal.value) {
+            throw new Error('User must be logged in')
+        }
+
+        try {
+            const rewardsActor = await createRewardsActor()
+            
+            // Build ICRC1 Account object using user's principal
+            const account = {
+                owner: userPrincipal.value,
+                subaccount: [] // Empty subaccount
+            }
+            
+            // Call withdraw with account and neuron IDs
+            const result = await rewardsActor.withdraw(account, neuronIds) as any
+            
+            if ('Ok' in result) {
+                const transactionId = result.Ok
+                addToast({
+                    id: Date.now(),
+                    code: 'rewards-claimed',
+                    title: 'Rewards Claimed!',
+                    icon: 'fa-solid fa-check',
+                    message: `Successfully claimed rewards! Transaction ID: ${transactionId}`
+                })
+                return true
+            } else {
+                // Handle ICRC1 transfer errors
+                const error = result.Err
+                let errorMessage = 'Failed to claim rewards'
+                
+                if ('InsufficientFunds' in error) {
+                    errorMessage = `Insufficient funds: Balance is ${error.InsufficientFunds.balance}`
+                } else if ('BadFee' in error) {
+                    errorMessage = `Bad fee: Expected ${error.BadFee.expected_fee}`
+                } else if ('GenericError' in error) {
+                    errorMessage = `Error ${error.GenericError.error_code}: ${error.GenericError.message}`
+                } else {
+                    errorMessage = `Claim failed: ${JSON.stringify(error)}`
+                }
+                
+                addToast({
+                    id: Date.now() + 1,
+                    code: 'rewards-claim-failed',
+                    title: 'Claim Failed',
+                    icon: 'fa-solid fa-exclamation-triangle',
+                    message: errorMessage
+                })
+                return false
+            }
+        } catch (error: any) {
+            console.error('Error claiming rewards:', error)
+            addToast({
+                id: Date.now() + 2,
+                code: 'rewards-claim-error',
+                title: 'Claim Error',
+                icon: 'fa-solid fa-exclamation-triangle',
+                message: 'Failed to claim rewards: ' + error.message
+            })
+            return false
+        }
+    }
+
+    // Claim all available rewards
+    const claimAllNeuronRewards = async (neurons: any[]): Promise<boolean> => {
+        if (!userLoggedIn.value || neurons.length === 0) {
+            return false
+        }
+
+        try {
+            // Get all neuron IDs that have rewards
+            const neuronBalances = await loadNeuronRewardBalances(neurons)
+            const claimableNeuronIds: Uint8Array[] = []
+
+            for (const neuron of neurons) {
+                if (neuron.id && neuron.id.length > 0) {
+                    const neuronIdHex = formatNeuronIdForMap(neuron.id[0].id)
+                    const balance = neuronBalances.get(neuronIdHex) || 0
+                    if (balance > 0) {
+                        claimableNeuronIds.push(neuron.id[0].id)
+                    }
+                }
+            }
+
+            if (claimableNeuronIds.length === 0) {
+                addToast({
+                    id: Date.now(),
+                    code: 'no-rewards',
+                    title: 'No Rewards',
+                    icon: 'fa-solid fa-info-circle',
+                    message: 'No rewards available to claim'
+                })
+                return false
+            }
+
+            return await claimNeuronRewards(claimableNeuronIds)
+
+        } catch (error: any) {
+            console.error('Error claiming all rewards:', error)
+            addToast({
+                id: Date.now() + 1,
+                code: 'claim-all-error',
+                title: 'Claim Error',
+                icon: 'fa-solid fa-exclamation-triangle',
+                message: 'Failed to claim all rewards: ' + error.message
+            })
+            return false
+        }
+    }
+
     // Set dissolve timestamp for a neuron (dissolve period setting)
     const setDissolveTimestamp = async (neuronId: Uint8Array, dissolveTimestampSeconds: bigint) => {
         try {
@@ -6955,6 +7144,10 @@ export const useTacoStore = defineStore('taco', () => {
         getTacoNeurons,
         formatNeuronForDisplay,
         categorizeNeurons,
+        loadNeuronRewardBalances,
+        claimNeuronRewards,
+        claimAllNeuronRewards,
+        formatNeuronIdForMap,
         stakeToNeuron,
         createNeuron,
         setNeuronDissolveDelay,

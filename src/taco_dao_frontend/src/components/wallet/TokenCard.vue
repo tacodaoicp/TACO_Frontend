@@ -63,6 +63,49 @@
       </div>
     </div>
     
+    <!-- Rewards section for TACO token -->
+    <div v-if="token.symbol === 'TACO'" class="rewards-section">
+      <div class="rewards-header">
+        <h6 class="rewards-title">
+          <i class="fa fa-coins me-2"></i>
+          Rewards
+        </h6>
+        <div class="rewards-actions">
+          <button 
+            v-if="totalRewards > 0"
+            @click="claimAllRewards"
+            class="btn btn-success btn-sm"
+            :disabled="loadingRewards || claimingAllRewards"
+            title="Claim all rewards"
+          >
+            <i v-if="claimingAllRewards" class="fa fa-spinner fa-spin me-1"></i>
+            <i v-else class="fa fa-coins me-1"></i>
+            {{ claimingAllRewards ? 'Claiming...' : 'Claim All' }}
+          </button>
+        </div>
+      </div>
+      <div class="rewards-content">
+        <div v-if="loadingRewards" class="rewards-loading">
+          <div class="spinner-border spinner-border-sm" role="status">
+            <span class="visually-hidden">Loading...</span>
+          </div>
+          <span class="ms-2">Loading rewards...</span>
+        </div>
+        <div v-else class="rewards-balance">
+          <div class="balance-amount">
+            {{ formatBalance(BigInt(Math.floor(totalRewards)), 8) }}
+            <span class="balance-symbol">TACO</span>
+          </div>
+          <div v-if="totalRewards === 0" class="balance-subtitle text-muted">
+            No rewards available
+          </div>
+          <div v-else class="balance-subtitle text-success">
+            Available to claim
+          </div>
+        </div>
+      </div>
+    </div>
+    
     <!-- Neurons section for TACO token -->
     <div v-if="token.symbol === 'TACO'" class="neurons-section">
       <div class="neurons-header" @click="toggleNeuronsSection">
@@ -173,6 +216,21 @@
                   <div v-if="neuron.stakedMaturity > 0" class="detail-item">
                     <span class="detail-label">Staked Maturity:</span>
                     <span class="detail-value">{{ formatBalance(neuron.stakedMaturity, 8) }} TACO</span>
+                  </div>
+                  <div v-if="getNeuronRewards(neuron.idHex) > 0" class="detail-item">
+                    <span class="detail-label">Rewards:</span>
+                    <span class="detail-value text-success">
+                      {{ formatBalance(BigInt(Math.floor(getNeuronRewards(neuron.idHex))), 8) }} TACO
+                      <button 
+                        @click.stop="claimNeuronRewards(neuron)"
+                        class="btn btn-success btn-xs ms-2"
+                        :disabled="loadingRewards || isNeuronClaiming(neuron.idHex)"
+                        title="Claim this neuron's rewards"
+                      >
+                        <i v-if="isNeuronClaiming(neuron.idHex)" class="fa fa-spinner fa-spin"></i>
+                        <i v-else class="fa fa-coins"></i>
+                      </button>
+                    </span>
                   </div>
                   <div class="detail-item">
                     <span class="detail-label">Voting Power:</span>
@@ -317,6 +375,21 @@
                   <div v-if="neuron.stakedMaturity > 0" class="detail-item">
                     <span class="detail-label">Staked Maturity:</span>
                     <span class="detail-value">{{ formatBalance(neuron.stakedMaturity, 8) }} TACO</span>
+                  </div>
+                  <div v-if="getNeuronRewards(neuron.idHex) > 0" class="detail-item">
+                    <span class="detail-label">Rewards:</span>
+                    <span class="detail-value text-success">
+                      {{ formatBalance(BigInt(Math.floor(getNeuronRewards(neuron.idHex))), 8) }} TACO
+                      <button 
+                        @click.stop="claimNeuronRewards(neuron)"
+                        class="btn btn-success btn-xs ms-2"
+                        :disabled="loadingRewards || isNeuronClaiming(neuron.idHex)"
+                        title="Claim this neuron's rewards"
+                      >
+                        <i v-if="isNeuronClaiming(neuron.idHex)" class="fa fa-spinner fa-spin"></i>
+                        <i v-else class="fa fa-coins"></i>
+                      </button>
+                    </span>
                   </div>
                   <div class="detail-item">
                     <span class="detail-label">Voting Power:</span>
@@ -516,6 +589,12 @@ const categorizedNeurons = ref<{owned: any[], hotkeyed: any[], all: any[]}>({own
 const expandedNeurons = ref<Set<string>>(new Set())
 const neuronsExpanded = ref(false) // Default to collapsed
 
+// Rewards state
+const neuronBalances = ref<Map<string, number>>(new Map())
+const loadingRewards = ref(false)
+const claimingAllRewards = ref(false)
+const claimingNeurons = ref<Set<string>>(new Set())
+
 // Load neurons for TACO token
 const loadNeurons = async () => {
   if (!tacoStore.userLoggedIn || props.token.symbol !== 'TACO') {
@@ -527,6 +606,9 @@ const loadNeurons = async () => {
     const rawNeurons = await tacoStore.getTacoNeurons()
     categorizedNeurons.value = tacoStore.categorizeNeurons(rawNeurons)
     neurons.value = categorizedNeurons.value.all // Keep for backward compatibility
+    
+    // Load rewards after neurons are loaded
+    await loadRewards()
   } catch (error) {
     console.error('Error loading neurons:', error)
     neurons.value = []
@@ -550,10 +632,123 @@ const toggleNeuronsSection = () => {
   neuronsExpanded.value = !neuronsExpanded.value
 }
 
-// Auto-load neurons on mount for TACO token
+// Computed rewards properties
+const totalRewards = computed(() => {
+  let total = 0
+  for (const balance of neuronBalances.value.values()) {
+    total += balance
+  }
+  return total
+})
+
+// Rewards functions
+const getNeuronRewards = (neuronIdHex: string): number => {
+  return neuronBalances.value.get(neuronIdHex) || 0
+}
+
+const isNeuronClaiming = (neuronIdHex: string): boolean => {
+  return claimingNeurons.value.has(neuronIdHex)
+}
+
+const claimNeuronRewards = async (neuron: any) => {
+  if (!tacoStore.userLoggedIn) return
+  
+  claimingNeurons.value.add(neuron.idHex)
+  try {
+    // Find the original neuron data to get the proper ID format
+    const originalNeuron = categorizedNeurons.value.all.find(n => n.idHex === neuron.idHex)
+    if (!originalNeuron?.id || originalNeuron.id.length === 0) {
+      throw new Error('Invalid neuron ID format')
+    }
+    
+    // Call the real claim function with the neuron ID
+    const success = await tacoStore.claimNeuronRewards([originalNeuron.id[0].id])
+    
+    if (success) {
+      // Update the neuron balance to 0 after successful claim
+      neuronBalances.value.set(neuron.idHex, 0)
+      
+      // Reload rewards to get updated balances
+      await loadRewards()
+    }
+  } catch (error) {
+    console.error('Error claiming neuron rewards:', error)
+    tacoStore.addToast({
+      id: Date.now() + 1,
+      code: 'claim-error',
+      title: 'Claim Failed',
+      icon: 'fa-solid fa-exclamation-triangle',
+      message: 'Failed to claim neuron rewards: ' + (error as Error).message
+    })
+  } finally {
+    claimingNeurons.value.delete(neuron.idHex)
+  }
+}
+
+const claimAllRewards = async () => {
+  if (!tacoStore.userLoggedIn || totalRewards.value <= 0) return
+  
+  claimingAllRewards.value = true
+  try {
+    // Use the real claim all function from taco store
+    const success = await tacoStore.claimAllNeuronRewards(categorizedNeurons.value.all)
+    
+    if (success) {
+      // Clear all neuron balances after successful claim
+      neuronBalances.value.clear()
+      
+      // Reload rewards to get updated balances
+      await loadRewards()
+    }
+  } catch (error) {
+    console.error('Error claiming all rewards:', error)
+    tacoStore.addToast({
+      id: Date.now() + 1,
+      code: 'claim-all-error',
+      title: 'Claim Failed',
+      icon: 'fa-solid fa-exclamation-triangle',
+      message: 'Failed to claim all rewards: ' + (error as Error).message
+    })
+  } finally {
+    claimingAllRewards.value = false
+  }
+}
+
+const loadRewards = async () => {
+  if (!tacoStore.userLoggedIn || props.token.symbol !== 'TACO') {
+    return
+  }
+  
+  loadingRewards.value = true
+  try {
+    // Load real rewards data from taco store
+    const rewardsMap = await tacoStore.loadNeuronRewardBalances(categorizedNeurons.value.all)
+    
+    // Convert the rewards map to use neuron hex IDs as keys
+    const neuronRewards = new Map<string, number>()
+    for (const neuron of categorizedNeurons.value.all) {
+      if (neuron.id && neuron.id.length > 0) {
+        const neuronIdHex = tacoStore.formatNeuronIdForMap(neuron.id[0].id)
+        const balance = rewardsMap.get(neuronIdHex) || 0
+        if (balance > 0) {
+          neuronRewards.set(neuron.idHex, balance)
+        }
+      }
+    }
+    
+    neuronBalances.value = neuronRewards
+  } catch (error) {
+    console.error('Error loading rewards:', error)
+  } finally {
+    loadingRewards.value = false
+  }
+}
+
+// Auto-load neurons and rewards on mount for TACO token
 onMounted(() => {
   if (props.token.symbol === 'TACO' && tacoStore.userLoggedIn) {
     loadNeurons()
+    loadRewards()
   }
 })
 
@@ -797,6 +992,71 @@ const formatUSDValue = (balance: bigint, decimals: number, priceUSD: number): st
   min-width: 0;
 }
 
+/* Rewards section styles */
+.rewards-section {
+  margin-bottom: 0.5rem;
+  padding: 0.75rem;
+  background: rgba(0, 128, 0, 0.05);
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+}
+
+.rewards-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.rewards-title {
+  font-size: 0.9rem;
+  font-weight: 600;
+  margin: 0;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+}
+
+.rewards-actions {
+  display: flex;
+  align-items: center;
+}
+
+.rewards-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem 0;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.rewards-balance {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0.5rem 0;
+}
+
+.rewards-balance .balance-amount {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 0.25rem;
+}
+
+.rewards-balance .balance-symbol {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  margin-left: 0.25rem;
+}
+
+.rewards-balance .balance-subtitle {
+  font-size: 0.8rem;
+  font-weight: 500;
+}
+
 /* Neurons section styles */
 .neurons-section {
   margin-bottom: 0.5rem;
@@ -942,6 +1202,13 @@ const formatUSDValue = (balance: bigint, decimals: number, priceUSD: number): st
   padding: 0.4rem 0.6rem;
   font-size: 0.8rem;
   min-width: auto;
+}
+
+.btn-xs {
+  padding: 0.15rem 0.35rem;
+  font-size: 0.7rem;
+  line-height: 1;
+  border-radius: 3px;
 }
 
 .neuron-details {
