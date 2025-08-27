@@ -195,6 +195,7 @@ interface SwapData {
   outputToken: Token
   amount: string
   selectedQuote: Quote
+  slippageTolerance: number
 }
 
 interface SwapConfirmDialogProps {
@@ -240,9 +241,9 @@ const executeSwap = async () => {
     const { inputToken, outputToken, amount, selectedQuote } = swapData.value
     const amountIn = parseAmountToBigInt(amount, inputToken.decimals)
     
-    // Calculate minimum amount out with some slippage tolerance (0.5% additional)
-    const slippageTolerance = Math.max(selectedQuote.slippage / 100, 0.005) + 0.005
-    const minAmountOut = BigInt(Math.floor(Number(selectedQuote.amountOut) * (1 - slippageTolerance)))
+    // Use the user's selected slippage tolerance
+    const userSlippageTolerance = swapData.value.slippageTolerance
+    const minAmountOut = BigInt(Math.floor(Number(selectedQuote.amountOut) * (1 - userSlippageTolerance)))
 
     let result: any
 
@@ -256,7 +257,7 @@ const executeSwap = async () => {
         buyTokenSymbol: outputToken.symbol,
         amountIn,
         minAmountOut,
-        slippageTolerance: slippageTolerance,
+        slippageTolerance: userSlippageTolerance,
       }
 
       if (swapMethod.value === 'icrc2') {
@@ -275,7 +276,7 @@ const executeSwap = async () => {
         buyTokenPrincipal: outputToken.principal,
         amountIn,
         minAmountOut,
-        slippageTolerance: slippageTolerance,
+        slippageTolerance: userSlippageTolerance,
       }
 
       if (swapMethod.value === 'icrc2') {

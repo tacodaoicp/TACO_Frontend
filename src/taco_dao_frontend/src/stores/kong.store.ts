@@ -18,12 +18,12 @@ const KONG_CANISTER_ID = '2ipq2-uqaaa-aaaar-qailq-cai'
 interface KongSwapArgs {
   pay_token: string
   pay_amount: bigint
-  pay_tx_id?: { BlockIndex: bigint } | null
+  pay_tx_id?: { BlockIndex: bigint }[] | []
   receive_token: string
-  receive_amount?: bigint[] | null
-  receive_address?: Principal[] | null
-  max_slippage?: number[] | null
-  referred_by?: Principal[] | null
+  receive_amount?: bigint[] | []
+  receive_address?: Principal[] | []
+  max_slippage?: number[] | []
+  referred_by?: Principal[] | []
 }
 
 interface SwapResult {
@@ -337,7 +337,7 @@ export const useKongStore = defineStore('kong', () => {
       const swapArgs: KongSwapArgs = {
         pay_token: formatTokenSymbolForKong(params.sellTokenSymbol),
         pay_amount: params.amountIn,
-        pay_tx_id: null, // No tx_id means Kong will use ICRC2
+        pay_tx_id: [], // No tx_id means Kong will use ICRC2
         receive_token: formatTokenSymbolForKong(params.buyTokenSymbol),
         receive_amount: [],
         receive_address: params.recipient ? [params.recipient] : [],
@@ -411,7 +411,7 @@ export const useKongStore = defineStore('kong', () => {
       const swapArgs: KongSwapArgs = {
         pay_token: formatTokenSymbolForKong(params.sellTokenSymbol),
         pay_amount: params.amountIn,
-        pay_tx_id: { BlockIndex: blockIndex },
+        pay_tx_id: [{ BlockIndex: BigInt(blockIndex) }],
         receive_token: formatTokenSymbolForKong(params.buyTokenSymbol),
         receive_amount: [],
         receive_address: params.recipient ? [params.recipient] : [],
