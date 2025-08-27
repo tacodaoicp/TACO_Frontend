@@ -177,7 +177,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useKongStore } from '../../stores/kong.store'
 import { useICPSwapStore } from '../../stores/icpswap.store'
 import { useTacoStore } from '../../stores/taco.store'
@@ -238,6 +238,15 @@ const hasError = ref(false)
 
 // Computed
 const swapData = computed(() => props.swapData)
+
+// Watch for dialog opening with new swap data and clear error state
+watch([() => props.show, () => props.swapData], ([newShow, newSwapData], [oldShow, oldSwapData]) => {
+  // Clear error when dialog opens or when swap data changes
+  if (newShow && (!oldShow || newSwapData !== oldSwapData)) {
+    hasError.value = false
+    errorMessage.value = ''
+  }
+}, { immediate: true })
 
 // Methods
 const closeModal = () => {

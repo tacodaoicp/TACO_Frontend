@@ -183,12 +183,19 @@
 
   // toasts
   .toast {
-    background-color: var(--white-to-light-orange);
+    background-color: #ffffff !important; // Solid white background
+    border: 1px solid #dee2e6; // Light border for definition
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075); // Subtle shadow
   }
 
   .toast-header {
     background-color: var(--success-green-hover);
     color: var(--white);
+    
+    // Error toast headers should be red
+    .toast:has(.fa-exclamation-triangle) & {
+      background-color: #dc3545 !important; // Bootstrap danger red
+    }
   }
 
   /////////////////////
