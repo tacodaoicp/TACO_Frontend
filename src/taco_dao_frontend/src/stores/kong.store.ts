@@ -314,14 +314,18 @@ export const useKongStore = defineStore('kong', () => {
       console.log('Token fee:', tokenFee)
 
       // Step 2: Create ICRC2 approval for Kong
+      // Approve amountIn + fee so Kong has enough allowance for the transfer + fee
       params.onStep?.('Approving tokens...')
       console.log('Step 2: Creating ICRC2 approval...')
+      const approvalAmount = params.amountIn + tokenFee
+      console.log('Approval amount (amountIn + fee):', approvalAmount)
+      
       const approvalArgs = {
         spender: {
           owner: Principal.fromText(KONG_CANISTER_ID),
           subaccount: [],
         },
-        amount: params.amountIn,
+        amount: approvalAmount,
         fee: [],
         memo: [],
         from_subaccount: [],

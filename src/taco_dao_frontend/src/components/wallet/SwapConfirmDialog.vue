@@ -141,6 +141,18 @@
         </div>
       </div>
 
+      <!-- Error Display -->
+      <div v-if="hasError" class="error-section">
+        <div class="error-content">
+          <i class="fa fa-exclamation-triangle text-danger me-2"></i>
+          <div class="error-details">
+            <h6 class="error-title">Swap Failed</h6>
+            <p class="error-message">{{ errorMessage }}</p>
+            <small class="error-hint">You can copy this error message for support.</small>
+          </div>
+        </div>
+      </div>
+
       <div class="modal-footer">
         <button @click="$emit('close')" class="btn btn-secondary" :disabled="isExecuting">
           Cancel
@@ -221,6 +233,8 @@ const tacoStore = useTacoStore()
 const swapMethod = ref<'icrc2' | 'icrc1'>('icrc2')
 const isExecuting = ref(false)
 const executionStep = ref('')
+const errorMessage = ref('')
+const hasError = ref(false)
 
 // Computed
 const swapData = computed(() => props.swapData)
@@ -228,6 +242,9 @@ const swapData = computed(() => props.swapData)
 // Methods
 const closeModal = () => {
   if (!isExecuting.value) {
+    // Reset error state when closing
+    hasError.value = false
+    errorMessage.value = ''
     emit('close')
   }
 }
@@ -235,6 +252,10 @@ const closeModal = () => {
 const executeSwap = async () => {
   if (!swapData.value || isExecuting.value) return
 
+  // Reset error state
+  hasError.value = false
+  errorMessage.value = ''
+  
   isExecuting.value = true
   
   try {
@@ -292,6 +313,12 @@ const executeSwap = async () => {
     
   } catch (error: any) {
     console.error('Swap execution error:', error)
+    
+    // Show error in the dialog
+    hasError.value = true
+    errorMessage.value = error.message || 'Swap failed'
+    
+    // Also emit to parent for toast (but dialog stays open)
     emit('error', error.message || 'Swap failed')
   } finally {
     isExecuting.value = false
@@ -652,6 +679,51 @@ const getPriceImpactClass = (slippage: number): string => {
 .confirm-content {
   display: flex;
   align-items: center;
+}
+
+.error-section {
+  padding: 1rem;
+  border-top: 1px solid #dee2e6;
+  background-color: #f8f9fa;
+}
+
+.error-content {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 1rem;
+  background-color: #fff5f5;
+  border: 1px solid #fed7d7;
+  border-radius: 0.5rem;
+}
+
+.error-details {
+  flex: 1;
+  min-width: 0;
+}
+
+.error-title {
+  color: #e53e3e;
+  font-size: 0.9rem;
+  font-weight: 600;
+  margin: 0 0 0.5rem 0;
+}
+
+.error-message {
+  color: #2d3748;
+  font-size: 0.85rem;
+  margin: 0 0 0.5rem 0;
+  word-break: break-word;
+  font-family: 'Courier New', monospace;
+  background-color: #f7fafc;
+  padding: 0.5rem;
+  border-radius: 0.25rem;
+  border: 1px solid #e2e8f0;
+}
+
+.error-hint {
+  color: #718096;
+  font-size: 0.75rem;
 }
 
 @media (max-width: 576px) {

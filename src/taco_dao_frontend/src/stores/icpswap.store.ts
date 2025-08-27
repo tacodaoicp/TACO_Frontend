@@ -152,11 +152,6 @@ export const useICPSwapStore = defineStore('icpswap', () => {
         'token': IDL.Text,
       })
 
-      const DepositFromArgs = IDL.Record({
-        'amount': IDL.Nat,
-        'token': IDL.Text,
-      })
-
       const WithdrawArgs = IDL.Record({
         'amount': IDL.Nat,
         'fee': IDL.Nat,
@@ -223,7 +218,7 @@ export const useICPSwapStore = defineStore('icpswap', () => {
       return IDL.Service({
         'swap': IDL.Func([SwapArgs], [SwapResult], []),
         'deposit': IDL.Func([DepositArgs], [DepositResult], []),
-        'depositFrom': IDL.Func([Account, DepositFromArgs], [DepositResult], []),
+        'depositFrom': IDL.Func([DepositArgs], [DepositResult], []),
         'withdraw': IDL.Func([WithdrawArgs], [WithdrawResult], []),
         'getUserUnusedBalance': IDL.Func([IDL.Principal], [BalanceResult], ['query']),
         'metadata': IDL.Func([], [MetadataResult], ['query']),
@@ -517,14 +512,18 @@ export const useICPSwapStore = defineStore('icpswap', () => {
       console.log('Token fee:', tokenFee)
 
       // Step 3: Create ICRC2 approval for pool
+      // Approve amountIn + fee so pool has enough allowance for the transfer + fee
       params.onStep?.('Approving tokens...')
       console.log('Step 3: Creating ICRC2 approval...')
+      const approvalAmount = params.amountIn + tokenFee
+      console.log('Approval amount (amountIn + fee):', approvalAmount)
+      
       const approvalArgs = {
         spender: {
           owner: Principal.fromText(poolId),
           subaccount: [],
         },
-        amount: params.amountIn,
+        amount: approvalAmount,
         fee: [],
         memo: [],
         from_subaccount: [],
@@ -550,18 +549,14 @@ export const useICPSwapStore = defineStore('icpswap', () => {
       // Generate pool subaccount for the user
       const userSubaccount = principalToSubAccount(Principal.fromText(userPrincipal.value!))
       
-      const userAccount = {
-        owner: Principal.fromText(userPrincipal.value!),
-        subaccount: [],
-      }
-      
       const depositFromArgs = {
         amount: params.amountIn,
+        fee: tokenFee,
         token: params.sellTokenPrincipal,
       }
 
-      console.log('DepositFrom args:', { userAccount, depositFromArgs })
-      const depositResult = await poolActor.depositFrom(userAccount, depositFromArgs) as any
+      console.log('DepositFrom args:', depositFromArgs)
+      const depositResult = await poolActor.depositFrom(depositFromArgs) as any
       console.log('DepositFrom result:', depositResult)
 
       if ('err' in depositResult) {
