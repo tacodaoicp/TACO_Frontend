@@ -185,7 +185,7 @@
                         {{ formatImportanceLevel(alarm.importanceLevel) }}
                       </span>
                     </div>
-                    <small class="text-muted">{{ formatTimestamp(alarm.emailSentAt?.[0]) }}</small>
+                    <small class="text-light">{{ formatTimestamp(alarm.emailSentAt?.[0]) }}</small>
                   </div>
                   <div class="mb-2">{{ alarm.message }}</div>
                   <div class="d-flex justify-content-between align-items-center">
@@ -234,11 +234,11 @@
                         {{ error.resolved ? 'Resolved' : 'Unresolved' }}
                       </span>
                     </div>
-                    <small class="text-muted">{{ formatTimestamp(error.timestamp) }}</small>
+                    <small class="text-light">{{ formatTimestamp(error.timestamp) }}</small>
                   </div>
                   <div class="mb-2">{{ error.errorMessage }}</div>
                   <div class="d-flex justify-content-between align-items-center">
-                    <small class="text-muted">Retries: {{ error.retryAttempts }}</small>
+                    <small class="text-light">Retries: {{ error.retryAttempts }}</small>
                     <button 
                       v-if="!error.resolved"
                       @click="resolveError(error.id)" 
