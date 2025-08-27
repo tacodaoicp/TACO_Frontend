@@ -972,9 +972,11 @@ export const useTacoStore = defineStore('taco', () => {
                 authClient.login({
                     maxTimeToLive: BigInt(30 * 24 * 60 * 60 * 1000 * 1000 * 1000),
                     identityProvider:
-                        process.env.DFX_NETWORK === "ic" || process.env.DFX_NETWORK === "staging"
+                        process.env.DFX_NETWORK === "ic"
                             ? 'https://identity.ic0.app'
-                            : `http://${iiCanisterId}.localhost:8080/`,
+                            : process.env.DFX_NETWORK === "staging"
+                            ? `http://${iiCanisterId}.localhost:8080/`
+                            : `http://${iiCanisterId}.localhost:4943/`,
                     onSuccess: resolve,
                     onError: reject,
                 })
@@ -2646,7 +2648,8 @@ export const useTacoStore = defineStore('taco', () => {
             // Create an agent with the identity
             const agent = await createAgent({
                 identity,
-                host: import.meta.env.VITE_IC_HOST
+                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+                fetchRootKey: process.env.DFX_NETWORK === "local",
             });
 
             // Create treasury actor with authenticated identity
@@ -2726,7 +2729,8 @@ export const useTacoStore = defineStore('taco', () => {
             // Create an agent with the identity
             const agent = await createAgent({
                 identity,
-                host: import.meta.env.VITE_IC_HOST
+                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+                fetchRootKey: process.env.DFX_NETWORK === "local",
             });
 
             // Create treasury actor with authenticated identity
@@ -2819,7 +2823,8 @@ export const useTacoStore = defineStore('taco', () => {
             // Create an agent with the identity
             const agent = await createAgent({
                 identity,
-                host: import.meta.env.VITE_IC_HOST
+                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+                fetchRootKey: process.env.DFX_NETWORK === "local",
             });
 
             // Create treasury actor with authenticated identity
@@ -5165,22 +5170,25 @@ export const useTacoStore = defineStore('taco', () => {
     // Helper function to create alarm actor
     const createAlarmActor = async (useAuth: boolean = true) => {
         try {
+
+
             let identity;
             
             if (useAuth) {
                 const authClient = await getAuthClient();
-                if (!(await authClient.isAuthenticated())) {
-                    throw new Error('User must be authenticated');
-                }
                 identity = authClient.getIdentity();
+                userLoggedIn.value = true;
             } else {
                 identity = new AnonymousIdentity();
+            }
+        if (!userLoggedIn.value) {
+                throw new Error('User must be logged in');
             }
 
             const agent = await createAgent({
                 identity,
-                host: "https://ic0.app",
-                fetchRootKey: false,
+                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+                fetchRootKey: process.env.DFX_NETWORK === "local",
             });
 
             return Actor.createActor<AlarmService>(alarmIDL, {
@@ -5335,25 +5343,39 @@ export const useTacoStore = defineStore('taco', () => {
         }
     }
 
-    const testAlarmContact = async (contactIds: number[]) => {
+    const testAlarmContact = async (contactIds: number[], options?: { email?: boolean; sms?: boolean }) => {
         try {
             const actor = await createAlarmActor();
             const bigIntContactIds = contactIds.map(id => BigInt(id));
             
-            // Send test SMS first
-            const smsResult = await actor.sendTestSMS(bigIntContactIds);
-            if ('err' in smsResult) {
-                throw new Error(`SMS test error: ${JSON.stringify(smsResult.err)}`);
+            const results: { sms?: any; email?: any } = {};
+            
+            // Default to both if no options specified
+            const shouldSendSMS = options?.sms !== false;
+            const shouldSendEmail = options?.email !== false;
+            
+            if (shouldSendSMS) {
+                const smsResult = await actor.sendTestSMS(bigIntContactIds);
+                if ('err' in smsResult) {
+                    throw new Error(`SMS test error: ${JSON.stringify(smsResult.err)}`);
+                }
+                results.sms = smsResult.ok;
             }
             
-            // Then send test email
-            const emailResult = await actor.sendTestEmail(bigIntContactIds);
-            if ('err' in emailResult) {
-                throw new Error(`Email test error: ${JSON.stringify(emailResult.err)}`);
+            if (shouldSendEmail) {
+                const emailResult = await actor.sendTestEmail(bigIntContactIds);
+                if ('err' in emailResult) {
+                    throw new Error(`Email test error: ${JSON.stringify(emailResult.err)}`);
+                }
+                results.email = emailResult.ok;
             }
             
-            showSuccess('Test messages sent successfully');
-            return { sms: smsResult.ok, email: emailResult.ok };
+            const messageTypes = [];
+            if (shouldSendSMS) messageTypes.push('SMS');
+            if (shouldSendEmail) messageTypes.push('Email');
+            
+            showSuccess(`Test ${messageTypes.join(' and ')} sent successfully`);
+            return results;
         } catch (error) {
             console.error('Error testing alarm contact:', error);
             showError(`Error testing contact: ${error instanceof Error ? error.message : String(error)}`);

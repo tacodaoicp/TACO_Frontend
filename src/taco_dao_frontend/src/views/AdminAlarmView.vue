@@ -50,7 +50,7 @@
           </div>
 
           <!-- Admin Management -->
-          <div v-if="userStore.userLoggedIn" class="card bg-dark text-white mb-4">
+          <div class="card bg-dark text-white mb-4">
             <div class="card-header">
               <h3 class="mb-0">Admin Management</h3>
             </div>
@@ -147,7 +147,13 @@
                             >
                               {{ contact.active ? 'Disable' : 'Enable' }}
                             </button>
-                            <button @click="testContact(contact)" class="btn btn-outline-info">Test</button>
+                            <button 
+                              @click="testContact(contact, getContactTypeFromVariant(contact.contactType).toLowerCase() as 'email' | 'sms')" 
+                              :class="getContactTypeFromVariant(contact.contactType) === 'Email' ? 'btn btn-outline-primary' : 'btn btn-outline-warning'"
+                              :title="'Test ' + getContactTypeFromVariant(contact.contactType)"
+                            >
+                              {{ getContactTypeFromVariant(contact.contactType) === 'Email' ? '📧' : '📱' }} Test
+                            </button>
                             <button @click="removeContact(contact.id)" class="btn btn-outline-danger">Remove</button>
                           </div>
                         </td>
@@ -619,24 +625,6 @@
             </div>
             
           </div>
-          <div  class="card bg-dark text-white mb-4">
-      <div class="card-header">
-       <h3 class="mb-0">Admin Management</h3>
-      </div>
-      <div class="card-body">
-       <div class="input-group mb-3">
-        <input
-         v-model="newAdminPrincipal"
-         type="text"
-         class="form-control"
-         placeholder="Enter principal ID"
-        />
-        <button @click="addAdmin" :disabled="!newAdminPrincipal || loading" class="btn btn-primary">
-         Add Admin
-        </button>
-   </div>
-      </div>
-     </div>
         </div>
       </div>
     </div>
@@ -658,7 +646,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useTacoStore } from '../stores/taco.store'
 import HeaderBar from '../components/HeaderBar.vue'
 import FooterBar from '../components/FooterBar.vue'
@@ -728,6 +716,11 @@ const configIntervals = ref({
 const logLimit = ref(25)
 const adminActionLogs = ref([] as any[])
 
+// Auto-refresh state
+const refreshInterval = ref<NodeJS.Timeout | null>(null)
+const refreshCount = ref(0)
+const maxRefreshCount = 30 // 30 minutes worth of refreshes (1 per minute)
+
 
 // Computed properties
 const isContactValid = computed(() => {
@@ -745,18 +738,54 @@ const isCanisterFormValid = computed(() => {
          (!newCanister.value.isSNSControlled || newCanister.value.snsRootCanisterId.trim())
 })
 
+// Auto-refresh function
+async function refreshData() {
+  try {
+    await Promise.all([
+      fetchSystemStatus(),
+      fetchContacts(),
+      fetchPendingAlarms(),
+      fetchSystemErrors(),
+      fetchConfigIntervals(),
+      fetchQueueStatus(),
+      fetchSentMessages(),
+      fetchAlarmAcknowledgments(),
+      fetchAdminActionLogs(),
+      fetchMonitoredCanisters()
+    ])
+  } catch (error) {
+    console.error('Error during auto-refresh:', error)
+  }
+}
+
+function startAutoRefresh() {
+  refreshInterval.value = setInterval(async () => {
+    refreshCount.value++
+    if (refreshCount.value > maxRefreshCount) {
+      stopAutoRefresh()
+      return
+    }
+    await refreshData()
+  }, 60000) // Refresh every 1 minute (60000 milliseconds)
+}
+
+function stopAutoRefresh() {
+  if (refreshInterval.value) {
+    clearInterval(refreshInterval.value)
+    refreshInterval.value = null
+  }
+}
+
 // Lifecycle
 onMounted(async () => {
-  await Promise.all([
-    fetchSystemStatus(),
-    fetchContacts(),
-    fetchPendingAlarms(),
-    fetchSystemErrors(),
-    fetchConfigIntervals(),
-    fetchQueueStatus(),
-    fetchSentMessages(),
-    fetchAlarmAcknowledgments()
-  ])
+  // Initial data load
+  await refreshData()
+  // Start auto-refresh
+  startAutoRefresh()
+})
+
+onUnmounted(() => {
+  stopAutoRefresh()
 })
 
 // Watch for error limit changes
@@ -872,11 +901,15 @@ async function removeContact(contactId: number) {
   showConfirmModal.value = true
 }
 
-async function testContact(contact: any) {
+async function testContact(contact: any, testType: 'email' | 'sms') {
   loading.value = true
   try {
-    await tacoStore.testAlarmContact([contact.id])
-    tacoStore.showSuccess('Test message sent')
+    const options = {
+      email: testType === 'email',
+      sms: testType === 'sms'
+    }
+    
+    await tacoStore.testAlarmContact([contact.id], options)
   } catch (error: any) {
     tacoStore.showError('Failed to send test message: ' + error.message)
   } finally {
@@ -1172,9 +1205,21 @@ function formatErrorType(errorType: any): string {
   return 'Unknown'
 }
 
-function formatTimestamp(timestamp: number): string {
+function formatTimestamp(timestamp: number | bigint | string): string {
   if (!timestamp) return 'N/A'
-  return new Date(timestamp / 1000000).toLocaleString()
+  
+  // Convert to number if it's a BigInt or string
+  let timestampNum: number
+  if (typeof timestamp === 'bigint') {
+    timestampNum = Number(timestamp)
+  } else if (typeof timestamp === 'string') {
+    timestampNum = parseInt(timestamp, 10)
+  } else {
+    timestampNum = timestamp
+  }
+  
+  // Handle nanosecond timestamps (divide by 1M to get milliseconds)
+  return new Date(timestampNum / 1000000).toLocaleString()
 }
 
 function formatCanisterId(canisterId: string): string {
