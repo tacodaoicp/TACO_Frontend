@@ -536,28 +536,64 @@ export default {
       try {
         const rewardsActor = await getRewardsActor()
         
-        // Extract neuron IDs (handle optional IDs) for filtering
-        const userNeuronIds = new Set()
-        neurons.value
-          .filter(neuron => neuron.id && neuron.id.length > 0)
-          .forEach(neuron => {
-            const neuronIdHex = formatNeuronIdForMap(neuron.id[0].id)
-            userNeuronIds.add(neuronIdHex)
-          })
-
-        if (userNeuronIds.size === 0) return
-
-        // Get all balances from the canister
-        const allBalances = await rewardsActor.getAllNeuronRewardBalances()
-        
-        // Filter for only the user's neurons and store in map
-        neuronBalances.value.clear()
-        for (const [neuronId, balance] of allBalances) {
-          const neuronIdHex = formatNeuronIdForMap(neuronId)
-          if (userNeuronIds.has(neuronIdHex)) {
-            neuronBalances.value.set(neuronIdHex, balance)
+        // Extract neuron IDs (Uint8Array format) for the API call with proper validation
+        const neuronIdBlobs = []
+        neurons.value.forEach(neuron => {
+          // Handle different neuron formats
+          let neuronIdBlob = null
+          
+          // Check if it's a categorized neuron (has id as Uint8Array directly)
+          if (neuron && neuron.id && neuron.id instanceof Uint8Array) {
+            neuronIdBlob = neuron.id
           }
+          // Check if it's a raw neuron (has id as array with objects)
+          else if (neuron && neuron.id && Array.isArray(neuron.id) && neuron.id.length > 0) {
+            const neuronIdObj = neuron.id[0]
+            if (neuronIdObj && neuronIdObj.id) {
+              neuronIdBlob = neuronIdObj.id
+            }
+          }
+          
+          if (!neuronIdBlob) {
+            console.warn('Invalid neuron structure - no valid ID found:', neuron)
+            return
+          }
+          
+          // Ensure it's a valid Uint8Array
+          if (!(neuronIdBlob instanceof Uint8Array) && !Array.isArray(neuronIdBlob)) {
+            console.warn('Invalid neuron ID format (not Uint8Array or Array):', neuronIdBlob)
+            return
+          }
+          
+          // Convert to Uint8Array if it's a regular array
+          const validBlob = neuronIdBlob instanceof Uint8Array ? neuronIdBlob : new Uint8Array(neuronIdBlob)
+          
+          if (validBlob.length === 0) {
+            console.warn('Empty neuron ID blob')
+            return
+          }
+          
+          neuronIdBlobs.push(validBlob)
+        })
+
+        if (neuronIdBlobs.length === 0) {
+          console.warn('No valid neuron IDs found after filtering')
+          return
         }
+
+        console.log(`Requesting balances for ${neuronIdBlobs.length} neurons`)
+
+        // Use getNeuronRewardBalances instead of getAllNeuronRewardBalances (admin-only)
+        const balances = await rewardsActor.getNeuronRewardBalances(neuronIdBlobs)
+        
+        // Convert to map using hex IDs as keys
+        neuronBalances.value.clear()
+        for (const [neuronId, balance] of balances) {
+          const neuronIdHex = formatNeuronIdForMap(neuronId)
+          neuronBalances.value.set(neuronIdHex, balance)
+        }
+
+        console.log(`Successfully loaded ${neuronBalances.value.size} neuron balances`)
 
       } catch (error) {
         console.error('Error loading neuron balances:', error)

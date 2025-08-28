@@ -84,11 +84,11 @@
                                 <div class="neuron-info">
                                     <div class="neuron-id">
                                         <label>Neuron ID:</label>
-                                        <span class="id">{{ formatNeuronId(neuron.id) }}</span>
+                                        <span class="id">{{ neuron.idHex || formatNeuronId(neuron.id) }}</span>
                                     </div>
                                     <div class="neuron-name">
                                         <label>Current Name:</label>
-                                        <span class="display-name">{{ getNeuronCurrentName(neuron.id) }}</span>
+                                        <span class="display-name">{{ neuron.displayName || getNeuronCurrentName(neuron.id) }}</span>
                                     </div>
                                 </div>
                                 
@@ -171,7 +171,7 @@ const {
     getNeuronDisplayName,
     setPrincipalName,
     setNeuronName,
-    getUserNeurons
+    getTacoNeurons
 } = tacoStore
 
 // Local state
@@ -194,6 +194,10 @@ const lastLoadedFormatted = computed(() => {
 
 // Helper methods
 const neuronKey = (neuron) => {
+    // Use the same format as TokenCard.vue - use idHex if available, otherwise generate from id
+    if (neuron.idHex) {
+        return neuron.idHex
+    }
     if (neuron.id && neuron.id.id) {
         return Array.from(neuron.id.id, byte => byte.toString(16).padStart(2, '0')).join('')
     }
@@ -262,17 +266,20 @@ const loadUserNeurons = async () => {
     
     try {
         neuronsLoading.value = true
-        const neurons = await getUserNeurons()
-        userNeurons.value = neurons
+        // Use getTacoNeurons and categorizeNeurons like in TokenCard.vue
+        const rawNeurons = await getTacoNeurons()
+        const categorizedNeurons = tacoStore.categorizeNeurons(rawNeurons)
+        // Use all neurons (both owned and hotkeyed) like in TokenCard
+        userNeurons.value = categorizedNeurons.all
         
         // Initialize input refs for each neuron
-        neurons.forEach(neuron => {
+        userNeurons.value.forEach(neuron => {
             const key = neuronKey(neuron)
             neuronNameInputs.value[key] = ''
             neuronNameSaving.value[key] = false
         })
         
-        console.log('✅ Loaded user neurons:', neurons)
+        console.log('✅ Loaded user neurons:', userNeurons.value)
     } catch (error) {
         console.error('❌ Error loading user neurons:', error)
         userNeurons.value = []

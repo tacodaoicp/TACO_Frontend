@@ -721,22 +721,26 @@ const loadRewards = async () => {
   
   loadingRewards.value = true
   try {
-    // Load real rewards data from taco store
-    const rewardsMap = await tacoStore.loadNeuronRewardBalances(categorizedNeurons.value.all)
+    // Use the same approach as RewardsView - work with raw neurons directly
+    const rawNeurons = await tacoStore.getTacoNeurons()
+    console.log('Raw neurons for rewards:', rawNeurons)
     
-    // Convert the rewards map to use neuron hex IDs as keys
+    // Load real rewards data from taco store using raw neurons
+    const rewardsMap = await tacoStore.loadNeuronRewardBalances(rawNeurons)
+    console.log('Rewards map from store:', rewardsMap)
+    
+    // Convert the rewards map to use neuron hex IDs as keys for the categorized neurons
     const neuronRewards = new Map<string, number>()
     for (const neuron of categorizedNeurons.value.all) {
-      if (neuron.id && neuron.id.length > 0) {
-        const neuronIdHex = tacoStore.formatNeuronIdForMap(neuron.id[0].id)
-        const balance = rewardsMap.get(neuronIdHex) || 0
-        if (balance > 0) {
-          neuronRewards.set(neuron.idHex, balance)
-        }
+      if (neuron.idHex) {
+        const balance = rewardsMap.get(neuron.idHex) || 0
+        neuronRewards.set(neuron.idHex, balance)
+        console.log(`Neuron ${neuron.idHex}: ${balance} rewards`)
       }
     }
     
     neuronBalances.value = neuronRewards
+    console.log('Final neuron balances:', neuronBalances.value)
   } catch (error) {
     console.error('Error loading rewards:', error)
   } finally {
@@ -747,8 +751,7 @@ const loadRewards = async () => {
 // Auto-load neurons and rewards on mount for TACO token
 onMounted(() => {
   if (props.token.symbol === 'TACO' && tacoStore.userLoggedIn) {
-    loadNeurons()
-    loadRewards()
+    loadNeurons() // This already calls loadRewards() after loading neurons
   }
 })
 
