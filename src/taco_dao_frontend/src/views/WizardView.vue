@@ -322,6 +322,31 @@
                   </div>
                 </div>
 
+                <!-- Swap & Stake Information -->
+                <div v-if="selectedSwapFromToken" class="swap-stake-info mb-4">
+                  <div class="info-box">
+                    <h6><i class="fa fa-magic me-2"></i>Swap & Stake Preview:</h6>
+                    <div class="preview-items">
+                      <div class="preview-item">
+                        <span class="label">Will swap:</span>
+                        <span class="value">{{ formatBalance(selectedSwapToken.balance - selectedSwapToken.fee, selectedSwapToken.decimals) }} {{ selectedSwapToken.symbol }}</span>
+                      </div>
+                      <div class="preview-item">
+                        <span class="label">Auto-stake:</span>
+                        <span class="value">All received TACO</span>
+                      </div>
+                      <div class="preview-item">
+                        <span class="label">Dissolve period:</span>
+                        <span class="value">28 days (default)</span>
+                      </div>
+                    </div>
+                    <p class="info-note">
+                      <i class="fa fa-info-circle me-1"></i>
+                      For custom amounts or dissolve periods, use "Swap" then "Stake" separately.
+                    </p>
+                  </div>
+                </div>
+
                 <!-- Swap Actions -->
                 <div v-if="selectedSwapFromToken" class="swap-actions">
                   <button 
@@ -341,7 +366,7 @@
                   >
                     <i v-if="isSwapping" class="fa fa-spinner fa-spin me-2"></i>
                     <i v-else class="fa fa-magic me-2"></i>
-                    {{ isSwapping ? 'Processing...' : 'Swap & Stake' }}
+                    {{ isSwapping ? 'Processing...' : 'Swap & Stake All' }}
                   </button>
                 </div>
 
@@ -523,6 +548,8 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { Principal } from '@dfinity/principal'
 import { useTacoStore } from '../stores/taco.store'
+import { useKongStore } from '../stores/kong.store'
+import { useICPSwapStore } from '../stores/icpswap.store'
 import { getLegacyAccountId } from '../utils/accountUtils'
 import { useClipboard } from '@vueuse/core'
 import { tokenImages } from '../components/data/TokenData'
@@ -545,6 +572,8 @@ interface WalletToken {
 
 const router = useRouter()
 const tacoStore = useTacoStore()
+const kongStore = useKongStore()
+const icpswapStore = useICPSwapStore()
 const { copy } = useClipboard()
 
 // State
@@ -746,6 +775,10 @@ const canSwap = computed(() => {
 const maxTacoAmount = computed(() => {
   const maxAmount = Number(tacoToken.value.balance - tacoToken.value.fee) / (10 ** tacoToken.value.decimals)
   return maxAmount.toString()
+})
+
+const selectedSwapToken = computed(() => {
+  return getTokenByPrincipal(selectedSwapFromToken.value)
 })
 
 
@@ -963,9 +996,111 @@ const performSwap = async () => {
 }
 
 const performSwapAndStake = async () => {
-  // Set flag to indicate we want to stake after swap
+  if (!canSwap.value) return
+  
+  const token = getTokenByPrincipal(selectedSwapFromToken.value)
+  if (!token) return
+  
+  // Set flags for auto-swap & stake
   isSwapAndStake.value = true
-  await performSwap()
+  isSwapping.value = true
+  
+  try {
+    // Calculate max swap amount (all tokens minus fee)
+    const maxSwapAmount = Number(token.balance - token.fee) / (10 ** token.decimals)
+    
+    console.log(`Auto-swapping ${maxSwapAmount} ${token.symbol} to TACO...`)
+    
+    // Convert amount to BigInt for quotes
+    const amountInBigInt = BigInt(Math.floor(maxSwapAmount * (10 ** token.decimals)))
+    
+    // Get quotes from both exchanges
+    const [kongQuote, icpSwapQuote] = await Promise.allSettled([
+      kongStore.getQuote({
+        sellTokenSymbol: token.symbol,
+        buyTokenSymbol: 'TACO',
+        amountIn: amountInBigInt
+      }),
+      icpswapStore.getQuote({
+        sellTokenPrincipal: token.principal,
+        buyTokenPrincipal: tacoStore.tacoPrincipal,
+        amountIn: amountInBigInt
+      })
+    ])
+    
+    // Process quotes and find the best one
+    const quotes = []
+    
+    if (kongQuote.status === 'fulfilled' && kongQuote.value) {
+      quotes.push({
+        exchange: 'Kong',
+        amountOut: typeof kongQuote.value.receive_amount === 'bigint' ? kongQuote.value.receive_amount : BigInt(kongQuote.value.receive_amount),
+        slippage: kongQuote.value.slippage,
+        price: kongQuote.value.price,
+        fee: 0,
+        rawData: kongQuote.value
+      })
+    }
+    
+    if (icpSwapQuote.status === 'fulfilled' && icpSwapQuote.value) {
+      quotes.push({
+        exchange: 'ICPSwap',
+        amountOut: typeof icpSwapQuote.value.amountOut === 'bigint' ? icpSwapQuote.value.amountOut : BigInt(icpSwapQuote.value.amountOut),
+        slippage: icpSwapQuote.value.slippage,
+        price: icpSwapQuote.value.effectivePrice,
+        fee: typeof icpSwapQuote.value.fee === 'bigint' ? Number(icpSwapQuote.value.fee) : icpSwapQuote.value.fee,
+        rawData: icpSwapQuote.value
+      })
+    }
+    
+    if (quotes.length === 0) {
+      throw new Error('No swap quotes available')
+    }
+    
+    // Sort by amount out (highest first) and pick the best
+    const bestQuote = quotes.sort((a, b) => Number(b.amountOut) - Number(a.amountOut))[0]
+    
+    console.log(`Using ${bestQuote.exchange} with expected output: ${Number(bestQuote.amountOut) / 1e8} TACO`)
+    
+    // Execute the swap with ICRC2 (preferred method)
+    let swapResult
+    const swapParams = {
+      sellTokenPrincipal: token.principal,
+      buyTokenPrincipal: tacoStore.tacoPrincipal,
+      amountIn: amountInBigInt.toString(),
+      amountOutMinimum: (BigInt(Math.floor(Number(bestQuote.amountOut) * 0.99))).toString(), // 1% slippage tolerance
+      deadline: Math.floor(Date.now() / 1000) + 300, // 5 minutes
+      fee: bestQuote.fee
+    }
+    
+    if (bestQuote.exchange === 'Kong') {
+      swapResult = await kongStore.icrc2_swap(swapParams)
+    } else {
+      swapResult = await icpswapStore.icrc2_swap(swapParams)
+    }
+    
+    if (swapResult.success) {
+      console.log('Swap successful, proceeding with auto-staking...')
+      await handleSwapSuccess(swapResult)
+    } else {
+      throw new Error(swapResult.error || 'Swap failed')
+    }
+    
+  } catch (error: any) {
+    console.error('Auto-swap & stake failed:', error)
+    
+    tacoStore.addToast({
+      id: Date.now(),
+      code: 'swap-stake-failed',
+      title: 'Swap & Stake Failed',
+      icon: 'fa-solid fa-exclamation-triangle',
+      message: error.message || 'Failed to execute swap & stake. Please try manual swap.',
+      type: 'error'
+    })
+  } finally {
+    isSwapping.value = false
+    isSwapAndStake.value = false
+  }
 }
 
 const openSwapDialog = (token: WalletToken) => {
@@ -1874,6 +2009,60 @@ onMounted(async () => {
 
 .create-neuron-content .btn-success {
   align-self: center;
+}
+
+.swap-stake-info {
+  margin-bottom: 1.5rem;
+}
+
+.info-box {
+  background: rgba(0, 123, 255, 0.1);
+  border: 1px solid rgba(0, 123, 255, 0.3);
+  border-radius: 8px;
+  padding: 1rem;
+}
+
+.info-box h6 {
+  margin: 0 0 0.75rem 0;
+  color: #ffffff;
+  font-weight: 600;
+}
+
+.preview-items {
+  margin-bottom: 0.75rem;
+}
+
+.preview-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+  font-size: 0.9rem;
+}
+
+.preview-item:last-child {
+  margin-bottom: 0;
+}
+
+.preview-item .label {
+  color: #a0aec0;
+  font-weight: 500;
+}
+
+.preview-item .value {
+  color: #ffffff;
+  font-weight: 600;
+  text-align: right;
+}
+
+.info-note {
+  margin: 0;
+  padding: 0.5rem;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 4px;
+  font-size: 0.85rem;
+  color: #a0aec0;
+  border-left: 3px solid rgba(0, 123, 255, 0.5);
 }
 
 .step-actions,
