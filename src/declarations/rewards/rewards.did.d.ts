@@ -103,16 +103,19 @@ export type Result__1_2 = {
   { 'err' : RewardsError };
 export type Result__1_3 = { 'ok' : Array<WithdrawalRecord> } |
   { 'err' : RewardsError };
-export type Result__1_4 = {
+export type Result__1_4 = { 'ok' : Array<Uint8Array | number[]> } |
+  { 'err' : RewardsError };
+export type Result__1_5 = {
     'ok' : { 'distributions' : Array<DistributionRecord> }
   } |
   { 'err' : RewardsError };
-export type Result__1_5 = { 'ok' : PerformanceResult } |
+export type Result__1_6 = { 'ok' : PerformanceResult } |
   { 'err' : RewardsError };
 export interface Rewards {
+  'addToRewardSkipList' : ActorMethod<[Uint8Array | number[]], Result__1>,
   'calculateNeuronPerformance' : ActorMethod<
     [Uint8Array | number[], bigint, bigint, PriceType],
-    Result__1_5
+    Result__1_6
   >,
   'getAllNeuronRewardBalances' : ActorMethod<
     [],
@@ -141,6 +144,7 @@ export interface Rewards {
     {
       'distributionEnabled' : boolean,
       'distributionPeriodNS' : bigint,
+      'rewardSkipListSize' : bigint,
       'maxDistributionHistory' : bigint,
       'periodicRewardPot' : bigint,
       'performanceScorePower' : number,
@@ -166,21 +170,24 @@ export interface Rewards {
     [[] | [bigint]],
     Array<DistributionRecord>
   >,
-  'getDistributionsSince' : ActorMethod<[bigint, bigint], Result__1_4>,
+  'getDistributionsSince' : ActorMethod<[bigint, bigint], Result__1_5>,
   'getNeuronRewardBalance' : ActorMethod<[Uint8Array | number[]], bigint>,
   'getNeuronRewardBalances' : ActorMethod<
     [Array<Uint8Array | number[]>],
     Array<[Uint8Array | number[], bigint]>
   >,
+  'getRewardSkipList' : ActorMethod<[], Result__1_4>,
   'getTacoBalance' : ActorMethod<[], bigint>,
   'getTotalDistributed' : ActorMethod<[], bigint>,
   'getUserWithdrawalHistory' : ActorMethod<[[] | [bigint]], Result__1_3>,
   'getWithdrawalStats' : ActorMethod<[], Result__1_2>,
   'getWithdrawalsSince' : ActorMethod<[bigint, bigint], Result__1_1>,
+  'removeFromRewardSkipList' : ActorMethod<[Uint8Array | number[]], Result__1>,
   'setDistributionEnabled' : ActorMethod<[boolean], Result__1>,
   'setDistributionPeriod' : ActorMethod<[bigint], Result__1>,
   'setPerformanceScorePower' : ActorMethod<[number], Result__1>,
   'setPeriodicRewardPot' : ActorMethod<[bigint], Result__1>,
+  'setRewardSkipList' : ActorMethod<[Array<Uint8Array | number[]>], Result__1>,
   'setVotingPowerPower' : ActorMethod<[number], Result__1>,
   'startDistributionTimer' : ActorMethod<[], Result__1>,
   'startDistributionTimerAt' : ActorMethod<[bigint], Result__1>,

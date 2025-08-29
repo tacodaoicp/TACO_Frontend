@@ -71,7 +71,10 @@
             :class="rewardsExpanded ? 'fa fa-chevron-down' : 'fa fa-chevron-right'" 
             class="expand-icon me-2"
           ></i>
-          <i class="fa fa-coins me-2"></i>
+          <div class="rewards-icon-container">
+            <i class="fa fa-coins me-2"></i>
+            <span v-if="totalRewards > 0" class="rewards-indicator"></span>
+          </div>
           Rewards
           <span v-if="!rewardsExpanded && totalRewards > 0" class="rewards-count-badge">
             {{ formatBalance(BigInt(Math.floor(totalRewards)), 8) }} TACO
@@ -1079,6 +1082,39 @@ const formatUSDValue = (balance: bigint, decimals: number, priceUSD: number): st
   font-size: 0.7rem;
   font-weight: 500;
   margin-left: 0.5rem;
+}
+
+.rewards-icon-container {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.rewards-indicator {
+  position: absolute;
+  top: -2px;
+  right: 6px;
+  width: 8px;
+  height: 8px;
+  background: var(--success-color);
+  border-radius: 50%;
+  border: 2px solid var(--bg-primary);
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.2);
+    opacity: 0.7;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
 }
 
 .rewards-actions {

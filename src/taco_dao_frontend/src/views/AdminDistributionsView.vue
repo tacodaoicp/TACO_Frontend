@@ -210,6 +210,107 @@
             </div>
           </div>
 
+          <!-- Skip List Management -->
+          <div class="card bg-dark text-white mb-4">
+            <div class="card-header">
+              <h3 class="mb-0">
+                🚫 Reward Skip List Management
+                <span v-if="rewardSkipList.length > 0" class="badge bg-warning ms-2">{{ rewardSkipList.length }} neurons skipped</span>
+              </h3>
+            </div>
+            <div class="card-body">
+              <p class="text-muted mb-3">
+                Manage the list of neurons that should be excluded from reward distributions. 
+                Neurons in this list will not receive rewards during distribution runs.
+              </p>
+              
+              <!-- Add Neuron to Skip List -->
+              <div class="row mb-4">
+                <div class="col-md-8">
+                  <label for="newSkipNeuronId" class="form-label">Add Neuron ID to Skip List:</label>
+                  <input 
+                    id="newSkipNeuronId" 
+                    type="text" 
+                    class="form-control bg-dark text-white font-monospace" 
+                    v-model="newSkipNeuronId"
+                    placeholder="Enter neuron ID (hex format)..."
+                  />
+                  <small class="text-muted">
+                    Enter the full neuron ID in hexadecimal format
+                  </small>
+                </div>
+                <div class="col-md-4 d-flex align-items-end">
+                  <button 
+                    class="btn btn-warning w-100" 
+                    @click="addToSkipList"
+                    :disabled="isLoading || !newSkipNeuronId.trim()"
+                  >
+                    <span v-if="isLoading && currentAction === 'addSkip'" class="spinner-border spinner-border-sm me-2" role="status"></span>
+                    ➕ Add to Skip List
+                  </button>
+                </div>
+              </div>
+
+              <!-- Current Skip List -->
+              <div v-if="rewardSkipList.length > 0">
+                <h5 class="mb-3">Current Skip List ({{ rewardSkipList.length }} neurons):</h5>
+                <div class="table-responsive" style="max-height: 300px; overflow-y: auto;">
+                  <table class="table table-dark table-striped table-sm">
+                    <thead class="sticky-top">
+                      <tr>
+                        <th style="width: 60px;">#</th>
+                        <th>Neuron ID</th>
+                        <th style="width: 120px;">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr v-for="(neuronId, index) in rewardSkipList" :key="index">
+                        <td>{{ index + 1 }}</td>
+                        <td class="font-monospace">{{ formatNeuronId(neuronId) }}</td>
+                        <td>
+                          <button 
+                            class="btn btn-sm btn-outline-danger" 
+                            @click="removeFromSkipList(neuronId)"
+                            :disabled="isLoading"
+                            title="Remove from skip list"
+                          >
+                            <span v-if="isLoading && currentAction === 'removeSkip'" class="spinner-border spinner-border-sm" role="status"></span>
+                            <span v-else>🗑️</span>
+                          </button>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+                
+                <!-- Bulk Actions -->
+                <div class="mt-3">
+                  <button 
+                    class="btn btn-outline-danger" 
+                    @click="clearSkipList"
+                    :disabled="isLoading"
+                  >
+                    <span v-if="isLoading && currentAction === 'clearSkip'" class="spinner-border spinner-border-sm me-2" role="status"></span>
+                    🗑️ Clear All
+                  </button>
+                  <button 
+                    class="btn btn-outline-info ms-2" 
+                    @click="refreshSkipList"
+                    :disabled="isLoading"
+                  >
+                    <span v-if="isLoading && currentAction === 'refreshSkip'" class="spinner-border spinner-border-sm me-2" role="status"></span>
+                    🔄 Refresh
+                  </button>
+                </div>
+              </div>
+              
+              <div v-else class="text-center text-muted py-4">
+                <p class="mb-0">No neurons in skip list</p>
+                <small>All neurons will be included in reward distributions</small>
+              </div>
+            </div>
+          </div>
+
           <!-- Current Status -->
           <div class="card bg-dark text-white mb-4">
             <div class="card-header">
@@ -595,7 +696,9 @@ export default {
       customStartTime: '',
       customEndTime: '',
       selectedPriceType: 'USD',
-      refreshInterval: null
+      refreshInterval: null,
+      rewardSkipList: [],
+      newSkipNeuronId: ''
     }
   },
 
@@ -1443,6 +1546,150 @@ export default {
         this.isLoading = false
         this.currentAction = ''
       }
+    },
+
+    // Skip List Management Methods
+    async loadRewardSkipList() {
+      try {
+        const actor = await this.getRewardsActor()
+        const result = await actor.getRewardSkipList()
+        if (result.ok) {
+          this.rewardSkipList = result.ok
+        } else {
+          throw new Error('Failed to load skip list: ' + (result.err?.SystemError || 'Unknown error'))
+        }
+      } catch (error) {
+        console.error('Error loading reward skip list:', error)
+        this.errorMessage = 'Failed to load reward skip list'
+      }
+    },
+
+    async addToSkipList() {
+      if (!this.newSkipNeuronId.trim()) return
+      
+      this.clearMessages()
+      this.isLoading = true
+      this.currentAction = 'addSkip'
+      
+      try {
+        // Convert hex string to Uint8Array
+        const neuronIdHex = this.newSkipNeuronId.trim().replace(/^0x/, '')
+        if (neuronIdHex.length % 2 !== 0) {
+          throw new Error('Invalid hex string length')
+        }
+        
+        const neuronIdBytes = new Uint8Array(
+          neuronIdHex.match(/.{2}/g).map(byte => parseInt(byte, 16))
+        )
+        
+        const actor = await this.getRewardsActor()
+        const result = await actor.addToRewardSkipList(neuronIdBytes)
+        
+        if (result.ok) {
+          this.successMessage = result.ok
+          this.newSkipNeuronId = ''
+          await this.loadRewardSkipList() // Refresh the list
+        } else {
+          throw new Error(result.err?.SystemError || result.err?.NotAuthorized ? 'Not authorized' : 'Unknown error')
+        }
+      } catch (error) {
+        console.error('Error adding neuron to skip list:', error)
+        this.errorMessage = 'Failed to add neuron to skip list: ' + error.message
+      } finally {
+        this.isLoading = false
+        this.currentAction = ''
+      }
+    },
+
+    async removeFromSkipList(neuronId) {
+      this.clearMessages()
+      this.isLoading = true
+      this.currentAction = 'removeSkip'
+      
+      try {
+        const actor = await this.getRewardsActor()
+        const result = await actor.removeFromRewardSkipList(neuronId)
+        
+        if (result.ok) {
+          this.successMessage = result.ok
+          await this.loadRewardSkipList() // Refresh the list
+        } else {
+          throw new Error(result.err?.SystemError || result.err?.NotAuthorized ? 'Not authorized' : 'Unknown error')
+        }
+      } catch (error) {
+        console.error('Error removing neuron from skip list:', error)
+        this.errorMessage = 'Failed to remove neuron from skip list: ' + error.message
+      } finally {
+        this.isLoading = false
+        this.currentAction = ''
+      }
+    },
+
+    async clearSkipList() {
+      if (!confirm('Are you sure you want to clear the entire skip list? This will allow all neurons to receive rewards again.')) {
+        return
+      }
+      
+      this.clearMessages()
+      this.isLoading = true
+      this.currentAction = 'clearSkip'
+      
+      try {
+        const actor = await this.getRewardsActor()
+        const result = await actor.setRewardSkipList([])
+        
+        if (result.ok) {
+          this.successMessage = 'Skip list cleared successfully'
+          await this.loadRewardSkipList() // Refresh the list
+        } else {
+          throw new Error(result.err?.SystemError || result.err?.NotAuthorized ? 'Not authorized' : 'Unknown error')
+        }
+      } catch (error) {
+        console.error('Error clearing skip list:', error)
+        this.errorMessage = 'Failed to clear skip list: ' + error.message
+      } finally {
+        this.isLoading = false
+        this.currentAction = ''
+      }
+    },
+
+    async refreshSkipList() {
+      this.clearMessages()
+      this.isLoading = true
+      this.currentAction = 'refreshSkip'
+      
+      try {
+        await this.loadRewardSkipList()
+        this.successMessage = 'Skip list refreshed'
+      } catch (error) {
+        console.error('Error refreshing skip list:', error)
+        this.errorMessage = 'Failed to refresh skip list'
+      } finally {
+        this.isLoading = false
+        this.currentAction = ''
+      }
+    },
+
+    formatNeuronId(neuronId) {
+      try {
+        // Convert neuron ID to hex string for display
+        if (Array.isArray(neuronId)) {
+          return neuronId.map(b => b.toString(16).padStart(2, '0')).join('')
+        } else if (neuronId && neuronId._arr) {
+          // Handle Uint8Array format
+          return Array.from(neuronId._arr).map(b => b.toString(16).padStart(2, '0')).join('')
+        } else if (neuronId && typeof neuronId === 'object' && neuronId.constructor === Uint8Array) {
+          // Handle Uint8Array directly
+          return Array.from(neuronId).map(b => b.toString(16).padStart(2, '0')).join('')
+        } else if (typeof neuronId === 'string') {
+          return neuronId
+        }
+        
+        return 'Invalid format'
+      } catch (error) {
+        console.error('Error formatting neuron ID:', error)
+        return 'Format Error'
+      }
     }
   },
 
@@ -1457,7 +1704,8 @@ export default {
         this.loadTotalDistributed(),
         this.loadTacoBalance(),
         this.loadCurrentNeuronBalances(),
-        this.loadAvailableBalance()
+        this.loadAvailableBalance(),
+        this.loadRewardSkipList()
       ])
       this.startPeriodicUpdates()
     } catch (error) {

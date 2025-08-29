@@ -43,8 +43,9 @@ type RewardsError =
  };
 type Rewards = 
  service {
+   addToRewardSkipList: (neuronId: blob) -> (Result__1);
    calculateNeuronPerformance: (neuronId: blob, startTime: int, endTime: 
-    int, priceType: PriceType) -> (Result__1_5);
+    int, priceType: PriceType) -> (Result__1_6);
    getAllNeuronRewardBalances: () -> (vec record {
                                             blob;
                                             nat;
@@ -75,6 +76,7 @@ type Rewards =
        nextScheduledDistribution: opt int;
        performanceScorePower: float64;
        periodicRewardPot: nat;
+       rewardSkipListSize: nat;
        timerRunning: bool;
        totalDistributions: nat;
        votingPowerPower: float64;
@@ -90,23 +92,26 @@ type Rewards =
    getCurrentTotalNeuronBalances: () -> (nat) query;
    getDistributionHistory: (limit: opt nat) -> (vec DistributionRecord) query;
    getDistributionsSince: (sinceTimestamp: int, limit: nat) ->
-    (Result__1_4) query;
+    (Result__1_5) query;
    getNeuronRewardBalance: (neuronId: blob) -> (nat) query;
    getNeuronRewardBalances: (neuronIds: vec blob) ->
     (vec record {
            blob;
            nat;
          }) query;
+   getRewardSkipList: () -> (Result__1_4) query;
    getTacoBalance: () -> (nat);
    getTotalDistributed: () -> (nat) query;
    getUserWithdrawalHistory: (limit: opt nat) -> (Result__1_3);
    getWithdrawalStats: () -> (Result__1_2);
    getWithdrawalsSince: (sinceTimestamp: int, limit: nat) ->
     (Result__1_1) query;
+   removeFromRewardSkipList: (neuronId: blob) -> (Result__1);
    setDistributionEnabled: (enabled: bool) -> (Result__1);
    setDistributionPeriod: (periodNS: nat) -> (Result__1);
    setPerformanceScorePower: (power: float64) -> (Result__1);
    setPeriodicRewardPot: (amount: nat) -> (Result__1);
+   setRewardSkipList: (neuronIds: vec blob) -> (Result__1);
    setVotingPowerPower: (power: float64) -> (Result__1);
    startDistributionTimer: () -> (Result__1);
    startDistributionTimerAt: (targetTime: int) -> (Result__1);
@@ -116,15 +121,20 @@ type Rewards =
     PriceType) -> (Result__1);
    withdraw: (account: Account, neuronIds: vec blob) -> (Result);
  };
-type Result__1_5 = 
+type Result__1_6 = 
  variant {
    err: RewardsError;
    ok: PerformanceResult;
  };
-type Result__1_4 = 
+type Result__1_5 = 
  variant {
    err: RewardsError;
    ok: record {distributions: vec DistributionRecord;};
+ };
+type Result__1_4 = 
+ variant {
+   err: RewardsError;
+   ok: vec blob;
  };
 type Result__1_3 = 
  variant {
