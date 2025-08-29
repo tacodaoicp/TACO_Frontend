@@ -329,8 +329,8 @@ const saveNeuronName = async (neuronId) => {
         await setNeuronName(tacoSnsRoot, neuronId, name.trim())
         neuronNameInputs.value[key] = ''
         
-        // Reload neurons to show updated names
-        await loadUserNeurons()
+        // Don't reload neurons immediately - let's see if this is causing the issue
+        // await loadUserNeurons()
         
         // Show success message
         console.log('✅ Neuron name saved successfully')
@@ -373,7 +373,10 @@ const loadUserNeurons = async () => {
 }
 
 // Lifecycle
-onMounted(() => {
+onMounted(async () => {
+    // Load names cache first
+    await loadAllNames()
+    
     if (userLoggedIn.value) {
         loadUserNeurons()
     }

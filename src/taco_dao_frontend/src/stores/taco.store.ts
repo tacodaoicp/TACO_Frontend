@@ -5105,6 +5105,18 @@ export const useTacoStore = defineStore('taco', () => {
         const mapKey = createNeuronKey(snsRoot, neuronId);
         const cachedName = namesCache.value.neurons.get(mapKey);
         
+        // Debug logging for specific neuron
+        const neuronIdHex = Array.from(neuronId, byte => byte.toString(16).padStart(2, '0')).join('');
+        if (neuronIdHex === '0075df898135c4c2d1c2e2e429fe65d62c3a4a251fd733e4f6692d5949add5b9') {
+            console.log('🔍 getNeuronDisplayName debug:');
+            console.log('🔍 snsRoot:', snsRoot.toText());
+            console.log('🔍 neuronId:', neuronId);
+            console.log('🔍 neuronIdHex:', neuronIdHex);
+            console.log('🔍 mapKey:', mapKey);
+            console.log('🔍 cachedName:', cachedName);
+            console.log('🔍 all cache keys:', Array.from(namesCache.value.neurons.keys()));
+        }
+        
         if (cachedName) {
             return cachedName.verified ? `✓ ${cachedName.name}` : cachedName.name;
         }
@@ -5462,6 +5474,17 @@ export const useTacoStore = defineStore('taco', () => {
         // Get custom name from cache if available
         const tacoSnsRoot = Principal.fromText('lhdfz-wqaaa-aaaaq-aae3q-cai');
         const customName = neuronId ? getNeuronDisplayName(tacoSnsRoot, neuronId) : '';
+        
+        // Debug logging for name lookup
+        if (neuronIdHex === '0075df898135c4c2d1c2e2e429fe65d62c3a4a251fd733e4f6692d5949add5b9') {
+            console.log('🔍 Debug for specific neuron:', neuronIdHex);
+            console.log('🔍 tacoSnsRoot:', tacoSnsRoot.toText());
+            console.log('🔍 neuronId (Uint8Array):', neuronId);
+            console.log('🔍 customName from getNeuronDisplayName:', customName);
+            console.log('🔍 namesCache.neurons size:', namesCache.value.neurons.size);
+            console.log('🔍 namesCache.neurons keys:', Array.from(namesCache.value.neurons.keys()));
+        }
+        
         const displayName = customName || `Neuron ${neuronIdHex.substring(0, 8)}...`;
 
         return {
