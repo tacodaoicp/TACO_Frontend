@@ -323,7 +323,7 @@ const saveNeuronName = async (neuronId) => {
     try {
         neuronNameSaving.value[key] = true
         const tacoSnsRoot = Principal.fromText('lhdfz-wqaaa-aaaaq-aae3q-cai') // TACO SNS root
-        console.log('🔧 Calling setNeuronName with:', { tacoSnsRoot, neuronId: neuronId, name: name.trim() })
+        console.log('🔧 Calling setNeuronName with TACO SNS root:', tacoSnsRoot.toText(), 'name:', name.trim())
         
         // neuronId is already the Uint8Array, no need to access .id
         await setNeuronName(tacoSnsRoot, neuronId, name.trim())
