@@ -259,30 +259,18 @@
                   </div>
                 </div>
 
-                <!-- Amount Input -->
-                <div v-if="selectedSwapFromToken" class="amount-input">
-                  <label class="form-label">Amount:</label>
-                  <div class="input-group">
-                    <input
-                      v-model="swapAmount"
-                      type="number"
-                      class="form-control"
-                      :placeholder="`0.0 ${getTokenByPrincipal(selectedSwapFromToken)?.symbol || ''}`"
-                      step="any"
-                      min="0"
-                    />
-                    <button 
-                      @click="setMaxSwapAmount"
-                      class="btn btn-outline-secondary"
-                      type="button"
-                    >
-                      MAX
-                    </button>
+                <!-- Token Info Display -->
+                <div v-if="selectedSwapFromToken" class="token-info-display">
+                  <div class="selected-token-info">
+                    <img :src="getTokenByPrincipal(selectedSwapFromToken)?.logo" :alt="getTokenByPrincipal(selectedSwapFromToken)?.symbol" class="token-logo-small" />
+                    <div class="token-details">
+                      <div class="token-name">{{ getTokenByPrincipal(selectedSwapFromToken)?.name }}</div>
+                      <div class="token-balance">
+                        Available: {{ formatBalance(getTokenByPrincipal(selectedSwapFromToken)?.balance || 0n, getTokenByPrincipal(selectedSwapFromToken)?.decimals || 8) }}
+                        {{ getTokenByPrincipal(selectedSwapFromToken)?.symbol || '' }}
+                      </div>
+                    </div>
                   </div>
-                  <small class="form-text text-muted">
-                    Available: {{ formatBalance(getTokenByPrincipal(selectedSwapFromToken)?.balance || 0n, getTokenByPrincipal(selectedSwapFromToken)?.decimals || 8) }}
-                    {{ getTokenByPrincipal(selectedSwapFromToken)?.symbol || '' }}
-                  </small>
                 </div>
 
                 <!-- Swap Arrow -->
@@ -305,11 +293,11 @@
                 </div>
 
                 <!-- Swap Actions -->
-                <div v-if="selectedSwapFromToken && swapAmount" class="swap-actions">
+                <div v-if="selectedSwapFromToken" class="swap-actions">
                   <button 
                     @click="performSwap"
                     class="btn btn-primary btn-lg me-3"
-                    :disabled="!canSwap || isSwapping"
+                    :disabled="isSwapping"
                   >
                     <i v-if="isSwapping" class="fa fa-spinner fa-spin me-2"></i>
                     <i v-else class="fa fa-exchange-alt me-2"></i>
@@ -319,7 +307,7 @@
                   <button 
                     @click="performSwapAndStake"
                     class="btn btn-success btn-lg"
-                    :disabled="!canSwap || isSwapping"
+                    :disabled="isSwapping"
                   >
                     <i v-if="isSwapping" class="fa fa-spinner fa-spin me-2"></i>
                     <i v-else class="fa fa-magic me-2"></i>
@@ -377,9 +365,13 @@
                 <div v-if="userNeurons.length > 0" class="existing-neurons">
                   <h6>Your Existing Neurons:</h6>
                   <div class="neurons-list">
-                    <div v-for="neuron in userNeurons" :key="neuron.idHex" class="neuron-item">
+                    <div v-for="neuron in userNeurons" :key="neuron.idHex" class="neuron-item" :class="neuron.relationship">
                       <div class="neuron-info">
-                        <div class="neuron-name">{{ neuron.displayName }}</div>
+                        <div class="neuron-name">
+                          <i v-if="neuron.relationship === 'owned'" class="fa fa-crown me-1" title="Owned"></i>
+                          <i v-else-if="neuron.relationship === 'hotkeyed'" class="fa fa-key me-1" title="Hotkeyed"></i>
+                          {{ neuron.displayName }}
+                        </div>
                         <div class="neuron-stake">
                           Stake: {{ formatBalance(neuron.stake, 8) }} TACO
                         </div>
@@ -551,7 +543,6 @@ const currentStep = ref(1)
 const expandedSteps = ref<Set<number>>(new Set([1]))
 const selectedGetTokenSymbol = ref('ICP')
 const selectedSwapFromToken = ref('')
-const swapAmount = ref('')
 const stakeAmount = ref('')
 const isSwapping = ref(false)
 const isStaking = ref(false)
@@ -732,15 +723,12 @@ const swappableTokens = computed(() => {
 })
 
 const canSwap = computed(() => {
-  if (!selectedSwapFromToken.value || !swapAmount.value) return false
+  if (!selectedSwapFromToken.value) return false
   
   const token = getTokenByPrincipal(selectedSwapFromToken.value)
   if (!token) return false
   
-  const amount = parseFloat(swapAmount.value)
-  const maxAmount = Number(token.balance - token.fee) / (10 ** token.decimals)
-  
-  return amount > 0 && amount <= maxAmount
+  return token.balance > token.fee
 })
 
 const canStake = computed(() => {
@@ -868,7 +856,8 @@ const loadUserNeurons = async () => {
   try {
     const rawNeurons = await tacoStore.getTacoNeurons()
     const categorizedNeurons = tacoStore.categorizeNeurons(rawNeurons)
-    userNeurons.value = categorizedNeurons.owned // Only show owned neurons in wizard
+    // Include both owned and hotkeyed neurons in wizard
+    userNeurons.value = [...categorizedNeurons.owned, ...categorizedNeurons.hotkeyed]
   } catch (error) {
     console.error('Error loading user neurons:', error)
     userNeurons.value = []
@@ -944,13 +933,7 @@ const getTokenByPrincipal = (principal: string): WalletToken | undefined => {
   return allTokens.value.find(t => t.principal === principal)
 }
 
-const setMaxSwapAmount = () => {
-  const token = getTokenByPrincipal(selectedSwapFromToken.value)
-  if (token) {
-    const maxAmount = Number(token.balance - token.fee) / (10 ** token.decimals)
-    swapAmount.value = maxAmount.toString()
-  }
-}
+
 
 const setMaxStakeAmount = () => {
   const maxAmount = Number(tacoToken.value.balance - tacoToken.value.fee) / (10 ** tacoToken.value.decimals)
@@ -1094,7 +1077,6 @@ const resetWizard = () => {
   currentStep.value = 1
   expandedSteps.value = new Set([1])
   selectedSwapFromToken.value = ''
-  swapAmount.value = ''
   stakeAmount.value = ''
   stakingComplete.value = false
   loadWalletData()
@@ -1385,6 +1367,11 @@ onMounted(async () => {
   border-radius: 6px;
 }
 
+.form-select option {
+  background: #2d3748;
+  color: white;
+}
+
 .form-select:focus,
 .form-control:focus {
   background: rgba(255, 255, 255, 0.15);
@@ -1514,6 +1501,37 @@ onMounted(async () => {
   gap: 0.5rem;
 }
 
+.token-info-display {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 1rem;
+}
+
+.selected-token-info {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.token-logo-small {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.2);
+}
+
+.token-details .token-name {
+  font-weight: 600;
+  color: white;
+  margin-bottom: 0.25rem;
+}
+
+.token-details .token-balance {
+  color: #a0aec0;
+  font-size: 0.85rem;
+}
+
 .swap-arrow {
   display: flex;
   justify-content: center;
@@ -1610,6 +1628,15 @@ onMounted(async () => {
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 6px;
+  position: relative;
+}
+
+.neuron-item.owned {
+  border-left: 3px solid #ffd700; /* Gold for owned */
+}
+
+.neuron-item.hotkeyed {
+  border-left: 3px solid #87ceeb; /* Light blue for hotkeyed */
 }
 
 .neuron-name {
