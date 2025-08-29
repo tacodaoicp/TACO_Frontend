@@ -2,6 +2,17 @@ import type { Principal } from '@dfinity/principal';
 import type { ActorMethod } from '@dfinity/agent';
 import type { IDL } from '@dfinity/candid';
 
+export type AccountDelegationError = { 'NoSuchDelegation' : null } |
+  { 'InternalCanisterError' : string } |
+  { 'Unauthorized' : Principal };
+export interface AccountInfo {
+  'name' : [] | [string],
+  'origin' : string,
+  'account_number' : [] | [AccountNumber],
+  'last_used' : [] | [Timestamp],
+}
+export type AccountNumber = bigint;
+export interface AccountUpdate { 'name' : [] | [string] }
 export type AddTentativeDeviceResponse = {
     'device_registration_mode_off' : null
   } |
@@ -10,6 +21,14 @@ export type AddTentativeDeviceResponse = {
     'added_tentatively' : {
       'verification_code' : string,
       'device_registration_timeout' : Timestamp,
+    }
+  };
+export type AnalyticsConfig = {
+    'Plausible' : {
+      'domain' : [] | [string],
+      'track_localhost' : [] | [boolean],
+      'hash_mode' : [] | [boolean],
+      'api_host' : [] | [string],
     }
   };
 export interface AnchorCredentials {
@@ -27,6 +46,7 @@ export interface ArchiveInfo {
   'archive_config' : [] | [ArchiveConfig],
   'archive_canister' : [] | [Principal],
 }
+export type Aud = string;
 export type AuthnMethod = { 'PubKey' : PublicKeyAuthn } |
   { 'WebAuthn' : WebAuthn };
 export type AuthnMethodAddError = { 'InvalidMetadata' : string };
@@ -34,7 +54,11 @@ export interface AuthnMethodConfirmationCode {
   'confirmation_code' : string,
   'expiration' : Timestamp,
 }
-export type AuthnMethodConfirmationError = { 'RegistrationModeOff' : null } |
+export type AuthnMethodConfirmationError = {
+    'InternalCanisterError' : string
+  } |
+  { 'RegistrationModeOff' : null } |
+  { 'Unauthorized' : Principal } |
   { 'NoAuthnMethodToConfirm' : null } |
   { 'WrongCode' : { 'retries_left' : number } };
 export interface AuthnMethodData {
@@ -54,8 +78,21 @@ export type AuthnMethodRegisterError = { 'RegistrationModeOff' : null } |
   { 'InvalidMetadata' : string };
 export interface AuthnMethodRegistrationInfo {
   'expiration' : Timestamp,
+  'session' : [] | [Principal],
   'authn_method' : [] | [AuthnMethodData],
 }
+export type AuthnMethodRegistrationModeEnterError = {
+    'InvalidRegistrationId' : string
+  } |
+  { 'InternalCanisterError' : string } |
+  { 'AlreadyInProgress' : null } |
+  { 'Unauthorized' : Principal };
+export type AuthnMethodRegistrationModeExitError = {
+    'InternalCanisterError' : string
+  } |
+  { 'RegistrationModeOff' : null } |
+  { 'Unauthorized' : Principal } |
+  { 'InvalidMetadata' : string };
 export type AuthnMethodReplaceError = { 'AuthnMethodNotFound' : null } |
   { 'InvalidMetadata' : string };
 export interface AuthnMethodSecuritySettings {
@@ -65,11 +102,23 @@ export interface AuthnMethodSecuritySettings {
 export type AuthnMethodSecuritySettingsReplaceError = {
     'AuthnMethodNotFound' : null
   };
+export interface AuthnMethodSessionInfo { 'name' : [] | [string] }
 export interface BufferedArchiveEntry {
   'sequence_number' : bigint,
   'entry' : Uint8Array | number[],
   'anchor_number' : UserNumber,
   'timestamp' : Timestamp,
+}
+export interface CaptchaConfig {
+  'max_unsolved_captchas' : bigint,
+  'captcha_trigger' : {
+      'Dynamic' : {
+        'reference_rate_sampling_interval_s' : bigint,
+        'threshold_pct' : number,
+        'current_rate_sampling_interval_s' : bigint,
+      }
+    } |
+    { 'Static' : { 'CaptchaDisabled' : null } | { 'CaptchaEnabled' : null } },
 }
 export type CaptchaResult = ChallengeResult;
 export interface Challenge {
@@ -78,6 +127,14 @@ export interface Challenge {
 }
 export type ChallengeKey = string;
 export interface ChallengeResult { 'key' : ChallengeKey, 'chars' : string }
+export interface CheckCaptchaArg { 'solution' : string }
+export type CheckCaptchaError = { 'NoRegistrationFlow' : null } |
+  { 'UnexpectedCall' : { 'next_step' : RegistrationFlowNextStep } } |
+  { 'WrongSolution' : { 'new_captcha_png_base64' : string } };
+export type CreateAccountError = { 'AccountLimitReached' : null } |
+  { 'InternalCanisterError' : string } |
+  { 'Unauthorized' : Principal } |
+  { 'NameTooLong' : null };
 export type CredentialId = Uint8Array | number[];
 export interface Delegation {
   'pubkey' : PublicKey,
@@ -98,11 +155,16 @@ export interface DeviceData {
   'credential_id' : [] | [CredentialId],
 }
 export type DeviceKey = PublicKey;
+export interface DeviceKeyWithAnchor {
+  'pubkey' : DeviceKey,
+  'anchor_number' : UserNumber,
+}
 export type DeviceProtection = { 'unprotected' : null } |
   { 'protected' : null };
 export interface DeviceRegistrationInfo {
   'tentative_device' : [] | [DeviceData],
   'expiration' : Timestamp,
+  'tentative_session' : [] | [Principal],
 }
 export interface DeviceWithUsage {
   'alias' : string,
@@ -115,7 +177,10 @@ export interface DeviceWithUsage {
   'purpose' : Purpose,
   'credential_id' : [] | [CredentialId],
 }
+export interface DummyAuthConfig { 'prompt_for_index' : boolean }
 export type FrontendHostname = string;
+export type GetAccountsError = { 'InternalCanisterError' : string } |
+  { 'Unauthorized' : Principal };
 export type GetDelegationResponse = { 'no_such_delegation' : null } |
   { 'signed_delegation' : SignedDelegation };
 export type GetIdAliasError = { 'InternalCanisterError' : string } |
@@ -128,6 +193,7 @@ export interface GetIdAliasRequest {
   'relying_party' : FrontendHostname,
   'identity_number' : IdentityNumber,
 }
+export interface GoogleOpenIdConfig { 'client_id' : string }
 export type HeaderField = [string, string];
 export interface HttpRequest {
   'url' : string,
@@ -147,8 +213,24 @@ export interface IdAliasCredentials {
   'rp_id_alias_credential' : SignedIdAlias,
   'issuer_id_alias_credential' : SignedIdAlias,
 }
+export interface IdRegFinishArg {
+  'name' : [] | [string],
+  'authn_method' : AuthnMethodData,
+}
+export type IdRegFinishError = { 'NoRegistrationFlow' : null } |
+  { 'UnexpectedCall' : { 'next_step' : RegistrationFlowNextStep } } |
+  { 'InvalidAuthnMethod' : string } |
+  { 'IdentityLimitReached' : null } |
+  { 'StorageError' : string };
+export interface IdRegFinishResult { 'identity_number' : bigint }
+export interface IdRegNextStepResult { 'next_step' : RegistrationFlowNextStep }
+export type IdRegStartError = { 'InvalidCaller' : null } |
+  { 'AlreadyInProgress' : null } |
+  { 'RateLimitExceeded' : null };
 export interface IdentityAnchorInfo {
+  'name' : [] | [string],
   'devices' : Array<DeviceWithUsage>,
+  'openid_credentials' : [] | [Array<OpenIdCredential>],
   'device_registration' : [] | [DeviceRegistrationInfo],
 }
 export interface IdentityAuthnInfo {
@@ -158,7 +240,9 @@ export interface IdentityAuthnInfo {
 export interface IdentityInfo {
   'authn_methods' : Array<AuthnMethodData>,
   'metadata' : MetadataMapV2,
+  'name' : [] | [string],
   'authn_method_registration' : [] | [AuthnMethodRegistrationInfo],
+  'openid_credentials' : [] | [Array<OpenIdCredential>],
 }
 export type IdentityInfoError = { 'InternalCanisterError' : string } |
   { 'Unauthorized' : Principal };
@@ -173,31 +257,52 @@ export type IdentityMetadataReplaceError = {
     }
   };
 export type IdentityNumber = bigint;
-export type IdentityRegisterError = { 'BadCaptcha' : null } |
-  { 'CanisterFull' : null } |
-  { 'InvalidMetadata' : string };
+export interface IdentityPropertiesReplace { 'name' : [] | [string] }
+export type IdentityPropertiesReplaceError = {
+    'InternalCanisterError' : string
+  } |
+  { 'Unauthorized' : Principal } |
+  { 'NameTooLong' : { 'limit' : bigint } } |
+  {
+    'StorageSpaceExceeded' : {
+      'space_required' : bigint,
+      'space_available' : bigint,
+    }
+  };
 export interface InternetIdentityInit {
-  'max_num_latest_delegation_origins' : [] | [bigint],
+  'fetch_root_key' : [] | [boolean],
+  'openid_google' : [] | [[] | [GoogleOpenIdConfig]],
+  'is_production' : [] | [boolean],
+  'enable_dapps_explorer' : [] | [boolean],
   'assigned_user_number_range' : [] | [[bigint, bigint]],
-  'max_inflight_captchas' : [] | [bigint],
+  'new_flow_origins' : [] | [Array<string>],
   'archive_config' : [] | [ArchiveConfig],
   'canister_creation_cycles_cost' : [] | [bigint],
+  'analytics_config' : [] | [[] | [AnalyticsConfig]],
+  'feature_flag_enable_generic_open_id_fe' : [] | [boolean],
+  'related_origins' : [] | [Array<string>],
+  'feature_flag_continue_from_another_device' : [] | [boolean],
+  'openid_configs' : [] | [Array<OpenIdConfig>],
+  'captcha_config' : [] | [CaptchaConfig],
+  'dummy_auth' : [] | [[] | [DummyAuthConfig]],
   'register_rate_limit' : [] | [RateLimitConfig],
 }
 export interface InternetIdentityStats {
   'storage_layout_version' : number,
   'users_registered' : bigint,
-  'max_num_latest_delegation_origins' : bigint,
   'assigned_user_number_range' : [bigint, bigint],
-  'latest_delegation_origins' : Array<FrontendHostname>,
   'archive_info' : ArchiveInfo,
   'canister_creation_cycles_cost' : bigint,
+  'event_aggregations' : Array<[string, Array<[string, bigint]>]>,
 }
+export type Iss = string;
+export type JWT = string;
 export type KeyType = { 'platform' : null } |
   { 'seed_phrase' : null } |
   { 'cross_platform' : null } |
   { 'unknown' : null } |
   { 'browser_storage_key' : null };
+export type LookupByRegistrationIdError = { 'InvalidRegistrationId' : string };
 export type MetadataMap = Array<
   [
     string,
@@ -214,6 +319,48 @@ export type MetadataMapV2 = Array<
       { 'Bytes' : Uint8Array | number[] },
   ]
 >;
+export interface OpenIDRegFinishArg { 'jwt' : JWT, 'salt' : Salt }
+export interface OpenIdConfig {
+  'auth_uri' : string,
+  'jwks_uri' : string,
+  'logo' : string,
+  'name' : string,
+  'fedcm_uri' : [] | [string],
+  'issuer' : string,
+  'auth_scope' : Array<string>,
+  'client_id' : string,
+}
+export interface OpenIdCredential {
+  'aud' : Aud,
+  'iss' : Iss,
+  'sub' : Sub,
+  'metadata' : MetadataMapV2,
+  'last_usage_timestamp' : [] | [Timestamp],
+}
+export type OpenIdCredentialAddError = {
+    'OpenIdCredentialAlreadyRegistered' : null
+  } |
+  { 'InternalCanisterError' : string } |
+  { 'JwtExpired' : null } |
+  { 'Unauthorized' : Principal } |
+  { 'JwtVerificationFailed' : null };
+export type OpenIdCredentialKey = [Iss, Sub];
+export type OpenIdCredentialRemoveError = { 'InternalCanisterError' : string } |
+  { 'OpenIdCredentialNotFound' : null } |
+  { 'Unauthorized' : Principal };
+export type OpenIdDelegationError = { 'NoSuchDelegation' : null } |
+  { 'NoSuchAnchor' : null } |
+  { 'JwtExpired' : null } |
+  { 'JwtVerificationFailed' : null };
+export interface OpenIdPrepareDelegationResponse {
+  'user_key' : UserKey,
+  'expiration' : Timestamp,
+  'anchor_number' : UserNumber,
+}
+export interface PrepareAccountDelegation {
+  'user_key' : UserKey,
+  'expiration' : Timestamp,
+}
 export type PrepareIdAliasError = { 'InternalCanisterError' : string } |
   { 'Unauthorized' : Principal };
 export interface PrepareIdAliasRequest {
@@ -237,6 +384,12 @@ export interface RateLimitConfig {
 export type RegisterResponse = { 'bad_challenge' : null } |
   { 'canister_full' : null } |
   { 'registered' : { 'user_number' : UserNumber } };
+export type RegistrationFlowNextStep = {
+    'CheckCaptcha' : { 'captcha_png_base64' : string }
+  } |
+  { 'Finish' : null };
+export type RegistrationId = string;
+export type Salt = Uint8Array | number[];
 export type SessionKey = PublicKey;
 export interface SignedDelegation {
   'signature' : Uint8Array | number[],
@@ -254,8 +407,13 @@ export interface StreamingCallbackHttpResponse {
 export type StreamingStrategy = {
     'Callback' : { 'token' : Token, 'callback' : [Principal, string] }
   };
+export type Sub = string;
 export type Timestamp = bigint;
 export type Token = {};
+export type UpdateAccountError = { 'AccountLimitReached' : null } |
+  { 'InternalCanisterError' : string } |
+  { 'Unauthorized' : Principal } |
+  { 'NameTooLong' : null };
 export type UserKey = PublicKey;
 export type UserNumber = bigint;
 export type VerifyTentativeDeviceResponse = {
@@ -300,14 +458,14 @@ export interface _SERVICE {
       { 'Err' : AuthnMethodRegisterError }
   >,
   'authn_method_registration_mode_enter' : ActorMethod<
-    [IdentityNumber],
+    [IdentityNumber, [] | [RegistrationId]],
     { 'Ok' : { 'expiration' : Timestamp } } |
-      { 'Err' : null }
+      { 'Err' : AuthnMethodRegistrationModeEnterError }
   >,
   'authn_method_registration_mode_exit' : ActorMethod<
-    [IdentityNumber],
+    [IdentityNumber, [] | [AuthnMethodData]],
     { 'Ok' : null } |
-      { 'Err' : null }
+      { 'Err' : AuthnMethodRegistrationModeExitError }
   >,
   'authn_method_remove' : ActorMethod<
     [IdentityNumber, PublicKey],
@@ -324,12 +482,41 @@ export interface _SERVICE {
     { 'Ok' : null } |
       { 'Err' : AuthnMethodSecuritySettingsReplaceError }
   >,
-  'captcha_create' : ActorMethod<[], { 'Ok' : Challenge } | { 'Err' : null }>,
+  'authn_method_session_info' : ActorMethod<
+    [IdentityNumber],
+    [] | [AuthnMethodSessionInfo]
+  >,
+  'authn_method_session_register' : ActorMethod<
+    [IdentityNumber],
+    { 'Ok' : AuthnMethodConfirmationCode } |
+      { 'Err' : AuthnMethodRegisterError }
+  >,
+  'check_captcha' : ActorMethod<
+    [CheckCaptchaArg],
+    { 'Ok' : IdRegNextStepResult } |
+      { 'Err' : CheckCaptchaError }
+  >,
+  'config' : ActorMethod<[], InternetIdentityInit>,
+  'create_account' : ActorMethod<
+    [UserNumber, FrontendHostname, string],
+    { 'Ok' : AccountInfo } |
+      { 'Err' : CreateAccountError }
+  >,
   'create_challenge' : ActorMethod<[], Challenge>,
   'deploy_archive' : ActorMethod<[Uint8Array | number[]], DeployArchiveResult>,
   'enter_device_registration_mode' : ActorMethod<[UserNumber], Timestamp>,
   'exit_device_registration_mode' : ActorMethod<[UserNumber], undefined>,
   'fetch_entries' : ActorMethod<[], Array<BufferedArchiveEntry>>,
+  'get_account_delegation' : ActorMethod<
+    [UserNumber, FrontendHostname, [] | [AccountNumber], SessionKey, Timestamp],
+    { 'Ok' : SignedDelegation } |
+      { 'Err' : AccountDelegationError }
+  >,
+  'get_accounts' : ActorMethod<
+    [UserNumber, FrontendHostname],
+    { 'Ok' : Array<AccountInfo> } |
+      { 'Err' : GetAccountsError }
+  >,
   'get_anchor_credentials' : ActorMethod<[UserNumber], AnchorCredentials>,
   'get_anchor_info' : ActorMethod<[UserNumber], IdentityAnchorInfo>,
   'get_delegation' : ActorMethod<
@@ -359,13 +546,67 @@ export interface _SERVICE {
     { 'Ok' : null } |
       { 'Err' : IdentityMetadataReplaceError }
   >,
-  'identity_register' : ActorMethod<
-    [AuthnMethodData, CaptchaResult, [] | [Principal]],
-    { 'Ok' : IdentityNumber } |
-      { 'Err' : IdentityRegisterError }
+  'identity_properties_replace' : ActorMethod<
+    [IdentityNumber, IdentityPropertiesReplace],
+    { 'Ok' : null } |
+      { 'Err' : IdentityPropertiesReplaceError }
+  >,
+  'identity_registration_finish' : ActorMethod<
+    [IdRegFinishArg],
+    { 'Ok' : IdRegFinishResult } |
+      { 'Err' : IdRegFinishError }
+  >,
+  'identity_registration_start' : ActorMethod<
+    [],
+    { 'Ok' : IdRegNextStepResult } |
+      { 'Err' : IdRegStartError }
   >,
   'init_salt' : ActorMethod<[], undefined>,
   'lookup' : ActorMethod<[UserNumber], Array<DeviceData>>,
+  'lookup_by_registration_mode_id' : ActorMethod<
+    [RegistrationId],
+    [] | [IdentityNumber]
+  >,
+  'lookup_device_key' : ActorMethod<
+    [Uint8Array | number[]],
+    [] | [DeviceKeyWithAnchor]
+  >,
+  'openid_credential_add' : ActorMethod<
+    [IdentityNumber, JWT, Salt],
+    { 'Ok' : null } |
+      { 'Err' : OpenIdCredentialAddError }
+  >,
+  'openid_credential_remove' : ActorMethod<
+    [IdentityNumber, OpenIdCredentialKey],
+    { 'Ok' : null } |
+      { 'Err' : OpenIdCredentialRemoveError }
+  >,
+  'openid_get_delegation' : ActorMethod<
+    [JWT, Salt, SessionKey, Timestamp],
+    { 'Ok' : SignedDelegation } |
+      { 'Err' : OpenIdDelegationError }
+  >,
+  'openid_identity_registration_finish' : ActorMethod<
+    [OpenIDRegFinishArg],
+    { 'Ok' : IdRegFinishResult } |
+      { 'Err' : IdRegFinishError }
+  >,
+  'openid_prepare_delegation' : ActorMethod<
+    [JWT, Salt, SessionKey],
+    { 'Ok' : OpenIdPrepareDelegationResponse } |
+      { 'Err' : OpenIdDelegationError }
+  >,
+  'prepare_account_delegation' : ActorMethod<
+    [
+      UserNumber,
+      FrontendHostname,
+      [] | [AccountNumber],
+      SessionKey,
+      [] | [bigint],
+    ],
+    { 'Ok' : PrepareAccountDelegation } |
+      { 'Err' : AccountDelegationError }
+  >,
   'prepare_delegation' : ActorMethod<
     [UserNumber, FrontendHostname, SessionKey, [] | [bigint]],
     [UserKey, Timestamp]
@@ -383,6 +624,11 @@ export interface _SERVICE {
   'replace' : ActorMethod<[UserNumber, DeviceKey, DeviceData], undefined>,
   'stats' : ActorMethod<[], InternetIdentityStats>,
   'update' : ActorMethod<[UserNumber, DeviceKey, DeviceData], undefined>,
+  'update_account' : ActorMethod<
+    [UserNumber, FrontendHostname, [] | [AccountNumber], AccountUpdate],
+    { 'Ok' : AccountInfo } |
+      { 'Err' : UpdateAccountError }
+  >,
   'verify_tentative_device' : ActorMethod<
     [UserNumber, string],
     VerifyTentativeDeviceResponse
