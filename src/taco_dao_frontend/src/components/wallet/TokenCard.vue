@@ -65,12 +65,19 @@
     
     <!-- Rewards section for TACO token -->
     <div v-if="token.symbol === 'TACO'" class="rewards-section">
-      <div class="rewards-header">
+      <div class="rewards-header" @click="toggleRewardsSection">
         <h6 class="rewards-title">
+          <i 
+            :class="rewardsExpanded ? 'fa fa-chevron-down' : 'fa fa-chevron-right'" 
+            class="expand-icon me-2"
+          ></i>
           <i class="fa fa-coins me-2"></i>
           Rewards
+          <span v-if="!rewardsExpanded && totalRewards > 0" class="rewards-count-badge">
+            {{ formatBalance(BigInt(Math.floor(totalRewards)), 8) }} TACO
+          </span>
         </h6>
-        <div class="rewards-actions">
+        <div class="rewards-actions" @click.stop>
           <button 
             v-if="totalRewards > 0"
             @click="claimAllRewards"
@@ -84,7 +91,7 @@
           </button>
         </div>
       </div>
-      <div class="rewards-content">
+      <div v-if="rewardsExpanded" class="rewards-content">
         <div v-if="loadingRewards" class="rewards-loading">
           <div class="spinner-border spinner-border-sm" role="status">
             <span class="visually-hidden">Loading...</span>
@@ -531,7 +538,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, watch } from 'vue'
 import { useTacoStore } from '../../stores/taco.store'
 import { getLegacyAccountId } from '../../utils/accountUtils'
 import { useClipboard } from '@vueuse/core'
@@ -612,6 +619,7 @@ const expandedNeurons = ref<Set<string>>(new Set())
 const neuronsExpanded = ref(false) // Default to collapsed
 
 // Rewards state
+const rewardsExpanded = ref(false) // Will be set based on rewards availability
 const neuronBalances = ref<Map<string, number>>(new Map())
 const loadingRewards = ref(false)
 const claimingAllRewards = ref(false)
@@ -654,6 +662,11 @@ const toggleNeuronsSection = () => {
   neuronsExpanded.value = !neuronsExpanded.value
 }
 
+// Toggle rewards section expansion
+const toggleRewardsSection = () => {
+  rewardsExpanded.value = !rewardsExpanded.value
+}
+
 // Computed rewards properties
 const totalRewards = computed(() => {
   let total = 0
@@ -662,6 +675,13 @@ const totalRewards = computed(() => {
   }
   return total
 })
+
+// Watch totalRewards to auto-expand rewards section when there are rewards
+watch(totalRewards, (newTotal) => {
+  if (newTotal > 0 && !rewardsExpanded.value) {
+    rewardsExpanded.value = true
+  }
+}, { immediate: true })
 
 // Rewards functions
 const getNeuronRewards = (neuronIdHex: string): number => {
@@ -1032,6 +1052,14 @@ const formatUSDValue = (balance: bigint, decimals: number, priceUSD: number): st
   justify-content: space-between;
   align-items: center;
   margin-bottom: 0.5rem;
+  cursor: pointer;
+  padding: 0.25rem;
+  border-radius: 6px;
+  transition: background-color 0.2s ease;
+}
+
+.rewards-header:hover {
+  background: rgba(255, 255, 255, 0.05);
 }
 
 .rewards-title {
@@ -1041,6 +1069,16 @@ const formatUSDValue = (balance: bigint, decimals: number, priceUSD: number): st
   color: var(--text-primary);
   display: flex;
   align-items: center;
+}
+
+.rewards-count-badge {
+  background: var(--success-color);
+  color: white;
+  padding: 0.1rem 0.4rem;
+  border-radius: 12px;
+  font-size: 0.7rem;
+  font-weight: 500;
+  margin-left: 0.5rem;
 }
 
 .rewards-actions {
@@ -1081,6 +1119,22 @@ const formatUSDValue = (balance: bigint, decimals: number, priceUSD: number): st
 .rewards-balance .balance-subtitle {
   font-size: 0.8rem;
   font-weight: 500;
+}
+
+.rewards-content {
+  animation: slideDown 0.3s ease-out;
+  overflow: hidden;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 /* Neurons section styles */

@@ -121,7 +121,7 @@
                 </div>
                 <div class="method-description">
                   <span v-if="supportsICRC2">
-                    Approve tokens for the exchange to spend. More gas efficient.
+                    Approve tokens for the exchange to spend. More efficient.
                     <span v-if="swapData?.inputToken && swapMethod === 'icrc2'" class="auto-reason">
                       Token supports ICRC-2 standard.
                     </span>
