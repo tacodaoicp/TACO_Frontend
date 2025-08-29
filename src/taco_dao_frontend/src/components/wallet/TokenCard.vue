@@ -173,6 +173,9 @@
                       class="expand-icon"
                     ></i>
                     {{ neuron.displayName }}
+                    <span v-if="getNeuronRewards(neuron.idHex) > 0" class="rewards-indicator" title="Has rewards">
+                      <i class="fa fa-coins text-success"></i>
+                    </span>
                   </div>
                   <div class="neuron-stake">
                     {{ formatBalance(neuron.stake, 8) }} TACO
@@ -199,6 +202,29 @@
               <!-- Expanded details -->
               <div v-if="expandedNeurons.has(neuron.idHex)" class="neuron-details">
                 <div class="detail-grid">
+                  <!-- Rewards section - moved to top and always shown -->
+                  <div class="detail-item rewards-item" :class="{ 'has-rewards': getNeuronRewards(neuron.idHex) > 0 }">
+                    <span class="detail-label">
+                      <i class="fa fa-coins me-1"></i>
+                      Rewards:
+                    </span>
+                    <span v-if="getNeuronRewards(neuron.idHex) > 0" class="detail-value text-success">
+                      {{ formatBalance(BigInt(Math.floor(getNeuronRewards(neuron.idHex))), 8) }} TACO
+                      <button 
+                        @click.stop="claimNeuronRewards(neuron)"
+                        class="btn btn-success btn-xs ms-2"
+                        :disabled="loadingRewards || isNeuronClaiming(neuron.idHex)"
+                        title="Claim this neuron's rewards"
+                      >
+                        <i v-if="isNeuronClaiming(neuron.idHex)" class="fa fa-spinner fa-spin"></i>
+                        <i v-else class="fa fa-coins"></i>
+                      </button>
+                    </span>
+                    <span v-else class="detail-value text-muted">
+                      0 TACO
+                    </span>
+                  </div>
+                  
                   <div class="detail-item">
                     <span class="detail-label">Dissolve Period:</span>
                     <span class="detail-value" :class="'dissolve-' + neuron.dissolveState.type">
@@ -216,21 +242,6 @@
                   <div v-if="neuron.stakedMaturity > 0" class="detail-item">
                     <span class="detail-label">Staked Maturity:</span>
                     <span class="detail-value">{{ formatBalance(neuron.stakedMaturity, 8) }} TACO</span>
-                  </div>
-                  <div v-if="getNeuronRewards(neuron.idHex) > 0" class="detail-item">
-                    <span class="detail-label">Rewards:</span>
-                    <span class="detail-value text-success">
-                      {{ formatBalance(BigInt(Math.floor(getNeuronRewards(neuron.idHex))), 8) }} TACO
-                      <button 
-                        @click.stop="claimNeuronRewards(neuron)"
-                        class="btn btn-success btn-xs ms-2"
-                        :disabled="loadingRewards || isNeuronClaiming(neuron.idHex)"
-                        title="Claim this neuron's rewards"
-                      >
-                        <i v-if="isNeuronClaiming(neuron.idHex)" class="fa fa-spinner fa-spin"></i>
-                        <i v-else class="fa fa-coins"></i>
-                      </button>
-                    </span>
                   </div>
                   <div class="detail-item">
                     <span class="detail-label">Voting Power:</span>
@@ -341,6 +352,9 @@
                       class="expand-icon"
                     ></i>
                     {{ neuron.displayName }}
+                    <span v-if="getNeuronRewards(neuron.idHex) > 0" class="rewards-indicator" title="Has rewards">
+                      <i class="fa fa-coins text-success"></i>
+                    </span>
                   </div>
                   <div class="neuron-stake">
                     {{ formatBalance(neuron.stake, 8) }} TACO
@@ -358,6 +372,29 @@
               <!-- Expanded details -->
               <div v-if="expandedNeurons.has(neuron.idHex)" class="neuron-details">
                 <div class="detail-grid">
+                  <!-- Rewards section - moved to top and always shown -->
+                  <div class="detail-item rewards-item" :class="{ 'has-rewards': getNeuronRewards(neuron.idHex) > 0 }">
+                    <span class="detail-label">
+                      <i class="fa fa-coins me-1"></i>
+                      Rewards:
+                    </span>
+                    <span v-if="getNeuronRewards(neuron.idHex) > 0" class="detail-value text-success">
+                      {{ formatBalance(BigInt(Math.floor(getNeuronRewards(neuron.idHex))), 8) }} TACO
+                      <button 
+                        @click.stop="claimNeuronRewards(neuron)"
+                        class="btn btn-success btn-xs ms-2"
+                        :disabled="loadingRewards || isNeuronClaiming(neuron.idHex)"
+                        title="Claim this neuron's rewards"
+                      >
+                        <i v-if="isNeuronClaiming(neuron.idHex)" class="fa fa-spinner fa-spin"></i>
+                        <i v-else class="fa fa-coins"></i>
+                      </button>
+                    </span>
+                    <span v-else class="detail-value text-muted">
+                      0 TACO
+                    </span>
+                  </div>
+                  
                   <div class="detail-item">
                     <span class="detail-label">Dissolve Period:</span>
                     <span class="detail-value" :class="'dissolve-' + neuron.dissolveState.type">
@@ -375,21 +412,6 @@
                   <div v-if="neuron.stakedMaturity > 0" class="detail-item">
                     <span class="detail-label">Staked Maturity:</span>
                     <span class="detail-value">{{ formatBalance(neuron.stakedMaturity, 8) }} TACO</span>
-                  </div>
-                  <div v-if="getNeuronRewards(neuron.idHex) > 0" class="detail-item">
-                    <span class="detail-label">Rewards:</span>
-                    <span class="detail-value text-success">
-                      {{ formatBalance(BigInt(Math.floor(getNeuronRewards(neuron.idHex))), 8) }} TACO
-                      <button 
-                        @click.stop="claimNeuronRewards(neuron)"
-                        class="btn btn-success btn-xs ms-2"
-                        :disabled="loadingRewards || isNeuronClaiming(neuron.idHex)"
-                        title="Claim this neuron's rewards"
-                      >
-                        <i v-if="isNeuronClaiming(neuron.idHex)" class="fa fa-spinner fa-spin"></i>
-                        <i v-else class="fa fa-coins"></i>
-                      </button>
-                    </span>
                   </div>
                   <div class="detail-item">
                     <span class="detail-label">Voting Power:</span>
@@ -655,14 +677,15 @@ const claimNeuronRewards = async (neuron: any) => {
   
   claimingNeurons.value.add(neuron.idHex)
   try {
-    // Find the original neuron data to get the proper ID format
-    const originalNeuron = categorizedNeurons.value.all.find(n => n.idHex === neuron.idHex)
-    if (!originalNeuron?.id || originalNeuron.id.length === 0) {
-      throw new Error('Invalid neuron ID format')
+    // For categorized neurons, neuron.id is already a Uint8Array
+    if (!neuron.id || !(neuron.id instanceof Uint8Array)) {
+      throw new Error('Invalid neuron ID format - expected Uint8Array')
     }
     
+    console.log('Claiming rewards for neuron:', neuron.idHex, 'with ID:', neuron.id)
+    
     // Call the real claim function with the neuron ID
-    const success = await tacoStore.claimNeuronRewards([originalNeuron.id[0].id])
+    const success = await tacoStore.claimNeuronRewards([neuron.id])
     
     if (success) {
       // Update the neuron balance to 0 after successful claim
@@ -1426,6 +1449,47 @@ const formatUSDValue = (balance: bigint, decimals: number, priceUSD: number): st
   .token-fee {
     background: var(--dark-bg-secondary, #1a202c);
   }
+}
+
+/* Rewards indicator in neuron header */
+.rewards-indicator {
+  margin-left: 0.5rem;
+  font-size: 0.9rem;
+}
+
+.rewards-indicator i {
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.6;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+/* Enhanced rewards item styling */
+.rewards-item {
+  background: rgba(40, 167, 69, 0.1);
+  border-radius: 6px;
+  padding: 0.75rem !important;
+  margin-bottom: 0.5rem;
+  border: 1px solid rgba(40, 167, 69, 0.2);
+}
+
+.rewards-item.has-rewards {
+  background: rgba(40, 167, 69, 0.15);
+  border-color: rgba(40, 167, 69, 0.3);
+}
+
+.rewards-item .detail-label {
+  font-weight: 600;
+  color: var(--text-primary);
 }
 
 /* Mobile responsiveness */

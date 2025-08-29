@@ -5625,7 +5625,7 @@ export const useTacoStore = defineStore('taco', () => {
             
             // Build ICRC1 Account object using user's principal
             const account = {
-                owner: userPrincipal.value,
+                owner: Principal.fromText(userPrincipal.value),
                 subaccount: [] // Empty subaccount
             }
             
@@ -5691,11 +5691,24 @@ export const useTacoStore = defineStore('taco', () => {
             const claimableNeuronIds: Uint8Array[] = []
 
             for (const neuron of neurons) {
-                if (neuron.id && neuron.id.length > 0) {
-                    const neuronIdHex = formatNeuronIdForMap(neuron.id[0].id)
+                // Handle both raw and categorized neuron formats
+                let neuronIdBlob = null
+                let neuronIdHex = null
+                
+                if (neuron.id instanceof Uint8Array) {
+                    // Categorized neuron format
+                    neuronIdBlob = neuron.id
+                    neuronIdHex = neuron.idHex || formatNeuronIdForMap(neuron.id)
+                } else if (neuron.id && Array.isArray(neuron.id) && neuron.id.length > 0) {
+                    // Raw neuron format
+                    neuronIdBlob = neuron.id[0].id
+                    neuronIdHex = formatNeuronIdForMap(neuron.id[0].id)
+                }
+                
+                if (neuronIdBlob && neuronIdHex) {
                     const balance = neuronBalances.get(neuronIdHex) || 0
                     if (balance > 0) {
-                        claimableNeuronIds.push(neuron.id[0].id)
+                        claimableNeuronIds.push(neuronIdBlob)
                     }
                 }
             }
