@@ -88,9 +88,9 @@
             :disabled="loadingRewards || claimingAllRewards"
             title="Claim all rewards"
           >
-            <i v-if="claimingAllRewards" class="fa fa-spinner fa-spin me-1"></i>
-            <i v-else class="fa fa-coins me-1"></i>
-            {{ claimingAllRewards ? 'Claiming...' : 'Claim All' }}
+            <i v-if="claimingAllRewards" class="fa fa-spinner fa-spin" :class="{ 'me-1': rewardsExpanded }"></i>
+            <i v-else class="fa fa-coins" :class="{ 'me-1': rewardsExpanded }"></i>
+            <span v-if="rewardsExpanded">{{ claimingAllRewards ? 'Claiming...' : 'Claim All' }}</span>
           </button>
         </div>
       </div>
