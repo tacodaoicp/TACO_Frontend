@@ -290,16 +290,37 @@ const trustedTokens = computed<WalletToken[]>(() => {
     .map((entry) => {
       const principal = entry[0]
       const details = entry[1]
-      return {
-      principal: principal.toString(),
-      name: details.tokenName,
-      symbol: details.tokenSymbol,
-      logo: tokenImages[details.tokenName] || tokenImages['Default'],
-      balance: allTokenBalances.value.get(principal.toString()) || 0n,
-      decimals: Number(details.tokenDecimals),
-      fee: details.tokenTransferFee,
-        priceUSD: parseFloat(details.priceInUSD) || 0,
-        isRegistered: false
+      const principalStr = principal.toString()
+      
+      // Check if we have fresh metadata for this token
+      const freshMetadata = customTokenMetadata.value.get(principalStr)
+      
+      if (freshMetadata) {
+        // Use fresh ICRC1 metadata
+        return {
+          principal: principalStr,
+          name: freshMetadata.name,
+          symbol: freshMetadata.symbol,
+          logo: freshMetadata.logo || tokenImages[freshMetadata.name] || tokenImages['Default'],
+          balance: allTokenBalances.value.get(principalStr) || 0n,
+          decimals: freshMetadata.decimals,
+          fee: freshMetadata.fee,
+          priceUSD: parseFloat(details.priceInUSD) || 0, // Keep price from original source
+          isRegistered: false
+        }
+      } else {
+        // Fall back to original metadata
+        return {
+          principal: principalStr,
+          name: details.tokenName,
+          symbol: details.tokenSymbol,
+          logo: tokenImages[details.tokenName] || tokenImages['Default'],
+          balance: allTokenBalances.value.get(principalStr) || 0n,
+          decimals: Number(details.tokenDecimals),
+          fee: details.tokenTransferFee,
+          priceUSD: parseFloat(details.priceInUSD) || 0,
+          isRegistered: false
+        }
       }
     })
 })
@@ -362,6 +383,9 @@ const loadWalletData = async () => {
       tacoStore.fetchTokenDetails(),
       fetchUserRegisteredTokens()
     ])
+    
+    // Load fresh metadata for trusted tokens using ICRC1 calls
+    await loadTrustedTokenMetadata()
     
     // Load balances for all tokens
     await loadAllBalances()
@@ -427,6 +451,44 @@ const loadCustomTokenMetadata = async () => {
     }
   }
   console.log('Final customTokenMetadata:', customTokenMetadata.value)
+}
+
+const loadTrustedTokenMetadata = async () => {
+  console.log('Loading fresh metadata for trusted tokens')
+  
+  // Get all trusted token principals
+  const trustedTokenPrincipals = tacoStore.fetchedTokenDetails
+    .filter((entry) => {
+      const principal = entry[0]
+      const details = entry[1]
+      const coreTokenPrincipals = new Set(['ryjl3-tyaaa-aaaaa-aaaba-cai', 'kknbx-zyaaa-aaaaq-aae4a-cai']) // ICP and TACO
+      const userRegisteredPrincipals = new Set(userRegisteredTokenPrincipals.value)
+      
+      return !coreTokenPrincipals.has(principal.toString()) && 
+             !userRegisteredPrincipals.has(principal.toString()) &&
+             details.Active && 
+             !details.isPaused
+    })
+    .map(entry => entry[0].toString())
+  
+  console.log('Trusted token principals to refresh:', trustedTokenPrincipals)
+  
+  // Load fresh metadata for each trusted token
+  for (const principal of trustedTokenPrincipals) {
+    try {
+      console.log(`Loading fresh metadata for trusted token: ${principal}`)
+      // Clear cache to ensure we get fresh data
+      tacoStore.clearTokenMetadataCache(principal)
+      const metadata = await tacoStore.fetchTokenMetadata(principal)
+      console.log(`Fetched fresh metadata for ${principal}:`, metadata)
+      customTokenMetadata.value.set(principal, metadata)
+    } catch (error) {
+      console.error(`Error loading metadata for trusted token ${principal}:`, error)
+      // Keep the original metadata from fetchedTokenDetails as fallback
+    }
+  }
+  
+  console.log('Finished loading trusted token metadata')
 }
 
 const loadAllBalances = async () => {
