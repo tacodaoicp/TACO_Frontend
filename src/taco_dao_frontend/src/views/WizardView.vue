@@ -393,33 +393,6 @@
 
                 <!-- Staking Options -->
                 <div class="staking-options">
-                  
-                  <!-- Stake Amount Input -->
-                  <div class="stake-amount-input">
-                    <label class="form-label">Amount to Stake:</label>
-                    <div class="input-group">
-                      <input
-                        v-model="stakeAmount"
-                        type="number"
-                        class="form-control"
-                        placeholder="0.0"
-                        step="0.00000001"
-                        min="1"
-                        :max="Number(tacoToken.balance) / 100000000"
-                      />
-                      <span class="input-group-text">TACO</span>
-                      <button 
-                        @click="setMaxStakeAmount"
-                        class="btn btn-outline-secondary"
-                        type="button"
-                      >
-                        MAX
-                      </button>
-                    </div>
-                    <small class="form-text text-muted">
-                      Minimum stake: 1.00000000 TACO
-                    </small>
-                  </div>
 
                   <!-- Stake to Existing Neuron Section -->
                   <div v-if="userNeurons.length > 0" class="staking-section">
@@ -427,6 +400,9 @@
                       <i class="fa fa-plus me-2"></i>
                       Stake to Existing Neuron
                     </h6>
+                    <p class="section-description">
+                      Add more TACO tokens to your existing neurons. Each dialog will let you specify the amount.
+                    </p>
                     <div class="neurons-list">
                       <div v-for="neuron in userNeurons" :key="neuron.idHex" class="neuron-item" :class="neuron.relationship">
                         <div class="neuron-info">
@@ -442,7 +418,7 @@
                         <button 
                           @click="stakeToExistingNeuron(neuron)"
                           class="btn btn-outline-primary btn-sm"
-                          :disabled="!canStake || isStaking"
+                          :disabled="!hasTacoTokens || isStaking"
                         >
                           <i v-if="isStaking" class="fa fa-spinner fa-spin me-1"></i>
                           <i v-else class="fa fa-plus me-1"></i>
@@ -462,6 +438,34 @@
                       <p class="section-description">
                         Create a new neuron with your TACO tokens. This will find the next available neuron ID and stake your tokens.
                       </p>
+                      
+                      <!-- Stake Amount Input for New Neuron -->
+                      <div class="stake-amount-input">
+                        <label class="form-label">Amount to Stake:</label>
+                        <div class="input-group">
+                          <input
+                            v-model="stakeAmount"
+                            type="number"
+                            class="form-control"
+                            placeholder="0.0"
+                            step="0.00000001"
+                            min="1"
+                            :max="Number(tacoToken.balance) / 100000000"
+                          />
+                          <span class="input-group-text">TACO</span>
+                          <button 
+                            @click="setMaxStakeAmount"
+                            class="btn btn-outline-secondary"
+                            type="button"
+                          >
+                            MAX
+                          </button>
+                        </div>
+                        <small class="form-text text-muted">
+                          Minimum stake: 1.00000000 TACO
+                        </small>
+                      </div>
+                      
                       <button 
                         @click="createNewNeuron"
                         class="btn btn-success btn-lg"
@@ -1820,8 +1824,18 @@ onMounted(async () => {
 .create-neuron-content {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  text-align: center;
+  gap: 1.5rem;
+}
+
+.create-neuron-content .stake-amount-input {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 1rem;
+}
+
+.create-neuron-content .btn-success {
+  align-self: center;
 }
 
 .step-actions,
