@@ -183,6 +183,36 @@
                   </div>
                 </div>
 
+                <!-- Register Custom Token Section -->
+                <div class="register-token-section">
+                  <h6>Register Custom ICRC1 Token:</h6>
+                  <p class="section-description">
+                    If you have a custom ICRC1 token that's not listed above, you can register it here:
+                  </p>
+                  <div class="register-token-form">
+                    <div class="input-group">
+                      <input 
+                        v-model="newTokenPrincipal"
+                        placeholder="Token principal (e.g., rdmx6-jaaaa-aaaah-qcaiq-cai)"
+                        class="form-control"
+                        :disabled="registeringToken"
+                      />
+                      <button 
+                        @click="registerCustomToken" 
+                        :disabled="!newTokenPrincipal.trim() || registeringToken"
+                        class="btn btn-outline-primary"
+                      >
+                        <i v-if="registeringToken" class="fa fa-spinner fa-spin me-1"></i>
+                        <i v-else class="fa fa-plus me-1"></i>
+                        {{ registeringToken ? 'Registering...' : 'Register Token' }}
+                      </button>
+                    </div>
+                    <small class="form-text text-muted">
+                      Enter the principal ID of an ICRC1 token to add it to your wallet
+                    </small>
+                  </div>
+                </div>
+
                 <!-- Current Balance Display -->
                 <div class="current-balance">
                   <h6>Current Balance:</h6>
@@ -513,6 +543,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
+import { Principal } from '@dfinity/principal'
 import { useTacoStore } from '../stores/taco.store'
 import { getLegacyAccountId } from '../utils/accountUtils'
 import { useClipboard } from '@vueuse/core'
@@ -548,6 +579,8 @@ const stakeAmount = ref('')
 const isSwapping = ref(false)
 const isStaking = ref(false)
 const stakingComplete = ref(false)
+const newTokenPrincipal = ref('')
+const registeringToken = ref(false)
 
 // Token data
 const allTokenBalances = ref<Map<string, bigint>>(new Map())
@@ -1076,6 +1109,82 @@ const resetWizard = () => {
   loadWalletData()
 }
 
+const registerCustomToken = async () => {
+  if (!newTokenPrincipal.value.trim()) return
+  
+  try {
+    registeringToken.value = true
+    
+    // Validate principal format
+    try {
+      Principal.fromText(newTokenPrincipal.value.trim())
+    } catch (error) {
+      tacoStore.addToast({
+        id: Date.now(),
+        code: 'invalid-principal',
+        title: 'Invalid Principal',
+        icon: 'fa-solid fa-exclamation-triangle',
+        message: 'Please enter a valid principal ID'
+      })
+      return
+    }
+    
+    // Check if token is already registered
+    if (userRegisteredTokenPrincipals.value.includes(newTokenPrincipal.value.trim())) {
+      tacoStore.addToast({
+        id: Date.now(),
+        code: 'already-registered',
+        title: 'Already Registered',
+        icon: 'fa-solid fa-exclamation-triangle',
+        message: 'This token is already in your wallet'
+      })
+      return
+    }
+    
+    // Register the token
+    await tacoStore.registerUserToken(newTokenPrincipal.value.trim())
+    
+    // Clear input and refresh
+    const registeredPrincipal = newTokenPrincipal.value.trim()
+    newTokenPrincipal.value = ''
+    
+    // Refresh registered tokens list
+    await fetchUserRegisteredTokens()
+    
+    // Load balance for the new token
+    await loadAllBalances()
+    
+    // Get the metadata for the registered token for the toast
+    const metadata = customTokenMetadata.value.get(registeredPrincipal)
+    const tokenName = metadata?.symbol || 'Custom Token'
+    
+    tacoStore.addToast({
+      id: Date.now(),
+      code: 'register-success',
+      title: 'Token Registered',
+      icon: 'fa-solid fa-check',
+      message: `${tokenName} added to your wallet`
+    })
+    
+    // Update the dropdown to include the new token
+    if (metadata?.symbol && metadata.symbol !== 'TACO') {
+      selectedGetTokenSymbol.value = metadata.symbol
+    }
+    
+  } catch (error) {
+    console.error('Error registering custom token:', error)
+    tacoStore.addToast({
+      id: Date.now(),
+      code: 'register-error',
+      title: 'Registration Failed',
+      icon: 'fa-solid fa-exclamation-triangle',
+      message: 'Failed to register custom token'
+    })
+  } finally {
+    registeringToken.value = false
+  }
+}
+
 const formatBalance = (balance: bigint, decimals: number): string => {
   const divisor = BigInt(10 ** decimals)
   const wholePart = balance / divisor
@@ -1431,6 +1540,39 @@ onMounted(async () => {
   word-break: break-all;
   flex: 1;
   font-size: 0.85rem;
+}
+
+.register-token-section {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.register-token-section h6 {
+  color: white;
+  margin-bottom: 0.75rem;
+  font-weight: 600;
+}
+
+.register-token-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.register-token-form .input-group {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.register-token-form .form-control {
+  flex: 1;
+}
+
+.register-token-form .btn {
+  white-space: nowrap;
 }
 
 .current-balance {
@@ -1796,6 +1938,14 @@ onMounted(async () => {
   
   .balance-grid {
     grid-template-columns: 1fr;
+  }
+  
+  .register-token-form .input-group {
+    flex-direction: column;
+  }
+  
+  .register-token-form .btn {
+    margin-top: 0.5rem;
   }
 }
 </style>
