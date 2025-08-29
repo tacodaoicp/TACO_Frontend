@@ -73,7 +73,7 @@
           ></i>
           <div class="rewards-icon-container">
             <i class="fa fa-coins me-2"></i>
-            <span v-if="totalRewards > 0" class="rewards-indicator"></span>
+            <span v-if="totalRewards > 0" class="rewards-header-indicator"></span>
           </div>
           Rewards
           <span v-if="!rewardsExpanded && totalRewards > 0" class="rewards-count-badge">
@@ -183,7 +183,7 @@
                       class="expand-icon"
                     ></i>
                     {{ neuron.displayName }}
-                    <span v-if="getNeuronRewards(neuron.idHex) > 0" class="rewards-indicator" title="Has rewards">
+                    <span v-if="getNeuronRewards(neuron.idHex) > 0" class="neuron-rewards-indicator" title="Has rewards">
                       <i class="fa fa-coins text-success"></i>
                     </span>
                   </div>
@@ -362,7 +362,7 @@
                       class="expand-icon"
                     ></i>
                     {{ neuron.displayName }}
-                    <span v-if="getNeuronRewards(neuron.idHex) > 0" class="rewards-indicator" title="Has rewards">
+                    <span v-if="getNeuronRewards(neuron.idHex) > 0" class="neuron-rewards-indicator" title="Has rewards">
                       <i class="fa fa-coins text-success"></i>
                     </span>
                   </div>
@@ -1090,7 +1090,7 @@ const formatUSDValue = (balance: bigint, decimals: number, priceUSD: number): st
   align-items: center;
 }
 
-.rewards-indicator {
+.rewards-header-indicator {
   position: absolute;
   top: -2px;
   right: 6px;
@@ -1099,10 +1099,10 @@ const formatUSDValue = (balance: bigint, decimals: number, priceUSD: number): st
   background: var(--success-color);
   border-radius: 50%;
   border: 2px solid var(--bg-primary);
-  animation: pulse 2s infinite;
+  animation: pulse-dot 2s infinite;
 }
 
-@keyframes pulse {
+@keyframes pulse-dot {
   0% {
     transform: scale(1);
     opacity: 1;
@@ -1542,16 +1542,16 @@ const formatUSDValue = (balance: bigint, decimals: number, priceUSD: number): st
 }
 
 /* Rewards indicator in neuron header */
-.rewards-indicator {
+.neuron-rewards-indicator {
   margin-left: 0.5rem;
   font-size: 0.9rem;
 }
 
-.rewards-indicator i {
-  animation: pulse 2s infinite;
+.neuron-rewards-indicator i {
+  animation: pulse-icon 2s infinite;
 }
 
-@keyframes pulse {
+@keyframes pulse-icon {
   0% {
     opacity: 1;
   }
