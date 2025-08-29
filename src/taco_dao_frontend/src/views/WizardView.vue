@@ -350,23 +350,23 @@
                 <!-- Swap Actions -->
                 <div v-if="selectedSwapFromToken" class="swap-actions">
                   <button 
-                    @click="performSwap"
-                    class="btn btn-primary btn-lg me-3"
-                    :disabled="isSwapping"
-                  >
-                    <i v-if="isSwapping" class="fa fa-spinner fa-spin me-2"></i>
-                    <i v-else class="fa fa-exchange-alt me-2"></i>
-                    {{ isSwapping ? 'Swapping...' : 'Swap to TACO' }}
-                  </button>
-                  
-                  <button 
                     @click="performSwapAndStake"
-                    class="btn btn-success btn-lg"
+                    class="btn btn-success btn-lg me-3 primary-action-btn"
                     :disabled="isSwapping"
                   >
                     <i v-if="isSwapping" class="fa fa-spinner fa-spin me-2"></i>
                     <i v-else class="fa fa-magic me-2"></i>
                     {{ isSwapping ? 'Processing...' : 'Swap & Stake All' }}
+                  </button>
+                  
+                  <button 
+                    @click="performSwap"
+                    class="btn btn-outline-primary btn-lg"
+                    :disabled="isSwapping"
+                  >
+                    <i v-if="isSwapping" class="fa fa-spinner fa-spin me-2"></i>
+                    <i v-else class="fa fa-exchange-alt me-2"></i>
+                    {{ isSwapping ? 'Swapping...' : 'Swap to TACO' }}
                   </button>
                 </div>
 
@@ -1400,6 +1400,43 @@ const formatUSDValue = (balance: bigint, decimals: number, priceUSD: number): st
   })
 }
 
+// Watchers to sync token selections
+watch(currentStep, (newStep) => {
+  if (newStep === 2) {
+    // Sync swap token with the selected token from step 1
+    const selectedGetToken = allTokens.value.find(t => t.symbol === selectedGetTokenSymbol.value)
+    
+    if (selectedGetToken && selectedGetToken.symbol !== 'TACO' && selectedGetToken.balance > selectedGetToken.fee) {
+      selectedSwapFromToken.value = selectedGetToken.principal
+    } else if (!selectedSwapFromToken.value) {
+      // Fallback: Auto-select the first swappable token when entering swap step
+      const firstSwappable = swappableTokens.value[0]
+      if (firstSwappable) {
+        selectedSwapFromToken.value = firstSwappable.principal
+      }
+    }
+  }
+})
+
+watch(selectedGetTokenSymbol, (newSymbol) => {
+  // Sync swap selection when get token selection changes
+  const selectedToken = allTokens.value.find(t => t.symbol === newSymbol)
+  
+  if (selectedToken && selectedToken.symbol !== 'TACO' && selectedToken.balance > selectedToken.fee) {
+    selectedSwapFromToken.value = selectedToken.principal
+  }
+})
+
+// Also watch allTokens to sync when data loads
+watch(allTokens, (newTokens) => {
+  if (newTokens.length > 0 && currentStep.value === 2 && !selectedSwapFromToken.value) {
+    const selectedGetToken = newTokens.find(t => t.symbol === selectedGetTokenSymbol.value)
+    if (selectedGetToken && selectedGetToken.symbol !== 'TACO' && selectedGetToken.balance > selectedGetToken.fee) {
+      selectedSwapFromToken.value = selectedGetToken.principal
+    }
+  }
+}, { deep: true })
+
 // Lifecycle
 onMounted(async () => {
   try {
@@ -2063,6 +2100,59 @@ onMounted(async () => {
   font-size: 0.85rem;
   color: #a0aec0;
   border-left: 3px solid rgba(0, 123, 255, 0.5);
+}
+
+.primary-action-btn {
+  border: 2px solid rgba(40, 167, 69, 0.6) !important;
+  box-shadow: 0 0 0 2px rgba(40, 167, 69, 0.2);
+  transition: all 0.2s ease;
+}
+
+.primary-action-btn:hover:not(:disabled) {
+  border-color: rgba(40, 167, 69, 0.8) !important;
+  box-shadow: 0 0 0 3px rgba(40, 167, 69, 0.3);
+  transform: translateY(-1px);
+}
+
+.register-token-section {
+  margin-top: 2rem;
+  padding: 1.5rem;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+}
+
+.register-token-form {
+  margin-top: 1rem;
+}
+
+.register-token-form .input-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: stretch;
+}
+
+.register-token-form .form-control {
+  flex: 1;
+  min-width: 250px;
+  max-width: 100%;
+}
+
+.register-token-form .btn {
+  flex-shrink: 0;
+  white-space: nowrap;
+  min-width: 140px;
+}
+
+@media (max-width: 768px) {
+  .register-token-form .input-group {
+    flex-direction: column;
+  }
+  
+  .register-token-form .form-control {
+    min-width: 100%;
+  }
 }
 
 .step-actions,
