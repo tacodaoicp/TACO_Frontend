@@ -51,6 +51,45 @@
             </div>
           </div>
 
+          <div class="mb-3">
+            <label for="dissolveDays" class="form-label">Dissolve Period (Days)</label>
+            <input
+              id="dissolveDays"
+              v-model.number="dissolveDays"
+              type="number"
+              class="form-control"
+              :class="{ 'is-invalid': dissolveDays < 28 || dissolveDays > 180 }"
+              min="28"
+              max="180"
+              step="1"
+              placeholder="Enter days (e.g., 28, 60, 90)"
+              :disabled="isCreating"
+            />
+            <div class="form-text">
+              <i class="fa fa-info-circle me-1"></i>
+              Recommended: 28 days minimum for voting rewards. Range: 28-180 days (6 months)
+            </div>
+            <div v-if="dissolveDays < 28 || dissolveDays > 180" class="invalid-feedback">
+              Please enter between 28 and 180 days
+            </div>
+          </div>
+
+          <div v-if="dissolveDays >= 28 && dissolveDays <= 180" class="dissolve-preview">
+            <h6>Dissolve Preview:</h6>
+            <div class="preview-item">
+              <span class="label">Dissolve Period:</span>
+              <span class="value">{{ dissolveDays }} days ({{ Math.round(dissolveDays / 30 * 10) / 10 }} months)</span>
+            </div>
+            <div class="preview-item">
+              <span class="label">Dissolve Date:</span>
+              <span class="value">{{ formatFutureDate(dissolveDays) }}</span>
+            </div>
+            <div class="preview-item">
+              <span class="label">Age Bonus:</span>
+              <span class="value">✅ Will accrue from creation</span>
+            </div>
+          </div>
+
           <div v-if="stakeAmountBigInt > 0n" class="stake-preview mb-3">
             <div class="preview-item">
               <span>Amount to stake:</span>
@@ -123,6 +162,7 @@ import { useTacoStore } from '../../stores/taco.store'
 interface CreateNeuronDialogProps {
   show: boolean
   tacoBalance: bigint
+  prefilledAmount?: string
 }
 
 interface CreateNeuronDialogEmits {
@@ -137,6 +177,7 @@ const tacoStore = useTacoStore()
 
 // State
 const stakeAmount = ref('')
+const dissolveDays = ref(28) // Default to 28 days
 const isCreating = ref(false)
 const error = ref('')
 const successMessage = ref('')
@@ -160,6 +201,7 @@ const stakeAmountBigInt = computed(() => {
 const canCreate = computed(() => {
   return stakeAmountBigInt.value >= minStake && 
          stakeAmountBigInt.value + tacoFee <= props.tacoBalance &&
+         dissolveDays.value >= 28 && dissolveDays.value <= 180 &&
          !isCreating.value
 })
 
@@ -171,7 +213,9 @@ watch(() => props.show, (newShow) => {
 })
 
 const resetForm = () => {
-  stakeAmount.value = ''
+  // Use prefilled amount if provided, otherwise empty
+  stakeAmount.value = props.prefilledAmount || ''
+  dissolveDays.value = 28 // Reset to default
   error.value = ''
   successMessage.value = ''
   isCreating.value = false
@@ -199,13 +243,25 @@ const handleCreate = async () => {
   try {
     const result = await tacoStore.createNeuron(stakeAmountBigInt.value)
     
-    if (result.success) {
+    if (result.success && result.subaccount) {
+      // Set dissolve delay for the newly created neuron
+      try {
+        console.log('Setting dissolve delay for new neuron...')
+        const delayMonths = dissolveDays.value / 30
+        await tacoStore.setNeuronDissolveDelay(result.subaccount, delayMonths)
+        console.log(`Dissolve delay set to ${dissolveDays.value} days (${delayMonths} months)`)
+      } catch (dissolveError: any) {
+        console.warn('Failed to set dissolve delay, but neuron was created:', dissolveError)
+        // Don't fail the whole operation, just warn the user
+        error.value = `Neuron created successfully, but failed to set dissolve period: ${dissolveError.message}`
+      }
+      
       // Show success state in dialog
       isSuccess.value = true
-      successMessage.value = `Successfully created new neuron with ${formatBalance(stakeAmountBigInt.value, 8)} TACO!`
+      successMessage.value = `Successfully created new neuron with ${formatBalance(stakeAmountBigInt.value, 8)} TACO and ${dissolveDays.value} day dissolve period!`
       
       // Also show toast notification
-      tacoStore.addToast('success', 'Neuron Created', `Successfully created new neuron with ${formatBalance(stakeAmountBigInt.value, 8)} TACO`)
+      tacoStore.addToast('success', 'Neuron Created', `Successfully created new neuron with ${formatBalance(stakeAmountBigInt.value, 8)} TACO and ${dissolveDays.value} day dissolve period`)
       
       emit('created')
       
@@ -220,6 +276,16 @@ const handleCreate = async () => {
   } finally {
     isCreating.value = false
   }
+}
+
+const formatFutureDate = (days: number) => {
+  const futureDate = new Date()
+  futureDate.setDate(futureDate.getDate() + days)
+  return futureDate.toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric'
+  })
 }
 
 const formatBalance = (balance: bigint, decimals: number): string => {
@@ -356,6 +422,56 @@ const formatBalance = (balance: bigint, decimals: number): string => {
 
 .preview-item:last-child {
   margin-bottom: 0;
+}
+
+.dissolve-preview {
+  background: rgba(0, 123, 255, 0.1);
+  border: 1px solid rgba(0, 123, 255, 0.3);
+  border-radius: 8px;
+  padding: 1rem;
+  margin-bottom: 1rem;
+}
+
+.dissolve-preview h6 {
+  margin: 0 0 0.75rem 0;
+  color: white;
+  font-weight: 600;
+}
+
+.dissolve-preview .preview-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+  font-size: 0.9rem;
+}
+
+.dissolve-preview .preview-item:last-child {
+  margin-bottom: 0;
+}
+
+.dissolve-preview .label {
+  color: #a0aec0;
+  font-weight: 500;
+}
+
+.dissolve-preview .value {
+  color: white;
+  font-weight: 500;
+  text-align: right;
+  max-width: 60%;
+}
+
+.form-control.is-invalid {
+  border-color: #dc3545;
+}
+
+.invalid-feedback {
+  display: block;
+  width: 100%;
+  margin-top: 0.25rem;
+  font-size: 0.875rem;
+  color: #dc3545;
 }
 
 .alert-success {

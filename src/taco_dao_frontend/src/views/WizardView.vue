@@ -436,40 +436,13 @@
                     </h6>
                     <div class="create-neuron-content">
                       <p class="section-description">
-                        Create a new neuron with your TACO tokens. This will find the next available neuron ID and stake your tokens.
+                        Create a new neuron with your TACO tokens. The dialog will let you specify the amount and dissolve period.
                       </p>
-                      
-                      <!-- Stake Amount Input for New Neuron -->
-                      <div class="stake-amount-input">
-                        <label class="form-label">Amount to Stake:</label>
-                        <div class="input-group">
-                          <input
-                            v-model="stakeAmount"
-                            type="number"
-                            class="form-control"
-                            placeholder="0.0"
-                            step="0.00000001"
-                            min="1"
-                            :max="Number(tacoToken.balance) / 100000000"
-                          />
-                          <span class="input-group-text">TACO</span>
-                          <button 
-                            @click="setMaxStakeAmount"
-                            class="btn btn-outline-secondary"
-                            type="button"
-                          >
-                            MAX
-                          </button>
-                        </div>
-                        <small class="form-text text-muted">
-                          Minimum stake: 1.00000000 TACO
-                        </small>
-                      </div>
                       
                       <button 
                         @click="createNewNeuron"
                         class="btn btn-success btn-lg"
-                        :disabled="!canStake || isStaking"
+                        :disabled="!hasTacoTokens || isStaking"
                       >
                         <i v-if="isStaking" class="fa fa-spinner fa-spin me-2"></i>
                         <i v-else class="fa fa-brain me-2"></i>
@@ -537,6 +510,7 @@
     <CreateNeuronDialog
       :show="showCreateDialog"
       :taco-balance="tacoToken.balance"
+      :prefilled-amount="maxTacoAmount"
       @close="closeCreateDialog"
       @created="handleNeuronCreated"
     />
@@ -579,7 +553,6 @@ const currentStep = ref(1)
 const expandedSteps = ref<Set<number>>(new Set([1]))
 const selectedGetTokenSymbol = ref('ICP')
 const selectedSwapFromToken = ref('')
-const stakeAmount = ref('')
 const isSwapping = ref(false)
 const isStaking = ref(false)
 const stakingComplete = ref(false)
@@ -769,14 +742,12 @@ const canSwap = computed(() => {
   return token.balance > token.fee
 })
 
-const canStake = computed(() => {
-  if (!stakeAmount.value) return false
-  
-  const amount = parseFloat(stakeAmount.value)
+const maxTacoAmount = computed(() => {
   const maxAmount = Number(tacoToken.value.balance - tacoToken.value.fee) / (10 ** tacoToken.value.decimals)
-  
-  return amount >= 1 && amount <= maxAmount
+  return maxAmount.toString()
 })
+
+
 
 // Methods
 const loadWalletData = async () => {
@@ -973,10 +944,7 @@ const getTokenByPrincipal = (principal: string): WalletToken | undefined => {
 
 
 
-const setMaxStakeAmount = () => {
-  const maxAmount = Number(tacoToken.value.balance - tacoToken.value.fee) / (10 ** tacoToken.value.decimals)
-  stakeAmount.value = maxAmount.toString()
-}
+
 
 const performSwap = async () => {
   if (!canSwap.value) return
@@ -1108,7 +1076,6 @@ const resetWizard = () => {
   currentStep.value = 1
   expandedSteps.value = new Set([1])
   selectedSwapFromToken.value = ''
-  stakeAmount.value = ''
   stakingComplete.value = false
   loadWalletData()
 }
@@ -1827,12 +1794,7 @@ onMounted(async () => {
   gap: 1.5rem;
 }
 
-.create-neuron-content .stake-amount-input {
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 8px;
-  padding: 1rem;
-}
+
 
 .create-neuron-content .btn-success {
   align-self: center;
