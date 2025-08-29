@@ -109,7 +109,7 @@
                                             >
                                             <button 
                                                 @click="saveNeuronName(neuron.id)" 
-                                                :disabled="!neuronNameInputs[neuronKey(neuron)]?.trim() || neuronNameSaving[neuronKey(neuron)]"
+                                                :disabled="neuronNameSaving[neuronKey(neuron)]"
                                                 class="save-btn"
                                             >
                                                 <i v-if="neuronNameSaving[neuronKey(neuron)]" class="fa-solid fa-spinner fa-spin"></i>
@@ -150,7 +150,7 @@
                                             >
                                             <button 
                                                 @click="saveNeuronName(neuron.id)" 
-                                                :disabled="!neuronNameInputs[neuronKey(neuron)]?.trim() || neuronNameSaving[neuronKey(neuron)]"
+                                                :disabled="neuronNameSaving[neuronKey(neuron)]"
                                                 class="save-btn"
                                             >
                                                 <i v-if="neuronNameSaving[neuronKey(neuron)]" class="fa-solid fa-spinner fa-spin"></i>
@@ -245,12 +245,24 @@ const lastLoadedFormatted = computed(() => {
 
 // Helper methods
 const neuronKey = (neuron) => {
-    // Use the same format as TokenCard.vue - use idHex if available, otherwise generate from id
-    if (neuron.idHex) {
-        return neuron.idHex
+    // Handle different input formats
+    if (typeof neuron === 'object' && neuron !== null) {
+        // Case 1: neuron object with idHex property (formatted neuron)
+        if (neuron.idHex) {
+            return neuron.idHex
+        }
+        // Case 2: neuron object with nested id structure
+        if (neuron.id && neuron.id.id) {
+            return Array.from(neuron.id.id, byte => byte.toString(16).padStart(2, '0')).join('')
+        }
+        // Case 3: neuron object with direct id property as Uint8Array
+        if (neuron.id && neuron.id instanceof Uint8Array) {
+            return Array.from(neuron.id, byte => byte.toString(16).padStart(2, '0')).join('')
+        }
     }
-    if (neuron.id && neuron.id.id) {
-        return Array.from(neuron.id.id, byte => byte.toString(16).padStart(2, '0')).join('')
+    // Case 4: direct Uint8Array (for saveNeuronName calls)
+    if (neuron instanceof Uint8Array) {
+        return Array.from(neuron, byte => byte.toString(16).padStart(2, '0')).join('')
     }
     return 'unknown'
 }
@@ -291,19 +303,38 @@ const savePrincipalName = async () => {
 }
 
 const saveNeuronName = async (neuronId) => {
-    const key = neuronKey({ id: neuronId })
+    console.log('🔧 saveNeuronName called with neuronId:', neuronId)
+    console.log('🔧 neuronId type:', typeof neuronId)
+    console.log('🔧 neuronId instanceof Uint8Array:', neuronId instanceof Uint8Array)
+    
+    // neuronId is the actual Uint8Array from neuron.id
+    const key = neuronKey(neuronId)
     const name = neuronNameInputs.value[key]
     
-    if (!name?.trim()) return
+    console.log('🔧 neuronKey:', key)
+    console.log('🔧 name from input:', name)
+    console.log('🔧 neuronNameInputs.value:', neuronNameInputs.value)
+    
+    if (!name?.trim()) {
+        console.log('❌ No name provided, returning early')
+        return
+    }
     
     try {
         neuronNameSaving.value[key] = true
         const tacoSnsRoot = Principal.fromText('lhdfz-wqaaa-aaaaq-aae3q-cai') // TACO SNS root
-        await setNeuronName(tacoSnsRoot, neuronId.id, name.trim())
+        console.log('🔧 Calling setNeuronName with:', { tacoSnsRoot, neuronId: neuronId, name: name.trim() })
+        
+        // neuronId is already the Uint8Array, no need to access .id
+        await setNeuronName(tacoSnsRoot, neuronId, name.trim())
         neuronNameInputs.value[key] = ''
+        
+        // Reload neurons to show updated names
+        await loadUserNeurons()
         
         // Show success message
         console.log('✅ Neuron name saved successfully')
+        alert('✅ Neuron name saved successfully!')
     } catch (error) {
         console.error('❌ Error saving neuron name:', error)
         alert('Failed to save neuron name: ' + error.message)
@@ -507,23 +538,34 @@ watch(userLoggedIn, (newValue) => {
     align-items: center;
     gap: 0.5rem;
     padding: 0.75rem 1.5rem;
-    background: var(--primary-color);
+    background: linear-gradient(135deg, #007bff, #0056b3);
     color: white;
     border: none;
     border-radius: 8px;
     font-size: 1rem;
+    font-weight: 600;
     cursor: pointer;
-    transition: all 0.2s;
+    transition: all 0.3s ease;
     white-space: nowrap;
+    box-shadow: 0 2px 8px rgba(0, 123, 255, 0.3);
+    min-width: 100px;
 }
 
 .save-btn:hover:not(:disabled) {
-    background: var(--primary-hover);
+    background: linear-gradient(135deg, #0056b3, #004085);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 123, 255, 0.4);
+}
+
+.save-btn:active:not(:disabled) {
+    transform: translateY(0);
 }
 
 .save-btn:disabled {
-    opacity: 0.5;
+    opacity: 0.6;
     cursor: not-allowed;
+    transform: none;
+    box-shadow: 0 2px 4px rgba(0, 123, 255, 0.2);
 }
 
 .no-neurons {

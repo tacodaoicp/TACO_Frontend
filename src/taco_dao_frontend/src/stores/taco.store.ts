@@ -5459,6 +5459,11 @@ export const useTacoStore = defineStore('taco', () => {
             };
         });
         
+        // Get custom name from cache if available
+        const tacoSnsRoot = Principal.fromText('lhdfz-wqaaa-aaaaq-aae3q-cai');
+        const customName = neuronId ? getNeuronDisplayName(tacoSnsRoot, neuronId) : '';
+        const displayName = customName || `Neuron ${neuronIdHex.substring(0, 8)}...`;
+
         return {
             id: neuronId,
             idHex: neuronIdHex,
@@ -5467,7 +5472,7 @@ export const useTacoStore = defineStore('taco', () => {
             stakedMaturity,
             neuronFees,
             votingPowerMultiplier: neuron.voting_power_percentage_multiplier,
-            displayName: `Neuron ${neuronIdHex.substring(0, 8)}...`,
+            displayName: displayName,
             isOwner: relationship.isOwner,
             isHotkey: relationship.isHotkey,
             relationship: relationship.isOwner ? 'owned' : relationship.isHotkey ? 'hotkeyed' : 'unknown',
