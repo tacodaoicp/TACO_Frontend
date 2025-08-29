@@ -303,38 +303,25 @@ const savePrincipalName = async () => {
 }
 
 const saveNeuronName = async (neuronId) => {
-    console.log('🔧 saveNeuronName called with neuronId:', neuronId)
-    console.log('🔧 neuronId type:', typeof neuronId)
-    console.log('🔧 neuronId instanceof Uint8Array:', neuronId instanceof Uint8Array)
-    
     // neuronId is the actual Uint8Array from neuron.id
     const key = neuronKey(neuronId)
     const name = neuronNameInputs.value[key]
     
-    console.log('🔧 neuronKey:', key)
-    console.log('🔧 name from input:', name)
-    console.log('🔧 neuronNameInputs.value:', neuronNameInputs.value)
-    
-    if (!name?.trim()) {
-        console.log('❌ No name provided, returning early')
-        return
-    }
+    if (!name?.trim()) return
     
     try {
         neuronNameSaving.value[key] = true
         const tacoSnsRoot = Principal.fromText('lacdn-3iaaa-aaaaq-aae3a-cai') // TACO SNS root
-        console.log('🔧 Calling setNeuronName with TACO SNS root:', tacoSnsRoot.toText(), 'name:', name.trim())
         
         // neuronId is already the Uint8Array, no need to access .id
         await setNeuronName(tacoSnsRoot, neuronId, name.trim())
         neuronNameInputs.value[key] = ''
         
-        // Don't reload neurons immediately - let's see if this is causing the issue
-        // await loadUserNeurons()
+        // Reload neurons to show updated names (now safe with correct canister ID)
+        await loadUserNeurons()
         
         // Show success message
         console.log('✅ Neuron name saved successfully')
-        alert('✅ Neuron name saved successfully!')
     } catch (error) {
         console.error('❌ Error saving neuron name:', error)
         alert('Failed to save neuron name: ' + error.message)
