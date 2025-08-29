@@ -5472,7 +5472,7 @@ export const useTacoStore = defineStore('taco', () => {
         });
         
         // Get custom name from cache if available
-        const tacoSnsRoot = Principal.fromText('lhdfz-wqaaa-aaaaq-aae3q-cai');
+        const tacoSnsRoot = Principal.fromText('lacdn-3iaaa-aaaaq-aae3a-cai'); // TACO SNS Root (not governance)
         const customName = neuronId ? getNeuronDisplayName(tacoSnsRoot, neuronId) : '';
         
         // Debug logging for name lookup

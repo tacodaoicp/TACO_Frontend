@@ -277,7 +277,7 @@ const formatNeuronId = (neuronId) => {
 
 const getNeuronCurrentName = (neuronId) => {
     if (neuronId && neuronId.id) {
-        const tacoSnsRoot = Principal.fromText('lhdfz-wqaaa-aaaaq-aae3q-cai') // TACO SNS root
+        const tacoSnsRoot = Principal.fromText('lacdn-3iaaa-aaaaq-aae3a-cai') // TACO SNS root
         return getNeuronDisplayName(tacoSnsRoot, neuronId.id)
     }
     return 'Unknown'
@@ -322,7 +322,7 @@ const saveNeuronName = async (neuronId) => {
     
     try {
         neuronNameSaving.value[key] = true
-        const tacoSnsRoot = Principal.fromText('lhdfz-wqaaa-aaaaq-aae3q-cai') // TACO SNS root
+        const tacoSnsRoot = Principal.fromText('lacdn-3iaaa-aaaaq-aae3a-cai') // TACO SNS root
         console.log('🔧 Calling setNeuronName with TACO SNS root:', tacoSnsRoot.toText(), 'name:', name.trim())
         
         // neuronId is already the Uint8Array, no need to access .id
