@@ -81,12 +81,12 @@
               <span class="value">{{ dissolveDays }} days ({{ Math.round(dissolveDays / 30 * 10) / 10 }} months)</span>
             </div>
             <div class="preview-item">
-              <span class="label">Dissolve Date:</span>
-              <span class="value">{{ formatFutureDate(dissolveDays) }}</span>
+              <span class="label">Initial State:</span>
+              <span class="value">🔒 Locked (not dissolving)</span>
             </div>
             <div class="preview-item">
               <span class="label">Age Bonus:</span>
-              <span class="value">✅ Will accrue from creation</span>
+              <span class="value">✅ Will accrue while locked</span>
             </div>
           </div>
 
@@ -108,6 +108,11 @@
           <div v-if="successMessage" class="alert alert-success">
             <i class="fa fa-check-circle me-2"></i>
             {{ successMessage }}
+            <div class="mt-2">
+              <i class="fa fa-vote-yea me-1"></i>
+              <router-link to="/vote" class="vote-link">Vote on allocations</router-link> 
+              to start earning rewards!
+            </div>
           </div>
 
           <div v-if="error" class="alert alert-danger">
@@ -278,15 +283,7 @@ const handleCreate = async () => {
   }
 }
 
-const formatFutureDate = (days: number) => {
-  const futureDate = new Date()
-  futureDate.setDate(futureDate.getDate() + days)
-  return futureDate.toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric'
-  })
-}
+
 
 const formatBalance = (balance: bigint, decimals: number): string => {
   const divisor = BigInt(10 ** decimals)
@@ -478,6 +475,20 @@ const formatBalance = (balance: bigint, decimals: number): string => {
   background: rgba(25, 135, 84, 0.1);
   border: 1px solid rgba(25, 135, 84, 0.3);
   color: #d1e7dd;
+}
+
+.vote-link {
+  color: #28a745;
+  text-decoration: none;
+  font-weight: 600;
+  border-bottom: 1px solid transparent;
+  transition: all 0.2s ease;
+}
+
+.vote-link:hover {
+  color: #34ce57;
+  border-bottom-color: #34ce57;
+  text-decoration: none;
 }
 
 .alert-danger {

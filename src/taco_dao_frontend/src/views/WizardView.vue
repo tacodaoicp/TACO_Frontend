@@ -555,6 +555,7 @@ const selectedGetTokenSymbol = ref('ICP')
 const selectedSwapFromToken = ref('')
 const isSwapping = ref(false)
 const isStaking = ref(false)
+const isSwapAndStake = ref(false) // Flag to track if we're doing swap & stake
 const stakingComplete = ref(false)
 const newTokenPrincipal = ref('')
 const registeringToken = ref(false)
@@ -952,12 +953,18 @@ const performSwap = async () => {
   const token = getTokenByPrincipal(selectedSwapFromToken.value)
   if (!token) return
   
+  // Clear the swap & stake flag for regular swaps
+  if (!isSwapAndStake.value) {
+    isSwapAndStake.value = false
+  }
+  
   preselectedSwapToken.value = token
   showSwapDialog.value = true
 }
 
 const performSwapAndStake = async () => {
-  // For now, just perform swap - we can enhance this later to do both in one transaction
+  // Set flag to indicate we want to stake after swap
+  isSwapAndStake.value = true
   await performSwap()
 }
 
@@ -987,19 +994,87 @@ const handleSwapSuccess = async (result: any) => {
   
   closeSwapConfirmDialog()
   
-  tacoStore.addToast({
-    id: Date.now(),
-    code: 'swap-success',
-    title: 'Swap Successful',
-    icon: 'fa-solid fa-check',
-    message: `Successfully swapped to TACO`
-  })
-  
-  // Refresh wallet data
+  // Refresh wallet data first to get updated TACO balance
   await loadWalletData()
   
-  // Move to staking step
-  goToStep(3)
+  if (isSwapAndStake.value) {
+    // Auto-stake all the TACO we just received
+    console.log('Auto-staking TACO after swap...')
+    
+    try {
+      isStaking.value = true
+      
+      // Calculate max stakeable amount (balance - fee)
+      const maxStakeAmount = tacoToken.value.balance - tacoToken.value.fee
+      
+      if (maxStakeAmount >= 100000000n) { // Minimum 1 TACO
+        // Create neuron with all available TACO and default dissolve period
+        const result = await tacoStore.createNeuron(maxStakeAmount)
+        
+        if (result.success && result.subaccount) {
+          // Set default dissolve delay (28 days)
+          try {
+            const defaultDissolveDays = 28
+            const delayMonths = defaultDissolveDays / 30
+            await tacoStore.setNeuronDissolveDelay(result.subaccount, delayMonths)
+            console.log(`Auto-set dissolve delay to ${defaultDissolveDays} days`)
+          } catch (dissolveError: any) {
+            console.warn('Failed to set dissolve delay for auto-created neuron:', dissolveError)
+          }
+          
+          // Show success message
+          tacoStore.addToast({
+            id: Date.now(),
+            code: 'swap-stake-success',
+            title: 'Swap & Stake Complete!',
+            icon: 'fa-solid fa-magic',
+            message: `Successfully swapped and staked ${formatBalance(maxStakeAmount, 8)} TACO in a new neuron!`
+          })
+          
+          // Mark staking as complete and move to final step
+          stakingComplete.value = true
+          goToStep(3)
+          
+        } else {
+          throw new Error('Failed to create neuron')
+        }
+      } else {
+        throw new Error('Insufficient TACO balance to create neuron (minimum 1 TACO required)')
+      }
+      
+    } catch (error: any) {
+      console.error('Auto-staking failed:', error)
+      
+      // Show error and fall back to manual staking
+      tacoStore.addToast({
+        id: Date.now(),
+        code: 'swap-success-stake-failed',
+        title: 'Swap Successful, Staking Failed',
+        icon: 'fa-solid fa-exclamation-triangle',
+        message: `Swap completed successfully, but auto-staking failed: ${error.message}. Please stake manually.`,
+        type: 'warning'
+      })
+      
+      // Move to staking step for manual staking
+      goToStep(3)
+    } finally {
+      isStaking.value = false
+      isSwapAndStake.value = false // Reset the flag
+    }
+    
+  } else {
+    // Regular swap - just show success message and move to staking step
+    tacoStore.addToast({
+      id: Date.now(),
+      code: 'swap-success',
+      title: 'Swap Successful',
+      icon: 'fa-solid fa-check',
+      message: `Successfully swapped to TACO`
+    })
+    
+    // Move to staking step
+    goToStep(3)
+  }
 }
 
 const handleSwapError = (error: string) => {
@@ -1077,6 +1152,7 @@ const resetWizard = () => {
   expandedSteps.value = new Set([1])
   selectedSwapFromToken.value = ''
   stakingComplete.value = false
+  isSwapAndStake.value = false
   loadWalletData()
 }
 
