@@ -6541,12 +6541,17 @@ export const useTacoStore = defineStore('taco', () => {
                     'Text': IDL.Text,
                     'Blob': IDL.Vec(IDL.Nat8),
                 });
+                const SupportedStandard = IDL.Record({
+                    'name': IDL.Text,
+                    'url': IDL.Text,
+                });
                 return IDL.Service({
                     'icrc1_metadata': IDL.Func([], [IDL.Vec(IDL.Tuple(IDL.Text, MetadataValue))], ['query']),
                     'icrc1_name': IDL.Func([], [IDL.Text], ['query']),
                     'icrc1_symbol': IDL.Func([], [IDL.Text], ['query']),
                     'icrc1_decimals': IDL.Func([], [IDL.Nat8], ['query']),
                     'icrc1_fee': IDL.Func([], [IDL.Nat], ['query']),
+                    'icrc1_supported_standards': IDL.Func([], [IDL.Vec(SupportedStandard)], ['query']),
                 });
             };
 
@@ -6568,12 +6573,13 @@ export const useTacoStore = defineStore('taco', () => {
             });
 
             // Try to fetch individual ICRC1 properties (more reliable than metadata)
-            const [name, symbol, decimals, fee, metadataResult] = await Promise.allSettled([
+            const [name, symbol, decimals, fee, metadataResult, supportedStandardsResult] = await Promise.allSettled([
                 (tokenActor as any).icrc1_name(),
                 (tokenActor as any).icrc1_symbol(), 
                 (tokenActor as any).icrc1_decimals(),
                 (tokenActor as any).icrc1_fee(),
-                (tokenActor as any).icrc1_metadata()
+                (tokenActor as any).icrc1_metadata(),
+                (tokenActor as any).icrc1_supported_standards()
             ]);
 
             // Try to extract logo from metadata
@@ -6585,12 +6591,19 @@ export const useTacoStore = defineStore('taco', () => {
                 }
             }
 
+            // Extract supported standards
+            let supportedStandards: string[] = ['ICRC-1']; // Always includes ICRC-1
+            if (supportedStandardsResult.status === 'fulfilled' && Array.isArray(supportedStandardsResult.value)) {
+                supportedStandards = supportedStandardsResult.value.map((standard: any) => standard.name);
+            }
+
             const metadata = {
                 name: name.status === 'fulfilled' ? name.value : `Token ${tokenPrincipal.slice(0, 5)}...`,
                 symbol: symbol.status === 'fulfilled' ? symbol.value : 'CUSTOM',
                 decimals: decimals.status === 'fulfilled' ? Number(decimals.value) : 8,
                 fee: fee.status === 'fulfilled' ? fee.value : 10000n,
-                logo: logo
+                logo: logo,
+                supportedStandards: supportedStandards
             };
 
             console.log(`Fetched real metadata for ${tokenPrincipal}:`, metadata);
@@ -6607,8 +6620,22 @@ export const useTacoStore = defineStore('taco', () => {
                 symbol: 'CUSTOM',
                 decimals: 8,
                 fee: 10000n,
-                logo: null
+                logo: null,
+                supportedStandards: ['ICRC-1'] // Default to ICRC-1 only
             };
+        }
+    };
+
+    // Check if token supports ICRC2 standard
+    const checkTokenSupportsICRC2 = async (tokenPrincipal: string): Promise<boolean> => {
+        try {
+            const metadata = await fetchTokenMetadata(tokenPrincipal);
+            return metadata.supportedStandards.some((standard: string) => 
+                standard.toLowerCase().includes('icrc-2') || standard.toLowerCase().includes('icrc2')
+            );
+        } catch (error) {
+            console.error('Error checking ICRC2 support:', error);
+            return false; // Default to ICRC1 if check fails
         }
     };
 
@@ -7209,6 +7236,7 @@ export const useTacoStore = defineStore('taco', () => {
         fetchTokenMetadata,
         getCachedTokenMetadata,
         clearTokenMetadataCache,
+        checkTokenSupportsICRC2,
         
         // Canister ID functions
         daoBackendCanisterId,

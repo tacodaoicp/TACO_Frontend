@@ -95,7 +95,13 @@
 
         <!-- Swap Method Selection -->
         <div class="swap-method-section">
-          <h6 class="method-title">Swap Method</h6>
+          <h6 class="method-title">
+            Swap Method
+            <span v-if="swapData?.inputToken" class="auto-selected-badge">
+              <i class="fa fa-magic me-1"></i>
+              Auto-selected
+            </span>
+          </h6>
           <div class="method-options">
             <label class="method-option" :class="{ active: swapMethod === 'icrc2' }">
               <input 
@@ -108,9 +114,15 @@
                 <div class="method-name">
                   <i class="fa fa-key me-2"></i>
                   ICRC2 (Recommended)
+                  <span v-if="swapMethod === 'icrc2'" class="selected-reason">
+                    <i class="fa fa-check-circle text-success ms-2"></i>
+                  </span>
                 </div>
                 <div class="method-description">
                   Approve tokens for the exchange to spend. More gas efficient.
+                  <span v-if="swapData?.inputToken && swapMethod === 'icrc2'" class="auto-reason">
+                    Token supports ICRC-2 standard.
+                  </span>
                 </div>
               </div>
             </label>
@@ -126,9 +138,15 @@
                 <div class="method-name">
                   <i class="fa fa-paper-plane me-2"></i>
                   ICRC1 Transfer
+                  <span v-if="swapMethod === 'icrc1'" class="selected-reason">
+                    <i class="fa fa-check-circle text-success ms-2"></i>
+                  </span>
                 </div>
                 <div class="method-description">
                   Transfer tokens directly to the exchange first.
+                  <span v-if="swapData?.inputToken && swapMethod === 'icrc1'" class="auto-reason">
+                    Token only supports ICRC-1 standard.
+                  </span>
                 </div>
               </div>
             </label>
@@ -247,11 +265,27 @@ const hasError = ref(false)
 const swapData = computed(() => props.swapData)
 
 // Watch for dialog opening with new swap data and clear error state
-watch([() => props.show, () => props.swapData], ([newShow, newSwapData], [oldShow, oldSwapData]) => {
+watch([() => props.show, () => props.swapData], async ([newShow, newSwapData], [oldShow, oldSwapData]) => {
   // Clear error when dialog opens or when swap data changes
   if (newShow && (!oldShow || newSwapData !== oldSwapData)) {
     hasError.value = false
     errorMessage.value = ''
+    
+    // Auto-select swap method based on token standards
+    if (newSwapData?.inputToken) {
+      try {
+        console.log('Checking ICRC2 support for token:', newSwapData.inputToken.principal)
+        const supportsICRC2 = await tacoStore.checkTokenSupportsICRC2(newSwapData.inputToken.principal)
+        console.log('Token supports ICRC2:', supportsICRC2)
+        
+        // Auto-select ICRC2 if supported, otherwise ICRC1
+        swapMethod.value = supportsICRC2 ? 'icrc2' : 'icrc1'
+        console.log('Auto-selected swap method:', swapMethod.value)
+      } catch (error) {
+        console.error('Error checking token standards, defaulting to ICRC2:', error)
+        swapMethod.value = 'icrc2' // Default to ICRC2 if check fails
+      }
+    }
   }
 }, { immediate: true })
 
@@ -598,6 +632,47 @@ const getPriceImpactClass = (slippage: number): string => {
   font-weight: 600;
   color: var(--text-primary);
   margin-bottom: 0.75rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.auto-selected-badge {
+  background: linear-gradient(135deg, #28a745, #20c997);
+  color: white;
+  padding: 0.2rem 0.5rem;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.8;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+.auto-reason {
+  display: block;
+  font-size: 0.8rem;
+  color: var(--text-success);
+  font-weight: 500;
+  margin-top: 0.25rem;
+}
+
+.selected-reason {
+  display: inline-flex;
+  align-items: center;
 }
 
 .method-options {
