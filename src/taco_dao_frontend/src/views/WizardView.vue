@@ -361,36 +361,8 @@
                   </div>
                 </div>
 
-                <!-- Existing Neurons -->
-                <div v-if="userNeurons.length > 0" class="existing-neurons">
-                  <h6>Your Existing Neurons:</h6>
-                  <div class="neurons-list">
-                    <div v-for="neuron in userNeurons" :key="neuron.idHex" class="neuron-item" :class="neuron.relationship">
-                      <div class="neuron-info">
-                        <div class="neuron-name">
-                          <i v-if="neuron.relationship === 'owned'" class="fa fa-crown me-1" title="Owned"></i>
-                          <i v-else-if="neuron.relationship === 'hotkeyed'" class="fa fa-key me-1" title="Hotkeyed"></i>
-                          {{ neuron.displayName }}
-                        </div>
-                        <div class="neuron-stake">
-                          Stake: {{ formatBalance(neuron.stake, 8) }} TACO
-                        </div>
-                      </div>
-                      <button 
-                        @click="stakeToExistingNeuron(neuron)"
-                        class="btn btn-outline-primary btn-sm"
-                        :disabled="!hasTacoTokens || isStaking"
-                      >
-                        <i class="fa fa-plus me-1"></i>
-                        Add Stake
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
                 <!-- Staking Options -->
                 <div class="staking-options">
-                  <h6>Staking Options:</h6>
                   
                   <!-- Stake Amount Input -->
                   <div class="stake-amount-input">
@@ -419,28 +391,57 @@
                     </small>
                   </div>
 
-                  <!-- Action Buttons -->
-                  <div class="stake-actions">
-                    <button 
-                      v-if="userNeurons.length > 0"
-                      @click="stakeToExistingNeuronDialog"
-                      class="btn btn-primary btn-lg me-3"
-                      :disabled="!canStake || isStaking"
-                    >
-                      <i v-if="isStaking" class="fa fa-spinner fa-spin me-2"></i>
-                      <i v-else class="fa fa-plus me-2"></i>
-                      {{ isStaking ? 'Staking...' : 'Stake to Existing Neuron' }}
-                    </button>
-                    
-                    <button 
-                      @click="createNewNeuron"
-                      class="btn btn-success btn-lg"
-                      :disabled="!canStake || isStaking"
-                    >
-                      <i v-if="isStaking" class="fa fa-spinner fa-spin me-2"></i>
-                      <i v-else class="fa fa-brain me-2"></i>
-                      {{ isStaking ? 'Creating...' : 'Create New Neuron' }}
-                    </button>
+                  <!-- Stake to Existing Neuron Section -->
+                  <div v-if="userNeurons.length > 0" class="staking-section">
+                    <h6 class="section-header">
+                      <i class="fa fa-plus me-2"></i>
+                      Stake to Existing Neuron
+                    </h6>
+                    <div class="neurons-list">
+                      <div v-for="neuron in userNeurons" :key="neuron.idHex" class="neuron-item" :class="neuron.relationship">
+                        <div class="neuron-info">
+                          <div class="neuron-name">
+                            <i v-if="neuron.relationship === 'owned'" class="fa fa-crown me-1" title="Owned"></i>
+                            <i v-else-if="neuron.relationship === 'hotkeyed'" class="fa fa-key me-1" title="Hotkeyed"></i>
+                            {{ neuron.displayName }}
+                          </div>
+                          <div class="neuron-stake">
+                            Stake: {{ formatBalance(neuron.stake, 8) }} TACO
+                          </div>
+                        </div>
+                        <button 
+                          @click="stakeToExistingNeuron(neuron)"
+                          class="btn btn-outline-primary btn-sm"
+                          :disabled="!canStake || isStaking"
+                        >
+                          <i v-if="isStaking" class="fa fa-spinner fa-spin me-1"></i>
+                          <i v-else class="fa fa-plus me-1"></i>
+                          {{ isStaking ? 'Staking...' : 'Add Stake' }}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Create New Neuron Section -->
+                  <div class="staking-section">
+                    <h6 class="section-header">
+                      <i class="fa fa-brain me-2"></i>
+                      Create New Neuron
+                    </h6>
+                    <div class="create-neuron-content">
+                      <p class="section-description">
+                        Create a new neuron with your TACO tokens. This will find the next available neuron ID and stake your tokens.
+                      </p>
+                      <button 
+                        @click="createNewNeuron"
+                        class="btn btn-success btn-lg"
+                        :disabled="!canStake || isStaking"
+                      >
+                        <i v-if="isStaking" class="fa fa-spinner fa-spin me-2"></i>
+                        <i v-else class="fa fa-brain me-2"></i>
+                        {{ isStaking ? 'Creating...' : 'Create New Neuron' }}
+                      </button>
+                    </div>
                   </div>
                 </div>
 
@@ -1013,14 +1014,7 @@ const stakeToExistingNeuron = (neuron: any) => {
   showStakeDialog.value = true
 }
 
-const stakeToExistingNeuronDialog = () => {
-  if (userNeurons.value.length === 1) {
-    stakeToExistingNeuron(userNeurons.value[0])
-  } else {
-    // Show selection dialog or use the first one for now
-    stakeToExistingNeuron(userNeurons.value[0])
-  }
-}
+
 
 const createNewNeuron = () => {
   showCreateDialog.value = true
@@ -1651,9 +1645,41 @@ onMounted(async () => {
   font-family: monospace;
 }
 
-.staking-options h6 {
+.staking-options {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+.staking-section {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 1.5rem;
+}
+
+.section-header {
   color: white;
   margin-bottom: 1rem;
+  font-size: 1.1rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.section-description {
+  color: #a0aec0;
+  margin-bottom: 1rem;
+  line-height: 1.5;
+}
+
+.create-neuron-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
 }
 
 .step-actions,
