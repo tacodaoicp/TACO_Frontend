@@ -31,6 +31,7 @@ import NamesView from "./views/NamesView.vue"
 import ProposalsView from "./views/ProposalsView.vue"
 import ProposalView from "./views/ProposalView.vue"
 import WalletView from "./views/WalletView.vue"
+import WizardView from "./views/WizardView.vue"
 import VueApexCharts from 'vue3-apexcharts'
 import VueClickAway from "vue3-click-away"
 import 'animate.css'
@@ -43,6 +44,7 @@ const routes = [
     { path: "/sales/dkp-swap", name: "Sale1", component: SaleDKPSwap, meta: { robots: 'index' } },
     { path: "/info", name: "Info", component: InfoView, meta: { robots: 'index' } },
     { path: "/wallet", name: "Wallet", component: WalletView, meta: { robots: 'index' } },
+    { path: "/wizard", name: "Wizard", component: WizardView, meta: { robots: 'index' } },
     { path: "/rewards", name: "Rewards", component: RewardsView, meta: { robots: 'index' } },
     { path: "/chat/oc", name: "ChatOC", component: ChatView, meta: { robots: 'index' } },
     { path: "/chat/sneed", redirect: "/chat/forum", meta: { robots: 'noindex' } }, // keep for historical linking
