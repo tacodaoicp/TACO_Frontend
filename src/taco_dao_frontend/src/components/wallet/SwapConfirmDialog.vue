@@ -103,12 +103,13 @@
             </span>
           </h6>
           <div class="method-options">
-            <label class="method-option" :class="{ active: swapMethod === 'icrc2' }">
+            <label class="method-option" :class="{ active: swapMethod === 'icrc2', disabled: !supportsICRC2 }">
               <input 
                 type="radio" 
                 v-model="swapMethod" 
                 value="icrc2" 
                 class="method-radio"
+                :disabled="!supportsICRC2"
               />
               <div class="method-content">
                 <div class="method-name">
@@ -119,9 +120,17 @@
                   </span>
                 </div>
                 <div class="method-description">
-                  Approve tokens for the exchange to spend. More gas efficient.
-                  <span v-if="swapData?.inputToken && swapMethod === 'icrc2'" class="auto-reason">
-                    Token supports ICRC-2 standard.
+                  <span v-if="supportsICRC2">
+                    Approve tokens for the exchange to spend. More gas efficient.
+                    <span v-if="swapData?.inputToken && swapMethod === 'icrc2'" class="auto-reason">
+                      Token supports ICRC-2 standard.
+                    </span>
+                  </span>
+                  <span v-else class="not-supported-text">
+                    Not supported by this token.
+                    <span class="auto-reason">
+                      Token only supports ICRC-1 standard.
+                    </span>
                   </span>
                 </div>
               </div>
@@ -256,6 +265,7 @@ const tacoStore = useTacoStore()
 
 // State
 const swapMethod = ref<'icrc2' | 'icrc1'>('icrc2')
+const supportsICRC2 = ref(true)
 const isExecuting = ref(false)
 const executionStep = ref('')
 const errorMessage = ref('')
@@ -275,15 +285,19 @@ watch([() => props.show, () => props.swapData], async ([newShow, newSwapData], [
     if (newSwapData?.inputToken) {
       try {
         console.log('Checking ICRC2 support for token:', newSwapData.inputToken.principal)
-        const supportsICRC2 = await tacoStore.checkTokenSupportsICRC2(newSwapData.inputToken.principal)
-        console.log('Token supports ICRC2:', supportsICRC2)
+        const tokenSupportsICRC2 = await tacoStore.checkTokenSupportsICRC2(newSwapData.inputToken.principal)
+        console.log('Token supports ICRC2:', tokenSupportsICRC2)
+        
+        // Update ICRC2 support state
+        supportsICRC2.value = tokenSupportsICRC2
         
         // Auto-select ICRC2 if supported, otherwise ICRC1
-        swapMethod.value = supportsICRC2 ? 'icrc2' : 'icrc1'
+        swapMethod.value = tokenSupportsICRC2 ? 'icrc2' : 'icrc1'
         console.log('Auto-selected swap method:', swapMethod.value)
       } catch (error) {
-        console.error('Error checking token standards, defaulting to ICRC2:', error)
-        swapMethod.value = 'icrc2' // Default to ICRC2 if check fails
+        console.error('Error checking token standards, defaulting to ICRC1:', error)
+        supportsICRC2.value = false
+        swapMethod.value = 'icrc1' // Default to ICRC1 if check fails
       }
     }
   }
@@ -702,6 +716,16 @@ const getPriceImpactClass = (slippage: number): string => {
   background: rgba(var(--primary-color-rgb), 0.05);
 }
 
+.method-option.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background: var(--bg-tertiary);
+}
+
+.method-option.disabled:hover {
+  border-color: var(--border-color);
+}
+
 .method-radio {
   margin-top: 0.25rem;
 }
@@ -721,6 +745,11 @@ const getPriceImpactClass = (slippage: number): string => {
   font-size: 0.85rem;
   color: var(--text-secondary);
   line-height: 1.4;
+}
+
+.not-supported-text {
+  color: var(--text-muted);
+  font-style: italic;
 }
 
 .warning-section {
