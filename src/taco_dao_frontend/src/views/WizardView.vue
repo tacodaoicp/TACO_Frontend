@@ -907,6 +907,24 @@ const loadUserNeurons = async () => {
   }
 }
 
+const syncSwapTokenSelection = () => {
+  if (allTokens.value.length === 0) return
+  
+  // Try to use the token selected in step 1
+  const selectedGetToken = allTokens.value.find(t => t.symbol === selectedGetTokenSymbol.value)
+  
+  if (selectedGetToken && selectedGetToken.symbol !== 'TACO' && selectedGetToken.balance > selectedGetToken.fee) {
+    selectedSwapFromToken.value = selectedGetToken.principal
+    return
+  }
+  
+  // Fallback to first swappable token if step 1 selection isn't swappable
+  const firstSwappable = swappableTokens.value[0]
+  if (firstSwappable && !selectedSwapFromToken.value) {
+    selectedSwapFromToken.value = firstSwappable.principal
+  }
+}
+
 const determineStartingStep = () => {
   const minimumSwapThreshold = 100000000n // 1 ICP equivalent threshold
   
@@ -928,6 +946,8 @@ const determineStartingStep = () => {
     if (hasSignificantTokens) {
       currentStep.value = 2
       expandedSteps.value = new Set([2])
+      // Sync swap token selection when starting on step 2
+      setTimeout(() => syncSwapTokenSelection(), 0)
       return
     }
   }
@@ -1403,37 +1423,20 @@ const formatUSDValue = (balance: bigint, decimals: number, priceUSD: number): st
 // Watchers to sync token selections
 watch(currentStep, (newStep) => {
   if (newStep === 2) {
-    // Sync swap token with the selected token from step 1
-    const selectedGetToken = allTokens.value.find(t => t.symbol === selectedGetTokenSymbol.value)
-    
-    if (selectedGetToken && selectedGetToken.symbol !== 'TACO' && selectedGetToken.balance > selectedGetToken.fee) {
-      selectedSwapFromToken.value = selectedGetToken.principal
-    } else if (!selectedSwapFromToken.value) {
-      // Fallback: Auto-select the first swappable token when entering swap step
-      const firstSwappable = swappableTokens.value[0]
-      if (firstSwappable) {
-        selectedSwapFromToken.value = firstSwappable.principal
-      }
-    }
+    syncSwapTokenSelection()
   }
 })
 
 watch(selectedGetTokenSymbol, (newSymbol) => {
   // Sync swap selection when get token selection changes
-  const selectedToken = allTokens.value.find(t => t.symbol === newSymbol)
-  
-  if (selectedToken && selectedToken.symbol !== 'TACO' && selectedToken.balance > selectedToken.fee) {
-    selectedSwapFromToken.value = selectedToken.principal
-  }
-})
+  if (!newSymbol || allTokens.value.length === 0) return
+  syncSwapTokenSelection()
+}, { immediate: true })
 
 // Also watch allTokens to sync when data loads
 watch(allTokens, (newTokens) => {
-  if (newTokens.length > 0 && currentStep.value === 2 && !selectedSwapFromToken.value) {
-    const selectedGetToken = newTokens.find(t => t.symbol === selectedGetTokenSymbol.value)
-    if (selectedGetToken && selectedGetToken.symbol !== 'TACO' && selectedGetToken.balance > selectedGetToken.fee) {
-      selectedSwapFromToken.value = selectedGetToken.principal
-    }
+  if (newTokens.length > 0 && currentStep.value === 2) {
+    syncSwapTokenSelection()
   }
 }, { deep: true })
 
@@ -1445,6 +1448,11 @@ onMounted(async () => {
     
     if (tacoStore.userLoggedIn) {
       await loadWalletData()
+      
+      // After data loads, sync tokens if we're on step 2
+      if (currentStep.value === 2) {
+        syncSwapTokenSelection()
+      }
     } else {
       loading.value = false
     }
