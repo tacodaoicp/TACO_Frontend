@@ -73,7 +73,7 @@
                 <div class="card-body">
                   <div class="d-flex justify-content-between align-items-center">
                     <div>
-                      <h6 class="card-title text-muted mb-1">Total Neurons</h6>
+                      <h6 class="card-title text-light mb-1">Total Neurons</h6>
                       <div class="h4 mb-0 text-primary">{{ neurons.length }}</div>
                     </div>
                     <div class="text-primary">
@@ -88,7 +88,7 @@
                 <div class="card-body">
                   <div class="d-flex justify-content-between align-items-center">
                     <div>
-                      <h6 class="card-title text-muted mb-1">Total Rewards</h6>
+                      <h6 class="card-title text-light mb-1">Total Rewards</h6>
                       <div class="h4 mb-0 text-success">{{ formatTacoPrecise(totalRewards) }} TACO</div>
                     </div>
                     <div class="text-success">
@@ -103,7 +103,7 @@
                 <div class="card-body">
                   <div class="d-flex justify-content-between align-items-center">
                     <div>
-                      <h6 class="card-title text-muted mb-1">Claimable Neurons</h6>
+                      <h6 class="card-title text-light mb-1">Claimable Neurons</h6>
                       <div class="h4 mb-0 text-warning">{{ claimableNeurons }}</div>
                     </div>
                     <div class="text-warning">
@@ -130,41 +130,21 @@
             </div>
             <div class="card-body">
               <div class="row">
-                <div class="col-md-8">
-                  <label for="targetPrincipal" class="form-label">Target Principal <span class="text-danger">*</span></label>
-                  <input 
-                    id="targetPrincipal"
-                    v-model="targetPrincipal"
-                    @blur="saveAccount"
-                    type="text" 
-                    class="form-control bg-secondary text-white" 
-                    placeholder="Enter the principal ID where you want to receive TACO tokens"
-                  />
+                <div class="col-12">
+                  <label class="form-label">Target Principal</label>
+                  <div class="form-control bg-secondary text-white" style="min-height: 38px; display: flex; align-items: center;">
+                    <span v-if="debugAuthState.isReady">
+                      {{ debugAuthState.userPrincipal }}
+                    </span>
+                    <span v-else class="text-warning">
+                      <i class="fas fa-exclamation-triangle me-2"></i>
+                      Please log in to see your principal
+                    </span>
+                  </div>
                   <div class="form-text text-muted">
-                    This is where your claimed TACO tokens will be sent
+                    Tokens will be sent to your logged-in principal
                   </div>
                 </div>
-                <div class="col-md-4">
-                  <label for="targetSubaccount" class="form-label">Subaccount (Optional)</label>
-                  <input 
-                    id="targetSubaccount"
-                    v-model="targetSubaccount"
-                    @blur="saveAccount"
-                    type="text" 
-                    class="form-control bg-secondary text-white" 
-                    placeholder="64 hex characters"
-                    maxlength="64"
-                  />
-                  <div class="form-text text-muted">
-                    Leave empty for default account
-                  </div>
-                </div>
-              </div>
-              <div class="mt-2">
-                <small class="text-info">
-                  <i class="fas fa-info-circle me-1"></i>
-                  Your account details are saved locally for convenience
-                </small>
               </div>
             </div>
           </div>
@@ -206,12 +186,12 @@
                         </span>
                       </td>
                       <td>
-                        <span class="text-muted">
+                        <span class="text-light">
                           {{ formatStake(neuron.cached_neuron_stake_e8s) }} ICP
                         </span>
                       </td>
                       <td>
-                        <span class="text-muted">
+                        <span class="text-light">
                           {{ formatMaturity(neuron.maturity_e8s_equivalent) }} ICP
                         </span>
                       </td>
@@ -273,6 +253,99 @@
               </div>
             </div>
 
+            <!-- Claims History Section -->
+            <div v-if="userLoggedIn" class="mx-3 mt-4">
+              <div class="card bg-dark text-white">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                  <h5 class="mb-0">📋 Your Claims History</h5>
+                  <button 
+                    class="btn btn-outline-light btn-sm"
+                    @click="loadUserWithdrawalHistory"
+                    :disabled="isLoadingHistory"
+                  >
+                    <span v-if="isLoadingHistory" class="spinner-border spinner-border-sm me-1"></span>
+                    🔄 Refresh
+                  </button>
+                </div>
+                <div class="card-body">
+                  <div v-if="isLoadingHistory && userWithdrawalHistory.length === 0" class="text-center py-4">
+                    <div class="spinner-border text-primary" role="status">
+                      <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <p class="mt-2 text-muted">Loading your claims history...</p>
+                  </div>
+
+                  <div v-else-if="userWithdrawalHistory.length === 0" class="text-center py-4">
+                    <p class="text-muted">No claims history found.</p>
+                    <p class="text-muted">Your successful reward claims will appear here.</p>
+                  </div>
+
+                  <div v-else>
+                    <div class="table-responsive">
+                      <table class="table table-dark table-striped">
+                        <thead>
+                          <tr>
+                            <th>Date</th>
+                            <th>Neurons</th>
+                            <th>Amount Claimed</th>
+                            <th>Fee</th>
+                            <th>Received</th>
+                            <th>Status</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <tr v-for="claim in userWithdrawalHistory" :key="claim.id">
+                            <td>
+                              <small>{{ formatTimestamp(claim.timestamp) }}</small>
+                            </td>
+                            <td>
+                              <span class="badge bg-secondary me-1">{{ claim.neuronWithdrawals.length }}</span>
+                              <div class="mt-1">
+                                <small 
+                                  v-for="[neuronId, amount] in claim.neuronWithdrawals.slice(0, 2)" 
+                                  :key="neuronId"
+                                  class="d-block text-light"
+                                >
+                                  {{ formatNeuronId(neuronId) }}: {{ formatTacoPrecise(amount) }}
+                                </small>
+                                <small 
+                                  v-if="claim.neuronWithdrawals.length > 2" 
+                                  class="d-block text-light"
+                                >
+                                  +{{ claim.neuronWithdrawals.length - 2 }} more...
+                                </small>
+                              </div>
+                            </td>
+                            <td>
+                              <span class="text-info">{{ formatTacoPrecise(claim.totalAmount) }} TACO</span>
+                            </td>
+                            <td>
+                              <span class="text-warning">{{ formatTacoPrecise(claim.fee) }} TACO</span>
+                            </td>
+                            <td>
+                              <span class="text-success">{{ formatTacoPrecise(claim.amountSent) }} TACO</span>
+                            </td>
+                            <td>
+                              <span v-if="claim.transactionId" class="badge bg-success">
+                                ✅ Success
+                              </span>
+                              <span v-else class="badge bg-danger">❌ Failed</span>
+                            </td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+
+                    <div v-if="userWithdrawalHistory.length >= 20" class="text-center mt-3">
+                      <small class="text-muted">
+                        Showing your 20 most recent claims. Contact support if you need older records.
+                      </small>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
           </div>
         </div>
       </div>
@@ -311,9 +384,7 @@ export default {
     const tacoStore = useTacoStore()
     
     // user authentication state from taco store
-    const { userLoggedIn } = storeToRefs(tacoStore)
-    const { userPrincipal } = storeToRefs(tacoStore)
-    const { truncatedPrincipal } = storeToRefs(tacoStore)
+    const { userLoggedIn, userPrincipal, truncatedPrincipal } = storeToRefs(tacoStore)
     
     /////////////////
     // Reactive Data //
@@ -330,9 +401,22 @@ export default {
     const targetPrincipal = ref('')
     const targetSubaccount = ref('') // neuronId -> balance
     
+    // Withdrawal history
+    const userWithdrawalHistory = ref([])
+    const isLoadingHistory = ref(false)
+    
     ///////////////
     // Computed //
     ///////////////
+    
+    // Debug computed to force reactivity
+    const debugAuthState = computed(() => {
+      return {
+        userLoggedIn: userLoggedIn.value,
+        userPrincipal: userPrincipal.value,
+        isReady: userLoggedIn.value && userPrincipal.value
+      }
+    })
     
     const totalRewards = computed(() => {
       let total = 0
@@ -452,28 +536,64 @@ export default {
       try {
         const rewardsActor = await getRewardsActor()
         
-        // Extract neuron IDs (handle optional IDs) for filtering
-        const userNeuronIds = new Set()
-        neurons.value
-          .filter(neuron => neuron.id && neuron.id.length > 0)
-          .forEach(neuron => {
-            const neuronIdHex = formatNeuronIdForMap(neuron.id[0].id)
-            userNeuronIds.add(neuronIdHex)
-          })
-
-        if (userNeuronIds.size === 0) return
-
-        // Get all balances from the canister
-        const allBalances = await rewardsActor.getAllNeuronRewardBalances()
-        
-        // Filter for only the user's neurons and store in map
-        neuronBalances.value.clear()
-        for (const [neuronId, balance] of allBalances) {
-          const neuronIdHex = formatNeuronIdForMap(neuronId)
-          if (userNeuronIds.has(neuronIdHex)) {
-            neuronBalances.value.set(neuronIdHex, balance)
+        // Extract neuron IDs (Uint8Array format) for the API call with proper validation
+        const neuronIdBlobs = []
+        neurons.value.forEach(neuron => {
+          // Handle different neuron formats
+          let neuronIdBlob = null
+          
+          // Check if it's a categorized neuron (has id as Uint8Array directly)
+          if (neuron && neuron.id && neuron.id instanceof Uint8Array) {
+            neuronIdBlob = neuron.id
           }
+          // Check if it's a raw neuron (has id as array with objects)
+          else if (neuron && neuron.id && Array.isArray(neuron.id) && neuron.id.length > 0) {
+            const neuronIdObj = neuron.id[0]
+            if (neuronIdObj && neuronIdObj.id) {
+              neuronIdBlob = neuronIdObj.id
+            }
+          }
+          
+          if (!neuronIdBlob) {
+            console.warn('Invalid neuron structure - no valid ID found:', neuron)
+            return
+          }
+          
+          // Ensure it's a valid Uint8Array
+          if (!(neuronIdBlob instanceof Uint8Array) && !Array.isArray(neuronIdBlob)) {
+            console.warn('Invalid neuron ID format (not Uint8Array or Array):', neuronIdBlob)
+            return
+          }
+          
+          // Convert to Uint8Array if it's a regular array
+          const validBlob = neuronIdBlob instanceof Uint8Array ? neuronIdBlob : new Uint8Array(neuronIdBlob)
+          
+          if (validBlob.length === 0) {
+            console.warn('Empty neuron ID blob')
+            return
+          }
+          
+          neuronIdBlobs.push(validBlob)
+        })
+
+        if (neuronIdBlobs.length === 0) {
+          console.warn('No valid neuron IDs found after filtering')
+          return
         }
+
+        console.log(`Requesting balances for ${neuronIdBlobs.length} neurons`)
+
+        // Use getNeuronRewardBalances instead of getAllNeuronRewardBalances (admin-only)
+        const balances = await rewardsActor.getNeuronRewardBalances(neuronIdBlobs)
+        
+        // Convert to map using hex IDs as keys
+        neuronBalances.value.clear()
+        for (const [neuronId, balance] of balances) {
+          const neuronIdHex = formatNeuronIdForMap(neuronId)
+          neuronBalances.value.set(neuronIdHex, balance)
+        }
+
+        console.log(`Successfully loaded ${neuronBalances.value.size} neuron balances`)
 
       } catch (error) {
         console.error('Error loading neuron balances:', error)
@@ -591,8 +711,9 @@ export default {
           const transactionId = result.Ok
           successMessage.value = `Successfully claimed rewards! Transaction ID: ${transactionId}`
           
-          // Refresh balances to show updated amounts
+          // Refresh balances and withdrawal history to show updated amounts
           await loadNeuronBalances()
+          await loadUserWithdrawalHistory()
         } else {
           // Handle ICRC1 transfer errors
           const error = result.Err
@@ -628,13 +749,26 @@ export default {
 
     const formatNeuronId = (neuronId) => {
       try {
-        if (!neuronId || neuronId.length === 0) return 'Unknown'
+        if (!neuronId) return 'Unknown'
         
-        const id = neuronId[0].id
+        let id
+        // Handle different neuronId formats
+        if (Array.isArray(neuronId) && neuronId.length > 0 && neuronId[0].id) {
+          // Format from SNS governance: [{ id: Uint8Array }]
+          id = neuronId[0].id
+        } else if (neuronId instanceof Uint8Array || Array.isArray(neuronId)) {
+          // Direct Uint8Array or array format (from withdrawal history)
+          id = neuronId
+        } else {
+          return 'Unknown Format'
+        }
+        
+        if (!id || id.length === 0) return 'Unknown'
+        
         const hex = Array.from(id).map(b => b.toString(16).padStart(2, '0')).join('')
         return hex.length > 12 ? hex.substring(0, 8) + '...' + hex.substring(hex.length - 4) : hex
       } catch (error) {
-        console.error('Error formatting neuron ID:', error)
+        console.error('Error formatting neuron ID:', error, neuronId)
         return 'Format Error'
       }
     }
@@ -711,6 +845,58 @@ export default {
       return result
     }
 
+    // Load user's withdrawal history
+    const loadUserWithdrawalHistory = async () => {
+      isLoadingHistory.value = true
+      try {
+        const rewardsActor = await getRewardsActor()
+        const result = await rewardsActor.getUserWithdrawalHistory([20]) // Get last 20 records
+        
+        if ('ok' in result) {
+          // Convert BigInt values to regular numbers to avoid JSON.stringify issues
+          userWithdrawalHistory.value = result.ok.map(record => ({
+            ...record,
+            totalAmount: Number(record.totalAmount),
+            amountSent: Number(record.amountSent),
+            fee: Number(record.fee),
+            timestamp: Number(record.timestamp),
+            transactionId: record.transactionId ? Number(record.transactionId) : null,
+            neuronWithdrawals: record.neuronWithdrawals.map(([neuronId, amount]) => [
+              neuronId,
+              Number(amount)
+            ])
+          }))
+        } else {
+          console.error('Error loading withdrawal history:', result.err)
+        }
+      } catch (error) {
+        console.error('Failed to load withdrawal history:', error)
+      } finally {
+        isLoadingHistory.value = false
+      }
+    }
+
+    // Format timestamp from nanoseconds
+    const formatTimestamp = (timestampNS) => {
+      try {
+        if (!timestampNS || timestampNS === 0) {
+          return 'Never'
+        }
+        
+        const timestampMS = Number(timestampNS) / 1_000_000
+        const date = new Date(timestampMS)
+        
+        if (isNaN(date.getTime())) {
+          return 'Invalid Date'
+        }
+        
+        return date.toLocaleString()
+      } catch (error) {
+        console.error('Error formatting timestamp:', error, timestampNS)
+        return 'Format Error'
+      }
+    }
+
     ///////////
     // Watchers //
     ///////////
@@ -719,10 +905,12 @@ export default {
     watch(userLoggedIn, (newState) => {
       if (newState) {
         loadUserNeurons()
+        loadUserWithdrawalHistory()
       } else {
         // Clear data when user logs out
         neurons.value = []
         neuronBalances.value.clear()
+        userWithdrawalHistory.value = []
         errorMessage.value = ''
       }
     }, { immediate: true })
@@ -731,11 +919,33 @@ export default {
     // Lifecycle //
     /////////////
     
-    onMounted(() => {
+    onMounted(async () => {
+      console.log('RewardsView onMounted - BEFORE checkIfLoggedIn:', {
+        userLoggedIn: userLoggedIn.value,
+        userPrincipal: userPrincipal.value
+      })
+      
       loadSavedAccount()
-      if (userLoggedIn.value) {
-        loadUserNeurons()
-      }
+      
+      // Check authentication state first
+      await tacoStore.checkIfLoggedIn()
+      
+      console.log('RewardsView onMounted - AFTER checkIfLoggedIn:', {
+        userLoggedIn: userLoggedIn.value,
+        userPrincipal: userPrincipal.value
+      })
+      
+      // Small delay to ensure state is fully updated
+      setTimeout(() => {
+        console.log('RewardsView onMounted - AFTER setTimeout:', {
+          userLoggedIn: userLoggedIn.value,
+          userPrincipal: userPrincipal.value
+        })
+        if (userLoggedIn.value) {
+          loadUserNeurons()
+          loadUserWithdrawalHistory()
+        }
+      }, 100)
     })
 
     ////////////
@@ -750,11 +960,14 @@ export default {
       errorMessage,
       successMessage,
       neurons,
+      debugAuthState,
       totalRewards,
       claimableNeurons,
       targetPrincipal,
       targetSubaccount,
       claimingNeurons,
+      userWithdrawalHistory,
+      isLoadingHistory,
       
       // methods
       iidLogIn,
@@ -769,7 +982,9 @@ export default {
       formatMaturity,
       formatTacoPrecise,
       isNeuronClaiming,
-      saveAccount
+      saveAccount,
+      loadUserWithdrawalHistory,
+      formatTimestamp
     }
   }
 }

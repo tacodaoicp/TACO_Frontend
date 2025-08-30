@@ -22,6 +22,7 @@ import AdminRewardsView from "./views/AdminRewardsView.vue"
 import AdminDistributionsView from "./views/AdminDistributionsView.vue"
 import AdminRewardsBalancesView from "./views/AdminRewardsBalancesView.vue"
 import AdminAlarmView from "./views/AdminAlarmView.vue"
+import AdminClaimsView from "./views/AdminClaimsView.vue"
 import RewardsView from "./views/RewardsView.vue"
 import ChatView from "./views/ChatView.vue"
 import ReportsView from "./views/ReportsView.vue"
@@ -30,6 +31,8 @@ import ThreadView from "./views/ThreadView.vue"
 import NamesView from "./views/NamesView.vue"
 import ProposalsView from "./views/ProposalsView.vue"
 import ProposalView from "./views/ProposalView.vue"
+import WalletView from "./views/WalletView.vue"
+import WizardView from "./views/WizardView.vue"
 import VueApexCharts from 'vue3-apexcharts'
 import VueClickAway from "vue3-click-away"
 import 'animate.css'
@@ -42,6 +45,8 @@ const routes = [
     { path: "/sales", name: "Sales", component: SalesView, meta: { robots: 'index' } },
     { path: "/sales/dkp-swap", name: "Sale1", component: SaleDKPSwap, meta: { robots: 'index' } },
     { path: "/info", name: "Info", component: InfoView, meta: { robots: 'index' } },
+    { path: "/wallet", name: "Wallet", component: WalletView, meta: { robots: 'index' } },
+    { path: "/wizard", name: "Wizard", component: WizardView, meta: { robots: 'index' } },
     { path: "/rewards", name: "Rewards", component: RewardsView, meta: { robots: 'index' } },
     { path: "/chat/oc", name: "ChatOC", component: ChatView, meta: { robots: 'index' } },
     { path: "/chat/sneed", redirect: "/chat/forum", meta: { robots: 'noindex' } }, // keep for historical linking
@@ -73,6 +78,7 @@ const routes = [
     { path: "/admin/rewards/balances", name: "AdminRewardsBalances", component: AdminRewardsBalancesView, meta: { robots: 'noindex' } },
     { path: "/admin/distributions", name: "AdminDistributions", component: AdminDistributionsView, meta: { robots: 'noindex' } },
     { path: "/admin/alarm", name: "AdminAlarm", component: AdminAlarmView, meta: { robots: 'noindex' } },
+    { path: "/admin/claims", name: "AdminClaims", component: AdminClaimsView, meta: { robots: 'noindex' } },
     { path: "/forum", name: "Forum", component: ForumView, meta: { robots: 'noindex' } },
     { path: "/forum/thread/:id", name: "Thread", component: ThreadView, meta: { robots: 'noindex' } },
     { path: "/names", name: "Names", component: NamesView, meta: { robots: 'noindex' } }, //remove once integrated

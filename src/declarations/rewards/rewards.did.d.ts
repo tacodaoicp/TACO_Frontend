@@ -89,17 +89,39 @@ export type Result = { 'Ok' : bigint } |
   { 'Err' : TransferError };
 export type Result__1 = { 'ok' : string } |
   { 'err' : RewardsError };
-export type Result__1_1 = { 'ok' : PerformanceResult } |
+export type Result__1_1 = {
+    'ok' : { 'withdrawals' : Array<WithdrawalRecord> }
+  } |
+  { 'err' : RewardsError };
+export type Result__1_2 = {
+    'ok' : {
+      'totalRecordsInHistory' : bigint,
+      'totalWithdrawn' : bigint,
+      'totalWithdrawals' : bigint,
+    }
+  } |
+  { 'err' : RewardsError };
+export type Result__1_3 = { 'ok' : Array<WithdrawalRecord> } |
+  { 'err' : RewardsError };
+export type Result__1_4 = { 'ok' : Array<Uint8Array | number[]> } |
+  { 'err' : RewardsError };
+export type Result__1_5 = {
+    'ok' : { 'distributions' : Array<DistributionRecord> }
+  } |
+  { 'err' : RewardsError };
+export type Result__1_6 = { 'ok' : PerformanceResult } |
   { 'err' : RewardsError };
 export interface Rewards {
+  'addToRewardSkipList' : ActorMethod<[Uint8Array | number[]], Result__1>,
   'calculateNeuronPerformance' : ActorMethod<
     [Uint8Array | number[], bigint, bigint, PriceType],
-    Result__1_1
+    Result__1_6
   >,
   'getAllNeuronRewardBalances' : ActorMethod<
     [],
     Array<[Uint8Array | number[], bigint]>
   >,
+  'getAllWithdrawalHistory' : ActorMethod<[[] | [bigint]], Result__1_3>,
   'getAvailableBalance' : ActorMethod<[], bigint>,
   'getCanisterStatus' : ActorMethod<
     [],
@@ -122,10 +144,15 @@ export interface Rewards {
     {
       'distributionEnabled' : boolean,
       'distributionPeriodNS' : bigint,
+      'rewardSkipListSize' : bigint,
       'maxDistributionHistory' : bigint,
       'periodicRewardPot' : bigint,
       'performanceScorePower' : number,
+      'totalDistributions' : bigint,
+      'nextScheduledDistribution' : [] | [bigint],
       'votingPowerPower' : number,
+      'lastDistributionTime' : bigint,
+      'timerRunning' : boolean,
     }
   >,
   'getCurrentDistributionStatus' : ActorMethod<
@@ -143,19 +170,27 @@ export interface Rewards {
     [[] | [bigint]],
     Array<DistributionRecord>
   >,
+  'getDistributionsSince' : ActorMethod<[bigint, bigint], Result__1_5>,
   'getNeuronRewardBalance' : ActorMethod<[Uint8Array | number[]], bigint>,
   'getNeuronRewardBalances' : ActorMethod<
     [Array<Uint8Array | number[]>],
     Array<[Uint8Array | number[], bigint]>
   >,
+  'getRewardSkipList' : ActorMethod<[], Result__1_4>,
   'getTacoBalance' : ActorMethod<[], bigint>,
   'getTotalDistributed' : ActorMethod<[], bigint>,
+  'getUserWithdrawalHistory' : ActorMethod<[[] | [bigint]], Result__1_3>,
+  'getWithdrawalStats' : ActorMethod<[], Result__1_2>,
+  'getWithdrawalsSince' : ActorMethod<[bigint, bigint], Result__1_1>,
+  'removeFromRewardSkipList' : ActorMethod<[Uint8Array | number[]], Result__1>,
   'setDistributionEnabled' : ActorMethod<[boolean], Result__1>,
   'setDistributionPeriod' : ActorMethod<[bigint], Result__1>,
   'setPerformanceScorePower' : ActorMethod<[number], Result__1>,
   'setPeriodicRewardPot' : ActorMethod<[bigint], Result__1>,
+  'setRewardSkipList' : ActorMethod<[Array<Uint8Array | number[]>], Result__1>,
   'setVotingPowerPower' : ActorMethod<[number], Result__1>,
   'startDistributionTimer' : ActorMethod<[], Result__1>,
+  'startDistributionTimerAt' : ActorMethod<[bigint], Result__1>,
   'stopDistributionTimer' : ActorMethod<[], Result__1>,
   'triggerDistribution' : ActorMethod<[], Result__1>,
   'triggerDistributionCustom' : ActorMethod<
@@ -182,6 +217,17 @@ export type TransferError = {
   { 'CreatedInFuture' : { 'ledger_time' : bigint } } |
   { 'TooOld' : null } |
   { 'InsufficientFunds' : { 'balance' : bigint } };
+export interface WithdrawalRecord {
+  'id' : bigint,
+  'fee' : bigint,
+  'amountSent' : bigint,
+  'neuronWithdrawals' : Array<[Uint8Array | number[], bigint]>,
+  'totalAmount' : bigint,
+  'timestamp' : bigint,
+  'caller' : Principal,
+  'targetAccount' : Account,
+  'transactionId' : [] | [bigint],
+}
 export interface _SERVICE extends Rewards {}
 export declare const idlFactory: IDL.InterfaceFactory;
 export declare const init: (args: { IDL: typeof IDL }) => IDL.Type[];

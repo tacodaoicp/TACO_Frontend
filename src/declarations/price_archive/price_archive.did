@@ -41,6 +41,8 @@ type TacoBlockType =
    Pause;
    Portfolio;
    Price;
+   RewardDistribution;
+   RewardWithdrawal;
    Trade;
    VotingPower;
  };

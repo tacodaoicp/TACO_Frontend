@@ -21,6 +21,7 @@
     "@dfinity/ledger-icp": "^2.6.1",
     "@dfinity/principal": "^2.1.2",
     "@dfinity/utils": "^2.5.2",
+    "js-sha256": "^0.11.1",
     "vue3-click-away": "^1.2.4"
   }
 }

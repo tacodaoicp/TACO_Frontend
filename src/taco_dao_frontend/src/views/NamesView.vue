@@ -79,36 +79,86 @@
                             <p>You don't have any TACO neurons yet.</p>
                         </div>
                         
-                        <div v-else class="neurons-list">
-                            <div v-for="neuron in userNeurons" :key="neuronKey(neuron)" class="neuron-item">
-                                <div class="neuron-info">
-                                    <div class="neuron-id">
-                                        <label>Neuron ID:</label>
-                                        <span class="id">{{ formatNeuronId(neuron.id) }}</span>
-                                    </div>
-                                    <div class="neuron-name">
-                                        <label>Current Name:</label>
-                                        <span class="display-name">{{ getNeuronCurrentName(neuron.id) }}</span>
+                        <div v-else class="neurons-sections">
+                            <!-- Owned Neurons Section -->
+                            <div v-if="categorizedNeurons.owned.length > 0" class="neuron-section">
+                                <div class="section-header">
+                                    <i class="fa-solid fa-crown"></i>
+                                    <span class="section-title">Owned ({{ categorizedNeurons.owned.length }})</span>
+                                </div>
+                                <div class="neurons-list">
+                                    <div v-for="neuron in categorizedNeurons.owned" :key="neuronKey(neuron)" class="neuron-item">
+                                        <div class="neuron-info">
+                                            <div class="neuron-id">
+                                                <label>Neuron ID:</label>
+                                                <span class="id">{{ neuron.idHex || formatNeuronId(neuron.id) }}</span>
+                                            </div>
+                                            <div class="neuron-name">
+                                                <label>Current Name:</label>
+                                                <span class="display-name">{{ neuron.displayName || getNeuronCurrentName(neuron.id) }}</span>
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="neuron-name-input">
+                                            <input 
+                                                v-model="neuronNameInputs[neuronKey(neuron)]" 
+                                                type="text" 
+                                                placeholder="Enter neuron name"
+                                                maxlength="50"
+                                                @keyup.enter="saveNeuronName(neuron.id)"
+                                            >
+                                            <button 
+                                                @click="saveNeuronName(neuron.id)" 
+                                                :disabled="neuronNameSaving[neuronKey(neuron)]"
+                                                class="save-btn"
+                                            >
+                                                <i v-if="neuronNameSaving[neuronKey(neuron)]" class="fa-solid fa-spinner fa-spin"></i>
+                                                <i v-else class="fa-solid fa-save"></i>
+                                                Save
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
-                                
-                                <div class="neuron-name-input">
-                                    <input 
-                                        v-model="neuronNameInputs[neuronKey(neuron)]" 
-                                        type="text" 
-                                        placeholder="Enter neuron name"
-                                        maxlength="50"
-                                        @keyup.enter="saveNeuronName(neuron.id)"
-                                    >
-                                    <button 
-                                        @click="saveNeuronName(neuron.id)" 
-                                        :disabled="!neuronNameInputs[neuronKey(neuron)]?.trim() || neuronNameSaving[neuronKey(neuron)]"
-                                        class="save-btn"
-                                    >
-                                        <i v-if="neuronNameSaving[neuronKey(neuron)]" class="fa-solid fa-spinner fa-spin"></i>
-                                        <i v-else class="fa-solid fa-save"></i>
-                                        Save
-                                    </button>
+                            </div>
+
+                            <!-- Hotkeyed Neurons Section -->
+                            <div v-if="categorizedNeurons.hotkeyed.length > 0" class="neuron-section">
+                                <div class="section-header">
+                                    <i class="fa-solid fa-key"></i>
+                                    <span class="section-title">Hotkeyed ({{ categorizedNeurons.hotkeyed.length }})</span>
+                                </div>
+                                <div class="neurons-list">
+                                    <div v-for="neuron in categorizedNeurons.hotkeyed" :key="neuronKey(neuron)" class="neuron-item">
+                                        <div class="neuron-info">
+                                            <div class="neuron-id">
+                                                <label>Neuron ID:</label>
+                                                <span class="id">{{ neuron.idHex || formatNeuronId(neuron.id) }}</span>
+                                            </div>
+                                            <div class="neuron-name">
+                                                <label>Current Name:</label>
+                                                <span class="display-name">{{ neuron.displayName || getNeuronCurrentName(neuron.id) }}</span>
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="neuron-name-input">
+                                            <input 
+                                                v-model="neuronNameInputs[neuronKey(neuron)]" 
+                                                type="text" 
+                                                placeholder="Enter neuron name"
+                                                maxlength="50"
+                                                @keyup.enter="saveNeuronName(neuron.id)"
+                                            >
+                                            <button 
+                                                @click="saveNeuronName(neuron.id)" 
+                                                :disabled="neuronNameSaving[neuronKey(neuron)]"
+                                                class="save-btn"
+                                            >
+                                                <i v-if="neuronNameSaving[neuronKey(neuron)]" class="fa-solid fa-spinner fa-spin"></i>
+                                                <i v-else class="fa-solid fa-save"></i>
+                                                Save
+                                            </button>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -147,7 +197,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useTacoStore } from '../stores/taco.store'
 import { Principal } from '@dfinity/principal'
@@ -171,7 +221,7 @@ const {
     getNeuronDisplayName,
     setPrincipalName,
     setNeuronName,
-    getUserNeurons
+    getTacoNeurons
 } = tacoStore
 
 // Local state
@@ -179,6 +229,7 @@ const newPrincipalName = ref('')
 const principalNameSaving = ref(false)
 const neuronsLoading = ref(false)
 const userNeurons = ref([])
+const categorizedNeurons = ref({ owned: [], hotkeyed: [], all: [] })
 const neuronNameInputs = ref({})
 const neuronNameSaving = ref({})
 
@@ -194,8 +245,24 @@ const lastLoadedFormatted = computed(() => {
 
 // Helper methods
 const neuronKey = (neuron) => {
-    if (neuron.id && neuron.id.id) {
-        return Array.from(neuron.id.id, byte => byte.toString(16).padStart(2, '0')).join('')
+    // Handle different input formats
+    if (typeof neuron === 'object' && neuron !== null) {
+        // Case 1: neuron object with idHex property (formatted neuron)
+        if (neuron.idHex) {
+            return neuron.idHex
+        }
+        // Case 2: neuron object with nested id structure
+        if (neuron.id && neuron.id.id) {
+            return Array.from(neuron.id.id, byte => byte.toString(16).padStart(2, '0')).join('')
+        }
+        // Case 3: neuron object with direct id property as Uint8Array
+        if (neuron.id && neuron.id instanceof Uint8Array) {
+            return Array.from(neuron.id, byte => byte.toString(16).padStart(2, '0')).join('')
+        }
+    }
+    // Case 4: direct Uint8Array (for saveNeuronName calls)
+    if (neuron instanceof Uint8Array) {
+        return Array.from(neuron, byte => byte.toString(16).padStart(2, '0')).join('')
     }
     return 'unknown'
 }
@@ -210,7 +277,7 @@ const formatNeuronId = (neuronId) => {
 
 const getNeuronCurrentName = (neuronId) => {
     if (neuronId && neuronId.id) {
-        const tacoSnsRoot = Principal.fromText('lhdfz-wqaaa-aaaaq-aae3q-cai') // TACO SNS root
+        const tacoSnsRoot = Principal.fromText('lacdn-3iaaa-aaaaq-aae3a-cai') // TACO SNS root
         return getNeuronDisplayName(tacoSnsRoot, neuronId.id)
     }
     return 'Unknown'
@@ -236,16 +303,22 @@ const savePrincipalName = async () => {
 }
 
 const saveNeuronName = async (neuronId) => {
-    const key = neuronKey({ id: neuronId })
+    // neuronId is the actual Uint8Array from neuron.id
+    const key = neuronKey(neuronId)
     const name = neuronNameInputs.value[key]
     
     if (!name?.trim()) return
     
     try {
         neuronNameSaving.value[key] = true
-        const tacoSnsRoot = Principal.fromText('lhdfz-wqaaa-aaaaq-aae3q-cai') // TACO SNS root
-        await setNeuronName(tacoSnsRoot, neuronId.id, name.trim())
+        const tacoSnsRoot = Principal.fromText('lacdn-3iaaa-aaaaq-aae3a-cai') // TACO SNS root
+        
+        // neuronId is already the Uint8Array, no need to access .id
+        await setNeuronName(tacoSnsRoot, neuronId, name.trim())
         neuronNameInputs.value[key] = ''
+        
+        // Reload neurons to show updated names (now safe with correct canister ID)
+        await loadUserNeurons()
         
         // Show success message
         console.log('✅ Neuron name saved successfully')
@@ -262,29 +335,48 @@ const loadUserNeurons = async () => {
     
     try {
         neuronsLoading.value = true
-        const neurons = await getUserNeurons()
-        userNeurons.value = neurons
+        // Use getTacoNeurons and categorizeNeurons like in TokenCard.vue
+        const rawNeurons = await getTacoNeurons()
+        categorizedNeurons.value = tacoStore.categorizeNeurons(rawNeurons)
+        // Keep backward compatibility
+        userNeurons.value = categorizedNeurons.value.all
         
         // Initialize input refs for each neuron
-        neurons.forEach(neuron => {
+        userNeurons.value.forEach(neuron => {
             const key = neuronKey(neuron)
             neuronNameInputs.value[key] = ''
             neuronNameSaving.value[key] = false
         })
         
-        console.log('✅ Loaded user neurons:', neurons)
+        console.log('✅ Loaded user neurons:', userNeurons.value)
+        console.log('✅ Categorized neurons:', categorizedNeurons.value)
     } catch (error) {
         console.error('❌ Error loading user neurons:', error)
         userNeurons.value = []
+        categorizedNeurons.value = { owned: [], hotkeyed: [], all: [] }
     } finally {
         neuronsLoading.value = false
     }
 }
 
 // Lifecycle
-onMounted(() => {
+onMounted(async () => {
+    // Load names cache first
+    await loadAllNames()
+    
     if (userLoggedIn.value) {
         loadUserNeurons()
+    }
+})
+
+// Watch for login state changes
+watch(userLoggedIn, (newValue) => {
+    if (newValue) {
+        loadUserNeurons()
+    } else {
+        // Clear neurons when user logs out
+        userNeurons.value = []
+        categorizedNeurons.value = { owned: [], hotkeyed: [], all: [] }
     }
 })
 </script>
@@ -436,23 +528,34 @@ onMounted(() => {
     align-items: center;
     gap: 0.5rem;
     padding: 0.75rem 1.5rem;
-    background: var(--primary-color);
+    background: linear-gradient(135deg, #007bff, #0056b3);
     color: white;
     border: none;
     border-radius: 8px;
     font-size: 1rem;
+    font-weight: 600;
     cursor: pointer;
-    transition: all 0.2s;
+    transition: all 0.3s ease;
     white-space: nowrap;
+    box-shadow: 0 2px 8px rgba(0, 123, 255, 0.3);
+    min-width: 100px;
 }
 
 .save-btn:hover:not(:disabled) {
-    background: var(--primary-hover);
+    background: linear-gradient(135deg, #0056b3, #004085);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 123, 255, 0.4);
+}
+
+.save-btn:active:not(:disabled) {
+    transform: translateY(0);
 }
 
 .save-btn:disabled {
-    opacity: 0.5;
+    opacity: 0.6;
     cursor: not-allowed;
+    transform: none;
+    box-shadow: 0 2px 4px rgba(0, 123, 255, 0.2);
 }
 
 .no-neurons {
@@ -467,6 +570,39 @@ onMounted(() => {
     opacity: 0.5;
 }
 
+.neurons-sections {
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+}
+
+.neuron-section {
+    background: var(--background-tertiary);
+    border-radius: 12px;
+    padding: 1.5rem;
+    border: 1px solid var(--border-color);
+}
+
+.section-header {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 1.5rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.section-header i {
+    font-size: 1.2rem;
+    color: var(--primary-color);
+}
+
+.section-title {
+    font-weight: 600;
+    font-size: 1.1rem;
+    color: var(--text-primary);
+}
+
 .neurons-list {
     display: flex;
     flex-direction: column;
@@ -474,7 +610,7 @@ onMounted(() => {
 }
 
 .neuron-item {
-    background: var(--background-tertiary);
+    background: var(--background-secondary);
     border-radius: 8px;
     padding: 1.5rem;
     border: 1px solid var(--border-color);

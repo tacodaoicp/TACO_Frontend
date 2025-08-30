@@ -30,6 +30,8 @@
                     <option value="dao_allocation_archive">📊 DAO Allocation Archive</option>
                     <option value="dao_neuron_allocation_archive">🧠 DAO Neuron Allocation Archive</option>
                     <option value="dao_governance_archive">🗳️ DAO Governance Archive</option>
+                    <option value="reward_distribution_archive">🎁 Reward Distribution Archive</option>
+                    <option value="reward_withdrawal_archive">💸 Reward Withdrawal Archive</option>
                   </select>
                 </div>
                 <div class="col-md-6 d-flex align-items-end">
@@ -242,6 +244,32 @@
                         :disabled="loading"
                       >
                         🧠 Import Neuron Updates
+                      </button>
+                    </div>
+                  </div>
+                  
+                  <div v-if="selectedArchive === 'reward_distribution_archive'" class="mt-3">
+                    <h6>Reward Distribution Archive</h6>
+                    <div class="d-flex flex-wrap gap-2">
+                      <button 
+                        class="btn btn-sm btn-outline-primary" 
+                        @click="runArchiveSpecificImport('importRewardDistributions')"
+                        :disabled="loading"
+                      >
+                        🎁 Import Reward Distributions
+                      </button>
+                    </div>
+                  </div>
+                  
+                  <div v-if="selectedArchive === 'reward_withdrawal_archive'" class="mt-3">
+                    <h6>Reward Withdrawal Archive</h6>
+                    <div class="d-flex flex-wrap gap-2">
+                      <button 
+                        class="btn btn-sm btn-outline-warning" 
+                        @click="runArchiveSpecificImport('importRewardWithdrawals')"
+                        :disabled="loading"
+                      >
+                        💸 Import Reward Withdrawals
                       </button>
                     </div>
                   </div>
@@ -543,6 +571,8 @@ import { createActor as createDaoAdminActor } from '../../../declarations/dao_ad
 import { createActor as createDaoAllocationActor } from '../../../declarations/dao_allocation_archive'
 import { createActor as createDaoNeuronAllocationActor } from '../../../declarations/dao_neuron_allocation_archive'
 import { createActor as createDaoGovernanceActor } from '../../../declarations/dao_governance_archive'
+import { createActor as createRewardDistributionActor } from '../../../declarations/reward_distribution_archive'
+import { createActor as createRewardWithdrawalActor } from '../../../declarations/reward_withdrawal_archive'
 
 export default {
   name: 'AdminArchiveView',
@@ -572,6 +602,8 @@ export default {
       daoAllocationActor: null,
       daoNeuronAllocationActor: null,
       daoGovernanceActor: null,
+      rewardDistributionActor: null,
+      rewardWithdrawalActor: null,
       
       // Refresh interval
       refreshInterval: null,
@@ -610,6 +642,8 @@ export default {
         case 'dao_allocation_archive': return this.daoAllocationActor
         case 'dao_neuron_allocation_archive': return this.daoNeuronAllocationActor
         case 'dao_governance_archive': return this.daoGovernanceActor
+        case 'reward_distribution_archive': return this.rewardDistributionActor
+        case 'reward_withdrawal_archive': return this.rewardWithdrawalActor
         default: return this.tradingActor
       }
     }
@@ -709,7 +743,7 @@ export default {
     daoNeuronAllocationArchiveCanisterId() {
       switch (process.env.DFX_NETWORK) {
         case "ic":
-          return process.env.CANISTER_ID_DAO_NEURON_ALLOCATION_ARCHIVE_IC || 'dnhfs-7yaaa-aaaan-qz5mq-cai';
+          return process.env.CANISTER_ID_DAO_NEURON_ALLOCATION_ARCHIVE_IC || 'cajb4-qqaaa-aaaan-qz5la-cai';
         case "staging":
           return process.env.CANISTER_ID_DAO_NEURON_ALLOCATION_ARCHIVE_STAGING || 'cajb4-qqaaa-aaaan-qz5la-cai';
       }
@@ -724,6 +758,26 @@ export default {
           return process.env.CANISTER_ID_DAO_GOVERNANCE_ARCHIVE_STAGING || 'bzzag-2yaaa-aaaan-qz5cq-cai';
       }
       return 'bzzag-2yaaa-aaaan-qz5cq-cai'; // fallback to staging canisterId for local
+    },
+
+    rewardDistributionArchiveCanisterId() {
+      switch (process.env.DFX_NETWORK) {
+        case "ic":
+          return process.env.CANISTER_ID_REWARD_DISTRIBUTION_ARCHIVE_IC || 'ddfi2-eiaaa-aaaan-qz5nq-cai';
+        case "staging":
+          return process.env.CANISTER_ID_REWARD_DISTRIBUTION_ARCHIVE_STAGING || 'ddfi2-eiaaa-aaaan-qz5nq-cai';
+      }
+      return 'ddfi2-eiaaa-aaaan-qz5nq-cai'; // fallback for local
+    },
+
+    rewardWithdrawalArchiveCanisterId() {
+      switch (process.env.DFX_NETWORK) {
+        case "ic":
+          return process.env.CANISTER_ID_REWARD_WITHDRAWAL_ARCHIVE_IC || 'dwczx-faaaa-aaaan-qz5oa-cai';
+        case "staging":
+          return process.env.CANISTER_ID_REWARD_WITHDRAWAL_ARCHIVE_STAGING || 'dwczx-faaaa-aaaan-qz5oa-cai';
+      }
+      return 'dwczx-faaaa-aaaan-qz5oa-cai'; // fallback for local
     },
 
     async createArchiveActors() {
@@ -760,6 +814,8 @@ export default {
         this.daoAllocationActor = createDaoAllocationActor(this.daoAllocationArchiveCanisterId(), { agent })
         this.daoNeuronAllocationActor = createDaoNeuronAllocationActor(this.daoNeuronAllocationArchiveCanisterId(), { agent })
         this.daoGovernanceActor = createDaoGovernanceActor(this.daoGovernanceArchiveCanisterId(), { agent })
+        this.rewardDistributionActor = createRewardDistributionActor(this.rewardDistributionArchiveCanisterId(), { agent })
+        this.rewardWithdrawalActor = createRewardWithdrawalActor(this.rewardWithdrawalArchiveCanisterId(), { agent })
         
         //console.log('Archive actors created with identity:', identity.getPrincipal().toString())
       } catch (error) {
@@ -1056,6 +1112,8 @@ export default {
         case 'dao_allocation_archive': return 'bg-info'
         case 'dao_neuron_allocation_archive': return 'bg-success'
         case 'dao_governance_archive': return 'bg-secondary'
+        case 'reward_distribution_archive': return 'bg-success'
+        case 'reward_withdrawal_archive': return 'bg-warning'
         default: return 'bg-secondary'
       }
     },
@@ -1086,6 +1144,12 @@ export default {
         case 'dao_governance_archive':
           // DAO governance archive status - shows voting power and neuron updates
           return 'Governance Archive - Voting power changes and neuron updates'
+        case 'reward_distribution_archive':
+          // Reward distribution archive status - shows reward distribution records
+          return 'Reward Distribution Archive - Periodic reward distribution records and neuron rewards'
+        case 'reward_withdrawal_archive':
+          // Reward withdrawal archive status - shows reward withdrawal records
+          return 'Reward Withdrawal Archive - User reward withdrawals and transaction records'
         default:
           return 'Unknown'
       }
@@ -2024,6 +2088,340 @@ export default {
         `
       }
 
+      // Reward distribution block details
+      if ((parsedData.tx && parsedData.tx.operation === '3reward_distribution') || tradeData.operation === '3reward_distribution') {
+        // Extract reward distribution data from the nested structure
+        let distributionData = tradeData
+        if (parsedData.tx && parsedData.tx.data) {
+          distributionData = parsedData.tx.data
+        }
+        
+        if (!distributionData) {
+          return '<div class="text-muted">No reward distribution data available</div>'
+        }
+        
+        // Extract key metrics
+        const distributionId = distributionData.id || 'Unknown'
+        const totalRewardPot = Number(distributionData.totalRewardPot || 0)
+        const actualDistributed = Number(distributionData.actualDistributed || 0)
+        const neuronsProcessed = Number(distributionData.neuronsProcessed || 0)
+        const totalRewardScore = parseFloat(distributionData.totalRewardScore || '0')
+        const status = distributionData.status || {}
+        const neuronRewards = distributionData.neuronRewards || []
+        const failedNeurons = distributionData.failedNeurons || []
+        
+        // Format amounts (convert from satoshis to TACO)
+        const distributedTACO = (actualDistributed / 100000000).toLocaleString(undefined, { maximumFractionDigits: 2 })
+        const potTACO = totalRewardPot.toLocaleString()
+        
+        // Status formatting
+        const statusType = status.type || 'Unknown'
+        const successfulNeurons = Number(status.successfulNeurons || neuronsProcessed - failedNeurons.length)
+        const failedCount = failedNeurons.length
+        
+        const statusClass = statusType === 'Completed' ? 'bg-success' : 
+                           statusType === 'PartiallyCompleted' ? 'bg-warning text-dark' : 
+                           statusType === 'Failed' ? 'bg-danger' : 'bg-secondary'
+        
+        // Top 3 reward recipients
+        const topRewards = neuronRewards
+          .sort((a, b) => Number(b.rewardAmount || 0) - Number(a.rewardAmount || 0))
+          .slice(0, 3)
+          .map(reward => {
+            const neuronId = this.formatNeuronFromBlob(reward.neuronId)
+            const amount = (Number(reward.rewardAmount || 0) / 100000000).toLocaleString(undefined, { maximumFractionDigits: 2 })
+            const votingPower = (Number(reward.votingPower || 0) / 100000000).toLocaleString(undefined, { maximumFractionDigits: 0 })
+            return { neuronId, amount, votingPower }
+          })
+        
+        // Time formatting
+        const distributionTime = this.formatTime(Number(distributionData.timestamp))
+        const startTime = this.formatTime(Number(distributionData.startTime))
+        const endTime = this.formatTime(Number(distributionData.endTime))
+        
+        return `
+          <div class="card bg-dark border-success">
+            <div class="card-header bg-success text-white">
+              <div class="d-flex justify-content-between align-items-center">
+                <h6 class="mb-0">🎁 Reward Distribution #${distributionId}</h6>
+                <span class="badge ${statusClass}">${statusType}</span>
+              </div>
+            </div>
+            <div class="card-body">
+              <div class="row">
+                <div class="col-md-6">
+                  <h6>💰 Distribution Summary</h6>
+                  <table class="table table-sm table-dark">
+                    <tr>
+                      <td><strong>Reward Pot:</strong></td>
+                      <td><span class="text-warning">${potTACO} TACO</span></td>
+                    </tr>
+                    <tr>
+                      <td><strong>Distributed:</strong></td>
+                      <td><span class="text-success">${distributedTACO} TACO</span></td>
+                    </tr>
+                    <tr>
+                      <td><strong>Total Score:</strong></td>
+                      <td><span class="text-info">${totalRewardScore.toLocaleString()}</span></td>
+                    </tr>
+                    <tr>
+                      <td><strong>Neurons:</strong></td>
+                      <td>
+                        <span class="text-success">${successfulNeurons} ✅</span>
+                        ${failedCount > 0 ? `<span class="text-danger ms-2">${failedCount} ❌</span>` : ''}
+                      </td>
+                    </tr>
+                  </table>
+                </div>
+                <div class="col-md-6">
+                  <h6>📅 Timing</h6>
+                  <table class="table table-sm table-dark">
+                    <tr>
+                      <td><strong>Period Start:</strong></td>
+                      <td>🕐 ${startTime}</td>
+                    </tr>
+                    <tr>
+                      <td><strong>Period End:</strong></td>
+                      <td>🕐 ${endTime}</td>
+                    </tr>
+                    <tr>
+                      <td><strong>Distribution Time:</strong></td>
+                      <td>🕐 ${distributionTime}</td>
+                    </tr>
+                  </table>
+                </div>
+              </div>
+              
+              ${topRewards.length > 0 ? `
+                <div class="mt-3">
+                  <h6>🏆 Top Rewards</h6>
+                  <div class="row">
+                    ${topRewards.map((reward, index) => `
+                      <div class="col-md-4">
+                        <div class="alert alert-success">
+                          <strong>#${index + 1}</strong><br>
+                          <code class="text-light">${reward.neuronId}</code><br>
+                          <span class="text-warning">${reward.amount} TACO</span><br>
+                          <small class="text-muted">${reward.votingPower} VP</small>
+                        </div>
+                      </div>
+                    `).join('')}
+                  </div>
+                  
+                  ${neuronRewards.length > 3 ? `
+                    <div class="mt-3">
+                      <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#allNeurons${distributionId}" aria-expanded="false">
+                        <i class="fas fa-list"></i> View All ${neuronRewards.length} Neurons
+                      </button>
+                      <div class="collapse mt-3" id="allNeurons${distributionId}">
+                        <div class="card bg-secondary">
+                          <div class="card-header">
+                            <h6 class="mb-0 text-light">🧠 All Neuron Rewards</h6>
+                          </div>
+                          <div class="card-body p-0" style="max-height: 400px; overflow-y: auto;">
+                            <table class="table table-sm table-dark table-striped mb-0">
+                              <thead class="table-secondary">
+                                <tr>
+                                  <th>#</th>
+                                  <th>Neuron ID</th>
+                                  <th>Reward</th>
+                                  <th>Voting Power</th>
+                                  <th>Performance</th>
+                                  <th>Score</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                ${neuronRewards.map((reward, index) => {
+                                  const neuronId = this.formatNeuronFromBlob(reward.neuronId)
+                                  const amount = (Number(reward.rewardAmount || 0) / 100000000).toLocaleString(undefined, { maximumFractionDigits: 2 })
+                                  const votingPower = (Number(reward.votingPower || 0) / 100000000).toLocaleString(undefined, { maximumFractionDigits: 0 })
+                                  const performanceScore = parseFloat(reward.performanceScore || '0').toFixed(3)
+                                  const rewardScore = parseFloat(reward.rewardScore || '0').toLocaleString(undefined, { maximumFractionDigits: 0 })
+                                  
+                                  return `
+                                    <tr>
+                                      <td><span class="text-muted">${index + 1}</span></td>
+                                      <td><code class="text-info" style="font-size: 0.75em;">${neuronId}</code></td>
+                                      <td><span class="text-warning"><strong>${amount}</strong></span></td>
+                                      <td><span class="text-light">${votingPower}</span></td>
+                                      <td><span class="text-success">${performanceScore}</span></td>
+                                      <td><span class="text-light">${rewardScore}</span></td>
+                                    </tr>
+                                  `
+                                }).join('')}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ` : ''}
+                </div>
+              ` : ''}
+              
+              ${failedNeurons.length > 0 ? `
+                <div class="mt-3">
+                  <h6 class="text-danger">❌ Failed Neurons (${failedNeurons.length})</h6>
+                  <div class="alert alert-danger">
+                    ${failedNeurons.slice(0, 3).map(failed => {
+                      const neuronId = this.formatNeuronFromBlob(failed.neuronId)
+                      return `<div><code>${neuronId}</code>: ${failed.errorMessage}</div>`
+                    }).join('')}
+                    ${failedNeurons.length > 3 ? `<div><em>... and ${failedNeurons.length - 3} more</em></div>` : ''}
+                  </div>
+                </div>
+              ` : ''}
+              
+              <small class="text-muted">
+                Distribution processed ${neuronsProcessed} neurons with ${totalRewardScore.toLocaleString()} total reward score
+              </small>
+            </div>
+          </div>
+        `
+      }
+
+      // Reward withdrawal block details
+      if ((parsedData.tx && parsedData.tx.operation === '3reward_withdrawal') || tradeData.operation === '3reward_withdrawal') {
+        // Extract reward withdrawal data from the nested structure
+        let withdrawalData = tradeData
+        if (parsedData.tx && parsedData.tx.data) {
+          withdrawalData = parsedData.tx.data
+        }
+        
+        if (!withdrawalData) {
+          return '<div class="text-muted">No reward withdrawal data available</div>'
+        }
+        
+        // Extract key information from the actual structure
+        const withdrawalId = withdrawalData.id || 'Unknown'
+        const caller = withdrawalData.caller ? this.formatPrincipalFromBlob(withdrawalData.caller) : 'Unknown'
+        const totalAmount = Number(withdrawalData.totalAmount || 0)
+        const amountSent = Number(withdrawalData.amountSent || 0)
+        const fee = Number(withdrawalData.fee || 0)
+        const targetAccountOwner = withdrawalData.targetAccountOwner ? this.formatPrincipalFromBlob(withdrawalData.targetAccountOwner) : 'Unknown'
+        const targetAccountSubaccount = withdrawalData.targetAccountSubaccount || ''
+        const transactionId = withdrawalData.transactionId || null
+        const neuronWithdrawals = withdrawalData.neuronWithdrawals || []
+        
+        // Format amounts (convert from satoshis to TACO)
+        const totalTACO = (totalAmount / 100000000).toLocaleString(undefined, { maximumFractionDigits: 8 })
+        const sentTACO = (amountSent / 100000000).toLocaleString(undefined, { maximumFractionDigits: 8 })
+        const feeTACO = (fee / 100000000).toLocaleString(undefined, { maximumFractionDigits: 8 })
+        
+        // Format caller and target displays
+        const callerShort = caller.length > 16 ? caller.substring(0, 8) + '...' + caller.substring(caller.length - 8) : caller
+        const targetShort = targetAccountOwner.length > 16 ? targetAccountOwner.substring(0, 8) + '...' + targetAccountOwner.substring(targetAccountOwner.length - 8) : targetAccountOwner
+        
+        // Format subaccount if present
+        const subaccountDisplay = targetAccountSubaccount && targetAccountSubaccount !== '' ? 
+          `<tr>
+            <td><strong>Subaccount:</strong></td>
+            <td><code class="text-info">${targetAccountSubaccount}</code></td>
+          </tr>` : ''
+        
+        // Time formatting
+        const withdrawalTime = this.formatTime(Number(withdrawalData.timestamp))
+        
+        // Status is always completed if we have a transaction ID
+        const status = transactionId ? 'Completed' : 'Unknown'
+        const statusClass = 'bg-success'
+        const statusIcon = '✅'
+        
+        return `
+          <div class="card bg-dark border-warning">
+            <div class="card-header bg-warning text-dark">
+              <div class="d-flex justify-content-between align-items-center">
+                <h6 class="mb-0">💸 Reward Withdrawal #${withdrawalId}</h6>
+                <span class="badge ${statusClass}">${statusIcon} ${status}</span>
+              </div>
+            </div>
+            <div class="card-body">
+              <div class="row">
+                <div class="col-md-6">
+                  <h6 class="text-light">💰 Withdrawal Details</h6>
+                  <table class="table table-sm table-dark">
+                    <tr>
+                      <td><strong>Caller:</strong></td>
+                      <td>
+                        <code class="text-info">${callerShort}</code>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td><strong>Total Amount:</strong></td>
+                      <td><span class="text-warning">${totalTACO} TACO</span></td>
+                    </tr>
+                    <tr>
+                      <td><strong>Amount Sent:</strong></td>
+                      <td><span class="text-success">${sentTACO} TACO</span></td>
+                    </tr>
+                    <tr>
+                      <td><strong>Fee:</strong></td>
+                      <td><span class="text-light">${feeTACO} TACO</span></td>
+                    </tr>
+                    <tr>
+                      <td><strong>Neurons:</strong></td>
+                      <td><span class="text-info">${neuronWithdrawals.length} withdrawal${neuronWithdrawals.length !== 1 ? 's' : ''}</span></td>
+                    </tr>
+                  </table>
+                </div>
+                <div class="col-md-6">
+                  <h6 class="text-light">📋 Transaction Info</h6>
+                  <table class="table table-sm table-dark">
+                    <tr>
+                      <td><strong>Target Account:</strong></td>
+                      <td>
+                        <code class="text-success">${targetShort}</code>
+                      </td>
+                    </tr>
+                    ${subaccountDisplay}
+                    ${transactionId !== null ? `
+                      <tr>
+                        <td><strong>Transaction ID:</strong></td>
+                        <td><code class="text-success">${transactionId}</code></td>
+                      </tr>
+                    ` : ''}
+                    <tr>
+                      <td><strong>Timestamp:</strong></td>
+                      <td>🕐 ${withdrawalTime}</td>
+                    </tr>
+                  </table>
+                </div>
+              </div>
+              
+              ${neuronWithdrawals.length > 0 ? `
+                <div class="mt-3">
+                  <h6 class="text-light">🧠 Neuron Withdrawals</h6>
+                  <div class="row">
+                    ${neuronWithdrawals.slice(0, 3).map(withdrawal => {
+                      const neuronId = this.formatNeuronFromBlob(withdrawal.neuronId)
+                      const amount = (Number(withdrawal.amount || 0) / 100000000).toLocaleString(undefined, { maximumFractionDigits: 8 })
+                      return `
+                        <div class="col-md-4">
+                          <div class="alert alert-info">
+                            <code class="text-light">${neuronId}</code><br>
+                            <span class="text-warning">${amount} TACO</span>
+                          </div>
+                        </div>
+                      `
+                    }).join('')}
+                    ${neuronWithdrawals.length > 3 ? `
+                      <div class="col-md-12">
+                        <small class="text-muted">... and ${neuronWithdrawals.length - 3} more neuron withdrawals</small>
+                      </div>
+                    ` : ''}
+                  </div>
+                </div>
+              ` : ''}
+              
+              <small class="text-muted">
+                Withdrawal processed ${neuronWithdrawals.length} neuron${neuronWithdrawals.length !== 1 ? 's' : ''}
+                ${transactionId ? ` with transaction ID ${transactionId}` : ''}
+              </small>
+            </div>
+          </div>
+        `
+      }
+
       // Neuron allocation change block details
       if ((parsedData.tx && parsedData.tx.operation === '3neuron_allocation_change') || tradeData.operation === '3neuron_allocation_change') {
         //console.log('=== Processing neuron allocation change block ===', tradeData)
@@ -2229,6 +2627,8 @@ export default {
         if (parsedData.tx.operation === '3admin') return 'Admin Action'
         if (parsedData.tx.operation === '3admin_action') return 'Admin Action'
         if (parsedData.tx.operation === '3follow_action') return 'Follow Action'
+        if (parsedData.tx.operation === '3reward_distribution') return 'Reward Distribution'
+        if (parsedData.tx.operation === '3reward_withdrawal') return 'Reward Withdrawal'
         return parsedData.tx.operation
       }
       
@@ -2569,6 +2969,52 @@ export default {
         const formattedTime = this.formatTime(Number(timestamp))
         
         return `⚙️ ${adminShort}: ${actionType}${tokenInfo} on ${canister} ${statusIcon} • 🕐 ${formattedTime}`
+      }
+      
+      // Reward distribution summary
+      if ((parsedData.tx && parsedData.tx.operation === '3reward_distribution') || tradeData.operation === '3reward_distribution') {
+        let distributionData = tradeData
+        if (parsedData.tx && parsedData.tx.data) {
+          distributionData = parsedData.tx.data
+        }
+        
+        const distributionId = distributionData.id || 'Unknown'
+        const actualDistributed = Number(distributionData.actualDistributed || 0)
+        const neuronsProcessed = Number(distributionData.neuronsProcessed || 0)
+        const status = distributionData.status?.type || 'Unknown'
+        const failedCount = (distributionData.failedNeurons || []).length
+        
+        const distributedTACO = (actualDistributed / 100000000).toFixed(2)
+        const statusIcon = status === 'Completed' ? '✅' : 
+                          status === 'PartiallyCompleted' ? '⚠️' : 
+                          status === 'Failed' ? '❌' : '❓'
+        
+        const timestamp = distributionData.timestamp || Date.now()
+        const formattedTime = this.formatTime(Number(timestamp))
+        
+        return `🎁 Distribution #${distributionId}: ${distributedTACO} TACO to ${neuronsProcessed} neurons ${statusIcon}${failedCount > 0 ? ` (${failedCount} failed)` : ''} • 🕐 ${formattedTime}`
+      }
+      
+      // Reward withdrawal summary
+      if ((parsedData.tx && parsedData.tx.operation === '3reward_withdrawal') || tradeData.operation === '3reward_withdrawal') {
+        let withdrawalData = tradeData
+        if (parsedData.tx && parsedData.tx.data) {
+          withdrawalData = parsedData.tx.data
+        }
+        
+        const caller = withdrawalData.caller ? this.formatPrincipalFromBlob(withdrawalData.caller) : 'Unknown'
+        const totalAmount = Number(withdrawalData.totalAmount || 0)
+        const neuronCount = (withdrawalData.neuronWithdrawals || []).length
+        const transactionId = withdrawalData.transactionId
+        
+        const withdrawnTACO = (totalAmount / 100000000).toFixed(2)
+        const statusIcon = transactionId ? '✅' : '❓'
+        
+        const timestamp = withdrawalData.timestamp || Date.now()
+        const formattedTime = this.formatTime(Number(timestamp))
+        const callerShort = caller.length > 16 ? caller.substring(0, 8) + '...' + caller.substring(caller.length - 8) : caller
+        
+        return `💸 ${callerShort}: ${withdrawnTACO} TACO from ${neuronCount} neuron${neuronCount !== 1 ? 's' : ''} ${statusIcon} • 🕐 ${formattedTime}`
       }
       
       // Generic block

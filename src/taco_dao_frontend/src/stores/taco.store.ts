@@ -18,6 +18,7 @@ import { idlFactory as sneedForumIDL, _SERVICE as SneedForumService } from "../.
 import { idlFactory as appSneedDaoIDL, _SERVICE as AppSneedDaoService } from "../../../declarations/app_sneeddao_backend/app_sneeddao_backend.did.js"
 import { idlFactory as snsGovernanceIDL } from "../../../declarations/sns_governance/sns_governance.did.js"
 import { idlFactory as alarmIDL, _SERVICE as AlarmService } from "../../../declarations/alarm/alarm.did.js"
+import { idlFactory as rewardsIDL } from "../../../declarations/rewards/rewards.did.js"
 import { Principal } from '@dfinity/principal'
 import { AccountIdentifier } from '@dfinity/ledger-icp'
 import { canisterId as iiCanisterId } from "../../../declarations/internet_identity/index.js"
@@ -952,9 +953,6 @@ export const useTacoStore = defineStore('taco', () => {
             // Load names cache in background (non-blocking)
             loadAllNames().catch(console.error)
 
-            // Initialize alarm actor in background (non-blocking)
-            initializeAlarmActor().catch(console.error)
-
 
         } else {
 
@@ -1043,7 +1041,7 @@ export const useTacoStore = defineStore('taco', () => {
                     identityProvider:
                         process.env.DFX_NETWORK === "ic" || process.env.DFX_NETWORK === "staging"
                             ? 'https://identity.ic0.app'
-                            : `http://${iiCanisterId}.localhost:8080/`,
+                            : `http://${iiCanisterId}.localhost:4943/`,
                     onSuccess: resolve,
                     onError: reject,
                 })
@@ -1078,9 +1076,6 @@ export const useTacoStore = defineStore('taco', () => {
             // Load names cache in background (non-blocking)
             // console.log('🔍 Triggering loadAllNames() from iidLogIn - after successful login');
             loadAllNames().catch(console.error);
-
-            // Initialize alarm actor in background (non-blocking)
-            initializeAlarmActor().catch(console.error);
 
             // turn app loading off
             appLoadingOff()
@@ -5115,6 +5110,8 @@ export const useTacoStore = defineStore('taco', () => {
         const mapKey = createNeuronKey(snsRoot, neuronId);
         const cachedName = namesCache.value.neurons.get(mapKey);
         
+
+        
         if (cachedName) {
             return cachedName.verified ? `✓ ${cachedName.name}` : cachedName.name;
         }
@@ -5240,423 +5237,2120 @@ export const useTacoStore = defineStore('taco', () => {
         }
     }
 
-    // Alarm Management Functions
-    async function performSystemHealthCheck(): Promise<void> {
-    if (!alarmActor) {
-        throw new Error('Alarm actor not initialized')
-    }
-    
-    const result = await alarmActor.performSystemHealthCheckManual()
-    if ('err' in result) {
-        throw new Error(result.err)
-    }
-    }
-    async function getEnhancedAlarmSystemStatus(): Promise<any> {
-    if (!alarmActor) {
-        throw new Error('Alarm actor not initialized')
-    }
-    
-    const result = await alarmActor.getEnhancedAlarmSystemStatus()
-    if ('err' in result) {
-        throw new Error(result.err)
-    }
-    
-    return result.ok
-    }
-    async function getMonitoringStatus(): Promise<any> {
-    if (!alarmActor) {
-        throw new Error('Alarm actor not initialized')
-    }
-    
-    const result = await alarmActor.getMonitoringStatus()
-    if ('err' in result) {
-        throw new Error(result.err)
-    }
-    
-    return result.ok
-    }
-    async function addAlarmAdmin(principalId: string): Promise<void> {
-    if (!alarmActor) {
-        throw new Error('Alarm actor not initialized')
-    }
-    
-    const principal = Principal.fromText(principalId)
-    const result = await alarmActor.addAdmin(principal, [{ Admin: null }])
-    if ('err' in result) {
-        throw new Error(result.err)
-    }
-    }
-    async function addAlarmContact(name: string, type: string, value: string): Promise<void> {
-    if (!alarmActor) {
-        throw new Error('Alarm actor not initialized')
-    }
-    
-    const contactType = type === 'Email' ? { Email: value } : { SMS: value }
-    const result = await alarmActor.addContact(name, contactType)
-    if ('err' in result) {
-        throw new Error(result.err)
-    }
-    }
-    async function getAlarmContacts(): Promise<any[]> {
-    if (!alarmActor) {
-        throw new Error('Alarm actor not initialized')
-    }
-    
-    const result = await alarmActor.getContacts()
-    if ('err' in result) {
-        throw new Error(result.err)
-    }
-    
-    return result.ok
-    }
-    async function updateContactStatus(contactId: number, active: boolean): Promise<void> {
-    if (!alarmActor) {
-        throw new Error('Alarm actor not initialized')
-    }
-    
-    const result = await alarmActor.updateContactStatus(contactId, active)
-    if ('err' in result) {
-        throw new Error(result.err)
-    }
-    }
-    async function removeAlarmContact(contactId: number): Promise<void> {
-    if (!alarmActor) {
-        throw new Error('Alarm actor not initialized')
-    }
-    
-    const result = await alarmActor.removeContact(contactId)
-    if ('err' in result) {
-        throw new Error(result.err)
-    }
-    }
-    async function testAlarmContact(contactIds: number[]): Promise<void> {
-    if (!alarmActor) {
-        throw new Error('Alarm actor not initialized')
-    }
-    
-    // Try SMS first, then email
-    try {
-        const smsResult = await alarmActor.sendTestSMS(contactIds)
-        if ('err' in smsResult) {
-        // If SMS fails, try email
-        const emailResult = await alarmActor.sendTestEmail(contactIds)
-        if ('err' in emailResult) {
-            throw new Error(emailResult.err)
-        }
-        }
-    } catch (error) {
-        // Try email as fallback
-        const emailResult = await alarmActor.sendTestEmail(contactIds)
-        if ('err' in emailResult) {
-        throw new Error(emailResult.err)
-        }
-    }
-    }
-    async function getPendingAlarms(): Promise<any[]> {
-    if (!alarmActor) {
-        throw new Error('Alarm actor not initialized')
-    }
-    
-    const result = await alarmActor.getPendingAlarms()
-    if ('err' in result) {
-        throw new Error(result.err)
-    }
-    
-    return result.ok
-    }
-    async function acknowledgeAlarm(alarmId: number): Promise<void> {
-    if (!alarmActor) {
-        throw new Error('Alarm actor not initialized')
-    }
-    
-    const result = await alarmActor.acknowledgeAlarm(alarmId)
-    if ('err' in result) {
-        throw new Error(result.err)
-    }
-    }
-    async function getSystemErrors(limit?: number): Promise<any[]> {
-    if (!alarmActor) {
-        throw new Error('Alarm actor not initialized')
-    }
-    
-    const result = await alarmActor.getSystemErrors(limit ? [limit] : [])
-    if ('err' in result) {
-        throw new Error(result.err)
-    }
-    
-    return result.ok
-    }
-    async function resolveSystemError(errorId: number): Promise<void> {
-    if (!alarmActor) {
-        throw new Error('Alarm actor not initialized')
-    }
-    
-    const result = await alarmActor.resolveSystemErrorById(errorId)
-    if ('err' in result) {
-        throw new Error(result.err)
-    }
-    }
-    async function setCheckInterval(minutes: number): Promise<void> {
-    if (!alarmActor) {
-        throw new Error('Alarm actor not initialized')
-    }
-    
-    const result = await alarmActor.setCheckInterval(minutes)
-    if ('err' in result) {
-        throw new Error(result.err)
-    }
-    }
-    async function startMonitoring(): Promise<void> {
-    if (!alarmActor) {
-        throw new Error('Alarm actor not initialized')
-    }
-    
-    const result = await alarmActor.startMonitoring()
-    if ('err' in result) {
-        throw new Error(result.err)
-    }
-    }
-    async function stopMonitoring(): Promise<void> {
-    if (!alarmActor) {
-        throw new Error('Alarm actor not initialized')
-    }
-    
-    const result = await alarmActor.stopMonitoring()
-    if ('err' in result) {
-        throw new Error(result.err)
-    }
-    }
-
-    // Alarm Canister Monitoring Functions
-    async function addMonitoredCanister(
-        canisterId: string,
-        name: string,
-        isSNSControlled: boolean,
-        snsRootCanisterId: string | null,
-        minimumCycles: bigint,
-        cyclesAlertLevel: string,
-        timersAlertLevel: string,
-        statusAlertLevel: string
-    ): Promise<void> {
-        if (!alarmActor) {
-            throw new Error('Alarm actor not initialized')
-        }
-        
-        const principal = Principal.fromText(canisterId)
-        const snsRoot = snsRootCanisterId ? [Principal.fromText(snsRootCanisterId)] : []
-        
-        const cyclesLevel = cyclesAlertLevel === 'Level1Immediate' ? { Level1Immediate: null } : { Level2DelayedSMS: null }
-        const timersLevel = timersAlertLevel === 'Level1Immediate' ? { Level1Immediate: null } : { Level2DelayedSMS: null }
-        const statusLevel = statusAlertLevel === 'Level1Immediate' ? { Level1Immediate: null } : { Level2DelayedSMS: null }
-        
-        const result = await alarmActor.addMonitoredCanister(
-            principal,
-            name,
-            isSNSControlled,
-            snsRoot,
-            minimumCycles,
-            cyclesLevel,
-            timersLevel,
-            statusLevel
-        )
-        
-        if ('err' in result) {
-            throw new Error(result.err)
-        }
-    }
-    async function getMonitoredCanisters(): Promise<any[]> {
-        if (!alarmActor) {
-            throw new Error('Alarm actor not initialized')
-        }
-        
-        const result = await alarmActor.getMonitoredCanisters()
-        if ('err' in result) {
-            throw new Error(result.err)
-        }
-        
-        return result.ok
-    }
-    async function removeMonitoredCanister(configId: number): Promise<void> {
-        if (!alarmActor) {
-            throw new Error('Alarm actor not initialized')
-        }
-        
-        const result = await alarmActor.removeMonitoredCanister(configId)
-        if ('err' in result) {
-            throw new Error(result.err)
-        }
-    }
-    async function updateMonitoredCanisterStatus(configId: number, enabled: boolean): Promise<void> {
-        if (!alarmActor) {
-            throw new Error('Alarm actor not initialized')
-        }
-        
-        const result = await alarmActor.updateMonitoredCanisterStatus(configId, enabled)
-        if ('err' in result) {
-            throw new Error(result.err)
-        }
-    }
-    async function startCanisterMonitoring(): Promise<void> {
-        if (!alarmActor) {
-            throw new Error('Alarm actor not initialized')
-        }
-        
-        const result = await alarmActor.startCanisterMonitoring()
-        if ('err' in result) {
-            throw new Error(result.err)
-        }
-    }
-    async function stopCanisterMonitoring(): Promise<void> {
-        if (!alarmActor) {
-            throw new Error('Alarm actor not initialized')
-        }
-        
-        const result = await alarmActor.stopCanisterMonitoring()
-        if ('err' in result) {
-            throw new Error(result.err)
-        }
-    }
-    async function getCanisterHealthStatus(): Promise<any[]> {
-        if (!alarmActor) {
-            throw new Error('Alarm actor not initialized')
-        }
-        
-        const result = await alarmActor.getCanisterHealthStatus()
-        if ('err' in result) {
-            throw new Error(result.err)
-        }
-        
-        return result.ok
-    }
-    async function getQueueStatus(): Promise<any> {
-        if (!alarmActor) {
-            throw new Error('Alarm actor not initialized')
-        }
-        
-        const result = await alarmActor.getQueueStatus()
-        if ('err' in result) {
-            throw new Error(result.err)
-        }
-        
-        return result.ok
-    }
-    async function clearQueues(): Promise<void> {
-        if (!alarmActor) {
-            throw new Error('Alarm actor not initialized')
-        }
-        
-        const result = await alarmActor.clearQueues()
-        if ('err' in result) {
-            throw new Error(result.err)
-        }
-    }
-
-    // Alarm sent message history functions
-    async function getSentMessages(limit?: number): Promise<any[]> {
-        if (!alarmActor) {
-            throw new Error('Alarm actor not initialized')
-        }
-        
-        const result = await alarmActor.getSentMessages(limit ? [limit] : [])
-        if ('err' in result) {
-            throw new Error(result.err)
-        }
-        
-        return result.ok
-    }
-    async function getSentSMSMessages(limit?: number): Promise<any[]> {
-        if (!alarmActor) {
-            throw new Error('Alarm actor not initialized')
-        }
-        
-        const result = await alarmActor.getSentSMSMessages(limit ? [limit] : [])
-        if ('err' in result) {
-            throw new Error(result.err)
-        }
-        
-        return result.ok
-    }
-    async function getSentEmailMessages(limit?: number): Promise<any[]> {
-        if (!alarmActor) {
-            throw new Error('Alarm actor not initialized')
-        }
-        
-        const result = await alarmActor.getSentEmailMessages(limit ? [limit] : [])
-        if ('err' in result) {
-            throw new Error(result.err)
-        }
-        
-        return result.ok
-    }
-
-    // Alarm configuration functions
-    async function setCanisterMonitoringInterval(minutes: number): Promise<void> {
-        if (!alarmActor) {
-            throw new Error('Alarm actor not initialized')
-        }
-        
-        const result = await alarmActor.setCanisterMonitoringInterval(minutes)
-        if ('err' in result) {
-            throw new Error(result.err)
-        }
-    }
-    async function setLevel2SMSCheckInterval(minutes: number): Promise<void> {
-        if (!alarmActor) {
-            throw new Error('Alarm actor not initialized')
-        }
-        
-        const result = await alarmActor.setLevel2SMSCheckInterval(minutes)
-        if ('err' in result) {
-            throw new Error(result.err)
-        }
-    }
-    async function getConfigurationIntervals(): Promise<any> {
-        if (!alarmActor) {
-            throw new Error('Alarm actor not initialized')
-        }
-        
-        const result = await alarmActor.getConfigurationIntervals()
-        if ('err' in result) {
-            throw new Error(result.err)
-        }
-        
-        return result.ok
-    }
-    async function getAdminActionLogs(limit?: number): Promise<any[]> {
-        if (!alarmActor) {
-            throw new Error('Alarm actor not initialized')
-        }
-        
-        const result = await alarmActor.getAdminActionLogs(limit ? [limit] : [])
-        if ('err' in result) {
-            throw new Error(result.err)
-        }
-        
-        return result.ok
-    }
-
-    // Initialize alarm actor
-    const initializeAlarmActor = async () => {
+    // TACO Neuron methods for staking
+    const getTacoNeurons = async () => {
         try {
-            const authClient = await getAuthClient()
+            if (!userLoggedIn.value) {
+                throw new Error('User must be logged in');
+            }
+
+            const authClient = await getAuthClient();
+            const identity = authClient.getIdentity();
             
-            if (await authClient.isAuthenticated() && !alarmActor) {
-                const identity = authClient.getIdentity()
+            const agent = await createAgent({
+                identity,
+                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            });
+
+            // Create SNS Governance actor
+            const snsGov = await createSnsGovernanceActor(agent, 'lhdfz-wqaaa-aaaaq-aae3q-cai');
+            
+            const neuronsResult = await snsGov.list_neurons({
+                of_principal: [Principal.fromText(userPrincipal.value)],
+                limit: 1000,
+                start_page_at: []
+            }) as any;
+
+            return neuronsResult.neurons || [];
+        } catch (error: any) {
+            console.error('Error getting TACO neurons:', error);
+            throw error;
+        }
+    }
+
+    const createSnsGovernanceActor = async (agent: any, canisterId: string) => {
+        // Import the full SNS governance IDL that includes permissions
+        const { idlFactory } = await import('../../../declarations/sns_governance');
+        
+        return Actor.createActor(idlFactory, {
+            agent,
+            canisterId
+        });
+    }
+
+    // Determine neuron relationship to user
+    const getNeuronRelationship = (neuron: any, userPrincipalStr: string) => {
+        const userPrincipal = Principal.fromText(userPrincipalStr);
+        
+        let isOwner = false;
+        let isHotkey = false;
+        
+        // Check permissions for the user's principal
+        if (neuron.permissions && Array.isArray(neuron.permissions)) {
+            for (const permission of neuron.permissions) {
+                if (permission.principal && permission.principal.length > 0) {
+                    const permissionPrincipal = permission.principal[0];
+                    
+                    // Check if this permission is for the current user
+                    if (permissionPrincipal.toText() === userPrincipal.toText()) {
+                        const permissionTypes = permission.permission_type || [];
+                        
+                        // Check for owner permissions (typically includes permission type 1)
+                        // Owner usually has multiple permissions including 1 (configure), 2 (disburse), 3 (vote), 4 (submit proposal)
+                        if (permissionTypes.includes(1) || permissionTypes.includes(2)) {
+                            isOwner = true;
+                        }
+                        
+                        // Check for hotkey permissions [4, 3] or [3, 4] (vote and submit proposal)
+                        const hasVote = permissionTypes.includes(3);
+                        const hasSubmitProposal = permissionTypes.includes(4);
+                        if (hasVote && hasSubmitProposal && !isOwner) {
+                            isHotkey = true;
+                        }
+                    }
+                }
+            }
+        }
+        
+        return { isOwner, isHotkey };
+    }
+
+    // Helper function to format dissolve state
+    const formatDissolveState = (dissolveState: any) => {
+        if (!dissolveState || dissolveState.length === 0) {
+            return { type: 'none', display: 'Not dissolving', seconds: 0 };
+        }
+        
+        const state = dissolveState[0];
+        if (state.DissolveDelaySeconds !== undefined) {
+            const seconds = Number(state.DissolveDelaySeconds);
+            const days = Math.floor(seconds / (24 * 60 * 60));
+            const hours = Math.floor((seconds % (24 * 60 * 60)) / (60 * 60));
+            const minutes = Math.floor((seconds % (60 * 60)) / 60);
+            
+            let display = '';
+            if (days > 0) display += `${days}d `;
+            if (hours > 0) display += `${hours}h `;
+            if (minutes > 0) display += `${minutes}m`;
+            if (!display) display = `${seconds}s`;
+            
+            return { type: 'delay', display: display.trim(), seconds };
+        }
+        
+        if (state.WhenDissolvedTimestampSeconds !== undefined) {
+            const timestamp = Number(state.WhenDissolvedTimestampSeconds) * 1000; // Convert to milliseconds
+            const dissolveDate = new Date(timestamp);
+            const now = new Date();
+            
+            if (dissolveDate <= now) {
+                return { type: 'dissolved', display: 'Dissolved', seconds: 0 };
+            } else {
+                const remainingMs = dissolveDate.getTime() - now.getTime();
+                const remainingSeconds = Math.floor(remainingMs / 1000);
+                const days = Math.floor(remainingSeconds / (24 * 60 * 60));
+                const hours = Math.floor((remainingSeconds % (24 * 60 * 60)) / (60 * 60));
                 
-                const agent = await createAgent({
-                    identity,
-                    host: process.env.DFX_NETWORK === "local" ? getLocalHost() : "https://ic0.app",
-                    fetchRootKey: process.env.DFX_NETWORK === "local",
+                let display = '';
+                if (days > 0) display += `${days}d `;
+                if (hours > 0) display += `${hours}h`;
+                
+                return { type: 'dissolving', display: `Dissolving in ${display.trim()}`, seconds: remainingSeconds };
+            }
+        }
+        
+        return { type: 'unknown', display: 'Unknown', seconds: 0 };
+    };
+
+    // Helper function to calculate neuron age
+    const calculateNeuronAge = (createdTimestamp: number, agingSinceTimestamp: number) => {
+        const now = Math.floor(Date.now() / 1000); // Current time in seconds
+        const ageSeconds = now - agingSinceTimestamp;
+        const days = Math.floor(ageSeconds / (24 * 60 * 60));
+        const hours = Math.floor((ageSeconds % (24 * 60 * 60)) / (60 * 60));
+        
+        if (days > 0) {
+            return `${days}d ${hours}h`;
+        } else if (hours > 0) {
+            return `${hours}h`;
+        } else {
+            return '< 1h';
+        }
+    };
+
+    // Format neuron for display with relationship info and detailed stats
+    const formatNeuronForDisplay = (neuron: any) => {
+        const neuronId = neuron.id && neuron.id.length > 0 ? neuron.id[0].id : null;
+        const neuronIdHex = neuronId ? Array.from(neuronId as Uint8Array).map((b: number) => b.toString(16).padStart(2, '0')).join('') : 'Unknown';
+        const relationship = getNeuronRelationship(neuron, userPrincipal.value);
+        
+        // Parse dissolve state
+        const dissolveInfo = formatDissolveState(neuron.dissolve_state);
+        
+        // Calculate age
+        const createdTimestamp = Number(neuron.created_timestamp_seconds || 0);
+        const agingSinceTimestamp = Number(neuron.aging_since_timestamp_seconds || createdTimestamp);
+        const ageDisplay = calculateNeuronAge(createdTimestamp, agingSinceTimestamp);
+        
+        // Parse other stats
+        const stakedMaturity = Number(neuron.staked_maturity_e8s_equivalent || 0);
+        const neuronFees = Number(neuron.neuron_fees_e8s || 0);
+        const autoStakeMaturity = neuron.auto_stake_maturity && neuron.auto_stake_maturity.length > 0 ? neuron.auto_stake_maturity[0] : false;
+        
+        // Parse permissions
+        const permissions = (neuron.permissions || []).map((permission: any) => {
+            const principal = permission.principal && permission.principal.length > 0 ? permission.principal[0] : null;
+            const permissionTypes = permission.permission_type || [];
+            
+            // Map permission types to readable names
+            const permissionNames = permissionTypes.map((type: number) => {
+                switch (type) {
+                    case 1: return 'Configure';
+                    case 2: return 'Disburse';
+                    case 3: return 'Vote';
+                    case 4: return 'Submit Proposal';
+                    case 5: return 'Split';
+                    case 6: return 'Merge Maturity';
+                    case 7: return 'Disburse Maturity';
+                    case 8: return 'Stake Maturity';
+                    case 9: return 'Manage Voting Permission';
+                    default: return `Unknown (${type})`;
+                }
+            });
+            
+            return {
+                principal: principal ? principal.toText() : 'Unknown',
+                principalShort: principal ? `${principal.toText().substring(0, 8)}...${principal.toText().slice(-6)}` : 'Unknown',
+                permissionTypes,
+                permissionNames,
+                isCurrentUser: principal ? principal.toText() === userPrincipal.value : false
+            };
+        });
+        
+        // Parse followings
+        const followings = (neuron.followees || []).map((followee: any) => {
+            const functionId = followee[0]; // The function ID (governance function)
+            const followeeList = followee[1]?.followees || [];
+            
+            // Map function IDs to readable names
+            const getFunctionName = (id: number) => {
+                switch (id) {
+                    case 0: return 'All Functions';
+                    case 1: return 'Motion';
+                    case 2: return 'ManageNervousSystemParameters';
+                    case 3: return 'UpgradeRootToVersion';
+                    case 4: return 'ExecuteGenericNervousSystemFunction';
+                    case 5: return 'ManageDappCanisterSettings';
+                    case 6: return 'TransferSnsTreasuryFunds';
+                    case 7: return 'RegisterDappCanisters';
+                    case 8: return 'DeregisterDappCanisters';
+                    default: return `Function ${id}`;
+                }
+            };
+            
+            const followedNeurons = followeeList.map((followedNeuron: any) => {
+                const neuronId = followedNeuron.id;
+                const neuronIdHex = neuronId ? Array.from(neuronId as Uint8Array).map((b: number) => b.toString(16).padStart(2, '0')).join('') : 'Unknown';
+                return {
+                    id: neuronId,
+                    idHex: neuronIdHex,
+                    idShort: neuronIdHex !== 'Unknown' ? `${neuronIdHex.substring(0, 8)}...` : 'Unknown'
+                };
+            });
+            
+            return {
+                functionId,
+                functionName: getFunctionName(functionId),
+                followedNeurons,
+                followedCount: followedNeurons.length
+            };
+        });
+        
+        // Get custom name from cache if available
+        const tacoSnsRoot = Principal.fromText('lacdn-3iaaa-aaaaq-aae3a-cai'); // TACO SNS Root (not governance)
+        const customName = neuronId ? getNeuronDisplayName(tacoSnsRoot, neuronId) : '';
+        
+
+        
+        const displayName = customName || `Neuron ${neuronIdHex.substring(0, 8)}...`;
+
+        return {
+            id: neuronId,
+            idHex: neuronIdHex,
+            stake: neuron.cached_neuron_stake_e8s,
+            maturity: neuron.maturity_e8s_equivalent,
+            stakedMaturity,
+            neuronFees,
+            votingPowerMultiplier: neuron.voting_power_percentage_multiplier,
+            displayName: displayName,
+            isOwner: relationship.isOwner,
+            isHotkey: relationship.isHotkey,
+            relationship: relationship.isOwner ? 'owned' : relationship.isHotkey ? 'hotkeyed' : 'unknown',
+            
+            // Detailed stats for expanded view
+            dissolveState: dissolveInfo,
+            age: ageDisplay,
+            ageSeconds: Math.floor(Date.now() / 1000) - agingSinceTimestamp,
+            createdDate: new Date(createdTimestamp * 1000),
+            autoStakeMaturity,
+            followeesCount: neuron.followees ? neuron.followees.length : 0,
+            permissionsCount: neuron.permissions ? neuron.permissions.length : 0,
+            
+            // Detailed permissions and followings
+            permissions,
+            followings
+        };
+    }
+
+    // Categorize neurons into owned and hotkeyed
+    const categorizeNeurons = (neurons: any[]) => {
+        const formatted = neurons.map(neuron => formatNeuronForDisplay(neuron));
+        
+        return {
+            owned: formatted.filter(neuron => neuron.isOwner),
+            hotkeyed: formatted.filter(neuron => neuron.isHotkey && !neuron.isOwner),
+            all: formatted
+        };
+    }
+
+    // Create rewards actor
+    const createRewardsActor = async () => {
+        const canisterId = rewardsCanisterId()
+        if (!canisterId) {
+            throw new Error('Rewards canister ID not found')
+        }
+
+        const authClient = await AuthClient.create({
+            idleOptions: { disableIdle: true }
+        })
+        const identity = await authClient.getIdentity()
+        const host = process.env.DFX_NETWORK === 'local' ? 'http://localhost:4943' : 'https://ic0.app'
+
+        const agent = await createAgent({
+            identity,
+            host,
+            fetchRootKey: process.env.DFX_NETWORK === 'local',
+        })
+
+        return Actor.createActor(rewardsIDL, {
+            agent,
+            canisterId
+        })
+    }
+
+    // Format neuron ID for map key
+    const formatNeuronIdForMap = (neuronId: Uint8Array): string => {
+        try {
+            return Array.from(neuronId).map(b => b.toString(16).padStart(2, '0')).join('')
+        } catch (error) {
+            return 'unknown'
+        }
+    }
+
+    // Load neuron reward balances
+    const loadNeuronRewardBalances = async (neurons: any[]): Promise<Map<string, number>> => {
+        if (!userLoggedIn.value || neurons.length === 0) {
+            return new Map()
+        }
+
+        try {
+            const rewardsActor = await createRewardsActor()
+            
+            // Extract neuron IDs (Uint8Array format) for the API call with proper validation
+            const neuronIdBlobs: Uint8Array[] = []
+            
+            neurons.forEach(neuron => {
+                // Handle different neuron formats
+                let neuronIdBlob = null
+                
+                // Check if it's a categorized neuron (has id as Uint8Array directly)
+                if (neuron && neuron.id && neuron.id instanceof Uint8Array) {
+                    neuronIdBlob = neuron.id
+                }
+                // Check if it's a raw neuron (has id as array with objects)
+                else if (neuron && neuron.id && Array.isArray(neuron.id) && neuron.id.length > 0) {
+                    const neuronIdObj = neuron.id[0]
+                    if (neuronIdObj && neuronIdObj.id) {
+                        neuronIdBlob = neuronIdObj.id
+                    }
+                }
+                
+                if (!neuronIdBlob) {
+                    console.warn('Invalid neuron structure - no valid ID found:', neuron)
+                    return
+                }
+                
+                // Ensure it's a valid Uint8Array
+                if (!(neuronIdBlob instanceof Uint8Array) && !Array.isArray(neuronIdBlob)) {
+                    console.warn('Invalid neuron ID format (not Uint8Array or Array):', neuronIdBlob)
+                    return
+                }
+                
+                // Convert to Uint8Array if it's a regular array
+                const validBlob = neuronIdBlob instanceof Uint8Array ? neuronIdBlob : new Uint8Array(neuronIdBlob)
+                
+                if (validBlob.length === 0) {
+                    console.warn('Empty neuron ID blob')
+                    return
+                }
+                
+                neuronIdBlobs.push(validBlob)
+            })
+
+            if (neuronIdBlobs.length === 0) {
+                console.warn('No valid neuron IDs found after filtering')
+                return new Map()
+            }
+
+            console.log(`Requesting balances for ${neuronIdBlobs.length} neurons`)
+
+            // Use getNeuronRewardBalances instead of getAllNeuronRewardBalances (admin-only)
+            const balances = await rewardsActor.getNeuronRewardBalances(neuronIdBlobs) as [Uint8Array, bigint][]
+            
+            // Convert to map using hex IDs as keys
+            const neuronBalances = new Map<string, number>()
+            for (const [neuronId, balance] of balances) {
+                const neuronIdHex = formatNeuronIdForMap(neuronId)
+                neuronBalances.set(neuronIdHex, Number(balance))
+            }
+
+            console.log(`Successfully loaded ${neuronBalances.size} neuron balances`)
+            return neuronBalances
+
+        } catch (error) {
+            console.error('Error loading neuron balances:', error)
+            return new Map()
+        }
+    }
+
+    // Claim rewards for specific neurons
+    const claimNeuronRewards = async (neuronIds: Uint8Array[]): Promise<boolean> => {
+        if (!userLoggedIn.value || !userPrincipal.value) {
+            throw new Error('User must be logged in')
+        }
+
+        try {
+            const rewardsActor = await createRewardsActor()
+            
+            // Build ICRC1 Account object using user's principal
+            const account = {
+                owner: Principal.fromText(userPrincipal.value),
+                subaccount: [] // Empty subaccount
+            }
+            
+            // Call withdraw with account and neuron IDs
+            const result = await rewardsActor.withdraw(account, neuronIds) as any
+            
+            if ('Ok' in result) {
+                const transactionId = result.Ok
+                addToast({
+                    id: Date.now(),
+                    code: 'rewards-claimed',
+                    title: 'Rewards Claimed!',
+                    icon: 'fa-solid fa-check',
+                    message: `Successfully claimed rewards! Transaction ID: ${transactionId}`
                 })
-    
-                alarmActor = Actor.createActor(alarmIDL, {
+                return true
+            } else {
+                // Handle ICRC1 transfer errors
+                const error = result.Err
+                let errorMessage = 'Failed to claim rewards'
+                
+                if ('InsufficientFunds' in error) {
+                    errorMessage = `Insufficient funds: Balance is ${error.InsufficientFunds.balance}`
+                } else if ('BadFee' in error) {
+                    errorMessage = `Bad fee: Expected ${error.BadFee.expected_fee}`
+                } else if ('GenericError' in error) {
+                    errorMessage = `Error ${error.GenericError.error_code}: ${error.GenericError.message}`
+                } else {
+                    errorMessage = `Claim failed: ${JSON.stringify(error)}`
+                }
+                
+                addToast({
+                    id: Date.now() + 1,
+                    code: 'rewards-claim-failed',
+                    title: 'Claim Failed',
+                    icon: 'fa-solid fa-exclamation-triangle',
+                    message: errorMessage
+                })
+                return false
+            }
+        } catch (error: any) {
+            console.error('Error claiming rewards:', error)
+            addToast({
+                id: Date.now() + 2,
+                code: 'rewards-claim-error',
+                title: 'Claim Error',
+                icon: 'fa-solid fa-exclamation-triangle',
+                message: 'Failed to claim rewards: ' + error.message
+            })
+            return false
+        }
+    }
+
+    // Claim all available rewards
+    const claimAllNeuronRewards = async (neurons: any[]): Promise<boolean> => {
+        if (!userLoggedIn.value || neurons.length === 0) {
+            return false
+        }
+
+        try {
+            // Get all neuron IDs that have rewards
+            const neuronBalances = await loadNeuronRewardBalances(neurons)
+            const claimableNeuronIds: Uint8Array[] = []
+
+            for (const neuron of neurons) {
+                // Handle both raw and categorized neuron formats
+                let neuronIdBlob = null
+                let neuronIdHex = null
+                
+                if (neuron.id instanceof Uint8Array) {
+                    // Categorized neuron format
+                    neuronIdBlob = neuron.id
+                    neuronIdHex = neuron.idHex || formatNeuronIdForMap(neuron.id)
+                } else if (neuron.id && Array.isArray(neuron.id) && neuron.id.length > 0) {
+                    // Raw neuron format
+                    neuronIdBlob = neuron.id[0].id
+                    neuronIdHex = formatNeuronIdForMap(neuron.id[0].id)
+                }
+                
+                if (neuronIdBlob && neuronIdHex) {
+                    const balance = neuronBalances.get(neuronIdHex) || 0
+                    if (balance > 0) {
+                        claimableNeuronIds.push(neuronIdBlob)
+                    }
+                }
+            }
+
+            if (claimableNeuronIds.length === 0) {
+                addToast({
+                    id: Date.now(),
+                    code: 'no-rewards',
+                    title: 'No Rewards',
+                    icon: 'fa-solid fa-info-circle',
+                    message: 'No rewards available to claim'
+                })
+                return false
+            }
+
+            return await claimNeuronRewards(claimableNeuronIds)
+
+        } catch (error: any) {
+            console.error('Error claiming all rewards:', error)
+            addToast({
+                id: Date.now() + 1,
+                code: 'claim-all-error',
+                title: 'Claim Error',
+                icon: 'fa-solid fa-exclamation-triangle',
+                message: 'Failed to claim all rewards: ' + error.message
+            })
+            return false
+        }
+    }
+
+    // Set dissolve timestamp for a neuron (dissolve period setting)
+    const setDissolveTimestamp = async (neuronId: Uint8Array, dissolveTimestampSeconds: bigint) => {
+        try {
+            if (!userLoggedIn.value) {
+                throw new Error('User must be logged in');
+            }
+
+            console.log('Setting dissolve timestamp for neuron:', {
+                neuronId: Array.from(neuronId).map(b => b.toString(16).padStart(2, '0')).join(''),
+                dissolveTimestamp: dissolveTimestampSeconds.toString(),
+                dissolveDate: new Date(Number(dissolveTimestampSeconds) * 1000)
+            });
+
+            const authClient = await getAuthClient();
+            const identity = authClient.getIdentity();
+            
+            const agent = await createAgent({
+                identity,
+                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            });
+
+            // Create SNS Governance actor
+            const snsGov = await createSnsGovernanceActor(agent, 'lhdfz-wqaaa-aaaaq-aae3q-cai');
+            
+            // Prepare the manage neuron request for SetDissolveTimestamp
+            const manageNeuronRequest = {
+                subaccount: Array.from(neuronId),
+                command: [{
+                    Configure: {
+                        operation: [{
+                            SetDissolveTimestamp: {
+                                dissolve_timestamp_seconds: dissolveTimestampSeconds
+                            }
+                        }]
+                    }
+                }]
+            };
+
+            console.log('SetDissolveTimestamp request:', JSON.stringify(manageNeuronRequest, (key, value) =>
+                typeof value === 'bigint' ? value.toString() : value, 2));
+
+            const result = await snsGov.manage_neuron(manageNeuronRequest) as any;
+            console.log('SetDissolveTimestamp result:', result);
+
+            if (result.command && result.command.length > 0) {
+                const command = result.command[0];
+                if (command.Error) {
+                    throw new Error(`SetDissolveTimestamp failed: ${JSON.stringify(command)}`);
+                }
+                if (command.Configure) {
+                    console.log('Dissolve timestamp set successfully');
+                    return true;
+                }
+            }
+
+            throw new Error('Unexpected response format from manage_neuron');
+        } catch (error: any) {
+            console.error('Error setting dissolve timestamp:', error);
+            throw error;
+        }
+    }
+
+    // Stop dissolving for a neuron
+    const stopDissolving = async (neuronId: Uint8Array) => {
+        try {
+            if (!userLoggedIn.value) {
+                throw new Error('User must be logged in');
+            }
+
+            console.log('Stopping dissolving for neuron:', Array.from(neuronId).map(b => b.toString(16).padStart(2, '0')).join(''));
+
+            const authClient = await getAuthClient();
+            const identity = authClient.getIdentity();
+            
+            const agent = await createAgent({
+                identity,
+                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            });
+
+            // Create SNS Governance actor
+            const snsGov = await createSnsGovernanceActor(agent, 'lhdfz-wqaaa-aaaaq-aae3q-cai');
+            
+            // Prepare the manage neuron request for StopDissolving
+            const manageNeuronRequest = {
+                subaccount: Array.from(neuronId),
+                command: [{
+                    Configure: {
+                        operation: [{
+                            StopDissolving: {}
+                        }]
+                    }
+                }]
+            };
+
+            console.log('StopDissolving request:', JSON.stringify(manageNeuronRequest));
+
+            const result = await snsGov.manage_neuron(manageNeuronRequest) as any;
+            console.log('StopDissolving result:', result);
+
+            if (result.command && result.command.length > 0) {
+                const command = result.command[0];
+                if (command.Error) {
+                    throw new Error(`StopDissolving failed: ${JSON.stringify(command)}`);
+                }
+                if (command.Configure) {
+                    console.log('Dissolving stopped successfully');
+                    return true;
+                }
+            }
+
+            throw new Error('Unexpected response format from manage_neuron');
+        } catch (error: any) {
+            console.error('Error stopping dissolving:', error);
+            throw error;
+        }
+    }
+
+    // Set dissolve period for a neuron (high-level function)
+    const setNeuronDissolveDelay = async (neuronId: Uint8Array, delayMonths: number) => {
+        try {
+            // 1) Read DAO parameters to respect the minimum dissolve delay
+            const authClient = await getAuthClient();
+            const identity = authClient.getIdentity();
+            
+            const agent = await createAgent({
+                identity,
+                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            });
+
+            const snsGov = await createSnsGovernanceActor(agent, 'lhdfz-wqaaa-aaaaq-aae3q-cai');
+            
+            // Get nervous system parameters
+            const params = await snsGov.get_nervous_system_parameters(null) as any;
+            const minToVoteSeconds = params.neuron_minimum_dissolve_delay_to_vote_seconds && 
+                                   params.neuron_minimum_dissolve_delay_to_vote_seconds.length > 0 ? 
+                                   params.neuron_minimum_dissolve_delay_to_vote_seconds[0] : 0n;
+
+            console.log('Minimum dissolve delay to vote:', minToVoteSeconds.toString(), 'seconds');
+
+            // 2) Calculate target dissolve delay
+            const desiredSeconds = BigInt(delayMonths * 30 * 24 * 60 * 60); // approx months→seconds
+            const targetDelay = desiredSeconds > minToVoteSeconds ? desiredSeconds : minToVoteSeconds;
+            
+            console.log('Target dissolve delay:', targetDelay.toString(), 'seconds');
+
+            // 3) Set dissolve timestamp = now + targetDelay
+            const nowSeconds = BigInt(Math.floor(Date.now() / 1000));
+            const dissolveTimestamp = nowSeconds + targetDelay;
+
+            await setDissolveTimestamp(neuronId, dissolveTimestamp);
+
+            // Note: No need to call stopDissolving - setting a future dissolve timestamp
+            // automatically puts the neuron in a locked state that accrues age bonuses
+
+            return {
+                targetDelaySeconds: targetDelay,
+                dissolveTimestamp,
+                delayMonths
+            };
+        } catch (error: any) {
+            console.error('Error setting neuron dissolve delay:', error);
+            throw error;
+        }
+    }
+
+    // Generate neuron subaccount using the correct SNS formula
+    // SHA256(0x0c, "neuron-stake", principal-bytes, nonce-u64-be)
+    const generateNeuronSubaccount = async (controller: Principal, nonce: bigint): Promise<Uint8Array> => {
+        // u64 → big-endian 8 bytes using DataView (more reliable)
+        const u64be = (value: bigint): Uint8Array => {
+            const buffer = new ArrayBuffer(8);
+            new DataView(buffer).setBigUint64(0, value);
+            return new Uint8Array(buffer);
+        };
+
+        // Build the data to hash
+        const chunks = [
+            Uint8Array.from([0x0c]),                                    // len("neuron-stake")
+            new TextEncoder().encode("neuron-stake"),                   // "neuron-stake"
+            controller.toUint8Array(),                                  // controller principal bytes
+            u64be(nonce),                                               // nonce as u64 big-endian
+        ];
+        
+        // Concatenate all chunks
+        const totalLength = chunks.reduce((sum, chunk) => sum + chunk.length, 0);
+        const data = new Uint8Array(totalLength);
+        let offset = 0;
+        for (const chunk of chunks) {
+            data.set(chunk, offset);
+            offset += chunk.length;
+        }
+        
+        // Hash with SHA-256
+        const digest = await crypto.subtle.digest("SHA-256", data);
+        return new Uint8Array(digest);
+    }
+
+    // Find next available subaccount for neuron creation
+    const findFreeSubaccount = async (): Promise<{ subaccount: Uint8Array, index: number }> => {
+        if (!userLoggedIn.value) {
+            throw new Error('User must be logged in');
+        }
+
+        const authClient = await getAuthClient();
+        const identity = authClient.getIdentity();
+        
+        const agent = await createAgent({
+            identity,
+            host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+            fetchRootKey: process.env.DFX_NETWORK === "local",
+        });
+
+        // Use the existing SNS governance IDL
+        const { idlFactory } = await import('../../../declarations/sns_governance');
+        
+        const governanceActor = Actor.createActor(idlFactory, {
+            agent,
+            canisterId: 'lhdfz-wqaaa-aaaaq-aae3q-cai'
+        });
+
+        // Try nonces starting from 0
+        for (let nonce = 0n; nonce < 1000n; nonce++) {  // Reasonable upper limit
+            const controllerPrincipal = Principal.fromText(userPrincipal.value);
+            const subaccount = await generateNeuronSubaccount(controllerPrincipal, nonce);
+            
+            try {
+                // Try to get neuron with this subaccount
+                const getNeuronRequest = {
+                    neuron_id: [{
+                        id: Array.from(subaccount)
+                    }]
+                };
+                
+                const result = await governanceActor.get_neuron(getNeuronRequest) as any;
+                
+                // If result.result is empty/null, this subaccount is free
+                if (!result.result || result.result.length === 0) {
+                    return { subaccount, index: Number(nonce) };
+                }
+                
+                // If we get an error or the neuron doesn't exist, this subaccount is free
+                if (result.result[0] && 'Error' in result.result[0]) {
+                    return { subaccount, index: Number(nonce) };
+                }
+                
+            } catch (error) {
+                // If there's an error calling get_neuron, assume this subaccount is free
+                console.log(`Nonce ${nonce} appears to be free (error calling get_neuron):`, error);
+                return { subaccount, index: Number(nonce) };
+            }
+        }
+        
+        throw new Error('Could not find a free subaccount for neuron creation');
+    }
+
+    // Create a new neuron
+    const createNeuron = async (amount: bigint) => {
+        try {
+            if (!userLoggedIn.value) {
+                throw new Error('User must be logged in');
+            }
+
+            console.log('Finding free subaccount for new neuron...');
+            const { subaccount, index } = await findFreeSubaccount();
+            const nonce = BigInt(index);
+            
+            const tacoTokenPrincipal = 'kknbx-zyaaa-aaaaq-aae4a-cai'; // TACO token canister
+            const snsGovernancePrincipal = 'lhdfz-wqaaa-aaaaq-aae3q-cai'; // TACO SNS Governance
+
+            // Step 1: Transfer TACO tokens to SNS Governance with the new subaccount and memo
+            console.log(`Transferring TACO tokens to new neuron subaccount (nonce: ${nonce})...`);
+            console.log(`Subaccount (hex): ${Array.from(subaccount).map(b => b.toString(16).padStart(2, '0')).join('')}`);
+            console.log(`Controller principal: ${userPrincipal.value}`);
+            
+            const transferResult = await transferToNeuronSubaccount(tacoTokenPrincipal, snsGovernancePrincipal, subaccount, amount, nonce);
+            console.log(`Transfer completed with block index: ${transferResult}`);
+
+            // Step 2: Wait a moment for the transfer to be processed
+            console.log('Waiting for transfer to be processed...');
+            await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds
+
+            // Step 3: Claim/refresh the neuron to create it
+            console.log('Claiming new neuron...');
+            await claimOrRefreshNeuron(subaccount, nonce);
+
+            console.log('Neuron created successfully!');
+            return { subaccount, success: true };
+        } catch (error: any) {
+            console.error('Error creating neuron:', error);
+            throw error;
+        }
+    }
+
+    // Stake TACO tokens to a neuron
+    const stakeToNeuron = async (neuronId: Uint8Array, amount: bigint) => {
+        try {
+            if (!userLoggedIn.value) {
+                throw new Error('User must be logged in');
+            }
+
+            const tacoTokenPrincipal = 'kknbx-zyaaa-aaaaq-aae4a-cai'; // TACO token canister
+            const snsGovernancePrincipal = 'lhdfz-wqaaa-aaaaq-aae3q-cai'; // TACO SNS Governance
+
+            // Step 1: Transfer TACO tokens to SNS Governance with neuron ID as subaccount
+            console.log('Transferring TACO tokens to neuron subaccount...');
+            await transferToNeuronSubaccount(tacoTokenPrincipal, snsGovernancePrincipal, neuronId, amount);
+
+            // Step 2: Claim/refresh the neuron to recognize the new stake
+            console.log('Claiming/refreshing neuron...');
+            await claimOrRefreshNeuron(neuronId);
+
+            console.log('Staking completed successfully!');
+            return true;
+        } catch (error: any) {
+            console.error('Error staking to neuron:', error);
+            throw error;
+        }
+    }
+
+    // Transfer tokens to neuron subaccount
+    const transferToNeuronSubaccount = async (
+        tokenPrincipal: string,
+        governancePrincipal: string,
+        neuronId: Uint8Array,
+        amount: bigint,
+        memo?: bigint  // Optional memo for neuron creation traceability
+    ) => {
+        const authClient = await getAuthClient();
+        const identity = authClient.getIdentity();
+        
+        const agent = await createAgent({
+            identity,
+            host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+            fetchRootKey: process.env.DFX_NETWORK === "local",
+        });
+
+        // Create ICRC1 actor for TACO token
+        const icrc1IDL = ({ IDL }: any) => {
+            return IDL.Service({
+                'icrc1_transfer': IDL.Func(
+                    [IDL.Record({
+                        'to': IDL.Record({ 'owner': IDL.Principal, 'subaccount': IDL.Opt(IDL.Vec(IDL.Nat8)) }),
+                        'fee': IDL.Opt(IDL.Nat),
+                        'memo': IDL.Opt(IDL.Vec(IDL.Nat8)),
+                        'from_subaccount': IDL.Opt(IDL.Vec(IDL.Nat8)),
+                        'created_at_time': IDL.Opt(IDL.Nat64),
+                        'amount': IDL.Nat
+                    })],
+                    [IDL.Variant({
+                        'Ok': IDL.Nat,
+                        'Err': IDL.Record({
+                            'InsufficientFunds': IDL.Record({ 'balance': IDL.Nat }),
+                            'BadFee': IDL.Record({ 'expected_fee': IDL.Nat }),
+                            'TemporarilyUnavailable': IDL.Null,
+                            'GenericError': IDL.Record({ 'message': IDL.Text, 'error_code': IDL.Nat }),
+                            'TooOld': IDL.Null,
+                            'CreatedInFuture': IDL.Record({ 'ledger_time': IDL.Nat64 }),
+                            'Duplicate': IDL.Record({ 'duplicate_of': IDL.Nat }),
+                            'BadBurn': IDL.Record({ 'min_burn_amount': IDL.Nat })
+                        })
+                    })]
+                )
+            });
+        };
+
+        const tokenActor = Actor.createActor(icrc1IDL, {
+            agent,
+            canisterId: tokenPrincipal
+        });
+
+        // Convert neuronId to proper subaccount (32 bytes)
+        const subaccount = new Uint8Array(32);
+        subaccount.set(neuronId, 0);
+
+        // Convert memo to bytes if provided
+        const memoBytes = memo ? (() => {
+            const buffer = new ArrayBuffer(8);
+            new DataView(buffer).setBigUint64(0, memo);
+            return Array.from(new Uint8Array(buffer));
+        })() : [];
+
+        const transferArgs = {
+            to: {
+                owner: Principal.fromText(governancePrincipal),
+                subaccount: [Array.from(subaccount)]
+            },
+            fee: [],
+            memo: memo ? [memoBytes] : [],
+            from_subaccount: [],
+            created_at_time: [],
+            amount: amount
+        };
+
+        const result = await tokenActor.icrc1_transfer(transferArgs) as any;
+
+        if ('Ok' in result) {
+            return result.Ok;
+        } else {
+            throw new Error(`Transfer failed: ${JSON.stringify(result.Err)}`);
+        }
+    }
+
+    // Claim or refresh neuron after staking
+    const claimOrRefreshNeuron = async (neuronId: Uint8Array, memo?: bigint) => {
+        const authClient = await getAuthClient();
+        const identity = authClient.getIdentity();
+        
+        const agent = await createAgent({
+            identity,
+            host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+            fetchRootKey: process.env.DFX_NETWORK === "local",
+        });
+
+        // Use the existing SNS governance IDL
+        const { idlFactory } = await import('../../../declarations/sns_governance');
+        
+        const governanceActor = Actor.createActor(idlFactory, {
+            agent,
+            canisterId: 'lhdfz-wqaaa-aaaaq-aae3q-cai'
+        });
+
+        // Convert neuronId to proper subaccount (32 bytes)
+        const subaccount = new Uint8Array(32);
+        subaccount.set(neuronId, 0);
+
+        // Debug logging
+        console.log(`ClaimOrRefresh request details:`);
+        console.log(`- Subaccount: ${Array.from(subaccount).map(b => b.toString(16).padStart(2, '0')).join('')}`);
+        console.log(`- Memo: ${memo}`);
+        console.log(`- Controller: ${userPrincipal.value}`);
+
+        // For neuron creation, we need to use MemoAndController variant
+        const manageNeuronRequest = memo !== undefined ? {
+            subaccount: Array.from(subaccount),
+            command: [{
+                ClaimOrRefresh: {
+                    by: [{
+                        MemoAndController: {
+                            controller: [Principal.fromText(userPrincipal.value)],
+                            memo: Number(memo)  // Convert BigInt to Number for IDL
+                        }
+                    }]
+                }
+            }]
+        } : {
+            // For existing neurons, use NeuronId variant
+            subaccount: Array.from(subaccount),
+            command: [{
+                ClaimOrRefresh: {
+                    by: [{
+                        NeuronId: {}
+                    }]
+                }
+            }]
+        };
+
+        // Convert BigInt to string for logging
+        const requestForLogging = JSON.parse(JSON.stringify(manageNeuronRequest, (key, value) =>
+            typeof value === 'bigint' ? value.toString() : value
+        ));
+        console.log('ManageNeuron request:', JSON.stringify(requestForLogging, null, 2));
+
+        const result = await governanceActor.manage_neuron(manageNeuronRequest) as any;
+        
+        if (result.command && result.command.length > 0 && 'ClaimOrRefresh' in result.command[0]) {
+            return result.command[0].ClaimOrRefresh;
+        } else {
+            throw new Error(`ClaimOrRefresh failed: ${JSON.stringify(result)}`);
+        }
+    }
+
+    // Wallet methods
+    const registerUserToken = async (tokenPrincipal: string) => {
+        try {
+            if (!userLoggedIn.value) {
+                throw new Error('User must be logged in to register tokens');
+            }
+
+            const authClient = await getAuthClient();
+            const identity = authClient.getIdentity();
+            
+            const agent = await createAgent({
+                identity,
+                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            });
+
+            const daoActor = Actor.createActor(daoBackendIDL, {
+                agent,
+                canisterId: daoBackendCanisterId()
+            });
+
+            const result = await daoActor.registerUserToken(Principal.fromText(tokenPrincipal)) as { ok?: string; err?: any };
+            
+            if ('ok' in result) {
+                return (result as any).ok;
+            } else {
+                throw new Error(JSON.stringify((result as any).err));
+            }
+        } catch (error: any) {
+            console.error('Error registering token:', error);
+            throw error;
+        }
+    }
+
+    const unregisterUserToken = async (tokenPrincipal: string) => {
+        try {
+            if (!userLoggedIn.value) {
+                throw new Error('User must be logged in to unregister tokens');
+            }
+
+            const authClient = await getAuthClient();
+            const identity = authClient.getIdentity();
+            
+            const agent = await createAgent({
+                identity,
+                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            });
+
+            const daoActor = Actor.createActor(daoBackendIDL, {
+                agent,
+                canisterId: daoBackendCanisterId()
+            });
+
+            const result = await daoActor.unregisterUserToken(Principal.fromText(tokenPrincipal)) as { ok?: string; err?: any };
+            
+            if ('ok' in result) {
+                return (result as any).ok;
+            } else {
+                throw new Error(JSON.stringify((result as any).err));
+            }
+        } catch (error: any) {
+            console.error('Error unregistering token:', error);
+            throw error;
+        }
+    }
+
+    const getUserRegisteredTokens = async (): Promise<Principal[]> => {
+        try {
+            if (!userLoggedIn.value) {
+                return [];
+            }
+
+            const authClient = await getAuthClient();
+            const identity = authClient.getIdentity();
+            
+            const agent = await createAgent({
+                identity,
+                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            });
+
+            const daoActor = Actor.createActor(daoBackendIDL, {
+                agent,
+                canisterId: daoBackendCanisterId()
+            });
+
+            return await daoActor.getUserRegisteredTokens() as Principal[];
+        } catch (error: any) {
+            console.error('Error fetching user registered tokens:', error);
+            return [];
+        }
+    }
+
+    const fetchUserTokenBalance = async (tokenPrincipal: string, decimals: number): Promise<bigint> => {
+        try {
+            if (!userLoggedIn.value) {
+                return 0n;
+            }
+
+            const authClient = await getAuthClient();
+            const identity = authClient.getIdentity();
+            
+            const agent = await createAgent({
+                identity,
+                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            });
+
+            // Handle ICP differently
+            if (tokenPrincipal === 'ryjl3-tyaaa-aaaaa-aaaba-cai') {
+                const ledgerActor = Actor.createActor(idlFactory, {
                     agent,
-                    canisterId: alarmCanisterId(),
-                }) as AlarmCanisterActor
+                    canisterId: tokenPrincipal
+                });
+                
+                const accountId = AccountIdentifier.fromPrincipal({
+                    principal: Principal.fromText(userPrincipal.value)
+                });
+                const result = await ledgerActor.account_balance({ account: accountId.toUint8Array() });
+                return (result as any).e8s;
+            } else {
+                // ICRC1 token - use generic interface
+                const icrc1IDL = ({ IDL }: any) => {
+                    return IDL.Service({
+                        'icrc1_balance_of': IDL.Func(
+                            [IDL.Record({ 'owner': IDL.Principal, 'subaccount': IDL.Opt(IDL.Vec(IDL.Nat8)) })],
+                            [IDL.Nat],
+                            ['query']
+                        ),
+                    });
+                };
+
+                const tokenActor = Actor.createActor(icrc1IDL, {
+                    agent,
+                    canisterId: tokenPrincipal
+                });
+                
+                return await tokenActor.icrc1_balance_of({
+                    owner: Principal.fromText(userPrincipal.value),
+                    subaccount: []
+                }) as bigint;
+            }
+        } catch (error: any) {
+            console.error(`Error fetching balance for token ${tokenPrincipal}:`, error);
+            return 0n;
+        }
+    }
+
+    const sendToken = async (
+        tokenPrincipal: string,
+        recipient: string,
+        amount: bigint,
+        fee: bigint,
+        memo?: string
+    ) => {
+        try {
+            if (!userLoggedIn.value) {
+                throw new Error('User must be logged in to send tokens');
+            }
+
+            const authClient = await getAuthClient();
+            const identity = authClient.getIdentity();
+            
+            const agent = await createAgent({
+                identity,
+                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            });
+
+            // Handle ICP differently
+            if (tokenPrincipal === 'ryjl3-tyaaa-aaaaa-aaaba-cai') {
+                const ledgerActor = Actor.createActor(idlFactory, {
+                    agent,
+                    canisterId: tokenPrincipal
+                });
+
+                const result = await ledgerActor.transfer({
+                    to: AccountIdentifier.fromHex(recipient).toUint8Array(),
+                    fee: { e8s: fee },
+                    memo: memo ? BigInt(memo.charCodeAt(0)) : 0n,
+                    from_subaccount: [],
+                    created_at_time: [],
+                    amount: { e8s: amount }
+                }) as { Ok?: any; Err?: any };
+
+                if ('Ok' in result) {
+                    return (result as any).Ok;
+                } else {
+                    throw new Error(JSON.stringify((result as any).Err));
+                }
+            } else {
+                // ICRC1 token
+                const icrc1IDL = ({ IDL }: any) => {
+                    return IDL.Service({
+                        'icrc1_transfer': IDL.Func(
+                            [IDL.Record({
+                                'to': IDL.Record({ 'owner': IDL.Principal, 'subaccount': IDL.Opt(IDL.Vec(IDL.Nat8)) }),
+                                'fee': IDL.Opt(IDL.Nat),
+                                'memo': IDL.Opt(IDL.Vec(IDL.Nat8)),
+                                'from_subaccount': IDL.Opt(IDL.Vec(IDL.Nat8)),
+                                'created_at_time': IDL.Opt(IDL.Nat64),
+                                'amount': IDL.Nat,
+                            })],
+                            [IDL.Variant({ 'Ok': IDL.Nat, 'Err': IDL.Text })],
+                            []
+                        ),
+                    });
+                };
+
+                const tokenActor = Actor.createActor(icrc1IDL, {
+                    agent,
+                    canisterId: tokenPrincipal
+                });
+
+                const result = await tokenActor.icrc1_transfer({
+                    to: {
+                        owner: Principal.fromText(recipient),
+                        subaccount: []
+                    },
+                    fee: [fee],
+                    memo: memo ? [new TextEncoder().encode(memo)] : [],
+                    from_subaccount: [],
+                    created_at_time: [],
+                    amount: amount
+                }) as { Ok?: any; Err?: any };
+
+                if ('Ok' in result) {
+                    return (result as any).Ok;
+                } else {
+                    throw new Error(JSON.stringify((result as any).Err));
+                }
+            }
+        } catch (error: any) {
+            console.error('Error sending token:', error);
+            throw error;
+        }
+    }
+
+    // Token metadata cache (stored in localStorage)
+    const TOKEN_METADATA_CACHE_KEY = 'taco_token_metadata_cache';
+    const CACHE_EXPIRY_MS = 24 * 60 * 60 * 1000; // 24 hours
+
+    const getCachedTokenMetadata = (tokenPrincipal: string): any => {
+        try {
+            const cached = localStorage.getItem(TOKEN_METADATA_CACHE_KEY);
+            if (!cached) return null;
+            
+            const cache = JSON.parse(cached);
+            const tokenCache = cache[tokenPrincipal];
+            
+            if (!tokenCache) return null;
+            
+            // Check if cache is expired
+            if (Date.now() - tokenCache.timestamp > CACHE_EXPIRY_MS) {
+                return null;
+            }
+            
+            // Convert fee string back to BigInt
+            const metadata = {
+                ...tokenCache.metadata,
+                fee: tokenCache.metadata.fee ? BigInt(tokenCache.metadata.fee) : 10000n
+            };
+            
+            return metadata;
+        } catch (error) {
+            console.error('Error reading token metadata cache:', error);
+            return null;
+        }
+    };
+
+    const setCachedTokenMetadata = (tokenPrincipal: string, metadata: any) => {
+        try {
+            const cached = localStorage.getItem(TOKEN_METADATA_CACHE_KEY);
+            const cache = cached ? JSON.parse(cached) : {};
+            
+            // Convert BigInt to string for JSON serialization
+            const serializableMetadata = {
+                ...metadata,
+                fee: metadata.fee ? metadata.fee.toString() : '10000'
+            };
+            
+            cache[tokenPrincipal] = {
+                metadata: serializableMetadata,
+                timestamp: Date.now()
+            };
+            
+            localStorage.setItem(TOKEN_METADATA_CACHE_KEY, JSON.stringify(cache));
+        } catch (error) {
+            console.error('Error caching token metadata:', error);
+        }
+    };
+
+    const clearTokenMetadataCache = (tokenPrincipal?: string) => {
+        try {
+            if (tokenPrincipal) {
+                // Clear cache for specific token
+                const cached = localStorage.getItem(TOKEN_METADATA_CACHE_KEY);
+                if (cached) {
+                    const cache = JSON.parse(cached);
+                    delete cache[tokenPrincipal];
+                    localStorage.setItem(TOKEN_METADATA_CACHE_KEY, JSON.stringify(cache));
+                }
+            } else {
+                // Clear all cache
+                localStorage.removeItem(TOKEN_METADATA_CACHE_KEY);
             }
         } catch (error) {
-            console.error('Error initializing alarm actor:', error)
+            console.error('Error clearing token metadata cache:', error);
         }
+    };
+
+    const fetchTokenMetadata = async (tokenPrincipal: string): Promise<any> => {
+        // Check cache first
+        const cached = getCachedTokenMetadata(tokenPrincipal);
+        if (cached) {
+            return cached;
+        }
+
+        try {
+            // Create a basic ICRC1 token actor using existing patterns
+            const icrc1IDL = ({ IDL }: any) => {
+                const MetadataValue = IDL.Variant({
+                    'Nat': IDL.Nat,
+                    'Int': IDL.Int,
+                    'Text': IDL.Text,
+                    'Blob': IDL.Vec(IDL.Nat8),
+                });
+                const SupportedStandard = IDL.Record({
+                    'name': IDL.Text,
+                    'url': IDL.Text,
+                });
+                return IDL.Service({
+                    'icrc1_metadata': IDL.Func([], [IDL.Vec(IDL.Tuple(IDL.Text, MetadataValue))], ['query']),
+                    'icrc1_name': IDL.Func([], [IDL.Text], ['query']),
+                    'icrc1_symbol': IDL.Func([], [IDL.Text], ['query']),
+                    'icrc1_decimals': IDL.Func([], [IDL.Nat8], ['query']),
+                    'icrc1_fee': IDL.Func([], [IDL.Nat], ['query']),
+                    'icrc1_supported_standards': IDL.Func([], [IDL.Vec(SupportedStandard)], ['query']),
+                });
+            };
+
+            // Create agent
+            const host = process.env.DFX_NETWORK === "local"
+                ? getLocalHost()
+                : "https://ic0.app";
+                
+            const authClientInst = await getAuthClient();
+            const agent = await createAgent({
+                identity: new AnonymousIdentity(), // Use anonymous for metadata queries
+                host,
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            });
+
+            const tokenActor = Actor.createActor(icrc1IDL, {
+                agent,
+                canisterId: tokenPrincipal,
+            });
+
+            // Try to fetch individual ICRC1 properties (more reliable than metadata)
+            const [name, symbol, decimals, fee, metadataResult, supportedStandardsResult] = await Promise.allSettled([
+                (tokenActor as any).icrc1_name(),
+                (tokenActor as any).icrc1_symbol(), 
+                (tokenActor as any).icrc1_decimals(),
+                (tokenActor as any).icrc1_fee(),
+                (tokenActor as any).icrc1_metadata(),
+                (tokenActor as any).icrc1_supported_standards()
+            ]);
+
+            // Try to extract logo from metadata
+            let logo = null;
+            if (metadataResult.status === 'fulfilled' && Array.isArray(metadataResult.value)) {
+                const logoEntry = metadataResult.value.find(([key, _]: [string, any]) => key === 'icrc1:logo');
+                if (logoEntry && logoEntry[1] && 'Text' in logoEntry[1]) {
+                    logo = logoEntry[1].Text;
+                }
+            }
+
+            // Extract supported standards
+            let supportedStandards: string[] = ['ICRC-1']; // Always includes ICRC-1
+            if (supportedStandardsResult.status === 'fulfilled' && Array.isArray(supportedStandardsResult.value)) {
+                supportedStandards = supportedStandardsResult.value.map((standard: any) => standard.name);
+            }
+
+            const metadata = {
+                name: name.status === 'fulfilled' ? name.value : `Token ${tokenPrincipal.slice(0, 5)}...`,
+                symbol: symbol.status === 'fulfilled' ? symbol.value : 'CUSTOM',
+                decimals: decimals.status === 'fulfilled' ? Number(decimals.value) : 8,
+                fee: fee.status === 'fulfilled' ? fee.value : 10000n,
+                logo: logo,
+                supportedStandards: supportedStandards
+            };
+
+            console.log(`Fetched real metadata for ${tokenPrincipal}:`, metadata);
+
+            // Cache the metadata
+            setCachedTokenMetadata(tokenPrincipal, metadata);
+            
+            return metadata;
+        } catch (error) {
+            console.error('Error fetching token metadata:', error);
+            // Return default metadata if fetch fails
+            return {
+                name: `Custom Token (${tokenPrincipal.slice(0, 5)}...)`,
+                symbol: 'CUSTOM',
+                decimals: 8,
+                fee: 10000n,
+                logo: null,
+                supportedStandards: ['ICRC-1'] // Default to ICRC-1 only
+            };
+        }
+    };
+
+    // Check if token supports ICRC2 standard
+    const checkTokenSupportsICRC1 = async (tokenPrincipal: string): Promise<boolean> => {
+        try {
+            const metadata = await fetchTokenMetadata(tokenPrincipal);
+            return metadata.supportedStandards.some((standard: string) => 
+                standard.toLowerCase().includes('icrc-2') || standard.toLowerCase().includes('icrc2')
+            );
+        } catch (error) {
+            console.error('Error checking ICRC2 support:', error);
+            return false; // Default to ICRC1 if check fails
+        }
+    };
+
+    // Check if token supports ICRC2 standard
+    const checkTokenSupportsICRC2 = async (tokenPrincipal: string): Promise<boolean> => {
+        try {
+            const metadata = await fetchTokenMetadata(tokenPrincipal);
+            return metadata.supportedStandards.some((standard: string) => 
+                standard.toLowerCase().includes('icrc-2') || standard.toLowerCase().includes('icrc2')
+            );
+        } catch (error) {
+            console.error('Error checking ICRC2 support:', error);
+            return false; // Default to ICRC1 if check fails
+        }
+    };
+
+        // # ALARM MANAGEMENT FUNCTIONS #
+
+    // Helper function to create alarm actor
+    const createAlarmActor = async (useAuth: boolean = true) => {
+        try {
+
+
+            let identity;
+            
+            if (useAuth) {
+                const authClient = await getAuthClient();
+                identity = authClient.getIdentity();
+                userLoggedIn.value = true;
+            } else {
+                identity = new AnonymousIdentity();
+            }
+        if (!userLoggedIn.value) {
+                throw new Error('User must be logged in');
+            }
+
+            const agent = await createAgent({
+                identity,
+                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            });
+
+            return Actor.createActor<AlarmService>(alarmIDL, {
+                agent,
+                canisterId: alarmCanisterId()
+            });
+        } catch (error) {
+            console.error('Error creating alarm actor:', error);
+            throw error;
+        }
+    }
+
+    const performSystemHealthCheck = async () => {
+        try {
+            const actor = await createAlarmActor();
+            const result = await actor.performSystemHealthCheckManual();
+            
+            if ('err' in result) {
+                throw new Error(JSON.stringify(result.err));
+            }
+            
+            showSuccess('System health check completed successfully');
+            return result.ok;
+        } catch (error) {
+            console.error('Error performing system health check:', error);
+            showError(`Error performing system health check: ${error instanceof Error ? error.message : String(error)}`);
+            throw error;
+        }
+    }
+
+    const getEnhancedAlarmSystemStatus = async () => {
+        try {
+            const actor = await createAlarmActor();
+            const result = await actor.getEnhancedAlarmSystemStatus();
+            
+            if ('err' in result) {
+                throw new Error(JSON.stringify(result.err));
+            }
+            
+            return result.ok;
+        } catch (error) {
+            console.error('Error getting enhanced alarm system status:', error);
+            showError(`Error getting alarm system status: ${error instanceof Error ? error.message : String(error)}`);
+            throw error;
+        }
+    }
+
+    const getMonitoringStatus = async () => {
+        try {
+            const actor = await createAlarmActor();
+            const result = await actor.getMonitoringStatus();
+            
+            if ('err' in result) {
+                throw new Error(JSON.stringify(result.err));
+            }
+            
+            return result.ok;
+        } catch (error) {
+            console.error('Error getting monitoring status:', error);
+            showError(`Error getting monitoring status: ${error instanceof Error ? error.message : String(error)}`);
+            throw error;
+        }
+    }
+
+    const addAlarmAdmin = async (principalId: string) => {
+        try {
+            const actor = await createAlarmActor();
+            const result = await actor.addAdmin(Principal.fromText(principalId),[{ Admin: null }]);
+            
+            if ('err' in result) {
+                throw new Error(JSON.stringify(result.err));
+            }
+            
+            showSuccess('Admin added successfully');
+            return result.ok;
+        } catch (error) {
+            console.error('Error adding alarm admin:', error);
+            showError(`Error adding admin: ${error instanceof Error ? error.message : String(error)}`);
+            throw error;
+        }
+    }
+
+    const addAlarmContact = async (name: string, type: string, value: string) => {
+        try {
+            const actor = await createAlarmActor();
+            const contactType = type === 'SMS' ? { SMS: value } : { Email: value };
+            const result = await actor.addContact(name,contactType);
+            
+            if ('err' in result) {
+                throw new Error(JSON.stringify(result.err));
+            }
+            
+            showSuccess('Contact added successfully');
+            return result.ok;
+        } catch (error) {
+            console.error('Error adding alarm contact:', error);
+            showError(`Error adding contact: ${error instanceof Error ? error.message : String(error)}`);
+            throw error;
+        }
+    }
+
+    const getAlarmContacts = async () => {
+        try {
+            const actor = await createAlarmActor();
+            const result = await actor.getContacts();
+            
+            if ('err' in result) {
+                throw new Error(JSON.stringify(result.err));
+            }
+            
+            return result.ok;
+        } catch (error) {
+            console.error('Error getting alarm contacts:', error);
+            showError(`Error getting contacts: ${error instanceof Error ? error.message : String(error)}`);
+            throw error;
+        }
+    }
+
+    const updateContactStatus = async (contactId: number, active: boolean) => {
+        try {
+            const actor = await createAlarmActor();
+            const result = await actor.updateContactStatus(BigInt(contactId), active);
+            
+            if ('err' in result) {
+                throw new Error(JSON.stringify(result.err));
+            }
+            
+            showSuccess(`Contact ${active ? 'activated' : 'deactivated'} successfully`);
+            return result.ok;
+        } catch (error) {
+            console.error('Error updating contact status:', error);
+            showError(`Error updating contact status: ${error instanceof Error ? error.message : String(error)}`);
+            throw error;
+        }
+    }
+
+    const removeAlarmContact = async (contactId: number) => {
+        try {
+            const actor = await createAlarmActor();
+            const result = await actor.removeContact(BigInt(contactId));
+            
+            if ('err' in result) {
+                throw new Error(JSON.stringify(result.err));
+            }
+            
+            showSuccess('Contact removed successfully');
+            return result.ok;
+        } catch (error) {
+            console.error('Error removing alarm contact:', error);
+            showError(`Error removing contact: ${error instanceof Error ? error.message : String(error)}`);
+            throw error;
+        }
+    }
+
+    const testAlarmContact = async (contactIds: number[], options?: { email?: boolean; sms?: boolean }) => {
+        try {
+            const actor = await createAlarmActor();
+            const bigIntContactIds = contactIds.map(id => BigInt(id));
+            
+            const results: { sms?: any; email?: any } = {};
+            
+            // Default to both if no options specified
+            const shouldSendSMS = options?.sms !== false;
+            const shouldSendEmail = options?.email !== false;
+            
+            if (shouldSendSMS) {
+                const smsResult = await actor.sendTestSMS(bigIntContactIds);
+                if ('err' in smsResult) {
+                    throw new Error(`SMS test error: ${JSON.stringify(smsResult.err)}`);
+                }
+                results.sms = smsResult.ok;
+            }
+            
+            if (shouldSendEmail) {
+                const emailResult = await actor.sendTestEmail(bigIntContactIds);
+                if ('err' in emailResult) {
+                    throw new Error(`Email test error: ${JSON.stringify(emailResult.err)}`);
+                }
+                results.email = emailResult.ok;
+            }
+            
+            const messageTypes = [];
+            if (shouldSendSMS) messageTypes.push('SMS');
+            if (shouldSendEmail) messageTypes.push('Email');
+            
+            showSuccess(`Test ${messageTypes.join(' and ')} sent successfully`);
+            return results;
+        } catch (error) {
+            console.error('Error testing alarm contact:', error);
+            showError(`Error testing contact: ${error instanceof Error ? error.message : String(error)}`);
+            throw error;
+        }
+    }
+
+    const getPendingAlarms = async () => {
+        try {
+            const actor = await createAlarmActor();
+            const result = await actor.getPendingAlarms();
+            
+            if ('err' in result) {
+                throw new Error(JSON.stringify(result.err));
+            }
+            
+            return result.ok;
+        } catch (error) {
+            console.error('Error getting pending alarms:', error);
+            showError(`Error getting pending alarms: ${error instanceof Error ? error.message : String(error)}`);
+            throw error;
+        }
+    }
+
+    const acknowledgeAlarm = async (alarmId: number) => {
+        try {
+            const actor = await createAlarmActor();
+            const result = await actor.acknowledgeAlarm(BigInt(alarmId));
+            
+            if ('err' in result) {
+                throw new Error(JSON.stringify(result.err));
+            }
+            
+            showSuccess('Alarm acknowledged successfully');
+            return result.ok;
+        } catch (error) {
+            console.error('Error acknowledging alarm:', error);
+            showError(`Error acknowledging alarm: ${error instanceof Error ? error.message : String(error)}`);
+            throw error;
+        }
+    }
+
+    const getSystemErrors = async (limit?: number) => {
+        try {
+            const actor = await createAlarmActor();
+            const result = await actor.getSystemErrors(limit ? [BigInt(limit)] : []);
+            
+            if ('err' in result) {
+                throw new Error(JSON.stringify(result.err));
+            }
+            
+            return result.ok;
+        } catch (error) {
+            console.error('Error getting system errors:', error);
+            showError(`Error getting system errors: ${error instanceof Error ? error.message : String(error)}`);
+            throw error;
+        }
+    }
+
+    const resolveSystemError = async (errorId: number) => {
+        try {
+            const actor = await createAlarmActor();
+            const result = await actor.resolveSystemErrorById(BigInt(errorId));
+            
+            if ('err' in result) {
+                throw new Error(JSON.stringify(result.err));
+            }
+            
+            showSuccess('System error resolved successfully');
+            return result.ok;
+        } catch (error) {
+            console.error('Error resolving system error:', error);
+            showError(`Error resolving system error: ${error instanceof Error ? error.message : String(error)}`);
+            throw error;
+        }
+    }
+
+    const setCheckInterval = async (intervalMinutes: number) => {
+        try {
+            const actor = await createAlarmActor();
+            const result = await actor.setCheckInterval(BigInt(intervalMinutes));
+            
+            if ('err' in result) {
+                throw new Error(JSON.stringify(result.err));
+            }
+            
+            showSuccess('Check interval updated successfully');
+            return result.ok;
+        } catch (error) {
+            console.error('Error setting check interval:', error);
+            showError(`Error setting check interval: ${error instanceof Error ? error.message : String(error)}`);
+            throw error;
+        }
+    }
+
+    const startMonitoring = async () => {
+        try {
+            const actor = await createAlarmActor();
+            const result = await actor.startMonitoring();
+            
+            if ('err' in result) {
+                throw new Error(JSON.stringify(result.err));
+            }
+            
+            showSuccess('Monitoring started successfully');
+            return result.ok;
+        } catch (error) {
+            console.error('Error starting monitoring:', error);
+            showError(`Error starting monitoring: ${error instanceof Error ? error.message : String(error)}`);
+            throw error;
+        }
+    }
+
+    const stopMonitoring = async () => {
+        try {
+            const actor = await createAlarmActor();
+            const result = await actor.stopMonitoring();
+            
+            if ('err' in result) {
+                throw new Error(JSON.stringify(result.err));
+            }
+            
+            showSuccess('Monitoring stopped successfully');
+            return result.ok;
+        } catch (error) {
+            console.error('Error stopping monitoring:', error);
+            showError(`Error stopping monitoring: ${error instanceof Error ? error.message : String(error)}`);
+            throw error;
+        }
+    }
+
+    const addMonitoredCanister = async (canisterId: string, name: string, isSNSControlled: boolean, snsRootCanisterId: string | null, minimumCycles: bigint, cyclesAlertLevel: string, timersAlertLevel: string, statusAlertLevel: string) => {
+        try {
+            const actor = await createAlarmActor();
+            const result = await actor.addMonitoredCanister(
+    Principal.fromText(canisterId),
+    name,
+    isSNSControlled,
+    snsRootCanisterId ? [Principal.fromText(snsRootCanisterId)] : [],
+    minimumCycles,
+    cyclesAlertLevel === 'Level2DelayedSMS'
+        ? { Level2DelayedSMS: null }
+        : { Level1Immediate: null },
+        timersAlertLevel === 'Level2DelayedSMS'
+        ? { Level2DelayedSMS: null }
+        : { Level1Immediate: null },
+        statusAlertLevel === 'Level2DelayedSMS'
+        ? { Level2DelayedSMS: null }
+        : { Level1Immediate: null },
+);
+            
+            if ('err' in result) {
+                throw new Error(JSON.stringify(result.err));
+            }
+            
+            showSuccess('Monitored canister added successfully');
+            return result.ok;
+        } catch (error) {
+            console.error('Error adding monitored canister:', error);
+            showError(`Error adding monitored canister: ${error instanceof Error ? error.message : String(error)}`);
+            throw error;
+        }
+    }
+
+    const getMonitoredCanisters = async () => {
+        try {
+            const actor = await createAlarmActor();
+            const result = await actor.getMonitoredCanisters();
+            
+            if ('err' in result) {
+                throw new Error(JSON.stringify(result.err));
+            }
+            
+            return result.ok;
+        } catch (error) {
+            console.error('Error getting monitored canisters:', error);
+            showError(`Error getting monitored canisters: ${error instanceof Error ? error.message : String(error)}`);
+            throw error;
+        }
+    }
+
+    const removeMonitoredCanister = async (configId: number) => {
+        try {
+            const actor = await createAlarmActor();
+            const result = await actor.removeMonitoredCanister(BigInt(configId));
+            
+            if ('err' in result) {
+                throw new Error(JSON.stringify(result.err));
+            }
+            
+            showSuccess('Monitored canister removed successfully');
+            return result.ok;
+        } catch (error) {
+            console.error('Error removing monitored canister:', error);
+            showError(`Error removing monitored canister: ${error instanceof Error ? error.message : String(error)}`);
+            throw error;
+        }
+    }
+
+    const updateMonitoredCanisterStatus = async (configId: number, enabled: boolean) => {
+        try {
+            const actor = await createAlarmActor();
+            const result = await actor.updateMonitoredCanisterStatus(BigInt(configId), enabled);
+            
+            if ('err' in result) {
+                throw new Error(JSON.stringify(result.err));
+            }
+            
+            showSuccess(`Monitored canister ${enabled ? 'enabled' : 'disabled'} successfully`);
+            return result.ok;
+        } catch (error) {
+            console.error('Error updating monitored canister status:', error);
+            showError(`Error updating monitored canister status: ${error instanceof Error ? error.message : String(error)}`);
+            throw error;
+        }
+    }
+
+    const startCanisterMonitoring = async () => {
+        try {
+            const actor = await createAlarmActor();
+            const result = await actor.startCanisterMonitoring();
+            
+            if ('err' in result) {
+                throw new Error(JSON.stringify(result.err));
+            }
+            
+            showSuccess('Canister monitoring started successfully');
+            return result.ok;
+        } catch (error) {
+            console.error('Error starting canister monitoring:', error);
+            showError(`Error starting canister monitoring: ${error instanceof Error ? error.message : String(error)}`);
+            throw error;
+        }
+    }
+
+    const stopCanisterMonitoring = async () => {
+        try {
+            const actor = await createAlarmActor();
+            const result = await actor.stopCanisterMonitoring();
+            
+            if ('err' in result) {
+                throw new Error(JSON.stringify(result.err));
+            }
+            
+            showSuccess('Canister monitoring stopped successfully');
+            return result.ok;
+        } catch (error) {
+            console.error('Error stopping canister monitoring:', error);
+            showError(`Error stopping canister monitoring: ${error instanceof Error ? error.message : String(error)}`);
+            throw error;
+        }
+    }
+
+    const getCanisterHealthStatus = async () => {
+        try {
+            const actor = await createAlarmActor();
+            const result = await actor.getCanisterHealthStatus();
+            
+            if ('err' in result) {
+                throw new Error(JSON.stringify(result.err));
+            }
+            
+            return result.ok;
+        } catch (error) {
+            console.error('Error getting canister health status:', error);
+            showError(`Error getting canister health status: ${error instanceof Error ? error.message : String(error)}`);
+            throw error;
+        }
+    }
+
+    const getQueueStatus = async () => {
+        try {
+            const actor = await createAlarmActor();
+            const result = await actor.getQueueStatus();
+            
+            if ('err' in result) {
+                throw new Error(JSON.stringify(result.err));
+            }
+            
+            return result.ok;
+        } catch (error) {
+            console.error('Error getting queue status:', error);
+            showError(`Error getting queue status: ${error instanceof Error ? error.message : String(error)}`);
+            throw error;
+        }
+    }
+
+    const clearQueues = async () => {
+        try {
+            const actor = await createAlarmActor();
+            const result = await actor.clearQueues();
+            
+            if ('err' in result) {
+                throw new Error(JSON.stringify(result.err));
+            }
+            
+            showSuccess('Queues cleared successfully');
+            return result.ok;
+        } catch (error) {
+            console.error('Error clearing queues:', error);
+            showError(`Error clearing queues: ${error instanceof Error ? error.message : String(error)}`);
+            throw error;
+        }
+    }
+
+    const getSentMessages = async (limit?: number) => {
+        try {
+            const actor = await createAlarmActor();
+            const result = await actor.getSentMessages(limit ? [BigInt(limit)] : []);
+            
+            if ('err' in result) {
+                throw new Error(JSON.stringify(result.err));
+            }
+            
+            return result.ok;
+        } catch (error) {
+            console.error('Error getting sent messages:', error);
+            showError(`Error getting sent messages: ${error instanceof Error ? error.message : String(error)}`);
+            throw error;
+        }
+    }
+
+    const getSentSMSMessages = async (limit?: number) => {
+        try {
+            const actor = await createAlarmActor();
+            const result = await actor.getSentSMSMessages(limit ? [BigInt(limit)] : []);
+            
+            if ('err' in result) {
+                throw new Error(JSON.stringify(result.err));
+            }
+            
+            return result.ok;
+        } catch (error) {
+            console.error('Error getting sent SMS messages:', error);
+            showError(`Error getting sent SMS messages: ${error instanceof Error ? error.message : String(error)}`);
+            throw error;
+        }
+    }
+
+    const getSentEmailMessages = async (limit?: number) => {
+        try {
+            const actor = await createAlarmActor();
+            const result = await actor.getSentEmailMessages(limit ? [BigInt(limit)] : []);
+            
+            if ('err' in result) {
+                throw new Error(JSON.stringify(result.err));
+            }
+            
+            return result.ok;
+        } catch (error) {
+            console.error('Error getting sent email messages:', error);
+            showError(`Error getting sent email messages: ${error instanceof Error ? error.message : String(error)}`);
+            throw error;
+        }
+    }
+
+    const setCanisterMonitoringInterval = async (intervalMinutes: number) => {
+        try {
+            const actor = await createAlarmActor();
+            const result = await actor.setCanisterMonitoringInterval(BigInt(intervalMinutes));
+            
+            if ('err' in result) {
+                throw new Error(JSON.stringify(result.err));
+            }
+            
+            showSuccess('Canister monitoring interval updated successfully');
+            return result.ok;
+        } catch (error) {
+            console.error('Error setting canister monitoring interval:', error);
+            showError(`Error setting canister monitoring interval: ${error instanceof Error ? error.message : String(error)}`);
+            throw error;
+        }
+    }
+
+    const setLevel2SMSCheckInterval = async (intervalMinutes: number) => {
+        try {
+            const actor = await createAlarmActor();
+            const result = await actor.setLevel2SMSCheckInterval(BigInt(intervalMinutes));
+            
+            if ('err' in result) {
+                throw new Error(JSON.stringify(result.err));
+            }
+            
+            showSuccess('Level 2 SMS check interval updated successfully');
+            return result.ok;
+        } catch (error) {
+            console.error('Error setting level 2 SMS check interval:', error);
+            showError(`Error setting level 2 SMS check interval: ${error instanceof Error ? error.message : String(error)}`);
+            throw error;
+        }
+    }
+
+    const getConfigurationIntervals = async () => {
+        try {
+            const actor = await createAlarmActor();
+            const result = await actor.getConfigurationIntervals();
+            
+            if ('err' in result) {
+                throw new Error(JSON.stringify(result.err));
+            }
+            
+            return result.ok;
+        } catch (error) {
+            console.error('Error getting configuration intervals:', error);
+            showError(`Error getting configuration intervals: ${error instanceof Error ? error.message : String(error)}`);
+            throw error;
+        }
+    }
+
+    const getAdminActionLogs = async (limit?: number) => {
+        try {
+            const actor = await createAlarmActor();
+            const result = await actor.getAdminActionLogs(limit ? [BigInt(limit)] : []);
+            
+            if ('err' in result) {
+                throw new Error(JSON.stringify(result.err));
+            }
+            
+            return result.ok;
+        } catch (error) {
+            console.error('Error getting admin action logs:', error);
+            showError(`Error getting admin action logs: ${error instanceof Error ? error.message : String(error)}`);
+            throw error;
+        }
+    }
+
+    const getAlarmAcknowledgments = async (limit?: number) => {
+        try {
+            const actor = await createAlarmActor();
+            const result = await actor.getAlarmAcknowledgments(limit ? [BigInt(limit)] : []);
+            
+            if ('err' in result) {
+                throw new Error(JSON.stringify(result.err));
+            }
+            
+            return result.ok;
+        } catch (error) {
+            console.error('Error getting alarm acknowledgments:', error);
+            showError(`Error getting alarm acknowledgments: ${error instanceof Error ? error.message : String(error)}`);
+            throw error;
+        }
+    }
+
+    const sendTestEmailSingle = async (email: string, subject: string) => {
+        try {
+            const actor = await createAlarmActor();
+            const result = await actor.sendTestEmailSingle(email, subject);
+            
+            if ('err' in result) {
+                throw new Error(JSON.stringify(result.err));
+            }
+            
+            showSuccess('Test email sent successfully');
+            return result.ok;
+        } catch (error) {
+            console.error('Error sending test email:', error);
+            showError(`Error sending test email: ${error instanceof Error ? error.message : String(error)}`);
+            throw error;
+        }
+    }
+
+    const showSuccess = (message: string) => {
+        addToast({
+            id: Date.now(),
+            code: 'success',
+            title: 'Success',
+            message: message,
+            icon: 'fa-solid fa-exclamation-triangle'
+        });
+    }
+
+    const showError = (message: string) => {
+        addToast({
+            id: Date.now(),
+            code: 'error',
+            title: 'Error',
+            message: message,
+            icon: 'fa-solid fa-exclamation-triangle'
+        });
     }
 
     // # RETURN #
@@ -5816,13 +7510,37 @@ export const useTacoStore = defineStore('taco', () => {
         setPrincipalName,
         setNeuronName,
         getUserNeurons,
+        getTacoNeurons,
+        formatNeuronForDisplay,
+        categorizeNeurons,
+        loadNeuronRewardBalances,
+        claimNeuronRewards,
+        claimAllNeuronRewards,
+        formatNeuronIdForMap,
+        stakeToNeuron,
+        createNeuron,
+        setNeuronDissolveDelay,
         toggleThreadMenu,
+        
+        // Wallet methods
+        registerUserToken,
+        unregisterUserToken,
+        getUserRegisteredTokens,
+        fetchUserTokenBalance,
+        sendToken,
+        fetchTokenMetadata,
+        getCachedTokenMetadata,
+        clearTokenMetadataCache,
+        checkTokenSupportsICRC2,
         
         // Canister ID functions
         daoBackendCanisterId,
         treasuryCanisterId,
         neuronSnapshotCanisterId,
         rewardsCanisterId,
+        
+        // Router
+        router,
         alarmCanisterId,
         
         // Portfolio snapshot management
@@ -5831,7 +7549,8 @@ export const useTacoStore = defineStore('taco', () => {
         stopPortfolioSnapshots,
         updatePortfolioSnapshotInterval,
 
-        // Alarm Management Functions
+        // Alarm management functions
+        createAlarmActor,
         performSystemHealthCheck,
         getEnhancedAlarmSystemStatus,
         getMonitoringStatus,
@@ -5848,8 +7567,6 @@ export const useTacoStore = defineStore('taco', () => {
         setCheckInterval,
         startMonitoring,
         stopMonitoring,
-        
-        // Alarm canister monitoring functions
         addMonitoredCanister,
         getMonitoredCanisters,
         removeMonitoredCanister,
@@ -5859,16 +7576,16 @@ export const useTacoStore = defineStore('taco', () => {
         getCanisterHealthStatus,
         getQueueStatus,
         clearQueues,
-        
-        // Alarm sent message history functions
         getSentMessages,
         getSentSMSMessages,
         getSentEmailMessages,
-        
-        // Alarm configuration functions
         setCanisterMonitoringInterval,
         setLevel2SMSCheckInterval,
         getConfigurationIntervals,
         getAdminActionLogs,
+        getAlarmAcknowledgments,
+        sendTestEmailSingle,
+        showSuccess,
+        showError,
     }
 })

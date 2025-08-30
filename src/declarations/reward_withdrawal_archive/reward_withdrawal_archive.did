@@ -1,0 +1,170 @@
+type Value = 
+ variant {
+   Array: vec Value;
+   Blob: blob;
+   Int: int;
+   Map: vec record {
+              text;
+              Value;
+            };
+   Nat: nat;
+   Text: text;
+ };
+type TimerStatus = 
+ record {
+   innerLoopCurrentBatch: nat;
+   innerLoopCurrentType: text;
+   innerLoopLastRun: int;
+   innerLoopNextScheduled: int;
+   innerLoopRunning: bool;
+   innerLoopStartTime: int;
+   innerLoopTotalBatches: nat;
+   middleLoopCurrentState: text;
+   middleLoopLastRun: int;
+   middleLoopNextScheduled: int;
+   middleLoopRunning: bool;
+   middleLoopStartTime: int;
+   middleLoopTotalRuns: nat;
+   outerLoopIntervalSeconds: nat;
+   outerLoopLastRun: int;
+   outerLoopRunning: bool;
+   outerLoopTotalRuns: nat;
+ };
+type RewardWithdrawalBlockData = 
+ record {
+   amountSent: nat;
+   caller: principal;
+   fee: nat;
+   id: nat;
+   neuronWithdrawals: vec record {
+                            blob;
+                            nat;
+                          };
+   targetAccountOwner: principal;
+   targetAccountSubaccount: opt blob;
+   timestamp: int;
+   totalAmount: nat;
+   transactionId: opt nat;
+ };
+type RewardWithdrawalArchive = 
+ service {
+   archiveRewardWithdrawal: (withdrawal: RewardWithdrawalBlockData) ->
+    (Result_3);
+   getArchiveStats: () -> (ArchiveStatus) query;
+   getArchiveStatus: () -> (Result_2) query;
+   getBatchImportStatus: () ->
+    (record {
+       intervalSeconds: nat;
+       isRunning: bool;
+     }) query;
+   getLogs: (count: nat) -> (vec LogEntry) query;
+   getRewardWithdrawalsByCaller: (callerPrincipal: principal, startIndex:
+    opt nat, length: nat) -> (Result_1) query;
+   getRewardWithdrawalsByNeuron: (neuronId: blob, startIndex: opt nat,
+    length: nat) -> (Result_1) query;
+   getRewardWithdrawalsByTimeRange: (startTime: int, endTime: int, limit:
+    nat) -> (Result_1) query;
+   getTimerStatus: () -> (TimerStatus) query;
+   icrc3_get_archives: (args: GetArchivesArgs) -> (GetArchivesResult) query;
+   icrc3_get_blocks: (args: GetBlocksArgs) -> (GetBlocksResult) query;
+   icrc3_get_tip_certificate: () -> (opt DataCertificate) query;
+   icrc3_supported_block_types: () -> (vec BlockType) query;
+   resetImportTimestamps: () -> (Result);
+   runManualBatchImport: () -> (Result);
+   setMaxInnerLoopIterations: (iterations: nat) -> (Result);
+   startBatchImportSystem: () -> (Result);
+   stopAllTimers: () -> (Result);
+   stopBatchImportSystem: () -> (Result);
+ };
+type Result_3 = 
+ variant {
+   err: ArchiveError;
+   ok: nat;
+ };
+type Result_2 = 
+ variant {
+   err: ArchiveError;
+   ok: ArchiveStatus;
+ };
+type Result_1 = 
+ variant {
+   err: ArchiveError;
+   ok: vec RewardWithdrawalBlockData;
+ };
+type Result = 
+ variant {
+   err: text;
+   ok: text;
+ };
+type LogLevel = 
+ variant {
+   ERROR;
+   INFO;
+   WARN;
+ };
+type LogEntry = 
+ record {
+   component: text;
+   context: text;
+   level: LogLevel;
+   message: text;
+   timestamp: int;
+ };
+type GetBlocksResult = 
+ record {
+   archived_blocks: vec ArchivedBlock;
+   blocks: vec Block;
+   log_length: nat;
+ };
+type GetBlocksArgs = 
+ vec record {
+       length: nat;
+       start: nat;
+     };
+type GetArchivesResult = 
+ vec record {
+       canister_id: principal;
+       end: nat;
+       start: nat;
+     };
+type GetArchivesArgs = record {from: opt principal;};
+type DataCertificate = 
+ record {
+   certificate: blob;
+   hash_tree: blob;
+ };
+type BlockType = 
+ record {
+   block_type: text;
+   url: text;
+ };
+type Block = 
+ record {
+   block: Value;
+   id: nat;
+ };
+type ArchivedBlock = 
+ record {
+   args: GetBlocksArgs;
+   callback: func (GetBlocksArgs) -> (GetBlocksResult) query;
+ };
+type ArchiveStatus = 
+ record {
+   lastArchiveTime: int;
+   newestBlock: opt nat;
+   oldestBlock: opt nat;
+   storageUsed: nat;
+   supportedBlockTypes: vec text;
+   totalBlocks: nat;
+ };
+type ArchiveError = 
+ variant {
+   BlockNotFound;
+   InvalidBlockType;
+   InvalidData;
+   InvalidTimeRange;
+   NotAuthorized;
+   StorageFull;
+   SystemError: text;
+ };
+service : () -> RewardWithdrawalArchive

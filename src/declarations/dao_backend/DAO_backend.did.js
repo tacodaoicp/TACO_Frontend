@@ -62,7 +62,7 @@ export const idlFactory = ({ IDL }) => {
     'FolloweeNoAllocationYetMade' : IDL.Null,
     'SystemInactive' : IDL.Null,
   });
-  const Result_5 = IDL.Variant({ 'ok' : IDL.Text, 'err' : FollowError });
+  const Result_6 = IDL.Variant({ 'ok' : IDL.Text, 'err' : FollowError });
   const SystemState = IDL.Variant({
     'Paused' : IDL.Null,
     'Active' : IDL.Null,
@@ -122,7 +122,7 @@ export const idlFactory = ({ IDL }) => {
     'totalCount' : IDL.Nat,
     'actions' : IDL.Vec(AdminActionRecord),
   });
-  const Result_12 = IDL.Variant({
+  const Result_13 = IDL.Variant({
     'ok' : AdminActionsSinceResponse,
     'err' : AuthorizationError,
   });
@@ -171,7 +171,7 @@ export const idlFactory = ({ IDL }) => {
     'totalCount' : IDL.Nat,
     'changes' : IDL.Vec(PastAllocationRecord),
   });
-  const Result_11 = IDL.Variant({
+  const Result_12 = IDL.Variant({
     'ok' : AllocationChangesSinceResponse,
     'err' : AuthorizationError,
   });
@@ -190,7 +190,7 @@ export const idlFactory = ({ IDL }) => {
     'unfollows' : IDL.Vec(UnfollowRecord),
     'follows' : IDL.Vec(FollowRecord),
   });
-  const Result_10 = IDL.Variant({
+  const Result_11 = IDL.Variant({
     'ok' : FollowActionsSinceResponse,
     'err' : AuthorizationError,
   });
@@ -232,7 +232,7 @@ export const idlFactory = ({ IDL }) => {
     'totalCount' : IDL.Nat,
     'changes' : IDL.Vec(NeuronAllocationChangeRecord),
   });
-  const Result_9 = IDL.Variant({
+  const Result_10 = IDL.Variant({
     'ok' : NeuronAllocationChangesSinceResponse,
     'err' : AuthorizationError,
   });
@@ -245,7 +245,7 @@ export const idlFactory = ({ IDL }) => {
     'totalCount' : IDL.Nat,
     'neurons' : IDL.Vec(NeuronRecord),
   });
-  const Result_8 = IDL.Variant({
+  const Result_9 = IDL.Variant({
     'ok' : NeuronUpdatesSinceResponse,
     'err' : AuthorizationError,
   });
@@ -280,7 +280,7 @@ export const idlFactory = ({ IDL }) => {
     'totalCount' : IDL.Nat,
     'users' : IDL.Vec(UserVotingPowerRecord),
   });
-  const Result_7 = IDL.Variant({
+  const Result_8 = IDL.Variant({
     'ok' : VotingPowerChangesSinceResponse,
     'err' : AuthorizationError,
   });
@@ -291,7 +291,7 @@ export const idlFactory = ({ IDL }) => {
     'UnexpectedError' : IDL.Text,
     'SystemInactive' : IDL.Null,
   });
-  const Result_6 = IDL.Variant({
+  const Result_7 = IDL.Variant({
     'ok' : IDL.Record({
       'aggregateUpdated' : IDL.Bool,
       'oldVotingPower' : IDL.Nat,
@@ -300,11 +300,24 @@ export const idlFactory = ({ IDL }) => {
     }),
     'err' : RefreshError,
   });
+  const TokenRegistrationError = IDL.Variant({
+    'TokenAlreadyRegistered' : IDL.Null,
+    'NotAllowed' : IDL.Null,
+    'TokenNotFound' : IDL.Null,
+    'TokenNotRegistered' : IDL.Null,
+    'UnexpectedError' : IDL.Text,
+    'MaxTokensReached' : IDL.Null,
+    'SystemInactive' : IDL.Null,
+  });
+  const Result_3 = IDL.Variant({
+    'ok' : IDL.Text,
+    'err' : TokenRegistrationError,
+  });
   const SyncError = IDL.Variant({
     'NotTreasury' : IDL.Null,
     'UnexpectedError' : IDL.Text,
   });
-  const Result_4 = IDL.Variant({ 'ok' : IDL.Text, 'err' : SyncError });
+  const Result_5 = IDL.Variant({ 'ok' : IDL.Text, 'err' : SyncError });
   const UnfollowError = IDL.Variant({
     'NotAllowed' : IDL.Null,
     'FollowerNotFound' : IDL.Null,
@@ -316,7 +329,7 @@ export const idlFactory = ({ IDL }) => {
     'AlreadyUnfollowing' : IDL.Null,
     'SystemInactive' : IDL.Null,
   });
-  const Result_3 = IDL.Variant({ 'ok' : IDL.Text, 'err' : UnfollowError });
+  const Result_4 = IDL.Variant({ 'ok' : IDL.Text, 'err' : UnfollowError });
   const UpdateError = IDL.Variant({
     'NotAllowed' : IDL.Null,
     'UnexpectedError' : IDL.Text,
@@ -386,10 +399,10 @@ export const idlFactory = ({ IDL }) => {
     'admin_recalculateAllVotingPower' : IDL.Func([IDL.Nat], [], []),
     'clearLogs' : IDL.Func([], [], []),
     'deleteToken' : IDL.Func([IDL.Principal, IDL.Text], [Result_1], []),
-    'followAllocation' : IDL.Func([IDL.Principal], [Result_5], []),
+    'followAllocation' : IDL.Func([IDL.Principal], [Result_6], []),
     'getAdminActionsSince' : IDL.Func(
         [IDL.Int, IDL.Nat],
-        [Result_12],
+        [Result_13],
         ['query'],
       ),
     'getAdminPermissions' : IDL.Func(
@@ -404,12 +417,12 @@ export const idlFactory = ({ IDL }) => {
       ),
     'getAllocationChangesSince' : IDL.Func(
         [IDL.Int, IDL.Nat],
-        [Result_11],
+        [Result_12],
         ['query'],
       ),
     'getFollowActionsSince' : IDL.Func(
         [IDL.Int, IDL.Nat],
-        [Result_10],
+        [Result_11],
         ['query'],
       ),
     'getFollowersWithNeuronCounts' : IDL.Func(
@@ -440,12 +453,12 @@ export const idlFactory = ({ IDL }) => {
       ),
     'getNeuronAllocationChangesSince' : IDL.Func(
         [IDL.Int, IDL.Nat],
-        [Result_9],
+        [Result_10],
         ['query'],
       ),
     'getNeuronUpdatesSince' : IDL.Func(
         [IDL.Int, IDL.Nat],
-        [Result_8],
+        [Result_9],
         ['query'],
       ),
     'getSnapshotInfo' : IDL.Func(
@@ -468,9 +481,14 @@ export const idlFactory = ({ IDL }) => {
         ['query'],
       ),
     'getUserAllocation' : IDL.Func([], [IDL.Opt(UserState)], ['query']),
+    'getUserRegisteredTokens' : IDL.Func(
+        [],
+        [IDL.Vec(IDL.Principal)],
+        ['query'],
+      ),
     'getVotingPowerChangesSince' : IDL.Func(
         [IDL.Int, IDL.Nat],
-        [Result_7],
+        [Result_8],
         ['query'],
       ),
     'grantAdminPermission' : IDL.Func(
@@ -484,23 +502,25 @@ export const idlFactory = ({ IDL }) => {
         ['query'],
       ),
     'pauseToken' : IDL.Func([IDL.Principal, IDL.Text], [Result_1], []),
-    'refreshUserVotingPower' : IDL.Func([], [Result_6], []),
+    'refreshUserVotingPower' : IDL.Func([], [Result_7], []),
+    'registerUserToken' : IDL.Func([IDL.Principal], [Result_3], []),
     'removeAdmin' : IDL.Func(
         [IDL.Principal, IDL.Opt(IDL.Text)],
         [Result_1],
         [],
       ),
-    'removeFollower' : IDL.Func([IDL.Principal], [Result_5], []),
+    'removeFollower' : IDL.Func([IDL.Principal], [Result_6], []),
     'removeToken' : IDL.Func([IDL.Principal, IDL.Text], [Result_1], []),
     'setTacoAddress' : IDL.Func([IDL.Principal], [], []),
     'set_sns_governance_canister_id' : IDL.Func([IDL.Principal], [], []),
     'syncTokenDetailsFromTreasury' : IDL.Func(
         [IDL.Vec(IDL.Tuple(IDL.Principal, TokenDetails))],
-        [Result_4],
+        [Result_5],
         [],
       ),
-    'unfollowAllocation' : IDL.Func([IDL.Principal], [Result_3], []),
+    'unfollowAllocation' : IDL.Func([IDL.Principal], [Result_4], []),
     'unpauseToken' : IDL.Func([IDL.Principal, IDL.Text], [Result_1], []),
+    'unregisterUserToken' : IDL.Func([IDL.Principal], [Result_3], []),
     'updateAllocation' : IDL.Func([IDL.Vec(Allocation)], [Result_2], []),
     'updateMintingVaultConfig' : IDL.Func([UpdateConfig__1], [Result_1], []),
     'updateSpamParameters' : IDL.Func(

@@ -1,4 +1,18 @@
 export const idlFactory = ({ IDL }) => {
+  const RewardsError = IDL.Variant({
+    'AllocationDataMissing' : IDL.Null,
+    'SystemError' : IDL.Text,
+    'NotAuthorized' : IDL.Null,
+    'DistributionInProgress' : IDL.Null,
+    'PriceDataMissing' : IDL.Record({
+      'token' : IDL.Principal,
+      'timestamp' : IDL.Int,
+    }),
+    'NeuronNotFound' : IDL.Null,
+    'InvalidTimeRange' : IDL.Null,
+    'InsufficientRewardPot' : IDL.Null,
+  });
+  const Result__1 = IDL.Variant({ 'ok' : IDL.Text, 'err' : RewardsError });
   const PriceType = IDL.Variant({ 'ICP' : IDL.Null, 'USD' : IDL.Null });
   const Allocation = IDL.Record({
     'token' : IDL.Principal,
@@ -46,21 +60,27 @@ export const idlFactory = ({ IDL }) => {
     'inTimespanChanges' : IDL.Vec(NeuronAllocationChangeBlockData),
     'initialValue' : IDL.Float64,
   });
-  const RewardsError = IDL.Variant({
-    'AllocationDataMissing' : IDL.Null,
-    'SystemError' : IDL.Text,
-    'NotAuthorized' : IDL.Null,
-    'DistributionInProgress' : IDL.Null,
-    'PriceDataMissing' : IDL.Record({
-      'token' : IDL.Principal,
-      'timestamp' : IDL.Int,
-    }),
-    'NeuronNotFound' : IDL.Null,
-    'InvalidTimeRange' : IDL.Null,
-    'InsufficientRewardPot' : IDL.Null,
-  });
-  const Result__1_1 = IDL.Variant({
+  const Result__1_6 = IDL.Variant({
     'ok' : PerformanceResult,
+    'err' : RewardsError,
+  });
+  const Account = IDL.Record({
+    'owner' : IDL.Principal,
+    'subaccount' : IDL.Opt(IDL.Vec(IDL.Nat8)),
+  });
+  const WithdrawalRecord = IDL.Record({
+    'id' : IDL.Nat,
+    'fee' : IDL.Nat,
+    'amountSent' : IDL.Nat,
+    'neuronWithdrawals' : IDL.Vec(IDL.Tuple(IDL.Vec(IDL.Nat8), IDL.Nat)),
+    'totalAmount' : IDL.Nat,
+    'timestamp' : IDL.Int,
+    'caller' : IDL.Principal,
+    'targetAccount' : Account,
+    'transactionId' : IDL.Opt(IDL.Nat),
+  });
+  const Result__1_3 = IDL.Variant({
+    'ok' : IDL.Vec(WithdrawalRecord),
     'err' : RewardsError,
   });
   const DistributionStatus = IDL.Variant({
@@ -100,10 +120,25 @@ export const idlFactory = ({ IDL }) => {
     'neuronRewards' : IDL.Vec(NeuronReward),
     'failedNeurons' : IDL.Vec(FailedNeuron),
   });
-  const Result__1 = IDL.Variant({ 'ok' : IDL.Text, 'err' : RewardsError });
-  const Account = IDL.Record({
-    'owner' : IDL.Principal,
-    'subaccount' : IDL.Opt(IDL.Vec(IDL.Nat8)),
+  const Result__1_5 = IDL.Variant({
+    'ok' : IDL.Record({ 'distributions' : IDL.Vec(DistributionRecord) }),
+    'err' : RewardsError,
+  });
+  const Result__1_4 = IDL.Variant({
+    'ok' : IDL.Vec(IDL.Vec(IDL.Nat8)),
+    'err' : RewardsError,
+  });
+  const Result__1_2 = IDL.Variant({
+    'ok' : IDL.Record({
+      'totalRecordsInHistory' : IDL.Nat,
+      'totalWithdrawn' : IDL.Nat,
+      'totalWithdrawals' : IDL.Nat,
+    }),
+    'err' : RewardsError,
+  });
+  const Result__1_1 = IDL.Variant({
+    'ok' : IDL.Record({ 'withdrawals' : IDL.Vec(WithdrawalRecord) }),
+    'err' : RewardsError,
   });
   const TransferError = IDL.Variant({
     'GenericError' : IDL.Record({
@@ -120,9 +155,10 @@ export const idlFactory = ({ IDL }) => {
   });
   const Result = IDL.Variant({ 'Ok' : IDL.Nat, 'Err' : TransferError });
   const Rewards = IDL.Service({
+    'addToRewardSkipList' : IDL.Func([IDL.Vec(IDL.Nat8)], [Result__1], []),
     'calculateNeuronPerformance' : IDL.Func(
         [IDL.Vec(IDL.Nat8), IDL.Int, IDL.Int, PriceType],
-        [Result__1_1],
+        [Result__1_6],
         [],
       ),
     'getAllNeuronRewardBalances' : IDL.Func(
@@ -130,6 +166,7 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Vec(IDL.Tuple(IDL.Vec(IDL.Nat8), IDL.Nat))],
         ['query'],
       ),
+    'getAllWithdrawalHistory' : IDL.Func([IDL.Opt(IDL.Nat)], [Result__1_3], []),
     'getAvailableBalance' : IDL.Func([], [IDL.Nat], []),
     'getCanisterStatus' : IDL.Func(
         [],
@@ -156,10 +193,15 @@ export const idlFactory = ({ IDL }) => {
           IDL.Record({
             'distributionEnabled' : IDL.Bool,
             'distributionPeriodNS' : IDL.Nat,
+            'rewardSkipListSize' : IDL.Nat,
             'maxDistributionHistory' : IDL.Nat,
             'periodicRewardPot' : IDL.Nat,
             'performanceScorePower' : IDL.Float64,
+            'totalDistributions' : IDL.Nat,
+            'nextScheduledDistribution' : IDL.Opt(IDL.Int),
             'votingPowerPower' : IDL.Float64,
+            'lastDistributionTime' : IDL.Int,
+            'timerRunning' : IDL.Bool,
           }),
         ],
         ['query'],
@@ -183,6 +225,11 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Vec(DistributionRecord)],
         ['query'],
       ),
+    'getDistributionsSince' : IDL.Func(
+        [IDL.Int, IDL.Nat],
+        [Result__1_5],
+        ['query'],
+      ),
     'getNeuronRewardBalance' : IDL.Func(
         [IDL.Vec(IDL.Nat8)],
         [IDL.Nat],
@@ -193,14 +240,33 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Vec(IDL.Tuple(IDL.Vec(IDL.Nat8), IDL.Nat))],
         ['query'],
       ),
+    'getRewardSkipList' : IDL.Func([], [Result__1_4], ['query']),
     'getTacoBalance' : IDL.Func([], [IDL.Nat], []),
     'getTotalDistributed' : IDL.Func([], [IDL.Nat], ['query']),
+    'getUserWithdrawalHistory' : IDL.Func(
+        [IDL.Opt(IDL.Nat)],
+        [Result__1_3],
+        [],
+      ),
+    'getWithdrawalStats' : IDL.Func([], [Result__1_2], []),
+    'getWithdrawalsSince' : IDL.Func(
+        [IDL.Int, IDL.Nat],
+        [Result__1_1],
+        ['query'],
+      ),
+    'removeFromRewardSkipList' : IDL.Func([IDL.Vec(IDL.Nat8)], [Result__1], []),
     'setDistributionEnabled' : IDL.Func([IDL.Bool], [Result__1], []),
     'setDistributionPeriod' : IDL.Func([IDL.Nat], [Result__1], []),
     'setPerformanceScorePower' : IDL.Func([IDL.Float64], [Result__1], []),
     'setPeriodicRewardPot' : IDL.Func([IDL.Nat], [Result__1], []),
+    'setRewardSkipList' : IDL.Func(
+        [IDL.Vec(IDL.Vec(IDL.Nat8))],
+        [Result__1],
+        [],
+      ),
     'setVotingPowerPower' : IDL.Func([IDL.Float64], [Result__1], []),
     'startDistributionTimer' : IDL.Func([], [Result__1], []),
+    'startDistributionTimerAt' : IDL.Func([IDL.Int], [Result__1], []),
     'stopDistributionTimer' : IDL.Func([], [Result__1], []),
     'triggerDistribution' : IDL.Func([], [Result__1], []),
     'triggerDistributionCustom' : IDL.Func(
