@@ -1233,15 +1233,14 @@ export const useTacoStore = defineStore('taco', () => {
         }        
         return 'b2cwp-6qaaa-aaaad-qhn6a-cai' // if not ic or staging, use local (all the same for now)
     }
-    // lrekt-uaaaa-aaaan-qz4ya-cai
     const portfolioArchiveCanisterId = () => {
         switch (process.env.DFX_NETWORK) {
             case "ic":
                 return process.env.CANISTER_ID_PORTFOLIO_ARCHIVE_IC || 'bl7x7-wiaaa-aaaan-qz5bq-cai'
             case "staging":
-                return process.env.CANISTER_ID_PORTFOLIO_ARCHIVE_STAGING || 'bl7x7-wiaaa-aaaan-qz5bq-cai'
+                return process.env.CANISTER_ID_PORTFOLIO_ARCHIVE_STAGING || 'lrekt-uaaaa-aaaan-qz4ya-cai'
         }        
-        return 'bl7x7-wiaaa-aaaan-qz5bq-cai'
+        return 'lrekt-uaaaa-aaaan-qz4ya-cai'
     }
     const rewardDistributionArchiveCanisterId = () => {
         switch (process.env.DFX_NETWORK) {
