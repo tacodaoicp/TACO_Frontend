@@ -2166,13 +2166,13 @@
   // watch for chart range changes to update the current chart
   watch(selectedChartRange, async (newRange) => {
     if (!selectedView.value) return
-    if (selectedView.value === 'Portfolio Performance') {
+    if (selectedView.value === 'Portfolio Value') {
       const { labels, values } = extractPortfolioUsdTimeSeries(fetchedPortfolioArchiveBlocks.value, newRange)
       updateChartData({ xAxisData: labels, series: [{ name: 'total usd', data: values, lineStyle: { color: '#DA8D28' }, itemStyle: { color: '#DA8D28' } }] })
-    } else if (selectedView.value === 'Assets Performance') {
+    } else if (selectedView.value === 'Assets Value') {
       const { labels, series } = extractAssetsUsdTimeSeries(fetchedPortfolioArchiveBlocks.value, newRange)
       updateChartData({ xAxisData: labels, series })
-    } else if (selectedView.value === 'X Asset Performance' && selectedToken.value) {
+    } else if (selectedView.value === 'X Asset Value' && selectedToken.value) {
       const { labels, values } = extractSingleTokenUsdTimeSeries(
         fetchedPortfolioArchiveBlocks.value,
         selectedToken.value,
@@ -2250,22 +2250,22 @@
   onMounted(async () => {
 
     // log
-    // console.log('PerformanceView mounted')
+    console.log('PerformanceView mounted')
 
-    // // if we already have blocks in store, reuse them; else fetch once
-    // const hasBlocks = Array.isArray((fetchedPortfolioArchiveBlocks.value as any)?.blocks) && (fetchedPortfolioArchiveBlocks.value as any).blocks.length > 0
-    // if (!hasBlocks) {
-    //   await fetchPortfolioArchiveBlocks(1000)
-    // }
+    // if we already have blocks in store, reuse them; else fetch once
+    const hasBlocks = Array.isArray((fetchedPortfolioArchiveBlocks.value as any)?.blocks) && (fetchedPortfolioArchiveBlocks.value as any).blocks.length > 0
+    if (!hasBlocks) {
+      await fetchPortfolioArchiveBlocks(1000)
+    }
 
     // set selected view
-    selectedView.value = 'Leaderboard'
+    selectedView.value = 'Portfolio Value'
 
-    // // build caches and token nav if not already built
-    // if (!blocksParsed.value) {
-    //   buildParsedCaches(fetchedPortfolioArchiveBlocks.value)
-    //   await buildTokenNavFromBlocks(fetchedPortfolioArchiveBlocks.value)
-    // }
+    // build caches and token nav if not already built
+    if (!blocksParsed.value) {
+      buildParsedCaches(fetchedPortfolioArchiveBlocks.value)
+      await buildTokenNavFromBlocks(fetchedPortfolioArchiveBlocks.value)
+    }
 
   })
 
