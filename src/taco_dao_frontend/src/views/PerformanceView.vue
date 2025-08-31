@@ -34,55 +34,44 @@
             <!-- views list -->
             <div class="performance__views__list">
 
-              <!-- view item -->
+              <!-- view item - Portfolio -->
               <div class="performance__views__item"
-                   @click="selectedView = 'All Taco Dao Assets'"
-                   :class="{ active: selectedView === 'All Taco Dao Assets' }">
+                   @click="selectedView = 'Portfolio Performance'"
+                   :class="{ active: selectedView === 'Portfolio Performance' }">
 
                 <!-- view item text -->
                 <span>
-                  Total Assets Under Management
+                  Portfolio Performance
                 </span>
 
               </div>
 
-              <!-- view item -->
+              <!-- view item - Assets Performance -->
               <div class="performance__views__item"
-                   @click="selectedView = 'Treasury vs Portfolio'"
-                   :class="{ active: selectedView === 'Treasury vs Portfolio' }">
+                   @click="selectedView = 'Assets Performance'"
+                   :class="{ active: selectedView === 'Assets Performance' }">
 
                 <!-- view item text -->
                 <span>
-                  Treasury vs Portfolio
+                  Assets Performance
                 </span>
 
               </div>
 
-              <!-- view item -->
-              <div class="performance__views__item"
-                   @click="selectedView = 'All Treasury Assets'"
-                   :class="{ active: selectedView === 'All Treasury Assets' }">
+              <!-- dynamic token items -->
+              <div
+                   v-for="t in availableTokenNavList"
+                   :key="t.principal"
+                   class="performance__views__item"
+                   @click="selectTokenView(t.principal)"
+                   :class="{ active: selectedView === 'X Asset Performance' && selectedToken === t.principal }">
 
                 <!-- view item text -->
-                <span>
-                  All Treasury Assets
-                </span>
+                <span>{{ t.label }} Performance</span>
 
               </div>
 
-              <!-- view item -->
-              <div class="performance__views__item"
-                   @click="selectedView = 'All Portfolio Assets'"
-                   :class="{ active: selectedView === 'All Portfolio Assets' }">
-
-                <!-- view item text -->
-                <span>
-                  All Portfolio Assets
-                </span>
-
-              </div>
-
-              <!-- view item -->
+              <!-- view item - Leaderboard -->
               <div class="performance__views__item"
                    @click="selectedView = 'Leaderboard'"
                    :class="{ active: selectedView === 'Leaderboard' }">
@@ -113,28 +102,28 @@
                         gap-1-4 px-2">
 
               <span class="text-nowrap">
-                {{ selectedView }}
+                {{ selectedViewLabel }}
               </span>
 
               <!-- range selector -->
               <div v-if="selectedView !== 'Leaderboard'" class="performance__range-selector btn-group">
 
-                <button @click="handleSetChartRange('24h')" 
+                <button @click="selectedChartRange = '24h'" 
                         type="button" 
                         :class="{'taco-nav-btn--active': selectedChartRange === '24h'}" 
                         class="btn taco-nav-btn">24h</button>
 
-                <button @click="handleSetChartRange('7d')" 
+                <button @click="selectedChartRange = '7d'" 
                         type="button" 
                         :class="{'taco-nav-btn--active': selectedChartRange === '7d'}" 
                         class="btn taco-nav-btn">7d</button>
 
-                <button @click="handleSetChartRange('30d')" 
+                <button @click="selectedChartRange = '30d'" 
                         type="button" 
                         :class="{'taco-nav-btn--active': selectedChartRange === '30d'}" 
                         class="btn taco-nav-btn">30d</button>
 
-                <button @click="handleSetChartRange('all')" 
+                <button @click="selectedChartRange = 'all'" 
                         type="button" 
                         :class="{'taco-nav-btn--active': selectedChartRange === 'all'}" 
                         class="btn taco-nav-btn">All</button>                          
@@ -582,7 +571,7 @@
                       <th class="">Asset</th>
 
                       <!-- heading -->
-                      <th class="">Price</th>
+                      <th class="">Value</th>
 
                       <!-- heading -->
                       <th class="">24h</th>
@@ -603,167 +592,41 @@
                   <!-- table body -->
                   <tbody>
 
-<!-- total aum row -->
-<tr>
-  <td class="taco-text-black-to-white">
-    <span class="taco-text-black-to-white">Total AUM</span>
-  </td>
-  <td class="taco-text-black-to-white">
-    <span class="d-flex flex-column align-items-end">
-      <span class="taco-text-black-to-white">
-        ${{ statisticsData.totalAUM.current.toFixed(2) }}
-      </span>
-    </span>
-  </td>
-  <td class="taco-text-black-to-white">
-    <span class="d-flex flex-column align-items-end">
-      <span :class="getPosNegClass(statisticsData.totalAUM.change24h.value)">
-        ${{ statisticsData.totalAUM.change24h.value.toFixed(2) }}
-      </span>
-      <span :class="getPosNegClass(statisticsData.totalAUM.change24h.percentage)">
-        {{ statisticsData.totalAUM.change24h.percentage.toFixed(2) }}%
-      </span>
-    </span>
-  </td>
-  <td class="taco-text-black-to-white">
-    <span class="d-flex flex-column align-items-end">
-      <span :class="getPosNegClass(statisticsData.totalAUM.change7d.value)">
-        ${{ statisticsData.totalAUM.change7d.value.toFixed(2) }}
-      </span>
-      <span :class="getPosNegClass(statisticsData.totalAUM.change7d.percentage)">
-        {{ statisticsData.totalAUM.change7d.percentage.toFixed(2) }}%
-      </span>
-    </span>
-  </td>
-  <td class="taco-text-black-to-white">
-    <span class="d-flex flex-column align-items-end">
-      <span :class="getPosNegClass(statisticsData.totalAUM.change30d.value)">
-        ${{ statisticsData.totalAUM.change30d.value.toFixed(2) }}
-      </span>
-      <span :class="getPosNegClass(statisticsData.totalAUM.change30d.percentage)">
-        {{ statisticsData.totalAUM.change30d.percentage.toFixed(2) }}%
-      </span>
-    </span>
-  </td>
-  <td class="taco-text-black-to-white">
-    <span class="d-flex flex-column align-items-end">
-      <span :class="getPosNegClass(statisticsData.totalAUM.changeAll.value)">
-        ${{ statisticsData.totalAUM.changeAll.value.toFixed(2) }}
-      </span>
-      <span :class="getPosNegClass(statisticsData.totalAUM.changeAll.percentage)">
-        {{ statisticsData.totalAUM.changeAll.percentage.toFixed(2) }}%
-      </span>
-    </span>
-  </td>
-</tr>
-
-<!-- portfolio row -->
-<tr>
-  <td class="taco-text-black-to-white">
-    <span class="taco-text-black-to-white">Portfolio</span>
-  </td>
-  <td class="taco-text-black-to-white">
-    <span class="d-flex flex-column align-items-end">
-      <span class="taco-text-black-to-white">
-        ${{ statisticsData.portfolio.current.toFixed(2) }}
-      </span>
-    </span>
-  </td>
-  <td class="taco-text-black-to-white">
-    <span class="d-flex flex-column align-items-end">
-      <span :class="getPosNegClass(statisticsData.portfolio.change24h.value)">
-        ${{ statisticsData.portfolio.change24h.value.toFixed(2) }}
-      </span>
-      <span :class="getPosNegClass(statisticsData.portfolio.change24h.percentage)">
-        {{ statisticsData.portfolio.change24h.percentage.toFixed(2) }}%
-      </span>
-    </span>
-  </td>
-  <td class="taco-text-black-to-white">
-    <span class="d-flex flex-column align-items-end">
-      <span :class="getPosNegClass(statisticsData.portfolio.change7d.value)">
-        ${{ statisticsData.portfolio.change7d.value.toFixed(2) }}
-      </span>
-      <span :class="getPosNegClass(statisticsData.portfolio.change7d.percentage)">
-        {{ statisticsData.portfolio.change7d.percentage.toFixed(2) }}%
-      </span>
-    </span>
-  </td>
-  <td class="taco-text-black-to-white">
-    <span class="d-flex flex-column align-items-end">
-      <span :class="getPosNegClass(statisticsData.portfolio.change30d.value)">
-        ${{ statisticsData.portfolio.change30d.value.toFixed(2) }}
-      </span>
-      <span :class="getPosNegClass(statisticsData.portfolio.change30d.percentage)">
-        {{ statisticsData.portfolio.change30d.percentage.toFixed(2) }}%
-      </span>
-    </span>
-  </td>
-  <td class="taco-text-black-to-white">
-    <span class="d-flex flex-column align-items-end">
-      <span :class="getPosNegClass(statisticsData.portfolio.changeAll.value)">
-        ${{ statisticsData.portfolio.changeAll.value.toFixed(2) }}
-      </span>
-      <span :class="getPosNegClass(statisticsData.portfolio.changeAll.percentage)">
-        {{ statisticsData.portfolio.changeAll.percentage.toFixed(2) }}%
-      </span>
-    </span>
-  </td>
-</tr>
-
-<!-- treasury row -->
-<tr>
-  <td class="taco-text-black-to-white">
-    <span class="taco-text-black-to-white">Treasury</span>
-  </td>
-  <td class="taco-text-black-to-white">
-    <span class="d-flex flex-column align-items-end">
-      <span class="taco-text-black-to-white">
-        ${{ statisticsData.treasury.current.toFixed(2) }}
-      </span>
-    </span>
-  </td>
-  <td class="taco-text-black-to-white">
-    <span class="d-flex flex-column align-items-end">
-      <span :class="getPosNegClass(statisticsData.treasury.change24h.value)">
-        ${{ statisticsData.treasury.change24h.value.toFixed(2) }}
-      </span>
-      <span :class="getPosNegClass(statisticsData.treasury.change24h.percentage)">
-        {{ statisticsData.treasury.change24h.percentage.toFixed(2) }}%
-      </span>
-    </span>
-  </td>
-  <td class="taco-text-black-to-white">
-    <span class="d-flex flex-column align-items-end">
-      <span :class="getPosNegClass(statisticsData.treasury.change7d.value)">
-        ${{ statisticsData.treasury.change7d.value.toFixed(2) }}
-      </span>
-      <span :class="getPosNegClass(statisticsData.treasury.change7d.percentage)">
-        {{ statisticsData.treasury.change7d.percentage.toFixed(2) }}%
-      </span>
-    </span>
-  </td>
-  <td class="taco-text-black-to-white">
-    <span class="d-flex flex-column align-items-end">
-      <span :class="getPosNegClass(statisticsData.treasury.change30d.value)">
-        ${{ statisticsData.treasury.change30d.value.toFixed(2) }}
-      </span>
-      <span :class="getPosNegClass(statisticsData.treasury.change30d.percentage)">
-        {{ statisticsData.treasury.change30d.percentage.toFixed(2) }}%
-      </span>
-    </span>
-  </td>
-  <td class="taco-text-black-to-white">
-    <span class="d-flex flex-column align-items-end">
-      <span :class="getPosNegClass(statisticsData.treasury.changeAll.value)">
-        ${{ statisticsData.treasury.changeAll.value.toFixed(2) }}
-      </span>
-      <span :class="getPosNegClass(statisticsData.treasury.changeAll.percentage)">
-        {{ statisticsData.treasury.changeAll.percentage.toFixed(2) }}%
-      </span>
-    </span>
-  </td>
-</tr>                   
+                    <!-- portfolio -->
+                    <tr>
+                      <td class="taco-text-black-to-white">
+                        <span class="taco-text-black-to-white">Portfolio</span>
+                      </td>
+                      <td class="taco-text-black-to-white">
+                        <span class="d-flex flex-column align-items-end">
+                          <span class="taco-text-black-to-white">{{ formatUsd(portfolioStats.current) }}</span>
+                        </span>
+                      </td>
+                      <td class="taco-text-black-to-white">
+                        <span class="d-flex flex-column align-items-end">
+                          <span :class="getPosNegClass(portfolioStats.changes['24h'].abs)">{{ formatUsd(portfolioStats.changes['24h'].abs) }}</span>
+                          <span :class="getPosNegClass(portfolioStats.changes['24h'].abs)">{{ formatPct(portfolioStats.changes['24h'].pct) }}</span>
+                        </span>
+                      </td>
+                      <td class="taco-text-black-to-white">
+                        <span class="d-flex flex-column align-items-end">
+                          <span :class="getPosNegClass(portfolioStats.changes['7d'].abs)">{{ formatUsd(portfolioStats.changes['7d'].abs) }}</span>
+                          <span :class="getPosNegClass(portfolioStats.changes['7d'].abs)">{{ formatPct(portfolioStats.changes['7d'].pct) }}</span>
+                        </span>
+                      </td>
+                      <td class="taco-text-black-to-white">
+                        <span class="d-flex flex-column align-items-end">
+                          <span :class="getPosNegClass(portfolioStats.changes['30d'].abs)">{{ formatUsd(portfolioStats.changes['30d'].abs) }}</span>
+                          <span :class="getPosNegClass(portfolioStats.changes['30d'].abs)">{{ formatPct(portfolioStats.changes['30d'].pct) }}</span>
+                        </span>
+                      </td>
+                      <td class="taco-text-black-to-white">
+                        <span class="d-flex flex-column align-items-end">
+                          <span :class="getPosNegClass(portfolioStats.changes['all'].abs)">{{ formatUsd(portfolioStats.changes['all'].abs) }}</span>
+                          <span :class="getPosNegClass(portfolioStats.changes['all'].abs)">{{ formatPct(portfolioStats.changes['all'].pct) }}</span>
+                        </span>
+                      </td>
+                    </tr>                 
 
                   </tbody>
 
@@ -787,7 +650,7 @@
                       <th class="">Asset</th>
 
                       <!-- heading -->
-                      <th class="">Price</th>
+                      <th class="">Value</th>
 
                       <!-- heading -->
                       <th class="">24h</th>
@@ -807,99 +670,46 @@
 
                   <!-- table body -->
                   <tbody>
-
-                    <!-- row -->
-                    <tr>
-
+                    <tr v-for="t in tokenStats" :key="t.principal">
                       <!-- tokendata -->
                       <td class="taco-text-black-to-white">
-
-                        <!-- entry -->
-                        <span class="taco-text-black-to-white">
-                          ⚪️ XXX
-                        </span>
-                        
+                        <span class="taco-text-black-to-white">{{ t.label }}</span>
                       </td>
-
-                      <!-- price data -->
+                      <!-- value data -->
                       <td class="taco-text-black-to-white">
-
-                        <!-- entry -->
                         <span class="d-flex flex-column align-items-end">
-                          
-                          <!-- dollar amount -->
-                          <span :class="getPosNegClass(0)">$0.00</span>
-                          
+                          <span class="taco-text-black-to-white">{{ formatUsd(t.current) }}</span>
                         </span>
-                        
                       </td>
-
                       <!-- 24h data -->
                       <td class="taco-text-black-to-white">
-
-                        <!-- entry -->
                         <span class="d-flex flex-column align-items-end">
-                          
-                          <!-- dollar amount -->
-                          <span :class="getPosNegClass(0)">$0.00</span>
-
-                          <!-- percentage -->
-                          <span :class="getPosNegClass(0)">0.00%</span>
-                          
+                          <span :class="getPosNegClass(t.changes['24h'].abs)">{{ formatUsd(t.changes['24h'].abs) }}</span>
+                          <span :class="getPosNegClass(t.changes['24h'].abs)">{{ formatPct(t.changes['24h'].pct) }}</span>
                         </span>
-                        
                       </td>
-
                       <!-- 7d data -->
                       <td class="taco-text-black-to-white">
-
-                        <!-- entry -->
                         <span class="d-flex flex-column align-items-end">
-                          
-                          <!-- dollar amount -->
-                          <span :class="getPosNegClass(0)">$0.00</span>
-
-                          <!-- percentage -->
-                          <span :class="getPosNegClass(0)">0.00%</span>
-                          
+                          <span :class="getPosNegClass(t.changes['7d'].abs)">{{ formatUsd(t.changes['7d'].abs) }}</span>
+                          <span :class="getPosNegClass(t.changes['7d'].abs)">{{ formatPct(t.changes['7d'].pct) }}</span>
                         </span>
-                        
                       </td>
-
                       <!-- 30d data -->
                       <td class="taco-text-black-to-white">
-
-                        <!-- entry -->
                         <span class="d-flex flex-column align-items-end">
-                          
-                          <!-- dollar amount -->
-                          <span :class="getPosNegClass(0)">$0.00</span>
-
-                          <!-- percentage -->
-                          <span :class="getPosNegClass(0)">0.00%</span>
-                          
+                          <span :class="getPosNegClass(t.changes['30d'].abs)">{{ formatUsd(t.changes['30d'].abs) }}</span>
+                          <span :class="getPosNegClass(t.changes['30d'].abs)">{{ formatPct(t.changes['30d'].pct) }}</span>
                         </span>
-                        
                       </td>
-
                       <!-- all data -->
                       <td class="taco-text-black-to-white">
-
-                        <!-- entry -->
                         <span class="d-flex flex-column align-items-end">
-                          
-                          <!-- dollar amount -->
-                          <span :class="getPosNegClass(0)">$0.00</span>
-
-                          <!-- percentage -->
-                          <span :class="getPosNegClass(0)">0.00%</span>
-                          
+                          <span :class="getPosNegClass(t.changes['all'].abs)">{{ formatUsd(t.changes['all'].abs) }}</span>
+                          <span :class="getPosNegClass(t.changes['all'].abs)">{{ formatPct(t.changes['all'].pct) }}</span>
                         </span>
-                        
                       </td>
-
                     </tr>
-
                   </tbody>
 
                 </table>                
@@ -1531,7 +1341,8 @@
 
   import HeaderBar from "../components/HeaderBar.vue"
   import FooterBar from "../components/FooterBar.vue"
-  import { ref, onMounted, onUnmounted, computed, onUpdated, watch, provide, nextTick } from "vue"
+  import { ref, shallowRef, markRaw, onMounted, onUnmounted, computed, onUpdated, watch, provide, nextTick } from "vue"
+  import { useStorage } from '@vueuse/core'
   import TacoTitle from '../components/misc/TacoTitle.vue'
   import TacoExchangeLogo from "../assets/images/tacoExchangeLogo.vue"
   import DfinityLogo from "../assets/images/dfinityLogo.vue"
@@ -1541,11 +1352,12 @@
   import { use } from 'echarts/core'
   import { CanvasRenderer } from 'echarts/renderers'
   import { LineChart } from 'echarts/charts'
-  import {
-    TooltipComponent,
-    GridComponent,
-  } from 'echarts/components'
+  import { TooltipComponent, GridComponent } from 'echarts/components'
   import VChart, { THEME_KEY } from 'vue-echarts'
+  import { Principal } from '@dfinity/principal'
+  import { createActor as createPortfolioActor } from '../../../declarations/portfolio_archive'
+  import { createActor as createRewardDistributionActor } from '../../../declarations/reward_distribution_archive'
+  import { createActor as createDaoAllocationActor } from '../../../declarations/dao_allocation_archive'
 
   ///////////
   // Store //
@@ -1562,8 +1374,14 @@
   // user
   const { userLoggedIn } = storeToRefs(tacoStore)
 
-  // dap
+  // dao
   const { fetchedTokenDetails } = storeToRefs(tacoStore)
+
+  // naming system
+  const { namesCache } = storeToRefs(tacoStore)
+
+  // archives
+  const { fetchedPortfolioArchiveBlocks } = storeToRefs(tacoStore)
   
   // # ACTIONS #
 
@@ -1573,6 +1391,15 @@
   // misc
   const { fetchTokenDetails } = tacoStore
 
+  // naming system
+  const { loadAllNames } = tacoStore
+
+  // archives
+  const { fetchPortfolioArchiveBlocks } = tacoStore
+
+  // metadata
+  const { icrc1Metadata } = tacoStore
+
   /////////////////////
   // Local Varialbes //
   /////////////////////
@@ -1581,143 +1408,399 @@
   const chartLoaded = ref(false)
 
   // selected view
-  const selectedView = ref('All Taco Dao Assets')
+  const selectedView = ref('')
 
   // selected chart range
   const selectedChartRange = ref('all')
 
   // available tokens
   const availableTokens = ref<any[]>([])
+  const availableTokenNavList = ref<{ principal: string, label: string }[]>([])
+  const selectedToken = useStorage('performanceSelectedToken', '')
 
-  // treasury portfolio data
-  const treasuryPortfolioData = ref<any[]>([])
+  // parsed caches
+  const portfolioPointsCache = shallowRef<{ ms: number, usd: number }[]>([])
+  const tokenPointsCache = shallowRef<Map<string, { ms: number, usd: number }[]>>(new Map())
+  const blocksParsed = ref(false)
 
-  // dao portfolio data
-  const daoPortfolioData = ref<any[]>([])
+  // token label cache and resolvers (reactive so labels update when symbols resolve)
+  const tokenSymbolCache = shallowRef<Map<string, string>>(new Map()) 
+  
+  // series colors by symbol with fallback hashing
+  const symbolColorMap = new Map<string, string>()
+  const defaultPalette = [
+    '#FEC800', '#934A17', '#5E64D7', '#E48142', '#24e8a6',
+    '#D93777', '#58BA56', '#9992F4', '#F13036', '#1ED760',
+    '#2C6235', '#B3F8FF', '#80AC53', '#BBFD50'
+  ]  
+
+  // // treasury portfolio data
+  // const treasuryPortfolioData = ref<any[]>([])
+
+  // // dao portfolio data
+  // const daoPortfolioData = ref<any[]>([])
+
+
+
+  // // 
+  // const portfolioActor = ref<any>(null)
+
+  // // 
+  // const daoAllocationActor = ref<any>(null)
+
+  // // 
+  // const rewardDistributionActor = ref<any>(null)
+
+
 
   ///////////////////
   // Local Methods //
   ///////////////////
 
+  // safely get a nested candid map entry by key
+  const getFromMapByKey = (mapContainer: any, key: string) => {
+    const pairs = mapContainer?.Map
+    if (!Array.isArray(pairs)) return undefined
+    const match = pairs.find((pair: any) => Array.isArray(pair) && pair[0] === key)
+    return match ? match[1] : undefined
+  }
+
+  // extract total_value_usd values from portfolio archive blocks
+  const extractTotalUsdSeries = (blocksContainer: any) => {
+    const blocks = blocksContainer?.blocks || []
+    const series: number[] = []
+    for (const item of blocks) {
+      const tx = getFromMapByKey(item?.block, 'tx')
+      const data = getFromMapByKey(tx, 'data')
+      const totalUsdObj = getFromMapByKey(data, 'total_value_usd')
+      const valStr = totalUsdObj?.Text
+      if (typeof valStr === 'string') {
+        const num = parseFloat(valStr)
+        if (!Number.isNaN(num)) series.push(num)
+      }
+    }
+    return series
+  }
+
+  // format ms timestamp to a concise label
+  const formatMsToLabel = (ms: number) => {
+    const d = new Date(ms)
+    const pad = (n: number) => String(n).padStart(2, '0')
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
+  }
+
+  // bucket sizing based on selected range
+  const getBucketMsForRange = (range?: string) => {
+    if (range === '7d') return 60 * 60 * 1000 // hourly buckets
+    if (range === '30d' || range === 'all') return 24 * 60 * 60 * 1000 // daily buckets
+    return 0 // 24h uses all points
+  }
+
+  // reduce points by bucket (take the last point in each bucket)
+  const bucketizePoints = (points: { ms: number, usd: number }[], bucketMs: number) => {
+    if (!bucketMs || bucketMs <= 0) return points
+    const byBucket = new Map<number, { ms: number, usd: number }>()
+    for (const p of points) {
+      const bucketStart = Math.floor(p.ms / bucketMs) * bucketMs
+      const existing = byBucket.get(bucketStart)
+      if (!existing || p.ms > existing.ms) byBucket.set(bucketStart, p)
+    }
+    return Array.from(byBucket.values()).sort((a, b) => a.ms - b.ms)
+  }
+
+  // build x axis labels and usd values sorted by timestamp, with optional range filter
+  const extractPortfolioUsdTimeSeries = (blocksContainer: any, range?: string) => {
+    if (!blocksParsed.value) buildParsedCaches(blocksContainer)
+    const points = portfolioPointsCache.value.slice()
+
+    // filter by selected range relative to last timestamp
+    let filtered = points
+    if (range && range !== 'all' && points.length > 0) {
+      const endMs = points[points.length - 1].ms
+      const windowMs = range === '24h' ? 24 * 60 * 60 * 1000
+                      : range === '7d' ? 7 * 24 * 60 * 60 * 1000
+                      : range === '30d' ? 30 * 24 * 60 * 60 * 1000
+                      : Number.MAX_SAFE_INTEGER
+      const cutoff = endMs - windowMs
+      filtered = points.filter(p => p.ms >= cutoff)
+    }
+
+    const bucketMs = getBucketMsForRange(range)
+    const reduced = bucketizePoints(filtered, bucketMs)
+    return {
+      labels: reduced.map(p => formatMsToLabel(p.ms)),
+      values: reduced.map(p => p.usd)
+    }
+  }
+
+  // // token label cache and resolvers
+  // const tokenSymbolCache = new Map<string, string>()
+
+  const blobToBytes = (blobObj: any): number[] => {
+    const obj = blobObj?.Blob
+    if (!obj || typeof obj !== 'object') return []
+    return Object.keys(obj)
+      .map(k => Number(k))
+      .sort((a, b) => a - b)
+      .map(k => obj[String(k)])
+      .filter((v: any) => typeof v === 'number')
+  }
+
+  const blobToPrincipalText = (blobObj: any): string | null => {
+    try {
+      const bytes = blobToBytes(blobObj)
+      if (!bytes.length) return null
+      const p = Principal.fromUint8Array(Uint8Array.from(bytes))
+      return p.toText()
+    } catch {
+      return null
+    }
+  }
+
+  const getTokenLabel = (principalText: string) => {
+    const sym = tokenSymbolCache.value.get(principalText)
+    if (sym && typeof sym === 'string' && sym.length > 0) return sym.toUpperCase()
+    if (principalText && principalText.length > 12) return `${principalText.slice(0, 6)}...${principalText.slice(-5)}`
+    return principalText || 'unknown'
+  }
+
+  const buildParsedCaches = (blocksContainer: any) => {
+    portfolioPointsCache.value = []
+    tokenPointsCache.value = new Map()
+    const blocks = blocksContainer?.blocks || []
+    for (const item of blocks) {
+      const tx = getFromMapByKey(item?.block, 'tx')
+      const data = getFromMapByKey(tx, 'data')
+      const tsObj = getFromMapByKey(data, 'ts') || getFromMapByKey(tx, 'timestamp')
+      let ns: any = tsObj?.Int
+      if (typeof ns === 'string' && ns.endsWith('n')) ns = BigInt(ns.slice(0, -1))
+      if (typeof ns !== 'bigint') continue
+      const ms = Number(ns / 1000000n)
+      if (Number.isNaN(ms)) continue
+
+      const totalUsdStr = getFromMapByKey(data, 'total_value_usd')?.Text
+      if (typeof totalUsdStr === 'string') {
+        const usd = parseFloat(totalUsdStr)
+        if (!Number.isNaN(usd)) portfolioPointsCache.value.push({ ms, usd })
+      }
+
+      const tokensArr = getFromMapByKey(data, 'tokens')?.Array
+      if (Array.isArray(tokensArr)) {
+        for (const t of tokensArr) {
+          const tokenBlob = getFromMapByKey(t, 'token')
+          const principal = blobToPrincipalText(tokenBlob) || blobToHex(tokenBlob)
+          const valStr = getFromMapByKey(t, 'value_in_usd')?.Text
+          if (typeof valStr !== 'string') continue
+          const usd = parseFloat(valStr)
+          if (Number.isNaN(usd)) continue
+          if (!tokenPointsCache.value.has(principal)) tokenPointsCache.value.set(principal, [])
+          tokenPointsCache.value.get(principal)!.push({ ms, usd })
+        }
+      }
+    }
+    portfolioPointsCache.value.sort((a, b) => a.ms - b.ms)
+    for (const [, pts] of tokenPointsCache.value) pts.sort((a, b) => a.ms - b.ms)
+    blocksParsed.value = true
+  }
+
+  // prune large reactive blocks payload after caches are built
+  const pruneFetchedBlocks = () => {
+    try {
+      const original: any = fetchedPortfolioArchiveBlocks.value
+      const logLen = original && typeof original.log_length === 'bigint' ? original.log_length : BigInt(0)
+      // keep only minimal metadata; drop heavy arrays from reactivity
+      // @ts-ignore
+      fetchedPortfolioArchiveBlocks.value = { log_length: logLen }
+    } catch (e) {
+      // noop
+    }
+  }
+
+  const collectTokenPrincipals = (blocksContainer: any): string[] => {
+    const blocks = blocksContainer?.blocks || []
+    const set = new Set<string>()
+    for (const item of blocks) {
+      const tx = getFromMapByKey(item?.block, 'tx')
+      const data = getFromMapByKey(tx, 'data')
+      const tokensArr = getFromMapByKey(data, 'tokens')?.Array
+      if (!Array.isArray(tokensArr)) continue
+      for (const t of tokensArr) {
+        const principalText = blobToPrincipalText(getFromMapByKey(t, 'token'))
+        if (principalText) set.add(principalText)
+      }
+    }
+    return Array.from(set.values())
+  }
+
+  const resolveSymbolsForBlocks = async (blocksContainer: any) => {
+    const principals = collectTokenPrincipals(blocksContainer)
+    const unresolved = principals.filter(p => !tokenSymbolCache.value.has(p))
+    if (unresolved.length === 0) return
+    // fetch in parallel with soft cap
+    const chunks: string[][] = []
+    const size = 10
+    for (let i = 0; i < unresolved.length; i += size) chunks.push(unresolved.slice(i, i + size))
+    for (const chunk of chunks) {
+      await Promise.all(chunk.map(async p => {
+        try {
+          const md = await icrc1Metadata(p)
+          let sym: string | undefined
+          if (Array.isArray(md)) {
+            const entry = md.find((m: any) => Array.isArray(m) && (m[0] === 'icrc1:symbol' || m[0] === 'symbol' || (typeof m[0] === 'string' && m[0].endsWith(':symbol'))))
+            const val = entry?.[1]?.Text
+            if (typeof val === 'string') sym = val
+          }
+          if (sym) {
+            const next = new Map(tokenSymbolCache.value)
+            next.set(p, sym)
+            tokenSymbolCache.value = next
+          }
+        } catch (e) {
+          // leave unresolved, will fall back to principal truncation
+        }
+      }))
+    }
+  }
+
+  const buildTokenNavFromBlocks = async (blocksContainer: any) => {
+    await resolveSymbolsForBlocks(blocksContainer)
+    const principals = collectTokenPrincipals(blocksContainer)
+    availableTokenNavList.value = principals
+      .map(p => ({ principal: p, label: getTokenLabel(p) }))
+      .sort((a, b) => a.label.localeCompare(b.label))
+  }
+
+  // // series colors by symbol with fallback hashing
+  // const symbolColorMap = new Map<string, string>()
+  // const defaultPalette = [
+  //   '#FEC800', '#934A17', '#5E64D7', '#E48142', '#24e8a6',
+  //   '#D93777', '#58BA56', '#9992F4', '#F13036', '#1ED760',
+  //   '#2C6235', '#B3F8FF', '#80AC53', '#BBFD50'
+  // ]
+
+  const buildSymbolColorMap = () => {
+    try {
+      if (Array.isArray(tokenData)) {
+        for (const t of tokenData) {
+          const sym = typeof t?.symbol === 'string' ? t.symbol.toLowerCase() : null
+          const color = typeof t?.color === 'string' ? t.color : null
+          if (sym && color) symbolColorMap.set(sym, color)
+        }
+      }
+    } catch {}
+  }
+  buildSymbolColorMap()
+
+  const hashStringToIndex = (s: string, mod: number) => {
+    let h = 0
+    for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0
+    return h % mod
+  }
+
+  const getSeriesColorForPrincipal = (principalOrId: string) => {
+    const sym = tokenSymbolCache.value.get(principalOrId)
+    if (sym) {
+      const col = symbolColorMap.get(sym.toLowerCase())
+      if (col) return col
+    }
+    return defaultPalette[hashStringToIndex(principalOrId, defaultPalette.length)]
+  }
+
+  // blob to hex string for token id labeling
+  const blobToHex = (blobObj: any) => {
+    const obj = blobObj?.Blob
+    if (!obj || typeof obj !== 'object') return 'unknown'
+    const bytes = Object.keys(obj)
+      .map(k => Number(k))
+      .sort((a, b) => a - b)
+      .map(k => obj[String(k)])
+      .filter((v: any) => typeof v === 'number')
+    return bytes.map((b: number) => b.toString(16).padStart(2, '0')).join('') || 'unknown'
+  }
+
+  // extract per-token usd time series, range-aware, aligned on a unified x axis
+  const extractAssetsUsdTimeSeries = (blocksContainer: any, range?: string) => {
+    if (!blocksParsed.value) buildParsedCaches(blocksContainer)
+
+    // sort and determine global end timestamp
+    let globalEnd = 0
+    for (const [, pts] of tokenPointsCache.value) {
+      pts.sort((a, b) => a.ms - b.ms)
+      if (pts.length > 0) globalEnd = Math.max(globalEnd, pts[pts.length - 1].ms)
+    }
+
+    // range filter
+    let cutoff = -Infinity
+    if (range && range !== 'all' && globalEnd > 0) {
+      const windowMs = range === '24h' ? 24 * 60 * 60 * 1000
+                      : range === '7d' ? 7 * 24 * 60 * 60 * 1000
+                      : range === '30d' ? 30 * 24 * 60 * 60 * 1000
+                      : Number.MAX_SAFE_INTEGER
+      cutoff = globalEnd - windowMs
+    }
+
+    const bucketMs = getBucketMsForRange(range)
+
+    // unified timeline
+    const allMsSet = new Set<number>()
+    const tokenToMap = new Map<string, Map<number, number>>()
+    for (const [tokenId, pts] of tokenPointsCache.value) {
+      const filteredPts = cutoff === -Infinity ? pts : pts.filter(p => p.ms >= cutoff)
+      const reduced = bucketizePoints(filteredPts, bucketMs)
+      const map = new Map<number, number>()
+      for (const p of reduced) {
+        map.set(p.ms, p.usd)
+        allMsSet.add(p.ms)
+      }
+      tokenToMap.set(tokenId, map)
+    }
+
+    const msList = Array.from(allMsSet.values()).sort((a, b) => a - b)
+    const labels = msList.map(ms => formatMsToLabel(ms))
+
+    const series = Array.from(tokenToMap.entries()).map(([tokenId, map]) => ({
+      name: getTokenLabel(tokenId),
+      data: msList.map(ms => map.get(ms) ?? null),
+      lineStyle: { color: getSeriesColorForPrincipal(tokenId) },
+      itemStyle: { color: getSeriesColorForPrincipal(tokenId) }
+    }))
+
+    return { labels, series }
+  }
+
+  const extractSingleTokenUsdTimeSeries = (blocksContainer: any, tokenPrincipal: string, range?: string) => {
+    if (!blocksParsed.value) buildParsedCaches(blocksContainer)
+    const points = (tokenPointsCache.value.get(tokenPrincipal) || []).slice()
+    let filtered = points
+    if (range && range !== 'all' && points.length > 0) {
+      const endMs = points[points.length - 1].ms
+      const windowMs = range === '24h' ? 24 * 60 * 60 * 1000
+                      : range === '7d' ? 7 * 24 * 60 * 60 * 1000
+                      : range === '30d' ? 30 * 24 * 60 * 60 * 1000
+                      : Number.MAX_SAFE_INTEGER
+      const cutoff = endMs - windowMs
+      filtered = points.filter(p => p.ms >= cutoff)
+    }
+    const bucketMs = getBucketMsForRange(range)
+    const reduced = bucketizePoints(filtered, bucketMs)
+    return {
+      labels: reduced.map(p => formatMsToLabel(p.ms)),
+      values: reduced.map(p => p.usd)
+    }
+  }
+
+  const selectTokenView = (principal: string) => {
+    selectedToken.value = principal
+    selectedView.value = 'X Asset Performance'
+  }
+
   //////////////
   // HANDLERS //
 
-  // handle select chart range
-  const handleSetChartRange = (range: string) => {
-    selectedChartRange.value = range
-  }
+  // 
 
   /////////////
   // RETURNS //
-
-  // load available tokens
-  const loadAvailableTokens = async () => {
-
-    // try
-    try {
-
-      // if fetched token details is empty
-      if (fetchedTokenDetails.value.length === 0) {
-
-        // fetch token details
-        await fetchTokenDetails()
-
-      }
-
-      // set token details
-      const tokenDetails = fetchedTokenDetails || []
-
-      // filter token details
-      availableTokens.value = tokenDetails.value.filter(([_, details]: any) => 
-        details.Active && !details.isPaused
-      )
-      
-    } 
-    
-    // catch
-    catch (error) {
-
-      // log error
-      console.error('Failed to load available tokens:', error)
-
-    }
-    
-  }
-
-  // load price history
-  const loadPriceHistory = async () => {
-
-    // try
-    try {
-
-      // load both portfolio and treasury data
-      const [treasuryResult, daoResult] = await Promise.all([
-        tacoStore.getTreasuryPortfolioHistory(1000).catch(e => {
-          console.error('Failed to load treasury portfolio:', e)
-          return { snapshots: [] }
-        }),
-        tacoStore.getPortfolioHistory(2000).catch(e => {
-          console.error('Failed to load DAO portfolio:', e)
-          return []
-        })
-      ])
-      
-      // process treasury data
-      if (treasuryResult && treasuryResult.snapshots) {
-        treasuryPortfolioData.value = treasuryResult.snapshots.map((snapshot: any) => ({
-          time: snapshot.timestamp,
-          icpPrice: snapshot.totalValueICP,
-          usdPrice: snapshot.totalValueUSD,
-          tokens: snapshot.tokens
-        }))
-      } else {
-        treasuryPortfolioData.value = []
-      }
-      
-      // process DAO data
-      if (Array.isArray(daoResult)) {
-        daoPortfolioData.value = daoResult.map(([timestamp, data]: any) => ({
-          time: timestamp,
-          icpPrice: typeof data.totalWorthInICP === 'bigint' ? data.totalWorthInICP : BigInt(data.totalWorthInICP || 0),
-          usdPrice: typeof data.totalWorthInUSD === 'bigint' ? Number(data.totalWorthInUSD) : (data.totalWorthInUSD || 0),
-          balances: data.balances || [],
-          allocations: data.allocations || []
-        })).reverse()
-      } else {
-        daoPortfolioData.value = []
-      }
-      
-    } catch (error) {
-      console.error('Failed to load price history:', error)
-    }
-
-  }
-
-  // filter data by time range
-  const filterDataByTimeRange = (data: any[], range: string) => {
-    if (range === 'all') return data
-    
-    const now = Date.now()
-    const rangeInMs = {
-      '24h': 24 * 60 * 60 * 1000,
-      '7d': 7 * 24 * 60 * 60 * 1000,
-      '30d': 30 * 24 * 60 * 60 * 1000
-    }
-    
-    const cutoffTime = now - rangeInMs[range as keyof typeof rangeInMs]
-    
-    return data.filter(item => {
-      const itemTime = Number(item.time) / 1_000_000 // convert from nanoseconds to milliseconds
-      return itemTime >= cutoffTime
-    })
-  }
-
-  // check for data variation
-  const hasDataVariation = (seriesData: number[]) => {
-    if (seriesData.length <= 1) return false
-    const firstValue = seriesData[0]
-    return seriesData.some(value => value !== firstValue)
-  }  
 
   // get pos neg class
   const getPosNegClass = (value: number) => {
@@ -1725,85 +1808,124 @@
     return value > 0 ? "taco-text-light-green-to-success-green-hover" : "taco-text-red-to-light-red"
   }
 
+  // formatters
+  const formatUsd = (n: number) => {
+    if (!Number.isFinite(n)) return '$0.00'
+    try {
+      return `$${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+    } catch {
+      return `$${n.toFixed(2)}`
+    }
+  }
+
+  const formatPct = (n: number) => {
+    if (!Number.isFinite(n)) return '0.00%'
+    try {
+      return `${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`
+    } catch {
+      return `${n.toFixed(2)}%`
+    }
+  }
+
   //////////////
   // Computed //
   //////////////
 
-  const statisticsData = computed(() => {
-    if (treasuryPortfolioData.value.length === 0 || daoPortfolioData.value.length === 0) {
+  const portfolioStats = computed(() => {
+    const points = portfolioPointsCache.value || []
+    if (!points.length) {
       return {
-        totalAUM: { current: 999999, change24h: { value: 999999, percentage: 999999 }, change7d: { value: 999999, percentage: 999999 }, change30d: { value: 999999, percentage: 999999 }, changeAll: { value: 999999, percentage: 999999 } },
-        portfolio: { current: 999999, change24h: { value: 999999, percentage: 999999 }, change7d: { value: 999999, percentage: 999999 }, change30d: { value: 999999, percentage: 999999 }, changeAll: { value: 999999, percentage: 999999 } },
-        treasury: { current: 999999, change24h: { value: 999999, percentage: 999999 }, change7d: { value: 999999, percentage: 999999 }, change30d: { value: 999999, percentage: 999999 }, changeAll: { value: 999999, percentage: 999999 } }
+        current: 0,
+        changes: {
+          '24h': { abs: 0, pct: 0 },
+          '7d': { abs: 0, pct: 0 },
+          '30d': { abs: 0, pct: 0 },
+          'all': { abs: 0, pct: 0 }
+        }
       }
     }
-
-    // get current values (most recent - LAST index)
-    const currentTreasury = Number(treasuryPortfolioData.value[treasuryPortfolioData.value.length - 1]?.usdPrice || 0)
-    const currentPortfolio = Number(daoPortfolioData.value[daoPortfolioData.value.length - 1]?.usdPrice || 0)
-    const currentTotal = currentTreasury + currentPortfolio
-
-    // get values for different time periods
-    const getValueAtTime = (data: any[], hoursAgo: number) => {
-      const cutoffTime = Date.now() - (hoursAgo * 60 * 60 * 1000)
-      const item = data.find(item => {
-        const itemTime = Number(item.time) / 1_000_000
-        return itemTime >= cutoffTime
-      })
-      return item ? Number(item.usdPrice) : 0
+    const latest = points[points.length - 1]
+    const endMs = latest.ms
+    const windows: Record<string, number> = {
+      '24h': 24 * 60 * 60 * 1000,
+      '7d': 7 * 24 * 60 * 60 * 1000,
+      '30d': 30 * 24 * 60 * 60 * 1000
     }
 
-    // calculate changes for different periods
-    const calculateChange = (current: number, previous: number) => {
-      if (previous === 0) return { value: 0, percentage: 0 }
-      const change = current - previous
-      const percentage = (change / previous) * 100
-      return { value: change, percentage }
+    const findBaseline = (cutoff: number) => {
+      for (let i = 0; i < points.length; i++) {
+        if (points[i].ms >= cutoff) return points[i].usd
+      }
+      return points[0].usd
     }
 
-    // 24h changes
-    const treasury24h = getValueAtTime(treasuryPortfolioData.value, 24)
-    const portfolio24h = getValueAtTime(daoPortfolioData.value, 24)
-    const total24h = treasury24h + portfolio24h
-
-    // 7d changes
-    const treasury7d = getValueAtTime(treasuryPortfolioData.value, 24 * 7)
-    const portfolio7d = getValueAtTime(daoPortfolioData.value, 24 * 7)
-    const total7d = treasury7d + portfolio7d
-
-    // 30d changes
-    const treasury30d = getValueAtTime(treasuryPortfolioData.value, 24 * 30)
-    const portfolio30d = getValueAtTime(daoPortfolioData.value, 24 * 30)
-    const total30d = treasury30d + portfolio30d
-
-    // all time changes (oldest data - FIRST index)
-    const oldestTreasury = Number(treasuryPortfolioData.value[0]?.usdPrice || 0)
-    const oldestPortfolio = Number(daoPortfolioData.value[0]?.usdPrice || 0)
-    const oldestTotal = oldestTreasury + oldestPortfolio
+    const compute = (windowMs: number | 'all') => {
+      const startVal = windowMs === 'all' ? points[0].usd : findBaseline(endMs - (windowMs as number))
+      const endVal = latest.usd
+      const abs = endVal - startVal
+      const pct = startVal !== 0 ? (abs / startVal) * 100 : 0
+      return { abs, pct }
+    }
 
     return {
-      totalAUM: {
-        current: currentTotal,
-        change24h: calculateChange(currentTotal, total24h),
-        change7d: calculateChange(currentTotal, total7d),
-        change30d: calculateChange(currentTotal, total30d),
-        changeAll: calculateChange(currentTotal, oldestTotal)
-      },
-      portfolio: {
-        current: currentPortfolio,
-        change24h: calculateChange(currentPortfolio, portfolio24h),
-        change7d: calculateChange(currentPortfolio, portfolio7d),
-        change30d: calculateChange(currentPortfolio, portfolio30d),
-        changeAll: calculateChange(currentPortfolio, oldestPortfolio)
-      },
-      treasury: {
-        current: currentTreasury,
-        change24h: calculateChange(currentTreasury, treasury24h),
-        change7d: calculateChange(currentTreasury, treasury7d),
-        change30d: calculateChange(currentTreasury, treasury30d),
-        changeAll: calculateChange(currentTreasury, oldestTreasury)
+      current: latest.usd,
+      changes: {
+        '24h': compute(windows['24h']),
+        '7d': compute(windows['7d']),
+        '30d': compute(windows['30d']),
+        'all': compute('all')
       }
     }
+  })
+
+  const tokenStats = computed(() => {
+    const out: { principal: string, label: string, current: number, changes: Record<string, { abs: number, pct: number }> }[] = []
+    const map = tokenPointsCache.value || new Map()
+    for (const [principal, points] of map) {
+      if (!points || points.length === 0) continue
+      const latest = points[points.length - 1]
+      const endMs = latest.ms
+      const windows: Record<string, number> = {
+        '24h': 24 * 60 * 60 * 1000,
+        '7d': 7 * 24 * 60 * 60 * 1000,
+        '30d': 30 * 24 * 60 * 60 * 1000
+      }
+
+      const findBaseline = (cutoff: number) => {
+        for (let i = 0; i < points.length; i++) {
+          if (points[i].ms >= cutoff) return points[i].usd
+        }
+        return points[0].usd
+      }
+
+      const compute = (windowMs: number | 'all') => {
+        const startVal = windowMs === 'all' ? points[0].usd : findBaseline(endMs - (windowMs as number))
+        const endVal = latest.usd
+        const abs = endVal - startVal
+        const pct = startVal !== 0 ? (abs / startVal) * 100 : 0
+        return { abs, pct }
+      }
+
+      out.push({
+        principal,
+        label: getTokenLabel(principal),
+        current: latest.usd,
+        changes: {
+          '24h': compute(windows['24h']),
+          '7d': compute(windows['7d']),
+          '30d': compute(windows['30d']),
+          'all': compute('all')
+        }
+      })
+    }
+    return out.sort((a, b) => a.label.localeCompare(b.label))
+  })
+
+  const selectedViewLabel = computed(() => {
+    if (selectedView.value === 'X Asset Performance' && selectedToken.value) {
+      return `${getTokenLabel(selectedToken.value)} Performance`
+    }
+    return selectedView.value
   })
   
   /////////////
@@ -1828,6 +1950,7 @@
       smooth: false,
       label: { show: false },
       showSymbol: false,
+      animation: false,
     }))
     
     // update the chart
@@ -1980,307 +2103,102 @@
     // log
     console.log('selected view changed')
 
-    // if newVal is All Taco Dao Assets
-    if (newVal === 'All Taco Dao Assets') {
+    // Portfolio Performance
+    if (newVal === 'Portfolio Performance') {
 
       // log
-      console.log('All Taco Dao Assets')
+      console.log('Portfolio Performance')
 
-      // load price history only if data is not already loaded
-      if (treasuryPortfolioData.value.length === 0 || daoPortfolioData.value.length === 0) {
-        await loadPriceHistory()
-      }
+      // log fetched portfolio archive blocks
+      console.log('fetched portfolio archive blocks', fetchedPortfolioArchiveBlocks.value)
 
-      // filter data by selected time range
-      const filteredTreasuryData = filterDataByTimeRange(treasuryPortfolioData.value, selectedChartRange.value)
-      const filteredDaoData = filterDataByTimeRange(daoPortfolioData.value, selectedChartRange.value)
+      // extract and log total_value_usd series
+      const totalUsdSeries = extractTotalUsdSeries(fetchedPortfolioArchiveBlocks.value)
+      console.log('total_value_usd series', totalUsdSeries)
 
-      // check if the combined data has variation in the selected timeframe
-      const combinedData = filteredTreasuryData.map((item, index) => {
-        const treasuryValue = Number(item.usdPrice)
-        const daoValue = filteredDaoData[index] ? Number(filteredDaoData[index].usdPrice) : 0
-        return treasuryValue + daoValue
-      })
-      
-      const hasVariation = hasDataVariation(combinedData)
-
-      if (!hasVariation) {
-        // show "No data variation in selected timeframe" message
-        const newChartData = { 
-          xAxisData: ['No Data'], 
-          series: [{
-            name: "No Variation",
-            data: [0],
-            lineStyle: { color: "#808080" },
-            itemStyle: { color: "#808080" }
-          }]
-        }
-        updateChartData(newChartData)
-        return
-      }
-
-      const newChartData = {
-        xAxisData: filteredTreasuryData.map(item => {
-          // convert bigint time to readable date
-          const timestamp = Number(item.time) / 1_000_000 // convert from nanoseconds to milliseconds
-          return new Date(timestamp).toLocaleDateString()
-        }),
-        series: [
-          {
-            name: "Total AUM",
-            data: filteredTreasuryData.map((item, index) => {
-              const treasuryValue = Number(item.usdPrice)
-              const daoValue = filteredDaoData[index] ? Number(filteredDaoData[index].usdPrice) : 0
-              return treasuryValue + daoValue
-            }),
-            lineStyle: { color: "#FEA000" },
-            itemStyle: { color: "#FEA000" }
-          }
-        ]
-      }
-
-      updateChartData(newChartData)
+      // map to chart with timestamps on x-axis and selected range
+      const { labels, values } = extractPortfolioUsdTimeSeries(fetchedPortfolioArchiveBlocks.value, selectedChartRange.value)
+      console.log('portfolio performance chart points', { labelsCount: labels.length, valuesCount: values.length })
+      updateChartData({ xAxisData: labels, series: [{ name: 'total usd', data: values, lineStyle: { color: '#DA8D28' }, itemStyle: { color: '#DA8D28' } }] })
 
     }
 
-    // else if newVal is Treasury vs Portfolio
-    else if (newVal === 'Treasury vs Portfolio') {
+    // Assets Performance
+    else if (newVal === 'Assets Performance') {
 
       // log
-      console.log('Treasury vs Portfolio')
-
-      // load price history only if data is not already loaded
-      if (treasuryPortfolioData.value.length === 0 || daoPortfolioData.value.length === 0) {
-        await loadPriceHistory()
-      }
-
-      // filter data by selected time range
-      const filteredTreasuryData = filterDataByTimeRange(treasuryPortfolioData.value, selectedChartRange.value)
-      const filteredDaoData = filterDataByTimeRange(daoPortfolioData.value, selectedChartRange.value)
-
-      // check if either treasury or portfolio has variation in the selected timeframe
-      const treasuryData = filteredTreasuryData.map(item => Number(item.usdPrice))
-      const portfolioData = filteredDaoData.map(item => Number(item.usdPrice))
-      
-      const hasTreasuryVariation = hasDataVariation(treasuryData)
-      const hasPortfolioVariation = hasDataVariation(portfolioData)
-
-      if (!hasTreasuryVariation && !hasPortfolioVariation) {
-        // show "No data variation in selected timeframe" message
-        const newChartData = { 
-          xAxisData: ['No Data'], 
-          series: [{
-            name: "No Variation",
-            data: [0],
-            lineStyle: { color: "#808080" },
-            itemStyle: { color: "#808080" }
-          }]
-        }
-        updateChartData(newChartData)
-        return
-      }
-
-      const newChartData = {
-        xAxisData: filteredTreasuryData.map(item => {
-          // convert bigint time to readable date
-          const timestamp = Number(item.time) / 1_000_000 // convert from nanoseconds to milliseconds
-          return new Date(timestamp).toLocaleDateString()
-        }),
-        series: [
-          {
-            name: "Treasury",
-            data: filteredTreasuryData.map(item => Number(item.usdPrice)),
-            lineStyle: { color: "#FEA000" },
-            itemStyle: { color: "#FEA000" }
-          },
-          {
-            name: "Portfolio", 
-            data: filteredDaoData.map(item => Number(item.usdPrice)),
-            lineStyle: { color: "#4CAF50" },
-            itemStyle: { color: "#4CAF50" }
-          }
-        ]
-      }
-
-      updateChartData(newChartData) 
+      console.log('Assets Performance')
+      // symbols already cached during nav build; no need to refetch here
+      const { labels, series } = extractAssetsUsdTimeSeries(fetchedPortfolioArchiveBlocks.value, selectedChartRange.value)
+      updateChartData({ xAxisData: labels, series })
 
     }
 
-    // else if newVal is All Treasury Assets
-    else if (newVal === 'All Treasury Assets') {
+    // Leaderboard
+    else if (newVal === 'Leaderboard') {
 
       // log
-      console.log('All Treasury Assets')
+      console.log('Leaderboard')
 
-      // load price history only if data is not already loaded
-      if (treasuryPortfolioData.value.length === 0 || daoPortfolioData.value.length === 0) {
-        await loadPriceHistory()
-      }      
+      // code
 
-      // get unique token names from the first snapshot
-      const firstSnapshot = treasuryPortfolioData.value[0]
-      if (!firstSnapshot || !firstSnapshot.tokens) {
-        const newChartData = { xAxisData: [], series: [] }
-        updateChartData(newChartData)
-        return
-      }
-
-      // filter data by selected time range
-      const filteredTreasuryData = filterDataByTimeRange(treasuryPortfolioData.value, selectedChartRange.value)
-
-      const tokenNames = firstSnapshot.tokens.map((token: any) => token.symbol || 'Unknown')
       
-      // check if any token has variation in the selected timeframe
-      const hasAnyVariation = tokenNames.some((tokenName: string, tokenIndex: number) => {
-        const tokenData = filteredTreasuryData.map(item => {
-          const token = item.tokens[tokenIndex]
-          return token ? Number(token.valueInUSD || 0) : 0
-        })
-        return hasDataVariation(tokenData)
-      })
-
-      if (!hasAnyVariation) {
-        // show "No data variation in selected timeframe" message
-        const newChartData = { 
-          xAxisData: ['No Data'], 
-          series: [{
-            name: "No Variation",
-            data: [0],
-            lineStyle: { color: "#808080" },
-            itemStyle: { color: "#808080" }
-          }]
-        }
-        updateChartData(newChartData)
-        return
-      }
-
-      const newChartData = {
-        xAxisData: filteredTreasuryData.map(item => {
-          const timestamp = Number(item.time) / 1_000_000
-          return new Date(timestamp).toLocaleDateString()
-        }),
-        series: tokenNames.map((tokenName: string, tokenIndex: number) => {
-          // find token in TokenData to get the color
-          const tokenInfo = tokenData.find((t: any) => t.symbol.toLowerCase() === tokenName.toLowerCase())
-          const color = tokenInfo?.color || '#808080' // fallback to gray if not found
-          
-          return {
-            name: tokenName,
-            data: filteredTreasuryData.map(item => {
-              const token = item.tokens[tokenIndex]
-              return token ? Number(token.valueInUSD || 0) : 0
-            }),
-            lineStyle: { color: color },
-            itemStyle: { color: color }
-          }
-        })
-      }
-
-      updateChartData(newChartData) 
-
     }
-        
-    else if (newVal === 'All Portfolio Assets') {
+
+    else {
 
       // log
-      console.log('All Portfolio Assets')
-
-      // load price history only if data is not already loaded
-      if (treasuryPortfolioData.value.length === 0 || daoPortfolioData.value.length === 0) {
-        await loadPriceHistory()
+      console.log('Asset X Performance')
+      await resolveSymbolsForBlocks(fetchedPortfolioArchiveBlocks.value)
+      if (selectedToken.value) {
+        const { labels, values } = extractSingleTokenUsdTimeSeries(
+          fetchedPortfolioArchiveBlocks.value,
+          selectedToken.value,
+          selectedChartRange.value
+        )
+        updateChartData({ xAxisData: labels, series: [{ name: getTokenLabel(selectedToken.value), data: values, lineStyle: { color: getSeriesColorForPrincipal(selectedToken.value) }, itemStyle: { color: getSeriesColorForPrincipal(selectedToken.value) } }] })
+      } else {
+        const { labels, series } = extractAssetsUsdTimeSeries(fetchedPortfolioArchiveBlocks.value, selectedChartRange.value)
+        updateChartData({ xAxisData: labels, series })
       }
-
-      // get unique token principals from the first snapshot
-      const firstSnapshot = daoPortfolioData.value[0]
-      if (!firstSnapshot || !firstSnapshot.balances) {
-        const newChartData = { xAxisData: [], series: [] }
-        updateChartData(newChartData)
-        return
-      }
-
-      // filter data by selected time range
-      const filteredDaoData = filterDataByTimeRange(daoPortfolioData.value, selectedChartRange.value)
-
-      // map token principals to symbols (you'll need to implement this mapping)
-      const tokenPrincipals = firstSnapshot.balances.map((balance: any) => balance[0])
       
-      // check if any token has variation in the selected timeframe
-      const hasAnyVariation = tokenPrincipals.some((tokenPrincipal: any, tokenIndex: number) => {
-        const tokenData = filteredDaoData.map(item => {
-          const balance = item.balances[tokenIndex]
-          if (balance && balance[1]) {
-            // convert from cents to dollars (divide by 100)
-            const balanceValue = Number(balance[1]) / 100
-            return balanceValue
-          }
-          return 0
-        })
-        return hasDataVariation(tokenData)
-      })
-
-      if (!hasAnyVariation) {
-        // show "No data variation in selected timeframe" message
-        const newChartData = { 
-          xAxisData: ['No Data'], 
-          series: [{
-            name: "No Variation",
-            data: [0],
-            lineStyle: { color: "#808080" },
-            itemStyle: { color: "#808080" }
-          }]
-        }
-        updateChartData(newChartData)
-        return
-      }
-
-      const newChartData = {
-        xAxisData: filteredDaoData.map(item => {
-          const timestamp = Number(item.time) / 1_000_000
-          return new Date(timestamp).toLocaleDateString()
-        }),
-        series: tokenPrincipals.map((tokenPrincipal: any, tokenIndex: number) => {
-          // you'll need to implement a way to get the token symbol from the principal
-          // for now, using a placeholder
-          const tokenName = `Token ${tokenIndex + 1}`
-          
-          // find token in TokenData to get the color
-          const tokenInfo = tokenData.find((t: any) => t.symbol.toLowerCase() === tokenName.toLowerCase())
-          const color = tokenInfo?.color || '#808080' // fallback to gray if not found
-          
-          return {
-            name: tokenName,
-            data: filteredDaoData.map(item => {
-              const balance = item.balances[tokenIndex]
-              if (balance && balance[1]) {
-                // convert from cents to dollars (divide by 100)
-                const balanceValue = Number(balance[1]) / 100
-                return balanceValue
-              }
-              return 0
-            }),
-            lineStyle: { color: color },
-            itemStyle: { color: color }
-          }
-        })
-      }
-
-      updateChartData(newChartData) 
-
     }
 
-  }, { immediate: true })
+    // Asset X Performance
+
+  })
 
   // watch for chart range changes to update the current chart
   watch(selectedChartRange, async (newRange) => {
-    // only update if we have a view selected and data loaded
-    if (selectedView.value && (treasuryPortfolioData.value.length > 0 || daoPortfolioData.value.length > 0)) {
-      // trigger the view update logic again with the new range
-      const currentView = selectedView.value
-      selectedView.value = '' // temporarily clear to trigger change
-      await nextTick()
-      selectedView.value = currentView // set back to trigger the watch
+    if (!selectedView.value) return
+    if (selectedView.value === 'Portfolio Performance') {
+      const { labels, values } = extractPortfolioUsdTimeSeries(fetchedPortfolioArchiveBlocks.value, newRange)
+      updateChartData({ xAxisData: labels, series: [{ name: 'total usd', data: values, lineStyle: { color: '#DA8D28' }, itemStyle: { color: '#DA8D28' } }] })
+    } else if (selectedView.value === 'Assets Performance') {
+      const { labels, series } = extractAssetsUsdTimeSeries(fetchedPortfolioArchiveBlocks.value, newRange)
+      updateChartData({ xAxisData: labels, series })
+    } else if (selectedView.value === 'X Asset Performance' && selectedToken.value) {
+      const { labels, values } = extractSingleTokenUsdTimeSeries(
+        fetchedPortfolioArchiveBlocks.value,
+        selectedToken.value,
+        newRange
+      )
+      updateChartData({ xAxisData: labels, series: [{ name: getTokenLabel(selectedToken.value), data: values, lineStyle: { color: getSeriesColorForPrincipal(selectedToken.value) }, itemStyle: { color: getSeriesColorForPrincipal(selectedToken.value) } }] })
     }
+    // future: add handling for other views when they are wired to data
   })  
+
+  // watch for selected token changes when viewing a single asset
+  watch(selectedToken, async (newPrincipal) => {
+    if (selectedView.value !== 'X Asset Performance') return
+    if (!newPrincipal) return
+    const { labels, values } = extractSingleTokenUsdTimeSeries(
+      fetchedPortfolioArchiveBlocks.value,
+      newPrincipal,
+      selectedChartRange.value
+    )
+    updateChartData({ xAxisData: labels, series: [{ name: getTokenLabel(newPrincipal), data: values, lineStyle: { color: getSeriesColorForPrincipal(newPrincipal) }, itemStyle: { color: getSeriesColorForPrincipal(newPrincipal) } }] })
+  })
 
   // watch for dark mode to update
   watch(darkModeToggled, async (newVal) => {
@@ -2336,15 +2254,38 @@
   // on mounted
   onMounted(async () => {
 
-    // set selected view
-    selectedView.value = 'All Taco Dao Assets'  
-
-    // load available tokens
-    await loadAvailableTokens()
-
     // log
-    console.log('available tokens', availableTokens.value)
+    console.log('PerformanceView mounted')
 
+    // if we already have blocks in store, reuse them; else fetch once
+    const hasBlocks = Array.isArray((fetchedPortfolioArchiveBlocks.value as any)?.blocks) && (fetchedPortfolioArchiveBlocks.value as any).blocks.length > 0
+    if (!hasBlocks) {
+      await fetchPortfolioArchiveBlocks(3000)
+    }
+
+    // set selected view
+    selectedView.value = 'Portfolio Performance'
+
+    // build caches and token nav if not already built
+    if (!blocksParsed.value) {
+      buildParsedCaches(fetchedPortfolioArchiveBlocks.value)
+      await buildTokenNavFromBlocks(fetchedPortfolioArchiveBlocks.value)
+    }
+
+  })
+
+  onUnmounted(() => {
+    try {
+      option.value = {
+        ...(darkModeToggled.value ? lightTheme : darkTheme),
+        xAxis: { ...(darkModeToggled.value ? lightTheme : darkTheme).xAxis, data: [] },
+        series: []
+      }
+      portfolioPointsCache.value = markRaw([])
+      tokenPointsCache.value = markRaw(new Map())
+      availableTokenNavList.value = []
+      selectedToken.value = ''
+    } catch {}
   })
 
 </script>

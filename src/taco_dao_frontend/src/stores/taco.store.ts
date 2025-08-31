@@ -19,6 +19,12 @@ import { idlFactory as appSneedDaoIDL, _SERVICE as AppSneedDaoService } from "..
 import { idlFactory as snsGovernanceIDL } from "../../../declarations/sns_governance/sns_governance.did.js"
 import { idlFactory as alarmIDL, _SERVICE as AlarmService } from "../../../declarations/alarm/alarm.did.js"
 import { idlFactory as rewardsIDL } from "../../../declarations/rewards/rewards.did.js"
+
+import { idlFactory as portfolioArchiveIDL } from "../../../declarations/portfolio_archive/portfolio_archive.did.js"
+import { idlFactory as rewardDistributionArchiveIDL } from "../../../declarations/reward_distribution_archive/reward_distribution_archive.did.js"
+import { idlFactory as daoAllocationArchiveIDL } from "../../../declarations/dao_allocation_archive/dao_allocation_archive.did.js"
+
+
 import { Principal } from '@dfinity/principal'
 import { AccountIdentifier } from '@dfinity/ledger-icp'
 import { canisterId as iiCanisterId } from "../../../declarations/internet_identity/index.js"
@@ -543,6 +549,11 @@ export const useTacoStore = defineStore('taco', () => {
 
     // treasury
     const fetchedTradingStatus = ref()
+
+    // archives
+    const fetchedPortfolioArchiveBlocks = ref<any>({})
+    const fetchedRewardDistributionArchiveBlocks = ref([])
+    const fetchedDaoAllocationArchiveBlocks = ref([])
 
     // snassy's 
     const timerHealth = ref({
@@ -1222,6 +1233,33 @@ export const useTacoStore = defineStore('taco', () => {
         }        
         return 'b2cwp-6qaaa-aaaad-qhn6a-cai' // if not ic or staging, use local (all the same for now)
     }
+    const portfolioArchiveCanisterId = () => {
+        switch (process.env.DFX_NETWORK) {
+            case "ic":
+                return process.env.CANISTER_ID_PORTFOLIO_ARCHIVE_IC || 'bl7x7-wiaaa-aaaan-qz5bq-cai'
+            case "staging":
+                return process.env.CANISTER_ID_PORTFOLIO_ARCHIVE_STAGING || 'lrekt-uaaaa-aaaan-qz4ya-cai'
+        }        
+        return 'lrekt-uaaaa-aaaan-qz4ya-cai'
+    }
+    const rewardDistributionArchiveCanisterId = () => {
+        switch (process.env.DFX_NETWORK) {
+            case "ic":
+                return process.env.CANISTER_ID_REWARD_DISTRIBUTION_ARCHIVE_IC || 'ddfi2-eiaaa-aaaan-qz5nq-cai'
+            case "staging":
+                return process.env.CANISTER_ID_REWARD_DISTRIBUTION_ARCHIVE_STAGING || 'ddfi2-eiaaa-aaaan-qz5nq-cai'
+        }        
+        return 'ddfi2-eiaaa-aaaan-qz5nq-cai'
+    }
+    const daoAllocationArchiveCanisterId = () => {
+        switch (process.env.DFX_NETWORK) {
+            case "ic":
+                return process.env.CANISTER_ID_DAO_ALLOCATION_ARCHIVE_IC || 'cvoqr-ryaaa-aaaan-qz5iq-cai'
+            case "staging":
+                return process.env.CANISTER_ID_DAO_ALLOCATION_ARCHIVE_STAGING || 'bq2l2-mqaaa-aaaan-qz5da-cai'
+        }        
+        return 'bq2l2-mqaaa-aaaan-qz5da-cai'
+    }
 
     // crypto prices
     const fetchCryptoPrices = async () => {
@@ -1364,7 +1402,7 @@ export const useTacoStore = defineStore('taco', () => {
             const metadata = await actor.icrc1_metadata()
 
             // log
-            // console.log('taco.store: icrc1Metadata() - returned metadata:', metadata)
+            console.log('taco.store: icrc1Metadata() - returned metadata:', metadata)
 
             // return metadata
             return metadata
@@ -2216,6 +2254,158 @@ export const useTacoStore = defineStore('taco', () => {
 
         }
     }
+
+    // archive canisters
+    const fetchPortfolioArchiveBlocks = async (batchSize: number) => {
+
+        // log
+        console.log('taco.store: fetchPortfolioArchiveBlocks()')
+
+        // turn app loading on
+        appLoadingOn()
+
+        // try
+        try {
+
+            // create auth client
+            const authClient = await getAuthClient()
+
+            // if user is not authenticated
+            if (!(await authClient.isAuthenticated())) {
+                return false
+            }
+
+            // get host
+            const host = process.env.DFX_NETWORK === "local"
+                ? getLocalHost()
+                : "https://ic0.app"
+
+            // get identity
+            const identity = await authClient.getIdentity()
+
+            // create agent
+            const agent = await createAgent({
+                identity,
+                host,
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            })
+
+            // create actor
+            const actor = Actor.createActor(portfolioArchiveIDL, {
+                agent,
+                canisterId: portfolioArchiveCanisterId(),
+            })
+
+            //////////////////////
+            // post actor logic //
+
+            // create all blocks array
+            const allBlocks: any[] = []
+
+            // merge from result
+            const mergeFromResult = async (res: any) => {
+                if (Array.isArray(res?.blocks)) allBlocks.push(...res.blocks)
+                if (Array.isArray(res?.archived_blocks) && res.archived_blocks.length > 0) {
+                    for (const range of res.archived_blocks) {
+                        try {
+                            const archivedRes = await range.callback([{ start: range.start, length: range.length }])
+                            if (Array.isArray(archivedRes?.blocks)) allBlocks.push(...archivedRes.blocks)
+                        } catch (e) {
+                            console.warn('portfolio archive: failed archived callback', e)
+                        }
+                    }
+                }
+                return res?.log_length
+            }
+
+            // start at 0
+            let start = 0
+
+            // get first batch
+            let res = await actor.icrc3_get_blocks([{ start, length: batchSize }])
+
+            // merge from result
+            let logLenBig = await mergeFromResult(res)
+
+            // get log length
+            let logLen = typeof logLenBig === 'bigint' ? Number(logLenBig) : Number(logLenBig || 0)
+
+            // while log length is greater than 0 and start + batch size is less than log length
+            while (logLen > 0 && start + batchSize < logLen) {
+
+                // increment start by batch size
+                start += batchSize
+
+                // get remaining
+                const remaining = logLen - start
+
+                // get length
+                const len = remaining < batchSize ? remaining : batchSize
+
+                // log
+                console.log('FETCHING A BATCH OF BLOCKS')
+
+                // get next batch
+                res = await actor.icrc3_get_blocks([{ start, length: len }])
+
+                // merge from result
+                await mergeFromResult(res)
+                
+            }
+
+            // dedupe by id and sort ascending
+            const byId = new Map<string, any>()
+            for (const b of allBlocks) {
+                const key = b && b.id !== undefined ? String(b.id) : JSON.stringify(b?.block)
+                if (!byId.has(key)) byId.set(key, b)
+            }
+            const mergedBlocks = Array.from(byId.values()).sort((a, b) => {
+                const ai = typeof a?.id === 'bigint' ? Number(a.id) : 0
+                const bi = typeof b?.id === 'bigint' ? Number(b.id) : 0
+                return ai - bi
+            })
+
+            // set fetched portfolio archive blocks
+            // @ts-ignore
+            fetchedPortfolioArchiveBlocks.value = {
+                log_length: logLenBig ?? BigInt(mergedBlocks.length),
+                blocks: mergedBlocks,
+                archived_blocks: []
+            }
+
+            // turn app loading off
+            appLoadingOff()
+
+            // return true
+            return true
+
+        } catch (error) {
+
+            // log error
+            console.error('error fetching portfolio archive blocks:', error)
+
+            // turn app loading off
+            appLoadingOff()
+
+            // return false
+            return false
+
+        }
+
+    }
+    
+    // const fetchRewardDistributionArchiveBlocks = async () => {
+        
+    //     // 
+
+
+    // }
+    // const fetchDaoAllocationArchiveBlocks = async () => {
+        
+    //     // 
+
+
+    // }
 
     // snassy's
     const getTokenMetadata = async (canisterId: string): Promise<TokenMetadata> => {
@@ -7406,6 +7596,7 @@ export const useTacoStore = defineStore('taco', () => {
         namesCache,
         namesLoading,
         threadMenuOpen,
+        fetchedPortfolioArchiveBlocks,
         // actions
         changeRoute,
         toggleDarkMode,
@@ -7521,6 +7712,9 @@ export const useTacoStore = defineStore('taco', () => {
         createNeuron,
         setNeuronDissolveDelay,
         toggleThreadMenu,
+
+        // Archive methods
+        fetchPortfolioArchiveBlocks,
         
         // Wallet methods
         registerUserToken,
