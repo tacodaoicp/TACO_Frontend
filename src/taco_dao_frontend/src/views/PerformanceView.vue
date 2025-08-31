@@ -36,24 +36,24 @@
 
               <!-- view item - Portfolio -->
               <div class="performance__views__item"
-                   @click="selectedView = 'Portfolio Performance'"
-                   :class="{ active: selectedView === 'Portfolio Performance' }">
+                   @click="selectedView = 'Portfolio Value'"
+                   :class="{ active: selectedView === 'Portfolio Value' }">
 
                 <!-- view item text -->
                 <span>
-                  Portfolio Performance
+                  Portfolio Value
                 </span>
 
               </div>
 
               <!-- view item - Assets Performance -->
               <div class="performance__views__item"
-                   @click="selectedView = 'Assets Performance'"
-                   :class="{ active: selectedView === 'Assets Performance' }">
+                   @click="selectedView = 'Assets Value'"
+                   :class="{ active: selectedView === 'Assets Value' }">
 
                 <!-- view item text -->
                 <span>
-                  Assets Performance
+                  Assets Value
                 </span>
 
               </div>
@@ -64,10 +64,10 @@
                    :key="t.principal"
                    class="performance__views__item"
                    @click="selectTokenView(t.principal)"
-                   :class="{ active: selectedView === 'X Asset Performance' && selectedToken === t.principal }">
+                   :class="{ active: selectedView === 'X Asset Value' && selectedToken === t.principal }">
 
                 <!-- view item text -->
-                <span>{{ t.label }} Performance</span>
+                <span>{{ t.label }} Value</span>
 
               </div>
 
@@ -1355,9 +1355,6 @@
   import { TooltipComponent, GridComponent } from 'echarts/components'
   import VChart, { THEME_KEY } from 'vue-echarts'
   import { Principal } from '@dfinity/principal'
-  import { createActor as createPortfolioActor } from '../../../declarations/portfolio_archive'
-  import { createActor as createRewardDistributionActor } from '../../../declarations/reward_distribution_archive'
-  import { createActor as createDaoAllocationActor } from '../../../declarations/dao_allocation_archive'
 
   ///////////
   // Store //
@@ -1382,6 +1379,7 @@
 
   // archives
   const { fetchedPortfolioArchiveBlocks } = storeToRefs(tacoStore)
+  const { fetchedRewardDistributionArchiveBlocks } = storeToRefs(tacoStore)
   
   // # ACTIONS #
 
@@ -1396,6 +1394,7 @@
 
   // archives
   const { fetchPortfolioArchiveBlocks } = tacoStore
+  const { fetchRewardDistributionArchiveBlocks } = tacoStore
 
   // metadata
   const { icrc1Metadata } = tacoStore
@@ -1404,18 +1403,16 @@
   // Local Varialbes //
   /////////////////////
 
-  // ui references
-  const chartLoaded = ref(false)
-
   // selected view
   const selectedView = ref('')
 
   // selected chart range
   const selectedChartRange = ref('all')
 
-  // available tokens
-  const availableTokens = ref<any[]>([])
+  // available tokens for the nav list
   const availableTokenNavList = ref<{ principal: string, label: string }[]>([])
+
+  // selected token
   const selectedToken = useStorage('performanceSelectedToken', '')
 
   // parsed caches
@@ -1423,7 +1420,7 @@
   const tokenPointsCache = shallowRef<Map<string, { ms: number, usd: number }[]>>(new Map())
   const blocksParsed = ref(false)
 
-  // token label cache and resolvers (reactive so labels update when symbols resolve)
+  // token label cache and resolvers
   const tokenSymbolCache = shallowRef<Map<string, string>>(new Map()) 
   
   // series colors by symbol with fallback hashing
@@ -1433,25 +1430,6 @@
     '#D93777', '#58BA56', '#9992F4', '#F13036', '#1ED760',
     '#2C6235', '#B3F8FF', '#80AC53', '#BBFD50'
   ]  
-
-  // // treasury portfolio data
-  // const treasuryPortfolioData = ref<any[]>([])
-
-  // // dao portfolio data
-  // const daoPortfolioData = ref<any[]>([])
-
-
-
-  // // 
-  // const portfolioActor = ref<any>(null)
-
-  // // 
-  // const daoAllocationActor = ref<any>(null)
-
-  // // 
-  // const rewardDistributionActor = ref<any>(null)
-
-
 
   ///////////////////
   // Local Methods //
@@ -1533,9 +1511,7 @@
     }
   }
 
-  // // token label cache and resolvers
-  // const tokenSymbolCache = new Map<string, string>()
-
+  // blob to bytes
   const blobToBytes = (blobObj: any): number[] => {
     const obj = blobObj?.Blob
     if (!obj || typeof obj !== 'object') return []
@@ -1546,6 +1522,7 @@
       .filter((v: any) => typeof v === 'number')
   }
 
+  // blob to principal text
   const blobToPrincipalText = (blobObj: any): string | null => {
     try {
       const bytes = blobToBytes(blobObj)
@@ -1557,6 +1534,7 @@
     }
   }
 
+  // get token label
   const getTokenLabel = (principalText: string) => {
     const sym = tokenSymbolCache.value.get(principalText)
     if (sym && typeof sym === 'string' && sym.length > 0) return sym.toUpperCase()
@@ -1564,6 +1542,7 @@
     return principalText || 'unknown'
   }
 
+  // build parsed caches
   const buildParsedCaches = (blocksContainer: any) => {
     portfolioPointsCache.value = []
     tokenPointsCache.value = new Map()
@@ -1616,6 +1595,7 @@
     }
   }
 
+  // collect token principals
   const collectTokenPrincipals = (blocksContainer: any): string[] => {
     const blocks = blocksContainer?.blocks || []
     const set = new Set<string>()
@@ -1632,6 +1612,7 @@
     return Array.from(set.values())
   }
 
+  // resolve symbols for blocks
   const resolveSymbolsForBlocks = async (blocksContainer: any) => {
     const principals = collectTokenPrincipals(blocksContainer)
     const unresolved = principals.filter(p => !tokenSymbolCache.value.has(p))
@@ -1662,6 +1643,7 @@
     }
   }
 
+  // build token nav from blocks
   const buildTokenNavFromBlocks = async (blocksContainer: any) => {
     await resolveSymbolsForBlocks(blocksContainer)
     const principals = collectTokenPrincipals(blocksContainer)
@@ -1670,14 +1652,7 @@
       .sort((a, b) => a.label.localeCompare(b.label))
   }
 
-  // // series colors by symbol with fallback hashing
-  // const symbolColorMap = new Map<string, string>()
-  // const defaultPalette = [
-  //   '#FEC800', '#934A17', '#5E64D7', '#E48142', '#24e8a6',
-  //   '#D93777', '#58BA56', '#9992F4', '#F13036', '#1ED760',
-  //   '#2C6235', '#B3F8FF', '#80AC53', '#BBFD50'
-  // ]
-
+  // build symbol color map
   const buildSymbolColorMap = () => {
     try {
       if (Array.isArray(tokenData)) {
@@ -1691,12 +1666,14 @@
   }
   buildSymbolColorMap()
 
+  // hash string to index
   const hashStringToIndex = (s: string, mod: number) => {
     let h = 0
     for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0
     return h % mod
   }
 
+  // get series color for principal
   const getSeriesColorForPrincipal = (principalOrId: string) => {
     const sym = tokenSymbolCache.value.get(principalOrId)
     if (sym) {
@@ -1768,6 +1745,7 @@
     return { labels, series }
   }
 
+  // extract single token usd time series
   const extractSingleTokenUsdTimeSeries = (blocksContainer: any, tokenPrincipal: string, range?: string) => {
     if (!blocksParsed.value) buildParsedCaches(blocksContainer)
     const points = (tokenPointsCache.value.get(tokenPrincipal) || []).slice()
@@ -1789,6 +1767,7 @@
     }
   }
 
+  // select token view
   const selectTokenView = (principal: string) => {
     selectedToken.value = principal
     selectedView.value = 'X Asset Performance'
@@ -1818,6 +1797,7 @@
     }
   }
 
+  // format percentage
   const formatPct = (n: number) => {
     if (!Number.isFinite(n)) return '0.00%'
     try {
@@ -1831,6 +1811,7 @@
   // Computed //
   //////////////
 
+  // portfolio stats
   const portfolioStats = computed(() => {
     const points = portfolioPointsCache.value || []
     if (!points.length) {
@@ -1878,6 +1859,7 @@
     }
   })
 
+  // token stats
   const tokenStats = computed(() => {
     const out: { principal: string, label: string, current: number, changes: Record<string, { abs: number, pct: number }> }[] = []
     const map = tokenPointsCache.value || new Map()
@@ -1921,9 +1903,10 @@
     return out.sort((a, b) => a.label.localeCompare(b.label))
   })
 
+  // selected view label
   const selectedViewLabel = computed(() => {
     if (selectedView.value === 'X Asset Performance' && selectedToken.value) {
-      return `${getTokenLabel(selectedToken.value)} Performance`
+      return `${getTokenLabel(selectedToken.value)} Value`
     }
     return selectedView.value
   })
@@ -1962,7 +1945,16 @@
         axisPointer: {
           type: 'line' // shows a vertical line indicator
         },
-        valueFormatter: (value: number) => `$${value.toFixed(2)}` // format to 2 decimal places
+        valueFormatter: (value: any) => {
+          if (value == null || Number.isNaN(value)) return ''
+          const num = typeof value === 'number' ? value : parseFloat(String(value))
+          if (!Number.isFinite(num)) return ''
+          try {
+            return `$${num.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+          } catch {
+            return `$${num.toFixed(2)}`
+          }
+        }
       },
       xAxis: {
         ...option.value.xAxis,
@@ -2104,7 +2096,7 @@
     console.log('selected view changed')
 
     // Portfolio Performance
-    if (newVal === 'Portfolio Performance') {
+    if (newVal === 'Portfolio Value') {
 
       // log
       console.log('Portfolio Performance')
@@ -2124,7 +2116,7 @@
     }
 
     // Assets Performance
-    else if (newVal === 'Assets Performance') {
+    else if (newVal === 'Assets Value') {
 
       // log
       console.log('Assets Performance')
@@ -2140,15 +2132,20 @@
       // log
       console.log('Leaderboard')
 
-      // code
+      // fetch reward distribution archive blocks
+      await fetchRewardDistributionArchiveBlocks(3000)
+
+      // log fetched reward distribution archive blocks
+      console.log('fetched reward distribution archive blocks', fetchedRewardDistributionArchiveBlocks.value)
 
       
     }
 
+    // Asset X Performance
     else {
 
       // log
-      console.log('Asset X Performance')
+      console.log('Asset X Value')
       await resolveSymbolsForBlocks(fetchedPortfolioArchiveBlocks.value)
       if (selectedToken.value) {
         const { labels, values } = extractSingleTokenUsdTimeSeries(
@@ -2163,8 +2160,6 @@
       }
       
     }
-
-    // Asset X Performance
 
   })
 
@@ -2255,37 +2250,54 @@
   onMounted(async () => {
 
     // log
-    console.log('PerformanceView mounted')
+    // console.log('PerformanceView mounted')
 
-    // if we already have blocks in store, reuse them; else fetch once
-    const hasBlocks = Array.isArray((fetchedPortfolioArchiveBlocks.value as any)?.blocks) && (fetchedPortfolioArchiveBlocks.value as any).blocks.length > 0
-    if (!hasBlocks) {
-      await fetchPortfolioArchiveBlocks(3000)
-    }
+    // // if we already have blocks in store, reuse them; else fetch once
+    // const hasBlocks = Array.isArray((fetchedPortfolioArchiveBlocks.value as any)?.blocks) && (fetchedPortfolioArchiveBlocks.value as any).blocks.length > 0
+    // if (!hasBlocks) {
+    //   await fetchPortfolioArchiveBlocks(1000)
+    // }
 
     // set selected view
-    selectedView.value = 'Portfolio Performance'
+    selectedView.value = 'Leaderboard'
 
-    // build caches and token nav if not already built
-    if (!blocksParsed.value) {
-      buildParsedCaches(fetchedPortfolioArchiveBlocks.value)
-      await buildTokenNavFromBlocks(fetchedPortfolioArchiveBlocks.value)
-    }
+    // // build caches and token nav if not already built
+    // if (!blocksParsed.value) {
+    //   buildParsedCaches(fetchedPortfolioArchiveBlocks.value)
+    //   await buildTokenNavFromBlocks(fetchedPortfolioArchiveBlocks.value)
+    // }
 
   })
 
   onUnmounted(() => {
+
+    // try
     try {
+
+      // reset chart options
       option.value = {
         ...(darkModeToggled.value ? lightTheme : darkTheme),
         xAxis: { ...(darkModeToggled.value ? lightTheme : darkTheme).xAxis, data: [] },
         series: []
       }
+
+      // reset portfolio points cache
       portfolioPointsCache.value = markRaw([])
+
+      // reset token points cache
       tokenPointsCache.value = markRaw(new Map())
+
+      // reset available token nav list
       availableTokenNavList.value = []
+
+      // reset selected token
       selectedToken.value = ''
-    } catch {}
+
+    } 
+    
+    // empty catch
+    catch {}
+
   })
 
 </script>

@@ -552,8 +552,8 @@ export const useTacoStore = defineStore('taco', () => {
 
     // archives
     const fetchedPortfolioArchiveBlocks = ref<any>({})
-    const fetchedRewardDistributionArchiveBlocks = ref([])
-    const fetchedDaoAllocationArchiveBlocks = ref([])
+    const fetchedRewardDistributionArchiveBlocks = ref<any>({})
+    // const fetchedDaoAllocationArchiveBlocks = ref([])
 
     // snassy's 
     const timerHealth = ref({
@@ -1233,14 +1233,15 @@ export const useTacoStore = defineStore('taco', () => {
         }        
         return 'b2cwp-6qaaa-aaaad-qhn6a-cai' // if not ic or staging, use local (all the same for now)
     }
+    // lrekt-uaaaa-aaaan-qz4ya-cai
     const portfolioArchiveCanisterId = () => {
         switch (process.env.DFX_NETWORK) {
             case "ic":
                 return process.env.CANISTER_ID_PORTFOLIO_ARCHIVE_IC || 'bl7x7-wiaaa-aaaan-qz5bq-cai'
             case "staging":
-                return process.env.CANISTER_ID_PORTFOLIO_ARCHIVE_STAGING || 'lrekt-uaaaa-aaaan-qz4ya-cai'
+                return process.env.CANISTER_ID_PORTFOLIO_ARCHIVE_STAGING || 'bl7x7-wiaaa-aaaan-qz5bq-cai'
         }        
-        return 'lrekt-uaaaa-aaaan-qz4ya-cai'
+        return 'bl7x7-wiaaa-aaaan-qz5bq-cai'
     }
     const rewardDistributionArchiveCanisterId = () => {
         switch (process.env.DFX_NETWORK) {
@@ -2383,6 +2384,143 @@ export const useTacoStore = defineStore('taco', () => {
 
             // log error
             console.error('error fetching portfolio archive blocks:', error)
+
+            // turn app loading off
+            appLoadingOff()
+
+            // return false
+            return false
+
+        }
+
+    }
+    const fetchRewardDistributionArchiveBlocks = async (batchSize: number) => {
+
+        // log
+        console.log('taco.store: fetchRewardDistributionArchiveBlocks()')
+
+        // turn app loading on
+        appLoadingOn()
+
+        // try
+        try {
+
+            // create auth client
+            const authClient = await getAuthClient()
+
+            // if user is not authenticated
+            if (!(await authClient.isAuthenticated())) {
+                return false
+            }
+
+            // get host
+            const host = process.env.DFX_NETWORK === "local"
+                ? getLocalHost()
+                : "https://ic0.app"
+
+            // get identity
+            const identity = await authClient.getIdentity()
+
+            // create agent
+            const agent = await createAgent({
+                identity,
+                host,
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            })
+
+            // create actor
+            const actor = Actor.createActor(rewardDistributionArchiveIDL, {
+                agent,
+                canisterId: rewardDistributionArchiveCanisterId(),
+            })
+
+            //////////////////////
+            // post actor logic //
+
+            // create all blocks array
+            const allBlocks: any[] = []
+
+            // merge from result
+            const mergeFromResult = async (res: any) => {
+                if (Array.isArray(res?.blocks)) allBlocks.push(...res.blocks)
+                if (Array.isArray(res?.archived_blocks) && res.archived_blocks.length > 0) {
+                    for (const range of res.archived_blocks) {
+                        try {
+                            const archivedRes = await range.callback([{ start: range.start, length: range.length }])
+                            if (Array.isArray(archivedRes?.blocks)) allBlocks.push(...archivedRes.blocks)
+                        } catch (e) {
+                            console.warn('reward distribution archive: failed archived callback', e)
+                        }
+                    }
+                }
+                return res?.log_length
+            }
+
+            // start at 0
+            let start = 0
+
+            // get first batch
+            let res = await actor.icrc3_get_blocks([{ start, length: batchSize }])
+
+            // merge from result
+            let logLenBig = await mergeFromResult(res)
+
+            // get log length
+            let logLen = typeof logLenBig === 'bigint' ? Number(logLenBig) : Number(logLenBig || 0)
+
+            // while log length is greater than 0 and start + batch size is less than log length
+            while (logLen > 0 && start + batchSize < logLen) {
+
+                // increment start by batch size
+                start += batchSize
+
+                // get remaining
+                const remaining = logLen - start
+
+                // get length
+                const len = remaining < batchSize ? remaining : batchSize
+
+                // log
+                console.log('FETCHING A BATCH OF REWARD DISTRIBUTION BLOCKS')
+
+                // get next batch
+                res = await actor.icrc3_get_blocks([{ start, length: len }])
+
+                // merge from result
+                await mergeFromResult(res)
+                
+            }
+
+            // dedupe by id and sort ascending
+            const byId = new Map<string, any>()
+            for (const b of allBlocks) {
+                const key = b && b.id !== undefined ? String(b.id) : JSON.stringify(b?.block)
+                if (!byId.has(key)) byId.set(key, b)
+            }
+            const mergedBlocks = Array.from(byId.values()).sort((a, b) => {
+                const ai = typeof a?.id === 'bigint' ? Number(a.id) : 0
+                const bi = typeof b?.id === 'bigint' ? Number(b.id) : 0
+                return ai - bi
+            })
+
+            // set fetched portfolio archive blocks
+            // @ts-ignore
+            fetchedRewardDistributionArchiveBlocks.value = {
+                log_length: logLenBig ?? BigInt(mergedBlocks.length),
+                blocks: mergedBlocks,
+                archived_blocks: []
+            }
+
+            // turn app loading off
+            appLoadingOff()
+
+            // return true
+            return true
+
+        } catch (error) {
+
+            // log error
+            console.error('error fetching reward distribution archive blocks:', error)
 
             // turn app loading off
             appLoadingOff()
@@ -7597,6 +7735,7 @@ export const useTacoStore = defineStore('taco', () => {
         namesLoading,
         threadMenuOpen,
         fetchedPortfolioArchiveBlocks,
+        fetchedRewardDistributionArchiveBlocks,
         // actions
         changeRoute,
         toggleDarkMode,
@@ -7715,6 +7854,7 @@ export const useTacoStore = defineStore('taco', () => {
 
         // Archive methods
         fetchPortfolioArchiveBlocks,
+        fetchRewardDistributionArchiveBlocks,
         
         // Wallet methods
         registerUserToken,
