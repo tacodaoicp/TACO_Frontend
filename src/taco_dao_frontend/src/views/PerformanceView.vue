@@ -1770,7 +1770,7 @@
   // select token view
   const selectTokenView = (principal: string) => {
     selectedToken.value = principal
-    selectedView.value = 'X Asset Performance'
+    selectedView.value = 'X Asset Value'
   }
 
   //////////////
