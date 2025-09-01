@@ -345,7 +345,7 @@
                             <i class="fa fa-spinner fa-spin me-1"></i>Loading...
                           </span>
                           <span v-else>
-                            {{ swapInputAmount }} {{ selectedSwapToken.symbol }}
+                            {{ swapInputAmount }} {{ selectedSwapToken?.symbol || '' }}
                           </span>
                         </span>
                       </div>
@@ -1179,7 +1179,7 @@ const performSwapAndStake = async () => {
       }),
       icpswapStore.getQuote({
         sellTokenPrincipal: token.principal,
-        buyTokenPrincipal: tacoStore.tacoPrincipal,
+        buyTokenPrincipal: tacoToken.value.principal,
         amountIn: amountInBigInt
       })
     ])
@@ -1218,29 +1218,53 @@ const performSwapAndStake = async () => {
     
     console.log(`Using ${bestQuote.exchange} with expected output: ${Number(bestQuote.amountOut) / 1e8} TACO`)
     
-    // Execute the swap with ICRC2 (preferred method)
+    // Execute the swap using the same approach as SwapConfirmDialog
     let swapResult
+    const slippageTolerance = 0.01 // 1% slippage
+    const minAmountOut = BigInt(Math.floor(Number(bestQuote.amountOut) * (1 - slippageTolerance)))
+    
     const swapParams = {
       sellTokenPrincipal: token.principal,
-      buyTokenPrincipal: tacoStore.tacoPrincipal,
-      amountIn: amountInBigInt.toString(),
-      amountOutMinimum: (BigInt(Math.floor(Number(bestQuote.amountOut) * 0.99))).toString(), // 1% slippage tolerance
-      deadline: Math.floor(Date.now() / 1000) + 300, // 5 minutes
-      fee: bestQuote.fee
+      sellTokenSymbol: token.symbol,
+      buyTokenPrincipal: tacoToken.value.principal,
+      buyTokenSymbol: 'TACO',
+      amountIn: amountInBigInt, // Keep as BigInt, not string
+      minAmountOut,
+      slippageTolerance,
     }
     
+    // Check ICRC2 support and use appropriate method like SwapConfirmDialog
     if (bestQuote.exchange === 'Kong') {
-      swapResult = await kongStore.icrc2_swap(swapParams)
+      try {
+        const tokenSupportsICRC2 = await tacoStore.checkTokenSupportsICRC2(token.principal)
+        
+        if (tokenSupportsICRC2) {
+          swapResult = await kongStore.icrc2_swap(swapParams)
+        } else {
+          swapResult = await kongStore.icrc1_swap(swapParams)
+        }
+      } catch (error) {
+        console.log('Kong ICRC2 failed, trying ICRC1:', error)
+        swapResult = await kongStore.icrc1_swap(swapParams)
+      }
     } else {
-      swapResult = await icpswapStore.icrc2_swap(swapParams)
+      try {
+        const tokenSupportsICRC2 = await tacoStore.checkTokenSupportsICRC2(token.principal)
+        
+        if (tokenSupportsICRC2) {
+          swapResult = await icpswapStore.icrc2_swap(swapParams)
+        } else {
+          swapResult = await icpswapStore.icrc1_swap(swapParams)
+        }
+      } catch (error) {
+        console.log('ICPSwap ICRC2 failed, trying ICRC1:', error)
+        swapResult = await icpswapStore.icrc1_swap(swapParams)
+      }
     }
     
-    if (swapResult.success) {
-      console.log('Swap successful, proceeding with auto-staking...')
-      await handleSwapSuccess(swapResult)
-    } else {
-      throw new Error(swapResult.error || 'Swap failed')
-    }
+    // Kong/ICPSwap stores return results directly, not wrapped in success/error objects
+    console.log('Swap successful, proceeding with auto-staking...')
+    await handleSwapSuccess(swapResult)
     
   } catch (error: any) {
     console.error('Auto-swap & stake failed:', error)
@@ -1250,8 +1274,7 @@ const performSwapAndStake = async () => {
       code: 'swap-stake-failed',
       title: 'Swap & Stake Failed',
       icon: 'fa-solid fa-exclamation-triangle',
-      message: error.message || 'Failed to execute swap & stake. Please try manual swap.',
-      type: 'error'
+      message: error.message || 'Failed to execute swap & stake. Please try manual swap.'
     })
   } finally {
     isSwapping.value = false
@@ -1342,8 +1365,7 @@ const handleSwapSuccess = async (result: any) => {
         code: 'swap-success-stake-failed',
         title: 'Swap Successful, Staking Failed',
         icon: 'fa-solid fa-exclamation-triangle',
-        message: `Swap completed successfully, but auto-staking failed: ${error.message}. Please stake manually.`,
-        type: 'warning'
+        message: `Swap completed successfully, but auto-staking failed: ${error.message}. Please stake manually.`
       })
       
       // Move to staking step for manual staking
