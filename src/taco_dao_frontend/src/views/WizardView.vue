@@ -821,8 +821,9 @@ const swapInputAmount = computed(() => {
   const token = selectedSwapToken.value
   if (!token) return '0'
   
-  // Use all available balance minus fee - avoid floating point precision issues
-  const availableAmountBigInt = token.balance - token.fee
+  // Use available balance minus fees - reserve extra fee for ICPSwap operations
+  const extraFeeReserve = token.fee // Reserve one additional fee for ICPSwap operations
+  const availableAmountBigInt = token.balance - token.fee - extraFeeReserve
   const availableAmount = Number(availableAmountBigInt) / (10 ** token.decimals)
   return availableAmount.toFixed(8)
 })
@@ -1163,11 +1164,14 @@ const performSwapAndStake = async () => {
   isSwapping.value = true
   
   try {
-    // Calculate max swap amount (all tokens minus fee) - avoid floating point precision issues
-    const amountInBigInt = token.balance - token.fee
+    // Calculate max swap amount - reserve extra fee for ICPSwap operations
+    // ICPSwap requires additional fee reserves beyond the basic transfer fee
+    const extraFeeReserve = token.fee // Reserve one additional fee for ICPSwap operations
+    const amountInBigInt = token.balance - token.fee - extraFeeReserve
     const maxSwapAmount = Number(amountInBigInt) / (10 ** token.decimals)
     
     console.log(`Auto-swapping ${maxSwapAmount} ${token.symbol} (${amountInBigInt} base units) to TACO...`)
+    console.log(`Reserved fees: ${token.fee + extraFeeReserve} base units for exchange operations`)
     
     // Get quotes from both exchanges
     const [kongQuote, icpSwapQuote] = await Promise.allSettled([
