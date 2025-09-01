@@ -205,31 +205,39 @@
 
                 <!-- Register Custom Token Section -->
                 <div class="register-token-section">
-                  <h6>Register Custom ICRC1 Token:</h6>
-                  <p class="section-description">
-                    If you have a custom ICRC1 token that's not listed above, you can register it here:
-                  </p>
-                  <div class="register-token-form">
-                    <div class="input-group">
-                      <input 
-                        v-model="newTokenPrincipal"
-                        placeholder="Token principal (e.g., rdmx6-jaaaa-aaaah-qcaiq-cai)"
-                        class="form-control"
-                        :disabled="registeringToken"
-                      />
-                      <button 
-                        @click="registerCustomToken" 
-                        :disabled="!newTokenPrincipal.trim() || registeringToken"
-                        class="btn btn-outline-primary"
-                      >
-                        <i v-if="registeringToken" class="fa fa-spinner fa-spin me-1"></i>
-                        <i v-else class="fa fa-plus me-1"></i>
-                        {{ registeringToken ? 'Registering...' : 'Register Token' }}
-                      </button>
+                  <div class="register-token-header" @click="showRegisterToken = !showRegisterToken">
+                    <h6>Register Custom ICRC1 Token</h6>
+                    <button class="collapse-toggle-btn" type="button">
+                      <i :class="showRegisterToken ? 'fa fa-chevron-up' : 'fa fa-chevron-down'"></i>
+                    </button>
+                  </div>
+                  
+                  <div v-show="showRegisterToken" class="register-token-content">
+                    <p class="section-description">
+                      If you have a custom ICRC1 token that's not listed above, you can register it here:
+                    </p>
+                    <div class="register-token-form">
+                      <div class="input-group">
+                        <input 
+                          v-model="newTokenPrincipal"
+                          placeholder="Token principal (e.g., rdmx6-jaaaa-aaaah-qcaiq-cai)"
+                          class="form-control"
+                          :disabled="registeringToken"
+                        />
+                        <button 
+                          @click="registerCustomToken" 
+                          :disabled="!newTokenPrincipal.trim() || registeringToken"
+                          class="btn btn-outline-primary"
+                        >
+                          <i v-if="registeringToken" class="fa fa-spinner fa-spin me-1"></i>
+                          <i v-else class="fa fa-plus me-1"></i>
+                          {{ registeringToken ? 'Registering...' : 'Register Token' }}
+                        </button>
+                      </div>
+                      <small class="form-text text-muted">
+                        Enter the principal ID of an ICRC1 token to add it to your wallet
+                      </small>
                     </div>
-                    <small class="form-text text-muted">
-                      Enter the principal ID of an ICRC1 token to add it to your wallet
-                    </small>
                   </div>
                 </div>
 
@@ -653,6 +661,7 @@ const bestExchange = ref<string>('')
 const newTokenPrincipal = ref('')
 const registeringToken = ref(false)
 const refreshingBalance = ref(false)
+const showRegisterToken = ref(false)
 
 // Token data
 const allTokenBalances = ref<Map<string, bigint>>(new Map())
@@ -2530,6 +2539,63 @@ onMounted(async () => {
 .refresh-btn:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+}
+
+.register-token-section {
+  margin-top: 1.5rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.register-token-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1rem;
+  background: rgba(255, 255, 255, 0.05);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.register-token-header:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.register-token-header h6 {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: white;
+}
+
+.collapse-toggle-btn {
+  background: none;
+  border: none;
+  color: #a0aec0;
+  font-size: 0.875rem;
+  cursor: pointer;
+  padding: 0.25rem;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+  pointer-events: none; /* Let the parent handle the click */
+}
+
+.register-token-header:hover .collapse-toggle-btn {
+  color: white;
+}
+
+.register-token-content {
+  padding: 1rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.register-token-content .section-description {
+  font-size: 0.875rem;
+  color: #a0aec0;
+  margin-bottom: 1rem;
+  line-height: 1.4;
 }
 
 .token-amount {
