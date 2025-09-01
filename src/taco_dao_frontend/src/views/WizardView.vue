@@ -287,25 +287,25 @@
                       </option>
                     </select>
                   </div>
-                </div>
-
-                <!-- Token Info Display -->
-                <div v-if="selectedSwapFromToken" class="token-info-display">
-                  <div class="selected-token-info">
-                    <img :src="getTokenByPrincipal(selectedSwapFromToken)?.logo" :alt="getTokenByPrincipal(selectedSwapFromToken)?.symbol" class="token-logo-small" />
-                    <div class="token-details">
-                      <div class="token-name">{{ getTokenByPrincipal(selectedSwapFromToken)?.name }}</div>
-                      <div class="token-balance">
-                        Available: {{ formatBalance(getTokenByPrincipal(selectedSwapFromToken)?.balance || 0n, getTokenByPrincipal(selectedSwapFromToken)?.decimals || 8) }}
-                        {{ getTokenByPrincipal(selectedSwapFromToken)?.symbol || '' }}
+                  
+                  <!-- Token Info Display -->
+                  <div v-if="selectedSwapFromToken" class="token-info-display">
+                    <div class="selected-token-info">
+                      <img :src="getTokenByPrincipal(selectedSwapFromToken)?.logo" :alt="getTokenByPrincipal(selectedSwapFromToken)?.symbol" class="token-logo-small" />
+                      <div class="token-details">
+                        <div class="token-name">{{ getTokenByPrincipal(selectedSwapFromToken)?.name }}</div>
+                        <div class="token-balance">
+                          Available: {{ formatBalance(getTokenByPrincipal(selectedSwapFromToken)?.balance || 0n, getTokenByPrincipal(selectedSwapFromToken)?.decimals || 8) }}
+                          {{ getTokenByPrincipal(selectedSwapFromToken)?.symbol || '' }}
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
-
-                <!-- Swap Arrow -->
-                <div class="swap-arrow">
-                  <i class="fa fa-arrow-down"></i>
+                  
+                  <!-- Swap Arrow -->
+                  <div class="swap-arrow">
+                    <i class="fa fa-arrow-down"></i>
+                  </div>
                 </div>
 
                 <!-- TACO Output -->
@@ -2185,22 +2185,16 @@ onMounted(async () => {
   z-index: 2;
 }
 
-.swap-output {
-  position: relative;
-  z-index: 1;
-  margin-top: -20px; /* Overlap the cards */
-}
-
-.swap-arrow {
+.swap-input .swap-arrow {
   position: absolute;
-  top: 50%;
+  bottom: -20px; /* Position at bottom of input card */
   left: 50%;
-  transform: translate(-50%, -50%);
+  transform: translateX(-50%);
   z-index: 3;
   width: 40px;
   height: 40px;
-  background: #2d3748;
-  border: 2px solid #4a5568;
+  background: #374151;
+  border: 2px solid #4b5563;
   border-radius: 50%;
   display: flex;
   justify-content: center;
@@ -2210,17 +2204,18 @@ onMounted(async () => {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
 }
 
+.swap-output {
+  position: relative;
+  z-index: 1;
+  margin-top: -20px; /* Overlap the cards */
+}
+
 .swap-arrow i {
   color: #ffffff;
 }
 
 /* Add circular cutouts to the cards */
-.swap-input .token-input-group,
-.swap-output .token-output-display {
-  position: relative;
-}
-
-.swap-input .token-input-group::after {
+.swap-input .token-info-display::after {
   content: '';
   position: absolute;
   bottom: -20px;
@@ -2228,7 +2223,7 @@ onMounted(async () => {
   transform: translateX(-50%);
   width: 44px;
   height: 22px;
-  background: #2d3748;
+  background: #374151; /* Match card background */
   border-radius: 0 0 22px 22px;
   z-index: 1;
 }
@@ -2241,7 +2236,7 @@ onMounted(async () => {
   transform: translateX(-50%);
   width: 44px;
   height: 22px;
-  background: #2d3748;
+  background: #374151; /* Match card background */
   border-radius: 22px 22px 0 0;
   z-index: 1;
 }
