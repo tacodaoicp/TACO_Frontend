@@ -1227,58 +1227,49 @@ const performSwapAndStake = async () => {
       sellTokenSymbol: token.symbol,
       buyTokenPrincipal: tacoToken.value.principal,
       buyTokenSymbol: 'TACO',
-      amountIn: amountInBigInt, // Keep as BigInt, not string
+      amountIn: amountInBigInt,
       minAmountOut,
       slippageTolerance,
     }
+
+    // Create a step update callback (like SwapConfirmDialog)
+    const updateStep = (step: string) => {
+      console.log('Swap step:', step)
+    }
+
+    // Add step callback to swap params (exactly like SwapConfirmDialog)
+    const swapParamsWithCallback = {
+      ...swapParams,
+      onStep: updateStep
+    }
     
-    // Check ICRC2 support and use appropriate method like SwapConfirmDialog
+    // Use the exact same logic as SwapConfirmDialog
     if (bestQuote.exchange === 'Kong') {
-      try {
-        const tokenSupportsICRC2 = await tacoStore.checkTokenSupportsICRC2(token.principal)
-        
-        if (tokenSupportsICRC2) {
-          swapResult = await kongStore.icrc2_swap(swapParams)
-        } else {
-          swapResult = await kongStore.icrc1_swap(swapParams)
+      const tokenSupportsICRC2 = await tacoStore.checkTokenSupportsICRC2(token.principal)
+      
+      if (tokenSupportsICRC2) {
+        try {
+          swapResult = await kongStore.icrc2_swap(swapParamsWithCallback)
+        } catch (error) {
+          console.log('Kong ICRC2 failed, trying ICRC1:', error)
+          swapResult = await kongStore.icrc1_swap(swapParamsWithCallback)
         }
-      } catch (error) {
-        console.log('Kong ICRC2 failed, trying ICRC1:', error)
-        swapResult = await kongStore.icrc1_swap(swapParams)
+      } else {
+        swapResult = await kongStore.icrc1_swap(swapParamsWithCallback)
       }
     } else {
-      // ICPSwap - add extra logging and error handling
-      console.log('Attempting ICPSwap with amount:', amountInBigInt, 'balance available:', token.balance)
-      try {
-        const tokenSupportsICRC2 = await tacoStore.checkTokenSupportsICRC2(token.principal)
-        console.log('ICPSwap ICRC2 support:', tokenSupportsICRC2)
-        
-        if (tokenSupportsICRC2) {
-          swapResult = await icpswapStore.icrc2_swap(swapParams)
-        } else {
-          console.log('Using ICRC1 for ICPSwap')
-          swapResult = await icpswapStore.icrc1_swap(swapParams)
-        }
-      } catch (error) {
-        console.log('ICPSwap ICRC2 failed, trying ICRC1:', error)
+      // ICPSwap
+      const tokenSupportsICRC2 = await tacoStore.checkTokenSupportsICRC2(token.principal)
+      
+      if (tokenSupportsICRC2) {
         try {
-          swapResult = await icpswapStore.icrc1_swap(swapParams)
-        } catch (icrc1Error) {
-          console.error('Both ICPSwap methods failed:', icrc1Error)
-          // If both ICPSwap methods fail, try Kong as fallback if available
-          const kongQuote = quotes.find(q => q.exchange === 'Kong')
-          if (kongQuote) {
-            console.log('Falling back to Kong swap as ICPSwap failed')
-            const tokenSupportsICRC2 = await tacoStore.checkTokenSupportsICRC2(token.principal)
-            if (tokenSupportsICRC2) {
-              swapResult = await kongStore.icrc2_swap(swapParams)
-            } else {
-              swapResult = await kongStore.icrc1_swap(swapParams)
-            }
-          } else {
-            throw icrc1Error
-          }
+          swapResult = await icpswapStore.icrc2_swap(swapParamsWithCallback)
+        } catch (error) {
+          console.log('ICPSwap ICRC2 failed, trying ICRC1:', error)
+          swapResult = await icpswapStore.icrc1_swap(swapParamsWithCallback)
         }
+      } else {
+        swapResult = await icpswapStore.icrc1_swap(swapParamsWithCallback)
       }
     }
     
