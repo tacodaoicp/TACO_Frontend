@@ -280,7 +280,7 @@
                 <div class="swap-input">
                   <label class="form-label">From:</label>
                   <div class="token-input-group">
-                    <select v-model="selectedSwapFromToken" class="form-select">
+                    <select v-model="selectedSwapFromToken" class="form-select" @change="onStep2DropdownChange">
                       <option value="">Select token to swap from</option>
                       <option v-for="token in swappableTokens" :key="token.principal" :value="token.principal">
                         {{ token.symbol }} - Balance: {{ formatBalance(token.balance, token.decimals) }}
@@ -582,6 +582,7 @@ const currentStep = ref(1)
 const expandedSteps = ref<Set<number>>(new Set([1]))
 const selectedGetTokenSymbol = ref('ICP')
 const selectedSwapFromToken = ref('')
+const userChangedStep2Selection = ref(false) // Track if user manually changed step 2
 const isSwapping = ref(false)
 const isStaking = ref(false)
 const isSwapAndStake = ref(false) // Flag to track if we're doing swap & stake
@@ -910,6 +911,9 @@ const loadUserNeurons = async () => {
 const syncSwapTokenSelection = () => {
   if (allTokens.value.length === 0) return
   
+  // Don't sync if user has manually changed step 2 selection
+  if (userChangedStep2Selection.value) return
+  
   // Try to use the token selected in step 1
   const selectedGetToken = allTokens.value.find(t => t.symbol === selectedGetTokenSymbol.value)
   
@@ -918,11 +922,26 @@ const syncSwapTokenSelection = () => {
     return
   }
   
-  // Fallback to first swappable token if step 1 selection isn't swappable
-  const firstSwappable = swappableTokens.value[0]
-  if (firstSwappable && !selectedSwapFromToken.value) {
-    selectedSwapFromToken.value = firstSwappable.principal
+  // If step 1 selection isn't swappable, don't change step 2 selection
+}
+
+const initializeTokenSelections = () => {
+  // Set both dropdowns to ICP by default
+  selectedGetTokenSymbol.value = 'ICP'
+  
+  // Find ICP token and set step 2 dropdown
+  const icpToken = allTokens.value.find(t => t.symbol === 'ICP')
+  if (icpToken) {
+    selectedSwapFromToken.value = icpToken.principal
   }
+  
+  // Reset the manual change flag
+  userChangedStep2Selection.value = false
+}
+
+const onStep2DropdownChange = () => {
+  // User manually changed step 2 dropdown
+  userChangedStep2Selection.value = true
 }
 
 const determineStartingStep = () => {
@@ -946,8 +965,6 @@ const determineStartingStep = () => {
     if (hasSignificantTokens) {
       currentStep.value = 2
       expandedSteps.value = new Set([2])
-      // Sync swap token selection when starting on step 2
-      setTimeout(() => syncSwapTokenSelection(), 0)
       return
     }
   }
@@ -1421,22 +1438,16 @@ const formatUSDValue = (balance: bigint, decimals: number, priceUSD: number): st
 }
 
 // Watchers to sync token selections
-watch(currentStep, (newStep) => {
-  if (newStep === 2) {
-    syncSwapTokenSelection()
-  }
-})
-
 watch(selectedGetTokenSymbol, (newSymbol) => {
-  // Sync swap selection when get token selection changes
+  // Sync step 2 when step 1 changes (unless user manually changed step 2)
   if (!newSymbol || allTokens.value.length === 0) return
   syncSwapTokenSelection()
-}, { immediate: true })
+})
 
-// Also watch allTokens to sync when data loads
+// Initialize selections when token data loads
 watch(allTokens, (newTokens) => {
-  if (newTokens.length > 0 && currentStep.value === 2) {
-    syncSwapTokenSelection()
+  if (newTokens.length > 0 && !selectedSwapFromToken.value) {
+    initializeTokenSelections()
   }
 }, { deep: true })
 
@@ -1449,9 +1460,9 @@ onMounted(async () => {
     if (tacoStore.userLoggedIn) {
       await loadWalletData()
       
-      // After data loads, sync tokens if we're on step 2
-      if (currentStep.value === 2) {
-        syncSwapTokenSelection()
+      // Initialize token selections after data loads
+      if (allTokens.value.length > 0) {
+        initializeTokenSelections()
       }
     } else {
       loading.value = false
@@ -2166,20 +2177,73 @@ onMounted(async () => {
 .swap-section {
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  position: relative;
+}
+
+.swap-input {
+  position: relative;
+  z-index: 2;
+}
+
+.swap-output {
+  position: relative;
+  z-index: 1;
+  margin-top: -20px; /* Overlap the cards */
 }
 
 .swap-arrow {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 3;
+  width: 40px;
+  height: 40px;
+  background: #2d3748;
+  border: 2px solid #4a5568;
+  border-radius: 50%;
   display: flex;
   justify-content: center;
   align-items: center;
-  margin: 0.5rem 0;
   color: #ffffff;
-  font-size: 1.2rem;
+  font-size: 1.1rem;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
 }
 
 .swap-arrow i {
   color: #ffffff;
+}
+
+/* Add circular cutouts to the cards */
+.swap-input .token-input-group,
+.swap-output .token-output-display {
+  position: relative;
+}
+
+.swap-input .token-input-group::after {
+  content: '';
+  position: absolute;
+  bottom: -20px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 44px;
+  height: 22px;
+  background: #2d3748;
+  border-radius: 0 0 22px 22px;
+  z-index: 1;
+}
+
+.swap-output .token-output-display::before {
+  content: '';
+  position: absolute;
+  top: -20px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 44px;
+  height: 22px;
+  background: #2d3748;
+  border-radius: 22px 22px 0 0;
+  z-index: 1;
 }
 
 .step-actions,
