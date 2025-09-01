@@ -108,6 +108,26 @@
                       {{ token.symbol }} - {{ token.name }}
                     </option>
                   </select>
+                  
+                  <!-- Token Balance Display with Refresh -->
+                  <div class="token-balance-display">
+                    <div class="balance-info">
+                      <span class="balance-label">Current Balance:</span>
+                      <span class="balance-amount">
+                        {{ formatBalance(getTokenBalance(selectedGetTokenSymbol), getTokenDecimals(selectedGetTokenSymbol)) }} {{ selectedGetTokenSymbol }}
+                      </span>
+                    </div>
+                    <button 
+                      type="button"
+                      class="btn btn-sm btn-outline-primary refresh-btn"
+                      @click="refreshTokenBalance"
+                      :disabled="refreshingBalance"
+                      title="Refresh balance to check if tokens arrived"
+                    >
+                      <i v-if="refreshingBalance" class="fa fa-spinner fa-spin"></i>
+                      <i v-else class="fa fa-refresh"></i>
+                    </button>
+                  </div>
                 </div>
 
                 <!-- Instructions for selected token -->
@@ -632,6 +652,7 @@ const bestQuote = ref<any>(null)
 const bestExchange = ref<string>('')
 const newTokenPrincipal = ref('')
 const registeringToken = ref(false)
+const refreshingBalance = ref(false)
 
 // Token data
 const allTokenBalances = ref<Map<string, bigint>>(new Map())
@@ -876,6 +897,36 @@ const loadWalletData = async () => {
     })
   } finally {
     loading.value = false
+  }
+}
+
+const refreshTokenBalance = async () => {
+  refreshingBalance.value = true
+  
+  try {
+    // Reload wallet data to refresh all balances
+    await loadWalletData()
+    
+    // Show success toast
+    tacoStore.addToast({
+      id: Date.now(),
+      code: 'balance-refreshed',
+      title: 'Balance Updated',
+      icon: 'fa-solid fa-refresh',
+      message: `${selectedGetTokenSymbol.value} balance refreshed successfully`
+    })
+    
+  } catch (error: any) {
+    console.error('Error refreshing balance:', error)
+    tacoStore.addToast({
+      id: Date.now(),
+      code: 'refresh-error',
+      title: 'Refresh Failed',
+      icon: 'fa-solid fa-exclamation-triangle',
+      message: 'Failed to refresh balance. Please try again.'
+    })
+  } finally {
+    refreshingBalance.value = false
   }
 }
 
@@ -1142,6 +1193,16 @@ const copyToClipboard = async (text: string) => {
 
 const getTokenByPrincipal = (principal: string): WalletToken | undefined => {
   return allTokens.value.find(t => t.principal === principal)
+}
+
+const getTokenBalance = (symbol: string): bigint => {
+  const token = allTokens.value.find(t => t.symbol === symbol)
+  return token ? token.balance : 0n
+}
+
+const getTokenDecimals = (symbol: string): number => {
+  const token = allTokens.value.find(t => t.symbol === symbol)
+  return token ? token.decimals : 8
 }
 
 
@@ -2419,6 +2480,56 @@ onMounted(async () => {
   line-height: 1.4;
   margin-top: 0.5rem;
   display: block;
+}
+
+.token-balance-display {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 0.75rem;
+  padding: 0.75rem;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+}
+
+.balance-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.balance-label {
+  font-size: 0.875rem;
+  color: #a0aec0;
+  font-weight: 500;
+}
+
+.balance-amount {
+  font-size: 1rem;
+  font-weight: 600;
+  color: white;
+  font-family: monospace;
+}
+
+.refresh-btn {
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+}
+
+.refresh-btn:hover:not(:disabled) {
+  transform: scale(1.05);
+}
+
+.refresh-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .token-amount {
