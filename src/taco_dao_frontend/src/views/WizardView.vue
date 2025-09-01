@@ -821,8 +821,9 @@ const swapInputAmount = computed(() => {
   const token = selectedSwapToken.value
   if (!token) return '0'
   
-  // Use all available balance minus fee
-  const availableAmount = Number(token.balance - token.fee) / (10 ** token.decimals)
+  // Use all available balance minus fee - avoid floating point precision issues
+  const availableAmountBigInt = token.balance - token.fee
+  const availableAmount = Number(availableAmountBigInt) / (10 ** token.decimals)
   return availableAmount.toFixed(8)
 })
 
@@ -1162,13 +1163,11 @@ const performSwapAndStake = async () => {
   isSwapping.value = true
   
   try {
-    // Calculate max swap amount (all tokens minus fee)
-    const maxSwapAmount = Number(token.balance - token.fee) / (10 ** token.decimals)
+    // Calculate max swap amount (all tokens minus fee) - avoid floating point precision issues
+    const amountInBigInt = token.balance - token.fee
+    const maxSwapAmount = Number(amountInBigInt) / (10 ** token.decimals)
     
-    console.log(`Auto-swapping ${maxSwapAmount} ${token.symbol} to TACO...`)
-    
-    // Convert amount to BigInt for quotes
-    const amountInBigInt = BigInt(Math.floor(maxSwapAmount * (10 ** token.decimals)))
+    console.log(`Auto-swapping ${maxSwapAmount} ${token.symbol} (${amountInBigInt} base units) to TACO...`)
     
     // Get quotes from both exchanges
     const [kongQuote, icpSwapQuote] = await Promise.allSettled([
@@ -1214,7 +1213,24 @@ const performSwapAndStake = async () => {
     }
     
     // Sort by amount out (highest first) and pick the best
-    const bestQuote = quotes.sort((a, b) => Number(b.amountOut) - Number(a.amountOut))[0]
+    // If quotes are very similar (within 1%), prefer Kong as it's more reliable
+    const sortedQuotes = quotes.sort((a, b) => Number(b.amountOut) - Number(a.amountOut))
+    let bestQuote = sortedQuotes[0]
+    
+    if (sortedQuotes.length > 1) {
+      const bestAmount = Number(sortedQuotes[0].amountOut)
+      const secondAmount = Number(sortedQuotes[1].amountOut)
+      const difference = Math.abs(bestAmount - secondAmount) / bestAmount
+      
+      // If difference is less than 1% and Kong is available, prefer Kong
+      if (difference < 0.01) {
+        const kongQuote = sortedQuotes.find(q => q.exchange === 'Kong')
+        if (kongQuote) {
+          bestQuote = kongQuote
+          console.log('Quotes are similar, preferring Kong for reliability')
+        }
+      }
+    }
     
     console.log(`Using ${bestQuote.exchange} with expected output: ${Number(bestQuote.amountOut) / 1e8} TACO`)
     
@@ -1248,17 +1264,38 @@ const performSwapAndStake = async () => {
         swapResult = await kongStore.icrc1_swap(swapParams)
       }
     } else {
+      // ICPSwap - add extra logging and error handling
+      console.log('Attempting ICPSwap with amount:', amountInBigInt, 'balance available:', token.balance)
       try {
         const tokenSupportsICRC2 = await tacoStore.checkTokenSupportsICRC2(token.principal)
+        console.log('ICPSwap ICRC2 support:', tokenSupportsICRC2)
         
         if (tokenSupportsICRC2) {
           swapResult = await icpswapStore.icrc2_swap(swapParams)
         } else {
+          console.log('Using ICRC1 for ICPSwap')
           swapResult = await icpswapStore.icrc1_swap(swapParams)
         }
       } catch (error) {
         console.log('ICPSwap ICRC2 failed, trying ICRC1:', error)
-        swapResult = await icpswapStore.icrc1_swap(swapParams)
+        try {
+          swapResult = await icpswapStore.icrc1_swap(swapParams)
+        } catch (icrc1Error) {
+          console.error('Both ICPSwap methods failed:', icrc1Error)
+          // If both ICPSwap methods fail, try Kong as fallback if available
+          const kongQuote = quotes.find(q => q.exchange === 'Kong')
+          if (kongQuote) {
+            console.log('Falling back to Kong swap as ICPSwap failed')
+            const tokenSupportsICRC2 = await tacoStore.checkTokenSupportsICRC2(token.principal)
+            if (tokenSupportsICRC2) {
+              swapResult = await kongStore.icrc2_swap(swapParams)
+            } else {
+              swapResult = await kongStore.icrc1_swap(swapParams)
+            }
+          } else {
+            throw icrc1Error
+          }
+        }
       }
     }
     
