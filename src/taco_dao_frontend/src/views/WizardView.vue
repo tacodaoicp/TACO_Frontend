@@ -122,7 +122,7 @@
                         <li>Buy ICP on a centralized exchange like Coinbase, Binance, or Kraken</li>
                         <li>Copy your ICP Legacy Account ID below</li>
                         <li>Withdraw ICP from the exchange to this address</li>
-                        <li>Wait for the transaction to confirm (usually 1-5 minutes)</li>
+                        <li>Wait for the transaction to confirm (usually within a few seconds)</li>
                       </ol>
                     </div>
 
@@ -278,7 +278,6 @@
               <div class="swap-section">
                 <!-- Token Selection for Swap -->
                 <div class="swap-input">
-                  <label class="form-label">From:</label>
                   <div class="token-input-group">
                     <select v-model="selectedSwapFromToken" class="form-select" @change="onStep2DropdownChange">
                       <option value="">Select token to swap from</option>
@@ -310,7 +309,6 @@
 
                 <!-- TACO Output -->
                 <div class="swap-output">
-                  <label class="form-label">To:</label>
                   <div class="token-output-display">
                     <img :src="tacoToken.logo" :alt="tacoToken.symbol" class="token-logo" />
                     <div class="token-info">
