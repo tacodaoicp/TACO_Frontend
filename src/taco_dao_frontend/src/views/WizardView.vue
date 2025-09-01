@@ -293,9 +293,13 @@
                       <img :src="getTokenByPrincipal(selectedSwapFromToken)?.logo" :alt="getTokenByPrincipal(selectedSwapFromToken)?.symbol" class="token-logo-small" />
                       <div class="token-details">
                         <div class="token-name">{{ getTokenByPrincipal(selectedSwapFromToken)?.name }}</div>
-                        <div class="token-balance">
-                          Available: {{ formatBalance(getTokenByPrincipal(selectedSwapFromToken)?.balance || 0n, getTokenByPrincipal(selectedSwapFromToken)?.decimals || 8) }}
-                          {{ getTokenByPrincipal(selectedSwapFromToken)?.symbol || '' }}
+                        <div class="token-amount">
+                          <span v-if="loadingQuotes" class="loading-text">
+                            <i class="fa fa-spinner fa-spin me-1"></i>Loading...
+                          </span>
+                          <span v-else class="amount-display">
+                            {{ swapInputAmount }} {{ getTokenByPrincipal(selectedSwapFromToken)?.symbol }}
+                          </span>
                         </div>
                       </div>
                     </div>
@@ -313,8 +317,17 @@
                     <img :src="tacoToken.logo" :alt="tacoToken.symbol" class="token-logo" />
                     <div class="token-info">
                       <div class="token-name">{{ tacoToken.symbol }}</div>
-                      <div class="token-balance">
-                        Balance: {{ formatBalance(tacoToken.balance, tacoToken.decimals) }}
+                      <div class="token-amount">
+                        <span v-if="loadingQuotes" class="loading-text">
+                          <i class="fa fa-spinner fa-spin me-1"></i>Loading...
+                        </span>
+                        <span v-else-if="bestQuote" class="amount-display">
+                          {{ swapOutputAmount }} TACO
+                          <small class="exchange-badge">via {{ bestExchange }}</small>
+                        </span>
+                        <span v-else class="amount-display">
+                          0.00000000 TACO
+                        </span>
                       </div>
                     </div>
                   </div>
@@ -327,7 +340,28 @@
                     <div class="preview-items">
                       <div class="preview-item">
                         <span class="label">Will swap:</span>
-                        <span class="value">{{ formatBalance(selectedSwapToken.balance - selectedSwapToken.fee, selectedSwapToken.decimals) }} {{ selectedSwapToken.symbol }}</span>
+                        <span class="value">
+                          <span v-if="loadingQuotes">
+                            <i class="fa fa-spinner fa-spin me-1"></i>Loading...
+                          </span>
+                          <span v-else>
+                            {{ swapInputAmount }} {{ selectedSwapToken.symbol }}
+                          </span>
+                        </span>
+                      </div>
+                      <div class="preview-item">
+                        <span class="label">Will receive:</span>
+                        <span class="value">
+                          <span v-if="loadingQuotes">
+                            <i class="fa fa-spinner fa-spin me-1"></i>Loading...
+                          </span>
+                          <span v-else-if="bestQuote">
+                            {{ swapOutputAmount }} TACO ({{ bestExchange }})
+                          </span>
+                          <span v-else>
+                            0.00000000 TACO
+                          </span>
+                        </span>
                       </div>
                       <div class="preview-item">
                         <span class="label">Auto-stake:</span>
@@ -585,6 +619,9 @@ const isSwapping = ref(false)
 const isStaking = ref(false)
 const isSwapAndStake = ref(false) // Flag to track if we're doing swap & stake
 const stakingComplete = ref(false)
+const loadingQuotes = ref(false)
+const bestQuote = ref<any>(null)
+const bestExchange = ref<string>('')
 const newTokenPrincipal = ref('')
 const registeringToken = ref(false)
 
@@ -780,6 +817,23 @@ const selectedSwapToken = computed(() => {
   return getTokenByPrincipal(selectedSwapFromToken.value)
 })
 
+const swapInputAmount = computed(() => {
+  const token = selectedSwapToken.value
+  if (!token) return '0'
+  
+  // Use all available balance minus fee
+  const availableAmount = Number(token.balance - token.fee) / (10 ** token.decimals)
+  return availableAmount.toFixed(8)
+})
+
+const swapOutputAmount = computed(() => {
+  if (!bestQuote.value) return '0'
+  
+  // Convert from BigInt to decimal
+  const outputAmount = Number(bestQuote.value.amountOut) / 1e8 // TACO has 8 decimals
+  return outputAmount.toFixed(8)
+})
+
 
 
 // Methods
@@ -906,6 +960,71 @@ const loadUserNeurons = async () => {
   }
 }
 
+const fetchSwapQuotes = async () => {
+  const token = selectedSwapToken.value
+  if (!token || !tacoToken.value) return
+  
+  const inputAmountBigInt = token.balance - token.fee
+  if (inputAmountBigInt <= 0n) return
+  
+  loadingQuotes.value = true
+  bestQuote.value = null
+  bestExchange.value = ''
+  
+  try {
+    // Get quotes from both exchanges
+    const [kongQuote, icpSwapQuote] = await Promise.allSettled([
+      kongStore.getQuote({
+        sellTokenSymbol: token.symbol,
+        buyTokenSymbol: 'TACO',
+        amountIn: inputAmountBigInt
+      }),
+      icpswapStore.getQuote({
+        sellTokenPrincipal: token.principal,
+        buyTokenPrincipal: tacoToken.value.principal,
+        amountIn: inputAmountBigInt
+      })
+    ])
+    
+    // Process quotes and find the best one
+    const quotes = []
+    
+    if (kongQuote.status === 'fulfilled' && kongQuote.value) {
+      quotes.push({
+        exchange: 'Kong',
+        amountOut: typeof kongQuote.value.receive_amount === 'bigint' ? kongQuote.value.receive_amount : BigInt(kongQuote.value.receive_amount),
+        slippage: kongQuote.value.slippage,
+        price: kongQuote.value.price,
+        fee: 0,
+        rawData: kongQuote.value
+      })
+    }
+    
+    if (icpSwapQuote.status === 'fulfilled' && icpSwapQuote.value) {
+      quotes.push({
+        exchange: 'ICPSwap',
+        amountOut: typeof icpSwapQuote.value.amountOut === 'bigint' ? icpSwapQuote.value.amountOut : BigInt(icpSwapQuote.value.amountOut),
+        slippage: icpSwapQuote.value.slippage,
+        price: icpSwapQuote.value.effectivePrice,
+        fee: typeof icpSwapQuote.value.fee === 'bigint' ? Number(icpSwapQuote.value.fee) : icpSwapQuote.value.fee,
+        rawData: icpSwapQuote.value
+      })
+    }
+    
+    if (quotes.length > 0) {
+      // Sort by amount out (highest first) and pick the best
+      const sortedQuotes = quotes.sort((a, b) => Number(b.amountOut) - Number(a.amountOut))
+      bestQuote.value = sortedQuotes[0]
+      bestExchange.value = sortedQuotes[0].exchange
+    }
+    
+  } catch (error) {
+    console.error('Error fetching quotes:', error)
+  } finally {
+    loadingQuotes.value = false
+  }
+}
+
 const syncSwapTokenSelection = () => {
   if (allTokens.value.length === 0) return
   
@@ -931,6 +1050,8 @@ const initializeTokenSelections = () => {
   const icpToken = allTokens.value.find(t => t.symbol === 'ICP')
   if (icpToken) {
     selectedSwapFromToken.value = icpToken.principal
+    // Fetch quotes for initial selection
+    setTimeout(() => fetchSwapQuotes(), 100)
   }
   
   // Reset the manual change flag
@@ -1440,6 +1561,13 @@ watch(selectedGetTokenSymbol, (newSymbol) => {
   // Sync step 2 when step 1 changes (unless user manually changed step 2)
   if (!newSymbol || allTokens.value.length === 0) return
   syncSwapTokenSelection()
+})
+
+// Watch for swap token changes to fetch quotes
+watch(selectedSwapFromToken, (newToken) => {
+  if (newToken && allTokens.value.length > 0) {
+    fetchSwapQuotes()
+  }
 })
 
 // Initialize selections when token data loads
@@ -2178,6 +2306,29 @@ onMounted(async () => {
   line-height: 1.4;
   margin-top: 0.5rem;
   display: block;
+}
+
+.token-amount {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #ffffff;
+}
+
+.amount-display {
+  color: #ffffff;
+}
+
+.loading-text {
+  color: #a0aec0;
+  font-style: italic;
+}
+
+.exchange-badge {
+  display: block;
+  font-size: 0.75rem;
+  color: #4ade80;
+  font-weight: 500;
+  margin-top: 0.25rem;
 }
 
 .swap-section {
