@@ -2163,6 +2163,25 @@ onMounted(async () => {
   }
 }
 
+.swap-section {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.swap-arrow {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin: 0.5rem 0;
+  color: #ffffff;
+  font-size: 1.2rem;
+}
+
+.swap-arrow i {
+  color: #ffffff;
+}
+
 .step-actions,
 .swap-actions,
 .stake-actions {
