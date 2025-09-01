@@ -572,6 +572,13 @@
       @created="handleNeuronCreated"
     />
 
+    <!-- Swap & Stake Progress Dialog -->
+    <SwapStakeProgressDialog
+      ref="progressDialog"
+      :show="showProgressDialog"
+      @close="closeProgressDialog"
+    />
+
   </div>
 </template>
 
@@ -589,6 +596,7 @@ import SwapDialog from '../components/wallet/SwapDialog.vue'
 import SwapConfirmDialog from '../components/wallet/SwapConfirmDialog.vue'
 import StakeToNeuronDialog from '../components/wallet/StakeToNeuronDialog.vue'
 import CreateNeuronDialog from '../components/wallet/CreateNeuronDialog.vue'
+import SwapStakeProgressDialog from '../components/wallet/SwapStakeProgressDialog.vue'
 
 interface WalletToken {
   principal: string
@@ -636,7 +644,9 @@ const showSwapDialog = ref(false)
 const showSwapConfirmDialog = ref(false)
 const showStakeDialog = ref(false)
 const showCreateDialog = ref(false)
+const showProgressDialog = ref(false)
 const selectedNeuron = ref<any | null>(null)
+const progressDialog = ref<any>(null)
 const preselectedSwapToken = ref<WalletToken | null>(null)
 const swapConfirmData = ref<any | null>(null)
 
@@ -1163,7 +1173,13 @@ const performSwapAndStake = async () => {
   isSwapAndStake.value = true
   isSwapping.value = true
   
+  // Show progress dialog and reset state
+  showProgressDialog.value = true
+  progressDialog.value?.reset()
+  
   try {
+    // Step 1: Getting quotes
+    progressDialog.value?.setStepActive('quotes')
     // Calculate max swap amount - reserve extra fee for ICPSwap operations
     // ICPSwap requires additional fee reserves beyond the basic transfer fee
     const extraFeeReserve = token.fee // Reserve one additional fee for ICPSwap operations
@@ -1220,6 +1236,18 @@ const performSwapAndStake = async () => {
     const bestQuote = quotes.sort((a, b) => Number(b.amountOut) - Number(a.amountOut))[0]
     
     console.log(`Using ${bestQuote.exchange} with expected output: ${Number(bestQuote.amountOut) / 1e8} TACO`)
+    
+    // Complete quotes step and show swap details
+    progressDialog.value?.setStepCompleted('quotes')
+    progressDialog.value?.setSwapDetails({
+      exchange: bestQuote.exchange,
+      inputAmount: maxSwapAmount.toFixed(6),
+      inputSymbol: token.symbol,
+      outputAmount: (Number(bestQuote.amountOut) / 1e8).toFixed(6)
+    })
+    
+    // Step 2: Executing swap
+    progressDialog.value?.setStepActive('swap')
     
     // Execute the swap using the same approach as SwapConfirmDialog
     let swapResult
@@ -1279,10 +1307,17 @@ const performSwapAndStake = async () => {
     
     // Kong/ICPSwap stores return results directly, not wrapped in success/error objects
     console.log('Swap successful, proceeding with auto-staking...')
+    
+    // Complete swap step
+    progressDialog.value?.setStepCompleted('swap')
+    
     await handleSwapSuccess(swapResult)
     
   } catch (error: any) {
     console.error('Auto-swap & stake failed:', error)
+    
+    // Show error in progress dialog
+    progressDialog.value?.setError(error.message || 'Failed to execute swap & stake')
     
     tacoStore.addToast({
       id: Date.now(),
@@ -1330,6 +1365,9 @@ const handleSwapSuccess = async (result: any) => {
     // Auto-stake all the TACO we just received
     console.log('Auto-staking TACO after swap...')
     
+    // Step 3: Creating neuron
+    progressDialog.value?.setStepActive('stake')
+    
     try {
       isStaking.value = true
       
@@ -1341,14 +1379,22 @@ const handleSwapSuccess = async (result: any) => {
         const result = await tacoStore.createNeuron(maxStakeAmount)
         
         if (result.success && result.subaccount) {
+          // Complete stake step and start dissolve step
+          progressDialog.value?.setStepCompleted('stake')
+          progressDialog.value?.setStepActive('dissolve')
+          
           // Set default dissolve delay (28 days)
           try {
             const defaultDissolveDays = 28
             const delayMonths = defaultDissolveDays / 30
             await tacoStore.setNeuronDissolveDelay(result.subaccount, delayMonths)
             console.log(`Auto-set dissolve delay to ${defaultDissolveDays} days`)
+            
+            // Complete dissolve step
+            progressDialog.value?.setStepCompleted('dissolve')
           } catch (dissolveError: any) {
             console.warn('Failed to set dissolve delay for auto-created neuron:', dissolveError)
+            progressDialog.value?.setStepError('dissolve')
           }
           
           // Show success message
@@ -1365,9 +1411,15 @@ const handleSwapSuccess = async (result: any) => {
           
           // Mark staking as complete and move to final step
           stakingComplete.value = true
-          goToStep(3)
+          
+          // Auto-close progress dialog after 3 seconds
+          setTimeout(() => {
+            showProgressDialog.value = false
+            goToStep(3)
+          }, 3000)
           
         } else {
+          progressDialog.value?.setStepError('stake')
           throw new Error('Failed to create neuron')
         }
       } else {
@@ -1376,6 +1428,9 @@ const handleSwapSuccess = async (result: any) => {
       
     } catch (error: any) {
       console.error('Auto-staking failed:', error)
+      
+      // Show error in progress dialog
+      progressDialog.value?.setError(`Swap completed successfully, but staking failed: ${error.message}`)
       
       // Show error and fall back to manual staking
       tacoStore.addToast({
@@ -1389,8 +1444,11 @@ const handleSwapSuccess = async (result: any) => {
       // Refresh neurons list for manual staking
       await loadUserNeurons()
       
-      // Move to staking step for manual staking
-      goToStep(3)
+      // Auto-close progress dialog and move to staking step for manual staking
+      setTimeout(() => {
+        showProgressDialog.value = false
+        goToStep(3)
+      }, 3000)
     } finally {
       isStaking.value = false
       isSwapAndStake.value = false // Reset the flag
@@ -1441,6 +1499,10 @@ const closeStakeDialog = () => {
 
 const closeCreateDialog = () => {
   showCreateDialog.value = false
+}
+
+const closeProgressDialog = () => {
+  showProgressDialog.value = false
 }
 
 const handleStakeCompleted = async (neuron: any) => {
