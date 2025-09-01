@@ -141,7 +141,7 @@
                           <i class="fa fa-copy"></i>
                         </button>
                       </div>
-                      <small class="text-muted">
+                      <small class="account-help-text">
                         This is your unique ICP address. Use this exact address when withdrawing from exchanges.
                       </small>
                     </div>
@@ -176,7 +176,7 @@
                           <i class="fa fa-copy"></i>
                         </button>
                       </div>
-                      <small class="text-muted">
+                      <small class="account-help-text">
                         This is your Principal ID. Use this when sending ICRC-1 tokens.
                       </small>
                     </div>
@@ -2170,6 +2170,14 @@ onMounted(async () => {
   .register-token-form .form-control {
     min-width: 100%;
   }
+}
+
+.account-help-text {
+  color: #a0aec0 !important;
+  font-size: 0.85rem;
+  line-height: 1.4;
+  margin-top: 0.5rem;
+  display: block;
 }
 
 .swap-section {
