@@ -1213,24 +1213,7 @@ const performSwapAndStake = async () => {
     }
     
     // Sort by amount out (highest first) and pick the best
-    // If quotes are very similar (within 1%), prefer Kong as it's more reliable
-    const sortedQuotes = quotes.sort((a, b) => Number(b.amountOut) - Number(a.amountOut))
-    let bestQuote = sortedQuotes[0]
-    
-    if (sortedQuotes.length > 1) {
-      const bestAmount = Number(sortedQuotes[0].amountOut)
-      const secondAmount = Number(sortedQuotes[1].amountOut)
-      const difference = Math.abs(bestAmount - secondAmount) / bestAmount
-      
-      // If difference is less than 1% and Kong is available, prefer Kong
-      if (difference < 0.01) {
-        const kongQuote = sortedQuotes.find(q => q.exchange === 'Kong')
-        if (kongQuote) {
-          bestQuote = kongQuote
-          console.log('Quotes are similar, preferring Kong for reliability')
-        }
-      }
-    }
+    const bestQuote = quotes.sort((a, b) => Number(b.amountOut) - Number(a.amountOut))[0]
     
     console.log(`Using ${bestQuote.exchange} with expected output: ${Number(bestQuote.amountOut) / 1e8} TACO`)
     
