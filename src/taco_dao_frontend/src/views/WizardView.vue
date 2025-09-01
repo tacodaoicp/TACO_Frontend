@@ -1356,6 +1356,9 @@ const handleSwapSuccess = async (result: any) => {
             message: `Successfully swapped and staked ${formatBalance(maxStakeAmount, 8)} TACO in a new neuron!`
           })
           
+          // Refresh neurons list to show the new neuron
+          await loadUserNeurons()
+          
           // Mark staking as complete and move to final step
           stakingComplete.value = true
           goToStep(3)
@@ -1378,6 +1381,9 @@ const handleSwapSuccess = async (result: any) => {
         icon: 'fa-solid fa-exclamation-triangle',
         message: `Swap completed successfully, but auto-staking failed: ${error.message}. Please stake manually.`
       })
+      
+      // Refresh neurons list for manual staking
+      await loadUserNeurons()
       
       // Move to staking step for manual staking
       goToStep(3)
@@ -1434,38 +1440,46 @@ const closeCreateDialog = () => {
 }
 
 const handleStakeCompleted = async (neuron: any) => {
-  console.log('Staking completed for neuron:', neuron)
+  console.log('Stake completed for neuron:', neuron)
   
+  // Refresh neurons list to show updated stake
+  await loadUserNeurons()
+  
+  // Close dialog
   closeStakeDialog()
   
+  // Show success message
   tacoStore.addToast({
     id: Date.now(),
     code: 'stake-success',
-    title: 'Staking Successful',
+    title: 'Stake Added Successfully',
     icon: 'fa-solid fa-check',
-    message: 'Successfully staked TACO to neuron'
+    message: `Successfully added stake to ${neuron?.displayName || 'neuron'}`
   })
-  
-  await loadWalletData()
-  stakingComplete.value = true
 }
 
 const handleNeuronCreated = async () => {
   console.log('Neuron created successfully')
   
+  // Refresh neurons list to show new neuron
+  await loadUserNeurons()
+  
+  // Close dialog
   closeCreateDialog()
   
+  // Show success message
   tacoStore.addToast({
     id: Date.now(),
-    code: 'neuron-created',
-    title: 'Neuron Created',
+    code: 'neuron-created-success',
+    title: 'Neuron Created Successfully',
     icon: 'fa-solid fa-check',
-    message: 'Successfully created new neuron'
+    message: 'New neuron created successfully'
   })
-  
-  await loadWalletData()
-  stakingComplete.value = true
 }
+
+
+
+
 
 const goToWallet = () => {
   router.push('/wallet')
