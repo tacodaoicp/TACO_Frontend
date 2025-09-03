@@ -1,143 +1,230 @@
 <template>
-  <div class="container-fluid">
-    <div class="row">
-      <div class="col-12">
-        
-        <!-- page title -->
-        <div class="page-title">
-          <h1>Wallet</h1>
-          <p class="text-muted">Manage your tokens and send transactions</p>
-        </div>
 
-        <!-- loading state -->
-        <div v-if="loading" class="text-center py-5">
-          <div class="spinner-border text-primary" role="status">
-            <span class="visually-hidden">Loading...</span>
-          </div>
-          <p class="mt-2">Loading wallet...</p>
-        </div>
+  <div class="standard-view">
 
-        <!-- login required state -->
-        <div v-else-if="!tacoStore.userLoggedIn" class="text-center py-5">
-          <div class="card">
-            <div class="card-body py-5">
-              <i class="fa fa-lock fa-4x text-muted mb-4"></i>
-              <h3 class="mb-3">Login Required</h3>
-              <p class="text-muted mb-4">You need to log in to view and manage your wallet.</p>
-              <button 
-                @click="tacoStore.iidLogIn()" 
-                class="btn btn-primary btn-lg"
-              >
-                <i class="fa fa-sign-in-alt me-2"></i>
-                Login with Internet Identity
-              </button>
+    <!-- header bar -->
+    <HeaderBar />
+
+    <!-- scroll container -->
+    <div class="scroll-y-container h-100">
+
+      <!-- bootstrap container -->
+      <div class="container p-0">
+
+        <!-- bootstrap row -->
+        <div class="row h-100 d-flex flex-column flex-nowrap overflow-hidden px-2 px-sm-0">
+
+          <!-- wallet page -->
+          <div class="wallet-view">
+
+            <!-- title container -->
+            <div class="d-flex align-items-center">
+
+              <!-- wallet title -->
+              <TacoTitle level="h2" emoji="💸" title="Wallet" class="mt-4" /> 
+
             </div>
-          </div>
-        </div>
 
-        <!-- wallet content -->
-        <div v-else>
-          
-          <!-- Core Tokens Section -->
-          <div class="card mb-4">
-            <div class="card-header">
-              <h5 class="mb-0">Core Tokens</h5>
-            </div>
-            <div class="card-body">
-              <div class="row">
-                <div v-for="token in coreTokens" :key="token.principal" class="col-md-6 col-lg-4 mb-3">
-                  <TokenCard 
-                    :token="token" 
-                    @send="openSendDialog"
-                    @swap="openSwapDialog" 
+            <!-- taco container -->
+            <div class="taco-container
+                        taco-container--l1
+                        d-flex flex-column gap-0 w-100 p-0 flex-grow-1 overflow-hidden position-relative">
 
-                    @unregister="unregisterToken"
-                          @stake-to-neuron="handleStakeToNeuron"
-      @create-neuron="handleCreateNeuron"
-      @set-dissolve="handleSetDissolve"
-                  />
+              <!-- toolbar container - l2 -->
+              <div class="taco-container taco-container--l2 taco-container--l2--dark p-2 mx-3 mt-3 mb-0">
+
+                <!-- toolbar -->
+                <div class="taco-toolbar gap-2">
+
+                  <!-- left -->
+                  <div class="taco-toolbar__left">
+
+                    <!-- buttons -->
+                    <div class="btn-group">
+
+                        <!-- tokens -->
+                        <button class="btn taco-nav-btn"
+                                :class="{ 'taco-nav-btn--active': true }">Tokens</button>
+
+                        <!-- other -->
+                        <button class="btn taco-nav-btn"
+                                :class="{ 'taco-nav-btn--active': false }">Other</button>
+
+                    </div>
+
+                  </div>
+
+                  <!-- right -->
+                  <div class="taco-toolbar__right flex-grow-1 flex-wrap d-flex justify-content-end gap-2"> 
+
+                    <!-- nothing atm -->
+
+                  </div>
+
                 </div>
-              </div>
-            </div>
-          </div>
 
-          <!-- Trusted Tokens Section -->
-          <div class="card mb-4" v-if="trustedTokens.length > 0">
-            <div class="card-header d-flex justify-content-between align-items-center">
-              <h5 class="mb-0">Trusted Tokens</h5>
-              <small class="text-muted">{{ trustedTokens.length }} tokens</small>
-            </div>
-            <div class="card-body">
-              <div class="row">
-                <div v-for="token in trustedTokens" :key="token.principal" class="col-md-6 col-lg-4 mb-3">
-                  <TokenCard 
-                    :token="token" 
-                    @send="openSendDialog"
-                    @swap="openSwapDialog"
-                  />
+              </div>              
+              
+              <!-- logged out content -->
+              <div v-if="!tacoStore.userLoggedIn" 
+                   class="wallet-view__logged-out-content">
+
+                <!-- wallet icon -->
+                <i class="fa-solid fa-wallet"></i>
+
+              </div>
+
+              <!-- logged out curtain -->
+              <div v-if="!tacoStore.userLoggedIn" class="login-curtain">
+
+                <!-- login button -->
+                <button class="btn iid-login" @click="tacoStore.iidLogIn()">
+
+                  <!-- dfinity logo -->
+                  <DfinityLogo />
+
+                  <!-- login text -->
+                  <span class="taco-text-white">Login to view</span>
+
+                </button>
+
+              </div>              
+
+              <!-- logged in content -->
+              <div v-if="tacoStore.userLoggedIn"
+                   class="wallet-view__logged-in-content">
+
+                <!-- core tokens -->
+                <div>
+                  
+                  <!-- core tokens title -->
+                  <h2 class="tokens-title">Core Tokens <span class="small">({{ coreTokens.length }})</span></h2>
+
+                  <!-- trusted token -->
+                  <div class="d-flex flex-column gap-2">
+
+                    <!-- core token -->
+                    <div v-for="token in coreTokens" 
+                        :key="token.principal">
+
+                      <!-- core token card -->
+                      <TokenCard 
+                        :token="token" 
+                        @send="openSendDialog"
+                        @swap="openSwapDialog" 
+                        @unregister="unregisterToken"
+                        @stake-to-neuron="handleStakeToNeuron"
+                        @create-neuron="handleCreateNeuron"
+                        @set-dissolve="handleSetDissolve" />
+
+                    </div>
+
+                  </div>
+
                 </div>
-              </div>
-            </div>
-          </div>
 
-          <!-- Register Custom Token Section -->
-          <div>
-            <h3>Register Custom ICRC1 Token</h3>
-            <p>Enter the principal of an ICRC1 token to add it to your wallet:</p>
-            <div>
-              <input 
-                v-model="newTokenPrincipal"
-                placeholder="Token principal (e.g., rdmx6-jaaaa-aaaah-qcaiq-cai)"
-                style="width: 400px; padding: 8px; margin-right: 10px;"
-              />
-              <button 
-                @click="registerCustomToken" 
-                :disabled="!newTokenPrincipal.trim() || registeringToken"
-                style="padding: 8px 16px;"
-              >
-                {{ registeringToken ? 'Registering...' : 'Register Token' }}
-              </button>
-            </div>
-            <br>
-          </div>
+                <!-- trusted tokens container -->
+                <div>
 
-          <!-- User Registered Tokens Section -->
-          <div class="card mb-4" v-if="userRegisteredTokens.length > 0">
-            <div class="card-header d-flex justify-content-between align-items-center">
-              <h5 class="mb-0">Your Registered Tokens</h5>
-              <small class="text-muted">{{ userRegisteredTokens.length }} tokens</small>
-            </div>
-            <div class="card-body">
-              <div class="row">
-                <div v-for="token in userRegisteredTokens" :key="token.principal" class="col-md-6 col-lg-4 mb-3">
-                  <TokenCard 
-                    :token="token" 
-                    @send="openSendDialog"
-                    @swap="openSwapDialog"
+                  <!-- trusted tokens title -->
+                  <h2 class="tokens-title">Trusted Tokens <span class="small">({{ trustedTokens.length }})</span></h2>
 
-                    @unregister="unregisterToken"
-                  />
+                  <!-- if trusted tokens -->
+                  <div v-if="trustedTokens.length > 0">
+
+                    <!-- trusted token -->
+                    <div class="d-flex flex-column gap-2">
+
+                      <!-- trusted token -->
+                      <div v-for="token in trustedTokens" :key="token.principal">
+
+                        <!-- token card -->
+                        <TokenCard 
+                          :token="token" 
+                          @send="openSendDialog"
+                          @swap="openSwapDialog" />
+                      </div>
+
+                    </div>
+
+                  </div>
+
                 </div>
-              </div>
-            </div>
-          </div>
 
-          <!-- Empty state for user registered tokens -->
-          <div class="card" v-if="userRegisteredTokens.length === 0">
-            <div class="card-header">
-              <h5 class="mb-0">Your Registered Tokens</h5>
+                <!-- registered tokens container -->
+                <div>
+
+                  <!-- registered tokens title -->
+                  <h2 class="tokens-title">Registered Tokens <span class="small">({{ userRegisteredTokens.length }})</span></h2>
+
+                  <!-- register a token -->
+                  <div class="d-flex gap-2 mb-2">
+
+                    <!-- input -->
+                    <input v-model="newTokenPrincipal"
+                           placeholder="Enter token principal"
+                           class="register-token-input taco-input" />
+
+                    <!-- add button -->
+                    <button @click="registerCustomToken" 
+                            :disabled="!newTokenPrincipal.trim() || registeringToken"
+                            class="btn btn-sm taco-btn taco-btn--green px-3 py-1">
+                      
+                      <!-- plus icon -->
+                      <i class="fa fa-plus"></i>
+
+                    </button>
+                  </div>                  
+
+                  <!-- if registered tokens -->
+                  <div v-if="userRegisteredTokens.length > 0">
+
+                    <!-- registered tokens -->
+                    <div class="d-flex flex-column gap-2">
+
+                      <!-- registered token -->
+                      <div v-for="token in userRegisteredTokens" :key="token.principal">
+
+                        <!-- token card -->
+                        <TokenCard 
+                          :token="token" 
+                          @send="openSendDialog"
+                          @swap="openSwapDialog"
+                          @unregister="unregisterToken" />
+                      </div>
+
+                    </div>
+
+                  </div>
+
+                  <!-- no registered tokens -->
+                  <div v-if="userRegisteredTokens.length === 0">
+                    
+                    <div class="wallet-view__no-registered-tokens
+                                d-flex align-items-center justify-content-center">
+
+                      <span class="d-inline-block taco-text-black-to-white ps-4 py-5">No registered tokens</span>
+
+                    </div>
+                    
+                  </div>
+
+                </div>
+
+              </div>
+
             </div>
-            <div class="card-body text-center py-5">
-              <i class="fa fa-plus-circle fa-3x text-muted mb-3"></i>
-              <h6 class="text-muted">No registered tokens yet</h6>
-              <p class="text-muted">Register ICRC1 tokens using the form above to track and manage them in your wallet</p>
-            </div>
+
           </div>
 
         </div>
 
       </div>
+
     </div>
+
+    <!-- footer bar -->
+    <FooterBar />    
 
     <!-- Send Token Dialog -->
     <SendTokenDialog 
@@ -191,9 +278,116 @@
     />
 
   </div>
+
 </template>
 
+<style scoped lang="scss">
+
+// wallet view
+.wallet-view {
+  display: flex;
+  flex-direction: column;
+  color: var(--black-to-white);
+
+  // logged out banner
+  &__logged-out-content {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    min-height: 300px;
+
+    // wallet icon
+    i {
+      font-size: 8rem;
+      color: var(--dark-orange-to-dark-brown);
+      transform: rotate(-10deg);
+    }
+
+  }
+
+  // logged in content
+  &__logged-in-content {
+    padding: 0rem 1rem 1rem;
+  }
+
+  // no registered tokens
+  &__no-registered-tokens {
+    background-color: var(--light-brown-to-dark-brown);
+    border-radius: 0.5rem;
+    border: 1px solid var(--light-orange-to-dark-orange);
+  }
+
+  // tokens title
+  .tokens-title {
+    font-size: 1.5rem;
+    line-height: 1;
+    font-family: 'Space Mono';
+    padding: 1.5rem 0 1rem;
+    margin-bottom: 0;
+  }
+
+}
+
+// login curtain
+.login-curtain {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  height: 100%;
+  position: absolute;
+  top: 0;
+  left: 0;
+  background-color: var(--curtain-bg);
+  padding: 0 3rem;
+  border-radius: 0.5rem;
+  z-index: 1000;
+
+  // login
+  .iid-login {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.325rem;
+
+    svg {
+      width: 1.375rem;
+    }
+
+    span {
+      font-size: 1rem;
+      font-family: 'Space Mono', monospace;
+    }
+
+    &:active {
+      border-color: transparent;
+    }
+
+  }
+
+}
+
+// register token input
+.register-token-input {
+  padding: 0.375rem 1rem;
+  border-radius: 0.25rem;
+  font-size: 0.875rem;
+  width: 100%;
+  max-width: 280px;
+}
+
+</style>
+
 <script setup lang="ts">
+
+/////////////
+// imports //
+/////////////
+
+import HeaderBar from "../components/HeaderBar.vue";
+import FooterBar from "../components/FooterBar.vue";
+import TacoTitle from '../components/misc/TacoTitle.vue'
 import { ref, computed, onMounted } from 'vue'
 import { useTacoStore } from '../stores/taco.store'
 import { Principal } from '@dfinity/principal'
@@ -205,7 +399,13 @@ import StakeToNeuronDialog from '../components/wallet/StakeToNeuronDialog.vue'
 import CreateNeuronDialog from '../components/wallet/CreateNeuronDialog.vue'
 import SetDissolveDialog from '../components/wallet/SetDissolveDialog.vue'
 import { tokenImages } from '../components/data/TokenData'
+import DfinityLogo from '../assets/images/dfinityLogo.vue'
 
+////////////////
+// interfaces //
+////////////////
+
+// wallet token interface
 interface WalletToken {
   principal: string
   name: string
@@ -218,10 +418,14 @@ interface WalletToken {
   isRegistered?: boolean
 }
 
+///////////
+// store //
+///////////
+
+// # SETUP #
 const tacoStore = useTacoStore()
 
-// State
-const loading = ref(true)
+// # STATE #
 const showSendDialog = ref(false)
 const selectedToken = ref<WalletToken | null>(null)
 const showStakeDialog = ref(false)
@@ -238,12 +442,23 @@ const customTokenMetadata = ref<Map<string, any>>(new Map())
 const newTokenPrincipal = ref('')
 const registeringToken = ref(false)
 
-// Core tokens (ICP and TACO)
+// # ACTIONS #
+const { appLoadingOn, appLoadingOff } = tacoStore
+
+//////////////
+// computed //
+//////////////
+
+// core tokens (ICP and TACO)
 const coreTokens = computed<WalletToken[]>(() => {
+
+  // create tokens array
   const tokens: WalletToken[] = []
   
-  // ICP Token
+  // ICP token principal
   const icpPrincipal = 'ryjl3-tyaaa-aaaaa-aaaba-cai'
+
+  // add ICP token to tokens array
   tokens.push({
     principal: icpPrincipal,
     name: 'Internet Computer',
@@ -256,8 +471,10 @@ const coreTokens = computed<WalletToken[]>(() => {
     isRegistered: false
   })
 
-  // TACO Token
+  // TACO token principal
   const tacoPrincipal = 'kknbx-zyaaa-aaaaq-aae4a-cai'
+
+  // add TACO token to tokens array
   tokens.push({
     principal: tacoPrincipal,
     name: 'TACO DAO Token',
@@ -270,14 +487,21 @@ const coreTokens = computed<WalletToken[]>(() => {
     isRegistered: false
   })
 
+  // return tokens array
   return tokens
+
 })
 
-// Trusted tokens (excluding core tokens)
+// trusted tokens (excluding core tokens)
 const trustedTokens = computed<WalletToken[]>(() => {
+
+  // create core token principals set
   const coreTokenPrincipals = new Set(coreTokens.value.map(t => t.principal))
+
+  // create user registered token principals set
   const userRegisteredPrincipals = new Set(userRegisteredTokenPrincipals.value)
   
+  // return fetched token details filtered by core token principals and user registered token principals
   return tacoStore.fetchedTokenDetails
     .filter((entry) => {
       const principal = entry[0]
@@ -373,10 +597,16 @@ const allTokens = computed<WalletToken[]>(() => {
   ]
 })
 
-// Methods
+///////////////////
+// local methods //
+///////////////////
+
+// load wallet data
 const loadWalletData = async () => {
   try {
-    loading.value = true
+    
+    // turn app loading on
+    appLoadingOn()
     
     // Load token details and user registered tokens
     await Promise.all([
@@ -400,10 +630,15 @@ const loadWalletData = async () => {
       message: 'Failed to load wallet data'
     })
   } finally {
-    loading.value = false
+
+    // turn app loading off
+    appLoadingOff()
+
   }
+
 }
 
+// fetch user registered tokens
 const fetchUserRegisteredTokens = async () => {
   try {
     const registeredTokens = await tacoStore.getUserRegisteredTokens()
@@ -417,6 +652,7 @@ const fetchUserRegisteredTokens = async () => {
   }
 }
 
+// load custom token metadata
 const loadCustomTokenMetadata = async () => {
   console.log('Loading custom token metadata for:', userRegisteredTokenPrincipals.value)
       const tokenDetailsMap = new Map(tacoStore.fetchedTokenDetails.map((entry) => [entry[0].toString(), entry[1]]))
@@ -453,6 +689,7 @@ const loadCustomTokenMetadata = async () => {
   console.log('Final customTokenMetadata:', customTokenMetadata.value)
 }
 
+// load trusted token metadata
 const loadTrustedTokenMetadata = async () => {
   console.log('Loading fresh metadata for trusted tokens')
   
@@ -491,6 +728,7 @@ const loadTrustedTokenMetadata = async () => {
   console.log('Finished loading trusted token metadata')
 }
 
+// load all balances
 const loadAllBalances = async () => {
   const allTokens = [
     ...coreTokens.value,
@@ -511,16 +749,19 @@ const loadAllBalances = async () => {
   await Promise.all(balancePromises)
 }
 
+// open send dialog
 const openSendDialog = (token: WalletToken) => {
   selectedToken.value = token
   showSendDialog.value = true
 }
 
+// close send dialog
 const closeSendDialog = () => {
   showSendDialog.value = false
   selectedToken.value = null
 }
 
+// handle send token
 const handleSendToken = async (params: { recipient: string; amount: bigint; memo?: string }) => {
   if (!selectedToken.value) return
   
@@ -561,8 +802,7 @@ const handleSendToken = async (params: { recipient: string; amount: bigint; memo
   }
 }
 
-
-
+// unregister token
 const unregisterToken = async (token: WalletToken) => {
   try {
     await tacoStore.unregisterUserToken(token.principal)
@@ -586,59 +826,69 @@ const unregisterToken = async (token: WalletToken) => {
   }
 }
 
+// handle stake to neuron
 const handleStakeToNeuron = (neuron: any) => {
   console.log('Stake to neuron:', neuron)
   selectedNeuron.value = neuron
   showStakeDialog.value = true
 }
 
+// close stake dialog
 const closeStakeDialog = () => {
   showStakeDialog.value = false
   selectedNeuron.value = null
 }
 
+// handle stake completed
 const handleStakeCompleted = async (neuron: any) => {
   console.log('Staking completed for neuron:', neuron)
   // Refresh wallet data to show updated balances
   await loadWalletData()
 }
 
+// get taco balance
 const getTacoBalance = (): bigint => {
   const tacoPrincipal = 'kknbx-zyaaa-aaaaq-aae4a-cai'
   return allTokenBalances.value.get(tacoPrincipal) || 0n
 }
 
+// handle create neuron
 const handleCreateNeuron = () => {
   console.log('Create neuron clicked')
   showCreateDialog.value = true
 }
 
+// close create dialog
 const closeCreateDialog = () => {
   showCreateDialog.value = false
 }
 
+// handle neuron created
 const handleNeuronCreated = async () => {
   console.log('Neuron created successfully')
   // Refresh wallet data to show updated balances
   await loadWalletData()
 }
 
-// Dissolve dialog handlers
+// dissolve dialog handlers
 const handleSetDissolve = (neuron: any) => {
   selectedNeuron.value = neuron
   showDissolveDialog.value = true
 }
 
+// close dissolve dialog
 const closeDissolveDialog = () => {
   showDissolveDialog.value = false
   selectedNeuron.value = null
 }
 
+// handle dissolve set
 const handleDissolveSet = () => {
   // Refresh the wallet data to show updated neuron info
   loadWalletData()
 }
 
+// register custom token
 const registerCustomToken = async () => {
   if (!newTokenPrincipal.value.trim()) return
   
@@ -710,28 +960,32 @@ const registerCustomToken = async () => {
   }
 }
 
-// Swap-related methods
+// open swap dialog
 const openSwapDialog = (token: WalletToken) => {
   selectedTokenForSwap.value = token.symbol === 'TACO' ? null : token
   showSwapDialog.value = true
 }
 
+// close swap dialog
 const closeSwapDialog = () => {
   showSwapDialog.value = false
   selectedTokenForSwap.value = null
 }
 
+// handle swap confirm
 const handleSwapConfirm = (swapData: any) => {
   swapConfirmData.value = swapData
   showSwapDialog.value = false
   showSwapConfirmDialog.value = true
 }
 
+// close swap confirm dialog
 const closeSwapConfirmDialog = () => {
   showSwapConfirmDialog.value = false
   swapConfirmData.value = null
 }
 
+// handle swap success
 const handleSwapSuccess = async (result: any) => {
   console.log('Swap successful:', result)
   
@@ -751,6 +1005,7 @@ const handleSwapSuccess = async (result: any) => {
   await loadWalletData()
 }
 
+// handle swap error
 const handleSwapError = (error: string) => {
   console.error('Swap failed:', error)
   
@@ -764,110 +1019,53 @@ const handleSwapError = (error: string) => {
   })
 }
 
-// Lifecycle
+/////////////////////
+// lifecycle hooks //
+/////////////////////
+
+// on mounted
 onMounted(async () => {
+
+  // try
   try {
-    // Wait for authentication to be checked first
+
+    // wait for authentication to be checked first
     await tacoStore.checkIfLoggedIn()
     
-    // Small delay to ensure state is fully updated
+    // small delay to ensure state is fully updated
     await new Promise(resolve => setTimeout(resolve, 100))
     
+    // if user is logged in, load wallet data
     if (tacoStore.userLoggedIn) {
+
+      // log
       console.log('User is logged in, loading wallet data')
+
+      // load wallet data
       await loadWalletData()
-    } else {
+
+    } 
+    
+    // else user not logged in
+    else {
+
+      // log
       console.log('User not logged in, showing login prompt')
-      loading.value = false
+
+      // turn app loading off
+      appLoadingOff()
+
     }
   } catch (error) {
+
+    // log error
     console.error('Error in wallet onMounted:', error)
-    loading.value = false
+
+    // turn app loading off
+    appLoadingOff()
+
   }
+
 })
+
 </script>
-
-<style scoped>
-.page-title {
-  margin-bottom: 2rem;
-  padding-bottom: 1rem;
-  border-bottom: 1px solid var(--border-color);
-}
-
-.page-title h1 {
-  font-size: 2.5rem;
-  font-weight: 600;
-  margin-bottom: 0.5rem;
-}
-
-.card {
-  background: #2d3748 !important;
-  border: 1px solid #4a5568 !important;
-  border-radius: 12px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
-  color: white !important;
-}
-
-.card-header {
-  background: #1a202c !important;
-  border-bottom: 1px solid #4a5568 !important;
-  padding: 1rem 1.5rem;
-}
-
-.card-header h5 {
-  font-weight: 600;
-  color: white !important;
-}
-
-.card-body {
-  padding: 1.5rem;
-  color: white !important;
-}
-
-/* Ensure all text in cards is white */
-.card * {
-  color: white !important;
-}
-
-.card .text-muted {
-  color: #a0aec0 !important;
-}
-
-.spinner-border {
-  width: 3rem;
-  height: 3rem;
-}
-
-.btn-lg {
-  padding: 0.75rem 2rem;
-  font-size: 1.125rem;
-  border-radius: 8px;
-}
-
-.btn-primary {
-  background: linear-gradient(135deg, var(--primary-color), var(--primary-hover));
-  border: none;
-  transition: all 0.3s ease;
-}
-
-.btn-primary:hover {
-  background: linear-gradient(135deg, var(--primary-hover), var(--primary-color));
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 123, 255, 0.3);
-}
-
-@media (max-width: 768px) {
-  .page-title h1 {
-    font-size: 2rem;
-  }
-  
-  .card-body {
-    padding: 1rem;
-  }
-  
-  .btn-lg {
-    padding: 0.625rem 1.5rem;
-    font-size: 1rem;
-  }
-}
-</style>

@@ -81,7 +81,14 @@
           
           <span class="header-bar__rl-span">Code</span>
         
-        </a>        
+        </a>  
+        
+        <!-- wallet - router link -->
+        <router-link to="/wallet" class="header-bar__rl">
+          
+          <span class="header-bar__rl-span">Wallet</span>
+        
+        </router-link>         
 
       </div>
 
@@ -239,14 +246,6 @@
           <!-- item text -->
           <span>Sales</span>
 
-        </router-link>    
-        
-        <!-- wallet - router link -->
-        <router-link @click="togglePagesMenu()" to="/wallet" class="list-group-item">
-
-          <!-- item text -->
-          <span>Wallet</span>
-
         </router-link>
 
         <!-- info - router link -->
@@ -265,7 +264,15 @@
           <!-- item text -->
           <span>Code</span>
 
-        </a>        
+        </a>  
+        
+        <!-- wallet - router link -->
+        <router-link @click="togglePagesMenu()" to="/wallet" class="list-group-item">
+
+          <!-- item text -->
+          <span>Wallet</span>
+
+        </router-link>        
 
       </div>
 
