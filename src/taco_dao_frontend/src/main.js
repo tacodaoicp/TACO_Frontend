@@ -65,6 +65,7 @@ const routes = [
     { path: "/reports/sgldt", component: ReportsView, meta: { robots: 'index' } },
     { path: "/reports/openchat", component: ReportsView, meta: { robots: 'index' } },
     { path: "/reports/kongswap", component: ReportsView, meta: { robots: 'index' } },
+    { path: "/reports/neutrinite", component: ReportsView, meta: { robots: 'index' } },
     { path: "/admin", name: "Admin", component: AdminView, meta: { robots: 'noindex' } },
     { path: "/admin/archives", name: "AdminArchive", component: AdminArchiveView, meta: { robots: 'noindex' } },
     { path: "/admin/trade", name: "AdminTrade", component: AdminTradeView, meta: { robots: 'noindex' } },
