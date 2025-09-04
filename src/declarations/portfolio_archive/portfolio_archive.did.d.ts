@@ -62,10 +62,25 @@ export interface LogEntry {
 export type LogLevel = { 'INFO' : null } |
   { 'WARN' : null } |
   { 'ERROR' : null };
+export interface OHLCCandle {
+  'icpOHLC' : {
+    'low' : bigint,
+    'high' : bigint,
+    'close' : bigint,
+    'open' : bigint,
+  },
+  'timestamp' : bigint,
+  'usdOHLC' : {
+    'low' : number,
+    'high' : number,
+    'close' : number,
+    'open' : number,
+  },
+}
 export interface PortfolioArchiveV2 {
-  'archivePortfolioBlock' : ActorMethod<[PortfolioBlockData], Result_3>,
+  'archivePortfolioBlock' : ActorMethod<[PortfolioBlockData], Result_2>,
   'getArchiveStats' : ActorMethod<[], ArchiveStatus>,
-  'getArchiveStatus' : ActorMethod<[], Result_2>,
+  'getArchiveStatus' : ActorMethod<[], Result_4>,
   'getBatchImportStatus' : ActorMethod<
     [],
     {
@@ -75,11 +90,13 @@ export interface PortfolioArchiveV2 {
     }
   >,
   'getLogs' : ActorMethod<[bigint], Array<LogEntry>>,
+  'getOHLCCandles' : ActorMethod<[bigint, bigint, bigint], Result_3>,
   'getTimerStatus' : ActorMethod<[], TimerStatus>,
   'icrc3_get_archives' : ActorMethod<[GetArchivesArgs], GetArchivesResult>,
   'icrc3_get_blocks' : ActorMethod<[GetBlocksArgs], GetBlocksResult>,
   'icrc3_get_tip_certificate' : ActorMethod<[], [] | [DataCertificate]>,
   'icrc3_supported_block_types' : ActorMethod<[], Array<BlockType>>,
+  'lower_bound_ts' : ActorMethod<[bigint], Result_2>,
   'resetImportTimestamps' : ActorMethod<[], Result_1>,
   'runLegacyManualBatchImport' : ActorMethod<[], Result_1>,
   'runManualBatchImport' : ActorMethod<[], Result_1>,
@@ -103,9 +120,11 @@ export type Result = { 'ok' : string } |
   { 'err' : ArchiveError };
 export type Result_1 = { 'ok' : string } |
   { 'err' : string };
-export type Result_2 = { 'ok' : ArchiveStatus } |
+export type Result_2 = { 'ok' : bigint } |
   { 'err' : ArchiveError };
-export type Result_3 = { 'ok' : bigint } |
+export type Result_3 = { 'ok' : Array<OHLCCandle> } |
+  { 'err' : ArchiveError };
+export type Result_4 = { 'ok' : ArchiveStatus } |
   { 'err' : ArchiveError };
 export type SnapshotReason = { 'ManualTrigger' : null } |
   { 'SystemEvent' : null } |
