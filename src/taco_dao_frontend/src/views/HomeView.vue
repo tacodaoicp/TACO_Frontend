@@ -28,9 +28,9 @@
                 <span class="home-view__canted__title">Current Discussion</span>
 
                 <!-- current discussion link -->
-                <router-link to="/chat/forum/88" 
+                <router-link to="/chat/forum/99" 
                             class="home-view__canted__link">
-                  Trusting Kong Swap
+                  Neutrinite & cICP
                 </router-link>
                 
               </div>
@@ -89,7 +89,7 @@
                 <!-- latest report link -->
                 <router-link to="/reports/neutrinite" 
                             class="home-view__canted__link">
-                  Neutrinite Due Diligence
+                  Neutrinite & cICP
                 </router-link>
 
               </div>

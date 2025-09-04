@@ -69,7 +69,7 @@
                       <div class="taco-report-explorer__list-report__title-container">
                         
                         <!-- report title -->
-                        <span class="taco-report-explorer__list-report__title">DUE DILIGENCE PROCESS Neutrinite (NTN/cICP)</span>
+                        <span class="taco-report-explorer__list-report__title">DUE DILIGENCE PROCESS Neutrinite (NTN) & Compounding Stream ICP (cICP)</span>
                         
                       </div>
                       
@@ -7771,7 +7771,7 @@ potential risks if KongSwap scales.
                       <!-- report metadata -->
                       <span class="taco-report-explorer__report-header__metadata">
                         <i class="fa-solid fa-luchador-mask"></i> 
-                        <span> Written by @Manilpwn, @Tirex and @TrickyVik</span>
+                        <span> Written by Manilpwn, Tirex and TrickyVik</span>
                         <span class="small"> 08/2025</span>
                       </span>
 
@@ -8287,7 +8287,7 @@ Other examples of ecosystem alignment include:
 
                         <!-- paragraph -->
                         <p>
-50,000 NTN airdropped to SNS1 holders
+~25k NTN airdropped to SNS1 holders
                         </p>
 
                       </li>
@@ -9367,15 +9367,13 @@ when and how much of the next treasury withdrawal are also unknown.
                       <!-- link group -->
                       <span class="d-flex flex-column align-items-end">
 
-                        <span class="text-end">Motion to Discuss Pending</span>
+                        <span class="text-end">#99 Motion to Discuss</span>
 
                         <span class="d-flex gap-2">
 
-                          <!-- <a href="https://nns.ic0.app/proposal/?u=lacdn-3iaaa-aaaaq-aae3a-cai&proposal=26" class="taco-text-blue-to-light-blue text-end" target="_blank">NNS</a> -->
-                          <span class="fst-italic">NNS</span>
+                          <a href="https://nns.ic0.app/proposal/?u=lacdn-3iaaa-aaaaq-aae3a-cai&proposal=99" class="taco-text-blue-to-light-blue text-end" target="_blank">NNS</a>
 
-                          <!-- <a href="https://tacodao.com/chat/forum/26" class="taco-text-blue-to-light-blue text-end">Taco Forum</a> -->
-                          <span class="fst-italic">Taco Forum</span>
+                          <a href="https://tacodao.com/chat/forum/99" class="taco-text-blue-to-light-blue text-end">Taco Forum</a>
 
                         </span>
                         
