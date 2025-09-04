@@ -6664,13 +6664,17 @@ export const useTacoStore = defineStore('taco', () => {
 
 
             let identity;
+            const authClient = await getAuthClient();
             
-            if (useAuth) {
-                const authClient = await getAuthClient();
+            if (await authClient.isAuthenticated()) {
                 identity = authClient.getIdentity();
-                userLoggedIn.value = true;
+                if (identity.getPrincipal().isAnonymous()) {
+                    userLoggedIn.value = false;
+                } else{
+                userLoggedIn.value = true;};
             } else {
                 identity = new AnonymousIdentity();
+                userLoggedIn.value = false;
             }
         if (!userLoggedIn.value) {
                 throw new Error('User must be logged in');

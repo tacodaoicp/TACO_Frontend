@@ -87,9 +87,9 @@
                 <span class="home-view__canted__title">Latest Report</span>
 
                 <!-- latest report link -->
-                <router-link to="/reports/kongswap" 
+                <router-link to="/reports/neutrinite" 
                             class="home-view__canted__link">
-                  Kong Swap Due Diligence
+                  Neutrinite Due Diligence
                 </router-link>
 
               </div>
