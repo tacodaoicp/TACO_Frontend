@@ -15,6 +15,7 @@ import AdminArchiveView from "./views/AdminArchiveView.vue"
 import AdminTradeView from "./views/AdminTradeView.vue"
 import AdminPriceView from "./views/AdminPriceView.vue"
 import AdminPriceHistoryView from "./views/AdminPriceHistoryView.vue"
+import PortfolioHistoryView from "./views/PortfolioHistoryView.vue"
 import AdminNeuronView from "./views/AdminNeuronView.vue"
 import AdminVotesView from "./views/AdminVotesView.vue"
 import AdminRewardsView from "./views/AdminRewardsView.vue"
@@ -71,6 +72,7 @@ const routes = [
     { path: "/admin/trade", name: "AdminTrade", component: AdminTradeView, meta: { robots: 'noindex' } },
     { path: "/admin/price", name: "AdminPrice", component: AdminPriceView, meta: { robots: 'noindex' } },
     { path: "/admin/pricehistory", name: "AdminPriceHistory", component: AdminPriceHistoryView, meta: { robots: 'noindex' } },
+    { path: "/portfolio_history", name: "PortfolioHistory", component: PortfolioHistoryView, meta: { robots: 'noindex' } },
     { path: "/admin/neuron", name: "AdminNeuron", component: AdminNeuronView, meta: { robots: 'noindex' } },
     { path: "/admin/votes", name: "AdminVotes", component: AdminVotesView, meta: { robots: 'noindex' } },
     { path: "/admin/rewards", name: "AdminRewards", component: AdminRewardsView, meta: { robots: 'noindex' } },
