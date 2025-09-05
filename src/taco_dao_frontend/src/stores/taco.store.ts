@@ -1188,6 +1188,18 @@ export const useTacoStore = defineStore('taco', () => {
         }        
         return 'z4is7-giaaa-aaaad-qg6uq-cai'; // local canisterId
     }
+    const nachosCanisterId = () => {
+
+        switch (process.env.DFX_NETWORK) {
+            case "ic":
+                return process.env.CANISTER_ID_NACHOS_IC || 'rctxc-zqaaa-aaaan-qz6na-cai';
+                break;
+            case "staging":
+                return  process.env.CANISTER_ID_NACHOS_STAGING || 'rctxc-zqaaa-aaaan-qz6na-caitptia-syaaa-aaaai-atieq-cai';
+                break;
+        }        
+        return 'rctxc-zqaaa-aaaan-qz6na-cai'; // local canisterId
+    }
     const neuronSnapshotCanisterId = () => {
         switch (process.env.DFX_NETWORK) {
             case "ic":
