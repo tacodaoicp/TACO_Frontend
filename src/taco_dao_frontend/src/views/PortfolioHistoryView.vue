@@ -418,7 +418,7 @@ const formatValue = (value) => {
     return new Intl.NumberFormat('en-US', {
       minimumFractionDigits: 2,
       maximumFractionDigits: 8
-    }).format(value / 100000000) + ' ICP' // Convert from e8s
+    }).format(value)
   }
 }
 
