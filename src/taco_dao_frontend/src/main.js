@@ -51,7 +51,7 @@ const routes = [
     { path: "/chat/forum", name: "ChatForum", component: ChatView, meta: { robots: 'index' } },
     { path: "/chat/forum/:id", name: "ChatForumThread", component: ChatView, meta: { robots: 'index' } },
     { path: "/chat", redirect: "/chat/oc", meta: { robots: 'noindex' } },
-    { path: "/reports", redirect: "/reports/kongswap", meta: { robots: 'noindex' } },
+    { path: "/reports", redirect: "/reports/neutrinite", meta: { robots: 'noindex' } },
     { path: "/reports/example", component: ReportsView, meta: { robots: 'index' } },    
     { path: "/reports/ddckbtc", component: ReportsView, meta: { robots: 'noindex' } }, // dd* links should remain for historical linking
     { path: "/reports/ddsneed", component: ReportsView, meta: { robots: 'noindex' } }, // dd* links should remain for historical linking
@@ -65,6 +65,7 @@ const routes = [
     { path: "/reports/sgldt", component: ReportsView, meta: { robots: 'index' } },
     { path: "/reports/openchat", component: ReportsView, meta: { robots: 'index' } },
     { path: "/reports/kongswap", component: ReportsView, meta: { robots: 'index' } },
+    { path: "/reports/neutrinite", component: ReportsView, meta: { robots: 'index' } },
     { path: "/admin", name: "Admin", component: AdminView, meta: { robots: 'noindex' } },
     { path: "/admin/archives", name: "AdminArchive", component: AdminArchiveView, meta: { robots: 'noindex' } },
     { path: "/admin/trade", name: "AdminTrade", component: AdminTradeView, meta: { robots: 'noindex' } },
