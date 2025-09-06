@@ -1,221 +1,230 @@
 <template>
 
   <div class="token-card">
+    
+    <!-- token card non-neuron content -->
+    <div class="d-flex flex-wrap justify-content-between w-100 gap-4-2">
 
-    <!-- left -->
-    <div class="d-flex flex-wrap gap-3-5 flex-grow-1">
+      <!-- left -->
+      <div class="d-flex flex-wrap gap-3-5 flex-grow-1">
 
-      <!-- token logo, balance, symbol, usd value, and name -->
-      <div class="d-flex align-items-start gap-2">
+        <!-- token logo, balance, symbol, usd value, and name -->
+        <div class="d-flex align-items-start gap-2">
 
-        <!-- token logo -->
-        <img :src="token.logo" 
-            :alt="token.symbol" 
-            class="token-card__logo" />
+          <!-- token logo -->
+          <img :src="token.logo" 
+              :alt="token.symbol" 
+              class="token-card__logo" />
 
-        <!-- token balance, symbol, and name -->
-        <div class="d-flex flex-column gap-2">
+          <!-- token balance, symbol, and name -->
+          <div class="d-flex flex-column gap-2">
 
-          <!-- balance balance and symbol -->
-          <div class="d-flex align-items-center gap-2">
+            <!-- balance balance and symbol -->
+            <div class="d-flex align-items-center gap-2">
 
-            <!-- balance amount and symbol -->
-            <span class="token-card__balance">
-              {{ formatBalance(token.balance, token.decimals) }}
+              <!-- balance amount and symbol -->
+              <span class="token-card__balance">
+                {{ formatBalance(token.balance, token.decimals) }}
+              </span>
+
+              <!-- token symbol -->
+              <span class="token-card__symbol">{{ token.symbol }}</span>    
+              
+              <!-- unregister button -->
+              <button v-if="token.isRegistered" 
+                      @click="$emit('unregister', token)"
+                      class="token-card__action-btn
+                            btn btn-sm"
+                      title="Remove from wallet">
+
+                <!-- icon -->
+                <i class="fa fa-xmark"></i>
+
+              </button>          
+
+            </div>
+
+            <!-- balance usd value -->
+            <span v-if="token.priceUSD && token.priceUSD > 0" 
+                  class="token-card__usd-value">
+              ${{ formatUSDValue(token.balance, token.decimals, token.priceUSD) }}
             </span>
 
-            <!-- token symbol -->
-            <span class="token-card__symbol">{{ token.symbol }}</span>    
-            
-            <!-- unregister button -->
-            <button v-if="token.isRegistered" 
-                    @click="$emit('unregister', token)"
-                    class="token-card__action-btn
-                          btn btn-sm"
-                    title="Remove from wallet">
+            <!-- token name -->
+            <span class="token-card__name">{{ token.name }}</span>
 
-              <!-- icon -->
-              <i class="fa fa-xmark"></i>
+            <!-- account id container -->
+            <div v-if="token.symbol === 'ICP'"
+                class="d-flex gap-1 align-items-center gap-1"
+                style="margin-top: -0.25rem;">
 
-            </button>          
-
-          </div>
-
-          <!-- balance usd value -->
-          <span v-if="token.priceUSD && token.priceUSD > 0" 
-                class="token-card__usd-value">
-            ${{ formatUSDValue(token.balance, token.decimals, token.priceUSD) }}
-          </span>
-
-          <!-- token name -->
-          <span class="token-card__name">{{ token.name }}</span>
-
-          <!-- account id container -->
-          <div v-if="token.symbol === 'ICP'"
-              class="d-flex gap-1 align-items-center gap-1"
-              style="margin-top: -0.25rem;">
-
-            <!-- account id, bootstrap tooltip -->
-            <span class="small"
-                  style="word-break: break-all;"
-                  data-bs-toggle="tooltip"
-                  data-bs-placement="bottom"
-                  data-bs-custom-class="taco-tooltip"
-                  :title="icpAccountId.hex">
-              &hellip;{{ icpAccountId.hex.slice(-15) }}
-            </span>
-
-            <!-- copy button -->
-            <button  @click="copyToClipboard(icpAccountId.hex)"
-                    class="btn btn-sm m-0 p-0 taco-text-black-to-white"
+              <!-- account id, bootstrap tooltip -->
+              <span class="small"
+                    style="word-break: break-all;"
                     data-bs-toggle="tooltip"
                     data-bs-placement="bottom"
                     data-bs-custom-class="taco-tooltip"
-                    title="Copy account ID">
+                    :title="icpAccountId.hex">
+                &hellip;{{ icpAccountId.hex.slice(-15) }}
+              </span>
 
-              <!-- icon -->
-              <i class="fa fa-regular fa-copy"></i>
+              <!-- copy button -->
+              <button  @click="copyToClipboard(icpAccountId.hex)"
+                      class="btn btn-sm m-0 p-0 taco-text-black-to-white"
+                      data-bs-toggle="tooltip"
+                      data-bs-placement="bottom"
+                      data-bs-custom-class="taco-tooltip"
+                      title="Copy account ID">
 
-            </button>
+                <!-- icon -->
+                <i class="fa fa-regular fa-copy"></i>
 
-          </div>        
+              </button>
+
+            </div>        
+
+          </div>
 
         </div>
 
-      </div>
+        <!-- rewards (taco) -->
+        <div v-if="token.symbol === 'TACO'" 
+            class="d-flex flex-column gap-1">
 
-      <!-- rewards (taco) -->
-      <div v-if="token.symbol === 'TACO'" 
-          class="d-flex flex-column gap-1 ml-auto">
+          <!-- rewards header -->
+          <div class="d-flex align-items-center gap-2 mt-1">
 
-        <!-- rewards header -->
-        <div class="d-flex align-items-center gap-2 mt-1">
+            <!-- rewards header title -->
+            <div class="d-flex align-items-center gap-2">
 
-          <!-- rewards header title -->
-          <div class="d-flex align-items-center gap-2">
+              <!-- rewards icon -->
+              <i class="fa fa-coins"></i>
 
-            <!-- rewards icon -->
-            <i class="fa fa-coins"></i>
+              <!-- rewards title text -->
+              <span>Rewards</span>
 
-            <!-- rewards title text -->
-            <span>Rewards</span>
+              <!-- rewards balance -->
+              <span v-if="totalRewards > 0" class="small">
+                {{ formatBalance(BigInt(Math.floor(totalRewards)), 8) }} TACO
+              </span>
+
+              <!-- empty rewards balance -->
+              <span v-else class="small">(0)</span>
+
+              <button v-if="totalRewards > 0"
+                      class="btn btn-sm taco-btn taco-btn--green px-2 py-1"
+                      :disabled="loadingRewards || claimingAllRewards"
+                      title="Claim some rewards">
+                Calim Some
+              </button>            
+
+              <button v-if="totalRewards > 0"
+                      @click="claimAllRewards"
+                      class="btn btn-sm taco-btn taco-btn--green px-2 py-1"
+                      :disabled="loadingRewards || claimingAllRewards"
+                      title="Claim all rewards">
+                Calim All
+              </button>
+
+            </div>
+
+          </div>
+
+          <!-- loading rewards -->
+          <div v-if="loadingRewards" 
+              class="d-flex align-items-center gap-2">
+
+            <!-- spinner -->
+            <div class="spinner-border spinner-border-sm" role="status">
+
+              <!-- hidden text -->
+              <span class="visually-hidden">Loading rewards</span>
+
+            </div>
+
+            <!-- text -->
+            <span class="small">Loading rewards...</span>
+
+          </div>
+
+          <!-- loaded rewards -->
+          <div v-else>
 
             <!-- rewards balance -->
-            <span v-if="totalRewards > 0" class="small">
-              {{ formatBalance(BigInt(Math.floor(totalRewards)), 8) }} TACO
-            </span>
-
-            <!-- empty rewards balance -->
-            <span v-else class="small">(0)</span>
-
-            <button v-if="totalRewards > 0"
-                    class="btn btn-sm taco-btn taco-btn--green px-2 py-1"
-                    :disabled="loadingRewards || claimingAllRewards"
-                    title="Claim some rewards">
-              Calim Some
-            </button>            
-
-            <button v-if="totalRewards > 0"
-                    @click="claimAllRewards"
-                    class="btn btn-sm taco-btn taco-btn--green px-2 py-1"
-                    :disabled="loadingRewards || claimingAllRewards"
-                    title="Claim all rewards">
-              Calim All
-            </button>
+            <span>{{ formatBalance(BigInt(Math.floor(totalRewards)), 8) }} TACO</span>
 
           </div>
 
         </div>
+        
+        <!-- neurons (taco) -->
+        <div v-if="token.symbol === 'TACO'" 
+            class="token-card__neurons flex-grow-1">
 
-        <!-- loading rewards -->
-        <div v-if="loadingRewards" 
-            class="d-flex align-items-center gap-2">
+          <!-- neurons header -->
+          <div class="d-flex align-items-center gap-2">
 
-          <!-- spinner -->
-          <div class="spinner-border spinner-border-sm" role="status">
+            <!-- neurons header title -->
+            <div @click="toggleNeuronsSection"
+                class="d-flex align-items-center gap-2"
+                style="cursor: pointer;">
 
-            <!-- hidden text -->
-            <span class="visually-hidden">Loading rewards</span>
+              <!-- expand icon -->
+              <i v-if="categorizedNeurons.all.length > 0"
+                  :class="neuronsExpanded ? 'fa fa-chevron-down' : 'fa fa-chevron-right'" 
+                  style="min-width: 1rem;"></i>
 
-          </div>
+              <!-- neurons icon -->
+              <i class="fa fa-brain"></i>
 
-          <!-- text -->
-          <span class="small">Loading rewards...</span>
+              <!-- neurons title text -->
+              <span>Neurons</span>
 
-        </div>
+              <!-- neurons count -->
+              <span v-if="categorizedNeurons.all.length > 0"
+                    class="small">
+                ({{ categorizedNeurons.all.length }})
+              </span>
 
-        <!-- loaded rewards -->
-        <div v-else>
+              <!-- empty neurons count -->
+              <span v-else class="small">(0)</span>
 
-          <!-- rewards balance -->
-          <span>{{ formatBalance(BigInt(Math.floor(totalRewards)), 8) }} TACO</span>
+            </div>
 
-        </div>
+            <!-- create neuron button -->
+            <button @click="$emit('create-neuron')"
+                    class="btn btn-sm taco-btn taco-btn--green px-2 py-2"
+                    title="Create new neuron">
+              
+              <!-- icon -->
+              <i class="fa fa-plus"></i>
 
-      </div>
-      
-      <!-- neurons (taco) -->
-      <div v-if="token.symbol === 'TACO'" 
-          class="token-card__neurons flex-grow-1">
-
-        <!-- neurons header -->
-        <div class="d-flex align-items-center gap-2">
-
-          <!-- neurons header title -->
-          <div @click="toggleNeuronsSection"
-              class="d-flex align-items-center gap-2"
-              style="cursor: pointer;">
-
-            <!-- expand icon -->
-            <i :class="neuronsExpanded ? 'fa fa-chevron-down' : 'fa fa-chevron-right'" 
-              style="min-width: 1rem;"></i>          
-
-            <!-- neurons icon -->
-            <i class="fa fa-brain"></i>
-
-            <!-- neurons title text -->
-            <span>Neurons</span>
-
-            <!-- neurons count -->
-            <span v-if="categorizedNeurons.all.length > 0"
-                  class="small">
-              ({{ categorizedNeurons.all.length }})
-            </span>
-
-            <!-- empty neurons count -->
-            <span v-else class="small">(0)</span>
-
-          </div>
-
-          <!-- create neuron button -->
-          <button @click="$emit('create-neuron')"
-                  class="btn btn-sm taco-btn taco-btn--green px-2 py-2"
-                  title="Create new neuron">
+            </button>      
             
-            <!-- icon -->
-            <i class="fa fa-plus"></i>
+            <!-- refresh neurons button -->
+            <button @click="loadNeurons"
+                    class="btn btn-sm taco-btn taco-btn--green px-2 py-2"
+                    :disabled="loadingNeurons"
+                    title="Refresh neurons">
 
-          </button>      
+              <!-- icon -->
+              <i class="fa fa-refresh" :class="{ 'fa-spin': loadingNeurons }"></i>
+
+            </button>        
+
+          </div>
+
+          <!-- no neurons -->
+          <div v-if="categorizedNeurons.all.length === 0 && !loadingNeurons">
+
+            <!-- text -->
+            <span>No neurons found</span>
+
+          </div>  
           
-          <!-- refresh neurons button -->
-          <button @click="loadNeurons"
-                  class="btn btn-sm taco-btn taco-btn--green px-2 py-2"
-                  :disabled="loadingNeurons"
-                  title="Refresh neurons">
-
-            <!-- icon -->
-            <i class="fa fa-refresh" :class="{ 'fa-spin': loadingNeurons }"></i>
-
-          </button>        
-
-        </div>
-
-        <!-- neurons content -->
-        <div v-if="neuronsExpanded">
-
           <!-- loading neurons -->
           <div v-if="loadingNeurons" 
-              class="d-flex align-items-center gap-2">
+               class="d-flex align-items-center gap-2 mt-1">
 
             <!-- spinner -->
             <div class="spinner-border spinner-border-sm" role="status">
@@ -228,734 +237,822 @@
             <!-- text -->
             <span class="small">Loading neurons...</span>
 
-          </div>
+          </div>  
           
-          <!-- no neurons -->
-          <!-- v-else-if="categorizedNeurons.all.length === 0" -->
-          <div v-if="false">
+          <!-- click to expand neurons -->
+          <div v-if="categorizedNeurons.all.length > 0 && !neuronsExpanded"
+               @click="toggleNeuronsSection">
+            <span style="text-decoration: underline;">Click to show</span>
+          </div>
 
-            <!-- text -->
-            <span>No neurons found</span>
+        </div>
+
+      </div>
+
+      <!-- right -->
+      <div class="ms-auto">
+
+        <!-- send, swap, and fee -->
+        <div class="d-flex flex-column gap-2">
+
+          <!-- actions -->
+          <div class="d-flex gap-2">
+
+            <!-- send button -->
+            <button @click="$emit('send', token)"
+                    class="btn taco-btn taco-btn--green px-3 py-1"
+                    :disabled="token.balance <= token.fee">
+
+              <!-- icon -->
+              <i class="fa fa-paper-plane me-1"></i>
+
+              <!-- text -->
+              <span>Send</span>
+
+            </button>
+
+            <!-- swap button -->
+            <button @click="$emit('swap', token)"
+                    class="btn taco-btn taco-btn--green px-3 py-1">
+
+              <!-- icon -->
+              <i class="fa fa-exchange-alt me-1"></i>
+
+              <!-- text -->
+              <span>Swap</span>
+
+            </button>
 
           </div>
-          
-          <!-- neurons sections -->
-          <!-- v-else -->
-          <div v-else class="d-flex flex-column gap-3">
 
-            <!-- neurons owned -->
-            <!-- v-if="categorizedNeurons.owned.length > 0" -->
-            <div class="d-flex flex-column gap-2">
+          <!-- fee -->
+          <div class="d-flex justify-content-center">
 
-              <!-- neurons owned header -->
-              <span>
+            <!-- fee -->
+            <span class="small">Fee: {{ formatBalance(token.fee, token.decimals) }} {{ token.symbol }}</span>
 
-                <!-- icon -->
-                <i class="fa fa-crown"></i>
+          </div>
 
-                <!-- title -->
-                <!-- {{ categorizedNeurons.owned.length }} -->
-                <span>
-                  Owned <span class="small">(X)</span>
-                </span>
+        </div>
 
-              </span>
+      </div>
 
-              <!-- neurons owned list -->
-              <div class="token-card__neurons__list">
+    </div>
 
-                <!-- neuron owned -->
-                <!-- v-for="neuron in categorizedNeurons.owned" :key="neuron.idHex" -->
-                <div class="token-card__neurons__neuron
-                            d-flex flex-column">
+    <!-- neurons content -->
+    <div v-if="neuronsExpanded">
+      
+      <!-- neurons sections -->
+      <div class="d-flex flex-wrap gap-3">
 
-                  <!-- neuron name -->
-                  <div class="d-flex align-items-center justify-content-between gap-2 mb-3">
+        <!-- neurons owned -->
+        <!-- v-if="categorizedNeurons.owned.length > 0" -->
+        <div class="d-flex flex-column gap-2">
 
-                    <span class="d-flex align-items-center gap-2">
+          <!-- neurons owned header -->
+          <span>
 
-                      <!-- icon -->
-                      <i class="fa fa-brain"></i>
+            <!-- icon -->
+            <span>🌮</span>
 
-                      <!-- neuron name -->
-                      <!-- {{ neuron.displayName }} -->
-                      <span style="font-size: 1.25rem;">My Neuron</span>
-                      
-                    </span>
+            <!-- title -->
+            <!-- {{ categorizedNeurons.owned.length }} -->
+            <span>
+              TacoDao.com Neurons <span class="small">(X)</span>
+            </span>
 
-                    <!-- rewards indicator -->
-                    <!-- v-if="getNeuronRewards(neuron.idHex) > 0" -->
-                    <span  
-                          data-bs-toggle="tooltip"
-                          data-bs-placement="bottom"
-                          data-bs-custom-class="taco-tooltip"
-                          title="This neuron has unclaimed rewards">
+          </span>
 
-                      <!-- icon -->
-                      <i class="fa fa-coins"></i>
+          <!-- neurons owned and add neuron container -->
+          <div class="d-flex flex-wrap gap-3">
 
-                    </span>
+            <!-- neurons owned list -->
+            <div class="token-card__neurons__list">
 
-                  </div>                            
+              <!-- neuron owned -->
+              <!-- v-for="neuron in categorizedNeurons.owned" :key="neuron.idHex" -->
+              <div class="token-card__neurons__neuron
+                          d-flex flex-column">
 
-                  <!-- neuron info -->
-                  <div class="neuron-info-section d-flex flex-column">
+                <!-- neuron name, icon, and rewards indicator -->
+                <div class="d-flex align-items-center justify-content-between gap-2 mb-3">
+
+                  <!-- neuron name and icon -->
+                  <span class="d-flex align-items-center gap-2">
+
+                    <!-- icon -->
+                    <i class="fa fa-brain"></i>
+
+                    <!-- neuron name -->
+                    <!-- {{ neuron.displayName }} -->
+                    <span style="font-size: 1.25rem;">My Neuron</span>
+                    
+                  </span>
+
+                  <!-- rewards indicator -->
+                  <!-- v-if="getNeuronRewards(neuron.idHex) > 0" -->
+                  <span  
+                        data-bs-toggle="tooltip"
+                        data-bs-placement="bottom"
+                        data-bs-custom-class="taco-tooltip"
+                        title="This neuron has unclaimed rewards">
+
+                    <!-- icon -->
+                    <i class="fa fa-coins"></i>
+
+                  </span>
+
+                </div>                            
+
+                <!-- neuron info -->
+                <div class="neuron-info-section d-flex flex-column">
+
+                  <!-- neuron stake -->
+                  <div>
 
                     <!-- neuron stake -->
-                    <div class="">
-
-                      <!-- neuron stake -->
-                      <!-- {{ formatBalance(neuron.stake, 8) }} -->
-                      <div class="small">
-                        <span class="fw-bold">Staked:</span> X TACO
-                      </div>
-
-                      <div class="d-flex gap-2">
-
-                        <!-- stake to neuron button -->
-                        <!-- @click.stop="$emit('stake-to-neuron', neuron)" -->
-                        <button 
-                                class="btn btn-sm taco-btn taco-btn--green px-2 py-1"
-                                title="Stake to this neuron">
-
-                          <!-- icon -->
-                          <i class="fa fa-plus"></i>
-
-                        </button>
-
-                        <!-- set dissolve period button -->
-                        <!-- @click.stop="$emit('set-dissolve', neuron)" -->
-                        <button 
-                                class="btn btn-sm taco-btn taco-btn--green px-2 py-1"
-                                title="Set dissolve period">
-
-                          <!-- icon -->
-                          <i class="fa fa-regular fa-clock"></i>
-
-                        </button>
-
-                      </div>
-
-
-
+                    <!-- {{ formatBalance(neuron.stake, 8) }} -->
+                    <div class="small">
+                      <span class="fw-bold">Staked:</span> X TACO
                     </div>
 
-                    <!-- neuron rewards -->
-                    <!-- :class="{ '--has-rewards': getNeuronRewards(neuron.idHex) > 0 }" -->
-                    <div class=""
-                        >
+                    <div class="d-flex gap-2">
 
-                      <!-- detail label -->
-                      <span class="small"><span class="fw-bold">Rewards:</span> X TACO</span>
-
-                      <!-- v-if="getNeuronRewards(neuron.idHex) > 0" -->
-                      <!-- {{ formatBalance(BigInt(Math.floor(getNeuronRewards(neuron.idHex))), 8) }} -->
-                      <!-- <span  class="small">X TACO</span> -->
-
-                      <!-- @click.stop="claimNeuronRewards(neuron)" -->
-                      <!-- :disabled="loadingRewards || isNeuronClaiming(neuron.idHex)" -->
+                      <!-- stake to neuron button -->
+                      <!-- @click.stop="$emit('stake-to-neuron', neuron)" -->
                       <button 
-                        
-                        class="btn btn-sm taco-btn taco-btn--green px-2"
-                        style="padding-top: 0.125rem; padding-bottom: 0.125rem;"
-                        
-                        title="Claim this neuron's rewards">
-                        Claim
+                              class="btn btn-sm taco-btn taco-btn--green px-2 py-1"
+                              title="Stake to this neuron">
+
+                        <!-- icon -->
+                        <i class="fa fa-plus"></i>
+
                       </button>
 
-                      <!-- v-else -->
-                      <span  class="d-none small">
-                        <span class="fw-bold">Rewards:</span> 0 TACO
-                      </span>
+                      <!-- set dissolve period button -->
+                      <!-- @click.stop="$emit('set-dissolve', neuron)" -->
+                      <button 
+                              class="btn btn-sm taco-btn taco-btn--green px-2 py-1"
+                              title="Set dissolve period">
+
+                        <!-- icon -->
+                        <i class="fa fa-regular fa-clock"></i>
+
+                      </button>
 
                     </div>
+
+                  </div>
+
+                  <!-- neuron rewards -->
+                  <!-- :class="{ '--has-rewards': getNeuronRewards(neuron.idHex) > 0 }" -->
+                  <div class=""
+                      >
+
+                    <!-- detail label -->
+                    <span class="small"><span class="fw-bold">Rewards:</span> X TACO</span>
+
+                    <!-- v-if="getNeuronRewards(neuron.idHex) > 0" -->
+                    <!-- {{ formatBalance(BigInt(Math.floor(getNeuronRewards(neuron.idHex))), 8) }} -->
+                    <!-- <span  class="small">X TACO</span> -->
+
+                    <!-- @click.stop="claimNeuronRewards(neuron)" -->
+                    <!-- :disabled="loadingRewards || isNeuronClaiming(neuron.idHex)" -->
+                    <button 
+                      
+                      class="btn btn-sm taco-btn taco-btn--green px-2"
+                      style="padding-top: 0.125rem; padding-bottom: 0.125rem;"
+                      
+                      title="Claim this neuron's rewards">
+                      Claim
+                    </button>
+
+                    <!-- v-else -->
+                    <span  class="d-none small">
+                      <span class="fw-bold">Rewards:</span> 0 TACO
+                    </span>
+
+                  </div>
+                  
+                  <!-- neuron dissolve period -->
+                  <div class="">
+
+                    <span class="small"><span class="fw-bold">Dissolve Period:</span> X days</span>
+
+                    <!-- :class="'dissolve-' + neuron.dissolveState.type" -->
+                    <!-- {{ neuron.dissolveState.display }} -->
+                    <!-- <span class="" 
+                          >
+                      dissolve state
+                    </span> -->
+
+                  </div>
+
+                  <!-- neuron age -->
+                  <div class="">
+
+                    <span class="small"><span class="fw-bold">Age:</span> X days</span>
+
+                    <!-- {{ neuron.age }} -->
+                    <!-- <span class="">neuron age</span> -->
+
+                  </div>
+
+                  <!-- neuron maturity -->
+                  <div class="d-none">
+
+                    <span class=""><span class="fw-bold">Maturity:</span> X TACO</span>
+
+                    <!-- {{ formatBalance(neuron.maturity, 8) }} -->
+                    <!-- <span class="">
+                      X TACO
+                    </span> -->
+
+                  </div>
+
+                  <!-- neuron staked maturity -->
+                  <!-- v-if="neuron.stakedMaturity > 0" -->
+                  <div class="d-none">
+
+                    <span class="fw-bold">Staked Maturity:</span>
+
+                    <!-- {{ formatBalance(neuron.stakedMaturity, 8) }}  -->
+                    <span class="">
+                      X TACO
+                    </span>
+
+                  </div>
+
+                  <!-- neuron voting power -->
+                  <div class="">
+
+                    <span class="small"><span class="fw-bold">Voting Power:</span> X%</span>
+
+                    <!-- {{ neuron.votingPowerMultiplier }} -->
+                    <!-- <span class="">X%</span> -->
+
+                  </div>
+
+                  <!-- neuron auto-stake -->
+                  <div class="">
+
+                    <span class="small">
+                      
+                      <span class="fw-bold">Auto-stake:</span> Enabled
                     
-                    <!-- neuron dissolve period -->
+                      <!-- :class="neuron.autoStakeMaturity ? 'fa fa-check text-success' : 'fa fa-times text-muted'" -->
+                      <i class="fa fa-check"></i>  
+                    
+                    </span>
+
+                    <!-- disable button -->
+                    <button class="btn btn-sm taco-btn taco-btn--green px-2 py-1"
+                            title="Disable auto-stake">
+                      <i class="fa fa-times"></i>
+                    </button>                      
+
+                    <span class="d-none">
+
+                      <!-- :class="neuron.autoStakeMaturity ? 'fa fa-check text-success' : 'fa fa-times text-muted'" -->
+                      <!-- <i class="fa fa-check"></i> -->
+
+                      <!-- {{ neuron.autoStakeMaturity ? 'Enabled' : 'Disabled' }} -->
+                      <!-- <span>
+                        Enabled
+                      </span> -->
+
+                    </span>
+
+                  </div>
+
+                  <!-- neuron created -->
+                  <div class="">
+
+                    <span class="small"><span class="fw-bold">Created:</span> xx/xx/xxxx</span>
+
+                    <!-- {{ neuron.createdDate.toLocaleDateString() }} -->
+                    <!-- <span class="">
+                      created date
+                    </span> -->
+
+                  </div>
+
+                  <!-- neuron id -->
+                  <div class="">
+
+                    <span class="small"><span class="fw-bold">Neuron ID:</span> &hellip;xxxxxxxxxxxxxxx</span>
+
+                    <!-- {{ neuron.idHex }} -->
+                    <!-- <span class="">
+                      neuron id hex
+                    </span> -->
+
+                    <!-- copy neuron id button -->
+                    <button class="btn btn-sm taco-btn taco-btn--green px-2 py-1"
+                            title="Copy neuron id">
+                      <i class="fa fa-regular fa-copy"></i>
+                    </button>
+
+                  </div>                    
+
+                </div>
+                
+                <!-- permissions section -->
+                <!-- v-if="neuron.permissions && neuron.permissions.length > 0"  -->
+                <div class="d-flex flex-column gap-2 mt-3">
+
+                  <!-- permissions header -->
+                  <span class="">
+
+                    <i class="fa fa-key me-2"></i>
+                    
+                    <!-- {{ neuron.permissions.length }} -->
+                    <span>Permissions <span class="small">(X)</span></span>
+
+                  </span>
+
+                  <!-- v-for="permission in neuron.permissions"  -->
+                  <!-- :key="permission.principal" -->
+                  <!-- :class="{ 'current-user': permission.isCurrentUser }" -->
+                  <div class="neuron-info-section">
+
                     <div class="">
 
-                      <span class="small"><span class="fw-bold">Dissolve Period:</span> X days</span>
-
-                      <!-- :class="'dissolve-' + neuron.dissolveState.type" -->
-                      <!-- {{ neuron.dissolveState.display }} -->
-                      <!-- <span class="" 
+                      <!-- :title="permission.principal" -->
+                      <!-- {{ permission.principalShort }} -->
+                      <span class="small" 
                             >
-                        dissolve state
+                        <span class="fw-bold">Principal:</span> You
+                      </span>
+
+                      <!-- v-if="permission.isCurrentUser" -->
+                      <!-- <span  class="user-badge">
+
+                        <i class="fa fa-user"></i> You
+
                       </span> -->
 
                     </div>
 
-                    <!-- neuron age -->
                     <div class="">
 
-                      <span class="small"><span class="fw-bold">Age:</span> X days</span>
-
-                      <!-- {{ neuron.age }} -->
-                      <!-- <span class="">neuron age</span> -->
-
-                    </div>
-
-                    <!-- neuron maturity -->
-                    <div class="d-none">
-
-                      <span class=""><span class="fw-bold">Maturity:</span> X TACO</span>
-
-                      <!-- {{ formatBalance(neuron.maturity, 8) }} -->
-                      <!-- <span class="">
-                        X TACO
-                      </span> -->
-
-                    </div>
-
-                    <!-- neuron staked maturity -->
-                    <!-- v-if="neuron.stakedMaturity > 0" -->
-                    <div class="d-none">
-
-                      <span class="fw-bold">Staked Maturity:</span>
-
-                      <!-- {{ formatBalance(neuron.stakedMaturity, 8) }}  -->
-                      <span class="">
-                        X TACO
+                      <!-- v-for="permName in permission.permissionNames"  -->
+                      <!-- :key="permName" -->
+                      <!-- {{ permName }} -->
+                      <span 
+                            
+                            class="small">
+                        <span class="fw-bold">Permission:</span> permission name
                       </span>
 
                     </div>
 
-                    <!-- neuron voting power -->
-                    <div class="">
-
-                      <span class="small"><span class="fw-bold">Voting Power:</span> X%</span>
-
-                      <!-- {{ neuron.votingPowerMultiplier }} -->
-                      <!-- <span class="">X%</span> -->
-
-                    </div>
-
-                    <!-- neuron auto-stake -->
-                    <div class="">
-
-                      <span class="small">
-                        
-                        <span class="fw-bold">Auto-stake:</span> Enabled
-                      
-                        <!-- :class="neuron.autoStakeMaturity ? 'fa fa-check text-success' : 'fa fa-times text-muted'" -->
-                        <i class="fa fa-check"></i>  
-                      
-                      </span>
-
-                      <!-- disable button -->
-                      <button class="btn btn-sm taco-btn taco-btn--green px-2 py-1"
-                              title="Disable auto-stake">
-                        <i class="fa fa-times"></i>
-                      </button>                      
-
-                      <span class="d-none">
-
-                        <!-- :class="neuron.autoStakeMaturity ? 'fa fa-check text-success' : 'fa fa-times text-muted'" -->
-                        <!-- <i class="fa fa-check"></i> -->
-
-                        <!-- {{ neuron.autoStakeMaturity ? 'Enabled' : 'Disabled' }} -->
-                        <!-- <span>
-                          Enabled
-                        </span> -->
-
-                      </span>
-
-                    </div>
-
-                    <!-- neuron created -->
-                    <div class="">
-
-                      <span class="small"><span class="fw-bold">Created:</span> xx/xx/xxxx</span>
-
-                      <!-- {{ neuron.createdDate.toLocaleDateString() }} -->
-                      <!-- <span class="">
-                        created date
-                      </span> -->
-
-                    </div>
-
-                    <!-- neuron id -->
-                    <div class="">
-
-                      <span class="small"><span class="fw-bold">Neuron ID:</span> &hellip;xxxxxxxxxxxxxxx</span>
-
-                      <!-- {{ neuron.idHex }} -->
-                      <!-- <span class="">
-                        neuron id hex
-                      </span> -->
-
-                      <!-- copy neuron id button -->
-                      <button class="btn btn-sm taco-btn taco-btn--green px-2 py-1"
-                              title="Copy neuron id">
-                        <i class="fa fa-regular fa-copy"></i>
-                      </button>
-
-                    </div>                    
-
-                  </div>
-                  
-                  <!-- permissions section -->
-                  <!-- v-if="neuron.permissions && neuron.permissions.length > 0"  -->
-                  <div class="d-flex flex-column gap-2 mt-3">
-
-                    <!-- permissions header -->
-                    <span class="">
-
-                      <i class="fa fa-key me-2"></i>
-                      
-                      <!-- {{ neuron.permissions.length }} -->
-                      <span>Permissions <span class="small">(X)</span></span>
-
-                    </span>
-
-                    <!-- v-for="permission in neuron.permissions"  -->
-                    <!-- :key="permission.principal" -->
-                    <!-- :class="{ 'current-user': permission.isCurrentUser }" -->
-                    <div class="neuron-info-section">
-
-                      <div class="">
-
-                        <!-- :title="permission.principal" -->
-                        <!-- {{ permission.principalShort }} -->
-                        <span class="small" 
-                              >
-                          <span class="fw-bold">Principal:</span> You
-                        </span>
-
-                        <!-- v-if="permission.isCurrentUser" -->
-                        <!-- <span  class="user-badge">
-
-                          <i class="fa fa-user"></i> You
-
-                        </span> -->
-
-                      </div>
-
-                      <div class="">
-
-                        <!-- v-for="permName in permission.permissionNames"  -->
-                        <!-- :key="permName" -->
-                        <!-- {{ permName }} -->
-                        <span 
-                              
-                              class="small">
-                          <span class="fw-bold">Permission:</span> permission name
-                        </span>
-
-                      </div>
-
-                    </div>
-
-                  </div>
-                  
-                  <!-- followings section -->
-                  <!-- v-if="neuron.followings && neuron.followings.length > 0"  -->
-                  <div class="d-flex flex-column gap-2 mt-3">
-
-                    <!-- followings header -->
-                    <span class="">
-
-                      <!-- {{ neuron.followings.reduce((acc: number, f: any) => acc + f.followedCount, 0) }} -->
-                      <span><i class="fa-solid fa-person-walking"></i> Following <span class="small">(X)</span></span>
-
-                    </span>
-
-                    <!-- v-for="following in neuron.followings"  -->
-                    <!-- :key="following.functionId" -->
-                    <div 
-                        
-                        class="neuron-info-section">
-
-                      <div class="d-flex align-items-center gap-2">
-
-                        <!-- {{ following.functionName }} -->
-                        <span class="fw-bold small">Motion <span class="small fw-normal">(x)</span></span>
-
-                        <!-- {{ following.followedCount }} -->
-                        <!-- <span class="">(x)</span> -->
-
-                        <!-- add to following button -->
-                        <button class="btn btn-sm taco-btn taco-btn--green px-2 py-1"
-                                title="Add to following">
-                          <i class="fa fa-plus"></i>
-                        </button>
-
-                      </div>
-
-                      <div class="">
-
-                        <!-- v-for="followedNeuron in following.followedNeurons" 
-                              :key="followedNeuron.idHex"
-                              :title="followedNeuron.idHex" -->
-                              <!-- followedNeuron.idShort -->
-                        <div
-                              class="d-flex align-items-center gap-2">
-                          
-                              <span class="small"><span class="fw-bold">Following:</span> &hellip;xxxxxxxxxxxxxxx</span>
-
-                          <!-- unfollow button -->
-                          <button class="btn btn-sm taco-btn taco-btn--green px-2 py-1"
-                                  title="Unfollow">
-                            <i class="fa fa-times"></i>
-                          </button>
-
-                        </div>
-
-                      </div>
-
-                    </div>
-                    
                   </div>
 
                 </div>
+                
+                <!-- followings section -->
+                <!-- v-if="neuron.followings && neuron.followings.length > 0"  -->
+                <div class="d-flex flex-column gap-2 mt-3">
+
+                  <!-- followings header -->
+                  <span class="">
+
+                    <!-- {{ neuron.followings.reduce((acc: number, f: any) => acc + f.followedCount, 0) }} -->
+                    <span><i class="fa-solid fa-person-walking"></i> Following <span class="small">(X)</span></span>
+
+                  </span>
+
+                  <!-- v-for="following in neuron.followings"  -->
+                  <!-- :key="following.functionId" -->
+                  <div 
+                      
+                      class="neuron-info-section">
+
+                    <div class="d-flex align-items-center gap-2">
+
+                      <!-- {{ following.functionName }} -->
+                      <span class="fw-bold small">Motion <span class="small fw-normal">(x)</span></span>
+
+                      <!-- {{ following.followedCount }} -->
+                      <!-- <span class="">(x)</span> -->
+
+                      <!-- add to following button -->
+                      <button class="btn btn-sm taco-btn taco-btn--green px-2 py-1"
+                              title="Add to following">
+                        <i class="fa fa-plus"></i>
+                      </button>
+
+                    </div>
+
+                    <div class="">
+
+                      <!-- v-for="followedNeuron in following.followedNeurons" 
+                            :key="followedNeuron.idHex"
+                            :title="followedNeuron.idHex" -->
+                            <!-- followedNeuron.idShort -->
+                      <div
+                            class="d-flex align-items-center gap-2">
+                        
+                            <span class="small"><span class="fw-bold">Following:</span> &hellip;xxxxxxxxxxxxxxx</span>
+
+                        <!-- unfollow button -->
+                        <button class="btn btn-sm taco-btn taco-btn--green px-2 py-1"
+                                title="Unfollow">
+                          <i class="fa fa-times"></i>
+                        </button>
+
+                      </div>
+
+                    </div>
+
+                  </div>
+                  
+                </div>
+
+              </div>
+
+              <!-- add a neuron -->
+              <div class="token-card__neurons__add-neuron-card
+                          d-flex flex-column align-items-center justify-content-center"
+                  @click="$emit('create-neuron')">
+
+                <!-- taco -->
+                <span style="font-size: 2rem;">🌮</span>
+
+                <!-- add a neuron -->
+                <span>Create a New Neuron</span>
 
               </div>
 
             </div>
 
-            <!-- neurons hotkeyed -->
-            <!-- v-if="categorizedNeurons.hotkeyed.length > 0" class="token-card__neurons__section" -->
-            <div class="token-card__neurons__hotkeyed">
+          </div>
 
-              <!-- neurons hotkeyed header -->
-              <div>
+        </div>
 
-                <i class="fa fa-key me-2"></i>
+        <!-- neurons hotkeyed -->
+        <!-- v-if="categorizedNeurons.hotkeyed.length > 0" class="token-card__neurons__section" -->
+        <div class="d-flex flex-column gap-2">
 
-                <!-- {{ categorizedNeurons.hotkeyed.length }} -->
-                <span class="section-title">Hotkeyed (X)</span>
+          <!-- neurons hotkeyed header -->
+          <span>
+
+            <!-- icon -->
+            <i class="fa fa-key"></i>
+
+            <!-- title -->
+            <!-- {{ categorizedNeurons.hotkeyed.length }} -->
+            <span class="section-title">
+              Hotkeyed NNS Neurons <span class="small">(X)</span>
+            </span>
+
+          </span>
+
+          <!-- neurons hotkeyed list -->
+          <div class="token-card__neurons__list">
+
+            <!-- neuron hotkeyed -->
+            <!-- v-for="neuron in categorizedNeurons.hotkeyed" 
+              :key="neuron.idHex" -->
+            <div 
+                  class="token-card__neurons__neuron
+                        d-flex flex-column">
+
+              <!-- neuron name, icon, and rewards indicator -->
+              <div class="d-flex align-items-center justify-content-between gap-2 mb-3">
+
+                <!-- neuron name and icon -->
+                <span class="d-flex align-items-center gap-2">
+
+                  <!-- icon -->
+                  <i class="fa fa-brain"></i>
+
+                  <!-- neuron name -->
+                  <!-- {{ neuron.displayName }} -->
+                  <span style="font-size: 1.25rem;">My Neuron</span>
+                  
+                </span>
+
+                <!-- rewards indicator -->
+                <!-- v-if="getNeuronRewards(neuron.idHex) > 0" -->
+                <span  
+                      data-bs-toggle="tooltip"
+                      data-bs-placement="bottom"
+                      data-bs-custom-class="taco-tooltip"
+                      title="This neuron has unclaimed rewards">
+
+                  <!-- icon -->
+                  <i class="fa fa-coins"></i>
+
+                </span>              
 
               </div>
 
-              <!-- neurons hotkeyed list -->
-              <div class="token-card__neurons__list">
+              <!-- neuron info -->
+              <div class="neuron-info-section d-flex flex-column">
 
-                <!-- neuron hotkeyed -->
-                <!-- v-for="neuron in categorizedNeurons.hotkeyed" 
-                  :key="neuron.idHex" -->
-                <div 
-                  
-                  class="neuron-item hotkeyed"
-                >
+                <!-- neuron stake -->
+                <div>
 
-                <!-- @click="toggleNeuronExpansion(neuron.idHex)" -->
-                  <div class="neuron-header" >
+                  <!-- neuron stake -->
+                  <!-- {{ formatBalance(neuron.stake, 8) }} -->
+                  <div class="small">
+                    <span class="fw-bold">Staked:</span> X TACO
+                  </div>
 
-                    <div class="neuron-info">
+                  <div class="d-flex gap-2">
 
-                      <div class="neuron-name">
-
-                        <!-- :class="expandedNeurons.has(neuron.idHex) ? 'fa fa-chevron-down' : 'fa fa-chevron-right'" -->
-                        <i 
-                          
-                          class="expand-icon"
-                        ></i>
-
-                        <!-- {{ neuron.displayName }} -->
-                        <span class="">neuron display name</span>
-
-                        <!-- v-if="getNeuronRewards(neuron.idHex) > 0" -->
-                        <span  
-                              class="neuron-rewards-indicator" 
-                              title="Has rewards">
-
-                          <i class="fa fa-coins text-success"></i>
-
-                        </span>
-
-                      </div>
-
-                      <!-- {{ formatBalance(neuron.stake, 8) }} -->
-                      <div class="neuron-stake">
-                        X TACO
-                      </div>
-
-                    </div>
-
+                    <!-- stake to neuron button -->
                     <!-- @click.stop="$emit('stake-to-neuron', neuron)" -->
                     <button 
-                      
-                      class="btn btn-primary btn-sm"
-                      title="Stake to this neuron"
-                    >
+                            class="btn btn-sm taco-btn taco-btn--green px-2 py-1"
+                            title="Stake to this neuron">
 
+                      <!-- icon -->
                       <i class="fa fa-plus"></i>
 
                     </button>
 
+                    <!-- set dissolve period button -->
+                    <!-- @click.stop="$emit('set-dissolve', neuron)" -->
+                    <button 
+                            class="btn btn-sm taco-btn taco-btn--green px-2 py-1"
+                            title="Set dissolve period">
+
+                      <!-- icon -->
+                      <i class="fa fa-regular fa-clock"></i>
+
+                    </button>
+
                   </div>
+
+                </div>
+
+                <!-- neuron rewards -->
+                <!-- :class="{ '--has-rewards': getNeuronRewards(neuron.idHex) > 0 }" -->
+                <div class=""
+                    >
+
+                  <!-- detail label -->
+                  <span class="small"><span class="fw-bold">Rewards:</span> X TACO</span>
+
+                  <!-- v-if="getNeuronRewards(neuron.idHex) > 0" -->
+                  <!-- {{ formatBalance(BigInt(Math.floor(getNeuronRewards(neuron.idHex))), 8) }} -->
+                  <!-- <span  class="small">X TACO</span> -->
+
+                  <!-- @click.stop="claimNeuronRewards(neuron)" -->
+                  <!-- :disabled="loadingRewards || isNeuronClaiming(neuron.idHex)" -->
+                  <button 
+                    
+                    class="btn btn-sm taco-btn taco-btn--green px-2"
+                    style="padding-top: 0.125rem; padding-bottom: 0.125rem;"
+                    
+                    title="Claim this neuron's rewards">
+                    Claim
+                  </button>
+
+                  <!-- v-else -->
+                  <span  class="d-none small">
+                    <span class="fw-bold">Rewards:</span> 0 TACO
+                  </span>
+
+                </div>
+
+                <!-- neuron dissolve period -->
+                <div class="">
+
+                  <span class="small"><span class="fw-bold">Dissolve Period:</span> X days</span>
+
+                  <!-- :class="'dissolve-' + neuron.dissolveState.type" -->
+                  <!-- {{ neuron.dissolveState.display }} -->
+                  <!-- <span class="" 
+                        >
+                    dissolve state
+                  </span> -->
+
+                </div>     
+                
+                <!-- neuron age -->
+                <div class="">
+
+                  <span class="small"><span class="fw-bold">Age:</span> X days</span>
+
+                  <!-- {{ neuron.age }} -->
+                  <!-- <span class="">neuron age</span> -->
+
+                </div>
+
+                <!-- neuron maturity -->
+                <div class="d-none">
+
+                  <span class=""><span class="fw-bold">Maturity:</span> X TACO</span>
+
+                  <!-- {{ formatBalance(neuron.maturity, 8) }} -->
+                  <!-- <span class="">
+                    X TACO
+                  </span> -->
+
+                </div>
+
+                <!-- neuron staked maturity -->
+                <!-- v-if="neuron.stakedMaturity > 0" -->
+                <div class="d-none">
+
+                  <span class="fw-bold">Staked Maturity:</span>
+
+                  <!-- {{ formatBalance(neuron.stakedMaturity, 8) }}  -->
+                  <span class="">
+                    X TACO
+                  </span>
+
+                </div>
+
+                <!-- neuron voting power -->
+                <div class="">
+
+                  <span class="small"><span class="fw-bold">Voting Power:</span> X%</span>
+
+                  <!-- {{ neuron.votingPowerMultiplier }} -->
+                  <!-- <span class="">X%</span> -->
+
+                </div>
+
+                <!-- neuron auto-stake -->
+                <div class="">
+
+                  <span class="small">
+                    
+                    <span class="fw-bold">Auto-stake:</span> Enabled
                   
-                  <!-- Expanded details -->
-                  <!-- v-if="expandedNeurons.has(neuron.idHex)"  -->
-                  <div class="neuron-details">
+                    <!-- :class="neuron.autoStakeMaturity ? 'fa fa-check text-success' : 'fa fa-times text-muted'" -->
+                    <i class="fa fa-check"></i>  
+                  
+                  </span>
 
-                    <div class="detail-grid">
+                  <!-- disable button -->
+                  <button class="btn btn-sm taco-btn taco-btn--green px-2 py-1"
+                          title="Disable auto-stake">
+                    <i class="fa fa-times"></i>
+                  </button>                      
 
-                      <!-- :class="{ 'has-rewards': getNeuronRewards(neuron.idHex) > 0 }" -->
-                      <div class="detail-item rewards-item">
+                  <span class="d-none">
 
-                        <span class="detail-label">
+                    <!-- :class="neuron.autoStakeMaturity ? 'fa fa-check text-success' : 'fa fa-times text-muted'" -->
+                    <!-- <i class="fa fa-check"></i> -->
 
-                          <i class="fa fa-coins me-1"></i>
+                    <!-- {{ neuron.autoStakeMaturity ? 'Enabled' : 'Disabled' }} -->
+                    <!-- <span>
+                      Enabled
+                    </span> -->
 
-                          Rewards:
+                  </span>
 
-                        </span>
+                </div>
 
-                        <!-- v-if="getNeuronRewards(neuron.idHex) > 0" -->
-                        <span class="detail-value text-success">
+                <!-- neuron created -->
+                <div class="">
 
-                          <!-- {{ formatBalance(BigInt(Math.floor(getNeuronRewards(neuron.idHex))), 8) }} -->
-                          X TACO
+                  <span class="small"><span class="fw-bold">Created:</span> xx/xx/xxxx</span>
 
-                          <!-- @click.stop="claimNeuronRewards(neuron)" -->
-                          <!-- :disabled="loadingRewards || isNeuronClaiming(neuron.idHex)" -->
-                          <button 
-                            
-                            class="btn btn-success btn-xs ms-2"
-                            
-                            title="Claim this neuron's rewards"
+                  <!-- {{ neuron.createdDate.toLocaleDateString() }} -->
+                  <!-- <span class="">
+                    created date
+                  </span> -->
+
+                </div>
+
+                <!-- neuron id -->
+                <div class="">
+
+                  <span class="small"><span class="fw-bold">Neuron ID:</span> &hellip;xxxxxxxxxxxxxxx</span>
+
+                  <!-- {{ neuron.idHex }} -->
+                  <!-- <span class="">
+                    neuron id hex
+                  </span> -->
+
+                  <!-- copy neuron id button -->
+                  <button class="btn btn-sm taco-btn taco-btn--green px-2 py-1"
+                          title="Copy neuron id">
+                    <i class="fa fa-regular fa-copy"></i>
+                  </button>
+
+                </div>
+
+              </div>
+
+              <!-- permissions section -->
+              <!-- v-if="neuron.permissions && neuron.permissions.length > 0"  -->
+              <div class="d-flex flex-column gap-2 mt-3">
+
+                <!-- permissions header -->
+                <span class="">
+
+                  <i class="fa fa-key me-2"></i>
+                  
+                  <!-- {{ neuron.permissions.length }} -->
+                  <span>Permissions <span class="small">(X)</span></span>
+
+                </span>
+
+                <!-- v-for="permission in neuron.permissions"  -->
+                <!-- :key="permission.principal" -->
+                <!-- :class="{ 'current-user': permission.isCurrentUser }" -->
+                <div class="neuron-info-section">
+
+                  <div class="">
+
+                    <!-- :title="permission.principal" -->
+                    <!-- {{ permission.principalShort }} -->
+                    <span class="small" 
                           >
+                      <span class="fw-bold">Principal:</span> You
+                    </span>
 
-                          <!-- v-if="isNeuronClaiming(neuron.idHex)" -->
-                            <i  class="fa fa-spinner fa-spin"></i>
+                    <!-- v-if="permission.isCurrentUser" -->
+                    <!-- <span  class="user-badge">
 
-                            <!-- v-else -->
-                            <i  class="fa fa-coins"></i>
+                      <i class="fa fa-user"></i> You
 
-                          </button>
+                    </span> -->
 
-                        </span>
+                  </div>
 
-                        <!-- v-else class="detail-value text-muted" -->
-                        <span >
-                          0 TACO
-                        </span>
+                  <div class="">
 
-                      </div>
-                      
-                      <div class="detail-item">
+                    <!-- v-for="permName in permission.permissionNames"  -->
+                    <!-- :key="permName" -->
+                    <!-- {{ permName }} -->
+                    <span 
+                          
+                          class="small">
+                      <span class="fw-bold">Permission:</span> permission name
+                    </span>
 
-                        <span class="detail-label">Dissolve Period:</span>
+                  </div>
 
-                        <!-- :class="'dissolve-' + neuron.dissolveState.type" -->
-                        <span class="detail-value" >
-                          <!-- {{ neuron.dissolveState.display }} -->
-                          dissolve state display
-                        </span>
+                </div>
 
-                      </div>
+              </div>
+              
+              <!-- followings section -->
+              <!-- v-if="neuron.followings && neuron.followings.length > 0"  -->
+              <div class="d-flex flex-column gap-2 mt-3">
 
-                      <div class="detail-item">
+                <!-- followings header -->
+                <span class="">
 
-                        <span class="detail-label">Age:</span>
+                  <!-- {{ neuron.followings.reduce((acc: number, f: any) => acc + f.followedCount, 0) }} -->
+                  <span><i class="fa-solid fa-person-walking"></i> Following <span class="small">(X)</span></span>
 
-                        <span class="detail-value">
-                          <!-- {{ neuron.age }} -->
-                          neuron age
-                        </span>
+                </span>
 
-                      </div>
-
-                      <div class="detail-item">
-
-                        <span class="detail-label">Maturity:</span>
-
-                        <span class="detail-value">
-                          <!-- {{ formatBalance(neuron.maturity, 8) }} -->
-                          X TACO
-                        </span>
-
-                      </div>
-
-                      <!-- v-if="neuron.stakedMaturity > 0"  -->
-                      <div class="detail-item">
-
-                        <span class="detail-label">Staked Maturity:</span>
-
-                        <span class="detail-value">
-                          <!-- {{ formatBalance(neuron.stakedMaturity, 8) }} -->
-                          X TACO
-                        </span>
-
-                      </div>
-
-                      <div class="detail-item">
-
-                        <span class="detail-label">Voting Power:</span>
-
-                        <span class="detail-value">
-                          <!-- {{ neuron.votingPowerMultiplier }}% -->
-                          X%
-                        </span>
-
-                      </div>
-
-                      <div class="detail-item">
-
-                        <span class="detail-label">Auto-stake:</span>
-
-                        <span class="detail-value">
-
-                          <!-- :class="neuron.autoStakeMaturity ? 'fa fa-check text-success' : 'fa fa-times text-muted'" -->
-                          <i class="fa fa-check"></i>
-                          <!-- {{ neuron.autoStakeMaturity ? 'Enabled' : 'Disabled' }} -->
-                          Enabled
-                        </span>
-
-                      </div>
-
-                      <div class="detail-item">
-
-                        <span class="detail-label">Created:</span>
-
-                        <span class="detail-value">
-                          <!-- {{ neuron.createdDate.toLocaleDateString() }} -->
-                          created date
-                        </span>
-
-                      </div>
-
-                      <div class="detail-item">
-
-                        <span class="detail-label">Neuron ID:</span>
-
-                        <span class="detail-value neuron-id">
-                          <!-- {{ neuron.idHex }} -->
-                          neuron id hex
-                        </span>
-
-                      </div>
-
-                    </div>
+                <!-- v-for="following in neuron.followings"  -->
+                <!-- :key="following.functionId" -->
+                <div 
                     
-                    <!-- Permissions Section -->
-                    <!-- v-if="neuron.permissions && neuron.permissions.length > 0" -->
-                    <div  class="detail-section">
+                    class="neuron-info-section">
 
-                      <h6 class="section-title">
+                  <div class="d-flex align-items-center gap-2">
 
-                        <i class="fa fa-key me-2"></i>
+                    <!-- {{ following.functionName }} -->
+                    <span class="fw-bold small">Motion <span class="small fw-normal">(x)</span></span>
 
-                        <!-- {{ neuron.permissions.length }} -->
+                    <!-- {{ following.followedCount }} -->
+                    <!-- <span class="">(x)</span> -->
 
-                        <span>perm length</span>
+                    <!-- add to following button -->
+                    <button class="btn btn-sm taco-btn taco-btn--green px-2 py-1"
+                            title="Add to following">
+                      <i class="fa fa-plus"></i>
+                    </button>
 
-                      </h6>
+                  </div>
 
-                      <div class="permissions-list">
+                  <div class="">
 
-                        <!-- v-for="permission in neuron.permissions" 
-                          :key="permission.principal" -->
-                          <!-- :class="{ 'current-user': permission.isCurrentUser }" -->
-                        <div 
-                          
-                          class="permission-item"
-                          
-                        >
-
-                          <div class="permission-principal">
-
-                            <!-- :title="permission.principal" -->
-                            <span class="principal-text" >
-
-                              <!-- {{ permission.principalShort }} -->
-                              principal short
-
-                            </span>
-
-                            <!-- v-if="permission.isCurrentUser" -->
-                            <span  class="user-badge">
-
-                              <i class="fa fa-user"></i> You
-
-                            </span>
-
-                          </div>
-
-                          <div class="permission-types">
-
-                            <!-- v-for="permName in permission.permissionNames" 
-                              :key="permName" -->
-                            <span 
-                              
-                              class="permission-badge"
-                            >
-                              <!-- {{ permName }} -->
-                              perm name
-                            </span>
-
-                          </div>
-                          
-                        </div>
-                        
-                      </div>
+                    <!-- v-for="followedNeuron in following.followedNeurons" 
+                          :key="followedNeuron.idHex"
+                          :title="followedNeuron.idHex" -->
+                          <!-- followedNeuron.idShort -->
+                    <div
+                          class="d-flex align-items-center gap-2">
                       
-                    </div>
-                    
-                    <!-- Followings Section -->
-                    <!-- v-if="neuron.followings && neuron.followings.length > 0" -->
-                    <div  class="detail-section">
+                          <span class="small"><span class="fw-bold">Following:</span> &hellip;xxxxxxxxxxxxxxx</span>
 
-                      <h6 class="section-title">
-
-                        <i class="fa fa-users me-2"></i>
-
-                        <!-- {{ neuron.followings.reduce((acc: number, f: any) => acc + f.followedCount, 0) }} -->
-                        <span>Following (X neurons)</span>
-
-                      </h6>
-
-                      <div class="followings-list">
-
-                        <!-- v-for="following in neuron.followings" 
-                          :key="following.functionId" -->
-                        <div 
-                          
-                          class="following-item"
-                        >
-
-                          <div class="following-function">
-
-                            <span class="function-name">
-                              <!-- {{ following.functionName }} -->
-                              following function name
-                            </span>
-
-                            <span class="function-count">
-                              <!-- {{ following.followedCount }}) -->
-                              (x)
-                            </span>
-
-                          </div>
-
-                          <div class="followed-neurons">
-
-                            <!-- v-for="followedNeuron in following.followedNeurons" 
-                              :key="followedNeuron.idHex" -->
-                              <!-- :title="followedNeuron.idHex" -->
-                            <span 
-
-                              
-                              class="followed-neuron"
-                              
-                            >
-
-                              <!-- {{ followedNeuron.idShort }} -->
-                              followed neuron id short
-                            </span>
-
-                          </div>
-
-                        </div>
-
-                      </div>
+                      <!-- unfollow button -->
+                      <button class="btn btn-sm taco-btn taco-btn--green px-2 py-1"
+                              title="Unfollow">
+                        <i class="fa fa-times"></i>
+                      </button>
 
                     </div>
 
                   </div>
 
                 </div>
-
+                
               </div>
 
             </div>
@@ -967,58 +1064,6 @@
       </div>
 
     </div>
-
-
-
-    <!-- right -->
-    <div>
-
-      <!-- send, swap, and fee -->
-      <div class="d-flex flex-column gap-2">
-
-        <!-- actions -->
-        <div class="d-flex gap-2">
-
-          <!-- send button -->
-          <button @click="$emit('send', token)"
-                  class="btn taco-btn taco-btn--green px-3 py-1"
-                  :disabled="token.balance <= token.fee">
-
-            <!-- icon -->
-            <i class="fa fa-paper-plane me-1"></i>
-
-            <!-- text -->
-            <span>Send</span>
-
-          </button>
-
-          <!-- swap button -->
-          <button @click="$emit('swap', token)"
-                  class="btn taco-btn taco-btn--green px-3 py-1">
-
-            <!-- icon -->
-            <i class="fa fa-exchange-alt me-1"></i>
-
-            <!-- text -->
-            <span>Swap</span>
-
-          </button>
-
-        </div>
-
-        <!-- fee -->
-        <div class="d-flex justify-content-center">
-
-          <!-- fee -->
-          <span class="small">Fee: {{ formatBalance(token.fee, token.decimals) }} {{ token.symbol }}</span>
-
-        </div>
-
-      </div>
-
-    </div>
-
-
 
   </div>
 
@@ -1028,6 +1073,7 @@
 
 .token-card {
   display: flex;
+  flex-direction: column;
   flex-wrap: wrap;
   align-items: start;
   justify-content: space-between;
@@ -1093,9 +1139,13 @@
 
     // list
     &__list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1rem;
       background-color: var(--brown);
       padding: 1rem;
       border-radius: 0.5rem;
+      width: fit-content;
     }
 
     // neuron
@@ -1104,6 +1154,21 @@
       padding: 1rem;
       border-radius: 0.5rem;
       border: 1px solid var(--dark-orange);
+      width: fit-content;
+    }
+
+    // add neuron card
+    &__add-neuron-card {
+      width: 19rem;
+      // background-color: var(--dark-brown);
+      border: 1px dashed var(--dark-orange);
+      border-radius: 0.5rem;
+      cursor: pointer;
+
+      &:hover {
+        background-color: var(--light-brown);
+      }
+
     }
     
   }
