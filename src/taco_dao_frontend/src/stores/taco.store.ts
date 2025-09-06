@@ -1188,6 +1188,18 @@ export const useTacoStore = defineStore('taco', () => {
         }        
         return 'z4is7-giaaa-aaaad-qg6uq-cai'; // local canisterId
     }
+    const nachosCanisterId = () => {
+
+        switch (process.env.DFX_NETWORK) {
+            case "ic":
+                return process.env.CANISTER_ID_NACHOS_IC || 'rctxc-zqaaa-aaaan-qz6na-cai';
+                break;
+            case "staging":
+                return  process.env.CANISTER_ID_NACHOS_STAGING || 'rctxc-zqaaa-aaaan-qz6na-caitptia-syaaa-aaaai-atieq-cai';
+                break;
+        }        
+        return 'rctxc-zqaaa-aaaan-qz6na-cai'; // local canisterId
+    }
     const neuronSnapshotCanisterId = () => {
         switch (process.env.DFX_NETWORK) {
             case "ic":
@@ -1210,6 +1222,15 @@ export const useTacoStore = defineStore('taco', () => {
                 break;
         }        
         return 'cjkka-gyaaa-aaaan-qz5kq-cai'; // local canisterId
+    }
+    const portfolioArchiveCanisterId = () => {
+        switch (process.env.DFX_NETWORK) {
+            case "ic":
+                return process.env.CANISTER_ID_PORTFOLIO_ARCHIVE_IC || 'bl7x7-wiaaa-aaaan-qz5bq-cai';
+            case "staging":
+                return process.env.CANISTER_ID_PORTFOLIO_ARCHIVE_STAGING || 'lrekt-uaaaa-aaaan-qz4ya-cai';
+        }        
+        return 'lrekt-uaaaa-aaaan-qz4ya-cai'; // local canisterId
     }
     const alarmCanisterId = () => {
         switch (process.env.DFX_NETWORK) {
@@ -6664,13 +6685,17 @@ export const useTacoStore = defineStore('taco', () => {
 
 
             let identity;
+            const authClient = await getAuthClient();
             
-            if (useAuth) {
-                const authClient = await getAuthClient();
+            if (await authClient.isAuthenticated()) {
                 identity = authClient.getIdentity();
-                userLoggedIn.value = true;
+                if (identity.getPrincipal().isAnonymous()) {
+                    userLoggedIn.value = false;
+                } else{
+                userLoggedIn.value = true;};
             } else {
                 identity = new AnonymousIdentity();
+                userLoggedIn.value = false;
             }
         if (!userLoggedIn.value) {
                 throw new Error('User must be logged in');
@@ -7533,6 +7558,7 @@ export const useTacoStore = defineStore('taco', () => {
         treasuryCanisterId,
         neuronSnapshotCanisterId,
         rewardsCanisterId,
+        portfolioArchiveCanisterId,
         
         // Router
         router,

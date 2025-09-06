@@ -108,6 +108,26 @@
                       {{ token.symbol }} - {{ token.name }}
                     </option>
                   </select>
+                  
+                  <!-- Token Balance Display with Refresh -->
+                  <div class="token-balance-display">
+                    <div class="balance-info">
+                      <span class="balance-label">Current Balance:</span>
+                      <span class="balance-amount">
+                        {{ formatBalance(getTokenBalance(selectedGetTokenSymbol), getTokenDecimals(selectedGetTokenSymbol)) }} {{ selectedGetTokenSymbol }}
+                      </span>
+                    </div>
+                    <button 
+                      type="button"
+                      class="btn btn-sm btn-outline-primary refresh-btn"
+                      @click="refreshTokenBalance"
+                      :disabled="refreshingBalance"
+                      title="Refresh balance to check if tokens arrived"
+                    >
+                      <i v-if="refreshingBalance" class="fa fa-spinner fa-spin"></i>
+                      <i v-else class="fa fa-refresh"></i>
+                    </button>
+                  </div>
                 </div>
 
                 <!-- Instructions for selected token -->
@@ -122,7 +142,7 @@
                         <li>Buy ICP on a centralized exchange like Coinbase, Binance, or Kraken</li>
                         <li>Copy your ICP Legacy Account ID below</li>
                         <li>Withdraw ICP from the exchange to this address</li>
-                        <li>Wait for the transaction to confirm (usually 1-5 minutes)</li>
+                        <li>Wait for the transaction to confirm (usually within a few seconds)</li>
                       </ol>
                     </div>
 
@@ -141,7 +161,7 @@
                           <i class="fa fa-copy"></i>
                         </button>
                       </div>
-                      <small class="text-muted">
+                      <small class="account-help-text">
                         This is your unique ICP address. Use this exact address when withdrawing from exchanges.
                       </small>
                     </div>
@@ -176,7 +196,7 @@
                           <i class="fa fa-copy"></i>
                         </button>
                       </div>
-                      <small class="text-muted">
+                      <small class="account-help-text">
                         This is your Principal ID. Use this when sending ICRC-1 tokens.
                       </small>
                     </div>
@@ -185,31 +205,39 @@
 
                 <!-- Register Custom Token Section -->
                 <div class="register-token-section">
-                  <h6>Register Custom ICRC1 Token:</h6>
-                  <p class="section-description">
-                    If you have a custom ICRC1 token that's not listed above, you can register it here:
-                  </p>
-                  <div class="register-token-form">
-                    <div class="input-group">
-                      <input 
-                        v-model="newTokenPrincipal"
-                        placeholder="Token principal (e.g., rdmx6-jaaaa-aaaah-qcaiq-cai)"
-                        class="form-control"
-                        :disabled="registeringToken"
-                      />
-                      <button 
-                        @click="registerCustomToken" 
-                        :disabled="!newTokenPrincipal.trim() || registeringToken"
-                        class="btn btn-outline-primary"
-                      >
-                        <i v-if="registeringToken" class="fa fa-spinner fa-spin me-1"></i>
-                        <i v-else class="fa fa-plus me-1"></i>
-                        {{ registeringToken ? 'Registering...' : 'Register Token' }}
-                      </button>
+                  <div class="register-token-header" @click="showRegisterToken = !showRegisterToken">
+                    <h6>Register Custom ICRC1 Token</h6>
+                    <button class="collapse-toggle-btn" type="button">
+                      <i :class="showRegisterToken ? 'fa fa-chevron-up' : 'fa fa-chevron-down'"></i>
+                    </button>
+                  </div>
+                  
+                  <div v-show="showRegisterToken" class="register-token-content">
+                    <p class="section-description">
+                      If you have a custom ICRC1 token that's not listed above, you can register it here:
+                    </p>
+                    <div class="register-token-form">
+                      <div class="input-group">
+                        <input 
+                          v-model="newTokenPrincipal"
+                          placeholder="Token principal (e.g., rdmx6-jaaaa-aaaah-qcaiq-cai)"
+                          class="form-control"
+                          :disabled="registeringToken"
+                        />
+                        <button 
+                          @click="registerCustomToken" 
+                          :disabled="!newTokenPrincipal.trim() || registeringToken"
+                          class="btn btn-outline-primary"
+                        >
+                          <i v-if="registeringToken" class="fa fa-spinner fa-spin me-1"></i>
+                          <i v-else class="fa fa-plus me-1"></i>
+                          {{ registeringToken ? 'Registering...' : 'Register Token' }}
+                        </button>
+                      </div>
+                      <small class="form-text text-muted">
+                        Enter the principal ID of an ICRC1 token to add it to your wallet
+                      </small>
                     </div>
-                    <small class="form-text text-muted">
-                      Enter the principal ID of an ICRC1 token to add it to your wallet
-                    </small>
                   </div>
                 </div>
 
@@ -278,45 +306,56 @@
               <div class="swap-section">
                 <!-- Token Selection for Swap -->
                 <div class="swap-input">
-                  <label class="form-label">From:</label>
                   <div class="token-input-group">
-                    <select v-model="selectedSwapFromToken" class="form-select">
+                    <select v-model="selectedSwapFromToken" class="form-select" @change="onStep2DropdownChange">
                       <option value="">Select token to swap from</option>
                       <option v-for="token in swappableTokens" :key="token.principal" :value="token.principal">
                         {{ token.symbol }} - Balance: {{ formatBalance(token.balance, token.decimals) }}
                       </option>
                     </select>
                   </div>
-                </div>
-
-                <!-- Token Info Display -->
-                <div v-if="selectedSwapFromToken" class="token-info-display">
-                  <div class="selected-token-info">
-                    <img :src="getTokenByPrincipal(selectedSwapFromToken)?.logo" :alt="getTokenByPrincipal(selectedSwapFromToken)?.symbol" class="token-logo-small" />
-                    <div class="token-details">
-                      <div class="token-name">{{ getTokenByPrincipal(selectedSwapFromToken)?.name }}</div>
-                      <div class="token-balance">
-                        Available: {{ formatBalance(getTokenByPrincipal(selectedSwapFromToken)?.balance || 0n, getTokenByPrincipal(selectedSwapFromToken)?.decimals || 8) }}
-                        {{ getTokenByPrincipal(selectedSwapFromToken)?.symbol || '' }}
+                  
+                  <!-- Token Info Display -->
+                  <div v-if="selectedSwapFromToken" class="token-info-display">
+                    <div class="selected-token-info">
+                      <img :src="getTokenByPrincipal(selectedSwapFromToken)?.logo" :alt="getTokenByPrincipal(selectedSwapFromToken)?.symbol" class="token-logo-small" />
+                      <div class="token-details">
+                        <div class="token-name">{{ getTokenByPrincipal(selectedSwapFromToken)?.name }}</div>
+                        <div class="token-amount">
+                          <span v-if="loadingQuotes" class="loading-text">
+                            <i class="fa fa-spinner fa-spin me-1"></i>Loading...
+                          </span>
+                          <span v-else class="amount-display">
+                            {{ swapInputAmount }} {{ getTokenByPrincipal(selectedSwapFromToken)?.symbol }}
+                          </span>
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
-
-                <!-- Swap Arrow -->
-                <div class="swap-arrow">
-                  <i class="fa fa-arrow-down"></i>
+                  
+                  <!-- Swap Arrow -->
+                  <div class="swap-arrow">
+                    <i class="fa fa-arrow-down"></i>
+                  </div>
                 </div>
 
                 <!-- TACO Output -->
                 <div class="swap-output">
-                  <label class="form-label">To:</label>
                   <div class="token-output-display">
                     <img :src="tacoToken.logo" :alt="tacoToken.symbol" class="token-logo" />
                     <div class="token-info">
                       <div class="token-name">{{ tacoToken.symbol }}</div>
-                      <div class="token-balance">
-                        Balance: {{ formatBalance(tacoToken.balance, tacoToken.decimals) }}
+                      <div class="token-amount">
+                        <span v-if="loadingQuotes" class="loading-text">
+                          <i class="fa fa-spinner fa-spin me-1"></i>Loading...
+                        </span>
+                        <span v-else-if="bestQuote" class="amount-display">
+                          {{ swapOutputAmount }} TACO
+                          <small class="exchange-badge">via {{ bestExchange }}</small>
+                        </span>
+                        <span v-else class="amount-display">
+                          0.00000000 TACO
+                        </span>
                       </div>
                     </div>
                   </div>
@@ -329,7 +368,28 @@
                     <div class="preview-items">
                       <div class="preview-item">
                         <span class="label">Will swap:</span>
-                        <span class="value">{{ formatBalance(selectedSwapToken.balance - selectedSwapToken.fee, selectedSwapToken.decimals) }} {{ selectedSwapToken.symbol }}</span>
+                        <span class="value">
+                          <span v-if="loadingQuotes">
+                            <i class="fa fa-spinner fa-spin me-1"></i>Loading...
+                          </span>
+                          <span v-else>
+                            {{ swapInputAmount }} {{ selectedSwapToken?.symbol || '' }}
+                          </span>
+                        </span>
+                      </div>
+                      <div class="preview-item">
+                        <span class="label">Will receive:</span>
+                        <span class="value">
+                          <span v-if="loadingQuotes">
+                            <i class="fa fa-spinner fa-spin me-1"></i>Loading...
+                          </span>
+                          <span v-else-if="bestQuote">
+                            {{ swapOutputAmount }} TACO ({{ bestExchange }})
+                          </span>
+                          <span v-else>
+                            0.00000000 TACO
+                          </span>
+                        </span>
                       </div>
                       <div class="preview-item">
                         <span class="label">Auto-stake:</span>
@@ -540,6 +600,13 @@
       @created="handleNeuronCreated"
     />
 
+    <!-- Swap & Stake Progress Dialog -->
+    <SwapStakeProgressDialog
+      ref="progressDialog"
+      :show="showProgressDialog"
+      @close="closeProgressDialog"
+    />
+
   </div>
 </template>
 
@@ -557,6 +624,7 @@ import SwapDialog from '../components/wallet/SwapDialog.vue'
 import SwapConfirmDialog from '../components/wallet/SwapConfirmDialog.vue'
 import StakeToNeuronDialog from '../components/wallet/StakeToNeuronDialog.vue'
 import CreateNeuronDialog from '../components/wallet/CreateNeuronDialog.vue'
+import SwapStakeProgressDialog from '../components/wallet/SwapStakeProgressDialog.vue'
 
 interface WalletToken {
   principal: string
@@ -582,12 +650,18 @@ const currentStep = ref(1)
 const expandedSteps = ref<Set<number>>(new Set([1]))
 const selectedGetTokenSymbol = ref('ICP')
 const selectedSwapFromToken = ref('')
+const userChangedStep2Selection = ref(false) // Track if user manually changed step 2
 const isSwapping = ref(false)
 const isStaking = ref(false)
 const isSwapAndStake = ref(false) // Flag to track if we're doing swap & stake
 const stakingComplete = ref(false)
+const loadingQuotes = ref(false)
+const bestQuote = ref<any>(null)
+const bestExchange = ref<string>('')
 const newTokenPrincipal = ref('')
 const registeringToken = ref(false)
+const refreshingBalance = ref(false)
+const showRegisterToken = ref(false)
 
 // Token data
 const allTokenBalances = ref<Map<string, bigint>>(new Map())
@@ -600,7 +674,9 @@ const showSwapDialog = ref(false)
 const showSwapConfirmDialog = ref(false)
 const showStakeDialog = ref(false)
 const showCreateDialog = ref(false)
+const showProgressDialog = ref(false)
 const selectedNeuron = ref<any | null>(null)
+const progressDialog = ref<any>(null)
 const preselectedSwapToken = ref<WalletToken | null>(null)
 const swapConfirmData = ref<any | null>(null)
 
@@ -781,6 +857,25 @@ const selectedSwapToken = computed(() => {
   return getTokenByPrincipal(selectedSwapFromToken.value)
 })
 
+const swapInputAmount = computed(() => {
+  const token = selectedSwapToken.value
+  if (!token) return '0'
+  
+  // Use available balance minus fees - reserve extra fee for ICPSwap operations
+  const extraFeeReserve = token.fee // Reserve one additional fee for ICPSwap operations
+  const availableAmountBigInt = token.balance - token.fee - extraFeeReserve
+  const availableAmount = Number(availableAmountBigInt) / (10 ** token.decimals)
+  return availableAmount.toFixed(8)
+})
+
+const swapOutputAmount = computed(() => {
+  if (!bestQuote.value) return '0'
+  
+  // Convert from BigInt to decimal
+  const outputAmount = Number(bestQuote.value.amountOut) / 1e8 // TACO has 8 decimals
+  return outputAmount.toFixed(8)
+})
+
 
 
 // Methods
@@ -811,6 +906,36 @@ const loadWalletData = async () => {
     })
   } finally {
     loading.value = false
+  }
+}
+
+const refreshTokenBalance = async () => {
+  refreshingBalance.value = true
+  
+  try {
+    // Reload wallet data to refresh all balances
+    await loadWalletData()
+    
+    // Show success toast
+    tacoStore.addToast({
+      id: Date.now(),
+      code: 'balance-refreshed',
+      title: 'Balance Updated',
+      icon: 'fa-solid fa-refresh',
+      message: `${selectedGetTokenSymbol.value} balance refreshed successfully`
+    })
+    
+  } catch (error: any) {
+    console.error('Error refreshing balance:', error)
+    tacoStore.addToast({
+      id: Date.now(),
+      code: 'refresh-error',
+      title: 'Refresh Failed',
+      icon: 'fa-solid fa-exclamation-triangle',
+      message: 'Failed to refresh balance. Please try again.'
+    })
+  } finally {
+    refreshingBalance.value = false
   }
 }
 
@@ -907,6 +1032,109 @@ const loadUserNeurons = async () => {
   }
 }
 
+const fetchSwapQuotes = async () => {
+  const token = selectedSwapToken.value
+  if (!token || !tacoToken.value) return
+  
+  const inputAmountBigInt = token.balance - token.fee
+  if (inputAmountBigInt <= 0n) return
+  
+  loadingQuotes.value = true
+  bestQuote.value = null
+  bestExchange.value = ''
+  
+  try {
+    // Get quotes from both exchanges
+    const [kongQuote, icpSwapQuote] = await Promise.allSettled([
+      kongStore.getQuote({
+        sellTokenSymbol: token.symbol,
+        buyTokenSymbol: 'TACO',
+        amountIn: inputAmountBigInt
+      }),
+      icpswapStore.getQuote({
+        sellTokenPrincipal: token.principal,
+        buyTokenPrincipal: tacoToken.value.principal,
+        amountIn: inputAmountBigInt
+      })
+    ])
+    
+    // Process quotes and find the best one
+    const quotes = []
+    
+    if (kongQuote.status === 'fulfilled' && kongQuote.value) {
+      quotes.push({
+        exchange: 'Kong',
+        amountOut: typeof kongQuote.value.receive_amount === 'bigint' ? kongQuote.value.receive_amount : BigInt(kongQuote.value.receive_amount),
+        slippage: kongQuote.value.slippage,
+        price: kongQuote.value.price,
+        fee: 0,
+        rawData: kongQuote.value
+      })
+    }
+    
+    if (icpSwapQuote.status === 'fulfilled' && icpSwapQuote.value) {
+      quotes.push({
+        exchange: 'ICPSwap',
+        amountOut: typeof icpSwapQuote.value.amountOut === 'bigint' ? icpSwapQuote.value.amountOut : BigInt(icpSwapQuote.value.amountOut),
+        slippage: icpSwapQuote.value.slippage,
+        price: icpSwapQuote.value.effectivePrice,
+        fee: typeof icpSwapQuote.value.fee === 'bigint' ? Number(icpSwapQuote.value.fee) : icpSwapQuote.value.fee,
+        rawData: icpSwapQuote.value
+      })
+    }
+    
+    if (quotes.length > 0) {
+      // Sort by amount out (highest first) and pick the best
+      const sortedQuotes = quotes.sort((a, b) => Number(b.amountOut) - Number(a.amountOut))
+      bestQuote.value = sortedQuotes[0]
+      bestExchange.value = sortedQuotes[0].exchange
+    }
+    
+  } catch (error) {
+    console.error('Error fetching quotes:', error)
+  } finally {
+    loadingQuotes.value = false
+  }
+}
+
+const syncSwapTokenSelection = () => {
+  if (allTokens.value.length === 0) return
+  
+  // Don't sync if user has manually changed step 2 selection
+  if (userChangedStep2Selection.value) return
+  
+  // Try to use the token selected in step 1
+  const selectedGetToken = allTokens.value.find(t => t.symbol === selectedGetTokenSymbol.value)
+  
+  if (selectedGetToken && selectedGetToken.symbol !== 'TACO' && selectedGetToken.balance > selectedGetToken.fee) {
+    selectedSwapFromToken.value = selectedGetToken.principal
+    return
+  }
+  
+  // If step 1 selection isn't swappable, don't change step 2 selection
+}
+
+const initializeTokenSelections = () => {
+  // Set both dropdowns to ICP by default
+  selectedGetTokenSymbol.value = 'ICP'
+  
+  // Find ICP token and set step 2 dropdown
+  const icpToken = allTokens.value.find(t => t.symbol === 'ICP')
+  if (icpToken) {
+    selectedSwapFromToken.value = icpToken.principal
+    // Fetch quotes for initial selection
+    setTimeout(() => fetchSwapQuotes(), 100)
+  }
+  
+  // Reset the manual change flag
+  userChangedStep2Selection.value = false
+}
+
+const onStep2DropdownChange = () => {
+  // User manually changed step 2 dropdown
+  userChangedStep2Selection.value = true
+}
+
 const determineStartingStep = () => {
   const minimumSwapThreshold = 100000000n // 1 ICP equivalent threshold
   
@@ -976,6 +1204,16 @@ const getTokenByPrincipal = (principal: string): WalletToken | undefined => {
   return allTokens.value.find(t => t.principal === principal)
 }
 
+const getTokenBalance = (symbol: string): bigint => {
+  const token = allTokens.value.find(t => t.symbol === symbol)
+  return token ? token.balance : 0n
+}
+
+const getTokenDecimals = (symbol: string): number => {
+  const token = allTokens.value.find(t => t.symbol === symbol)
+  return token ? token.decimals : 8
+}
+
 
 
 
@@ -1005,14 +1243,21 @@ const performSwapAndStake = async () => {
   isSwapAndStake.value = true
   isSwapping.value = true
   
+  // Show progress dialog and reset state
+  showProgressDialog.value = true
+  progressDialog.value?.reset()
+  
   try {
-    // Calculate max swap amount (all tokens minus fee)
-    const maxSwapAmount = Number(token.balance - token.fee) / (10 ** token.decimals)
+    // Step 1: Getting quotes
+    progressDialog.value?.setStepActive('quotes')
+    // Calculate max swap amount - reserve extra fee for ICPSwap operations
+    // ICPSwap requires additional fee reserves beyond the basic transfer fee
+    const extraFeeReserve = token.fee // Reserve one additional fee for ICPSwap operations
+    const amountInBigInt = token.balance - token.fee - extraFeeReserve
+    const maxSwapAmount = Number(amountInBigInt) / (10 ** token.decimals)
     
-    console.log(`Auto-swapping ${maxSwapAmount} ${token.symbol} to TACO...`)
-    
-    // Convert amount to BigInt for quotes
-    const amountInBigInt = BigInt(Math.floor(maxSwapAmount * (10 ** token.decimals)))
+    console.log(`Auto-swapping ${maxSwapAmount} ${token.symbol} (${amountInBigInt} base units) to TACO...`)
+    console.log(`Reserved fees: ${token.fee + extraFeeReserve} base units for exchange operations`)
     
     // Get quotes from both exchanges
     const [kongQuote, icpSwapQuote] = await Promise.allSettled([
@@ -1023,7 +1268,7 @@ const performSwapAndStake = async () => {
       }),
       icpswapStore.getQuote({
         sellTokenPrincipal: token.principal,
-        buyTokenPrincipal: tacoStore.tacoPrincipal,
+        buyTokenPrincipal: tacoToken.value.principal,
         amountIn: amountInBigInt
       })
     ])
@@ -1062,40 +1307,94 @@ const performSwapAndStake = async () => {
     
     console.log(`Using ${bestQuote.exchange} with expected output: ${Number(bestQuote.amountOut) / 1e8} TACO`)
     
-    // Execute the swap with ICRC2 (preferred method)
+    // Complete quotes step and show swap details
+    progressDialog.value?.setStepCompleted('quotes')
+    progressDialog.value?.setSwapDetails({
+      exchange: bestQuote.exchange,
+      inputAmount: maxSwapAmount.toFixed(6),
+      inputSymbol: token.symbol,
+      outputAmount: (Number(bestQuote.amountOut) / 1e8).toFixed(6)
+    })
+    
+    // Step 2: Executing swap
+    progressDialog.value?.setStepActive('swap')
+    
+    // Execute the swap using the same approach as SwapConfirmDialog
     let swapResult
+    const slippageTolerance = 0.01 // 1% slippage
+    const minAmountOut = BigInt(Math.floor(Number(bestQuote.amountOut) * (1 - slippageTolerance)))
+    
     const swapParams = {
       sellTokenPrincipal: token.principal,
-      buyTokenPrincipal: tacoStore.tacoPrincipal,
-      amountIn: amountInBigInt.toString(),
-      amountOutMinimum: (BigInt(Math.floor(Number(bestQuote.amountOut) * 0.99))).toString(), // 1% slippage tolerance
-      deadline: Math.floor(Date.now() / 1000) + 300, // 5 minutes
-      fee: bestQuote.fee
+      sellTokenSymbol: token.symbol,
+      buyTokenPrincipal: tacoToken.value.principal,
+      buyTokenSymbol: 'TACO',
+      amountIn: amountInBigInt,
+      minAmountOut,
+      slippageTolerance,
+    }
+
+    // Create a step update callback (like SwapConfirmDialog)
+    const updateStep = (step: string) => {
+      console.log('Swap step:', step)
+    }
+
+    // Add step callback to swap params (exactly like SwapConfirmDialog)
+    const swapParamsWithCallback = {
+      ...swapParams,
+      onStep: updateStep
     }
     
+    // Use the exact same logic as SwapConfirmDialog
     if (bestQuote.exchange === 'Kong') {
-      swapResult = await kongStore.icrc2_swap(swapParams)
+      const tokenSupportsICRC2 = await tacoStore.checkTokenSupportsICRC2(token.principal)
+      
+      if (tokenSupportsICRC2) {
+        try {
+          swapResult = await kongStore.icrc2_swap(swapParamsWithCallback)
+        } catch (error) {
+          console.log('Kong ICRC2 failed, trying ICRC1:', error)
+          swapResult = await kongStore.icrc1_swap(swapParamsWithCallback)
+        }
+      } else {
+        swapResult = await kongStore.icrc1_swap(swapParamsWithCallback)
+      }
     } else {
-      swapResult = await icpswapStore.icrc2_swap(swapParams)
+      // ICPSwap
+      const tokenSupportsICRC2 = await tacoStore.checkTokenSupportsICRC2(token.principal)
+      
+      if (tokenSupportsICRC2) {
+        try {
+          swapResult = await icpswapStore.icrc2_swap(swapParamsWithCallback)
+        } catch (error) {
+          console.log('ICPSwap ICRC2 failed, trying ICRC1:', error)
+          swapResult = await icpswapStore.icrc1_swap(swapParamsWithCallback)
+        }
+      } else {
+        swapResult = await icpswapStore.icrc1_swap(swapParamsWithCallback)
+      }
     }
     
-    if (swapResult.success) {
-      console.log('Swap successful, proceeding with auto-staking...')
-      await handleSwapSuccess(swapResult)
-    } else {
-      throw new Error(swapResult.error || 'Swap failed')
-    }
+    // Kong/ICPSwap stores return results directly, not wrapped in success/error objects
+    console.log('Swap successful, proceeding with auto-staking...')
+    
+    // Complete swap step
+    progressDialog.value?.setStepCompleted('swap')
+    
+    await handleSwapSuccess(swapResult)
     
   } catch (error: any) {
     console.error('Auto-swap & stake failed:', error)
+    
+    // Show error in progress dialog
+    progressDialog.value?.setError(error.message || 'Failed to execute swap & stake')
     
     tacoStore.addToast({
       id: Date.now(),
       code: 'swap-stake-failed',
       title: 'Swap & Stake Failed',
       icon: 'fa-solid fa-exclamation-triangle',
-      message: error.message || 'Failed to execute swap & stake. Please try manual swap.',
-      type: 'error'
+      message: error.message || 'Failed to execute swap & stake. Please try manual swap.'
     })
   } finally {
     isSwapping.value = false
@@ -1136,6 +1435,9 @@ const handleSwapSuccess = async (result: any) => {
     // Auto-stake all the TACO we just received
     console.log('Auto-staking TACO after swap...')
     
+    // Step 3: Creating neuron
+    progressDialog.value?.setStepActive('stake')
+    
     try {
       isStaking.value = true
       
@@ -1147,14 +1449,22 @@ const handleSwapSuccess = async (result: any) => {
         const result = await tacoStore.createNeuron(maxStakeAmount)
         
         if (result.success && result.subaccount) {
+          // Complete stake step and start dissolve step
+          progressDialog.value?.setStepCompleted('stake')
+          progressDialog.value?.setStepActive('dissolve')
+          
           // Set default dissolve delay (28 days)
           try {
             const defaultDissolveDays = 28
             const delayMonths = defaultDissolveDays / 30
             await tacoStore.setNeuronDissolveDelay(result.subaccount, delayMonths)
             console.log(`Auto-set dissolve delay to ${defaultDissolveDays} days`)
+            
+            // Complete dissolve step
+            progressDialog.value?.setStepCompleted('dissolve')
           } catch (dissolveError: any) {
             console.warn('Failed to set dissolve delay for auto-created neuron:', dissolveError)
+            progressDialog.value?.setStepError('dissolve')
           }
           
           // Show success message
@@ -1166,11 +1476,20 @@ const handleSwapSuccess = async (result: any) => {
             message: `Successfully swapped and staked ${formatBalance(maxStakeAmount, 8)} TACO in a new neuron!`
           })
           
+          // Refresh neurons list to show the new neuron
+          await loadUserNeurons()
+          
           // Mark staking as complete and move to final step
           stakingComplete.value = true
-          goToStep(3)
+          
+          // Auto-close progress dialog after 3 seconds
+          setTimeout(() => {
+            showProgressDialog.value = false
+            goToStep(3)
+          }, 3000)
           
         } else {
+          progressDialog.value?.setStepError('stake')
           throw new Error('Failed to create neuron')
         }
       } else {
@@ -1180,18 +1499,26 @@ const handleSwapSuccess = async (result: any) => {
     } catch (error: any) {
       console.error('Auto-staking failed:', error)
       
+      // Show error in progress dialog
+      progressDialog.value?.setError(`Swap completed successfully, but staking failed: ${error.message}`)
+      
       // Show error and fall back to manual staking
       tacoStore.addToast({
         id: Date.now(),
         code: 'swap-success-stake-failed',
         title: 'Swap Successful, Staking Failed',
         icon: 'fa-solid fa-exclamation-triangle',
-        message: `Swap completed successfully, but auto-staking failed: ${error.message}. Please stake manually.`,
-        type: 'warning'
+        message: `Swap completed successfully, but auto-staking failed: ${error.message}. Please stake manually.`
       })
       
-      // Move to staking step for manual staking
-      goToStep(3)
+      // Refresh neurons list for manual staking
+      await loadUserNeurons()
+      
+      // Auto-close progress dialog and move to staking step for manual staking
+      setTimeout(() => {
+        showProgressDialog.value = false
+        goToStep(3)
+      }, 3000)
     } finally {
       isStaking.value = false
       isSwapAndStake.value = false // Reset the flag
@@ -1244,39 +1571,51 @@ const closeCreateDialog = () => {
   showCreateDialog.value = false
 }
 
+const closeProgressDialog = () => {
+  showProgressDialog.value = false
+}
+
 const handleStakeCompleted = async (neuron: any) => {
-  console.log('Staking completed for neuron:', neuron)
+  console.log('Stake completed for neuron:', neuron)
   
+  // Refresh neurons list to show updated stake
+  await loadUserNeurons()
+  
+  // Close dialog
   closeStakeDialog()
   
+  // Show success message
   tacoStore.addToast({
     id: Date.now(),
     code: 'stake-success',
-    title: 'Staking Successful',
+    title: 'Stake Added Successfully',
     icon: 'fa-solid fa-check',
-    message: 'Successfully staked TACO to neuron'
+    message: `Successfully added stake to ${neuron?.displayName || 'neuron'}`
   })
-  
-  await loadWalletData()
-  stakingComplete.value = true
 }
 
 const handleNeuronCreated = async () => {
   console.log('Neuron created successfully')
   
+  // Refresh neurons list to show new neuron
+  await loadUserNeurons()
+  
+  // Close dialog
   closeCreateDialog()
   
+  // Show success message
   tacoStore.addToast({
     id: Date.now(),
-    code: 'neuron-created',
-    title: 'Neuron Created',
+    code: 'neuron-created-success',
+    title: 'Neuron Created Successfully',
     icon: 'fa-solid fa-check',
-    message: 'Successfully created new neuron'
+    message: 'New neuron created successfully'
   })
-  
-  await loadWalletData()
-  stakingComplete.value = true
 }
+
+
+
+
 
 const goToWallet = () => {
   router.push('/wallet')
@@ -1401,39 +1740,23 @@ const formatUSDValue = (balance: bigint, decimals: number, priceUSD: number): st
 }
 
 // Watchers to sync token selections
-watch(currentStep, (newStep) => {
-  if (newStep === 2) {
-    // Sync swap token with the selected token from step 1
-    const selectedGetToken = allTokens.value.find(t => t.symbol === selectedGetTokenSymbol.value)
-    
-    if (selectedGetToken && selectedGetToken.symbol !== 'TACO' && selectedGetToken.balance > selectedGetToken.fee) {
-      selectedSwapFromToken.value = selectedGetToken.principal
-    } else if (!selectedSwapFromToken.value) {
-      // Fallback: Auto-select the first swappable token when entering swap step
-      const firstSwappable = swappableTokens.value[0]
-      if (firstSwappable) {
-        selectedSwapFromToken.value = firstSwappable.principal
-      }
-    }
-  }
-})
-
 watch(selectedGetTokenSymbol, (newSymbol) => {
-  // Sync swap selection when get token selection changes
-  const selectedToken = allTokens.value.find(t => t.symbol === newSymbol)
-  
-  if (selectedToken && selectedToken.symbol !== 'TACO' && selectedToken.balance > selectedToken.fee) {
-    selectedSwapFromToken.value = selectedToken.principal
+  // Sync step 2 when step 1 changes (unless user manually changed step 2)
+  if (!newSymbol || allTokens.value.length === 0) return
+  syncSwapTokenSelection()
+})
+
+// Watch for swap token changes to fetch quotes
+watch(selectedSwapFromToken, (newToken) => {
+  if (newToken && allTokens.value.length > 0) {
+    fetchSwapQuotes()
   }
 })
 
-// Also watch allTokens to sync when data loads
+// Initialize selections when token data loads
 watch(allTokens, (newTokens) => {
-  if (newTokens.length > 0 && currentStep.value === 2 && !selectedSwapFromToken.value) {
-    const selectedGetToken = newTokens.find(t => t.symbol === selectedGetTokenSymbol.value)
-    if (selectedGetToken && selectedGetToken.symbol !== 'TACO' && selectedGetToken.balance > selectedGetToken.fee) {
-      selectedSwapFromToken.value = selectedGetToken.principal
-    }
+  if (newTokens.length > 0 && !selectedSwapFromToken.value) {
+    initializeTokenSelections()
   }
 }, { deep: true })
 
@@ -1445,6 +1768,11 @@ onMounted(async () => {
     
     if (tacoStore.userLoggedIn) {
       await loadWalletData()
+      
+      // Initialize token selections after data loads
+      if (allTokens.value.length > 0) {
+        initializeTokenSelections()
+      }
     } else {
       loading.value = false
     }
@@ -2153,6 +2481,211 @@ onMounted(async () => {
   .register-token-form .form-control {
     min-width: 100%;
   }
+}
+
+.account-help-text {
+  color: #a0aec0 !important;
+  font-size: 0.85rem;
+  line-height: 1.4;
+  margin-top: 0.5rem;
+  display: block;
+}
+
+.token-balance-display {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 0.75rem;
+  padding: 0.75rem;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+}
+
+.balance-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.balance-label {
+  font-size: 0.875rem;
+  color: #a0aec0;
+  font-weight: 500;
+}
+
+.balance-amount {
+  font-size: 1rem;
+  font-weight: 600;
+  color: white;
+  font-family: monospace;
+}
+
+.refresh-btn {
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+}
+
+.refresh-btn:hover:not(:disabled) {
+  transform: scale(1.05);
+}
+
+.refresh-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.register-token-section {
+  margin-top: 1.5rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.register-token-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1rem;
+  background: rgba(255, 255, 255, 0.05);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.register-token-header:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.register-token-header h6 {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: white;
+}
+
+.collapse-toggle-btn {
+  background: none;
+  border: none;
+  color: #a0aec0;
+  font-size: 0.875rem;
+  cursor: pointer;
+  padding: 0.25rem;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+  pointer-events: none; /* Let the parent handle the click */
+}
+
+.register-token-header:hover .collapse-toggle-btn {
+  color: white;
+}
+
+.register-token-content {
+  padding: 1rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.register-token-content .section-description {
+  font-size: 0.875rem;
+  color: #a0aec0;
+  margin-bottom: 1rem;
+  line-height: 1.4;
+}
+
+.token-amount {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #ffffff;
+}
+
+.amount-display {
+  color: #ffffff;
+}
+
+.loading-text {
+  color: #a0aec0;
+  font-style: italic;
+}
+
+.exchange-badge {
+  display: block;
+  font-size: 0.75rem;
+  color: #4ade80;
+  font-weight: 500;
+  margin-top: 0.25rem;
+}
+
+.swap-section {
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+
+.swap-input {
+  position: relative;
+  z-index: 2;
+}
+
+.swap-input .swap-arrow {
+  position: absolute;
+  bottom: -20px; /* Position at bottom of input card */
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 3;
+  width: 40px;
+  height: 40px;
+  background: #374151;
+  border: 2px solid #4b5563;
+  border-radius: 50%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  color: #ffffff;
+  font-size: 1.1rem;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.swap-output {
+  position: relative;
+  z-index: 1;
+  margin-top: -20px; /* Overlap the cards */
+}
+
+.swap-arrow i {
+  color: #ffffff;
+}
+
+/* Add circular cutouts to the cards */
+.swap-input .token-info-display::after {
+  content: '';
+  position: absolute;
+  bottom: -20px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 44px;
+  height: 22px;
+  background: #374151; /* Match card background */
+  border-radius: 0 0 22px 22px;
+  z-index: 1;
+}
+
+.swap-output .token-output-display::before {
+  content: '';
+  position: absolute;
+  top: -20px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 44px;
+  height: 22px;
+  background: #374151; /* Match card background */
+  border-radius: 22px 22px 0 0;
+  z-index: 1;
 }
 
 .step-actions,
