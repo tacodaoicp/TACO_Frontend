@@ -556,7 +556,18 @@
               </button>
             </div>
             <div class="card-body">
-              <TradingLogs ref="tradingLogsComponent" />
+              <!-- Custom Trading Logs Implementation for Treasury Selection -->
+              <div class="trading-logs">
+                <div class="log-container">
+                  <div v-for="log in sortedOverrideTradingLogs" :key="log.timestamp" class="log-entry">
+                    <div class="log-timestamp">{{ formatTimestamp(log.timestamp) }}</div>
+                    <div class="log-message">{{ log.message }}</div>
+                  </div>
+                  <div v-if="!sortedOverrideTradingLogs.length" class="no-logs">
+                    No trading logs available
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -934,6 +945,40 @@
   }
 }
 
+/* Trading Logs Styles */
+.trading-logs {
+  .log-container {
+    max-height: 400px;
+    overflow-y: auto;
+  }
+
+  .log-entry {
+    padding: 10px;
+    border-bottom: 1px solid #333;
+    
+    &:last-child {
+      border-bottom: none;
+    }
+  }
+
+  .log-timestamp {
+    font-size: 0.8em;
+    color: #888;
+    margin-bottom: 5px;
+  }
+
+  .log-message {
+    color: #fff;
+  }
+
+  .no-logs {
+    padding: 20px;
+    text-align: center;
+    color: #888;
+    font-style: italic;
+  }
+}
+
 .timer-section {
   padding: 1rem;
   border: 1px solid rgba(255, 255, 255, 0.1);
@@ -1200,7 +1245,6 @@ import { storeToRefs } from "pinia"
 import HeaderBar from "../components/HeaderBar.vue";
 import FooterBar from "../components/FooterBar.vue";
 import TacoTitle from '../components/misc/TacoTitle.vue';
-import TradingLogs from '../components/admin/TradingLogs.vue';
 import AdminConfirmationModal from '../components/admin/AdminConfirmationModal.vue';
 import { Principal } from '@dfinity/principal';
 import { idlFactory as treasuryIDL, _SERVICE as TreasuryService } from '../../../declarations/treasury/treasury.did.js';
@@ -1401,6 +1445,7 @@ onMounted(async () => {
         refreshTimerStatus(),
         loadConfig(),
         refreshLogs(),
+        refreshTradingLogs(),
         refreshVotingMetrics(),
         refreshVoterDetails(),
         refreshNeuronAllocations(),
@@ -1642,11 +1687,107 @@ const retryLoadConfig = () => {
   loadConfig();
 };
 
-// New function for refreshing trading logs
+// Override trading logs to use selected treasury
+const overrideTradingLogs = ref([]);
+
+// Computed property for sorted trading logs
+const sortedOverrideTradingLogs = computed(() => {
+  return [...overrideTradingLogs.value].sort((a, b) => {
+    // Use proper BigInt comparison that returns a number
+    return Number(b.timestamp > a.timestamp) - Number(b.timestamp < a.timestamp);
+  });
+});
+
+// Format timestamp function (same as TradingLogs component)
+function formatTimestamp(timestamp) {
+  try {
+    const date = new Date(Number(timestamp) / 1000000); // Convert nanoseconds to milliseconds
+    return date.toLocaleString();
+  } catch (error) {
+    console.error('Error formatting timestamp:', error);
+    return 'Invalid date';
+  }
+}
+
+// New function for refreshing trading logs from selected treasury
 async function refreshTradingLogs() {
-  console.log('AdminView: refreshTradingLogs called');
-  await tacoStore.refreshTimerStatus();
-  console.log('AdminView: refreshTradingLogs completed');
+  console.log('AdminView: refreshTradingLogs called for', selectedTreasury.value);
+  
+  if (!tacoStore.userLoggedIn) {
+    console.log('User not logged in, skipping trading logs refresh');
+    return;
+  }
+
+  try {
+    const actor = await createTreasuryActor();
+    if (!actor) {
+      console.error('Failed to create treasury actor for trading logs');
+      return;
+    }
+
+    // Get trading status from the selected treasury
+    const tradingStatusResult = await actor.getTradingStatus();
+    
+    if ('ok' in tradingStatusResult && tradingStatusResult.ok) {
+      const { executedTrades } = tradingStatusResult.ok;
+      
+      // Process trades the same way as the store does
+      overrideTradingLogs.value = executedTrades.map((trade) => {
+        if (trade.error && trade.error.length > 0) {
+          return {
+            timestamp: trade.timestamp,
+            message: `Failed: ${trade.error[0]}`
+          };
+        }
+        
+        // Find token details from our trusted tokens list
+        const soldToken = tacoStore.fetchedTokenDetails.find(t => {
+          try {
+            const tradeTokenId = trade.tokenSold.toText();
+            const listTokenId = t[0].toText();
+            return tradeTokenId === listTokenId;
+          } catch (error) {
+            console.error('Error comparing sold token IDs:', error);
+            return false;
+          }
+        })?.[1];
+        
+        const boughtToken = tacoStore.fetchedTokenDetails.find(t => {
+          try {
+            const tradeTokenId = trade.tokenBought.toText();
+            const listTokenId = t[0].toText();
+            return tradeTokenId === listTokenId;
+          } catch (error) {
+            console.error('Error comparing bought token IDs:', error);
+            return false;
+          }
+        })?.[1];
+
+        // Format amounts
+        const soldAmount = soldToken ? 
+          (Number(trade.amountSold) / Math.pow(10, Number(soldToken.tokenDecimals))).toFixed(8) : 
+          trade.amountSold.toString();
+        const boughtAmount = boughtToken ? 
+          (Number(trade.amountBought) / Math.pow(10, Number(boughtToken.tokenDecimals))).toFixed(8) : 
+          trade.amountBought.toString();
+
+        const soldSymbol = soldToken?.tokenSymbol || 'Unknown';
+        const boughtSymbol = boughtToken?.tokenSymbol || 'Unknown';
+        const exchange = trade.exchange || 'Unknown';
+
+        return {
+          timestamp: trade.timestamp,
+          message: `${soldAmount} ${soldSymbol} → ${boughtAmount} ${boughtSymbol} on ${exchange}`
+        };
+      });
+      
+      console.log(`AdminView: Updated trading logs for ${selectedTreasury.value}:`, overrideTradingLogs.value.length, 'trades');
+    } else {
+      console.error('Failed to get trading status:', tradingStatusResult.err);
+    }
+  } catch (error) {
+    console.error('Error refreshing trading logs:', error);
+  }
 }
 
 async function executeTradingCycle() {
@@ -2501,6 +2642,7 @@ const onTreasuryChange = async () => {
   await Promise.all([
     refreshTimerStatus(),
     loadConfig(),
+    refreshTradingLogs(),
     // Note: voting metrics, voter details, and neuron allocations are DAO-specific, not treasury-specific
     // refreshVotingMetrics(),
     // refreshVoterDetails(), 
