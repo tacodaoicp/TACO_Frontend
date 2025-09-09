@@ -4624,11 +4624,15 @@ export const useTacoStore = defineStore('taco', () => {
             });
 
             const status = await nachos.getPortfolioSnapshotStatus();
-            return {
+            console.log('getNachosPortfolioSnapshotStatus: Raw status from nachos:', status);
+            
+            const result = {
                 status: status.status,
                 intervalMinutes: Number(status.intervalMinutes),
                 lastSnapshotTime: status.lastSnapshotTime
             };
+            console.log('getNachosPortfolioSnapshotStatus: Processed result:', result);
+            return result;
         } catch (error: any) {
             console.error('Error getting nachos portfolio snapshot status:', error);
             throw error;

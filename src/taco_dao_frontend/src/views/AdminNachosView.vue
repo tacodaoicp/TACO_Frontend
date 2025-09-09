@@ -777,7 +777,21 @@ async function executeTradingCycle() {
 
 // Portfolio functions
 async function refreshPortfolioSnapshotStatus() {
-    await tacoStore.getNachosPortfolioSnapshotStatus();
+    try {
+        console.log('AdminNachosView: refreshPortfolioSnapshotStatus called');
+        const status = await tacoStore.getNachosPortfolioSnapshotStatus();
+        if (status) {
+            portfolioSnapshotStatus.value = status;
+            newPortfolioSnapshotInterval.value = status.intervalMinutes;
+            console.log('AdminNachosView: Portfolio snapshot status updated', {
+                status: status.status,
+                intervalMinutes: status.intervalMinutes,
+                lastSnapshotTime: status.lastSnapshotTime
+            });
+        }
+    } catch (error) {
+        console.error('AdminNachosView: Error refreshing portfolio snapshot status:', error);
+    }
 }
 
 async function triggerManualSnapshot() {
