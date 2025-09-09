@@ -87,8 +87,8 @@
               <div class="timer-section mb-4">
                 <h4>Neuron Snapshot Timer</h4>
                 <div class="d-flex gap-3 align-items-center mb-2">
-                  <div class="status-indicator" :class="snapshotStatus.active ? 'active' : 'inactive'"></div>
-                  <span>Last Snapshot: {{ formatTime(snapshotStatus.lastSnapshotTime) }}</span>
+                  <div class="status-indicator" :class="snapshotStatus?.active ? 'active' : 'inactive'"></div>
+                  <span>Last Snapshot: {{ formatTime(snapshotStatus?.lastSnapshotTime) }}</span>
                   <span>Next Expected: {{ formatTime(calculateNextExpectedSnapshot()) }}</span>
                 </div>
                 <!-- Add Snapshot Interval Control -->
@@ -113,13 +113,13 @@
                   <button 
                     class="btn btn-warning" 
                     @click="triggerManualSnapshot"
-                    :disabled="snapshotStatus.inProgress">
+                    :disabled="snapshotStatus?.inProgress">
                     Trigger Manual Snapshot
                   </button>
                   <button 
                     class="btn btn-danger" 
                     @click="restartSnapshotTimer"
-                    v-if="!snapshotStatus.active">
+                    v-if="!snapshotStatus?.active">
                     Restart Timer
                   </button>
                 </div>
@@ -131,16 +131,16 @@
                 <div class="d-flex flex-column gap-2">
                   <!-- Short Sync -->
                   <div class="d-flex gap-3 align-items-center">
-                    <div class="status-indicator" :class="timerHealth.treasury.shortSync.active ? 'active' : 'inactive'"></div>
+                    <div class="status-indicator" :class="timerHealth?.treasury?.shortSync?.active ? 'active' : 'inactive'"></div>
                     <span>Short Sync (15m)</span>
-                    <span>Last: {{ formatTime(timerHealth.treasury.shortSync.lastSync) }}</span>
+                    <span>Last: {{ formatTime(timerHealth?.treasury?.shortSync?.lastSync) }}</span>
                   </div>
                   <!-- Trading Status -->
                   <div class="d-flex gap-3 align-items-center">
-                    <div class="status-indicator" :class="timerHealth.treasury.rebalanceStatus === 'Trading' ? 'active' : 'inactive'"></div>
+                    <div class="status-indicator" :class="timerHealth?.treasury?.rebalanceStatus === 'Trading' ? 'active' : 'inactive'"></div>
                     <span>Trading Status:</span>
-                    <span>{{ timerHealth.treasury.rebalanceStatus }}</span>
-                    <span v-if="timerHealth.treasury.rebalanceError" class="text-danger">({{ timerHealth.treasury.rebalanceError }})</span>
+                    <span>{{ timerHealth?.treasury?.rebalanceStatus || 'Unknown' }}</span>
+                    <span v-if="timerHealth?.treasury?.rebalanceError" class="text-danger">({{ timerHealth?.treasury?.rebalanceError }})</span>
                     <div class="ms-auto">
                       <button 
                         class="btn btn-warning btn-sm me-2" 
@@ -150,19 +150,19 @@
                       <button 
                         class="btn btn-success btn-sm me-2" 
                         @click="startRebalancing"
-                        :disabled="timerHealth.treasury.rebalanceStatus === 'Trading'">
+                        :disabled="timerHealth?.treasury?.rebalanceStatus === 'Trading'">
                         Start Trading
                       </button>
                       <button 
                         class="btn btn-danger btn-sm" 
                         @click="stopRebalancing"
-                        :disabled="timerHealth.treasury.rebalanceStatus === 'Idle'">
+                        :disabled="timerHealth?.treasury?.rebalanceStatus === 'Idle'">
                         Stop Trading
                       </button>
                     </div>
                   </div>
                   <!-- Trading Metrics -->
-                  <div v-if="timerHealth.treasury.tradingMetrics" class="trading-metrics mt-2">
+                  <div v-if="timerHealth?.treasury?.tradingMetrics" class="trading-metrics mt-2">
                     <h5>Trading Metrics</h5>
                     
                     <!-- Trading Bot Warning -->
@@ -172,11 +172,11 @@
                     </div>
                     
                     <div class="d-flex flex-column gap-1">
-                      <div>Last Attempt: {{ formatTime(timerHealth.treasury.tradingMetrics.lastRebalanceAttempt) }}</div>
-                      <div>Total Trades: {{ timerHealth.treasury.tradingMetrics.totalTradesExecuted.toString() }}</div>
-                      <div>Failed Trades: {{ timerHealth.treasury.tradingMetrics.totalTradesFailed.toString() }}</div>
-                      <div>Success Rate: {{ (timerHealth.treasury.tradingMetrics.successRate * 100).toFixed(1) }}%</div>
-                      <div>Avg Slippage: {{ timerHealth.treasury.tradingMetrics.avgSlippage.toFixed(2) }}%</div>
+                      <div>Last Attempt: {{ formatTime(timerHealth?.treasury?.tradingMetrics?.lastRebalanceAttempt) }}</div>
+                      <div>Total Trades: {{ timerHealth?.treasury?.tradingMetrics?.totalTradesExecuted?.toString() || '0' }}</div>
+                      <div>Failed Trades: {{ timerHealth?.treasury?.tradingMetrics?.totalTradesFailed?.toString() || '0' }}</div>
+                      <div>Success Rate: {{ timerHealth?.treasury?.tradingMetrics?.successRate ? (timerHealth?.treasury?.tradingMetrics?.successRate * 100).toFixed(1) : '0' }}%</div>
+                      <div>Avg Slippage: {{ timerHealth?.treasury?.tradingMetrics?.avgSlippage?.toFixed(2) || '0' }}%</div>
                     </div>
                   </div>
                   <!-- Token Sync Status -->
@@ -229,7 +229,7 @@
                     <button 
                       class="btn btn-danger" 
                       @click="restartTreasurySyncs"
-                      v-if="!timerHealth.treasury.shortSync.active">
+                      v-if="!timerHealth?.treasury?.shortSync?.active">
                       Restart Syncs
                     </button>
                   </div>
@@ -250,10 +250,10 @@
             <div class="card-body">
               <div class="timer-section">
                 <div class="d-flex gap-3 align-items-center mb-3">
-                  <div class="status-indicator" :class="'Running' in portfolioSnapshotStatus.status ? 'active' : 'inactive'"></div>
-                  <span><strong>Status:</strong> {{ 'Running' in portfolioSnapshotStatus.status ? 'Running' : 'Stopped' }}</span>
-                  <span><strong>Interval:</strong> {{ portfolioSnapshotStatus.intervalMinutes }} minutes</span>
-                  <span><strong>Last Snapshot:</strong> {{ formatTime(portfolioSnapshotStatus.lastSnapshotTime) }}</span>
+                  <div class="status-indicator" :class="portfolioSnapshotStatus?.status && 'Running' in portfolioSnapshotStatus.status ? 'active' : 'inactive'"></div>
+                  <span><strong>Status:</strong> {{ portfolioSnapshotStatus?.status && 'Running' in portfolioSnapshotStatus.status ? 'Running' : 'Stopped' }}</span>
+                  <span><strong>Interval:</strong> {{ portfolioSnapshotStatus?.intervalMinutes || 0 }} minutes</span>
+                  <span><strong>Last Snapshot:</strong> {{ formatTime(portfolioSnapshotStatus?.lastSnapshotTime) }}</span>
                 </div>
                 
                 <!-- Interval Control -->
@@ -281,13 +281,13 @@
                   <button 
                     class="btn btn-success" 
                     @click="showStartPortfolioSnapshotsConfirmation"
-                    :disabled="'Running' in portfolioSnapshotStatus.status">
+                    :disabled="portfolioSnapshotStatus?.status && 'Running' in portfolioSnapshotStatus.status">
                     Start Portfolio Snapshots
                   </button>
                   <button 
                     class="btn btn-danger" 
                     @click="showStopPortfolioSnapshotsConfirmation"
-                    :disabled="'Stopped' in portfolioSnapshotStatus.status">
+                    :disabled="portfolioSnapshotStatus?.status && 'Stopped' in portfolioSnapshotStatus.status">
                     Stop Portfolio Snapshots
                   </button>
                   <button 
@@ -321,15 +321,15 @@
                 <div class="metrics-grid">
                   <div class="metric-item">
                     <label>Total Voting Power</label>
-                    <div class="value">{{ formatNumber(votingMetrics.totalVotingPower) }}</div>
+                    <div class="value">{{ formatNumber(votingMetrics?.totalVotingPower) }}</div>
                   </div>
                   <div class="metric-item">
                     <label>Hotkey Setters VP</label>
-                    <div class="value">{{ formatNumber(votingMetrics.totalVotingPowerByHotkeySetters) }}</div>
+                    <div class="value">{{ formatNumber(votingMetrics?.totalVotingPowerByHotkeySetters) }}</div>
                   </div>
                   <div class="metric-item">
                     <label>Allocated VP</label>
-                    <div class="value">{{ formatNumber(votingMetrics.allocatedVotingPower) }}</div>
+                    <div class="value">{{ formatNumber(votingMetrics?.allocatedVotingPower) }}</div>
                   </div>
                   <div class="metric-item">
                     <label>Allocation Utilization</label>
@@ -337,11 +337,11 @@
                   </div>
                   <div class="metric-item">
                     <label>Hotkey Principals</label>
-                    <div class="value">{{ formatNumber(votingMetrics.principalCount) }}</div>
+                    <div class="value">{{ formatNumber(votingMetrics?.principalCount) }}</div>
                   </div>
                   <div class="metric-item">
                     <label>Voting Neurons</label>
-                    <div class="value">{{ formatNumber(votingMetrics.neuronCount) }}</div>
+                    <div class="value">{{ formatNumber(votingMetrics?.neuronCount) }}</div>
                   </div>
                 </div>
               </div>
@@ -1194,6 +1194,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue';
 import { Actor } from '@dfinity/agent';
+import { createAgent } from '@dfinity/utils';
 import { useTacoStore, type GetSystemParameterResult } from '../stores/taco.store';
 import { storeToRefs } from "pinia"  
 import HeaderBar from "../components/HeaderBar.vue";
@@ -1203,6 +1204,7 @@ import TradingLogs from '../components/admin/TradingLogs.vue';
 import AdminConfirmationModal from '../components/admin/AdminConfirmationModal.vue';
 import { Principal } from '@dfinity/principal';
 import { idlFactory as treasuryIDL, _SERVICE as TreasuryService } from '../../../declarations/treasury/treasury.did.js';
+import { idlFactory as nachosIDL, _SERVICE as NachosService } from '../../../declarations/nachos/nachos.did.js';
 
 // Add interface for VotingMetrics
 interface VotingMetrics {
@@ -1618,8 +1620,8 @@ const loadConfig = async () => {
   configError.value = null;
   try {
     // Check if user is logged in and agent is available
-    if (!tacoStore.agent) {
-      console.warn('Agent not available, falling back to store method');
+    if (!tacoStore.userLoggedIn) {
+      console.warn('User not logged in, falling back to store method');
       await tacoStore.getRebalanceConfig();
     } else {
       await getRebalanceConfigOverride();
@@ -2002,14 +2004,14 @@ function calculateVotingPower(basisPoints: bigint, totalVotingPower: bigint): bi
     return (totalVotingPower * basisPoints) / 10000n;
 }
 
-function formatNumber(value: bigint | number | undefined): string {
-    if (value === undefined) return '0';
+function formatNumber(value: bigint | number | undefined | null): string {
+    if (value === undefined || value === null) return '0';
     const numValue = typeof value === 'bigint' ? Number(value) : value;
     return new Intl.NumberFormat().format(numValue);
 }
 
 function calculateUtilization(metrics: typeof votingMetrics.value): string {
-    if (!metrics.totalVotingPower || metrics.totalVotingPower === 0n) return '0';
+    if (!metrics || !metrics.totalVotingPower || metrics.totalVotingPower === 0n) return '0';
     const utilization = (Number(metrics.allocatedVotingPower) / Number(metrics.totalVotingPower)) * 100;
     return utilization.toFixed(2);
 }
@@ -2261,7 +2263,7 @@ const createVoteHistoryLink = (principal: Principal | string): string => {
 
 // Trading bot warning logic
 const getTradingBotWarning = (): { level: 'none' | 'warning' | 'danger', message: string } => {
-  if (!timerHealth.value.treasury.tradingMetrics?.lastRebalanceAttempt || !rebalanceConfig.value?.rebalanceIntervalNS) {
+  if (!timerHealth.value?.treasury?.tradingMetrics?.lastRebalanceAttempt || !rebalanceConfig.value?.rebalanceIntervalNS) {
     return { level: 'none', message: '' };
   }
 
@@ -2490,8 +2492,8 @@ const getCurrentTreasuryCanisterId = () => {
 const onTreasuryChange = async () => {
   console.log('Treasury selection changed to:', selectedTreasury.value);
   
-  if (!tacoStore.agent) {
-    console.warn('Agent not available, treasury data will be loaded when user logs in');
+  if (!tacoStore.userLoggedIn) {
+    console.warn('User not logged in, treasury data will be loaded when user logs in');
     return;
   }
   
@@ -2507,15 +2509,36 @@ const onTreasuryChange = async () => {
   ]);
 };
 
+// Helper function to get local host like the store does
+function getLocalHost(): string {
+  const port = import.meta.env.VITE_LOCAL_PORT || '51000';
+  return `http://localhost:${port}`;
+}
+
 // Helper function to create treasury actor with selected canister ID
-const createTreasuryActor = (): TreasuryService => {
-  if (!tacoStore.agent) {
-    throw new Error('Agent not initialized. Please ensure you are logged in.');
+const createTreasuryActor = async (): Promise<TreasuryService | NachosService> => {
+  if (!tacoStore.userLoggedIn) {
+    throw new Error('User not logged in. Please log in to perform this action.');
   }
-  return Actor.createActor(treasuryIDL, {
-    agent: tacoStore.agent,
+  
+  // Create agent exactly like the store does
+  const host = process.env.DFX_NETWORK === "local"
+    ? getLocalHost()
+    : "https://ic0.app";
+  
+  const agent = await createAgent({
+    identity: tacoStore.identity,
+    host,
+    fetchRootKey: process.env.DFX_NETWORK === "local",
+  });
+  
+  // Use appropriate IDL based on selected treasury
+  const idl = selectedTreasury.value === 'nachos' ? nachosIDL : treasuryIDL;
+  
+  return Actor.createActor(idl, {
+    agent,
     canisterId: getCurrentTreasuryCanisterId(),
-  }) as TreasuryService;
+  }) as TreasuryService | NachosService;
 };
 
 // Override treasury functions to use selected treasury
@@ -2525,18 +2548,18 @@ const refreshTimerStatusOverride = async () => {
   // Get DAO backend status (this doesn't change)
   await tacoStore.refreshTimerStatus();
   
-  // Only override treasury calls if we have an agent and selected treasury is different from default
-  if (!tacoStore.agent) {
-    console.warn('Agent not available, using default treasury data from store');
+  // Only override treasury calls if user is logged in
+  if (!tacoStore.userLoggedIn) {
+    console.warn('User not logged in, using default treasury data from store');
     return;
   }
   
   // Override treasury-specific calls for selected treasury
   try {
-    const treasuryActor = createTreasuryActor();
+    const actor = await createTreasuryActor();
     
     // Get treasury trading status (which contains the timer health info)
-    const tradingStatus = await treasuryActor.getTradingStatus();
+    const tradingStatus = await actor.getTradingStatus();
     
     // Update the treasury part of timerHealth
     if (timerHealth.value && tradingStatus && 'ok' in tradingStatus) {
@@ -2544,7 +2567,7 @@ const refreshTimerStatusOverride = async () => {
     }
     
     // Get token details for the selected treasury
-    const tokenDetails = await treasuryActor.getTokenDetails();
+    const tokenDetails = await actor.getTokenDetails();
     fetchedTokenDetails.value = tokenDetails;
     
     console.log('AdminView: refreshTimerStatus completed for', selectedTreasury.value);
@@ -2557,15 +2580,15 @@ const refreshTimerStatusOverride = async () => {
 
 const triggerManualSyncOverride = async () => {
   console.log('AdminView: triggerManualSync called for', selectedTreasury.value);
-  if (!tacoStore.agent) {
+  if (!tacoStore.userLoggedIn) {
     alert('Please log in to perform this action.');
     return;
   }
   
   if (confirm(`Are you sure you want to force a ${selectedTreasury.value} treasury sync?`)) {
     try {
-      const treasuryActor = createTreasuryActor();
-      await treasuryActor.admin_syncWithDao();
+      const actor = await createTreasuryActor();
+      await actor.admin_syncWithDao();
       console.log('AdminView: Manual sync triggered for', selectedTreasury.value);
     } catch (error) {
       console.error('AdminView: Error triggering manual sync for', selectedTreasury.value, ':', error);
@@ -2575,14 +2598,14 @@ const triggerManualSyncOverride = async () => {
 };
 
 const startRebalancingOverride = async (reason: string) => {
-  if (!tacoStore.agent) {
-    console.error('Agent not available for starting rebalancing');
+  if (!tacoStore.userLoggedIn) {
+    console.error('User not logged in for starting rebalancing');
     return false;
   }
   
   try {
-    const treasuryActor = createTreasuryActor();
-    const result = await treasuryActor.startRebalancing(reason ? [reason] : []);
+    const actor = await createTreasuryActor();
+    const result = await actor.startRebalancing(reason ? [reason] : []);
     return 'ok' in result;
   } catch (error) {
     console.error('AdminView: Error starting rebalancing for', selectedTreasury.value, ':', error);
@@ -2591,14 +2614,14 @@ const startRebalancingOverride = async (reason: string) => {
 };
 
 const stopRebalancingOverride = async (reason: string) => {
-  if (!tacoStore.agent) {
-    console.error('Agent not available for stopping rebalancing');
+  if (!tacoStore.userLoggedIn) {
+    console.error('User not logged in for stopping rebalancing');
     return false;
   }
   
   try {
-    const treasuryActor = createTreasuryActor();
-    const result = await treasuryActor.stopRebalancing(reason ? [reason] : []);
+    const actor = await createTreasuryActor();
+    const result = await actor.stopRebalancing(reason ? [reason] : []);
     return 'ok' in result;
   } catch (error) {
     console.error('AdminView: Error stopping rebalancing for', selectedTreasury.value, ':', error);
@@ -2607,14 +2630,14 @@ const stopRebalancingOverride = async (reason: string) => {
 };
 
 const executeTradingCycleOverride = async (reason: string) => {
-  if (!tacoStore.agent) {
-    console.error('Agent not available for executing trading cycle');
+  if (!tacoStore.userLoggedIn) {
+    console.error('User not logged in for executing trading cycle');
     return;
   }
   
   try {
-    const treasuryActor = createTreasuryActor();
-    await treasuryActor.admin_executeTradingCycle(reason ? [reason] : []);
+    const actor = await createTreasuryActor();
+    await actor.admin_executeTradingCycle(reason ? [reason] : []);
     console.log('AdminView: Trading cycle executed for', selectedTreasury.value);
   } catch (error) {
     console.error('AdminView: Error executing trading cycle for', selectedTreasury.value, ':', error);
@@ -2622,14 +2645,14 @@ const executeTradingCycleOverride = async (reason: string) => {
 };
 
 const getRebalanceConfigOverride = async () => {
-  if (!tacoStore.agent) {
-    console.error('Agent not available for getting rebalance config');
+  if (!tacoStore.userLoggedIn) {
+    console.error('User not logged in for getting rebalance config');
     return null;
   }
   
   try {
-    const treasuryActor = createTreasuryActor();
-    const config = await treasuryActor.getSystemParameters();
+    const actor = await createTreasuryActor();
+    const config = await actor.getSystemParameters();
     rebalanceConfig.value = config;
     return config;
   } catch (error) {
@@ -2639,9 +2662,14 @@ const getRebalanceConfigOverride = async () => {
 };
 
 const updateRebalanceConfigOverride = async (updates: any, reason: string) => {
+  if (!tacoStore.userLoggedIn) {
+    console.error('User not logged in for updating rebalance config');
+    return;
+  }
+  
   try {
-    const treasuryActor = createTreasuryActor();
-    await treasuryActor.updateRebalanceConfig(updates, [], reason ? [reason] : []);
+    const actor = await createTreasuryActor();
+    await actor.updateRebalanceConfig(updates, [], reason ? [reason] : []);
     // Refresh config after update
     await getRebalanceConfigOverride();
     console.log('AdminView: Rebalance config updated for', selectedTreasury.value);
@@ -2655,8 +2683,8 @@ const recoverPoolBalancesOverride = async () => {
   if (confirm(`Are you sure you want to recover balances from ICPSwap pools for ${selectedTreasury.value}?`)) {
     isRecoveringBalances.value = true;
     try {
-      const treasuryActor = createTreasuryActor();
-      await treasuryActor.admin_recoverPoolBalances();
+      const actor = await createTreasuryActor();
+      await actor.admin_recoverPoolBalances();
       console.log('AdminView: Pool balances recovered for', selectedTreasury.value);
     } catch (error) {
       console.error('AdminView: Error recovering pool balances for', selectedTreasury.value, ':', error);
@@ -2667,9 +2695,14 @@ const recoverPoolBalancesOverride = async () => {
 };
 
 const pauseTokenOverride = async (principal: Principal, reason: string) => {
+  if (!tacoStore.userLoggedIn) {
+    console.error('User not logged in for pausing token');
+    return false;
+  }
+  
   try {
-    const treasuryActor = createTreasuryActor();
-    const result = await treasuryActor.pauseTokenFromTradingManual(principal, reason);
+    const actor = await createTreasuryActor();
+    const result = await actor.pauseTokenFromTradingManual(principal, reason);
     return 'ok' in result;
   } catch (error) {
     console.error('AdminView: Error pausing token for', selectedTreasury.value, ':', error);
@@ -2678,9 +2711,14 @@ const pauseTokenOverride = async (principal: Principal, reason: string) => {
 };
 
 const unpauseTokenOverride = async (principal: Principal, reason: string) => {
+  if (!tacoStore.userLoggedIn) {
+    console.error('User not logged in for unpausing token');
+    return false;
+  }
+  
   try {
-    const treasuryActor = createTreasuryActor();
-    const result = await treasuryActor.unpauseTokenFromTrading(principal, reason ? [reason] : []);
+    const actor = await createTreasuryActor();
+    const result = await actor.unpauseTokenFromTrading(principal, reason ? [reason] : []);
     return 'ok' in result;
   } catch (error) {
     console.error('AdminView: Error unpausing token for', selectedTreasury.value, ':', error);
