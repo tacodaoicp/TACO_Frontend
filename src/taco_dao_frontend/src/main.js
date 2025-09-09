@@ -11,6 +11,7 @@ import SalesView from "./views/SalesView.vue"
 import SaleDKPSwap from "./components/sales/SaleDKPSwap.vue"
 import InfoView from "./views/InfoView.vue"
 import AdminView from "./views/AdminView.vue"
+import AdminNachosView from "./views/AdminNachosView.vue"
 import AdminArchiveView from "./views/AdminArchiveView.vue"
 import AdminTradeView from "./views/AdminTradeView.vue"
 import AdminPriceView from "./views/AdminPriceView.vue"
@@ -68,6 +69,7 @@ const routes = [
     { path: "/reports/kongswap", component: ReportsView, meta: { robots: 'index' } },
     { path: "/reports/neutrinite", component: ReportsView, meta: { robots: 'index' } },
     { path: "/admin", name: "Admin", component: AdminView, meta: { robots: 'noindex' } },
+    { path: "/admin/nachos", name: "AdminNachos", component: AdminNachosView, meta: { robots: 'noindex' } },
     { path: "/admin/archives", name: "AdminArchive", component: AdminArchiveView, meta: { robots: 'noindex' } },
     { path: "/admin/trade", name: "AdminTrade", component: AdminTradeView, meta: { robots: 'noindex' } },
     { path: "/admin/price", name: "AdminPrice", component: AdminPriceView, meta: { robots: 'noindex' } },

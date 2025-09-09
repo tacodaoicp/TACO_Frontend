@@ -13,6 +13,7 @@ import { createAgent } from '@dfinity/utils'
 import { idlFactory } from "../../../declarations/ledger_canister/ledger_canister.did.js"
 import { idlFactory as daoBackendIDL } from "../../../declarations/dao_backend/DAO_backend.did.js"
 import { Result_4, idlFactory as treasuryIDL, UpdateConfig, RebalanceConfig, _SERVICE as TreasuryService } from "../../../declarations/treasury/treasury.did.js"
+import { idlFactory as nachosIDL, _SERVICE as NachosService } from "../../../declarations/nachos/nachos.did.js"
 import { idlFactory as neuronSnapshotIDL, _SERVICE as NeuronSnapshotService } from "../../../declarations/neuronSnapshot/neuronSnapshot.did.js"
 import { idlFactory as sneedForumIDL, _SERVICE as SneedForumService } from "../../../declarations/sneed_sns_forum/sneed_sns_forum.did.js"
 import { idlFactory as appSneedDaoIDL, _SERVICE as AppSneedDaoService } from "../../../declarations/app_sneeddao_backend/app_sneeddao_backend.did.js"
@@ -1188,18 +1189,19 @@ export const useTacoStore = defineStore('taco', () => {
         }        
         return 'z4is7-giaaa-aaaad-qg6uq-cai'; // local canisterId
     }
-    const nachosCanisterId = () => {
 
+    const nachosCanisterId = () => {
         switch (process.env.DFX_NETWORK) {
             case "ic":
-                return process.env.CANISTER_ID_NACHOS_IC || 'rctxc-zqaaa-aaaan-qz6na-cai';
+                return process.env.CANISTER_ID_NACHOS_IC || 'rctxc-zqaaa-aaaan-qz6na-cai'; // fallback to staging for now
                 break;
             case "staging":
-                return  process.env.CANISTER_ID_NACHOS_STAGING || 'rctxc-zqaaa-aaaan-qz6na-caitptia-syaaa-aaaai-atieq-cai';
+                return process.env.CANISTER_ID_NACHOS_STAGING || 'rctxc-zqaaa-aaaan-qz6na-cai';
                 break;
         }        
-        return 'rctxc-zqaaa-aaaan-qz6na-cai'; // local canisterId
+        return 'rctxc-zqaaa-aaaan-qz6na-cai'; // local canisterId - using staging ID as fallback
     }
+    
     const neuronSnapshotCanisterId = () => {
         switch (process.env.DFX_NETWORK) {
             case "ic":
@@ -4167,6 +4169,561 @@ export const useTacoStore = defineStore('taco', () => {
         } catch (error: any) {
             console.error('Error clearing portfolio circuit breaker logs:', error);
             throw error;
+        }
+    }
+
+    // =====================================
+    // NACHOS METHODS (Treasury instance #2)
+    // =====================================
+
+    const refreshNachosTimerStatus = async () => {
+        try {
+            console.log('refreshNachosTimerStatus: Starting to refresh nachos status...');
+            
+            const authClient = await getAuthClient();
+            
+            if (!await authClient.isAuthenticated()) {
+                console.warn('refreshNachosTimerStatus: User not authenticated, using anonymous identity');
+            }
+
+            const identity = await authClient.isAuthenticated() 
+                ? await authClient.getIdentity() 
+                : new AnonymousIdentity();
+
+            const agent = await createAgent({
+                identity,
+                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            });
+
+            // Create Nachos actor for sync info
+            const nachosActor = Actor.createActor(nachosIDL, {
+                agent,
+                canisterId: nachosCanisterId()
+            })
+
+            // Get nachos status
+            const tradingStatusResult = await nachosActor.getTradingStatus() as any;
+            
+            if ('ok' in tradingStatusResult && tradingStatusResult.ok) {
+                const { metrics, rebalanceStatus } = tradingStatusResult.ok;
+                // Update nachos timer health in the component
+                // This will be handled by the component's local state
+                console.log('refreshNachosTimerStatus: Nachos status updated');
+            } else if (tradingStatusResult.err) {
+                console.error('refreshNachosTimerStatus: Error getting nachos status:', tradingStatusResult.err);
+            }
+        } catch (error) {
+            console.error('refreshNachosTimerStatus: Error:', error);
+        }
+    }
+
+    const triggerNachosManualSync = async () => {
+        try {
+            const authClient = await getAuthClient();
+            
+            if (!await authClient.isAuthenticated()) {
+                throw new Error('User not authenticated');
+            }
+
+            const identity = await authClient.getIdentity();
+            const agent = await createAgent({
+                identity,
+                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            })
+
+            const actor = Actor.createActor(nachosIDL, {
+                agent,
+                canisterId: nachosCanisterId(),
+            })
+
+            await actor.admin_syncWithDao();
+            await refreshNachosTimerStatus();
+        } catch (error) {
+            console.error('Error triggering nachos manual sync:', error);
+        }
+    }
+
+    const restartNachosSyncs = async () => {
+        try {
+            const authClient = await getAuthClient();
+            
+            if (!await authClient.isAuthenticated()) {
+                throw new Error('User not authenticated');
+            }
+
+            const identity = await authClient.getIdentity();
+            const agent = await createAgent({
+                identity,
+                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            });
+
+            const actor = Actor.createActor(nachosIDL, {
+                agent,
+                canisterId: nachosCanisterId(),
+            });
+
+            await actor.admin_restartSyncs();
+            await refreshNachosTimerStatus();
+        } catch (error) {
+            console.error('Error restarting nachos syncs:', error);
+            throw error;
+        }
+    }
+
+    const recoverNachosPoolBalances = async () => {
+        try {
+            const authClient = await getAuthClient();
+            
+            if (!await authClient.isAuthenticated()) {
+                throw new Error('User not authenticated');
+            }
+
+            const identity = await authClient.getIdentity();
+            const agent = await createAgent({
+                identity,
+                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            });
+
+            const actor = Actor.createActor(nachosIDL, {
+                agent,
+                canisterId: nachosCanisterId(),
+            });
+
+            const result = await actor.admin_recoverPoolBalances() as any;
+            if ('err' in result) {
+                throw new Error(JSON.stringify(result.err));
+            }
+            await refreshNachosTimerStatus();
+        } catch (error) {
+            console.error('Error recovering nachos pool balances:', error);
+            throw error;
+        }
+    }
+
+    const fetchNachosSystemLogs = async () => {
+        try {
+            const authClient = await getAuthClient();
+            
+            if (!await authClient.isAuthenticated()) {
+                throw new Error('User not authenticated');
+            }
+
+            const identity = await authClient.getIdentity();
+            const agent = await createAgent({
+                identity,
+                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            });
+
+            const nachos = Actor.createActor<NachosService>(nachosIDL, {
+                agent,
+                canisterId: nachosCanisterId()
+            });
+
+            return await nachos.getLogs(BigInt(1000));
+        } catch (error: any) {
+            console.error('Error fetching nachos logs:', error);
+            throw error;
+        }
+    }
+
+    const startNachosRebalancing = async (reason?: string) => {
+        try {
+            const authClient = await getAuthClient();
+            
+            if (!await authClient.isAuthenticated()) {
+                throw new Error('User not authenticated');
+            }
+
+            const identity = await authClient.getIdentity();
+            const agent = await createAgent({
+                identity,
+                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            })
+
+            const actor = Actor.createActor(nachosIDL, {
+                agent,
+                canisterId: nachosCanisterId(),
+            })
+
+            const result = await actor.startRebalancing(reason ? [reason] : []) as any;
+            if ('err' in result) {
+                console.error('Error starting nachos rebalancing:', result.err);
+                return false;
+            }
+            return true;
+        } catch (error) {
+            console.error('Error starting nachos rebalancing:', error);
+            return false;
+        }
+    }
+
+    const stopNachosRebalancing = async (reason?: string) => {
+        try {
+            const authClient = await getAuthClient();
+            
+            if (!await authClient.isAuthenticated()) {
+                throw new Error('User not authenticated');
+            }
+
+            const identity = await authClient.getIdentity();
+            const agent = await createAgent({
+                identity,
+                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            })
+
+            const actor = Actor.createActor(nachosIDL, {
+                agent,
+                canisterId: nachosCanisterId(),
+            })
+
+            const result = await actor.stopRebalancing(reason ? [reason] : []) as any;
+            if ('err' in result) {
+                console.error('Error stopping nachos rebalancing:', result.err);
+                return false;
+            }
+            return true;
+        } catch (error) {
+            console.error('Error stopping nachos rebalancing:', error);
+            return false;
+        }
+    }
+
+    const getNachosRebalanceConfig = async () => {
+        try {
+            const authClient = await getAuthClient();
+            
+            if (!await authClient.isAuthenticated()) {
+                throw new Error('User not authenticated');
+            }
+
+            const identity = await authClient.getIdentity();
+            const agent = await createAgent({
+                identity,
+                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            });
+
+            const nachos = Actor.createActor<NachosService>(nachosIDL, {
+                agent,
+                canisterId: nachosCanisterId()
+            });
+
+            const config = await nachos.getSystemParameters();
+            if (!config) {
+                throw new Error('Failed to get nachos system parameters');
+            }
+            return config;
+
+        } catch (error) {
+            console.error('Error getting nachos system parameters:', error);
+            throw error;
+        }
+    }
+
+    const updateNachosRebalanceConfig = async (updates: any, reason?: string) => {
+        try {
+            const authClient = await getAuthClient();
+            
+            if (!await authClient.isAuthenticated()) {
+                throw new Error('User not authenticated');
+            }
+
+            const identity = await authClient.getIdentity();
+            const agent = await createAgent({
+                identity,
+                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            });
+
+            const nachos = Actor.createActor<NachosService>(nachosIDL, {
+                agent,
+                canisterId: nachosCanisterId()
+            });
+
+            const result = await nachos.updateRebalanceConfig(updates, [], reason ? [reason] : []);
+
+            if ('ok' in result) {
+                addToast({
+                    id: Date.now(),
+                    code: 'success',
+                    title: 'Success',
+                    icon: 'fa-solid fa-check',
+                    message: 'Nachos configuration updated successfully'
+                });
+                return true;
+            } else {
+                console.error('Error updating nachos config:', result.err);
+                addToast({
+                    id: Date.now(),
+                    code: 'error',
+                    title: 'Error',
+                    icon: 'fa-solid fa-times',
+                    message: 'Failed to update nachos configuration'
+                });
+                return false;
+            }
+        } catch (error) {
+            console.error('Error updating nachos rebalance config:', error);
+            throw error;
+        }
+    }
+
+    const executeNachosTradingCycle = async (reason?: string) => {
+        appLoadingOn();
+        try {
+            const authClient = await getAuthClient();
+            
+            if (!await authClient.isAuthenticated()) {
+                throw new Error('User not authenticated');
+            }
+
+            const identity = await authClient.getIdentity();
+            const agent = await createAgent({
+                identity,
+                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            });
+
+            const nachos = Actor.createActor<NachosService>(nachosIDL, {
+                agent,
+                canisterId: nachosCanisterId()
+            });
+
+            await nachos.admin_executeTradingCycle(reason ? [reason] : []);
+        } catch (error) {
+            console.error('Error executing nachos trading cycle:', error);
+            throw error;
+        } finally {
+            appLoadingOff();
+        }
+    }
+
+    const pauseNachosToken = async (token: Principal, reason?: string) => {
+        try {
+            const authClient = await getAuthClient();
+            
+            if (!await authClient.isAuthenticated()) {
+                throw new Error('User not authenticated');
+            }
+
+            const identity = await authClient.getIdentity();
+            const agent = await createAgent({
+                identity,
+                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            });
+
+            const nachos = Actor.createActor<NachosService>(nachosIDL, {
+                agent,
+                canisterId: nachosCanisterId()
+            });
+
+            return await nachos.pauseTokenFromTradingManual(token, reason || 'Manual pause from admin');
+        } catch (error: any) {
+            console.error('Error pausing nachos token:', error);
+            return false;
+        }
+    }
+
+    const unpauseNachosToken = async (token: Principal, reason?: string) => {
+        try {
+            const authClient = await getAuthClient();
+            
+            if (!await authClient.isAuthenticated()) {
+                throw new Error('User not authenticated');
+            }
+
+            const identity = await authClient.getIdentity();
+            const agent = await createAgent({
+                identity,
+                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            });
+
+            const nachos = Actor.createActor<NachosService>(nachosIDL, {
+                agent,
+                canisterId: nachosCanisterId()
+            });
+
+            return await nachos.unpauseTokenFromTrading(token, reason ? [reason] : []);
+        } catch (error: any) {
+            console.error('Error unpausing nachos token:', error);
+            return false;
+        }
+    }
+
+    const takeNachosManualPortfolioSnapshot = async (reason?: string) => {
+        try {
+            const authClient = await getAuthClient();
+            
+            if (!await authClient.isAuthenticated()) {
+                throw new Error('User not authenticated');
+            }
+
+            const identity = await authClient.getIdentity();
+            const agent = await createAgent({
+                identity,
+                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            });
+
+            const nachos = Actor.createActor<NachosService>(nachosIDL, {
+                agent,
+                canisterId: nachosCanisterId()
+            });
+
+            const result = await nachos.takeManualPortfolioSnapshot(reason ? [reason] : []);
+            if ('ok' in result) {
+                console.log('Nachos manual snapshot taken:', result.ok);
+                return result.ok;
+            } else {
+                console.error('Error taking nachos manual snapshot:', result.err);
+                throw new Error('Failed to take nachos manual snapshot');
+            }
+        } catch (error: any) {
+            console.error('Error taking nachos manual portfolio snapshot:', error);
+            throw error;
+        }
+    }
+
+    const getNachosPortfolioSnapshotStatus = async () => {
+        try {
+            const authClient = await getAuthClient();
+            
+            if (!await authClient.isAuthenticated()) {
+                throw new Error('User not authenticated');
+            }
+
+            const identity = await authClient.getIdentity();
+            const agent = await createAgent({
+                identity,
+                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            });
+
+            const nachos = Actor.createActor<NachosService>(nachosIDL, {
+                agent,
+                canisterId: nachosCanisterId()
+            });
+
+            const status = await nachos.getPortfolioSnapshotStatus();
+            return {
+                status: status.status,
+                intervalMinutes: Number(status.intervalMinutes),
+                lastSnapshotTime: status.lastSnapshotTime
+            };
+        } catch (error: any) {
+            console.error('Error getting nachos portfolio snapshot status:', error);
+            throw error;
+        }
+    }
+
+    const startNachosPortfolioSnapshots = async (reason?: string) => {
+        try {
+            const authClient = await getAuthClient();
+            
+            if (!await authClient.isAuthenticated()) {
+                throw new Error('User not authenticated');
+            }
+
+            const identity = await authClient.getIdentity();
+            const agent = await createAgent({
+                identity,
+                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            });
+
+            const nachos = Actor.createActor<NachosService>(nachosIDL, {
+                agent,
+                canisterId: nachosCanisterId()
+            });
+
+            const result = await nachos.startPortfolioSnapshots(reason ? [reason] : []);
+            if ('ok' in result) {
+                console.log('Nachos portfolio snapshots started:', result.ok);
+                return true;
+            } else {
+                console.error('Error starting nachos portfolio snapshots:', result.err);
+                return false;
+            }
+        } catch (error: any) {
+            console.error('Error starting nachos portfolio snapshots:', error);
+            return false;
+        }
+    }
+
+    const stopNachosPortfolioSnapshots = async (reason?: string) => {
+        try {
+            const authClient = await getAuthClient();
+            
+            if (!await authClient.isAuthenticated()) {
+                throw new Error('User not authenticated');
+            }
+
+            const identity = await authClient.getIdentity();
+            const agent = await createAgent({
+                identity,
+                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            });
+
+            const nachos = Actor.createActor<NachosService>(nachosIDL, {
+                agent,
+                canisterId: nachosCanisterId()
+            });
+
+            const result = await nachos.stopPortfolioSnapshots(reason ? [reason] : []);
+            if ('ok' in result) {
+                console.log('Nachos portfolio snapshots stopped:', result.ok);
+                return true;
+            } else {
+                console.error('Error stopping nachos portfolio snapshots:', result.err);
+                return false;
+            }
+        } catch (error: any) {
+            console.error('Error stopping nachos portfolio snapshots:', error);
+            return false;
+        }
+    }
+
+    const updateNachosPortfolioSnapshotInterval = async (intervalMinutes: number, reason?: string) => {
+        try {
+            const authClient = await getAuthClient();
+            
+            if (!await authClient.isAuthenticated()) {
+                throw new Error('User not authenticated');
+            }
+
+            const identity = await authClient.getIdentity();
+            const agent = await createAgent({
+                identity,
+                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            });
+
+            const nachos = Actor.createActor<NachosService>(nachosIDL, {
+                agent,
+                canisterId: nachosCanisterId()
+            });
+
+            const result = await nachos.updatePortfolioSnapshotInterval(BigInt(intervalMinutes), reason ? [reason] : []);
+            if ('ok' in result) {
+                console.log('Nachos portfolio snapshot interval updated:', result.ok);
+                return true;
+            } else {
+                console.error('Error updating nachos portfolio snapshot interval:', result.err);
+                return false;
+            }
+        } catch (error: any) {
+            console.error('Error updating nachos portfolio snapshot interval:', error);
+            return false;
         }
     }
 
@@ -7497,6 +8054,26 @@ export const useTacoStore = defineStore('taco', () => {
         removePortfolioCircuitBreakerCondition,
         getPortfolioCircuitBreakerLogs,
         clearPortfolioCircuitBreakerLogs,
+        
+        // Nachos methods
+        refreshNachosTimerStatus,
+        triggerNachosManualSync,
+        restartNachosSyncs,
+        recoverNachosPoolBalances,
+        fetchNachosSystemLogs,
+        startNachosRebalancing,
+        stopNachosRebalancing,
+        getNachosRebalanceConfig,
+        updateNachosRebalanceConfig,
+        executeNachosTradingCycle,
+        pauseNachosToken,
+        unpauseNachosToken,
+        takeNachosManualPortfolioSnapshot,
+        getNachosPortfolioSnapshotStatus,
+        startNachosPortfolioSnapshots,
+        stopNachosPortfolioSnapshots,
+        updateNachosPortfolioSnapshotInterval,
+        
         getNeuronSnapshotStatus,
         getNeuronSnapshotsInfo,
         getNeuronSnapshotInfo,
