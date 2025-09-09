@@ -8,6 +8,35 @@
         <div class="row">
           <TacoTitle level="h2" emoji="📦" title="Archive Management" class="mt-4" style="padding-left: 1rem !important;"/>
           
+          <!-- Treasury Selection -->
+          <div class="card bg-dark text-white mb-4">
+            <div class="card-header">
+              <h3 class="mb-0">Treasury Selection</h3>
+            </div>
+            <div class="card-body">
+              <div class="row align-items-center">
+                <div class="col-md-6">
+                  <label for="treasurySelect" class="form-label">Select Treasury:</label>
+                  <select 
+                    id="treasurySelect" 
+                    class="form-select bg-dark text-white" 
+                    v-model="selectedTreasury"
+                    @change="onTreasuryChange"
+                  >
+                    <option value="TACO">🌮 TACO Treasury</option>
+                    <option value="nachos">🧀 Nachos Treasury</option>
+                  </select>
+                </div>
+                <div class="col-md-6">
+                  <div class="text-muted">
+                    <small>Current Treasury: <strong>{{ selectedTreasury }}</strong></small><br>
+                    <small>Canister ID: <code>{{ getCurrentTreasuryCanisterId() }}</code></small>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          
           <!-- Archive Selection -->
           <div class="card bg-dark text-white mb-4">
             <div class="card-header">
@@ -583,6 +612,7 @@ export default {
   data() {
     return {
       selectedArchive: 'trading_archive',
+      selectedTreasury: 'TACO',
       loading: false,
       timerStatus: null,
       legacyStatus: null,
@@ -3809,8 +3839,8 @@ export default {
             //console.log('Treasury canister ID:', this.tacoStore.treasuryCanisterId?.())
             
             // Check if it's a known principal (like Treasury)
-            if (this.tacoStore.treasuryCanisterId && principalStr === this.tacoStore.treasuryCanisterId()) {
-              return 'Treasury'
+            if (this.getCurrentTreasuryCanisterId() && principalStr === this.getCurrentTreasuryCanisterId()) {
+              return `${this.selectedTreasury} Treasury`
             }
             
             // Return full principal for now (for debugging) - you can truncate later
@@ -4586,6 +4616,37 @@ export default {
           this.fetchAllPreviousAllocations(blockId, userId, timestamp)
           break
       }
+    },
+
+    // Treasury selection methods
+    getCurrentTreasuryCanisterId() {
+      if (this.selectedTreasury === 'nachos') {
+        // Return nachos canister ID based on environment
+        switch (process.env.DFX_NETWORK) {
+          case "ic":
+            return process.env.CANISTER_ID_NACHOS_IC || 'nachos-ic-id-not-set';
+          case "staging":
+            return process.env.CANISTER_ID_NACHOS_STAGING || 'rctxc-zqaaa-aaaan-qz6na-cai';
+        }
+        return 'nachos-local-id'; // local canisterId for nachos
+      } else {
+        // Return TACO treasury canister ID
+        switch (process.env.DFX_NETWORK) {
+          case "ic":
+            return process.env.CANISTER_ID_TREASURY_IC || 'v6t5d-6yaaa-aaaan-qzzja-cai';
+          case "staging":
+            return process.env.CANISTER_ID_TREASURY_STAGING || 'tptia-syaaa-aaaai-atieq-cai';
+        }
+        return 'z4is7-giaaa-aaaad-qg6uq-cai'; // local canisterId
+      }
+    },
+
+    onTreasuryChange() {
+      console.log('Treasury selection changed to:', this.selectedTreasury);
+      // Since this page mainly shows archived data, we might not need to refresh everything
+      // But we should refresh the status and logs to show the correct treasury data
+      this.refreshStatus();
+      this.refreshLogs();
     }
   }
 }

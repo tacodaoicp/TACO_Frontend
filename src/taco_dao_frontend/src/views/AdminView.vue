@@ -8,6 +8,35 @@
         <div class="row">
           <TacoTitle level="h2" emoji="🔑" title="Admin Panel" class="mt-4" style="padding-left: 1rem !important;"/>
           
+          <!-- Treasury Selection -->
+          <div class="card bg-dark text-white mb-4">
+            <div class="card-header">
+              <h3 class="mb-0">Treasury Selection</h3>
+            </div>
+            <div class="card-body">
+              <div class="row align-items-center">
+                <div class="col-md-6">
+                  <label for="treasurySelect" class="form-label">Select Treasury:</label>
+                  <select 
+                    id="treasurySelect" 
+                    class="form-select bg-dark text-white" 
+                    v-model="selectedTreasury"
+                    @change="onTreasuryChange"
+                  >
+                    <option value="TACO">🌮 TACO Treasury</option>
+                    <option value="nachos">🧀 Nachos Treasury</option>
+                  </select>
+                </div>
+                <div class="col-md-6">
+                  <div class="text-muted">
+                    <small>Current Treasury: <strong>{{ selectedTreasury }}</strong></small><br>
+                    <small>Canister ID: <code>{{ getCurrentTreasuryCanisterId() }}</code></small>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          
           <!-- Quick Navigation -->
           <div class="mb-4">
             <div class="d-flex gap-3 flex-wrap">
@@ -1173,6 +1202,7 @@ import TacoTitle from '../components/misc/TacoTitle.vue';
 import TradingLogs from '../components/admin/TradingLogs.vue';
 import AdminConfirmationModal from '../components/admin/AdminConfirmationModal.vue';
 import { Principal } from '@dfinity/principal';
+import { idlFactory as treasuryIDL, _SERVICE as TreasuryService } from '../../../declarations/treasury/treasury.did.js';
 
 // Add interface for VotingMetrics
 interface VotingMetrics {
@@ -1189,6 +1219,9 @@ const isRecoveringBalances = ref(false);
 const showOnlyActive = ref(false);
 const showOnlyFollowing = ref(false);
 const refreshingVP = ref(false);
+
+// Treasury selection
+const selectedTreasury = ref('TACO');
 
 // Trading pauses state
 const tradingPauses = ref<any[]>([]);
@@ -1271,7 +1304,7 @@ const uniqueComponents = computed(() => {
 // Timer status functions
 async function refreshTimerStatus() {
   console.log('AdminView: refreshTimerStatus called');
-  await tacoStore.refreshTimerStatus();
+  await refreshTimerStatusOverride();
   await fetchTradingPauses();
   console.log('AdminView: refreshTimerStatus completed');
 }
@@ -1283,10 +1316,7 @@ async function triggerManualSnapshot() {
 
 async function triggerManualSync() {
     console.log('AdminView: triggerManualSync called');
-    if (confirm('Are you sure you want to force a treasury sync?')) {
-        await tacoStore.triggerManualSync();
-        console.log('AdminView: Manual sync triggered');
-    }
+    await triggerManualSyncOverride();
 }
 
 async function restartSnapshotTimer() {
@@ -1391,17 +1421,7 @@ async function stopRebalancing() {
 
 async function recoverPoolBalances() {
     console.log('AdminView: recoverPoolBalances called');
-    if (confirm('Are you sure you want to recover balances from ICPSwap pools?')) {
-        isRecoveringBalances.value = true;
-        try {
-            await tacoStore.recoverPoolBalances();
-            console.log('AdminView: Pool balances recovered');
-        } catch (error) {
-            console.error('AdminView: Error recovering pool balances:', error);
-        } finally {
-            isRecoveringBalances.value = false;
-        }
-    }
+    await recoverPoolBalancesOverride();
 }
 
 const configInputs = ref({
@@ -1554,7 +1574,7 @@ const updateConfigWithReason = async (reason: string) => {
     priceUpdateIntervalNS: [] as []
   };
   
-  await tacoStore.updateRebalanceConfig(updates, reason);
+  await updateRebalanceConfigOverride(updates, reason);
   
   // Update max portfolio snapshots separately if it changed
   if (configInputs.value.maxPortfolioSnapshots !== originalMaxPortfolioSnapshots.value) {
@@ -1597,14 +1617,20 @@ const loadConfig = async () => {
   configLoading.value = true;
   configError.value = null;
   try {
-    await tacoStore.getRebalanceConfig();
-    //await tacoStore.getSystemParameters();
-    if (!tacoStore.rebalanceConfig) {
+    // Check if user is logged in and agent is available
+    if (!tacoStore.agent) {
+      console.warn('Agent not available, falling back to store method');
+      await tacoStore.getRebalanceConfig();
+    } else {
+      await getRebalanceConfigOverride();
+    }
+    
+    if (!rebalanceConfig.value) {
       throw new Error('Failed to load configuration');
     }
   } catch (error) {
     console.error('Error loading configuration:', error);
-    configError.value = 'Failed to load configuration. Please try again.';
+    configError.value = 'Failed to load configuration. Please ensure you are logged in and try again.';
   } finally {
     configLoading.value = false;
   }
@@ -1813,14 +1839,14 @@ const handleConfirmAction = async (reason: string) => {
       success = true;
     } else if (actionData.type === 'startRebalancing') {
       // Handle start trading
-      success = await tacoStore.startRebalancing(reason);
+      success = await startRebalancingOverride(reason);
       if (success) {
         await refreshTimerStatus();
         console.log('AdminView: Trading started');
       }
     } else if (actionData.type === 'stopRebalancing') {
       // Handle stop trading
-      success = await tacoStore.stopRebalancing(reason);
+      success = await stopRebalancingOverride(reason);
       if (success) {
         await refreshTimerStatus();
         console.log('AdminView: Trading stopped');
@@ -1832,7 +1858,7 @@ const handleConfirmAction = async (reason: string) => {
       success = true;
     } else if (actionData.type === 'executeTradingCycle') {
       // Handle execute trading cycle
-      await tacoStore.executeTradingCycle(reason);
+      await executeTradingCycleOverride(reason);
       await refreshTimerStatus();
       console.log('AdminView: Trading cycle executed');
       success = true;
@@ -1873,9 +1899,9 @@ const handleConfirmAction = async (reason: string) => {
       const { principal, tokenName } = actionData;
       
       if (confirmationModal.value.title === 'Pause Token') {
-        success = await tacoStore.pauseToken(Principal.fromText(principal), reason);
+        success = await pauseTokenOverride(Principal.fromText(principal), reason);
       } else if (confirmationModal.value.title === 'Unpause Token') {
-        success = await tacoStore.unpauseToken(Principal.fromText(principal), reason);
+        success = await unpauseTokenOverride(Principal.fromText(principal), reason);
       }
       
       if (success) {
@@ -2437,4 +2463,228 @@ async function updateSystemParameters(reason?: string) {
     return false;
   }
 }
+
+// Treasury selection functions
+const getCurrentTreasuryCanisterId = () => {
+  if (selectedTreasury.value === 'nachos') {
+    // Return nachos canister ID based on environment
+    switch (process.env.DFX_NETWORK) {
+      case "ic":
+        return process.env.CANISTER_ID_NACHOS_IC || 'nachos-ic-id-not-set';
+      case "staging":
+        return process.env.CANISTER_ID_NACHOS_STAGING || 'rctxc-zqaaa-aaaan-qz6na-cai';
+    }
+    return 'nachos-local-id'; // local canisterId for nachos
+  } else {
+    // Return TACO treasury canister ID
+    switch (process.env.DFX_NETWORK) {
+      case "ic":
+        return process.env.CANISTER_ID_TREASURY_IC || 'v6t5d-6yaaa-aaaan-qzzja-cai';
+      case "staging":
+        return process.env.CANISTER_ID_TREASURY_STAGING || 'tptia-syaaa-aaaai-atieq-cai';
+    }
+    return 'z4is7-giaaa-aaaad-qg6uq-cai'; // local canisterId
+  }
+};
+
+const onTreasuryChange = async () => {
+  console.log('Treasury selection changed to:', selectedTreasury.value);
+  
+  if (!tacoStore.agent) {
+    console.warn('Agent not available, treasury data will be loaded when user logs in');
+    return;
+  }
+  
+  // Refresh all data for the new treasury
+  await Promise.all([
+    refreshTimerStatus(),
+    loadConfig(),
+    // Note: voting metrics, voter details, and neuron allocations are DAO-specific, not treasury-specific
+    // refreshVotingMetrics(),
+    // refreshVoterDetails(), 
+    // refreshNeuronAllocations(),
+    refreshPortfolioSnapshotStatus()
+  ]);
+};
+
+// Helper function to create treasury actor with selected canister ID
+const createTreasuryActor = (): TreasuryService => {
+  if (!tacoStore.agent) {
+    throw new Error('Agent not initialized. Please ensure you are logged in.');
+  }
+  return Actor.createActor(treasuryIDL, {
+    agent: tacoStore.agent,
+    canisterId: getCurrentTreasuryCanisterId(),
+  }) as TreasuryService;
+};
+
+// Override treasury functions to use selected treasury
+const refreshTimerStatusOverride = async () => {
+  console.log('AdminView: refreshTimerStatus called for', selectedTreasury.value);
+  
+  // Get DAO backend status (this doesn't change)
+  await tacoStore.refreshTimerStatus();
+  
+  // Only override treasury calls if we have an agent and selected treasury is different from default
+  if (!tacoStore.agent) {
+    console.warn('Agent not available, using default treasury data from store');
+    return;
+  }
+  
+  // Override treasury-specific calls for selected treasury
+  try {
+    const treasuryActor = createTreasuryActor();
+    
+    // Get treasury trading status (which contains the timer health info)
+    const tradingStatus = await treasuryActor.getTradingStatus();
+    
+    // Update the treasury part of timerHealth
+    if (timerHealth.value && tradingStatus && 'ok' in tradingStatus) {
+      timerHealth.value.treasury = tradingStatus.ok;
+    }
+    
+    // Get token details for the selected treasury
+    const tokenDetails = await treasuryActor.getTokenDetails();
+    fetchedTokenDetails.value = tokenDetails;
+    
+    console.log('AdminView: refreshTimerStatus completed for', selectedTreasury.value);
+  } catch (error) {
+    console.error('AdminView: Error refreshing timer status for', selectedTreasury.value, ':', error);
+    // Fallback to store method if treasury-specific call fails
+    console.warn('Falling back to store method for treasury data');
+  }
+};
+
+const triggerManualSyncOverride = async () => {
+  console.log('AdminView: triggerManualSync called for', selectedTreasury.value);
+  if (!tacoStore.agent) {
+    alert('Please log in to perform this action.');
+    return;
+  }
+  
+  if (confirm(`Are you sure you want to force a ${selectedTreasury.value} treasury sync?`)) {
+    try {
+      const treasuryActor = createTreasuryActor();
+      await treasuryActor.admin_syncWithDao();
+      console.log('AdminView: Manual sync triggered for', selectedTreasury.value);
+    } catch (error) {
+      console.error('AdminView: Error triggering manual sync for', selectedTreasury.value, ':', error);
+      alert(`Failed to sync ${selectedTreasury.value} treasury. Please check console for details.`);
+    }
+  }
+};
+
+const startRebalancingOverride = async (reason: string) => {
+  if (!tacoStore.agent) {
+    console.error('Agent not available for starting rebalancing');
+    return false;
+  }
+  
+  try {
+    const treasuryActor = createTreasuryActor();
+    const result = await treasuryActor.startRebalancing(reason ? [reason] : []);
+    return 'ok' in result;
+  } catch (error) {
+    console.error('AdminView: Error starting rebalancing for', selectedTreasury.value, ':', error);
+    return false;
+  }
+};
+
+const stopRebalancingOverride = async (reason: string) => {
+  if (!tacoStore.agent) {
+    console.error('Agent not available for stopping rebalancing');
+    return false;
+  }
+  
+  try {
+    const treasuryActor = createTreasuryActor();
+    const result = await treasuryActor.stopRebalancing(reason ? [reason] : []);
+    return 'ok' in result;
+  } catch (error) {
+    console.error('AdminView: Error stopping rebalancing for', selectedTreasury.value, ':', error);
+    return false;
+  }
+};
+
+const executeTradingCycleOverride = async (reason: string) => {
+  if (!tacoStore.agent) {
+    console.error('Agent not available for executing trading cycle');
+    return;
+  }
+  
+  try {
+    const treasuryActor = createTreasuryActor();
+    await treasuryActor.admin_executeTradingCycle(reason ? [reason] : []);
+    console.log('AdminView: Trading cycle executed for', selectedTreasury.value);
+  } catch (error) {
+    console.error('AdminView: Error executing trading cycle for', selectedTreasury.value, ':', error);
+  }
+};
+
+const getRebalanceConfigOverride = async () => {
+  if (!tacoStore.agent) {
+    console.error('Agent not available for getting rebalance config');
+    return null;
+  }
+  
+  try {
+    const treasuryActor = createTreasuryActor();
+    const config = await treasuryActor.getSystemParameters();
+    rebalanceConfig.value = config;
+    return config;
+  } catch (error) {
+    console.error('AdminView: Error getting rebalance config for', selectedTreasury.value, ':', error);
+    return null;
+  }
+};
+
+const updateRebalanceConfigOverride = async (updates: any, reason: string) => {
+  try {
+    const treasuryActor = createTreasuryActor();
+    await treasuryActor.updateRebalanceConfig(updates, [], reason ? [reason] : []);
+    // Refresh config after update
+    await getRebalanceConfigOverride();
+    console.log('AdminView: Rebalance config updated for', selectedTreasury.value);
+  } catch (error) {
+    console.error('AdminView: Error updating rebalance config for', selectedTreasury.value, ':', error);
+  }
+};
+
+const recoverPoolBalancesOverride = async () => {
+  console.log('AdminView: recoverPoolBalances called for', selectedTreasury.value);
+  if (confirm(`Are you sure you want to recover balances from ICPSwap pools for ${selectedTreasury.value}?`)) {
+    isRecoveringBalances.value = true;
+    try {
+      const treasuryActor = createTreasuryActor();
+      await treasuryActor.admin_recoverPoolBalances();
+      console.log('AdminView: Pool balances recovered for', selectedTreasury.value);
+    } catch (error) {
+      console.error('AdminView: Error recovering pool balances for', selectedTreasury.value, ':', error);
+    } finally {
+      isRecoveringBalances.value = false;
+    }
+  }
+};
+
+const pauseTokenOverride = async (principal: Principal, reason: string) => {
+  try {
+    const treasuryActor = createTreasuryActor();
+    const result = await treasuryActor.pauseTokenFromTradingManual(principal, reason);
+    return 'ok' in result;
+  } catch (error) {
+    console.error('AdminView: Error pausing token for', selectedTreasury.value, ':', error);
+    return false;
+  }
+};
+
+const unpauseTokenOverride = async (principal: Principal, reason: string) => {
+  try {
+    const treasuryActor = createTreasuryActor();
+    const result = await treasuryActor.unpauseTokenFromTrading(principal, reason ? [reason] : []);
+    return 'ok' in result;
+  } catch (error) {
+    console.error('AdminView: Error unpausing token for', selectedTreasury.value, ':', error);
+    return false;
+  }
+};
 </script>
