@@ -756,6 +756,7 @@ export const useTacoStore = defineStore('taco', () => {
             root.style.setProperty("--light-brown-to-dark-orange", "#DA8D28") // dark orange
             root.style.setProperty("--light-brown-to-dark-brown", "#512100") // dark brown
             root.style.setProperty("--dark-brown-to-light-orange", "#feeac1") // light orange
+            root.style.setProperty("--dark-brown-to-orange", "#FED66C") // orange
             root.style.setProperty("--dark-brown-to-dark-orange", "#DA8D28") // dark orange
             root.style.setProperty("--dark-orange-to-transparent", "transparent") // transparent
             root.style.setProperty("--transparent-to-dark-orange", "#DA8D28") // dark orange
@@ -831,6 +832,7 @@ export const useTacoStore = defineStore('taco', () => {
             root.style.setProperty("--light-brown-to-dark-brown", "#c16d33") // light brown
             root.style.setProperty("--dark-brown-to-light-orange", "#512100") // dark brown
             root.style.setProperty("--dark-brown-to-dark-orange", "#512100") // dark brown
+            root.style.setProperty("--dark-brown-to-orange", "#512100") // dark brown
             root.style.setProperty("--dark-orange-to-transparent", "#DA8D28") // dark orange
             root.style.setProperty("--transparent-to-dark-orange", "transparent") // transparent
             root.style.setProperty("--dark-orange-to-light-orange", "#DA8D28") // dark orange
@@ -5664,7 +5666,7 @@ export const useTacoStore = defineStore('taco', () => {
                     code: 'rewards-claimed',
                     title: 'Rewards Claimed!',
                     icon: 'fa-solid fa-check',
-                    message: `Successfully claimed rewards! Transaction ID: ${transactionId}`
+                    message: `Successfully claimed rewards!`
                 })
                 return true
             } else {

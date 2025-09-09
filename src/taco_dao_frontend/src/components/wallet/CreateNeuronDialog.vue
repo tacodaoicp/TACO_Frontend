@@ -1,164 +1,362 @@
 <template>
+
   <div class="modal fade" :class="{ show: show }" :style="{ display: show ? 'block' : 'none' }" tabindex="-1" @click="handleBackdropClick">
+    
     <div class="modal-dialog modal-dialog-centered">
+      
       <div class="modal-content">
+        
         <div class="modal-header">
-          <h5 class="modal-title">
-            <i class="fa fa-plus-circle me-2"></i>
-            Create New Neuron
-          </h5>
-          <button type="button" class="btn-close" @click="close"></button>
+
+          <div class="modal-title gap-2">
+
+            <i class="create-icon fa fa-brain me-2"></i>
+            
+            <span class="create-title-text">Create New Neuron</span>
+
+          </div>
+
+          <button type="button" class="btn create-btn-close" @click="close">
+
+            <i class="fa fa-times"></i>
+
+          </button>
+
         </div>
         
         <div class="modal-body">
-          <div class="info-section mb-4">
-            <div class="info-card">
-              <div class="info-header">
-                <i class="fa fa-info-circle me-2"></i>
-                <span>Creating a New Neuron</span>
+
+          <!-- disclaimer -->
+          <div v-if="!isSuccess" class="disclaimer">
+
+            <span>You're about to create a new TACO DAO neuron! This will:</span>
+
+            <ul>
+              <li>
+                <span>Find the next available neuron ID for your account</span>
+              </li>
+              <li>
+                <span>Transfer your TACO tokens to the neuron</span>
+              </li>
+              <li>
+                <span>Create and activate the neuron for voting</span>
+              </li>
+            </ul>
+
+          </div>
+
+          <!-- amount to stake label -->
+          <label v-if="!isSuccess" for="createAmount" class="form-label">
+
+            <span class="create-amount-text">Amount to Stake <span class="small">(TACO)</span></span>
+
+          </label>
+
+          <!-- amount to stake input -->
+          <input
+            v-if="!isSuccess"
+            id="createAmount"
+            v-model="stakeAmount"
+            type="number"
+            class="form-control taco-input"
+            placeholder="0.00000000"
+            step="0.00000001"
+            min="0.00000001"
+            :disabled="isCreating"
+          />
+
+          <!-- amount to stake info -->
+          <div v-if="!isSuccess" class="d-flex justify-content-between flex-wrap w-100 mt-1">
+
+            <div>
+
+              <span v-if="stakeAmount && stakeAmountBigInt < 100000000n" class="small" style="color: var(--red-to-light-red);">Minimum stake: 1 TACO</span>
+
+            </div>
+
+            <div class="ms-auto">
+
+              <span class="small">Available: {{ formatBalance(tacoBalance, 8) }} TACO</span>
+
+            </div>
+
+          </div>
+
+          <!-- dissolve period label -->
+          <label v-if="!isSuccess" for="dissolveDays" class="form-label mt-1">
+
+            <span class="dissolve-period-text">Dissolve Period <span class="small">(Days)</span></span>
+
+          </label>
+
+          <input
+            v-if="!isSuccess"
+            id="dissolveDays"
+            v-model.number="dissolveDays"
+            type="number"
+            class="form-control taco-input"
+            :class="{ 'is-invalid': dissolveDays && (dissolveDays < 7 || dissolveDays > 30.44) }"
+            min="7"
+            max="30.44"
+            step="1"
+            placeholder="Enter days"
+            :disabled="isCreating"
+          />
+
+          <span v-if="dissolveDays && (dissolveDays < 7 || dissolveDays > 30.44) && !isSuccess" 
+            class="small" 
+            style="color: var(--red-to-light-red);">Min 7, Max 30.44 days</span>
+
+          <!-- preview -->
+          <div v-if="
+            dissolveDays >= 7 
+            && dissolveDays <= 30.44
+            && dissolveDays >= 7
+            && stakeAmount 
+            && stakeAmountBigInt >= 100000000n" 
+            class="dissolve-preview"
+            :class="{ 'mt-3': !isSuccess }">
+            
+            <span v-if="!isSuccess" class="dissolve-preview-text">Neuron Preview:</span>
+
+            <span v-if="isSuccess" class="dissolve-preview-text">Staked Neuron:</span>
+
+            <div class="neuron-preview d-flex flex-column">
+
+              <div class="d-flex justify-content-between flex-wrap">
+
+                <span class="fw-bold">Dissolve Period:</span>
+
+                <span class="ms-auto">{{ dissolveDays }} days ({{ Math.round(dissolveDays / 30 * 10) / 10 }} months)</span>
+              
               </div>
-              <div class="info-content">
-                <p>You're about to create a new TACO neuron. This will:</p>
-                <ul>
-                  <li>Find the next available neuron ID for your account</li>
-                  <li>Transfer your TACO tokens to the neuron</li>
-                  <li>Create and activate the neuron for voting</li>
-                </ul>
+
+              <div class="d-flex justify-content-between flex-wrap">
+
+                <span class="fw-bold">Initial State:</span>
+                
+                <span class="ms-auto">Locked (not dissolving)</span>
+              
               </div>
+
+              <div class="d-flex justify-content-between flex-wrap">
+
+                <span class="fw-bold">Amount to stake:</span>
+
+                <span class="ms-auto">{{ formatBalance(stakeAmountBigInt, 8) }} TACO</span>
+              
+              </div>
+
+              <div class="d-flex justify-content-between flex-wrap">
+
+                <span class="fw-bold">Transfer fee:</span>
+
+                <span class="ms-auto">{{ formatBalance(tacoFee, 8) }} TACO</span>
+
+              </div>
+
+              <div class="d-flex justify-content-between flex-wrap">
+
+                <span class="fw-bold">Total required:</span>
+
+                <span class="ms-auto">{{ formatBalance(stakeAmountBigInt + tacoFee, 8) }} TACO</span>
+
+              </div>            
+
             </div>
+
           </div>
 
-          <div class="mb-3">
-            <label for="createAmount" class="form-label">Amount to Stake (TACO)</label>
-            <div class="input-group">
-              <input
-                id="createAmount"
-                v-model="stakeAmount"
-                type="number"
-                class="form-control"
-                placeholder="0.00000000"
-                step="0.00000001"
-                min="0.00000001"
-                :disabled="isCreating"
-              />
-              <span class="input-group-text">TACO</span>
-            </div>
-            <div class="form-text">
-              Available Balance: {{ formatBalance(tacoBalance, 8) }} TACO
-            </div>
-            <div v-if="stakeAmountBigInt > 0n" class="form-text">
-              Minimum stake: 1.00000000 TACO
-            </div>
-          </div>
+          <!-- success message -->
+          <div v-if="successMessage" class="alert mb-0 mt-3 px-3 py-2" 
+          style="background-color: var(--green);">
 
-          <div class="mb-3">
-            <label for="dissolveDays" class="form-label">Dissolve Period (Days)</label>
-            <input
-              id="dissolveDays"
-              v-model.number="dissolveDays"
-              type="number"
-              class="form-control"
-              :class="{ 'is-invalid': dissolveDays < 28 || dissolveDays > 180 }"
-              min="28"
-              max="180"
-              step="1"
-              placeholder="Enter days (e.g., 28, 60, 90)"
-              :disabled="isCreating"
-            />
-            <div class="form-text">
-              <i class="fa fa-info-circle me-1"></i>
-              Recommended: 28 days minimum for voting rewards. Range: 28-180 days (6 months)
-            </div>
-            <div v-if="dissolveDays < 28 || dissolveDays > 180" class="invalid-feedback">
-              Please enter between 28 and 180 days
-            </div>
-          </div>
-
-          <div v-if="dissolveDays >= 28 && dissolveDays <= 180" class="dissolve-preview">
-            <h6>Dissolve Preview:</h6>
-            <div class="preview-item">
-              <span class="label">Dissolve Period:</span>
-              <span class="value">{{ dissolveDays }} days ({{ Math.round(dissolveDays / 30 * 10) / 10 }} months)</span>
-            </div>
-            <div class="preview-item">
-              <span class="label">Initial State:</span>
-              <span class="value">🔒 Locked (not dissolving)</span>
-            </div>
-            <div class="preview-item">
-              <span class="label">Age Bonus:</span>
-              <span class="value">✅ Will accrue while locked</span>
-            </div>
-          </div>
-
-          <div v-if="stakeAmountBigInt > 0n" class="stake-preview mb-3">
-            <div class="preview-item">
-              <span>Amount to stake:</span>
-              <span class="fw-bold">{{ formatBalance(stakeAmountBigInt, 8) }} TACO</span>
-            </div>
-            <div class="preview-item">
-              <span>Transfer fee:</span>
-              <span>{{ formatBalance(tacoFee, 8) }} TACO</span>
-            </div>
-            <div class="preview-item border-top pt-2">
-              <span class="fw-bold">Total required:</span>
-              <span class="fw-bold">{{ formatBalance(stakeAmountBigInt + tacoFee, 8) }} TACO</span>
-            </div>
-          </div>
-
-          <div v-if="successMessage" class="alert alert-success">
             <i class="fa fa-check-circle me-2"></i>
-            {{ successMessage }}
-            <div class="mt-2">
-              <i class="fa fa-vote-yea me-1"></i>
-              <router-link to="/vote" class="vote-link">Vote on allocations</router-link> 
-              to start earning rewards!
-            </div>
+
+            <span style="color: var(--black) !important;">{{ successMessage }}</span>
+
           </div>
 
-          <div v-if="error" class="alert alert-danger">
-            <i class="fa fa-exclamation-triangle me-2"></i>
-            {{ error }}
+          <div v-if="successMessage" class="mt-3 mb-1">
+
+            <span class="d-inline-block text-center">You can now <router-link to="/vote" class="vote-link" style="color: var(--blue-to-light-blue) !important;">Vote on allocations</router-link> and start earning rewards!</span>
+
           </div>
+
+          <!-- error message -->
+          <div v-if="error" class="alert mb-0 mt-3 px-3 py-2"
+          style="background-color: var(--red);">
+
+            <i class="fa fa-exclamation-triangle me-2" style="color: var(--white) !important;"></i>
+
+            <span style="color: var(--white) !important;">{{ error }}</span>
+
+          </div>
+
         </div>
         
         <div class="modal-footer">
+
           <button 
             v-if="!isSuccess"
             type="button" 
-            class="btn btn-secondary" 
+            class="btn"
+            style="font-family: 'Space Mono'; color: var(--black-to-white);"
             @click="close" 
             :disabled="isCreating"
           >
             Cancel
           </button>
+
           <button 
             v-if="isSuccess"
             type="button" 
-            class="btn btn-success" 
+            class="btn taco-btn taco-btn--green"
             @click="close"
           >
-            <i class="fa fa-check me-2"></i>
             Close
           </button>
+
           <button 
             v-if="!isSuccess"
             type="button" 
-            class="btn btn-primary" 
+            class="btn taco-btn taco-btn--green"
             @click="handleCreate"
-            :disabled="!canCreate || isCreating"
-          >
-            <span v-if="isCreating" class="spinner-border spinner-border-sm me-2"></span>
-            <i v-else class="fa fa-plus me-2"></i>
-            {{ isCreating ? 'Creating...' : 'Create Neuron' }}
+            :disabled="!canCreate || isCreating">
+            Create Neuron
           </button>
+
         </div>
+
       </div>
+
     </div>
+
   </div>
-  
-  <!-- Backdrop -->
-  <div v-if="show" class="modal-backdrop fade show"></div>
+
 </template>
+
+<style scoped lang="scss">
+.modal {
+  background-color: rgba(0, 0, 0, 0.5);
+
+  span {
+    color: var(--black-to-white);
+  }
+
+}
+
+.modal-content {
+  background-color: var(--light-orange-to-dark-brown);
+  border: 1px solid var(--dark-orange);
+}
+
+.modal-header {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  margin: 0;
+  margin-bottom: 0.5rem;
+  padding: 0;
+  border-bottom: 0;
+  margin-bottom: 1rem;
+}
+
+.modal-body {
+  padding: 0 1.5rem 0;
+}
+
+.modal-title {
+  display: flex;
+  align-items: center;
+  margin: 1.5rem 0px 0px 1.5rem;
+}
+
+.create-icon {
+  font-size: 3.5rem;
+  color: var(--dark-brown-to-white) !important;
+}
+
+.create-title-text {
+  font-size: 1.5rem;
+  font-weight: 600;
+}
+
+.create-btn-close {
+  margin: 1rem .5rem 0 0;
+
+  i {
+    font-size: 1.5rem;
+    color: var(--black-to-white);
+  }
+}
+
+.disclaimer {
+  background-color: var(--orange-to-brown);
+  border: 1px solid var(--dark-orange);
+  border-radius: .5rem;
+  padding: .5rem .75rem;
+  margin-top: 0.5rem;
+  margin-bottom: 1rem;
+
+  > span {
+    font-size: 1rem;
+    display: inline-block;
+    margin-bottom: .25rem;
+  }
+
+  ul {
+    list-style-type: disc;
+    padding-left: 1.5rem;
+    margin-top: 0.5rem;
+    margin-bottom: .5rem;
+
+    li::marker {
+      color: var(--black-to-white);
+    }
+
+  }
+
+}
+
+.create-amount-text,
+.dissolve-period-text,
+.dissolve-preview-text {
+  font-size: 1.25rem;
+}
+
+.dissolve-preview-text {
+  display: inline-block;
+  margin-bottom: 0.5rem;
+}
+
+.neuron-preview {
+  background-color: var(--orange-to-brown);
+  border: 1px solid var(--dark-orange);
+  border-radius: 0.5rem;
+  overflow: clip;
+
+  > div {
+    padding: 0.5rem 0.75rem;
+    border-bottom: 1px solid var(--dark-orange);
+
+    &:last-child {
+      border-bottom: none;
+    }
+    &:hover {
+      background-color: var(--dark-orange);
+    }
+
+  }
+
+}
+
+.modal-footer {
+  border-top: none;
+}
+
+</style>
+
 
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
@@ -180,9 +378,13 @@ const emit = defineEmits<CreateNeuronDialogEmits>()
 
 const tacoStore = useTacoStore()
 
+// # ACTIONS #
+const { appLoadingOn, appLoadingOff } = tacoStore
+
+
 // State
 const stakeAmount = ref('')
-const dissolveDays = ref(28) // Default to 28 days
+const dissolveDays = ref(30.44)
 const isCreating = ref(false)
 const error = ref('')
 const successMessage = ref('')
@@ -220,7 +422,7 @@ watch(() => props.show, (newShow) => {
 const resetForm = () => {
   // Use prefilled amount if provided, otherwise empty
   stakeAmount.value = props.prefilledAmount || ''
-  dissolveDays.value = 28 // Reset to default
+  dissolveDays.value = 30.44
   error.value = ''
   successMessage.value = ''
   isCreating.value = false
@@ -241,6 +443,9 @@ const handleBackdropClick = (event: MouseEvent) => {
 
 const handleCreate = async () => {
   if (!canCreate.value) return
+
+  // turn on app loading
+  appLoadingOn()
   
   isCreating.value = true
   error.value = ''
@@ -266,20 +471,23 @@ const handleCreate = async () => {
       successMessage.value = `Successfully created new neuron with ${formatBalance(stakeAmountBigInt.value, 8)} TACO and ${dissolveDays.value} day dissolve period!`
       
       // Also show toast notification
-      tacoStore.addToast('success', 'Neuron Created', `Successfully created new neuron with ${formatBalance(stakeAmountBigInt.value, 8)} TACO and ${dissolveDays.value} day dissolve period`)
-      
+      tacoStore.addToast({
+        id: Date.now(),
+        code: '',
+        title: 'Neuron Successfully Created!',
+        icon: 'fa-solid fa-brain',
+        message: `Successfully created new neuron with ${formatBalance(stakeAmountBigInt.value, 8)} TACO and ${dissolveDays.value} day dissolve period`
+      })
+
       emit('created')
-      
-      // Auto-close after 3 seconds
-      setTimeout(() => {
-        close()
-      }, 3000)
+
     }
   } catch (err: any) {
     console.error('Neuron creation error:', err)
     error.value = err.message || 'Failed to create neuron. Please try again.'
   } finally {
     isCreating.value = false
+    appLoadingOff()
   }
 }
 
@@ -304,250 +512,3 @@ const formatBalance = (balance: bigint, decimals: number): string => {
   return `${wholePart}.${trimmedFractional}`
 }
 </script>
-
-<style scoped>
-.modal-content {
-  background: var(--card-bg, #2d3748);
-  border: 1px solid var(--border-color, #4a5568);
-  border-radius: 12px;
-  color: white;
-}
-
-.modal-header {
-  border-bottom: 1px solid var(--border-color, #4a5568);
-  background: var(--header-bg, #1a202c);
-  border-radius: 12px 12px 0 0;
-}
-
-.modal-title {
-  font-weight: 600;
-  color: white;
-}
-
-.btn-close {
-  filter: invert(1);
-  opacity: 0.8;
-}
-
-.btn-close:hover {
-  opacity: 1;
-}
-
-.info-section {
-  margin-bottom: 1.5rem;
-}
-
-.info-card {
-  background: rgba(0, 123, 255, 0.1);
-  border: 1px solid rgba(0, 123, 255, 0.3);
-  border-radius: 8px;
-  padding: 1rem;
-}
-
-.info-header {
-  font-weight: 600;
-  color: #87ceeb;
-  margin-bottom: 0.75rem;
-  display: flex;
-  align-items: center;
-}
-
-.info-content p {
-  margin-bottom: 0.5rem;
-  color: var(--text-secondary, #a0aec0);
-}
-
-.info-content ul {
-  margin: 0;
-  padding-left: 1.25rem;
-  color: var(--text-secondary, #a0aec0);
-}
-
-.info-content li {
-  margin-bottom: 0.25rem;
-}
-
-.form-label {
-  font-weight: 600;
-  color: white;
-  margin-bottom: 0.5rem;
-}
-
-.form-control {
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  color: white;
-  border-radius: 6px;
-}
-
-.form-control:focus {
-  background: rgba(255, 255, 255, 0.15);
-  border-color: var(--primary-color, #0d6efd);
-  box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.25);
-  color: white;
-}
-
-.form-control::placeholder {
-  color: rgba(255, 255, 255, 0.5);
-}
-
-.input-group-text {
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  color: white;
-  border-left: none;
-}
-
-.form-text {
-  color: var(--text-secondary, #a0aec0);
-  font-size: 0.85rem;
-  margin-top: 0.25rem;
-}
-
-.stake-preview {
-  background: rgba(0, 123, 255, 0.1);
-  border: 1px solid rgba(0, 123, 255, 0.3);
-  border-radius: 8px;
-  padding: 1rem;
-}
-
-.preview-item {
-  display: flex;
-  justify-content: space-between;
-  margin-bottom: 0.5rem;
-}
-
-.preview-item:last-child {
-  margin-bottom: 0;
-}
-
-.dissolve-preview {
-  background: rgba(0, 123, 255, 0.1);
-  border: 1px solid rgba(0, 123, 255, 0.3);
-  border-radius: 8px;
-  padding: 1rem;
-  margin-bottom: 1rem;
-}
-
-.dissolve-preview h6 {
-  margin: 0 0 0.75rem 0;
-  color: white;
-  font-weight: 600;
-}
-
-.dissolve-preview .preview-item {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 0.5rem;
-  font-size: 0.9rem;
-}
-
-.dissolve-preview .preview-item:last-child {
-  margin-bottom: 0;
-}
-
-.dissolve-preview .label {
-  color: #a0aec0;
-  font-weight: 500;
-}
-
-.dissolve-preview .value {
-  color: white;
-  font-weight: 500;
-  text-align: right;
-  max-width: 60%;
-}
-
-.form-control.is-invalid {
-  border-color: #dc3545;
-}
-
-.invalid-feedback {
-  display: block;
-  width: 100%;
-  margin-top: 0.25rem;
-  font-size: 0.875rem;
-  color: #dc3545;
-}
-
-.alert-success {
-  background: rgba(25, 135, 84, 0.1);
-  border: 1px solid rgba(25, 135, 84, 0.3);
-  color: #d1e7dd;
-}
-
-.vote-link {
-  color: #28a745;
-  text-decoration: none;
-  font-weight: 600;
-  border-bottom: 1px solid transparent;
-  transition: all 0.2s ease;
-}
-
-.vote-link:hover {
-  color: #34ce57;
-  border-bottom-color: #34ce57;
-  text-decoration: none;
-}
-
-.alert-danger {
-  background: rgba(220, 53, 69, 0.1);
-  border: 1px solid rgba(220, 53, 69, 0.3);
-  color: #f8d7da;
-}
-
-.modal-footer {
-  border-top: 1px solid var(--border-color, #4a5568);
-}
-
-.btn-primary {
-  background: linear-gradient(135deg, var(--primary-color, #0d6efd), var(--primary-hover, #0b5ed7));
-  border: none;
-  font-weight: 600;
-  transition: all 0.3s ease;
-}
-
-.btn-primary:hover:not(:disabled) {
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(0, 123, 255, 0.3);
-}
-
-.btn-primary:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-  transform: none;
-}
-
-.btn-secondary {
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  color: white;
-  font-weight: 600;
-}
-
-.btn-secondary:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.2);
-  color: white;
-}
-
-.spinner-border-sm {
-  width: 1rem;
-  height: 1rem;
-}
-
-/* Mobile responsiveness */
-@media (max-width: 576px) {
-  .modal-dialog {
-    margin: 1rem;
-  }
-  
-  .info-card {
-    padding: 0.75rem;
-  }
-  
-  .stake-preview {
-    padding: 0.75rem;
-  }
-}
-</style>

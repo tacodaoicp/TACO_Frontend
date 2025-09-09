@@ -46,15 +46,14 @@
                   
                   <!-- refresh voting power button -->
                   <button 
-                    class="btn btn-sm taco-text-white py-0 border-0"
+                    class="btn btn-sm ms-2 px-2 py-1"
+                    style="background-color: var(--yellow); color: var(--black); border-color: var(--yellow);"
                     @click="refreshVotingPower"
-                    :disabled="refreshingVP"
-                    data-bs-toggle="tooltip" 
-                    data-bs-placement="top"
-                    title="Refresh your voting power">
+                    :class="{'disabled': refreshingVP}">
 
                     <!-- refresh icon -->
-                    <i class="fa-solid fa-refresh" :class="{ 'fa-spin': refreshingVP }"></i>
+                    <span v-if="!refreshingVP">Refresh</span>
+                    <span v-if="refreshingVP">Refreshing</span>
 
                   </button>
 

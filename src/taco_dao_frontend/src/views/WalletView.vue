@@ -28,42 +28,7 @@
             <!-- taco container -->
             <div class="taco-container
                         taco-container--l1
-                        d-flex flex-column gap-0 w-100 p-0 flex-grow-1 overflow-hidden position-relative">
-
-              <!-- toolbar container - l2 -->
-              <div class="taco-container taco-container--l2 taco-container--l2--dark p-2 mx-3 mt-3 mb-0">
-
-                <!-- toolbar -->
-                <div class="taco-toolbar gap-2">
-
-                  <!-- left -->
-                  <div class="taco-toolbar__left">
-
-                    <!-- buttons -->
-                    <div class="btn-group">
-
-                        <!-- tokens -->
-                        <button class="btn taco-nav-btn"
-                                :class="{ 'taco-nav-btn--active': true }">Tokens</button>
-
-                        <!-- other -->
-                        <button class="btn taco-nav-btn"
-                                :class="{ 'taco-nav-btn--active': false }">Other</button>
-
-                    </div>
-
-                  </div>
-
-                  <!-- right -->
-                  <div class="taco-toolbar__right flex-grow-1 flex-wrap d-flex justify-content-end gap-2"> 
-
-                    <!-- nothing atm -->
-
-                  </div>
-
-                </div>
-
-              </div>              
+                        d-flex flex-column gap-0 w-100 p-0 flex-grow-1 overflow-hidden position-relative">          
               
               <!-- logged out content -->
               <div v-if="!tacoStore.userLoggedIn" 
@@ -96,9 +61,20 @@
 
                 <!-- core tokens -->
                 <div>
+
+                  <div class="d-flex justify-content-between align-items-center">
                   
-                  <!-- core tokens title -->
-                  <h2 class="tokens-title">Core Tokens <span class="small">({{ coreTokens.length }})</span></h2>
+                    <!-- core tokens title -->
+                    <h2 class="tokens-title">Core Tokens <span class="small">({{ coreTokens.length }})</span></h2>
+
+                    <!-- refresh button -->
+                    <button class="btn btn-sm taco-btn taco-btn--green"
+                            style="padding: 0.75rem 1rem !important;"
+                            @click="loadAllBalances()">
+                      <i class="fa fa-refresh"></i>
+                    </button>
+
+                  </div>
 
                   <!-- trusted token -->
                   <div class="d-flex flex-column gap-2">
@@ -203,7 +179,7 @@
                     <div class="wallet-view__no-registered-tokens
                                 d-flex align-items-center justify-content-center">
 
-                      <span class="d-inline-block taco-text-black-to-white ps-4 py-5">No registered tokens</span>
+                      <span class="d-inline-block taco-text-black-to-white px-4 py-5">No registered tokens</span>
 
                     </div>
                     
@@ -313,9 +289,9 @@
 
   // no registered tokens
   &__no-registered-tokens {
-    background-color: var(--light-brown-to-dark-brown);
+    background-color: var(--orange-to-dark-brown);
     border-radius: 0.5rem;
-    border: 1px solid var(--light-orange-to-dark-orange);
+    border: 1px solid var(--dark-orange-to-dark-brown);
   }
 
   // tokens title
@@ -764,6 +740,9 @@ const closeSendDialog = () => {
 // handle send token
 const handleSendToken = async (params: { recipient: string; amount: bigint; memo?: string }) => {
   if (!selectedToken.value) return
+
+  // turn on app loading
+  appLoadingOn()
   
   try {
     await tacoStore.sendToken(
@@ -774,12 +753,19 @@ const handleSendToken = async (params: { recipient: string; amount: bigint; memo
       params.memo
     )
     
+    const decimals = selectedToken.value.decimals
+    const divisor = 10n ** BigInt(decimals)
+    const whole = params.amount / divisor
+    const frac = params.amount % divisor
+    const fracStr = frac === 0n ? '' : `.${frac.toString().padStart(decimals, '0').replace(/0+$/, '')}`
+    const formattedAmount = `${whole.toString()}${fracStr}`
+
     tacoStore.addToast({
       id: Date.now(),
       code: 'send-success',
       title: 'Transaction Sent',
       icon: 'fa-solid fa-check',
-      message: `Successfully sent ${params.amount} ${selectedToken.value.symbol}`
+      message: `Successfully sent ${formattedAmount} ${selectedToken.value.symbol}`
     })
     
     // Refresh balance
@@ -799,6 +785,8 @@ const handleSendToken = async (params: { recipient: string; amount: bigint; memo
       icon: 'fa-solid fa-exclamation-triangle',
       message: 'Failed to send token'
     })
+  } finally {
+    appLoadingOff()
   }
 }
 

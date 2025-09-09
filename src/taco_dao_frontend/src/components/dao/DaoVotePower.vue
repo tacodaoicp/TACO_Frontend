@@ -23,7 +23,23 @@
       <!-- router link to voting -->
       <router-link to="/vote" 
         class="dao-vote-power__go-to-voting__link
-          btn btn-lg taco-nav-btn taco-nav-btn--active">Go to voting</router-link>
+          btn btn-lg taco-nav-btn taco-nav-btn--active mb-0">Go to voting</router-link>
+
+    </div>
+
+    <div class="d-flex justify-content-center">
+
+      <!-- refresh voting power button -->
+      <button class="btn btn-link mb-2"
+              @click="refreshVotingPower"
+              :class="{'disabled': refreshingVP}"
+              style="color: var(--black-to-white);">
+
+        <!-- refresh icon -->
+        <span v-if="!refreshingVP" style="color: var(--black-to-white);">Refresh</span>
+        <span v-if="refreshingVP" style="color: var(--black-to-white);">Refreshing</span>
+
+      </button>    
 
     </div>
     
@@ -245,6 +261,9 @@
   // element references
   const formattedUserAllocation = ref()
 
+  // user
+  const refreshingVP = ref(false)
+
   ///////////////////
   // local methods //
   ///////////////////
@@ -265,6 +284,22 @@
     // console.log('DaoVotePower.vue: formattedUserAllocation:', formattedUserAllocation.value)
 
   }
+
+  // refresh voting power
+  const refreshVotingPower = async () => {
+    refreshingVP.value = true
+    try {
+      const { refreshUserVotingPower } = tacoStore
+      await refreshUserVotingPower()
+      // After refreshing, fetch updated user allocation
+      await fetchUserAllocation()
+      handleFetchedUserAllocation(fetchedUserAllocation.value)
+    } catch (error) {
+      console.error('Error refreshing voting power:', error)
+    } finally {
+      refreshingVP.value = false
+    }
+  }  
 
   /////////////
   // returns //

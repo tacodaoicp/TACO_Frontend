@@ -84,7 +84,7 @@
         </a>  
         
         <!-- wallet - router link -->
-        <router-link to="/wallet" class="header-bar__rl">
+        <router-link v-if="userLoggedIn" to="/wallet" class="header-bar__rl">
           
           <span class="header-bar__rl-span">Wallet</span>
         
@@ -93,7 +93,7 @@
       </div>
 
       <!-- environment indicator -->
-      <EnvironmentIndicator />
+      <!-- <EnvironmentIndicator /> -->
 
       <!-- pages menu button -->
       <button class="btn pages-menu__btn"
@@ -267,7 +267,7 @@
         </a>  
         
         <!-- wallet - router link -->
-        <router-link @click="togglePagesMenu()" to="/wallet" class="list-group-item">
+        <router-link v-if="userLoggedIn" @click="togglePagesMenu()" to="/wallet" class="list-group-item">
 
           <!-- item text -->
           <span>Wallet</span>
@@ -729,7 +729,7 @@
       tokenInitIdentifier: '',
       title: '👨‍🍳 Principal Copied!',
       icon: '',
-      message: `Your principal was copied to your clipboard`
+      message: `Neuron principal was copied to your clipboard`
     })
   }
 

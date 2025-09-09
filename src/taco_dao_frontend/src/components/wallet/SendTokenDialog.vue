@@ -1,150 +1,325 @@
 <template>
-  <div v-if="show" class="modal d-block" tabindex="-1" style="background: rgba(0,0,0,0.5)">
+
+  <div v-if="show" class="modal d-block" tabindex="-1">
+
+    <!-- modal dialog -->
     <div class="modal-dialog modal-lg">
-      <div class="modal-content bg-dark text-white">
+
+      <!-- modal content -->
+      <div class="modal-content">
+
+        <!-- modal header -->
         <div class="modal-header">
-          <h5 class="modal-title">
-            <img v-if="token" :src="token.logo" :alt="token.symbol" class="token-logo me-2" />
-            Send {{ token?.symbol || 'Token' }}
-          </h5>
-          <button type="button" class="btn-close btn-close-white" @click="handleClose"></button>
-        </div>
-        
-        <div class="modal-body">
-          <form @submit.prevent="handleSend" v-if="token">
-            
-            <!-- Token Info -->
-            <div class="token-info-card mb-4">
-              <div class="d-flex justify-content-between align-items-center">
-                <div>
-                  <h6 class="mb-1">{{ token.name }}</h6>
-                  <small class="text-muted">{{ token.symbol }}</small>
-                </div>
-                <div class="text-end">
-                  <div class="balance-display">
-                    {{ formatBalance(token.balance, token.decimals) }} {{ token.symbol }}
-                  </div>
-                  <small class="text-muted">Available Balance</small>
-                </div>
-              </div>
+
+          <!-- token logo and title -->
+          <div class="d-flex align-items-center gap-2"
+          style="margin: 1.5rem 0 0 1.5rem;">
+
+            <!-- token logo -->
+            <img v-if="token" 
+            :src="token.logo"
+            :alt="token.symbol" 
+            class="token-logo me-2" />
+
+            <div class="d-flex flex-column">
+
+              <!-- token title -->
+              <span class="send-token-title">Send {{ token?.symbol || 'Token' }}</span>
+
+              <!-- token name -->
+              <span class="send-token-name">{{ token.name }}</span>
+
             </div>
 
-            <!-- Recipient Address -->
-            <div class="mb-3">
+          </div>
+
+          <button type="button" 
+          class="btn modal-close-btn"
+          @click="handleClose">
+
+            <i class="fa fa-times"></i>
+
+          </button>
+
+        </div>
+        
+        <!-- modal body -->
+        <div class="modal-body">
+
+          <!-- form -->
+          <form @submit.prevent="handleSend" v-if="token">
+            
+            <!-- available balance -->
+            <span class="available-balance">Available Balance: {{ formatBalance(token.balance, token.decimals) }} {{ token.symbol }}</span>
+
+            <!-- recipient address -->
+            <div class="mb-2">
+
+              <!-- label -->
               <label class="form-label">
-                Recipient Address <span class="text-danger">*</span>
+                <span>Recipient Address</span>
               </label>
+
+              <!-- input -->
               <input 
                 type="text" 
-                class="form-control" 
+                class="form-control taco-input" 
                 v-model="recipient" 
                 required
                 :class="{ 'is-invalid': recipientError }"
                 placeholder="Enter recipient principal or account ID"
               />
-              <div v-if="recipientError" class="invalid-feedback">
-                {{ recipientError }}
-              </div>
-              <small class="text-muted">
-                Enter a valid principal ID or account identifier
-              </small>
+
+              <!-- invalid feedback -->
+              <div v-if="recipientError" 
+              class="mt-2">
+                <span class="small" 
+                style="color: var(--red-to-light-red);">
+                  {{ recipientError }}
+                </span>
+              </div>              
+
             </div>
 
-            <!-- Amount Input -->
-            <div class="mb-3">
-              <label class="form-label">
-                Amount <span class="text-danger">*</span>
-              </label>
-              <div class="input-group">
-                <input 
-                  type="number" 
-                  class="form-control" 
-                  v-model="amount"
-                  required
-                  min="0"
-                  :max="maxAmount"
-                  step="any"
-                  :class="{ 'is-invalid': amountError }"
-                  placeholder="0.00"
-                />
-                <span class="input-group-text">{{ token.symbol }}</span>
+            <!-- input label -->
+            <label class="form-label">
+              <span>Amount</span>
+            </label>
+
+            <!-- input and max button -->
+            <div class="d-flex flex-column align-items-end">
+
+              <!-- input -->
+              <input 
+                type="number" 
+                class="form-control taco-input" 
+                v-model="amount"
+                required
+                min="0"
+                :max="maxAmount"
+                step="any"
+                :class="{ 'is-invalid': amountError }"
+                placeholder="0.00"/>
+              
+              <!-- invalid feedback and max button -->
+              <div class="d-flex align-items-center justify-content-between w-100">
+                
+                <!-- invalid feedback -->
+                <div>
+                  <span v-if="amountError" 
+                  class="small" 
+                  style="color: var(--red-to-light-red);">
+                    {{ amountError }}
+                  </span>
+                </div>
+
+                <!-- max button -->
                 <button 
                   type="button" 
-                  class="btn btn-outline-secondary"
-                  @click="setMaxAmount"
-                  :disabled="maxAmountBigInt <= 0n"
-                >
-                  MAX
-                </button>
+                  class="btn btn-link"
+                  style="color: var(--black-to-white);"
+                  @click="setMaxAmount">
+                  <span>MAX</span>
+                </button>                  
+
               </div>
-              <div v-if="amountError" class="invalid-feedback d-block">
-                {{ amountError }}
-              </div>
-              <small class="text-muted">
-                Maximum: {{ formatBalance(maxAmountBigInt, token.decimals) }} {{ token.symbol }}
-              </small>
+
             </div>
 
-            <!-- Transaction Details -->
-            <div class="transaction-details mb-4">
-              <div class="details-header">
-                <h6>Transaction Details</h6>
+            <!-- transaction details title -->
+            <span class="transaction-details-title">Transaction Details</span>            
+
+            <!-- transaction details -->
+            <div class="d-flex flex-column transaction-details"
+            style="overflow: clip;">
+
+              <!-- amount to send -->
+              <div class="d-flex justify-content-between flex-wrap">
+                <span class="fw-bold">Amount to send:</span>
+                <span class="ms-auto">{{ amount || '0' }} {{ token.symbol }}</span>
               </div>
-              <div class="details-body">
-                <div class="detail-row">
-                  <span>Amount to send:</span>
-                  <span>{{ amount || '0' }} {{ token.symbol }}</span>
-                </div>
-                <div class="detail-row">
-                  <span>Transaction fee:</span>
-                  <span>{{ formatBalance(token.fee, token.decimals) }} {{ token.symbol }}</span>
-                </div>
-                <div class="detail-row total-row">
-                  <span><strong>Total deducted:</strong></span>
-                  <span><strong>{{ formatBalance(totalDeducted, token.decimals) }} {{ token.symbol }}</strong></span>
-                </div>
-                <div v-if="token.priceUSD && token.priceUSD > 0" class="detail-row">
-                  <span>Estimated USD value:</span>
-                  <span>${{ formatUSDValue(totalDeducted, token.decimals, token.priceUSD) }}</span>
-                </div>
+                
+              <!-- transaction fee -->
+              <div class="d-flex justify-content-between flex-wrap">
+                <span class="fw-bold">Transaction fee:</span>
+                <span class="ms-auto">{{ formatBalance(token.fee, token.decimals) }} {{ token.symbol }}</span>
               </div>
+
+              <!-- total deducted -->
+              <div class="d-flex justify-content-between flex-wrap">
+                <span class="fw-bold">Total deducted:</span>
+                <span class="ms-auto">{{ formatBalance(totalDeducted, token.decimals) }} {{ token.symbol }}</span>
+              </div>
+                
+              <!-- estimated USD value -->
+              <div v-if="token.priceUSD && token.priceUSD > 0" 
+                class="d-flex justify-content-between flex-wrap">
+                <span class="fw-bold">Estimated USD value:</span>
+                <span class="ms-auto">${{ formatUSDValue(totalDeducted, token.decimals, token.priceUSD) }}</span>
+              </div>
+
             </div>
 
-            <!-- Memo (Optional) -->
-            <div class="mb-4">
+            <!-- memo container -->
+            <div class="memo-container mb-3">
+
+              <!-- memo label -->
               <label class="form-label">
-                Memo (Optional)
+                <span class="memo-label">Memo <span class="small">(Optional)</span></span>
               </label>
+
+              <!-- memo input -->
               <textarea 
-                class="form-control" 
+                class="form-control taco-input" 
                 v-model="memo"
                 rows="2"
                 maxlength="32"
-                placeholder="Optional transaction memo"
-              ></textarea>
-              <small class="text-muted">{{ memo.length }}/32 characters</small>
+                placeholder="Optional transaction memo">
+              </textarea>
+
+              <!-- memo input container -->
+              <div class="d-flex w-100 justify-content-end">
+
+                <!-- memo length -->
+                <span class="small">{{ memo.length }}/32 characters</span>
+
+              </div>              
+
             </div>
 
-            <!-- Action Buttons -->
-            <div class="d-flex justify-content-end gap-2">
-              <button type="button" class="btn btn-secondary" @click="handleClose">
+            <!-- buttons -->
+            <div class="d-flex justify-content-end flex-wrap gap-2">
+
+              <!-- cancel button -->
+              <button type="button" 
+              class="btn"
+              style="font-family: 'Space Mono'; color: var(--black-to-white);" 
+              @click="handleClose">
                 Cancel
               </button>
+
+              <!-- send button -->
               <button 
                 type="submit" 
-                class="btn btn-primary"
-                :disabled="!canSend || submitting"
-              >
+                class="btn taco-btn taco-btn--green"
+                :disabled="!canSend || submitting">
                 {{ submitting ? 'Sending...' : 'Send Transaction' }}
               </button>
+
             </div>
             
           </form>
+
         </div>
+
       </div>
+
     </div>
+
   </div>
+
 </template>
+
+<style scoped>
+
+.modal {
+  background-color: rgba(0,0,0,0.5);
+
+  span {
+    color: var(--black-to-white);
+  }
+
+}
+
+.modal-content {
+  background-color: var(--light-orange-to-dark-brown);
+  border: 1px solid var(--dark-orange);
+}
+
+.modal-header {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  margin: 0;
+  margin-bottom: 0.5rem;
+  padding: 0;
+  border-bottom: 0;
+  margin-bottom: 0.75rem;
+}
+
+.modal-body {
+  padding: 0 1.5rem 1rem;
+}
+
+.token-logo {
+  width: 5rem;
+  height: 5rem;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.send-token-title {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: var(--black-to-white);
+  line-height: 1;
+}
+
+.modal-close-btn {
+  margin: 1rem 0.5rem 0 0;
+
+  i {
+    font-size: 1.5rem;
+    color: var(--black-to-white);
+  }
+
+}
+
+.available-balance {
+  font-size: 1.25rem;
+  display: inline-block;
+  margin-bottom: 0.5rem;
+}
+
+.max-btn {
+  font-size: 1rem;
+  color: var(--black-to-white);
+  font-family: 'Rubik';
+}
+
+.transaction-details-title {
+  font-size: 1.25rem;
+  display: inline-block;
+  margin-bottom: 0.5rem;
+}
+
+.transaction-details {
+  background-color: var(--orange-to-brown);
+  border: 1px solid var(--dark-orange);
+  border-radius: 0.5rem;
+  margin-bottom: 1rem;
+
+  > div {
+    padding: 0.5rem 0.75rem;
+    border-bottom: 1px solid var(--dark-orange);
+
+    &:last-child {
+      border-bottom: none;
+    }
+    &:hover {
+      background-color: var(--dark-orange);
+    }
+
+  }
+
+}
+
+.memo-label {
+  font-size: 1.25rem;
+  display: inline-block;
+}
+
+</style>
 
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
@@ -332,6 +507,7 @@ const handleClose = () => {
 }
 
 const handleSend = async () => {
+  
   if (!canSend.value || submitting.value) return
   
   // Final validation
@@ -355,101 +531,3 @@ const handleSend = async () => {
   }
 }
 </script>
-
-<style scoped>
-.modal-content {
-  border: 1px solid #495057;
-}
-
-.token-logo {
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  object-fit: cover;
-}
-
-.token-info-card {
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 8px;
-  padding: 1rem;
-}
-
-.balance-display {
-  font-size: 1.1rem;
-  font-weight: 600;
-  color: var(--text-primary);
-}
-
-.form-control:focus {
-  border-color: #80bdff;
-  box-shadow: 0 0 0 0.2rem rgba(128, 189, 255, 0.25);
-}
-
-.input-group .btn {
-  border-color: var(--border-color);
-}
-
-.transaction-details {
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 8px;
-  overflow: hidden;
-}
-
-.details-header {
-  background: rgba(255, 255, 255, 0.1);
-  padding: 0.75rem 1rem;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.details-header h6 {
-  margin: 0;
-  font-size: 0.9rem;
-  font-weight: 600;
-}
-
-.details-body {
-  padding: 1rem;
-}
-
-.detail-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 0.5rem 0;
-  font-size: 0.9rem;
-}
-
-.detail-row:not(:last-child) {
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.total-row {
-  background: rgba(0, 123, 255, 0.1);
-  margin: 0.5rem -1rem -1rem -1rem;
-  padding: 0.75rem 1rem;
-  border-top: 2px solid rgba(0, 123, 255, 0.3);
-}
-
-.btn:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-/* Mobile responsiveness */
-@media (max-width: 576px) {
-  .modal-dialog {
-    margin: 0.5rem;
-  }
-  
-  .token-info-card,
-  .details-body {
-    padding: 0.75rem;
-  }
-  
-  .detail-row {
-    font-size: 0.85rem;
-  }
-}
-</style>
