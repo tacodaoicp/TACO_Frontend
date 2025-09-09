@@ -618,7 +618,42 @@ const hasConfigChanges = ref(false);
 // Timer status functions
 async function refreshTimerStatus() {
   console.log('AdminNachosView: refreshTimerStatus called');
-  await tacoStore.refreshNachosTimerStatus();
+  try {
+    const result = await tacoStore.refreshNachosTimerStatus();
+    
+    if (result) {
+      // Update token details
+      if (result.tokenDetails && Array.isArray(result.tokenDetails)) {
+        nachosTokenDetails.value = result.tokenDetails;
+        console.log('AdminNachosView: Updated token details', result.tokenDetails.length);
+      }
+      
+      // Update trading status
+      if (result.tradingStatus && 'ok' in result.tradingStatus && result.tradingStatus.ok) {
+        const { metrics, rebalanceStatus } = result.tradingStatus.ok;
+        nachosTimerHealth.value = {
+          shortSync: {
+            active: true, // We'll assume active if we got data
+            lastSync: metrics.lastUpdate || 0n
+          },
+          rebalanceStatus: 'Idle' in rebalanceStatus ? 'Idle' 
+            : 'Trading' in rebalanceStatus ? 'Trading'
+            : 'Failed',
+          rebalanceError: 'Failed' in rebalanceStatus ? rebalanceStatus.Failed : undefined,
+          tradingMetrics: {
+            lastRebalanceAttempt: metrics.lastRebalanceAttempt || 0n,
+            totalTradesExecuted: metrics.totalTradesExecuted || 0n,
+            totalTradesFailed: metrics.totalTradesFailed || 0n,
+            successRate: metrics.successRate || 0,
+            avgSlippage: metrics.avgSlippage || 0
+          }
+        };
+        console.log('AdminNachosView: Updated timer health');
+      }
+    }
+  } catch (error) {
+    console.error('AdminNachosView: Error refreshing timer status:', error);
+  }
   console.log('AdminNachosView: refreshTimerStatus completed');
 }
 
@@ -633,6 +668,19 @@ async function triggerManualSync() {
 async function restartNachosSyncs() {
     if (confirm('Are you sure you want to restart nachos sync timers?')) {
         await tacoStore.restartNachosSyncs();
+    }
+}
+
+async function refreshTokenDetails() {
+    console.log('AdminNachosView: refreshTokenDetails called');
+    try {
+        const tokenDetails = await tacoStore.getNachosTokenDetails();
+        if (tokenDetails && Array.isArray(tokenDetails)) {
+            nachosTokenDetails.value = tokenDetails;
+            console.log('AdminNachosView: Updated token details', tokenDetails.length);
+        }
+    } catch (error) {
+        console.error('AdminNachosView: Error refreshing token details:', error);
     }
 }
 
@@ -1105,7 +1153,14 @@ onMounted(async () => {
             refreshLogs().catch(err => console.error('Error refreshing logs:', err)),
             refreshPortfolioSnapshotStatus().catch(err => console.error('Error refreshing portfolio status:', err))
         ]);
-        console.log('AdminNachosView: Initial data loaded');
+        
+        // If we still don't have token details, try to fetch them separately
+        if (!nachosTokenDetails.value || nachosTokenDetails.value.length === 0) {
+            console.log('AdminNachosView: No token details found, fetching separately...');
+            await refreshTokenDetails().catch(err => console.error('Error refreshing token details:', err));
+        }
+        
+        console.log('AdminNachosView: Initial data loaded, token count:', nachosTokenDetails.value?.length || 0);
     } catch (error) {
         console.error('AdminNachosView: Error during initialization:', error);
     }

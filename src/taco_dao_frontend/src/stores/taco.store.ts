@@ -4202,21 +4202,29 @@ export const useTacoStore = defineStore('taco', () => {
                 canisterId: nachosCanisterId()
             })
 
-            // Get nachos status
-            const tradingStatusResult = await nachosActor.getTradingStatus() as any;
+            // Get nachos trading status and token details in parallel
+            const [tradingStatusResult, tokenDetailsResult] = await Promise.all([
+                nachosActor.getTradingStatus() as any,
+                nachosActor.getTokenDetails() as any
+            ]);
             
-            if ('ok' in tradingStatusResult && tradingStatusResult.ok) {
-                const { metrics, rebalanceStatus } = tradingStatusResult.ok;
-                console.log('refreshNachosTimerStatus: Nachos status updated', {
-                    metricsType: typeof metrics?.lastRebalanceAttempt,
-                    rebalanceStatus: rebalanceStatus
-                });
-            } else if (tradingStatusResult.err) {
-                console.error('refreshNachosTimerStatus: Error getting nachos status:', tradingStatusResult.err);
-            }
+            console.log('refreshNachosTimerStatus: Received results', {
+                tradingStatusOk: 'ok' in tradingStatusResult,
+                tokenDetailsLength: tokenDetailsResult?.length || 0
+            });
+            
+            // Return the results so the component can use them
+            return {
+                tradingStatus: tradingStatusResult,
+                tokenDetails: tokenDetailsResult
+            };
         } catch (error) {
             console.error('refreshNachosTimerStatus: Error:', error);
             // Don't re-throw, just log the error
+            return {
+                tradingStatus: { err: 'Failed to fetch status' },
+                tokenDetails: []
+            };
         }
     }
 
@@ -4726,6 +4734,38 @@ export const useTacoStore = defineStore('taco', () => {
         } catch (error: any) {
             console.error('Error updating nachos portfolio snapshot interval:', error);
             return false;
+        }
+    }
+
+    const getNachosTokenDetails = async () => {
+        try {
+            const authClient = await getAuthClient();
+            
+            if (!await authClient.isAuthenticated()) {
+                console.warn('getNachosTokenDetails: User not authenticated, using anonymous identity');
+            }
+
+            const identity = await authClient.isAuthenticated() 
+                ? await authClient.getIdentity() 
+                : new AnonymousIdentity();
+
+            const agent = await createAgent({
+                identity,
+                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            });
+
+            const nachosActor = Actor.createActor(nachosIDL, {
+                agent,
+                canisterId: nachosCanisterId()
+            })
+
+            const tokenDetails = await nachosActor.getTokenDetails() as any;
+            console.log('getNachosTokenDetails: Fetched', tokenDetails?.length || 0, 'tokens');
+            return tokenDetails;
+        } catch (error) {
+            console.error('getNachosTokenDetails: Error:', error);
+            return [];
         }
     }
 
@@ -8075,6 +8115,7 @@ export const useTacoStore = defineStore('taco', () => {
         startNachosPortfolioSnapshots,
         stopNachosPortfolioSnapshots,
         updateNachosPortfolioSnapshotInterval,
+        getNachosTokenDetails,
         
         getNeuronSnapshotStatus,
         getNeuronSnapshotsInfo,
