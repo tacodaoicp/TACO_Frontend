@@ -76,7 +76,7 @@
           <!-- Timer Health Dashboard -->
           <div class="card bg-dark text-white mb-4">
             <div class="card-header d-flex justify-content-between align-items-center">
-              <h3 class="mb-0">Timer Health Dashboard</h3>
+              <h3 class="mb-0">Timer Health Dashboard {{ treasuryIndicator }}</h3>
               <button class="btn btn-primary" @click="refreshTimerStatus">
                 Refresh Status
               </button>
@@ -127,7 +127,7 @@
 
               <!-- Treasury Sync Status -->
               <div class="timer-section">
-                <h4>Treasury Sync</h4>
+                <h4>Treasury Sync {{ treasuryIndicator }}</h4>
                 <div class="d-flex flex-column gap-2">
                   <!-- Short Sync -->
                   <div class="d-flex gap-3 align-items-center">
@@ -163,7 +163,7 @@
                   </div>
                   <!-- Trading Metrics -->
                   <div v-if="timerHealth?.treasury?.tradingMetrics" class="trading-metrics mt-2">
-                    <h5>Trading Metrics</h5>
+                    <h5>Trading Metrics {{ treasuryIndicator }}</h5>
                     
                     <!-- Trading Bot Warning -->
                     <div v-if="getTradingBotWarning().level !== 'none'" 
@@ -181,7 +181,7 @@
                   </div>
                   <!-- Token Sync Status -->
                   <div class="token-sync-status mt-2">
-                    <h5>Token Sync Status</h5>
+                    <h5>Token Sync Status {{ treasuryIndicator }}</h5>
                     <div v-if="sortedTokenDetails.length" class="token-list">
                       <div v-for="[principal, token] in sortedTokenDetails" :key="principal.toString()" class="token-sync-item">
                         <div class="d-flex gap-3 align-items-center justify-content-between">
@@ -241,7 +241,7 @@
           <!-- Portfolio Snapshot Management -->
           <div class="card bg-dark text-white mb-4">
             <div class="card-header d-flex justify-content-between align-items-center">
-              <h3 class="mb-0">Portfolio Snapshot Management</h3>
+              <h3 class="mb-0">Portfolio Snapshot Management {{ treasuryIndicator }}</h3>
               <button class="btn btn-primary" @click="refreshPortfolioSnapshotStatus">
                 Refresh Status
               </button>
@@ -550,7 +550,7 @@
           <!-- Trading Logs -->
           <div class="card bg-dark text-white mt-4">
             <div class="card-header d-flex justify-content-between align-items-center">
-              <h3 class="mb-0">Trading Logs</h3>
+              <h3 class="mb-0">Trading Logs {{ treasuryIndicator }}</h3>
               <button class="btn btn-primary btn-sm" @click="refreshTradingLogs">
                 Refresh Logs
               </button>
@@ -574,7 +574,7 @@
           <!-- Rebalance Configuration -->
           <div class="card bg-dark text-white mt-4">
             <div class="card-header d-flex justify-content-between align-items-center">
-              <h3 class="mb-0">Rebalance Configuration</h3>
+              <h3 class="mb-0">Rebalance Configuration {{ treasuryIndicator }}</h3>
             </div>
             <div class="card-body">
               <div v-if="rebalanceConfig" class="config-grid">
@@ -1268,6 +1268,11 @@ const refreshingVP = ref(false);
 
 // Treasury selection
 const selectedTreasury = ref('TACO');
+
+// Computed property for treasury indicator
+const treasuryIndicator = computed(() => {
+  return selectedTreasury.value === 'TACO' ? '🌮 (TACO)' : '🧀 (Nachos)';
+});
 
 // Trading pauses state
 const tradingPauses = ref<any[]>([]);
