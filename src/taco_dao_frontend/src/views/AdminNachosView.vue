@@ -251,6 +251,39 @@
                   />
                 </div>
                 <div class="config-item">
+                  <label>Max Trades Stored</label>
+                  <input 
+                    type="number" 
+                    v-model="configInputs.maxTradesStored" 
+                    step="1" 
+                    min="1"
+                    @input="validateInput('maxTradesStored')"
+                    class="form-control"
+                  />
+                </div>
+                <div class="config-item">
+                  <label>Max Trade Attempts per Interval</label>
+                  <input 
+                    type="number" 
+                    v-model="configInputs.maxTradeAttemptsPerInterval" 
+                    step="1" 
+                    min="1"
+                    @input="validateInput('maxTradeAttemptsPerInterval')"
+                    class="form-control"
+                  />
+                </div>
+                <div class="config-item">
+                  <label>Max Kongswap Attempts</label>
+                  <input 
+                    type="number" 
+                    v-model="configInputs.maxKongswapAttempts" 
+                    step="1" 
+                    min="1"
+                    @input="validateInput('maxKongswapAttempts')"
+                    class="form-control"
+                  />
+                </div>
+                <div class="config-item">
                   <label>Rebalance Interval (minutes)</label>
                   <input 
                     type="number" 
@@ -262,15 +295,61 @@
                   />
                 </div>
                 <div class="config-item">
+                  <label>Portfolio Rebalance Period (minutes)</label>
+                  <input 
+                    type="number" 
+                    v-model="configInputs.portfolioRebalancePeriodMinutes" 
+                    step="1" 
+                    min="1"
+                    @input="validateInput('portfolioRebalancePeriodMinutes')"
+                    class="form-control"
+                  />
+                </div>
+                <div class="config-item">
                   <label>Short Sync Interval (seconds)</label>
                   <input 
                     type="number" 
                     v-model="configInputs.shortSyncIntervalSeconds" 
                     step="1" 
-                    min="30"
+                    min="1"
                     @input="validateInput('shortSyncIntervalSeconds')"
                     class="form-control"
                   />
+                </div>
+                <div class="config-item">
+                  <label>Long Sync Interval (minutes)</label>
+                  <input 
+                    type="number" 
+                    v-model="configInputs.longSyncIntervalMinutes" 
+                    step="1" 
+                    min="1"
+                    @input="validateInput('longSyncIntervalMinutes')"
+                    class="form-control"
+                  />
+                </div>
+                <div class="config-item">
+                  <label>Token Sync Timeout (seconds)</label>
+                  <input 
+                    type="number" 
+                    v-model="configInputs.tokenSyncTimeoutSeconds" 
+                    step="1" 
+                    min="1"
+                    @input="validateInput('tokenSyncTimeoutSeconds')"
+                    class="form-control"
+                  />
+                </div>
+                <div class="config-item">
+                  <label>Max Price History Entries</label>
+                  <input 
+                    type="number" 
+                    v-model="configInputs.maxPriceHistoryEntries" 
+                    step="1" 
+                    min="10"
+                    max="1000000"
+                    @input="validateInput('maxPriceHistoryEntries')"
+                    class="form-control"
+                  />
+                  <div class="help-text text-muted">Range: 10-1,000,000 entries. At 1-min intervals: 1M entries ≈ 1.8 years</div>
                 </div>
                 <div class="config-item">
                   <label>Max Portfolio Snapshots</label>
@@ -278,10 +357,12 @@
                     type="number" 
                     v-model="configInputs.maxPortfolioSnapshots" 
                     step="1" 
-                    min="1"
+                    min="10"
+                    max="10000"
                     @input="validateInput('maxPortfolioSnapshots')"
                     class="form-control"
                   />
+                  <div class="help-text text-muted">Range: 10-10,000 snapshots</div>
                 </div>
               </div>
               
@@ -607,8 +688,15 @@ const configInputs = ref({
   maxSlippageBasisPoints: 0,
   minTradeValueICP: 0,
   maxTradeValueICP: 0,
+  maxTradesStored: 0,
+  maxTradeAttemptsPerInterval: 0,
+  maxKongswapAttempts: 0,
   rebalanceIntervalMinutes: 0,
+  portfolioRebalancePeriodMinutes: 0,
   shortSyncIntervalSeconds: 0,
+  longSyncIntervalMinutes: 0,
+  tokenSyncTimeoutSeconds: 0,
+  maxPriceHistoryEntries: 0,
   maxPortfolioSnapshots: 0
 });
 
@@ -804,15 +892,29 @@ async function loadConfig() {
         const config = await tacoStore.getNachosRebalanceConfig();
         if (config) {
             rebalanceConfig.value = config;
+            console.log('AdminNachosView: Loaded nachos config:', config);
+            
+            // Helper functions for nanosecond conversions
+            const nsToMinutes = (ns: bigint | number) => Number(ns || 0n) / (60 * 1_000_000_000);
+            const nsToSeconds = (ns: bigint | number) => Number(ns || 0n) / 1_000_000_000;
+            
             // Update form inputs - safely convert BigInt values
             configInputs.value = {
                 maxSlippageBasisPoints: Number(config.maxSlippageBasisPoints || 0) / 100,
                 minTradeValueICP: Number(config.minTradeValueICP || 0),
                 maxTradeValueICP: Number(config.maxTradeValueICP || 0),
-                rebalanceIntervalMinutes: Number(config.rebalanceIntervalNS || 0n) / (60 * 1_000_000_000),
-                shortSyncIntervalSeconds: Number(config.shortSyncIntervalNS || 0n) / 1_000_000_000,
+                maxTradesStored: Number(config.maxTradesStored || 0),
+                maxTradeAttemptsPerInterval: Number(config.maxTradeAttemptsPerInterval || 0),
+                maxKongswapAttempts: Number(config.maxKongswapAttempts || 0),
+                rebalanceIntervalMinutes: nsToMinutes(config.rebalanceIntervalNS || 0n),
+                portfolioRebalancePeriodMinutes: nsToMinutes(config.portfolioRebalancePeriodNS || 0n),
+                shortSyncIntervalSeconds: nsToSeconds(config.shortSyncIntervalNS || 0n),
+                longSyncIntervalMinutes: nsToMinutes(config.longSyncIntervalNS || 0n),
+                tokenSyncTimeoutSeconds: nsToSeconds(config.tokenSyncTimeoutNS || 0n),
+                maxPriceHistoryEntries: Number(config.maxPriceHistoryEntries || 0),
                 maxPortfolioSnapshots: Number(config.maxPortfolioSnapshots || 0)
             };
+            console.log('AdminNachosView: Updated config inputs:', configInputs.value);
             hasConfigChanges.value = false;
         }
     } catch (error) {
@@ -822,8 +924,15 @@ async function loadConfig() {
             maxSlippageBasisPoints: 1.0,
             minTradeValueICP: 0.1,
             maxTradeValueICP: 100,
+            maxTradesStored: 1000,
+            maxTradeAttemptsPerInterval: 5,
+            maxKongswapAttempts: 3,
             rebalanceIntervalMinutes: 60,
+            portfolioRebalancePeriodMinutes: 1440,
             shortSyncIntervalSeconds: 900,
+            longSyncIntervalMinutes: 60,
+            tokenSyncTimeoutSeconds: 30,
+            maxPriceHistoryEntries: 10000,
             maxPortfolioSnapshots: 1000
         };
     }
@@ -1111,11 +1220,19 @@ async function updateConfigWithReason(reason: string) {
         maxSlippageBasisPoints: Math.round(configInputs.value.maxSlippageBasisPoints * 100),
         minTradeValueICP: configInputs.value.minTradeValueICP,
         maxTradeValueICP: configInputs.value.maxTradeValueICP,
+        maxTradesStored: configInputs.value.maxTradesStored,
+        maxTradeAttemptsPerInterval: configInputs.value.maxTradeAttemptsPerInterval,
+        maxKongswapAttempts: configInputs.value.maxKongswapAttempts,
         rebalanceIntervalNS: BigInt(Math.round(configInputs.value.rebalanceIntervalMinutes * 60 * 1_000_000_000)),
+        portfolioRebalancePeriodNS: BigInt(Math.round(configInputs.value.portfolioRebalancePeriodMinutes * 60 * 1_000_000_000)),
         shortSyncIntervalNS: BigInt(Math.round(configInputs.value.shortSyncIntervalSeconds * 1_000_000_000)),
+        longSyncIntervalNS: BigInt(Math.round(configInputs.value.longSyncIntervalMinutes * 60 * 1_000_000_000)),
+        tokenSyncTimeoutNS: BigInt(Math.round(configInputs.value.tokenSyncTimeoutSeconds * 1_000_000_000)),
+        maxPriceHistoryEntries: configInputs.value.maxPriceHistoryEntries,
         maxPortfolioSnapshots: configInputs.value.maxPortfolioSnapshots
     };
     
+    console.log('AdminNachosView: Updating nachos config with:', updates);
     await tacoStore.updateNachosRebalanceConfig(updates, reason);
     await loadConfig(); // Reload to get the updated config
 }
