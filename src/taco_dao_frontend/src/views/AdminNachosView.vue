@@ -678,27 +678,37 @@ function getLogLevelString(level: any): string {
 
 // Token status functions
 function getTokenStatusClass(token: any, principal: any): string {
-  if (token.isPaused) return 'paused';
-  
-  const now = Date.now() * 1_000_000; // Convert to nanoseconds
-  const lastSync = Number(token.lastTimeSynced);
-  const timeSinceSync = now - lastSync;
-  const thirtyMinutesNS = 30 * 60 * 1_000_000_000;
-  
-  if (timeSinceSync > thirtyMinutesNS) return 'inactive';
-  return 'active';
+  try {
+    if (token?.isPaused) return 'paused';
+    
+    const now = Date.now() * 1_000_000; // Convert to nanoseconds
+    const lastSync = Number(token?.lastTimeSynced || 0n);
+    const timeSinceSync = now - lastSync;
+    const thirtyMinutesNS = 30 * 60 * 1_000_000_000;
+    
+    if (timeSinceSync > thirtyMinutesNS) return 'inactive';
+    return 'active';
+  } catch (error) {
+    console.error('Error in getTokenStatusClass:', error);
+    return 'inactive';
+  }
 }
 
 function getTokenStatusText(token: any, principal: any): string {
-  if (token.isPaused) return 'Paused';
-  
-  const now = Date.now() * 1_000_000;
-  const lastSync = Number(token.lastTimeSynced);
-  const timeSinceSync = now - lastSync;
-  const thirtyMinutesNS = 30 * 60 * 1_000_000_000;
-  
-  if (timeSinceSync > thirtyMinutesNS) return 'Inactive';
-  return 'Active';
+  try {
+    if (token?.isPaused) return 'Paused';
+    
+    const now = Date.now() * 1_000_000;
+    const lastSync = Number(token?.lastTimeSynced || 0n);
+    const timeSinceSync = now - lastSync;
+    const thirtyMinutesNS = 30 * 60 * 1_000_000_000;
+    
+    if (timeSinceSync > thirtyMinutesNS) return 'Inactive';
+    return 'Active';
+  } catch (error) {
+    console.error('Error in getTokenStatusText:', error);
+    return 'Unknown';
+  }
 }
 
 // Trading functions
@@ -728,19 +738,32 @@ async function triggerManualSnapshot() {
 
 // Configuration functions
 async function loadConfig() {
-    const config = await tacoStore.getNachosRebalanceConfig();
-    if (config) {
-        rebalanceConfig.value = config;
-        // Update form inputs
+    try {
+        const config = await tacoStore.getNachosRebalanceConfig();
+        if (config) {
+            rebalanceConfig.value = config;
+            // Update form inputs - safely convert BigInt values
+            configInputs.value = {
+                maxSlippageBasisPoints: Number(config.maxSlippageBasisPoints || 0) / 100,
+                minTradeValueICP: Number(config.minTradeValueICP || 0),
+                maxTradeValueICP: Number(config.maxTradeValueICP || 0),
+                rebalanceIntervalMinutes: Number(config.rebalanceIntervalNS || 0n) / (60 * 1_000_000_000),
+                shortSyncIntervalSeconds: Number(config.shortSyncIntervalNS || 0n) / 1_000_000_000,
+                maxPortfolioSnapshots: Number(config.maxPortfolioSnapshots || 0)
+            };
+            hasConfigChanges.value = false;
+        }
+    } catch (error) {
+        console.error('Error loading nachos config:', error);
+        // Initialize with default values if config load fails
         configInputs.value = {
-            maxSlippageBasisPoints: config.maxSlippageBasisPoints / 100,
-            minTradeValueICP: config.minTradeValueICP,
-            maxTradeValueICP: config.maxTradeValueICP,
-            rebalanceIntervalMinutes: Number(config.rebalanceIntervalNS) / (60 * 1_000_000_000),
-            shortSyncIntervalSeconds: Number(config.shortSyncIntervalNS) / 1_000_000_000,
-            maxPortfolioSnapshots: config.maxPortfolioSnapshots
+            maxSlippageBasisPoints: 1.0,
+            minTradeValueICP: 0.1,
+            maxTradeValueICP: 100,
+            rebalanceIntervalMinutes: 60,
+            shortSyncIntervalSeconds: 900,
+            maxPortfolioSnapshots: 1000
         };
-        hasConfigChanges.value = false;
     }
 }
 
@@ -1026,8 +1049,8 @@ async function updateConfigWithReason(reason: string) {
         maxSlippageBasisPoints: Math.round(configInputs.value.maxSlippageBasisPoints * 100),
         minTradeValueICP: configInputs.value.minTradeValueICP,
         maxTradeValueICP: configInputs.value.maxTradeValueICP,
-        rebalanceIntervalNS: BigInt(configInputs.value.rebalanceIntervalMinutes * 60 * 1_000_000_000),
-        shortSyncIntervalNS: BigInt(configInputs.value.shortSyncIntervalSeconds * 1_000_000_000),
+        rebalanceIntervalNS: BigInt(Math.round(configInputs.value.rebalanceIntervalMinutes * 60 * 1_000_000_000)),
+        shortSyncIntervalNS: BigInt(Math.round(configInputs.value.shortSyncIntervalSeconds * 1_000_000_000)),
         maxPortfolioSnapshots: configInputs.value.maxPortfolioSnapshots
     };
     
@@ -1037,46 +1060,55 @@ async function updateConfigWithReason(reason: string) {
 
 // Trading bot warning logic
 const getTradingBotWarning = (): { level: 'none' | 'warning' | 'danger', message: string } => {
-  if (!nachosTimerHealth.value.tradingMetrics?.lastRebalanceAttempt || !rebalanceConfig.value?.rebalanceIntervalNS) {
+  try {
+    if (!nachosTimerHealth.value.tradingMetrics?.lastRebalanceAttempt || !rebalanceConfig.value?.rebalanceIntervalNS) {
+      return { level: 'none', message: '' };
+    }
+
+    const now = Date.now() * 1_000_000; // Convert to nanoseconds
+    const lastAttempt = Number(nachosTimerHealth.value.tradingMetrics.lastRebalanceAttempt || 0n);
+    const intervalNS = Number(rebalanceConfig.value.rebalanceIntervalNS || 0n);
+    const timeSinceLastAttempt = now - lastAttempt;
+
+    // Warning if more than 1.5x the interval has passed
+    if (timeSinceLastAttempt > intervalNS * 1.5) {
+      const minutesLate = Math.floor((timeSinceLastAttempt - intervalNS) / (60 * 1_000_000_000));
+      
+      if (timeSinceLastAttempt > intervalNS * 3) {
+        // Danger if more than 3x the interval has passed
+        return {
+          level: 'danger',
+          message: `Trading bot appears to be stuck! No rebalance attempt for ${minutesLate} minutes past due.`
+        };
+      } else {
+        return {
+          level: 'warning',
+          message: `Trading bot is running late. Rebalance is ${minutesLate} minutes overdue.`
+        };
+      }
+    }
+
+    return { level: 'none', message: '' };
+  } catch (error) {
+    console.error('Error in getTradingBotWarning:', error);
     return { level: 'none', message: '' };
   }
-
-  const now = Date.now() * 1_000_000; // Convert to nanoseconds
-  const lastAttempt = Number(nachosTimerHealth.value.tradingMetrics.lastRebalanceAttempt);
-  const intervalNS = Number(rebalanceConfig.value.rebalanceIntervalNS);
-  const timeSinceLastAttempt = now - lastAttempt;
-
-  // Warning if more than 1.5x the interval has passed
-  if (timeSinceLastAttempt > intervalNS * 1.5) {
-    const minutesLate = Math.floor((timeSinceLastAttempt - intervalNS) / (60 * 1_000_000_000));
-    
-    if (timeSinceLastAttempt > intervalNS * 3) {
-      // Danger if more than 3x the interval has passed
-      return {
-        level: 'danger',
-        message: `Trading bot appears to be stuck! No rebalance attempt for ${minutesLate} minutes past due.`
-      };
-    } else {
-      return {
-        level: 'warning',
-        message: `Trading bot is running late. Rebalance is ${minutesLate} minutes overdue.`
-      };
-    }
-  }
-
-  return { level: 'none', message: '' };
 };
 
 // Lifecycle hooks
 onMounted(async () => {
     console.log('AdminNachosView: Component mounted');
-    await Promise.all([
-        refreshTimerStatus(),
-        loadConfig(),
-        refreshLogs(),
-        refreshPortfolioSnapshotStatus()
-    ]);
-    console.log('AdminNachosView: Initial data loaded');
+    try {
+        await Promise.all([
+            refreshTimerStatus().catch(err => console.error('Error refreshing timer status:', err)),
+            loadConfig().catch(err => console.error('Error loading config:', err)),
+            refreshLogs().catch(err => console.error('Error refreshing logs:', err)),
+            refreshPortfolioSnapshotStatus().catch(err => console.error('Error refreshing portfolio status:', err))
+        ]);
+        console.log('AdminNachosView: Initial data loaded');
+    } catch (error) {
+        console.error('AdminNachosView: Error during initialization:', error);
+    }
 });
 
 // Watch for config changes

@@ -4207,14 +4207,16 @@ export const useTacoStore = defineStore('taco', () => {
             
             if ('ok' in tradingStatusResult && tradingStatusResult.ok) {
                 const { metrics, rebalanceStatus } = tradingStatusResult.ok;
-                // Update nachos timer health in the component
-                // This will be handled by the component's local state
-                console.log('refreshNachosTimerStatus: Nachos status updated');
+                console.log('refreshNachosTimerStatus: Nachos status updated', {
+                    metricsType: typeof metrics?.lastRebalanceAttempt,
+                    rebalanceStatus: rebalanceStatus
+                });
             } else if (tradingStatusResult.err) {
                 console.error('refreshNachosTimerStatus: Error getting nachos status:', tradingStatusResult.err);
             }
         } catch (error) {
             console.error('refreshNachosTimerStatus: Error:', error);
+            // Don't re-throw, just log the error
         }
     }
 
