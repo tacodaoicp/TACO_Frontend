@@ -1311,7 +1311,7 @@
         align-items: center;
         justify-content: center;
         border-radius: 0.5rem;
-        z-index: 9998; // above everything
+        z-index: 999; // above everything
 
         // loading image
         .loading-img {
@@ -1424,7 +1424,7 @@
     background-color: var(--curtain-bg);
     padding: 0 3rem;
     border-radius: 0.5rem;
-    z-index: 1000;
+    z-index: 998;
 
     // login
     .iid-login {
@@ -1566,7 +1566,7 @@
         height: 100%;
         background-color: rgba(0,0,0,0.75);
         padding: 0 1rem;
-        z-index: 1000;
+        z-index: 997;
         border-radius: 0.5rem;
       }
             
