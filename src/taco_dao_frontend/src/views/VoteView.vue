@@ -3074,13 +3074,13 @@
 
     try {
 
-      handleFetchedTokenDetails(fetchedTokenDetails.value)
+      await handleFetchedTokenDetails(fetchedTokenDetails.value)
       // console.log('fetchedTokenDetails', fetchedTokenDetails.value)
       await fetchAggregateAllocation()
-      handleFetchedAggregateAllocation(fetchedAggregateAllocation.value)
+      await handleFetchedAggregateAllocation(fetchedAggregateAllocation.value)
       // console.log('fetchedAggregateAllocation', fetchedAggregateAllocation.value)
       await fetchVotingPowerMetrics()
-      handleFetchedVotingPowerMetrics(fetchedVotingPowerMetrics.value)
+      await handleFetchedVotingPowerMetrics(fetchedVotingPowerMetrics.value)
       // console.log('fetchedVotingPowerMetrics', fetchedVotingPowerMetrics.value)
 
       // check if user is logged in
@@ -3099,7 +3099,7 @@
         // console.log('fetchedUserAllocation', fetchedUserAllocation.value)
 
         // handle fetched user allocation
-        handleFetchedUserAllocation(fetchedUserAllocation.value)
+        await handleFetchedUserAllocation(fetchedUserAllocation.value)
 
       } else {
 
