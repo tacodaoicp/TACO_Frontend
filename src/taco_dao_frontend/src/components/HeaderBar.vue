@@ -641,9 +641,7 @@
   import TacoDaoLogo from "../assets/images/tacoDaoLogo.vue"
   import IcpValueChip from "../components/misc/IcpValueChip.vue"
   import TacoTokenPriceChip from "../components/misc/TacoTokenPriceChip.vue"
-  import TacoPortfolioValueChip from "../components/misc/TacoPortfolioValueChip.vue"
   import TacoEntityValueChip from "../components/misc/TacoEntityValueChip.vue"
-  import TacoTreasuryValueChip from "../components/misc/TacoTreasuryValueChip.vue"
   import DfinityLogo from "../assets/images/dfinityLogo.vue"
   import DarkModeToggle from "./theme/DarkModeToggle.vue"
   import { Tooltip } from 'bootstrap'

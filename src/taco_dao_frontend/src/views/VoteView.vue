@@ -2172,7 +2172,6 @@
   const { acceptHotkeyTutorial } = tacoStore
 
   // dao backend
-  const { fetchTokenDetails } = tacoStore
   const { updateAllocation } = tacoStore
   const { fetchVotingPowerMetrics } = tacoStore
   const { fetchUserAllocation } = tacoStore
@@ -2182,6 +2181,9 @@
 
   // ledger canisters
   const { icrc1Metadata } = tacoStore
+
+  // dao backend
+  const { ensureTokenDetails } = tacoStore
 
   /////////////////////
   // local variables //
@@ -2505,157 +2507,6 @@
 
   }
 
-  // handle add follow
-  // const handleAddFollow = async (principal: string) => {
-
-  //   // log
-  //   // console.log('VoteView.vue: handleAddFollow:', followPrincipalInput.value)
-
-  //   // call to backend to add follow
-  //   try {
-
-  //     // call to backend to add follow
-  //     const result = await followAllocation(Principal.fromText(followPrincipalInput.value))
-
-  //     // log result
-  //     // console.log('VoteView.vue: followAllocation result:', result)
-
-  //     // if true
-  //     if (result) {
-
-  //       // fetch and handle user allocation
-  //       await fetchUserAllocation()
-  //       handleFetchedUserAllocation(fetchedUserAllocation.value)
-        
-  //       // toast
-  //       addToast({
-  //         id: Date.now(),
-  //         code: 'code',
-  //         tradeAmount: '',
-  //         tokenSellIdentifier: '',
-  //         tradeLimit: '',
-  //         tokenInitIdentifier: '',
-  //         title: '👨‍🍳 Follow Added!',
-  //         icon: '',
-  //         message: `Followed ${followPrincipalInput.value}`
-  //       })  
-        
-  //     } else {
-
-  //       // toast
-  //       addToast({
-  //         id: Date.now(),
-  //         code: 'code',
-  //         tradeAmount: '',
-  //         tokenSellIdentifier: '',
-  //         tradeLimit: '',
-  //         tokenInitIdentifier: '',
-  //         title: '👨‍🍳 Error Following',
-  //         icon: '',
-  //         message: `Something happened when trying to follow principal. It could be that you or the principal you are trying to follow have not made an initial allocation. Please try again`
-  //       })  
-      
-  //     }
-
-  //     // reset input
-  //     followPrincipalInput.value = ''         
-
-  //   } catch (error) {
-
-  //     // log
-  //     console.error('VoteView.vue: error adding follow:', error)   
-      
-  //     // toast
-  //     addToast({
-  //       id: Date.now(),
-  //       code: 'code',
-  //       tradeAmount: '',
-  //       tokenSellIdentifier: '',
-  //       tradeLimit: '',
-  //       tokenInitIdentifier: '',
-  //       title: '👨‍🍳 Error Following',
-  //       icon: '',
-  //       message: `Something happened when trying to follow principal. It could be that you or the principal you are trying to follow have not made an initial allocation. Please try again`
-  //     }) 
-
-  //   }
-
-  // }
-
-  // // handle remove follow
-  // const handleRemoveFollow = async (principal: Principal) => {
-
-  //   // log
-  //   // console.log('VoteView.vue: handleRemoveFollow:', principal)
-
-  //   // call to backend to remove follow
-  //   try {
-
-  //     // call to backend to remove follow
-  //     const result = await unfollowAllocation(principal)
-
-  //     // log result
-  //     // console.log('VoteView.vue: unfollowAllocation result:', result)
-
-  //     // if true
-  //     if (result) {
-
-  //       // fetch and handle user allocation
-  //       await fetchUserAllocation()
-  //       handleFetchedUserAllocation(fetchedUserAllocation.value)
-
-  //       // toast
-  //       addToast({
-  //         id: Date.now(),
-  //         code: 'code',
-  //         tradeAmount: '',
-  //         tokenSellIdentifier: '',
-  //         tradeLimit: '',
-  //         tokenInitIdentifier: '',
-  //         title: '👨‍🍳 Follow Removed!',
-  //         icon: '',
-  //         message: `Unfollowed ${principal.toString()}`
-  //       })         
-
-  //     } else {
-
-  //       // toast
-  //       addToast({
-  //         id: Date.now(),
-  //         code: 'code',
-  //         tradeAmount: '',
-  //         tokenSellIdentifier: '',
-  //         tradeLimit: '',
-  //         tokenInitIdentifier: '',
-  //         title: '👨‍🍳 Error Unfollowing',
-  //         icon: '',
-  //         message: `Something happened when trying to unfollow principal. Please try again`
-  //       })  
-
-  //     }
-
-  //   } catch (error) {
-
-  //     // log
-  //     console.error('VoteView.vue: error removing follow:', error)
-
-  //     // toast
-  //     addToast({
-  //       id: Date.now(),
-  //       code: 'code',
-  //       tradeAmount: '',
-  //       tokenSellIdentifier: '',
-  //       tradeLimit: '',
-  //       tokenInitIdentifier: '',
-  //       title: '👨‍🍳 Error Unfollowing',
-  //       icon: '',
-  //       message: `Something happened when trying to unfollow principal. Please try again`
-  //     })
-
-  //   }
-
-  // }
-
   // handle apply allocation data to chart
   const handleApplyDataToChart = async (seriesParams: number[], seriesNamesParams: string[], colorsParams: string[]) => {
       
@@ -2808,7 +2659,6 @@
       console.log('... Vote Cast!')
 
       // refresh everything
-      await fetchTokenDetails()
       handleFetchedTokenDetails(fetchedTokenDetails.value)
       await fetchAggregateAllocation()
       handleFetchedAggregateAllocation(fetchedAggregateAllocation.value)
@@ -3161,6 +3011,8 @@
   // on mounted
   onMounted(async () => {
 
+    await ensureTokenDetails()
+
     // log
     // console.log('vote page mounted')
 
@@ -3173,8 +3025,6 @@
 
     try {
 
-      // fetch and handle dao data
-      await fetchTokenDetails()
       handleFetchedTokenDetails(fetchedTokenDetails.value)
       // console.log('fetchedTokenDetails', fetchedTokenDetails.value)
       await fetchAggregateAllocation()

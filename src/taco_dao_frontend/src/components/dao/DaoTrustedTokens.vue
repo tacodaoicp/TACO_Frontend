@@ -553,7 +553,7 @@ LOCAL METHODS
   // # ACTIONS #
 
   // otc backend
-  const { fetchTokenDetails } = tacoStore
+  const { ensureTokenDetails } = tacoStore
 
   /////////////////////
   // local variables //
@@ -706,27 +706,16 @@ LOCAL METHODS
     // try
     try { 
 
-      // fetch token details from dao backend
-      await fetchTokenDetails()
-
-      // log
-      // console.log('fetchedTokenDetails: ', fetchedTokenDetails.value)
-      
-      // log
-      // console.log('tokenData: ', tokenData)
+      // ensure token details are loaded once
+      await ensureTokenDetails()
 
       // handle fetched token details
       handleFetchedTokenDetails( fetchedTokenDetails.value )
-
-      // 
 
     } catch (error) {
 
       // log
       console.error('error fetching token details:', error)
-
-      // turn off loading
-      componentLoading.value = false
 
     } finally {
 
@@ -745,10 +734,7 @@ LOCAL METHODS
       componentLoading.value = true
 
       // try
-      try { 
-
-        // fetch token details from dao backend
-        await fetchTokenDetails()
+      try {
 
         // handle fetched token details
         handleFetchedTokenDetails(fetchedTokenDetails.value)
