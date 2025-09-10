@@ -53,6 +53,7 @@ import personalDaoToken from "../../assets/tokens/snspng/personal-dao.png"
 import dolrToken from "../../assets/tokens/snspng/dolr.png"
 import fuelEvToken from "../../assets/tokens/snspng/fuelev.png"
 import sgldtToken from "../../assets/tokens/sgldt.png"
+import cicpToken from "../../assets/tokens/cicp.png"
 
 //////////////
 // mappings //
@@ -108,6 +109,7 @@ export const tokenImages: { [key: string]: string } = {
 "ICExplorer": icpExToken,
 "FomoWell": fomoWellToken,
 "sGLDT": sgldtToken,
+"cICP": cicpToken,
 }  
 
 //////////
@@ -585,5 +587,14 @@ export const tokenData = [
         icon: sgldtToken,
         description: `Reduce the fees associated with Gold Token by Wrapping for sGLDT`,
         color: '#c6ad52'
+    },
+    {
+        title: 'cICP',
+        symbol: 'cicp',
+        link: 'https://forum.dfinity.org/t/cicp-compounding-stream-icp-liquid-staking-token/49663',
+        icpCoinsLink: 'https://neutrinite.io/currencies/cICP',
+        icon: cicpToken,
+        description: `cICP is a liquid staking token (compounding stream ICP) designed to align long-term incentives on the Internet Computer (IC). When you mint cICP, 95-98% of the ICP provided as mint_input is staked into an 8-year neuron. The voting rewards from this neuron are disbursed daily into the buyback stream, where ICP is used to purchase cICP via a vector, and the purchased cICP is burned. cICP doesn't unlock.`,
+        color: '#0c0f23'
     }
 ]
