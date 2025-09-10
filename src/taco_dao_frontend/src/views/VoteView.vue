@@ -96,7 +96,7 @@
             <div class="vote-view__content gap-4">
 
               <!-- left -->
-              <div class="vote-view__content__left gap-4">
+              <div class="vote-view__content__left gap-4 position-relative" style="height: fit-content;">
 
                 <!-- top - allocations -->
                 <div>
@@ -455,6 +455,14 @@
                     </div>                       
 
                   </div>               
+
+                </div>
+
+                <!-- loading curtain -->
+                <div v-if="leftLoading" class="vote-view__loading-curtain">
+                  
+                  <!-- astronaut -->
+                  <img :src="astronautLoaderUrl" class="loading-img">
 
                 </div>
 
@@ -950,8 +958,16 @@
 
                   </div>
 
+                  <!-- loading curtain -->
+                  <div v-if="rightLoading" class="vote-view__loading-curtain">
+                    
+                    <!-- astronaut -->
+                    <img :src="astronautLoaderUrl" class="loading-img">
+
+                  </div>                  
+
                   <!-- logged out, curtain -->
-                  <div v-if="!userLoggedIn && tokenCount >= 3" class="login-curtain">
+                  <div v-if="!userLoggedIn && tokenCount >= 3 && !rightLoading" class="login-curtain">
 
                     <!-- login button -->
                     <button class="btn iid-login" @click="iidLogIn()">
@@ -1279,6 +1295,30 @@
     }
 
     /********** end Range Input Styles **********/
+
+    // loading curtain
+    // loading curtain
+    &__loading-curtain {
+        position: absolute;
+        height: 100%;
+        width: 100%;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: rgba(0,0,0,0.5);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 0.5rem;
+        z-index: 9998; // above everything
+
+        // loading image
+        .loading-img {
+            width: 10rem;
+        }
+
+    }
 
   }
 
@@ -2123,6 +2163,7 @@
   import { tokenData } from "../components/data/TokenData"
   import DfinityLogo from "../assets/images/dfinityLogo.vue"
   import { Principal } from "@dfinity/principal"
+  import astronautLoader from "../assets/images/astonautLoader.webp"
 
   ////////////////
   // interfaces //
@@ -2167,12 +2208,10 @@
   const { checkIfLoggedIn } = tacoStore
 
   // app
-  const { appLoadingOn, appLoadingOff } = tacoStore
   const { addToast } = tacoStore
   const { acceptHotkeyTutorial } = tacoStore
 
   // dao backend
-  const { fetchTokenDetails } = tacoStore
   const { updateAllocation } = tacoStore
   const { fetchVotingPowerMetrics } = tacoStore
   const { fetchUserAllocation } = tacoStore
@@ -2183,9 +2222,21 @@
   // ledger canisters
   const { icrc1Metadata } = tacoStore
 
+  // dao backend
+  const { ensureTokenDetails } = tacoStore
+
+  // images
+  const astronautLoaderUrl = astronautLoader  
+
   /////////////////////
   // local variables //
   /////////////////////
+
+  // left loading
+  const leftLoading = ref(false)
+
+  // right loading
+  const rightLoading = ref(false)
 
   // feature flags
   const followingEnabled = ref(false)
@@ -2505,157 +2556,6 @@
 
   }
 
-  // handle add follow
-  // const handleAddFollow = async (principal: string) => {
-
-  //   // log
-  //   // console.log('VoteView.vue: handleAddFollow:', followPrincipalInput.value)
-
-  //   // call to backend to add follow
-  //   try {
-
-  //     // call to backend to add follow
-  //     const result = await followAllocation(Principal.fromText(followPrincipalInput.value))
-
-  //     // log result
-  //     // console.log('VoteView.vue: followAllocation result:', result)
-
-  //     // if true
-  //     if (result) {
-
-  //       // fetch and handle user allocation
-  //       await fetchUserAllocation()
-  //       handleFetchedUserAllocation(fetchedUserAllocation.value)
-        
-  //       // toast
-  //       addToast({
-  //         id: Date.now(),
-  //         code: 'code',
-  //         tradeAmount: '',
-  //         tokenSellIdentifier: '',
-  //         tradeLimit: '',
-  //         tokenInitIdentifier: '',
-  //         title: '👨‍🍳 Follow Added!',
-  //         icon: '',
-  //         message: `Followed ${followPrincipalInput.value}`
-  //       })  
-        
-  //     } else {
-
-  //       // toast
-  //       addToast({
-  //         id: Date.now(),
-  //         code: 'code',
-  //         tradeAmount: '',
-  //         tokenSellIdentifier: '',
-  //         tradeLimit: '',
-  //         tokenInitIdentifier: '',
-  //         title: '👨‍🍳 Error Following',
-  //         icon: '',
-  //         message: `Something happened when trying to follow principal. It could be that you or the principal you are trying to follow have not made an initial allocation. Please try again`
-  //       })  
-      
-  //     }
-
-  //     // reset input
-  //     followPrincipalInput.value = ''         
-
-  //   } catch (error) {
-
-  //     // log
-  //     console.error('VoteView.vue: error adding follow:', error)   
-      
-  //     // toast
-  //     addToast({
-  //       id: Date.now(),
-  //       code: 'code',
-  //       tradeAmount: '',
-  //       tokenSellIdentifier: '',
-  //       tradeLimit: '',
-  //       tokenInitIdentifier: '',
-  //       title: '👨‍🍳 Error Following',
-  //       icon: '',
-  //       message: `Something happened when trying to follow principal. It could be that you or the principal you are trying to follow have not made an initial allocation. Please try again`
-  //     }) 
-
-  //   }
-
-  // }
-
-  // // handle remove follow
-  // const handleRemoveFollow = async (principal: Principal) => {
-
-  //   // log
-  //   // console.log('VoteView.vue: handleRemoveFollow:', principal)
-
-  //   // call to backend to remove follow
-  //   try {
-
-  //     // call to backend to remove follow
-  //     const result = await unfollowAllocation(principal)
-
-  //     // log result
-  //     // console.log('VoteView.vue: unfollowAllocation result:', result)
-
-  //     // if true
-  //     if (result) {
-
-  //       // fetch and handle user allocation
-  //       await fetchUserAllocation()
-  //       handleFetchedUserAllocation(fetchedUserAllocation.value)
-
-  //       // toast
-  //       addToast({
-  //         id: Date.now(),
-  //         code: 'code',
-  //         tradeAmount: '',
-  //         tokenSellIdentifier: '',
-  //         tradeLimit: '',
-  //         tokenInitIdentifier: '',
-  //         title: '👨‍🍳 Follow Removed!',
-  //         icon: '',
-  //         message: `Unfollowed ${principal.toString()}`
-  //       })         
-
-  //     } else {
-
-  //       // toast
-  //       addToast({
-  //         id: Date.now(),
-  //         code: 'code',
-  //         tradeAmount: '',
-  //         tokenSellIdentifier: '',
-  //         tradeLimit: '',
-  //         tokenInitIdentifier: '',
-  //         title: '👨‍🍳 Error Unfollowing',
-  //         icon: '',
-  //         message: `Something happened when trying to unfollow principal. Please try again`
-  //       })  
-
-  //     }
-
-  //   } catch (error) {
-
-  //     // log
-  //     console.error('VoteView.vue: error removing follow:', error)
-
-  //     // toast
-  //     addToast({
-  //       id: Date.now(),
-  //       code: 'code',
-  //       tradeAmount: '',
-  //       tokenSellIdentifier: '',
-  //       tradeLimit: '',
-  //       tokenInitIdentifier: '',
-  //       title: '👨‍🍳 Error Unfollowing',
-  //       icon: '',
-  //       message: `Something happened when trying to unfollow principal. Please try again`
-  //     })
-
-  //   }
-
-  // }
-
   // handle apply allocation data to chart
   const handleApplyDataToChart = async (seriesParams: number[], seriesNamesParams: string[], colorsParams: string[]) => {
       
@@ -2760,10 +2660,13 @@
   const castVote = async () => {
 
     // log
-    console.log('Casting Vote...')
+    // console.log('Casting Vote...')
 
-    // turn on app loading
-    appLoadingOn()
+    // turn left loading
+    leftLoading.value = true
+
+    // turn right loading
+    rightLoading.value = true
 
     // create allocations array with basis points (percentage * 100)
     const allocations = currentSliders.value.map((slider: any) => ({
@@ -2783,9 +2686,6 @@
       // log
       console.log('VoteView.vue: allocations do not sum to 10000 basis points!')
       console.log('VoteView.vue: sum is:', sum)
-
-      // turn off app loading
-      appLoadingOff()
 
       // return to allocation sliders
       userLockedVote.value = false
@@ -2808,20 +2708,16 @@
       console.log('... Vote Cast!')
 
       // refresh everything
-      await fetchTokenDetails()
-      handleFetchedTokenDetails(fetchedTokenDetails.value)
+      await handleFetchedTokenDetails(fetchedTokenDetails.value)
       await fetchAggregateAllocation()
-      handleFetchedAggregateAllocation(fetchedAggregateAllocation.value)
+      await handleFetchedAggregateAllocation(fetchedAggregateAllocation.value)
       await fetchVotingPowerMetrics()
-      handleFetchedVotingPowerMetrics(fetchedVotingPowerMetrics.value)
+      await handleFetchedVotingPowerMetrics(fetchedVotingPowerMetrics.value)
       await fetchUserAllocation()
-      handleFetchedUserAllocation(fetchedUserAllocation.value)
+      await handleFetchedUserAllocation(fetchedUserAllocation.value)
 
       // return to allocation sliders
       userLockedVote.value = false      
-
-      // turn off app loading
-      appLoadingOff()
 
       // add toast
       addToast({
@@ -2854,11 +2750,16 @@
       // log
       console.error('VoteView.vue: error casting vote:', error)
 
-      // turn off app loading
-      appLoadingOff()
-
       // return to allocation sliders
       userLockedVote.value = false      
+    } finally {
+
+      // turn off left loading
+      leftLoading.value = false
+
+      // turn off right loading
+      rightLoading.value = false
+
     }
 
   }
@@ -3161,11 +3062,16 @@
   // on mounted
   onMounted(async () => {
 
+    // turn on left loading
+    leftLoading.value = true
+
+    // turn on right loading
+    rightLoading.value = true
+
+    await ensureTokenDetails()
+
     // log
     // console.log('vote page mounted')
-
-    // turn app loading on
-    appLoadingOn()
 
     // chart stuff
     setTacoChartMaxHeight()
@@ -3173,15 +3079,13 @@
 
     try {
 
-      // fetch and handle dao data
-      await fetchTokenDetails()
-      handleFetchedTokenDetails(fetchedTokenDetails.value)
+      await handleFetchedTokenDetails(fetchedTokenDetails.value)
       // console.log('fetchedTokenDetails', fetchedTokenDetails.value)
       await fetchAggregateAllocation()
-      handleFetchedAggregateAllocation(fetchedAggregateAllocation.value)
+      await handleFetchedAggregateAllocation(fetchedAggregateAllocation.value)
       // console.log('fetchedAggregateAllocation', fetchedAggregateAllocation.value)
       await fetchVotingPowerMetrics()
-      handleFetchedVotingPowerMetrics(fetchedVotingPowerMetrics.value)
+      await handleFetchedVotingPowerMetrics(fetchedVotingPowerMetrics.value)
       // console.log('fetchedVotingPowerMetrics', fetchedVotingPowerMetrics.value)
 
       // check if user is logged in
@@ -3200,7 +3104,7 @@
         // console.log('fetchedUserAllocation', fetchedUserAllocation.value)
 
         // handle fetched user allocation
-        handleFetchedUserAllocation(fetchedUserAllocation.value)
+        await handleFetchedUserAllocation(fetchedUserAllocation.value)
 
       } else {
 
@@ -3214,13 +3118,13 @@
       // log
       console.error('VoteView.vue: error on mounted:', error)
 
-      // turn off app loading
-      appLoadingOff()
-
     } finally {
 
-      // turn off app loading
-      appLoadingOff()
+      // turn off left loading
+      leftLoading.value = false
+
+      // turn off right loading
+      rightLoading.value = false
 
     }
 

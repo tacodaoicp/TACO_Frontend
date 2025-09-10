@@ -46,6 +46,96 @@
     </div>
 </template>
 
+<style scoped>
+.trading-logs {
+    background: var(--light-orange-to-brown);
+    border-radius: 8px;
+    padding: 20px;
+    margin: 20px 0;
+}
+
+h3 {
+    color: var(--white-to-black);
+    margin-top: 0;
+    margin-bottom: 15px;
+}
+
+.log-container {
+    max-height: 400px;
+    overflow-y: auto;
+    background: var(--black-to-white);
+    border-radius: 4px;
+    padding: 10px;
+}
+
+.log-entry {
+    padding: 8px;
+    border-bottom: 1px solid var(--light-gray);
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.log-entry:last-child {
+    border-bottom: none;
+}
+
+.log-timestamp {
+    font-size: 0.8em;
+    color: var(--dark-gray);
+}
+
+.log-message {
+    color: var(--black);
+    word-break: break-word;
+}
+
+.token-trade {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.token-info {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.token-icon {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+}
+
+.trade-arrow {
+    color: var(--dark-gray);
+    font-size: 1.2em;
+}
+
+.token-symbol {
+    color: var(--blue);
+    text-decoration: none;
+    font-weight: 500;
+}
+
+.token-symbol:hover {
+    text-decoration: underline;
+}
+
+.exchange-info {
+    font-size: 0.8em;
+    color: var(--dark-gray);
+}
+
+.no-logs {
+    text-align: center;
+    padding: 20px;
+    color: var(--dark-gray);
+    font-style: italic;
+}
+</style> 
+
 <script setup lang="ts">
 import { computed, onMounted } from 'vue'
 import { useTacoStore } from '../../stores/taco.store'
@@ -53,14 +143,8 @@ import { storeToRefs } from 'pinia'
 import { tokenData } from '../data/TokenData'
 
 const store = useTacoStore()
-const { fetchedTokenDetails, tradingLogs } = storeToRefs(store)
-const { fetchTokenDetails } = store
-
-onMounted(async () => {
-    if (!fetchedTokenDetails.value.length) {
-        await fetchTokenDetails()
-    }
-})
+const { tradingLogs } = storeToRefs(store)
+const { ensureTokenDetails } = store
 
 const sortedLogs = computed(() => {
     return [...tradingLogs.value].sort((a, b) => {
@@ -156,94 +240,8 @@ const getTokenInfo = (symbol: string) => {
     if (!symbol) return null
     return tokenData.find(t => t.symbol.toLowerCase() === symbol.toLowerCase())
 }
+
+onMounted(async () => {
+    await ensureTokenDetails()
+})
 </script>
-
-<style scoped>
-.trading-logs {
-    background: var(--light-orange-to-brown);
-    border-radius: 8px;
-    padding: 20px;
-    margin: 20px 0;
-}
-
-h3 {
-    color: var(--white-to-black);
-    margin-top: 0;
-    margin-bottom: 15px;
-}
-
-.log-container {
-    max-height: 400px;
-    overflow-y: auto;
-    background: var(--black-to-white);
-    border-radius: 4px;
-    padding: 10px;
-}
-
-.log-entry {
-    padding: 8px;
-    border-bottom: 1px solid var(--light-gray);
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-}
-
-.log-entry:last-child {
-    border-bottom: none;
-}
-
-.log-timestamp {
-    font-size: 0.8em;
-    color: var(--dark-gray);
-}
-
-.log-message {
-    color: var(--black);
-    word-break: break-word;
-}
-
-.token-trade {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-}
-
-.token-info {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-}
-
-.token-icon {
-    width: 20px;
-    height: 20px;
-    border-radius: 50%;
-}
-
-.trade-arrow {
-    color: var(--dark-gray);
-    font-size: 1.2em;
-}
-
-.token-symbol {
-    color: var(--blue);
-    text-decoration: none;
-    font-weight: 500;
-}
-
-.token-symbol:hover {
-    text-decoration: underline;
-}
-
-.exchange-info {
-    font-size: 0.8em;
-    color: var(--dark-gray);
-}
-
-.no-logs {
-    text-align: center;
-    padding: 20px;
-    color: var(--dark-gray);
-    font-style: italic;
-}
-</style> 

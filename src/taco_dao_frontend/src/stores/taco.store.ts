@@ -1459,6 +1459,11 @@ export const useTacoStore = defineStore('taco', () => {
     // sns provided canisters
     const fetchTotalTreasuryValueInUsd = async () => {
 
+        // if total treasury value in usd is already set, return
+        if (totalTreasuryValueInUsd.value > 0) {
+            return true
+        }
+
         // first fetch the total ICP in the treasury
         // second fetch the total TACO in the treasury
         // convert both to usd
@@ -1559,8 +1564,23 @@ export const useTacoStore = defineStore('taco', () => {
     // dao backend
     const fetchTokenDetails = async () => {
 
+        // turn on loading
+        appLoadingOn()
+
         // log
         // console.log('taco.store: fetchTokenDetails()')
+
+        // // if fetched token details is already set, return
+        // if (fetchedTokenDetails.value.length > 0) {
+
+        //     // log
+        //     console.log('taco.store: fetchTokenDetails() - fetched token details already set')
+
+        //     return true
+        // }
+
+        // log
+        // console.log('taco.store: fetchTokenDetails() - fetched token details not set, fetching...')
 
         try {
 
@@ -1642,9 +1662,27 @@ export const useTacoStore = defineStore('taco', () => {
             // return
             return false
 
+        } finally {
+
+            // turn off loading
+            appLoadingOff()
+
         }
 
     }
+    // ready flag
+    const hasTokenDetails = computed(() => fetchedTokenDetails.value.length > 0)
+    // single-flight
+    let inflightTokenDetails: Promise<void> | null = null
+    const ensureTokenDetails = async () => {
+        if (hasTokenDetails.value) return
+        if (inflightTokenDetails) return inflightTokenDetails
+        inflightTokenDetails = (async () => {
+            try { await fetchTokenDetails() } finally { inflightTokenDetails = null }
+        })()
+        return inflightTokenDetails
+    }
+
     const fetchAggregateAllocation = async () => {
 
         // log
@@ -7426,6 +7464,7 @@ export const useTacoStore = defineStore('taco', () => {
         namesCache,
         namesLoading,
         threadMenuOpen,
+        hasTokenDetails,
         // actions
         changeRoute,
         toggleDarkMode,
@@ -7541,18 +7580,8 @@ export const useTacoStore = defineStore('taco', () => {
         createNeuron,
         setNeuronDissolveDelay,
         toggleThreadMenu,
-        
-        // Wallet methods
-        registerUserToken,
-        unregisterUserToken,
-        getUserRegisteredTokens,
-        fetchUserTokenBalance,
-        sendToken,
-        fetchTokenMetadata,
-        getCachedTokenMetadata,
-        clearTokenMetadataCache,
-        checkTokenSupportsICRC2,
-        
+        ensureTokenDetails,
+
         // Canister ID functions
         daoBackendCanisterId,
         treasuryCanisterId,

@@ -241,14 +241,6 @@
 
         </router-link>    
         
-        <!-- wallet - router link -->
-        <router-link @click="togglePagesMenu()" to="/wallet" class="list-group-item">
-
-          <!-- item text -->
-          <span>Wallet</span>
-
-        </router-link>
-
         <!-- info - router link -->
         <router-link @click="togglePagesMenu()" to="/info" class="list-group-item">
 
@@ -649,9 +641,7 @@
   import TacoDaoLogo from "../assets/images/tacoDaoLogo.vue"
   import IcpValueChip from "../components/misc/IcpValueChip.vue"
   import TacoTokenPriceChip from "../components/misc/TacoTokenPriceChip.vue"
-  import TacoPortfolioValueChip from "../components/misc/TacoPortfolioValueChip.vue"
   import TacoEntityValueChip from "../components/misc/TacoEntityValueChip.vue"
-  import TacoTreasuryValueChip from "../components/misc/TacoTreasuryValueChip.vue"
   import DfinityLogo from "../assets/images/dfinityLogo.vue"
   import DarkModeToggle from "./theme/DarkModeToggle.vue"
   import { Tooltip } from 'bootstrap'
@@ -760,7 +750,5 @@
       }
     })
 
-  })  
-    
-  
+  })
 </script>
