@@ -2208,7 +2208,6 @@
   const { checkIfLoggedIn } = tacoStore
 
   // app
-  const { appLoadingOn, appLoadingOff } = tacoStore
   const { addToast } = tacoStore
   const { acceptHotkeyTutorial } = tacoStore
 
@@ -2663,8 +2662,11 @@
     // log
     // console.log('Casting Vote...')
 
-    // turn on app loading
-    appLoadingOn()
+    // turn left loading
+    leftLoading.value = true
+
+    // turn right loading
+    rightLoading.value = true
 
     // create allocations array with basis points (percentage * 100)
     const allocations = currentSliders.value.map((slider: any) => ({
@@ -2706,13 +2708,13 @@
       console.log('... Vote Cast!')
 
       // refresh everything
-      handleFetchedTokenDetails(fetchedTokenDetails.value)
+      await handleFetchedTokenDetails(fetchedTokenDetails.value)
       await fetchAggregateAllocation()
-      handleFetchedAggregateAllocation(fetchedAggregateAllocation.value)
+      await handleFetchedAggregateAllocation(fetchedAggregateAllocation.value)
       await fetchVotingPowerMetrics()
-      handleFetchedVotingPowerMetrics(fetchedVotingPowerMetrics.value)
+      await handleFetchedVotingPowerMetrics(fetchedVotingPowerMetrics.value)
       await fetchUserAllocation()
-      handleFetchedUserAllocation(fetchedUserAllocation.value)
+      await handleFetchedUserAllocation(fetchedUserAllocation.value)
 
       // return to allocation sliders
       userLockedVote.value = false      
@@ -2752,8 +2754,11 @@
       userLockedVote.value = false      
     } finally {
 
-      // turn off app loading
-      appLoadingOff()
+      // turn off left loading
+      leftLoading.value = false
+
+      // turn off right loading
+      rightLoading.value = false
 
     }
 
