@@ -248,33 +248,6 @@
 
       </div>
 
-      <!-- pagination container - l2 -->
-      <div class="taco-container taco-container--l2 taco-container--l2--dark
-                  p-2 d-flex justify-content-center">
-
-        <!-- pagination -->
-        <div class="d-flex gap-2 overflow-auto">
-
-            <button type="button" 
-                class="taco-nav-btn disabled
-                        btn">
-            <i class="fa-solid fa-angle-left"></i>
-            </button>
-            <button type="button" 
-                    class="taco-nav-btn taco-nav-btn--active
-                            btn">
-            1
-            </button>
-            <button type="button" 
-                    class="taco-nav-btn disabled
-                            btn">
-            <i class="fa-solid fa-angle-right"></i>
-            </button>
-
-        </div>
-
-      </div>
-
   </div>
   
 </template>
