@@ -264,7 +264,8 @@
     const tacoStore = useTacoStore()
 
     // # ACTIONS #
-    const { fetchTokenDetails, fetchTotalTreasuryValueInUsd } = tacoStore
+    const { fetchTotalTreasuryValueInUsd } = tacoStore
+    const { ensureTokenDetails } = tacoStore
 
     // # STATE #
 
@@ -324,11 +325,10 @@
     // on mount
     onMounted(async () => {
 
+        await ensureTokenDetails()
+
         // log
         // console.log('TacoEntityValueChip mounted')
-
-        // fetch token details from dao backend
-        await fetchTokenDetails()
 
         // fetch total treasury value in usd
         await fetchTotalTreasuryValueInUsd()
