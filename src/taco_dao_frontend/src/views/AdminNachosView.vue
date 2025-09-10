@@ -1216,24 +1216,36 @@ const handleConfirmAction = async (reason: string) => {
 };
 
 async function updateConfigWithReason(reason: string) {
+    // Helper functions for nanosecond conversions
+    const minutesToNs = (minutes: number): bigint => BigInt(Math.round(minutes * 60 * 1_000_000_000));
+    const secondsToNs = (seconds: number): bigint => BigInt(Math.round(seconds * 1_000_000_000));
+    
     const updates = {
-        maxSlippageBasisPoints: Math.round(configInputs.value.maxSlippageBasisPoints * 100),
-        minTradeValueICP: configInputs.value.minTradeValueICP,
-        maxTradeValueICP: configInputs.value.maxTradeValueICP,
-        maxTradesStored: configInputs.value.maxTradesStored,
-        maxTradeAttemptsPerInterval: configInputs.value.maxTradeAttemptsPerInterval,
-        maxKongswapAttempts: configInputs.value.maxKongswapAttempts,
-        rebalanceIntervalNS: BigInt(Math.round(configInputs.value.rebalanceIntervalMinutes * 60 * 1_000_000_000)),
-        portfolioRebalancePeriodNS: BigInt(Math.round(configInputs.value.portfolioRebalancePeriodMinutes * 60 * 1_000_000_000)),
-        shortSyncIntervalNS: BigInt(Math.round(configInputs.value.shortSyncIntervalSeconds * 1_000_000_000)),
-        longSyncIntervalNS: BigInt(Math.round(configInputs.value.longSyncIntervalMinutes * 60 * 1_000_000_000)),
-        tokenSyncTimeoutNS: BigInt(Math.round(configInputs.value.tokenSyncTimeoutSeconds * 1_000_000_000)),
-        maxPriceHistoryEntries: configInputs.value.maxPriceHistoryEntries,
-        maxPortfolioSnapshots: configInputs.value.maxPortfolioSnapshots
+        maxSlippageBasisPoints: [BigInt(Math.round(configInputs.value.maxSlippageBasisPoints * 100))] as [bigint],
+        minTradeValueICP: [BigInt(Math.round(configInputs.value.minTradeValueICP))] as [bigint],
+        maxTradeValueICP: [BigInt(Math.round(configInputs.value.maxTradeValueICP))] as [bigint],
+        maxTradesStored: [BigInt(Math.round(configInputs.value.maxTradesStored))] as [bigint],
+        maxTradeAttemptsPerInterval: [BigInt(Math.round(configInputs.value.maxTradeAttemptsPerInterval))] as [bigint],
+        maxKongswapAttempts: [BigInt(Math.round(configInputs.value.maxKongswapAttempts))] as [bigint],
+        rebalanceIntervalNS: [minutesToNs(configInputs.value.rebalanceIntervalMinutes)] as [bigint],
+        portfolioRebalancePeriodNS: [minutesToNs(configInputs.value.portfolioRebalancePeriodMinutes)] as [bigint],
+        shortSyncIntervalNS: [secondsToNs(configInputs.value.shortSyncIntervalSeconds)] as [bigint],
+        longSyncIntervalNS: [minutesToNs(configInputs.value.longSyncIntervalMinutes)] as [bigint],
+        tokenSyncTimeoutNS: configInputs.value.tokenSyncTimeoutSeconds > 0 ? [secondsToNs(configInputs.value.tokenSyncTimeoutSeconds)] as [bigint] : [] as [],
+        maxPriceHistoryEntries: configInputs.value.maxPriceHistoryEntries > 0 ? [BigInt(Math.round(configInputs.value.maxPriceHistoryEntries))] as [bigint] : [] as [],
+        priceUpdateIntervalNS: [] as []
     };
     
     console.log('AdminNachosView: Updating nachos config with:', updates);
     await tacoStore.updateNachosRebalanceConfig(updates, reason);
+    
+    // Update max portfolio snapshots separately if it changed
+    // Note: We need to track the original value to detect changes
+    if (configInputs.value.maxPortfolioSnapshots > 0) {
+        console.log('AdminNachosView: Updating max portfolio snapshots to:', configInputs.value.maxPortfolioSnapshots);
+        await tacoStore.updateNachosMaxPortfolioSnapshots(configInputs.value.maxPortfolioSnapshots, reason);
+    }
+    
     await loadConfig(); // Reload to get the updated config
 }
 

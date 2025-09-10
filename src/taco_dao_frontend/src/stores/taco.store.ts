@@ -4741,6 +4741,54 @@ export const useTacoStore = defineStore('taco', () => {
         }
     }
 
+    const updateNachosMaxPortfolioSnapshots = async (newLimit: number, reason?: string) => {
+        try {
+            const authClient = await getAuthClient();
+            
+            if (!await authClient.isAuthenticated()) {
+                throw new Error('User not authenticated');
+            }
+
+            const identity = await authClient.getIdentity();
+            const agent = await createAgent({
+                identity,
+                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            });
+
+            const nachos = Actor.createActor<NachosService>(nachosIDL, {
+                agent,
+                canisterId: nachosCanisterId()
+            });
+
+            const result = await nachos.updateMaxPortfolioSnapshots(BigInt(newLimit), reason ? [reason] : []);
+            if ('ok' in result) {
+                console.log('Nachos max portfolio snapshots updated:', result.ok);
+                addToast({
+                    id: Date.now(),
+                    code: 'success',
+                    title: 'Success',
+                    icon: 'fa-solid fa-check',
+                    message: 'Nachos max portfolio snapshots updated successfully'
+                });
+                return true;
+            } else {
+                console.error('Error updating nachos max portfolio snapshots:', result.err);
+                addToast({
+                    id: Date.now(),
+                    code: 'error',
+                    title: 'Error',
+                    icon: 'fa-solid fa-times',
+                    message: 'Failed to update nachos max portfolio snapshots'
+                });
+                return false;
+            }
+        } catch (error: any) {
+            console.error('Error updating nachos max portfolio snapshots:', error);
+            throw error;
+        }
+    }
+
     const getNachosTokenDetails = async () => {
         try {
             const authClient = await getAuthClient();
@@ -8119,6 +8167,7 @@ export const useTacoStore = defineStore('taco', () => {
         startNachosPortfolioSnapshots,
         stopNachosPortfolioSnapshots,
         updateNachosPortfolioSnapshotInterval,
+        updateNachosMaxPortfolioSnapshots,
         getNachosTokenDetails,
         
         getNeuronSnapshotStatus,
