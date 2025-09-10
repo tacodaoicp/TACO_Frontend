@@ -7582,6 +7582,14 @@ export const useTacoStore = defineStore('taco', () => {
         toggleThreadMenu,
         ensureTokenDetails,
 
+        //Wallet functions
+        getUserRegisteredTokens,
+        registerUserToken,
+        unregisterUserToken,
+        fetchUserTokenBalance,
+        clearTokenMetadataCache,
+        fetchTokenMetadata,
+
         // Canister ID functions
         daoBackendCanisterId,
         treasuryCanisterId,
