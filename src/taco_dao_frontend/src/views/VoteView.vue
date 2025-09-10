@@ -96,7 +96,7 @@
             <div class="vote-view__content gap-4">
 
               <!-- left -->
-              <div class="vote-view__content__left gap-4">
+              <div class="vote-view__content__left gap-4 position-relative" style="height: fit-content;">
 
                 <!-- top - allocations -->
                 <div>
@@ -455,6 +455,14 @@
                     </div>                       
 
                   </div>               
+
+                </div>
+
+                <!-- loading curtain -->
+                <div v-if="leftLoading" class="vote-view__loading-curtain">
+                  
+                  <!-- astronaut -->
+                  <img :src="astronautLoaderUrl" class="loading-img">
 
                 </div>
 
@@ -950,8 +958,16 @@
 
                   </div>
 
+                  <!-- loading curtain -->
+                  <div v-if="rightLoading" class="vote-view__loading-curtain">
+                    
+                    <!-- astronaut -->
+                    <img :src="astronautLoaderUrl" class="loading-img">
+
+                  </div>                  
+
                   <!-- logged out, curtain -->
-                  <div v-if="!userLoggedIn && tokenCount >= 3" class="login-curtain">
+                  <div v-if="!userLoggedIn && tokenCount >= 3 && !rightLoading" class="login-curtain">
 
                     <!-- login button -->
                     <button class="btn iid-login" @click="iidLogIn()">
@@ -1279,6 +1295,30 @@
     }
 
     /********** end Range Input Styles **********/
+
+    // loading curtain
+    // loading curtain
+    &__loading-curtain {
+        position: absolute;
+        height: 100%;
+        width: 100%;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: rgba(0,0,0,0.5);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 0.5rem;
+        z-index: 9998; // above everything
+
+        // loading image
+        .loading-img {
+            width: 10rem;
+        }
+
+    }
 
   }
 
@@ -2123,6 +2163,7 @@
   import { tokenData } from "../components/data/TokenData"
   import DfinityLogo from "../assets/images/dfinityLogo.vue"
   import { Principal } from "@dfinity/principal"
+  import astronautLoader from "../assets/images/astonautLoader.webp"
 
   ////////////////
   // interfaces //
@@ -2185,9 +2226,18 @@
   // dao backend
   const { ensureTokenDetails } = tacoStore
 
+  // images
+  const astronautLoaderUrl = astronautLoader  
+
   /////////////////////
   // local variables //
   /////////////////////
+
+  // left loading
+  const leftLoading = ref(false)
+
+  // right loading
+  const rightLoading = ref(false)
 
   // feature flags
   const followingEnabled = ref(false)
@@ -2611,7 +2661,7 @@
   const castVote = async () => {
 
     // log
-    console.log('Casting Vote...')
+    // console.log('Casting Vote...')
 
     // turn on app loading
     appLoadingOn()
@@ -2634,9 +2684,6 @@
       // log
       console.log('VoteView.vue: allocations do not sum to 10000 basis points!')
       console.log('VoteView.vue: sum is:', sum)
-
-      // turn off app loading
-      appLoadingOff()
 
       // return to allocation sliders
       userLockedVote.value = false
@@ -2670,9 +2717,6 @@
       // return to allocation sliders
       userLockedVote.value = false      
 
-      // turn off app loading
-      appLoadingOff()
-
       // add toast
       addToast({
         id: Date.now(),
@@ -2704,11 +2748,13 @@
       // log
       console.error('VoteView.vue: error casting vote:', error)
 
+      // return to allocation sliders
+      userLockedVote.value = false      
+    } finally {
+
       // turn off app loading
       appLoadingOff()
 
-      // return to allocation sliders
-      userLockedVote.value = false      
     }
 
   }
@@ -3011,13 +3057,16 @@
   // on mounted
   onMounted(async () => {
 
+    // turn on left loading
+    leftLoading.value = true
+
+    // turn on right loading
+    rightLoading.value = true
+
     await ensureTokenDetails()
 
     // log
     // console.log('vote page mounted')
-
-    // turn app loading on
-    appLoadingOn()
 
     // chart stuff
     setTacoChartMaxHeight()
@@ -3064,13 +3113,13 @@
       // log
       console.error('VoteView.vue: error on mounted:', error)
 
-      // turn off app loading
-      appLoadingOff()
-
     } finally {
 
-      // turn off app loading
-      appLoadingOff()
+      // turn off left loading
+      leftLoading.value = false
+
+      // turn off right loading
+      rightLoading.value = false
 
     }
 
