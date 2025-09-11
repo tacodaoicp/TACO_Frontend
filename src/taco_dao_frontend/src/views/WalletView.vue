@@ -55,6 +55,9 @@
                           @stake-to-neuron="handleStakeToNeuron"
       @create-neuron="handleCreateNeuron"
       @set-dissolve="handleSetDissolve"
+      @start-dissolving="handleStartDissolving"
+      @stop-dissolving="handleStopDissolving"
+      @disburse-neuron="handleDisburseNeuron"
                   />
                 </div>
               </div>
@@ -637,6 +640,100 @@ const closeDissolveDialog = () => {
 const handleDissolveSet = () => {
   // Refresh the wallet data to show updated neuron info
   loadWalletData()
+}
+
+const handleStartDissolving = async (neuron: any) => {
+  try {
+    console.log('Starting dissolving for neuron:', neuron.displayName)
+    
+    // Convert neuron ID from hex to Uint8Array
+    const neuronIdBytes = new Uint8Array(neuron.idHex.match(/.{2}/g).map((byte: string) => parseInt(byte, 16)))
+    
+    await tacoStore.startDissolving(neuronIdBytes)
+    
+    tacoStore.addToast({
+      id: Date.now(),
+      code: 'start-dissolving-success',
+      title: 'Dissolving Started',
+      icon: 'fa-solid fa-check',
+      message: `Successfully started dissolving for neuron ${neuron.displayName}`
+    })
+    
+    // Refresh the wallet data to show updated neuron info
+    loadWalletData()
+  } catch (error: any) {
+    console.error('Error starting dissolving:', error)
+    tacoStore.addToast({
+      id: Date.now(),
+      code: 'start-dissolving-error',
+      title: 'Start Dissolving Failed',
+      icon: 'fa-solid fa-exclamation-triangle',
+      message: error.message || 'Failed to start dissolving neuron'
+    })
+  }
+}
+
+const handleStopDissolving = async (neuron: any) => {
+  try {
+    console.log('Stopping dissolving for neuron:', neuron.displayName)
+    
+    // Convert neuron ID from hex to Uint8Array
+    const neuronIdBytes = new Uint8Array(neuron.idHex.match(/.{2}/g).map((byte: string) => parseInt(byte, 16)))
+    
+    await tacoStore.stopDissolving(neuronIdBytes)
+    
+    tacoStore.addToast({
+      id: Date.now(),
+      code: 'stop-dissolving-success',
+      title: 'Dissolving Stopped',
+      icon: 'fa-solid fa-check',
+      message: `Successfully stopped dissolving for neuron ${neuron.displayName}`
+    })
+    
+    // Refresh the wallet data to show updated neuron info
+    loadWalletData()
+  } catch (error: any) {
+    console.error('Error stopping dissolving:', error)
+    tacoStore.addToast({
+      id: Date.now(),
+      code: 'stop-dissolving-error',
+      title: 'Stop Dissolving Failed',
+      icon: 'fa-solid fa-exclamation-triangle',
+      message: error.message || 'Failed to stop dissolving neuron'
+    })
+  }
+}
+
+const handleDisburseNeuron = async (neuron: any) => {
+  try {
+    console.log('Disbursing neuron:', neuron.displayName)
+    
+    // Convert neuron ID from hex to Uint8Array
+    const neuronIdBytes = new Uint8Array(neuron.idHex.match(/.{2}/g).map((byte: string) => parseInt(byte, 16)))
+    
+    // Disburse without specifying to_account or amount (defaults to owner's account and full amount)
+    await tacoStore.disburseNeuron(neuronIdBytes)
+    
+    tacoStore.addToast({
+      id: Date.now(),
+      code: 'disburse-success',
+      title: 'Neuron Disbursed',
+      icon: 'fa-solid fa-check',
+      message: `Successfully disbursed neuron ${neuron.displayName}`
+    })
+    
+    // Refresh the wallet data to show updated neuron info
+    loadWalletData()
+  } catch (error: any) {
+    console.error('Error disbursing neuron:', error)
+    tacoStore.addToast({
+      id: Date.now(),
+      code: 'disburse-error',
+      title: 'Disburse Failed',
+      icon: 'fa-solid fa-exclamation-triangle',
+      message: error.message || 'Failed to disburse neuron'
+    })
+  }
 }
 
 const registerCustomToken = async () => {

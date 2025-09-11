@@ -206,6 +206,32 @@
                   >
                     <i class="fa fa-clock"></i>
                   </button>
+                  
+                  <!-- Dissolving buttons based on state -->
+                  <button 
+                    v-if="neuron.dissolveState.type === 'delay' || neuron.dissolveState.type === 'none'"
+                    @click.stop="$emit('start-dissolving', neuron)"
+                    class="btn btn-warning btn-sm"
+                    title="Start dissolving this neuron"
+                  >
+                    <i class="fa fa-play"></i>
+                  </button>
+                  <button 
+                    v-if="neuron.dissolveState.type === 'dissolving'"
+                    @click.stop="$emit('stop-dissolving', neuron)"
+                    class="btn btn-info btn-sm"
+                    title="Stop dissolving this neuron"
+                  >
+                    <i class="fa fa-stop"></i>
+                  </button>
+                  <button 
+                    v-if="neuron.dissolveState.type === 'dissolved' && (neuron.stake > 0 || neuron.maturity > 0)"
+                    @click.stop="$emit('disburse-neuron', neuron)"
+                    class="btn btn-success btn-sm"
+                    title="Disburse this neuron"
+                  >
+                    <i class="fa fa-coins"></i>
+                  </button>
                 </div>
               </div>
               
@@ -569,6 +595,9 @@ interface TokenCardEmits {
   (e: 'stake-to-neuron', neuron: any): void
   (e: 'create-neuron'): void
   (e: 'set-dissolve', neuron: any): void
+  (e: 'start-dissolving', neuron: any): void
+  (e: 'stop-dissolving', neuron: any): void
+  (e: 'disburse-neuron', neuron: any): void
 }
 
 const props = withDefaults(defineProps<TokenCardProps>(), {
