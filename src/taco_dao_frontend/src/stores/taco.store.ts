@@ -6039,6 +6039,162 @@ export const useTacoStore = defineStore('taco', () => {
         }
     }
 
+    // Add neuron permissions
+    const addNeuronPermissions = async (neuronId: Uint8Array, principalId: string, permissionTypes: number[]) => {
+        try {
+            if (!userLoggedIn.value) {
+                throw new Error('User must be logged in');
+            }
+
+            console.log('Adding neuron permissions:', {
+                neuronId: Array.from(neuronId).map(b => b.toString(16).padStart(2, '0')).join(''),
+                principalId,
+                permissionTypes
+            });
+
+            const authClient = await getAuthClient();
+            const identity = authClient.getIdentity();
+            
+            const agent = await createAgent({
+                identity,
+                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            });
+
+            // Create SNS Governance actor
+            const snsGov = await createSnsGovernanceActor(agent, 'lhdfz-wqaaa-aaaaq-aae3q-cai');
+            
+            // Prepare the manage neuron request for AddNeuronPermissions
+            const manageNeuronRequest = {
+                subaccount: Array.from(neuronId),
+                command: [{
+                    AddNeuronPermissions: {
+                        principal_id: [Principal.fromText(principalId)],
+                        permissions_to_add: [{
+                            permissions: permissionTypes
+                        }]
+                    }
+                }]
+            };
+
+            console.log('AddNeuronPermissions request:', JSON.stringify(manageNeuronRequest, (key, value) =>
+                typeof value === 'bigint' ? value.toString() : value, 2));
+
+            const result = await snsGov.manage_neuron(manageNeuronRequest) as any;
+            console.log('AddNeuronPermissions result:', result);
+
+            if (result.command && result.command.length > 0) {
+                const command = result.command[0];
+                if (command.Error) {
+                    throw new Error(`AddNeuronPermissions failed: ${JSON.stringify(command)}`);
+                }
+                if (command.AddNeuronPermission !== undefined) {
+                    console.log('Neuron permissions added successfully');
+                    return true;
+                }
+            }
+
+            throw new Error('Unexpected response format from manage_neuron');
+        } catch (error: any) {
+            console.error('Error adding neuron permissions:', error);
+            throw error;
+        }
+    }
+
+    // Remove neuron permissions
+    const removeNeuronPermissions = async (neuronId: Uint8Array, principalId: string, permissionTypes: number[]) => {
+        try {
+            if (!userLoggedIn.value) {
+                throw new Error('User must be logged in');
+            }
+
+            console.log('Removing neuron permissions:', {
+                neuronId: Array.from(neuronId).map(b => b.toString(16).padStart(2, '0')).join(''),
+                principalId,
+                permissionTypes
+            });
+
+            const authClient = await getAuthClient();
+            const identity = authClient.getIdentity();
+            
+            const agent = await createAgent({
+                identity,
+                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            });
+
+            // Create SNS Governance actor
+            const snsGov = await createSnsGovernanceActor(agent, 'lhdfz-wqaaa-aaaaq-aae3q-cai');
+            
+            // Prepare the manage neuron request for RemoveNeuronPermissions
+            const manageNeuronRequest = {
+                subaccount: Array.from(neuronId),
+                command: [{
+                    RemoveNeuronPermissions: {
+                        principal_id: [Principal.fromText(principalId)],
+                        permissions_to_remove: [{
+                            permissions: permissionTypes
+                        }]
+                    }
+                }]
+            };
+
+            console.log('RemoveNeuronPermissions request:', JSON.stringify(manageNeuronRequest, (key, value) =>
+                typeof value === 'bigint' ? value.toString() : value, 2));
+
+            const result = await snsGov.manage_neuron(manageNeuronRequest) as any;
+            console.log('RemoveNeuronPermissions result:', result);
+
+            if (result.command && result.command.length > 0) {
+                const command = result.command[0];
+                if (command.Error) {
+                    throw new Error(`RemoveNeuronPermissions failed: ${JSON.stringify(command)}`);
+                }
+                if (command.RemoveNeuronPermission !== undefined) {
+                    console.log('Neuron permissions removed successfully');
+                    return true;
+                }
+            }
+
+            throw new Error('Unexpected response format from manage_neuron');
+        } catch (error: any) {
+            console.error('Error removing neuron permissions:', error);
+            throw error;
+        }
+    }
+
+    // Get grantable permissions from nervous system parameters
+    const getGrantablePermissions = async (): Promise<number[]> => {
+        try {
+            const authClient = await getAuthClient();
+            const identity = authClient.getIdentity();
+            
+            const agent = await createAgent({
+                identity,
+                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            });
+
+            // Create SNS Governance actor
+            const snsGov = await createSnsGovernanceActor(agent, 'lhdfz-wqaaa-aaaaq-aae3q-cai');
+            
+            // Get nervous system parameters
+            const params = await snsGov.get_nervous_system_parameters(null) as any;
+            
+            if (params.neuron_grantable_permissions && params.neuron_grantable_permissions.length > 0) {
+                const grantablePermissions = params.neuron_grantable_permissions[0];
+                return grantablePermissions.permissions || [];
+            }
+            
+            // Default permissions if not specified
+            return [1, 2, 3, 4]; // Configure, Disburse, Vote, Submit Proposal
+        } catch (error: any) {
+            console.error('Error getting grantable permissions:', error);
+            // Return default permissions on error
+            return [1, 2, 3, 4];
+        }
+    }
+
     // Set dissolve period for a neuron (high-level function)
     const setNeuronDissolveDelay = async (neuronId: Uint8Array, delayMonths: number) => {
         try {
@@ -7700,6 +7856,9 @@ export const useTacoStore = defineStore('taco', () => {
         startDissolving,
         stopDissolving,
         disburseNeuron,
+        addNeuronPermissions,
+        removeNeuronPermissions,
+        getGrantablePermissions,
         toggleThreadMenu,
         ensureTokenDetails,
 

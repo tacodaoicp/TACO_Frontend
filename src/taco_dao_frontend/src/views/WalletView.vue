@@ -58,6 +58,7 @@
       @start-dissolving="handleStartDissolving"
       @stop-dissolving="handleStopDissolving"
       @disburse-neuron="handleDisburseNeuron"
+      @manage-permissions="handleManagePermissions"
                   />
                 </div>
               </div>
@@ -175,6 +176,14 @@
       @dissolve-set="handleDissolveSet"
     />
 
+    <!-- Manage Permissions Dialog -->
+    <ManagePermissionsDialog
+      :show="showPermissionsDialog"
+      :neuron="selectedNeuron"
+      @close="closePermissionsDialog"
+      @permissions-updated="handlePermissionsUpdated"
+    />
+
     <!-- Swap Dialog -->
     <SwapDialog
       :show="showSwapDialog"
@@ -207,6 +216,7 @@ import SwapConfirmDialog from '../components/wallet/SwapConfirmDialog.vue'
 import StakeToNeuronDialog from '../components/wallet/StakeToNeuronDialog.vue'
 import CreateNeuronDialog from '../components/wallet/CreateNeuronDialog.vue'
 import SetDissolveDialog from '../components/wallet/SetDissolveDialog.vue'
+import ManagePermissionsDialog from '../components/wallet/ManagePermissionsDialog.vue'
 import { tokenImages } from '../components/data/TokenData'
 
 interface WalletToken {
@@ -231,6 +241,7 @@ const showStakeDialog = ref(false)
 const selectedNeuron = ref<any | null>(null)
 const showCreateDialog = ref(false)
 const showDissolveDialog = ref(false)
+const showPermissionsDialog = ref(false)
 const showSwapDialog = ref(false)
 const showSwapConfirmDialog = ref(false)
 const selectedTokenForSwap = ref<WalletToken | null>(null)
@@ -638,6 +649,21 @@ const closeDissolveDialog = () => {
 }
 
 const handleDissolveSet = () => {
+  // Refresh the wallet data to show updated neuron info
+  loadWalletData()
+}
+
+const handleManagePermissions = (neuron: any) => {
+  selectedNeuron.value = neuron
+  showPermissionsDialog.value = true
+}
+
+const closePermissionsDialog = () => {
+  showPermissionsDialog.value = false
+  selectedNeuron.value = null
+}
+
+const handlePermissionsUpdated = () => {
   // Refresh the wallet data to show updated neuron info
   loadWalletData()
 }

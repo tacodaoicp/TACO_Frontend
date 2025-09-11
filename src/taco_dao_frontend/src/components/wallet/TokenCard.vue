@@ -232,6 +232,13 @@
                   >
                     <i class="fa fa-coins"></i>
                   </button>
+                  <button 
+                    @click.stop="$emit('manage-permissions', neuron)"
+                    class="btn btn-outline-light btn-sm"
+                    title="Manage permissions for this neuron"
+                  >
+                    <i class="fa fa-key"></i>
+                  </button>
                 </div>
               </div>
               
@@ -598,6 +605,7 @@ interface TokenCardEmits {
   (e: 'start-dissolving', neuron: any): void
   (e: 'stop-dissolving', neuron: any): void
   (e: 'disburse-neuron', neuron: any): void
+  (e: 'manage-permissions', neuron: any): void
 }
 
 const props = withDefaults(defineProps<TokenCardProps>(), {
