@@ -272,6 +272,9 @@
     // fetched trading status
     const { fetchedTradingStatus } = storeToRefs(tacoStore)
 
+    // dao backend
+    const { ensureTokenDetails } = tacoStore
+
     // 
     const { fetchedTokenDetails } = storeToRefs(tacoStore)
 
@@ -279,9 +282,6 @@
 
     // get trading status
     const { getTradingStatus } = tacoStore
-
-    // 
-    const { fetchTokenDetails } = tacoStore
 
     /////////////////////
     // local variables //
@@ -390,17 +390,12 @@
 
     // on mounted
     onMounted(async () => {
+
+        // ensure token details are loaded
+        await ensureTokenDetails()
         
         // get trading status from treasury backend
         await getTradingStatus()
-
-        // log
-        // console.log('DaoTradingLogs.vue: onMounted() - fetched trading status:', fetchedTradingStatus.value)
-
-        // if no token details, fetch them
-        if (!fetchedTokenDetails.value.length) {
-            await fetchTokenDetails()
-        }
 
         // log
         // console.log('DaoTradingLogs.vue: onMounted() - fetched token details:', fetchedTokenDetails.value)

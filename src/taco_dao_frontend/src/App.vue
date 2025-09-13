@@ -106,7 +106,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    z-index: 99999; // above everything
+    z-index: 999999; // above everything
 
     .loading-img {
       width: 10rem;

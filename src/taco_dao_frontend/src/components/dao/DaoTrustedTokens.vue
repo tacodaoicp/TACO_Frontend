@@ -248,33 +248,6 @@
 
       </div>
 
-      <!-- pagination container - l2 -->
-      <div class="taco-container taco-container--l2 taco-container--l2--dark
-                  p-2 d-flex justify-content-center">
-
-        <!-- pagination -->
-        <div class="d-flex gap-2 overflow-auto">
-
-            <button type="button" 
-                class="taco-nav-btn disabled
-                        btn">
-            <i class="fa-solid fa-angle-left"></i>
-            </button>
-            <button type="button" 
-                    class="taco-nav-btn taco-nav-btn--active
-                            btn">
-            1
-            </button>
-            <button type="button" 
-                    class="taco-nav-btn disabled
-                            btn">
-            <i class="fa-solid fa-angle-right"></i>
-            </button>
-
-        </div>
-
-      </div>
-
   </div>
   
 </template>
@@ -553,7 +526,7 @@ LOCAL METHODS
   // # ACTIONS #
 
   // otc backend
-  const { fetchTokenDetails } = tacoStore
+  const { ensureTokenDetails } = tacoStore
 
   /////////////////////
   // local variables //
@@ -706,27 +679,16 @@ LOCAL METHODS
     // try
     try { 
 
-      // fetch token details from dao backend
-      await fetchTokenDetails()
-
-      // log
-      // console.log('fetchedTokenDetails: ', fetchedTokenDetails.value)
-      
-      // log
-      // console.log('tokenData: ', tokenData)
+      // ensure token details are loaded once
+      await ensureTokenDetails()
 
       // handle fetched token details
       handleFetchedTokenDetails( fetchedTokenDetails.value )
-
-      // 
 
     } catch (error) {
 
       // log
       console.error('error fetching token details:', error)
-
-      // turn off loading
-      componentLoading.value = false
 
     } finally {
 
@@ -745,10 +707,7 @@ LOCAL METHODS
       componentLoading.value = true
 
       // try
-      try { 
-
-        // fetch token details from dao backend
-        await fetchTokenDetails()
+      try {
 
         // handle fetched token details
         handleFetchedTokenDetails(fetchedTokenDetails.value)
