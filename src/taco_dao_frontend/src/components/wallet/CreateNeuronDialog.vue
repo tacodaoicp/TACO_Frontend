@@ -2,33 +2,43 @@
 
   <div class="modal fade" :class="{ show: show }" :style="{ display: show ? 'block' : 'none' }" tabindex="-1" @click="handleBackdropClick">
     
+    <!-- modal dialog -->
     <div class="modal-dialog modal-dialog-centered">
       
+      <!-- modal content -->
       <div class="modal-content">
         
+        <!-- modal header -->
         <div class="modal-header">
 
+          <!-- modal title -->
           <div class="modal-title gap-2">
 
+            <!-- icon -->
             <i class="create-icon fa fa-brain me-2"></i>
             
+            <!-- title -->
             <span class="create-title-text">Create New Neuron</span>
 
           </div>
 
+          <!-- close button -->
           <button type="button" class="btn create-btn-close" @click="close">
 
+            <!-- icon -->
             <i class="fa fa-times"></i>
 
           </button>
 
         </div>
         
+        <!-- modal body -->
         <div class="modal-body">
 
           <!-- disclaimer -->
           <div v-if="!isSuccess" class="disclaimer">
 
+            <!-- title -->
             <span>You're about to create a new TACO DAO neuron! This will:</span>
 
             <ul>
@@ -48,6 +58,7 @@
           <!-- amount to stake label -->
           <label v-if="!isSuccess" for="createAmount" class="form-label">
 
+            <!-- title -->
             <span class="create-amount-text">Amount to Stake <span class="small">(TACO)</span></span>
 
           </label>
@@ -85,10 +96,12 @@
           <!-- dissolve period label -->
           <label v-if="!isSuccess" for="dissolveDays" class="form-label mt-1">
 
+            <!-- title -->
             <span class="dissolve-period-text">Dissolve Period <span class="small">(Days)</span></span>
 
           </label>
 
+          <!-- dissolve period input -->
           <input
             v-if="!isSuccess"
             id="dissolveDays"
@@ -103,6 +116,7 @@
             :disabled="isCreating"
           />
 
+          <!-- dissolve period error -->
           <span v-if="dissolveDays && (dissolveDays < 7 || dissolveDays > 30.44) && !isSuccess" 
             class="small" 
             style="color: var(--red-to-light-red);">Min 7, Max 30.44 days</span>
@@ -408,7 +422,7 @@ const stakeAmountBigInt = computed(() => {
 const canCreate = computed(() => {
   return stakeAmountBigInt.value >= minStake && 
          stakeAmountBigInt.value + tacoFee <= props.tacoBalance &&
-         dissolveDays.value >= 28 && dissolveDays.value <= 180 &&
+         dissolveDays.value >= 7 && dissolveDays.value <= 30.44 &&
          !isCreating.value
 })
 

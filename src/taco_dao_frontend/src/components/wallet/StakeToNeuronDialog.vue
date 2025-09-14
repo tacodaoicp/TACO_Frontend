@@ -1,6 +1,10 @@
 <template>
 
-  <div class="modal fade" :class="{ show: show }" :style="{ display: show ? 'block' : 'none' }" tabindex="-1" @click="handleBackdropClick">
+  <div class="modal" 
+        :class="{ show: show }" 
+        :style="{ display: show ? 'block' : 'none' }" 
+        tabindex="-1" 
+        @click="handleBackdropClick">
     
     <div class="modal-dialog modal-dialog-centered">
 
@@ -30,7 +34,7 @@
           <div v-if="neuron"
           class="d-flex flex-column">
 
-            <span class="stake-to-text">Staking to:</span>
+            <span class="stake-to-text">Staking to</span>
 
             <div class="neuron-info">
 

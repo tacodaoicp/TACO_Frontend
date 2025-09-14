@@ -7583,11 +7583,13 @@ export const useTacoStore = defineStore('taco', () => {
         setNeuronDissolveDelay,
         toggleThreadMenu,
         ensureTokenDetails,
+        stopDissolving,
 
         //Wallet functions
         getUserRegisteredTokens,
         registerUserToken,
         unregisterUserToken,
+        sendToken,
         fetchUserTokenBalance,
         clearTokenMetadataCache,
         fetchTokenMetadata,

@@ -727,7 +727,7 @@
       tokenInitIdentifier: '',
       title: '👨‍🍳 Principal Copied!',
       icon: '',
-      message: `Neuron principal was copied to your clipboard`
+      message: `Account principal was copied to your clipboard`
     })
   }
 

@@ -85,6 +85,7 @@
 
                       <!-- core token card -->
                       <TokenCard 
+                        ref="tacoTokenCardRef"
                         :token="token" 
                         @send="openSendDialog"
                         @swap="openSwapDialog" 
@@ -403,6 +404,7 @@ const tacoStore = useTacoStore()
 
 // # STATE #
 const showSendDialog = ref(false)
+const tacoTokenCardRef = ref<any | null>(null)
 const selectedToken = ref<WalletToken | null>(null)
 const showStakeDialog = ref(false)
 const selectedNeuron = ref<any | null>(null)
@@ -871,9 +873,20 @@ const closeDissolveDialog = () => {
 }
 
 // handle dissolve set
-const handleDissolveSet = () => {
-  // Refresh the wallet data to show updated neuron info
-  loadWalletData()
+const handleDissolveSet = async () => {
+  // refresh the wallet data to show updated balances etc
+  await loadWalletData()
+  // then refresh neurons in the taco token card specifically
+  try {
+    const refVal = tacoTokenCardRef.value as any
+    // handle both single and v-for array refs
+    const instances = Array.isArray(refVal) ? refVal : [refVal]
+    for (const inst of instances) {
+      if (inst && typeof inst.loadNeurons === 'function') await inst.loadNeurons()
+    }
+  } catch (e) {
+    console.error('error refreshing neurons after dissolve-set', e)
+  }
 }
 
 // register custom token

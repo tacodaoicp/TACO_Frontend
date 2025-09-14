@@ -375,19 +375,6 @@
 
                   </button>
 
-                  <!-- set dissolve period button -->
-                  <button @click.stop="dismissTooltips(); $emit('set-dissolve', neuron)"
-                          class="btn btn-sm taco-btn taco-btn--green px-2 py-1"
-                          data-bs-toggle="tooltip"
-                          data-bs-placement="bottom"
-                          data-bs-custom-class="taco-tooltip"
-                          title="Modify dissolve period">
-
-                    <!-- icon -->
-                    <i class="fa fa-regular fa-clock"></i>
-
-                  </button>
-
                 </div>
 
               </div>
@@ -403,7 +390,10 @@
                         @click.stop="claimNeuronRewards(neuron)"
                         class="btn btn-sm taco-btn taco-btn--green px-2"
                         style="padding-top: 0.125rem; padding-bottom: 0.125rem;">
-                  Claim
+                  
+                        <!-- tokens icon -->
+                  <i class="fa fa-coins"></i>
+
                 </button>
 
               </div>
@@ -416,6 +406,33 @@
                   <span v-else-if="neuron.dissolveState.display === '0s'">Dissolved</span>
                   <span v-else>Dissolving</span>
                 </span>
+
+                <!-- start dissolving button -->
+                <button v-if="true" @click.stop="dismissTooltips();"
+                        class="btn btn-sm taco-btn taco-btn--green px-2 py-1"
+                        data-bs-toggle="tooltip"
+                        data-bs-placement="bottom"
+                        data-bs-custom-class="taco-tooltip"
+                        title="Start dissolving">
+
+                  <!-- check icon -->
+                  <i class="fa fa-check"></i>
+
+                </button>
+
+                <!-- stop dissolving button -->
+                <button v-if="false" @click.stop="dismissTooltips();"
+                        class="btn btn-sm taco-btn taco-btn--green px-2 py-1"
+                        data-bs-toggle="tooltip"
+                        data-bs-placement="bottom"
+                        data-bs-custom-class="taco-tooltip"
+                        title="Stop dissolving">
+
+                  <!-- x icon -->
+                  <i class="fa fa-xmark"></i>
+
+                </button>                
+
               </div>
               
               <!-- neuron dissolve period -->
@@ -426,6 +443,20 @@
                   <span v-else-if="neuron.dissolveState.type === 'dissolving'">{{ neuron.dissolveState.display.slice(14) }}</span>
                   <span v-else>{{ neuron.dissolveState.display }}</span>
                 </span>
+
+                <!-- set dissolve period button -->
+                <button @click.stop="dismissTooltips(); $emit('set-dissolve', neuron)"
+                      class="btn btn-sm taco-btn taco-btn--green px-2 py-1"
+                      data-bs-toggle="tooltip"
+                      data-bs-placement="bottom"
+                      data-bs-custom-class="taco-tooltip"
+                      title="Modify dissolve period">
+
+                <!-- icon -->
+                <i class="fa fa-regular fa-clock"></i>
+
+              </button>
+
               </div>
 
               <!-- neuron age -->
@@ -579,19 +610,6 @@
 
                   </button>
 
-                  <!-- set dissolve period button -->
-                  <button @click.stop="$emit('set-dissolve', neuron)"
-                          class="btn btn-sm taco-btn taco-btn--green px-2 py-1"
-                          data-bs-toggle="tooltip"
-                          data-bs-placement="bottom"
-                          data-bs-custom-class="taco-tooltip"
-                          title="Modify dissolve period">
-
-                    <!-- icon -->
-                    <i class="fa fa-regular fa-clock"></i>
-
-                  </button>
-
                 </div>
 
               </div>
@@ -607,7 +625,10 @@
                         @click.stop="claimNeuronRewards(neuron)"
                         class="btn btn-sm taco-btn taco-btn--green px-2"
                         style="padding-top: 0.125rem; padding-bottom: 0.125rem;">
-                  Claim
+                  
+                        <!-- tokens icon -->
+                        <i class="fa fa-coins"></i>
+
                 </button>
 
               </div>
@@ -629,7 +650,8 @@
                   <span v-if="neuron.dissolveState.display === '0s'">None</span>
                   <span v-else-if="neuron.dissolveState.type === 'dissolving'">{{ neuron.dissolveState.display.slice(14) }}</span>
                   <span v-else>{{ neuron.dissolveState.display }}</span>
-                </span>
+                </span>   
+                            
               </div>
 
               <!-- neuron age -->
@@ -1003,13 +1025,6 @@ const totalRewards = computed(() => {
   return total
 })
 
-// Watch totalRewards to auto-expand rewards section when there are rewards
-watch(totalRewards, (newTotal) => {
-  if (newTotal > 0 && !rewardsExpanded.value) {
-    rewardsExpanded.value = true
-  }
-}, { immediate: true })
-
 // Rewards functions
 const getNeuronRewards = (neuronIdHex: string): number => {
   return neuronBalances.value.get(neuronIdHex) || 0
@@ -1169,4 +1184,7 @@ const formatUSDValue = (balance: bigint, decimals: number, priceUSD: number): st
     maximumFractionDigits: 2
   })
 }
+
+// expose to parent so wallet view can refresh neurons on demand
+defineExpose({ loadNeurons })
 </script>

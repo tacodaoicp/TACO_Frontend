@@ -1,38 +1,92 @@
 <template>
-  <div v-if="show" class="modal-overlay">
-    <div class="modal-dialog">
-      <div class="modal-header">
-        <h5 class="modal-title">
-          <i class="fa fa-exchange-alt me-2"></i>
-          Swap Tokens
-        </h5>
-        <button @click="$emit('close')" class="btn-close">
-          <i class="fa fa-times"></i>
-        </button>
-      </div>
 
+  <div v-if="show" class="modal-overlay">
+
+    <!-- modal dialog -->
+    <div class="modal-dialog">
+
+      <!-- modal header -->
+      <div class="modal-header">
+
+        <!-- modal title -->
+        <div class="modal-title gap-2">
+
+          <!-- icon -->
+          <i class="swap-icon fa fa-exchange-alt me-2"></i>
+          
+          <!-- text -->
+          <span class="swap-title-text">Taco Swap</span>
+
+        </div>
+
+        <!-- close button -->
+        <button type="button" class="btn swap-btn-close" @click="$emit('close')">
+
+          <!-- icon -->
+          <i class="fa fa-times"></i>
+
+        </button>
+
+      </div>       
+
+      <!-- modal body -->
       <div class="modal-body">
-        <!-- Input Token Selection -->
+
+        <!-- input token selection -->
         <div class="swap-section">
-          <label class="section-label">From</label>
+
+          <!-- label -->
+          <label class="mb-2">
+
+            <!-- text -->
+            <span style="font-size: 1.25rem;">From</span>
+
+          </label>
+
+          <!-- token input group -->
           <div class="token-input-group">
+
+            <!-- token selector -->
             <div class="token-selector" @click="showTokenSelector = true">
+
               <div v-if="selectedInputToken" class="selected-token">
+
                 <img :src="selectedInputToken.logo" :alt="selectedInputToken.symbol" class="token-logo-small" />
+                
                 <div class="token-info">
-                  <div class="token-name">{{ selectedInputToken.symbol }}</div>
-                  <div class="token-balance">
-                    Balance: {{ formatBalance(selectedInputToken.balance, selectedInputToken.decimals) }}
+
+                  <div class="token-name">
+
+                    <span>{{ selectedInputToken.symbol }}</span>
+
                   </div>
+
+                  <div class="token-balance">
+
+                    <span>Balance: {{ formatBalance(selectedInputToken.balance, selectedInputToken.decimals) }}</span>
+
+                  </div>
+
                 </div>
+
               </div>
+
               <div v-else class="select-token-placeholder">
-                <i class="fa fa-plus-circle me-2"></i>
-                Select Token
+
+                <i class="fa fa-plus-circle me-2" style="font-size: 2.75rem;"></i>
+
+                <span>Select Token</span>
+
               </div>
+
               <i class="fa fa-chevron-down"></i>
+
             </div>
+
+            <!-- amount input group -->
             <div class="amount-input-wrapper">
+
+              <!-- amount input -->
               <input
                 v-model="inputAmount"
                 type="number"
@@ -42,104 +96,185 @@
                 min="0"
                 @input="onAmountChange"
               />
+
+              <!-- max button -->
               <button 
                 v-if="selectedInputToken"
                 @click="setMaxAmount"
-                class="max-button"
-              >
-                MAX
+                class="btn btn-link"
+                style="color: var(--black-to-white);">
+                
+                <span>MAX</span>
+
               </button>
+
             </div>
+
           </div>
-          <!-- Token metadata info -->
-          <div v-if="selectedInputToken" class="token-metadata">
-            <div class="metadata-item">
-              <span class="label">Decimals:</span>
-              <span class="value">{{ selectedInputToken.decimals }}</span>
-            </div>
-            <div class="metadata-item">
-              <span class="label">Fee:</span>
-              <span class="value">{{ formatBalance(selectedInputToken.fee, selectedInputToken.decimals) }} {{ selectedInputToken.symbol }}</span>
-            </div>
+
+          <!-- token metadata -->
+          <div v-if="selectedInputToken" class="token-metadata d-flex flex-wrap justify-content-end">
+
+              <!-- decimals -->
+              <span class="small w-fit-content text-end">Decimals: {{ selectedInputToken.decimals }}</span>
+
+              <!-- fee -->
+              <span class="small w-fit-content text-end">Fee: {{ formatBalance(selectedInputToken.fee, selectedInputToken.decimals) }} {{ selectedInputToken.symbol }}</span>
+
           </div>
+
         </div>
 
-        <!-- Swap Arrow -->
+        <!-- swap arrow -->
         <div class="swap-arrow">
-          <div class="arrow-circle">
-            <i class="fa fa-arrow-down"></i>
-          </div>
+
+          <!-- icon -->
+          <i class="fa fa-arrow-down" style="font-size: 2rem;"></i>
+
         </div>
 
-        <!-- Output Token (Always TACO) -->
+        <!-- output token (always TACO) -->
         <div class="swap-section">
-          <label class="section-label">To</label>
+
+          <!-- label -->
+          <label class="mb-2">
+
+            <!-- text -->
+            <span style="font-size: 1.25rem;">To</span>
+
+          </label>
+
+          <!-- token output group -->
           <div class="token-output-group">
+
+            <!-- selected token -->
             <div class="selected-token">
+
+              <!-- logo -->
               <img :src="tacoToken.logo" :alt="tacoToken.symbol" class="token-logo-small" />
+
+              <!-- token info -->
               <div class="token-info">
-                <div class="token-name">{{ tacoToken.symbol }}</div>
-                <div class="token-balance">
-                  Balance: {{ formatBalance(tacoToken.balance, tacoToken.decimals) }}
+
+                <!-- name -->
+                <div class="token-name">
+
+                  <!-- text -->
+                  <span>{{ tacoToken.symbol }}</span>
+
                 </div>
+
+                <!-- balance -->
+                <div class="token-balance">
+
+                  <!-- text -->
+                  <span>Balance: {{ formatBalance(tacoToken.balance, tacoToken.decimals) }}</span>
+
+                </div>
+
               </div>
+
             </div>
+
+            <!-- expected amount -->
             <div class="expected-amount">
+
+              <!-- amount display -->
               <div class="amount-display">
-                {{ expectedOutput || '0.0' }}
+
+                <!-- text -->
+                <span>{{ expectedOutput || '0.0' }}</span>
+
               </div>
+
             </div>
+
           </div>
+
         </div>
 
-        <!-- Slippage Tolerance Section -->
+        <!-- slippage tolerance section -->
         <div class="slippage-section">
-          <label class="section-label">Slippage Tolerance</label>
+
+          <!-- label -->
+          <label class="section-label mb-2">
+
+            <!-- text -->
+            <span style="font-size: 1.25rem;">Slippage Tolerance</span>
+
+          </label>
+
+          <!-- slippage controls -->
           <div class="slippage-controls">
+
+            <!-- slippage presets -->
             <div class="slippage-presets">
+
+              <!-- slippage presets -->
               <button 
                 v-for="preset in slippagePresets" 
                 :key="preset"
                 @click="setSlippageTolerance(preset)"
-                class="slippage-preset-btn"
-                :class="{ 'active': slippageTolerance === preset }"
-              >
+                class="btn btn-sm taco-nav-btn"
+                :class="{ 'taco-nav-btn--active': slippageTolerance === preset }">
                 {{ (preset * 100).toFixed(1) }}%
               </button>
+
             </div>
+
+            <!-- or -->
+            <span>or</span>
+
+            <!-- slippage custom -->
             <div class="slippage-custom">
+
+              <!-- input -->
               <input
                 v-model.number="customSlippage"
                 @input="setCustomSlippage"
                 type="number"
-                class="slippage-input"
-                placeholder="0.5"
+                class="form-control form-control-sm taco-input py-0"
+                style="font-size: 0.925rem;"
+                placeholder="0"
                 min="0.1"
                 max="50"
                 step="0.1"
               />
+
+              <!-- unit -->
               <span class="slippage-unit">%</span>
+
             </div>
+
           </div>
-          <div class="slippage-info">
-            <small>Current: {{ (slippageTolerance * 100).toFixed(1) }}% - Higher slippage allows faster execution but worse prices</small>
-          </div>
+
+          <!-- slippage info -->
+          <span style="line-height: 1; font-size: 0.75rem;">
+            Higher slippage allows faster execution but worse prices
+          </span>
+
         </div>
 
-        <!-- Quotes Section -->
+        <!-- quotes section -->
         <div v-if="quotes.length > 0" class="quotes-section">
+
+          <!-- quotes title -->
           <h6 class="quotes-title">Available Quotes</h6>
+
+          <!-- quotes list -->
           <div class="quotes-list">
+
+            <!-- quote item -->
             <div 
               v-for="(quote, index) in sortedQuotes" 
               :key="quote.exchange"
               class="quote-item"
-              :class="{ 
-                'best-quote': index === 0, 
+              :class="{
                 'selected-quote': selectedQuote && selectedQuote.exchange === quote.exchange 
               }"
-              @click="selectQuote(quote)"
-            >
+              @click="selectQuote(quote)">
+
+              <!-- quote header -->
               <div class="quote-header">
                 <div class="exchange-info">
                   <div class="exchange-name">{{ quote.exchange }}</div>
@@ -149,6 +284,8 @@
                   {{ formatBalance(quote.amountOut, tacoToken.decimals) }} TACO
                 </div>
               </div>
+
+              <!-- quote details -->
               <div class="quote-details">
                 <div class="detail-item">
                   <span>Price Impact:</span>
@@ -165,40 +302,64 @@
                   <span>{{ (quote.fee / 10000).toFixed(2) }}%</span>
                 </div>
               </div>
+
             </div>
+
           </div>
+
         </div>
 
-        <!-- Loading State -->
+        <!-- loading state -->
         <div v-if="loadingQuotes" class="loading-quotes">
+
           <div class="spinner-border spinner-border-sm me-2"></div>
+
           <span>Getting quotes...</span>
+
         </div>
 
-        <!-- Error State -->
+        <!-- error state -->
         <div v-if="quotesError" class="quotes-error">
+
           <i class="fa fa-exclamation-triangle me-2"></i>
-          {{ quotesError }}
+
+          <span>{{ quotesError }}</span>
+
         </div>
+
       </div>
 
+      <!-- footer -->
       <div class="modal-footer">
-        <button @click="$emit('close')" class="btn btn-secondary">
-          Cancel
+
+        <!-- cancel button -->
+        <button @click="$emit('close')" 
+                class="btn"
+                style="font-family: 'Space Mono';">
+          
+          <!-- text -->
+          <span style="color: var(--black-to-white);">Cancel</span>
+
         </button>
+
+        <!-- review swap button -->
         <button 
           @click="proceedWithSwap"
-          class="btn btn-primary"
-          :disabled="!canProceed"
-        >
-          <i class="fa fa-exchange-alt me-1"></i>
-          Review Swap
-        </button>
-      </div>
-    </div>
+          class="btn taco-btn taco-btn--green"
+          :disabled="!canProceed">
+          
+          <!-- text -->
+          <span style="color: var(--black) !important;">Review Swap</span>
 
-    <!-- Token Selector Modal -->
+        </button>
+
+      </div>
+
+    </div>   
+
+    <!-- token select modal -->
     <div v-if="showTokenSelector" class="token-selector-overlay">
+
       <div class="token-selector-dialog">
         <div class="token-selector-header">
           <h6>Select Token</h6>
@@ -224,9 +385,584 @@
           </div>
         </div>
       </div>
+
     </div>
+
   </div>
+
 </template>
+
+<style scoped>
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1050;
+  pointer-events: auto;
+}
+
+.modal-dialog {
+  background-color: var(--light-orange-to-dark-brown);
+  border: 1px solid var(--dark-orange);
+  border-radius: .5rem;
+  overflow: clip;
+  max-width: 500px;
+  width: 90%;
+  max-height: 90vh;
+  overflow-y: auto;
+  color: #ffffff;
+  pointer-events: auto;
+  position: relative;
+}
+
+.modal-header {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  margin: 0;
+  margin-bottom: 0.5rem;
+  padding: 0;
+  border-bottom: 0;
+  margin-bottom: 0.75rem;
+}
+
+.modal-body {
+  padding: 1.5rem 1.5rem 0 !important;
+}
+
+.modal-title {
+  display: flex;
+  align-items: center;
+  margin: 1.5rem 0px 0px 1.5rem;
+}
+
+.swap-icon {
+  font-size: 3.5rem;
+  color: var(--dark-brown-to-white) !important;
+}
+
+.swap-title-text {
+  font-size: 1.5rem;
+  font-weight: 600;
+}
+
+.swap-btn-close {
+  margin: 1rem .5rem 0 0;
+
+  i {
+    font-size: 1.5rem;
+    color: var(--black-to-white);
+  }
+}
+
+.modal-body {
+  padding: 1.5rem;
+}
+
+.swap-section {
+  margin-top: -1rem;
+  margin-bottom: 1rem;
+}
+
+.token-input-group {
+  border-radius: 0.5rem;
+  padding: 0.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  background-color: var(--orange-to-brown);
+  border: 1px solid var(--dark-orange);
+}
+
+.token-selector {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.5rem;
+  background: var(--light-brown);
+  border: 1px solid var(--dark-orange);
+  border-radius: 0.5rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.selected-token {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.select-token-placeholder {
+  display: flex;
+  align-items: center;
+  color: var(--text-secondary);
+  font-size: 0.95rem;
+}
+
+.token-logo-small {
+  width: 3rem;
+  height: 3rem;
+  border-radius: 50%;
+  border: 2px solid var(--border-color);
+}
+
+.token-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.token-name {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: white;
+}
+
+.token-balance {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.amount-input-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.amount-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: white;
+  outline: none;
+  font-family: 'Space Mono';
+}
+
+.amount-input::placeholder {
+  color: var(--text-muted);
+}
+
+.token-metadata {
+  display: flex;
+  margin-top: 0.5rem;
+  gap: 0 1rem;
+}
+
+.metadata-item {
+  font-size: 0.8rem;
+}
+
+.metadata-item .label {
+  color: var(--text-secondary);
+}
+
+.metadata-item .value {
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.swap-arrow {
+  display: flex;
+  justify-content: center;
+  margin: 0rem 0;
+}
+
+.token-output-group {
+  background-color: var(--orange-to-brown);
+  border: 1px solid var(--dark-orange);
+  border-radius: 0.5rem;
+  padding: 0.5rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.expected-amount {
+  text-align: right;
+}
+
+.amount-display {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: white;
+}
+
+.quotes-section {
+  margin-top: 1.5rem;
+}
+
+.quotes-title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: white;
+  margin-bottom: 0.75rem;
+}
+
+.quotes-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.quote-item {
+  background-color: var(--dark-brown);
+  border: none;
+  outline: 1px solid var(--dark-orange);  
+  border-radius: 0.5rem;
+  padding: 0.75rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.quote-item:hover {
+  /* border-color: var(--primary-color);
+  background: rgba(var(--primary-color-rgb), 0.05); */
+}
+
+.quote-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.exchange-info {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.exchange-name {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: white;
+}
+
+.best-badge {
+  background: var(--success-color);
+  color: white;
+  padding: 0.2rem 0.5rem;
+  border-radius: 12px;
+  font-size: 0.7rem;
+  font-weight: 600;
+}
+
+.quote-amount {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: white;
+}
+
+.quote-details {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.detail-item {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.impact-low {
+  color: var(--success-color);
+}
+
+.impact-medium {
+  color: var(--warning-color);
+}
+
+.impact-high {
+  color: var(--danger-color);
+}
+
+.loading-quotes {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  color: var(--text-secondary);
+}
+
+.quotes-error {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background: rgba(var(--danger-color-rgb), 0.1);
+  border: 1px solid var(--danger-color);
+  border-radius: 8px;
+  color: var(--danger-color);
+  font-size: 0.9rem;
+}
+
+.modal-footer {
+  border-top: none;
+  padding: 1rem;
+}
+
+.modal-footer .btn {
+  /* flex: 1;
+  padding: 0.75rem 1.5rem;
+  font-weight: 600;
+  border-radius: 8px; */
+}
+
+/* Token Selector Modal */
+.token-selector-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1060;
+  pointer-events: none;
+}
+
+.token-selector-dialog {
+  background: #2d3748;
+  border-radius: 12px;
+  border: 1px solid #4a5568;
+  width: 90%;
+  max-width: 400px;
+  max-height: 500px;
+  overflow: hidden;
+  pointer-events: auto;
+}
+
+.token-selector-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.token-selector-header h6 {
+  margin: 0;
+  color: white;
+  font-weight: 600;
+}
+
+.token-list {
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.token-list-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1rem;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.token-list-item:hover {
+  background: var(--bg-secondary);
+}
+
+.token-list-item .token-info {
+  flex: 1;
+}
+
+.token-full-name {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+@media (max-width: 576px) {
+  .modal-dialog {
+    margin: 0.5rem;
+    max-height: 95vh;
+  }
+  
+  .modal-header,
+  .modal-body,
+  .modal-footer {
+    padding: 1rem;
+  }
+}
+
+/* Quote selection styles */
+.quotes-section {
+  margin-top: 1rem;
+}
+
+.quotes-title {
+  color: white;
+  font-size: 0.9rem;
+  font-weight: 600;
+  margin-bottom: 0.75rem;
+}
+
+.quotes-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.quote-item {
+  background: #1a202c;
+  border: 1px solid #4a5568;
+  border-radius: 8px;
+  padding: 0.75rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.quote-item:hover {
+  border-color: #63b3ed;
+  background: #2d3748;
+}
+
+.quote-item.best-quote {
+  border-color: #48bb78;
+  background: #1a2e1a;
+}
+
+.quote-item.selected-quote {
+  outline: 3px solid var(--dark-orange);
+  background: var(--brown);
+  border: none;
+  border-radius: 0.5rem;
+}
+
+.quote-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 0.5rem;
+}
+
+.exchange-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.exchange-name {
+  color: white;
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.best-badge {
+  background: #48bb78;
+  color: white;
+  font-size: 0.7rem;
+  padding: 0.2rem 0.5rem;
+  border-radius: 12px;
+  font-weight: 500;
+}
+
+.quote-amount {
+  color: white;
+  font-weight: 600;
+  font-size: 1rem;
+}
+
+.quote-details {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+  font-size: 0.8rem;
+}
+
+.quote-detail {
+  color: #a0aec0;
+}
+
+.quotes-error {
+  color: #fc8181;
+  background: #2d1b1b;
+  border: 1px solid #e53e3e;
+  border-radius: 6px;
+  padding: 0.75rem;
+  font-size: 0.9rem;
+  margin-top: 1rem;
+}
+
+/* Slippage tolerance styles */
+.slippage-section {
+  margin: 1rem 0;
+}
+
+.slippage-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1rem;
+  align-items: center;
+  margin-bottom: 0.25rem;
+}
+
+.slippage-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.taco-nav-btn {
+  padding: 0.25rem 0.5rem;
+}
+
+.slippage-preset-btn:hover {
+  border-color: #63b3ed;
+  background: #2d3748;
+}
+
+.slippage-preset-btn.active {
+  background: #3182ce;
+  border-color: #3182ce;
+  color: white;
+}
+
+.slippage-custom {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.slippage-input {
+  background: #1a202c;
+  border: 1px solid #4a5568;
+  border-radius: 6px;
+  color: white;
+  padding: 0.5rem;
+  width: 60px;
+  font-size: 0.8rem;
+  text-align: center;
+}
+
+.slippage-input:focus {
+  outline: none;
+  border-color: #3182ce;
+  box-shadow: 0 0 0 2px rgba(49, 130, 206, 0.2);
+}
+
+.slippage-unit {
+  color: #a0aec0;
+  font-size: 0.8rem;
+}
+
+.slippage-info {
+  color: #a0aec0;
+  font-size: 0.75rem;
+}
+</style>
 
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from 'vue'
@@ -578,626 +1314,3 @@ onMounted(() => {
   }
 })
 </script>
-
-<style scoped>
-.modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.8);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1050;
-  padding: 1rem;
-  pointer-events: none;
-}
-
-.modal-dialog {
-  background: #2d3748;
-  border-radius: 12px;
-  border: 1px solid #4a5568;
-  width: 100%;
-  max-width: 500px;
-  max-height: 90vh;
-  overflow-y: auto;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
-  color: white;
-  pointer-events: auto;
-}
-
-.modal-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 1.5rem;
-  border-bottom: 1px solid var(--border-color);
-}
-
-.modal-title {
-  font-size: 1.25rem;
-  font-weight: 600;
-  color: white;
-  margin: 0;
-}
-
-.btn-close {
-  background: none;
-  border: none;
-  color: var(--text-secondary);
-  font-size: 1.2rem;
-  cursor: pointer;
-  padding: 0.5rem;
-  border-radius: 6px;
-  transition: all 0.2s ease;
-}
-
-.btn-close:hover {
-  background: var(--bg-secondary);
-  color: var(--text-primary);
-}
-
-.modal-body {
-  padding: 1.5rem;
-}
-
-.swap-section {
-  margin-bottom: 1rem;
-}
-
-.section-label {
-  display: block;
-  font-size: 0.9rem;
-  font-weight: 600;
-  color: var(--text-secondary);
-  margin-bottom: 0.5rem;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.token-input-group {
-  background: #1a202c;
-  border: 1px solid #4a5568;
-  border-radius: 12px;
-  padding: 1rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-}
-
-.token-selector {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0.75rem;
-  background: #2d3748;
-  border: 1px solid #4a5568;
-  border-radius: 8px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.token-selector:hover {
-  border-color: var(--primary-color);
-}
-
-.selected-token {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-}
-
-.select-token-placeholder {
-  display: flex;
-  align-items: center;
-  color: var(--text-secondary);
-  font-size: 0.95rem;
-}
-
-.token-logo-small {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  border: 2px solid var(--border-color);
-}
-
-.token-info {
-  display: flex;
-  flex-direction: column;
-}
-
-.token-name {
-  font-size: 0.95rem;
-  font-weight: 600;
-  color: white;
-}
-
-.token-balance {
-  font-size: 0.8rem;
-  color: var(--text-secondary);
-}
-
-.amount-input-wrapper {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.amount-input {
-  flex: 1;
-  background: transparent;
-  border: none;
-  font-size: 1.5rem;
-  font-weight: 600;
-  color: white;
-  outline: none;
-}
-
-.amount-input::placeholder {
-  color: var(--text-muted);
-}
-
-.max-button {
-  background: var(--primary-color);
-  color: white;
-  border: none;
-  padding: 0.4rem 0.8rem;
-  border-radius: 6px;
-  font-size: 0.8rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.max-button:hover {
-  background: var(--primary-hover);
-}
-
-.token-metadata {
-  display: flex;
-  gap: 1rem;
-  margin-top: 0.5rem;
-}
-
-.metadata-item {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  font-size: 0.8rem;
-}
-
-.metadata-item .label {
-  color: var(--text-secondary);
-}
-
-.metadata-item .value {
-  color: var(--text-primary);
-  font-weight: 500;
-}
-
-.swap-arrow {
-  display: flex;
-  justify-content: center;
-  margin: 1rem 0;
-}
-
-.arrow-circle {
-  width: 40px;
-  height: 40px;
-  background: var(--bg-secondary);
-  border: 2px solid var(--border-color);
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--text-secondary);
-  font-size: 1.2rem;
-}
-
-.token-output-group {
-  background: #1a202c;
-  border: 1px solid #4a5568;
-  border-radius: 12px;
-  padding: 1rem;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.expected-amount {
-  text-align: right;
-}
-
-.amount-display {
-  font-size: 1.5rem;
-  font-weight: 600;
-  color: white;
-}
-
-.quotes-section {
-  margin-top: 1.5rem;
-}
-
-.quotes-title {
-  font-size: 1rem;
-  font-weight: 600;
-  color: white;
-  margin-bottom: 0.75rem;
-}
-
-.quotes-list {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.quote-item {
-  background: #1a202c;
-  border: 1px solid #4a5568;
-  border-radius: 8px;
-  padding: 1rem;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.quote-item:hover {
-  border-color: var(--primary-color);
-  background: rgba(var(--primary-color-rgb), 0.05);
-}
-
-.quote-item.best-quote {
-  border-color: var(--success-color);
-  background: rgba(var(--success-color-rgb), 0.05);
-}
-
-.quote-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 0.5rem;
-}
-
-.exchange-info {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.exchange-name {
-  font-size: 0.95rem;
-  font-weight: 600;
-  color: white;
-}
-
-.best-badge {
-  background: var(--success-color);
-  color: white;
-  padding: 0.2rem 0.5rem;
-  border-radius: 12px;
-  font-size: 0.7rem;
-  font-weight: 600;
-}
-
-.quote-amount {
-  font-size: 1.1rem;
-  font-weight: 600;
-  color: white;
-}
-
-.quote-details {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-}
-
-.detail-item {
-  display: flex;
-  justify-content: space-between;
-  font-size: 0.85rem;
-  color: var(--text-secondary);
-}
-
-.impact-low {
-  color: var(--success-color);
-}
-
-.impact-medium {
-  color: var(--warning-color);
-}
-
-.impact-high {
-  color: var(--danger-color);
-}
-
-.loading-quotes {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 2rem;
-  color: var(--text-secondary);
-}
-
-.quotes-error {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 1rem;
-  background: rgba(var(--danger-color-rgb), 0.1);
-  border: 1px solid var(--danger-color);
-  border-radius: 8px;
-  color: var(--danger-color);
-  font-size: 0.9rem;
-}
-
-.modal-footer {
-  display: flex;
-  justify-content: space-between;
-  gap: 1rem;
-  padding: 1.5rem;
-  border-top: 1px solid var(--border-color);
-}
-
-.modal-footer .btn {
-  flex: 1;
-  padding: 0.75rem 1.5rem;
-  font-weight: 600;
-  border-radius: 8px;
-}
-
-/* Token Selector Modal */
-.token-selector-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.7);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1060;
-  pointer-events: none;
-}
-
-.token-selector-dialog {
-  background: #2d3748;
-  border-radius: 12px;
-  border: 1px solid #4a5568;
-  width: 90%;
-  max-width: 400px;
-  max-height: 500px;
-  overflow: hidden;
-  pointer-events: auto;
-}
-
-.token-selector-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 1rem;
-  border-bottom: 1px solid var(--border-color);
-}
-
-.token-selector-header h6 {
-  margin: 0;
-  color: white;
-  font-weight: 600;
-}
-
-.token-list {
-  max-height: 400px;
-  overflow-y: auto;
-}
-
-.token-list-item {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  padding: 1rem;
-  cursor: pointer;
-  transition: background-color 0.2s ease;
-}
-
-.token-list-item:hover {
-  background: var(--bg-secondary);
-}
-
-.token-list-item .token-info {
-  flex: 1;
-}
-
-.token-full-name {
-  font-size: 0.8rem;
-  color: var(--text-secondary);
-}
-
-@media (max-width: 576px) {
-  .modal-dialog {
-    margin: 0.5rem;
-    max-height: 95vh;
-  }
-  
-  .modal-header,
-  .modal-body,
-  .modal-footer {
-    padding: 1rem;
-  }
-  
-  .token-metadata {
-    flex-direction: column;
-    gap: 0.5rem;
-  }
-}
-
-/* Quote selection styles */
-.quotes-section {
-  margin-top: 1rem;
-}
-
-.quotes-title {
-  color: white;
-  font-size: 0.9rem;
-  font-weight: 600;
-  margin-bottom: 0.75rem;
-}
-
-.quotes-list {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.quote-item {
-  background: #1a202c;
-  border: 1px solid #4a5568;
-  border-radius: 8px;
-  padding: 0.75rem;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.quote-item:hover {
-  border-color: #63b3ed;
-  background: #2d3748;
-}
-
-.quote-item.best-quote {
-  border-color: #48bb78;
-  background: #1a2e1a;
-}
-
-.quote-item.selected-quote {
-  border-color: #3182ce;
-  background: #1a2a3a;
-  box-shadow: 0 0 0 2px rgba(49, 130, 206, 0.2);
-}
-
-.quote-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: 0.5rem;
-}
-
-.exchange-info {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-}
-
-.exchange-name {
-  color: white;
-  font-weight: 600;
-  font-size: 0.9rem;
-}
-
-.best-badge {
-  background: #48bb78;
-  color: white;
-  font-size: 0.7rem;
-  padding: 0.2rem 0.5rem;
-  border-radius: 12px;
-  font-weight: 500;
-}
-
-.quote-amount {
-  color: white;
-  font-weight: 600;
-  font-size: 1rem;
-}
-
-.quote-details {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 0.5rem;
-  font-size: 0.8rem;
-}
-
-.quote-detail {
-  color: #a0aec0;
-}
-
-.quotes-error {
-  color: #fc8181;
-  background: #2d1b1b;
-  border: 1px solid #e53e3e;
-  border-radius: 6px;
-  padding: 0.75rem;
-  font-size: 0.9rem;
-  margin-top: 1rem;
-}
-
-/* Slippage tolerance styles */
-.slippage-section {
-  margin: 1rem 0;
-}
-
-.slippage-controls {
-  display: flex;
-  gap: 1rem;
-  align-items: center;
-  margin-bottom: 0.5rem;
-}
-
-.slippage-presets {
-  display: flex;
-  gap: 0.5rem;
-}
-
-.slippage-preset-btn {
-  background: #1a202c;
-  border: 1px solid #4a5568;
-  border-radius: 6px;
-  color: white;
-  padding: 0.5rem 0.75rem;
-  font-size: 0.8rem;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.slippage-preset-btn:hover {
-  border-color: #63b3ed;
-  background: #2d3748;
-}
-
-.slippage-preset-btn.active {
-  background: #3182ce;
-  border-color: #3182ce;
-  color: white;
-}
-
-.slippage-custom {
-  display: flex;
-  align-items: center;
-  gap: 0.25rem;
-}
-
-.slippage-input {
-  background: #1a202c;
-  border: 1px solid #4a5568;
-  border-radius: 6px;
-  color: white;
-  padding: 0.5rem;
-  width: 60px;
-  font-size: 0.8rem;
-  text-align: center;
-}
-
-.slippage-input:focus {
-  outline: none;
-  border-color: #3182ce;
-  box-shadow: 0 0 0 2px rgba(49, 130, 206, 0.2);
-}
-
-.slippage-unit {
-  color: #a0aec0;
-  font-size: 0.8rem;
-}
-
-.slippage-info {
-  color: #a0aec0;
-  font-size: 0.75rem;
-}
-</style>

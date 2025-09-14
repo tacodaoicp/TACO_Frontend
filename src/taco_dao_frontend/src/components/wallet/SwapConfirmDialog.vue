@@ -1,17 +1,24 @@
 <template>
+
   <div v-if="show" class="modal-overlay">
+
     <div class="modal-dialog">
+
       <div class="modal-header">
+
         <h5 class="modal-title">
           <i class="fa fa-check-circle me-2"></i>
           Confirm Swap
         </h5>
+
         <button @click="$emit('close')" class="btn-close">
           <i class="fa fa-times"></i>
         </button>
+
       </div>
 
       <div class="modal-body">
+
         <!-- Swap Summary -->
         <div class="swap-summary">
           <div class="swap-route">
@@ -173,6 +180,7 @@
             <span>High price impact ({{ swapData.selectedQuote.slippage.toFixed(2) }}%). Consider reducing your swap amount.</span>
           </div>
         </div>
+
       </div>
 
       <!-- Error Display -->
@@ -188,9 +196,11 @@
       </div>
 
       <div class="modal-footer">
+
         <button @click="$emit('close')" class="btn btn-secondary" :disabled="isExecuting">
           Cancel
         </button>
+
         <button 
           @click="executeSwap"
           class="btn btn-primary"
@@ -205,228 +215,14 @@
             <span>Confirm Swap</span>
           </div>
         </button>
+        
       </div>
+
     </div>
+
   </div>
+
 </template>
-
-<script setup lang="ts">
-import { ref, computed, watch } from 'vue'
-import { useKongStore } from '../../stores/kong.store'
-import { useICPSwapStore } from '../../stores/icpswap.store'
-import { useTacoStore } from '../../stores/taco.store'
-
-interface Token {
-  principal: string
-  name: string
-  symbol: string
-  logo: string
-  balance: bigint
-  decimals: number
-  fee: bigint
-  priceUSD?: number
-}
-
-interface Quote {
-  exchange: 'Kong' | 'ICPSwap'
-  amountOut: bigint
-  slippage: number
-  price: number
-  fee: number
-  rawData: any
-}
-
-interface SwapData {
-  inputToken: Token
-  outputToken: Token
-  amount: string
-  selectedQuote: Quote
-  slippageTolerance: number
-}
-
-interface SwapConfirmDialogProps {
-  show: boolean
-  swapData: SwapData | null
-}
-
-interface SwapConfirmDialogEmits {
-  (e: 'close'): void
-  (e: 'success', result: any): void
-  (e: 'error', error: string): void
-}
-
-const props = defineProps<SwapConfirmDialogProps>()
-const emit = defineEmits<SwapConfirmDialogEmits>()
-
-// Stores
-const kongStore = useKongStore()
-const icpswapStore = useICPSwapStore()
-const tacoStore = useTacoStore()
-
-// State
-const swapMethod = ref<'icrc2' | 'icrc1'>('icrc2')
-const supportsICRC2 = ref(true)
-const isExecuting = ref(false)
-const executionStep = ref('')
-const errorMessage = ref('')
-const hasError = ref(false)
-
-// Computed
-const swapData = computed(() => props.swapData)
-
-// Watch for dialog opening with new swap data and clear error state
-watch([() => props.show, () => props.swapData], async ([newShow, newSwapData], [oldShow, oldSwapData]) => {
-  // Clear error when dialog opens or when swap data changes
-  if (newShow && (!oldShow || newSwapData !== oldSwapData)) {
-    hasError.value = false
-    errorMessage.value = ''
-    
-    // Auto-select swap method based on token standards
-    if (newSwapData?.inputToken) {
-      try {
-        console.log('Checking ICRC2 support for token:', newSwapData.inputToken.principal)
-        const tokenSupportsICRC2 = await tacoStore.checkTokenSupportsICRC2(newSwapData.inputToken.principal)
-        console.log('Token supports ICRC2:', tokenSupportsICRC2)
-        
-        // Update ICRC2 support state
-        supportsICRC2.value = tokenSupportsICRC2
-        
-        // Auto-select ICRC2 if supported, otherwise ICRC1
-        swapMethod.value = tokenSupportsICRC2 ? 'icrc2' : 'icrc1'
-        console.log('Auto-selected swap method:', swapMethod.value)
-      } catch (error) {
-        console.error('Error checking token standards, defaulting to ICRC1:', error)
-        supportsICRC2.value = false
-        swapMethod.value = 'icrc1' // Default to ICRC1 if check fails
-      }
-    }
-  }
-}, { immediate: true })
-
-// Methods
-const closeModal = () => {
-  if (!isExecuting.value) {
-    // Reset error state when closing
-    hasError.value = false
-    errorMessage.value = ''
-    emit('close')
-  }
-}
-
-const executeSwap = async () => {
-  if (!swapData.value || isExecuting.value) return
-
-  // Reset error state
-  hasError.value = false
-  errorMessage.value = ''
-  
-  isExecuting.value = true
-  
-  try {
-    const { inputToken, outputToken, amount, selectedQuote } = swapData.value
-    const amountIn = parseAmountToBigInt(amount, inputToken.decimals)
-    
-    // Use the user's selected slippage tolerance
-    const userSlippageTolerance = swapData.value.slippageTolerance
-    const minAmountOut = BigInt(Math.floor(Number(selectedQuote.amountOut) * (1 - userSlippageTolerance)))
-
-    let result: any
-
-    const swapParams = {
-      sellTokenPrincipal: inputToken.principal,
-      sellTokenSymbol: inputToken.symbol,
-      buyTokenPrincipal: outputToken.principal,
-      buyTokenSymbol: outputToken.symbol,
-      amountIn,
-      minAmountOut,
-      slippageTolerance: userSlippageTolerance,
-    }
-
-    // Create a step update callback
-    const updateStep = (step: string) => {
-      executionStep.value = step
-    }
-
-    // Add step callback to swap params
-    const swapParamsWithCallback = {
-      ...swapParams,
-      onStep: updateStep
-    }
-
-    if (selectedQuote.exchange === 'Kong') {
-      if (swapMethod.value === 'icrc2') {
-        executionStep.value = 'Starting ICRC2 swap...'
-        result = await kongStore.icrc2_swap(swapParamsWithCallback)
-      } else {
-        executionStep.value = 'Starting ICRC1 swap...'
-        result = await kongStore.icrc1_swap(swapParamsWithCallback)
-      }
-    } else {
-      // ICPSwap
-      if (swapMethod.value === 'icrc2') {
-        executionStep.value = 'Starting ICRC2 swap...'
-        result = await icpswapStore.icrc2_swap(swapParamsWithCallback)
-      } else {
-        executionStep.value = 'Starting ICRC1 swap...'
-        result = await icpswapStore.icrc1_swap(swapParamsWithCallback)
-      }
-    }
-
-    // Success
-    emit('success', result)
-    
-  } catch (error: any) {
-    console.error('Swap execution error:', error)
-    
-    // Show error in the dialog
-    hasError.value = true
-    errorMessage.value = error.message || 'Swap failed'
-    
-    // Also emit to parent for toast (but dialog stays open)
-    emit('error', error.message || 'Swap failed')
-  } finally {
-    isExecuting.value = false
-    executionStep.value = ''
-  }
-}
-
-const parseAmountToBigInt = (amount: string, decimals: number): bigint => {
-  const num = parseFloat(amount)
-  if (isNaN(num)) return 0n
-  
-  const multiplier = BigInt(10 ** decimals)
-  const wholePart = BigInt(Math.floor(num))
-  const fractionalPart = num - Math.floor(num)
-  const fractionalBigInt = BigInt(Math.round(fractionalPart * (10 ** decimals)))
-  
-  return wholePart * multiplier + fractionalBigInt
-}
-
-const formatBalance = (balance: bigint, decimals: number): string => {
-  const divisor = BigInt(10 ** decimals)
-  const wholePart = balance / divisor
-  const fractionalPart = balance % divisor
-  
-  if (fractionalPart === 0n) {
-    return wholePart.toString()
-  }
-  
-  const fractionalStr = fractionalPart.toString().padStart(decimals, '0')
-  const trimmedFractional = fractionalStr.replace(/0+$/, '')
-  
-  if (trimmedFractional === '') {
-    return wholePart.toString()
-  }
-  
-  return `${wholePart}.${trimmedFractional}`
-}
-
-const getPriceImpactClass = (slippage: number): string => {
-  if (slippage < 0.1) return 'impact-low'
-  if (slippage < 1) return 'impact-medium'
-  return 'impact-high'
-}
-</script>
 
 <style scoped>
 .modal-overlay {
@@ -872,3 +668,221 @@ const getPriceImpactClass = (slippage: number): string => {
   }
 }
 </style>
+
+<script setup lang="ts">
+import { ref, computed, watch } from 'vue'
+import { useKongStore } from '../../stores/kong.store'
+import { useICPSwapStore } from '../../stores/icpswap.store'
+import { useTacoStore } from '../../stores/taco.store'
+
+interface Token {
+  principal: string
+  name: string
+  symbol: string
+  logo: string
+  balance: bigint
+  decimals: number
+  fee: bigint
+  priceUSD?: number
+}
+
+interface Quote {
+  exchange: 'Kong' | 'ICPSwap'
+  amountOut: bigint
+  slippage: number
+  price: number
+  fee: number
+  rawData: any
+}
+
+interface SwapData {
+  inputToken: Token
+  outputToken: Token
+  amount: string
+  selectedQuote: Quote
+  slippageTolerance: number
+}
+
+interface SwapConfirmDialogProps {
+  show: boolean
+  swapData: SwapData | null
+}
+
+interface SwapConfirmDialogEmits {
+  (e: 'close'): void
+  (e: 'success', result: any): void
+  (e: 'error', error: string): void
+}
+
+const props = defineProps<SwapConfirmDialogProps>()
+const emit = defineEmits<SwapConfirmDialogEmits>()
+
+// Stores
+const kongStore = useKongStore()
+const icpswapStore = useICPSwapStore()
+const tacoStore = useTacoStore()
+
+// State
+const swapMethod = ref<'icrc2' | 'icrc1'>('icrc2')
+const supportsICRC2 = ref(true)
+const isExecuting = ref(false)
+const executionStep = ref('')
+const errorMessage = ref('')
+const hasError = ref(false)
+
+// Computed
+const swapData = computed(() => props.swapData)
+
+// Watch for dialog opening with new swap data and clear error state
+watch([() => props.show, () => props.swapData], async ([newShow, newSwapData], [oldShow, oldSwapData]) => {
+  // Clear error when dialog opens or when swap data changes
+  if (newShow && (!oldShow || newSwapData !== oldSwapData)) {
+    hasError.value = false
+    errorMessage.value = ''
+    
+    // Auto-select swap method based on token standards
+    if (newSwapData?.inputToken) {
+      try {
+        console.log('Checking ICRC2 support for token:', newSwapData.inputToken.principal)
+        const tokenSupportsICRC2 = await tacoStore.checkTokenSupportsICRC2(newSwapData.inputToken.principal)
+        console.log('Token supports ICRC2:', tokenSupportsICRC2)
+        
+        // Update ICRC2 support state
+        supportsICRC2.value = tokenSupportsICRC2
+        
+        // Auto-select ICRC2 if supported, otherwise ICRC1
+        swapMethod.value = tokenSupportsICRC2 ? 'icrc2' : 'icrc1'
+        console.log('Auto-selected swap method:', swapMethod.value)
+      } catch (error) {
+        console.error('Error checking token standards, defaulting to ICRC1:', error)
+        supportsICRC2.value = false
+        swapMethod.value = 'icrc1' // Default to ICRC1 if check fails
+      }
+    }
+  }
+}, { immediate: true })
+
+// Methods
+const closeModal = () => {
+  if (!isExecuting.value) {
+    // Reset error state when closing
+    hasError.value = false
+    errorMessage.value = ''
+    emit('close')
+  }
+}
+
+const executeSwap = async () => {
+  if (!swapData.value || isExecuting.value) return
+
+  // Reset error state
+  hasError.value = false
+  errorMessage.value = ''
+  
+  isExecuting.value = true
+  
+  try {
+    const { inputToken, outputToken, amount, selectedQuote } = swapData.value
+    const amountIn = parseAmountToBigInt(amount, inputToken.decimals)
+    
+    // Use the user's selected slippage tolerance
+    const userSlippageTolerance = swapData.value.slippageTolerance
+    const minAmountOut = BigInt(Math.floor(Number(selectedQuote.amountOut) * (1 - userSlippageTolerance)))
+
+    let result: any
+
+    const swapParams = {
+      sellTokenPrincipal: inputToken.principal,
+      sellTokenSymbol: inputToken.symbol,
+      buyTokenPrincipal: outputToken.principal,
+      buyTokenSymbol: outputToken.symbol,
+      amountIn,
+      minAmountOut,
+      slippageTolerance: userSlippageTolerance,
+    }
+
+    // Create a step update callback
+    const updateStep = (step: string) => {
+      executionStep.value = step
+    }
+
+    // Add step callback to swap params
+    const swapParamsWithCallback = {
+      ...swapParams,
+      onStep: updateStep
+    }
+
+    if (selectedQuote.exchange === 'Kong') {
+      if (swapMethod.value === 'icrc2') {
+        executionStep.value = 'Starting ICRC2 swap...'
+        result = await kongStore.icrc2_swap(swapParamsWithCallback)
+      } else {
+        executionStep.value = 'Starting ICRC1 swap...'
+        result = await kongStore.icrc1_swap(swapParamsWithCallback)
+      }
+    } else {
+      // ICPSwap
+      if (swapMethod.value === 'icrc2') {
+        executionStep.value = 'Starting ICRC2 swap...'
+        result = await icpswapStore.icrc2_swap(swapParamsWithCallback)
+      } else {
+        executionStep.value = 'Starting ICRC1 swap...'
+        result = await icpswapStore.icrc1_swap(swapParamsWithCallback)
+      }
+    }
+
+    // Success
+    emit('success', result)
+    
+  } catch (error: any) {
+    console.error('Swap execution error:', error)
+    
+    // Show error in the dialog
+    hasError.value = true
+    errorMessage.value = error.message || 'Swap failed'
+    
+    // Also emit to parent for toast (but dialog stays open)
+    emit('error', error.message || 'Swap failed')
+  } finally {
+    isExecuting.value = false
+    executionStep.value = ''
+  }
+}
+
+const parseAmountToBigInt = (amount: string, decimals: number): bigint => {
+  const num = parseFloat(amount)
+  if (isNaN(num)) return 0n
+  
+  const multiplier = BigInt(10 ** decimals)
+  const wholePart = BigInt(Math.floor(num))
+  const fractionalPart = num - Math.floor(num)
+  const fractionalBigInt = BigInt(Math.round(fractionalPart * (10 ** decimals)))
+  
+  return wholePart * multiplier + fractionalBigInt
+}
+
+const formatBalance = (balance: bigint, decimals: number): string => {
+  const divisor = BigInt(10 ** decimals)
+  const wholePart = balance / divisor
+  const fractionalPart = balance % divisor
+  
+  if (fractionalPart === 0n) {
+    return wholePart.toString()
+  }
+  
+  const fractionalStr = fractionalPart.toString().padStart(decimals, '0')
+  const trimmedFractional = fractionalStr.replace(/0+$/, '')
+  
+  if (trimmedFractional === '') {
+    return wholePart.toString()
+  }
+  
+  return `${wholePart}.${trimmedFractional}`
+}
+
+const getPriceImpactClass = (slippage: number): string => {
+  if (slippage < 0.1) return 'impact-low'
+  if (slippage < 1) return 'impact-medium'
+  return 'impact-high'
+}
+</script>
