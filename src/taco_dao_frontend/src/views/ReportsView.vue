@@ -9678,7 +9678,7 @@ Raid comments include all the same criterions, with the exception of the tagging
 
                     <h4 class="taco-report-explorer__report-heading
                               taco-report-explorer__report-heading--h2 mt-4">
-                      dApp Economics
+                      DApp Economics
                     </h4>
 
                     <!-- paragraph -->
