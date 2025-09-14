@@ -70,7 +70,7 @@
                 <!-- latest report link -->
                 <router-link to="/reports/clown" 
                             class="home-view__canted__link">
-                  Clown
+                  Insane Clown Protocol
                 </router-link>
 
               </div>

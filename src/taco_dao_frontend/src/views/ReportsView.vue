@@ -69,7 +69,7 @@
                       <div class="taco-report-explorer__list-report__title-container">
                         
                         <!-- report title -->
-                        <span class="taco-report-explorer__list-report__title">DUE DILIGENCE PROCESS Clown (CLOWN)</span>
+                        <span class="taco-report-explorer__list-report__title">DUE DILIGENCE PROCESS Insane Clown Protocol (CLOWN)</span>
                         
                       </div>
                       
@@ -9435,7 +9435,7 @@ when and how much of the next treasury withdrawal are also unknown.
                   <div class="taco-report-explorer__report-header">
                     
                     <!-- report title -->
-                    <h2 class="taco-report-explorer__report-header__title">DUE DILIGENCE PROCESS Clown (CLOWN)</h2>
+                    <h2 class="taco-report-explorer__report-header__title">DUE DILIGENCE PROCESS Insane Clown Protocol (CLOWN)</h2>
 
                     <!-- report metadata continer -->
                     <div class="taco-report-explorer__report-header__metadata-container">
