@@ -73,18 +73,18 @@
 
               <div v-else class="select-token-placeholder">
 
-                <i class="fa fa-plus-circle me-2" style="font-size: 2.75rem;"></i>
+                <i class="fa fa-plus-circle me-2" style="font-size: 2.75rem; color: var(--dark-brown-to-white);"></i>
 
                 <span>Select Token</span>
 
               </div>
 
-              <i class="fa fa-chevron-down"></i>
+              <i class="fa fa-chevron-down" style="color: var(--black-to-white);"></i>
 
             </div>
 
             <!-- amount input group -->
-            <div class="amount-input-wrapper">
+            <div class="amount-input-wrapper flex-wrap">
 
               <!-- amount input -->
               <input
@@ -101,7 +101,7 @@
               <button 
                 v-if="selectedInputToken"
                 @click="setMaxAmount"
-                class="btn btn-link"
+                class="btn btn-link ms-auto"
                 style="color: var(--black-to-white);">
                 
                 <span>MAX</span>
@@ -129,7 +129,7 @@
         <div class="swap-arrow">
 
           <!-- icon -->
-          <i class="fa fa-arrow-down" style="font-size: 2rem;"></i>
+          <i class="fa fa-arrow-down" style="font-size: 2rem; color: var(--black-to-white);"></i>
 
         </div>
 
@@ -259,7 +259,7 @@
         <div v-if="quotes.length > 0" class="quotes-section">
 
           <!-- quotes title -->
-          <h6 class="quotes-title">Available Quotes</h6>
+          <span class="d-inline-block mb-2" style="font-size: 1.25rem;">Available Quotes</span>
 
           <!-- quotes list -->
           <div class="quotes-list">
@@ -277,11 +277,14 @@
               <!-- quote header -->
               <div class="quote-header">
                 <div class="exchange-info">
-                  <div class="exchange-name">{{ quote.exchange }}</div>
-                  <div v-if="index === 0" class="best-badge">Best Rate</div>
+                  <div class="exchange-name"><span>{{ quote.exchange }}</span></div>
+                  <div v-if="index === 0" class="best-badge">
+                    <i class="fa fa-star"></i>
+                    <span class="text-nowrap">Best Rate</span>
+                  </div>
                 </div>
                 <div class="quote-amount">
-                  {{ formatBalance(quote.amountOut, tacoToken.decimals) }} TACO
+                  <span>{{ formatBalance(quote.amountOut, tacoToken.decimals) }} TACO</span>
                 </div>
               </div>
 
@@ -312,7 +315,7 @@
         <!-- loading state -->
         <div v-if="loadingQuotes" class="loading-quotes">
 
-          <div class="spinner-border spinner-border-sm me-2"></div>
+          <div class="spinner-border spinner-border-sm me-2" style="color: var(--black-to-white);"></div>
 
           <span>Getting quotes...</span>
 
@@ -360,30 +363,69 @@
     <!-- token select modal -->
     <div v-if="showTokenSelector" class="token-selector-overlay">
 
+        <!-- token selector dialog -->
       <div class="token-selector-dialog">
+
+        <!-- token selector header -->
         <div class="token-selector-header">
-          <h6>Select Token</h6>
-          <button @click="showTokenSelector = false" class="btn-close">
+
+          <!-- title -->
+          <span style="font-size: 1.5rem; font-weight: 600;">Select Token</span>
+
+          <!-- close button -->
+          <button @click="showTokenSelector = false" style="font-size: 1.5rem; color: var(--black-to-white);" class="btn">
+
+            <!-- icon -->
             <i class="fa fa-times"></i>
+
           </button>
+
         </div>
+
+        <!-- token list -->
         <div class="token-list">
+
+          <!-- token list item -->
           <div 
             v-for="token in availableTokens" 
             :key="token.principal"
             class="token-list-item"
             @click="selectInputToken(token)"
           >
+
+            <!-- token logo -->
             <img :src="token.logo" :alt="token.symbol" class="token-logo-small" />
+
+            <!-- token info -->
             <div class="token-info">
-              <div class="token-name">{{ token.symbol }}</div>
-              <div class="token-full-name">{{ token.name }}</div>
+
+              <!-- token name -->
+              <div class="token-name">
+
+                <span style="color: var(--black-to-white);">{{ token.symbol }}</span>
+                
+              </div>
+
+              <!-- token full name -->
+              <div class="token-full-name">
+
+                <span style="color: var(--black-to-white);">{{ token.name }}</span>
+
+              </div>
+
             </div>
+
+            <!-- token balance -->
             <div class="token-balance">
-              {{ formatBalance(token.balance, token.decimals) }}
+              
+              <!-- balance -->
+              <span style="color: var(--black-to-white);">{{ formatBalance(token.balance, token.decimals) }}</span>
+
             </div>
+
           </div>
         </div>
+
       </div>
 
     </div>
@@ -405,6 +447,11 @@
   justify-content: center;
   z-index: 1050;
   pointer-events: auto;
+
+  span {
+    color: var(--black-to-white);
+  }
+  
 }
 
 .modal-dialog {
@@ -485,7 +532,7 @@
   align-items: center;
   justify-content: space-between;
   padding: 0.5rem;
-  background: var(--light-brown);
+  background: var(--dark-orange-to-light-brown);
   border: 1px solid var(--dark-orange);
   border-radius: 0.5rem;
   cursor: pointer;
@@ -535,12 +582,14 @@
 }
 
 .amount-input {
+  min-width: 130px;
+  width: 100%;
   flex: 1;
   background: transparent;
   border: none;
   font-size: 1.5rem;
   font-weight: 600;
-  color: white;
+  color: var(--black-to-white);
   outline: none;
   font-family: 'Space Mono';
 }
@@ -580,12 +629,14 @@
   border-radius: 0.5rem;
   padding: 0.5rem;
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
   align-items: center;
 }
 
 .expected-amount {
   text-align: right;
+  margin-left: auto;
 }
 
 .amount-display {
@@ -613,29 +664,22 @@
 
 .quote-item {
   background-color: var(--dark-brown);
-  border: none;
-  outline: 1px solid var(--dark-orange);  
+  background: none;
+  outline: 1px dashed var(--dark-orange);  
   border-radius: 0.5rem;
   padding: 0.75rem;
   cursor: pointer;
-  transition: all 0.2s ease;
 }
 
-.quote-item:hover {
-  /* border-color: var(--primary-color);
-  background: rgba(var(--primary-color-rgb), 0.05); */
-}
-
-.quote-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 0.5rem;
+.quote-item.selected-quote {
+  outline: 3px solid var(--dark-orange);
+  background: var(--orange-to-brown);
+  border: none;
+  border-radius: 0.5rem;
 }
 
 .exchange-info {
   display: flex;
-  align-items: center;
   gap: 0.5rem;
 }
 
@@ -646,12 +690,19 @@
 }
 
 .best-badge {
-  background: var(--success-color);
-  color: white;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  background: var(--yellow);
   padding: 0.2rem 0.5rem;
   border-radius: 12px;
   font-size: 0.7rem;
   font-weight: 600;
+  color: var(--black);
+
+  i {
+    color: var(--dark-orange);
+  }
 }
 
 .quote-amount {
@@ -724,7 +775,7 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.7);
+  background: rgba(0, 0, 0, 0.5);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -733,9 +784,9 @@
 }
 
 .token-selector-dialog {
-  background: #2d3748;
-  border-radius: 12px;
-  border: 1px solid #4a5568;
+  background: var(--light-orange-to-brown);
+  border-radius: 0.5rem;
+  border: 1px solid var(--dark-orange);
   width: 90%;
   max-width: 400px;
   max-height: 500px;
@@ -751,7 +802,7 @@
   border-bottom: 1px solid var(--border-color);
 }
 
-.token-selector-header h6 {
+.token-selector-header {
   margin: 0;
   color: white;
   font-weight: 600;
@@ -815,37 +866,12 @@
   gap: 0.5rem;
 }
 
-.quote-item {
-  background: #1a202c;
-  border: 1px solid #4a5568;
-  border-radius: 8px;
-  padding: 0.75rem;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.quote-item:hover {
-  border-color: #63b3ed;
-  background: #2d3748;
-}
-
-.quote-item.best-quote {
-  border-color: #48bb78;
-  background: #1a2e1a;
-}
-
-.quote-item.selected-quote {
-  outline: 3px solid var(--dark-orange);
-  background: var(--brown);
-  border: none;
-  border-radius: 0.5rem;
-}
-
 .quote-header {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
   margin-bottom: 0.5rem;
+  flex-wrap: wrap;
 }
 
 .exchange-info {
@@ -858,15 +884,6 @@
   color: white;
   font-weight: 600;
   font-size: 0.9rem;
-}
-
-.best-badge {
-  background: #48bb78;
-  color: white;
-  font-size: 0.7rem;
-  padding: 0.2rem 0.5rem;
-  border-radius: 12px;
-  font-weight: 500;
 }
 
 .quote-amount {
@@ -961,6 +978,11 @@
 .slippage-info {
   color: #a0aec0;
   font-size: 0.75rem;
+}
+
+.taco-nav-btn {
+  color: var(--black-to-white);
+  border-color: var(--black-to-white);
 }
 </style>
 
@@ -1226,7 +1248,7 @@ const fetchICPSwapQuote = async (amountIn: bigint): Promise<Quote | null> => {
 
 const selectQuote = (quote: Quote) => {
   selectedQuote.value = quote
-  console.log('Selected quote:', quote)
+  // console.log('Selected quote:', quote)
 }
 
 const setSlippageTolerance = (value: number) => {
@@ -1304,6 +1326,30 @@ watch(() => props.preselectedToken, (newToken) => {
     selectedInputToken.value = newToken
   }
 }, { immediate: true })
+
+// Method to clear all swap data
+const clearSwapData = () => {
+  selectedInputToken.value = null
+  inputAmount.value = ''
+  quotes.value = []
+  selectedQuote.value = null
+  loadingQuotes.value = false
+  quotesError.value = null
+  slippageTolerance.value = 0.01 // reset to default
+  customSlippage.value = ''
+  showTokenSelector.value = false
+  
+  // clear any pending quote timeout
+  if (quoteTimeout.value) {
+    clearTimeout(quoteTimeout.value)
+    quoteTimeout.value = null
+  }
+}
+
+// Expose method to parent
+defineExpose({
+  clearSwapData
+})
 
 // Cleanup timeout on unmount
 onMounted(() => {

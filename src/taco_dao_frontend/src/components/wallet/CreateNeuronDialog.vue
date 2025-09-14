@@ -470,10 +470,10 @@ const handleCreate = async () => {
     if (result.success && result.subaccount) {
       // Set dissolve delay for the newly created neuron
       try {
-        console.log('Setting dissolve delay for new neuron...')
+        // console.log('Setting dissolve delay for new neuron...')
         const delayMonths = dissolveDays.value / 30
         await tacoStore.setNeuronDissolveDelay(result.subaccount, delayMonths)
-        console.log(`Dissolve delay set to ${dissolveDays.value} days (${delayMonths} months)`)
+        // console.log(`Dissolve delay set to ${dissolveDays.value} days (${delayMonths} months)`)
       } catch (dissolveError: any) {
         console.warn('Failed to set dissolve delay, but neuron was created:', dissolveError)
         // Don't fail the whole operation, just warn the user

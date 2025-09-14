@@ -581,7 +581,7 @@ export default {
           return
         }
 
-        console.log(`Requesting balances for ${neuronIdBlobs.length} neurons`)
+        // console.log(`Requesting balances for ${neuronIdBlobs.length} neurons`)
 
         // Use getNeuronRewardBalances instead of getAllNeuronRewardBalances (admin-only)
         const balances = await rewardsActor.getNeuronRewardBalances(neuronIdBlobs)
@@ -593,7 +593,7 @@ export default {
           neuronBalances.value.set(neuronIdHex, balance)
         }
 
-        console.log(`Successfully loaded ${neuronBalances.value.size} neuron balances`)
+        // console.log(`Successfully loaded ${neuronBalances.value.size} neuron balances`)
 
       } catch (error) {
         console.error('Error loading neuron balances:', error)

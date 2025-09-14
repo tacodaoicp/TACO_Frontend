@@ -254,6 +254,18 @@
           <!-- actions -->
           <div class="d-flex gap-2">
 
+            <!-- swap button -->
+            <button @click="$emit('swap', token)"
+                    class="btn taco-btn taco-btn--green px-3 py-1">
+
+              <!-- icon -->
+              <i class="fa fa-exchange-alt me-1"></i>
+
+              <!-- text -->
+              <span>Swap</span>
+
+            </button>            
+
             <!-- send button -->
             <button @click="$emit('send', token)"
                     class="btn taco-btn taco-btn--green px-3 py-1"
@@ -264,18 +276,6 @@
 
               <!-- text -->
               <span>Send</span>
-
-            </button>
-
-            <!-- swap button -->
-            <button @click="$emit('swap', token)"
-                    class="btn taco-btn taco-btn--green px-3 py-1">
-
-              <!-- icon -->
-              <i class="fa fa-exchange-alt me-1"></i>
-
-              <!-- text -->
-              <span>Swap</span>
 
             </button>
 
@@ -1044,7 +1044,7 @@ const claimNeuronRewards = async (neuron: any) => {
       throw new Error('Invalid neuron ID format - expected Uint8Array')
     }
     
-    console.log('Claiming rewards for neuron:', neuron.idHex, 'with ID:', neuron.id)
+    // console.log('Claiming rewards for neuron:', neuron.idHex, 'with ID:', neuron.id)
     
     // Call the real claim function with the neuron ID
     const success = await tacoStore.claimNeuronRewards([neuron.id])
@@ -1108,11 +1108,11 @@ const loadRewards = async () => {
   try {
     // Use the same approach as RewardsView - work with raw neurons directly
     const rawNeurons = await tacoStore.getTacoNeurons()
-    console.log('Raw neurons for rewards:', rawNeurons)
+    // console.log('Raw neurons for rewards:', rawNeurons)
     
     // Load real rewards data from taco store using raw neurons
     const rewardsMap = await tacoStore.loadNeuronRewardBalances(rawNeurons)
-    console.log('Rewards map from store:', rewardsMap)
+    // console.log('Rewards map from store:', rewardsMap)
     
     // Convert the rewards map to use neuron hex IDs as keys for the categorized neurons
     const neuronRewards = new Map<string, number>()
@@ -1120,12 +1120,12 @@ const loadRewards = async () => {
       if (neuron.idHex) {
         const balance = rewardsMap.get(neuron.idHex) || 0
         neuronRewards.set(neuron.idHex, balance)
-        console.log(`Neuron ${neuron.idHex}: ${balance} rewards`)
+        // console.log(`Neuron ${neuron.idHex}: ${balance} rewards`)
       }
     }
     
     neuronBalances.value = neuronRewards
-    console.log('Final neuron balances:', neuronBalances.value)
+    // console.log('Final neuron balances:', neuronBalances.value)
   } catch (error) {
     console.error('Error loading rewards:', error)
   } finally {

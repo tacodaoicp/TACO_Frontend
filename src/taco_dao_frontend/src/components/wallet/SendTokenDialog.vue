@@ -3,7 +3,7 @@
   <div v-if="show" class="modal d-block" tabindex="-1">
 
     <!-- modal dialog -->
-    <div class="modal-dialog modal-lg">
+    <div class="modal-dialog">
 
       <!-- modal content -->
       <div class="modal-content">
@@ -67,7 +67,7 @@
                 v-model="recipient" 
                 required
                 :class="{ 'is-invalid': recipientError }"
-                placeholder="Enter recipient principal or account ID"
+                placeholder="Enter principal or account ID"
               />
 
               <!-- invalid feedback -->
@@ -157,33 +157,6 @@
                 <span class="fw-bold">Estimated USD value:</span>
                 <span class="ms-auto">${{ formatUSDValue(totalDeducted, token.decimals, token.priceUSD) }}</span>
               </div>
-
-            </div>
-
-            <!-- memo container -->
-            <div class="memo-container mb-3">
-
-              <!-- memo label -->
-              <label class="form-label">
-                <span class="memo-label">Memo <span class="small">(Optional)</span></span>
-              </label>
-
-              <!-- memo input -->
-              <textarea 
-                class="form-control taco-input" 
-                v-model="memo"
-                rows="2"
-                maxlength="32"
-                placeholder="Optional transaction memo">
-              </textarea>
-
-              <!-- memo input container -->
-              <div class="d-flex w-100 justify-content-end">
-
-                <!-- memo length -->
-                <span class="small">{{ memo.length }}/32 characters</span>
-
-              </div>              
 
             </div>
 

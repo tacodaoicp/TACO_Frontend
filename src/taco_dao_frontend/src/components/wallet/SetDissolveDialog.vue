@@ -165,6 +165,11 @@
   justify-content: center;
   z-index: 1050;
   pointer-events: auto;
+
+  span {
+    color: var(--black-to-white);
+  }
+  
 }
 
 .modal-dialog {
@@ -347,13 +352,13 @@ const setDissolveDelay = async () => {
   errorMessage.value = ''
 
   try {
-    console.log('Setting dissolve delay for neuron:', props.neuron.idHex, 'to', dissolveDays.value, 'days')
+    // console.log('Setting dissolve delay for neuron:', props.neuron.idHex, 'to', dissolveDays.value, 'days')
     
     // Convert days to months for the backend function
     const delayMonths = dissolveDays.value / 30
     const result = await tacoStore.setNeuronDissolveDelay(props.neuron.id, delayMonths)
     
-    console.log('Dissolve delay set successfully:', result)
+    // console.log('Dissolve delay set successfully:', result)
 
     // Also show toast notification
     tacoStore.addToast({

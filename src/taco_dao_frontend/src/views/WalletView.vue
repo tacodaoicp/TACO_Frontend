@@ -238,6 +238,7 @@
 
     <!-- Swap Dialog -->
     <SwapDialog
+      ref="swapDialogRef"
       :show="showSwapDialog"
       :preselected-token="selectedTokenForSwap"
       :available-tokens="allTokens"
@@ -414,6 +415,7 @@ const showSwapDialog = ref(false)
 const showSwapConfirmDialog = ref(false)
 const selectedTokenForSwap = ref<WalletToken | null>(null)
 const swapConfirmData = ref<any | null>(null)
+const swapDialogRef = ref<any>(null)
 const allTokenBalances = ref<Map<string, bigint>>(new Map())
 const userRegisteredTokenPrincipals = ref<string[]>([])
 const customTokenMetadata = ref<Map<string, any>>(new Map())
@@ -591,12 +593,21 @@ const loadWalletData = async () => {
       tacoStore.fetchTokenDetails(),
       fetchUserRegisteredTokens()
     ])
+
+    // turn app loading on
+    appLoadingOn()    
     
     // Load fresh metadata for trusted tokens using ICRC1 calls
     await loadTrustedTokenMetadata()
+
+    // turn app loading on
+    appLoadingOn()    
     
     // Load balances for all tokens
     await loadAllBalances()
+
+    // turn app loading on
+    appLoadingOn()    
     
   } catch (error) {
     console.error('Error loading wallet data:', error)
@@ -632,23 +643,23 @@ const fetchUserRegisteredTokens = async () => {
 
 // load custom token metadata
 const loadCustomTokenMetadata = async () => {
-  console.log('Loading custom token metadata for:', userRegisteredTokenPrincipals.value)
+  // console.log('Loading custom token metadata for:', userRegisteredTokenPrincipals.value)
       const tokenDetailsMap = new Map(tacoStore.fetchedTokenDetails.map((entry) => [entry[0].toString(), entry[1]]))
   
   // Load metadata for tokens not in trusted list
   for (const principal of userRegisteredTokenPrincipals.value) {
-    console.log(`Processing token: ${principal}`)
+    // console.log(`Processing token: ${principal}`)
     if (!tokenDetailsMap.has(principal)) {
-      console.log(`Token ${principal} not in trusted list, loading custom metadata`)
+      // console.log(`Token ${principal} not in trusted list, loading custom metadata`)
       try {
         // Clear cache and fetch fresh metadata to get real ICRC1 data
-        console.log(`Clearing cache and fetching fresh metadata for ${principal}`)
+        // console.log(`Clearing cache and fetching fresh metadata for ${principal}`)
         tacoStore.clearTokenMetadataCache(principal)
         const metadata = await tacoStore.fetchTokenMetadata(principal)
-        console.log(`Fetched fresh metadata for ${principal}:`, metadata)
+        // console.log(`Fetched fresh metadata for ${principal}:`, metadata)
         customTokenMetadata.value.set(principal, metadata)
       } catch (error) {
-        console.error(`Error loading metadata for token ${principal}:`, error)
+        // console.error(`Error loading metadata for token ${principal}:`, error)
         // Set default metadata
         const defaultMetadata = {
           name: `Custom Token (${principal.slice(0, 5)}...)`,
@@ -658,18 +669,18 @@ const loadCustomTokenMetadata = async () => {
           logo: null
         }
         customTokenMetadata.value.set(principal, defaultMetadata)
-        console.log(`Set default metadata for ${principal}:`, defaultMetadata)
+        // console.log(`Set default metadata for ${principal}:`, defaultMetadata)
       }
     } else {
-      console.log(`Token ${principal} is in trusted list, skipping`)
+      // console.log(`Token ${principal} is in trusted list, skipping`)
     }
   }
-  console.log('Final customTokenMetadata:', customTokenMetadata.value)
+  // console.log('Final customTokenMetadata:', customTokenMetadata.value)
 }
 
 // load trusted token metadata
 const loadTrustedTokenMetadata = async () => {
-  console.log('Loading fresh metadata for trusted tokens')
+  // console.log('Loading fresh metadata for trusted tokens')
   
   // Get all trusted token principals
   const trustedTokenPrincipals = tacoStore.fetchedTokenDetails
@@ -686,16 +697,16 @@ const loadTrustedTokenMetadata = async () => {
     })
     .map(entry => entry[0].toString())
   
-  console.log('Trusted token principals to refresh:', trustedTokenPrincipals)
+  // console.log('Trusted token principals to refresh:', trustedTokenPrincipals)
   
   // Load fresh metadata for each trusted token
   for (const principal of trustedTokenPrincipals) {
     try {
-      console.log(`Loading fresh metadata for trusted token: ${principal}`)
+      // console.log(`Loading fresh metadata for trusted token: ${principal}`)
       // Clear cache to ensure we get fresh data
       tacoStore.clearTokenMetadataCache(principal)
       const metadata = await tacoStore.fetchTokenMetadata(principal)
-      console.log(`Fetched fresh metadata for ${principal}:`, metadata)
+      // console.log(`Fetched fresh metadata for ${principal}:`, metadata)
       customTokenMetadata.value.set(principal, metadata)
     } catch (error) {
       console.error(`Error loading metadata for trusted token ${principal}:`, error)
@@ -703,11 +714,15 @@ const loadTrustedTokenMetadata = async () => {
     }
   }
   
-  console.log('Finished loading trusted token metadata')
+  // console.log('Finished loading trusted token metadata')
 }
 
 // load all balances
 const loadAllBalances = async () => {
+
+  // turn app loading on
+  appLoadingOn()
+  
   const allTokens = [
     ...coreTokens.value,
     ...trustedTokens.value,
@@ -721,10 +736,18 @@ const loadAllBalances = async () => {
     } catch (error) {
       console.error(`Error fetching balance for ${token.symbol}:`, error)
       allTokenBalances.value.set(token.principal, 0n)
+
+      // turn app loading off
+      appLoadingOff()
+
     }
   })
   
   await Promise.all(balancePromises)
+
+  // turn app loading off
+  appLoadingOff()
+  
 }
 
 // open send dialog
@@ -818,7 +841,7 @@ const unregisterToken = async (token: WalletToken) => {
 
 // handle stake to neuron
 const handleStakeToNeuron = (neuron: any) => {
-  console.log('Stake to neuron:', neuron)
+  // console.log('Stake to neuron:', neuron)
   selectedNeuron.value = neuron
   showStakeDialog.value = true
 }
@@ -831,7 +854,7 @@ const closeStakeDialog = () => {
 
 // handle stake completed
 const handleStakeCompleted = async (neuron: any) => {
-  console.log('Staking completed for neuron:', neuron)
+  // console.log('Staking completed for neuron:', neuron)
   // Refresh wallet data to show updated balances
   await loadWalletData()
 }
@@ -844,7 +867,7 @@ const getTacoBalance = (): bigint => {
 
 // handle create neuron
 const handleCreateNeuron = () => {
-  console.log('Create neuron clicked')
+  // console.log('Create neuron clicked')
   showCreateDialog.value = true
 }
 
@@ -855,7 +878,7 @@ const closeCreateDialog = () => {
 
 // handle neuron created
 const handleNeuronCreated = async () => {
-  console.log('Neuron created successfully')
+  // console.log('Neuron created successfully')
   // Refresh wallet data to show updated balances
   await loadWalletData()
 }
@@ -891,7 +914,11 @@ const handleDissolveSet = async () => {
 
 // register custom token
 const registerCustomToken = async () => {
+  
   if (!newTokenPrincipal.value.trim()) return
+
+  // turn app loading on
+  appLoadingOn()
   
   try {
     registeringToken.value = true
@@ -958,6 +985,10 @@ const registerCustomToken = async () => {
     })
   } finally {
     registeringToken.value = false
+
+    // turn app loading off
+    appLoadingOff()
+
   }
 }
 
@@ -967,10 +998,22 @@ const openSwapDialog = (token: WalletToken) => {
   showSwapDialog.value = true
 }
 
+// clear all swap data
+const clearSwapData = () => {
+  // clear wallet view state
+  selectedTokenForSwap.value = null
+  swapConfirmData.value = null
+  
+  // clear swap dialog internal state
+  if (swapDialogRef.value && swapDialogRef.value.clearSwapData) {
+    swapDialogRef.value.clearSwapData()
+  }
+}
+
 // close swap dialog
 const closeSwapDialog = () => {
   showSwapDialog.value = false
-  selectedTokenForSwap.value = null
+  clearSwapData()
 }
 
 // handle swap confirm
@@ -983,12 +1026,12 @@ const handleSwapConfirm = (swapData: any) => {
 // close swap confirm dialog
 const closeSwapConfirmDialog = () => {
   showSwapConfirmDialog.value = false
-  swapConfirmData.value = null
+  clearSwapData()
 }
 
 // handle swap success
 const handleSwapSuccess = async (result: any) => {
-  console.log('Swap successful:', result)
+  // console.log('Swap successful:', result)
   
   // Close the confirm dialog
   closeSwapConfirmDialog()
@@ -1040,7 +1083,7 @@ onMounted(async () => {
     if (tacoStore.userLoggedIn) {
 
       // log
-      console.log('User is logged in, loading wallet data')
+      // console.log('User is logged in, loading wallet data')
 
       // load wallet data
       await loadWalletData()
@@ -1051,7 +1094,7 @@ onMounted(async () => {
     else {
 
       // log
-      console.log('User not logged in, showing login prompt')
+      // console.log('User not logged in, showing login prompt')
 
       // turn app loading off
       appLoadingOff()
