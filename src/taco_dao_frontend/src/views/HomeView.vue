@@ -68,9 +68,9 @@
                 <span class="home-view__canted__title">Latest Report</span>
 
                 <!-- latest report link -->
-                <router-link to="/reports/neutrinite" 
+                <router-link to="/reports/clown" 
                             class="home-view__canted__link">
-                  Neutrinite & cICP
+                  Clown
                 </router-link>
 
               </div>
