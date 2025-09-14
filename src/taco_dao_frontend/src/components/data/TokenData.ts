@@ -54,6 +54,7 @@ import dolrToken from "../../assets/tokens/snspng/dolr.png"
 import fuelEvToken from "../../assets/tokens/snspng/fuelev.png"
 import sgldtToken from "../../assets/tokens/sgldt.png"
 import cicpToken from "../../assets/tokens/cicp.png"
+import clownToken from "../../assets/tokens/clown.png"
 
 //////////////
 // mappings //
@@ -110,6 +111,7 @@ export const tokenImages: { [key: string]: string } = {
 "FomoWell": fomoWellToken,
 "sGLDT": sgldtToken,
 "cICP": cicpToken,
+"Clown": clownToken,
 }  
 
 //////////
@@ -596,5 +598,14 @@ export const tokenData = [
         icon: cicpToken,
         description: `cICP is a liquid staking token (compounding stream ICP) designed to align long-term incentives on the Internet Computer (IC). When you mint cICP, 95-98% of the ICP provided as mint_input is staked into an 8-year neuron. The voting rewards from this neuron are disbursed daily into the buyback stream, where ICP is used to purchase cICP via a vector, and the purchased cICP is burned. cICP doesn't unlock.`,
         color: '#0c0f23'
+    },
+    {
+        title: 'Clown',
+        symbol: 'clown',
+        link: 'https://social.insaneclownprotocol.com/',
+        icpCoinsLink: 'https://neutrinite.io/currencies/CLOWN',
+        icon: clownToken,
+        description: `Clown is a unique social mining platform that allows users to earn rewards for engagement and content creation within its social ecosystem.`,
+        color: '#4da2d6'
     }
 ]
