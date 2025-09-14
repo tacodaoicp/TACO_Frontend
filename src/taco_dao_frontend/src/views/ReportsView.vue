@@ -54,6 +54,29 @@
                 <!-- reports list -->
                 <ul class="taco-report-explorer__list">
 
+                  <!-- clown - report item -->
+                  <li class="taco-report-explorer__list-item" @click="toggleReportMenuOnMobile(); router.push('/reports/clown')">
+                    
+                    <!-- report -->
+                    <div class="taco-report-explorer__list-report"
+                    :class="{ 'taco-report-explorer__list-report--active': reportId === 9 }">
+                      
+                      <!-- report title icon -->              
+                      <div class="taco-report-explorer__list-report__icon"
+                          :style="{ backgroundImage: `url(${clownIconUrl})` }"></div>            
+                      
+                      <!-- report title container -->
+                      <div class="taco-report-explorer__list-report__title-container">
+                        
+                        <!-- report title -->
+                        <span class="taco-report-explorer__list-report__title">DUE DILIGENCE PROCESS Clown (CLOWN)</span>
+                        
+                      </div>
+                      
+                    </div>
+                    
+                  </li>
+
                   <!-- neutrinite - report item -->
                   <li class="taco-report-explorer__list-item" @click="toggleReportMenuOnMobile(); router.push('/reports/neutrinite')">
                     
@@ -8892,7 +8915,7 @@ place.
                             
                             <!-- paragraph -->
                             <p>
-250 ICP ($1320) will result in a trade to 243.9235 cICP ($1311.3) 0.659% lost to price impac
+250 ICP ($1320) will result in a trade to 243.9235 cICP ($1311.3) 0.659% lost to price impact
                             </p>
                             
                           </li>
@@ -9350,19 +9373,19 @@ when and how much of the next treasury withdrawal are also unknown.
                     <div class="taco-report-explorer__report-footer__right">
 
                       <!-- link group -->
-                      <!-- <span class="d-flex flex-column align-items-end">
+                      <span class="d-flex flex-column align-items-end">
 
-                        <span class="text-end">#45 Add Token</span>
+                        <span class="text-end">#103 Add Token</span>
 
                         <span class="d-flex gap-2">
 
-                          <a href="https://nns.ic0.app/proposal/?u=lacdn-3iaaa-aaaaq-aae3a-cai&proposal=45" class="taco-text-blue-to-light-blue text-end" target="_blank">NNS</a>                        
+                          <a href="https://nns.ic0.app/proposal/?u=lacdn-3iaaa-aaaaq-aae3a-cai&proposal=103" class="taco-text-blue-to-light-blue text-end" target="_blank">NNS</a>                        
 
-                          <a href="https://app.sneeddao.com/proposal?proposalid=45&sns=lacdn-3iaaa-aaaaq-aae3a-cai" class="taco-text-blue-to-light-blue text-end" target="_blank">Sneed Hub</a>
+                          <a href="https://tacodao.com/chat/forum/103" class="taco-text-blue-to-light-blue text-end">Taco Forum</a>
 
                         </span>
                         
-                      </span> -->
+                      </span>
                       
                       <!-- link group -->
                       <span class="d-flex flex-column align-items-end">
@@ -9401,6 +9424,1210 @@ when and how much of the next treasury withdrawal are also unknown.
                 </div>
                 
               </div>
+
+              <!-- clown dd report -->
+              <div v-if="reportId === 9" class="taco-report-explorer__report-container">
+
+                <!-- inner -->
+                <div class="taco-report-explorer__report-container__inner">
+                
+                  <!-- report header -->
+                  <div class="taco-report-explorer__report-header">
+                    
+                    <!-- report title -->
+                    <h2 class="taco-report-explorer__report-header__title">DUE DILIGENCE PROCESS Clown (CLOWN)</h2>
+
+                    <!-- report metadata continer -->
+                    <div class="taco-report-explorer__report-header__metadata-container">
+
+                      <!-- report metadata -->
+                      <span class="taco-report-explorer__report-header__metadata">
+                        <i class="fa-solid fa-luchador-mask"></i> 
+                        <span> Written by TrickyVik</span>
+                        <span class="small"> 09/2025</span>
+                      </span>
+
+                    </div>        
+                    
+                  </div>
+
+                  <!-- report body -->
+                  <div class="taco-report-explorer__report-body">
+                    
+                    <!-- heading -->
+                    <h3 class="taco-report-explorer__report-heading
+                              taco-report-explorer__report-heading--h1">
+                      Team Background
+                      <i class="fa-solid fa-circle-info" 
+                        data-bs-toggle="tooltip" 
+                        data-bs-placement="top" 
+                        title="Assess the founding team's transparency, credibility, experience, and any past contributions to the ICP ecosystem"></i>
+                    </h3>
+                    
+                    <!-- paragraph -->
+                    <p>
+Insane Clown Protocol started as an ICP-based memecoin over two years ago. I could not find a public
+record of its full history, but according to information collated from community members, the project has
+lost most of its value twice over, and has had four transfers of 'leadership'. The second last developer in
+charge was <a href="https://x.com/joeyboeyboyo" target="_blank">Joey</a>, until, in March, Sergei took over and the project fledged from a memecoin into a dApp
+with 'social mining' utility. Sergei had been working on this dApp, mostly in stealth, for eight months.
+                    </p>
+
+                    <!-- paragraph -->
+                    <p>
+I could not find public information on the team. The following information was sourced from team
+members:
+                    </p>
+
+                    <!-- unordered list -->
+                    <ul>
+                      
+                      <!-- list item -->
+                      <li>
+
+                        <!-- paragraph -->
+                        <p>
+<a href="https://x.com/let4be" target="_blank">Sergei</a> is the only developer, having ~ 25 years of experience. He has a background in distributed
+computing and security + 'a little bit of everything'. He has been developing on ICP for two
+years
+                        </p>
+
+                      </li>
+
+                      <!-- list item -->
+                      <li>
+
+                        <!-- paragraph -->
+                        <p>
+Christian is in charge of community relations. He previously worked as a paramedic and believes
+the communication skills built in this role transfer over to community relations. He is also the
+creator of the <a href="https://x.com/Snoge222" target="_blank">SNOGE</a> project, a component of which includes/included hosting X spaces focused
+on ICP projects
+                        </p>
+
+                      </li>
+
+                      <!-- list item -->
+                      <li>
+
+                        <!-- paragraph -->
+                        <p>
+Whi1ol has been helping with the front-end and visual/UX elements
+                        </p>
+
+                      </li>
+
+                      <!-- list item -->
+                      <li>
+
+                        <!-- paragraph -->
+                        <p>
+<a href="https://x.com/Craigersuk" target="_blank">Rizzinator</a> made the logo, and helps with graphics and community relations. He is a senior
+designer with 15 years of industry experience. He designed some logos for TACO DAO prior to
+TACO DAO's team deciding to go with EgidoVal
+                        </p>
+
+                      </li>
+
+                      <!-- list item -->
+                      <li>
+
+                        <!-- paragraph -->
+                        <p>
+Badri has made some videos and animations
+                        </p>
+
+                      </li>
+
+                      <!-- list item -->
+                      <li>
+
+                        <!-- paragraph -->
+                        <p>
+<a href="https://x.com/omniaicp" target="_blank">Omnia</a>, an ICP-based active X user, helps with the shilling
+                        </p>
+
+                      </li>
+
+                      <!-- list item -->
+                      <li>
+
+                        <!-- paragraph -->
+                        <p>
+<a href="https://x.com/Thebitcoinbarbi" target="_blank">Barbie</a> helps with the shilling. She is an active X user who was previously based outside the ICP
+ecosystem
+                        </p>
+
+                      </li>
+
+                    </ul>
+
+                    <!-- paragraph -->
+                    <p>
+The team was described as 'self-assembled'. It should not be assumed that all individuals mentioned
+above are team members, they may also just be contributors. This should also not be assumed to be an
+exhaustive list of contributors.
+                    </p>
+
+                    <hr>
+
+                    <!-- heading -->
+                    <h3 class="taco-report-explorer__report-heading
+                              taco-report-explorer__report-heading--h1">
+                      Token Utility
+                      <i class="fa-solid fa-circle-info" 
+                        data-bs-toggle="tooltip" 
+                        data-bs-placement="top" 
+                        title="Examine the token's purpose and functionality within its ecosystem to ensure it provides tangible value and practical use cases"></i>
+                    </h3>
+
+                    <!-- paragraph -->
+                    <p>
+The $CLOWN token benefits from income generated on the Insane Clown Protocol dApp, as a large
+amount of this income is used to buy $CLOWN (pushing the price up) and store it in the treasury for later
+uses, such as liquidity provision.
+                    </p>
+
+                    <h4 class="taco-report-explorer__report-heading
+                              taco-report-explorer__report-heading--h2 mt-4">
+                      Allocations & Raids
+                    </h4>
+
+                    <!-- paragraph -->
+                    <p>
+The Insane Clown Protocol dApp connects 'allocation' creators and 'raid' creators with 'social miners'.
+Allocation creators offer token rewards for <a href="https://x.com/" target="_blank">X posts</a> that meet certain criteria, and social miners earn these
+rewards by creating X posts that meet the criteria. Raids do the same but with X comments on a target
+post.
+                    </p>
+
+                    <!-- paragraph -->
+                    <p>
+Allocations include the following parameters: criteria, duration, optional reward halving (diminishing
+rewards over time), and optional scheduled start. Raid parameters include deadline, comment criteria, and
+raid targets. Raid rewards are only disbursed if all raid targets have been met. Raid targets include total
+comment amounts, repost amounts, like amounts, bookmark amounts, and participant amounts. If raid
+targets are not met, every participating party is refunded.
+                    </p>
+
+                    <!-- paragraph -->
+                    <p>
+Post criterions can include:
+                    </p>
+
+                    <!-- unordered list -->
+                    <ul>
+                      
+                      <!-- list item -->
+                      <li>
+
+                        <!-- paragraph -->
+                        <p>
+Tagging a certain account
+                        </p>
+
+                      </li>
+
+                      <!-- list item -->
+                      <li>
+
+                        <!-- paragraph -->
+                        <p>
+Containing certain tickers and/or hashtags
+                        </p>
+
+                      </li>
+
+                      <!-- list item -->
+                      <li>
+
+                        <!-- paragraph -->
+                        <p>
+Containing certain links
+                        </p>
+
+                      </li>
+
+                      <!-- list item -->
+                      <li>
+
+                        <!-- paragraph -->
+                        <p>
+Containing certain text
+                        </p>
+
+                      </li>
+
+                      <!-- list item -->
+                      <li>
+
+                        <!-- paragraph -->
+                        <p>
+Passing an AI filter for content type, including filters for sentiment, politeness, meaning, and
+depth
+                        </p>
+
+                      </li>
+
+                    </ul>
+
+                    <!-- paragraph -->
+                    <p>
+Raid comments include all the same criterions, with the exception of the tagging criterion.
+                    </p>
+
+                    <h4 class="taco-report-explorer__report-heading
+                              taco-report-explorer__report-heading--h2 mt-4">
+                      dApp Economics
+                    </h4>
+
+                    <!-- paragraph -->
+                    <p>
+Social miners compete with each other for rewards. An undisclosed scoring algorithm and the level of
+each social miner's 'Clown Printer' determine reward distribution for posts. Raid comment rewards are
+determined by the same factors, plus an earliness weight that pays more for earlier qualifying comments.
+The scoring algorithm consists of engagement tracking and AI analysis. Clown Printers are upgraded with
+Clown Tickets (CTX).
+                    </p>
+
+                    <!-- paragraph -->
+                    <p>
+CTX is non-transferrable and illiquid. The mechanisms of obtaining CTX include: claiming it from a
+daily 'giftbox', earning it from posts, buying it with ICP, or 'dusting'. The giftbox gives out a randomised
+amount with a maximum of 8,888 CTX. Social miners currently earn CTX from posts via a single,
+platform-wide Free For All (FFA) CTX allocation (created by Sergei) that mirrors aggregate rewards from
+all other non-FFA allocations across the dApp. CTX can be bought with ICP in one of three
+deals/envelopes: 5 ICP for 250,000 CTX, 15 ICP for 850,000 CTX, or 99 ICP for 8,888,888 CTX.
+                    </p>
+
+                    <!-- paragraph -->
+                    <p>
+The proceeds from these CTX sales are split in the following manner:
+                    </p>
+
+                    <!-- unordered list -->
+                    <ul>
+                      
+                      <!-- list item -->
+                      <li>
+
+                        <!-- paragraph -->
+                        <p>
+10% for dApp operational expenses (cycles, API, off-chain services)
+                        </p>
+
+                      </li>
+
+                      <!-- list item -->
+                      <li>
+
+                        <!-- paragraph -->
+                        <p>
+13% to Sergei
+                        </p>
+
+                      </li>
+
+                      <!-- list item -->
+                      <li>
+
+                        <!-- paragraph -->
+                        <p>
+27% for direct $CLOWN buyback on ICPSwap
+                        </p>
+
+                      </li>
+
+                      <!-- list item -->
+                      <li>
+
+                        <!-- paragraph -->
+                        <p>
+50% to the treasury to be used for other expenses or additional $CLOWN buyback
+                        </p>
+
+                      </li>
+
+                    </ul>
+
+                    <!-- paragraph -->
+                    <p>
+So far, over 6% of the $CLOWN supply has been bought back.
+                    </p>
+
+                    <!-- paragraph -->
+                    <p>
+The free Clown Printer granted at account creation is virtually worthless. It has a 1x reward multiplier.
+The first Clown Printer upgrade currently costs 62,500 CTX and grants a 55x reward multiplier. There is a
+limit on the number of posts a social miner can submit per day, and only one can be submitted per hour.
+Some posts come free daily and some posts have to be paid for with CTX (2.5k per post). The daily post
+limit and free post amount depends on the Clown Printer's level. There are 12 upgrades currently on offer,
+the maximum costing 30,868,050 CTX (on the top of previous upgrades), offering a 220x reward
+multiplier, and having a 10 maximum posts per day limit. The price of a Clown Printer upgrade is
+increasing with time.
+                    </p>
+
+                    <!-- paragraph -->
+                    <p>
+Alongside claiming earned rewards, social miners have the option to 'dust' them, which converts them to
+CTX. The conversion rate here is based on the price of CTX in the cheapest envelope (5 ICP/250,000
+CTX) and the available liquidity for the tokens that are about to get dusted. The level of your printer
+either gives a worse or better deal. For example, the first upgrade has a 'dusting efficiency' of 85%. Daily
+dusting limits also exist, which increase with higher printer levels. Tokens with bad liquidity cannot be
+dusted. Dusted tokens are sold, and the resulting funds are used to buy back $CLOWN. This accrues in
+the 'Seasonal Clown Rewards' for approximately a month (one season). At the end of each season, the
+accrued $CLOWN is distributed in the following manner: 20% is distributed between allocation creators
+(weighted by tokens contributed), 30% is sent equally between users of the dApp who have bound an X
+account, and 50% is sent to the treasury. The dusting feature appears to not be used much.
+                    </p>
+
+                    <!-- paragraph -->
+                    <p>
+Creating an allocation charges a fee of 108,888 CTX. Creating a raid charges a fee of 88,888 CTX. An
+'SNS Funded' feature exists for creating allocations, where the dApp creates an SNS Treasury Transfer
+proposal in a targeted SNS DAO to fund an allocation. This action is initiated by 'finders'. The initiation
+fee charged to finders is the SNS's proposal rejection fee converted from ICP to CTX at the
+cheapest-envelope rate (5 ICP = 250,000 CTX), with a 50,000 CTX minimum. If the targeted SNS
+accepts the proposal, the Finder gets 8% of the allocated amount.
+                    </p>
+
+                    <h4 class="taco-report-explorer__report-heading
+                              taco-report-explorer__report-heading--h2 mt-4">
+                      Roadmap
+                    </h4>
+
+                    <!-- paragraph -->
+                    <p>
+There is no public roadmap. From talking with Sergei, I have identified that the near term plans include a
+referral program, and that the long term plans include SNS-ification.
+                    </p>
+                    
+                    <hr>
+
+                    <!-- heading -->
+                    <h3 class="taco-report-explorer__report-heading
+                              taco-report-explorer__report-heading--h1">
+                      Ecosystem Alignment
+                      <i class="fa-solid fa-circle-info" 
+                        data-bs-toggle="tooltip" 
+                        data-bs-placement="top" 
+                        title="Evaluate the token's synergy with other ICP projects, including any existing collaborations and suitability for inclusion in the Salsa Season rewards program."></i>
+                    </h3>
+
+                    <!-- paragraph -->
+                    <p>
+Subjectively speaking, X appears to be the main stage for public attention and discovery of new
+cryptocurrency projects. Insane Clown Protocol provides a straightforward means for ICP projects to pay
+to get posted about on X. These posts can be general or focus on something specific, such as an upcoming
+update. This could help ICP projects get broader attention, as well as inform broader audiences on
+narratives they'd like to receive focus on. It also enables ICP-based content creators on X to be
+programmatically rewarded for their work. If this project's reach extends beyond ICP's ecosystem, its
+novel nature and unique use case may give significant attention to ICP's powerful tech stack.
+                    </p>
+
+                    <!-- paragraph -->
+                    <p>
+So far, there have been allocations for projects such as KongSwap, TACO DAO, Yral, ELNA, Kinic, and
+ICPSwap.
+                    </p>
+
+                    <!-- paragraph -->
+                    <p>
+Other examples of ecosystem alignment include:
+                    </p>
+
+                    <!-- unordered list -->
+                    <ul>
+                      
+                      <!-- list item -->
+                      <li>
+
+                        <!-- paragraph -->
+                        <p>
+Co-hosting X spaces with KongSwap
+                        </p>
+
+                      </li>
+
+                      <!-- list item -->
+                      <li>
+
+                        <!-- paragraph -->
+                        <p>
+$CLOWN being used for tipping on OpenChat
+                        </p>
+
+                      </li>
+
+                      <!-- list item -->
+                      <li>
+
+                        <!-- paragraph -->
+                        <p>
+Neutrinite's vectors being used in revenue loops
+                        </p>
+
+                      </li>
+
+                    </ul>
+
+                    <hr>
+
+                    <!-- heading -->
+                    <h3 class="taco-report-explorer__report-heading
+                              taco-report-explorer__report-heading--h1">
+                      Community
+                      <i class="fa-solid fa-circle-info" 
+                        data-bs-toggle="tooltip" 
+                        data-bs-placement="top" 
+                        title="Assess the size and engagement of the token's community to gauge long-term adoption potential"></i>
+                    </h3>
+
+                    <!-- paragraph -->
+                    <p>
+The Telegram group has 392 members and the OpenChat community has 5575 members. On X, clownitx
+has 439 followers. They had an X account with 2000+ followers but they lost access to that one.
+                    </p>
+
+                    <!-- paragraph -->
+                    <p>
+<a href="https://clown.it.com/#about" target="_blank">According to the dApp</a>, there's a total of 1618 dApp users, 930 of which are verified (on X).
+                    </p>
+                    
+                    <hr>
+
+                    <!-- heading -->
+                    <h3 class="taco-report-explorer__report-heading
+                              taco-report-explorer__report-heading--h1">
+                      Technology
+                      <i class="fa-solid fa-circle-info" 
+                        data-bs-toggle="tooltip" 
+                        data-bs-placement="top" 
+                        title="Review the project's technical foundation, focusing on code quality, scalability, and how effectively it leverages ICP's capabilities"></i>
+                    </h3>
+
+                    <!-- paragraph -->
+                    <p>
+The code has not been open-sourced and Sergei is the sole controller of the Insane Clown Protocol dApp.
+The following information is what has been shared by Sergei and what can be inferred from the dApp.
+                    </p>
+
+                    <!-- paragraph -->
+                    <p>
+The dApp is hosted 100% on-chain with minimal off-chain dependencies.
+                    </p>
+
+                    <!-- paragraph -->
+                    <p>
+Users verify their X page by posting a verification code the dApp provides them with. X feed tracking is
+used for automatic verification.
+                    </p>
+
+                    <!-- paragraph -->
+                    <p>
+Each post submitted to the dApp deemed eligible is scored, and then rewarded pro-rata to its share of the
+total score in the relevant pool. Rewards are emitted in discrete 'blocks', of which there are 88 per day.
+                    </p>
+
+                    <!-- paragraph -->
+                    <p>
+Inputs to scoring include:
+                    </p>
+
+                    <!-- unordered list -->
+                    <ul>
+                      
+                      <!-- list item -->
+                      <li>
+
+                        <!-- paragraph -->
+                        <p>
+Post engagement tracking in real-time and from recent times
+                        </p>
+
+                      </li>
+
+                      <!-- list item -->
+                      <li>
+
+                        <!-- paragraph -->
+                        <p>
+AI (Deepseek) analysis via an on-chain ↔ off-chain bridge
+                        </p>
+
+                      </li>
+
+                      <!-- list item -->
+                      <li>
+
+                        <!-- paragraph -->
+                        <p>
+Static filters that change scores depending on formatting and what kind of content is encountered
+                        </p>
+
+                      </li>
+
+                      <!-- list item -->
+                      <li>
+
+                        <!-- paragraph -->
+                        <p>
+Clown Printer level
+                        </p>
+
+                      </li>
+
+                    </ul>
+
+                    <!-- paragraph -->
+                    <p>
+The team has kept the exact details of the scoring private so social miners can't game it, but they provide
+public tips on X.
+                    </p>
+
+                    <!-- paragraph -->
+                    <p>
+Neutrinite's vectors are used in the revenue loops from envelope sales.
+                    </p>
+
+                    <!-- paragraph -->
+                    <p>
+Metrics on the 'About' page are updated close to realtime. A real-time quoting service (built-in to the
+backend) provides price data from ICPSwap for USD estimates across the dApp, and for liquidity
+estimation when the dusting feature is used.
+                    </p>
+                    
+                    <hr>
+
+                    <!-- anon container -->
+                    <div class="d-flex flex-wrap" style="gap: 1rem 3rem;">
+
+                      <!-- left -->
+                      <div>
+
+                        <!-- heading -->
+                        <h3 class="taco-report-explorer__report-heading
+                                  taco-report-explorer__report-heading--h1">
+                          Tokenomics
+                          <i class="fa-solid fa-circle-info" 
+                            data-bs-toggle="tooltip" 
+                            data-bs-placement="top" 
+                            title="Analyse the supply and distribution of the token; any inflationary/deflationary mechanisms; and any incentive structures, to ensure sustainability and fair distribution"></i>
+                        </h3>
+
+                        <!-- unordered list -->
+                        <ul>
+
+                          <!-- list item -->
+                          <li>
+                            
+                            <!-- paragraph -->
+                            <p>
+                              Total Supply: 999,999,909
+                            </p>
+                            
+                          </li>                        
+                          
+                          <!-- list item -->
+                          <li>
+                            
+                            <!-- paragraph -->
+                            <p>
+                              Burn per transaction: 0.0005 CLOWN
+                            </p>
+                            
+                          </li>
+                          
+                          <!-- holders -->
+                          <li>
+                            
+                            <!-- paragraph -->
+                            <p>
+                              Holders:
+                            </p>
+
+                            <!-- unordered list -->
+                            <ul style="list-style-type: disc">
+
+                              <!-- list item -->
+                              <li>
+                                
+                                <!-- paragraph -->
+                                <p>
+                                  Top - 7.37%
+                                </p>
+
+                              </li>
+
+                              <!-- list item -->
+                              <li>
+                                
+                                <!-- paragraph -->
+                                <p>
+                                  Second - 6.79%
+                                </p>
+                                
+                              </li>
+                              
+                              <!-- list item -->
+                              <li>
+                                
+                                <!-- paragraph -->
+                                <p>
+                                  Third - 6.43% (Treasury)
+                                </p>
+                                
+                              </li>
+                              
+                              <!-- list item -->
+                              <li>
+                                
+                                <!-- paragraph -->
+                                <p>
+                                  Mean of Top 25 - 3.1048%
+                                </p>
+                                
+                              </li>
+                              
+                              <!-- list item -->
+                              <li>
+                                
+                                <!-- paragraph -->
+                                <p>
+                                  Median of Top 25 - 2.92%
+                                </p>
+                                
+                              </li>
+                              
+                              <!-- list item -->
+                              <li>
+                                
+                                <!-- paragraph -->
+                                <p>
+                                  Top 25 Total - 77.62%
+                                </p>
+                                
+                              </li>
+                              
+                              <!-- list item -->
+                              <li>
+                                
+                                <!-- paragraph -->
+                                <p>
+                                  Mean of Top 100 - 0.9671%
+                                </p>
+                                
+                              </li>
+                              
+                              <!-- list item -->
+                              <li>
+                                
+                                <!-- paragraph -->
+                                <p>
+                                  Median of Top 100 - 0.23%
+                                </p>
+                                
+                              </li>
+                              
+                              <!-- list item -->
+                              <li>
+                                
+                                <!-- paragraph -->
+                                <p>
+                                  Top 100 Total - 96.71%
+                                </p>
+                                
+                              </li>                          
+
+                            </ul>
+                            
+                          </li> 
+                          
+                          <!-- treasury -->
+                          <li>
+                            
+                            <!-- paragraph -->
+                            <p>
+                              Treasury (controlled by Sergei):
+                            </p>
+
+                            <!-- unordered list -->
+                            <ul style="list-style-type: disc">
+
+                              <!-- list item -->
+                              <li>
+                                
+                                <!-- paragraph -->
+                                <p>
+                                  64,357,304.33 CLOWN ($47,817.47)
+                                </p>
+
+                              </li>  
+                              
+                              <!-- list item -->
+                              <li>
+                                
+                                <!-- paragraph -->
+                                <p>
+                                  55.21 ICP (like two n a half hundos)
+                                </p>
+
+                              </li>                             
+
+                            </ul>
+                            
+                          </li>
+
+                        </ul>
+
+                      </div>
+
+                      <!-- center -->
+                      <div>
+
+                        <!-- heading -->
+                        <h3 class="taco-report-explorer__report-heading
+                                  taco-report-explorer__report-heading--h1">
+                          Market Metrics
+                          <i class="fa-solid fa-circle-info" 
+                            data-bs-toggle="tooltip" 
+                            data-bs-placement="top" 
+                            title="Review key indicators such as trading volume and historical market performance."></i>
+                        </h3>
+
+                        <!-- unordered list -->
+                        <ul>
+
+                          <!-- list item -->
+                          <li>
+                            
+                            <!-- paragraph -->
+                            <p>
+                              All Time High (USD): 0.0010921
+                            </p>
+                            
+                          </li>
+
+                          <!-- list item -->
+                          <li>
+                            
+                            <!-- paragraph -->
+                            <p>
+                              All Time Low (USD): 0.0000189
+                            </p>
+                            
+                          </li>
+                          
+                          <!-- list item -->
+                          <li>
+                            
+                            <!-- paragraph -->
+                            <p>
+                              As at 08/09/25 (USD): 0.0007344
+                            </p>
+                            
+                          </li>
+                          
+                          <!-- list item -->
+                          <li>
+                            
+                            <!-- paragraph -->
+                            <p>
+                              Change from ATH USD: -32.7534%
+                            </p>
+                            
+                          </li>                      
+
+                          <!-- list item -->
+                          <li>
+                            
+                            <!-- paragraph -->
+                            <p>
+                              Change from ATL USD: 3785.71%
+                            </p>
+
+                          </li>
+
+                          <!-- list item -->
+                          <li>
+                            
+                            <!-- paragraph -->
+                            <p>
+                              USD Volume 24H as at 08/09/25: 17,831
+                            </p>
+                            
+                          </li>
+
+                        </ul>                        
+
+                      </div>
+
+                      <!-- right -->
+                      <div>
+
+                        <!-- heading -->
+                        <h3 class="taco-report-explorer__report-heading
+                                  taco-report-explorer__report-heading--h1">
+                          Liquidity
+                        </h3>
+
+                        <!-- paragraph -->
+                        <p>
+                          As per <a href="https://swaprunner.com" target="_blank">SwapRunner</a> on the 8th of September, a single transaction of:
+                        </p>
+
+                        <!-- unordered list -->
+                        <ul>
+
+                          <!-- list item -->
+                          <li>
+                            
+                            <!-- paragraph -->
+                            <p>
+20000 ICP ($96587.12) will result in a trade to 44908061.14 CLOWN ($33140.03). 65.69% lost
+to price impact
+                            </p>
+                            
+                          </li>
+
+                          <!-- list item -->
+                          <li>
+                            
+                            <!-- paragraph -->
+                            <p>
+10000 ICP ($48293.56) will result in a trade to 35960647.24 CLOWN ($26537.26). 45.05% lost
+to price impact
+                            </p>
+                            
+                          </li>
+                          
+                          <!-- list item -->
+                          <li>
+                            
+                            <!-- paragraph -->
+                            <p>
+1000 ICP ($4829.36) will result in a trade to 5912008.688 CLOWN ($4362.78). 9.66% lost to
+price impact
+                            </p>
+                            
+                          </li>
+                          
+                          <!-- list item -->
+                          <li>
+                            
+                            <!-- paragraph -->
+                            <p>
+250 ICP ($1207.34) will result in a trade to 1591528.242 CLOWN ($1174.47) 2.72% lost to price
+impact
+                            </p>
+                            
+                          </li>
+
+                        </ul>
+
+                        <!-- paragraph -->
+                        <p>
+As can be seen, liquidity for CLOWN remains very limited. If liquidity is not recycled, and there are no
+'sells' between the DAO's 'buys', the effective slippage rate will be identical regardless of whether
+multiple small transactions or one large one take place.
+                        </p>
+
+                      </div>                      
+
+                    </div>
+
+                    <hr>
+
+                    <!-- headings -->
+                    <h3 class="taco-report-explorer__report-heading
+                              taco-report-explorer__report-heading--h1">
+                      Competitors
+                      <i class="fa-solid fa-circle-info" 
+                        data-bs-toggle="tooltip" 
+                        data-bs-placement="top" 
+                        title="Identify similar projects and assess the token's differentiators alongside the perceived competitive positioning within its niche"></i>
+                    </h3>
+
+                    <!-- paragraph -->
+                    <p>
+Insane Clown Protocol is competing with everything that offers paid attention acquisition.
+                    </p>
+
+                    <h4 class="taco-report-explorer__report-heading
+                              taco-report-explorer__report-heading--h2 mt-4">
+                      SocialFi
+                    </h4>
+
+                    <!-- paragraph -->
+                    <p>
+SocialFi is the financialisation of social interactions. There are several popular SocialFi projects.
+                    </p>
+
+                    <!-- paragraph -->
+                    <p>
+Several of these projects can be categorised as quest rails. This category includes projects such as
+<a href="https://x.com/taskonxyz" target="_blank">TaskOn</a>, <a href="https://x.com/zealy_io" target="_blank">Zealy</a>, <a href="https://x.com/Galxe" target="_blank">Galxe</a>, and <a href="https://x.com/layer3xyz" target="_blank">Layer3</a>. These services enable projects wanting engagement to reward users
+for engagement. Such engagement generally includes checklist tasks - follow/post/reply/like on X, join a
+Discord server, attend an event such as an AMA, swap, provide liquidity, bridge, fill out a quiz, etc. Such
+incentives exist for a few reasons. New users attracted by them may stick around after the experience. The
+existing community may be encouraged to stay engaged and learn more about the project. Checklist items
+such as liking posts and following the page may improve appearances
+                    </p>
+
+                    <!-- paragraph -->
+                    <p>
+Quality over quantity is the relevant adage here. These paid-for checklist tasks may provide temporary
+traffic, but that doesn't ensure anyone will stick around. Allocation creators on the Insane Clown Protocol
+dApp do not pay for checkboxes, the funds that they allocate are competed over with scored posts,
+potentially resulting in high quality posts. This methodology in providing a service that bolsters
+engagement may prove superior in its stickiness compared to the methodology utilised by established
+platforms. Because payouts are tied to quality rather than mere completion, spend concentrates on moving
+sentiment and discovery, potentially tending toward higher retention and a better
+cost-per-meaningful-engagement.
+                    </p>
+
+                    <!-- paragraph -->
+                    <p>
+Other relevant SocialFi projects, such as <a href="https://x.com/farcaster_xyz" target="_blank">Farcaster</a> and <a href="https://x.com/desoprotocol" target="_blank">DeSo</a>, are their own social platforms, differing
+from Insane Clown Protocol, which operates as a layer on top of X. For positioning, it's basically breadth
+vs. depth: X delivers broader, more general exposure, while crypto-native socials deliver deeper
+engagement among more informed audiences. As established in the previous paragraph, Insane Clown
+Protocol focuses on depth, and it is doing so on the platform with breadth. This appears to be a
+well-rounded position.
+                    </p>
+
+                    <h4 class="taco-report-explorer__report-heading
+                              taco-report-explorer__report-heading--h2 mt-4">
+                      Web2 Ads & Paid Reach
+                    </h4>
+
+                    <!-- paragraph -->
+                    <p>
+Outside of SocialFi, Insane Clown Protocol is competing with the existing Web2 behemoths of paid
+attention. These include the obvious channels such as ads on X, Google, Facebook, TikTok, YouTube, as
+well as the influencer economy where projects pay individuals, agencies, or networks to push content.
+                    </p>
+
+                    <!-- paragraph -->
+                    <p>
+Web2 ads are precise in their targeting, but they're also expensive and saturated. Buying impressions on X
+doesn't mean buying engagement, it means paying to appear in a feed that people are conditioned to scroll
+past. Agencies and influencer deals offer more texture, but they are high-touch and can be opaque. Rates
+are set on gut feel and follower counts, rather than a transparent marketplace. Projects can spend
+thousands of dollars on a sponsored thread, a video review, or an AMA slot and still be wondering if it
+moved the needle.
+                    </p>
+
+                    <!-- paragraph -->
+                    <p>
+In this light, Insane Clown Protocol resembles a hybrid. It plugs into X like an ad rail, but instead of
+buying impressions, it funds posts that are scored and rewarded pro-rata against a pool. If adopted, it
+could function as a permissionless attention marketplace, removing the haggling, middlemen, and inflated
+pricing. Web2 ads and agencies rely on top-down deals and vanity metrics; Insane Clown Protocol may
+create a bottom-up system where creators compete for rewards based on the attention they generate.
+                    </p>
+
+                    <!-- paragraph -->
+                    <p>
+Additionally, while individual providers may be cautious about promoting something that could trigger
+their audience or raise suspicion, a DAO protocol (which Insane Clown Protocol aims to be) doesn't
+suffer from that kind of selective hesitation. There is no single gatekeeper deciding what deserves
+promotion. This removes the bottleneck of personal discretion and replaces it with collective mechanics,
+ensuring that even controversial or niche narratives can still find amplification if the incentives are there.
+                    </p>                    
+
+                    <hr>
+                   
+                    <!-- heading -->
+                    <h3 class="taco-report-explorer__report-heading
+                              taco-report-explorer__report-heading--h1">
+                      Security Risks
+                      <i class="fa-solid fa-circle-info" 
+                        data-bs-toggle="tooltip" 
+                        data-bs-placement="top" 
+                        title="Investigate perceived vulnerabilities, any audit reports, and adherence to security and regulatory standards"></i>
+                    </h3>
+
+                    <h4 class="taco-report-explorer__report-heading
+                              taco-report-explorer__report-heading--h2 mt-4">
+                      One Controller
+                    </h4>
+
+                    <!-- paragraph -->
+                    <p>
+The code is closed-source and Sergei is the dApp's only controller. He has not made preparations for a
+handover of the code for the scenario in which he meets an untimely demise. This means that if he were to
+disappear for whatever reason, the dApp would likely eventually stop running for good (once it
+encounters a bug), therefore devaluing $CLOWN. Additionally, I assume it is possible for him to do
+anything in the dApp, such as mint and distribute an unlimited amount of CTX, max out anyone's Clown
+Printer, etc. This could raise some concerns about the state and fairness of existing accounts on the dApp
+when they do decide to SNSify.
+                    </p>
+
+                    <h4 class="taco-report-explorer__report-heading
+                              taco-report-explorer__report-heading--h2 mt-4">
+                      No External Audit
+                    </h4>
+
+                    <!-- paragraph -->
+                    <p>
+The code has only been internally audited. Without independent verification, the risk of undiscovered
+vulnerabilities existing is higher.
+                    </p>
+
+                    <h4 class="taco-report-explorer__report-heading
+                              taco-report-explorer__report-heading--h2 mt-4">
+                      X Reliance
+                    </h4>
+
+                    <!-- paragraph -->
+                    <p>
+The project is entirely reliant on and largely at the mercy of X. The dApp becomes useless if X goes
+down.
+                    </p>
+
+                    <!-- paragraph -->
+                    <p>
+X's Engagement Spam <a href="https://help.x.com/en/rules-and-policies/authenticity" target="_blank">policy</a> prohibits compensating users for metrics such as Likes, Replies, or
+Reposts. While Insane Clown Protocol structures these incentives through transparent, competitive pools
+rather than bot farms, the underlying mechanism could still be interpreted as “account metric inflation.” If
+X decides to enforce this rule strictly, the project and its users risk account flags, suspensions, or bans.
+This risk will grow as Insane Clown Protocol grows in reach.
+                    </p>
+
+                    <h4 class="taco-report-explorer__report-heading
+                              taco-report-explorer__report-heading--h2 mt-4">
+                      Regulatory Risk
+                    </h4>
+
+                    <!-- paragraph -->
+                    <p>
+Regulatory scrutiny around undisclosed paid promotion is a risk. While enforcement usually focuses on
+large campaigns or high-profile influencers, the fact that CLOWN directly incentivizes undisclosed
+posting could expose both allocation creators and the protocol to scrutiny in strict jurisdictions. The risk is
+elevated if the protocol achieves mainstream scale, but lower if activity remains fragmented and
+pseudonymous.
+                    </p>
+
+                    <h4 class="taco-report-explorer__report-heading
+                              taco-report-explorer__report-heading--h2 mt-4">
+                      Scoring Concerns
+                    </h4>
+
+                    <!-- paragraph -->
+                    <p>
+The team has not disclosed the exact details of how posts are scored because they do not want to enable
+users to game this scoring. However, the scoring algorithm will be open-sourced when the project
+decentralizes, making the static filter and AI analysis parts of the scoring fully game-able. It is unknown
+how much the engagement part of the scoring contributes to the overall score, or how exactly engagement
+is determined. However, assuming a chunk of it is made up of likes, replies, and reposts, farmers could
+coordinate to inflate that portion of their scores. Altogether, this could mean that allocation funds will be
+extracted rather than put to good use, unless the team has a really good plan in place for separating value
+from spam.
+                    </p>
+
+                    <h4 class="taco-report-explorer__report-heading
+                              taco-report-explorer__report-heading--h2 mt-4">
+                      Unvalidated
+                    </h4>
+
+                    <!-- paragraph -->
+                    <p>
+Effectiveness remains unproven. While allocations that target post URLs have boosted impressions, it's
+still unclear how much of those impressions translate into meaningful engagement, and it will remain
+unclear until Insane Clown Protocol has long-running return customers (having demonstrated
+effectiveness to them).
+                    </p>
+
+                    <!-- paragraph -->
+                    <p>
+While managing the TACO DAO X page, I noticed that impressions on posts dropped below baseline
+(what they were pre-allocation) once an allocation ended. If I were to speculate as to why, I'd suggest that
+the influx of posts tagging the account (often with AI generated images) conditions users to quickly swipe
+past, which in turn teaches the X For You algorithm that people are not interested in seeing this account or
+posts related to it. The negative impact towards the main account did not occur when we set the allocation
+to tag/target the tacojak account instead. Take this shallow observation with a grain of salt
+                    </p>
+
+                    <hr>
+                    
+                    <!-- back to top link -->
+                    <a href="#" @click.prevent="scrollToTop" class="taco-report-explorer__report-link text-center w-100 d-inline-block mt-2">Back to top</a>
+                    
+                  </div>
+
+                  <!-- report footer -->
+                  <div class="taco-report-explorer__report-footer">
+                    
+                    <!-- left -->
+                    <div class="taco-report-explorer__report-footer__left">
+                      
+                      ❤️🌮
+                      
+                    </div>
+                    
+                    <!-- center -->
+                    <div class="taco-report-explorer__report-footer__center text-center">
+                      
+                      &copy;2025 Taco Dao
+                      
+                    </div>
+                    
+                    <!-- right -->
+                    <div class="taco-report-explorer__report-footer__right">
+
+                      <!-- link group -->
+                      <!-- <span class="d-flex flex-column align-items-end">
+
+                        <span class="text-end">#45 Add Token</span>
+
+                        <span class="d-flex gap-2">
+
+                          <a href="https://nns.ic0.app/proposal/?u=lacdn-3iaaa-aaaaq-aae3a-cai&proposal=45" class="taco-text-blue-to-light-blue text-end" target="_blank">NNS</a>                        
+
+                          <a href="https://app.sneeddao.com/proposal?proposalid=45&sns=lacdn-3iaaa-aaaaq-aae3a-cai" class="taco-text-blue-to-light-blue text-end" target="_blank">Sneed Hub</a>
+
+                        </span>
+                        
+                      </span> -->
+                      
+                      <!-- link group -->
+                      <!-- <span class="d-flex flex-column align-items-end">
+
+                        <span class="text-end">#99 Motion to Discuss</span>
+
+                        <span class="d-flex gap-2">
+
+                          <a href="https://nns.ic0.app/proposal/?u=lacdn-3iaaa-aaaaq-aae3a-cai&proposal=99" class="taco-text-blue-to-light-blue text-end" target="_blank">NNS</a>
+
+                          <a href="https://tacodao.com/chat/forum/99" class="taco-text-blue-to-light-blue text-end">Taco Forum</a>
+
+                        </span>
+                        
+                      </span> -->
+
+                      <!-- link group -->
+                      <span class="d-flex flex-column align-items-end">
+
+                        <span class="text-end">#31 Motion to Research</span>
+
+                        <span class="d-flex gap-2">
+
+                          <a href="https://nns.ic0.app/proposal/?u=lacdn-3iaaa-aaaaq-aae3a-cai&proposal=31" class="taco-text-blue-to-light-blue text-end" target="_blank">NNS</a>
+
+                          <a href="https://tacodao.com/chat/forum/31" class="taco-text-blue-to-light-blue text-end">Taco Forum</a>
+
+                        </span>
+                        
+                      </span>                      
+
+                    </div>
+                    
+                  </div>
+
+                </div>
+                
+              </div>              
               
             </div>
             
@@ -9932,6 +11159,7 @@ when and how much of the next treasury withdrawal are also unknown.
   import openChatIcon from '../assets/tokens/snspng/openchat.png'
   import kongSwapIcon from '../assets/tokens/snspng/kongswap.png'
   import neutriniteIcon from '../assets/tokens/snspng/neutrinite.png'
+  import clownIcon from '../assets/tokens/clown.png'
   
   ///////////
   // store //
@@ -9968,6 +11196,7 @@ when and how much of the next treasury withdrawal are also unknown.
   const openChatIconUrl = openChatIcon
   const kongSwapIconUrl = kongSwapIcon
   const neutriniteIconUrl = neutriniteIcon
+  const clownIconUrl = clownIcon
 
   // show report menu on mobile
   const showReportMenuOnMobile = ref(false)
@@ -10062,6 +11291,8 @@ when and how much of the next treasury withdrawal are also unknown.
       reportId.value = 7
     } else if (newPath === '/reports/neutrinite') {
       reportId.value = 8
+    } else if (newPath === '/reports/clown') {
+      reportId.value = 9
     } else if (newPath === '/reports/example') {
       reportId.value = 0
     }
