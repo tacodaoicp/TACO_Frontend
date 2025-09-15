@@ -763,7 +763,7 @@ export default {
     rewardDistributionArchiveCanisterId() {
       switch (process.env.DFX_NETWORK) {
         case "ic":
-          return process.env.CANISTER_ID_REWARD_DISTRIBUTION_ARCHIVE_IC || 'ddfi2-eiaaa-aaaan-qz5nq-cai';
+          return process.env.CANISTER_ID_REWARD_DISTRIBUTION_ARCHIVE_IC || 'uqkap-jiaaa-aaaan-qz6tq-cai';
         case "staging":
           return process.env.CANISTER_ID_REWARD_DISTRIBUTION_ARCHIVE_STAGING || 'ddfi2-eiaaa-aaaan-qz5nq-cai';
       }
@@ -773,7 +773,7 @@ export default {
     rewardWithdrawalArchiveCanisterId() {
       switch (process.env.DFX_NETWORK) {
         case "ic":
-          return process.env.CANISTER_ID_REWARD_WITHDRAWAL_ARCHIVE_IC || 'dwczx-faaaa-aaaan-qz5oa-cai';
+          return process.env.CANISTER_ID_REWARD_WITHDRAWAL_ARCHIVE_IC || 'v5eeb-gaaaa-aaaan-qz6ua-cai';
         case "staging":
           return process.env.CANISTER_ID_REWARD_WITHDRAWAL_ARCHIVE_STAGING || 'dwczx-faaaa-aaaan-qz5oa-cai';
       }
