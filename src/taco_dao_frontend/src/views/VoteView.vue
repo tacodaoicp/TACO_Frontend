@@ -568,6 +568,13 @@
                           Match Last
                         </button>
 
+                        <!-- lock/unlock all button -->
+                        <button v-if="userLoggedIn && !userLockedVote"
+                          class="btn taco-btn taco-btn--green btn-sm"
+                          @click="toggleLockAll">
+                          {{ allSlidersLocked ? 'Unlock All' : 'Lock All' }}
+                        </button>
+
                       </div>
 
                     </div>
@@ -3275,6 +3282,11 @@
 
   )
 
+  // computed property to check if all sliders are locked
+  const allSlidersLocked = computed(() =>
+    currentSliders.value.length > 0 && currentSliders.value.every((token: any) => token.isLocked)
+  )
+
   // distributes the reduction of delta among the unlocked tokens
   function distributeReduction(delta: number, freeIndices: number[]): boolean {
 
@@ -3467,6 +3479,14 @@
   // toggle the locked state for a token
   function toggleLock(index: number) {
     currentSliders.value[index].isLocked = !currentSliders.value[index].isLocked
+  }
+
+  // toggle the locked state for all tokens
+  function toggleLockAll() {
+    const shouldLockAll = !allSlidersLocked.value
+    currentSliders.value.forEach((token: any) => {
+      token.isLocked = shouldLockAll
+    })
   }
 
   // how many history allocations to show
