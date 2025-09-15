@@ -5979,62 +5979,6 @@ export const useTacoStore = defineStore('taco', () => {
         }
     }
 
-    // Start dissolving for a neuron
-    const startDissolving = async (neuronId: Uint8Array) => {
-        try {
-            if (!userLoggedIn.value) {
-                throw new Error('User must be logged in');
-            }
-
-            console.log('Starting dissolving for neuron:', Array.from(neuronId).map(b => b.toString(16).padStart(2, '0')).join(''));
-
-            const authClient = await getAuthClient();
-            const identity = authClient.getIdentity();
-            
-            const agent = await createAgent({
-                identity,
-                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-                fetchRootKey: process.env.DFX_NETWORK === "local",
-            });
-
-            // Create SNS Governance actor
-            const snsGov = await createSnsGovernanceActor(agent, 'lhdfz-wqaaa-aaaaq-aae3q-cai');
-            
-            // Prepare the manage neuron request for StartDissolving
-            const manageNeuronRequest = {
-                subaccount: Array.from(neuronId),
-                command: [{
-                    Configure: {
-                        operation: [{
-                            StartDissolving: {}
-                        }]
-                    }
-                }]
-            };
-
-            console.log('StartDissolving request:', JSON.stringify(manageNeuronRequest));
-
-            const result = await snsGov.manage_neuron(manageNeuronRequest) as any;
-            console.log('StartDissolving result:', result);
-
-            if (result.command && result.command.length > 0) {
-                const command = result.command[0];
-                if (command.Error) {
-                    throw new Error(`StartDissolving failed: ${JSON.stringify(command)}`);
-                }
-                if (command.Configure) {
-                    console.log('Dissolving started successfully');
-                    return true;
-                }
-            }
-
-            throw new Error('Unexpected response format from manage_neuron');
-        } catch (error: any) {
-            console.error('Error starting dissolving:', error);
-            throw error;
-        }
-    }
-
     // Disburse neuron funds
     const disburseNeuron = async (neuronId: Uint8Array, toAccount?: any, amount?: bigint) => {
         try {
@@ -7920,8 +7864,6 @@ export const useTacoStore = defineStore('taco', () => {
         getGrantablePermissions,
         toggleThreadMenu,
         ensureTokenDetails,
-        startDissolving,
-        stopDissolving,
         checkTokenSupportsICRC2,
 
         //Wallet functions
