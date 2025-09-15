@@ -363,7 +363,7 @@
                 <div class="d-flex gap-2">
 
                   <!-- stake to neuron button -->
-                  <button @click.stop="dismissTooltips(); $emit('stake-to-neuron', neuron)"
+                  <button @click.stop="$emit('stake-to-neuron', neuron); dismissTooltips()"
                           class="btn btn-sm taco-btn taco-btn--green px-2 py-1"
                           data-bs-toggle="tooltip"
                           data-bs-placement="bottom"
@@ -372,6 +372,21 @@
 
                     <!-- icon -->
                     <i class="fa fa-plus"></i>
+
+                  </button>
+
+                  <!-- disburse neuron button -->
+                  <!-- @click.stop="disburseNeuron(neuron)" -->
+                  <button v-if="neuron.dissolveState.display === '0s'"
+                          @click.stop="dismissTooltips()"
+                          class="btn btn-sm taco-btn taco-btn--green px-2 py-1"
+                          data-bs-toggle="tooltip"
+                          data-bs-placement="bottom"
+                          data-bs-custom-class="taco-tooltip"
+                          title="Disburse neuron">
+
+                    <!-- icon -->
+                    <i class="fa fa-coins"></i>
 
                   </button>
 
@@ -408,7 +423,7 @@
                 </span>
 
                 <!-- start dissolving button -->
-                <button v-if="true" @click.stop="dismissTooltips();"
+                <button v-if="neuron.dissolveState.type === 'delay' && neuron.dissolveState.display !== '0s'" @click.stop="dismissTooltips(); startDissolving(neuron.id)"
                         class="btn btn-sm taco-btn taco-btn--green px-2 py-1"
                         data-bs-toggle="tooltip"
                         data-bs-placement="bottom"
@@ -418,10 +433,10 @@
                   <!-- check icon -->
                   <i class="fa fa-check"></i>
 
-                </button>
+                </button>                 
 
                 <!-- stop dissolving button -->
-                <button v-if="false" @click.stop="dismissTooltips();"
+                <button v-else @click.stop="dismissTooltips(); stopDissolving(neuron.id)"
                         class="btn btn-sm taco-btn taco-btn--green px-2 py-1"
                         data-bs-toggle="tooltip"
                         data-bs-placement="bottom"
@@ -431,7 +446,7 @@
                   <!-- x icon -->
                   <i class="fa fa-xmark"></i>
 
-                </button>                
+                </button>                               
 
               </div>
               
@@ -598,7 +613,7 @@
                 <div class="d-flex gap-2">
 
                   <!-- stake to neuron button -->
-                  <button @click.stop="$emit('stake-to-neuron', neuron)"
+                  <button @click.stop="$emit('stake-to-neuron', neuron); dismissTooltips()"
                           class="btn btn-sm taco-btn taco-btn--green px-2 py-1"
                           data-bs-toggle="tooltip"
                           data-bs-placement="bottom"
@@ -683,7 +698,7 @@
                 </span>
 
                 <!-- copy neuron id button -->
-                <button @click.stop="copy(neuron.idHex); addToast({
+                <button @click.stop="dismissTooltips(); copy(neuron.idHex); addToast({
                             id: Date.now(),
                             code: 'code',
                             tradeAmount: '',
@@ -929,6 +944,65 @@ defineEmits<TokenCardEmits>()
 
 // Taco store for neuron operations
 const tacoStore = useTacoStore()
+
+// start dissolving
+const startDissolving = async (neuronId: Uint8Array) => {
+
+  // turn app loading on
+  tacoStore.appLoadingOn()
+
+  // log
+  // console.log('Starting dissolving for neuron:', neuronId)
+  await tacoStore.startDissolving(neuronId)
+
+  // log
+  // console.log('Dissolving started for neuron:', neuronId)
+
+  // toast notification
+  tacoStore.addToast({
+    id: Date.now(),
+    code: '',
+    title: 'Dissolving Started',
+    icon: 'fa-solid fa-check',
+    message: 'Started dissolving neuron'
+  })
+
+  // load neurons
+  loadNeurons()
+
+  // turn app loading off
+  tacoStore.appLoadingOff()
+
+}
+
+// stop dissolving
+const stopDissolving = async (neuronId: Uint8Array) => {
+
+  // turn app loading on
+  tacoStore.appLoadingOn()
+
+  // log
+  // console.log('Stopping dissolving for neuron:', neuronId)
+  await tacoStore.stopDissolving(neuronId)
+  // log
+  // console.log('Dissolving stopped for neuron:', neuronId)
+
+  // toast notification
+  tacoStore.addToast({
+    id: Date.now(),
+    code: '',
+    title: 'Dissolving Stopped',
+    icon: 'fa-solid fa-xmark',
+    message: 'Stopped dissolving neuron'
+  })
+
+  // load neurons
+  loadNeurons()
+
+  // turn app loading off
+  tacoStore.appLoadingOff()
+
+}
 
 // Clipboard functionality
 const { copy } = useClipboard()

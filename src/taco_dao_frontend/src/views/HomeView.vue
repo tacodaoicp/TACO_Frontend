@@ -374,7 +374,7 @@
           <div class="home-view__pitch-point">
 
             <!-- left -->
-            <img :src="TacoChefWave" alt="placeholder" loading="lazy" class="home-view__pitch-point__image home-view__pitch-point__image--lg">
+            <img :src="TacoChefWave" alt="placeholder" class="home-view__pitch-point__image home-view__pitch-point__image--lg">
 
             <!-- right -->
             <div class="home-view__pitch-point__right">
@@ -393,7 +393,7 @@
           <div class="home-view__pitch-point">
 
             <!-- left -->
-            <img :src="TacoChefTaco" alt="placeholder" loading="lazy" class="home-view__pitch-point__image">
+            <img :src="TacoChefTaco" alt="placeholder" class="home-view__pitch-point__image">
 
             <!-- right -->
             <div class="home-view__pitch-point__right">
@@ -412,7 +412,7 @@
           <div class="home-view__pitch-point">
 
             <!-- left -->
-            <img :src="TacoChefFriends" alt="placeholder" loading="lazy" class="home-view__pitch-point__image">
+            <img :src="TacoChefFriends" alt="placeholder" class="home-view__pitch-point__image">
 
             <!-- right -->
             <div class="home-view__pitch-point__right">
@@ -431,7 +431,7 @@
           <div class="home-view__pitch-point">
 
             <!-- left -->
-            <img :src="TacoChefRead" alt="placeholder" loading="lazy" class="home-view__pitch-point__image">
+            <img :src="TacoChefRead" alt="placeholder" class="home-view__pitch-point__image">
 
             <!-- right -->
             <div class="home-view__pitch-point__right">
@@ -530,8 +530,7 @@
 
           <img class="home-view__powered-by__logo" 
                :src="internetComputerLogoUrl" 
-               alt="Internet Computer"
-               loading="lazy" />
+               alt="Internet Computer" />
 
         </a>
 

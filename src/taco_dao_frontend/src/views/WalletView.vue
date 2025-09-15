@@ -103,8 +103,19 @@
                 <!-- trusted tokens container -->
                 <div>
 
-                  <!-- trusted tokens title -->
-                  <h2 class="tokens-title">Trusted Tokens <span class="small">({{ trustedTokens.length }})</span></h2>
+                  <div class="d-flex justify-content-between align-items-center">
+
+                    <!-- trusted tokens title -->
+                    <h2 class="tokens-title">Trusted Tokens <span class="small">({{ trustedTokens.length }})</span></h2>
+
+                    <!-- refresh button -->
+                    <button class="btn btn-sm taco-btn taco-btn--green"
+                            style="padding: 0.75rem 1rem !important;"
+                            @click="loadAllBalances()">
+                      <i class="fa fa-refresh"></i>
+                    </button>
+
+                  </div>
 
                   <!-- if trusted tokens -->
                   <div v-if="trustedTokens.length > 0">
@@ -131,8 +142,19 @@
                 <!-- registered tokens container -->
                 <div>
 
-                  <!-- registered tokens title -->
-                  <h2 class="tokens-title">Registered Tokens <span class="small">({{ userRegisteredTokens.length }})</span></h2>
+                  <div class="d-flex justify-content-between align-items-center">
+
+                    <!-- registered tokens title -->
+                    <h2 class="tokens-title">Registered Tokens <span class="small">({{ userRegisteredTokens.length }})</span></h2>
+
+                    <!-- refresh button -->
+                    <button class="btn btn-sm taco-btn taco-btn--green"
+                            style="padding: 0.75rem 1rem !important;"
+                            @click="loadAllBalances()">
+                      <i class="fa fa-refresh"></i>
+                    </button> 
+                    
+                  </div>
 
                   <!-- register a token -->
                   <div class="d-flex gap-2 mb-2">

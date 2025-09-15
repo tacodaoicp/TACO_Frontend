@@ -15,7 +15,7 @@
           <i class="dissolve-icon fa fa-clock me-2"></i>
           
           <!-- title -->
-          <span class="dissolve-title-text">Set Dissolve Period</span>
+          <span class="dissolve-title-text">Modify Dissolve Period</span>
 
         </div>
 
