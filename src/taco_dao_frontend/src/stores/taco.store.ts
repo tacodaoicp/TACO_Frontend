@@ -6661,40 +6661,26 @@ export const useTacoStore = defineStore('taco', () => {
                 fetchRootKey: process.env.DFX_NETWORK === "local",
             });
 
-            // Handle ICP differently
-            if (tokenPrincipal === 'ryjl3-tyaaa-aaaaa-aaaba-cai') {
-                const ledgerActor = Actor.createActor(idlFactory, {
-                    agent,
-                    canisterId: tokenPrincipal
+            // Use ICRC1 interface for all tokens (including ICP)
+            const icrc1IDL = ({ IDL }: any) => {
+                return IDL.Service({
+                    'icrc1_balance_of': IDL.Func(
+                        [IDL.Record({ 'owner': IDL.Principal, 'subaccount': IDL.Opt(IDL.Vec(IDL.Nat8)) })],
+                        [IDL.Nat],
+                        ['query']
+                    ),
                 });
-                
-                const accountId = AccountIdentifier.fromPrincipal({
-                    principal: Principal.fromText(userPrincipal.value)
-                });
-                const result = await ledgerActor.account_balance({ account: accountId.toUint8Array() });
-                return (result as any).e8s;
-            } else {
-                // ICRC1 token - use generic interface
-                const icrc1IDL = ({ IDL }: any) => {
-                    return IDL.Service({
-                        'icrc1_balance_of': IDL.Func(
-                            [IDL.Record({ 'owner': IDL.Principal, 'subaccount': IDL.Opt(IDL.Vec(IDL.Nat8)) })],
-                            [IDL.Nat],
-                            ['query']
-                        ),
-                    });
-                };
+            };
 
-                const tokenActor = Actor.createActor(icrc1IDL, {
-                    agent,
-                    canisterId: tokenPrincipal
-                });
-                
-                return await tokenActor.icrc1_balance_of({
-                    owner: Principal.fromText(userPrincipal.value),
-                    subaccount: []
-                }) as bigint;
-            }
+            const tokenActor = Actor.createActor(icrc1IDL, {
+                agent,
+                canisterId: tokenPrincipal
+            });
+            
+            return await tokenActor.icrc1_balance_of({
+                owner: Principal.fromText(userPrincipal.value),
+                subaccount: []
+            }) as bigint;
         } catch (error: any) {
             console.error(`Error fetching balance for token ${tokenPrincipal}:`, error);
             return 0n;
@@ -6722,68 +6708,45 @@ export const useTacoStore = defineStore('taco', () => {
                 fetchRootKey: process.env.DFX_NETWORK === "local",
             });
 
-            // Handle ICP differently
-            if (tokenPrincipal === 'ryjl3-tyaaa-aaaaa-aaaba-cai') {
-                const ledgerActor = Actor.createActor(idlFactory, {
-                    agent,
-                    canisterId: tokenPrincipal
+            // Use ICRC1 interface for all tokens (including ICP)
+            const icrc1IDL = ({ IDL }: any) => {
+                return IDL.Service({
+                    'icrc1_transfer': IDL.Func(
+                        [IDL.Record({
+                            'to': IDL.Record({ 'owner': IDL.Principal, 'subaccount': IDL.Opt(IDL.Vec(IDL.Nat8)) }),
+                            'fee': IDL.Opt(IDL.Nat),
+                            'memo': IDL.Opt(IDL.Vec(IDL.Nat8)),
+                            'from_subaccount': IDL.Opt(IDL.Vec(IDL.Nat8)),
+                            'created_at_time': IDL.Opt(IDL.Nat64),
+                            'amount': IDL.Nat,
+                        })],
+                        [IDL.Variant({ 'Ok': IDL.Nat, 'Err': IDL.Text })],
+                        []
+                    ),
                 });
+            };
 
-                const result = await ledgerActor.transfer({
-                    to: AccountIdentifier.fromHex(recipient).toUint8Array(),
-                    fee: { e8s: fee },
-                    memo: memo ? BigInt(memo.charCodeAt(0)) : 0n,
-                    from_subaccount: [],
-                    created_at_time: [],
-                    amount: { e8s: amount }
-                }) as { Ok?: any; Err?: any };
+            const tokenActor = Actor.createActor(icrc1IDL, {
+                agent,
+                canisterId: tokenPrincipal
+            });
 
-                if ('Ok' in result) {
-                    return (result as any).Ok;
-                } else {
-                    throw new Error(JSON.stringify((result as any).Err));
-                }
+            const result = await tokenActor.icrc1_transfer({
+                to: {
+                    owner: Principal.fromText(recipient),
+                    subaccount: []
+                },
+                fee: [fee],
+                memo: memo ? [new TextEncoder().encode(memo)] : [],
+                from_subaccount: [],
+                created_at_time: [],
+                amount: amount
+            }) as { Ok?: any; Err?: any };
+
+            if ('Ok' in result) {
+                return (result as any).Ok;
             } else {
-                // ICRC1 token
-                const icrc1IDL = ({ IDL }: any) => {
-                    return IDL.Service({
-                        'icrc1_transfer': IDL.Func(
-                            [IDL.Record({
-                                'to': IDL.Record({ 'owner': IDL.Principal, 'subaccount': IDL.Opt(IDL.Vec(IDL.Nat8)) }),
-                                'fee': IDL.Opt(IDL.Nat),
-                                'memo': IDL.Opt(IDL.Vec(IDL.Nat8)),
-                                'from_subaccount': IDL.Opt(IDL.Vec(IDL.Nat8)),
-                                'created_at_time': IDL.Opt(IDL.Nat64),
-                                'amount': IDL.Nat,
-                            })],
-                            [IDL.Variant({ 'Ok': IDL.Nat, 'Err': IDL.Text })],
-                            []
-                        ),
-                    });
-                };
-
-                const tokenActor = Actor.createActor(icrc1IDL, {
-                    agent,
-                    canisterId: tokenPrincipal
-                });
-
-                const result = await tokenActor.icrc1_transfer({
-                    to: {
-                        owner: Principal.fromText(recipient),
-                        subaccount: []
-                    },
-                    fee: [fee],
-                    memo: memo ? [new TextEncoder().encode(memo)] : [],
-                    from_subaccount: [],
-                    created_at_time: [],
-                    amount: amount
-                }) as { Ok?: any; Err?: any };
-
-                if ('Ok' in result) {
-                    return (result as any).Ok;
-                } else {
-                    throw new Error(JSON.stringify((result as any).Err));
-                }
+                throw new Error(JSON.stringify((result as any).Err));
             }
         } catch (error: any) {
             console.error('Error sending token:', error);
