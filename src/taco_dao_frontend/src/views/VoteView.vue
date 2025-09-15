@@ -46,15 +46,14 @@
                   
                   <!-- refresh voting power button -->
                   <button 
-                    class="btn btn-sm taco-text-white py-0 border-0"
+                    class="btn btn-sm ms-2 px-2 py-1"
+                    style="background-color: var(--yellow); color: var(--black); border-color: var(--yellow);"
                     @click="refreshVotingPower"
-                    :disabled="refreshingVP"
-                    data-bs-toggle="tooltip" 
-                    data-bs-placement="top"
-                    title="Refresh your voting power">
+                    :class="{'disabled': refreshingVP}">
 
                     <!-- refresh icon -->
-                    <i class="fa-solid fa-refresh" :class="{ 'fa-spin': refreshingVP }"></i>
+                    <span v-if="!refreshingVP">Refresh</span>
+                    <span v-if="refreshingVP">Refreshing</span>
 
                   </button>
 
@@ -567,6 +566,13 @@
                           @click="matchLast"
                           :disabled="matchesLast">
                           Match Last
+                        </button>
+
+                        <!-- lock/unlock all button -->
+                        <button v-if="userLoggedIn && !userLockedVote"
+                          class="btn taco-btn taco-btn--green btn-sm"
+                          @click="toggleLockAll">
+                          {{ allSlidersLocked ? 'Unlock All' : 'Lock All' }}
                         </button>
 
                       </div>
@@ -3276,6 +3282,11 @@
 
   )
 
+  // computed property to check if all sliders are locked
+  const allSlidersLocked = computed(() =>
+    currentSliders.value.length > 0 && currentSliders.value.every((token: any) => token.isLocked)
+  )
+
   // distributes the reduction of delta among the unlocked tokens
   function distributeReduction(delta: number, freeIndices: number[]): boolean {
 
@@ -3468,6 +3479,14 @@
   // toggle the locked state for a token
   function toggleLock(index: number) {
     currentSliders.value[index].isLocked = !currentSliders.value[index].isLocked
+  }
+
+  // toggle the locked state for all tokens
+  function toggleLockAll() {
+    const shouldLockAll = !allSlidersLocked.value
+    currentSliders.value.forEach((token: any) => {
+      token.isLocked = shouldLockAll
+    })
   }
 
   // how many history allocations to show

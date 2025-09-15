@@ -1,432 +1,288 @@
 <template>
+
   <div v-if="show" class="modal-overlay">
+
+    <!-- modal dialog -->
     <div class="modal-dialog">
+
+      <!-- modal header -->
       <div class="modal-header">
-        <h5 class="modal-title">
-          <i class="fa fa-check-circle me-2"></i>
-          Confirm Swap
-        </h5>
-        <button @click="$emit('close')" class="btn-close">
-          <i class="fa fa-times"></i>
-        </button>
-      </div>
 
-      <div class="modal-body">
-        <!-- Swap Summary -->
-        <div class="swap-summary">
-          <div class="swap-route">
-            <!-- From Token -->
-            <div class="token-section">
-              <div class="token-header">
-                <img :src="swapData.inputToken.logo" :alt="swapData.inputToken.symbol" class="token-logo" />
-                <div class="token-info">
-                  <div class="token-name">{{ swapData.inputToken.symbol }}</div>
-                  <div class="token-full-name">{{ swapData.inputToken.name }}</div>
-                </div>
-              </div>
-              <div class="token-amount">
-                <div class="amount">{{ swapData.amount }}</div>
-                <div class="amount-symbol">{{ swapData.inputToken.symbol }}</div>
-              </div>
-            </div>
+        <!-- modal title -->
+        <div class="modal-title gap-2">
 
-            <!-- Arrow -->
-            <div class="swap-arrow">
-              <i class="fa fa-arrow-right"></i>
-            </div>
+          <!-- icon -->
+          <i class="confirm-icon fa fa-check-circle me-2"></i>
+          
+          <!-- text -->
+          <span class="confirm-title-text">Confirm Swap</span>
 
-            <!-- To Token -->
-            <div class="token-section">
-              <div class="token-header">
-                <img :src="swapData.outputToken.logo" :alt="swapData.outputToken.symbol" class="token-logo" />
-                <div class="token-info">
-                  <div class="token-name">{{ swapData.outputToken.symbol }}</div>
-                  <div class="token-full-name">{{ swapData.outputToken.name }}</div>
-                </div>
-              </div>
-              <div class="token-amount">
-                <div class="amount">{{ formatBalance(swapData.selectedQuote.amountOut, swapData.outputToken.decimals) }}</div>
-                <div class="amount-symbol">{{ swapData.outputToken.symbol }}</div>
-              </div>
-            </div>
-          </div>
         </div>
 
-        <!-- Exchange Info -->
-        <div class="exchange-info">
-          <div class="info-header">
-            <h6>Exchange: {{ swapData.selectedQuote.exchange }}</h6>
-            <div class="best-rate-badge">Best Rate</div>
+        <button type="button" class="btn confirm-btn-close" @click="closeModal">
+
+          <!-- icon -->
+          <i class="fa fa-times"></i>
+
+        </button>
+
+      </div>
+
+      <!-- modal body -->
+      <div class="modal-body">
+
+        <!-- swap route -->
+        <div class="swap-route">
+
+          <!-- from token -->
+          <div class="token-section">
+
+            <!-- amount -->
+            <span class="fw-bold" style="font-size: 1.5rem;">{{ swapData.amount }}</span>
+
+            <div class="d-flex align-items-center gap-1">
+
+              <!-- logo -->
+              <img :src="swapData.inputToken.logo" :alt="swapData.inputToken.symbol" class="token-logo" />
+
+              <!-- symbol -->
+              <span>{{ swapData.inputToken.symbol }}</span>
+
+            </div>
+
+          </div>
+
+          <!-- arrow -->
+          <i class="direction-arrow fa fa-arrow-right" style="font-size: 1.5rem; color: var(--black-to-white);"></i>             
+
+          <!-- to token -->
+          <div class="token-section">  
+            
+            <!-- amount -->
+            <span class="fw-bold" style="font-size: 1.5rem;">{{ formatBalance(swapData.selectedQuote.amountOut, swapData.outputToken.decimals) }}</span>
+
+            <div class="d-flex align-items-center gap-1">
+
+              <!-- logo -->
+              <img :src="swapData.outputToken.logo" :alt="swapData.outputToken.symbol" class="token-logo" />
+
+              <!-- symbol -->
+              <span>{{ swapData.outputToken.symbol }}</span>
+
+            </div>
+
+          </div>
+
+        </div>
+
+        <!-- exchange info -->
+        <div class="exchange-info d-flex flex-column mt-3 mb-3">
+
+          <!-- exchange -->
+          <div class="d-flex justify-content-between flex-wrap">
+
+            <!-- label -->
+            <span class="fw-bold">Exchange:</span>
+
+            <!-- value -->
+            <span class="ms-auto">
+
+              <!-- exchange name -->
+              <span>{{ swapData.selectedQuote.exchange }}</span>
+
+            </span>
+
           </div>
           
-          <div class="info-details">
-            <div class="detail-row">
-              <span class="detail-label">Price Impact:</span>
-              <span class="detail-value" :class="getPriceImpactClass(swapData.selectedQuote.slippage)">
-                {{ swapData.selectedQuote.slippage.toFixed(2) }}%
-              </span>
-            </div>
+          <!-- info details -->
+          <div class="d-flex justify-content-between flex-wrap">
 
-            <div class="detail-row">
-              <span class="detail-label">Slippage Tolerance:</span>
-              <span class="detail-value text-primary">
-                {{ (swapData.slippageTolerance * 100).toFixed(1) }}%
-              </span>
-            </div>
-            
-            <div v-if="swapData.selectedQuote.exchange === 'Kong'" class="detail-row">
-              <span class="detail-label">Execution Price:</span>
-              <span class="detail-value">{{ swapData.selectedQuote.price.toFixed(6) }}</span>
-            </div>
-            
-            <div v-if="swapData.selectedQuote.exchange === 'ICPSwap'" class="detail-row">
-              <span class="detail-label">Pool Fee:</span>
-              <span class="detail-value">{{ (swapData.selectedQuote.fee / 10000).toFixed(2) }}%</span>
-            </div>
+            <!-- label -->
+            <span class="fw-bold">Price Impact:</span>
 
-            <div class="detail-row">
-              <span class="detail-label">Network Fee:</span>
-              <span class="detail-value">
-                {{ formatBalance(swapData.inputToken.fee, swapData.inputToken.decimals) }} {{ swapData.inputToken.symbol }}
-              </span>
-            </div>
+            <!-- value -->
+            <span class="ms-auto">{{ swapData.selectedQuote.slippage.toFixed(2) }}%</span>
+
           </div>
-        </div>
 
-        <!-- Swap Method Selection -->
-        <div class="swap-method-section">
-          <h6 class="method-title">
-            Swap Method
-            <span v-if="swapData?.inputToken" class="auto-selected-badge">
-              <i class="fa fa-magic me-1"></i>
-              Auto-selected
+          <!-- slippage tolerance -->
+          <div class="d-flex justify-content-between flex-wrap">
+
+            <!-- label -->
+            <span class="fw-bold">Slippage Tolerance:</span>
+
+            <!-- value -->
+            <span class="ms-auto">
+              {{ (swapData.slippageTolerance * 100).toFixed(1) }}%
             </span>
-          </h6>
-          <div class="method-options">
-            <label class="method-option" :class="{ active: swapMethod === 'icrc2', disabled: !supportsICRC2 }">
-              <input 
-                type="radio" 
-                v-model="swapMethod" 
-                value="icrc2" 
-                class="method-radio"
-                :disabled="!supportsICRC2"
-              />
-              <div class="method-content">
-                <div class="method-name">
-                  <i class="fa fa-key me-2"></i>
-                  ICRC2 (Recommended)
-                  <span v-if="swapMethod === 'icrc2'" class="selected-reason">
-                    <i class="fa fa-check-circle text-success ms-2"></i>
-                  </span>
-                </div>
-                <div class="method-description">
-                  <span v-if="supportsICRC2">
-                    Approve tokens for the exchange to spend. More efficient.
-                    <span v-if="swapData?.inputToken && swapMethod === 'icrc2'" class="auto-reason">
-                      Token supports ICRC-2 standard.
-                    </span>
-                  </span>
-                  <span v-else class="not-supported-text">
-                    Not supported by this token.
-                    <span class="auto-reason">
-                      Token only supports ICRC-1 standard.
-                    </span>
-                  </span>
-                </div>
-              </div>
-            </label>
-            
-            <label class="method-option" :class="{ active: swapMethod === 'icrc1' }">
-              <input 
-                type="radio" 
-                v-model="swapMethod" 
-                value="icrc1" 
-                class="method-radio"
-              />
-              <div class="method-content">
-                <div class="method-name">
-                  <i class="fa fa-paper-plane me-2"></i>
-                  ICRC1 Transfer
-                  <span v-if="swapMethod === 'icrc1'" class="selected-reason">
-                    <i class="fa fa-check-circle text-success ms-2"></i>
-                  </span>
-                </div>
-                <div class="method-description">
-                  Transfer tokens directly to the exchange first.
-                  <span v-if="swapData?.inputToken && swapMethod === 'icrc1'" class="auto-reason">
-                    Token only supports ICRC-1 standard.
-                  </span>
-                </div>
-              </div>
-            </label>
+
           </div>
+          
+          <!-- pool fee -->
+          <div v-if="swapData.selectedQuote.exchange === 'ICPSwap'" class="d-flex justify-content-between flex-wrap">
+
+            <!-- label -->
+            <span class="fw-bold">Pool Fee:</span>
+
+            <!-- value -->
+            <span class="ms-auto">{{ (swapData.selectedQuote.fee / 10000).toFixed(2) }}%</span>
+
+          </div>
+
+          <!-- network fee -->
+          <div class="d-flex justify-content-between flex-wrap">
+
+            <!-- label -->
+            <span class="fw-bold">Network Fee:</span>
+
+            <!-- value -->
+            <span class="ms-auto">
+              {{ formatBalance(swapData.inputToken.fee, swapData.inputToken.decimals) }} {{ swapData.inputToken.symbol }}
+            </span>
+
+          </div>          
+
         </div>
 
-        <!-- Warning Section -->
-        <div class="warning-section">
-          <div class="warning-item">
-            <i class="fa fa-info-circle me-2"></i>
-            <span>This transaction cannot be undone. Please verify all details before proceeding.</span>
+        <!-- swap method title -->
+        <span class="d-inline-flex mb-2 align-items-baseline gap-2" style="font-size: 1.25rem;">
+          Swap Method
+          <span v-if="swapData?.inputToken" class="small">
+            (Auto-selected)
+          </span>
+        </span>
+
+        <!-- method option -->
+        <label class="method-option" :class="{ active: swapMethod === 'icrc2', disabled: !supportsICRC2 }">
+          
+          <!-- input -->
+          <input 
+            type="radio" 
+            v-model="swapMethod" 
+            value="icrc2" 
+            class="method-radio"
+            :disabled="!supportsICRC2"
+          />
+
+          <!-- method content -->
+          <div class="method-content">
+
+            <!-- method name -->
+            <div class="method-name">
+
+              <!-- text -->
+              <span>ICRC2 (Recommended)</span>
+
+              <!-- selected reason -->
+              <span v-if="swapMethod === 'icrc2'" class="selected-reason">
+
+                <!-- icon -->
+                <i class="fa fa-check-circle ms-1"></i>
+
+              </span>
+
+            </div>
+
           </div>
-          <div v-if="swapData.selectedQuote.slippage > 1" class="warning-item high-slippage">
-            <i class="fa fa-exclamation-triangle me-2"></i>
-            <span>High price impact ({{ swapData.selectedQuote.slippage.toFixed(2) }}%). Consider reducing your swap amount.</span>
+
+        </label>
+        
+        <!-- method option -->
+        <label class="method-option" :class="{ active: swapMethod === 'icrc1' }">
+          
+          <!-- input -->
+          <input 
+            type="radio" 
+            v-model="swapMethod" 
+            value="icrc1" 
+            class="method-radio"
+          />
+
+          <!-- method content -->
+          <div class="method-content">
+
+            <!-- method name -->
+            <div class="method-name">
+
+              <!-- text -->
+              <span>ICRC1</span>
+
+              <!-- selected reason -->
+              <span v-if="swapMethod === 'icrc1'" class="selected-reason">
+
+                <!-- icon -->
+                <i class="fa fa-check-circle ms-1"></i>
+
+              </span>
+
+            </div>
+
           </div>
+
+        </label>
+
+        <!-- slippage warning -->
+        <div v-if="swapData.selectedQuote.slippage > 1" class="alert mb-0 mt-3 px-3 py-2"
+        style="background-color: var(--red);">
+
+          <!-- icon -->
+          <i class="fa fa-exclamation-triangle me-2" style="color: var(--white) !important;"></i>
+
+          <!-- text -->
+          <span style="color: var(--white) !important;">High price impact ({{ swapData.selectedQuote.slippage.toFixed(2) }}%). Consider reducing your swap amount.</span>
+
         </div>
+
+        <!-- error display -->
+        <div v-if="hasError" class="alert mb-0 mt-3 px-3 py-2"
+        style="background-color: var(--red);">
+
+            <!-- icon -->
+          <i class="fa fa-exclamation-triangle me-2" style="color: var(--white) !important;"></i>
+
+          <!-- text -->
+          <span style="color: var(--white) !important;">Swap Failed: {{ errorMessage }}</span>
+
+        </div>
+
       </div>
 
-      <!-- Error Display -->
-      <div v-if="hasError" class="error-section">
-        <div class="error-content">
-          <i class="fa fa-exclamation-triangle text-danger me-2"></i>
-          <div class="error-details">
-            <h6 class="error-title">Swap Failed</h6>
-            <p class="error-message">{{ errorMessage }}</p>
-            <small class="error-hint">You can copy this error message for support.</small>
-          </div>
-        </div>
-      </div>
-
+      <!-- modal footer -->
       <div class="modal-footer">
-        <button @click="$emit('close')" class="btn btn-secondary" :disabled="isExecuting">
-          Cancel
+
+        <!-- cancel button -->
+        <button @click="closeModal" 
+        class="btn"
+        style="font-family: 'Space Mono';"
+        :disabled="isExecuting">
+
+          <!-- text -->
+          <span style="color: var(--black-to-white);">Cancel</span>
+
         </button>
+
+        <!-- confirm button -->
         <button 
           @click="executeSwap"
-          class="btn btn-primary"
+          class="btn taco-btn taco-btn--green"
           :disabled="isExecuting"
         >
-          <div v-if="isExecuting" class="executing-content">
-            <div class="spinner-border spinner-border-sm me-2"></div>
-            <span>{{ executionStep }}</span>
-          </div>
-          <div v-else class="confirm-content">
-            <i class="fa fa-exchange-alt me-1"></i>
-            <span>Confirm Swap</span>
-          </div>
+
+          <!-- text -->
+          <span v-if="!isExecuting" style="color: var(--black) !important;">Confirm Swap</span>
+
+          <!-- executing text -->
+          <span v-if="isExecuting">{{ executionStep }}</span>        
+
         </button>
+        
       </div>
+
     </div>
+
   </div>
+
 </template>
-
-<script setup lang="ts">
-import { ref, computed, watch } from 'vue'
-import { useKongStore } from '../../stores/kong.store'
-import { useICPSwapStore } from '../../stores/icpswap.store'
-import { useTacoStore } from '../../stores/taco.store'
-
-interface Token {
-  principal: string
-  name: string
-  symbol: string
-  logo: string
-  balance: bigint
-  decimals: number
-  fee: bigint
-  priceUSD?: number
-}
-
-interface Quote {
-  exchange: 'Kong' | 'ICPSwap'
-  amountOut: bigint
-  slippage: number
-  price: number
-  fee: number
-  rawData: any
-}
-
-interface SwapData {
-  inputToken: Token
-  outputToken: Token
-  amount: string
-  selectedQuote: Quote
-  slippageTolerance: number
-}
-
-interface SwapConfirmDialogProps {
-  show: boolean
-  swapData: SwapData | null
-}
-
-interface SwapConfirmDialogEmits {
-  (e: 'close'): void
-  (e: 'success', result: any): void
-  (e: 'error', error: string): void
-}
-
-const props = defineProps<SwapConfirmDialogProps>()
-const emit = defineEmits<SwapConfirmDialogEmits>()
-
-// Stores
-const kongStore = useKongStore()
-const icpswapStore = useICPSwapStore()
-const tacoStore = useTacoStore()
-
-// State
-const swapMethod = ref<'icrc2' | 'icrc1'>('icrc2')
-const supportsICRC2 = ref(true)
-const isExecuting = ref(false)
-const executionStep = ref('')
-const errorMessage = ref('')
-const hasError = ref(false)
-
-// Computed
-const swapData = computed(() => props.swapData)
-
-// Watch for dialog opening with new swap data and clear error state
-watch([() => props.show, () => props.swapData], async ([newShow, newSwapData], [oldShow, oldSwapData]) => {
-  // Clear error when dialog opens or when swap data changes
-  if (newShow && (!oldShow || newSwapData !== oldSwapData)) {
-    hasError.value = false
-    errorMessage.value = ''
-    
-    // Auto-select swap method based on token standards
-    if (newSwapData?.inputToken) {
-      try {
-        console.log('Checking ICRC2 support for token:', newSwapData.inputToken.principal)
-        const tokenSupportsICRC2 = await tacoStore.checkTokenSupportsICRC2(newSwapData.inputToken.principal)
-        console.log('Token supports ICRC2:', tokenSupportsICRC2)
-        
-        // Update ICRC2 support state
-        supportsICRC2.value = tokenSupportsICRC2
-        
-        // Auto-select ICRC2 if supported, otherwise ICRC1
-        swapMethod.value = tokenSupportsICRC2 ? 'icrc2' : 'icrc1'
-        console.log('Auto-selected swap method:', swapMethod.value)
-      } catch (error) {
-        console.error('Error checking token standards, defaulting to ICRC1:', error)
-        supportsICRC2.value = false
-        swapMethod.value = 'icrc1' // Default to ICRC1 if check fails
-      }
-    }
-  }
-}, { immediate: true })
-
-// Methods
-const closeModal = () => {
-  if (!isExecuting.value) {
-    // Reset error state when closing
-    hasError.value = false
-    errorMessage.value = ''
-    emit('close')
-  }
-}
-
-const executeSwap = async () => {
-  if (!swapData.value || isExecuting.value) return
-
-  // Reset error state
-  hasError.value = false
-  errorMessage.value = ''
-  
-  isExecuting.value = true
-  
-  try {
-    const { inputToken, outputToken, amount, selectedQuote } = swapData.value
-    const amountIn = parseAmountToBigInt(amount, inputToken.decimals)
-    
-    // Use the user's selected slippage tolerance
-    const userSlippageTolerance = swapData.value.slippageTolerance
-    const minAmountOut = BigInt(Math.floor(Number(selectedQuote.amountOut) * (1 - userSlippageTolerance)))
-
-    let result: any
-
-    const swapParams = {
-      sellTokenPrincipal: inputToken.principal,
-      sellTokenSymbol: inputToken.symbol,
-      buyTokenPrincipal: outputToken.principal,
-      buyTokenSymbol: outputToken.symbol,
-      amountIn,
-      minAmountOut,
-      slippageTolerance: userSlippageTolerance,
-    }
-
-    // Create a step update callback
-    const updateStep = (step: string) => {
-      executionStep.value = step
-    }
-
-    // Add step callback to swap params
-    const swapParamsWithCallback = {
-      ...swapParams,
-      onStep: updateStep
-    }
-
-    if (selectedQuote.exchange === 'Kong') {
-      if (swapMethod.value === 'icrc2') {
-        executionStep.value = 'Starting ICRC2 swap...'
-        result = await kongStore.icrc2_swap(swapParamsWithCallback)
-      } else {
-        executionStep.value = 'Starting ICRC1 swap...'
-        result = await kongStore.icrc1_swap(swapParamsWithCallback)
-      }
-    } else {
-      // ICPSwap
-      if (swapMethod.value === 'icrc2') {
-        executionStep.value = 'Starting ICRC2 swap...'
-        result = await icpswapStore.icrc2_swap(swapParamsWithCallback)
-      } else {
-        executionStep.value = 'Starting ICRC1 swap...'
-        result = await icpswapStore.icrc1_swap(swapParamsWithCallback)
-      }
-    }
-
-    // Success
-    emit('success', result)
-    
-  } catch (error: any) {
-    console.error('Swap execution error:', error)
-    
-    // Show error in the dialog
-    hasError.value = true
-    errorMessage.value = error.message || 'Swap failed'
-    
-    // Also emit to parent for toast (but dialog stays open)
-    emit('error', error.message || 'Swap failed')
-  } finally {
-    isExecuting.value = false
-    executionStep.value = ''
-  }
-}
-
-const parseAmountToBigInt = (amount: string, decimals: number): bigint => {
-  const num = parseFloat(amount)
-  if (isNaN(num)) return 0n
-  
-  const multiplier = BigInt(10 ** decimals)
-  const wholePart = BigInt(Math.floor(num))
-  const fractionalPart = num - Math.floor(num)
-  const fractionalBigInt = BigInt(Math.round(fractionalPart * (10 ** decimals)))
-  
-  return wholePart * multiplier + fractionalBigInt
-}
-
-const formatBalance = (balance: bigint, decimals: number): string => {
-  const divisor = BigInt(10 ** decimals)
-  const wholePart = balance / divisor
-  const fractionalPart = balance % divisor
-  
-  if (fractionalPart === 0n) {
-    return wholePart.toString()
-  }
-  
-  const fractionalStr = fractionalPart.toString().padStart(decimals, '0')
-  const trimmedFractional = fractionalStr.replace(/0+$/, '')
-  
-  if (trimmedFractional === '') {
-    return wholePart.toString()
-  }
-  
-  return `${wholePart}.${trimmedFractional}`
-}
-
-const getPriceImpactClass = (slippage: number): string => {
-  if (slippage < 0.1) return 'impact-low'
-  if (slippage < 1) return 'impact-medium'
-  return 'impact-high'
-}
-</script>
 
 <style scoped>
 .modal-overlay {
@@ -435,82 +291,93 @@ const getPriceImpactClass = (slippage: number): string => {
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.8);
+  background: rgba(0, 0, 0, 0.7);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 1050;
-  padding: 1rem;
-  pointer-events: none;
+  pointer-events: auto;
+
+  span {
+    color: var(--black-to-white);
+  }
+  
 }
 
 .modal-dialog {
-  background: #2d3748;
-  border-radius: 12px;
-  border: 1px solid #4a5568;
-  width: 100%;
+  background-color: var(--light-orange-to-dark-brown);
+  border: 1px solid var(--dark-orange);
+  border-radius: .5rem;
+  overflow: clip;
   max-width: 500px;
+  width: 90%;
   max-height: 90vh;
   overflow-y: auto;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
-  color: white;
+  color: #ffffff;
   pointer-events: auto;
+  position: relative;
 }
 
 .modal-header {
   display: flex;
+  align-items: start;
   justify-content: space-between;
-  align-items: center;
-  padding: 1.5rem;
-  border-bottom: 1px solid var(--border-color);
+  margin: 0;
+  margin-bottom: 0.5rem;
+  padding: 0;
+  border-bottom: 0;
+  margin-bottom: 0.75rem;
 }
 
 .modal-title {
-  font-size: 1.25rem;
+  display: flex;
+  align-items: center;
+  margin: 1.5rem 0px 0px 1.5rem;
+}
+
+.confirm-icon {
+  font-size: 3.5rem;
+  color: var(--dark-brown-to-white) !important;
+}
+
+.confirm-title-text {
+  font-size: 1.5rem;
   font-weight: 600;
-  color: white;
-  margin: 0;
 }
 
-.btn-close {
-  background: none;
-  border: none;
-  color: var(--text-secondary);
-  font-size: 1.2rem;
-  cursor: pointer;
-  padding: 0.5rem;
-  border-radius: 6px;
-  transition: all 0.2s ease;
-}
+.confirm-btn-close {
+  margin: 1rem .5rem 0 0;
 
-.btn-close:hover {
-  background: var(--bg-secondary);
-  color: var(--text-primary);
+  i {
+    font-size: 1.5rem;
+    color: var(--black-to-white);
+  }
 }
 
 .modal-body {
-  padding: 1.5rem;
+  padding: 0.75rem 1.5rem 0 !important;
 }
 
 .swap-summary {
-  margin-bottom: 1.5rem;
+  /* margin-bottom: 1.5rem; */
 }
 
 .swap-route {
+  background: var(--orange-to-brown);
   display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
   align-items: center;
-  gap: 1rem;
-  background: #1a202c;
-  border: 1px solid #4a5568;
+  /* gap: 1rem; */
+  border: 1px solid var(--dark-orange);
   border-radius: 12px;
-  padding: 1.5rem;
+  padding: 0.5rem 1rem 0.75rem;
 }
 
 .token-section {
-  flex: 1;
+  /* flex: 1; */
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
 }
 
 .token-header {
@@ -520,8 +387,8 @@ const getPriceImpactClass = (slippage: number): string => {
 }
 
 .token-logo {
-  width: 40px;
-  height: 40px;
+  width: 1.25rem;
+  height: 1.25rem;
   border-radius: 50%;
   border: 2px solid var(--border-color);
 }
@@ -543,14 +410,15 @@ const getPriceImpactClass = (slippage: number): string => {
 }
 
 .token-amount {
-  text-align: center;
+  /* text-align: center; */
 }
 
 .amount {
   font-size: 1.5rem;
   font-weight: 700;
   color: var(--text-primary);
-  word-break: break-all;
+  /* word-break: break-all; */
+  white-space: nowrap;
 }
 
 .amount-symbol {
@@ -572,11 +440,24 @@ const getPriceImpactClass = (slippage: number): string => {
 }
 
 .exchange-info {
-  background: var(--bg-secondary);
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-  padding: 1rem;
-  margin-bottom: 1.5rem;
+  background-color: var(--orange-to-brown);
+  border: 1px solid var(--dark-orange);
+  border-radius: 0.5rem;
+  overflow: clip;
+
+  > div {
+    padding: 0.5rem 0.75rem;
+    border-bottom: 1px solid var(--dark-orange);
+
+    &:last-child {
+      border-bottom: none;
+    }
+    &:hover {
+      background-color: var(--dark-orange);
+    }
+
+  }
+
 }
 
 .info-header {
@@ -699,7 +580,7 @@ const getPriceImpactClass = (slippage: number): string => {
   display: flex;
   align-items: flex-start;
   gap: 0.75rem;
-  padding: 1rem;
+  /* padding: 1rem; */
   background: var(--bg-secondary);
   border: 2px solid var(--border-color);
   border-radius: 8px;
@@ -778,21 +659,12 @@ const getPriceImpactClass = (slippage: number): string => {
 }
 
 .modal-footer {
-  display: flex;
-  justify-content: space-between;
-  gap: 1rem;
-  padding: 1.5rem;
-  border-top: 1px solid var(--border-color);
-}
+  border-top: none;
+  padding: 1rem;
 
-.modal-footer .btn {
-  flex: 1;
-  padding: 0.75rem 1.5rem;
-  font-weight: 600;
-  border-radius: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  .btn:active {
+    border-color: transparent;
+  }
 }
 
 .executing-content,
@@ -860,7 +732,12 @@ const getPriceImpactClass = (slippage: number): string => {
   
   .swap-route {
     flex-direction: column;
+    align-items: center;
     gap: 1rem;
+  }
+
+  .token-section {
+    align-items: center;
   }
   
   .swap-arrow {
@@ -868,7 +745,239 @@ const getPriceImpactClass = (slippage: number): string => {
   }
   
   .token-amount {
-    text-align: left;
+    text-align: center;
+    align-items: center;
   }
+
+  .direction-arrow {
+    transform: rotate(90deg);
+  }
+
 }
 </style>
+
+<script setup lang="ts">
+import { ref, computed, watch } from 'vue'
+import { useKongStore } from '../../stores/kong.store'
+import { useICPSwapStore } from '../../stores/icpswap.store'
+import { useTacoStore } from '../../stores/taco.store'
+
+interface Token {
+  principal: string
+  name: string
+  symbol: string
+  logo: string
+  balance: bigint
+  decimals: number
+  fee: bigint
+  priceUSD?: number
+}
+
+interface Quote {
+  exchange: 'Kong' | 'ICPSwap'
+  amountOut: bigint
+  slippage: number
+  price: number
+  fee: number
+  rawData: any
+}
+
+interface SwapData {
+  inputToken: Token
+  outputToken: Token
+  amount: string
+  selectedQuote: Quote
+  slippageTolerance: number
+}
+
+interface SwapConfirmDialogProps {
+  show: boolean
+  swapData: SwapData | null
+}
+
+interface SwapConfirmDialogEmits {
+  (e: 'close'): void
+  (e: 'success', result: any): void
+  (e: 'error', error: string): void
+}
+
+const props = defineProps<SwapConfirmDialogProps>()
+const emit = defineEmits<SwapConfirmDialogEmits>()
+
+// Stores
+const kongStore = useKongStore()
+const icpswapStore = useICPSwapStore()
+const tacoStore = useTacoStore()
+
+// State
+const swapMethod = ref<'icrc2' | 'icrc1'>('icrc2')
+const supportsICRC2 = ref(true)
+const isExecuting = ref(false)
+const executionStep = ref('')
+const errorMessage = ref('')
+const hasError = ref(false)
+
+// Computed
+const swapData = computed(() => props.swapData)
+
+// Watch for dialog opening with new swap data and clear error state
+watch([() => props.show, () => props.swapData], async ([newShow, newSwapData], [oldShow, oldSwapData]) => {
+  // debug logging
+  // console.log('SwapConfirmDialog watcher fired:', { newShow, oldShow, newSwapData: !!newSwapData, oldSwapData: !!oldSwapData })
+  
+  // Clear error when dialog opens or when swap data changes
+  if (newShow && (!oldShow || newSwapData !== oldSwapData)) {
+    // console.log('SwapConfirmDialog watcher condition met')
+    hasError.value = false
+    errorMessage.value = ''
+    
+    // Auto-select swap method based on token standards
+    if (newSwapData?.inputToken) {
+      try {
+        // console.log('Checking ICRC2 support for token:', newSwapData.inputToken.principal)
+        const tokenSupportsICRC2 = await tacoStore.checkTokenSupportsICRC2(newSwapData.inputToken.principal)
+        // console.log('Token supports ICRC2:', tokenSupportsICRC2)
+        
+        // Update ICRC2 support state
+        supportsICRC2.value = tokenSupportsICRC2
+        
+        // Auto-select ICRC2 if supported, otherwise ICRC1
+        swapMethod.value = tokenSupportsICRC2 ? 'icrc2' : 'icrc1'
+        // console.log('Auto-selected swap method:', swapMethod.value)
+      } catch (error) {
+        console.error('Error checking token standards, defaulting to ICRC1:', error)
+        supportsICRC2.value = false
+        swapMethod.value = 'icrc1' // Default to ICRC1 if check fails
+      }
+    }
+  }
+}, { immediate: true })
+
+// Methods
+const closeModal = () => {
+  if (!isExecuting.value) {
+    // Reset error state when closing
+    hasError.value = false
+    errorMessage.value = ''
+    emit('close')
+  }
+}
+
+const executeSwap = async () => {
+
+  // log
+  // console.log('Executing swap')
+
+  if (!swapData.value || isExecuting.value) return
+
+  // Reset error state
+  hasError.value = false
+  errorMessage.value = ''
+  
+  isExecuting.value = true
+  
+  try {
+    const { inputToken, outputToken, amount, selectedQuote } = swapData.value
+    const amountIn = parseAmountToBigInt(amount, inputToken.decimals)
+    
+    // Use the user's selected slippage tolerance
+    const userSlippageTolerance = swapData.value.slippageTolerance
+    const minAmountOut = BigInt(Math.floor(Number(selectedQuote.amountOut) * (1 - userSlippageTolerance)))
+
+    let result: any
+
+    const swapParams = {
+      sellTokenPrincipal: inputToken.principal,
+      sellTokenSymbol: inputToken.symbol,
+      buyTokenPrincipal: outputToken.principal,
+      buyTokenSymbol: outputToken.symbol,
+      amountIn,
+      minAmountOut,
+      slippageTolerance: userSlippageTolerance,
+    }
+
+    // Create a step update callback
+    const updateStep = (step: string) => {
+      executionStep.value = step
+    }
+
+    // Add step callback to swap params
+    const swapParamsWithCallback = {
+      ...swapParams,
+      onStep: updateStep
+    }
+
+    if (selectedQuote.exchange === 'Kong') {
+      if (swapMethod.value === 'icrc2') {
+        executionStep.value = 'Starting ICRC2 swap...'
+        result = await kongStore.icrc2_swap(swapParamsWithCallback)
+      } else {
+        executionStep.value = 'Starting ICRC1 swap...'
+        result = await kongStore.icrc1_swap(swapParamsWithCallback)
+      }
+    } else {
+      // ICPSwap
+      if (swapMethod.value === 'icrc2') {
+        executionStep.value = 'Starting ICRC2 swap...'
+        result = await icpswapStore.icrc2_swap(swapParamsWithCallback)
+      } else {
+        executionStep.value = 'Starting ICRC1 swap...'
+        result = await icpswapStore.icrc1_swap(swapParamsWithCallback)
+      }
+    }
+
+    // Success
+    emit('success', result)
+    
+  } catch (error: any) {
+    console.error('Swap execution error:', error)
+    
+    // Show error in the dialog
+    hasError.value = true
+    errorMessage.value = error.message || 'Swap failed'
+    
+    // Also emit to parent for toast (but dialog stays open)
+    emit('error', error.message || 'Swap failed')
+  } finally {
+    isExecuting.value = false
+    executionStep.value = ''
+  }
+}
+
+const parseAmountToBigInt = (amount: string, decimals: number): bigint => {
+  const num = parseFloat(amount)
+  if (isNaN(num)) return 0n
+  
+  const multiplier = BigInt(10 ** decimals)
+  const wholePart = BigInt(Math.floor(num))
+  const fractionalPart = num - Math.floor(num)
+  const fractionalBigInt = BigInt(Math.round(fractionalPart * (10 ** decimals)))
+  
+  return wholePart * multiplier + fractionalBigInt
+}
+
+const formatBalance = (balance: bigint, decimals: number): string => {
+  const divisor = BigInt(10 ** decimals)
+  const wholePart = balance / divisor
+  const fractionalPart = balance % divisor
+  
+  if (fractionalPart === 0n) {
+    return wholePart.toString()
+  }
+  
+  const fractionalStr = fractionalPart.toString().padStart(decimals, '0')
+  const trimmedFractional = fractionalStr.replace(/0+$/, '')
+  
+  if (trimmedFractional === '') {
+    return wholePart.toString()
+  }
+  
+  return `${wholePart}.${trimmedFractional}`
+}
+
+const getPriceImpactClass = (slippage: number): string => {
+  if (slippage < 0.1) return 'impact-low'
+  if (slippage < 1) return 'impact-medium'
+  return 'impact-high'
+}
+</script>

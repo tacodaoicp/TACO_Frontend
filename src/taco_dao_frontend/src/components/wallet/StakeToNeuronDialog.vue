@@ -1,116 +1,302 @@
 <template>
-  <div class="modal fade" :class="{ show: show }" :style="{ display: show ? 'block' : 'none' }" tabindex="-1" @click="handleBackdropClick">
+
+  <div class="modal" 
+        :class="{ show: show }" 
+        :style="{ display: show ? 'block' : 'none' }" 
+        tabindex="-1" 
+        @click="handleBackdropClick">
+    
     <div class="modal-dialog modal-dialog-centered">
+
       <div class="modal-content">
+
         <div class="modal-header">
-          <h5 class="modal-title">
-            <i class="fa fa-plus-circle me-2"></i>
-            Stake to Neuron
-          </h5>
-          <button type="button" class="btn-close" @click="close"></button>
+
+          <div class="modal-title gap-2">
+
+            <i class="stake-icon fa fa-plus-circle me-2"></i>
+            
+            <span class="stake-title-text">Add to Stake</span>
+
+          </div>
+
+          <button type="button" class="btn stake-btn-close" @click="close">
+
+            <i class="fa fa-times"></i>
+
+          </button>
+
         </div>
         
         <div class="modal-body">
-          <div v-if="neuron" class="neuron-info mb-4">
-            <h6 class="text-muted mb-2">Staking to:</h6>
-            <div class="neuron-card">
-              <div class="neuron-details">
-                <div class="neuron-name">{{ neuron.displayName }}</div>
-                <div class="neuron-stake">
-                  Current Stake: {{ formatBalance(neuron.stake, 8) }} TACO
-                </div>
-              </div>
+
+          <!-- neuron info -->
+          <div v-if="neuron"
+          class="d-flex flex-column">
+
+            <span class="stake-to-text">Staking to</span>
+
+            <div class="neuron-info">
+
+              <span class="fw-bold">{{ neuron.displayName }}</span>
+
+              <span><span class="fw-bold">Current Stake:</span> {{ formatBalance(neuron.stake, 8) }} TACO</span>
+
             </div>
+
           </div>
 
-          <div class="mb-3">
-            <label for="stakeAmount" class="form-label">Amount to Stake (TACO)</label>
-            <div class="input-group">
-              <input
+          <!-- amount to stake -->
+          <div class="mt-3">
+
+            <label for="stakeAmount" class="form-label">
+
+              <span class="stake-amount-text">Amount to Stake <span class="small">(TACO)</span></span>
+                
+            </label>
+
+            <input
                 id="stakeAmount"
                 v-model="stakeAmount"
                 type="number"
-                class="form-control"
-                placeholder="0.00000000"
+                class="form-control taco-input"
+                placeholder="0"
                 step="0.00000001"
                 min="0.00000001"
-                :disabled="isStaking"
-              />
-              <span class="input-group-text">TACO</span>
+                :disabled="isStaking"/>            
+
+            <div class="d-flex justify-content-end w-100 mt-1">
+
+              <span class="small">Available: {{ formatBalance(tacoBalance, 8) }} TACO</span>
+
             </div>
-            <div class="form-text">
-              Available Balance: {{ formatBalance(tacoBalance, 8) }} TACO
-            </div>
+
           </div>
 
-          <div v-if="stakeAmountBigInt > 0n" class="stake-preview mb-3">
-            <div class="preview-item">
-              <span>Amount to stake:</span>
-              <span class="fw-bold">{{ formatBalance(stakeAmountBigInt, 8) }} TACO</span>
+          <!-- stake preview -->
+          <div v-if="stakeAmountBigInt > 0n" class="mt-3">
+
+            <div class="stake-preview d-flex flex-column">
+
+              <div class="stake-preview-row d-flex flex-wrap justify-content-between align-items-center">
+
+                <span class="fw-bold">Amount to stake: </span>
+
+                <span class="ms-auto">{{ formatBalance(stakeAmountBigInt, 8) }} TACO</span>
+
+              </div>
+
+              <div class="stake-preview-row d-flex flex-wrap justify-content-between align-items-center">
+
+                <span class="fw-bold">Transfer fee: </span>
+
+                <span class="ms-auto">{{ formatBalance(tacoFee, 8) }} TACO</span>
+
+              </div>
+
+              <div class="stake-preview-row d-flex flex-wrap justify-content-between align-items-center">
+
+                <span class="fw-bold">Total required: </span>
+
+                <span class="ms-auto">{{ formatBalance(stakeAmountBigInt + tacoFee, 8) }} TACO</span>
+
+              </div>
+
             </div>
-            <div class="preview-item">
-              <span>Transfer fee:</span>
-              <span>{{ formatBalance(tacoFee, 8) }} TACO</span>
-            </div>
-            <div class="preview-item border-top pt-2">
-              <span class="fw-bold">Total required:</span>
-              <span class="fw-bold">{{ formatBalance(stakeAmountBigInt + tacoFee, 8) }} TACO</span>
-            </div>
+
           </div>
 
-          <div v-if="successMessage" class="alert alert-success">
-            <i class="fa fa-check-circle me-2"></i>
-            {{ successMessage }}
+          <!-- success message -->
+          <div v-if="successMessage" class="alert mb-0 mt-3 px-3 py-2" 
+          style="background-color: var(--green);">
+
+            <i class="fa fa-check-circle me-2" style="color: var(--black) !important;"></i>
+
+            <span style="color: var(--black) !important;">{{ successMessage }}</span>
+
           </div>
 
-          <div v-if="error" class="alert alert-danger">
-            <i class="fa fa-exclamation-triangle me-2"></i>
-            {{ error }}
+          <!-- error message -->
+          <div v-if="error" class="alert mb-0 mt-3 px-3 py-2"
+          style="background-color: var(--red);">
+
+            <i class="fa fa-exclamation-triangle me-2" style="color: var(--white) !important;"></i>
+
+            <span style="color: var(--white) !important;">{{ error }}</span>
+
           </div>
+
         </div>
         
         <div class="modal-footer">
+
           <button 
             v-if="!isSuccess"
             type="button" 
-            class="btn btn-secondary" 
+            class="btn"
+            style="font-family: 'Space Mono'; color: var(--black-to-white);"
             @click="close" 
-            :disabled="isStaking"
-          >
-            Cancel
+            :disabled="isStaking">
+
+            <span>Cancel</span>
+
           </button>
-          <button 
-            v-if="isSuccess"
-            type="button" 
-            class="btn btn-success" 
-            @click="close"
-          >
-            <i class="fa fa-check me-2"></i>
-            Close
-          </button>
+
           <button 
             v-if="!isSuccess"
             type="button" 
-            class="btn btn-primary" 
+            class="btn taco-btn taco-btn--green"
             @click="handleStake"
-            :disabled="!canStake || isStaking"
-          >
-            <span v-if="isStaking" class="spinner-border spinner-border-sm me-2"></span>
-            <i v-else class="fa fa-plus me-2"></i>
-            {{ isStaking ? 'Staking...' : 'Stake TACO' }}
+            :disabled="!canStake || isStaking">
+
+            <span style="color: var(--black) !important;">Add to Stake</span>
+
           </button>
+
         </div>
+
       </div>
+
     </div>
+
   </div>
-  
-  <!-- Backdrop -->
-  <div v-if="show" class="modal-backdrop fade show"></div>
+
 </template>
+
+<style scoped lang="scss">
+.modal {
+  background-color: rgba(0, 0, 0, 0.5);
+
+  span {
+    color: var(--black-to-white);
+  }
+
+}
+
+.modal-content {
+  background-color: var(--light-orange-to-dark-brown);
+  border: 1px solid var(--dark-orange);
+}
+
+.modal-header {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  margin: 0;
+  margin-bottom: 0.5rem;
+  padding: 0;
+  border-bottom: 0;
+  margin-bottom: 0.75rem;
+}
+
+.modal-body {
+  padding: 0 1.5rem 0;
+}
+
+.modal-title {
+  display: flex;
+  align-items: center;
+  margin: 1.5rem 0px 0px 1.5rem;
+}
+
+.stake-icon {
+  font-size: 3.5rem;
+  color: var(--dark-brown-to-white) !important;
+}
+
+.stake-title-text {
+  font-size: 1.5rem;
+  font-weight: 600;
+}
+
+.stake-btn-close {
+  margin: 1rem .5rem 0 0;
+
+  i {
+    font-size: 1.5rem;
+    color: var(--black-to-white);
+  }
+}
+
+.stake-to-text {
+  font-size: 1.25rem;
+  display: inline-block;
+  margin-bottom: .5rem;
+}
+
+.stake-amount-text {
+  font-size: 1.25rem;
+}
+
+.neuron-info {
+  display: flex;
+  flex-direction: column;
+  background-color: var(--orange-to-brown);
+  border: 1px solid var(--dark-orange);
+  border-radius: .5rem;
+  overflow: clip;
+
+  > span {
+    padding: .5rem .75rem;
+    border-bottom: 1px solid var(--dark-orange);
+
+    &:hover {
+      background-color: var(--dark-orange);
+    }
+
+    &:last-child {
+      border-bottom: none;
+    }
+
+  }
+
+}
+
+.stake-preview {
+  background-color: var(--orange-to-brown);
+  border: 1px solid var(--dark-orange);  
+  border-radius: .5rem;
+  overflow: clip;
+}
+
+.stake-preview-row {
+  padding: .5rem .75rem;
+  border-bottom: 1px solid var(--dark-orange);
+
+  &:hover {
+    background-color: var(--dark-orange);
+  }
+
+  &:last-child {
+    border-bottom: none;
+  }
+}
+
+.modal-footer {
+  border-top: none;
+}
+
+</style>
 
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import { useTacoStore } from '../../stores/taco.store'
+
+///////////
+// store //
+///////////
+
+// # SETUP #
+const tacoStore = useTacoStore()
+
+// # STATE #
+// none
+
+// # ACTIONS #
+const { appLoadingOn, appLoadingOff } = tacoStore
+
+
+
 
 interface StakeToNeuronDialogProps {
   show: boolean
@@ -125,8 +311,6 @@ interface StakeToNeuronDialogEmits {
 
 const props = defineProps<StakeToNeuronDialogProps>()
 const emit = defineEmits<StakeToNeuronDialogEmits>()
-
-const tacoStore = useTacoStore()
 
 // State
 const stakeAmount = ref('')
@@ -184,7 +368,11 @@ const handleBackdropClick = (event: MouseEvent) => {
 }
 
 const handleStake = async () => {
+
   if (!props.neuron || !canStake.value) return
+
+  // turn on app loading
+  appLoadingOn()  
   
   isStaking.value = true
   error.value = ''
@@ -197,7 +385,13 @@ const handleStake = async () => {
     successMessage.value = `Successfully staked ${formatBalance(stakeAmountBigInt.value, 8)} TACO to ${props.neuron.displayName}!`
     
     // Also show toast notification
-    tacoStore.addToast('success', 'Staking Successful', `Successfully staked ${formatBalance(stakeAmountBigInt.value, 8)} TACO to ${props.neuron.displayName}`)
+    tacoStore.addToast({
+      id: Date.now(),
+      code: '',
+      title: 'Staking Successful!',
+      icon: 'fa-solid fa-check',
+      message: `Successfully staked ${formatBalance(stakeAmountBigInt.value, 8)} TACO to ${props.neuron.displayName}`
+    })
     
     emit('staked', props.neuron)
     
@@ -208,8 +402,16 @@ const handleStake = async () => {
   } catch (err: any) {
     console.error('Staking error:', err)
     error.value = err.message || 'Failed to stake TACO. Please try again.'
+    tacoStore.addToast({
+      id: Date.now(),
+      code: '',
+      title: 'Staking Failed',
+      icon: 'fa-solid fa-exclamation-triangle',
+      message: `Failed to stake, please try again.`
+    })
   } finally {
     isStaking.value = false
+    appLoadingOff()
   }
 }
 
@@ -232,171 +434,3 @@ const formatBalance = (balance: bigint, decimals: number): string => {
   return `${wholePart}.${trimmedFractional}`
 }
 </script>
-
-<style scoped>
-.modal-content {
-  background: var(--card-bg, #2d3748);
-  border: 1px solid var(--border-color, #4a5568);
-  border-radius: 12px;
-  color: white;
-}
-
-.modal-header {
-  border-bottom: 1px solid var(--border-color, #4a5568);
-  background: var(--header-bg, #1a202c);
-  border-radius: 12px 12px 0 0;
-}
-
-.modal-title {
-  font-weight: 600;
-  color: white;
-}
-
-.btn-close {
-  filter: invert(1);
-  opacity: 0.8;
-}
-
-.btn-close:hover {
-  opacity: 1;
-}
-
-.neuron-card {
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 8px;
-  padding: 1rem;
-}
-
-.neuron-name {
-  font-weight: 600;
-  font-size: 0.95rem;
-  margin-bottom: 0.25rem;
-}
-
-.neuron-stake {
-  font-size: 0.85rem;
-  color: var(--text-secondary, #a0aec0);
-  font-family: monospace;
-}
-
-.form-label {
-  font-weight: 600;
-  color: white;
-  margin-bottom: 0.5rem;
-}
-
-.form-control {
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  color: white;
-  border-radius: 6px;
-}
-
-.form-control:focus {
-  background: rgba(255, 255, 255, 0.15);
-  border-color: var(--primary-color, #0d6efd);
-  box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.25);
-  color: white;
-}
-
-.form-control::placeholder {
-  color: rgba(255, 255, 255, 0.5);
-}
-
-.input-group-text {
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  color: white;
-  border-left: none;
-}
-
-.form-text {
-  color: var(--text-secondary, #a0aec0);
-  font-size: 0.85rem;
-  margin-top: 0.25rem;
-}
-
-.stake-preview {
-  background: rgba(0, 123, 255, 0.1);
-  border: 1px solid rgba(0, 123, 255, 0.3);
-  border-radius: 8px;
-  padding: 1rem;
-}
-
-.preview-item {
-  display: flex;
-  justify-content: space-between;
-  margin-bottom: 0.5rem;
-}
-
-.preview-item:last-child {
-  margin-bottom: 0;
-}
-
-.alert-success {
-  background: rgba(25, 135, 84, 0.1);
-  border: 1px solid rgba(25, 135, 84, 0.3);
-  color: #d1e7dd;
-}
-
-.alert-danger {
-  background: rgba(220, 53, 69, 0.1);
-  border: 1px solid rgba(220, 53, 69, 0.3);
-  color: #f8d7da;
-}
-
-.modal-footer {
-  border-top: 1px solid var(--border-color, #4a5568);
-}
-
-.btn-primary {
-  background: linear-gradient(135deg, var(--primary-color, #0d6efd), var(--primary-hover, #0b5ed7));
-  border: none;
-  font-weight: 600;
-  transition: all 0.3s ease;
-}
-
-.btn-primary:hover:not(:disabled) {
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(0, 123, 255, 0.3);
-}
-
-.btn-primary:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-  transform: none;
-}
-
-.btn-secondary {
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  color: white;
-  font-weight: 600;
-}
-
-.btn-secondary:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.2);
-  color: white;
-}
-
-.spinner-border-sm {
-  width: 1rem;
-  height: 1rem;
-}
-
-/* Mobile responsiveness */
-@media (max-width: 576px) {
-  .modal-dialog {
-    margin: 1rem;
-  }
-  
-  .neuron-card {
-    padding: 0.75rem;
-  }
-  
-  .stake-preview {
-    padding: 0.75rem;
-  }
-}
-</style>

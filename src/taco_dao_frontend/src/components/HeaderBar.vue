@@ -81,12 +81,19 @@
           
           <span class="header-bar__rl-span">Code</span>
         
-        </a>        
+        </a>  
+        
+        <!-- wallet - router link -->
+        <router-link v-if="userLoggedIn" to="/wallet" class="header-bar__rl">
+          
+          <span class="header-bar__rl-span">Wallet</span>
+        
+        </router-link>         
 
       </div>
 
       <!-- environment indicator -->
-      <EnvironmentIndicator />
+      <!-- <EnvironmentIndicator /> -->
 
       <!-- pages menu button -->
       <button class="btn pages-menu__btn"
@@ -239,8 +246,8 @@
           <!-- item text -->
           <span>Sales</span>
 
-        </router-link>    
-        
+        </router-link>
+
         <!-- info - router link -->
         <router-link @click="togglePagesMenu()" to="/info" class="list-group-item">
 
@@ -257,7 +264,15 @@
           <!-- item text -->
           <span>Code</span>
 
-        </a>        
+        </a>  
+        
+        <!-- wallet - router link -->
+        <router-link v-if="userLoggedIn" @click="togglePagesMenu()" to="/wallet" class="list-group-item">
+
+          <!-- item text -->
+          <span>Wallet</span>
+
+        </router-link>        
 
       </div>
 
@@ -712,7 +727,7 @@
       tokenInitIdentifier: '',
       title: '👨‍🍳 Principal Copied!',
       icon: '',
-      message: `Your principal was copied to your clipboard`
+      message: `Account principal was copied to your clipboard`
     })
   }
 

@@ -107,6 +107,124 @@
   </div>
 </template>
 
+<script setup lang="ts">
+import { ref, computed } from 'vue'
+
+interface SwapStakeProgressProps {
+  show: boolean
+}
+
+interface SwapDetails {
+  exchange: string
+  inputAmount: string
+  inputSymbol: string
+  outputAmount: string
+}
+
+interface SwapStakeProgressEmits {
+  (e: 'close'): void
+}
+
+const props = defineProps<SwapStakeProgressProps>()
+const emit = defineEmits<SwapStakeProgressEmits>()
+
+// State
+const stepStatus = ref<{[key: string]: 'pending' | 'active' | 'completed' | 'error'}>({
+  quotes: 'pending',
+  swap: 'pending', 
+  stake: 'pending',
+  dissolve: 'pending'
+})
+
+const swapDetails = ref<SwapDetails>({
+  exchange: '',
+  inputAmount: '',
+  inputSymbol: '',
+  outputAmount: ''
+})
+
+const error = ref('')
+
+// Computed
+const isProcessing = computed(() => {
+  return Object.values(stepStatus.value).some(status => status === 'active')
+})
+
+const isComplete = computed(() => {
+  return Object.values(stepStatus.value).every(status => status === 'completed')
+})
+
+// Methods
+const getStepClass = (step: string) => {
+  const status = stepStatus.value[step]
+  return {
+    'step-pending': status === 'pending',
+    'step-active': status === 'active',
+    'step-completed': status === 'completed',
+    'step-error': status === 'error'
+  }
+}
+
+const handleBackdropClick = (event: MouseEvent) => {
+  if (event.target === event.currentTarget && !isProcessing.value) {
+    close()
+  }
+}
+
+const close = () => {
+  if (!isProcessing.value) {
+    emit('close')
+  }
+}
+
+// Public methods for parent to control progress
+const setStepActive = (step: string) => {
+  stepStatus.value[step] = 'active'
+}
+
+const setStepCompleted = (step: string) => {
+  stepStatus.value[step] = 'completed'
+}
+
+const setStepError = (step: string) => {
+  stepStatus.value[step] = 'error'
+}
+
+const setSwapDetails = (details: SwapDetails) => {
+  swapDetails.value = details
+}
+
+const setError = (errorMessage: string) => {
+  error.value = errorMessage
+}
+
+const reset = () => {
+  stepStatus.value = {
+    quotes: 'pending',
+    swap: 'pending',
+    stake: 'pending', 
+    dissolve: 'pending'
+  }
+  swapDetails.value = {
+    exchange: '',
+    inputAmount: '',
+    inputSymbol: '',
+    outputAmount: ''
+  }
+  error.value = ''
+}
+
+// Expose methods to parent
+defineExpose({
+  setStepActive,
+  setStepCompleted,
+  setStepError,
+  setSwapDetails,
+  setError,
+  reset
+})
+</script>
+
 <style scoped>
 .modal-overlay {
   position: fixed;
@@ -304,121 +422,3 @@
   background: #5a6478;
 }
 </style>
-
-<script setup lang="ts">
-import { ref, computed } from 'vue'
-
-interface SwapStakeProgressProps {
-  show: boolean
-}
-
-interface SwapDetails {
-  exchange: string
-  inputAmount: string
-  inputSymbol: string
-  outputAmount: string
-}
-
-interface SwapStakeProgressEmits {
-  (e: 'close'): void
-}
-
-const props = defineProps<SwapStakeProgressProps>()
-const emit = defineEmits<SwapStakeProgressEmits>()
-
-// State
-const stepStatus = ref<{[key: string]: 'pending' | 'active' | 'completed' | 'error'}>({
-  quotes: 'pending',
-  swap: 'pending', 
-  stake: 'pending',
-  dissolve: 'pending'
-})
-
-const swapDetails = ref<SwapDetails>({
-  exchange: '',
-  inputAmount: '',
-  inputSymbol: '',
-  outputAmount: ''
-})
-
-const error = ref('')
-
-// Computed
-const isProcessing = computed(() => {
-  return Object.values(stepStatus.value).some(status => status === 'active')
-})
-
-const isComplete = computed(() => {
-  return Object.values(stepStatus.value).every(status => status === 'completed')
-})
-
-// Methods
-const getStepClass = (step: string) => {
-  const status = stepStatus.value[step]
-  return {
-    'step-pending': status === 'pending',
-    'step-active': status === 'active',
-    'step-completed': status === 'completed',
-    'step-error': status === 'error'
-  }
-}
-
-const handleBackdropClick = (event: MouseEvent) => {
-  if (event.target === event.currentTarget && !isProcessing.value) {
-    close()
-  }
-}
-
-const close = () => {
-  if (!isProcessing.value) {
-    emit('close')
-  }
-}
-
-// Public methods for parent to control progress
-const setStepActive = (step: string) => {
-  stepStatus.value[step] = 'active'
-}
-
-const setStepCompleted = (step: string) => {
-  stepStatus.value[step] = 'completed'
-}
-
-const setStepError = (step: string) => {
-  stepStatus.value[step] = 'error'
-}
-
-const setSwapDetails = (details: SwapDetails) => {
-  swapDetails.value = details
-}
-
-const setError = (errorMessage: string) => {
-  error.value = errorMessage
-}
-
-const reset = () => {
-  stepStatus.value = {
-    quotes: 'pending',
-    swap: 'pending',
-    stake: 'pending', 
-    dissolve: 'pending'
-  }
-  swapDetails.value = {
-    exchange: '',
-    inputAmount: '',
-    inputSymbol: '',
-    outputAmount: ''
-  }
-  error.value = ''
-}
-
-// Expose methods to parent
-defineExpose({
-  setStepActive,
-  setStepCompleted,
-  setStepError,
-  setSwapDetails,
-  setError,
-  reset
-})
-</script>
