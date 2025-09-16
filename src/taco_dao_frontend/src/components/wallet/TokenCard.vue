@@ -131,7 +131,7 @@
                         class="btn btn-sm taco-btn taco-btn--green px-2 py-1"
                         :disabled="loadingRewards || claimingAllRewards"
                         title="Claim some rewards">
-                  Calim Some
+                  Claim Some
                 </button>            
 
                 <!-- claim all -->
@@ -139,7 +139,7 @@
                         class="btn btn-sm taco-btn taco-btn--green px-2 py-1"
                         :disabled="loadingRewards || claimingAllRewards"
                         title="Claim all rewards">
-                  Calim All
+                  Claim All
                 </button>
 
               </div>
@@ -404,7 +404,8 @@
                 <button v-if="getNeuronRewards(neuron.idHex) > 0"
                         @click.stop="claimNeuronRewards(neuron)"
                         class="btn btn-sm taco-btn taco-btn--green px-2"
-                        style="padding-top: 0.125rem; padding-bottom: 0.125rem;">
+                        style="padding-top: 0.25rem; padding-bottom: 0.25rem;"
+                        :disabled="loadingRewards || isNeuronClaiming(neuron.idHex)">
                   
                         <!-- tokens icon -->
                   <i class="fa fa-coins"></i>
@@ -639,7 +640,8 @@
                 <button v-if="getNeuronRewards(neuron.idHex) > 0"
                         @click.stop="claimNeuronRewards(neuron)"
                         class="btn btn-sm taco-btn taco-btn--green px-2"
-                        style="padding-top: 0.125rem; padding-bottom: 0.125rem;">
+                        style="padding-top: 0.25rem; padding-bottom: 0.25rem;"
+                        :disabled="loadingRewards || isNeuronClaiming(neuron.idHex)">
                   
                         <!-- tokens icon -->
                         <i class="fa fa-coins"></i>
