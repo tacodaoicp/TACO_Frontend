@@ -691,7 +691,6 @@ import TacoTitle from '../components/misc/TacoTitle.vue'
 import AdminConfirmationModal from '../components/admin/AdminConfirmationModal.vue'
 
 const tacoStore = useTacoStore()
-const userStore = tacoStore // Assuming user functions are in taco store
 
 // Reactive state
 const loading = ref(false)
@@ -879,7 +878,6 @@ async function performSystemHealthCheck() {
   try {
     await tacoStore.performSystemHealthCheck()
     await fetchSystemStatus()
-    tacoStore.showSuccess('System health check completed')
   } catch (error: any) {
     showErrorWithDeduplication('Failed to perform health check: ' + error.message)
   } finally {
@@ -908,11 +906,9 @@ async function addAdmin() {
   try {
     await tacoStore.addAlarmAdmin(newAdminPrincipal.value)
     newAdminPrincipal.value = ''
-    tacoStore.showSuccess('Admin added successfully')
   } catch (error: any) {
     showErrorWithDeduplication('Failed to add admin: ' + error.message)
-  } finally {const logLimit = ref(25)
-const adminActionLogs = ref([] as any[])
+  } finally {
     loading.value = false
   }
 }
@@ -929,7 +925,6 @@ async function addContact() {
     )
     newContact.value = { name: '', type: 'Email', value: '' }
     await fetchContacts()
-    tacoStore.showSuccess('Contact added successfully')
   } catch (error: any) {
     showErrorWithDeduplication('Failed to add contact: ' + error.message)
   } finally {
@@ -947,11 +942,9 @@ async function fetchContacts() {
 
 async function toggleContactStatus(contactId: number, active: boolean) {
   loading.value = true;
-  const monitoredCanisters = ref([] as any[]);
   try {
     await tacoStore.updateContactStatus(contactId, active)
     await fetchContacts()
-    tacoStore.showSuccess(`Contact ${active ? 'enabled' : 'disabled'}`)
   } catch (error: any) {
     showErrorWithDeduplication('Failed to update contact: ' + error.message)
   } finally {
@@ -970,7 +963,6 @@ async function removeContact(contactId: number) {
       try {
         await tacoStore.removeAlarmContact(contactId)
         await fetchContacts()
-        tacoStore.showSuccess('Contact removed successfully')
       } catch (error: any) {
         showErrorWithDeduplication('Failed to remove contact: ' + error.message)
       } finally {
@@ -1018,7 +1010,6 @@ async function acknowledgeAlarm(alarmId: number) {
   try {
     await tacoStore.acknowledgeAlarm(alarmId)
     await fetchPendingAlarms()
-    tacoStore.showSuccess('Alarm acknowledged successfully')
   } catch (error: any) {
     showErrorWithDeduplication('Failed to acknowledge alarm: ' + error.message)
   } finally {
@@ -1047,7 +1038,6 @@ async function resolveError(errorId: number) {
   try {
     await tacoStore.resolveSystemError(errorId)
     await fetchSystemErrors()
-    tacoStore.showSuccess('Error marked as resolved')
   } catch (error: any) {
     showErrorWithDeduplication('Failed to resolve error: ' + error.message)
   } finally {
@@ -1061,7 +1051,6 @@ async function updateCheckInterval() {
     await tacoStore.setCheckInterval(Number(configIntervals.value.treasuryCheckMinutes))
     await fetchSystemStatus()
     await fetchConfigIntervals()
-    tacoStore.showSuccess('Treasury check interval updated')
   } catch (error: any) {
     showErrorWithDeduplication('Failed to update interval: ' + error.message)
   } finally {
@@ -1074,7 +1063,6 @@ async function updateCanisterMonitoringInterval() {
   try {
     await tacoStore.setCanisterMonitoringInterval(Number(configIntervals.value.canisterMonitoringMinutes))
     await fetchConfigIntervals()
-    tacoStore.showSuccess('Canister monitoring interval updated')
   } catch (error: any) {
     showErrorWithDeduplication('Failed to update canister monitoring interval: ' + error.message)
   } finally {
@@ -1095,7 +1083,6 @@ async function toggleCanisterMonitoring(canisterId: bigint, enabled: boolean) {
   try {
     await tacoStore.updateMonitoredCanisterStatus(Number(canisterId), enabled);
     await fetchMonitoredCanisters();
-    tacoStore.showSuccess(`Canister monitoring ${enabled ? 'enabled' : 'disabled'}`);
   } catch (error: any) {
     showErrorWithDeduplication('Failed to update canister status: ' + error.message);
   } finally {
@@ -1114,7 +1101,6 @@ async function removeMonitoredCanister(canisterId: bigint) {
       try {
         await tacoStore.removeMonitoredCanister(Number(canisterId));
         await fetchMonitoredCanisters();
-        tacoStore.showSuccess('Monitored canister removed successfully');
       } catch (error: any) {
         showErrorWithDeduplication('Failed to remove canister: ' + error.message);
       } finally {
@@ -1194,7 +1180,6 @@ async function addMonitoredCanister() {
       statusAlertLevel: 'Level1Immediate'
     }
     
-    tacoStore.showSuccess('Monitored canister added successfully')
   } catch (error: any) {
     showErrorWithDeduplication('Failed to add monitored canister: ' + error.message)
   } finally {
@@ -1209,7 +1194,6 @@ async function sendTestEmail() {
   try {
     await tacoStore.sendTestEmailSingle(testEmail.value.email, testEmail.value.subject)
     testEmail.value = { email: '', subject: '' }
-    tacoStore.showSuccess('Test email sent successfully')
   } catch (error: any) {
     showErrorWithDeduplication('Failed to send test email: ' + error.message)
   } finally {
@@ -1222,7 +1206,6 @@ async function updateLevel2SMSInterval() {
   try {
     await tacoStore.setLevel2SMSCheckInterval(Number(configIntervals.value.level2SMSCheckMinutes))
     await fetchConfigIntervals()
-    tacoStore.showSuccess('Level 2 SMS check interval updated')
   } catch (error: any) {
     showErrorWithDeduplication('Failed to update Level 2 SMS interval: ' + error.message)
   } finally {
@@ -1234,7 +1217,6 @@ async function refreshConfigIntervals() {
   loading.value = true
   try {
     await fetchConfigIntervals()
-    tacoStore.showSuccess('Configuration refreshed')
   } catch (error: any) {
     showErrorWithDeduplication('Failed to refresh configuration: ' + error.message)
   } finally {
@@ -1247,10 +1229,8 @@ async function toggleMonitoring() {
   try {
     if (systemStatus.value.enabled) {
       await tacoStore.stopMonitoring()
-      tacoStore.showSuccess('Monitoring stopped')
     } else {
       await tacoStore.startMonitoring()
-      tacoStore.showSuccess('Monitoring started')
     }
     await fetchSystemStatus()
   } catch (error: any) {
