@@ -50,6 +50,13 @@ export interface Contact {
 }
 export type ContactType = { 'SMS' : string } |
   { 'Email' : string };
+export interface InternalError {
+  'id' : bigint,
+  'context' : [] | [string],
+  'errorType' : string,
+  'message' : string,
+  'timestamp' : bigint,
+}
 export interface MonitoredCanisterConfig {
   'id' : bigint,
   'timersAlertLevel' : AlarmImportanceLevel,
@@ -80,7 +87,9 @@ export type Result = { 'ok' : string } |
   { 'err' : string };
 export type Result_1 = { 'ok' : bigint } |
   { 'err' : string };
-export type Result_10 = {
+export type Result_10 = { 'ok' : Array<Contact> } |
+  { 'err' : string };
+export type Result_11 = {
     'ok' : {
       'canisterMonitoringMinutes' : bigint,
       'level2SMSCheckMinutes' : bigint,
@@ -89,7 +98,7 @@ export type Result_10 = {
     }
   } |
   { 'err' : string };
-export type Result_11 = {
+export type Result_12 = {
     'ok' : Array<
       [
         MonitoredCanisterConfig,
@@ -100,7 +109,7 @@ export type Result_11 = {
     >
   } |
   { 'err' : string };
-export type Result_12 = {
+export type Result_13 = {
     'ok' : {
       'smsUrl' : string,
       'username' : string,
@@ -109,13 +118,13 @@ export type Result_12 = {
     }
   } |
   { 'err' : string };
-export type Result_13 = { 'ok' : Array<AlarmLog> } |
+export type Result_14 = { 'ok' : Array<AlarmLog> } |
   { 'err' : string };
-export type Result_14 = { 'ok' : Array<AlarmAcknowledgment> } |
+export type Result_15 = { 'ok' : Array<AlarmAcknowledgment> } |
   { 'err' : string };
-export type Result_15 = { 'ok' : Array<AdminPermission> } |
+export type Result_16 = { 'ok' : Array<AdminPermission> } |
   { 'err' : string };
-export type Result_16 = { 'ok' : Array<AdminActionLog> } |
+export type Result_17 = { 'ok' : Array<AdminActionLog> } |
   { 'err' : string };
 export type Result_2 = { 'ok' : Array<SystemError> } |
   { 'err' : string };
@@ -145,7 +154,9 @@ export type Result_6 = {
   { 'err' : string };
 export type Result_7 = { 'ok' : Array<MonitoredCanisterConfig> } |
   { 'err' : string };
-export type Result_8 = {
+export type Result_8 = { 'ok' : Array<InternalError> } |
+  { 'err' : string };
+export type Result_9 = {
     'ok' : {
       'smsQueueSize' : bigint,
       'monitoredCanistersCount' : bigint,
@@ -156,8 +167,6 @@ export type Result_8 = {
       'enabledCanistersCount' : bigint,
     }
   } |
-  { 'err' : string };
-export type Result_9 = { 'ok' : Array<Contact> } |
   { 'err' : string };
 export interface SentMessage {
   'id' : bigint,
@@ -208,15 +217,16 @@ export interface _SERVICE {
   >,
   'clearAllLogs' : ActorMethod<[], Result>,
   'clearQueues' : ActorMethod<[], Result>,
-  'getAdminActionLogs' : ActorMethod<[[] | [bigint]], Result_16>,
-  'getAdminPermissions' : ActorMethod<[], Result_15>,
-  'getAlarmAcknowledgments' : ActorMethod<[[] | [bigint]], Result_14>,
-  'getAlarmLogs' : ActorMethod<[[] | [bigint]], Result_13>,
-  'getApiConfiguration' : ActorMethod<[], Result_12>,
-  'getCanisterHealthStatus' : ActorMethod<[], Result_11>,
-  'getConfigurationIntervals' : ActorMethod<[], Result_10>,
-  'getContacts' : ActorMethod<[], Result_9>,
-  'getEnhancedAlarmSystemStatus' : ActorMethod<[], Result_8>,
+  'getAdminActionLogs' : ActorMethod<[[] | [bigint]], Result_17>,
+  'getAdminPermissions' : ActorMethod<[], Result_16>,
+  'getAlarmAcknowledgments' : ActorMethod<[[] | [bigint]], Result_15>,
+  'getAlarmLogs' : ActorMethod<[[] | [bigint]], Result_14>,
+  'getApiConfiguration' : ActorMethod<[], Result_13>,
+  'getCanisterHealthStatus' : ActorMethod<[], Result_12>,
+  'getConfigurationIntervals' : ActorMethod<[], Result_11>,
+  'getContacts' : ActorMethod<[], Result_10>,
+  'getEnhancedAlarmSystemStatus' : ActorMethod<[], Result_9>,
+  'getInternalErrors' : ActorMethod<[[] | [bigint]], Result_8>,
   'getMonitoredCanisters' : ActorMethod<[], Result_7>,
   'getMonitoringStatus' : ActorMethod<[], Result_6>,
   'getPendingAlarms' : ActorMethod<[], Result_5>,

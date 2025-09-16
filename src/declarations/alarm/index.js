@@ -1,21 +1,37 @@
-import { Actor, HttpAgent } from '@dfinity/agent';
-import { idlFactory } from './alarm.did.js';
+import { Actor, HttpAgent } from "@dfinity/agent";
 
-export const canisterId = process.env.CANISTER_ID_ALARM || 'b2cwp-6qaaa-aaaad-qhn6a-cai';
+// Imports and re-exports candid interface
+import { idlFactory } from "./alarm.did.js";
+export { idlFactory } from "./alarm.did.js";
+
+/* CANISTER_ID is replaced by webpack based on node environment
+ * Note: canister environment variable will be standardized as
+ * process.env.CANISTER_ID_<CANISTER_NAME_UPPERCASE>
+ * beginning in dfx 0.15.0
+ */
+export const canisterId =
+  process.env.CANISTER_ID_ALARM;
 
 export const createActor = (canisterId, options = {}) => {
-  const agent = options.agent || new HttpAgent({
-    ...options.agentOptions,
-    host: process.env.DFX_NETWORK === 'local' ? 'http://localhost:4943' : 'https://ic0.app',
-  });
+  const agent = options.agent || new HttpAgent({ ...options.agentOptions });
 
-  if (process.env.DFX_NETWORK !== 'ic') {
+  if (options.agent && options.agentOptions) {
+    console.warn(
+      "Detected both agent and agentOptions passed to createActor. Ignoring agentOptions and proceeding with the provided agent."
+    );
+  }
+
+  // Fetch root key for certificate validation during development
+  if (process.env.DFX_NETWORK !== "ic") {
     agent.fetchRootKey().catch((err) => {
-      console.warn('Unable to fetch root key. Check to ensure that your local replica is running');
+      console.warn(
+        "Unable to fetch root key. Check to ensure that your local replica is running"
+      );
       console.error(err);
     });
   }
 
+  // Creates an actor with using the candid interface and the HttpAgent
   return Actor.createActor(idlFactory, {
     agent,
     canisterId,
@@ -23,5 +39,4 @@ export const createActor = (canisterId, options = {}) => {
   });
 };
 
-export const alarm = createActor(canisterId);
-export * from './alarm.did.js';
+export const alarm = canisterId ? createActor(canisterId) : undefined;
