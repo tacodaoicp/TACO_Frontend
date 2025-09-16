@@ -210,6 +210,17 @@
             <div class="card-header d-flex justify-content-between align-items-center">
               <h3 class="mb-0">System Errors</h3>
               <div class="d-flex gap-2">
+                <div class="form-check form-check-inline">
+                  <input
+                    v-model="showOnlyUnresolvedErrors"
+                    class="form-check-input"
+                    type="checkbox"
+                    id="unresolvedOnly"
+                  >
+                  <label class="form-check-label" for="unresolvedOnly">
+                    Unresolved only
+                  </label>
+                </div>
                 <select v-model="errorLimit" class="form-select form-select-sm" style="width: auto;">
                   <option value="10">10</option>
                   <option value="25">25</option>
@@ -220,12 +231,12 @@
               </div>
             </div>
             <div class="card-body">
-              <div v-if="systemErrors.length === 0" class="text-center py-3">
-                <p class="mb-0">No system errors found</p>
+              <div v-if="filteredSystemErrors.length === 0" class="text-center py-3">
+                <p class="mb-0">{{ showOnlyUnresolvedErrors ? 'No unresolved system errors found' : 'No system errors found' }}</p>
               </div>
-              
+
               <div v-else>
-                <div v-for="error in systemErrors" :key="error.id" class="border rounded p-3 mb-3">
+                <div v-for="error in filteredSystemErrors" :key="error.id" class="border rounded p-3 mb-3">
                   <div class="d-flex justify-content-between align-items-start mb-2">
                     <div>
                       <strong>Error ID: {{ error.id }}</strong>
@@ -696,6 +707,7 @@ const tacoStore = useTacoStore()
 const loading = ref(false)
 const newAdminPrincipal = ref('')
 const errorLimit = ref(25)
+const showOnlyUnresolvedErrors = ref(false)
 
 // Contact form
 const newContact = ref({
@@ -773,10 +785,16 @@ const isContactValid = computed(() => {
 })
 
 const isCanisterFormValid = computed(() => {
-  return newCanister.value.canisterId.trim() && 
-         newCanister.value.name.trim() && 
+  return newCanister.value.canisterId.trim() &&
+         newCanister.value.name.trim() &&
          newCanister.value.minimumCycles.trim() &&
          (!newCanister.value.isSNSControlled || newCanister.value.snsRootCanisterId.trim())
+})
+
+const filteredSystemErrors = computed(() => {
+  return showOnlyUnresolvedErrors.value
+    ? systemErrors.value.filter(error => !error.resolved)
+    : systemErrors.value
 })
 
 // Auto-refresh function
