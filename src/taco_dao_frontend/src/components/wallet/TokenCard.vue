@@ -1115,6 +1115,10 @@ const claimNeuronRewards = async (neuron: any) => {
   
   claimingNeurons.value.add(neuron.idHex)
   try {
+
+    // turn app loading on
+    tacoStore.appLoadingOn()
+
     // For categorized neurons, neuron.id is already a Uint8Array
     if (!neuron.id || !(neuron.id instanceof Uint8Array)) {
       throw new Error('Invalid neuron ID format - expected Uint8Array')
@@ -1143,6 +1147,9 @@ const claimNeuronRewards = async (neuron: any) => {
     })
   } finally {
     claimingNeurons.value.delete(neuron.idHex)
+
+    // turn app loading off
+    tacoStore.appLoadingOff()
   }
 }
 
