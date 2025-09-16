@@ -422,6 +422,7 @@ export interface AlarmCanisterActor {
     getPendingAlarms(): Promise<{ ok: any[] } | { err: string }>
     acknowledgeAlarm(alarmId: number): Promise<{ ok: string } | { err: string }>
     getSystemErrors(limit: number[]): Promise<{ ok: any[] } | { err: string }>
+    getInternalErrors(limit?: number): Promise<any[]>
     resolveSystemErrorById(errorId: number): Promise<{ ok: string } | { err: string }>
 
     // Monitoring Configuration
@@ -7229,6 +7230,23 @@ export const useTacoStore = defineStore('taco', () => {
         }
     }
 
+    const getInternalErrors = async (limit?: number) => {
+        try {
+            const actor = await createAlarmActor();
+            const result = await actor.getInternalErrors(limit ? [BigInt(limit)] : []);
+
+            if ('err' in result) {
+                throw new Error(JSON.stringify(result.err));
+            }
+
+            return result.ok;
+        } catch (error) {
+            console.error('Error getting internal errors:', error);
+            showError(`Error getting internal errors: ${error instanceof Error ? error.message : String(error)}`);
+            throw error;
+        }
+    }
+
     const resolveSystemError = async (errorId: number) => {
         try {
             const actor = await createAlarmActor();
@@ -7869,6 +7887,7 @@ export const useTacoStore = defineStore('taco', () => {
         getPendingAlarms,
         acknowledgeAlarm,
         getSystemErrors,
+        getInternalErrors,
         resolveSystemError,
         setCheckInterval,
         startMonitoring,

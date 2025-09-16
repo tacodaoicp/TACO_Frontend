@@ -623,7 +623,44 @@
                 </button>
               </div>
             </div>
-            
+
+          </div>
+
+          <!-- Internal Errors -->
+          <div class="card bg-dark text-white mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+              <h3 class="mb-0">Internal Errors</h3>
+              <div class="d-flex gap-2">
+                <select v-model="internalErrorLimit" class="form-select form-select-sm" style="width: auto;">
+                  <option value="10">10</option>
+                  <option value="25">25</option>
+                  <option value="50">50</option>
+                  <option value="100">100</option>
+                </select>
+                <button @click="fetchInternalErrors" class="btn btn-secondary">Refresh</button>
+              </div>
+            </div>
+            <div class="card-body">
+              <div v-if="internalErrors.length === 0" class="text-center py-3">
+                <p class="mb-0">No internal errors found</p>
+              </div>
+
+              <div v-else>
+                <div v-for="error in internalErrors" :key="error.id" class="border rounded p-3 mb-3">
+                  <div class="d-flex justify-content-between align-items-start mb-2">
+                    <div>
+                      <strong>Error ID: {{ error.id }}</strong>
+                      <span class="badge bg-danger ms-2">{{ error.errorType }}</span>
+                    </div>
+                    <small class="text-light">{{ formatTimestamp(error.timestamp) }}</small>
+                  </div>
+                  <div class="mb-2">{{ error.message }}</div>
+                  <div v-if="error.context" class="mb-2">
+                    <small class="text-muted">Context: {{ error.context }}</small>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -702,6 +739,8 @@ const confirmModal = ref({
 const contacts = ref([] as any[])
 const pendingAlarms = ref([] as any[])
 const systemErrors = ref([] as any[])
+const internalErrors = ref([] as any[])
+const internalErrorLimit = ref(25)
 const systemStatus = ref({} as any)
 const messageFilter = ref('all')
 const sentMessages = ref([] as any[])
@@ -746,6 +785,7 @@ async function refreshData() {
       fetchContacts(),
       fetchPendingAlarms(),
       fetchSystemErrors(),
+      fetchInternalErrors(),
       fetchConfigIntervals(),
       fetchQueueStatus(),
       fetchSentMessages(),
@@ -791,6 +831,10 @@ onUnmounted(() => {
 // Watch for error limit changes
 watch(errorLimit, () => {
   fetchSystemErrors()
+})
+
+watch(internalErrorLimit, () => {
+  fetchInternalErrors()
 })
 
 // Methods
@@ -951,6 +995,14 @@ async function fetchSystemErrors() {
     systemErrors.value = await tacoStore.getSystemErrors(errorLimit.value)
   } catch (error) {
     console.error('Failed to fetch system errors:', error)
+  }
+}
+
+async function fetchInternalErrors() {
+  try {
+    internalErrors.value = await tacoStore.getInternalErrors(internalErrorLimit.value)
+  } catch (error) {
+    console.error('Failed to fetch internal errors:', error)
   }
 }
 
