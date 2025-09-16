@@ -131,7 +131,7 @@
                         class="btn btn-sm taco-btn taco-btn--green px-2 py-1"
                         :disabled="loadingRewards || claimingAllRewards"
                         title="Claim some rewards">
-                  Calim Some
+                  Claim Some
                 </button>            
 
                 <!-- claim all -->
@@ -139,7 +139,7 @@
                         class="btn btn-sm taco-btn taco-btn--green px-2 py-1"
                         :disabled="loadingRewards || claimingAllRewards"
                         title="Claim all rewards">
-                  Calim All
+                  Claim All
                 </button>
 
               </div>
@@ -404,7 +404,8 @@
                 <button v-if="getNeuronRewards(neuron.idHex) > 0"
                         @click.stop="claimNeuronRewards(neuron)"
                         class="btn btn-sm taco-btn taco-btn--green px-2"
-                        style="padding-top: 0.125rem; padding-bottom: 0.125rem;">
+                        style="padding-top: 0.25rem; padding-bottom: 0.25rem;"
+                        :disabled="loadingRewards || isNeuronClaiming(neuron.idHex)">
                   
                         <!-- tokens icon -->
                   <i class="fa fa-coins"></i>
@@ -639,7 +640,8 @@
                 <button v-if="getNeuronRewards(neuron.idHex) > 0"
                         @click.stop="claimNeuronRewards(neuron)"
                         class="btn btn-sm taco-btn taco-btn--green px-2"
-                        style="padding-top: 0.125rem; padding-bottom: 0.125rem;">
+                        style="padding-top: 0.25rem; padding-bottom: 0.25rem;"
+                        :disabled="loadingRewards || isNeuronClaiming(neuron.idHex)">
                   
                         <!-- tokens icon -->
                         <i class="fa fa-coins"></i>
@@ -1113,6 +1115,10 @@ const claimNeuronRewards = async (neuron: any) => {
   
   claimingNeurons.value.add(neuron.idHex)
   try {
+
+    // turn app loading on
+    tacoStore.appLoadingOn()
+
     // For categorized neurons, neuron.id is already a Uint8Array
     if (!neuron.id || !(neuron.id instanceof Uint8Array)) {
       throw new Error('Invalid neuron ID format - expected Uint8Array')
@@ -1141,6 +1147,9 @@ const claimNeuronRewards = async (neuron: any) => {
     })
   } finally {
     claimingNeurons.value.delete(neuron.idHex)
+
+    // turn app loading off
+    tacoStore.appLoadingOff()
   }
 }
 
@@ -1149,6 +1158,10 @@ const claimAllRewards = async () => {
   
   claimingAllRewards.value = true
   try {
+
+    // turn app loading on
+    tacoStore.appLoadingOn()
+
     // Use the real claim all function from taco store
     const success = await tacoStore.claimAllNeuronRewards(categorizedNeurons.value.all)
     
@@ -1170,6 +1183,10 @@ const claimAllRewards = async () => {
     })
   } finally {
     claimingAllRewards.value = false
+
+    // turn app loading off
+    tacoStore.appLoadingOff()
+    
   }
 }
 

@@ -55,7 +55,7 @@
                 <ul class="taco-report-explorer__list">
 
                   <!-- clown - report item -->
-                  <li class="taco-report-explorer__list-item" @click="toggleReportMenuOnMobile(); router.push('/reports/clown')">
+                  <li v-if="false" class="taco-report-explorer__list-item" @click="toggleReportMenuOnMobile(); router.push('/reports/clown')">
                     
                     <!-- report -->
                     <div class="taco-report-explorer__list-report"
