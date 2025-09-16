@@ -1158,6 +1158,10 @@ const claimAllRewards = async () => {
   
   claimingAllRewards.value = true
   try {
+
+    // turn app loading on
+    tacoStore.appLoadingOn()
+
     // Use the real claim all function from taco store
     const success = await tacoStore.claimAllNeuronRewards(categorizedNeurons.value.all)
     
@@ -1179,6 +1183,10 @@ const claimAllRewards = async () => {
     })
   } finally {
     claimingAllRewards.value = false
+
+    // turn app loading off
+    tacoStore.appLoadingOff()
+    
   }
 }
 
