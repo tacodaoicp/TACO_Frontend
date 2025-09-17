@@ -8,6 +8,26 @@
             <!-- changelog item -->
             <div class="changelog-content__item">
                 <h3 class="changelog-content__title">
+                    v1.0.6
+                </h3>
+                <span class="changelog-content__date">🍽️ September 16, 2025</span>
+                <p class="changelog-content__text">
+                    - Adds /wallet
+                    - Adds sending and receiving tokens
+                    - Adds swapping tokens into TACO
+                    - Adds neuron creation
+                    - Adds rewards claiming
+                    - Adds staking to neurons
+                    - Adds start and stop neuron dissolution
+                    - Adds modifying neuron dissolve period
+                    - Adds neuron disbursal
+                    - Adds registering of non-core/trusted tokens
+                </p>
+            </div>            
+
+            <!-- changelog item -->
+            <div class="changelog-content__item">
+                <h3 class="changelog-content__title">
                     v1.0.5
                 </h3>
                 <span class="changelog-content__date">🍽️ August 16, 2025</span>

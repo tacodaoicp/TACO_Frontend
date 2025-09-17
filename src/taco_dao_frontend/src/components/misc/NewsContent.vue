@@ -8,6 +8,17 @@
             <!-- news item -->
             <div class="news-content__item">
                 <h3 class="news-content__title">
+                    We've got a wallet!
+                </h3>
+                <span class="news-content__date">🍽️ September 16, 2025</span>
+                <p class="news-content__text">
+                    We've added a wallet to the site! You can now send and receive tokens, swap into TACO, stake new neurons, add stake to neurons, register non-core/trusted tokens, claim rewards, start and stop neuron dissolution, modify neuron dissolve periods, and disburse neurons!
+                </p>
+            </div>
+
+            <!-- news item -->
+            <div class="news-content__item">
+                <h3 class="news-content__title">
                     We're funding the portfolio!
                 </h3>
                 <span class="news-content__date">🍽️ July 26, 2025</span>
