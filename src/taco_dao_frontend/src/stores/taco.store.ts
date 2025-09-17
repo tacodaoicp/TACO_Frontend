@@ -1953,7 +1953,7 @@ export const useTacoStore = defineStore('taco', () => {
                         code: 'voting-power-error',
                         title: 'Voting Power Refresh Failed',
                         icon: 'fa-solid fa-exclamation-triangle',
-                        message: `Failed to refresh voting power: ${errorMsg}`
+                        message: `We may have pushed an update to the site since you last logged in. Try logging out and logging back in`
                     })
                     
                     return false
@@ -1980,7 +1980,7 @@ export const useTacoStore = defineStore('taco', () => {
                 code: 'voting-power-error',
                 title: 'Voting Power Refresh Failed',
                 icon: 'fa-solid fa-exclamation-triangle',
-                message: `Error: ${error}`
+                message: `We may have pushed an update to the site since you last logged in. Try logging out and logging back in`
             })
 
             // return
