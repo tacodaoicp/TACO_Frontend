@@ -849,6 +849,8 @@ function showErrorWithDeduplication(message: string) {
     normalizedMessage = 'User must be logged in'
   } else if (message.toLowerCase().includes('only admins can') || message.toLowerCase().includes('admin only') || message.toLowerCase().includes('not authorized') || message.toLowerCase().includes('unauthorized')) {
     normalizedMessage = 'Unauthorized access - admin privileges required'
+  } else if (message.includes('Invalid signature') || message.includes('EcdsaP256 signature could not be verified') || message.includes('verification failed')) {
+    normalizedMessage = 'Invalid signature - authentication failed'
   }
 
   const lastShown = recentErrorMessages.value.get(normalizedMessage)
