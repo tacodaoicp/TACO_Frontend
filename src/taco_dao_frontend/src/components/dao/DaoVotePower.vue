@@ -36,7 +36,7 @@
               style="color: var(--black-to-white);">
 
         <!-- refresh icon -->
-        <span v-if="!refreshingVP" style="color: var(--black-to-white);">Refresh</span>
+        <span v-if="!refreshingVP && userLoggedIn" style="color: var(--black-to-white);">Refresh</span>
         <span v-if="refreshingVP" style="color: var(--black-to-white);">Refreshing</span>
 
       </button>    
