@@ -8227,15 +8227,123 @@ for cycle top-ups, and the ledger fee is 0.005 NTC. NTC vectors charge NTN fees.
 
                     <!-- paragraph -->
                     <p>
-There is no public roadmap for Neutrinite, the team's modus operandi so far appears to be hinting at what
-they'll do next and revealing it once they're close to done with it.
+In proposal <a href="https://dashboard.internetcomputer.org/sns/extk7-gaaaa-aaaaq-aacda-cai/proposal/296" target="_blank">296,</a> the following list of items was provided:
                     </p>
 
-                    <!-- paragraph -->
-                    <p>
-Anvil concluded the forum post that introduced NTC with: “Next up: multi-chain tokens. Crypto, brace
-for impact!”.
-                    </p>
+                    <!-- unordered list -->
+                    <ul>
+                      
+                      <!-- list item -->
+                      <li>
+
+                        <!-- paragraph -->
+                        <p>
+Multi-chain integrations
+                        </p>
+
+                      </li>
+
+                      <!-- list item -->
+                      <li>
+
+                        <!-- paragraph -->
+                        <p>
+Improve UX of deposit/withdrawal
+                        </p>
+
+                      </li>
+
+                      <!-- list item -->
+                      <li>
+
+                        <!-- paragraph -->
+                        <p>
+Intro with all features explained
+                        </p>
+
+                      </li>
+                      
+                      <!-- list item -->
+                      <li>
+
+                        <!-- paragraph -->
+                        <p>
+Reduce price impact
+                        </p>
+
+                      </li>
+                      
+                      <!-- list item -->
+                      <li>
+
+                        <!-- paragraph -->
+                        <p>
+Arbitrage improvements
+                        </p>
+
+                      </li>
+                      
+                      <!-- list item -->
+                      <li>
+
+                        <!-- paragraph -->
+                        <p>
+New AMM algo, tokens & pools
+                        </p>
+
+                      </li>
+                      
+                      <!-- list item -->
+                      <li>
+
+                        <!-- paragraph -->
+                        <p>
+Bug fixes & improvements
+                        </p>
+
+                      </li>
+                      
+                      <!-- list item -->
+                      <li>
+
+                        <!-- paragraph -->
+                        <p>
+Vector algo improvements
+                        </p>
+
+                      </li>
+                      
+                      <!-- list item -->
+                      <li>
+
+                        <!-- paragraph -->
+                        <p>
+New vectors
+                        </p>
+
+                      </li>
+                      
+                      <!-- list item -->
+                      <li>
+
+                        <!-- paragraph -->
+                        <p>
+Market & community growth
+                        </p>
+
+                      </li>
+                      
+                      <!-- list item -->
+                      <li>
+
+                        <!-- paragraph -->
+                        <p>
+Dispute resolution system & social network
+                        </p>
+
+                      </li>
+
+                    </ul>
                     
                     <hr>
 
@@ -8310,7 +8418,7 @@ Other examples of ecosystem alignment include:
 
                         <!-- paragraph -->
                         <p>
-~25k NTN airdropped to SNS1 holders
+~25,000 NTN airdropped to SNS1 holders
                         </p>
 
                       </li>
@@ -9025,8 +9133,8 @@ At the most basic interpretation, the necessity of DAOs stems from the desirabil
 trust. A project could be blackholed to guarantee full trust, but then it has no controller, and therefore
 cannot evolve. However, if you give control to a controller, something could be broken or lost on purpose
 or incident. DAOs distribute control between many token holders so a project can continue evolving
-without the single point of error. This is beneficial in crypto, where there is no assurance for assets
-through legal systems. This is the most concrete take on this technology.
+without the single point of error. This is beneficial in crypto, where there is oftentimes no assurance for assets through legal
+systems. This is the most concrete take on this technology.
                     </p>
 
                     <!-- paragraph -->
@@ -9287,38 +9395,27 @@ likely cancels out some of the risk they pose individually.
 
                     <!-- paragraph -->
                     <p>
-The timeline and execution of cICP's node provider component appears unclear or undecided on. The
-following two statements are pretty much all the information we've been able to find related to trust and
-execution<a href="https://forum.dfinity.org/t/cicp-compounding-stream-icp-liquid-staking-token/49663/167" target="_blank">[1]</a><a href="https://neutrinite.io/streamfusion/cICP" target="_blank">[2]</a>:
+The timeline and execution of cICP's node provider component appears unclear or undecided
+on. After reviewing this report, Anvil directly messaged the following concept related to trust and
+execution:
                     </p>
 
                     <!-- quote -->
                     <div class="taco-report-explorer__report-quote">
-                      <blockquote cite="#">
+                      <blockquote>
                         <p>
-“Different LLCs can own the servers, same way RWAs work and mint NFTs for them, which the DAO
-holds. The DAO gets all the ICP rewards directly, while the service provider gets ~300$ in NTN. I'll be
-happy to support the IC and run some servers to see what the process is and what the obstacles are.”
+“There is another solution, which I am going to get to, it's about the DAO being in the middle of
+rewards and just paying less rewards to the NP overall, but increasing the first few months, so
+NP hardware cost can be covered.”
                         </p>
                       </blockquote>
-                      <p>—infu, <cite><a href="https://forum.dfinity.org/t/cicp-compounding-stream-icp-liquid-staking-token/49663/167" target="_blank" class="taco-text-blue-to-light-blue">source</a></cite></p>
-                    </div>                     
-
-                    <!-- quote -->
-                    <div class="taco-report-explorer__report-quote">
-                      <blockquote cite="#">
-                        <p>
-“NPs lock cICP for a duration so the DAO doesn't take risks.”
-                        </p>
-                      </blockquote>
-                      <p>—https://neutrinite.io, <cite><a href="https://neutrinite.io/streamfusion/cICP" target="_blank" class="taco-text-blue-to-light-blue">source</a></cite></p>
-                    </div>                    
+                      <p>—infu</p>
+                    </div>                  
 
                     <!-- paragraph -->
                     <p>
-How node providers will be minted as RWA NFTs, and the specifics of the cICP as node provider
-collateral scheme are yet to be elucidated upon. The lack of elaboration puts into question the feasibility
-of this endeavour, especially in a timely-fashion.
+The current lack of elaboration puts into question the feasibility of this endeavour, especially in
+a timely-fashion.
                     </p>
 
                     <h4 class="taco-report-explorer__report-heading
