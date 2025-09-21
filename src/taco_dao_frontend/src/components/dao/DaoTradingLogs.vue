@@ -400,8 +400,8 @@
         // log
         // console.log('DaoTradingLogs.vue: onMounted() - fetched token details:', fetchedTokenDetails.value)
 
-        // set refresh interval
-        refreshInterval = window.setInterval(refreshData, 60_000)
+        // // set refresh interval
+        // refreshInterval = window.setInterval(refreshData, 60_000)
 
     })
 

@@ -1062,21 +1062,9 @@ export const useTacoStore = defineStore('taco', () => {
             // calculate and set user ledger account ID
             userLedgerAccountId.value = calculateAccountId(userPrincipal.value)
 
-            // refresh voting power immediately after login
-            try {
-                await refreshUserVotingPower()
-            } catch (error) {
-
-                // log
-                // console.log('Could not refresh voting power on login:', error)
-
-                // Don't fail login if refresh fails
-
-            }
-
             // Load names cache in background (non-blocking)
             // console.log('🔍 Triggering loadAllNames() from iidLogIn - after successful login');
-            loadAllNames().catch(console.error);
+            loadAllNames().catch(console.error)
 
             // turn app loading off
             appLoadingOff()

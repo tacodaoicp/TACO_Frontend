@@ -338,9 +338,9 @@
 
   // 
 
-  /////////////
+  //////////////
   // watchers //
-  /////////////
+  //////////////
 
   // watch user logged in, run immediately
   watch(userLoggedIn, async () => {
@@ -348,17 +348,20 @@
     // log
     // console.log('DaoVotePower.vue: userLoggedIn changed')
 
-    // turn on loading curtain
-    componentLoading.value = true    
-
     try {
 
       // if user is logged in, fetch user state
       if (userLoggedIn.value) {
 
-        // fetch and handle user allocation
-        await fetchUserAllocation()
-        handleFetchedUserAllocation(fetchedUserAllocation.value)
+        // turn on loading curtain
+        componentLoading.value = true    
+
+        // // fetch and handle user allocation
+        // await fetchUserAllocation()
+        // handleFetchedUserAllocation(fetchedUserAllocation.value)
+
+        // refresh voting power
+        await refreshVotingPower()
 
       } else {
 
@@ -393,6 +396,15 @@
 
     // log
     // console.log('DaoVotePower.vue: onMounted')
+
+    // turn component loading on
+    componentLoading.value = true
+
+    // refresh voting power
+    await refreshVotingPower()
+
+    // turn component loading off
+    componentLoading.value = false
 
   })
   
