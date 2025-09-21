@@ -1120,6 +1120,9 @@ export const useTacoStore = defineStore('taco', () => {
             // logout
             await authClient.logout()
 
+            // clear cached auth client instance to force fresh instance on next login
+            authClientInstance = null
+
             // set user principal to empty string
             setUserPrincipal('')
 
@@ -1900,7 +1903,7 @@ export const useTacoStore = defineStore('taco', () => {
                 // get host
                 const host = process.env.DFX_NETWORK === "local"
                     ? getLocalHost()
-                    : "https://ic0.app";                
+                    : "https://ic0.app";
 
                 // get identity
                 const identity = await authClient.getIdentity()
@@ -1930,6 +1933,7 @@ export const useTacoStore = defineStore('taco', () => {
 
                 // check if successful
                 if (result && result.ok) {
+                    
                     // refresh user allocation to get updated data
                     await fetchUserAllocation()
                     
