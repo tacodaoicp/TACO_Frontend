@@ -637,11 +637,13 @@ LOCAL METHODS
     // # ACTIONS #
 
     // dao backend
-    const { fetchTokenDetails } = tacoStore
     const { fetchAggregateAllocation } = tacoStore
 
     // ledger canisters
     const { icrc1Metadata } = tacoStore
+
+    // dao backend
+    const { ensureTokenDetails } = tacoStore
 
     /////////////////////
     // local variables //
@@ -851,7 +853,12 @@ LOCAL METHODS
             // run allocations logic
             try {
 
+                // ensure token details are loaded
+                await ensureTokenDetails()
+
                 // fetch aggregate allocation from dao backend
+
+                // if fetched aggregate allocation is not set, fetch it
                 await fetchAggregateAllocation()
 
                 // log
@@ -1016,9 +1023,6 @@ LOCAL METHODS
             // run holdings logic
             try {
 
-                // fetch token details from dao backend
-                await fetchTokenDetails()
-
                 // safely extract holdings data
                 const holdings = fetchedTokenDetails.value || []
 
@@ -1106,6 +1110,8 @@ LOCAL METHODS
     // on mounted
     onMounted(async () => {
 
+        await ensureTokenDetails()
+
         // turn on component loading
         componentLoading.value = true
 
@@ -1118,39 +1124,7 @@ LOCAL METHODS
         // init bootstrap tooltips
         new Tooltip(document.body, {
             selector: "[data-bs-toggle='tooltip']",
-        })        
-
-        // refresh every minute
-        refreshTimer.value = window.setInterval(async () => {
-
-            // log
-            console.log('refreshing allocations tile...')
-
-            // turn on component loading
-            componentLoading.value = true
-
-            // try
-            try {
-
-                // trigger the appropriate watcher based on current view
-                if (showCurrentAllocations.value) {
-                    await fetchAggregateAllocation()
-                } else if (showCurrentHoldings.value) {
-                    await fetchTokenDetails()
-                }
-
-            } catch (error) {
-
-                // log
-                console.error('error refreshing data:', error)
-
-            } finally {
-
-                componentLoading.value = false
-
-            }
-            
-        }, 60000) // 60000ms = 1 minute
+        })
 
     })
 

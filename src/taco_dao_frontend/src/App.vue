@@ -106,7 +106,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    z-index: 99999; // above everything
+    z-index: 999999; // above everything
 
     .loading-img {
       width: 10rem;
@@ -1059,7 +1059,7 @@
     console.log(
       "👨‍🍳 Welcome to %cTaco Dao",
       "color: yellow;",
-      "\n❤️ Together, We Perfect The Recipe!\n🌮 v1.0.5"
+      "\n❤️ Together, We Perfect The Recipe!\n🌮 v1.0.6"
     );
 
     // run mounted logic

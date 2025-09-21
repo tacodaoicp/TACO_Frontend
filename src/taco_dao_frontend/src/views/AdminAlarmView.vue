@@ -623,7 +623,44 @@
                 </button>
               </div>
             </div>
-            
+
+          </div>
+
+          <!-- Internal Errors -->
+          <div class="card bg-dark text-white mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+              <h3 class="mb-0">Internal Errors</h3>
+              <div class="d-flex gap-2">
+                <select v-model="internalErrorLimit" class="form-select form-select-sm" style="width: auto;">
+                  <option value="10">10</option>
+                  <option value="25">25</option>
+                  <option value="50">50</option>
+                  <option value="100">100</option>
+                </select>
+                <button @click="fetchInternalErrors" class="btn btn-secondary">Refresh</button>
+              </div>
+            </div>
+            <div class="card-body">
+              <div v-if="internalErrors.length === 0" class="text-center py-3">
+                <p class="mb-0">No internal errors found</p>
+              </div>
+
+              <div v-else>
+                <div v-for="error in internalErrors" :key="error.id" class="border rounded p-3 mb-3">
+                  <div class="d-flex justify-content-between align-items-start mb-2">
+                    <div>
+                      <strong>Error ID: {{ error.id }}</strong>
+                      <span class="badge bg-danger ms-2">{{ error.errorType }}</span>
+                    </div>
+                    <small class="text-light">{{ formatTimestamp(error.timestamp) }}</small>
+                  </div>
+                  <div class="mb-2">{{ error.message }}</div>
+                  <div v-if="error.context" class="mb-2">
+                    <small class="text-muted">Context: {{ error.context }}</small>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -654,7 +691,6 @@ import TacoTitle from '../components/misc/TacoTitle.vue'
 import AdminConfirmationModal from '../components/admin/AdminConfirmationModal.vue'
 
 const tacoStore = useTacoStore()
-const userStore = tacoStore // Assuming user functions are in taco store
 
 // Reactive state
 const loading = ref(false)
@@ -702,6 +738,8 @@ const confirmModal = ref({
 const contacts = ref([] as any[])
 const pendingAlarms = ref([] as any[])
 const systemErrors = ref([] as any[])
+const internalErrors = ref([] as any[])
+const internalErrorLimit = ref(25)
 const systemStatus = ref({} as any)
 const messageFilter = ref('all')
 const sentMessages = ref([] as any[])
@@ -720,6 +758,9 @@ const adminActionLogs = ref([] as any[])
 const refreshInterval = ref<NodeJS.Timeout | null>(null)
 const refreshCount = ref(0)
 const maxRefreshCount = 30 // 30 minutes worth of refreshes (1 per minute)
+
+// Error message deduplication
+const recentErrorMessages = ref(new Map<string, number>())
 
 
 // Computed properties
@@ -746,6 +787,7 @@ async function refreshData() {
       fetchContacts(),
       fetchPendingAlarms(),
       fetchSystemErrors(),
+      fetchInternalErrors(),
       fetchConfigIntervals(),
       fetchQueueStatus(),
       fetchSentMessages(),
@@ -793,15 +835,53 @@ watch(errorLimit, () => {
   fetchSystemErrors()
 })
 
+watch(internalErrorLimit, () => {
+  fetchInternalErrors()
+})
+
+// Error deduplication function
+function showErrorWithDeduplication(message: string) {
+  const now = Date.now()
+
+  // Normalize common auth error messages for better deduplication
+  let normalizedMessage = message
+  if (message.includes('User must be logged in') || message.includes('Must be logged in')) {
+    normalizedMessage = 'User must be logged in'
+  } else if (message.toLowerCase().includes('only admins can') || message.toLowerCase().includes('admin only') || message.toLowerCase().includes('not authorized') || message.toLowerCase().includes('unauthorized')) {
+    normalizedMessage = 'Unauthorized access - admin privileges required'
+  } else if (message.includes('Invalid signature') || message.includes('EcdsaP256 signature could not be verified') || message.includes('verification failed')) {
+    normalizedMessage = 'Invalid signature - authentication failed'
+  }
+
+  const lastShown = recentErrorMessages.value.get(normalizedMessage)
+
+  // If this message was shown in the last 10 seconds, don't show it again
+  if (lastShown && (now - lastShown) < 10000) {
+    return
+  }
+
+  // Update the timestamp for this message
+  recentErrorMessages.value.set(normalizedMessage, now)
+
+  // Clean up old messages (older than 10 seconds)
+  for (const [msg, timestamp] of recentErrorMessages.value.entries()) {
+    if (now - timestamp > 10000) {
+      recentErrorMessages.value.delete(msg)
+    }
+  }
+
+  // Show the original error message (not normalized)
+  tacoStore.showError(message)
+}
+
 // Methods
 async function performSystemHealthCheck() {
   loading.value = true
   try {
     await tacoStore.performSystemHealthCheck()
     await fetchSystemStatus()
-    tacoStore.showSuccess('System health check completed')
   } catch (error: any) {
-    tacoStore.showError('Failed to perform health check: ' + error.message)
+    showErrorWithDeduplication('Failed to perform health check: ' + error.message)
   } finally {
     loading.value = false
   }
@@ -828,11 +908,9 @@ async function addAdmin() {
   try {
     await tacoStore.addAlarmAdmin(newAdminPrincipal.value)
     newAdminPrincipal.value = ''
-    tacoStore.showSuccess('Admin added successfully')
   } catch (error: any) {
-    tacoStore.showError('Failed to add admin: ' + error.message)
-  } finally {const logLimit = ref(25)
-const adminActionLogs = ref([] as any[])
+    showErrorWithDeduplication('Failed to add admin: ' + error.message)
+  } finally {
     loading.value = false
   }
 }
@@ -849,9 +927,8 @@ async function addContact() {
     )
     newContact.value = { name: '', type: 'Email', value: '' }
     await fetchContacts()
-    tacoStore.showSuccess('Contact added successfully')
   } catch (error: any) {
-    tacoStore.showError('Failed to add contact: ' + error.message)
+    showErrorWithDeduplication('Failed to add contact: ' + error.message)
   } finally {
     loading.value = false
   }
@@ -867,13 +944,11 @@ async function fetchContacts() {
 
 async function toggleContactStatus(contactId: number, active: boolean) {
   loading.value = true;
-  const monitoredCanisters = ref([] as any[]);
   try {
     await tacoStore.updateContactStatus(contactId, active)
     await fetchContacts()
-    tacoStore.showSuccess(`Contact ${active ? 'enabled' : 'disabled'}`)
   } catch (error: any) {
-    tacoStore.showError('Failed to update contact: ' + error.message)
+    showErrorWithDeduplication('Failed to update contact: ' + error.message)
   } finally {
     loading.value = false
   }
@@ -890,9 +965,8 @@ async function removeContact(contactId: number) {
       try {
         await tacoStore.removeAlarmContact(contactId)
         await fetchContacts()
-        tacoStore.showSuccess('Contact removed successfully')
       } catch (error: any) {
-        tacoStore.showError('Failed to remove contact: ' + error.message)
+        showErrorWithDeduplication('Failed to remove contact: ' + error.message)
       } finally {
         loading.value = false
       }
@@ -911,7 +985,7 @@ async function testContact(contact: any, testType: 'email' | 'sms') {
     
     await tacoStore.testAlarmContact([contact.id], options)
   } catch (error: any) {
-    tacoStore.showError('Failed to send test message: ' + error.message)
+    showErrorWithDeduplication('Failed to send test message: ' + error.message)
   } finally {
     loading.value = false
   }
@@ -938,9 +1012,8 @@ async function acknowledgeAlarm(alarmId: number) {
   try {
     await tacoStore.acknowledgeAlarm(alarmId)
     await fetchPendingAlarms()
-    tacoStore.showSuccess('Alarm acknowledged successfully')
   } catch (error: any) {
-    tacoStore.showError('Failed to acknowledge alarm: ' + error.message)
+    showErrorWithDeduplication('Failed to acknowledge alarm: ' + error.message)
   } finally {
     loading.value = false
   }
@@ -954,14 +1027,21 @@ async function fetchSystemErrors() {
   }
 }
 
+async function fetchInternalErrors() {
+  try {
+    internalErrors.value = await tacoStore.getInternalErrors(internalErrorLimit.value)
+  } catch (error) {
+    console.error('Failed to fetch internal errors:', error)
+  }
+}
+
 async function resolveError(errorId: number) {
   loading.value = true
   try {
     await tacoStore.resolveSystemError(errorId)
     await fetchSystemErrors()
-    tacoStore.showSuccess('Error marked as resolved')
   } catch (error: any) {
-    tacoStore.showError('Failed to resolve error: ' + error.message)
+    showErrorWithDeduplication('Failed to resolve error: ' + error.message)
   } finally {
     loading.value = false
   }
@@ -973,9 +1053,8 @@ async function updateCheckInterval() {
     await tacoStore.setCheckInterval(Number(configIntervals.value.treasuryCheckMinutes))
     await fetchSystemStatus()
     await fetchConfigIntervals()
-    tacoStore.showSuccess('Treasury check interval updated')
   } catch (error: any) {
-    tacoStore.showError('Failed to update interval: ' + error.message)
+    showErrorWithDeduplication('Failed to update interval: ' + error.message)
   } finally {
     loading.value = false
   }
@@ -986,9 +1065,8 @@ async function updateCanisterMonitoringInterval() {
   try {
     await tacoStore.setCanisterMonitoringInterval(Number(configIntervals.value.canisterMonitoringMinutes))
     await fetchConfigIntervals()
-    tacoStore.showSuccess('Canister monitoring interval updated')
   } catch (error: any) {
-    tacoStore.showError('Failed to update canister monitoring interval: ' + error.message)
+    showErrorWithDeduplication('Failed to update canister monitoring interval: ' + error.message)
   } finally {
     loading.value = false
   }
@@ -1007,9 +1085,8 @@ async function toggleCanisterMonitoring(canisterId: bigint, enabled: boolean) {
   try {
     await tacoStore.updateMonitoredCanisterStatus(Number(canisterId), enabled);
     await fetchMonitoredCanisters();
-    tacoStore.showSuccess(`Canister monitoring ${enabled ? 'enabled' : 'disabled'}`);
   } catch (error: any) {
-    tacoStore.showError('Failed to update canister status: ' + error.message);
+    showErrorWithDeduplication('Failed to update canister status: ' + error.message);
   } finally {
     loading.value = false;
   }
@@ -1026,9 +1103,8 @@ async function removeMonitoredCanister(canisterId: bigint) {
       try {
         await tacoStore.removeMonitoredCanister(Number(canisterId));
         await fetchMonitoredCanisters();
-        tacoStore.showSuccess('Monitored canister removed successfully');
       } catch (error: any) {
-        tacoStore.showError('Failed to remove canister: ' + error.message);
+        showErrorWithDeduplication('Failed to remove canister: ' + error.message);
       } finally {
         loading.value = false;
       }
@@ -1106,9 +1182,8 @@ async function addMonitoredCanister() {
       statusAlertLevel: 'Level1Immediate'
     }
     
-    tacoStore.showSuccess('Monitored canister added successfully')
   } catch (error: any) {
-    tacoStore.showError('Failed to add monitored canister: ' + error.message)
+    showErrorWithDeduplication('Failed to add monitored canister: ' + error.message)
   } finally {
     loading.value = false
   }
@@ -1121,9 +1196,8 @@ async function sendTestEmail() {
   try {
     await tacoStore.sendTestEmailSingle(testEmail.value.email, testEmail.value.subject)
     testEmail.value = { email: '', subject: '' }
-    tacoStore.showSuccess('Test email sent successfully')
   } catch (error: any) {
-    tacoStore.showError('Failed to send test email: ' + error.message)
+    showErrorWithDeduplication('Failed to send test email: ' + error.message)
   } finally {
     loading.value = false
   }
@@ -1134,9 +1208,8 @@ async function updateLevel2SMSInterval() {
   try {
     await tacoStore.setLevel2SMSCheckInterval(Number(configIntervals.value.level2SMSCheckMinutes))
     await fetchConfigIntervals()
-    tacoStore.showSuccess('Level 2 SMS check interval updated')
   } catch (error: any) {
-    tacoStore.showError('Failed to update Level 2 SMS interval: ' + error.message)
+    showErrorWithDeduplication('Failed to update Level 2 SMS interval: ' + error.message)
   } finally {
     loading.value = false
   }
@@ -1146,9 +1219,8 @@ async function refreshConfigIntervals() {
   loading.value = true
   try {
     await fetchConfigIntervals()
-    tacoStore.showSuccess('Configuration refreshed')
   } catch (error: any) {
-    tacoStore.showError('Failed to refresh configuration: ' + error.message)
+    showErrorWithDeduplication('Failed to refresh configuration: ' + error.message)
   } finally {
     loading.value = false
   }
@@ -1159,14 +1231,12 @@ async function toggleMonitoring() {
   try {
     if (systemStatus.value.enabled) {
       await tacoStore.stopMonitoring()
-      tacoStore.showSuccess('Monitoring stopped')
     } else {
       await tacoStore.startMonitoring()
-      tacoStore.showSuccess('Monitoring started')
     }
     await fetchSystemStatus()
   } catch (error: any) {
-    tacoStore.showError('Failed to toggle monitoring: ' + error.message)
+    showErrorWithDeduplication('Failed to toggle monitoring: ' + error.message)
   } finally {
     loading.value = false
   }

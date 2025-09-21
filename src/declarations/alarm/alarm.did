@@ -1,0 +1,345 @@
+type http_request_result = 
+ record {
+   body: blob;
+   headers: vec http_header;
+   status: nat;
+ };
+type http_header = 
+ record {
+   name: text;
+   value: text;
+ };
+type SystemError = 
+ record {
+   errorMessage: text;
+   errorType:
+    variant {
+      InterCanisterCall: record {
+                           function: text;
+                           target: principal;
+                         };
+      MonitoringError: record {component: text;};
+      QueueProcessing: record {queueType: text;};
+      SystemHealth: record {check: text;};
+      TimerSetup: record {timerType: text;};
+    };
+   id: nat;
+   resolved: bool;
+   retryAttempts: nat;
+   timestamp: int;
+ };
+type SentMessage = 
+ record {
+   alarmId: opt nat;
+   contactId: nat;
+   contactInfo: text;
+   errorMessage: opt text;
+   id: nat;
+   message: text;
+   messageType: variant {
+                  Email;
+                  SMS;
+                };
+   sentAt: int;
+   success: bool;
+ };
+type Result_9 = 
+ variant {
+   err: text;
+   ok:
+    record {
+      acknowledgmentsCount: nat;
+      emailQueueSize: nat;
+      enabledCanistersCount: nat;
+      level2AlarmsPendingSMS: nat;
+      monitoredCanistersCount: nat;
+      pendingAlarmsCount: nat;
+      smsQueueSize: nat;
+    };
+ };
+type Result_8 = 
+ variant {
+   err: text;
+   ok: vec InternalError;
+ };
+type Result_7 = 
+ variant {
+   err: text;
+   ok: vec MonitoredCanisterConfig;
+ };
+type Result_6 = 
+ variant {
+   err: text;
+   ok:
+    record {
+      activeContacts: nat;
+      checkIntervalMinutes: nat;
+      enabled: bool;
+      lastKnownStatus: opt RebalanceStatus;
+      lastTradingStallTime: int;
+      totalContacts: nat;
+      tradingStallAlarmState: AlarmState;
+    };
+ };
+type Result_5 = 
+ variant {
+   err: text;
+   ok: vec PendingAlarm;
+ };
+type Result_4 = 
+ variant {
+   err: text;
+   ok:
+    record {
+      emailQueueSize: nat;
+      processingIntervalMinutes: nat;
+      smsQueueSize: nat;
+    };
+ };
+type Result_3 = 
+ variant {
+   err: text;
+   ok: vec SentMessage;
+ };
+type Result_2 = 
+ variant {
+   err: text;
+   ok: vec SystemError;
+ };
+type Result_17 = 
+ variant {
+   err: text;
+   ok: vec AdminActionLog;
+ };
+type Result_16 = 
+ variant {
+   err: text;
+   ok: vec AdminPermission;
+ };
+type Result_15 = 
+ variant {
+   err: text;
+   ok: vec AlarmAcknowledgment;
+ };
+type Result_14 = 
+ variant {
+   err: text;
+   ok: vec AlarmLog;
+ };
+type Result_13 = 
+ variant {
+   err: text;
+   ok: record {
+         apiKey: text;
+         emailUrl: text;
+         smsUrl: text;
+         username: text;
+       };
+ };
+type Result_12 = 
+ variant {
+   err: text;
+   ok:
+    vec
+     record {
+       MonitoredCanisterConfig;
+       CanisterMonitoringStatus;
+       CanisterMonitoringStatus;
+       CanisterMonitoringStatus;
+     };
+ };
+type Result_11 = 
+ variant {
+   err: text;
+   ok:
+    record {
+      canisterMonitoringMinutes: nat;
+      level2AlarmDelayMinutes: nat;
+      level2SMSCheckMinutes: nat;
+      treasuryCheckMinutes: nat;
+    };
+ };
+type Result_10 = 
+ variant {
+   err: text;
+   ok: vec Contact;
+ };
+type Result_1 = 
+ variant {
+   err: text;
+   ok: nat;
+ };
+type Result = 
+ variant {
+   err: text;
+   ok: text;
+ };
+type RebalanceStatus = 
+ variant {
+   Failed: text;
+   Idle;
+   Trading;
+ };
+type PendingAlarm = 
+ record {
+   acknowledged: bool;
+   acknowledgedBy: opt principal;
+   emailSentAt: opt int;
+   id: nat;
+   importanceLevel: AlarmImportanceLevel;
+   message: text;
+   smsPendingAt: opt int;
+ };
+type MonitoredCanisterConfig = 
+ record {
+   addedAt: int;
+   addedBy: principal;
+   canisterId: principal;
+   cyclesAlertLevel: AlarmImportanceLevel;
+   enabled: bool;
+   id: nat;
+   isSNSControlled: bool;
+   minimumCycles: nat;
+   name: text;
+   snsRootCanisterId: opt principal;
+   statusAlertLevel: AlarmImportanceLevel;
+   timersAlertLevel: AlarmImportanceLevel;
+ };
+type InternalError = 
+ record {
+   context: opt text;
+   errorType: text;
+   id: nat;
+   message: text;
+   timestamp: int;
+ };
+type ContactType = 
+ variant {
+   Email: text;
+   SMS: text;
+ };
+type Contact = 
+ record {
+   active: bool;
+   addedAt: int;
+   addedBy: principal;
+   contactType: ContactType;
+   id: nat;
+   name: text;
+ };
+type CanisterMonitoringStatus = 
+ variant {
+   CyclesLow: nat;
+   Error: text;
+   Healthy;
+   StatusChanged: text;
+   TimerStalled: text;
+ };
+type AlarmType = 
+ variant {
+   StatusChanged: record {
+                    from: RebalanceStatus;
+                    to: RebalanceStatus;
+                  };
+   SystemError: text;
+   TradingStalled;
+   TradingStarted;
+ };
+type AlarmState = 
+ variant {
+   NotSent;
+   Resolved;
+   Sent;
+ };
+type AlarmLog = 
+ record {
+   alarmType: AlarmType;
+   contactsSent: vec nat;
+   id: nat;
+   message: text;
+   success: bool;
+   timestamp: int;
+ };
+type AlarmImportanceLevel = 
+ variant {
+   Level1Immediate;
+   Level2DelayedSMS;
+ };
+type AlarmAcknowledgment = 
+ record {
+   acknowledgedAt: int;
+   acknowledgedBy: principal;
+   alarmId: nat;
+ };
+type AdminPermission = variant {Admin;};
+type AdminActionLog = 
+ record {
+   action: text;
+   caller: principal;
+   id: nat;
+   parameters: text;
+   result: text;
+   timestamp: int;
+ };
+service : {
+  acknowledgeAlarm: (alarmId: nat) -> (Result);
+  addAdmin: (admin: principal, permissions: vec AdminPermission) -> (Result);
+  addContact: (name: text, contactType: ContactType) -> (Result_1);
+  addMonitoredCanister: (canisterId: principal, name: text, isSNSControlled:
+   bool, snsRootCanisterId: opt principal, minimumCycles: nat,
+   cyclesAlertLevel: AlarmImportanceLevel, timersAlertLevel:
+   AlarmImportanceLevel, statusAlertLevel: AlarmImportanceLevel) ->
+   (Result_1);
+  clearAllLogs: () -> (Result);
+  clearQueues: () -> (Result);
+  getAdminActionLogs: (limit: opt nat) -> (Result_17) query;
+  getAdminPermissions: () -> (Result_16) query;
+  getAlarmAcknowledgments: (limit: opt nat) -> (Result_15) query;
+  getAlarmLogs: (limit: opt nat) -> (Result_14) query;
+  getApiConfiguration: () -> (Result_13) query;
+  getCanisterHealthStatus: () -> (Result_12);
+  getConfigurationIntervals: () -> (Result_11) query;
+  getContacts: () -> (Result_10) query;
+  getEnhancedAlarmSystemStatus: () -> (Result_9) query;
+  getInternalErrors: (limit: opt nat) -> (Result_8) query;
+  getMonitoredCanisters: () -> (Result_7) query;
+  getMonitoringStatus: () -> (Result_6) query;
+  getPendingAlarms: () -> (Result_5) query;
+  getQueueStatus: () -> (Result_4);
+  getSentEmailMessages: (limit: opt nat) -> (Result_3) query;
+  getSentMessages: (limit: opt nat) -> (Result_3) query;
+  getSentSMSMessages: (limit: opt nat) -> (Result_3) query;
+  getSystemErrors: (limit: opt nat) -> (Result_2) query;
+  manualRestartTimer: () -> (Result);
+  performSystemHealthCheckManual: () -> (Result);
+  removeAdmin: (admin: principal) -> (Result);
+  removeContact: (contactId: nat) -> (Result_1);
+  removeMonitoredCanister: (configId: nat) -> (Result);
+  resetAlarmStates: () -> (Result);
+  resolveSystemErrorById: (errorId: nat) -> (Result);
+  sendTestEmail: (contactIds: vec nat) -> (Result);
+  sendTestEmailSingle: (emailAddress: text, name: text) -> (Result);
+  sendTestSMS: (contactIds: vec nat) -> (Result);
+  sendTestSMSSingle: (phoneNumber: text) -> (Result);
+  setCanisterMonitoringInterval: (minutes: nat) -> (Result);
+  setCheckInterval: (minutes: nat) -> (Result);
+  setLevel2SMSCheckInterval: (minutes: nat) -> (Result);
+  startCanisterMonitoring: () -> (Result);
+  startMonitoring: () -> (Result);
+  stopCanisterMonitoring: () -> (Result);
+  stopMonitoring: () -> (Result);
+  transform: (record {
+                context: blob;
+                response: http_request_result;
+              }) -> (http_request_result) query;
+  updateCanisterAlertLevels: (configId: nat, cyclesAlertLevel:
+   opt AlarmImportanceLevel, timersAlertLevel: opt AlarmImportanceLevel,
+   statusAlertLevel: opt AlarmImportanceLevel) -> (Result);
+  updateClickSendApiKey: (apiKey: text) -> (Result);
+  updateClickSendEmailID: (id: text) -> (Result);
+  updateClickSendEmailUrl: (url: text) -> (Result);
+  updateClickSendSmsUrl: (url: text) -> (Result);
+  updateClickSendUsername: (username: text) -> (Result);
+  updateContactStatus: (contactId: nat, active: bool) -> (Result);
+  updateMonitoredCanisterStatus: (configId: nat, enabled: bool) -> (Result);
+}

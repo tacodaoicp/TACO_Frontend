@@ -428,6 +428,7 @@ export interface AlarmCanisterActor {
     getPendingAlarms(): Promise<{ ok: any[] } | { err: string }>
     acknowledgeAlarm(alarmId: number): Promise<{ ok: string } | { err: string }>
     getSystemErrors(limit: number[]): Promise<{ ok: any[] } | { err: string }>
+    getInternalErrors(limit?: number): Promise<any[]>
     resolveSystemErrorById(errorId: number): Promise<{ ok: string } | { err: string }>
 
     // Monitoring Configuration
@@ -768,6 +769,7 @@ export const useTacoStore = defineStore('taco', () => {
             root.style.setProperty("--light-brown-to-dark-orange", "#DA8D28") // dark orange
             root.style.setProperty("--light-brown-to-dark-brown", "#512100") // dark brown
             root.style.setProperty("--dark-brown-to-light-orange", "#feeac1") // light orange
+            root.style.setProperty("--dark-brown-to-orange", "#FED66C") // orange
             root.style.setProperty("--dark-brown-to-dark-orange", "#DA8D28") // dark orange
             root.style.setProperty("--dark-orange-to-transparent", "transparent") // transparent
             root.style.setProperty("--transparent-to-dark-orange", "#DA8D28") // dark orange
@@ -844,6 +846,7 @@ export const useTacoStore = defineStore('taco', () => {
             root.style.setProperty("--light-brown-to-dark-brown", "#c16d33") // light brown
             root.style.setProperty("--dark-brown-to-light-orange", "#512100") // dark brown
             root.style.setProperty("--dark-brown-to-dark-orange", "#512100") // dark brown
+            root.style.setProperty("--dark-brown-to-orange", "#512100") // dark brown
             root.style.setProperty("--dark-orange-to-transparent", "#DA8D28") // dark orange
             root.style.setProperty("--transparent-to-dark-orange", "transparent") // transparent
             root.style.setProperty("--dark-orange-to-light-orange", "#DA8D28") // dark orange
@@ -1201,6 +1204,18 @@ export const useTacoStore = defineStore('taco', () => {
         }        
         return 'z4is7-giaaa-aaaad-qg6uq-cai'; // local canisterId
     }
+    const nachosCanisterId = () => {
+
+        switch (process.env.DFX_NETWORK) {
+            case "ic":
+                return process.env.CANISTER_ID_NACHOS_IC || 'rctxc-zqaaa-aaaan-qz6na-cai';
+                break;
+            case "staging":
+                return  process.env.CANISTER_ID_NACHOS_STAGING || 'rctxc-zqaaa-aaaan-qz6na-caitptia-syaaa-aaaai-atieq-cai';
+                break;
+        }        
+        return 'rctxc-zqaaa-aaaan-qz6na-cai'; // local canisterId
+    }
     const neuronSnapshotCanisterId = () => {
         switch (process.env.DFX_NETWORK) {
             case "ic":
@@ -1223,6 +1238,15 @@ export const useTacoStore = defineStore('taco', () => {
                 break;
         }        
         return 'cjkka-gyaaa-aaaan-qz5kq-cai'; // local canisterId
+    }
+    const portfolioArchiveCanisterId = () => {
+        switch (process.env.DFX_NETWORK) {
+            case "ic":
+                return process.env.CANISTER_ID_PORTFOLIO_ARCHIVE_IC || 'bl7x7-wiaaa-aaaan-qz5bq-cai';
+            case "staging":
+                return process.env.CANISTER_ID_PORTFOLIO_ARCHIVE_STAGING || 'lrekt-uaaaa-aaaan-qz4ya-cai';
+        }        
+        return 'lrekt-uaaaa-aaaan-qz4ya-cai'; // local canisterId
     }
     const alarmCanisterId = () => {
         switch (process.env.DFX_NETWORK) {
@@ -1478,6 +1502,11 @@ export const useTacoStore = defineStore('taco', () => {
     // sns provided canisters
     const fetchTotalTreasuryValueInUsd = async () => {
 
+        // if total treasury value in usd is already set, return
+        if (totalTreasuryValueInUsd.value > 0) {
+            return true
+        }
+
         // first fetch the total ICP in the treasury
         // second fetch the total TACO in the treasury
         // convert both to usd
@@ -1578,8 +1607,23 @@ export const useTacoStore = defineStore('taco', () => {
     // dao backend
     const fetchTokenDetails = async () => {
 
+        // turn on loading
+        appLoadingOn()
+
         // log
         // console.log('taco.store: fetchTokenDetails()')
+
+        // // if fetched token details is already set, return
+        // if (fetchedTokenDetails.value.length > 0) {
+
+        //     // log
+        //     console.log('taco.store: fetchTokenDetails() - fetched token details already set')
+
+        //     return true
+        // }
+
+        // log
+        // console.log('taco.store: fetchTokenDetails() - fetched token details not set, fetching...')
 
         try {
 
@@ -1661,9 +1705,27 @@ export const useTacoStore = defineStore('taco', () => {
             // return
             return false
 
+        } finally {
+
+            // turn off loading
+            appLoadingOff()
+
         }
 
     }
+    // ready flag
+    const hasTokenDetails = computed(() => fetchedTokenDetails.value.length > 0)
+    // single-flight
+    let inflightTokenDetails: Promise<void> | null = null
+    const ensureTokenDetails = async () => {
+        if (hasTokenDetails.value) return
+        if (inflightTokenDetails) return inflightTokenDetails
+        inflightTokenDetails = (async () => {
+            try { await fetchTokenDetails() } finally { inflightTokenDetails = null }
+        })()
+        return inflightTokenDetails
+    }
+
     const fetchAggregateAllocation = async () => {
 
         // log
@@ -1932,7 +1994,7 @@ export const useTacoStore = defineStore('taco', () => {
                         code: 'voting-power-error',
                         title: 'Voting Power Refresh Failed',
                         icon: 'fa-solid fa-exclamation-triangle',
-                        message: `Failed to refresh voting power: ${errorMsg}`
+                        message: `We may have pushed an update to the site since you last logged in. Try logging out and logging back in`
                     })
                     
                     return false
@@ -1959,7 +2021,7 @@ export const useTacoStore = defineStore('taco', () => {
                 code: 'voting-power-error',
                 title: 'Voting Power Refresh Failed',
                 icon: 'fa-solid fa-exclamation-triangle',
-                message: `Error: ${error}`
+                message: `We may have pushed an update to the site since you last logged in. Try logging out and logging back in`
             })
 
             // return
@@ -5929,7 +5991,7 @@ export const useTacoStore = defineStore('taco', () => {
                 return new Map()
             }
 
-            console.log(`Requesting balances for ${neuronIdBlobs.length} neurons`)
+            // console.log(`Requesting balances for ${neuronIdBlobs.length} neurons`)
 
             // Use getNeuronRewardBalances instead of getAllNeuronRewardBalances (admin-only)
             const balances = await rewardsActor.getNeuronRewardBalances(neuronIdBlobs) as [Uint8Array, bigint][]
@@ -5941,7 +6003,7 @@ export const useTacoStore = defineStore('taco', () => {
                 neuronBalances.set(neuronIdHex, Number(balance))
             }
 
-            console.log(`Successfully loaded ${neuronBalances.size} neuron balances`)
+            // console.log(`Successfully loaded ${neuronBalances.size} neuron balances`)
             return neuronBalances
 
         } catch (error) {
@@ -5975,7 +6037,7 @@ export const useTacoStore = defineStore('taco', () => {
                     code: 'rewards-claimed',
                     title: 'Rewards Claimed!',
                     icon: 'fa-solid fa-check',
-                    message: `Successfully claimed rewards! Transaction ID: ${transactionId}`
+                    message: `Successfully claimed rewards!`
                 })
                 return true
             } else {
@@ -6082,11 +6144,11 @@ export const useTacoStore = defineStore('taco', () => {
                 throw new Error('User must be logged in');
             }
 
-            console.log('Setting dissolve timestamp for neuron:', {
-                neuronId: Array.from(neuronId).map(b => b.toString(16).padStart(2, '0')).join(''),
-                dissolveTimestamp: dissolveTimestampSeconds.toString(),
-                dissolveDate: new Date(Number(dissolveTimestampSeconds) * 1000)
-            });
+            // console.log('Setting dissolve timestamp for neuron:', {
+            //     neuronId: Array.from(neuronId).map(b => b.toString(16).padStart(2, '0')).join(''),
+            //     dissolveTimestamp: dissolveTimestampSeconds.toString(),
+            //     dissolveDate: new Date(Number(dissolveTimestampSeconds) * 1000)
+            // });
 
             const authClient = await getAuthClient();
             const identity = authClient.getIdentity();
@@ -6114,11 +6176,11 @@ export const useTacoStore = defineStore('taco', () => {
                 }]
             };
 
-            console.log('SetDissolveTimestamp request:', JSON.stringify(manageNeuronRequest, (key, value) =>
-                typeof value === 'bigint' ? value.toString() : value, 2));
+            // console.log('SetDissolveTimestamp request:', JSON.stringify(manageNeuronRequest, (key, value) =>
+            //     typeof value === 'bigint' ? value.toString() : value, 2));
 
             const result = await snsGov.manage_neuron(manageNeuronRequest) as any;
-            console.log('SetDissolveTimestamp result:', result);
+            // console.log('SetDissolveTimestamp result:', result);
 
             if (result.command && result.command.length > 0) {
                 const command = result.command[0];
@@ -6126,7 +6188,7 @@ export const useTacoStore = defineStore('taco', () => {
                     throw new Error(`SetDissolveTimestamp failed: ${JSON.stringify(command)}`);
                 }
                 if (command.Configure) {
-                    console.log('Dissolve timestamp set successfully');
+                    // console.log('Dissolve timestamp set successfully');
                     return true;
                 }
             }
@@ -6138,6 +6200,62 @@ export const useTacoStore = defineStore('taco', () => {
         }
     }
 
+    // start dissolving for a neuron
+    const startDissolving = async (neuronId: Uint8Array) => {
+        try {
+            if (!userLoggedIn.value) {
+                throw new Error('User must be logged in');
+            }
+
+            // console.log('Starting dissolving for neuron:', Array.from(neuronId).map(b => b.toString(16).padStart(2, '0')).join(''));
+
+            const authClient = await getAuthClient();
+            const identity = authClient.getIdentity();
+            
+            const agent = await createAgent({
+                identity,
+                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            });
+
+            // Create SNS Governance actor
+            const snsGov = await createSnsGovernanceActor(agent, 'lhdfz-wqaaa-aaaaq-aae3q-cai');
+            
+            // Prepare the manage neuron request for StartDissolving
+            const manageNeuronRequest = {
+                subaccount: Array.from(neuronId),
+                command: [{
+                    Configure: {
+                        operation: [{
+                            StartDissolving: {}
+                        }]
+                    }
+                }]
+            };
+
+            // console.log('StartDissolving request:', JSON.stringify(manageNeuronRequest));
+
+            const result = await snsGov.manage_neuron(manageNeuronRequest) as any;
+            // console.log('StartDissolving result:', result);
+
+            if (result.command && result.command.length > 0) {
+                const command = result.command[0];
+                if (command.Error) {
+                    throw new Error(`StartDissolving failed: ${JSON.stringify(command)}`);
+                }
+                if (command.Configure) {
+                    // console.log('Dissolving started successfully');
+                    return true;
+                }
+            }
+
+            throw new Error('Unexpected response format from manage_neuron');
+        } catch (error: any) {
+            console.error('Error starting dissolving:', error);
+            throw error;
+        }
+    }
+
     // Stop dissolving for a neuron
     const stopDissolving = async (neuronId: Uint8Array) => {
         try {
@@ -6145,7 +6263,7 @@ export const useTacoStore = defineStore('taco', () => {
                 throw new Error('User must be logged in');
             }
 
-            console.log('Stopping dissolving for neuron:', Array.from(neuronId).map(b => b.toString(16).padStart(2, '0')).join(''));
+            // console.log('Stopping dissolving for neuron:', Array.from(neuronId).map(b => b.toString(16).padStart(2, '0')).join(''));
 
             const authClient = await getAuthClient();
             const identity = authClient.getIdentity();
@@ -6171,10 +6289,10 @@ export const useTacoStore = defineStore('taco', () => {
                 }]
             };
 
-            console.log('StopDissolving request:', JSON.stringify(manageNeuronRequest));
+            // console.log('StopDissolving request:', JSON.stringify(manageNeuronRequest));
 
             const result = await snsGov.manage_neuron(manageNeuronRequest) as any;
-            console.log('StopDissolving result:', result);
+            // console.log('StopDissolving result:', result);
 
             if (result.command && result.command.length > 0) {
                 const command = result.command[0];
@@ -6182,7 +6300,7 @@ export const useTacoStore = defineStore('taco', () => {
                     throw new Error(`StopDissolving failed: ${JSON.stringify(command)}`);
                 }
                 if (command.Configure) {
-                    console.log('Dissolving stopped successfully');
+                    // console.log('Dissolving stopped successfully');
                     return true;
                 }
             }
@@ -6191,6 +6309,224 @@ export const useTacoStore = defineStore('taco', () => {
         } catch (error: any) {
             console.error('Error stopping dissolving:', error);
             throw error;
+        }
+    }
+
+    // Disburse neuron funds
+    const disburseNeuron = async (neuronId: Uint8Array, toAccount?: any, amount?: bigint) => {
+        try {
+            if (!userLoggedIn.value) {
+                throw new Error('User must be logged in');
+            }
+
+            console.log('Disbursing neuron:', Array.from(neuronId).map(b => b.toString(16).padStart(2, '0')).join(''));
+
+            const authClient = await getAuthClient();
+            const identity = authClient.getIdentity();
+            
+            const agent = await createAgent({
+                identity,
+                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            });
+
+            // Create SNS Governance actor
+            const snsGov = await createSnsGovernanceActor(agent, 'lhdfz-wqaaa-aaaaq-aae3q-cai');
+            
+            // Prepare the disburse command
+            const disburseCommand: any = {};
+            if (toAccount) {
+                disburseCommand.to_account = toAccount;
+            }
+            if (amount) {
+                disburseCommand.amount = { e8s: amount };
+            }
+
+            // Prepare the manage neuron request for Disburse
+            const manageNeuronRequest = {
+                subaccount: Array.from(neuronId),
+                command: [{
+                    Disburse: disburseCommand
+                }]
+            };
+
+            console.log('Disburse request:', JSON.stringify(manageNeuronRequest, (key, value) =>
+                typeof value === 'bigint' ? value.toString() : value, 2));
+
+            const result = await snsGov.manage_neuron(manageNeuronRequest) as any;
+            console.log('Disburse result:', result);
+
+            if (result.command && result.command.length > 0) {
+                const command = result.command[0];
+                if (command.Error) {
+                    throw new Error(`Disburse failed: ${JSON.stringify(command)}`);
+                }
+                if (command.Disburse) {
+                    console.log('Neuron disbursed successfully');
+                    return true;
+                }
+            }
+
+            throw new Error('Unexpected response format from manage_neuron');
+        } catch (error: any) {
+            console.error('Error disbursing neuron:', error);
+            throw error;
+        }
+    }
+
+    // Add neuron permissions
+    const addNeuronPermissions = async (neuronId: Uint8Array, principalId: string, permissionTypes: number[]) => {
+        try {
+            if (!userLoggedIn.value) {
+                throw new Error('User must be logged in');
+            }
+
+            console.log('Adding neuron permissions:', {
+                neuronId: Array.from(neuronId).map(b => b.toString(16).padStart(2, '0')).join(''),
+                principalId,
+                permissionTypes
+            });
+
+            const authClient = await getAuthClient();
+            const identity = authClient.getIdentity();
+            
+            const agent = await createAgent({
+                identity,
+                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            });
+
+            // Create SNS Governance actor
+            const snsGov = await createSnsGovernanceActor(agent, 'lhdfz-wqaaa-aaaaq-aae3q-cai');
+            
+            // Prepare the manage neuron request for AddNeuronPermissions
+            const manageNeuronRequest = {
+                subaccount: Array.from(neuronId),
+                command: [{
+                    AddNeuronPermissions: {
+                        principal_id: [Principal.fromText(principalId)],
+                        permissions_to_add: [{
+                            permissions: permissionTypes
+                        }]
+                    }
+                }]
+            };
+
+            console.log('AddNeuronPermissions request:', JSON.stringify(manageNeuronRequest, (key, value) =>
+                typeof value === 'bigint' ? value.toString() : value, 2));
+
+            const result = await snsGov.manage_neuron(manageNeuronRequest) as any;
+            console.log('AddNeuronPermissions result:', result);
+
+            if (result.command && result.command.length > 0) {
+                const command = result.command[0];
+                if (command.Error) {
+                    throw new Error(`AddNeuronPermissions failed: ${JSON.stringify(command)}`);
+                }
+                if (command.AddNeuronPermission !== undefined) {
+                    console.log('Neuron permissions added successfully');
+                    return true;
+                }
+            }
+
+            throw new Error('Unexpected response format from manage_neuron');
+        } catch (error: any) {
+            console.error('Error adding neuron permissions:', error);
+            throw error;
+        }
+    }
+
+    // Remove neuron permissions
+    const removeNeuronPermissions = async (neuronId: Uint8Array, principalId: string, permissionTypes: number[]) => {
+        try {
+            if (!userLoggedIn.value) {
+                throw new Error('User must be logged in');
+            }
+
+            console.log('Removing neuron permissions:', {
+                neuronId: Array.from(neuronId).map(b => b.toString(16).padStart(2, '0')).join(''),
+                principalId,
+                permissionTypes
+            });
+
+            const authClient = await getAuthClient();
+            const identity = authClient.getIdentity();
+            
+            const agent = await createAgent({
+                identity,
+                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            });
+
+            // Create SNS Governance actor
+            const snsGov = await createSnsGovernanceActor(agent, 'lhdfz-wqaaa-aaaaq-aae3q-cai');
+            
+            // Prepare the manage neuron request for RemoveNeuronPermissions
+            const manageNeuronRequest = {
+                subaccount: Array.from(neuronId),
+                command: [{
+                    RemoveNeuronPermissions: {
+                        principal_id: [Principal.fromText(principalId)],
+                        permissions_to_remove: [{
+                            permissions: permissionTypes
+                        }]
+                    }
+                }]
+            };
+
+            console.log('RemoveNeuronPermissions request:', JSON.stringify(manageNeuronRequest, (key, value) =>
+                typeof value === 'bigint' ? value.toString() : value, 2));
+
+            const result = await snsGov.manage_neuron(manageNeuronRequest) as any;
+            console.log('RemoveNeuronPermissions result:', result);
+
+            if (result.command && result.command.length > 0) {
+                const command = result.command[0];
+                if (command.Error) {
+                    throw new Error(`RemoveNeuronPermissions failed: ${JSON.stringify(command)}`);
+                }
+                if (command.RemoveNeuronPermission !== undefined) {
+                    console.log('Neuron permissions removed successfully');
+                    return true;
+                }
+            }
+
+            throw new Error('Unexpected response format from manage_neuron');
+        } catch (error: any) {
+            console.error('Error removing neuron permissions:', error);
+            throw error;
+        }
+    }
+
+    // Get grantable permissions from nervous system parameters
+    const getGrantablePermissions = async (): Promise<number[]> => {
+        try {
+            const authClient = await getAuthClient();
+            const identity = authClient.getIdentity();
+            
+            const agent = await createAgent({
+                identity,
+                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            });
+
+            // Create SNS Governance actor
+            const snsGov = await createSnsGovernanceActor(agent, 'lhdfz-wqaaa-aaaaq-aae3q-cai');
+            
+            // Get nervous system parameters
+            const params = await snsGov.get_nervous_system_parameters(null) as any;
+            
+            if (params.neuron_grantable_permissions && params.neuron_grantable_permissions.length > 0) {
+                const grantablePermissions = params.neuron_grantable_permissions[0];
+                return grantablePermissions.permissions || [];
+            }
+            
+            // Default permissions if not specified
+            return [1, 2, 3, 4]; // Configure, Disburse, Vote, Submit Proposal
+        } catch (error: any) {
+            console.error('Error getting grantable permissions:', error);
+            // Return default permissions on error
+            return [1, 2, 3, 4];
         }
     }
 
@@ -6215,13 +6551,13 @@ export const useTacoStore = defineStore('taco', () => {
                                    params.neuron_minimum_dissolve_delay_to_vote_seconds.length > 0 ? 
                                    params.neuron_minimum_dissolve_delay_to_vote_seconds[0] : 0n;
 
-            console.log('Minimum dissolve delay to vote:', minToVoteSeconds.toString(), 'seconds');
+            // console.log('Minimum dissolve delay to vote:', minToVoteSeconds.toString(), 'seconds');
 
             // 2) Calculate target dissolve delay
             const desiredSeconds = BigInt(delayMonths * 30 * 24 * 60 * 60); // approx months→seconds
             const targetDelay = desiredSeconds > minToVoteSeconds ? desiredSeconds : minToVoteSeconds;
             
-            console.log('Target dissolve delay:', targetDelay.toString(), 'seconds');
+            // console.log('Target dissolve delay:', targetDelay.toString(), 'seconds');
 
             // 3) Set dissolve timestamp = now + targetDelay
             const nowSeconds = BigInt(Math.floor(Date.now() / 1000));
@@ -6325,7 +6661,7 @@ export const useTacoStore = defineStore('taco', () => {
                 
             } catch (error) {
                 // If there's an error calling get_neuron, assume this subaccount is free
-                console.log(`Nonce ${nonce} appears to be free (error calling get_neuron):`, error);
+                // console.log(`Nonce ${nonce} appears to be free (error calling get_neuron):`, error);
                 return { subaccount, index: Number(nonce) };
             }
         }
@@ -6340,7 +6676,7 @@ export const useTacoStore = defineStore('taco', () => {
                 throw new Error('User must be logged in');
             }
 
-            console.log('Finding free subaccount for new neuron...');
+            // console.log('Finding free subaccount for new neuron...');
             const { subaccount, index } = await findFreeSubaccount();
             const nonce = BigInt(index);
             
@@ -6348,22 +6684,22 @@ export const useTacoStore = defineStore('taco', () => {
             const snsGovernancePrincipal = 'lhdfz-wqaaa-aaaaq-aae3q-cai'; // TACO SNS Governance
 
             // Step 1: Transfer TACO tokens to SNS Governance with the new subaccount and memo
-            console.log(`Transferring TACO tokens to new neuron subaccount (nonce: ${nonce})...`);
-            console.log(`Subaccount (hex): ${Array.from(subaccount).map(b => b.toString(16).padStart(2, '0')).join('')}`);
-            console.log(`Controller principal: ${userPrincipal.value}`);
+            // console.log(`Transferring TACO tokens to new neuron subaccount (nonce: ${nonce})...`);
+            // console.log(`Subaccount (hex): ${Array.from(subaccount).map(b => b.toString(16).padStart(2, '0')).join('')}`);
+            // console.log(`Controller principal: ${userPrincipal.value}`);
             
             const transferResult = await transferToNeuronSubaccount(tacoTokenPrincipal, snsGovernancePrincipal, subaccount, amount, nonce);
-            console.log(`Transfer completed with block index: ${transferResult}`);
+            // console.log(`Transfer completed with block index: ${transferResult}`);
 
             // Step 2: Wait a moment for the transfer to be processed
-            console.log('Waiting for transfer to be processed...');
+            // console.log('Waiting for transfer to be processed...');
             await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds
 
             // Step 3: Claim/refresh the neuron to create it
-            console.log('Claiming new neuron...');
+            // console.log('Claiming new neuron...');
             await claimOrRefreshNeuron(subaccount, nonce);
 
-            console.log('Neuron created successfully!');
+            // console.log('Neuron created successfully!');
             return { subaccount, success: true };
         } catch (error: any) {
             console.error('Error creating neuron:', error);
@@ -6382,14 +6718,14 @@ export const useTacoStore = defineStore('taco', () => {
             const snsGovernancePrincipal = 'lhdfz-wqaaa-aaaaq-aae3q-cai'; // TACO SNS Governance
 
             // Step 1: Transfer TACO tokens to SNS Governance with neuron ID as subaccount
-            console.log('Transferring TACO tokens to neuron subaccount...');
+            // console.log('Transferring TACO tokens to neuron subaccount...');
             await transferToNeuronSubaccount(tacoTokenPrincipal, snsGovernancePrincipal, neuronId, amount);
 
             // Step 2: Claim/refresh the neuron to recognize the new stake
-            console.log('Claiming/refreshing neuron...');
+            // console.log('Claiming/refreshing neuron...');
             await claimOrRefreshNeuron(neuronId);
 
-            console.log('Staking completed successfully!');
+            // console.log('Staking completed successfully!');
             return true;
         } catch (error: any) {
             console.error('Error staking to neuron:', error);
@@ -6504,10 +6840,10 @@ export const useTacoStore = defineStore('taco', () => {
         subaccount.set(neuronId, 0);
 
         // Debug logging
-        console.log(`ClaimOrRefresh request details:`);
-        console.log(`- Subaccount: ${Array.from(subaccount).map(b => b.toString(16).padStart(2, '0')).join('')}`);
-        console.log(`- Memo: ${memo}`);
-        console.log(`- Controller: ${userPrincipal.value}`);
+        // console.log(`ClaimOrRefresh request details:`);
+        // console.log(`- Subaccount: ${Array.from(subaccount).map(b => b.toString(16).padStart(2, '0')).join('')}`);
+        // console.log(`- Memo: ${memo}`);
+        // console.log(`- Controller: ${userPrincipal.value}`);
 
         // For neuron creation, we need to use MemoAndController variant
         const manageNeuronRequest = memo !== undefined ? {
@@ -6538,7 +6874,7 @@ export const useTacoStore = defineStore('taco', () => {
         const requestForLogging = JSON.parse(JSON.stringify(manageNeuronRequest, (key, value) =>
             typeof value === 'bigint' ? value.toString() : value
         ));
-        console.log('ManageNeuron request:', JSON.stringify(requestForLogging, null, 2));
+        // console.log('ManageNeuron request:', JSON.stringify(requestForLogging, null, 2));
 
         const result = await governanceActor.manage_neuron(manageNeuronRequest) as any;
         
@@ -6658,40 +6994,26 @@ export const useTacoStore = defineStore('taco', () => {
                 fetchRootKey: process.env.DFX_NETWORK === "local",
             });
 
-            // Handle ICP differently
-            if (tokenPrincipal === 'ryjl3-tyaaa-aaaaa-aaaba-cai') {
-                const ledgerActor = Actor.createActor(idlFactory, {
-                    agent,
-                    canisterId: tokenPrincipal
+            // Use ICRC1 interface for all tokens (including ICP)
+            const icrc1IDL = ({ IDL }: any) => {
+                return IDL.Service({
+                    'icrc1_balance_of': IDL.Func(
+                        [IDL.Record({ 'owner': IDL.Principal, 'subaccount': IDL.Opt(IDL.Vec(IDL.Nat8)) })],
+                        [IDL.Nat],
+                        ['query']
+                    ),
                 });
-                
-                const accountId = AccountIdentifier.fromPrincipal({
-                    principal: Principal.fromText(userPrincipal.value)
-                });
-                const result = await ledgerActor.account_balance({ account: accountId.toUint8Array() });
-                return (result as any).e8s;
-            } else {
-                // ICRC1 token - use generic interface
-                const icrc1IDL = ({ IDL }: any) => {
-                    return IDL.Service({
-                        'icrc1_balance_of': IDL.Func(
-                            [IDL.Record({ 'owner': IDL.Principal, 'subaccount': IDL.Opt(IDL.Vec(IDL.Nat8)) })],
-                            [IDL.Nat],
-                            ['query']
-                        ),
-                    });
-                };
+            };
 
-                const tokenActor = Actor.createActor(icrc1IDL, {
-                    agent,
-                    canisterId: tokenPrincipal
-                });
-                
-                return await tokenActor.icrc1_balance_of({
-                    owner: Principal.fromText(userPrincipal.value),
-                    subaccount: []
-                }) as bigint;
-            }
+            const tokenActor = Actor.createActor(icrc1IDL, {
+                agent,
+                canisterId: tokenPrincipal
+            });
+            
+            return await tokenActor.icrc1_balance_of({
+                owner: Principal.fromText(userPrincipal.value),
+                subaccount: []
+            }) as bigint;
         } catch (error: any) {
             console.error(`Error fetching balance for token ${tokenPrincipal}:`, error);
             return 0n;
@@ -6719,68 +7041,45 @@ export const useTacoStore = defineStore('taco', () => {
                 fetchRootKey: process.env.DFX_NETWORK === "local",
             });
 
-            // Handle ICP differently
-            if (tokenPrincipal === 'ryjl3-tyaaa-aaaaa-aaaba-cai') {
-                const ledgerActor = Actor.createActor(idlFactory, {
-                    agent,
-                    canisterId: tokenPrincipal
+            // Use ICRC1 interface for all tokens (including ICP)
+            const icrc1IDL = ({ IDL }: any) => {
+                return IDL.Service({
+                    'icrc1_transfer': IDL.Func(
+                        [IDL.Record({
+                            'to': IDL.Record({ 'owner': IDL.Principal, 'subaccount': IDL.Opt(IDL.Vec(IDL.Nat8)) }),
+                            'fee': IDL.Opt(IDL.Nat),
+                            'memo': IDL.Opt(IDL.Vec(IDL.Nat8)),
+                            'from_subaccount': IDL.Opt(IDL.Vec(IDL.Nat8)),
+                            'created_at_time': IDL.Opt(IDL.Nat64),
+                            'amount': IDL.Nat,
+                        })],
+                        [IDL.Variant({ 'Ok': IDL.Nat, 'Err': IDL.Text })],
+                        []
+                    ),
                 });
+            };
 
-                const result = await ledgerActor.transfer({
-                    to: AccountIdentifier.fromHex(recipient).toUint8Array(),
-                    fee: { e8s: fee },
-                    memo: memo ? BigInt(memo.charCodeAt(0)) : 0n,
-                    from_subaccount: [],
-                    created_at_time: [],
-                    amount: { e8s: amount }
-                }) as { Ok?: any; Err?: any };
+            const tokenActor = Actor.createActor(icrc1IDL, {
+                agent,
+                canisterId: tokenPrincipal
+            });
 
-                if ('Ok' in result) {
-                    return (result as any).Ok;
-                } else {
-                    throw new Error(JSON.stringify((result as any).Err));
-                }
+            const result = await tokenActor.icrc1_transfer({
+                to: {
+                    owner: Principal.fromText(recipient),
+                    subaccount: []
+                },
+                fee: [fee],
+                memo: memo ? [new TextEncoder().encode(memo)] : [],
+                from_subaccount: [],
+                created_at_time: [],
+                amount: amount
+            }) as { Ok?: any; Err?: any };
+
+            if ('Ok' in result) {
+                return (result as any).Ok;
             } else {
-                // ICRC1 token
-                const icrc1IDL = ({ IDL }: any) => {
-                    return IDL.Service({
-                        'icrc1_transfer': IDL.Func(
-                            [IDL.Record({
-                                'to': IDL.Record({ 'owner': IDL.Principal, 'subaccount': IDL.Opt(IDL.Vec(IDL.Nat8)) }),
-                                'fee': IDL.Opt(IDL.Nat),
-                                'memo': IDL.Opt(IDL.Vec(IDL.Nat8)),
-                                'from_subaccount': IDL.Opt(IDL.Vec(IDL.Nat8)),
-                                'created_at_time': IDL.Opt(IDL.Nat64),
-                                'amount': IDL.Nat,
-                            })],
-                            [IDL.Variant({ 'Ok': IDL.Nat, 'Err': IDL.Text })],
-                            []
-                        ),
-                    });
-                };
-
-                const tokenActor = Actor.createActor(icrc1IDL, {
-                    agent,
-                    canisterId: tokenPrincipal
-                });
-
-                const result = await tokenActor.icrc1_transfer({
-                    to: {
-                        owner: Principal.fromText(recipient),
-                        subaccount: []
-                    },
-                    fee: [fee],
-                    memo: memo ? [new TextEncoder().encode(memo)] : [],
-                    from_subaccount: [],
-                    created_at_time: [],
-                    amount: amount
-                }) as { Ok?: any; Err?: any };
-
-                if ('Ok' in result) {
-                    return (result as any).Ok;
-                } else {
-                    throw new Error(JSON.stringify((result as any).Err));
-                }
+                throw new Error(JSON.stringify((result as any).Err));
             }
         } catch (error: any) {
             console.error('Error sending token:', error);
@@ -6942,7 +7241,7 @@ export const useTacoStore = defineStore('taco', () => {
                 supportedStandards: supportedStandards
             };
 
-            console.log(`Fetched real metadata for ${tokenPrincipal}:`, metadata);
+            // console.log(`Fetched real metadata for ${tokenPrincipal}:`, metadata);
 
             // Cache the metadata
             setCachedTokenMetadata(tokenPrincipal, metadata);
@@ -6979,6 +7278,7 @@ export const useTacoStore = defineStore('taco', () => {
     const checkTokenSupportsICRC2 = async (tokenPrincipal: string): Promise<boolean> => {
         try {
             const metadata = await fetchTokenMetadata(tokenPrincipal);
+            // console.log('ASDFASDF:', metadata.supportedStandards);
             return metadata.supportedStandards.some((standard: string) => 
                 standard.toLowerCase().includes('icrc-2') || standard.toLowerCase().includes('icrc2')
             );
@@ -6996,13 +7296,17 @@ export const useTacoStore = defineStore('taco', () => {
 
 
             let identity;
+            const authClient = await getAuthClient();
             
-            if (useAuth) {
-                const authClient = await getAuthClient();
+            if (await authClient.isAuthenticated()) {
                 identity = authClient.getIdentity();
-                userLoggedIn.value = true;
+                if (identity.getPrincipal().isAnonymous()) {
+                    userLoggedIn.value = false;
+                } else{
+                userLoggedIn.value = true;};
             } else {
                 identity = new AnonymousIdentity();
+                userLoggedIn.value = false;
             }
         if (!userLoggedIn.value) {
                 throw new Error('User must be logged in');
@@ -7254,6 +7558,23 @@ export const useTacoStore = defineStore('taco', () => {
         } catch (error) {
             console.error('Error getting system errors:', error);
             showError(`Error getting system errors: ${error instanceof Error ? error.message : String(error)}`);
+            throw error;
+        }
+    }
+
+    const getInternalErrors = async (limit?: number) => {
+        try {
+            const actor = await createAlarmActor();
+            const result = await actor.getInternalErrors(limit ? [BigInt(limit)] : []);
+
+            if ('err' in result) {
+                throw new Error(JSON.stringify(result.err));
+            }
+
+            return result.ok;
+        } catch (error) {
+            console.error('Error getting internal errors:', error);
+            showError(`Error getting internal errors: ${error instanceof Error ? error.message : String(error)}`);
             throw error;
         }
     }
@@ -7735,6 +8056,7 @@ export const useTacoStore = defineStore('taco', () => {
         threadMenuOpen,
         fetchedPortfolioArchiveBlocks,
         fetchedRewardDistributionArchiveBlocks,
+        hasTokenDetails,
         // actions
         changeRoute,
         toggleDarkMode,
@@ -7849,6 +8171,12 @@ export const useTacoStore = defineStore('taco', () => {
         stakeToNeuron,
         createNeuron,
         setNeuronDissolveDelay,
+        startDissolving,
+        stopDissolving,
+        disburseNeuron,
+        addNeuronPermissions,
+        removeNeuronPermissions,
+        getGrantablePermissions,
         toggleThreadMenu,
 
         // Archive methods
@@ -7856,21 +8184,24 @@ export const useTacoStore = defineStore('taco', () => {
         fetchRewardDistributionArchiveBlocks,
         
         // Wallet methods
+        ensureTokenDetails,
+        checkTokenSupportsICRC2,
+
+        //Wallet functions
+        getUserRegisteredTokens,
         registerUserToken,
         unregisterUserToken,
-        getUserRegisteredTokens,
-        fetchUserTokenBalance,
         sendToken,
-        fetchTokenMetadata,
-        getCachedTokenMetadata,
+        fetchUserTokenBalance,
         clearTokenMetadataCache,
-        checkTokenSupportsICRC2,
-        
+        fetchTokenMetadata,
+
         // Canister ID functions
         daoBackendCanisterId,
         treasuryCanisterId,
         neuronSnapshotCanisterId,
         rewardsCanisterId,
+        portfolioArchiveCanisterId,
         
         // Router
         router,
@@ -7896,6 +8227,7 @@ export const useTacoStore = defineStore('taco', () => {
         getPendingAlarms,
         acknowledgeAlarm,
         getSystemErrors,
+        getInternalErrors,
         resolveSystemError,
         setCheckInterval,
         startMonitoring,

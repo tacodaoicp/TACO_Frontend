@@ -30,13 +30,6 @@
         
         </router-link>
 
-        <!-- performance - router link -->
-        <router-link to="/performance" class="header-bar__rl">
-                      
-          <span class="header-bar__rl-span">Performance</span>
-        
-        </router-link> 
-
         <!-- vote - router link -->
         <router-link to="/vote" class="header-bar__rl">
                       
@@ -88,12 +81,19 @@
           
           <span class="header-bar__rl-span">Code</span>
         
-        </a>
+        </a>  
+        
+        <!-- wallet - router link -->
+        <router-link v-if="userLoggedIn" to="/wallet" class="header-bar__rl">
+          
+          <span class="header-bar__rl-span">Wallet</span>
+        
+        </router-link>         
 
       </div>
 
       <!-- environment indicator -->
-      <EnvironmentIndicator />
+      <!-- <EnvironmentIndicator /> -->
 
       <!-- pages menu button -->
       <button class="btn pages-menu__btn"
@@ -204,14 +204,6 @@
 
         </router-link>
 
-        <!-- performance - router link -->
-        <router-link @click="togglePagesMenu()" to="/performance" class="list-group-item">
-
-          <!-- item text -->
-          <span>Performance</span>
-
-        </router-link>        
-
         <!-- vote - router link -->
         <router-link @click="togglePagesMenu()" to="/vote" class="list-group-item">
 
@@ -254,8 +246,8 @@
           <!-- item text -->
           <span>Sales</span>
 
-        </router-link>    
-        
+        </router-link>
+
         <!-- info - router link -->
         <router-link @click="togglePagesMenu()" to="/info" class="list-group-item">
 
@@ -272,7 +264,15 @@
           <!-- item text -->
           <span>Code</span>
 
-        </a>        
+        </a>  
+        
+        <!-- wallet - router link -->
+        <router-link v-if="userLoggedIn" @click="togglePagesMenu()" to="/wallet" class="list-group-item">
+
+          <!-- item text -->
+          <span>Wallet</span>
+
+        </router-link>        
 
       </div>
 
@@ -656,9 +656,7 @@
   import TacoDaoLogo from "../assets/images/tacoDaoLogo.vue"
   import IcpValueChip from "../components/misc/IcpValueChip.vue"
   import TacoTokenPriceChip from "../components/misc/TacoTokenPriceChip.vue"
-  import TacoPortfolioValueChip from "../components/misc/TacoPortfolioValueChip.vue"
   import TacoEntityValueChip from "../components/misc/TacoEntityValueChip.vue"
-  import TacoTreasuryValueChip from "../components/misc/TacoTreasuryValueChip.vue"
   import DfinityLogo from "../assets/images/dfinityLogo.vue"
   import DarkModeToggle from "./theme/DarkModeToggle.vue"
   import { Tooltip } from 'bootstrap'
@@ -729,7 +727,7 @@
       tokenInitIdentifier: '',
       title: '👨‍🍳 Principal Copied!',
       icon: '',
-      message: `Your principal was copied to your clipboard`
+      message: `Account principal was copied to your clipboard`
     })
   }
 

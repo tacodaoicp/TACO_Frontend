@@ -38,15 +38,20 @@ type SnapshotReason =
    Scheduled;
    SystemEvent;
  };
+type Result_4 = 
+ variant {
+   err: ArchiveError;
+   ok: ArchiveStatus;
+ };
 type Result_3 = 
  variant {
    err: ArchiveError;
-   ok: nat;
+   ok: vec OHLCCandle;
  };
 type Result_2 = 
  variant {
    err: ArchiveError;
-   ok: ArchiveStatus;
+   ok: nat;
  };
 type Result_1 = 
  variant {
@@ -70,9 +75,9 @@ type PortfolioBlockData =
  };
 type PortfolioArchiveV2 = 
  service {
-   archivePortfolioBlock: (portfolio: PortfolioBlockData) -> (Result_3);
+   archivePortfolioBlock: (portfolio: PortfolioBlockData) -> (Result_2);
    getArchiveStats: () -> (ArchiveStatus) query;
-   getArchiveStatus: () -> (Result_2) query;
+   getArchiveStatus: () -> (Result_4) query;
    getBatchImportStatus: () ->
     (record {
        intervalSeconds: nat;
@@ -80,11 +85,14 @@ type PortfolioArchiveV2 =
        lastPortfolioImportTime: int;
      }) query;
    getLogs: (count: nat) -> (vec LogEntry) query;
+   getOHLCCandles: (startTime: int, endTime: int, intervalNS: int) ->
+    (Result_3) query;
    getTimerStatus: () -> (TimerStatus) query;
    icrc3_get_archives: (args: GetArchivesArgs) -> (GetArchivesResult) query;
    icrc3_get_blocks: (args: GetBlocksArgs) -> (GetBlocksResult) query;
    icrc3_get_tip_certificate: () -> (opt DataCertificate) query;
    icrc3_supported_block_types: () -> (vec BlockType) query;
+   lower_bound_ts: (ts: int) -> (Result_2) query;
    resetImportTimestamps: () -> (Result_1);
    runLegacyManualBatchImport: () -> (Result_1);
    runManualBatchImport: () -> (Result_1);
@@ -94,6 +102,22 @@ type PortfolioArchiveV2 =
    stopAllTimers: () -> (Result_1);
    stopBatchImportSystem: () -> (Result_1);
    updateConfig: (newConfig: ArchiveConfig) -> (Result);
+ };
+type OHLCCandle = 
+ record {
+   icpOHLC: record {
+              close: nat;
+              high: nat;
+              low: nat;
+              open: nat;
+            };
+   timestamp: int;
+   usdOHLC: record {
+              close: float64;
+              high: float64;
+              low: float64;
+              open: float64;
+            };
  };
 type LogLevel = 
  variant {

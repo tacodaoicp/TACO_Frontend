@@ -201,7 +201,7 @@ export const useKongStore = defineStore('kong', () => {
     }
 
     try {
-      console.log('Kong quote request with params:', params)
+      // console.log('Kong quote request with params:', params)
 
       const kongActor = await createKongActor()
 
@@ -209,20 +209,20 @@ export const useKongStore = defineStore('kong', () => {
       const payToken = formatTokenSymbolForKong(params.sellTokenSymbol)
       const receiveToken = formatTokenSymbolForKong(params.buyTokenSymbol)
 
-      console.log('Calling Kong swap_amounts with:', { payToken, amountIn: params.amountIn, receiveToken })
+      // console.log('Calling Kong swap_amounts with:', { payToken, amountIn: params.amountIn, receiveToken })
       const quoteResult = await kongActor.swap_amounts(payToken, params.amountIn, receiveToken) as any
-      console.log('Kong quote result:', quoteResult)
+      // console.log('Kong quote result:', quoteResult)
 
       if ('Err' in quoteResult) {
         throw new Error(`Kong quote failed: ${quoteResult.Err}`)
       }
 
       const quote = quoteResult.Ok as KongQuoteResult
-      console.log('Kong quote successful:', quote)
+      // console.log('Kong quote successful:', quote)
 
       return quote
     } catch (error: any) {
-      console.error('Kong quote error:', error)
+      // console.error('Kong quote error:', error)
       lastError.value = error.message
       throw error
     }
@@ -243,22 +243,22 @@ export const useKongStore = defineStore('kong', () => {
     lastError.value = null
 
     try {
-      console.log('Kong ICRC2 swap starting with params:', params)
+      // console.log('Kong ICRC2 swap starting with params:', params)
 
       // Step 1: Get token fee for proper amount calculations
       params.onStep?.('Getting token fee...')
-      console.log('Step 1: Getting token fee...')
+      // console.log('Step 1: Getting token fee...')
       const tokenActor = await createTokenActor(params.sellTokenPrincipal)
       const feeResult = await tokenActor.icrc1_fee() as any
       const tokenFee = typeof feeResult === 'bigint' ? feeResult : BigInt(feeResult)
-      console.log('Token fee:', tokenFee)
+      // console.log('Token fee:', tokenFee)
 
       // Step 2: Create ICRC2 approval for Kong
       // Approve amountIn + fee so Kong has enough allowance for the transfer + fee
       params.onStep?.('Approving tokens...')
-      console.log('Step 2: Creating ICRC2 approval...')
+      // console.log('Step 2: Creating ICRC2 approval...')
       const approvalAmount = params.amountIn + tokenFee
-      console.log('Approval amount (amountIn + fee):', approvalAmount)
+      // console.log('Approval amount (amountIn + fee):', approvalAmount)
       
       const approvalArgs = {
         spender: {
@@ -274,9 +274,9 @@ export const useKongStore = defineStore('kong', () => {
         expires_at: [],
       }
 
-      console.log('Approval args:', approvalArgs)
+      // console.log('Approval args:', approvalArgs)
       const approvalResult = await tokenActor.icrc2_approve(approvalArgs) as any
-      console.log('Approval result:', approvalResult)
+      // console.log('Approval result:', approvalResult)
 
       if ('Err' in approvalResult) {
         throw new Error(`Approval failed: ${JSON.stringify(approvalResult.Err)}`)
@@ -284,15 +284,15 @@ export const useKongStore = defineStore('kong', () => {
 
       // Extract approval transaction ID
       const approvalTxId = approvalResult.Ok
-      console.log('Approval transaction ID:', approvalTxId)
+      // console.log('Approval transaction ID:', approvalTxId)
 
       // Step 3: Execute Kong swap with approval tx_id (ICRC2 flow)
       // Reduce swap amount by transfer fee since Kong will do a transfer_from
       params.onStep?.('Executing swap...')
-      console.log('Step 3: Executing Kong swap...')
+      // console.log('Step 3: Executing Kong swap...')
       const kongActor = await createKongActor()
       const swapAmount = params.amountIn - tokenFee
-      console.log('Swap amount after fee deduction:', swapAmount)
+      // console.log('Swap amount after fee deduction:', swapAmount)
 
       const swapArgs: KongSwapArgs = {
         pay_token: formatTokenSymbolForKong(params.sellTokenSymbol),
@@ -305,9 +305,9 @@ export const useKongStore = defineStore('kong', () => {
         referred_by: [],
       }
 
-      console.log('Kong swap args:', swapArgs)
+      // console.log('Kong swap args:', swapArgs)
       const swapResult = await kongActor.swap(swapArgs) as any
-      console.log('Kong swap result:', swapResult)
+      // console.log('Kong swap result:', swapResult)
 
       if ('Err' in swapResult) {
         throw new Error(`Kong swap failed: ${swapResult.Err}`)
@@ -315,7 +315,7 @@ export const useKongStore = defineStore('kong', () => {
 
       return swapResult.Ok
     } catch (error: any) {
-      console.error('Kong ICRC2 swap error:', error)
+      // console.error('Kong ICRC2 swap error:', error)
       lastError.value = error.message
       throw error
     } finally {
@@ -336,11 +336,11 @@ export const useKongStore = defineStore('kong', () => {
     lastError.value = null
 
     try {
-      console.log('Kong ICRC1 swap starting with params:', params)
+      // console.log('Kong ICRC1 swap starting with params:', params)
 
       // Step 1: Transfer tokens to Kong
       params.onStep?.('Transferring tokens...')
-      console.log('Step 1: Transferring tokens to Kong...')
+      // console.log('Step 1: Transferring tokens to Kong...')
       const tokenActor = await createTokenActor(params.sellTokenPrincipal)
 
       const transferArgs = {
@@ -355,9 +355,9 @@ export const useKongStore = defineStore('kong', () => {
         amount: params.amountIn,
       }
 
-      console.log('Transfer args:', transferArgs)
+      // console.log('Transfer args:', transferArgs)
       const transferResult = await tokenActor.icrc1_transfer(transferArgs) as any
-      console.log('Transfer result:', transferResult)
+      // console.log('Transfer result:', transferResult)
 
       if ('Err' in transferResult) {
         throw new Error(`Transfer failed: ${JSON.stringify(transferResult.Err)}`)
@@ -367,7 +367,7 @@ export const useKongStore = defineStore('kong', () => {
 
       // Step 2: Execute Kong swap with tx_id
       params.onStep?.('Executing swap...')
-      console.log('Step 2: Executing Kong swap with tx_id...')
+      // console.log('Step 2: Executing Kong swap with tx_id...')
       const kongActor = await createKongActor()
 
       const swapArgs: KongSwapArgs = {
@@ -381,9 +381,9 @@ export const useKongStore = defineStore('kong', () => {
         referred_by: [],
       }
 
-      console.log('Kong swap args:', swapArgs)
+      // console.log('Kong swap args:', swapArgs)
       const swapResult = await kongActor.swap(swapArgs) as any
-      console.log('Kong swap result:', swapResult)
+      // console.log('Kong swap result:', swapResult)
 
       if ('Err' in swapResult) {
         throw new Error(`Kong swap failed: ${swapResult.Err}`)

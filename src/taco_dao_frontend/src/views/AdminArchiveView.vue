@@ -8,6 +8,58 @@
         <div class="row">
           <TacoTitle level="h2" emoji="📦" title="Archive Management" class="mt-4" style="padding-left: 1rem !important;"/>
           
+          <!-- Overview: All Archives -->
+          <div class="card bg-dark text-white mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+              <h3 class="mb-0">Overview: Archive Loop Status</h3>
+              <div class="d-flex gap-2">
+                <button class="btn btn-sm btn-outline-light" @click="refreshOverviewStatuses" :disabled="overviewLoading">
+                  🔄 Refresh Overview
+                </button>
+              </div>
+            </div>
+            <div class="card-body">
+              <div v-if="overviewLoading" class="text-center">
+                <div class="spinner-border text-primary" role="status">
+                  <span class="visually-hidden">Loading...</span>
+                </div>
+              </div>
+              <div v-else class="row g-3">
+                <div 
+                  v-for="def in archiveDefs" 
+                  :key="def.key" 
+                  class="col-12 col-md-6 col-lg-4"
+                >
+                  <div class="p-3 border rounded h-100" style="cursor: pointer;"
+                       @click="selectedArchive = def.key; onArchiveChange()">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                      <h5 class="mb-0 d-flex align-items-center gap-2">
+                        <span class="badge" :class="def.badgeClass">{{ def.label }}</span>
+                      </h5>
+                      <span class="badge" :class="getOverviewOverallBadge(def.key)">
+                        {{ getOverviewOverallStatus(def.key) }}
+                      </span>
+                    </div>
+                    <div class="d-flex align-items-center gap-4">
+                      <div class="d-flex align-items-center gap-2">
+                        <div class="status-indicator" :class="getOverviewLampClass(def.key, 'outer')"></div>
+                        <small>Outer</small>
+                      </div>
+                      <div class="d-flex align-items-center gap-2">
+                        <div class="status-indicator" :class="getOverviewLampClass(def.key, 'middle')"></div>
+                        <small>Middle</small>
+                      </div>
+                      <div class="d-flex align-items-center gap-2">
+                        <div class="status-indicator" :class="getOverviewLampClass(def.key, 'inner')"></div>
+                        <small>Inner</small>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
           <!-- Archive Selection -->
           <div class="card bg-dark text-white mb-4">
             <div class="card-header">
@@ -584,6 +636,8 @@ export default {
     return {
       selectedArchive: 'trading_archive',
       loading: false,
+      overviewLoading: false,
+      overviewStatuses: {},
       timerStatus: null,
       legacyStatus: null,
       archiveStatus: null,
@@ -633,6 +687,19 @@ export default {
   },
   computed: {
     ...mapStores(useTacoStore),
+    archiveDefs() {
+      return [
+        { key: 'trading_archive', label: 'Trading Archive', badgeClass: 'bg-success' },
+        { key: 'portfolio_archive', label: 'Portfolio Archive', badgeClass: 'bg-info' },
+        { key: 'price_archive', label: 'Price Archive', badgeClass: 'bg-warning' },
+        { key: 'dao_admin_archive', label: 'DAO Admin Archive', badgeClass: 'bg-primary' },
+        { key: 'dao_allocation_archive', label: 'DAO Allocation Archive', badgeClass: 'bg-info' },
+        { key: 'dao_neuron_allocation_archive', label: 'DAO Neuron Allocation', badgeClass: 'bg-success' },
+        { key: 'dao_governance_archive', label: 'DAO Governance Archive', badgeClass: 'bg-secondary' },
+        { key: 'reward_distribution_archive', label: 'Reward Distribution', badgeClass: 'bg-success' },
+        { key: 'reward_withdrawal_archive', label: 'Reward Withdrawal', badgeClass: 'bg-warning' }
+      ]
+    },
     currentArchiveActor() {
       switch (this.selectedArchive) {
         case 'trading_archive': return this.tradingActor
@@ -664,6 +731,7 @@ export default {
     await this.createArchiveActors()
     
     this.refreshStatus()
+    this.refreshOverviewStatuses()
     this.refreshLogs()
     
     // Load the first blocks
@@ -672,6 +740,7 @@ export default {
     // Auto-refresh every 10 seconds
     this.refreshInterval = setInterval(() => {
       this.refreshStatus()
+      this.refreshOverviewStatuses()
     }, 10000)
     
     // Add event delegation for fetch buttons
@@ -689,6 +758,71 @@ export default {
     this.cleanupPortfolioCharts()
   },
   methods: {
+    // ===== Overview helpers =====
+    getOverviewLampClass(key, tier) {
+      const s = this.overviewStatuses[key]
+      if (!s) return 'inactive'
+      if (tier === 'outer') return s.outerLoopRunning ? 'active' : 'inactive'
+      if (tier === 'middle') return s.middleLoopRunning ? 'active' : 'inactive'
+      if (tier === 'inner') return s.innerLoopRunning ? 'active' : 'inactive'
+      return 'inactive'
+    },
+
+    getOverviewOverallStatus(key) {
+      const s = this.overviewStatuses[key]
+      if (!s) return 'Unknown'
+      if (s.innerLoopRunning) return 'Importing'
+      if (s.middleLoopRunning) return 'Coordinating'
+      if (s.outerLoopRunning) return 'Scheduled'
+      return 'Stopped'
+    },
+
+    getOverviewOverallBadge(key) {
+      const status = this.getOverviewOverallStatus(key)
+      switch (status) {
+        case 'Importing': return 'bg-success'
+        case 'Coordinating': return 'bg-info'
+        case 'Scheduled': return 'bg-primary'
+        case 'Stopped': return 'bg-secondary'
+        default: return 'bg-dark'
+      }
+    },
+
+    async refreshOverviewStatuses() {
+      try {
+        this.overviewLoading = true
+        const actorMap = {
+          trading_archive: this.tradingActor,
+          portfolio_archive: this.portfolioActor,
+          price_archive: this.priceActor,
+          dao_admin_archive: this.daoAdminActor,
+          dao_allocation_archive: this.daoAllocationActor,
+          dao_neuron_allocation_archive: this.daoNeuronAllocationActor,
+          dao_governance_archive: this.daoGovernanceActor,
+          reward_distribution_archive: this.rewardDistributionActor,
+          reward_withdrawal_archive: this.rewardWithdrawalActor,
+        }
+
+        const entries = Object.entries(actorMap)
+        const results = await Promise.all(entries.map(async ([key, actor]) => {
+          try {
+            if (!actor || !actor.getTimerStatus) return [key, null]
+            const raw = await actor.getTimerStatus()
+            return [key, this.convertBigIntFields(raw)]
+          } catch (e) {
+            return [key, null]
+          }
+        }))
+
+        const statusObj = {}
+        for (const [key, val] of results) {
+          if (val) statusObj[key] = val
+        }
+        this.overviewStatuses = statusObj
+      } finally {
+        this.overviewLoading = false
+      }
+    },
     // Canister ID functions using actual deployed canister IDs from canister_ids.json
     tradingArchiveCanisterId() {
       switch (process.env.DFX_NETWORK) {
@@ -743,7 +877,7 @@ export default {
     daoNeuronAllocationArchiveCanisterId() {
       switch (process.env.DFX_NETWORK) {
         case "ic":
-          return process.env.CANISTER_ID_DAO_NEURON_ALLOCATION_ARCHIVE_IC || 'cajb4-qqaaa-aaaan-qz5la-cai';
+          return process.env.CANISTER_ID_DAO_NEURON_ALLOCATION_ARCHIVE_IC || 'dnhfs-7yaaa-aaaan-qz5mq-cai';
         case "staging":
           return process.env.CANISTER_ID_DAO_NEURON_ALLOCATION_ARCHIVE_STAGING || 'cajb4-qqaaa-aaaan-qz5la-cai';
       }
@@ -763,7 +897,7 @@ export default {
     rewardDistributionArchiveCanisterId() {
       switch (process.env.DFX_NETWORK) {
         case "ic":
-          return process.env.CANISTER_ID_REWARD_DISTRIBUTION_ARCHIVE_IC || 'ddfi2-eiaaa-aaaan-qz5nq-cai';
+          return process.env.CANISTER_ID_REWARD_DISTRIBUTION_ARCHIVE_IC || 'uqkap-jiaaa-aaaan-qz6tq-cai';
         case "staging":
           return process.env.CANISTER_ID_REWARD_DISTRIBUTION_ARCHIVE_STAGING || 'ddfi2-eiaaa-aaaan-qz5nq-cai';
       }
@@ -773,7 +907,7 @@ export default {
     rewardWithdrawalArchiveCanisterId() {
       switch (process.env.DFX_NETWORK) {
         case "ic":
-          return process.env.CANISTER_ID_REWARD_WITHDRAWAL_ARCHIVE_IC || 'dwczx-faaaa-aaaan-qz5oa-cai';
+          return process.env.CANISTER_ID_REWARD_WITHDRAWAL_ARCHIVE_IC || 'v5eeb-gaaaa-aaaan-qz6ua-cai';
         case "staging":
           return process.env.CANISTER_ID_REWARD_WITHDRAWAL_ARCHIVE_STAGING || 'dwczx-faaaa-aaaan-qz5oa-cai';
       }

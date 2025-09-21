@@ -15,11 +15,11 @@ export const idlFactory = ({ IDL }) => {
     'timestamp' : IDL.Int,
     'caller' : IDL.Principal,
   });
-  const Result_16 = IDL.Variant({
+  const Result_17 = IDL.Variant({
     'ok' : IDL.Vec(AdminActionLog),
     'err' : IDL.Text,
   });
-  const Result_15 = IDL.Variant({
+  const Result_16 = IDL.Variant({
     'ok' : IDL.Vec(AdminPermission),
     'err' : IDL.Text,
   });
@@ -28,7 +28,7 @@ export const idlFactory = ({ IDL }) => {
     'acknowledgedAt' : IDL.Int,
     'acknowledgedBy' : IDL.Principal,
   });
-  const Result_14 = IDL.Variant({
+  const Result_15 = IDL.Variant({
     'ok' : IDL.Vec(AlarmAcknowledgment),
     'err' : IDL.Text,
   });
@@ -54,8 +54,8 @@ export const idlFactory = ({ IDL }) => {
     'timestamp' : IDL.Int,
     'success' : IDL.Bool,
   });
-  const Result_13 = IDL.Variant({ 'ok' : IDL.Vec(AlarmLog), 'err' : IDL.Text });
-  const Result_12 = IDL.Variant({
+  const Result_14 = IDL.Variant({ 'ok' : IDL.Vec(AlarmLog), 'err' : IDL.Text });
+  const Result_13 = IDL.Variant({
     'ok' : IDL.Record({
       'smsUrl' : IDL.Text,
       'username' : IDL.Text,
@@ -85,7 +85,7 @@ export const idlFactory = ({ IDL }) => {
     'CyclesLow' : IDL.Nat,
     'TimerStalled' : IDL.Text,
   });
-  const Result_11 = IDL.Variant({
+  const Result_12 = IDL.Variant({
     'ok' : IDL.Vec(
       IDL.Tuple(
         MonitoredCanisterConfig,
@@ -96,7 +96,7 @@ export const idlFactory = ({ IDL }) => {
     ),
     'err' : IDL.Text,
   });
-  const Result_10 = IDL.Variant({
+  const Result_11 = IDL.Variant({
     'ok' : IDL.Record({
       'canisterMonitoringMinutes' : IDL.Nat,
       'level2SMSCheckMinutes' : IDL.Nat,
@@ -113,8 +113,8 @@ export const idlFactory = ({ IDL }) => {
     'addedAt' : IDL.Int,
     'addedBy' : IDL.Principal,
   });
-  const Result_9 = IDL.Variant({ 'ok' : IDL.Vec(Contact), 'err' : IDL.Text });
-  const Result_8 = IDL.Variant({
+  const Result_10 = IDL.Variant({ 'ok' : IDL.Vec(Contact), 'err' : IDL.Text });
+  const Result_9 = IDL.Variant({
     'ok' : IDL.Record({
       'smsQueueSize' : IDL.Nat,
       'monitoredCanistersCount' : IDL.Nat,
@@ -124,6 +124,17 @@ export const idlFactory = ({ IDL }) => {
       'acknowledgmentsCount' : IDL.Nat,
       'enabledCanistersCount' : IDL.Nat,
     }),
+    'err' : IDL.Text,
+  });
+  const InternalError = IDL.Record({
+    'id' : IDL.Nat,
+    'context' : IDL.Opt(IDL.Text),
+    'errorType' : IDL.Text,
+    'message' : IDL.Text,
+    'timestamp' : IDL.Int,
+  });
+  const Result_8 = IDL.Variant({
+    'ok' : IDL.Vec(InternalError),
     'err' : IDL.Text,
   });
   const Result_7 = IDL.Variant({
@@ -234,19 +245,20 @@ export const idlFactory = ({ IDL }) => {
       ),
     'clearAllLogs' : IDL.Func([], [Result], []),
     'clearQueues' : IDL.Func([], [Result], []),
-    'getAdminActionLogs' : IDL.Func([IDL.Opt(IDL.Nat)], [Result_16], ['query']),
-    'getAdminPermissions' : IDL.Func([], [Result_15], ['query']),
+    'getAdminActionLogs' : IDL.Func([IDL.Opt(IDL.Nat)], [Result_17], ['query']),
+    'getAdminPermissions' : IDL.Func([], [Result_16], ['query']),
     'getAlarmAcknowledgments' : IDL.Func(
         [IDL.Opt(IDL.Nat)],
-        [Result_14],
+        [Result_15],
         ['query'],
       ),
-    'getAlarmLogs' : IDL.Func([IDL.Opt(IDL.Nat)], [Result_13], ['query']),
-    'getApiConfiguration' : IDL.Func([], [Result_12], ['query']),
-    'getCanisterHealthStatus' : IDL.Func([], [Result_11], []),
-    'getConfigurationIntervals' : IDL.Func([], [Result_10], ['query']),
-    'getContacts' : IDL.Func([], [Result_9], ['query']),
-    'getEnhancedAlarmSystemStatus' : IDL.Func([], [Result_8], ['query']),
+    'getAlarmLogs' : IDL.Func([IDL.Opt(IDL.Nat)], [Result_14], ['query']),
+    'getApiConfiguration' : IDL.Func([], [Result_13], ['query']),
+    'getCanisterHealthStatus' : IDL.Func([], [Result_12], []),
+    'getConfigurationIntervals' : IDL.Func([], [Result_11], ['query']),
+    'getContacts' : IDL.Func([], [Result_10], ['query']),
+    'getEnhancedAlarmSystemStatus' : IDL.Func([], [Result_9], ['query']),
+    'getInternalErrors' : IDL.Func([IDL.Opt(IDL.Nat)], [Result_8], ['query']),
     'getMonitoredCanisters' : IDL.Func([], [Result_7], ['query']),
     'getMonitoringStatus' : IDL.Func([], [Result_6], ['query']),
     'getPendingAlarms' : IDL.Func([], [Result_5], ['query']),
