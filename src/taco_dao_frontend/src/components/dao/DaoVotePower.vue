@@ -287,8 +287,16 @@
 
   // refresh voting power
   const refreshVotingPower = async () => {
+
+    // if logged out, return
+    if (!userLoggedIn.value) return
+
     refreshingVP.value = true
     try {
+
+      // turn on loading curtain
+      componentLoading.value = true
+
       const { refreshUserVotingPower } = tacoStore
       await refreshUserVotingPower()
       // After refreshing, fetch updated user allocation
@@ -298,6 +306,10 @@
       console.error('Error refreshing voting power:', error)
     } finally {
       refreshingVP.value = false
+
+      // turn off loading curtain
+      componentLoading.value = false
+      
     }
   }  
 
@@ -354,7 +366,7 @@
       if (userLoggedIn.value) {
 
         // turn on loading curtain
-        componentLoading.value = true    
+        componentLoading.value = true
 
         // // fetch and handle user allocation
         // await fetchUserAllocation()
