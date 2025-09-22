@@ -3068,7 +3068,7 @@
 
     }
 
-  }, { immediate: true })
+  })
 
   /////////////////////
   // lifecycle hooks //
