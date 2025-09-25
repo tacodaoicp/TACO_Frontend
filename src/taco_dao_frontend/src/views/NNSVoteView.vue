@@ -1,396 +1,317 @@
 <template>
-    <div class="nns-vote-view" :class="[{ 'overflow-hidden': componentLoading }]">
+    <div class="standard-view">
 
-        <!-- loading curtain -->
-        <div v-show="componentLoading" class="nns-vote-view__loading-curtain">
-            <img :src="astronautLoaderUrl" class="loading-img">
-        </div>
+        <!-- header bar -->
+        <HeaderBar />
 
-        <!-- error state -->
-        <div v-if="error" class="nns-vote-view__error">
-            <div class="alert alert-danger">
-                <h4>Error</h4>
-                <p>{{ error }}</p>
-                <router-link to="/chat/forum" class="btn btn-primary">
-                    <i class="fa-light fa-arrow-left"></i> Back to Forum
-                </router-link>
-            </div>
-        </div>
+        <!-- scroll container -->
+        <div class="scroll-y-container h-100">
 
-        <!-- main content -->
-        <div v-if="!error && !componentLoading" class="nns-vote-view__content">
+            <!-- bootstrap container -->
+            <div class="container p-0">
 
-            <!-- header -->
-            <div class="nns-vote-view__header">
-                <h1 class="nns-vote-view__title">
-                    <i class="fa-light fa-vote-yea"></i>
-                    NNS Proposal Voting
-                </h1>
-                <p class="nns-vote-view__subtitle">
-                    Vote on NNS proposals using your TACO neurons without risking your stake
-                </p>
-            </div>
+                <!-- bootstrap row -->
+                <div class="row h-100 d-flex flex-column flex-nowrap overflow-hidden px-2 px-sm-0">
 
-            <!-- voting disabled notice -->
-            <div v-if="daoAlreadyVoted" class="alert alert-warning mb-4">
-                <i class="fa-light fa-info-circle"></i>
-                <strong>Voting Closed:</strong> The DAO has already submitted its collective vote for this NNS proposal.
-            </div>
-
-            <!-- login required notice -->
-            <div v-if="!isLoggedIn" class="alert alert-info mb-4">
-                <i class="fa-light fa-sign-in"></i>
-                <strong>Login Required:</strong> Please login to vote on this proposal.
-                <button @click="iidLogIn" class="btn btn-sm btn-primary ms-2">
-                    <i class="fa-light fa-sign-in"></i> Login
-                </button>
-            </div>
-
-            <!-- proposals container -->
-            <div class="nns-vote-view__proposals">
-
-                <!-- NNS Proposal Section -->
-                <div class="nns-vote-view__proposal-section">
-                    <div class="nns-vote-view__proposal-header">
-                        <h2>
-                            <i class="fa-light fa-network-wired"></i>
-                            Original NNS Proposal
-                        </h2>
-                        <a :href="nnsProposalLink" target="_blank" class="btn btn-outline-primary btn-sm">
-                            <i class="fa-light fa-external-link"></i> View on NNS
-                        </a>
+                    <!-- loading curtain -->
+                    <div v-show="componentLoading" class="login-curtain">
+                        <img :src="astronautLoaderUrl" class="loading-img">
                     </div>
 
-                    <!-- NNS Proposal Details -->
-                    <div v-if="nnsProposal" class="proposal-details-card">
-                        <div class="proposal-details-card__content">
-                            
-                            <!-- title -->
-                            <div class="proposal-details-card__title">
-                                <span class="proposal-details-card__title-number">#{{ nnsProposalId }}&nbsp;</span>
-                                <span class="proposal-details-card__title-text">{{ nnsProposal.title || 'NNS Proposal' }}</span>
-                            </div>
-
-                            <!-- NNS voting progress -->
-                            <div v-if="nnsProposal.latest_tally" class="proposal-details-card__progress-container">
-                                <div class="proposal-details-card__progress-container__top">
-                                    <div class="proposal-details-card__progress-container__top__left">
-                                        <div class="proposal-details-card__progress-container__yes-details">
-                                            <span class="proposal-details-card__progress-container__yes-percentage">
-                                                Yes <strong>{{ (Number(nnsProposal.latest_tally.yes) / Number(nnsProposal.latest_tally.total) * 100).toFixed(2) }}%</strong>
-                                            </span>
-                                            <span class="proposal-details-card__progress-container__yes-count">
-                                                {{ Number((Number(nnsProposal.latest_tally.yes) / 100000000).toFixed(0)).toLocaleString() }} VP
-                                            </span>
-                                        </div>
-                                    </div>
-                                    <div class="proposal-details-card__progress-container__top__center">
-                                        <div class="proposal-details-card__progress-container__misc-details">
-                                            <span class="proposal-details-card__progress-container__total-votes">Total Votes</span>
-                                            <span class="proposal-details-card__progress-container__eligable-count">
-                                                {{ Number((Number(nnsProposal.latest_tally.total) / 100000000).toFixed(0)).toLocaleString() }} VP
-                                            </span>
-                                        </div>
-                                    </div>
-                                    <div class="proposal-details-card__progress-container__top__right">
-                                        <div class="proposal-details-card__progress-container__no-details">
-                                            <span class="proposal-details-card__progress-container__no-percentage">
-                                                No <strong>{{ (Number(nnsProposal.latest_tally.no) / Number(nnsProposal.latest_tally.total) * 100).toFixed(2) }}%</strong>
-                                            </span>
-                                            <span class="proposal-details-card__progress-container__no-count">
-                                                {{ Number((Number(nnsProposal.latest_tally.no) / 100000000).toFixed(0)).toLocaleString() }} VP
-                                            </span>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="proposal-details-card__progress-container__bottom">
-                                    <div class="progress proposal-details-card__progress-container__progress">
-                                        <div class="progress-bar progress-bar--yes" 
-                                            :style="{ width: (Number(nnsProposal.latest_tally.yes) / Number(nnsProposal.latest_tally.total) * 100).toFixed(2) + '%' }"></div>
-                                        <div class="progress-bar progress-bar--no" 
-                                            :style="{ width: (Number(nnsProposal.latest_tally.no) / Number(nnsProposal.latest_tally.total) * 100).toFixed(2) + '%' }"></div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- NNS proposal details -->
-                            <div class="proposal-details-card__key-value-pairs">
-                                <div class="proposal-details-card__key-value-pair">
-                                    <span class="proposal-details-card__key">Topic</span>
-                                    <span class="proposal-details-card__value">{{ getNNSTopicName(nnsProposal.topic) }}</span>
-                                </div>
-                                <div class="proposal-details-card__key-value-pair">
-                                    <span class="proposal-details-card__key">Description</span>
-                                    <span class="proposal-details-card__value wordwrap-anywhere" v-html="nnsProposal.summary || 'No description available'"></span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- SNS Proposal Section -->
-                <div class="nns-vote-view__proposal-section">
-                    <div class="nns-vote-view__proposal-header">
-                        <h2>
-                            <i class="fa-light fa-comments"></i>
-                            TACO DAO Discussion Proposal
-                        </h2>
-                        <router-link :to="`/chat/forum/${snsProposalId}`" class="btn btn-outline-primary btn-sm">
-                            <i class="fa-light fa-comments"></i> View Discussion
-                        </router-link>
-                    </div>
-
-                    <!-- SNS Proposal Details -->
-                    <div v-if="snsProposal" class="proposal-details-card">
-                        <div class="proposal-details-card__content">
-                            
-                            <!-- title -->
-                            <div class="proposal-details-card__title">
-                                <span class="proposal-details-card__title-number">#{{ snsProposal.id }}&nbsp;</span>
-                                <span class="proposal-details-card__title-text">{{ snsProposal.title }}</span>
-                            </div>
-
-                            <!-- SNS voting progress -->
-                            <div class="proposal-details-card__progress-container">
-                                <div class="proposal-details-card__progress-container__top">
-                                    <div class="proposal-details-card__progress-container__top__left">
-                                        <div class="proposal-details-card__progress-container__yes-details">
-                                            <span class="proposal-details-card__progress-container__yes-percentage">
-                                                Yes <strong>{{ (Number(snsProposal.yesVotes) / Number(snsProposal.totalVotes) * 100).toFixed(2) }}%</strong>
-                                            </span>
-                                            <span class="proposal-details-card__progress-container__yes-count">
-                                                {{ Number((Number(snsProposal.yesVotes) / 100000000).toFixed(0)).toLocaleString() }} VP
-                                            </span>
-                                        </div>
-                                    </div>
-                                    <div class="proposal-details-card__progress-container__top__center">
-                                        <div class="proposal-details-card__progress-container__misc-details">
-                                            <span class="proposal-details-card__progress-container__total-votes">Total Votes</span>
-                                            <span class="proposal-details-card__progress-container__eligable-count">
-                                                {{ Number((Number(snsProposal.totalVotes) / 100000000).toFixed(0)).toLocaleString() }} VP
-                                            </span>
-                                        </div>
-                                    </div>
-                                    <div class="proposal-details-card__progress-container__top__right">
-                                        <div class="proposal-details-card__progress-container__no-details">
-                                            <span class="proposal-details-card__progress-container__no-percentage">
-                                                No <strong>{{ (Number(snsProposal.noVotes) / Number(snsProposal.totalVotes) * 100).toFixed(2) }}%</strong>
-                                            </span>
-                                            <span class="proposal-details-card__progress-container__no-count">
-                                                {{ Number((Number(snsProposal.noVotes) / 100000000).toFixed(0)).toLocaleString() }} VP
-                                            </span>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="proposal-details-card__progress-container__bottom">
-                                    <div class="progress proposal-details-card__progress-container__progress">
-                                        <div class="progress-bar progress-bar--yes" 
-                                            :style="{ width: (Number(snsProposal.yesVotes) / Number(snsProposal.totalVotes) * 100).toFixed(2) + '%' }"></div>
-                                        <div class="progress-bar progress-bar--no" 
-                                            :style="{ width: (Number(snsProposal.noVotes) / Number(snsProposal.totalVotes) * 100).toFixed(2) + '%' }"></div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- SNS proposal details -->
-                            <div class="proposal-details-card__key-value-pairs">
-                                <div class="proposal-details-card__key-value-pair">
-                                    <span class="proposal-details-card__key">Status</span>
-                                    <span class="proposal-details-card__value">{{ snsProposal.status }}</span>
-                                </div>
-                                <div class="proposal-details-card__key-value-pair">
-                                    <span class="proposal-details-card__key">Description</span>
-                                    <span class="proposal-details-card__value wordwrap-anywhere" v-html="snsProposal.summary"></span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- DAO Vote Tally Section -->
-                <div class="nns-vote-view__proposal-section">
-                    <div class="nns-vote-view__proposal-header">
-                        <h2>
-                            <i class="fa-light fa-chart-bar"></i>
-                            TACO DAO Votes
-                        </h2>
-                        <button @click="refreshDAOVotes" class="btn btn-outline-primary btn-sm" :disabled="componentLoading">
-                            <i class="fa-light fa-refresh" :class="{ 'fa-spin': componentLoading }"></i> Refresh
-                        </button>
-                    </div>
-
-                    <!-- DAO Vote Tally -->
-                    <div v-if="daoVoteTally" class="proposal-details-card">
-                        <div class="proposal-details-card__content">
-                            
-                            <!-- title -->
-                            <div class="proposal-details-card__title">
-                                <span class="proposal-details-card__title-text">DAO Member Votes</span>
-                            </div>
-
-                            <!-- DAO voting progress -->
-                            <div class="proposal-details-card__progress-container">
-                                <div class="proposal-details-card__progress-container__top">
-                                    <div class="proposal-details-card__progress-container__top__left">
-                                        <div class="proposal-details-card__progress-container__yes-details">
-                                            <span class="proposal-details-card__progress-container__yes-percentage">
-                                                Adopt <strong>{{ daoVoteTally.total_voting_power > 0 ? (Number(daoVoteTally.adopt_voting_power) / Number(daoVoteTally.total_voting_power) * 100).toFixed(2) : 0 }}%</strong>
-                                            </span>
-                                            <span class="proposal-details-card__progress-container__yes-count">
-                                                {{ Number((Number(daoVoteTally.adopt_voting_power) / 100000000).toFixed(0)).toLocaleString() }} VP
-                                            </span>
-                                        </div>
-                                    </div>
-                                    <div class="proposal-details-card__progress-container__top__center">
-                                        <div class="proposal-details-card__progress-container__misc-details">
-                                            <span class="proposal-details-card__progress-container__total-votes">Total DAO Votes</span>
-                                            <span class="proposal-details-card__progress-container__eligable-count">
-                                                {{ Number((Number(daoVoteTally.total_voting_power) / 100000000).toFixed(0)).toLocaleString() }} VP
-                                            </span>
-                                        </div>
-                                    </div>
-                                    <div class="proposal-details-card__progress-container__top__right">
-                                        <div class="proposal-details-card__progress-container__no-details">
-                                            <span class="proposal-details-card__progress-container__no-percentage">
-                                                Reject <strong>{{ daoVoteTally.total_voting_power > 0 ? (Number(daoVoteTally.reject_voting_power) / Number(daoVoteTally.total_voting_power) * 100).toFixed(2) : 0 }}%</strong>
-                                            </span>
-                                            <span class="proposal-details-card__progress-container__no-count">
-                                                {{ Number((Number(daoVoteTally.reject_voting_power) / 100000000).toFixed(0)).toLocaleString() }} VP
-                                            </span>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="proposal-details-card__progress-container__bottom">
-                                    <div class="progress proposal-details-card__progress-container__progress">
-                                        <div class="progress-bar progress-bar--yes" 
-                                            :style="{ width: daoVoteTally.total_voting_power > 0 ? (Number(daoVoteTally.adopt_voting_power) / Number(daoVoteTally.total_voting_power) * 100).toFixed(2) + '%' : '0%' }"></div>
-                                        <div class="progress-bar progress-bar--no" 
-                                            :style="{ width: daoVoteTally.total_voting_power > 0 ? (Number(daoVoteTally.reject_voting_power) / Number(daoVoteTally.total_voting_power) * 100).toFixed(2) + '%' : '0%' }"></div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- DAO vote stats -->
-                            <div class="proposal-details-card__key-value-pairs">
-                                <div class="proposal-details-card__key-value-pair">
-                                    <span class="proposal-details-card__key">Adopt Votes</span>
-                                    <span class="proposal-details-card__value">{{ daoVoteTally.adopt_votes }} neurons</span>
-                                </div>
-                                <div class="proposal-details-card__key-value-pair">
-                                    <span class="proposal-details-card__key">Reject Votes</span>
-                                    <span class="proposal-details-card__value">{{ daoVoteTally.reject_votes }} neurons</span>
-                                </div>
-                                <div class="proposal-details-card__key-value-pair">
-                                    <span class="proposal-details-card__key">Total Participants</span>
-                                    <span class="proposal-details-card__value">{{ daoVoteTally.total_votes }} neurons</span>
-                                </div>
-                            </div>
+                    <!-- error state -->
+                    <div v-if="error" class="taco-container taco-container--l1 mt-4 p-4">
+                        <div class="text-center">
+                            <h4 class="taco-text-black-to-white mb-3">⚠️ Error</h4>
+                            <p class="taco-text-black-to-white mb-3">{{ error }}</p>
+                            <router-link to="/chat/forum" class="btn taco-btn taco-btn--green">
+                                ← Back to Forum
+                            </router-link>
                         </div>
                     </div>
 
-                    <!-- No votes yet -->
-                    <div v-else class="proposal-details-card">
-                        <div class="proposal-details-card__content text-center py-4">
-                            <i class="fa-light fa-vote-yea fa-3x text-muted mb-3"></i>
-                            <p class="text-muted">No DAO votes cast yet. Be the first to vote!</p>
+                    <!-- main content -->
+                    <div v-if="!error" class="nns-vote-view">
+
+                        <!-- title container -->
+                        <div class="d-flex align-items-center">
+                            <!-- page title -->
+                            <h1 class="taco-title mb-4 mt-4 px-3">
+                                <span class="taco-title__icon">🗳️</span>
+                                <span class="taco-title__title">NNS Proposal Voting</span>
+                            </h1>
                         </div>
-                    </div>
-                </div>
 
-                <!-- Voting Interface -->
-                <div v-if="isLoggedIn && !daoAlreadyVoted" class="nns-vote-view__voting-section">
-                    <div class="nns-vote-view__proposal-header">
-                        <h2>
-                            <i class="fa-light fa-ballot"></i>
-                            Cast Your Vote
-                        </h2>
-                    </div>
-
-                    <div class="voting-interface-card">
-                        <div class="voting-interface-card__content">
-                            
-                            <!-- neuron selection -->
-                            <div class="mb-4">
-                                <h5>Select Neurons to Vote With</h5>
-                                <div v-if="userNeurons.length > 0" class="neuron-selection">
-                                    <div v-for="neuron in userNeurons" :key="uint8ArrayToHex(neuron.id.id)" 
-                                        class="neuron-item" 
-                                        :class="{ 'neuron-item--selected': isNeuronSelected(neuron.id.id), 'neuron-item--voted': hasVoted(neuron.id.id) }">
-                                        
-                                        <div class="form-check">
-                                            <input 
-                                                class="form-check-input" 
-                                                type="checkbox" 
-                                                :id="'neuron-' + uint8ArrayToHex(neuron.id.id)"
-                                                :value="neuron.id.id"
-                                                v-model="selectedNeurons"
-                                                :disabled="hasVoted(neuron.id.id) || votingInProgress">
-                                            <label class="form-check-label" :for="'neuron-' + uint8ArrayToHex(neuron.id.id)">
-                                                <div class="neuron-info">
-                                                    <div class="neuron-name">
-                                                        {{ getNeuronDisplayName(tacoSnsRootCanisterId(), neuron.id.id) }}
-                                                    </div>
-                                                    <div class="neuron-details">
-                                                        <span class="neuron-vp">{{ formatTokenAmount(BigInt(neuron.votingPower || 0), 8) }} VP</span>
-                                                        <span v-if="hasVoted(neuron.id.id)" class="badge bg-success ms-2">Already Voted</span>
-                                                    </div>
-                                                </div>
-                                            </label>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div v-else class="text-center py-3">
-                                    <p class="text-muted">No TACO neurons found. You need TACO neurons to vote.</p>
-                                    <router-link to="/wallet" class="btn btn-outline-primary">
-                                        <i class="fa-light fa-wallet"></i> Go to Wallet
-                                    </router-link>
-                                </div>
+                        <!-- top bar -->
+                        <div class="nns-vote-view__top-bar gap-2 mb-3 shadow">
+                            <!-- left-->
+                            <div class="d-flex align-items-center">
+                                <!-- if logged out, log in title -->
+                                <h2 v-if="!userLoggedIn" class="nns-vote-view__top-bar__title py-2">Log in to Vote on NNS Proposals</h2>                
+                                <!-- if logged in, welcome title -->
+                                <h2 v-if="userLoggedIn" class="nns-vote-view__top-bar__title py-2">
+                                    <span class="whitespace-nowrap">Welcome, …{{ truncatedPrincipal }}&nbsp;</span>
+                                    <span class="nns-vote-view__top-bar__vote-power text-nowrap">({{ votePower }} VP)</span>
+                                </h2>               
                             </div>
-
-                            <!-- vote decision -->
-                            <div class="mb-4" v-if="selectedNeurons.length > 0">
-                                <h5>Your Decision</h5>
-                                <div class="btn-group w-100" role="group">
-                                    <input type="radio" class="btn-check" id="vote-adopt" v-model="voteDecision" value="Adopt" :disabled="votingInProgress">
-                                    <label class="btn btn-outline-success" for="vote-adopt">
-                                        <i class="fa-light fa-thumbs-up"></i> Adopt
-                                    </label>
-                                    <input type="radio" class="btn-check" id="vote-reject" v-model="voteDecision" value="Reject" :disabled="votingInProgress">
-                                    <label class="btn btn-outline-danger" for="vote-reject">
-                                        <i class="fa-light fa-thumbs-down"></i> Reject
-                                    </label>
-                                </div>
-                            </div>
-
-                            <!-- vote summary -->
-                            <div v-if="selectedNeurons.length > 0 && voteDecision" class="vote-summary mb-4">
-                                <div class="alert alert-info">
-                                    <h6><i class="fa-light fa-info-circle"></i> Vote Summary</h6>
-                                    <p class="mb-2">
-                                        <strong>Decision:</strong> {{ voteDecision }} the NNS proposal<br>
-                                        <strong>Neurons:</strong> {{ selectedNeurons.length }} selected<br>
-                                        <strong>Total Voting Power:</strong> {{ formatTokenAmount(totalSelectedVotingPower, 8) }} VP
-                                    </p>
-                                    <small class="text-muted">
-                                        This vote will be recorded on the TACO DAO backend and counted towards the collective decision.
-                                    </small>
-                                </div>
-                            </div>
-
-                            <!-- submit button -->
-                            <div class="text-center">
-                                <button 
-                                    @click="submitVote" 
-                                    class="btn btn-primary btn-lg"
-                                    :disabled="!canSubmitVote || votingInProgress">
-                                    <i class="fa-light fa-paper-plane" :class="{ 'fa-spin': votingInProgress }"></i>
-                                    {{ votingInProgress ? 'Submitting Vote...' : 'Submit Vote' }}
+                            <!-- right -->
+                            <div class="d-flex gap-2 flex-wrap ms-auto">
+                                <!-- if logged out, login button -->
+                                <button v-if="!userLoggedIn" class="btn iid-login m-2 me-2" @click="iidLogIn">
+                                    <!-- dfinity logo -->
+                                    <DfinityLogo />
+                                    <!-- login text -->
+                                    <span class="taco-text-white">Login</span>
+                                </button>
+                                <!-- if logged in, refresh button -->
+                                <button v-if="userLoggedIn" 
+                                    class="btn taco-nav-btn taco-nav-btn--active m-2" 
+                                    @click="refreshData"
+                                    :disabled="componentLoading">
+                                    <span class="taco-text-black">
+                                        {{ componentLoading ? 'Refreshing...' : 'Refresh Data' }}
+                                    </span>
                                 </button>
                             </div>
                         </div>
+
+                        <!-- voting disabled notice -->
+                        <div v-if="daoAlreadyVoted" class="taco-container taco-container--l1 mb-4 p-3">
+                            <div class="text-center">
+                                <h5 class="taco-text-black-to-white mb-2">⚠️ Voting Closed</h5>
+                                <p class="taco-text-black-to-white mb-0">The DAO has already submitted its collective vote for this NNS proposal.</p>
+                            </div>
+                        </div>
+
+                        <!-- proposals container -->
+                        <div class="nns-vote-view__proposals gap-4">
+
+                            <!-- NNS Proposal Section -->
+                            <div class="taco-container taco-container--l1 mb-4">
+                                <div class="d-flex justify-content-between align-items-center mb-3 p-3 pb-0">
+                                    <TacoTitle level="h3" emoji="🌐" title="Original NNS Proposal" />
+                                    <a :href="nnsProposalLink" target="_blank" class="btn taco-btn taco-btn--green btn-sm">
+                                        View on NNS →
+                                    </a>
+                                </div>
+
+                                <!-- NNS Proposal Details -->
+                                <div v-if="nnsProposal" class="p-3">
+                                    <!-- title -->
+                                    <div class="mb-3">
+                                        <h4 class="taco-text-black-to-white mb-2">
+                                            #{{ nnsProposalId }} {{ nnsProposal.title || 'NNS Proposal' }}
+                                        </h4>
+                                    </div>
+
+                                    <!-- NNS voting progress -->
+                                    <div v-if="nnsProposal.latest_tally" class="mb-3">
+                                        <!-- Vote percentages -->
+                                        <div class="d-flex justify-content-between mb-2">
+                                            <span class="text-success fw-bold">
+                                                Yes {{ (Number(nnsProposal.latest_tally.yes) / Number(nnsProposal.latest_tally.total) * 100).toFixed(2) }}%
+                                            </span>
+                                            <span class="taco-text-black-to-white fw-bold">
+                                                Total: {{ Number((Number(nnsProposal.latest_tally.total) / 100000000).toFixed(0)).toLocaleString() }} VP
+                                            </span>
+                                            <span class="text-danger fw-bold">
+                                                No {{ (Number(nnsProposal.latest_tally.no) / Number(nnsProposal.latest_tally.total) * 100).toFixed(2) }}%
+                                            </span>
+                                        </div>
+                                        <!-- Progress bar -->
+                                        <div class="progress mb-2" style="height: 20px;">
+                                            <div class="progress-bar bg-success" 
+                                                :style="{ width: (Number(nnsProposal.latest_tally.yes) / Number(nnsProposal.latest_tally.total) * 100).toFixed(2) + '%' }"></div>
+                                            <div class="progress-bar bg-danger" 
+                                                :style="{ width: (Number(nnsProposal.latest_tally.no) / Number(nnsProposal.latest_tally.total) * 100).toFixed(2) + '%' }"></div>
+                                        </div>
+                                    </div>
+
+                                    <!-- NNS proposal details -->
+                                    <div class="mb-3">
+                                        <div class="row">
+                                            <div class="col-md-6 mb-2">
+                                                <small class="text-muted">TOPIC</small>
+                                                <div class="taco-text-black-to-white">{{ getNNSTopicName(nnsProposal.topic) }}</div>
+                                            </div>
+                                        </div>
+                                        <div class="mb-2">
+                                            <small class="text-muted">DESCRIPTION</small>
+                                            <div class="taco-text-black-to-white" v-html="nnsProposal.summary || 'No description available'"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- SNS Proposal Section -->
+                            <div class="taco-container taco-container--l1 mb-4">
+                                <div class="d-flex justify-content-between align-items-center mb-3 p-3 pb-0">
+                                    <TacoTitle level="h3" emoji="💬" title="TACO DAO Discussion" />
+                                    <router-link :to="`/chat/forum/${snsProposalId}`" class="btn taco-btn taco-btn--green btn-sm">
+                                        View Discussion →
+                                    </router-link>
+                                </div>
+
+                                <!-- SNS Proposal Details -->
+                                <div v-if="snsProposal" class="p-3">
+                                    <!-- title -->
+                                    <div class="mb-3">
+                                        <h4 class="taco-text-black-to-white mb-2">
+                                            #{{ snsProposal.id }} {{ snsProposal.title }}
+                                        </h4>
+                                    </div>
+
+                                    <!-- SNS voting progress -->
+                                    <div class="mb-3">
+                                        <!-- Vote percentages -->
+                                        <div class="d-flex justify-content-between mb-2">
+                                            <span class="text-success fw-bold">
+                                                Yes {{ snsProposal.totalVotes > 0 ? (Number(snsProposal.yesVotes) / Number(snsProposal.totalVotes) * 100).toFixed(2) : 0 }}%
+                                            </span>
+                                            <span class="taco-text-black-to-white fw-bold">
+                                                Total: {{ Number((Number(snsProposal.totalVotes) / 100000000).toFixed(0)).toLocaleString() }} VP
+                                            </span>
+                                            <span class="text-danger fw-bold">
+                                                No {{ snsProposal.totalVotes > 0 ? (Number(snsProposal.noVotes) / Number(snsProposal.totalVotes) * 100).toFixed(2) : 0 }}%
+                                            </span>
+                                        </div>
+                                        <!-- Progress bar -->
+                                        <div class="progress mb-2" style="height: 20px;">
+                                            <div class="progress-bar bg-success" 
+                                                :style="{ width: snsProposal.totalVotes > 0 ? (Number(snsProposal.yesVotes) / Number(snsProposal.totalVotes) * 100).toFixed(2) + '%' : '0%' }"></div>
+                                            <div class="progress-bar bg-danger" 
+                                                :style="{ width: snsProposal.totalVotes > 0 ? (Number(snsProposal.noVotes) / Number(snsProposal.totalVotes) * 100).toFixed(2) + '%' : '0%' }"></div>
+                                        </div>
+                                    </div>
+
+                                    <!-- SNS proposal details -->
+                                    <div class="mb-3">
+                                        <div class="row">
+                                            <div class="col-md-6 mb-2">
+                                                <small class="text-muted">STATUS</small>
+                                                <div class="taco-text-black-to-white">{{ snsProposal.status }}</div>
+                                            </div>
+                                        </div>
+                                        <div class="mb-2">
+                                            <small class="text-muted">DESCRIPTION</small>
+                                            <div class="taco-text-black-to-white" v-html="snsProposal.summary"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- DAO Vote Tally Section -->
+                            <div class="taco-container taco-container--l1 mb-4">
+                                <div class="d-flex justify-content-between align-items-center mb-3 p-3 pb-0">
+                                    <TacoTitle level="h3" emoji="📊" title="TACO DAO Votes" />
+                                    <button @click="refreshDAOVotes" class="btn taco-btn taco-btn--green btn-sm" :disabled="componentLoading">
+                                        {{ componentLoading ? 'Refreshing...' : 'Refresh' }}
+                                    </button>
+                                </div>
+
+                                <!-- DAO Vote Tally -->
+                                <div v-if="daoVoteTally" class="p-3">
+                                    <div class="mb-3">
+                                        <!-- Vote percentages -->
+                                        <div class="d-flex justify-content-between mb-2">
+                                            <span class="text-success fw-bold">
+                                                Adopt {{ daoVoteTally.total_voting_power > 0 ? (Number(daoVoteTally.adopt_voting_power) / Number(daoVoteTally.total_voting_power) * 100).toFixed(2) : 0 }}%
+                                            </span>
+                                            <span class="taco-text-black-to-white fw-bold">
+                                                Total: {{ Number((Number(daoVoteTally.total_voting_power) / 100000000).toFixed(0)).toLocaleString() }} VP
+                                            </span>
+                                            <span class="text-danger fw-bold">
+                                                Reject {{ daoVoteTally.total_voting_power > 0 ? (Number(daoVoteTally.reject_voting_power) / Number(daoVoteTally.total_voting_power) * 100).toFixed(2) : 0 }}%
+                                            </span>
+                                        </div>
+                                        <!-- Progress bar -->
+                                        <div class="progress mb-3" style="height: 20px;">
+                                            <div class="progress-bar bg-success" 
+                                                :style="{ width: daoVoteTally.total_voting_power > 0 ? (Number(daoVoteTally.adopt_voting_power) / Number(daoVoteTally.total_voting_power) * 100).toFixed(2) + '%' : '0%' }"></div>
+                                            <div class="progress-bar bg-danger" 
+                                                :style="{ width: daoVoteTally.total_voting_power > 0 ? (Number(daoVoteTally.reject_voting_power) / Number(daoVoteTally.total_voting_power) * 100).toFixed(2) + '%' : '0%' }"></div>
+                                        </div>
+                                    </div>
+
+                                    <!-- DAO vote stats -->
+                                    <div class="row text-center">
+                                        <div class="col-md-4 mb-2">
+                                            <small class="text-muted">ADOPT VOTES</small>
+                                            <div class="taco-text-black-to-white fw-bold">{{ daoVoteTally.adopt_votes }} neurons</div>
+                                        </div>
+                                        <div class="col-md-4 mb-2">
+                                            <small class="text-muted">REJECT VOTES</small>
+                                            <div class="taco-text-black-to-white fw-bold">{{ daoVoteTally.reject_votes }} neurons</div>
+                                        </div>
+                                        <div class="col-md-4 mb-2">
+                                            <small class="text-muted">TOTAL PARTICIPANTS</small>
+                                            <div class="taco-text-black-to-white fw-bold">{{ daoVoteTally.total_votes }} neurons</div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- No votes yet -->
+                                <div v-else class="p-3 text-center">
+                                    <div class="py-4">
+                                        <div class="mb-3" style="font-size: 3rem;">🗳️</div>
+                                        <p class="taco-text-black-to-white">No DAO votes cast yet. Be the first to vote!</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Voting Interface -->
+                            <div v-if="userLoggedIn && !daoAlreadyVoted" class="taco-container taco-container--l1 mb-4">
+                                <div class="p-3">
+                                    <TacoTitle level="h3" emoji="🗳️" title="Cast Your Vote" class="mb-4" />
+
+                                    <!-- Simple voting interface for now -->
+                                    <div v-if="userNeurons.length > 0" class="mb-4">
+                                        <h5 class="taco-text-black-to-white mb-3">Select Decision</h5>
+                                        <div class="d-flex gap-3 mb-3">
+                                            <button 
+                                                @click="voteDecision = 'Adopt'"
+                                                class="btn taco-btn flex-fill"
+                                                :class="voteDecision === 'Adopt' ? 'taco-btn--green' : 'taco-btn--outline'">
+                                                👍 Adopt
+                                            </button>
+                                            <button 
+                                                @click="voteDecision = 'Reject'"
+                                                class="btn taco-btn flex-fill"
+                                                :class="voteDecision === 'Reject' ? 'taco-btn--red' : 'taco-btn--outline'">
+                                                👎 Reject
+                                            </button>
+                                        </div>
+
+                                        <div v-if="voteDecision" class="text-center">
+                                            <button 
+                                                @click="submitVoteSimple" 
+                                                class="btn taco-btn taco-btn--green"
+                                                :disabled="votingInProgress">
+                                                {{ votingInProgress ? 'Submitting...' : `Submit ${voteDecision} Vote` }}
+                                            </button>
+                                            <div class="mt-2">
+                                                <small class="text-muted">
+                                                    Will vote with all your TACO neurons ({{ userNeurons.length }} neurons)
+                                                </small>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div v-else class="text-center py-4">
+                                        <div class="mb-3" style="font-size: 2rem;">💰</div>
+                                        <p class="taco-text-black-to-white mb-3">No TACO neurons found.</p>
+                                        <router-link to="/wallet" class="btn taco-btn taco-btn--green">
+                                            Go to Wallet →
+                                        </router-link>
+                                    </div>
+                                </div>
+                            </div>
+
+                        </div>
                     </div>
+
                 </div>
             </div>
+
         </div>
     </div>
 </template>
@@ -398,12 +319,19 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { storeToRefs } from 'pinia'
 import { useTacoStore } from '../stores/taco.store'
+import HeaderBar from '../components/HeaderBar.vue'
+import TacoTitle from '../components/misc/TacoTitle.vue'
+import DfinityLogo from '../assets/images/dfinityLogo.vue'
 
 // Store and router
 const tacoStore = useTacoStore()
 const route = useRoute()
 const router = useRouter()
+
+// Store refs
+const { userLoggedIn, truncatedPrincipal } = storeToRefs(tacoStore)
 
 // Component state
 const componentLoading = ref(true)
@@ -421,8 +349,8 @@ const votingInProgress = ref(false)
 const neuronVoteStatus = ref<Map<string, any>>(new Map())
 
 // Computed properties
-const isLoggedIn = computed(() => tacoStore.isLoggedIn)
 const astronautLoaderUrl = computed(() => tacoStore.astronautLoaderUrl)
+const votePower = computed(() => tacoStore.votePower || '0')
 
 const nnsProposalLink = computed(() => {
     return tacoStore.formatNNSProposalLink(nnsProposalId.value)
@@ -550,15 +478,18 @@ const loadUserNeurons = async () => {
     }
 }
 
-const submitVote = async () => {
-    if (!canSubmitVote.value) return
+const submitVoteSimple = async () => {
+    if (!voteDecision.value || votingInProgress.value) return
 
     try {
         votingInProgress.value = true
 
+        // Get all user neuron IDs
+        const allNeuronIds = userNeurons.value.map(n => n.id.id)
+
         const result = await tacoStore.submitDAOVotes(
             snsProposalId.value,
-            selectedNeurons.value,
+            allNeuronIds,
             voteDecision.value
         )
 
@@ -568,12 +499,8 @@ const submitVote = async () => {
         )
 
         // Reset form and refresh data
-        selectedNeurons.value = []
         voteDecision.value = 'Adopt'
-        await Promise.all([
-            refreshDAOVotes(),
-            loadUserNeurons()
-        ])
+        await refreshData()
 
     } catch (err: any) {
         console.error('Error submitting vote:', err)
@@ -583,8 +510,15 @@ const submitVote = async () => {
     }
 }
 
+const refreshData = async () => {
+    await Promise.all([
+        refreshDAOVotes(),
+        loadUserNeurons()
+    ])
+}
+
 // Watch for login status changes
-watch(isLoggedIn, async (newValue) => {
+watch(userLoggedIn, async (newValue) => {
     if (newValue) {
         await loadUserNeurons()
     } else {
@@ -605,18 +539,42 @@ const {
     uint8ArrayToHex, 
     formatTokenAmount, 
     getNeuronDisplayName,
-    tacoSnsRootCanisterId 
+    tacoSnsRootCanisterId,
+    checkIfLoggedIn
 } = tacoStore
 </script>
 
 <style scoped>
-.nns-vote-view {
-    min-height: 100vh;
-    padding: 2rem;
-    background: var(--bs-body-bg);
+/* Use TACO's existing styles - most styling comes from taco-container classes */
+
+.nns-vote-view__top-bar {
+    background: var(--dark-bg);
+    border-radius: 12px;
+    padding: 1rem 1.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
 }
 
-.nns-vote-view__loading-curtain {
+.nns-vote-view__top-bar__title {
+    color: var(--white);
+    margin: 0;
+    font-size: 1.2rem;
+    font-weight: 600;
+}
+
+.nns-vote-view__top-bar__vote-power {
+    color: var(--yellow);
+    font-weight: 500;
+}
+
+.loading-img {
+    width: 100px;
+    height: 100px;
+}
+
+.login-curtain {
     position: fixed;
     top: 0;
     left: 0;
@@ -629,239 +587,11 @@ const {
     z-index: 9999;
 }
 
-.loading-img {
-    width: 100px;
-    height: 100px;
-}
-
-.nns-vote-view__header {
-    text-align: center;
-    margin-bottom: 2rem;
-}
-
-.nns-vote-view__title {
-    color: var(--bs-primary);
-    margin-bottom: 0.5rem;
-}
-
-.nns-vote-view__subtitle {
-    color: var(--bs-secondary);
-    font-size: 1.1rem;
-}
-
-.nns-vote-view__proposals {
-    max-width: 1200px;
-    margin: 0 auto;
-    display: flex;
-    flex-direction: column;
-    gap: 2rem;
-}
-
-.nns-vote-view__proposal-section {
-    background: var(--bs-card-bg);
-    border-radius: 12px;
-    padding: 1.5rem;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-}
-
-.nns-vote-view__proposal-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 1.5rem;
-    padding-bottom: 1rem;
-    border-bottom: 1px solid var(--bs-border-color);
-}
-
-.nns-vote-view__proposal-header h2 {
-    margin: 0;
-    color: var(--bs-heading-color);
-}
-
-.proposal-details-card,
-.voting-interface-card {
-    background: var(--bs-card-bg);
-    border: 1px solid var(--bs-border-color);
-    border-radius: 8px;
-    overflow: hidden;
-}
-
-.proposal-details-card__content,
-.voting-interface-card__content {
-    padding: 1.5rem;
-}
-
-.proposal-details-card__title {
-    font-size: 1.25rem;
-    font-weight: 600;
-    margin-bottom: 1.5rem;
-    color: var(--bs-heading-color);
-}
-
-.proposal-details-card__title-number {
-    color: var(--bs-primary);
-}
-
-.proposal-details-card__progress-container {
-    margin-bottom: 1.5rem;
-}
-
-.proposal-details-card__progress-container__top {
-    display: flex;
-    justify-content: space-between;
-    margin-bottom: 0.5rem;
-}
-
-.proposal-details-card__progress-container__yes-details,
-.proposal-details-card__progress-container__no-details,
-.proposal-details-card__progress-container__misc-details {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-}
-
-.proposal-details-card__progress-container__yes-percentage {
-    color: var(--bs-success);
-    font-weight: 600;
-}
-
-.proposal-details-card__progress-container__no-percentage {
-    color: var(--bs-danger);
-    font-weight: 600;
-}
-
-.proposal-details-card__progress-container__total-votes {
-    color: var(--bs-secondary);
-    font-weight: 600;
-}
-
-.proposal-details-card__progress-container__yes-count,
-.proposal-details-card__progress-container__no-count,
-.proposal-details-card__progress-container__eligable-count {
-    font-size: 0.9rem;
-    color: var(--bs-secondary);
-}
-
-.proposal-details-card__progress-container__progress {
-    height: 20px;
-    background-color: var(--bs-gray-200);
-    border-radius: 10px;
-    overflow: hidden;
-}
-
-.progress-bar--yes {
-    background-color: var(--bs-success);
-}
-
-.progress-bar--no {
-    background-color: var(--bs-danger);
-}
-
-.proposal-details-card__key-value-pairs {
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-}
-
-.proposal-details-card__key-value-pair {
-    display: flex;
-    flex-direction: column;
-    gap: 0.25rem;
-}
-
-.proposal-details-card__key {
-    font-weight: 600;
-    color: var(--bs-secondary);
-    font-size: 0.9rem;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-}
-
-.proposal-details-card__value {
-    color: var(--bs-body-color);
-}
-
-.neuron-selection {
-    display: flex;
-    flex-direction: column;
-    gap: 0.75rem;
-    max-height: 400px;
-    overflow-y: auto;
-    border: 1px solid var(--bs-border-color);
-    border-radius: 8px;
-    padding: 1rem;
-}
-
-.neuron-item {
-    padding: 0.75rem;
-    border: 1px solid var(--bs-border-color);
-    border-radius: 6px;
-    transition: all 0.2s ease;
-}
-
-.neuron-item:hover {
-    border-color: var(--bs-primary);
-    background-color: var(--bs-primary-bg-subtle);
-}
-
-.neuron-item--selected {
-    border-color: var(--bs-primary);
-    background-color: var(--bs-primary-bg-subtle);
-}
-
-.neuron-item--voted {
-    opacity: 0.6;
-    background-color: var(--bs-success-bg-subtle);
-    border-color: var(--bs-success);
-}
-
-.neuron-info {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-
-.neuron-name {
-    font-weight: 600;
-    color: var(--bs-heading-color);
-}
-
-.neuron-details {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-}
-
-.neuron-vp {
-    color: var(--bs-secondary);
-    font-size: 0.9rem;
-}
-
-.vote-summary {
-    background: var(--bs-info-bg-subtle);
-    border: 1px solid var(--bs-info);
-    border-radius: 8px;
-    padding: 1rem;
-}
-
 @media (max-width: 768px) {
-    .nns-vote-view {
-        padding: 1rem;
-    }
-    
-    .nns-vote-view__proposal-header {
+    .nns-vote-view__top-bar {
         flex-direction: column;
         gap: 1rem;
-        align-items: flex-start;
+        text-align: center;
     }
-    
-    .proposal-details-card__progress-container__top {
-        flex-direction: column;
-        gap: 1rem;
-    }
-}
-
-.wordwrap-anywhere {
-    word-wrap: anywhere;
 }
 </style>
