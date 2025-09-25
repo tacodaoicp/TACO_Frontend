@@ -441,7 +441,7 @@ const loadProposalData = async () => {
         await refreshDAOVotes()
 
         // Load user neurons if logged in
-        if (isLoggedIn.value) {
+        if (userLoggedIn.value) {
             await loadUserNeurons()
         }
 
