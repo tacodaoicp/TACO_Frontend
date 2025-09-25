@@ -350,7 +350,28 @@ const neuronVoteStatus = ref<Map<string, any>>(new Map())
 
 // Computed properties
 const astronautLoaderUrl = computed(() => tacoStore.astronautLoaderUrl)
-const votePower = computed(() => tacoStore.votePower || '0')
+
+// Calculate total voting power from all user neurons
+const votePower = computed(() => {
+    if (!userNeurons.value || userNeurons.value.length === 0) {
+        return '0'
+    }
+    
+    const totalVP = userNeurons.value.reduce((sum, neuron) => {
+        // Handle different neuron formats
+        let votingPower = 0n
+        if (neuron.voting_power !== undefined) {
+            votingPower = BigInt(neuron.voting_power)
+        } else if (neuron.cached_neuron_stake_e8s !== undefined) {
+            votingPower = BigInt(neuron.cached_neuron_stake_e8s)
+        }
+        return sum + votingPower
+    }, 0n)
+    
+    // Format as human-readable number (divide by 1e8 and format)
+    const formattedVP = Number(totalVP) / 100000000
+    return formattedVP.toLocaleString('en-US', { maximumFractionDigits: 0 })
+})
 
 const nnsProposalLink = computed(() => {
     return tacoStore.formatNNSProposalLink(nnsProposalId.value)
@@ -510,11 +531,17 @@ const submitVoteSimple = async () => {
             return null;
         }).filter(id => id !== null)
 
+        console.log('User neurons:', userNeurons.value) // Debug
+        console.log('Extracted neuron IDs:', allNeuronIds) // Debug
+        console.log('Number of valid neuron IDs:', allNeuronIds.length) // Debug
+
         const result = await tacoStore.submitDAOVotes(
             snsProposalId.value,
             allNeuronIds,
             voteDecision.value
         )
+
+        console.log('Vote submission result:', result) // Debug
 
         // Show success message
         tacoStore.showSuccess(
