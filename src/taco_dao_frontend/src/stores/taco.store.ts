@@ -8124,5 +8124,6 @@ export const useTacoStore = defineStore('taco', () => {
         formatSNSProposalForDisplay,
         getProposalStatus,
         getProposalTopic,
+        uint8ArrayToHex,
     }
 })
