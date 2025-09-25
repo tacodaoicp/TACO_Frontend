@@ -285,12 +285,15 @@
                                             <button 
                                                 @click="submitVoteSimple" 
                                                 class="btn taco-btn taco-btn--green"
-                                                :disabled="votingInProgress">
+                                                :disabled="votingInProgress || availableNeuronsToVote === 0">
                                                 {{ votingInProgress ? 'Submitting...' : `Submit ${voteDecision} Vote` }}
                                             </button>
                                             <div class="mt-2">
-                                                <small class="text-muted">
-                                                    Will vote with all your TACO neurons ({{ userNeurons.length }} neurons)
+                                                <small class="text-muted" v-if="availableNeuronsToVote > 0">
+                                                    Will vote with {{ availableNeuronsToVote }} available neurons ({{ userNeurons.length - availableNeuronsToVote }} already voted)
+                                                </small>
+                                                <small class="text-warning" v-else>
+                                                    All {{ userNeurons.length }} neurons have already voted on this proposal
                                                 </small>
                                             </div>
                                         </div>
@@ -375,6 +378,33 @@ const votePower = computed(() => {
 
 const nnsProposalLink = computed(() => {
     return tacoStore.formatNNSProposalLink(nnsProposalId.value)
+})
+
+// Check how many neurons haven't voted yet
+const availableNeuronsToVote = computed(() => {
+    if (!userNeurons.value || userNeurons.value.length === 0) {
+        return 0
+    }
+    
+    let availableCount = 0
+    for (const neuron of userNeurons.value) {
+        // Get neuron ID for checking vote status
+        let neuronIdBlob = null
+        if (neuron.id instanceof Uint8Array) {
+            neuronIdBlob = neuron.id
+        } else if (neuron.id && Array.isArray(neuron.id) && neuron.id.length > 0) {
+            neuronIdBlob = neuron.id[0].id
+        }
+        
+        if (neuronIdBlob) {
+            const key = tacoStore.uint8ArrayToHex(neuronIdBlob)
+            if (!neuronVoteStatus.value.has(key)) {
+                availableCount++
+            }
+        }
+    }
+    
+    return availableCount
 })
 
 const totalSelectedVotingPower = computed(() => {
@@ -476,8 +506,19 @@ const loadProposalData = async () => {
 
 const refreshDAOVotes = async () => {
     try {
-        daoVoteTally.value = await tacoStore.getDAOVoteTally(snsProposalId.value)
-        console.log('DAO vote tally:', daoVoteTally.value) // Debug log
+        const rawTally = await tacoStore.getDAOVoteTally(snsProposalId.value)
+        console.log('Raw DAO vote tally:', rawTally) // Debug log
+        
+        // Handle array format from backend (Candid optional returns as array)
+        if (Array.isArray(rawTally) && rawTally.length > 0) {
+            daoVoteTally.value = rawTally[0] // Extract from array
+        } else if (rawTally && typeof rawTally === 'object' && !Array.isArray(rawTally)) {
+            daoVoteTally.value = rawTally // Direct object
+        } else {
+            daoVoteTally.value = null // No votes
+        }
+        
+        console.log('Processed DAO vote tally:', daoVoteTally.value) // Debug log
     } catch (err) {
         console.error('Error refreshing DAO votes:', err)
     }
@@ -543,10 +584,26 @@ const submitVoteSimple = async () => {
 
         console.log('Vote submission result:', result) // Debug
 
-        // Show success message
-        tacoStore.showSuccess(
-            `Vote submitted successfully! ${result.successful_votes} neurons voted with ${tacoStore.formatTokenAmount(BigInt(result.total_voting_power), 8)} VP.`
-        )
+        // Handle different vote submission outcomes
+        if (result.successful_votes > 0n) {
+            // Some neurons voted successfully
+            tacoStore.showSuccess(
+                `Vote submitted successfully! ${result.successful_votes} neurons voted with ${tacoStore.formatTokenAmount(BigInt(result.total_voting_power), 8)} VP.`
+            )
+        } else if (result.skipped_already_voted > 0n && result.skipped_no_access === 0n) {
+            // All neurons already voted
+            tacoStore.showError(
+                `All ${result.skipped_already_voted} of your neurons have already voted on this proposal.`
+            )
+        } else if (result.skipped_no_access > 0n) {
+            // No access to neurons
+            tacoStore.showError(
+                `Vote failed: No access to ${result.skipped_no_access} neurons. ${result.skipped_already_voted > 0n ? `${result.skipped_already_voted} neurons already voted.` : ''}`
+            )
+        } else {
+            // Other cases
+            tacoStore.showError('Vote submission failed for unknown reasons.')
+        }
 
         // Reset form and refresh data
         voteDecision.value = 'Adopt'
