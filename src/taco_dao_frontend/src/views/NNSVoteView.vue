@@ -467,10 +467,22 @@ const loadUserNeurons = async () => {
         
         // Check vote status for each neuron
         for (const neuron of userNeurons.value) {
-            const voteStatus = await tacoStore.hasNeuronVoted(snsProposalId.value, neuron.id.id)
-            if (voteStatus) {
-                const key = tacoStore.uint8ArrayToHex(neuron.id.id)
-                neuronVoteStatus.value.set(key, voteStatus)
+            // Handle different neuron ID formats
+            let neuronIdBlob = null;
+            if (neuron.id instanceof Uint8Array) {
+                // Categorized neuron format
+                neuronIdBlob = neuron.id;
+            } else if (neuron.id && Array.isArray(neuron.id) && neuron.id.length > 0) {
+                // Raw neuron format from SNS governance
+                neuronIdBlob = neuron.id[0].id;
+            }
+            
+            if (neuronIdBlob) {
+                const voteStatus = await tacoStore.hasNeuronVoted(snsProposalId.value, neuronIdBlob)
+                if (voteStatus) {
+                    const key = tacoStore.uint8ArrayToHex(neuronIdBlob)
+                    neuronVoteStatus.value.set(key, voteStatus)
+                }
             }
         }
     } catch (err) {
@@ -485,7 +497,17 @@ const submitVoteSimple = async () => {
         votingInProgress.value = true
 
         // Get all user neuron IDs
-        const allNeuronIds = userNeurons.value.map(n => n.id.id)
+        const allNeuronIds = userNeurons.value.map(neuron => {
+            // Handle different neuron ID formats
+            if (neuron.id instanceof Uint8Array) {
+                // Categorized neuron format
+                return neuron.id;
+            } else if (neuron.id && Array.isArray(neuron.id) && neuron.id.length > 0) {
+                // Raw neuron format from SNS governance
+                return neuron.id[0].id;
+            }
+            return null;
+        }).filter(id => id !== null)
 
         const result = await tacoStore.submitDAOVotes(
             snsProposalId.value,
