@@ -7733,7 +7733,36 @@ export const useTacoStore = defineStore('taco', () => {
             });
 
             const result = await (nnsGov as any).get_proposal_info(nnsProposalId);
-            return result;
+            
+            // get_proposal_info returns opt ProposalInfo, so we need to handle the optional
+            if (!result || (Array.isArray(result) && result.length === 0)) {
+                throw new Error(`NNS proposal ${nnsProposalId} not found`);
+            }
+            
+            // Handle both array format (from optional) and direct object format
+            const proposalInfo = Array.isArray(result) ? result[0] : result;
+            
+            if (!proposalInfo) {
+                throw new Error(`NNS proposal ${nnsProposalId} not found`);
+            }
+            
+            console.log('Raw NNS proposalInfo:', proposalInfo); // Debug log
+            
+            // Format the proposal data for display
+            return {
+                id: proposalInfo.id?.[0]?.id || nnsProposalId,
+                title: proposalInfo.proposal?.[0]?.title?.[0] || `NNS Proposal ${nnsProposalId}`,
+                summary: proposalInfo.proposal?.[0]?.summary || 'No summary available',
+                url: proposalInfo.proposal?.[0]?.url || '',
+                topic: proposalInfo.topic,
+                status: proposalInfo.status,
+                latest_tally: proposalInfo.latest_tally?.[0] || null,
+                proposal_timestamp_seconds: proposalInfo.proposal_timestamp_seconds,
+                deadline_timestamp_seconds: proposalInfo.deadline_timestamp_seconds?.[0] || null,
+                decided_timestamp_seconds: proposalInfo.decided_timestamp_seconds,
+                executed_timestamp_seconds: proposalInfo.executed_timestamp_seconds,
+                proposer: proposalInfo.proposer?.[0] || null,
+            };
         } catch (error) {
             console.error('Error getting NNS proposal:', error);
             throw error;
@@ -7745,7 +7774,10 @@ export const useTacoStore = defineStore('taco', () => {
         try {
             const actor = await createNeuronSnapshotActor();
             const result = await (actor as any).getSNSProposal(snsProposalId);
+            console.log('Raw SNS proposal result:', result); // Debug log
+            
             if ('ok' in result) {
+                console.log('SNS proposal data:', result.ok); // Debug log
                 return result.ok;
             } else {
                 throw new Error(result.err?.error_message || 'Failed to get SNS proposal');
