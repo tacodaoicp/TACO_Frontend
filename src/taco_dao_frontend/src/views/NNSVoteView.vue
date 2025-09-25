@@ -434,16 +434,8 @@ const loadProposalData = async () => {
             tacoStore.getSNSProposal(snsProposalId.value)
         ])
 
-        // Debug logging
-        console.log('Raw NNS data:', nnsData)
-        console.log('Raw SNS data:', snsData)
-
         nnsProposal.value = nnsData
         snsProposal.value = tacoStore.formatSNSProposalForDisplay(snsData)
-        
-        // Debug formatted data
-        console.log('Formatted NNS proposal:', nnsProposal.value)
-        console.log('Formatted SNS proposal:', snsProposal.value)
 
         // Load DAO vote tally
         await refreshDAOVotes()

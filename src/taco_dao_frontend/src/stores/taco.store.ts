@@ -7746,7 +7746,6 @@ export const useTacoStore = defineStore('taco', () => {
                 throw new Error(`NNS proposal ${nnsProposalId} not found`);
             }
             
-            console.log('Raw NNS proposalInfo:', proposalInfo); // Debug log
             
             // Format the proposal data for display
             return {
@@ -7774,10 +7773,7 @@ export const useTacoStore = defineStore('taco', () => {
         try {
             const actor = await createNeuronSnapshotActor();
             const result = await (actor as any).getSNSProposal(snsProposalId);
-            console.log('Raw SNS proposal result:', result); // Debug log
-            
             if ('ok' in result) {
-                console.log('SNS proposal data:', result.ok); // Debug log
                 return result.ok;
             } else {
                 throw new Error(result.err?.error_message || 'Failed to get SNS proposal');
@@ -7854,21 +7850,36 @@ export const useTacoStore = defineStore('taco', () => {
 
     // Format SNS proposal for display (similar to TACO proposals)
     const formatSNSProposalForDisplay = (proposal: any) => {
+        
+        // Extract data from SNS proposal structure (arrays for optional fields)
+        const proposalId = proposal.id?.[0]?.id || 0n;
+        const proposalData = proposal.proposal?.[0];
+        const latestTally = proposal.latest_tally?.[0];
+        const proposerData = proposal.proposer?.[0];
+        
+        // Use payload_text_rendering as the summary if available, otherwise proposal summary
+        let summary = 'No summary available';
+        if (proposal.payload_text_rendering?.[0]) {
+            summary = proposal.payload_text_rendering[0];
+        } else if (proposalData?.summary) {
+            summary = proposalData.summary;
+        }
+        
         return {
-            id: proposal.id?.id || 0n,
-            title: proposal.proposal?.title || 'Untitled Proposal',
-            summary: proposal.proposal?.summary || 'No summary available',
-            url: proposal.proposal?.url || '',
+            id: proposalId,
+            title: proposalData?.title || `SNS Proposal ${proposalId}`,
+            summary: summary,
+            url: proposalData?.url || '',
             status: getProposalStatus(proposal),
             createdAt: new Date(Number(proposal.proposal_creation_timestamp_seconds) * 1000),
             decidedAt: proposal.decided_timestamp_seconds > 0n ? 
                 new Date(Number(proposal.decided_timestamp_seconds) * 1000) : undefined,
             executedAt: proposal.executed_timestamp_seconds > 0n ? 
                 new Date(Number(proposal.executed_timestamp_seconds) * 1000) : undefined,
-            proposer: proposal.proposer?.id ? uint8ArrayToHex(proposal.proposer.id) : undefined,
-            yesVotes: proposal.latest_tally?.yes || 0n,
-            noVotes: proposal.latest_tally?.no || 0n,
-            totalVotes: proposal.latest_tally?.total || 0n,
+            proposer: proposerData?.id ? uint8ArrayToHex(proposerData.id) : undefined,
+            yesVotes: latestTally?.yes || 0n,
+            noVotes: latestTally?.no || 0n,
+            totalVotes: latestTally?.total || 0n,
             topic: getProposalTopic(proposal)
         };
     }
@@ -7879,8 +7890,9 @@ export const useTacoStore = defineStore('taco', () => {
         if (proposal.failed_timestamp_seconds > 0n) return 'Failed';
         if (proposal.decided_timestamp_seconds > 0n) {
             // Check if it was adopted or rejected based on votes
-            const yes = Number(proposal.latest_tally?.yes || 0n);
-            const no = Number(proposal.latest_tally?.no || 0n);
+            const latestTally = proposal.latest_tally?.[0];
+            const yes = Number(latestTally?.yes || 0n);
+            const no = Number(latestTally?.no || 0n);
             return yes > no ? 'Adopted' : 'Rejected';
         }
         return 'Open';
@@ -7889,8 +7901,9 @@ export const useTacoStore = defineStore('taco', () => {
     // Get proposal topic from SNS proposal data
     const getProposalTopic = (proposal: any) => {
         // Extract topic from the action if available
-        if (proposal.proposal?.action) {
-            const actionKeys = Object.keys(proposal.proposal.action);
+        const proposalData = proposal.proposal?.[0];
+        if (proposalData?.action) {
+            const actionKeys = Object.keys(proposalData.action);
             if (actionKeys.length > 0) {
                 return { [actionKeys[0]]: null };
             }
