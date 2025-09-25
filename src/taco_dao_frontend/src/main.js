@@ -34,6 +34,7 @@ import ProposalView from "./views/ProposalView.vue"
 import WalletView from "./views/WalletView.vue"
 import WalletViewDemo from "./views/WalletViewDemo.vue"
 import WizardView from "./views/WizardView.vue"
+import NNSVoteView from "./views/NNSVoteView.vue"
 import VueApexCharts from 'vue3-apexcharts'
 import VueClickAway from "vue3-click-away"
 import 'animate.css'
@@ -86,6 +87,7 @@ const routes = [
     { path: "/forum", name: "Forum", component: ForumView, meta: { robots: 'noindex' } },
     { path: "/forum/thread/:id", name: "Thread", component: ThreadView, meta: { robots: 'noindex' } },
     { path: "/names", name: "Names", component: NamesView, meta: { robots: 'noindex' } }, //remove once integrated
+    { path: "/nnsvote/:id", name: "NNSVote", component: NNSVoteView, meta: { robots: 'noindex' } },
     { path: "/:pathMatch(.*)*", redirect: "/" },
 ]
 

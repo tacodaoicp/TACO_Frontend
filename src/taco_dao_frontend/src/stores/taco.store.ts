@@ -7661,6 +7661,211 @@ export const useTacoStore = defineStore('taco', () => {
         });
     }
 
+    // ===========================
+    // NNS VOTING SYSTEM FUNCTIONS
+    // ===========================
+
+    // Create neuron snapshot actor
+    const createNeuronSnapshotActor = async () => {
+        const { HttpAgent } = await import('@dfinity/agent');
+        const authClient = await getAuthClient();
+        const identity = await authClient.getIdentity();
+        const agent = new HttpAgent({
+            identity,
+            host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+        });
+
+        if (process.env.DFX_NETWORK === "local") {
+            await agent.fetchRootKey();
+        }
+
+        return Actor.createActor(neuronSnapshotIDL, {
+            agent,
+            canisterId: neuronSnapshotCanisterId()
+        });
+    }
+
+    // Get votable NNS/SNS proposal pairs
+    const getVotableProposals = async () => {
+        try {
+            const actor = await createNeuronSnapshotActor();
+            const result = await (actor as any).getVotableProposals();
+            return result; // Array of [nnsId, snsId] pairs
+        } catch (error) {
+            console.error('Error getting votable proposals:', error);
+            throw error;
+        }
+    }
+
+    // Find NNS proposal ID for given SNS proposal ID
+    const findNNSProposalForSNS = async (snsProposalId: bigint): Promise<bigint | null> => {
+        try {
+            const votableProposals = await getVotableProposals();
+            const match = votableProposals.find(([nnsId, snsId]: [any, any]) => snsId === snsProposalId);
+            return match ? match[0] : null;
+        } catch (error) {
+            console.error('Error finding NNS proposal for SNS:', error);
+            return null;
+        }
+    }
+
+    // Get NNS proposal details from NNS governance
+    const getNNSProposal = async (nnsProposalId: bigint) => {
+        try {
+            const { Actor, HttpAgent } = await import('@dfinity/agent');
+            const authClient = await getAuthClient();
+            const identity = await authClient.getIdentity();
+            const agent = new HttpAgent({
+                identity,
+                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+            });
+
+            if (process.env.DFX_NETWORK === "local") {
+                await agent.fetchRootKey();
+            }
+
+            // Import NNS governance IDL
+            const { idlFactory } = await import('../../../declarations/nns_governance');
+            
+            const nnsGov = Actor.createActor(idlFactory, {
+                agent,
+                canisterId: 'rrkah-fqaaa-aaaaa-aaaaq-cai' // NNS Governance canister
+            });
+
+            const result = await (nnsGov as any).get_proposal_info(nnsProposalId);
+            return result;
+        } catch (error) {
+            console.error('Error getting NNS proposal:', error);
+            throw error;
+        }
+    }
+
+    // Get SNS proposal details from SNS governance
+    const getSNSProposal = async (snsProposalId: bigint) => {
+        try {
+            const actor = await createNeuronSnapshotActor();
+            const result = await (actor as any).getSNSProposal(snsProposalId);
+            if ('ok' in result) {
+                return result.ok;
+            } else {
+                throw new Error(result.err?.error_message || 'Failed to get SNS proposal');
+            }
+        } catch (error) {
+            console.error('Error getting SNS proposal:', error);
+            throw error;
+        }
+    }
+
+    // Get DAO vote tally for SNS proposal
+    const getDAOVoteTally = async (snsProposalId: bigint) => {
+        try {
+            const actor = await createNeuronSnapshotActor();
+            const result = await (actor as any).getDAOVoteTally(snsProposalId);
+            return result;
+        } catch (error) {
+            console.error('Error getting DAO vote tally:', error);
+            throw error;
+        }
+    }
+
+    // Submit DAO votes for SNS proposal
+    const submitDAOVotes = async (snsProposalId: bigint, neuronIds: Uint8Array[], decision: 'Adopt' | 'Reject') => {
+        try {
+            const actor = await createNeuronSnapshotActor();
+            const decisionVariant = decision === 'Adopt' ? { Adopt: null } : { Reject: null };
+            const result = await (actor as any).submitDAOVotes(snsProposalId, neuronIds, decisionVariant);
+            
+            if ('ok' in result) {
+                return result.ok;
+            } else {
+                throw new Error(result.err || 'Failed to submit votes');
+            }
+        } catch (error) {
+            console.error('Error submitting DAO votes:', error);
+            throw error;
+        }
+    }
+
+    // Check if a neuron has voted on a proposal
+    const hasNeuronVoted = async (snsProposalId: bigint, neuronId: Uint8Array) => {
+        try {
+            const actor = await createNeuronSnapshotActor();
+            const result = await (actor as any).hasNeuronVoted(snsProposalId, neuronId);
+            return result;
+        } catch (error) {
+            console.error('Error checking if neuron voted:', error);
+            return null;
+        }
+    }
+
+    // Check if DAO has already voted on NNS proposal
+    const hasDAOVoted = async (nnsProposalId: bigint): Promise<boolean> => {
+        try {
+            const actor = await createNeuronSnapshotActor();
+            const result = await (actor as any).hasDAOVoted(nnsProposalId);
+            return result;
+        } catch (error) {
+            console.error('Error checking if DAO voted:', error);
+            return false;
+        }
+    }
+
+    // Get user's TACO neurons for voting (reuse existing function)
+    const getUserVotingNeurons = async () => {
+        return await getTacoNeurons();
+    }
+
+    // Format NNS proposal link
+    const formatNNSProposalLink = (nnsProposalId: bigint): string => {
+        return `https://nns.ic0.app/proposal/?u=qoctq-giaaa-aaaaa-aaaea-cai&proposal=${nnsProposalId}`;
+    }
+
+    // Format SNS proposal for display (similar to TACO proposals)
+    const formatSNSProposalForDisplay = (proposal: any) => {
+        return {
+            id: proposal.id?.id || 0n,
+            title: proposal.proposal?.title || 'Untitled Proposal',
+            summary: proposal.proposal?.summary || 'No summary available',
+            url: proposal.proposal?.url || '',
+            status: getProposalStatus(proposal),
+            createdAt: new Date(Number(proposal.proposal_creation_timestamp_seconds) * 1000),
+            decidedAt: proposal.decided_timestamp_seconds > 0n ? 
+                new Date(Number(proposal.decided_timestamp_seconds) * 1000) : undefined,
+            executedAt: proposal.executed_timestamp_seconds > 0n ? 
+                new Date(Number(proposal.executed_timestamp_seconds) * 1000) : undefined,
+            proposer: proposal.proposer?.id ? uint8ArrayToHex(proposal.proposer.id) : undefined,
+            yesVotes: proposal.latest_tally?.yes || 0n,
+            noVotes: proposal.latest_tally?.no || 0n,
+            totalVotes: proposal.latest_tally?.total || 0n,
+            topic: getProposalTopic(proposal)
+        };
+    }
+
+    // Get proposal status from SNS proposal data
+    const getProposalStatus = (proposal: any): string => {
+        if (proposal.executed_timestamp_seconds > 0n) return 'Executed';
+        if (proposal.failed_timestamp_seconds > 0n) return 'Failed';
+        if (proposal.decided_timestamp_seconds > 0n) {
+            // Check if it was adopted or rejected based on votes
+            const yes = Number(proposal.latest_tally?.yes || 0n);
+            const no = Number(proposal.latest_tally?.no || 0n);
+            return yes > no ? 'Adopted' : 'Rejected';
+        }
+        return 'Open';
+    }
+
+    // Get proposal topic from SNS proposal data
+    const getProposalTopic = (proposal: any) => {
+        // Extract topic from the action if available
+        if (proposal.proposal?.action) {
+            const actionKeys = Object.keys(proposal.proposal.action);
+            if (actionKeys.length > 0) {
+                return { [actionKeys[0]]: null };
+            }
+        }
+        return { Motion: null }; // Default to Motion for copied proposals
+    }
+
     // # RETURN #
     return {
         // state
@@ -7904,5 +8109,20 @@ export const useTacoStore = defineStore('taco', () => {
         sendTestEmailSingle,
         showSuccess,
         showError,
+
+        // NNS Voting System
+        getVotableProposals,
+        findNNSProposalForSNS,
+        getNNSProposal,
+        getSNSProposal,
+        getDAOVoteTally,
+        submitDAOVotes,
+        hasNeuronVoted,
+        hasDAOVoted,
+        getUserVotingNeurons,
+        formatNNSProposalLink,
+        formatSNSProposalForDisplay,
+        getProposalStatus,
+        getProposalTopic,
     }
 })
