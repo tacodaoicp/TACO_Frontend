@@ -8170,5 +8170,6 @@ export const useTacoStore = defineStore('taco', () => {
         getProposalStatus,
         getProposalTopic,
         uint8ArrayToHex,
+        formatTokenAmount,
     }
 })

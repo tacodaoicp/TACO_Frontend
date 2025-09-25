@@ -209,7 +209,7 @@
                                 </div>
 
                                 <!-- DAO Vote Tally -->
-                                <div v-if="daoVoteTally" class="p-3">
+                                <div v-if="daoVoteTally && daoVoteTally.total_voting_power !== undefined" class="p-3">
                                     <div class="mb-3">
                                         <!-- Vote percentages -->
                                         <div class="d-flex justify-content-between mb-2">
@@ -250,7 +250,7 @@
                                 </div>
 
                                 <!-- No votes yet -->
-                                <div v-else class="p-3 text-center">
+                                <div v-else-if="!daoVoteTally || daoVoteTally.total_voting_power === undefined || daoVoteTally.total_votes === 0" class="p-3 text-center">
                                     <div class="py-4">
                                         <div class="mb-3" style="font-size: 3rem;">🗳️</div>
                                         <p class="taco-text-black-to-white">No DAO votes cast yet. Be the first to vote!</p>
@@ -456,6 +456,7 @@ const loadProposalData = async () => {
 const refreshDAOVotes = async () => {
     try {
         daoVoteTally.value = await tacoStore.getDAOVoteTally(snsProposalId.value)
+        console.log('DAO vote tally:', daoVoteTally.value) // Debug log
     } catch (err) {
         console.error('Error refreshing DAO votes:', err)
     }
