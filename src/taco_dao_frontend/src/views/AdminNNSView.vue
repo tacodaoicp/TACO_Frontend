@@ -28,7 +28,15 @@
                     <!-- Timer Status Section -->
                     <div class="taco-container taco-container--l1 mb-4">
                         <div class="p-3">
-                            <TacoTitle level="h3" emoji="⏰" title="Timer Status" class="mb-4" />
+                            <div class="d-flex justify-content-between align-items-center mb-4">
+                                <TacoTitle level="h3" emoji="⏰" title="Timer Status" />
+                                <button 
+                                    @click="loadTimerStatus" 
+                                    :disabled="actionLoading"
+                                    class="btn taco-btn taco-btn--outline btn-sm">
+                                    <i class="fas fa-refresh me-1"></i>Refresh Status
+                                </button>
+                            </div>
 
                             <!-- Periodic Timer -->
                             <div class="mb-4">
@@ -339,7 +347,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useTacoStore } from '../stores/taco.store'
 import HeaderBar from '../components/HeaderBar.vue'
@@ -779,25 +787,17 @@ const loadConfiguration = async () => {
     }
 }
 
-// Initialize
-onMounted(async () => {
-    console.log('AdminNNSView mounted, user logged in:', userLoggedIn.value)
+// Function to initialize data
+const initializeData = async () => {
+    console.log('Initializing admin data, user logged in:', userLoggedIn.value)
     
-    // Wait a bit for the store to initialize if needed
     if (!userLoggedIn.value) {
-        console.log('User not logged in initially, waiting 500ms...')
-        await new Promise(resolve => setTimeout(resolve, 500))
-        console.log('After wait, user logged in:', userLoggedIn.value)
+        console.log('User not logged in, skipping initialization')
+        loading.value = false
+        return
     }
     
     try {
-        if (!userLoggedIn.value) {
-            console.log('User still not logged in, showing error')
-            tacoStore.showError('You must be logged in to access admin functions')
-            loading.value = false
-            return
-        }
-        
         console.log('Starting to load admin data...')
         await Promise.all([
             loadTimerStatus(),
@@ -810,6 +810,28 @@ onMounted(async () => {
         tacoStore.showError('Error loading admin data: ' + error.message)
     } finally {
         console.log('Setting loading to false')
+        loading.value = false
+    }
+}
+
+// Watch for login state changes and initialize when user logs in
+watch(userLoggedIn, async (newValue, oldValue) => {
+    console.log('User login state changed:', { oldValue, newValue })
+    if (newValue && !oldValue) {
+        console.log('User just logged in, initializing data...')
+        await initializeData()
+    }
+}, { immediate: false })
+
+// Initialize on mount if already logged in
+onMounted(async () => {
+    console.log('AdminNNSView mounted, user logged in:', userLoggedIn.value)
+    
+    if (userLoggedIn.value) {
+        console.log('User already logged in, initializing immediately')
+        await initializeData()
+    } else {
+        console.log('User not logged in, waiting for login state change')
         loading.value = false
     }
 })
