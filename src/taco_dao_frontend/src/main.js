@@ -23,6 +23,7 @@ import AdminDistributionsView from "./views/AdminDistributionsView.vue"
 import AdminRewardsBalancesView from "./views/AdminRewardsBalancesView.vue"
 import AdminAlarmView from "./views/AdminAlarmView.vue"
 import AdminClaimsView from "./views/AdminClaimsView.vue"
+import AdminNNSView from "./views/AdminNNSView.vue"
 import RewardsView from "./views/RewardsView.vue"
 import ChatView from "./views/ChatView.vue"
 import ReportsView from "./views/ReportsView.vue"
@@ -84,6 +85,7 @@ const routes = [
     { path: "/admin/distributions", name: "AdminDistributions", component: AdminDistributionsView, meta: { robots: 'noindex' } },
     { path: "/admin/alarm", name: "AdminAlarm", component: AdminAlarmView, meta: { robots: 'noindex' } },
     { path: "/admin/claims", name: "AdminClaims", component: AdminClaimsView, meta: { robots: 'noindex' } },
+    { path: "/admin/nns", name: "AdminNNS", component: AdminNNSView, meta: { robots: 'noindex' } },
     { path: "/forum", name: "Forum", component: ForumView, meta: { robots: 'noindex' } },
     { path: "/forum/thread/:id", name: "Thread", component: ThreadView, meta: { robots: 'noindex' } },
     { path: "/names", name: "Names", component: NamesView, meta: { robots: 'noindex' } }, //remove once integrated

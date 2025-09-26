@@ -41,6 +41,9 @@
               <router-link to="/admin/alarm" class="btn btn-outline-danger">
                 🚨 Alarm
               </router-link>
+              <router-link to="/admin/nns" class="btn btn-outline-info">
+                🤖 NNS Automation
+              </router-link>
             </div>
           </div>
           
