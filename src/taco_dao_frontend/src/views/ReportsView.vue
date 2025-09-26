@@ -55,7 +55,7 @@
                 <ul class="taco-report-explorer__list">
 
                   <!-- clown - report item -->
-                  <li v-if="false" class="taco-report-explorer__list-item" @click="toggleReportMenuOnMobile(); router.push('/reports/clown')">
+                  <li class="taco-report-explorer__list-item" @click="toggleReportMenuOnMobile(); router.push('/reports/clown')">
                     
                     <!-- report -->
                     <div class="taco-report-explorer__list-report"
@@ -9540,7 +9540,7 @@ when and how much of the next treasury withdrawal are also unknown.
                       <!-- report metadata -->
                       <span class="taco-report-explorer__report-header__metadata">
                         <i class="fa-solid fa-luchador-mask"></i> 
-                        <span> Written by TrickyVik</span>
+                        <span> Written by TrickyVik & Manilpwn</span>
                         <span class="small"> 09/2025</span>
                       </span>
 
@@ -9563,17 +9563,25 @@ when and how much of the next treasury withdrawal are also unknown.
                     
                     <!-- paragraph -->
                     <p>
-Insane Clown Protocol started as an ICP-based memecoin over two years ago. I could not find a public
-record of its full history, but according to information collated from community members, the project has
-lost most of its value twice over, and has had four transfers of 'leadership'. The second last developer in
-charge was <a href="https://x.com/joeyboeyboyo" target="_blank">Joey</a>, until, in March, Sergei took over and the project fledged from a memecoin into a dApp
-with 'social mining' utility. Sergei had been working on this dApp, mostly in stealth, for eight months.
+Insane Clown Protocol started as an ICP-based memecoin in 2023. There exists no official record of the
+tokens history, and information has instead been collated from community members. The project has gone
+through various iterations that brought with it noteworthy price fluctuations, and has had four transfers of
+leadership. The second last developer in charge was <a href="https://x.com/joeyboeyboyo" target="_blank">Joey</a>, until, in March, Sergei took over and the
+project fledged from a memecoin into a dApp with 'social mining' utility. Sergei had been working on
+this dApp for four months before it launched.
                     </p>
 
                     <!-- paragraph -->
                     <p>
-I could not find public information on the team. The following information was sourced from team
-members:
+The team believes that the previous volatile history of different incarnations should not be seen as a black
+mark on the project as Sergei could've launched a new token for it, but instead decided to build it on top
+of $CLOWN for its name and existing holders. In other words, the negative history can be cast off
+because those associated with it have departed the project.
+                    </p>
+
+                    <!-- paragraph -->
+                    <p>
+The following information was sourced from team members:
                     </p>
 
                     <!-- unordered list -->
@@ -9586,7 +9594,7 @@ members:
                         <p>
 <a href="https://x.com/let4be" target="_blank">Sergei</a> is the only developer, having ~ 25 years of experience. He has a background in distributed
 computing and security + 'a little bit of everything'. He has been developing on ICP for two
-years
+years.
                         </p>
 
                       </li>
@@ -9596,10 +9604,22 @@ years
 
                         <!-- paragraph -->
                         <p>
-Christian is in charge of community relations. He previously worked as a paramedic and believes
-the communication skills built in this role transfer over to community relations. He is also the
-creator of the <a href="https://x.com/Snoge222" target="_blank">SNOGE</a> project, a component of which includes/included hosting X spaces focused
-on ICP projects
+<a href="https://x.com/Snoge222" target="_blank">Christian</a> (doxxed) is the voice for the project on X spaces, and has represented the project at
+in-person events. He previously worked as a paramedic and believes the communication skills
+built in this role transfer over to community relations. He is the creator of SNOGE, which is the
+official memecoin of Sneed DAO
+                        </p>
+
+                      </li>                      
+
+                      <!-- list item -->
+                      <li>
+
+                        <!-- paragraph -->
+                        <p>
+<a href="https://x.com/omniaicp" target="_blank">Omnia</a> leads social media management. She has a background in language and composition, art,
+marketing, sales, and social media management with two prior crypto projects and many personal
+social media accounts as experience
                         </p>
 
                       </li>
@@ -9609,7 +9629,7 @@ on ICP projects
 
                         <!-- paragraph -->
                         <p>
-Whi1ol has been helping with the front-end and visual/UX elements
+<a href="https://x.com/whi10l" target="_blank">Whi1ol</a> has been helping with the front-end and visual/UX elements
                         </p>
 
                       </li>
@@ -9619,9 +9639,8 @@ Whi1ol has been helping with the front-end and visual/UX elements
 
                         <!-- paragraph -->
                         <p>
-<a href="https://x.com/Craigersuk" target="_blank">Rizzinator</a> made the logo, and helps with graphics and community relations. He is a senior
-designer with 15 years of industry experience. He designed some logos for TACO DAO prior to
-TACO DAO's team deciding to go with EgidoVal
+<a href="https://x.com/Craigersuk" target="_blank">Rizzinator</a> made the logo, and helps with graphics. He has also networked with major voices such
+as <a href="https://x.com/realsixfig" target="_blank">6figs</a> on X. He is a senior designer with 15 years of industry experience
                         </p>
 
                       </li>
@@ -9631,7 +9650,7 @@ TACO DAO's team deciding to go with EgidoVal
 
                         <!-- paragraph -->
                         <p>
-Badri has made some videos and animations
+<a href="https://x.com/18yoinvestor" target="_blank">Badri</a> has made some videos and animations
                         </p>
 
                       </li>
@@ -9641,7 +9660,7 @@ Badri has made some videos and animations
 
                         <!-- paragraph -->
                         <p>
-<a href="https://x.com/omniaicp" target="_blank">Omnia</a>, an ICP-based active X user, helps with the shilling
+<a href="https://x.com/TakeitLikeaMen" target="_blank">Mr.Motoko</a> is a shiller, networker, and discussion contributor
                         </p>
 
                       </li>
@@ -9651,8 +9670,18 @@ Badri has made some videos and animations
 
                         <!-- paragraph -->
                         <p>
-<a href="https://x.com/Thebitcoinbarbi" target="_blank">Barbie</a> helps with the shilling. She is an active X user who was previously based outside the ICP
-ecosystem
+<a href="https://x.com/Thebitcoinbarbi" target="_blank">Barbie</a> helps with onboarding and networking as a sales expert and KOL. She is an active X user
+with vast experience in sales, communication, and social media
+                        </p>
+
+                      </li>
+
+                      <!-- list item -->
+                      <li>
+
+                        <!-- paragraph -->
+                        <p>
+Sneedster, Frank, Joey (former dev), and TeeG also occasionally participate in discussions
                         </p>
 
                       </li>
@@ -9661,9 +9690,7 @@ ecosystem
 
                     <!-- paragraph -->
                     <p>
-The team was described as 'self-assembled'. It should not be assumed that all individuals mentioned
-above are team members, they may also just be contributors. This should also not be assumed to be an
-exhaustive list of contributors.
+All team members, with the exception of Sergei, are solely motivated by holding $CLOWN and unpaid
                     </p>
 
                     <hr>
@@ -9680,9 +9707,9 @@ exhaustive list of contributors.
 
                     <!-- paragraph -->
                     <p>
-The $CLOWN token benefits from income generated on the Insane Clown Protocol dApp, as a large
-amount of this income is used to buy $CLOWN (pushing the price up) and store it in the treasury for later
-uses, such as liquidity provision.
+The $CLOWN token benefits from income generated on the Insane Clown Protocol dApp, as a
+large amount of this income is used to buy $CLOWN and store it in the treasury for later uses,
+such as liquidity provision.
                     </p>
 
                     <h4 class="taco-report-explorer__report-heading
@@ -9789,10 +9816,10 @@ Clown Tickets (CTX).
 
                     <!-- paragraph -->
                     <p>
-CTX is non-transferrable and illiquid. The mechanisms of obtaining CTX include: claiming it from a
-daily 'giftbox', earning it from posts, buying it with ICP, or 'dusting'. The giftbox gives out a randomised
-amount with a maximum of 8,888 CTX. Social miners currently earn CTX from posts via a single,
-platform-wide Free For All (FFA) CTX allocation (created by Sergei) that mirrors aggregate rewards from
+CTX is non-transferrable and illiquid. The mechanisms of obtaining CTX include: claiming it
+from a daily 'giftbox', earning it from posts, buying it with ICP, or 'dusting'. The giftbox gives out a
+randomised amount with a maximum of 8,888 CTX. Social miners currently earn CTX from posts
+via a single, platform-wide Free For All (FFA) CTX allocation that mirrors aggregate rewards from
 all other non-FFA allocations across the dApp. CTX can be bought with ICP in one of three
 deals/envelopes: 5 ICP for 250,000 CTX, 15 ICP for 850,000 CTX, or 99 ICP for 8,888,888 CTX.
                     </p>
@@ -9854,14 +9881,13 @@ So far, over 6% of the $CLOWN supply has been bought back.
 
                     <!-- paragraph -->
                     <p>
-The free Clown Printer granted at account creation is virtually worthless. It has a 1x reward multiplier.
-The first Clown Printer upgrade currently costs 62,500 CTX and grants a 55x reward multiplier. There is a
-limit on the number of posts a social miner can submit per day, and only one can be submitted per hour.
-Some posts come free daily and some posts have to be paid for with CTX (2.5k per post). The daily post
-limit and free post amount depends on the Clown Printer's level. There are 12 upgrades currently on offer,
-the maximum costing 30,868,050 CTX (on the top of previous upgrades), offering a 220x reward
-multiplier, and having a 10 maximum posts per day limit. The price of a Clown Printer upgrade is
-increasing with time.
+The free Clown Printer granted at account creation is virtually worthless. It has a 1x reward
+multiplier. The first Clown Printer upgrade currently costs 62,500 CTX and grants a 55x reward
+multiplier. There is a limit on the number of posts a social miner can submit per day. Some
+posts come free daily, and some posts have to be paid for with CTX (2.5k per post). The daily
+post limit and free post amount depends on the Clown Printer's level. There are 12 upgrades
+currently on offer, the maximum costing 30,868,050 CTX (on the top of previous upgrades),
+offering a 220x reward multiplier, and having a 10 maximum posts per day limit.
                     </p>
 
                     <!-- paragraph -->
@@ -9888,6 +9914,63 @@ cheapest-envelope rate (5 ICP = 250,000 CTX), with a 50,000 CTX minimum. If the 
 accepts the proposal, the Finder gets 8% of the allocated amount.
                     </p>
 
+                    <!-- paragraph -->
+                    <p>
+Insane Clown Protocol has a referral system. Users that are referred will gain ~ 33 ICP worth of
+CTX. Users that refer, called ringleaders, gain rewards from the activities of their referees for a
+few seasons. Ringleaders unlock these revenue shares with higher clown printer tiers.
+                    </p>
+
+                    <!-- paragraph -->
+                    <p>
+Revenue shares are unlocked in the following order:
+                    </p>
+
+                    <!-- unordered list -->
+                    <ol>
+                      
+                      <!-- list item -->
+                      <li>
+
+                        <!-- paragraph -->
+                        <p>
+8% of budgets from successful SNS Treasury Transfer proposals for allocations
+                        </p>
+
+                      </li>
+
+                      <!-- list item -->
+                      <li>
+
+                        <!-- paragraph -->
+                        <p>
+8% of budgets for created allocations
+                        </p>
+
+                      </li>
+
+                      <!-- list item -->
+                      <li>
+
+                        <!-- paragraph -->
+                        <p>
+6% of social mining earnings
+                        </p>
+
+                      </li>
+
+                      <!-- list item -->
+                      <li>
+
+                        <!-- paragraph -->
+                        <p>
+8% of envelope purchases
+                        </p>
+
+                      </li>
+
+                    </ol>                    
+
                     <h4 class="taco-report-explorer__report-heading
                               taco-report-explorer__report-heading--h2 mt-4">
                       Roadmap
@@ -9895,9 +9978,91 @@ accepts the proposal, the Finder gets 8% of the allocated amount.
 
                     <!-- paragraph -->
                     <p>
-There is no public roadmap. From talking with Sergei, I have identified that the near term plans include a
-referral program, and that the long term plans include SNS-ification.
+The CLOWN team has posted an X <a href="https://x.com/clownitx/status/1957564392645521601" target="_blank">roadmap</a> in the August of 2025, showing planned developments with
+the intention of having $CLOWN reach a certain market cap as a result of said developments. From
+discussions with the team, the current 'institutional support' target is being reached via discussions with
+OpenChat and Dfinity, though the topics of such discussions are currently unknown to us.
                     </p>
+
+                    <!-- paragraph -->
+                    <p>
+Asides from this, there are a few concretely definable points of interest on the roadmap. They are:
+                    </p>
+
+                    <!-- unordered list -->
+                    <ul>
+                      
+                      <!-- list item -->
+                      <li>
+
+                        <!-- paragraph -->
+                        <p>
+Refining dApp Visuals
+                        </p>
+
+                      </li>
+
+                      <!-- list item -->
+                      <li>
+
+                        <!-- paragraph -->
+                        <p>
+Team Expansion
+                        </p>
+
+                      </li>
+
+                      <!-- list item -->
+                      <li>
+
+                        <!-- paragraph -->
+                        <p>
+SNS Launch
+                        </p>
+
+                      </li>
+
+                      <!-- list item -->
+                      <li>
+
+                        <!-- paragraph -->
+                        <p>
+Token Rebrand/Staking
+                        </p>
+
+                      </li>
+
+                      <!-- list item -->
+                      <li>
+
+                        <!-- paragraph -->
+                        <p>
+Hiring Specialists & Influencers
+                        </p>
+
+                      </li>
+
+                      <!-- list item -->
+                      <li>
+
+                        <!-- paragraph -->
+                        <p>
+Retail Marketing ICP
+                        </p>
+
+                      </li>
+
+                      <!-- list item -->
+                      <li>
+
+                        <!-- paragraph -->
+                        <p>
+IRL/Cross-Social-Media
+                        </p>
+
+                      </li>
+
+                    </ul>
                     
                     <hr>
 
@@ -9913,19 +10078,20 @@ referral program, and that the long term plans include SNS-ification.
 
                     <!-- paragraph -->
                     <p>
-Subjectively speaking, X appears to be the main stage for public attention and discovery of new
-cryptocurrency projects. Insane Clown Protocol provides a straightforward means for ICP projects to pay
-to get posted about on X. These posts can be general or focus on something specific, such as an upcoming
-update. This could help ICP projects get broader attention, as well as inform broader audiences on
-narratives they'd like to receive focus on. It also enables ICP-based content creators on X to be
-programmatically rewarded for their work. If this project's reach extends beyond ICP's ecosystem, its
-novel nature and unique use case may give significant attention to ICP's powerful tech stack.
+Subjectively speaking, X appears to be the main stage for public attention and discovery of
+new cryptocurrency projects. Insane Clown Protocol provides a straightforward means for
+ICP projects to pay to get posted about on X. These posts can be general or focus on
+something specific, such as an upcoming update. This could help ICP projects get broader
+attention, as well as inform broader audiences on narratives they'd like to receive focus on.
+It also enables ICP-based content creators on X to be programmatically rewarded for their
+work.
                     </p>
 
                     <!-- paragraph -->
                     <p>
-So far, there have been allocations for projects such as KongSwap, TACO DAO, Yral, ELNA, Kinic, and
-ICPSwap.
+So far, there have been allocations for projects such as KongSwap, TACO DAO, Yral, ELNA,
+Kinic, and ICPSwap. Recently, the OpenChat X account posted a social miner verification
+code.
                     </p>
 
                     <!-- paragraph -->
@@ -9968,6 +10134,21 @@ Neutrinite's vectors being used in revenue loops
 
                     </ul>
 
+                    <!-- paragraph -->
+                    <p>
+Recently, the project has boasted allocations for projects in the Solana ecosystem. If
+Insane Clown Protocol's reach further extends beyond ICP's ecosystem, its novel nature
+and unique use case may give significant attention to ICP's powerful tech stack.
+                    </p>
+
+                    <!-- paragraph -->
+                    <p>
+The Insane Clown Protocol team has not indicated interest in getting involved in Salsa
+Season. Salsa Season will have off-seasons and active seasons to create hype around the
+active seasons, so projects that integrate their rewards programs would do so in order to
+join in on the seasonal hype and hot-points of engagement.
+                    </p>                    
+
                     <hr>
 
                     <!-- heading -->
@@ -9983,7 +10164,7 @@ Neutrinite's vectors being used in revenue loops
                     <!-- paragraph -->
                     <p>
 The Telegram group has 392 members and the OpenChat community has 5575 members. On X, clownitx
-has 439 followers. They had an X account with 2000+ followers but they lost access to that one.
+has 613 followers. They had an X account with 2000+ followers but they lost access to that one.
                     </p>
 
                     <!-- paragraph -->
@@ -10005,8 +10186,9 @@ has 439 followers. They had an X account with 2000+ followers but they lost acce
 
                     <!-- paragraph -->
                     <p>
-The code has not been open-sourced and Sergei is the sole controller of the Insane Clown Protocol dApp.
-The following information is what has been shared by Sergei and what can be inferred from the dApp.
+The code has not been open-sourced and Sergei is the sole controller of the Insane Clown
+Protocol dApp. The following information is what has been shared by the team and what can
+be inferred from the dApp.
                     </p>
 
                     <!-- paragraph -->
@@ -10256,7 +10438,7 @@ estimation when the dusting feature is used.
                                 
                                 <!-- paragraph -->
                                 <p>
-                                  64,357,304.33 CLOWN ($47,817.47)
+                                  65,803,018.07 CLOWN ($46,364.81)
                                 </p>
 
                               </li>  
@@ -10266,7 +10448,7 @@ estimation when the dusting feature is used.
                                 
                                 <!-- paragraph -->
                                 <p>
-                                  55.21 ICP (like two n a half hundos)
+                                  121.06 ICP ($526.61)
                                 </p>
 
                               </li>                             
@@ -10507,21 +10689,22 @@ well as the influencer economy where projects pay individuals, agencies, or netw
 
                     <!-- paragraph -->
                     <p>
-Web2 ads are precise in their targeting, but they're also expensive and saturated. Buying impressions on X
-doesn't mean buying engagement, it means paying to appear in a feed that people are conditioned to scroll
-past. Agencies and influencer deals offer more texture, but they are high-touch and can be opaque. Rates
-are set on gut feel and follower counts, rather than a transparent marketplace. Projects can spend
-thousands of dollars on a sponsored thread, a video review, or an AMA slot and still be wondering if it
-moved the needle.
+Web2 ads can be precise in their targeting, but also expensive and saturated. Buying
+impressions on X doesn't equate to buying engagement, for a paid impression is simply a piece
+of content that appears in a feed used by individuals conditioned to scroll past. Agencies and
+influencer deals offer more texture, but they are high-touch and can be opaque. Rates are set on
+expectations and follower counts. Projects can spend thousands of dollars on a sponsored
+thread, a YouTube video, or a pop-up ad, and remain wondering what impact they truly had.
                     </p>
 
                     <!-- paragraph -->
                     <p>
-In this light, Insane Clown Protocol resembles a hybrid. It plugs into X like an ad rail, but instead of
-buying impressions, it funds posts that are scored and rewarded pro-rata against a pool. If adopted, it
-could function as a permissionless attention marketplace, removing the haggling, middlemen, and inflated
-pricing. Web2 ads and agencies rely on top-down deals and vanity metrics; Insane Clown Protocol may
-create a bottom-up system where creators compete for rewards based on the attention they generate.
+In this light, Insane Clown Protocol resembles a hybrid. It plugs into X, but instead of buying
+impressions, it funds posts that are scored and rewarded pro-rata against a pool. If adopted, it
+could function as a permissionless attention marketplace, removing the haggling, middlemen,
+and inflated pricing. Web2 ads and agencies rely on top-down deals and vanity metrics; Insane
+Clown Protocol may create a bottom-up system where creators compete for rewards based on
+the attention they generate.
                     </p>
 
                     <!-- paragraph -->
@@ -10531,7 +10714,74 @@ their audience or raise suspicion, a DAO protocol (which Insane Clown Protocol a
 suffer from that kind of selective hesitation. There is no single gatekeeper deciding what deserves
 promotion. This removes the bottleneck of personal discretion and replaces it with collective mechanics,
 ensuring that even controversial or niche narratives can still find amplification if the incentives are there.
-                    </p>                    
+                    </p>
+                    
+                    <h4 class="taco-report-explorer__report-heading
+                              taco-report-explorer__report-heading--h2 mt-4">
+                      Statistics
+                    </h4>
+
+                    <!-- paragraph -->
+                    <p>
+As per a <a href="https://x.com/clownitx/status/1965379126258524602" target="_blank">tweet</a> made by the CLOWN X account in September 2025, the cost efficiency of CLOWN far
+exceeds that of conventional marketing platforms. Insane Clown Protocol offers no cost per click on
+advertisements created, and its cost per impression sits about half of that of the cheapest platforms such as
+Instagram and Facebook.
+                    </p>
+
+                    <!-- paragraph -->
+                    <p>
+Treasury as at 22.09.25:
+                    </p>
+
+                    <!-- unordered list -->
+                    <ul>
+
+                      <!-- list item -->
+                      <li>
+                        
+                        <!-- paragraph -->
+                        <p>
+65,803,018.07 CLOWN ($46,364.81)
+                        </p>
+                        
+                      </li>
+
+                      <!-- list item -->
+                      <li>
+                        
+                        <!-- paragraph -->
+                        <p>
+121.06 ICP ($526.61)
+                        </p>
+                        
+                      </li>
+
+                    </ul>
+
+                    <!-- paragraph -->
+                    <p>
+This would represent the income earned since the dApp launched 7 months ago, via envelope sales. It is
+worth noting that a far higher amount of ICP has been earned, but a significant amount has been spent on
+$CLOWN buybacks. As previously mentioned, only half of the ICP earned via CTX sales is sent to the
+treasury, and then an unspecified amount of that is used to further the $CLOWN buyback scheme.
+                    </p>
+
+                    <!-- paragraph -->
+                    <p>
+As per conversation with the team, an estimated 7,000 ICP has been earned over the dApp's lifespan.
+Based on the previously mentioned split, 27%, or 1890 ICP, was instantly used to purchase $CLOWN.
+ICP's price fluctuated between $4 and $6 in this period, while CLOWN's increased from below $0.0001
+to a high of just below $0.001. 3500 ICP was sent to the Treasury, which almost all of it seems to have
+been spent on CLOWN buybacks.
+                    </p>
+
+                    <!-- paragraph -->
+                    <p>
+Presuming an average of $5 per ICP, around $35,000 has been earned by the dApp since launch, but these
+earnings have been furthered via funnelling the majority of them into $CLOWN which has seen a positive
+CLOWN/ICP price ratio increase.
+                    </p>
 
                     <hr>
                    
@@ -10568,8 +10818,15 @@ when they do decide to SNSify.
 
                     <!-- paragraph -->
                     <p>
-The code has only been internally audited. Without independent verification, the risk of undiscovered
-vulnerabilities existing is higher.
+The code has only been internally audited, though an external audit is planned. Without
+independent verification, the risk of undiscovered vulnerabilities existing is higher.
+                    </p>
+
+                    <!-- paragraph -->
+                    <p>
+The main treasury funds (mostly consisting of $CLOWN) sit in a separate canister with,
+according to the team, a very limited surface area able to be exploited. So, the treasury canister
+will not be drained if the Insane Clown Protocol dApp encounters a bug or gets exploited.
                     </p>
 
                     <h4 class="taco-report-explorer__report-heading
@@ -10579,17 +10836,20 @@ vulnerabilities existing is higher.
 
                     <!-- paragraph -->
                     <p>
-The project is entirely reliant on and largely at the mercy of X. The dApp becomes useless if X goes
-down.
+The project is reliant on X. If X goes down, the dApp (in its current state) would become useless
+until it is able to pivot to different applications.
                     </p>
 
                     <!-- paragraph -->
                     <p>
-X's Engagement Spam <a href="https://help.x.com/en/rules-and-policies/authenticity" target="_blank">policy</a> prohibits compensating users for metrics such as Likes, Replies, or
-Reposts. While Insane Clown Protocol structures these incentives through transparent, competitive pools
-rather than bot farms, the underlying mechanism could still be interpreted as “account metric inflation.” If
-X decides to enforce this rule strictly, the project and its users risk account flags, suspensions, or bans.
-This risk will grow as Insane Clown Protocol grows in reach.
+X's Engagement Spam <a href="https://help.x.com/en/rules-and-policies/authenticity" target="_blank">policy</a> prohibits compensating users for metrics such as Likes, Replies,
+or Reposts. While Insane Clown Protocol structures these incentives through transparent,
+competitive pools rather than bot farms, the underlying mechanism could still be interpreted as
+“account metric inflation.” If X decides to enforce this rule strictly, the project and its users risk
+flags, suspensions, or bans of their X accounts. This risk will grow as Insane Clown Protocol
+grows in reach. The team states that, should this scenario be encountered, all that is needed to
+rectify it is to tell users to stop mentioning on X that they are earning from posts, and make the
+post feed inside the dApp private to users.
                     </p>
 
                     <h4 class="taco-report-explorer__report-heading
@@ -10630,20 +10890,18 @@ from spam.
 
                     <!-- paragraph -->
                     <p>
-Effectiveness remains unproven. While allocations that target post URLs have boosted impressions, it's
-still unclear how much of those impressions translate into meaningful engagement, and it will remain
-unclear until Insane Clown Protocol has long-running return customers (having demonstrated
-effectiveness to them).
+Effectiveness remains unproven. While allocations that target post URLs have boosted
+impressions, it's still unclear how much of those impressions translate into meaningful
+engagement, and it will remain unclear until Insane Clown Protocol has long-running return
+customers (having demonstrated effectiveness to them).
                     </p>
 
                     <!-- paragraph -->
                     <p>
-While managing the TACO DAO X page, I noticed that impressions on posts dropped below baseline
-(what they were pre-allocation) once an allocation ended. If I were to speculate as to why, I'd suggest that
-the influx of posts tagging the account (often with AI generated images) conditions users to quickly swipe
-past, which in turn teaches the X For You algorithm that people are not interested in seeing this account or
-posts related to it. The negative impact towards the main account did not occur when we set the allocation
-to tag/target the tacojak account instead. Take this shallow observation with a grain of salt
+The team has stated that they do have a few examples and clear results in terms of price action,
+views, and new users to projects over campaign time-frames. We do not accept or deny the
+truthfulness of this anecdotal evidence. At the very least, the social miners themselves learn
+about the projects that create allocations.
                     </p>
 
                     <hr>
@@ -10689,19 +10947,19 @@ to tag/target the tacojak account instead. Take this shallow observation with a 
                       </span> -->
                       
                       <!-- link group -->
-                      <!-- <span class="d-flex flex-column align-items-end">
+                      <span class="d-flex flex-column align-items-end">
 
-                        <span class="text-end">#99 Motion to Discuss</span>
+                        <span class="text-end">#142 Motion to Discuss</span>
 
                         <span class="d-flex gap-2">
 
-                          <a href="https://nns.ic0.app/proposal/?u=lacdn-3iaaa-aaaaq-aae3a-cai&proposal=99" class="taco-text-blue-to-light-blue text-end" target="_blank">NNS</a>
+                          <a href="https://nns.ic0.app/proposal/?u=lacdn-3iaaa-aaaaq-aae3a-cai&proposal=142" class="taco-text-blue-to-light-blue text-end" target="_blank">NNS</a>
 
-                          <a href="https://tacodao.com/chat/forum/99" class="taco-text-blue-to-light-blue text-end">Taco Forum</a>
+                          <a href="https://tacodao.com/chat/forum/142" class="taco-text-blue-to-light-blue text-end">Taco Forum</a>
 
                         </span>
                         
-                      </span> -->
+                      </span>
 
                       <!-- link group -->
                       <span class="d-flex flex-column align-items-end">

@@ -28,9 +28,9 @@
                 <span class="home-view__canted__title">Current Discussion</span>
 
                 <!-- current discussion link -->
-                <router-link to="/chat/forum/99" 
+                <router-link to="/chat/forum/142" 
                             class="home-view__canted__link">
-                  Neutrinite & cICP
+                  Insane Clown Protocol
                 </router-link>
                 
               </div>
@@ -68,10 +68,10 @@
                 <span class="home-view__canted__title">Latest Report</span>
 
                 <!-- latest report link -->
-                <router-link to="/reports/neutrinite" 
+                <router-link to="/reports/clown" 
                             class="home-view__canted__link">
                   <!-- Insane Clown Protocol -->
-                  Neutrinite & cICP
+                  Insane Clown Protocol
                 </router-link>
 
               </div>
