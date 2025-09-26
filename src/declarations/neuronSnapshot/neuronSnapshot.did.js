@@ -388,6 +388,11 @@ export const idlFactory = ({ IDL }) => {
       ),
     'getProposerSubaccount' : IDL.Func([], [IDL.Vec(IDL.Nat8)], ['query']),
     'getSNSProposal' : IDL.Func([IDL.Nat64], [GetSNSProposalFullResult], []),
+    'getSNSProposalIdForNNS' : IDL.Func(
+        [IDL.Nat64],
+        [IDL.Opt(IDL.Nat64)],
+        ['query'],
+      ),
     'getSNSProposalSummary' : IDL.Func(
         [IDL.Nat64],
         [GetSNSProposalSummaryResult],

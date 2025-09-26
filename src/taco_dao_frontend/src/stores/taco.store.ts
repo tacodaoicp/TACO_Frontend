@@ -8141,6 +8141,18 @@ export const useTacoStore = defineStore('taco', () => {
         return { Motion: null }; // Default to Motion for copied proposals
     }
 
+    // Get SNS proposal ID for a given NNS proposal ID
+    const getSNSProposalIdForNNS = async (nnsProposalId: bigint) => {
+        try {
+            const actor = await createNeuronSnapshotActor();
+            const result = await (actor as any).getSNSProposalIdForNNS(nnsProposalId);
+            return result;
+        } catch (error) {
+            console.error('Error getting SNS proposal ID for NNS proposal:', error);
+            throw error;
+        }
+    }
+
     // # RETURN #
     return {
         // state
@@ -8421,5 +8433,6 @@ export const useTacoStore = defineStore('taco', () => {
         setProposerSubaccount,
         getTacoDAONeuronId,
         setTacoDAONeuronId,
+        getSNSProposalIdForNNS,
     }
 })

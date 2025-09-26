@@ -64,6 +64,7 @@ type neuronSnapshot =
      }) query;
    getProposerSubaccount: () -> (blob) query;
    getSNSProposal: (proposalId: nat64) -> (GetSNSProposalFullResult);
+   getSNSProposalIdForNNS: (nnsProposalId: nat64) -> (opt nat64) query;
    getSNSProposalSummary: (proposalId: nat64) ->
     (GetSNSProposalSummaryResult);
    getTacoDAONeuronId: () -> (NeuronId__1) query;

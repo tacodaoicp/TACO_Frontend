@@ -322,6 +322,7 @@ export interface neuronSnapshot {
   >,
   'getProposerSubaccount' : ActorMethod<[], Uint8Array | number[]>,
   'getSNSProposal' : ActorMethod<[bigint], GetSNSProposalFullResult>,
+  'getSNSProposalIdForNNS' : ActorMethod<[bigint], [] | [bigint]>,
   'getSNSProposalSummary' : ActorMethod<[bigint], GetSNSProposalSummaryResult>,
   'getTacoDAONeuronId' : ActorMethod<[], NeuronId__1>,
   'getUrgentVotableProposals' : ActorMethod<
