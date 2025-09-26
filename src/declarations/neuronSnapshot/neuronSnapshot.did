@@ -10,6 +10,7 @@ type neuronSnapshot =
    clearDAOVotesForProposal: (snsProposalId: nat64) -> (nat);
    clearLogs: () -> ();
    copyNNSProposal: (nnsProposalId: nat64) -> (CopyNNSProposalResult);
+   getAutoVotingRoundCounter: () -> (nat64) query;
    getAutoVotingThresholdSeconds: () -> (nat64) query;
    getCopiedNNSProposals: () -> (vec record {
                                        nat64;
@@ -36,6 +37,7 @@ type neuronSnapshot =
            DAOVote;
          }) query;
    getDAOVotingProposalsCount: () -> (nat) query;
+   getDefaultVoteBehavior: () -> (DefaultVoteBehavior) query;
    getHighestProcessedNNSProposalId: () -> (nat64) query;
    getLogs: (count: nat) -> (vec LogEntry) query;
    getLogsByContext: (context: text, count: nat) -> (vec LogEntry) query;
@@ -113,6 +115,7 @@ type neuronSnapshot =
     (ProcessSequentialProposalsResult);
    removeCopiedNNSProposal: (nnsProposalId: nat64) -> ();
    setAutoVotingThresholdSeconds: (thresholdSeconds: nat64) -> ();
+   setDefaultVoteBehavior: (behavior: DefaultVoteBehavior) -> ();
    setHighestProcessedNNSProposalId: (proposalId: nat64) -> ();
    setLogAdmin: (admin: principal) -> ();
    setMaxNeuronSnapshots: (maxSnapshots: nat) -> ();
@@ -418,6 +421,12 @@ type DisburseMaturityInProgress =
    amount_e8s: nat64;
    finalize_disbursement_timestamp_seconds: opt nat64;
    timestamp_of_disbursement_seconds: nat64;
+ };
+type DefaultVoteBehavior = 
+ variant {
+   Skip;
+   VoteAdopt;
+   VoteReject;
  };
 type DAOVoteDecision = 
  variant {

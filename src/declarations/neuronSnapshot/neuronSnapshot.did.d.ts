@@ -38,6 +38,9 @@ export interface DAOVote {
 }
 export type DAOVoteDecision = { 'Reject' : null } |
   { 'Adopt' : null };
+export type DefaultVoteBehavior = { 'Skip' : null } |
+  { 'VoteAdopt' : null } |
+  { 'VoteReject' : null };
 export interface DisburseMaturityInProgress {
   'timestamp_of_disbursement_seconds' : bigint,
   'amount_e8s' : bigint,
@@ -265,6 +268,7 @@ export interface neuronSnapshot {
   'clearDAOVotesForProposal' : ActorMethod<[bigint], bigint>,
   'clearLogs' : ActorMethod<[], undefined>,
   'copyNNSProposal' : ActorMethod<[bigint], CopyNNSProposalResult>,
+  'getAutoVotingRoundCounter' : ActorMethod<[], bigint>,
   'getAutoVotingThresholdSeconds' : ActorMethod<[], bigint>,
   'getCopiedNNSProposals' : ActorMethod<[], Array<[bigint, bigint]>>,
   'getCopiedNNSProposalsCount' : ActorMethod<[], bigint>,
@@ -292,6 +296,7 @@ export interface neuronSnapshot {
     Array<[Uint8Array | number[], DAOVote]>
   >,
   'getDAOVotingProposalsCount' : ActorMethod<[], bigint>,
+  'getDefaultVoteBehavior' : ActorMethod<[], DefaultVoteBehavior>,
   'getHighestProcessedNNSProposalId' : ActorMethod<[], bigint>,
   'getLogs' : ActorMethod<[bigint], Array<LogEntry>>,
   'getLogsByContext' : ActorMethod<[string, bigint], Array<LogEntry>>,
@@ -383,6 +388,7 @@ export interface neuronSnapshot {
   >,
   'removeCopiedNNSProposal' : ActorMethod<[bigint], undefined>,
   'setAutoVotingThresholdSeconds' : ActorMethod<[bigint], undefined>,
+  'setDefaultVoteBehavior' : ActorMethod<[DefaultVoteBehavior], undefined>,
   'setHighestProcessedNNSProposalId' : ActorMethod<[bigint], undefined>,
   'setLogAdmin' : ActorMethod<[Principal], undefined>,
   'setMaxNeuronSnapshots' : ActorMethod<[bigint], undefined>,

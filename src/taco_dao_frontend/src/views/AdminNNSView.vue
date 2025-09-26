@@ -265,6 +265,34 @@
                                         </span>
                                     </small>
                                 </div>
+
+                                <!-- Default Vote Behavior -->
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label taco-text-black-to-white">
+                                        <i class="fas fa-balance-scale me-2"></i>Default Vote Behavior
+                                    </label>
+                                    <div class="input-group">
+                                        <select 
+                                            v-model="newDefaultVoteBehavior" 
+                                            class="form-select taco-input"
+                                            :disabled="actionLoading">
+                                            <option value="VoteAdopt">Vote Adopt (Default)</option>
+                                            <option value="VoteReject">Vote Reject</option>
+                                            <option value="Skip">Skip Voting</option>
+                                        </select>
+                                        <button 
+                                            @click="updateDefaultVoteBehavior"
+                                            :disabled="actionLoading || newDefaultVoteBehavior === currentDefaultVoteBehavior"
+                                            class="btn taco-btn taco-btn--green">
+                                            <i class="fas fa-save me-1"></i>Update
+                                        </button>
+                                    </div>
+                                    <small class="text-muted">
+                                        Current: {{ currentDefaultVoteBehavior || 'Loading...' }}
+                                        <br>
+                                        What to do when there are no DAO votes or there's a tie vote
+                                    </small>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -383,6 +411,8 @@ const newProposerSubaccount = ref('')
 const currentProposerSubaccount = ref('')
 const newTacoDAONeuronId = ref('')
 const currentTacoDAONeuronId = ref('')
+const newDefaultVoteBehavior = ref('VoteAdopt')
+const currentDefaultVoteBehavior = ref('Loading...')
 
 // Proposals
 const votableProposals = ref<any[]>([])
@@ -634,6 +664,24 @@ const updateTacoDAONeuronId = async () => {
     }
 }
 
+const updateDefaultVoteBehavior = async () => {
+    try {
+        actionLoading.value = true
+        
+        // Convert string to variant format expected by backend
+        const behaviorVariant = { [newDefaultVoteBehavior.value]: null }
+        
+        await tacoStore.setDefaultVoteBehavior(behaviorVariant)
+        tacoStore.showSuccess('Default vote behavior updated successfully')
+        await loadConfiguration()
+    } catch (error: any) {
+        console.error('Error updating default vote behavior:', error)
+        tacoStore.showError('Error updating default vote behavior: ' + error.message)
+    } finally {
+        actionLoading.value = false
+    }
+}
+
 // Proposal methods
 const refreshVotableProposals = async () => {
     try {
@@ -714,10 +762,11 @@ const loadConfiguration = async () => {
             getTacoDAONeuronId: typeof tacoStore.getTacoDAONeuronId
         })
         
-        const [votingThreshold, proposerSubaccount, tacoDAONeuronId] = await Promise.all([
+        const [votingThreshold, proposerSubaccount, tacoDAONeuronId, defaultVoteBehavior] = await Promise.all([
             tacoStore.getAutoVotingThresholdSeconds(),
             tacoStore.getProposerSubaccount(),
-            tacoStore.getTacoDAONeuronId()
+            tacoStore.getTacoDAONeuronId(),
+            tacoStore.getDefaultVoteBehavior()
         ])
         
         console.log('Raw responses:', { votingThreshold, proposerSubaccount, tacoDAONeuronId })
@@ -792,10 +841,45 @@ const loadConfiguration = async () => {
             newTacoDAONeuronId.value = ''
         }
         
+        // Default vote behavior
+        if (defaultVoteBehavior) {
+            try {
+                console.log('Default vote behavior object:', defaultVoteBehavior)
+                
+                // Handle different possible formats from backend
+                let behaviorKey = null
+                if (typeof defaultVoteBehavior === 'object' && defaultVoteBehavior !== null) {
+                    // Find the key that has a non-undefined value (variant format)
+                    const keys = Object.keys(defaultVoteBehavior)
+                    behaviorKey = keys.find(key => defaultVoteBehavior[key] !== undefined) || keys[0]
+                } else if (typeof defaultVoteBehavior === 'string') {
+                    behaviorKey = defaultVoteBehavior
+                }
+                
+                console.log('Default vote behavior key:', behaviorKey)
+                
+                if (behaviorKey && ['VoteAdopt', 'VoteReject', 'Skip'].includes(behaviorKey)) {
+                    currentDefaultVoteBehavior.value = behaviorKey
+                    newDefaultVoteBehavior.value = behaviorKey
+                } else {
+                    currentDefaultVoteBehavior.value = 'VoteAdopt' // Default fallback
+                    newDefaultVoteBehavior.value = 'VoteAdopt'
+                }
+            } catch (behaviorError) {
+                console.error('Error processing default vote behavior:', behaviorError)
+                currentDefaultVoteBehavior.value = 'Error loading'
+                newDefaultVoteBehavior.value = 'VoteAdopt'
+            }
+        } else {
+            currentDefaultVoteBehavior.value = 'VoteAdopt' // Default fallback
+            newDefaultVoteBehavior.value = 'VoteAdopt'
+        }
+        
         console.log('Final values:', {
             currentVotingThreshold: currentVotingThreshold.value,
             currentProposerSubaccount: currentProposerSubaccount.value,
-            currentTacoDAONeuronId: currentTacoDAONeuronId.value
+            currentTacoDAONeuronId: currentTacoDAONeuronId.value,
+            currentDefaultVoteBehavior: currentDefaultVoteBehavior.value
         })
         
     } catch (error: any) {

@@ -8153,6 +8153,32 @@ export const useTacoStore = defineStore('taco', () => {
         }
     }
 
+    // Get default vote behavior
+    const getDefaultVoteBehavior = async () => {
+        try {
+            console.log('Getting default vote behavior...');
+            const actor = await createNeuronSnapshotActor();
+            const result = await (actor as any).getDefaultVoteBehavior();
+            console.log('Default vote behavior result:', result);
+            return result;
+        } catch (error) {
+            console.error('Error getting default vote behavior:', error);
+            throw error;
+        }
+    }
+
+    // Set default vote behavior
+    const setDefaultVoteBehavior = async (behavior: any) => {
+        try {
+            const actor = await createNeuronSnapshotActor();
+            const result = await (actor as any).setDefaultVoteBehavior(behavior);
+            return result;
+        } catch (error) {
+            console.error('Error setting default vote behavior:', error);
+            throw error;
+        }
+    }
+
     // # RETURN #
     return {
         // state
@@ -8434,5 +8460,7 @@ export const useTacoStore = defineStore('taco', () => {
         getTacoDAONeuronId,
         setTacoDAONeuronId,
         getSNSProposalIdForNNS,
+        getDefaultVoteBehavior,
+        setDefaultVoteBehavior,
     }
 })

@@ -77,6 +77,11 @@ export const idlFactory = ({ IDL }) => {
     'timestamp' : Timestamp,
     'voting_power' : IDL.Nat,
   });
+  const DefaultVoteBehavior = IDL.Variant({
+    'Skip' : IDL.Null,
+    'VoteAdopt' : IDL.Null,
+    'VoteReject' : IDL.Null,
+  });
   const LogLevel = IDL.Variant({
     'INFO' : IDL.Null,
     'WARN' : IDL.Null,
@@ -300,6 +305,7 @@ export const idlFactory = ({ IDL }) => {
     'clearDAOVotesForProposal' : IDL.Func([IDL.Nat64], [IDL.Nat], []),
     'clearLogs' : IDL.Func([], [], []),
     'copyNNSProposal' : IDL.Func([IDL.Nat64], [CopyNNSProposalResult], []),
+    'getAutoVotingRoundCounter' : IDL.Func([], [IDL.Nat64], ['query']),
     'getAutoVotingThresholdSeconds' : IDL.Func([], [IDL.Nat64], ['query']),
     'getCopiedNNSProposals' : IDL.Func(
         [],
@@ -340,6 +346,7 @@ export const idlFactory = ({ IDL }) => {
         ['query'],
       ),
     'getDAOVotingProposalsCount' : IDL.Func([], [IDL.Nat], ['query']),
+    'getDefaultVoteBehavior' : IDL.Func([], [DefaultVoteBehavior], ['query']),
     'getHighestProcessedNNSProposalId' : IDL.Func([], [IDL.Nat64], ['query']),
     'getLogs' : IDL.Func([IDL.Nat], [IDL.Vec(LogEntry)], ['query']),
     'getLogsByContext' : IDL.Func(
@@ -484,6 +491,7 @@ export const idlFactory = ({ IDL }) => {
       ),
     'removeCopiedNNSProposal' : IDL.Func([IDL.Nat64], [], []),
     'setAutoVotingThresholdSeconds' : IDL.Func([IDL.Nat64], [], []),
+    'setDefaultVoteBehavior' : IDL.Func([DefaultVoteBehavior], [], []),
     'setHighestProcessedNNSProposalId' : IDL.Func([IDL.Nat64], [], []),
     'setLogAdmin' : IDL.Func([IDL.Principal], [], []),
     'setMaxNeuronSnapshots' : IDL.Func([IDL.Nat], [], []),
