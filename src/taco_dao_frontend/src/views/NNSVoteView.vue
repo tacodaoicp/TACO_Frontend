@@ -542,9 +542,18 @@ const loadUserNeurons = async () => {
             
             if (neuronIdBlob) {
                 const voteStatus = await tacoStore.hasNeuronVoted(snsProposalId.value, neuronIdBlob)
-                if (voteStatus) {
+                console.log('Vote status for neuron:', tacoStore.uint8ArrayToHex(neuronIdBlob), voteStatus)
+                
+                // Check if voteStatus is a meaningful vote record (not null, undefined, or empty array)
+                if (voteStatus && 
+                    voteStatus !== null && 
+                    voteStatus !== undefined && 
+                    !(Array.isArray(voteStatus) && voteStatus.length === 0)) {
                     const key = tacoStore.uint8ArrayToHex(neuronIdBlob)
                     neuronVoteStatus.value.set(key, voteStatus)
+                    console.log('Neuron marked as voted:', key)
+                } else {
+                    console.log('Neuron not voted:', tacoStore.uint8ArrayToHex(neuronIdBlob))
                 }
             }
         }
