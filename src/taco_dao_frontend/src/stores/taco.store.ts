@@ -7838,6 +7838,184 @@ export const useTacoStore = defineStore('taco', () => {
         }
     }
 
+    // Get votable proposals with time remaining information
+    const getVotableProposalsWithTimeLeft = async () => {
+        try {
+            const actor = await createNeuronSnapshotActor();
+            const result = await (actor as any).getVotableProposalsWithTimeLeft();
+            return result;
+        } catch (error) {
+            console.error('Error getting votable proposals with time left:', error);
+            throw error;
+        }
+    }
+
+    // Get periodic timer status
+    const getPeriodicTimerStatus = async () => {
+        try {
+            const actor = await createNeuronSnapshotActor();
+            const result = await (actor as any).getPeriodicTimerStatus();
+            return result;
+        } catch (error) {
+            console.error('Error getting periodic timer status:', error);
+            throw error;
+        }
+    }
+
+    // Start periodic timer
+    const startPeriodicTimer = async () => {
+        try {
+            const actor = await createNeuronSnapshotActor();
+            const result = await (actor as any).startPeriodicTimer();
+            return result;
+        } catch (error) {
+            console.error('Error starting periodic timer:', error);
+            throw error;
+        }
+    }
+
+    // Stop periodic timer
+    const stopPeriodicTimer = async () => {
+        try {
+            const actor = await createNeuronSnapshotActor();
+            const result = await (actor as any).stopPeriodicTimer();
+            return result;
+        } catch (error) {
+            console.error('Error stopping periodic timer:', error);
+            throw error;
+        }
+    }
+
+    // Check if auto-processing is running
+    const isAutoProcessingRunning = async () => {
+        try {
+            const actor = await createNeuronSnapshotActor();
+            const result = await (actor as any).isAutoProcessingRunning();
+            return result;
+        } catch (error) {
+            console.error('Error checking auto-processing status:', error);
+            return false;
+        }
+    }
+
+    // Check if auto-voting is running
+    const isAutoVotingRunning = async () => {
+        try {
+            const actor = await createNeuronSnapshotActor();
+            const result = await (actor as any).isAutoVotingRunning();
+            return result;
+        } catch (error) {
+            console.error('Error checking auto-voting status:', error);
+            return false;
+        }
+    }
+
+    // Start auto-processing NNS proposals
+    const startAutoProcessNNSProposals = async (subaccount: Uint8Array) => {
+        try {
+            const actor = await createNeuronSnapshotActor();
+            const result = await (actor as any).startAutoProcessNNSProposals(subaccount);
+            return result;
+        } catch (error) {
+            console.error('Error starting auto-processing:', error);
+            throw error;
+        }
+    }
+
+    // Stop auto-processing NNS proposals
+    const stopAutoProcessNNSProposals = async () => {
+        try {
+            const actor = await createNeuronSnapshotActor();
+            const result = await (actor as any).stopAutoProcessNNSProposals();
+            return result;
+        } catch (error) {
+            console.error('Error stopping auto-processing:', error);
+            throw error;
+        }
+    }
+
+    // Start auto-voting on urgent proposals
+    const startAutoVoteOnUrgentProposals = async () => {
+        try {
+            const actor = await createNeuronSnapshotActor();
+            const result = await (actor as any).startAutoVoteOnUrgentProposals();
+            return result;
+        } catch (error) {
+            console.error('Error starting auto-voting:', error);
+            throw error;
+        }
+    }
+
+    // Stop auto-voting on urgent proposals
+    const stopAutoVoteOnUrgentProposals = async () => {
+        try {
+            const actor = await createNeuronSnapshotActor();
+            const result = await (actor as any).stopAutoVoteOnUrgentProposals();
+            return result;
+        } catch (error) {
+            console.error('Error stopping auto-voting:', error);
+            throw error;
+        }
+    }
+
+    // Get auto-voting threshold in seconds
+    const getAutoVotingThresholdSeconds = async () => {
+        try {
+            const actor = await createNeuronSnapshotActor();
+            const result = await (actor as any).getAutoVotingThresholdSeconds();
+            return result;
+        } catch (error) {
+            console.error('Error getting auto-voting threshold:', error);
+            throw error;
+        }
+    }
+
+    // Set auto-voting threshold in seconds
+    const setAutoVotingThresholdSeconds = async (thresholdSeconds: bigint) => {
+        try {
+            const actor = await createNeuronSnapshotActor();
+            await (actor as any).setAutoVotingThresholdSeconds(thresholdSeconds);
+        } catch (error) {
+            console.error('Error setting auto-voting threshold:', error);
+            throw error;
+        }
+    }
+
+    // Get periodic timer interval in seconds
+    const getPeriodicTimerIntervalSeconds = async () => {
+        try {
+            const actor = await createNeuronSnapshotActor();
+            const result = await (actor as any).getPeriodicTimerIntervalSeconds();
+            return result;
+        } catch (error) {
+            console.error('Error getting periodic timer interval:', error);
+            throw error;
+        }
+    }
+
+    // Set periodic timer interval in seconds
+    const setPeriodicTimerIntervalSeconds = async (intervalSeconds: bigint) => {
+        try {
+            const actor = await createNeuronSnapshotActor();
+            await (actor as any).setPeriodicTimerIntervalSeconds(intervalSeconds);
+        } catch (error) {
+            console.error('Error setting periodic timer interval:', error);
+            throw error;
+        }
+    }
+
+    // Vote on NNS proposal (force vote)
+    const voteOnNNSProposal = async (snsProposalId: bigint) => {
+        try {
+            const actor = await createNeuronSnapshotActor();
+            const result = await (actor as any).voteOnNNSProposal(snsProposalId);
+            return result;
+        } catch (error) {
+            console.error('Error voting on NNS proposal:', error);
+            throw error;
+        }
+    }
+
     // Get user's TACO neurons for voting (reuse existing function)
     const getUserVotingNeurons = async () => {
         return await getTacoNeurons();
@@ -8171,5 +8349,21 @@ export const useTacoStore = defineStore('taco', () => {
         getProposalTopic,
         uint8ArrayToHex,
         formatTokenAmount,
+        // New NNS automation functions
+        getVotableProposalsWithTimeLeft,
+        getPeriodicTimerStatus,
+        startPeriodicTimer,
+        stopPeriodicTimer,
+        isAutoProcessingRunning,
+        isAutoVotingRunning,
+        startAutoProcessNNSProposals,
+        stopAutoProcessNNSProposals,
+        startAutoVoteOnUrgentProposals,
+        stopAutoVoteOnUrgentProposals,
+        getAutoVotingThresholdSeconds,
+        setAutoVotingThresholdSeconds,
+        getPeriodicTimerIntervalSeconds,
+        setPeriodicTimerIntervalSeconds,
+        voteOnNNSProposal,
     }
 })

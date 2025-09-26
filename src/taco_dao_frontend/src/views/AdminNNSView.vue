@@ -345,7 +345,7 @@ const isUrgent = (proposal: any) => {
 const startPeriodicTimer = async () => {
     try {
         actionLoading.value = true
-        const result = await tacoStore.callCanisterMethod('neuronSnapshot', 'startPeriodicTimer', [])
+        const result = await tacoStore.startPeriodicTimer()
         if (result) {
             tacoStore.showSuccess('Periodic timer started successfully')
             await loadTimerStatus()
@@ -363,7 +363,7 @@ const startPeriodicTimer = async () => {
 const stopPeriodicTimer = async () => {
     try {
         actionLoading.value = true
-        const result = await tacoStore.callCanisterMethod('neuronSnapshot', 'stopPeriodicTimer', [])
+        const result = await tacoStore.stopPeriodicTimer()
         if (result) {
             tacoStore.showSuccess('Periodic timer stopped successfully')
             await loadTimerStatus()
@@ -381,7 +381,7 @@ const stopPeriodicTimer = async () => {
 const startAutoProcessing = async () => {
     try {
         actionLoading.value = true
-        const result = await tacoStore.callCanisterMethod('neuronSnapshot', 'startAutoProcessNNSProposals', [new Uint8Array()])
+        const result = await tacoStore.startAutoProcessNNSProposals(new Uint8Array())
         if (result) {
             tacoStore.showSuccess('Auto-processing started successfully')
             await loadTimerStatus()
@@ -399,7 +399,7 @@ const startAutoProcessing = async () => {
 const stopAutoProcessing = async () => {
     try {
         actionLoading.value = true
-        const result = await tacoStore.callCanisterMethod('neuronSnapshot', 'stopAutoProcessNNSProposals', [])
+        const result = await tacoStore.stopAutoProcessNNSProposals()
         if (result) {
             tacoStore.showSuccess('Auto-processing stopped successfully')
             await loadTimerStatus()
@@ -417,7 +417,7 @@ const stopAutoProcessing = async () => {
 const startAutoVoting = async () => {
     try {
         actionLoading.value = true
-        const result = await tacoStore.callCanisterMethod('neuronSnapshot', 'startAutoVoteOnUrgentProposals', [])
+        const result = await tacoStore.startAutoVoteOnUrgentProposals()
         if (result) {
             tacoStore.showSuccess('Auto-voting started successfully')
             await loadTimerStatus()
@@ -435,7 +435,7 @@ const startAutoVoting = async () => {
 const stopAutoVoting = async () => {
     try {
         actionLoading.value = true
-        const result = await tacoStore.callCanisterMethod('neuronSnapshot', 'stopAutoVoteOnUrgentProposals', [])
+        const result = await tacoStore.stopAutoVoteOnUrgentProposals()
         if (result) {
             tacoStore.showSuccess('Auto-voting stopped successfully')
             await loadTimerStatus()
@@ -454,7 +454,7 @@ const stopAutoVoting = async () => {
 const updatePeriodicInterval = async () => {
     try {
         actionLoading.value = true
-        await tacoStore.callCanisterMethod('neuronSnapshot', 'setPeriodicTimerIntervalSeconds', [BigInt(newPeriodicInterval.value)])
+        await tacoStore.setPeriodicTimerIntervalSeconds(BigInt(newPeriodicInterval.value))
         tacoStore.showSuccess('Periodic timer interval updated successfully')
         await loadTimerStatus()
     } catch (error: any) {
@@ -468,7 +468,7 @@ const updatePeriodicInterval = async () => {
 const updateVotingThreshold = async () => {
     try {
         actionLoading.value = true
-        await tacoStore.callCanisterMethod('neuronSnapshot', 'setAutoVotingThresholdSeconds', [BigInt(newVotingThreshold.value)])
+        await tacoStore.setAutoVotingThresholdSeconds(BigInt(newVotingThreshold.value))
         tacoStore.showSuccess('Voting threshold updated successfully')
         await loadConfiguration()
     } catch (error: any) {
@@ -483,7 +483,7 @@ const updateVotingThreshold = async () => {
 const refreshVotableProposals = async () => {
     try {
         proposalsLoading.value = true
-        const proposals = await tacoStore.callCanisterMethod('neuronSnapshot', 'getVotableProposalsWithTimeLeft', [])
+        const proposals = await tacoStore.getVotableProposalsWithTimeLeft()
         votableProposals.value = proposals || []
     } catch (error: any) {
         console.error('Error loading votable proposals:', error)
@@ -496,7 +496,7 @@ const refreshVotableProposals = async () => {
 const forceVoteOnProposal = async (snsProposalId: number) => {
     try {
         votingLoading.value[snsProposalId] = true
-        const result = await tacoStore.callCanisterMethod('neuronSnapshot', 'voteOnNNSProposal', [BigInt(snsProposalId)])
+        const result = await tacoStore.voteOnNNSProposal(BigInt(snsProposalId))
         
         if ('ok' in result) {
             tacoStore.showSuccess(`Successfully voted ${result.ok.dao_decision} on proposal ${snsProposalId}`)
@@ -516,9 +516,9 @@ const forceVoteOnProposal = async (snsProposalId: number) => {
 const loadTimerStatus = async () => {
     try {
         const [periodicStatus, autoProcessing, autoVoting] = await Promise.all([
-            tacoStore.callCanisterMethod('neuronSnapshot', 'getPeriodicTimerStatus', []),
-            tacoStore.callCanisterMethod('neuronSnapshot', 'isAutoProcessingRunning', []),
-            tacoStore.callCanisterMethod('neuronSnapshot', 'isAutoVotingRunning', [])
+            tacoStore.getPeriodicTimerStatus(),
+            tacoStore.isAutoProcessingRunning(),
+            tacoStore.isAutoVotingRunning()
         ])
         
         periodicTimerStatus.value = periodicStatus || periodicTimerStatus.value
@@ -535,7 +535,7 @@ const loadTimerStatus = async () => {
 
 const loadConfiguration = async () => {
     try {
-        const votingThreshold = await tacoStore.callCanisterMethod('neuronSnapshot', 'getAutoVotingThresholdSeconds', [])
+        const votingThreshold = await tacoStore.getAutoVotingThresholdSeconds()
         currentVotingThreshold.value = Number(votingThreshold || 7200)
         newVotingThreshold.value = currentVotingThreshold.value
     } catch (error: any) {
