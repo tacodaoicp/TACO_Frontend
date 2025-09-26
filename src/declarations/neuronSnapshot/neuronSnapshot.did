@@ -1,12 +1,17 @@
 type neuronSnapshot = 
  service {
    addCopiedNNSProposal: (nnsProposalId: nat64, snsProposalId: nat64) -> ();
+   autoVoteOnProposalsExpiringWithinOneHour: () -> (Result_3);
+   autoVoteOnUrgentProposals: (timeThresholdSeconds: nat64,
+    maxProposalsToVote: nat) -> (Result_3);
    cancel_neuron_snapshot: () -> (CancelNeuronSnapshotResult);
    clearCopiedNNSProposals: () -> (nat);
+   clearDAOVotedNNSProposals: () -> (nat);
    clearDAOVotesForProposal: (snsProposalId: nat64) -> (nat);
    clearLogs: () -> ();
    copyNNSProposal: (nnsProposalId: nat64, proposerSubaccount: blob) ->
     (CopyNNSProposalResult);
+   getAutoVotingThresholdSeconds: () -> (nat64) query;
    getCopiedNNSProposals: () -> (vec record {
                                        nat64;
                                        nat64;
@@ -14,6 +19,7 @@ type neuronSnapshot =
    getCopiedNNSProposalsCount: () -> (nat) query;
    getCumulativeValuesAtSnapshot: (snapshotId: opt SnapshotId) ->
     (opt CumulativeVP) query;
+   getDAOVoteRecord: (nnsProposalId: nat64) -> (opt DAONNSVoteRecord) query;
    getDAOVoteTally: (snsProposalId: nat64) ->
     (opt
       record {
@@ -36,7 +42,8 @@ type neuronSnapshot =
    getLogsByContext: (context: text, count: nat) -> (vec LogEntry) query;
    getLogsByLevel: (level: LogLevel, count: nat) -> (vec LogEntry) query;
    getMaxNeuronSnapshots: () -> (nat) query;
-   getNNSProposalCopyInfo: (nnsProposalId: nat64) -> (Result_1);
+   getNNSProposalCopyInfo: (nnsProposalId: nat64) -> (Result_2);
+   getNNSProposalIdForSNS: (snsProposalId: nat64) -> (opt nat64) query;
    getNeuronDataForDAO: (snapshotId: SnapshotId, start: nat, limit: nat) ->
     (opt
       record {
@@ -47,13 +54,42 @@ type neuronSnapshot =
         stopped_at: opt nat;
         total_entries: nat;
       }) query;
+   getPeriodicTimerIntervalSeconds: () -> (nat64) query;
+   getPeriodicTimerStatus: () ->
+    (record {
+       interval_seconds: nat64;
+       is_running: bool;
+       last_run_time: opt nat64;
+       next_run_time: opt nat64;
+       timer_id: opt nat;
+     }) query;
    getSNSProposal: (proposalId: nat64) -> (GetSNSProposalFullResult);
    getSNSProposalSummary: (proposalId: nat64) ->
     (GetSNSProposalSummaryResult);
+   getUrgentVotableProposals: (hoursThreshold: nat64) ->
+    (vec
+      record {
+        deadline_timestamp_seconds: opt nat64;
+        is_expired: bool;
+        nns_proposal_id: nat64;
+        proposal_timestamp_seconds: opt nat64;
+        sns_proposal_id: nat64;
+        time_remaining_seconds: opt int64;
+      });
    getVotableProposals: () -> (vec record {
                                      nat64;
                                      nat64;
                                    }) query;
+   getVotableProposalsWithTimeLeft: () ->
+    (vec
+      record {
+        deadline_timestamp_seconds: opt nat64;
+        is_expired: bool;
+        nns_proposal_id: nat64;
+        proposal_timestamp_seconds: opt nat64;
+        sns_proposal_id: nat64;
+        time_remaining_seconds: opt int64;
+      });
    get_neuron_snapshot_curr_neuron_id: () -> (opt NeuronId) query;
    get_neuron_snapshot_head_id: () -> (SnapshotId) query;
    get_neuron_snapshot_importing_count: () -> (nat) query;
@@ -68,28 +104,36 @@ type neuronSnapshot =
    hasNeuronVoted: (snsProposalId: nat64, neuronId: blob) ->
     (opt DAOVote) query;
    isAutoProcessingRunning: () -> (bool) query;
+   isAutoVotingRunning: () -> (bool) query;
    isNNSProposalCopied: (nnsProposalId: nat64) -> (opt nat64) query;
    markNNSProposalAsVoted: (nnsProposalId: nat64) -> (bool);
    processNewestNNSProposals: (limit: opt nat32, proposerSubaccount: 
     blob) -> (ProcessSequentialProposalsResult);
    removeCopiedNNSProposal: (nnsProposalId: nat64) -> ();
+   setAutoVotingThresholdSeconds: (thresholdSeconds: nat64) -> ();
    setHighestProcessedNNSProposalId: (proposalId: nat64) -> ();
    setLogAdmin: (admin: principal) -> ();
    setMaxNeuronSnapshots: (maxSnapshots: nat) -> ();
+   setPeriodicTimerIntervalSeconds: (intervalSeconds: nat64) -> ();
    setSnsGovernanceCanisterId: (canisterId: principal) -> ();
    setTest: (enabled: bool) -> ();
    shouldCopyNNSProposal: (nnsProposalId: nat64) ->
     (ShouldCopyProposalResult);
    startAutoProcessNNSProposals: (proposerSubaccount: blob) -> (bool);
+   startAutoVoteOnUrgentProposals: () -> (bool);
+   startPeriodicTimer: () -> (bool);
    stopAutoProcessNNSProposals: () -> (bool);
+   stopAutoVoteOnUrgentProposals: () -> (bool);
+   stopPeriodicTimer: () -> (bool);
    submitDAOVotes: (snsProposalId: nat64, neuronIds: vec blob, decision:
-    DAOVoteDecision) -> (Result);
+    DAOVoteDecision) -> (Result_1);
    take_neuron_snapshot: () -> (TakeNeuronSnapshotResult);
    testProposalTextFormatting: () -> (text) query;
    testVotingStatus: () -> (vec record {
                                   text;
                                   VotingStatus;
                                 }) query;
+   voteOnNNSProposal: (snsProposalId: nat64) -> (Result);
  };
 type WaitForQuietState = record {current_deadline_timestamp_seconds: nat64;};
 type VotingStatus = 
@@ -178,7 +222,42 @@ type SNSProposalData =
    wait_for_quiet_deadline_increase_seconds: nat64;
    wait_for_quiet_state: opt WaitForQuietState;
  };
-type Result_1 = 
+type Result_3 = 
+ variant {
+   err: text;
+   ok:
+    record {
+      max_proposals_limit: nat;
+      results:
+       vec
+        record {
+          nns_proposal_id: nat64;
+          sns_proposal_id: nat64;
+          time_remaining_seconds: opt int64;
+          vote_result:
+           variant {
+             already_voted: text;
+             error: text;
+             no_dao_votes: text;
+             success:
+              record {
+                adopt_vp: nat;
+                dao_decision: text;
+                reject_vp: nat;
+                total_vp: nat;
+              };
+           };
+        };
+      total_proposals_checked: nat;
+      urgent_proposals_found: nat;
+      votes_already_voted: nat;
+      votes_attempted: nat;
+      votes_failed: nat;
+      votes_no_dao_votes: nat;
+      votes_successful: nat;
+    };
+ };
+type Result_2 = 
  variant {
    err: CopyNNSProposalError;
    ok:
@@ -190,7 +269,7 @@ type Result_1 =
       topic_name: text;
     };
  };
-type Result = 
+type Result_1 = 
  variant {
    err: text;
    ok:
@@ -199,6 +278,18 @@ type Result =
       skipped_no_access: nat;
       successful_votes: nat;
       total_voting_power: nat;
+    };
+ };
+type Result = 
+ variant {
+   err: text;
+   ok:
+    record {
+      adopt_vp: nat;
+      dao_decision: text;
+      nns_proposal_id: nat64;
+      reject_vp: nat;
+      total_vp: nat;
     };
  };
 type Proposal = 
@@ -334,6 +425,16 @@ type DAOVote =
    timestamp: Timestamp;
    voter_principal: principal;
    voting_power: nat;
+ };
+type DAONNSVoteRecord = 
+ record {
+   adopt_vp: nat;
+   dao_decision: text;
+   nns_proposal_id: nat64;
+   reject_vp: nat;
+   total_vp: nat;
+   vote_timestamp: Timestamp;
+   voted_by_principal: principal;
  };
 type CumulativeVP = 
  record {

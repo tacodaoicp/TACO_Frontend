@@ -21,6 +21,15 @@ export interface CumulativeVP {
   'total_staked_vp_by_hotkey_setters' : bigint,
   'total_staked_vp' : bigint,
 }
+export interface DAONNSVoteRecord {
+  'nns_proposal_id' : bigint,
+  'adopt_vp' : bigint,
+  'dao_decision' : string,
+  'reject_vp' : bigint,
+  'total_vp' : bigint,
+  'vote_timestamp' : Timestamp,
+  'voted_by_principal' : Principal,
+}
 export interface DAOVote {
   'decision' : DAOVoteDecision,
   'voter_principal' : Principal,
@@ -116,6 +125,16 @@ export interface Proposal {
 }
 export type Result = {
     'ok' : {
+      'nns_proposal_id' : bigint,
+      'adopt_vp' : bigint,
+      'dao_decision' : string,
+      'reject_vp' : bigint,
+      'total_vp' : bigint,
+    }
+  } |
+  { 'err' : string };
+export type Result_1 = {
+    'ok' : {
       'skipped_already_voted' : bigint,
       'skipped_no_access' : bigint,
       'total_voting_power' : bigint,
@@ -123,7 +142,7 @@ export type Result = {
     }
   } |
   { 'err' : string };
-export type Result_1 = {
+export type Result_2 = {
     'ok' : {
       'should_copy' : boolean,
       'topic_name' : string,
@@ -133,6 +152,37 @@ export type Result_1 = {
     }
   } |
   { 'err' : CopyNNSProposalError };
+export type Result_3 = {
+    'ok' : {
+      'votes_successful' : bigint,
+      'results' : Array<
+        {
+          'nns_proposal_id' : bigint,
+          'vote_result' : { 'error' : string } |
+            { 'already_voted' : string } |
+            {
+              'success' : {
+                'adopt_vp' : bigint,
+                'dao_decision' : string,
+                'reject_vp' : bigint,
+                'total_vp' : bigint,
+              }
+            } |
+            { 'no_dao_votes' : string },
+          'time_remaining_seconds' : [] | [bigint],
+          'sns_proposal_id' : bigint,
+        }
+      >,
+      'votes_no_dao_votes' : bigint,
+      'total_proposals_checked' : bigint,
+      'urgent_proposals_found' : bigint,
+      'votes_failed' : bigint,
+      'max_proposals_limit' : bigint,
+      'votes_already_voted' : bigint,
+      'votes_attempted' : bigint,
+    }
+  } |
+  { 'err' : string };
 export interface SNSProposalData {
   'id' : [] | [SNSProposalId],
   'payload_text_rendering' : [] | [string],
@@ -206,20 +256,25 @@ export interface WaitForQuietState {
 }
 export interface neuronSnapshot {
   'addCopiedNNSProposal' : ActorMethod<[bigint, bigint], undefined>,
+  'autoVoteOnProposalsExpiringWithinOneHour' : ActorMethod<[], Result_3>,
+  'autoVoteOnUrgentProposals' : ActorMethod<[bigint, bigint], Result_3>,
   'cancel_neuron_snapshot' : ActorMethod<[], CancelNeuronSnapshotResult>,
   'clearCopiedNNSProposals' : ActorMethod<[], bigint>,
+  'clearDAOVotedNNSProposals' : ActorMethod<[], bigint>,
   'clearDAOVotesForProposal' : ActorMethod<[bigint], bigint>,
   'clearLogs' : ActorMethod<[], undefined>,
   'copyNNSProposal' : ActorMethod<
     [bigint, Uint8Array | number[]],
     CopyNNSProposalResult
   >,
+  'getAutoVotingThresholdSeconds' : ActorMethod<[], bigint>,
   'getCopiedNNSProposals' : ActorMethod<[], Array<[bigint, bigint]>>,
   'getCopiedNNSProposalsCount' : ActorMethod<[], bigint>,
   'getCumulativeValuesAtSnapshot' : ActorMethod<
     [[] | [SnapshotId]],
     [] | [CumulativeVP]
   >,
+  'getDAOVoteRecord' : ActorMethod<[bigint], [] | [DAONNSVoteRecord]>,
   'getDAOVoteTally' : ActorMethod<
     [bigint],
     [] | [
@@ -244,7 +299,8 @@ export interface neuronSnapshot {
   'getLogsByContext' : ActorMethod<[string, bigint], Array<LogEntry>>,
   'getLogsByLevel' : ActorMethod<[LogLevel, bigint], Array<LogEntry>>,
   'getMaxNeuronSnapshots' : ActorMethod<[], bigint>,
-  'getNNSProposalCopyInfo' : ActorMethod<[bigint], Result_1>,
+  'getNNSProposalCopyInfo' : ActorMethod<[bigint], Result_2>,
+  'getNNSProposalIdForSNS' : ActorMethod<[bigint], [] | [bigint]>,
   'getNeuronDataForDAO' : ActorMethod<
     [SnapshotId, bigint, bigint],
     [] | [
@@ -255,9 +311,46 @@ export interface neuronSnapshot {
       }
     ]
   >,
+  'getPeriodicTimerIntervalSeconds' : ActorMethod<[], bigint>,
+  'getPeriodicTimerStatus' : ActorMethod<
+    [],
+    {
+      'timer_id' : [] | [bigint],
+      'last_run_time' : [] | [bigint],
+      'next_run_time' : [] | [bigint],
+      'interval_seconds' : bigint,
+      'is_running' : boolean,
+    }
+  >,
   'getSNSProposal' : ActorMethod<[bigint], GetSNSProposalFullResult>,
   'getSNSProposalSummary' : ActorMethod<[bigint], GetSNSProposalSummaryResult>,
+  'getUrgentVotableProposals' : ActorMethod<
+    [bigint],
+    Array<
+      {
+        'is_expired' : boolean,
+        'nns_proposal_id' : bigint,
+        'proposal_timestamp_seconds' : [] | [bigint],
+        'deadline_timestamp_seconds' : [] | [bigint],
+        'time_remaining_seconds' : [] | [bigint],
+        'sns_proposal_id' : bigint,
+      }
+    >
+  >,
   'getVotableProposals' : ActorMethod<[], Array<[bigint, bigint]>>,
+  'getVotableProposalsWithTimeLeft' : ActorMethod<
+    [],
+    Array<
+      {
+        'is_expired' : boolean,
+        'nns_proposal_id' : bigint,
+        'proposal_timestamp_seconds' : [] | [bigint],
+        'deadline_timestamp_seconds' : [] | [bigint],
+        'time_remaining_seconds' : [] | [bigint],
+        'sns_proposal_id' : bigint,
+      }
+    >
+  >,
   'get_neuron_snapshot_curr_neuron_id' : ActorMethod<[], [] | [NeuronId]>,
   'get_neuron_snapshot_head_id' : ActorMethod<[], SnapshotId>,
   'get_neuron_snapshot_importing_count' : ActorMethod<[], bigint>,
@@ -280,6 +373,7 @@ export interface neuronSnapshot {
     [] | [DAOVote]
   >,
   'isAutoProcessingRunning' : ActorMethod<[], boolean>,
+  'isAutoVotingRunning' : ActorMethod<[], boolean>,
   'isNNSProposalCopied' : ActorMethod<[bigint], [] | [bigint]>,
   'markNNSProposalAsVoted' : ActorMethod<[bigint], boolean>,
   'processNewestNNSProposals' : ActorMethod<
@@ -287,9 +381,11 @@ export interface neuronSnapshot {
     ProcessSequentialProposalsResult
   >,
   'removeCopiedNNSProposal' : ActorMethod<[bigint], undefined>,
+  'setAutoVotingThresholdSeconds' : ActorMethod<[bigint], undefined>,
   'setHighestProcessedNNSProposalId' : ActorMethod<[bigint], undefined>,
   'setLogAdmin' : ActorMethod<[Principal], undefined>,
   'setMaxNeuronSnapshots' : ActorMethod<[bigint], undefined>,
+  'setPeriodicTimerIntervalSeconds' : ActorMethod<[bigint], undefined>,
   'setSnsGovernanceCanisterId' : ActorMethod<[Principal], undefined>,
   'setTest' : ActorMethod<[boolean], undefined>,
   'shouldCopyNNSProposal' : ActorMethod<[bigint], ShouldCopyProposalResult>,
@@ -297,14 +393,19 @@ export interface neuronSnapshot {
     [Uint8Array | number[]],
     boolean
   >,
+  'startAutoVoteOnUrgentProposals' : ActorMethod<[], boolean>,
+  'startPeriodicTimer' : ActorMethod<[], boolean>,
   'stopAutoProcessNNSProposals' : ActorMethod<[], boolean>,
+  'stopAutoVoteOnUrgentProposals' : ActorMethod<[], boolean>,
+  'stopPeriodicTimer' : ActorMethod<[], boolean>,
   'submitDAOVotes' : ActorMethod<
     [bigint, Array<Uint8Array | number[]>, DAOVoteDecision],
-    Result
+    Result_1
   >,
   'take_neuron_snapshot' : ActorMethod<[], TakeNeuronSnapshotResult>,
   'testProposalTextFormatting' : ActorMethod<[], string>,
   'testVotingStatus' : ActorMethod<[], Array<[string, VotingStatus]>>,
+  'voteOnNNSProposal' : ActorMethod<[bigint], Result>,
 }
 export interface _SERVICE extends neuronSnapshot {}
 export declare const idlFactory: IDL.InterfaceFactory;
