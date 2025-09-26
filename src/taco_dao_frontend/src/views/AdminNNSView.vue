@@ -142,7 +142,15 @@
                     <!-- Configuration Section -->
                     <div class="taco-container taco-container--l1 mb-4">
                         <div class="p-3">
-                            <TacoTitle level="h3" emoji="⚙️" title="Configuration" class="mb-4" />
+                            <div class="d-flex justify-content-between align-items-center mb-4">
+                                <TacoTitle level="h3" emoji="⚙️" title="Configuration" />
+                                <button 
+                                    @click="loadConfiguration" 
+                                    :disabled="actionLoading"
+                                    class="btn taco-btn taco-btn--outline btn-sm">
+                                    <i class="fas fa-refresh me-1"></i>Refresh Config
+                                </button>
+                            </div>
 
                             <div class="row">
                                 <!-- Periodic Timer Interval -->
@@ -192,6 +200,61 @@
                                     <small class="text-muted">
                                         Current: {{ formatSeconds(currentVotingThreshold) }} 
                                         (Must be greater than timer interval)
+                                    </small>
+                                </div>
+
+                                <!-- Proposer Subaccount -->
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label taco-text-black-to-white">
+                                        <strong>Proposer Subaccount</strong>
+                                    </label>
+                                    <div class="input-group">
+                                        <input 
+                                            v-model="newProposerSubaccount" 
+                                            type="text" 
+                                            class="form-control font-monospace" 
+                                            placeholder="Hex string (64 characters)"
+                                            maxlength="64"
+                                            style="font-size: 0.85rem;">
+                                        <button 
+                                            @click="updateProposerSubaccount" 
+                                            :disabled="actionLoading || !newProposerSubaccount || !isValidHex(newProposerSubaccount)"
+                                            class="btn taco-btn taco-btn--green">
+                                            Update
+                                        </button>
+                                    </div>
+                                    <small class="text-muted">
+                                        Current: {{ currentProposerSubaccount || 'Loading...' }} 
+                                        <span v-if="newProposerSubaccount && !isValidHex(newProposerSubaccount)" class="text-danger">
+                                            (Invalid hex format)
+                                        </span>
+                                    </small>
+                                </div>
+
+                                <!-- TACO DAO Neuron ID -->
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label taco-text-black-to-white">
+                                        <strong>TACO DAO Neuron ID</strong>
+                                    </label>
+                                    <div class="input-group">
+                                        <input 
+                                            v-model="newTacoDAONeuronId" 
+                                            type="text" 
+                                            class="form-control font-monospace" 
+                                            placeholder="Neuron ID (numeric)"
+                                            style="font-size: 0.85rem;">
+                                        <button 
+                                            @click="updateTacoDAONeuronId" 
+                                            :disabled="actionLoading || !newTacoDAONeuronId || !isValidNeuronId(newTacoDAONeuronId)"
+                                            class="btn taco-btn taco-btn--green">
+                                            Update
+                                        </button>
+                                    </div>
+                                    <small class="text-muted">
+                                        Current: {{ currentTacoDAONeuronId || 'Loading...' }}
+                                        <span v-if="newTacoDAONeuronId && !isValidNeuronId(newTacoDAONeuronId)" class="text-danger">
+                                            (Invalid neuron ID format)
+                                        </span>
                                     </small>
                                 </div>
                             </div>
@@ -281,6 +344,7 @@ import { storeToRefs } from 'pinia'
 import { useTacoStore } from '../stores/taco.store'
 import HeaderBar from '../components/HeaderBar.vue'
 import TacoTitle from '../components/misc/TacoTitle.vue'
+import astronautLoader from '../assets/images/astonautLoader.webp'
 
 // Store
 const tacoStore = useTacoStore()
@@ -307,12 +371,16 @@ const isAutoVotingRunning = ref(false)
 const newPeriodicInterval = ref(3600)
 const newVotingThreshold = ref(7200)
 const currentVotingThreshold = ref(7200)
+const newProposerSubaccount = ref('')
+const currentProposerSubaccount = ref('')
+const newTacoDAONeuronId = ref('')
+const currentTacoDAONeuronId = ref('')
 
 // Proposals
 const votableProposals = ref<any[]>([])
 
 // Computed
-const astronautLoaderUrl = computed(() => tacoStore.astronautLoaderUrl)
+const astronautLoaderUrl = astronautLoader
 
 // Methods
 const formatSeconds = (seconds: number | bigint) => {
@@ -349,6 +417,36 @@ const isUrgent = (proposal: any) => {
         ? Number(proposal.time_remaining_seconds) 
         : proposal.time_remaining_seconds
     return timeRemaining <= currentVotingThreshold.value && !proposal.is_expired
+}
+
+// Validation functions
+const isValidHex = (hex: string) => {
+    if (!hex) return true // Allow empty for display purposes
+    // Remove any whitespace and convert to lowercase
+    const cleanHex = hex.replace(/\s/g, '').toLowerCase()
+    // Check if it's exactly 64 characters and only contains hex characters
+    return /^[0-9a-f]{64}$/.test(cleanHex)
+}
+
+const isValidNeuronId = (neuronId: string) => {
+    if (!neuronId) return true // Allow empty for display purposes
+    // Check if it's a valid positive integer
+    return /^\d+$/.test(neuronId) && BigInt(neuronId) > 0
+}
+
+// Helper function to convert hex string to Uint8Array
+const hexToBytes = (hex: string): Uint8Array => {
+    const cleanHex = hex.replace(/\s/g, '').toLowerCase()
+    const bytes = new Uint8Array(cleanHex.length / 2)
+    for (let i = 0; i < cleanHex.length; i += 2) {
+        bytes[i / 2] = parseInt(cleanHex.substr(i, 2), 16)
+    }
+    return bytes
+}
+
+// Helper function to convert Uint8Array to hex string
+const bytesToHex = (bytes: Uint8Array): string => {
+    return Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('')
 }
 
 // Timer control methods
@@ -391,7 +489,7 @@ const stopPeriodicTimer = async () => {
 const startAutoProcessing = async () => {
     try {
         actionLoading.value = true
-        const result = await tacoStore.startAutoProcessNNSProposals(new Uint8Array())
+        const result = await tacoStore.startAutoProcessNNSProposals()
         if (result) {
             tacoStore.showSuccess('Auto-processing started successfully')
             await loadTimerStatus()
@@ -489,6 +587,45 @@ const updateVotingThreshold = async () => {
     }
 }
 
+const updateProposerSubaccount = async () => {
+    if (!newProposerSubaccount.value || !isValidHex(newProposerSubaccount.value)) {
+        tacoStore.showError('Invalid hex format. Please enter a 64-character hex string.')
+        return
+    }
+
+    try {
+        actionLoading.value = true
+        const bytes = hexToBytes(newProposerSubaccount.value)
+        await tacoStore.setProposerSubaccount(bytes)
+        tacoStore.showSuccess('Proposer subaccount updated successfully')
+        await loadConfiguration()
+    } catch (error: any) {
+        console.error('Error updating proposer subaccount:', error)
+        tacoStore.showError('Error updating proposer subaccount: ' + error.message)
+    } finally {
+        actionLoading.value = false
+    }
+}
+
+const updateTacoDAONeuronId = async () => {
+    if (!newTacoDAONeuronId.value || !isValidNeuronId(newTacoDAONeuronId.value)) {
+        tacoStore.showError('Invalid neuron ID format. Please enter a positive integer.')
+        return
+    }
+
+    try {
+        actionLoading.value = true
+        await tacoStore.setTacoDAONeuronId(BigInt(newTacoDAONeuronId.value))
+        tacoStore.showSuccess('TACO DAO neuron ID updated successfully')
+        await loadConfiguration()
+    } catch (error: any) {
+        console.error('Error updating TACO DAO neuron ID:', error)
+        tacoStore.showError('Error updating TACO DAO neuron ID: ' + error.message)
+    } finally {
+        actionLoading.value = false
+    }
+}
+
 // Proposal methods
 const refreshVotableProposals = async () => {
     try {
@@ -545,9 +682,91 @@ const loadTimerStatus = async () => {
 
 const loadConfiguration = async () => {
     try {
-        const votingThreshold = await tacoStore.getAutoVotingThresholdSeconds()
+        console.log('Loading configuration...')
+        console.log('TacoStore methods available:', {
+            getAutoVotingThresholdSeconds: typeof tacoStore.getAutoVotingThresholdSeconds,
+            getProposerSubaccount: typeof tacoStore.getProposerSubaccount,
+            getTacoDAONeuronId: typeof tacoStore.getTacoDAONeuronId
+        })
+        
+        const [votingThreshold, proposerSubaccount, tacoDAONeuronId] = await Promise.all([
+            tacoStore.getAutoVotingThresholdSeconds(),
+            tacoStore.getProposerSubaccount(),
+            tacoStore.getTacoDAONeuronId()
+        ])
+        
+        console.log('Raw responses:', { votingThreshold, proposerSubaccount, tacoDAONeuronId })
+        
+        // Voting threshold
         currentVotingThreshold.value = Number(votingThreshold || 7200)
         newVotingThreshold.value = currentVotingThreshold.value
+        
+        // Proposer subaccount
+        if (proposerSubaccount) {
+            try {
+                // Handle different possible formats
+                let bytes: Uint8Array
+                if (proposerSubaccount instanceof Uint8Array) {
+                    bytes = proposerSubaccount
+                } else if (Array.isArray(proposerSubaccount)) {
+                    bytes = new Uint8Array(proposerSubaccount)
+                } else if (proposerSubaccount._buffer) {
+                    // Handle ArrayBuffer-like objects
+                    bytes = new Uint8Array(proposerSubaccount._buffer || proposerSubaccount)
+                } else {
+                    console.warn('Unknown proposer subaccount format:', proposerSubaccount)
+                    bytes = new Uint8Array()
+                }
+                
+                const hexString = bytesToHex(bytes)
+                console.log('Proposer subaccount hex:', hexString)
+                currentProposerSubaccount.value = hexString
+                newProposerSubaccount.value = hexString
+            } catch (subError) {
+                console.error('Error processing proposer subaccount:', subError)
+                currentProposerSubaccount.value = 'Error loading'
+                newProposerSubaccount.value = ''
+            }
+        } else {
+            currentProposerSubaccount.value = 'Not set'
+            newProposerSubaccount.value = ''
+        }
+        
+        // TACO DAO neuron ID
+        if (tacoDAONeuronId) {
+            try {
+                console.log('Neuron ID object:', tacoDAONeuronId)
+                let neuronIdValue: bigint | number
+                
+                if (tacoDAONeuronId.id !== undefined) {
+                    neuronIdValue = tacoDAONeuronId.id
+                } else if (typeof tacoDAONeuronId === 'object' && Object.keys(tacoDAONeuronId).length === 1) {
+                    // Handle case where the response might be wrapped
+                    neuronIdValue = Object.values(tacoDAONeuronId)[0] as bigint | number
+                } else {
+                    neuronIdValue = tacoDAONeuronId as bigint | number
+                }
+                
+                const neuronIdString = neuronIdValue.toString()
+                console.log('Neuron ID string:', neuronIdString)
+                currentTacoDAONeuronId.value = neuronIdString
+                newTacoDAONeuronId.value = neuronIdString
+            } catch (neuronError) {
+                console.error('Error processing neuron ID:', neuronError)
+                currentTacoDAONeuronId.value = 'Error loading'
+                newTacoDAONeuronId.value = ''
+            }
+        } else {
+            currentTacoDAONeuronId.value = 'Not set'
+            newTacoDAONeuronId.value = ''
+        }
+        
+        console.log('Final values:', {
+            currentVotingThreshold: currentVotingThreshold.value,
+            currentProposerSubaccount: currentProposerSubaccount.value,
+            currentTacoDAONeuronId: currentTacoDAONeuronId.value
+        })
+        
     } catch (error: any) {
         console.error('Error loading configuration:', error)
         tacoStore.showError('Error loading configuration: ' + error.message)
@@ -556,21 +775,28 @@ const loadConfiguration = async () => {
 
 // Initialize
 onMounted(async () => {
+    console.log('AdminNNSView mounted, user logged in:', userLoggedIn.value)
+    
     try {
         if (!userLoggedIn.value) {
+            console.log('User not logged in, showing error')
             tacoStore.showError('You must be logged in to access admin functions')
+            loading.value = false
             return
         }
         
+        console.log('Starting to load admin data...')
         await Promise.all([
             loadTimerStatus(),
-            loadConfiguration(),
+            loadConfiguration(), 
             refreshVotableProposals()
         ])
+        console.log('All admin data loaded successfully')
     } catch (error: any) {
         console.error('Error initializing admin NNS page:', error)
         tacoStore.showError('Error loading admin data: ' + error.message)
     } finally {
+        console.log('Setting loading to false')
         loading.value = false
     }
 })

@@ -84,6 +84,7 @@ export interface Neuron {
   'neuron_fees_e8s' : bigint,
 }
 export interface NeuronId { 'id' : Uint8Array | number[] }
+export interface NeuronId__1 { 'id' : bigint }
 export interface NeuronPermission {
   'principal' : [] | [Principal],
   'permission_type' : Int32Array | number[],
@@ -263,10 +264,7 @@ export interface neuronSnapshot {
   'clearDAOVotedNNSProposals' : ActorMethod<[], bigint>,
   'clearDAOVotesForProposal' : ActorMethod<[bigint], bigint>,
   'clearLogs' : ActorMethod<[], undefined>,
-  'copyNNSProposal' : ActorMethod<
-    [bigint, Uint8Array | number[]],
-    CopyNNSProposalResult
-  >,
+  'copyNNSProposal' : ActorMethod<[bigint], CopyNNSProposalResult>,
   'getAutoVotingThresholdSeconds' : ActorMethod<[], bigint>,
   'getCopiedNNSProposals' : ActorMethod<[], Array<[bigint, bigint]>>,
   'getCopiedNNSProposalsCount' : ActorMethod<[], bigint>,
@@ -322,8 +320,10 @@ export interface neuronSnapshot {
       'is_running' : boolean,
     }
   >,
+  'getProposerSubaccount' : ActorMethod<[], Uint8Array | number[]>,
   'getSNSProposal' : ActorMethod<[bigint], GetSNSProposalFullResult>,
   'getSNSProposalSummary' : ActorMethod<[bigint], GetSNSProposalSummaryResult>,
+  'getTacoDAONeuronId' : ActorMethod<[], NeuronId__1>,
   'getUrgentVotableProposals' : ActorMethod<
     [bigint],
     Array<
@@ -377,7 +377,7 @@ export interface neuronSnapshot {
   'isNNSProposalCopied' : ActorMethod<[bigint], [] | [bigint]>,
   'markNNSProposalAsVoted' : ActorMethod<[bigint], boolean>,
   'processNewestNNSProposals' : ActorMethod<
-    [[] | [number], Uint8Array | number[]],
+    [[] | [number]],
     ProcessSequentialProposalsResult
   >,
   'removeCopiedNNSProposal' : ActorMethod<[bigint], undefined>,
@@ -386,13 +386,12 @@ export interface neuronSnapshot {
   'setLogAdmin' : ActorMethod<[Principal], undefined>,
   'setMaxNeuronSnapshots' : ActorMethod<[bigint], undefined>,
   'setPeriodicTimerIntervalSeconds' : ActorMethod<[bigint], undefined>,
+  'setProposerSubaccount' : ActorMethod<[Uint8Array | number[]], undefined>,
   'setSnsGovernanceCanisterId' : ActorMethod<[Principal], undefined>,
+  'setTacoDAONeuronId' : ActorMethod<[bigint], undefined>,
   'setTest' : ActorMethod<[boolean], undefined>,
   'shouldCopyNNSProposal' : ActorMethod<[bigint], ShouldCopyProposalResult>,
-  'startAutoProcessNNSProposals' : ActorMethod<
-    [Uint8Array | number[]],
-    boolean
-  >,
+  'startAutoProcessNNSProposals' : ActorMethod<[], boolean>,
   'startAutoVoteOnUrgentProposals' : ActorMethod<[], boolean>,
   'startPeriodicTimer' : ActorMethod<[], boolean>,
   'stopAutoProcessNNSProposals' : ActorMethod<[], boolean>,

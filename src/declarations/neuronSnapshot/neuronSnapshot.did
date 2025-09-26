@@ -9,8 +9,7 @@ type neuronSnapshot =
    clearDAOVotedNNSProposals: () -> (nat);
    clearDAOVotesForProposal: (snsProposalId: nat64) -> (nat);
    clearLogs: () -> ();
-   copyNNSProposal: (nnsProposalId: nat64, proposerSubaccount: blob) ->
-    (CopyNNSProposalResult);
+   copyNNSProposal: (nnsProposalId: nat64) -> (CopyNNSProposalResult);
    getAutoVotingThresholdSeconds: () -> (nat64) query;
    getCopiedNNSProposals: () -> (vec record {
                                        nat64;
@@ -63,9 +62,11 @@ type neuronSnapshot =
        next_run_time: opt nat64;
        timer_id: opt nat;
      }) query;
+   getProposerSubaccount: () -> (blob) query;
    getSNSProposal: (proposalId: nat64) -> (GetSNSProposalFullResult);
    getSNSProposalSummary: (proposalId: nat64) ->
     (GetSNSProposalSummaryResult);
+   getTacoDAONeuronId: () -> (NeuronId__1) query;
    getUrgentVotableProposals: (hoursThreshold: nat64) ->
     (vec
       record {
@@ -107,19 +108,21 @@ type neuronSnapshot =
    isAutoVotingRunning: () -> (bool) query;
    isNNSProposalCopied: (nnsProposalId: nat64) -> (opt nat64) query;
    markNNSProposalAsVoted: (nnsProposalId: nat64) -> (bool);
-   processNewestNNSProposals: (limit: opt nat32, proposerSubaccount: 
-    blob) -> (ProcessSequentialProposalsResult);
+   processNewestNNSProposals: (limit: opt nat32) ->
+    (ProcessSequentialProposalsResult);
    removeCopiedNNSProposal: (nnsProposalId: nat64) -> ();
    setAutoVotingThresholdSeconds: (thresholdSeconds: nat64) -> ();
    setHighestProcessedNNSProposalId: (proposalId: nat64) -> ();
    setLogAdmin: (admin: principal) -> ();
    setMaxNeuronSnapshots: (maxSnapshots: nat) -> ();
    setPeriodicTimerIntervalSeconds: (intervalSeconds: nat64) -> ();
+   setProposerSubaccount: (subaccount: blob) -> ();
    setSnsGovernanceCanisterId: (canisterId: principal) -> ();
+   setTacoDAONeuronId: (neuronId: nat64) -> ();
    setTest: (enabled: bool) -> ();
    shouldCopyNNSProposal: (nnsProposalId: nat64) ->
     (ShouldCopyProposalResult);
-   startAutoProcessNNSProposals: (proposerSubaccount: blob) -> (bool);
+   startAutoProcessNNSProposals: () -> (bool);
    startAutoVoteOnUrgentProposals: () -> (bool);
    startPeriodicTimer: () -> (bool);
    stopAutoProcessNNSProposals: () -> (bool);
@@ -349,6 +352,7 @@ type NeuronPermission =
    permission_type: vec int32;
    "principal": opt principal;
  };
+type NeuronId__1 = record {id: nat64;};
 type NeuronId = record {id: blob;};
 type Neuron = 
  record {

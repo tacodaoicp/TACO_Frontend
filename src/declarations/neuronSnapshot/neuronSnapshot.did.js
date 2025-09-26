@@ -186,6 +186,7 @@ export const idlFactory = ({ IDL }) => {
     'ok' : SNSProposalSummary,
     'err' : SNSProposalError,
   });
+  const NeuronId__1 = IDL.Record({ 'id' : IDL.Nat64 });
   const NeuronId = IDL.Record({ 'id' : IDL.Vec(IDL.Nat8) });
   const NeuronSnapshotError = IDL.Variant({
     'Timeout' : IDL.Null,
@@ -298,11 +299,7 @@ export const idlFactory = ({ IDL }) => {
     'clearDAOVotedNNSProposals' : IDL.Func([], [IDL.Nat], []),
     'clearDAOVotesForProposal' : IDL.Func([IDL.Nat64], [IDL.Nat], []),
     'clearLogs' : IDL.Func([], [], []),
-    'copyNNSProposal' : IDL.Func(
-        [IDL.Nat64, IDL.Vec(IDL.Nat8)],
-        [CopyNNSProposalResult],
-        [],
-      ),
+    'copyNNSProposal' : IDL.Func([IDL.Nat64], [CopyNNSProposalResult], []),
     'getAutoVotingThresholdSeconds' : IDL.Func([], [IDL.Nat64], ['query']),
     'getCopiedNNSProposals' : IDL.Func(
         [],
@@ -389,12 +386,14 @@ export const idlFactory = ({ IDL }) => {
         ],
         ['query'],
       ),
+    'getProposerSubaccount' : IDL.Func([], [IDL.Vec(IDL.Nat8)], ['query']),
     'getSNSProposal' : IDL.Func([IDL.Nat64], [GetSNSProposalFullResult], []),
     'getSNSProposalSummary' : IDL.Func(
         [IDL.Nat64],
         [GetSNSProposalSummaryResult],
         [],
       ),
+    'getTacoDAONeuronId' : IDL.Func([], [NeuronId__1], ['query']),
     'getUrgentVotableProposals' : IDL.Func(
         [IDL.Nat64],
         [
@@ -474,7 +473,7 @@ export const idlFactory = ({ IDL }) => {
       ),
     'markNNSProposalAsVoted' : IDL.Func([IDL.Nat64], [IDL.Bool], []),
     'processNewestNNSProposals' : IDL.Func(
-        [IDL.Opt(IDL.Nat32), IDL.Vec(IDL.Nat8)],
+        [IDL.Opt(IDL.Nat32)],
         [ProcessSequentialProposalsResult],
         [],
       ),
@@ -484,18 +483,16 @@ export const idlFactory = ({ IDL }) => {
     'setLogAdmin' : IDL.Func([IDL.Principal], [], []),
     'setMaxNeuronSnapshots' : IDL.Func([IDL.Nat], [], []),
     'setPeriodicTimerIntervalSeconds' : IDL.Func([IDL.Nat64], [], []),
+    'setProposerSubaccount' : IDL.Func([IDL.Vec(IDL.Nat8)], [], []),
     'setSnsGovernanceCanisterId' : IDL.Func([IDL.Principal], [], []),
+    'setTacoDAONeuronId' : IDL.Func([IDL.Nat64], [], []),
     'setTest' : IDL.Func([IDL.Bool], [], []),
     'shouldCopyNNSProposal' : IDL.Func(
         [IDL.Nat64],
         [ShouldCopyProposalResult],
         [],
       ),
-    'startAutoProcessNNSProposals' : IDL.Func(
-        [IDL.Vec(IDL.Nat8)],
-        [IDL.Bool],
-        [],
-      ),
+    'startAutoProcessNNSProposals' : IDL.Func([], [IDL.Bool], []),
     'startAutoVoteOnUrgentProposals' : IDL.Func([], [IDL.Bool], []),
     'startPeriodicTimer' : IDL.Func([], [IDL.Bool], []),
     'stopAutoProcessNNSProposals' : IDL.Func([], [IDL.Bool], []),

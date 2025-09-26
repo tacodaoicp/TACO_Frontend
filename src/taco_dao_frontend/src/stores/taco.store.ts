@@ -7911,10 +7911,10 @@ export const useTacoStore = defineStore('taco', () => {
     }
 
     // Start auto-processing NNS proposals
-    const startAutoProcessNNSProposals = async (subaccount: Uint8Array) => {
+    const startAutoProcessNNSProposals = async () => {
         try {
             const actor = await createNeuronSnapshotActor();
-            const result = await (actor as any).startAutoProcessNNSProposals(subaccount);
+            const result = await (actor as any).startAutoProcessNNSProposals();
             return result;
         } catch (error) {
             console.error('Error starting auto-processing:', error);
@@ -7961,8 +7961,10 @@ export const useTacoStore = defineStore('taco', () => {
     // Get auto-voting threshold in seconds
     const getAutoVotingThresholdSeconds = async () => {
         try {
+            console.log('Getting auto-voting threshold...');
             const actor = await createNeuronSnapshotActor();
             const result = await (actor as any).getAutoVotingThresholdSeconds();
+            console.log('Auto-voting threshold result:', result);
             return result;
         } catch (error) {
             console.error('Error getting auto-voting threshold:', error);
@@ -8012,6 +8014,56 @@ export const useTacoStore = defineStore('taco', () => {
             return result;
         } catch (error) {
             console.error('Error voting on NNS proposal:', error);
+            throw error;
+        }
+    }
+
+    // Get proposer subaccount
+    const getProposerSubaccount = async () => {
+        try {
+            console.log('Getting proposer subaccount...');
+            const actor = await createNeuronSnapshotActor();
+            const result = await (actor as any).getProposerSubaccount();
+            console.log('Proposer subaccount result:', result);
+            return result;
+        } catch (error) {
+            console.error('Error getting proposer subaccount:', error);
+            throw error;
+        }
+    }
+
+    // Set proposer subaccount
+    const setProposerSubaccount = async (subaccount: Uint8Array) => {
+        try {
+            const actor = await createNeuronSnapshotActor();
+            await (actor as any).setProposerSubaccount(subaccount);
+        } catch (error) {
+            console.error('Error setting proposer subaccount:', error);
+            throw error;
+        }
+    }
+
+    // Get TACO DAO neuron ID
+    const getTacoDAONeuronId = async () => {
+        try {
+            console.log('Getting TACO DAO neuron ID...');
+            const actor = await createNeuronSnapshotActor();
+            const result = await (actor as any).getTacoDAONeuronId();
+            console.log('TACO DAO neuron ID result:', result);
+            return result;
+        } catch (error) {
+            console.error('Error getting TACO DAO neuron ID:', error);
+            throw error;
+        }
+    }
+
+    // Set TACO DAO neuron ID
+    const setTacoDAONeuronId = async (neuronId: bigint) => {
+        try {
+            const actor = await createNeuronSnapshotActor();
+            await (actor as any).setTacoDAONeuronId(neuronId);
+        } catch (error) {
+            console.error('Error setting TACO DAO neuron ID:', error);
             throw error;
         }
     }
@@ -8365,5 +8417,9 @@ export const useTacoStore = defineStore('taco', () => {
         getPeriodicTimerIntervalSeconds,
         setPeriodicTimerIntervalSeconds,
         voteOnNNSProposal,
+        getProposerSubaccount,
+        setProposerSubaccount,
+        getTacoDAONeuronId,
+        setTacoDAONeuronId,
     }
 })
