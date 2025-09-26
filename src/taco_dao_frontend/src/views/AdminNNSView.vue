@@ -639,7 +639,14 @@ const refreshVotableProposals = async () => {
     try {
         proposalsLoading.value = true
         const proposals = await tacoStore.getVotableProposalsWithTimeLeft()
-        votableProposals.value = proposals || []
+        
+        // Convert BigInt values to Numbers to avoid JSON serialization issues
+        votableProposals.value = (proposals || []).map(proposal => ({
+            ...proposal,
+            nns_proposal_id: Number(proposal.nns_proposal_id),
+            sns_proposal_id: Number(proposal.sns_proposal_id),
+            time_remaining_seconds: Number(proposal.time_remaining_seconds)
+        }))
     } catch (error: any) {
         console.error('Error loading votable proposals:', error)
         tacoStore.showError('Error loading votable proposals: ' + error.message)
@@ -676,12 +683,22 @@ const loadTimerStatus = async () => {
             tacoStore.isAutoVotingRunning()
         ])
         
-        periodicTimerStatus.value = periodicStatus || periodicTimerStatus.value
+        // Convert BigInt values to Numbers to avoid JSON serialization issues
+        if (periodicStatus) {
+            periodicTimerStatus.value = {
+                is_running: periodicStatus.is_running,
+                interval_seconds: Number(periodicStatus.interval_seconds),
+                last_run_time: periodicStatus.last_run_time ? Number(periodicStatus.last_run_time) : null,
+                next_run_time: periodicStatus.next_run_time ? Number(periodicStatus.next_run_time) : null,
+                timer_id: periodicStatus.timer_id ? Number(periodicStatus.timer_id) : null
+            }
+        }
+        
         isAutoProcessingRunning.value = autoProcessing || false
         isAutoVotingRunning.value = autoVoting || false
         
-        // Update form values - handle BigInt conversion
-        newPeriodicInterval.value = Number(periodicTimerStatus.value.interval_seconds)
+        // Update form values
+        newPeriodicInterval.value = periodicTimerStatus.value.interval_seconds
     } catch (error: any) {
         console.error('Error loading timer status:', error)
         tacoStore.showError('Error loading timer status: ' + error.message)
