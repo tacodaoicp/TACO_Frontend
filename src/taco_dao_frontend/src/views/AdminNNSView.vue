@@ -315,30 +315,40 @@ const votableProposals = ref<any[]>([])
 const astronautLoaderUrl = computed(() => tacoStore.astronautLoaderUrl)
 
 // Methods
-const formatSeconds = (seconds: number) => {
-    if (seconds < 60) return `${seconds}s`
-    if (seconds < 3600) return `${Math.floor(seconds / 60)}m ${seconds % 60}s`
-    const hours = Math.floor(seconds / 3600)
-    const minutes = Math.floor((seconds % 3600) / 60)
+const formatSeconds = (seconds: number | bigint) => {
+    // Convert BigInt to Number if needed
+    const numSeconds = typeof seconds === 'bigint' ? Number(seconds) : seconds
+    if (numSeconds < 60) return `${numSeconds}s`
+    if (numSeconds < 3600) return `${Math.floor(numSeconds / 60)}m ${numSeconds % 60}s`
+    const hours = Math.floor(numSeconds / 3600)
+    const minutes = Math.floor((numSeconds % 3600) / 60)
     return `${hours}h ${minutes}m`
 }
 
-const formatTimestamp = (timestamp: number | null) => {
+const formatTimestamp = (timestamp: number | bigint | null) => {
     if (!timestamp) return 'Never'
-    return new Date(timestamp * 1000).toLocaleString()
+    // Convert BigInt to Number if needed
+    const numTimestamp = typeof timestamp === 'bigint' ? Number(timestamp) : timestamp
+    return new Date(numTimestamp * 1000).toLocaleString()
 }
 
-const formatTimeRemaining = (seconds: number) => {
-    if (seconds < 0) {
-        const absSeconds = Math.abs(seconds)
+const formatTimeRemaining = (seconds: number | bigint) => {
+    // Convert BigInt to Number if needed
+    const numSeconds = typeof seconds === 'bigint' ? Number(seconds) : seconds
+    if (numSeconds < 0) {
+        const absSeconds = Math.abs(numSeconds)
         return `Expired ${formatSeconds(absSeconds)} ago`
     }
-    return formatSeconds(seconds)
+    return formatSeconds(numSeconds)
 }
 
 const isUrgent = (proposal: any) => {
     if (!proposal.time_remaining_seconds) return false
-    return proposal.time_remaining_seconds <= currentVotingThreshold.value && !proposal.is_expired
+    // Convert BigInt to Number for comparison
+    const timeRemaining = typeof proposal.time_remaining_seconds === 'bigint' 
+        ? Number(proposal.time_remaining_seconds) 
+        : proposal.time_remaining_seconds
+    return timeRemaining <= currentVotingThreshold.value && !proposal.is_expired
 }
 
 // Timer control methods
@@ -525,7 +535,7 @@ const loadTimerStatus = async () => {
         isAutoProcessingRunning.value = autoProcessing || false
         isAutoVotingRunning.value = autoVoting || false
         
-        // Update form values
+        // Update form values - handle BigInt conversion
         newPeriodicInterval.value = Number(periodicTimerStatus.value.interval_seconds)
     } catch (error: any) {
         console.error('Error loading timer status:', error)
