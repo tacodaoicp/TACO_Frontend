@@ -720,8 +720,14 @@ const loadConfiguration = async () => {
                 
                 const hexString = bytesToHex(bytes)
                 console.log('Proposer subaccount hex:', hexString)
-                currentProposerSubaccount.value = hexString
-                newProposerSubaccount.value = hexString
+                
+                if (bytes.length === 0) {
+                    currentProposerSubaccount.value = 'Empty (needs to be set)'
+                    newProposerSubaccount.value = '712b9424940499b2a59979c3605c83772b636f8fce15bc963937da4812f89928' // Default to the correct value
+                } else {
+                    currentProposerSubaccount.value = hexString
+                    newProposerSubaccount.value = hexString
+                }
             } catch (subError) {
                 console.error('Error processing proposer subaccount:', subError)
                 currentProposerSubaccount.value = 'Error loading'
@@ -729,7 +735,7 @@ const loadConfiguration = async () => {
             }
         } else {
             currentProposerSubaccount.value = 'Not set'
-            newProposerSubaccount.value = ''
+            newProposerSubaccount.value = '712b9424940499b2a59979c3605c83772b636f8fce15bc963937da4812f89928' // Default to the correct value
         }
         
         // TACO DAO neuron ID
@@ -777,9 +783,16 @@ const loadConfiguration = async () => {
 onMounted(async () => {
     console.log('AdminNNSView mounted, user logged in:', userLoggedIn.value)
     
+    // Wait a bit for the store to initialize if needed
+    if (!userLoggedIn.value) {
+        console.log('User not logged in initially, waiting 500ms...')
+        await new Promise(resolve => setTimeout(resolve, 500))
+        console.log('After wait, user logged in:', userLoggedIn.value)
+    }
+    
     try {
         if (!userLoggedIn.value) {
-            console.log('User not logged in, showing error')
+            console.log('User still not logged in, showing error')
             tacoStore.showError('You must be logged in to access admin functions')
             loading.value = false
             return
