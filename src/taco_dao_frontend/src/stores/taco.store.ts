@@ -5413,19 +5413,21 @@ export const useTacoStore = defineStore('taco', () => {
 
     // Helper function to calculate neuron age
     const calculateNeuronAge = (createdTimestamp: number, agingSinceTimestamp: number) => {
-        const now = Math.floor(Date.now() / 1000); // Current time in seconds
-        const ageSeconds = now - agingSinceTimestamp;
-        const days = Math.floor(ageSeconds / (24 * 60 * 60));
-        const hours = Math.floor((ageSeconds % (24 * 60 * 60)) / (60 * 60));
+        const now = Math.floor(Date.now() / 1000) // current time in seconds
+        const aging = Number(agingSinceTimestamp)
+        const start = Number.isFinite(aging) && aging > 0 && aging <= now ? aging : createdTimestamp
+        const ageSeconds = Math.max(0, now - start)
+        const days = Math.floor(ageSeconds / (24 * 60 * 60))
+        const hours = Math.floor((ageSeconds % (24 * 60 * 60)) / (60 * 60))
         
         if (days > 0) {
-            return `${days}d ${hours}h`;
+            return `${days}d ${hours}h`
         } else if (hours > 0) {
-            return `${hours}h`;
+            return `${hours}h`
         } else {
-            return '< 1h';
+            return '< 1h'
         }
-    };
+    }
 
     // Format neuron for display with relationship info and detailed stats
     const formatNeuronForDisplay = (neuron: any) => {
@@ -5437,8 +5439,10 @@ export const useTacoStore = defineStore('taco', () => {
         const dissolveInfo = formatDissolveState(neuron.dissolve_state);
         
         // Calculate age
-        const createdTimestamp = Number(neuron.created_timestamp_seconds || 0);
-        const agingSinceTimestamp = Number(neuron.aging_since_timestamp_seconds || createdTimestamp);
+        const createdRaw = neuron.created_timestamp_seconds
+        const agingRaw = neuron.aging_since_timestamp_seconds
+        const createdTimestamp = Array.isArray(createdRaw) ? Number((createdRaw[0] ?? 0n)) : Number(createdRaw ?? 0)
+        const agingSinceTimestamp = Array.isArray(agingRaw) ? Number((agingRaw[0] ?? BigInt(createdTimestamp))) : Number(agingRaw ?? createdTimestamp)
         const ageDisplay = calculateNeuronAge(createdTimestamp, agingSinceTimestamp);
         
         // Parse other stats
@@ -5973,13 +5977,21 @@ export const useTacoStore = defineStore('taco', () => {
     }
 
     // Disburse neuron funds
-    const disburseNeuron = async (neuronId: Uint8Array, toAccount?: any, amount?: bigint) => {
+    const disburseNeuron = async (neuronId: Uint8Array) => {
+
         try {
             if (!userLoggedIn.value) {
                 throw new Error('User must be logged in');
             }
 
-            console.log('Disbursing neuron:', Array.from(neuronId).map(b => b.toString(16).padStart(2, '0')).join(''));
+            // turn app loading on
+            appLoadingOn()
+
+            if (!(neuronId instanceof Uint8Array) || neuronId.length === 0) {
+                throw new Error('invalid neuron id: Uint8Array required')
+            }
+
+            // console.log('Disbursing neuron:', Array.from(neuronId).map(b => b.toString(16).padStart(2, '0')).join(''));
 
             const authClient = await getAuthClient();
             const identity = authClient.getIdentity();
@@ -5995,26 +6007,27 @@ export const useTacoStore = defineStore('taco', () => {
             
             // Prepare the disburse command
             const disburseCommand: any = {};
-            if (toAccount) {
-                disburseCommand.to_account = toAccount;
-            }
-            if (amount) {
-                disburseCommand.amount = { e8s: amount };
-            }
+            // always disburse to the current user's primary account
+            const owner = [Principal.fromText(userPrincipal.value)]
+            disburseCommand.to_account = [{ owner, subaccount: [] }]
 
             // Prepare the manage neuron request for Disburse
             const manageNeuronRequest = {
-                subaccount: Array.from(neuronId),
+                // candid blob prefers Uint8Array
+                subaccount: neuronId,
                 command: [{
-                    Disburse: disburseCommand
+                    Disburse: {
+                        to_account: disburseCommand.to_account,
+                        amount: []
+                    }
                 }]
             };
 
-            console.log('Disburse request:', JSON.stringify(manageNeuronRequest, (key, value) =>
-                typeof value === 'bigint' ? value.toString() : value, 2));
+            // console.log('Disburse request:', JSON.stringify(manageNeuronRequest, (key, value) =>
+            //     typeof value === 'bigint' ? value.toString() : value, 2));
 
             const result = await snsGov.manage_neuron(manageNeuronRequest) as any;
-            console.log('Disburse result:', result);
+            // console.log('Disburse result:', result);
 
             if (result.command && result.command.length > 0) {
                 const command = result.command[0];
@@ -6022,7 +6035,7 @@ export const useTacoStore = defineStore('taco', () => {
                     throw new Error(`Disburse failed: ${JSON.stringify(command)}`);
                 }
                 if (command.Disburse) {
-                    console.log('Neuron disbursed successfully');
+                    // console.log('Neuron disbursed successfully');
                     return true;
                 }
             }
@@ -6031,7 +6044,13 @@ export const useTacoStore = defineStore('taco', () => {
         } catch (error: any) {
             console.error('Error disbursing neuron:', error);
             throw error;
+        } finally {
+
+            // turn app loading off
+            appLoadingOff()
+
         }
+        
     }
 
     // Add neuron permissions

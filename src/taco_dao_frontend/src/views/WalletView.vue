@@ -92,7 +92,8 @@
                         @unregister="unregisterToken"
                         @stake-to-neuron="handleStakeToNeuron"
                         @create-neuron="handleCreateNeuron"
-                        @set-dissolve="handleSetDissolve" />
+                        @set-dissolve="handleSetDissolve"
+                        @refresh-balances="loadAllBalances" />
 
                     </div>
 
