@@ -40,11 +40,11 @@
                 </div>
 
                 <!-- date -->
-                <div class="d-none d-md-flex flex-column align-items-center gap-1 ms-auto">
+                <div class="d-none d-md-flex flex-column align-items-center gap-1 ms-2">
 
                     <!-- if viewing current -->
                     <span class="taco-text-white 
-                                fw-bold pe-2"
+                                fw-bold pe-2 text-end"
                         style="font-size: 0.875rem;">
                         {{ new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) }}
                     </span>

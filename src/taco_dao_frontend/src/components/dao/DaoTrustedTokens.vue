@@ -697,34 +697,34 @@ LOCAL METHODS
 
     }
 
-    // refresh every minute
-    refreshTimer.value = window.setInterval(async () => {
+    // // refresh every minute
+    // refreshTimer.value = window.setInterval(async () => {
 
-      // log
-      console.log('refreshing trusted tokens tile...')
+    //   // log
+    //   console.log('refreshing trusted tokens tile...')
 
-      // turn on loading
-      componentLoading.value = true
+    //   // turn on loading
+    //   componentLoading.value = true
 
-      // try
-      try {
+    //   // try
+    //   try {
 
-        // handle fetched token details
-        handleFetchedTokenDetails(fetchedTokenDetails.value)
+    //     // handle fetched token details
+    //     handleFetchedTokenDetails(fetchedTokenDetails.value)
 
-      } catch (error) {
+    //   } catch (error) {
 
-        // log
-        console.error('error refreshing token details:', error)
+    //     // log
+    //     console.error('error refreshing token details:', error)
 
-      } finally {
+    //   } finally {
 
-        // turn off loading
-        componentLoading.value = false
+    //     // turn off loading
+    //     componentLoading.value = false
 
-      }
+    //   }
 
-    }, 60000) // 60000ms = 1 minute    
+    // }, 60000) // 60000ms = 1 minute    
 
   })
 

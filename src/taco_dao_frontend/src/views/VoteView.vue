@@ -671,8 +671,9 @@
                         class="btn taco-btn taco-btn--green taco-btn--big w-100"
                         :class="{'disabled': !currentSlidersSumTo100 || matchesLast || !votePower}"
                         :disabled="!currentSlidersSumTo100 || matchesLast || !votePower">
-                        <span v-if="votePower !== '0' && currentSlidersSumTo100 && !matchesLast">Lock In Vote</span>
-                        <span v-if="votePower === '0' || !votePower">You have no voting power</span>
+                        <span v-if="votePower !== '0' && votePower && currentSlidersSumTo100 && !matchesLast && userLoggedIn">Lock In Vote</span>
+                        <span v-if="userLoggedIn && (votePower === '0' || !votePower)">You have no voting power</span>
+                        <span v-if="!userLoggedIn">Login to vote</span>
                         <span v-if="!currentSlidersSumTo100">All values do not equal 100%</span>
                         <span v-if="currentSlidersSumTo100 && matchesLast">Must Be A New Vote</span>
                       </button>
@@ -3040,7 +3041,7 @@
   //////////////
 
   // watch for changes in user logged in state, fire immediately
-  watch(userLoggedIn, (newState) => {
+  watch(userLoggedIn, async (newState) => {
 
     // log
     // console.log('VoteView.vue: checking user logged in state')
@@ -3050,7 +3051,14 @@
       // log
       // console.log('VoteView.vue: user is logged in')
 
-      // 
+      // turn on right loading
+      rightLoading.value = true
+
+      // refresh voting power
+      await refreshVotingPower()
+
+      // turn off right loading
+      rightLoading.value = false
 
 
     } else {
@@ -3059,7 +3067,8 @@
       // console.log('VoteView.vue: user is not logged in')
 
     }
-  }, { immediate: true })
+
+  })
 
   /////////////////////
   // lifecycle hooks //
@@ -3111,6 +3120,9 @@
 
         // handle fetched user allocation
         await handleFetchedUserAllocation(fetchedUserAllocation.value)
+
+        // refresh voting power
+        await refreshVotingPower()
 
       } else {
 

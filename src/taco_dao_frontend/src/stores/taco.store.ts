@@ -1075,21 +1075,9 @@ export const useTacoStore = defineStore('taco', () => {
             // calculate and set user ledger account ID
             userLedgerAccountId.value = calculateAccountId(userPrincipal.value)
 
-            // refresh voting power immediately after login
-            try {
-                await refreshUserVotingPower()
-            } catch (error) {
-
-                // log
-                // console.log('Could not refresh voting power on login:', error)
-
-                // Don't fail login if refresh fails
-
-            }
-
             // Load names cache in background (non-blocking)
             // console.log('🔍 Triggering loadAllNames() from iidLogIn - after successful login');
-            loadAllNames().catch(console.error);
+            loadAllNames().catch(console.error)
 
             // turn app loading off
             appLoadingOff()
@@ -1132,6 +1120,9 @@ export const useTacoStore = defineStore('taco', () => {
 
             // logout
             await authClient.logout()
+
+            // clear cached auth client instance to force fresh instance on next login
+            authClientInstance = null
 
             // set user principal to empty string
             setUserPrincipal('')
@@ -1931,7 +1922,7 @@ export const useTacoStore = defineStore('taco', () => {
                 // get host
                 const host = process.env.DFX_NETWORK === "local"
                     ? getLocalHost()
-                    : "https://ic0.app";                
+                    : "https://ic0.app";
 
                 // get identity
                 const identity = await authClient.getIdentity()
@@ -1961,6 +1952,7 @@ export const useTacoStore = defineStore('taco', () => {
 
                 // check if successful
                 if (result && result.ok) {
+                    
                     // refresh user allocation to get updated data
                     await fetchUserAllocation()
                     
@@ -7992,6 +7984,524 @@ export const useTacoStore = defineStore('taco', () => {
         });
     }
 
+    // ===========================
+    // NNS VOTING SYSTEM FUNCTIONS
+    // ===========================
+
+    // Create neuron snapshot actor
+    const createNeuronSnapshotActor = async () => {
+        const { HttpAgent } = await import('@dfinity/agent');
+        const authClient = await getAuthClient();
+        const identity = await authClient.getIdentity();
+        const agent = new HttpAgent({
+            identity,
+            host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+        });
+
+        if (process.env.DFX_NETWORK === "local") {
+            await agent.fetchRootKey();
+        }
+
+        return Actor.createActor(neuronSnapshotIDL, {
+            agent,
+            canisterId: neuronSnapshotCanisterId()
+        });
+    }
+
+    // Get votable NNS/SNS proposal pairs
+    const getVotableProposals = async () => {
+        try {
+            const actor = await createNeuronSnapshotActor();
+            const result = await (actor as any).getVotableProposals();
+            return result; // Array of [nnsId, snsId] pairs
+        } catch (error) {
+            console.error('Error getting votable proposals:', error);
+            throw error;
+        }
+    }
+
+    // Find NNS proposal ID for given SNS proposal ID
+    const findNNSProposalForSNS = async (snsProposalId: bigint): Promise<bigint | null> => {
+        try {
+            const votableProposals = await getVotableProposals();
+            const match = votableProposals.find(([nnsId, snsId]: [any, any]) => snsId === snsProposalId);
+            return match ? match[0] : null;
+        } catch (error) {
+            console.error('Error finding NNS proposal for SNS:', error);
+            return null;
+        }
+    }
+
+    // Get NNS proposal details from NNS governance
+    const getNNSProposal = async (nnsProposalId: bigint) => {
+        try {
+            const { Actor, HttpAgent } = await import('@dfinity/agent');
+            const authClient = await getAuthClient();
+            const identity = await authClient.getIdentity();
+            const agent = new HttpAgent({
+                identity,
+                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+            });
+
+            if (process.env.DFX_NETWORK === "local") {
+                await agent.fetchRootKey();
+            }
+
+            // Import NNS governance IDL
+            const { idlFactory } = await import('../../../declarations/nns_governance');
+            
+            const nnsGov = Actor.createActor(idlFactory, {
+                agent,
+                canisterId: 'rrkah-fqaaa-aaaaa-aaaaq-cai' // NNS Governance canister
+            });
+
+            const result = await (nnsGov as any).get_proposal_info(nnsProposalId);
+            
+            // get_proposal_info returns opt ProposalInfo, so we need to handle the optional
+            if (!result || (Array.isArray(result) && result.length === 0)) {
+                throw new Error(`NNS proposal ${nnsProposalId} not found`);
+            }
+            
+            // Handle both array format (from optional) and direct object format
+            const proposalInfo = Array.isArray(result) ? result[0] : result;
+            
+            if (!proposalInfo) {
+                throw new Error(`NNS proposal ${nnsProposalId} not found`);
+            }
+            
+            
+            // Format the proposal data for display
+            return {
+                id: proposalInfo.id?.[0]?.id || nnsProposalId,
+                title: proposalInfo.proposal?.[0]?.title?.[0] || `NNS Proposal ${nnsProposalId}`,
+                summary: proposalInfo.proposal?.[0]?.summary || 'No summary available',
+                url: proposalInfo.proposal?.[0]?.url || '',
+                topic: proposalInfo.topic,
+                status: proposalInfo.status,
+                latest_tally: proposalInfo.latest_tally?.[0] || null,
+                proposal_timestamp_seconds: proposalInfo.proposal_timestamp_seconds,
+                deadline_timestamp_seconds: proposalInfo.deadline_timestamp_seconds?.[0] || null,
+                decided_timestamp_seconds: proposalInfo.decided_timestamp_seconds,
+                executed_timestamp_seconds: proposalInfo.executed_timestamp_seconds,
+                proposer: proposalInfo.proposer?.[0] || null,
+            };
+        } catch (error) {
+            console.error('Error getting NNS proposal:', error);
+            throw error;
+        }
+    }
+
+    // Get SNS proposal details from SNS governance
+    const getSNSProposal = async (snsProposalId: bigint) => {
+        try {
+            const actor = await createNeuronSnapshotActor();
+            const result = await (actor as any).getSNSProposal(snsProposalId);
+            if ('ok' in result) {
+                return result.ok;
+            } else {
+                throw new Error(result.err?.error_message || 'Failed to get SNS proposal');
+            }
+        } catch (error) {
+            console.error('Error getting SNS proposal:', error);
+            throw error;
+        }
+    }
+
+    // Get DAO vote tally for SNS proposal
+    const getDAOVoteTally = async (snsProposalId: bigint) => {
+        try {
+            const actor = await createNeuronSnapshotActor();
+            const result = await (actor as any).getDAOVoteTally(snsProposalId);
+            return result;
+        } catch (error) {
+            console.error('Error getting DAO vote tally:', error);
+            throw error;
+        }
+    }
+
+    // Submit DAO votes for SNS proposal
+    const submitDAOVotes = async (snsProposalId: bigint, neuronIds: Uint8Array[], decision: 'Adopt' | 'Reject') => {
+        try {
+            const actor = await createNeuronSnapshotActor();
+            const decisionVariant = decision === 'Adopt' ? { Adopt: null } : { Reject: null };
+            const result = await (actor as any).submitDAOVotes(snsProposalId, neuronIds, decisionVariant);
+            
+            if ('ok' in result) {
+                return result.ok;
+            } else {
+                throw new Error(result.err || 'Failed to submit votes');
+            }
+        } catch (error) {
+            console.error('Error submitting DAO votes:', error);
+            throw error;
+        }
+    }
+
+    // Check if a neuron has voted on a proposal
+    const hasNeuronVoted = async (snsProposalId: bigint, neuronId: Uint8Array) => {
+        try {
+            const actor = await createNeuronSnapshotActor();
+            const result = await (actor as any).hasNeuronVoted(snsProposalId, neuronId);
+            return result;
+        } catch (error) {
+            console.error('Error checking if neuron voted:', error);
+            return null;
+        }
+    }
+
+    // Check if DAO has already voted on NNS proposal
+    const hasDAOVoted = async (nnsProposalId: bigint): Promise<boolean> => {
+        try {
+            const actor = await createNeuronSnapshotActor();
+            const result = await (actor as any).hasDAOVoted(nnsProposalId);
+            return result;
+        } catch (error) {
+            console.error('Error checking if DAO voted:', error);
+            return false;
+        }
+    }
+
+    // Get votable proposals with time remaining information
+    const getVotableProposalsWithTimeLeft = async () => {
+        try {
+            const actor = await createNeuronSnapshotActor();
+            const result = await (actor as any).getVotableProposalsWithTimeLeft();
+            return result;
+        } catch (error) {
+            console.error('Error getting votable proposals with time left:', error);
+            throw error;
+        }
+    }
+
+    // Get periodic timer status
+    const getPeriodicTimerStatus = async () => {
+        try {
+            const actor = await createNeuronSnapshotActor();
+            const result = await (actor as any).getPeriodicTimerStatus();
+            return result;
+        } catch (error) {
+            console.error('Error getting periodic timer status:', error);
+            throw error;
+        }
+    }
+
+    // Start periodic timer
+    const startPeriodicTimer = async () => {
+        try {
+            const actor = await createNeuronSnapshotActor();
+            const result = await (actor as any).startPeriodicTimer();
+            return result;
+        } catch (error) {
+            console.error('Error starting periodic timer:', error);
+            throw error;
+        }
+    }
+
+    // Stop periodic timer
+    const stopPeriodicTimer = async () => {
+        try {
+            const actor = await createNeuronSnapshotActor();
+            const result = await (actor as any).stopPeriodicTimer();
+            return result;
+        } catch (error) {
+            console.error('Error stopping periodic timer:', error);
+            throw error;
+        }
+    }
+
+    // Check if auto-processing is running
+    const isAutoProcessingRunning = async () => {
+        try {
+            const actor = await createNeuronSnapshotActor();
+            const result = await (actor as any).isAutoProcessingRunning();
+            return result;
+        } catch (error) {
+            console.error('Error checking auto-processing status:', error);
+            return false;
+        }
+    }
+
+    // Check if auto-voting is running
+    const isAutoVotingRunning = async () => {
+        try {
+            const actor = await createNeuronSnapshotActor();
+            const result = await (actor as any).isAutoVotingRunning();
+            return result;
+        } catch (error) {
+            console.error('Error checking auto-voting status:', error);
+            return false;
+        }
+    }
+
+    // Start auto-processing NNS proposals
+    const startAutoProcessNNSProposals = async () => {
+        try {
+            const actor = await createNeuronSnapshotActor();
+            const result = await (actor as any).startAutoProcessNNSProposals();
+            return result;
+        } catch (error) {
+            console.error('Error starting auto-processing:', error);
+            throw error;
+        }
+    }
+
+    // Stop auto-processing NNS proposals
+    const stopAutoProcessNNSProposals = async () => {
+        try {
+            const actor = await createNeuronSnapshotActor();
+            const result = await (actor as any).stopAutoProcessNNSProposals();
+            return result;
+        } catch (error) {
+            console.error('Error stopping auto-processing:', error);
+            throw error;
+        }
+    }
+
+    // Start auto-voting on urgent proposals
+    const startAutoVoteOnUrgentProposals = async () => {
+        try {
+            const actor = await createNeuronSnapshotActor();
+            const result = await (actor as any).startAutoVoteOnUrgentProposals();
+            return result;
+        } catch (error) {
+            console.error('Error starting auto-voting:', error);
+            throw error;
+        }
+    }
+
+    // Stop auto-voting on urgent proposals
+    const stopAutoVoteOnUrgentProposals = async () => {
+        try {
+            const actor = await createNeuronSnapshotActor();
+            const result = await (actor as any).stopAutoVoteOnUrgentProposals();
+            return result;
+        } catch (error) {
+            console.error('Error stopping auto-voting:', error);
+            throw error;
+        }
+    }
+
+    // Get auto-voting threshold in seconds
+    const getAutoVotingThresholdSeconds = async () => {
+        try {
+            console.log('Getting auto-voting threshold...');
+            const actor = await createNeuronSnapshotActor();
+            const result = await (actor as any).getAutoVotingThresholdSeconds();
+            console.log('Auto-voting threshold result:', result);
+            return result;
+        } catch (error) {
+            console.error('Error getting auto-voting threshold:', error);
+            throw error;
+        }
+    }
+
+    // Set auto-voting threshold in seconds
+    const setAutoVotingThresholdSeconds = async (thresholdSeconds: bigint) => {
+        try {
+            const actor = await createNeuronSnapshotActor();
+            await (actor as any).setAutoVotingThresholdSeconds(thresholdSeconds);
+        } catch (error) {
+            console.error('Error setting auto-voting threshold:', error);
+            throw error;
+        }
+    }
+
+    // Get periodic timer interval in seconds
+    const getPeriodicTimerIntervalSeconds = async () => {
+        try {
+            const actor = await createNeuronSnapshotActor();
+            const result = await (actor as any).getPeriodicTimerIntervalSeconds();
+            return result;
+        } catch (error) {
+            console.error('Error getting periodic timer interval:', error);
+            throw error;
+        }
+    }
+
+    // Set periodic timer interval in seconds
+    const setPeriodicTimerIntervalSeconds = async (intervalSeconds: bigint) => {
+        try {
+            const actor = await createNeuronSnapshotActor();
+            await (actor as any).setPeriodicTimerIntervalSeconds(intervalSeconds);
+        } catch (error) {
+            console.error('Error setting periodic timer interval:', error);
+            throw error;
+        }
+    }
+
+    // Vote on NNS proposal (force vote)
+    const voteOnNNSProposal = async (snsProposalId: bigint) => {
+        try {
+            const actor = await createNeuronSnapshotActor();
+            const result = await (actor as any).voteOnNNSProposal(snsProposalId);
+            return result;
+        } catch (error) {
+            console.error('Error voting on NNS proposal:', error);
+            throw error;
+        }
+    }
+
+    // Get proposer subaccount
+    const getProposerSubaccount = async () => {
+        try {
+            console.log('Getting proposer subaccount...');
+            const actor = await createNeuronSnapshotActor();
+            const result = await (actor as any).getProposerSubaccount();
+            console.log('Proposer subaccount result:', result);
+            return result;
+        } catch (error) {
+            console.error('Error getting proposer subaccount:', error);
+            throw error;
+        }
+    }
+
+    // Set proposer subaccount
+    const setProposerSubaccount = async (subaccount: Uint8Array) => {
+        try {
+            const actor = await createNeuronSnapshotActor();
+            await (actor as any).setProposerSubaccount(subaccount);
+        } catch (error) {
+            console.error('Error setting proposer subaccount:', error);
+            throw error;
+        }
+    }
+
+    // Get TACO DAO neuron ID
+    const getTacoDAONeuronId = async () => {
+        try {
+            console.log('Getting TACO DAO neuron ID...');
+            const actor = await createNeuronSnapshotActor();
+            const result = await (actor as any).getTacoDAONeuronId();
+            console.log('TACO DAO neuron ID result:', result);
+            return result;
+        } catch (error) {
+            console.error('Error getting TACO DAO neuron ID:', error);
+            throw error;
+        }
+    }
+
+    // Set TACO DAO neuron ID
+    const setTacoDAONeuronId = async (neuronId: bigint) => {
+        try {
+            const actor = await createNeuronSnapshotActor();
+            await (actor as any).setTacoDAONeuronId(neuronId);
+        } catch (error) {
+            console.error('Error setting TACO DAO neuron ID:', error);
+            throw error;
+        }
+    }
+
+    // Get user's TACO neurons for voting (reuse existing function)
+    const getUserVotingNeurons = async () => {
+        return await getTacoNeurons();
+    }
+
+    // Format NNS proposal link
+    const formatNNSProposalLink = (nnsProposalId: bigint): string => {
+        return `https://nns.ic0.app/proposal/?u=qoctq-giaaa-aaaaa-aaaea-cai&proposal=${nnsProposalId}`;
+    }
+
+    // Format SNS proposal for display (similar to TACO proposals)
+    const formatSNSProposalForDisplay = (proposal: any) => {
+        
+        // Extract data from SNS proposal structure (arrays for optional fields)
+        const proposalId = proposal.id?.[0]?.id || 0n;
+        const proposalData = proposal.proposal?.[0];
+        const latestTally = proposal.latest_tally?.[0];
+        const proposerData = proposal.proposer?.[0];
+        
+        // Use payload_text_rendering as the summary if available, otherwise proposal summary
+        let summary = 'No summary available';
+        if (proposal.payload_text_rendering?.[0]) {
+            summary = proposal.payload_text_rendering[0];
+        } else if (proposalData?.summary) {
+            summary = proposalData.summary;
+        }
+        
+        return {
+            id: proposalId,
+            title: proposalData?.title || `SNS Proposal ${proposalId}`,
+            summary: summary,
+            url: proposalData?.url || '',
+            status: getProposalStatus(proposal),
+            createdAt: new Date(Number(proposal.proposal_creation_timestamp_seconds) * 1000),
+            decidedAt: proposal.decided_timestamp_seconds > 0n ? 
+                new Date(Number(proposal.decided_timestamp_seconds) * 1000) : undefined,
+            executedAt: proposal.executed_timestamp_seconds > 0n ? 
+                new Date(Number(proposal.executed_timestamp_seconds) * 1000) : undefined,
+            proposer: proposerData?.id ? uint8ArrayToHex(proposerData.id) : undefined,
+            yesVotes: latestTally?.yes || 0n,
+            noVotes: latestTally?.no || 0n,
+            totalVotes: latestTally?.total || 0n,
+            topic: getProposalTopic(proposal)
+        };
+    }
+
+    // Get proposal status from SNS proposal data
+    const getProposalStatus = (proposal: any): string => {
+        if (proposal.executed_timestamp_seconds > 0n) return 'Executed';
+        if (proposal.failed_timestamp_seconds > 0n) return 'Failed';
+        if (proposal.decided_timestamp_seconds > 0n) {
+            // Check if it was adopted or rejected based on votes
+            const latestTally = proposal.latest_tally?.[0];
+            const yes = Number(latestTally?.yes || 0n);
+            const no = Number(latestTally?.no || 0n);
+            return yes > no ? 'Adopted' : 'Rejected';
+        }
+        return 'Open';
+    }
+
+    // Get proposal topic from SNS proposal data
+    const getProposalTopic = (proposal: any) => {
+        // Extract topic from the action if available
+        const proposalData = proposal.proposal?.[0];
+        if (proposalData?.action) {
+            const actionKeys = Object.keys(proposalData.action);
+            if (actionKeys.length > 0) {
+                return { [actionKeys[0]]: null };
+            }
+        }
+        return { Motion: null }; // Default to Motion for copied proposals
+    }
+
+    // Get SNS proposal ID for a given NNS proposal ID
+    const getSNSProposalIdForNNS = async (nnsProposalId: bigint) => {
+        try {
+            const actor = await createNeuronSnapshotActor();
+            const result = await (actor as any).getSNSProposalIdForNNS(nnsProposalId);
+            return result;
+        } catch (error) {
+            console.error('Error getting SNS proposal ID for NNS proposal:', error);
+            throw error;
+        }
+    }
+
+    // Get default vote behavior
+    const getDefaultVoteBehavior = async () => {
+        try {
+            console.log('Getting default vote behavior...');
+            const actor = await createNeuronSnapshotActor();
+            const result = await (actor as any).getDefaultVoteBehavior();
+            console.log('Default vote behavior result:', result);
+            return result;
+        } catch (error) {
+            console.error('Error getting default vote behavior:', error);
+            throw error;
+        }
+    }
+
+    // Set default vote behavior
+    const setDefaultVoteBehavior = async (behavior: any) => {
+        try {
+            const actor = await createNeuronSnapshotActor();
+            const result = await (actor as any).setDefaultVoteBehavior(behavior);
+            return result;
+        } catch (error) {
+            console.error('Error setting default vote behavior:', error);
+            throw error;
+        }
+    }
+
     // # RETURN #
     return {
         // state
@@ -8243,5 +8753,45 @@ export const useTacoStore = defineStore('taco', () => {
         sendTestEmailSingle,
         showSuccess,
         showError,
+
+        // NNS Voting System
+        getVotableProposals,
+        findNNSProposalForSNS,
+        getNNSProposal,
+        getSNSProposal,
+        getDAOVoteTally,
+        submitDAOVotes,
+        hasNeuronVoted,
+        hasDAOVoted,
+        getUserVotingNeurons,
+        formatNNSProposalLink,
+        formatSNSProposalForDisplay,
+        getProposalStatus,
+        getProposalTopic,
+        uint8ArrayToHex,
+        formatTokenAmount,
+        // New NNS automation functions
+        getVotableProposalsWithTimeLeft,
+        getPeriodicTimerStatus,
+        startPeriodicTimer,
+        stopPeriodicTimer,
+        isAutoProcessingRunning,
+        isAutoVotingRunning,
+        startAutoProcessNNSProposals,
+        stopAutoProcessNNSProposals,
+        startAutoVoteOnUrgentProposals,
+        stopAutoVoteOnUrgentProposals,
+        getAutoVotingThresholdSeconds,
+        setAutoVotingThresholdSeconds,
+        getPeriodicTimerIntervalSeconds,
+        setPeriodicTimerIntervalSeconds,
+        voteOnNNSProposal,
+        getProposerSubaccount,
+        setProposerSubaccount,
+        getTacoDAONeuronId,
+        setTacoDAONeuronId,
+        getSNSProposalIdForNNS,
+        getDefaultVoteBehavior,
+        setDefaultVoteBehavior,
     }
 })

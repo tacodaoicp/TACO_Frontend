@@ -36,7 +36,7 @@
               style="color: var(--black-to-white);">
 
         <!-- refresh icon -->
-        <span v-if="!refreshingVP" style="color: var(--black-to-white);">Refresh</span>
+        <span v-if="!refreshingVP && userLoggedIn" style="color: var(--black-to-white);">Refresh</span>
         <span v-if="refreshingVP" style="color: var(--black-to-white);">Refreshing</span>
 
       </button>    
@@ -287,8 +287,16 @@
 
   // refresh voting power
   const refreshVotingPower = async () => {
+
+    // if logged out, return
+    if (!userLoggedIn.value) return
+
     refreshingVP.value = true
     try {
+
+      // turn on loading curtain
+      componentLoading.value = true
+
       const { refreshUserVotingPower } = tacoStore
       await refreshUserVotingPower()
       // After refreshing, fetch updated user allocation
@@ -298,6 +306,10 @@
       console.error('Error refreshing voting power:', error)
     } finally {
       refreshingVP.value = false
+
+      // turn off loading curtain
+      componentLoading.value = false
+      
     }
   }  
 
@@ -338,9 +350,9 @@
 
   // 
 
-  /////////////
+  //////////////
   // watchers //
-  /////////////
+  //////////////
 
   // watch user logged in, run immediately
   watch(userLoggedIn, async () => {
@@ -348,17 +360,20 @@
     // log
     // console.log('DaoVotePower.vue: userLoggedIn changed')
 
-    // turn on loading curtain
-    componentLoading.value = true    
-
     try {
 
       // if user is logged in, fetch user state
       if (userLoggedIn.value) {
 
-        // fetch and handle user allocation
-        await fetchUserAllocation()
-        handleFetchedUserAllocation(fetchedUserAllocation.value)
+        // turn on loading curtain
+        componentLoading.value = true
+
+        // // fetch and handle user allocation
+        // await fetchUserAllocation()
+        // handleFetchedUserAllocation(fetchedUserAllocation.value)
+
+        // refresh voting power
+        await refreshVotingPower()
 
       } else {
 
@@ -393,6 +408,15 @@
 
     // log
     // console.log('DaoVotePower.vue: onMounted')
+
+    // turn component loading on
+    componentLoading.value = true
+
+    // refresh voting power
+    await refreshVotingPower()
+
+    // turn component loading off
+    componentLoading.value = false
 
   })
   

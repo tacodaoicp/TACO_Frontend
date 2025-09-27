@@ -24,6 +24,7 @@ import AdminDistributionsView from "./views/AdminDistributionsView.vue"
 import AdminRewardsBalancesView from "./views/AdminRewardsBalancesView.vue"
 import AdminAlarmView from "./views/AdminAlarmView.vue"
 import AdminClaimsView from "./views/AdminClaimsView.vue"
+import AdminNNSView from "./views/AdminNNSView.vue"
 import RewardsView from "./views/RewardsView.vue"
 import ChatView from "./views/ChatView.vue"
 import ReportsView from "./views/ReportsView.vue"
@@ -35,6 +36,8 @@ import ProposalView from "./views/ProposalView.vue"
 import WalletView from "./views/WalletView.vue"
 import WalletViewDemo from "./views/WalletViewDemo.vue"
 import WizardView from "./views/WizardView.vue"
+import NNSVoteView from "./views/NNSVoteView.vue"
+import NNSPropView from "./views/NNSPropView.vue"
 import VueApexCharts from 'vue3-apexcharts'
 import VueClickAway from "vue3-click-away"
 import 'animate.css'
@@ -56,7 +59,7 @@ const routes = [
     { path: "/chat/forum", name: "ChatForum", component: ChatView, meta: { robots: 'index' } },
     { path: "/chat/forum/:id", name: "ChatForumThread", component: ChatView, meta: { robots: 'index' } },
     { path: "/chat", redirect: "/chat/oc", meta: { robots: 'noindex' } },
-    { path: "/reports", redirect: "/reports/neutrinite", meta: { robots: 'noindex' } },
+    { path: "/reports", redirect: "/reports/clown", meta: { robots: 'noindex' } },
     { path: "/reports/example", component: ReportsView, meta: { robots: 'index' } },    
     { path: "/reports/ddckbtc", component: ReportsView, meta: { robots: 'noindex' } }, // dd* links should remain for historical linking
     { path: "/reports/ddsneed", component: ReportsView, meta: { robots: 'noindex' } }, // dd* links should remain for historical linking
@@ -71,7 +74,7 @@ const routes = [
     { path: "/reports/openchat", component: ReportsView, meta: { robots: 'index' } },
     { path: "/reports/kongswap", component: ReportsView, meta: { robots: 'index' } },
     { path: "/reports/neutrinite", component: ReportsView, meta: { robots: 'index' } },
-    // { path: "/reports/clown", component: ReportsView, meta: { robots: 'index' } },
+    { path: "/reports/clown", component: ReportsView, meta: { robots: 'index' } },
     { path: "/admin", name: "Admin", component: AdminView, meta: { robots: 'noindex' } },
     { path: "/admin/archives", name: "AdminArchive", component: AdminArchiveView, meta: { robots: 'noindex' } },
     { path: "/admin/trade", name: "AdminTrade", component: AdminTradeView, meta: { robots: 'noindex' } },
@@ -85,9 +88,12 @@ const routes = [
     { path: "/admin/distributions", name: "AdminDistributions", component: AdminDistributionsView, meta: { robots: 'noindex' } },
     { path: "/admin/alarm", name: "AdminAlarm", component: AdminAlarmView, meta: { robots: 'noindex' } },
     { path: "/admin/claims", name: "AdminClaims", component: AdminClaimsView, meta: { robots: 'noindex' } },
+    { path: "/admin/nns", name: "AdminNNS", component: AdminNNSView, meta: { robots: 'noindex' } },
     { path: "/forum", name: "Forum", component: ForumView, meta: { robots: 'noindex' } },
     { path: "/forum/thread/:id", name: "Thread", component: ThreadView, meta: { robots: 'noindex' } },
     { path: "/names", name: "Names", component: NamesView, meta: { robots: 'noindex' } }, //remove once integrated
+    { path: "/nnsvote/:id", name: "NNSVote", component: NNSVoteView, meta: { robots: 'noindex' } },
+    { path: "/nnsprop/:id", name: "NNSProp", component: NNSPropView, meta: { robots: 'noindex' } },
     { path: "/:pathMatch(.*)*", redirect: "/" },
 ]
 
