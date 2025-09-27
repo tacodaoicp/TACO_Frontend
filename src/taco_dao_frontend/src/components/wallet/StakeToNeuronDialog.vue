@@ -395,10 +395,12 @@ const handleStake = async () => {
     
     emit('staked', props.neuron)
     
+    
     // Auto-close after 3 seconds
     setTimeout(() => {
       close()
     }, 3000)
+    
   } catch (err: any) {
     console.error('Staking error:', err)
     error.value = err.message || 'Failed to stake TACO. Please try again.'
