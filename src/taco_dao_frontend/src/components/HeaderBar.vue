@@ -146,7 +146,8 @@
           </span>
 
           <!-- account menu button -->
-          <button id="accountMenuBtn"
+          <button v-if="userLoggedIn"
+                  id="accountMenuBtn"
                   class="btn account-menu__btn taco-text-black-to-white"
                   style="padding: 0.25rem 0.5rem;"
                   @click="toggleAccountMenu()">
