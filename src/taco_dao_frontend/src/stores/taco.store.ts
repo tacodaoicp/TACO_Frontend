@@ -5413,20 +5413,18 @@ export const useTacoStore = defineStore('taco', () => {
 
     // Helper function to calculate neuron age
     const calculateNeuronAge = (createdTimestamp: number, agingSinceTimestamp: number) => {
-        const now = Math.floor(Date.now() / 1000) // current time in seconds
+        const now = Math.floor(Date.now() / 1000)
         const aging = Number(agingSinceTimestamp)
-        const start = Number.isFinite(aging) && aging > 0 && aging <= now ? aging : createdTimestamp
-        const ageSeconds = Math.max(0, now - start)
+        // prefer creation age for display; fallback to aging_since only if creation is missing/invalid
+        const base = (Number.isFinite(createdTimestamp) && createdTimestamp > 0 && createdTimestamp <= now)
+            ? createdTimestamp
+            : (Number.isFinite(aging) && aging > 0 && aging <= now ? aging : now)
+        const ageSeconds = Math.max(0, now - base)
         const days = Math.floor(ageSeconds / (24 * 60 * 60))
         const hours = Math.floor((ageSeconds % (24 * 60 * 60)) / (60 * 60))
-        
-        if (days > 0) {
-            return `${days}d ${hours}h`
-        } else if (hours > 0) {
-            return `${hours}h`
-        } else {
-            return '< 1h'
-        }
+        if (days > 0) return `${days}d ${hours}h`
+        if (hours > 0) return `${hours}h`
+        return '< 1h'
     }
 
     // Format neuron for display with relationship info and detailed stats
@@ -5443,7 +5441,7 @@ export const useTacoStore = defineStore('taco', () => {
         const agingRaw = neuron.aging_since_timestamp_seconds
         const createdTimestamp = Array.isArray(createdRaw) ? Number((createdRaw[0] ?? 0n)) : Number(createdRaw ?? 0)
         const agingSinceTimestamp = Array.isArray(agingRaw) ? Number((agingRaw[0] ?? BigInt(createdTimestamp))) : Number(agingRaw ?? createdTimestamp)
-        const ageDisplay = calculateNeuronAge(createdTimestamp, agingSinceTimestamp);
+        const ageDisplay = calculateNeuronAge(createdTimestamp, agingSinceTimestamp)
         
         // Parse other stats
         const stakedMaturity = Number(neuron.staked_maturity_e8s_equivalent || 0);
@@ -5525,7 +5523,7 @@ export const useTacoStore = defineStore('taco', () => {
         
 
         
-        const displayName = customName || `Neuron ${neuronIdHex.substring(0, 8)}...`;
+        const displayName = customName || `Neuron ${neuronIdHex.substring(0, 8)}...`
 
         return {
             id: neuronId,
@@ -5543,7 +5541,14 @@ export const useTacoStore = defineStore('taco', () => {
             // Detailed stats for expanded view
             dissolveState: dissolveInfo,
             age: ageDisplay,
-            ageSeconds: Math.floor(Date.now() / 1000) - agingSinceTimestamp,
+            ageSeconds: (() => {
+                const now = Math.floor(Date.now() / 1000)
+                const aging = Number(agingSinceTimestamp)
+                const base = (Number.isFinite(createdTimestamp) && createdTimestamp > 0 && createdTimestamp <= now)
+                    ? createdTimestamp
+                    : (Number.isFinite(aging) && aging > 0 && aging <= now ? aging : now)
+                return Math.max(0, now - base)
+            })(),
             createdDate: new Date(createdTimestamp * 1000),
             autoStakeMaturity,
             followeesCount: neuron.followees ? neuron.followees.length : 0,
