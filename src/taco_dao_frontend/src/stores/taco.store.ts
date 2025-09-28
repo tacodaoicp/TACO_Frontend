@@ -1520,7 +1520,7 @@ export const useTacoStore = defineStore('taco', () => {
         /////////////////////////////////////
 
         // log
-        console.log('taco.store: fetchTotalTreasuryValueInUsd() - fetching total DKP in the treasury')
+        // console.log('taco.store: fetchTotalTreasuryValueInUsd() - fetching total DKP in the treasury')
 
         // call icp ledger balance for sns treasury icp balance
         const snsTreasuryDkpBalance = await icrc1BalanceOf(
@@ -1530,7 +1530,7 @@ export const useTacoStore = defineStore('taco', () => {
         )
 
         // log
-        console.log('treasury dkp balance:', snsTreasuryDkpBalance)
+        // console.log('treasury dkp balance:', snsTreasuryDkpBalance)
 
         /////////////////
         // format data //
