@@ -525,6 +525,7 @@ export const useTacoStore = defineStore('taco', () => {
     const btcPriceUsd = useStorage('btcPriceUsd', 0)
     const tacoPriceUsd = useStorage('tacoPriceUsd', 0)
     const tacoPriceIcp = useStorage('tacoPriceIcp', 0)
+    const dkpPriceUsd = useStorage('dkpPriceUsd', 0)
     const lastPriceUpdate = useStorage('lastPriceUpdate', 0)
 
     // dao
@@ -540,6 +541,7 @@ export const useTacoStore = defineStore('taco', () => {
     // sns provided canisters
     const snsTreasuryTacoValueInUsd = ref(0)
     const snsTreasuryIcpValueInUsd = ref(0)
+    const snsTreasuryDkpValueInUsd = ref(0)
     const totalTreasuryValueInUsd = ref(0)
 
     // treasury
@@ -1254,14 +1256,14 @@ export const useTacoStore = defineStore('taco', () => {
             // log
             console.log('✨ fetching new crypto prices')
 
-            // try coingecko standard endpoint for icp and btc
+            // try coingecko standard endpoint for icp, btc, and dkp
             try {
 
                 // log
                 // console.log('taco.store: fetching new crypto prices - coingecko standard endpoint')
 
                 // fetch
-                const response = await fetch('https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=internet-computer,bitcoin&price_change_percentage=1h,24h')
+                const response = await fetch('https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=internet-computer,bitcoin,draggin-karma-points')
                 
                 // if not ok, throw error
                 if (!response.ok) throw new Error(`HTTP ${response.status}`)
@@ -1275,10 +1277,12 @@ export const useTacoStore = defineStore('taco', () => {
                 // Find the specific coins in the array
                 const icpData = data.find((coin: { id: string }) => coin.id === 'internet-computer')
                 const btcData = data.find((coin: { id: string }) => coin.id === 'bitcoin')
+                const dkpData = data.find((coin: { id: string }) => coin.id === 'draggin-karma-points')
 
                 // Set the prices
                 icpPriceUsd.value = icpData?.current_price || 0
                 btcPriceUsd.value = btcData?.current_price || 0
+                dkpPriceUsd.value = dkpData?.current_price || 0
 
                 // // set last price update
                 lastPriceUpdate.value = now
@@ -1511,6 +1515,23 @@ export const useTacoStore = defineStore('taco', () => {
         // log
         // console.log('treasury icp balance:', snsTreasuryIcpBalance)
 
+        /////////////////////////////////////
+        // fetch total DKP in the treasury //
+        /////////////////////////////////////
+
+        // log
+        console.log('taco.store: fetchTotalTreasuryValueInUsd() - fetching total DKP in the treasury')
+
+        // call icp ledger balance for sns treasury icp balance
+        const snsTreasuryDkpBalance = await icrc1BalanceOf(
+            'zfcdd-tqaaa-aaaaq-aaaga-cai', // ICP ledger canister ID
+            Principal.fromText('lhdfz-wqaaa-aaaaq-aae3q-cai'),
+            // hexToUint8Array('df86d44b4cf253518395a3213fbb6b256a27e60fb590c1b27211be9011709fdc')
+        )
+
+        // log
+        console.log('treasury dkp balance:', snsTreasuryDkpBalance)
+
         /////////////////
         // format data //
         /////////////////
@@ -1518,10 +1539,12 @@ export const useTacoStore = defineStore('taco', () => {
         // convert balances to numbers
         const tacoBalance = snsTreasuryTacoBalance ? Number(snsTreasuryTacoBalance) : 0
         const icpBalance = snsTreasuryIcpBalance ? Number(snsTreasuryIcpBalance) : 0
+        const dkpBalance = snsTreasuryDkpBalance ? Number(snsTreasuryDkpBalance) : 0
 
         // convert to proper units (ICP has 8 decimals, TACO has 8 decimals)
         const tacoBalanceNormalized = tacoBalance / Math.pow(10, 8)
         const icpBalanceNormalized = icpBalance / Math.pow(10, 8)
+        const dkpBalanceNormalized = dkpBalance / Math.pow(10, 8)
 
         // convert to USD using current prices
         const tacoValueUsd = tacoBalanceNormalized * tacoPriceUsd.value
@@ -1535,8 +1558,14 @@ export const useTacoStore = defineStore('taco', () => {
         // log
         // console.log('icp value in usd: %c$' + icpValueUsd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }), 'color: green; font-weight: bold;')
 
+        // convert to USD using current prices
+        const dkpValueUsd = dkpBalanceNormalized * dkpPriceUsd.value
+
+        // log
+        // console.log('dkp value in usd: %c$' + dkpValueUsd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }), 'color: green; font-weight: bold;')
+
         // calculate total treasury value in usd
-        const totalValue = tacoValueUsd + icpValueUsd
+        const totalValue = tacoValueUsd + icpValueUsd + dkpValueUsd
 
         // log total value
         // console.log('total treasury value: %c$' + totalValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }), 'color: green; font-weight: bold;')
@@ -1546,6 +1575,9 @@ export const useTacoStore = defineStore('taco', () => {
 
         // set sns treasury icp value in usd
         snsTreasuryIcpValueInUsd.value = icpValueUsd
+
+        // set sns treasury dkp value in usd
+        snsTreasuryDkpValueInUsd.value = dkpValueUsd
 
         // set total treasury value in usd
         totalTreasuryValueInUsd.value = totalValue
@@ -8244,6 +8276,7 @@ export const useTacoStore = defineStore('taco', () => {
         totalTreasuryValueInUsd,
         snsTreasuryTacoValueInUsd,
         snsTreasuryIcpValueInUsd,
+        snsTreasuryDkpValueInUsd,
         tacoForumId,
         proposalsTopicId,
         fetchedForums,

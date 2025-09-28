@@ -206,7 +206,22 @@
                         <!-- value -->
                         <span class="home-view__taco-assets__kvp__value">${{formatNumber(totalTreasuryValueInUsd)}}</span>
 
-                    </div>               
+                    </div>   
+                    
+                    <!-- kvp (icp) -->
+                    <div class="home-view__taco-assets__kvp">
+
+                        <!-- key -->
+                        <span class="home-view__taco-assets__kvp__key"
+                            style="padding-left: 0.5rem">
+                            <img :src="icpLogo" class="home-view__taco-assets__svg"/>
+                            ICP
+                        </span>
+
+                        <!-- value -->
+                        <span class="home-view__taco-assets__kvp__value">${{formatNumber(snsTreasuryIcpValueInUsd)}}</span>
+
+                    </div>                     
 
                     <!-- kvp (taco) -->
                     <div class="home-view__taco-assets__kvp">
@@ -221,22 +236,22 @@
                         <!-- value -->
                         <span class="home-view__taco-assets__kvp__value">${{formatNumber(snsTreasuryTacoValueInUsd)}}</span>
 
-                    </div>
-
-                    <!-- kvp (icp) -->
+                    </div> 
+                    
+                    <!-- kvp (dkp) -->
                     <div class="home-view__taco-assets__kvp">
 
                         <!-- key -->
                         <span class="home-view__taco-assets__kvp__key"
                             style="padding-left: 0.5rem">
-                            <img :src="icpLogo" class="home-view__taco-assets__svg"/>
-                            ICP
+                            <img :src="dkpLogo" class="home-view__taco-assets__svg"/>
+                            DKP
                         </span>
 
                         <!-- value -->
-                        <span class="home-view__taco-assets__kvp__value">${{formatNumber(snsTreasuryIcpValueInUsd)}}</span>
+                        <span class="home-view__taco-assets__kvp__value">${{formatNumber(snsTreasuryDkpValueInUsd)}}</span>
 
-                    </div>        
+                    </div>                     
                     
                     <hr class="m-0 p-0"></hr>
 
@@ -1975,6 +1990,7 @@
   import TacoChefRead from '../assets/images/chef/chef-read.png'
   import TacoDaoTaco from '../assets/images/tacoDaoTaco.svg'
   import icpLogo from "../assets/tokens/snspng/icp.png"
+  import dkpLogo from "../assets/tokens/snspng/dragginz.png"
   import astronautLoader from '../assets/images/astonautLoader.webp'
   import TaggrSocialImg from '../assets/images/social/taggr.vue'
   import CatalyzeSocialImg from '../assets/images/social/catalyze.vue'
@@ -2003,7 +2019,7 @@
   // # STATE #
 
   // dao
-  const { totalPortfolioValueInUsd, totalTreasuryValueInUsd, snsTreasuryTacoValueInUsd, snsTreasuryIcpValueInUsd } = storeToRefs(tacoStore)  
+  const { totalPortfolioValueInUsd, totalTreasuryValueInUsd, snsTreasuryTacoValueInUsd, snsTreasuryIcpValueInUsd, snsTreasuryDkpValueInUsd } = storeToRefs(tacoStore)  
 
   /////////////////////
   // Local Variables //
