@@ -410,10 +410,70 @@
                                 </button>
                             </div>
 
+                            <!-- Discovery Settings and Filters -->
+                            <div class="row g-3 mb-4">
+                                <div class="col-md-4">
+                                    <label for="discoveryStartId" class="form-label small">Start from Proposal ID:</label>
+                                    <input 
+                                        id="discoveryStartId"
+                                        v-model="discoveryStartId" 
+                                        type="number" 
+                                        class="form-control form-control-sm"
+                                        :disabled="discoveryLoading"
+                                        placeholder="Enter proposal ID"
+                                        min="1">
+                                </div>
+                                <div class="col-md-8">
+                                    <label class="form-label small">Filters:</label>
+                                    <div class="d-flex flex-wrap gap-3">
+                                        <div class="form-check form-check-sm">
+                                            <input 
+                                                id="hideNotEligible" 
+                                                v-model="filters.hideNotEligible" 
+                                                class="form-check-input" 
+                                                type="checkbox">
+                                            <label class="form-check-label small" for="hideNotEligible">
+                                                Hide Not Eligible
+                                            </label>
+                                        </div>
+                                        <div class="form-check form-check-sm">
+                                            <input 
+                                                id="hideCopied" 
+                                                v-model="filters.hideCopied" 
+                                                class="form-check-input" 
+                                                type="checkbox">
+                                            <label class="form-check-label small" for="hideCopied">
+                                                Hide Copied
+                                            </label>
+                                        </div>
+                                        <div class="form-check form-check-sm">
+                                            <input 
+                                                id="hideExpired" 
+                                                v-model="filters.hideExpired" 
+                                                class="form-check-input" 
+                                                type="checkbox">
+                                            <label class="form-check-label small" for="hideExpired">
+                                                Hide Expired
+                                            </label>
+                                        </div>
+                                        <div class="form-check form-check-sm">
+                                            <input 
+                                                id="hideVoted" 
+                                                v-model="filters.hideVoted" 
+                                                class="form-check-input" 
+                                                type="checkbox">
+                                            <label class="form-check-label small" for="hideVoted">
+                                                Hide Voted
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
                             <div class="table-responsive">
                                 <div class="d-flex justify-content-between align-items-center mb-3">
                                     <h5 class="taco-text-black-to-white mb-0">
-                                        {{ discoveryLoading ? 'Discovering proposals...' : `Discovered ${discoveredProposals.length} new proposals` }}
+                                        {{ discoveryLoading ? 'Discovering proposals...' : `Showing ${filteredDiscoveredProposals.length} of ${discoveredProposals.length} proposals` }}
                                     </h5>
                                     <button 
                                         @click="clearDiscoveredProposals" 
@@ -439,7 +499,7 @@
                                         <tr v-if="discoveredProposals.length === 0 && discoveryLoading" class="text-center">
                                             <td colspan="7" class="py-4">
                                                 <div class="spinner-border spinner-border-sm text-primary me-2" role="status"></div>
-                                                <span class="text-muted">Scanning for new NNS proposals starting from ID {{ (Number(currentHighestProcessedNNSProposalId) + 1) || 'unknown' }}...</span>
+                                                <span class="text-muted">Scanning for new NNS proposals starting from ID {{ discoveryStartId || (Number(currentHighestProcessedNNSProposalId) + 1) || 'unknown' }}...</span>
                                             </td>
                                         </tr>
                                         <tr v-else-if="discoveredProposals.length === 0 && !discoveryLoading" class="text-center">
@@ -447,11 +507,20 @@
                                                 <div class="mb-2" style="font-size: 2rem;">🔍</div>
                                                 <p class="taco-text-black-to-white mb-1">Click "Start Discovery" to scan for new NNS proposals</p>
                                                 <p class="small text-muted mb-0">
-                                                    Will start scanning from NNS proposal ID {{ (Number(currentHighestProcessedNNSProposalId) + 1) || 'unknown' }}
+                                                    Will start scanning from NNS proposal ID {{ discoveryStartId || (Number(currentHighestProcessedNNSProposalId) + 1) || 'unknown' }}
                                                 </p>
                                             </td>
                                         </tr>
-                                        <tr v-for="proposal in discoveredProposals" :key="proposal.id">
+                                        <tr v-else-if="filteredDiscoveredProposals.length === 0" class="text-center">
+                                            <td colspan="7" class="py-4">
+                                                <div class="mb-2" style="font-size: 1.5rem;">🚫</div>
+                                                <p class="taco-text-black-to-white mb-1">No proposals match the current filters</p>
+                                                <p class="small text-muted mb-0">
+                                                    Found {{ discoveredProposals.length }} total proposals, but all are filtered out
+                                                </p>
+                                            </td>
+                                        </tr>
+                                        <tr v-for="proposal in filteredDiscoveredProposals" :key="proposal.id">
                                             <td class="font-monospace">{{ proposal.id }}</td>
                                             <td>
                                                 <span class="badge" :class="proposal.shouldVote ? 'bg-success' : 'bg-secondary'">
@@ -526,20 +595,41 @@
                                                 </span>
                                             </td>
                                             <td>
-                                                <button 
-                                                    v-if="proposal.shouldVote && !proposal.isAlreadyCopied && !proposal.isCheckingCopyStatus"
-                                                    @click="copyProposal(proposal.id)" 
-                                                    :disabled="copyingProposals[proposal.id]"
-                                                    class="btn taco-btn taco-btn--orange btn-sm">
-                                                    <i class="fas fa-copy me-1"></i>
-                                                    {{ copyingProposals[proposal.id] ? 'Copying...' : 'Copy to SNS' }}
-                                                </button>
-                                                <span v-else-if="proposal.isCheckingCopyStatus" class="text-muted small">
-                                                    <i class="fas fa-spinner fa-spin me-1"></i>Checking status...
-                                                </span>
-                                                <span v-else class="text-muted small">
-                                                    {{ proposal.isAlreadyCopied ? 'Already copied' : 'Not eligible' }}
-                                                </span>
+                                                <div class="d-flex gap-1 flex-wrap">
+                                                    <!-- Copy Button -->
+                                                    <button 
+                                                        v-if="proposal.shouldVote && !proposal.isAlreadyCopied && !proposal.isCheckingCopyStatus"
+                                                        @click="copyProposal(proposal.id)" 
+                                                        :disabled="copyingProposals[proposal.id]"
+                                                        class="btn taco-btn taco-btn--orange btn-sm">
+                                                        <i class="fas fa-copy me-1"></i>
+                                                        {{ copyingProposals[proposal.id] ? 'Copying...' : 'Copy to SNS' }}
+                                                    </button>
+                                                    
+                                                    <!-- Vote Button for copied but unvoted proposals -->
+                                                    <button 
+                                                        v-if="proposal.isAlreadyCopied && proposal.isVotable && proposal.tacoDAOHasVoted === false"
+                                                        @click="voteOnProposal(proposal.id)" 
+                                                        :disabled="votingProposals[proposal.id]"
+                                                        class="btn taco-btn taco-btn--green btn-sm">
+                                                        <i class="fas fa-vote-yea me-1"></i>
+                                                        {{ votingProposals[proposal.id] ? 'Voting...' : 'Vote' }}
+                                                    </button>
+                                                    
+                                                    <!-- Status Messages -->
+                                                    <span v-if="proposal.isCheckingCopyStatus" class="text-muted small align-self-center">
+                                                        <i class="fas fa-spinner fa-spin me-1"></i>Checking status...
+                                                    </span>
+                                                    <span v-else-if="!proposal.shouldVote" class="text-muted small align-self-center">
+                                                        Not eligible
+                                                    </span>
+                                                    <span v-else-if="proposal.isAlreadyCopied && proposal.tacoDAOHasVoted === true" class="text-success small align-self-center">
+                                                        <i class="fas fa-check me-1"></i>Complete
+                                                    </span>
+                                                    <span v-else-if="proposal.isAlreadyCopied && !proposal.isVotable" class="text-muted small align-self-center">
+                                                        <i class="fas fa-clock-o me-1"></i>Voting ended
+                                                    </span>
+                                                </div>
                                             </td>
                                         </tr>
                                     </tbody>
@@ -573,6 +663,16 @@ const proposalsLoading = ref(false)
 const votingLoading = ref<Record<number, boolean>>({})
 const discoveryLoading = ref(false)
 const copyingProposals = ref<Record<number, boolean>>({})
+const votingProposals = ref<Record<number, boolean>>({})
+
+// Discovery settings
+const discoveryStartId = ref('')
+const filters = ref({
+    hideNotEligible: false,
+    hideCopied: false,
+    hideExpired: false,
+    hideVoted: false
+})
 
 // Timer status
 const periodicTimerStatus = ref({
@@ -604,6 +704,17 @@ const discoveredProposals = ref<any[]>([])
 
 // Computed
 const astronautLoaderUrl = astronautLoader
+
+// Filter discovered proposals based on checkboxes
+const filteredDiscoveredProposals = computed(() => {
+    return discoveredProposals.value.filter(proposal => {
+        if (filters.value.hideNotEligible && !proposal.shouldVote) return false
+        if (filters.value.hideCopied && proposal.isAlreadyCopied) return false
+        if (filters.value.hideExpired && !proposal.isVotable) return false
+        if (filters.value.hideVoted && proposal.tacoDAOHasVoted === true) return false
+        return true
+    })
+})
 
 // Methods
 const formatSeconds = (seconds: number | bigint) => {
@@ -938,8 +1049,9 @@ const startProposalDiscovery = async () => {
         discoveryLoading.value = true
         discoveredProposals.value = []
         
-        const highestProcessedId = Number(currentHighestProcessedNNSProposalId.value) || 0
-        let currentId = highestProcessedId + 1
+        // Use custom start ID if provided, otherwise use highest processed + 1
+        const startId = discoveryStartId.value ? Number(discoveryStartId.value) : (Number(currentHighestProcessedNNSProposalId.value) || 0) + 1
+        let currentId = startId
         let consecutiveNotFound = 0
         const maxConsecutiveNotFound = 10 // Stop after 10 consecutive missing proposals
         
@@ -1161,6 +1273,61 @@ const copyProposal = async (nnsProposalId: number) => {
     }
 }
 
+const voteOnProposal = async (nnsProposalId: number) => {
+    try {
+        votingProposals.value[nnsProposalId] = true
+        
+        // Vote using the same logic as the main voting table
+        const result = await tacoStore.voteOnNNSProposal(BigInt(nnsProposalId))
+        
+        if ('ok' in result) {
+            tacoStore.showSuccess(`Successfully voted on NNS proposal ${nnsProposalId}`)
+            
+            // Update the proposal in our list to show vote status
+            const proposalIndex = discoveredProposals.value.findIndex(p => p.id === nnsProposalId)
+            if (proposalIndex !== -1) {
+                discoveredProposals.value[proposalIndex] = {
+                    ...discoveredProposals.value[proposalIndex],
+                    tacoDAOHasVoted: true,
+                    isCheckingVoteStatus: false
+                }
+            }
+            
+            // Refresh the votable proposals list
+            await refreshVotableProposals()
+        } else {
+            let errorMessage = 'Unknown error'
+            if (result.err) {
+                if (typeof result.err === 'string') {
+                    errorMessage = result.err
+                } else if (result.err.error_message) {
+                    errorMessage = result.err.error_message
+                } else if (typeof result.err === 'object') {
+                    // Handle different error object structures
+                    const errorKeys = Object.keys(result.err)
+                    if (errorKeys.length > 0) {
+                        const firstKey = errorKeys[0]
+                        const errorValue = result.err[firstKey]
+                        if (typeof errorValue === 'string') {
+                            errorMessage = errorValue
+                        } else {
+                            errorMessage = firstKey
+                        }
+                    } else {
+                        errorMessage = JSON.stringify(result.err)
+                    }
+                }
+            }
+            tacoStore.showError(`Failed to vote on proposal ${nnsProposalId}: ${errorMessage}`)
+        }
+    } catch (error: any) {
+        console.error('Error voting on proposal:', error)
+        tacoStore.showError('Error voting on proposal: ' + error.message)
+    } finally {
+        votingProposals.value[nnsProposalId] = false
+    }
+}
+
 // Load data methods
 const loadTimerStatus = async () => {
     try {
@@ -1330,6 +1497,11 @@ const loadConfiguration = async () => {
         } else {
             currentHighestProcessedNNSProposalId.value = 'Not set'
             newHighestProcessedNNSProposalId.value = ''
+        }
+        
+        // Initialize discovery start ID with current highest + 1
+        if (currentHighestProcessedNNSProposalId.value && currentHighestProcessedNNSProposalId.value !== 'Not set' && currentHighestProcessedNNSProposalId.value !== 'Error loading') {
+            discoveryStartId.value = (Number(currentHighestProcessedNNSProposalId.value) + 1).toString()
         }
         
         console.log('Final values:', {
