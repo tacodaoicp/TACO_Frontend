@@ -8046,6 +8046,23 @@ export const useTacoStore = defineStore('taco', () => {
         return TOPICS_TO_COPY.includes(topicId);
     };
 
+    // Helper function to get proposal status name from status ID
+    const getProposalStatusName = (statusId: number): string => {
+        switch (statusId) {
+            case 1: return "Open";
+            case 2: return "Rejected";
+            case 3: return "Adopted";
+            case 4: return "Executed";
+            case 5: return "Failed";
+            default: return `Unknown (${statusId})`;
+        }
+    };
+
+    // Helper function to check if proposal status allows voting
+    const isProposalVotable = (statusId: number): boolean => {
+        return statusId === 1; // Only "Open" proposals can be voted on
+    };
+
     // Get NNS proposal info directly from NNS governance
     const getNNSProposalInfo = async (proposalId: bigint) => {
         try {
@@ -8645,6 +8662,8 @@ export const useTacoStore = defineStore('taco', () => {
         setHighestProcessedNNSProposalId,
         getTopicName,
         shouldVoteTopic,
+        getProposalStatusName,
+        isProposalVotable,
         getNNSProposalInfo,
         copyNNSProposal,
         isNNSProposalCopied,

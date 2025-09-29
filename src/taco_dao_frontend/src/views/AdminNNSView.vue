@@ -429,20 +429,21 @@
                                             <th>NNS Proposal ID</th>
                                             <th>Topic</th>
                                             <th>Should Vote?</th>
-                                            <th>Status</th>
+                                            <th>Proposal Status</th>
+                                            <th>Copy Status</th>
                                             <th>TACO DAO Voted?</th>
                                             <th>Actions</th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                         <tr v-if="discoveredProposals.length === 0 && discoveryLoading" class="text-center">
-                                            <td colspan="6" class="py-4">
+                                            <td colspan="7" class="py-4">
                                                 <div class="spinner-border spinner-border-sm text-primary me-2" role="status"></div>
                                                 <span class="text-muted">Scanning for new NNS proposals starting from ID {{ (Number(currentHighestProcessedNNSProposalId) + 1) || 'unknown' }}...</span>
                                             </td>
                                         </tr>
                                         <tr v-else-if="discoveredProposals.length === 0 && !discoveryLoading" class="text-center">
-                                            <td colspan="6" class="py-4">
+                                            <td colspan="7" class="py-4">
                                                 <div class="mb-2" style="font-size: 2rem;">🔍</div>
                                                 <p class="taco-text-black-to-white mb-1">Click "Start Discovery" to scan for new NNS proposals</p>
                                                 <p class="small text-muted mb-0">
@@ -466,6 +467,26 @@
                                                 </span>
                                             </td>
                                             <td>
+                                                <span v-if="proposal.statusId === 1" class="badge bg-success">
+                                                    <i class="fas fa-vote-yea me-1"></i>{{ proposal.statusName }}
+                                                </span>
+                                                <span v-else-if="proposal.statusId === 2" class="badge bg-danger">
+                                                    <i class="fas fa-times me-1"></i>{{ proposal.statusName }}
+                                                </span>
+                                                <span v-else-if="proposal.statusId === 3" class="badge bg-primary">
+                                                    <i class="fas fa-check me-1"></i>{{ proposal.statusName }}
+                                                </span>
+                                                <span v-else-if="proposal.statusId === 4" class="badge bg-info">
+                                                    <i class="fas fa-cog me-1"></i>{{ proposal.statusName }}
+                                                </span>
+                                                <span v-else-if="proposal.statusId === 5" class="badge bg-warning">
+                                                    <i class="fas fa-exclamation-triangle me-1"></i>{{ proposal.statusName }}
+                                                </span>
+                                                <span v-else class="badge bg-secondary">
+                                                    <i class="fas fa-question me-1"></i>{{ proposal.statusName || 'Unknown' }}
+                                                </span>
+                                            </td>
+                                            <td>
                                                 <span v-if="proposal.isCheckingCopyStatus" class="badge bg-light text-dark">
                                                     <i class="fas fa-spinner fa-spin me-1"></i>Checking...
                                                 </span>
@@ -482,6 +503,9 @@
                                             <td>
                                                 <span v-if="proposal.isCheckingVoteStatus" class="badge bg-light text-dark">
                                                     <i class="fas fa-spinner fa-spin me-1"></i>Checking...
+                                                </span>
+                                                <span v-else-if="!proposal.isVotable" class="text-muted small">
+                                                    <i class="fas fa-ban me-1"></i>N/A ({{ proposal.statusName }})
                                                 </span>
                                                 <span v-else-if="proposal.tacoDAOHasVoted === true" class="badge bg-success">
                                                     <i class="fas fa-check me-1"></i>Voted
@@ -921,10 +945,15 @@ const startProposalDiscovery = async () => {
                 if (proposalInfo) {
                     consecutiveNotFound = 0 // Reset counter when we find a proposal
                     
-                    // Extract topic ID from the proposal
+                    // Extract topic ID and status from the proposal
                     const topicId = Number(proposalInfo.topic || 0)
                     const topicName = tacoStore.getTopicName(topicId)
                     const shouldVote = tacoStore.shouldVoteTopic(topicId)
+                    
+                    // Extract proposal status
+                    const statusId = Number(proposalInfo.status || 0)
+                    const statusName = tacoStore.getProposalStatusName(statusId)
+                    const isVotable = tacoStore.isProposalVotable(statusId)
                     
                     // Create the proposal object first (without copy/vote checks)
                     const discoveredProposal = {
@@ -932,11 +961,14 @@ const startProposalDiscovery = async () => {
                         topicId: topicId,
                         topicName: topicName,
                         shouldVote: shouldVote,
+                        statusId: statusId,
+                        statusName: statusName,
+                        isVotable: isVotable,
                         isAlreadyCopied: false, // Will be updated below
                         proposalInfo: proposalInfo,
                         isCheckingCopyStatus: shouldVote, // Show loading state for copy check
                         tacoDAOHasVoted: null as boolean | null, // Will be updated below
-                        isCheckingVoteStatus: true // Show loading state for vote check
+                        isCheckingVoteStatus: isVotable // Only check vote status for votable proposals
                     }
                     
                     // Add to table immediately for progressive display
@@ -948,24 +980,37 @@ const startProposalDiscovery = async () => {
                     console.log('Found proposal:', discoveredProposal)
                     console.log('Total discovered proposals now:', discoveredProposals.value.length)
                     
-                    // Check TACO DAO voting status (async, will update the proposal in place)
-                    try {
-                        const tacoDAONeuronId = BigInt(currentTacoDAONeuronId.value || '0')
-                        if (tacoDAONeuronId > 0) {
-                            const hasVoted = await tacoStore.hasNeuronVotedOnNNSProposal(BigInt(currentId), tacoDAONeuronId)
-                            console.log(`Proposal ${currentId} TACO DAO vote check:`, { hasVoted })
-                            
-                            // Update the proposal in the array reactively
-                            const proposalIndex = discoveredProposals.value.findIndex(p => p.id === currentId)
-                            if (proposalIndex !== -1) {
-                                discoveredProposals.value[proposalIndex] = {
-                                    ...discoveredProposals.value[proposalIndex],
-                                    tacoDAOHasVoted: hasVoted,
-                                    isCheckingVoteStatus: false
+                    // Check TACO DAO voting status only for votable (open) proposals
+                    if (isVotable) {
+                        try {
+                            const tacoDAONeuronId = BigInt(currentTacoDAONeuronId.value || '0')
+                            if (tacoDAONeuronId > 0) {
+                                const hasVoted = await tacoStore.hasNeuronVotedOnNNSProposal(BigInt(currentId), tacoDAONeuronId)
+                                console.log(`Proposal ${currentId} TACO DAO vote check:`, { hasVoted })
+                                
+                                // Update the proposal in the array reactively
+                                const proposalIndex = discoveredProposals.value.findIndex(p => p.id === currentId)
+                                if (proposalIndex !== -1) {
+                                    discoveredProposals.value[proposalIndex] = {
+                                        ...discoveredProposals.value[proposalIndex],
+                                        tacoDAOHasVoted: hasVoted,
+                                        isCheckingVoteStatus: false
+                                    }
+                                }
+                            } else {
+                                // No TACO DAO neuron ID set
+                                const proposalIndex = discoveredProposals.value.findIndex(p => p.id === currentId)
+                                if (proposalIndex !== -1) {
+                                    discoveredProposals.value[proposalIndex] = {
+                                        ...discoveredProposals.value[proposalIndex],
+                                        tacoDAOHasVoted: null,
+                                        isCheckingVoteStatus: false
+                                    }
                                 }
                             }
-                        } else {
-                            // No TACO DAO neuron ID set
+                        } catch (error) {
+                            console.warn('Error checking TACO DAO vote status:', error)
+                            // Update the proposal in the array reactively
                             const proposalIndex = discoveredProposals.value.findIndex(p => p.id === currentId)
                             if (proposalIndex !== -1) {
                                 discoveredProposals.value[proposalIndex] = {
@@ -975,14 +1020,13 @@ const startProposalDiscovery = async () => {
                                 }
                             }
                         }
-                    } catch (error) {
-                        console.warn('Error checking TACO DAO vote status:', error)
-                        // Update the proposal in the array reactively
+                    } else {
+                        // For non-votable proposals, set vote status immediately without checking
                         const proposalIndex = discoveredProposals.value.findIndex(p => p.id === currentId)
                         if (proposalIndex !== -1) {
                             discoveredProposals.value[proposalIndex] = {
                                 ...discoveredProposals.value[proposalIndex],
-                                tacoDAOHasVoted: null,
+                                tacoDAOHasVoted: null, // N/A for non-votable proposals
                                 isCheckingVoteStatus: false
                             }
                         }
