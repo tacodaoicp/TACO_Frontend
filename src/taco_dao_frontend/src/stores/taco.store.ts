@@ -8146,6 +8146,19 @@ export const useTacoStore = defineStore('taco', () => {
         }
     };
 
+    // Remove NNS-SNS proposal mapping
+    const removeCopiedNNSProposal = async (nnsProposalId: bigint) => {
+        try {
+            console.log('Removing NNS-SNS proposal mapping for NNS proposal:', nnsProposalId.toString());
+            const actor = await createNeuronSnapshotActor();
+            await (actor as any).removeCopiedNNSProposal(nnsProposalId);
+            console.log('Successfully removed NNS-SNS proposal mapping for:', nnsProposalId.toString());
+        } catch (error) {
+            console.error('Error removing NNS-SNS proposal mapping:', error);
+            throw error;
+        }
+    };
+
     // Check if TACO DAO neuron has voted on NNS proposal
     const hasNeuronVotedOnNNSProposal = async (proposalId: bigint, neuronId: bigint): Promise<boolean> => {
         try {
@@ -8676,6 +8689,7 @@ export const useTacoStore = defineStore('taco', () => {
         getNNSProposalInfo,
         copyNNSProposal,
         isNNSProposalCopied,
+        removeCopiedNNSProposal,
         hasNeuronVotedOnNNSProposal,
         getPeriodicTimerIntervalSeconds,
         setPeriodicTimerIntervalSeconds,

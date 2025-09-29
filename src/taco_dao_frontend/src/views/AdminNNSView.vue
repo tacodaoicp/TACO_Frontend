@@ -383,12 +383,23 @@
                                                 </span>
                                             </td>
                                             <td>
-                                                <button 
-                                                    @click="forceVoteOnProposal(proposal.sns_proposal_id)" 
-                                                    :disabled="votingLoading[proposal.sns_proposal_id]"
-                                                    class="btn taco-btn taco-btn--orange btn-sm">
-                                                    <i class="fas fa-gavel me-1"></i>Force Vote
-                                                </button>
+                                                <div class="d-flex gap-1">
+                                                    <button 
+                                                        @click="forceVoteOnProposal(proposal.sns_proposal_id)" 
+                                                        :disabled="votingLoading[proposal.sns_proposal_id]"
+                                                        class="btn taco-btn taco-btn--orange btn-sm">
+                                                        <i class="fas fa-gavel me-1"></i>Force Vote
+                                                    </button>
+                                                    <button 
+                                                        v-if="proposal.is_expired"
+                                                        @click="removeProposalMapping(proposal.nns_proposal_id)" 
+                                                        :disabled="removingProposals[proposal.nns_proposal_id]"
+                                                        class="btn btn-outline-danger btn-sm"
+                                                        title="Remove NNS-SNS mapping for expired proposal">
+                                                        <i class="fas fa-trash me-1"></i>
+                                                        {{ removingProposals[proposal.nns_proposal_id] ? 'Removing...' : 'Remove' }}
+                                                    </button>
+                                                </div>
                                             </td>
                                         </tr>
                                     </tbody>
@@ -676,6 +687,7 @@ const votingLoading = ref<Record<number, boolean>>({})
 const discoveryLoading = ref(false)
 const copyingProposals = ref<Record<number, boolean>>({})
 const votingProposals = ref<Record<number, boolean>>({})
+const removingProposals = ref<Record<number, boolean>>({})
 
 // Discovery settings
 const discoveryStartId = ref('')
@@ -1345,6 +1357,25 @@ const voteOnProposal = async (nnsProposalId: number) => {
         tacoStore.showError('Error voting on proposal: ' + error.message)
     } finally {
         votingProposals.value[nnsProposalId] = false
+    }
+}
+
+const removeProposalMapping = async (nnsProposalId: number) => {
+    try {
+        removingProposals.value[nnsProposalId] = true
+        
+        await tacoStore.removeCopiedNNSProposal(BigInt(nnsProposalId))
+        
+        tacoStore.showSuccess(`Successfully removed NNS-SNS mapping for proposal ${nnsProposalId}`)
+        
+        // Refresh the votable proposals list to remove it from the table
+        await refreshVotableProposals()
+        
+    } catch (error: any) {
+        console.error('Error removing proposal mapping:', error)
+        tacoStore.showError('Error removing proposal mapping: ' + error.message)
+    } finally {
+        removingProposals.value[nnsProposalId] = false
     }
 }
 
