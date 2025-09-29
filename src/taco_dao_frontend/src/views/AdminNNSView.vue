@@ -412,7 +412,7 @@
 
                             <!-- Discovery Settings and Filters -->
                             <div class="row g-3 mb-4">
-                                <div class="col-md-4">
+                                <div class="col-md-3">
                                     <label for="discoveryStartId" class="form-label small">Start from Proposal ID:</label>
                                     <input 
                                         id="discoveryStartId"
@@ -423,7 +423,19 @@
                                         placeholder="Enter proposal ID"
                                         min="1">
                                 </div>
-                                <div class="col-md-8">
+                                <div class="col-md-2">
+                                    <label for="maxProposalsToFetch" class="form-label small">Max to fetch:</label>
+                                    <input 
+                                        id="maxProposalsToFetch"
+                                        v-model="maxProposalsToFetch" 
+                                        type="number" 
+                                        class="form-control form-control-sm"
+                                        :disabled="discoveryLoading"
+                                        placeholder="Max"
+                                        min="1"
+                                        max="500">
+                                </div>
+                                <div class="col-md-7">
                                     <label class="form-label small">Filters:</label>
                                     <div class="d-flex flex-wrap gap-3">
                                         <div class="form-check form-check-sm">
@@ -667,6 +679,7 @@ const votingProposals = ref<Record<number, boolean>>({})
 
 // Discovery settings
 const discoveryStartId = ref('')
+const maxProposalsToFetch = ref(50) // Default to 50, max 500
 const filters = ref({
     hideNotEligible: false,
     hideCopied: false,
@@ -1055,9 +1068,13 @@ const startProposalDiscovery = async () => {
         let consecutiveNotFound = 0
         const maxConsecutiveNotFound = 10 // Stop after 10 consecutive missing proposals
         
-        tacoStore.showSuccess('Starting proposal discovery from ID ' + currentId)
+        // Respect max proposals limit (1-500)
+        const maxToFetch = Math.min(Math.max(Number(maxProposalsToFetch.value) || 50, 1), 500)
+        let proposalsFound = 0
         
-        while (consecutiveNotFound < maxConsecutiveNotFound) {
+        tacoStore.showSuccess(`Starting proposal discovery from ID ${currentId} (max ${maxToFetch} proposals)`)
+        
+        while (consecutiveNotFound < maxConsecutiveNotFound && proposalsFound < maxToFetch) {
             try {
                 console.log('Checking NNS proposal ID:', currentId)
                 const proposalInfo = await tacoStore.getNNSProposalInfo(BigInt(currentId))
@@ -1093,12 +1110,13 @@ const startProposalDiscovery = async () => {
                     
                     // Add to table immediately for progressive display
                     discoveredProposals.value.push(discoveredProposal)
+                    proposalsFound++ // Increment counter for max limit
                     
                     // Force DOM update
                     await nextTick()
                     
                     console.log('Found proposal:', discoveredProposal)
-                    console.log('Total discovered proposals now:', discoveredProposals.value.length)
+                    console.log(`Total discovered proposals now: ${discoveredProposals.value.length} (${proposalsFound}/${maxToFetch})`)
                     
                     // Check TACO DAO voting status only for votable (open) proposals
                     if (isVotable) {
@@ -1201,7 +1219,9 @@ const startProposalDiscovery = async () => {
         const eligibleCount = discoveredProposals.value.filter(p => p.shouldVote && !p.isAlreadyCopied).length
         
         if (foundCount > 0) {
-            tacoStore.showSuccess(`Discovery complete! Found ${foundCount} proposals, ${eligibleCount} eligible for copying`)
+            const hitLimit = proposalsFound >= maxToFetch
+            const limitText = hitLimit ? ` (reached limit of ${maxToFetch})` : ''
+            tacoStore.showSuccess(`Discovery complete! Found ${foundCount} proposals${limitText}, ${eligibleCount} eligible for copying`)
         } else {
             tacoStore.showSuccess('No new proposals found')
         }
