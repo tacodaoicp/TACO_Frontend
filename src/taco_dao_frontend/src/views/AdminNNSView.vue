@@ -410,28 +410,10 @@
                                 </button>
                             </div>
 
-                            <div v-if="discoveryLoading" class="text-center py-4">
-                                <div class="spinner-border text-primary" role="status">
-                                    <span class="visually-hidden">Discovering proposals...</span>
-                                </div>
-                                <p class="mt-3 taco-text-black-to-white">
-                                    Scanning for new NNS proposals starting from ID {{ (Number(currentHighestProcessedNNSProposalId) + 1) || 'unknown' }}...
-                                </p>
-                                <p class="small text-muted">Found {{ discoveredProposals.length }} proposals so far</p>
-                            </div>
-
-                            <div v-else-if="discoveredProposals.length === 0 && !discoveryLoading" class="text-center py-4">
-                                <div class="mb-3" style="font-size: 2rem;">🔍</div>
-                                <p class="taco-text-black-to-white">Click "Start Discovery" to scan for new NNS proposals</p>
-                                <p class="small text-muted">
-                                    Will start scanning from NNS proposal ID {{ (Number(currentHighestProcessedNNSProposalId) + 1) || 'unknown' }}
-                                </p>
-                            </div>
-
-                            <div v-else-if="discoveredProposals.length > 0" class="table-responsive">
+                            <div class="table-responsive">
                                 <div class="d-flex justify-content-between align-items-center mb-3">
                                     <h5 class="taco-text-black-to-white mb-0">
-                                        Discovered {{ discoveredProposals.length }} new proposals
+                                        {{ discoveryLoading ? 'Discovering proposals...' : `Discovered ${discoveredProposals.length} new proposals` }}
                                     </h5>
                                     <button 
                                         @click="clearDiscoveredProposals" 
@@ -452,6 +434,21 @@
                                         </tr>
                                     </thead>
                                     <tbody>
+                                        <tr v-if="discoveredProposals.length === 0 && discoveryLoading" class="text-center">
+                                            <td colspan="5" class="py-4">
+                                                <div class="spinner-border spinner-border-sm text-primary me-2" role="status"></div>
+                                                <span class="text-muted">Scanning for new NNS proposals starting from ID {{ (Number(currentHighestProcessedNNSProposalId) + 1) || 'unknown' }}...</span>
+                                            </td>
+                                        </tr>
+                                        <tr v-else-if="discoveredProposals.length === 0 && !discoveryLoading" class="text-center">
+                                            <td colspan="5" class="py-4">
+                                                <div class="mb-2" style="font-size: 2rem;">🔍</div>
+                                                <p class="taco-text-black-to-white mb-1">Click "Start Discovery" to scan for new NNS proposals</p>
+                                                <p class="small text-muted mb-0">
+                                                    Will start scanning from NNS proposal ID {{ (Number(currentHighestProcessedNNSProposalId) + 1) || 'unknown' }}
+                                                </p>
+                                            </td>
+                                        </tr>
                                         <tr v-for="proposal in discoveredProposals" :key="proposal.id">
                                             <td class="font-monospace">{{ proposal.id }}</td>
                                             <td>
@@ -511,7 +508,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch, nextTick, triggerRef } from 'vue'
+import { ref, computed, onMounted, watch, nextTick } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useTacoStore } from '../stores/taco.store'
 import HeaderBar from '../components/HeaderBar.vue'
@@ -928,9 +925,6 @@ const startProposalDiscovery = async () => {
                     // Add to table immediately for progressive display
                     discoveredProposals.value.push(discoveredProposal)
                     
-                    // Force Vue to detect the change
-                    triggerRef(discoveredProposals)
-                    
                     // Force DOM update
                     await nextTick()
                     
@@ -952,7 +946,6 @@ const startProposalDiscovery = async () => {
                                     isAlreadyCopied: isAlreadyCopied,
                                     isCheckingCopyStatus: false
                                 }
-                                triggerRef(discoveredProposals)
                             }
                         } catch (error) {
                             console.warn('Error checking if proposal is copied:', error)
@@ -963,7 +956,6 @@ const startProposalDiscovery = async () => {
                                     ...discoveredProposals.value[proposalIndex],
                                     isCheckingCopyStatus: false
                                 }
-                                triggerRef(discoveredProposals)
                             }
                         }
                     }
@@ -1023,7 +1015,6 @@ const copyProposal = async (nnsProposalId: number) => {
                     isAlreadyCopied: true,
                     isCheckingCopyStatus: false
                 }
-                triggerRef(discoveredProposals)
             }
             
             // Refresh the votable proposals list
