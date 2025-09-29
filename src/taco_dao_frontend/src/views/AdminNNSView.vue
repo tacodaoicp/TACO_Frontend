@@ -293,6 +293,35 @@
                                         What to do when there are no DAO votes or there's a tie vote
                                     </small>
                                 </div>
+
+                                <!-- Highest Processed NNS Proposal ID -->
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label taco-text-black-to-white">
+                                        <i class="fas fa-list-ol me-2"></i>Highest Processed NNS Proposal ID
+                                    </label>
+                                    <div class="input-group">
+                                        <input 
+                                            v-model="newHighestProcessedNNSProposalId" 
+                                            type="text" 
+                                            class="form-control font-monospace" 
+                                            placeholder="NNS Proposal ID (numeric)"
+                                            style="font-size: 0.85rem;">
+                                        <button 
+                                            @click="updateHighestProcessedNNSProposalId" 
+                                            :disabled="actionLoading || !newHighestProcessedNNSProposalId || !isValidProposalId(newHighestProcessedNNSProposalId)"
+                                            class="btn taco-btn taco-btn--green">
+                                            <i class="fas fa-save me-1"></i>Update
+                                        </button>
+                                    </div>
+                                    <small class="text-muted">
+                                        Current: {{ currentHighestProcessedNNSProposalId || 'Loading...' }}
+                                        <span v-if="newHighestProcessedNNSProposalId && !isValidProposalId(newHighestProcessedNNSProposalId)" class="text-danger">
+                                            (Invalid proposal ID format)
+                                        </span>
+                                        <br>
+                                        The highest NNS proposal ID that has been processed for copying
+                                    </small>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -413,6 +442,8 @@ const newTacoDAONeuronId = ref('')
 const currentTacoDAONeuronId = ref('')
 const newDefaultVoteBehavior = ref('VoteAdopt')
 const currentDefaultVoteBehavior = ref('Loading...')
+const newHighestProcessedNNSProposalId = ref('')
+const currentHighestProcessedNNSProposalId = ref('')
 
 // Proposals
 const votableProposals = ref<any[]>([])
@@ -470,6 +501,12 @@ const isValidNeuronId = (neuronId: string) => {
     if (!neuronId) return true // Allow empty for display purposes
     // Check if it's a valid positive integer
     return /^\d+$/.test(neuronId) && BigInt(neuronId) > 0
+}
+
+const isValidProposalId = (proposalId: string) => {
+    if (!proposalId) return true // Allow empty for display purposes
+    // Check if it's a valid positive integer
+    return /^\d+$/.test(proposalId) && BigInt(proposalId) > 0
 }
 
 // Helper function to convert hex string to Uint8Array
@@ -682,6 +719,25 @@ const updateDefaultVoteBehavior = async () => {
     }
 }
 
+const updateHighestProcessedNNSProposalId = async () => {
+    if (!newHighestProcessedNNSProposalId.value || !isValidProposalId(newHighestProcessedNNSProposalId.value)) {
+        tacoStore.showError('Invalid proposal ID format. Please enter a positive integer.')
+        return
+    }
+
+    try {
+        actionLoading.value = true
+        await tacoStore.setHighestProcessedNNSProposalId(BigInt(newHighestProcessedNNSProposalId.value))
+        tacoStore.showSuccess('Highest processed NNS proposal ID updated successfully')
+        await loadConfiguration()
+    } catch (error: any) {
+        console.error('Error updating highest processed NNS proposal ID:', error)
+        tacoStore.showError('Error updating highest processed NNS proposal ID: ' + error.message)
+    } finally {
+        actionLoading.value = false
+    }
+}
+
 // Proposal methods
 const refreshVotableProposals = async () => {
     try {
@@ -689,7 +745,7 @@ const refreshVotableProposals = async () => {
         const proposals = await tacoStore.getVotableProposalsWithTimeLeft()
         
         // Convert BigInt values to Numbers to avoid JSON serialization issues
-        votableProposals.value = (proposals || []).map(proposal => ({
+        votableProposals.value = (proposals || []).map((proposal: any) => ({
             ...proposal,
             nns_proposal_id: Number(proposal.nns_proposal_id),
             sns_proposal_id: Number(proposal.sns_proposal_id),
@@ -762,11 +818,12 @@ const loadConfiguration = async () => {
             getTacoDAONeuronId: typeof tacoStore.getTacoDAONeuronId
         })
         
-        const [votingThreshold, proposerSubaccount, tacoDAONeuronId, defaultVoteBehavior] = await Promise.all([
+        const [votingThreshold, proposerSubaccount, tacoDAONeuronId, defaultVoteBehavior, highestProcessedNNSProposalId] = await Promise.all([
             tacoStore.getAutoVotingThresholdSeconds(),
             tacoStore.getProposerSubaccount(),
             tacoStore.getTacoDAONeuronId(),
-            tacoStore.getDefaultVoteBehavior()
+            tacoStore.getDefaultVoteBehavior(),
+            tacoStore.getHighestProcessedNNSProposalId()
         ])
         
         console.log('Raw responses:', { votingThreshold, proposerSubaccount, tacoDAONeuronId })
@@ -875,11 +932,29 @@ const loadConfiguration = async () => {
             newDefaultVoteBehavior.value = 'VoteAdopt'
         }
         
+        // Highest processed NNS proposal ID
+        if (highestProcessedNNSProposalId !== null && highestProcessedNNSProposalId !== undefined) {
+            try {
+                console.log('Highest processed NNS proposal ID:', highestProcessedNNSProposalId)
+                const proposalIdString = highestProcessedNNSProposalId.toString()
+                currentHighestProcessedNNSProposalId.value = proposalIdString
+                newHighestProcessedNNSProposalId.value = proposalIdString
+            } catch (proposalIdError) {
+                console.error('Error processing highest processed NNS proposal ID:', proposalIdError)
+                currentHighestProcessedNNSProposalId.value = 'Error loading'
+                newHighestProcessedNNSProposalId.value = ''
+            }
+        } else {
+            currentHighestProcessedNNSProposalId.value = 'Not set'
+            newHighestProcessedNNSProposalId.value = ''
+        }
+        
         console.log('Final values:', {
             currentVotingThreshold: currentVotingThreshold.value,
             currentProposerSubaccount: currentProposerSubaccount.value,
             currentTacoDAONeuronId: currentTacoDAONeuronId.value,
-            currentDefaultVoteBehavior: currentDefaultVoteBehavior.value
+            currentDefaultVoteBehavior: currentDefaultVoteBehavior.value,
+            currentHighestProcessedNNSProposalId: currentHighestProcessedNNSProposalId.value
         })
         
     } catch (error: any) {

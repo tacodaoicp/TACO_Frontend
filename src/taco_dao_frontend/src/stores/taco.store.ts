@@ -7972,6 +7972,20 @@ export const useTacoStore = defineStore('taco', () => {
         }
     }
 
+    // Get highest processed NNS proposal ID
+    const getHighestProcessedNNSProposalId = async () => {
+        try {
+            console.log('Getting highest processed NNS proposal ID...');
+            const actor = await createNeuronSnapshotActor();
+            const result = await (actor as any).getHighestProcessedNNSProposalId();
+            console.log('Highest processed NNS proposal ID result:', result);
+            return result;
+        } catch (error) {
+            console.error('Error getting highest processed NNS proposal ID:', error);
+            throw error;
+        }
+    }
+
     // Set auto-voting threshold in seconds
     const setAutoVotingThresholdSeconds = async (thresholdSeconds: bigint) => {
         try {
@@ -7979,6 +7993,19 @@ export const useTacoStore = defineStore('taco', () => {
             await (actor as any).setAutoVotingThresholdSeconds(thresholdSeconds);
         } catch (error) {
             console.error('Error setting auto-voting threshold:', error);
+            throw error;
+        }
+    }
+
+    // Set highest processed NNS proposal ID
+    const setHighestProcessedNNSProposalId = async (proposalId: bigint) => {
+        try {
+            console.log('Setting highest processed NNS proposal ID to:', proposalId.toString());
+            const actor = await createNeuronSnapshotActor();
+            await (actor as any).setHighestProcessedNNSProposalId(proposalId);
+            console.log('Successfully set highest processed NNS proposal ID to:', proposalId.toString());
+        } catch (error) {
+            console.error('Error setting highest processed NNS proposal ID:', error);
             throw error;
         }
     }
@@ -8452,6 +8479,8 @@ export const useTacoStore = defineStore('taco', () => {
         stopAutoVoteOnUrgentProposals,
         getAutoVotingThresholdSeconds,
         setAutoVotingThresholdSeconds,
+        getHighestProcessedNNSProposalId,
+        setHighestProcessedNNSProposalId,
         getPeriodicTimerIntervalSeconds,
         setPeriodicTimerIntervalSeconds,
         voteOnNNSProposal,
