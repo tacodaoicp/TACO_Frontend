@@ -1050,6 +1050,12 @@ const refreshVotableProposals = async () => {
 }
 
 const forceVoteOnProposal = async (snsProposalId: number) => {
+    // Show confirmation dialog
+    const confirmed = confirm(`Are you sure you want to force vote on SNS Proposal ${snsProposalId}?\n\nThis will cast a vote using the current default vote behavior.`)
+    if (!confirmed) {
+        return
+    }
+
     try {
         votingLoading.value[snsProposalId] = true
         const result = await tacoStore.voteOnNNSProposal(BigInt(snsProposalId))
@@ -1252,6 +1258,12 @@ const clearDiscoveredProposals = () => {
 }
 
 const copyProposal = async (nnsProposalId: number) => {
+    // Show confirmation dialog
+    const confirmed = confirm(`Are you sure you want to copy NNS Proposal ${nnsProposalId} to SNS?\n\nThis will create a new SNS motion proposal.`)
+    if (!confirmed) {
+        return
+    }
+
     try {
         copyingProposals.value[nnsProposalId] = true
         
@@ -1306,6 +1318,12 @@ const copyProposal = async (nnsProposalId: number) => {
 }
 
 const voteOnProposal = async (nnsProposalId: number) => {
+    // Show confirmation dialog
+    const confirmed = confirm(`Are you sure you want to vote on NNS Proposal ${nnsProposalId}?\n\nThis will cast a vote using the current default vote behavior.`)
+    if (!confirmed) {
+        return
+    }
+
     try {
         votingProposals.value[nnsProposalId] = true
         
@@ -1361,6 +1379,12 @@ const voteOnProposal = async (nnsProposalId: number) => {
 }
 
 const removeProposalMapping = async (nnsProposalId: number) => {
+    // Show confirmation dialog
+    const confirmed = confirm(`Are you sure you want to remove the NNS-SNS mapping for NNS Proposal ${nnsProposalId}?\n\nThis will permanently delete the relationship between the NNS and SNS proposals.`)
+    if (!confirmed) {
+        return
+    }
+
     try {
         removingProposals.value[nnsProposalId] = true
         
