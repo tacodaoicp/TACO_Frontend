@@ -11650,6 +11650,8 @@ about the projects that create allocations.
       reportId.value = 9
     } else if (newPath === '/reports/example') {
       reportId.value = 0
+    } else {
+      reportId.value = 9
     }
 
   }, { immediate: true })

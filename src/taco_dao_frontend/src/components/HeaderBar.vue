@@ -84,7 +84,7 @@
         </a>  
         
         <!-- wallet - router link -->
-        <router-link v-if="userLoggedIn" to="/wallet" class="header-bar__rl">
+        <router-link to="/wallet" class="header-bar__rl">
           
           <span class="header-bar__rl-span">Wallet</span>
         
@@ -146,13 +146,13 @@
           </span>
 
           <!-- account menu button -->
-          <button v-if="userLoggedIn" 
+          <button v-if="userLoggedIn"
                   id="accountMenuBtn"
                   class="btn account-menu__btn taco-text-black-to-white"
                   style="padding: 0.25rem 0.5rem;"
                   @click="toggleAccountMenu()">
 
-            <!-- wallet icon -->
+            <!-- user icon -->
             <i class="fa-lg fa fa-user"></i>
             
           </button>
@@ -267,7 +267,7 @@
         </a>  
         
         <!-- wallet - router link -->
-        <router-link v-if="userLoggedIn" @click="togglePagesMenu()" to="/wallet" class="list-group-item">
+        <router-link @click="togglePagesMenu()" to="/wallet" class="list-group-item">
 
           <!-- item text -->
           <span>Wallet</span>
@@ -287,6 +287,17 @@
       <!-- list group -->
       <div class="list-group">
 
+        <!-- wallet - router link -->
+        <router-link to="/wallet" class="list-group-item">
+
+          <!-- item icon-->
+          <i class="fa-solid fa-wallet"></i>
+
+          <!-- item text -->
+          <span>Wallet</span>
+
+        </router-link>            
+
         <!-- list group item -->
         <a class="list-group-item"
            href="#"
@@ -298,7 +309,7 @@
           <!-- item text -->
           <span>Logout</span>
 
-        </a>
+        </a>    
       
       </div>
 
@@ -466,6 +477,7 @@
         border: none;
         background-color: transparent;
         gap: 1rem;
+        text-decoration: none;
 
         &:hover {
           background-color: rgba(0,0,0,0.04);
@@ -516,23 +528,9 @@
     }
 
   }
-  // super small
-  @media (max-width: 440px) {
-
-    // hide inline page links
-    .header-bar__wallet-link {
-      display: none !important;
-    }
-
-  }
 
   // custom breakpoint
   @media (max-width: 490px) {
-
-    // hide inline page links
-    .header-bar__wallet-link {
-      display: none !important;
-    }
 
     // 
     .header-bar__chips {

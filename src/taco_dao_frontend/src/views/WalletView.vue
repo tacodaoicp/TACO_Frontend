@@ -92,7 +92,8 @@
                         @unregister="unregisterToken"
                         @stake-to-neuron="handleStakeToNeuron"
                         @create-neuron="handleCreateNeuron"
-                        @set-dissolve="handleSetDissolve" />
+                        @set-dissolve="handleSetDissolve"
+                        @refresh-balances="loadAllBalances" />
 
                     </div>
 
@@ -889,6 +890,16 @@ const handleStakeCompleted = async (neuron: any) => {
   // console.log('Staking completed for neuron:', neuron)
   // Refresh wallet data to show updated balances
   await loadWalletData()
+  // then refresh neurons in the taco token card specifically
+  try {
+    const refVal = tacoTokenCardRef.value as any
+    const instances = Array.isArray(refVal) ? refVal : [refVal]
+    for (const inst of instances) {
+      if (inst && typeof inst.loadNeurons === 'function') await inst.loadNeurons()
+    }
+  } catch (e) {
+    console.error('error refreshing neurons after stake', e)
+  }
 }
 
 // get taco balance
@@ -913,6 +924,20 @@ const handleNeuronCreated = async () => {
   // console.log('Neuron created successfully')
   // Refresh wallet data to show updated balances
   await loadWalletData()
+  // then refresh neurons in the taco token card specifically
+  try {
+    const refVal = tacoTokenCardRef.value as any
+    const instances = Array.isArray(refVal) ? refVal : [refVal]
+    for (const inst of instances) {
+      if (inst && typeof inst.loadNeurons === 'function') await inst.loadNeurons()
+    }
+  } catch (e) {
+    console.error('error refreshing neurons after create', e)
+  }
+
+  // the refresh user voting power
+  await tacoStore.refreshUserVotingPower()
+  
 }
 
 // dissolve dialog handlers

@@ -177,14 +177,14 @@
               </span>
 
               <!-- neurons count -->
-              <span v-if="categorizedNeurons.all.length > 0 && !loadingNeurons"
+              <span v-if="(categorizedNeurons.owned.filter(n => n.stake > 0n).length + categorizedNeurons.hotkeyed.filter(n => n.stake > 0n).length) > 0 && !loadingNeurons"
                     @click="toggleNeuronsSection"
                     class="small">
-                ({{ categorizedNeurons.all.length }})
+                ({{ categorizedNeurons.owned.filter(n => n.stake > 0n).length + categorizedNeurons.hotkeyed.filter(n => n.stake > 0n).length }})
               </span>
 
               <!-- empty neurons count -->
-              <span v-if="categorizedNeurons.all.length === 0 && !loadingNeurons"
+              <span v-if="(categorizedNeurons.owned.filter(n => n.stake > 0n).length + categorizedNeurons.hotkeyed.filter(n => n.stake > 0n).length) === 0 && !loadingNeurons"
                     class="small">
                 (0)
               </span>
@@ -310,7 +310,7 @@
         <div class="token-card__neurons__list">
 
           <!-- neuron owned -->
-          <div v-for="neuron in categorizedNeurons.owned" :key="neuron.idHex"
+          <div v-for="neuron in categorizedNeurons.owned.filter(n => n.stake > 0n)" :key="neuron.idHex"
                 class="token-card__neurons__neuron
                       d-flex flex-column shadow">
 
@@ -360,33 +360,33 @@
                   </span>
                 </div>
 
+                <!-- neuron stake actions -->
                 <div class="d-flex gap-2">
 
                   <!-- stake to neuron button -->
                   <button @click.stop="$emit('stake-to-neuron', neuron); dismissTooltips()"
-                          class="btn btn-sm taco-btn taco-btn--green px-2 py-1"
+                          class="btn btn-sm taco-btn taco-btn--green p-1"
                           data-bs-toggle="tooltip"
                           data-bs-placement="bottom"
                           data-bs-custom-class="taco-tooltip"
                           title="Add to stake">
 
                     <!-- icon -->
-                    <i class="fa fa-plus"></i>
+                    <i class="fa fa-fw fa-plus"></i>
 
                   </button>
 
                   <!-- disburse neuron button -->
-                  <!-- @click.stop="disburseNeuron(neuron)" -->
-                  <button v-if="neuron.dissolveState.display === '0s'"
-                          @click.stop="dismissTooltips()"
-                          class="btn btn-sm taco-btn taco-btn--green px-2 py-1"
+                  <button v-if="neuron.dissolveState.type === 'dissolved' || (neuron.dissolveState.type === 'delay' && neuron.dissolveState.seconds === 0)"
+                          @click.stop="localDisburseNeuron(neuron.id); dismissTooltips()"
+                          class="btn btn-sm taco-btn taco-btn--green p-1"
                           data-bs-toggle="tooltip"
                           data-bs-placement="bottom"
                           data-bs-custom-class="taco-tooltip"
-                          title="Disburse neuron">
+                          title="Disburse neuron to wallet">
 
                     <!-- icon -->
-                    <i class="fa fa-coins"></i>
+                    <i class="fa fa-fw fa-coins"></i>
 
                   </button>
 
@@ -403,12 +403,12 @@
                 <!-- claim rewards button -->
                 <button v-if="getNeuronRewards(neuron.idHex) > 0"
                         @click.stop="claimNeuronRewards(neuron)"
-                        class="btn btn-sm taco-btn taco-btn--green px-2"
+                        class="btn btn-sm taco-btn taco-btn--green p-1"
                         style="padding-top: 0.25rem; padding-bottom: 0.25rem;"
                         :disabled="loadingRewards || isNeuronClaiming(neuron.idHex)">
                   
                         <!-- tokens icon -->
-                  <i class="fa fa-coins"></i>
+                  <i class="fa fa-fw fa-coins"></i>
 
                 </button>
 
@@ -418,36 +418,36 @@
               <div>
                 <span class="small">
                   <span class="fw-bold">Dissolve State: </span>
-                  <span v-if="neuron.dissolveState.type === 'delay' && neuron.dissolveState.display !== '0s'">Not Dissolving</span>
-                  <span v-else-if="neuron.dissolveState.display === '0s'">Dissolved</span>
-                  <span v-else>Dissolving</span>
+                  <span v-if="neuron.dissolveState.type === 'delay' && neuron.dissolveState.seconds > 0">Not Dissolving</span>
+                  <span v-else-if="neuron.dissolveState.type === 'dissolving'">Dissolving</span>
+                  <span v-else>Dissolved</span>
                 </span>
 
                 <!-- start dissolving button -->
-                <button v-if="neuron.dissolveState.type === 'delay' && neuron.dissolveState.display !== '0s'" @click.stop="dismissTooltips(); startDissolving(neuron.id)"
-                        class="btn btn-sm taco-btn taco-btn--green px-2 py-1"
+                <button v-if="neuron.dissolveState.type === 'delay' && neuron.dissolveState.seconds > 0" @click.stop="dismissTooltips(); startDissolving(neuron.id)"
+                        class="btn btn-sm taco-btn taco-btn--green p-1"
                         data-bs-toggle="tooltip"
                         data-bs-placement="bottom"
                         data-bs-custom-class="taco-tooltip"
                         title="Start dissolving">
 
                   <!-- check icon -->
-                  <i class="fa fa-check"></i>
+                  <i class="fa fa-fw fa-check"></i>
 
-                </button>                 
+                </button>
 
                 <!-- stop dissolving button -->
-                <button v-else @click.stop="dismissTooltips(); stopDissolving(neuron.id)"
-                        class="btn btn-sm taco-btn taco-btn--green px-2 py-1"
+                <button v-if="neuron.dissolveState.type === 'dissolving'" @click.stop="dismissTooltips(); stopDissolving(neuron.id)"
+                        class="btn btn-sm taco-btn taco-btn--green p-1"
                         data-bs-toggle="tooltip"
                         data-bs-placement="bottom"
                         data-bs-custom-class="taco-tooltip"
                         title="Stop dissolving">
 
                   <!-- x icon -->
-                  <i class="fa fa-xmark"></i>
+                  <i class="fa fa-fw fa-xmark"></i>
 
-                </button>                               
+                </button>
 
               </div>
               
@@ -455,23 +455,23 @@
               <div>
                 <span class="small">
                   <span class="fw-bold">Dissolve Period: </span>
-                  <span v-if="neuron.dissolveState.display === '0s'">None</span>
+                  <span v-if="neuron.dissolveState.type === 'dissolved' || neuron.dissolveState.type === 'none' || (neuron.dissolveState.type === 'delay' && neuron.dissolveState.seconds === 0)">None</span>
                   <span v-else-if="neuron.dissolveState.type === 'dissolving'">{{ neuron.dissolveState.display.slice(14) }}</span>
                   <span v-else>{{ neuron.dissolveState.display }}</span>
                 </span>
 
                 <!-- set dissolve period button -->
                 <button @click.stop="dismissTooltips(); $emit('set-dissolve', neuron)"
-                      class="btn btn-sm taco-btn taco-btn--green px-2 py-1"
+                      class="btn btn-sm taco-btn taco-btn--green p-1"
                       data-bs-toggle="tooltip"
                       data-bs-placement="bottom"
                       data-bs-custom-class="taco-tooltip"
                       title="Modify dissolve period">
 
-                <!-- icon -->
-                <i class="fa fa-regular fa-clock"></i>
+                  <!-- icon -->
+                  <i class="fa fa-regular fa-fw fa-clock"></i>
 
-              </button>
+                </button>
 
               </div>
 
@@ -515,14 +515,14 @@
                             icon: '',
                             message: `Neuron principal was copied to your clipboard`
                           })"
-                        class="btn btn-sm taco-btn taco-btn--green px-2 py-1"
+                        class="btn btn-sm taco-btn taco-btn--green p-1"
                         data-bs-toggle="tooltip"
                         data-bs-placement="bottom"
                         data-bs-custom-class="taco-tooltip"
                         title="Copy neuron id">
 
                   <!-- icon -->
-                  <i class="fa fa-regular fa-copy"></i>
+                  <i class="fa fa-regular fa-fw fa-copy"></i>
 
                 </button>
 
@@ -561,7 +561,7 @@
         <div class="token-card__neurons__list">
 
           <!-- neuron hotkeyed -->
-          <div v-for="neuron in categorizedNeurons.hotkeyed" 
+          <div v-for="neuron in categorizedNeurons.hotkeyed.filter(n => n.stake > 0n)" 
               :key="neuron.idHex"
               class="token-card__neurons__neuron
                       d-flex flex-column shadow">
@@ -611,18 +611,34 @@
 
                 </div>
 
+                <!-- neuron stake actions -->
                 <div class="d-flex gap-2">
 
                   <!-- stake to neuron button -->
                   <button @click.stop="$emit('stake-to-neuron', neuron); dismissTooltips()"
-                          class="btn btn-sm taco-btn taco-btn--green px-2 py-1"
+                          class="btn btn-sm taco-btn taco-btn--green p-1"
                           data-bs-toggle="tooltip"
                           data-bs-placement="bottom"
                           data-bs-custom-class="taco-tooltip"
                           title="Add to stake">
 
                     <!-- icon -->
-                    <i class="fa fa-plus"></i>
+                    <i class="fa fa-fw fa-plus"></i>
+
+                  </button>
+
+                  <!-- disburse neuron button -->
+                  <button v-if="neuron.dissolveState.type === 'dissolved' || (neuron.dissolveState.type === 'delay' && neuron.dissolveState.seconds === 0)"
+                          @click.stop="dismissTooltips()"
+                          class="btn btn-sm taco-btn taco-btn--green p-1"
+                          data-bs-toggle="tooltip"
+                          data-bs-placement="bottom"
+                          data-bs-custom-class="taco-tooltip"
+                          title="You must disburse this neuron from the NNS"
+                          style="cursor: not-allowed; opacity: 0.5;">
+
+                    <!-- icon -->
+                    <i class="fa fa-fw fa-coins"></i>
 
                   </button>
 
@@ -639,12 +655,12 @@
                 <!-- claim rewards button -->
                 <button v-if="getNeuronRewards(neuron.idHex) > 0"
                         @click.stop="claimNeuronRewards(neuron)"
-                        class="btn btn-sm taco-btn taco-btn--green px-2"
+                        class="btn btn-sm taco-btn taco-btn--green p-1"
                         style="padding-top: 0.25rem; padding-bottom: 0.25rem;"
                         :disabled="loadingRewards || isNeuronClaiming(neuron.idHex)">
                   
                         <!-- tokens icon -->
-                        <i class="fa fa-coins"></i>
+                        <i class="fa fa-fw fa-coins"></i>
 
                 </button>
 
@@ -654,21 +670,64 @@
               <div>
                 <span class="small">
                   <span class="fw-bold">Dissolve State: </span>
-                  <span v-if="neuron.dissolveState.type === 'delay' && neuron.dissolveState.display !== '0s'">Not Dissolving</span>
-                  <span v-else-if="neuron.dissolveState.display === '0s'">Dissolved</span>
-                  <span v-else>Dissolving</span>
+                  <span v-if="neuron.dissolveState.type === 'delay' && neuron.dissolveState.seconds > 0">Not Dissolving</span>
+                  <span v-else-if="neuron.dissolveState.type === 'dissolving'">Dissolving</span>
+                  <span v-else>Dissolved</span>
                 </span>
+
+                <!-- stop dissolving button -->
+                <button v-if="neuron.dissolveState.type === 'dissolving'" @click.stop="dismissTooltips();"
+                        class="btn btn-sm taco-btn taco-btn--green p-1"
+                        data-bs-toggle="tooltip"
+                        data-bs-placement="bottom"
+                        data-bs-custom-class="taco-tooltip"
+                        title="You must stop dissolving from the NNS"
+                        style="cursor: not-allowed; opacity: 0.5;">
+
+                  <!-- x icon -->
+                  <i class="fa fa-fw fa-xmark"></i>
+
+                </button>
+
+                <!-- start dissolving button -->
+                <button v-if="neuron.dissolveState.type === 'delay' && neuron.dissolveState.seconds > 0" @click.stop="dismissTooltips();"
+                        class="btn btn-sm taco-btn taco-btn--green p-1"
+                        data-bs-toggle="tooltip"
+                        data-bs-placement="bottom"
+                        data-bs-custom-class="taco-tooltip"
+                        title="You must start dissolving from the NNS"
+                        style="cursor: not-allowed; opacity: 0.5;">
+
+                  <!-- check icon -->
+                  <i class="fa fa-fw fa-check"></i>
+
+                </button>
+
               </div>
               
               <!-- neuron dissolve period -->
               <div>
                 <span class="small">
                   <span class="fw-bold">Dissolve Period: </span>
-                  <span v-if="neuron.dissolveState.display === '0s'">None</span>
+                  <span v-if="neuron.dissolveState.type === 'dissolved' || neuron.dissolveState.type === 'none' || (neuron.dissolveState.type === 'delay' && neuron.dissolveState.seconds === 0)">None</span>
                   <span v-else-if="neuron.dissolveState.type === 'dissolving'">{{ neuron.dissolveState.display.slice(14) }}</span>
                   <span v-else>{{ neuron.dissolveState.display }}</span>
                 </span>   
-                            
+
+                <!-- set dissolve period button -->
+                <button @click.stop="dismissTooltips();"
+                      class="btn btn-sm taco-btn taco-btn--green p-1"
+                      data-bs-toggle="tooltip"
+                      data-bs-placement="bottom"
+                      data-bs-custom-class="taco-tooltip"
+                      title="You must modify the dissolve period from the NNS"
+                      style="cursor: not-allowed; opacity: 0.5;"> 
+
+                  <!-- icon -->
+                  <i class="fa fa-regular fa-fw fa-clock"></i>
+
+                </button>
+
               </div>
 
               <!-- neuron age -->
@@ -711,14 +770,14 @@
                             icon: '',
                             message: `Neuron principal was copied to your clipboard`
                           })"
-                        class="btn btn-sm taco-btn taco-btn--green px-2 py-1"
+                        class="btn btn-sm taco-btn taco-btn--green p-1"
                         data-bs-toggle="tooltip"
                         data-bs-placement="bottom"
                         data-bs-custom-class="taco-tooltip"
                         title="Copy neuron id">
 
                   <!-- icon -->
-                  <i class="fa fa-regular fa-copy"></i>
+                  <i class="fa fa-regular fa-fw fa-copy"></i>
 
                 </button>
 
@@ -936,13 +995,14 @@ interface TokenCardEmits {
   (e: 'stake-to-neuron', neuron: any): void
   (e: 'create-neuron'): void
   (e: 'set-dissolve', neuron: any): void
+  (e: 'refresh-balances'): void
 }
 
 const props = withDefaults(defineProps<TokenCardProps>(), {
   showRegisterButton: true
 })
 
-defineEmits<TokenCardEmits>()
+const emit = defineEmits<TokenCardEmits>()
 
 // Taco store for neuron operations
 const tacoStore = useTacoStore()
@@ -1010,6 +1070,39 @@ const stopDissolving = async (neuronId: Uint8Array) => {
 const { copy } = useClipboard()
 
 const { addToast } = tacoStore // not reactive
+
+// disburse neuron
+const localDisburseNeuron = async (neuronId: Uint8Array) => {
+
+  // await disburse neuron
+  const result = await tacoStore.disburseNeuron(neuronId)
+
+  // load neurons
+  loadNeurons()
+
+  // refresh wallet balances via parent
+  emit('refresh-balances')
+
+  // it returns true
+  if (result) {
+    tacoStore.addToast({
+      id: Date.now(),
+      code: 'disburse-success',
+      title: 'Neuron Disbursed',
+      icon: 'fa-solid fa-coins',
+      message: 'Neuron disbursed successfully, the funds are now in your wallet'
+    })
+  }
+  else {
+    tacoStore.addToast({
+      id: Date.now(),
+      code: 'disburse-error',
+      title: 'Neuron Disburse Failed',
+      icon: 'fa-solid fa-exclamation-triangle',
+      message: 'Neuron disburse failed, please try again'
+    })
+  }
+}
 
 // ICP Account ID computation
 const icpAccountId = computed(() => {

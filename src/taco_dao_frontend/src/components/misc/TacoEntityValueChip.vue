@@ -44,7 +44,24 @@
                 <span class="taco-entity-value-chip__tooltip__kvp__value 
                     taco-text-black-to-white">${{formatNumber(totalTreasuryValueInUsd)}}</span>
 
-            </div>               
+            </div>   
+            
+            <!-- kvp (icp) -->
+            <div class="taco-entity-value-chip__tooltip__kvp pt-2"
+                style="padding-top: 0.75rem !important; padding-left: 1.25rem !important;">
+
+                <!-- key -->
+                <span class="taco-entity-value-chip__tooltip__kvp__key 
+                    taco-text-black-to-white">
+                    <img :src="icpLogo" style="width: 1rem; height: 1rem;"/>
+                    ICP
+                </span>
+
+                <!-- value -->
+                <span class="taco-entity-value-chip__tooltip__kvp__value 
+                    taco-text-black-to-white">${{formatNumber(snsTreasuryIcpValueInUsd)}}</span>
+
+            </div>              
 
             <!-- kvp (taco) -->
             <div class="taco-entity-value-chip__tooltip__kvp pt-2"
@@ -61,24 +78,24 @@
                 <span class="taco-entity-value-chip__tooltip__kvp__value 
                     taco-text-black-to-white">${{formatNumber(snsTreasuryTacoValueInUsd)}}</span>
 
-            </div>
-
-            <!-- kvp (icp) -->
+            </div> 
+            
+            <!-- kvp (dkp) -->
             <div class="taco-entity-value-chip__tooltip__kvp pt-2"
                 style="padding: 0.75rem 1rem 1rem 1.25rem !important; border-bottom: 1px solid var(--dark-orange);">
 
                 <!-- key -->
                 <span class="taco-entity-value-chip__tooltip__kvp__key 
                     taco-text-black-to-white">
-                    <img :src="icpLogo" style="width: 1rem; height: 1rem;"/>
-                    ICP
+                    <img :src="dkpLogo" style="width: 1rem; height: 1rem;"/>
+                    DKP
                 </span>
 
                 <!-- value -->
                 <span class="taco-entity-value-chip__tooltip__kvp__value 
-                    taco-text-black-to-white">${{formatNumber(snsTreasuryIcpValueInUsd)}}</span>
+                    taco-text-black-to-white">${{formatNumber(snsTreasuryDkpValueInUsd)}}</span>
 
-            </div>         
+            </div> 
 
             <!-- kvp (portfolio) -->
             <div class="taco-entity-value-chip__tooltip__kvp py-2"
@@ -254,6 +271,7 @@
     import { useTacoStore } from "../../stores/taco.store"
     import { storeToRefs } from "pinia"
     import icpLogo from "../../assets/tokens/snspng/icp.png"
+    import dkpLogo from "../../assets/tokens/snspng/dragginz.png"
     import TacoCoinIcon from "../../assets/tokens/tacoCoinIcon.vue"
 
     ///////////
@@ -270,7 +288,7 @@
     // # STATE #
 
     // dao
-    const { totalPortfolioValueInUsd, totalTreasuryValueInUsd, snsTreasuryTacoValueInUsd, snsTreasuryIcpValueInUsd } = storeToRefs(tacoStore)
+    const { totalPortfolioValueInUsd, totalTreasuryValueInUsd, snsTreasuryTacoValueInUsd, snsTreasuryIcpValueInUsd, snsTreasuryDkpValueInUsd } = storeToRefs(tacoStore)
 
     /////////////////////
     // local variables //

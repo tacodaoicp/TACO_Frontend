@@ -193,7 +193,8 @@
 
           <div v-if="successMessage" class="mt-3 mb-1">
 
-            <span class="d-inline-block text-center">You can now <router-link to="/vote" class="vote-link" style="color: var(--blue-to-light-blue) !important;">Vote on allocations</router-link> and start earning rewards!</span>
+            <span class="d-inline-block text-center mb-2">You can now <router-link to="/vote" class="vote-link" style="color: var(--blue-to-light-blue) !important;">Vote on allocations</router-link> and start earning rewards!</span>
+            <span class="d-inline-block text-center">If you've already voted, you must vote again to use this neuron's voting power</span>
 
           </div>
 

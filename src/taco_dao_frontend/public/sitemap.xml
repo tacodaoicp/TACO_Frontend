@@ -25,7 +25,7 @@
     <priority>0.8</priority>las
   </url> 
   <url>
-    <loc>https://tacodao.com/chat/sneed</loc>
+    <loc>https://tacodao.com/chat/forum</loc>
     <lastmod>2025-07-10</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
@@ -44,6 +44,12 @@
   </url>
   <url>
     <loc>https://tacodao.com/info</loc>
+    <lastmod>2025-07-10</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://tacodao.com/wallet</loc>
     <lastmod>2025-07-10</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>

@@ -525,6 +525,7 @@ export const useTacoStore = defineStore('taco', () => {
     const btcPriceUsd = useStorage('btcPriceUsd', 0)
     const tacoPriceUsd = useStorage('tacoPriceUsd', 0)
     const tacoPriceIcp = useStorage('tacoPriceIcp', 0)
+    const dkpPriceUsd = useStorage('dkpPriceUsd', 0)
     const lastPriceUpdate = useStorage('lastPriceUpdate', 0)
 
     // dao
@@ -540,6 +541,7 @@ export const useTacoStore = defineStore('taco', () => {
     // sns provided canisters
     const snsTreasuryTacoValueInUsd = ref(0)
     const snsTreasuryIcpValueInUsd = ref(0)
+    const snsTreasuryDkpValueInUsd = ref(0)
     const totalTreasuryValueInUsd = ref(0)
 
     // treasury
@@ -1254,14 +1256,14 @@ export const useTacoStore = defineStore('taco', () => {
             // log
             console.log('✨ fetching new crypto prices')
 
-            // try coingecko standard endpoint for icp and btc
+            // try coingecko standard endpoint for icp, btc, and dkp
             try {
 
                 // log
                 // console.log('taco.store: fetching new crypto prices - coingecko standard endpoint')
 
                 // fetch
-                const response = await fetch('https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=internet-computer,bitcoin&price_change_percentage=1h,24h')
+                const response = await fetch('https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=internet-computer,bitcoin,draggin-karma-points')
                 
                 // if not ok, throw error
                 if (!response.ok) throw new Error(`HTTP ${response.status}`)
@@ -1275,10 +1277,12 @@ export const useTacoStore = defineStore('taco', () => {
                 // Find the specific coins in the array
                 const icpData = data.find((coin: { id: string }) => coin.id === 'internet-computer')
                 const btcData = data.find((coin: { id: string }) => coin.id === 'bitcoin')
+                const dkpData = data.find((coin: { id: string }) => coin.id === 'draggin-karma-points')
 
                 // Set the prices
                 icpPriceUsd.value = icpData?.current_price || 0
                 btcPriceUsd.value = btcData?.current_price || 0
+                dkpPriceUsd.value = dkpData?.current_price || 0
 
                 // // set last price update
                 lastPriceUpdate.value = now
@@ -1511,6 +1515,23 @@ export const useTacoStore = defineStore('taco', () => {
         // log
         // console.log('treasury icp balance:', snsTreasuryIcpBalance)
 
+        /////////////////////////////////////
+        // fetch total DKP in the treasury //
+        /////////////////////////////////////
+
+        // log
+        // console.log('taco.store: fetchTotalTreasuryValueInUsd() - fetching total DKP in the treasury')
+
+        // call icp ledger balance for sns treasury icp balance
+        const snsTreasuryDkpBalance = await icrc1BalanceOf(
+            'zfcdd-tqaaa-aaaaq-aaaga-cai', // ICP ledger canister ID
+            Principal.fromText('lhdfz-wqaaa-aaaaq-aae3q-cai'),
+            // hexToUint8Array('df86d44b4cf253518395a3213fbb6b256a27e60fb590c1b27211be9011709fdc')
+        )
+
+        // log
+        // console.log('treasury dkp balance:', snsTreasuryDkpBalance)
+
         /////////////////
         // format data //
         /////////////////
@@ -1518,10 +1539,12 @@ export const useTacoStore = defineStore('taco', () => {
         // convert balances to numbers
         const tacoBalance = snsTreasuryTacoBalance ? Number(snsTreasuryTacoBalance) : 0
         const icpBalance = snsTreasuryIcpBalance ? Number(snsTreasuryIcpBalance) : 0
+        const dkpBalance = snsTreasuryDkpBalance ? Number(snsTreasuryDkpBalance) : 0
 
         // convert to proper units (ICP has 8 decimals, TACO has 8 decimals)
         const tacoBalanceNormalized = tacoBalance / Math.pow(10, 8)
         const icpBalanceNormalized = icpBalance / Math.pow(10, 8)
+        const dkpBalanceNormalized = dkpBalance / Math.pow(10, 8)
 
         // convert to USD using current prices
         const tacoValueUsd = tacoBalanceNormalized * tacoPriceUsd.value
@@ -1535,8 +1558,14 @@ export const useTacoStore = defineStore('taco', () => {
         // log
         // console.log('icp value in usd: %c$' + icpValueUsd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }), 'color: green; font-weight: bold;')
 
+        // convert to USD using current prices
+        const dkpValueUsd = dkpBalanceNormalized * dkpPriceUsd.value
+
+        // log
+        // console.log('dkp value in usd: %c$' + dkpValueUsd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }), 'color: green; font-weight: bold;')
+
         // calculate total treasury value in usd
-        const totalValue = tacoValueUsd + icpValueUsd
+        const totalValue = tacoValueUsd + icpValueUsd + dkpValueUsd
 
         // log total value
         // console.log('total treasury value: %c$' + totalValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }), 'color: green; font-weight: bold;')
@@ -1546,6 +1575,9 @@ export const useTacoStore = defineStore('taco', () => {
 
         // set sns treasury icp value in usd
         snsTreasuryIcpValueInUsd.value = icpValueUsd
+
+        // set sns treasury dkp value in usd
+        snsTreasuryDkpValueInUsd.value = dkpValueUsd
 
         // set total treasury value in usd
         totalTreasuryValueInUsd.value = totalValue
@@ -5413,19 +5445,19 @@ export const useTacoStore = defineStore('taco', () => {
 
     // Helper function to calculate neuron age
     const calculateNeuronAge = (createdTimestamp: number, agingSinceTimestamp: number) => {
-        const now = Math.floor(Date.now() / 1000); // Current time in seconds
-        const ageSeconds = now - agingSinceTimestamp;
-        const days = Math.floor(ageSeconds / (24 * 60 * 60));
-        const hours = Math.floor((ageSeconds % (24 * 60 * 60)) / (60 * 60));
-        
-        if (days > 0) {
-            return `${days}d ${hours}h`;
-        } else if (hours > 0) {
-            return `${hours}h`;
-        } else {
-            return '< 1h';
-        }
-    };
+        const now = Math.floor(Date.now() / 1000)
+        const aging = Number(agingSinceTimestamp)
+        // prefer creation age for display; fallback to aging_since only if creation is missing/invalid
+        const base = (Number.isFinite(createdTimestamp) && createdTimestamp > 0 && createdTimestamp <= now)
+            ? createdTimestamp
+            : (Number.isFinite(aging) && aging > 0 && aging <= now ? aging : now)
+        const ageSeconds = Math.max(0, now - base)
+        const days = Math.floor(ageSeconds / (24 * 60 * 60))
+        const hours = Math.floor((ageSeconds % (24 * 60 * 60)) / (60 * 60))
+        if (days > 0) return `${days}d ${hours}h`
+        if (hours > 0) return `${hours}h`
+        return '< 1h'
+    }
 
     // Format neuron for display with relationship info and detailed stats
     const formatNeuronForDisplay = (neuron: any) => {
@@ -5437,9 +5469,11 @@ export const useTacoStore = defineStore('taco', () => {
         const dissolveInfo = formatDissolveState(neuron.dissolve_state);
         
         // Calculate age
-        const createdTimestamp = Number(neuron.created_timestamp_seconds || 0);
-        const agingSinceTimestamp = Number(neuron.aging_since_timestamp_seconds || createdTimestamp);
-        const ageDisplay = calculateNeuronAge(createdTimestamp, agingSinceTimestamp);
+        const createdRaw = neuron.created_timestamp_seconds
+        const agingRaw = neuron.aging_since_timestamp_seconds
+        const createdTimestamp = Array.isArray(createdRaw) ? Number((createdRaw[0] ?? 0n)) : Number(createdRaw ?? 0)
+        const agingSinceTimestamp = Array.isArray(agingRaw) ? Number((agingRaw[0] ?? BigInt(createdTimestamp))) : Number(agingRaw ?? createdTimestamp)
+        const ageDisplay = calculateNeuronAge(createdTimestamp, agingSinceTimestamp)
         
         // Parse other stats
         const stakedMaturity = Number(neuron.staked_maturity_e8s_equivalent || 0);
@@ -5521,7 +5555,7 @@ export const useTacoStore = defineStore('taco', () => {
         
 
         
-        const displayName = customName || `Neuron ${neuronIdHex.substring(0, 8)}...`;
+        const displayName = customName || `Neuron ${neuronIdHex.substring(0, 8)}...`
 
         return {
             id: neuronId,
@@ -5539,7 +5573,14 @@ export const useTacoStore = defineStore('taco', () => {
             // Detailed stats for expanded view
             dissolveState: dissolveInfo,
             age: ageDisplay,
-            ageSeconds: Math.floor(Date.now() / 1000) - agingSinceTimestamp,
+            ageSeconds: (() => {
+                const now = Math.floor(Date.now() / 1000)
+                const aging = Number(agingSinceTimestamp)
+                const base = (Number.isFinite(createdTimestamp) && createdTimestamp > 0 && createdTimestamp <= now)
+                    ? createdTimestamp
+                    : (Number.isFinite(aging) && aging > 0 && aging <= now ? aging : now)
+                return Math.max(0, now - base)
+            })(),
             createdDate: new Date(createdTimestamp * 1000),
             autoStakeMaturity,
             followeesCount: neuron.followees ? neuron.followees.length : 0,
@@ -5973,13 +6014,21 @@ export const useTacoStore = defineStore('taco', () => {
     }
 
     // Disburse neuron funds
-    const disburseNeuron = async (neuronId: Uint8Array, toAccount?: any, amount?: bigint) => {
+    const disburseNeuron = async (neuronId: Uint8Array) => {
+
         try {
             if (!userLoggedIn.value) {
                 throw new Error('User must be logged in');
             }
 
-            console.log('Disbursing neuron:', Array.from(neuronId).map(b => b.toString(16).padStart(2, '0')).join(''));
+            // turn app loading on
+            appLoadingOn()
+
+            if (!(neuronId instanceof Uint8Array) || neuronId.length === 0) {
+                throw new Error('invalid neuron id: Uint8Array required')
+            }
+
+            // console.log('Disbursing neuron:', Array.from(neuronId).map(b => b.toString(16).padStart(2, '0')).join(''));
 
             const authClient = await getAuthClient();
             const identity = authClient.getIdentity();
@@ -5995,26 +6044,27 @@ export const useTacoStore = defineStore('taco', () => {
             
             // Prepare the disburse command
             const disburseCommand: any = {};
-            if (toAccount) {
-                disburseCommand.to_account = toAccount;
-            }
-            if (amount) {
-                disburseCommand.amount = { e8s: amount };
-            }
+            // always disburse to the current user's primary account
+            const owner = [Principal.fromText(userPrincipal.value)]
+            disburseCommand.to_account = [{ owner, subaccount: [] }]
 
             // Prepare the manage neuron request for Disburse
             const manageNeuronRequest = {
-                subaccount: Array.from(neuronId),
+                // candid blob prefers Uint8Array
+                subaccount: neuronId,
                 command: [{
-                    Disburse: disburseCommand
+                    Disburse: {
+                        to_account: disburseCommand.to_account,
+                        amount: []
+                    }
                 }]
             };
 
-            console.log('Disburse request:', JSON.stringify(manageNeuronRequest, (key, value) =>
-                typeof value === 'bigint' ? value.toString() : value, 2));
+            // console.log('Disburse request:', JSON.stringify(manageNeuronRequest, (key, value) =>
+            //     typeof value === 'bigint' ? value.toString() : value, 2));
 
             const result = await snsGov.manage_neuron(manageNeuronRequest) as any;
-            console.log('Disburse result:', result);
+            // console.log('Disburse result:', result);
 
             if (result.command && result.command.length > 0) {
                 const command = result.command[0];
@@ -6022,7 +6072,7 @@ export const useTacoStore = defineStore('taco', () => {
                     throw new Error(`Disburse failed: ${JSON.stringify(command)}`);
                 }
                 if (command.Disburse) {
-                    console.log('Neuron disbursed successfully');
+                    // console.log('Neuron disbursed successfully');
                     return true;
                 }
             }
@@ -6031,7 +6081,13 @@ export const useTacoStore = defineStore('taco', () => {
         } catch (error: any) {
             console.error('Error disbursing neuron:', error);
             throw error;
+        } finally {
+
+            // turn app loading off
+            appLoadingOff()
+
         }
+        
     }
 
     // Add neuron permissions
@@ -8448,6 +8504,7 @@ export const useTacoStore = defineStore('taco', () => {
         totalTreasuryValueInUsd,
         snsTreasuryTacoValueInUsd,
         snsTreasuryIcpValueInUsd,
+        snsTreasuryDkpValueInUsd,
         tacoForumId,
         proposalsTopicId,
         fetchedForums,
