@@ -468,7 +468,10 @@
                                                 </span>
                                             </td>
                                             <td>
-                                                <span v-if="proposal.isAlreadyCopied" class="badge bg-info">
+                                                <span v-if="proposal.isCheckingCopyStatus" class="badge bg-light text-dark">
+                                                    <i class="fas fa-spinner fa-spin me-1"></i>Checking...
+                                                </span>
+                                                <span v-else-if="proposal.isAlreadyCopied" class="badge bg-info">
                                                     <i class="fas fa-copy me-1"></i>Already Copied
                                                 </span>
                                                 <span v-else-if="!proposal.shouldVote" class="badge bg-secondary">
@@ -480,13 +483,16 @@
                                             </td>
                                             <td>
                                                 <button 
-                                                    v-if="proposal.shouldVote && !proposal.isAlreadyCopied"
+                                                    v-if="proposal.shouldVote && !proposal.isAlreadyCopied && !proposal.isCheckingCopyStatus"
                                                     @click="copyProposal(proposal.id)" 
                                                     :disabled="copyingProposals[proposal.id]"
                                                     class="btn taco-btn taco-btn--orange btn-sm">
                                                     <i class="fas fa-copy me-1"></i>
                                                     {{ copyingProposals[proposal.id] ? 'Copying...' : 'Copy to SNS' }}
                                                 </button>
+                                                <span v-else-if="proposal.isCheckingCopyStatus" class="text-muted small">
+                                                    <i class="fas fa-spinner fa-spin me-1"></i>Checking status...
+                                                </span>
                                                 <span v-else class="text-muted small">
                                                     {{ proposal.isAlreadyCopied ? 'Already copied' : 'Not eligible' }}
                                                 </span>
@@ -908,28 +914,36 @@ const startProposalDiscovery = async () => {
                     const topicName = tacoStore.getTopicName(topicId)
                     const shouldVote = tacoStore.shouldVoteTopic(topicId)
                     
-                    // Check if already copied
-                    let isAlreadyCopied = false
-                    if (shouldVote) {
-                        try {
-                            const copiedSnsId = await tacoStore.isNNSProposalCopied(BigInt(currentId))
-                            isAlreadyCopied = copiedSnsId !== null
-                        } catch (error) {
-                            console.warn('Error checking if proposal is copied:', error)
-                        }
-                    }
-                    
+                    // Create the proposal object first (without copy check)
                     const discoveredProposal = {
                         id: currentId,
                         topicId: topicId,
                         topicName: topicName,
                         shouldVote: shouldVote,
-                        isAlreadyCopied: isAlreadyCopied,
-                        proposalInfo: proposalInfo
+                        isAlreadyCopied: false, // Will be updated below
+                        proposalInfo: proposalInfo,
+                        isCheckingCopyStatus: shouldVote // Show loading state for copy check
                     }
                     
+                    // Add to table immediately for progressive display
                     discoveredProposals.value.push(discoveredProposal)
                     console.log('Found proposal:', discoveredProposal)
+                    
+                    // Check if already copied (async, will update the proposal in place)
+                    if (shouldVote) {
+                        try {
+                            const copiedSnsId = await tacoStore.isNNSProposalCopied(BigInt(currentId))
+                            const isAlreadyCopied = copiedSnsId !== null
+                            console.log(`Proposal ${currentId} copy check:`, { copiedSnsId, isAlreadyCopied })
+                            
+                            // Update the proposal in the array
+                            discoveredProposal.isAlreadyCopied = isAlreadyCopied
+                            discoveredProposal.isCheckingCopyStatus = false
+                        } catch (error) {
+                            console.warn('Error checking if proposal is copied:', error)
+                            discoveredProposal.isCheckingCopyStatus = false
+                        }
+                    }
                 } else {
                     consecutiveNotFound++
                     console.log(`Proposal ${currentId} not found (${consecutiveNotFound}/${maxConsecutiveNotFound})`)
@@ -938,7 +952,7 @@ const startProposalDiscovery = async () => {
                 currentId++
                 
                 // Add a small delay to avoid overwhelming the network
-                await new Promise(resolve => setTimeout(resolve, 100))
+                await new Promise(resolve => setTimeout(resolve, 50))
                 
             } catch (error: any) {
                 console.error(`Error checking proposal ${currentId}:`, error)
@@ -982,6 +996,7 @@ const copyProposal = async (nnsProposalId: number) => {
             const proposal = discoveredProposals.value.find(p => p.id === nnsProposalId)
             if (proposal) {
                 proposal.isAlreadyCopied = true
+                proposal.isCheckingCopyStatus = false
             }
             
             // Refresh the votable proposals list

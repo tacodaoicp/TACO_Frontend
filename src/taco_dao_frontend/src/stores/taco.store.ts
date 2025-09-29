@@ -8104,7 +8104,16 @@ export const useTacoStore = defineStore('taco', () => {
         try {
             const actor = await createNeuronSnapshotActor();
             const result = await (actor as any).isNNSProposalCopied(nnsProposalId);
-            return result;
+            
+            // console.log(`isNNSProposalCopied(${nnsProposalId}) raw result:`, result);
+            
+            // Handle Motoko optional return type
+            // Optional with value comes as [value], empty optional comes as []
+            if (Array.isArray(result) && result.length > 0) {
+                return result[0]; // Has value (copied, return SNS ID)
+            } else {
+                return null; // No value (not copied)
+            }
         } catch (error) {
             console.error('Error checking if NNS proposal is copied:', error);
             throw error;
