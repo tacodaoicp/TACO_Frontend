@@ -363,8 +363,24 @@
                                     </thead>
                                     <tbody>
                                         <tr v-for="proposal in votableProposals" :key="proposal.nns_proposal_id">
-                                            <td>{{ proposal.nns_proposal_id }}</td>
-                                            <td>{{ proposal.sns_proposal_id }}</td>
+                                            <td>
+                                                <a 
+                                                    :href="`https://nns.ic0.app/proposal/?u=qoctq-giaaa-aaaaa-aaaea-cai&proposal=${proposal.nns_proposal_id}`"
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    class="text-decoration-none">
+                                                    {{ proposal.nns_proposal_id }}
+                                                    <i class="fas fa-external-link-alt ms-1 small text-muted"></i>
+                                                </a>
+                                            </td>
+                                            <td>
+                                                <router-link 
+                                                    :to="`/nnsvote/${proposal.sns_proposal_id}`"
+                                                    class="text-decoration-none">
+                                                    {{ proposal.sns_proposal_id }}
+                                                    <i class="fas fa-arrow-right ms-1 small text-muted"></i>
+                                                </router-link>
+                                            </td>
                                             <td>
                                                 <span v-if="proposal.time_remaining_seconds !== null">
                                                     {{ formatTimeRemaining(proposal.time_remaining_seconds) }}
@@ -544,7 +560,16 @@
                                             </td>
                                         </tr>
                                         <tr v-for="proposal in filteredDiscoveredProposals" :key="proposal.id">
-                                            <td class="font-monospace">{{ proposal.id }}</td>
+                                            <td class="font-monospace">
+                                                <a 
+                                                    :href="`https://nns.ic0.app/proposal/?u=qoctq-giaaa-aaaaa-aaaea-cai&proposal=${proposal.id}`"
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    class="text-decoration-none">
+                                                    {{ proposal.id }}
+                                                    <i class="fas fa-external-link-alt ms-1 small text-muted"></i>
+                                                </a>
+                                            </td>
                                             <td>
                                                 <span class="badge" :class="proposal.shouldVote ? 'bg-success' : 'bg-secondary'">
                                                     {{ proposal.topicName }}
