@@ -511,7 +511,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, watch, nextTick } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useTacoStore } from '../stores/taco.store'
 import HeaderBar from '../components/HeaderBar.vue'
@@ -926,7 +926,8 @@ const startProposalDiscovery = async () => {
                     }
                     
                     // Add to table immediately for progressive display
-                    discoveredProposals.value.push(discoveredProposal)
+                    discoveredProposals.value = [...discoveredProposals.value, discoveredProposal]
+                    
                     console.log('Found proposal:', discoveredProposal)
                     
                     // Check if already copied (async, will update the proposal in place)
@@ -936,12 +937,25 @@ const startProposalDiscovery = async () => {
                             const isAlreadyCopied = copiedSnsId !== null
                             console.log(`Proposal ${currentId} copy check:`, { copiedSnsId, isAlreadyCopied })
                             
-                            // Update the proposal in the array
-                            discoveredProposal.isAlreadyCopied = isAlreadyCopied
-                            discoveredProposal.isCheckingCopyStatus = false
+                            // Update the proposal in the array reactively
+                            const proposalIndex = discoveredProposals.value.findIndex(p => p.id === currentId)
+                            if (proposalIndex !== -1) {
+                                discoveredProposals.value[proposalIndex] = {
+                                    ...discoveredProposals.value[proposalIndex],
+                                    isAlreadyCopied: isAlreadyCopied,
+                                    isCheckingCopyStatus: false
+                                }
+                            }
                         } catch (error) {
                             console.warn('Error checking if proposal is copied:', error)
-                            discoveredProposal.isCheckingCopyStatus = false
+                            // Update the proposal in the array reactively
+                            const proposalIndex = discoveredProposals.value.findIndex(p => p.id === currentId)
+                            if (proposalIndex !== -1) {
+                                discoveredProposals.value[proposalIndex] = {
+                                    ...discoveredProposals.value[proposalIndex],
+                                    isCheckingCopyStatus: false
+                                }
+                            }
                         }
                     }
                 } else {
@@ -993,10 +1007,13 @@ const copyProposal = async (nnsProposalId: number) => {
             tacoStore.showSuccess(`Successfully copied NNS proposal ${nnsProposalId} to SNS proposal ${result.ok}`)
             
             // Update the proposal in our list to show it's now copied
-            const proposal = discoveredProposals.value.find(p => p.id === nnsProposalId)
-            if (proposal) {
-                proposal.isAlreadyCopied = true
-                proposal.isCheckingCopyStatus = false
+            const proposalIndex = discoveredProposals.value.findIndex(p => p.id === nnsProposalId)
+            if (proposalIndex !== -1) {
+                discoveredProposals.value[proposalIndex] = {
+                    ...discoveredProposals.value[proposalIndex],
+                    isAlreadyCopied: true,
+                    isCheckingCopyStatus: false
+                }
             }
             
             // Refresh the votable proposals list
