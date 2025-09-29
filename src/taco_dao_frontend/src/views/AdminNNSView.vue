@@ -511,7 +511,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch, nextTick } from 'vue'
+import { ref, computed, onMounted, watch, nextTick, triggerRef } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useTacoStore } from '../stores/taco.store'
 import HeaderBar from '../components/HeaderBar.vue'
@@ -926,9 +926,16 @@ const startProposalDiscovery = async () => {
                     }
                     
                     // Add to table immediately for progressive display
-                    discoveredProposals.value = [...discoveredProposals.value, discoveredProposal]
+                    discoveredProposals.value.push(discoveredProposal)
+                    
+                    // Force Vue to detect the change
+                    triggerRef(discoveredProposals)
+                    
+                    // Force DOM update
+                    await nextTick()
                     
                     console.log('Found proposal:', discoveredProposal)
+                    console.log('Total discovered proposals now:', discoveredProposals.value.length)
                     
                     // Check if already copied (async, will update the proposal in place)
                     if (shouldVote) {
@@ -945,6 +952,7 @@ const startProposalDiscovery = async () => {
                                     isAlreadyCopied: isAlreadyCopied,
                                     isCheckingCopyStatus: false
                                 }
+                                triggerRef(discoveredProposals)
                             }
                         } catch (error) {
                             console.warn('Error checking if proposal is copied:', error)
@@ -955,6 +963,7 @@ const startProposalDiscovery = async () => {
                                     ...discoveredProposals.value[proposalIndex],
                                     isCheckingCopyStatus: false
                                 }
+                                triggerRef(discoveredProposals)
                             }
                         }
                     }
@@ -1014,12 +1023,35 @@ const copyProposal = async (nnsProposalId: number) => {
                     isAlreadyCopied: true,
                     isCheckingCopyStatus: false
                 }
+                triggerRef(discoveredProposals)
             }
             
             // Refresh the votable proposals list
             await refreshVotableProposals()
         } else {
-            tacoStore.showError(`Failed to copy proposal ${nnsProposalId}: ${result.err.error_message || result.err}`)
+            let errorMessage = 'Unknown error'
+            if (result.err) {
+                if (typeof result.err === 'string') {
+                    errorMessage = result.err
+                } else if (result.err.error_message) {
+                    errorMessage = result.err.error_message
+                } else if (typeof result.err === 'object') {
+                    // Handle different error object structures
+                    const errorKeys = Object.keys(result.err)
+                    if (errorKeys.length > 0) {
+                        const firstKey = errorKeys[0]
+                        const errorValue = result.err[firstKey]
+                        if (typeof errorValue === 'string') {
+                            errorMessage = errorValue
+                        } else {
+                            errorMessage = firstKey
+                        }
+                    } else {
+                        errorMessage = JSON.stringify(result.err)
+                    }
+                }
+            }
+            tacoStore.showError(`Failed to copy proposal ${nnsProposalId}: ${errorMessage}`)
         }
     } catch (error: any) {
         console.error('Error copying proposal:', error)
