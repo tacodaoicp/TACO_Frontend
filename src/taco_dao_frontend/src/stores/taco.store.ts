@@ -8120,6 +8120,58 @@ export const useTacoStore = defineStore('taco', () => {
         }
     };
 
+    // Check if TACO DAO neuron has voted on NNS proposal
+    const hasNeuronVotedOnNNSProposal = async (proposalId: bigint, neuronId: bigint): Promise<boolean> => {
+        try {
+            const { HttpAgent } = await import('@dfinity/agent');
+            const authClient = await getAuthClient();
+            const identity = await authClient.getIdentity();
+            const agent = new HttpAgent({
+                identity,
+                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+            });
+
+            if (process.env.DFX_NETWORK === "local") {
+                await agent.fetchRootKey();
+            }
+
+            // Import NNS governance IDL
+            const { idlFactory } = await import('../../../declarations/nns_governance');
+            
+            const nnsGov = Actor.createActor(idlFactory, {
+                agent,
+                canisterId: 'rrkah-fqaaa-aaaaa-aaaaq-cai' // NNS Governance canister
+            });
+
+            // Get the proposal info which includes ballots
+            const result = await (nnsGov as any).get_proposal_info(proposalId);
+            
+            if (!result || (Array.isArray(result) && result.length === 0)) {
+                return false; // Proposal not found, assume not voted
+            }
+
+            // Extract the proposal info from the optional wrapper
+            const proposalInfo = Array.isArray(result) ? result[0] : result;
+            
+            // Check if our neuron has voted by looking at the ballots
+            if (proposalInfo.ballots) {
+                // ballots is a Map-like structure where keys are neuron IDs
+                for (const [ballotNeuronId, ballot] of proposalInfo.ballots) {
+                    if (ballotNeuronId === neuronId) {
+                        // Found our neuron in the ballots, check if it has actually voted
+                        // vote field: 0 = Unspecified, 1 = Yes, 2 = No
+                        return ballot.vote !== undefined && ballot.vote !== 0;
+                    }
+                }
+            }
+            
+            return false; // Neuron not found in ballots or hasn't voted
+        } catch (error) {
+            console.error('Error checking if neuron voted on NNS proposal:', error);
+            return false; // Assume not voted on error
+        }
+    };
+
     // Get periodic timer interval in seconds
     const getPeriodicTimerIntervalSeconds = async () => {
         try {
@@ -8596,6 +8648,7 @@ export const useTacoStore = defineStore('taco', () => {
         getNNSProposalInfo,
         copyNNSProposal,
         isNNSProposalCopied,
+        hasNeuronVotedOnNNSProposal,
         getPeriodicTimerIntervalSeconds,
         setPeriodicTimerIntervalSeconds,
         voteOnNNSProposal,
