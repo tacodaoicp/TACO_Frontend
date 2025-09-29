@@ -467,24 +467,32 @@
                                                 </span>
                                             </td>
                                             <td>
-                                                <span v-if="proposal.statusId === 1" class="badge bg-success">
-                                                    <i class="fas fa-vote-yea me-1"></i>{{ proposal.statusName }}
-                                                </span>
-                                                <span v-else-if="proposal.statusId === 2" class="badge bg-danger">
-                                                    <i class="fas fa-times me-1"></i>{{ proposal.statusName }}
-                                                </span>
-                                                <span v-else-if="proposal.statusId === 3" class="badge bg-primary">
-                                                    <i class="fas fa-check me-1"></i>{{ proposal.statusName }}
-                                                </span>
-                                                <span v-else-if="proposal.statusId === 4" class="badge bg-info">
-                                                    <i class="fas fa-cog me-1"></i>{{ proposal.statusName }}
-                                                </span>
-                                                <span v-else-if="proposal.statusId === 5" class="badge bg-warning">
-                                                    <i class="fas fa-exclamation-triangle me-1"></i>{{ proposal.statusName }}
-                                                </span>
-                                                <span v-else class="badge bg-secondary">
-                                                    <i class="fas fa-question me-1"></i>{{ proposal.statusName || 'Unknown' }}
-                                                </span>
+                                                <div>
+                                                    <span v-if="proposal.statusId === 1" class="badge bg-success">
+                                                        <i class="fas fa-vote-yea me-1"></i>{{ proposal.statusName }}
+                                                    </span>
+                                                    <span v-else-if="proposal.statusId === 2" class="badge bg-danger">
+                                                        <i class="fas fa-times me-1"></i>{{ proposal.statusName }}
+                                                    </span>
+                                                    <span v-else-if="proposal.statusId === 3" class="badge bg-primary">
+                                                        <i class="fas fa-check me-1"></i>{{ proposal.statusName }}
+                                                    </span>
+                                                    <span v-else-if="proposal.statusId === 4" class="badge bg-info">
+                                                        <i class="fas fa-cog me-1"></i>{{ proposal.statusName }}
+                                                    </span>
+                                                    <span v-else-if="proposal.statusId === 5" class="badge bg-warning">
+                                                        <i class="fas fa-exclamation-triangle me-1"></i>{{ proposal.statusName }}
+                                                    </span>
+                                                    <span v-else class="badge bg-secondary">
+                                                        <i class="fas fa-question me-1"></i>{{ proposal.statusName || 'Unknown' }}
+                                                    </span>
+                                                    <div v-if="proposal.isVotable && proposal.statusId !== 1" class="small text-success mt-1">
+                                                        <i class="fas fa-clock me-1"></i>Still accepting votes
+                                                    </div>
+                                                    <div v-else-if="!proposal.isVotable && proposal.proposalInfo?.deadline_timestamp_seconds" class="small text-muted mt-1">
+                                                        <i class="fas fa-clock-o me-1"></i>Voting ended
+                                                    </div>
+                                                </div>
                                             </td>
                                             <td>
                                                 <span v-if="proposal.isCheckingCopyStatus" class="badge bg-light text-dark">
@@ -505,7 +513,7 @@
                                                     <i class="fas fa-spinner fa-spin me-1"></i>Checking...
                                                 </span>
                                                 <span v-else-if="!proposal.isVotable" class="text-muted small">
-                                                    <i class="fas fa-ban me-1"></i>N/A ({{ proposal.statusName }})
+                                                    <i class="fas fa-ban me-1"></i>N/A (Voting Ended)
                                                 </span>
                                                 <span v-else-if="proposal.tacoDAOHasVoted === true" class="badge bg-success">
                                                     <i class="fas fa-check me-1"></i>Voted
@@ -953,7 +961,7 @@ const startProposalDiscovery = async () => {
                     // Extract proposal status
                     const statusId = Number(proposalInfo.status || 0)
                     const statusName = tacoStore.getProposalStatusName(statusId)
-                    const isVotable = tacoStore.isProposalVotable(statusId)
+                    const isVotable = tacoStore.isProposalVotable(proposalInfo)
                     
                     // Create the proposal object first (without copy/vote checks)
                     const discoveredProposal = {

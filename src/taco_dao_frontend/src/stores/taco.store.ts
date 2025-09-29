@@ -8058,9 +8058,18 @@ export const useTacoStore = defineStore('taco', () => {
         }
     };
 
-    // Helper function to check if proposal status allows voting
-    const isProposalVotable = (statusId: number): boolean => {
-        return statusId === 1; // Only "Open" proposals can be voted on
+    // Helper function to check if proposal is still open for voting
+    const isProposalVotable = (proposalInfo: any): boolean => {
+        // Check if proposal has a deadline and if it's still in the future
+        if (proposalInfo.deadline_timestamp_seconds) {
+            const deadlineMs = Number(proposalInfo.deadline_timestamp_seconds) * 1000;
+            const now = Date.now();
+            return now < deadlineMs;
+        }
+        
+        // Fallback: if no deadline info, check status (Open = 1)
+        const statusId = Number(proposalInfo.status || 0);
+        return statusId === 1;
     };
 
     // Get NNS proposal info directly from NNS governance
