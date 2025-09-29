@@ -8010,6 +8010,107 @@ export const useTacoStore = defineStore('taco', () => {
         }
     }
 
+    // Topic IDs that should be copied to SNS (matching backend TOPICS_TO_COPY)
+    const TOPICS_TO_COPY = [
+        5,  // TOPIC_NODE_ADMIN - Node Admin
+        6,  // TOPIC_PARTICIPANT_MANAGEMENT - Participant Management  
+        10, // TOPIC_NODE_PROVIDER_REWARDS - Node Provider Rewards
+        14, // TOPIC_SNS_AND_COMMUNITY_FUND - SNS & Community Fund
+    ];
+
+    // Helper function to get topic name from topic ID
+    const getTopicName = (topicId: number): string => {
+        switch (topicId) {
+            case 0: return "Unspecified";
+            case 1: return "Neuron Management";
+            case 2: return "Exchange Rate";
+            case 3: return "Network Economics";
+            case 4: return "Governance";
+            case 5: return "Node Admin";
+            case 6: return "Participant Management";
+            case 7: return "Subnet Management";
+            case 8: return "Network Canister Management";
+            case 9: return "KYC";
+            case 10: return "Node Provider Rewards";
+            case 11: return "SNS Decentralization Sale (Deprecated)";
+            case 12: return "Subnet Replica Version Management";
+            case 13: return "Replica Version Management";
+            case 14: return "SNS & Community Fund";
+            case 15: return "API Boundary Node Management";
+            default: return `Unknown Topic (${topicId})`;
+        }
+    };
+
+    // Helper function to check if a topic should be copied
+    const shouldVoteTopic = (topicId: number): boolean => {
+        return TOPICS_TO_COPY.includes(topicId);
+    };
+
+    // Get NNS proposal info directly from NNS governance
+    const getNNSProposalInfo = async (proposalId: bigint) => {
+        try {
+            const { HttpAgent } = await import('@dfinity/agent');
+            const authClient = await getAuthClient();
+            const identity = await authClient.getIdentity();
+            const agent = new HttpAgent({
+                identity,
+                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+            });
+
+            if (process.env.DFX_NETWORK === "local") {
+                await agent.fetchRootKey();
+            }
+
+            // Import NNS governance IDL
+            const { idlFactory } = await import('../../../declarations/nns_governance');
+            
+            const nnsGov = Actor.createActor(idlFactory, {
+                agent,
+                canisterId: 'rrkah-fqaaa-aaaaa-aaaaq-cai' // NNS Governance canister
+            });
+
+            const result = await (nnsGov as any).get_proposal_info(proposalId);
+            
+            // get_proposal_info returns opt ProposalInfo, so we need to handle the optional
+            if (!result || (Array.isArray(result) && result.length === 0)) {
+                return null; // Proposal not found
+            }
+
+            // Extract the proposal info from the optional wrapper
+            const proposalInfo = Array.isArray(result) ? result[0] : result;
+            return proposalInfo;
+        } catch (error) {
+            console.error('Error getting NNS proposal info:', error);
+            throw error;
+        }
+    };
+
+    // Copy NNS proposal to SNS
+    const copyNNSProposal = async (nnsProposalId: bigint) => {
+        try {
+            console.log('Copying NNS proposal:', nnsProposalId.toString());
+            const actor = await createNeuronSnapshotActor();
+            const result = await (actor as any).copyNNSProposal(nnsProposalId);
+            console.log('Copy NNS proposal result:', result);
+            return result;
+        } catch (error) {
+            console.error('Error copying NNS proposal:', error);
+            throw error;
+        }
+    };
+
+    // Check if NNS proposal is already copied
+    const isNNSProposalCopied = async (nnsProposalId: bigint): Promise<bigint | null> => {
+        try {
+            const actor = await createNeuronSnapshotActor();
+            const result = await (actor as any).isNNSProposalCopied(nnsProposalId);
+            return result;
+        } catch (error) {
+            console.error('Error checking if NNS proposal is copied:', error);
+            throw error;
+        }
+    };
+
     // Get periodic timer interval in seconds
     const getPeriodicTimerIntervalSeconds = async () => {
         try {
@@ -8481,6 +8582,11 @@ export const useTacoStore = defineStore('taco', () => {
         setAutoVotingThresholdSeconds,
         getHighestProcessedNNSProposalId,
         setHighestProcessedNNSProposalId,
+        getTopicName,
+        shouldVoteTopic,
+        getNNSProposalInfo,
+        copyNNSProposal,
+        isNNSProposalCopied,
         getPeriodicTimerIntervalSeconds,
         setPeriodicTimerIntervalSeconds,
         voteOnNNSProposal,

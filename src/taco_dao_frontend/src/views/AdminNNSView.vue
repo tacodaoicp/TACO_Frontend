@@ -397,6 +397,107 @@
                         </div>
                     </div>
 
+                    <!-- New Proposal Discovery Section -->
+                    <div class="taco-container taco-container--l1 mb-4">
+                        <div class="p-3">
+                            <div class="d-flex justify-content-between align-items-center mb-4">
+                                <TacoTitle level="h3" emoji="🔍" title="Discover New NNS Proposals" />
+                                <button 
+                                    @click="startProposalDiscovery" 
+                                    :disabled="discoveryLoading || actionLoading"
+                                    class="btn taco-btn taco-btn--green">
+                                    <i class="fas fa-search me-1"></i>{{ discoveryLoading ? 'Scanning...' : 'Start Discovery' }}
+                                </button>
+                            </div>
+
+                            <div v-if="discoveryLoading" class="text-center py-4">
+                                <div class="spinner-border text-primary" role="status">
+                                    <span class="visually-hidden">Discovering proposals...</span>
+                                </div>
+                                <p class="mt-3 taco-text-black-to-white">
+                                    Scanning for new NNS proposals starting from ID {{ (Number(currentHighestProcessedNNSProposalId) + 1) || 'unknown' }}...
+                                </p>
+                                <p class="small text-muted">Found {{ discoveredProposals.length }} proposals so far</p>
+                            </div>
+
+                            <div v-else-if="discoveredProposals.length === 0 && !discoveryLoading" class="text-center py-4">
+                                <div class="mb-3" style="font-size: 2rem;">🔍</div>
+                                <p class="taco-text-black-to-white">Click "Start Discovery" to scan for new NNS proposals</p>
+                                <p class="small text-muted">
+                                    Will start scanning from NNS proposal ID {{ (Number(currentHighestProcessedNNSProposalId) + 1) || 'unknown' }}
+                                </p>
+                            </div>
+
+                            <div v-else-if="discoveredProposals.length > 0" class="table-responsive">
+                                <div class="d-flex justify-content-between align-items-center mb-3">
+                                    <h5 class="taco-text-black-to-white mb-0">
+                                        Discovered {{ discoveredProposals.length }} new proposals
+                                    </h5>
+                                    <button 
+                                        @click="clearDiscoveredProposals" 
+                                        :disabled="discoveryLoading"
+                                        class="btn btn-outline-secondary btn-sm">
+                                        <i class="fas fa-times me-1"></i>Clear
+                                    </button>
+                                </div>
+                                
+                                <table class="table table-striped">
+                                    <thead>
+                                        <tr>
+                                            <th>NNS Proposal ID</th>
+                                            <th>Topic</th>
+                                            <th>Should Vote?</th>
+                                            <th>Status</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr v-for="proposal in discoveredProposals" :key="proposal.id">
+                                            <td class="font-monospace">{{ proposal.id }}</td>
+                                            <td>
+                                                <span class="badge" :class="proposal.shouldVote ? 'bg-success' : 'bg-secondary'">
+                                                    {{ proposal.topicName }}
+                                                </span>
+                                            </td>
+                                            <td>
+                                                <span v-if="proposal.shouldVote" class="text-success">
+                                                    <i class="fas fa-check me-1"></i>Yes
+                                                </span>
+                                                <span v-else class="text-muted">
+                                                    <i class="fas fa-times me-1"></i>No
+                                                </span>
+                                            </td>
+                                            <td>
+                                                <span v-if="proposal.isAlreadyCopied" class="badge bg-info">
+                                                    <i class="fas fa-copy me-1"></i>Already Copied
+                                                </span>
+                                                <span v-else-if="!proposal.shouldVote" class="badge bg-secondary">
+                                                    <i class="fas fa-ban me-1"></i>Skip (Topic)
+                                                </span>
+                                                <span v-else class="badge bg-warning">
+                                                    <i class="fas fa-clock me-1"></i>Ready to Copy
+                                                </span>
+                                            </td>
+                                            <td>
+                                                <button 
+                                                    v-if="proposal.shouldVote && !proposal.isAlreadyCopied"
+                                                    @click="copyProposal(proposal.id)" 
+                                                    :disabled="copyingProposals[proposal.id]"
+                                                    class="btn taco-btn taco-btn--orange btn-sm">
+                                                    <i class="fas fa-copy me-1"></i>
+                                                    {{ copyingProposals[proposal.id] ? 'Copying...' : 'Copy to SNS' }}
+                                                </button>
+                                                <span v-else class="text-muted small">
+                                                    {{ proposal.isAlreadyCopied ? 'Already copied' : 'Not eligible' }}
+                                                </span>
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
                 </div>
             </div>
         </div>
@@ -420,6 +521,8 @@ const loading = ref(true)
 const actionLoading = ref(false)
 const proposalsLoading = ref(false)
 const votingLoading = ref<Record<number, boolean>>({})
+const discoveryLoading = ref(false)
+const copyingProposals = ref<Record<number, boolean>>({})
 
 // Timer status
 const periodicTimerStatus = ref({
@@ -447,6 +550,7 @@ const currentHighestProcessedNNSProposalId = ref('')
 
 // Proposals
 const votableProposals = ref<any[]>([])
+const discoveredProposals = ref<any[]>([])
 
 // Computed
 const astronautLoaderUrl = astronautLoader
@@ -775,6 +879,121 @@ const forceVoteOnProposal = async (snsProposalId: number) => {
         tacoStore.showError('Error voting on proposal: ' + error.message)
     } finally {
         votingLoading.value[snsProposalId] = false
+    }
+}
+
+// Proposal discovery methods
+const startProposalDiscovery = async () => {
+    try {
+        discoveryLoading.value = true
+        discoveredProposals.value = []
+        
+        const highestProcessedId = Number(currentHighestProcessedNNSProposalId.value) || 0
+        let currentId = highestProcessedId + 1
+        let consecutiveNotFound = 0
+        const maxConsecutiveNotFound = 10 // Stop after 10 consecutive missing proposals
+        
+        tacoStore.showSuccess('Starting proposal discovery from ID ' + currentId)
+        
+        while (consecutiveNotFound < maxConsecutiveNotFound) {
+            try {
+                console.log('Checking NNS proposal ID:', currentId)
+                const proposalInfo = await tacoStore.getNNSProposalInfo(BigInt(currentId))
+                
+                if (proposalInfo) {
+                    consecutiveNotFound = 0 // Reset counter when we find a proposal
+                    
+                    // Extract topic ID from the proposal
+                    const topicId = Number(proposalInfo.topic || 0)
+                    const topicName = tacoStore.getTopicName(topicId)
+                    const shouldVote = tacoStore.shouldVoteTopic(topicId)
+                    
+                    // Check if already copied
+                    let isAlreadyCopied = false
+                    if (shouldVote) {
+                        try {
+                            const copiedSnsId = await tacoStore.isNNSProposalCopied(BigInt(currentId))
+                            isAlreadyCopied = copiedSnsId !== null
+                        } catch (error) {
+                            console.warn('Error checking if proposal is copied:', error)
+                        }
+                    }
+                    
+                    const discoveredProposal = {
+                        id: currentId,
+                        topicId: topicId,
+                        topicName: topicName,
+                        shouldVote: shouldVote,
+                        isAlreadyCopied: isAlreadyCopied,
+                        proposalInfo: proposalInfo
+                    }
+                    
+                    discoveredProposals.value.push(discoveredProposal)
+                    console.log('Found proposal:', discoveredProposal)
+                } else {
+                    consecutiveNotFound++
+                    console.log(`Proposal ${currentId} not found (${consecutiveNotFound}/${maxConsecutiveNotFound})`)
+                }
+                
+                currentId++
+                
+                // Add a small delay to avoid overwhelming the network
+                await new Promise(resolve => setTimeout(resolve, 100))
+                
+            } catch (error: any) {
+                console.error(`Error checking proposal ${currentId}:`, error)
+                consecutiveNotFound++
+                currentId++
+            }
+        }
+        
+        const foundCount = discoveredProposals.value.length
+        const eligibleCount = discoveredProposals.value.filter(p => p.shouldVote && !p.isAlreadyCopied).length
+        
+        if (foundCount > 0) {
+            tacoStore.showSuccess(`Discovery complete! Found ${foundCount} proposals, ${eligibleCount} eligible for copying`)
+        } else {
+            tacoStore.showSuccess('No new proposals found')
+        }
+        
+    } catch (error: any) {
+        console.error('Error during proposal discovery:', error)
+        tacoStore.showError('Error during proposal discovery: ' + error.message)
+    } finally {
+        discoveryLoading.value = false
+    }
+}
+
+const clearDiscoveredProposals = () => {
+    discoveredProposals.value = []
+    tacoStore.showSuccess('Cleared discovered proposals')
+}
+
+const copyProposal = async (nnsProposalId: number) => {
+    try {
+        copyingProposals.value[nnsProposalId] = true
+        
+        const result = await tacoStore.copyNNSProposal(BigInt(nnsProposalId))
+        
+        if ('ok' in result) {
+            tacoStore.showSuccess(`Successfully copied NNS proposal ${nnsProposalId} to SNS proposal ${result.ok}`)
+            
+            // Update the proposal in our list to show it's now copied
+            const proposal = discoveredProposals.value.find(p => p.id === nnsProposalId)
+            if (proposal) {
+                proposal.isAlreadyCopied = true
+            }
+            
+            // Refresh the votable proposals list
+            await refreshVotableProposals()
+        } else {
+            tacoStore.showError(`Failed to copy proposal ${nnsProposalId}: ${result.err.error_message || result.err}`)
+        }
+    } catch (error: any) {
+        console.error('Error copying proposal:', error)
+        tacoStore.showError('Error copying proposal: ' + error.message)
+    } finally {
+        copyingProposals.value[nnsProposalId] = false
     }
 }
 
