@@ -6238,21 +6238,33 @@ export const useTacoStore = defineStore('taco', () => {
                 return grantablePermissions.permissions || [];
             }
             
-            // Default permissions if not specified - use SNS types
+            // Default permissions if not specified - use all available SNS types
             return [
                 SnsNeuronPermissionType.NEURON_PERMISSION_TYPE_CONFIGURE_DISSOLVE_STATE,
-                SnsNeuronPermissionType.NEURON_PERMISSION_TYPE_DISBURSE,
+                SnsNeuronPermissionType.NEURON_PERMISSION_TYPE_MANAGE_PRINCIPALS,
+                SnsNeuronPermissionType.NEURON_PERMISSION_TYPE_SUBMIT_PROPOSAL,
                 SnsNeuronPermissionType.NEURON_PERMISSION_TYPE_VOTE,
-                SnsNeuronPermissionType.NEURON_PERMISSION_TYPE_SUBMIT_PROPOSAL
+                SnsNeuronPermissionType.NEURON_PERMISSION_TYPE_DISBURSE,
+                SnsNeuronPermissionType.NEURON_PERMISSION_TYPE_SPLIT,
+                SnsNeuronPermissionType.NEURON_PERMISSION_TYPE_MERGE_MATURITY,
+                SnsNeuronPermissionType.NEURON_PERMISSION_TYPE_DISBURSE_MATURITY,
+                SnsNeuronPermissionType.NEURON_PERMISSION_TYPE_STAKE_MATURITY,
+                SnsNeuronPermissionType.NEURON_PERMISSION_TYPE_MANAGE_VOTING_PERMISSION
             ];
         } catch (error: any) {
             console.error('Error getting grantable permissions:', error);
-            // Return default permissions on error - use SNS types
+            // Return default permissions on error - use all available SNS types
             return [
                 SnsNeuronPermissionType.NEURON_PERMISSION_TYPE_CONFIGURE_DISSOLVE_STATE,
-                SnsNeuronPermissionType.NEURON_PERMISSION_TYPE_DISBURSE,
+                SnsNeuronPermissionType.NEURON_PERMISSION_TYPE_MANAGE_PRINCIPALS,
+                SnsNeuronPermissionType.NEURON_PERMISSION_TYPE_SUBMIT_PROPOSAL,
                 SnsNeuronPermissionType.NEURON_PERMISSION_TYPE_VOTE,
-                SnsNeuronPermissionType.NEURON_PERMISSION_TYPE_SUBMIT_PROPOSAL
+                SnsNeuronPermissionType.NEURON_PERMISSION_TYPE_DISBURSE,
+                SnsNeuronPermissionType.NEURON_PERMISSION_TYPE_SPLIT,
+                SnsNeuronPermissionType.NEURON_PERMISSION_TYPE_MERGE_MATURITY,
+                SnsNeuronPermissionType.NEURON_PERMISSION_TYPE_DISBURSE_MATURITY,
+                SnsNeuronPermissionType.NEURON_PERMISSION_TYPE_STAKE_MATURITY,
+                SnsNeuronPermissionType.NEURON_PERMISSION_TYPE_MANAGE_VOTING_PERMISSION
             ];
         }
     }

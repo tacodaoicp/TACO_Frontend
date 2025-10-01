@@ -126,6 +126,10 @@
                 </div>
                 <div class="mb-3">
                   <label class="form-label">Permissions to Grant</label>
+                  <div class="alert alert-info mb-3">
+                    <i class="fa fa-info-circle me-2"></i>
+                    <strong>Important:</strong> The "Manage Principals" permission allows the recipient to add/remove other principals and manage all permissions. Only grant this to trusted parties.
+                  </div>
                   <div class="permission-checkboxes">
                     <div 
                       v-for="permType in availablePermissionTypes" 
@@ -263,23 +267,53 @@ const newPermission = ref({
 const availablePermissionTypes = ref([
   { 
     value: SnsNeuronPermissionType.NEURON_PERMISSION_TYPE_CONFIGURE_DISSOLVE_STATE, 
-    name: 'Configure', 
-    description: 'Modify neuron settings (dissolve delay, auto-stake, etc.)' 
+    name: 'Configure Dissolve State', 
+    description: 'Modify neuron dissolve delay and dissolving state' 
   },
   { 
-    value: SnsNeuronPermissionType.NEURON_PERMISSION_TYPE_DISBURSE, 
-    name: 'Disburse', 
-    description: 'Disburse neuron stake and maturity' 
-  },
-  { 
-    value: SnsNeuronPermissionType.NEURON_PERMISSION_TYPE_VOTE, 
-    name: 'Vote', 
-    description: 'Vote on proposals' 
+    value: SnsNeuronPermissionType.NEURON_PERMISSION_TYPE_MANAGE_PRINCIPALS, 
+    name: 'Manage Principals', 
+    description: 'Add/remove principals and manage their permissions (ADMIN PERMISSION)' 
   },
   { 
     value: SnsNeuronPermissionType.NEURON_PERMISSION_TYPE_SUBMIT_PROPOSAL, 
     name: 'Submit Proposal', 
-    description: 'Submit new proposals' 
+    description: 'Submit new governance proposals' 
+  },
+  { 
+    value: SnsNeuronPermissionType.NEURON_PERMISSION_TYPE_VOTE, 
+    name: 'Vote', 
+    description: 'Vote on governance proposals' 
+  },
+  { 
+    value: SnsNeuronPermissionType.NEURON_PERMISSION_TYPE_DISBURSE, 
+    name: 'Disburse', 
+    description: 'Disburse neuron stake' 
+  },
+  { 
+    value: SnsNeuronPermissionType.NEURON_PERMISSION_TYPE_SPLIT, 
+    name: 'Split', 
+    description: 'Split neuron into multiple neurons' 
+  },
+  { 
+    value: SnsNeuronPermissionType.NEURON_PERMISSION_TYPE_MERGE_MATURITY, 
+    name: 'Merge Maturity', 
+    description: 'Merge maturity into neuron stake' 
+  },
+  { 
+    value: SnsNeuronPermissionType.NEURON_PERMISSION_TYPE_DISBURSE_MATURITY, 
+    name: 'Disburse Maturity', 
+    description: 'Disburse neuron maturity rewards' 
+  },
+  { 
+    value: SnsNeuronPermissionType.NEURON_PERMISSION_TYPE_STAKE_MATURITY, 
+    name: 'Stake Maturity', 
+    description: 'Stake maturity to increase neuron stake' 
+  },
+  { 
+    value: SnsNeuronPermissionType.NEURON_PERMISSION_TYPE_MANAGE_VOTING_PERMISSION, 
+    name: 'Manage Voting Permission', 
+    description: 'Manage voting and following settings' 
   }
 ])
 
@@ -707,5 +741,11 @@ watch(() => props.show, (newShow) => {
   background: rgba(255, 193, 7, 0.1);
   border-color: rgba(255, 193, 7, 0.3);
   color: #ffc107;
+}
+
+.alert-info {
+  background: rgba(23, 162, 184, 0.1);
+  border-color: rgba(23, 162, 184, 0.3);
+  color: #17a2b8;
 }
 </style>
