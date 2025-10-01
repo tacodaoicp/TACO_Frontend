@@ -18,10 +18,18 @@
 
             <!-- Current Permissions -->
             <div class="current-permissions mb-4">
-              <h6 class="section-title">
-                <i class="fa fa-users me-2"></i>
-                Current Permissions ({{ neuron.permissions?.length || 0 }})
-              </h6>
+              <div class="section-header">
+                <h6 class="section-title">
+                  <i class="fa fa-users me-2"></i>
+                  Current Permissions ({{ neuron.permissions?.length || 0 }})
+                </h6>
+                <div class="section-description">
+                  <small class="text-muted">
+                    <i class="fa fa-info-circle me-1"></i>
+                    Toggle individual permissions or remove principals entirely
+                  </small>
+                </div>
+              </div>
               <div v-if="neuron.permissions && neuron.permissions.length > 0" class="permissions-list">
                 <div 
                   v-for="permission in neuron.permissions" 
@@ -42,20 +50,42 @@
                       <button 
                         @click="showRemovePermissions(permission)"
                         class="btn btn-outline-danger btn-sm"
-                        title="Remove permissions"
+                        title="Remove all permissions for this principal"
                       >
-                        <i class="fa fa-minus"></i>
+                        <i class="fa fa-trash"></i>
                       </button>
                     </div>
                   </div>
                   <div class="permission-types">
-                    <span 
-                      v-for="permName in permission.permissionNames" 
-                      :key="permName"
-                      class="permission-badge"
+                    <div 
+                      v-for="permType in availablePermissions" 
+                      :key="permType.value"
+                      class="permission-toggle"
+                      v-if="!permission.isCurrentUser"
                     >
-                      {{ permName }}
-                    </span>
+                      <div class="form-check form-switch">
+                        <input 
+                          class="form-check-input" 
+                          type="checkbox" 
+                          :id="`perm-toggle-${permission.principal}-${permType.value}`"
+                          :checked="permission.permissionTypes.includes(permType.value)"
+                          @change="toggleIndividualPermission(permission, permType.value, $event)"
+                          :disabled="loading"
+                        >
+                        <label class="form-check-label" :for="`perm-toggle-${permission.principal}-${permType.value}`">
+                          {{ permType.name }}
+                        </label>
+                      </div>
+                    </div>
+                    <div v-if="permission.isCurrentUser" class="permission-badges">
+                      <span 
+                        v-for="permName in permission.permissionNames" 
+                        :key="permName"
+                        class="permission-badge"
+                      >
+                        {{ permName }}
+                      </span>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -67,10 +97,18 @@
 
             <!-- Add New Permission -->
             <div class="add-permission">
-              <h6 class="section-title">
-                <i class="fa fa-plus me-2"></i>
-                Grant New Permission
-              </h6>
+              <div class="section-header">
+                <h6 class="section-title">
+                  <i class="fa fa-plus me-2"></i>
+                  Grant New Permission
+                </h6>
+                <div class="section-description">
+                  <small class="text-muted">
+                    <i class="fa fa-info-circle me-1"></i>
+                    Add a new principal and select which permissions to grant
+                  </small>
+                </div>
+              </div>
               <form @submit.prevent="addPermission">
                 <div class="mb-3">
                   <label for="principalId" class="form-label">Principal ID</label>
@@ -140,23 +178,33 @@
         <div class="modal-header">
           <h5 class="modal-title">
             <i class="fa fa-exclamation-triangle me-2 text-warning"></i>
-            Remove Permissions
+            Remove Principal from Permissions
           </h5>
           <button type="button" class="btn-close" @click="closeRemoveModal"></button>
         </div>
         <div class="modal-body">
-          <p>Are you sure you want to remove permissions for:</p>
+          <p>Are you sure you want to completely remove this principal from the neuron's permissions?</p>
           <div v-if="permissionToRemove" class="permission-preview">
-            <strong>{{ permissionToRemove.principalShort }}</strong>
-            <div class="permission-types mt-2">
-              <span 
-                v-for="permName in permissionToRemove.permissionNames" 
-                :key="permName"
-                class="permission-badge"
-              >
-                {{ permName }}
-              </span>
+            <div class="principal-info">
+              <strong>Principal:</strong>
+              <code class="ms-2">{{ permissionToRemove.principalShort }}</code>
             </div>
+            <div class="current-permissions mt-3">
+              <strong>Current Permissions:</strong>
+              <div class="permission-badges mt-2">
+                <span 
+                  v-for="permName in permissionToRemove.permissionNames" 
+                  :key="permName"
+                  class="permission-badge"
+                >
+                  {{ permName }}
+                </span>
+              </div>
+            </div>
+          </div>
+          <div class="alert alert-warning mt-3">
+            <i class="fa fa-exclamation-triangle me-2"></i>
+            <strong>Warning:</strong> This will remove ALL permissions for this principal and they will no longer have any access to this neuron.
           </div>
         </div>
         <div class="modal-footer">
@@ -169,7 +217,7 @@
           >
             <i v-if="loading" class="fa fa-spinner fa-spin me-2"></i>
             <i v-else class="fa fa-trash me-2"></i>
-            Remove Permissions
+            Remove Principal
           </button>
         </div>
       </div>
@@ -346,6 +394,70 @@ const confirmRemovePermissions = async () => {
   }
 }
 
+// Toggle individual permission
+const toggleIndividualPermission = async (permission: any, permissionType: number, event: Event) => {
+  const target = event.target as HTMLInputElement
+  const isChecked = target.checked
+  
+  if (!props.neuron) return
+  
+  try {
+    loading.value = true
+    
+    // Convert neuron ID from hex to Uint8Array
+    const neuronIdBytes = new Uint8Array(props.neuron.idHex.match(/.{2}/g).map((byte: string) => parseInt(byte, 16)))
+    
+    if (isChecked) {
+      // Add the permission
+      await tacoStore.addNeuronPermissions(
+        neuronIdBytes,
+        permission.principal,
+        [permissionType]
+      )
+      
+      tacoStore.addToast({
+        id: Date.now(),
+        code: 'permission-added',
+        title: 'Permission Added',
+        icon: 'fa-solid fa-check',
+        message: `Successfully added permission for ${permission.principalShort}`
+      })
+    } else {
+      // Remove the permission
+      await tacoStore.removeNeuronPermissions(
+        neuronIdBytes,
+        permission.principal,
+        [permissionType]
+      )
+      
+      tacoStore.addToast({
+        id: Date.now(),
+        code: 'permission-removed',
+        title: 'Permission Removed',
+        icon: 'fa-solid fa-check',
+        message: `Successfully removed permission for ${permission.principalShort}`
+      })
+    }
+    
+    emit('permissions-updated')
+  } catch (error: any) {
+    console.error('Error toggling permission:', error)
+    
+    // Revert the checkbox state on error
+    target.checked = !isChecked
+    
+    tacoStore.addToast({
+      id: Date.now(),
+      code: 'permission-toggle-error',
+      title: 'Permission Update Failed',
+      icon: 'fa-solid fa-exclamation-triangle',
+      message: error.message || 'Failed to update permission'
+    })
+  } finally {
+    loading.value = false
+  }
+}
+
 // Reset form when dialog closes
 watch(() => props.show, (newShow) => {
   if (!newShow) {
@@ -362,13 +474,26 @@ watch(() => props.show, (newShow) => {
   border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
+.section-header {
+  margin-bottom: 1rem;
+}
+
 .section-title {
   color: #fff;
-  margin-bottom: 1rem;
+  margin-bottom: 0.25rem;
   font-size: 0.9rem;
   font-weight: 600;
   display: flex;
   align-items: center;
+}
+
+.section-description {
+  margin-bottom: 0.5rem;
+}
+
+.section-description .text-muted {
+  color: #a0aec0 !important;
+  font-size: 0.8rem;
 }
 
 .permissions-list {
@@ -382,11 +507,21 @@ watch(() => props.show, (newShow) => {
   background: rgba(255, 255, 255, 0.03);
   border-radius: 6px;
   border: 1px solid rgba(255, 255, 255, 0.1);
+  transition: all 0.2s ease;
+}
+
+.permission-item:hover {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.2);
 }
 
 .permission-item.current-user {
   border-color: #007bff;
   background: rgba(0, 123, 255, 0.1);
+}
+
+.permission-item.current-user:hover {
+  background: rgba(0, 123, 255, 0.15);
 }
 
 .permission-header {
@@ -419,6 +554,12 @@ watch(() => props.show, (newShow) => {
 
 .permission-types {
   display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.permission-badges {
+  display: flex;
   flex-wrap: wrap;
   gap: 0.25rem;
 }
@@ -429,6 +570,62 @@ watch(() => props.show, (newShow) => {
   padding: 0.1rem 0.4rem;
   border-radius: 12px;
   font-size: 0.7rem;
+}
+
+.permission-toggle {
+  padding: 0.25rem 0;
+}
+
+.permission-toggle .form-check {
+  padding: 0.5rem 0.75rem;
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  margin-bottom: 0;
+  transition: all 0.2s ease;
+}
+
+.permission-toggle .form-check:hover {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+.permission-toggle .form-check-label {
+  font-size: 0.85rem;
+  color: #e9ecef;
+  cursor: pointer;
+  font-weight: 500;
+  width: 100%;
+  margin-bottom: 0;
+}
+
+.permission-toggle .form-check-input {
+  cursor: pointer;
+  margin-top: 0.1rem;
+}
+
+.permission-toggle .form-check-input:checked {
+  background-color: #28a745;
+  border-color: #28a745;
+}
+
+.permission-toggle .form-check-input:checked + .form-check-label {
+  color: #28a745;
+}
+
+.permission-toggle .form-check-input:focus {
+  border-color: #28a745;
+  box-shadow: 0 0 0 0.2rem rgba(40, 167, 69, 0.25);
+}
+
+.permission-toggle .form-check-input:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.permission-toggle .form-check-input:disabled + .form-check-label {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .permission-checkboxes {
@@ -459,6 +656,40 @@ watch(() => props.show, (newShow) => {
 .add-permission {
   padding-top: 1rem;
   border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.principal-info {
+  padding: 0.75rem;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.principal-info code {
+  background: rgba(255, 255, 255, 0.1);
+  color: #e9ecef;
+  padding: 0.2rem 0.4rem;
+  border-radius: 4px;
+  font-size: 0.85rem;
+}
+
+.current-permissions {
+  padding: 0.75rem;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.alert {
+  padding: 0.75rem 1rem;
+  border-radius: 6px;
+  border: 1px solid;
+}
+
+.alert-warning {
+  background: rgba(255, 193, 7, 0.1);
+  border-color: rgba(255, 193, 7, 0.3);
+  color: #ffc107;
 }
 </style>
 

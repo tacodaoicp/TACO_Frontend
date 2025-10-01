@@ -206,6 +206,13 @@
                   >
                     <i class="fa fa-clock"></i>
                   </button>
+                  <button 
+                    @click.stop="$emit('manage-permissions', neuron)"
+                    class="btn btn-info btn-sm"
+                    title="Manage neuron permissions"
+                  >
+                    <i class="fa fa-key"></i>
+                  </button>
                 </div>
               </div>
               

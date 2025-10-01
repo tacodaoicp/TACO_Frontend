@@ -55,6 +55,7 @@
                           @stake-to-neuron="handleStakeToNeuron"
       @create-neuron="handleCreateNeuron"
       @set-dissolve="handleSetDissolve"
+      @manage-permissions="handleManagePermissions"
                   />
                 </div>
               </div>
@@ -190,6 +191,14 @@
       @error="handleSwapError"
     />
 
+    <!-- Manage Permissions Dialog -->
+    <ManagePermissionsDialog
+      :show="showManagePermissionsDialog"
+      :neuron="selectedNeuronForPermissions"
+      @close="closeManagePermissionsDialog"
+      @permissions-updated="handlePermissionsUpdated"
+    />
+
   </div>
 </template>
 
@@ -204,6 +213,7 @@ import SwapConfirmDialog from '../components/wallet/SwapConfirmDialogDemo.vue'
 import StakeToNeuronDialog from '../components/wallet/StakeToNeuronDialogDemo.vue'
 import CreateNeuronDialog from '../components/wallet/CreateNeuronDialogDemo.vue'
 import SetDissolveDialog from '../components/wallet/SetDissolveDialogDemo.vue'
+import ManagePermissionsDialog from '../components/wallet/ManagePermissionsDialog.vue'
 import { tokenImages } from '../components/data/TokenData'
 
 interface WalletToken {
@@ -232,6 +242,8 @@ const showSwapDialog = ref(false)
 const showSwapConfirmDialog = ref(false)
 const selectedTokenForSwap = ref<WalletToken | null>(null)
 const swapConfirmData = ref<any | null>(null)
+const showManagePermissionsDialog = ref(false)
+const selectedNeuronForPermissions = ref<any | null>(null)
 const allTokenBalances = ref<Map<string, bigint>>(new Map())
 const userRegisteredTokenPrincipals = ref<string[]>([])
 const customTokenMetadata = ref<Map<string, any>>(new Map())
@@ -762,6 +774,24 @@ const handleSwapError = (error: string) => {
     icon: 'fa-solid fa-exclamation-triangle',
     message: error
   })
+}
+
+// Manage permissions handlers
+const handleManagePermissions = (neuron: any) => {
+  console.log('Manage permissions for neuron:', neuron)
+  selectedNeuronForPermissions.value = neuron
+  showManagePermissionsDialog.value = true
+}
+
+const closeManagePermissionsDialog = () => {
+  showManagePermissionsDialog.value = false
+  selectedNeuronForPermissions.value = null
+}
+
+const handlePermissionsUpdated = async () => {
+  console.log('Permissions updated, refreshing wallet data')
+  // Refresh wallet data to show updated neuron permissions
+  await loadWalletData()
 }
 
 // Lifecycle
