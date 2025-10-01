@@ -126,6 +126,14 @@
                 </div>
                 <div class="mb-3">
                   <label class="form-label">Permissions to Grant</label>
+                  <div v-if="currentUserHasManagePrincipalsPermission" class="alert alert-success mb-3">
+                    <i class="fa fa-check-circle me-2"></i>
+                    <strong>Full Access:</strong> You have "Manage Principals" permission and can grant all available permissions.
+                  </div>
+                  <div v-else class="alert alert-warning mb-3">
+                    <i class="fa fa-exclamation-triangle me-2"></i>
+                    <strong>Limited Access:</strong> Your permissions are restricted by the SNS governance parameters. Only certain permissions can be granted.
+                  </div>
                   <div class="alert alert-info mb-3">
                     <i class="fa fa-info-circle me-2"></i>
                     <strong>Important:</strong> The "Manage Principals" permission allows the recipient to add/remove other principals and manage all permissions. Only grant this to trusted parties.
@@ -317,12 +325,33 @@ const availablePermissionTypes = ref([
   }
 ])
 
+// Check if current user has MANAGE_PRINCIPALS permission
+const currentUserHasManagePrincipalsPermission = computed(() => {
+  if (!props.neuron?.permissions) return false
+  
+  const currentUserPermission = props.neuron.permissions.find((p: any) => p.isCurrentUser)
+  if (!currentUserPermission) return false
+  
+  return currentUserPermission.permissionTypes.includes(SnsNeuronPermissionType.NEURON_PERMISSION_TYPE_MANAGE_PRINCIPALS)
+})
+
 // Load grantable permissions on mount
 onMounted(async () => {
   try {
     const grantablePermissions = await tacoStore.getGrantablePermissions()
-    // Filter available permissions based on what's grantable
+    console.log('Grantable permissions from store:', grantablePermissions)
+    console.log('Current user has MANAGE_PRINCIPALS:', currentUserHasManagePrincipalsPermission.value)
+    
+    // If user has MANAGE_PRINCIPALS permission, they can grant all permissions
+    if (currentUserHasManagePrincipalsPermission.value) {
+      console.log('User has MANAGE_PRINCIPALS permission, allowing all permission types')
+      // Keep all available permissions
+      return
+    }
+    
+    // Otherwise, filter based on what's grantable from SNS parameters
     if (grantablePermissions.length > 0) {
+      console.log('Filtering permissions based on SNS grantable permissions')
       availablePermissionTypes.value = availablePermissionTypes.value.filter(perm => 
         grantablePermissions.includes(perm.value)
       )
@@ -508,6 +537,82 @@ const confirmRemovePermissions = async () => {
     loading.value = false
   }
 }
+
+// Re-evaluate permissions when neuron changes
+watch(() => props.neuron, async () => {
+  if (props.neuron && props.show) {
+    // Re-run the permission loading logic
+    try {
+      const grantablePermissions = await tacoStore.getGrantablePermissions()
+      console.log('Re-evaluating permissions for neuron change')
+      console.log('Current user has MANAGE_PRINCIPALS:', currentUserHasManagePrincipalsPermission.value)
+      
+      // Reset to all permissions first
+      availablePermissionTypes.value = [
+        { 
+          value: SnsNeuronPermissionType.NEURON_PERMISSION_TYPE_CONFIGURE_DISSOLVE_STATE, 
+          name: 'Configure Dissolve State', 
+          description: 'Modify neuron dissolve delay and dissolving state' 
+        },
+        { 
+          value: SnsNeuronPermissionType.NEURON_PERMISSION_TYPE_MANAGE_PRINCIPALS, 
+          name: 'Manage Principals', 
+          description: 'Add/remove principals and manage their permissions (ADMIN PERMISSION)' 
+        },
+        { 
+          value: SnsNeuronPermissionType.NEURON_PERMISSION_TYPE_SUBMIT_PROPOSAL, 
+          name: 'Submit Proposal', 
+          description: 'Submit new governance proposals' 
+        },
+        { 
+          value: SnsNeuronPermissionType.NEURON_PERMISSION_TYPE_VOTE, 
+          name: 'Vote', 
+          description: 'Vote on governance proposals' 
+        },
+        { 
+          value: SnsNeuronPermissionType.NEURON_PERMISSION_TYPE_DISBURSE, 
+          name: 'Disburse', 
+          description: 'Disburse neuron stake' 
+        },
+        { 
+          value: SnsNeuronPermissionType.NEURON_PERMISSION_TYPE_SPLIT, 
+          name: 'Split', 
+          description: 'Split neuron into multiple neurons' 
+        },
+        { 
+          value: SnsNeuronPermissionType.NEURON_PERMISSION_TYPE_MERGE_MATURITY, 
+          name: 'Merge Maturity', 
+          description: 'Merge maturity into neuron stake' 
+        },
+        { 
+          value: SnsNeuronPermissionType.NEURON_PERMISSION_TYPE_DISBURSE_MATURITY, 
+          name: 'Disburse Maturity', 
+          description: 'Disburse neuron maturity rewards' 
+        },
+        { 
+          value: SnsNeuronPermissionType.NEURON_PERMISSION_TYPE_STAKE_MATURITY, 
+          name: 'Stake Maturity', 
+          description: 'Stake maturity to increase neuron stake' 
+        },
+        { 
+          value: SnsNeuronPermissionType.NEURON_PERMISSION_TYPE_MANAGE_VOTING_PERMISSION, 
+          name: 'Manage Voting Permission', 
+          description: 'Manage voting and following settings' 
+        }
+      ]
+      
+      // If user doesn't have MANAGE_PRINCIPALS permission, filter based on grantable permissions
+      if (!currentUserHasManagePrincipalsPermission.value && grantablePermissions.length > 0) {
+        console.log('Filtering permissions based on SNS grantable permissions')
+        availablePermissionTypes.value = availablePermissionTypes.value.filter(perm => 
+          grantablePermissions.includes(perm.value)
+        )
+      }
+    } catch (error) {
+      console.warn('Could not re-evaluate grantable permissions:', error)
+    }
+  }
+})
 
 // Reset form when dialog closes
 watch(() => props.show, (newShow) => {
@@ -747,5 +852,11 @@ watch(() => props.show, (newShow) => {
   background: rgba(23, 162, 184, 0.1);
   border-color: rgba(23, 162, 184, 0.3);
   color: #17a2b8;
+}
+
+.alert-success {
+  background: rgba(40, 167, 69, 0.1);
+  border-color: rgba(40, 167, 69, 0.3);
+  color: #28a745;
 }
 </style>

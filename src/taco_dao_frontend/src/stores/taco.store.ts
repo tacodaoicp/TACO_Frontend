@@ -6233,10 +6233,15 @@ export const useTacoStore = defineStore('taco', () => {
             // Get nervous system parameters
             const params = await snsGov.get_nervous_system_parameters(null) as any;
             
+            console.log('SNS Nervous System Parameters:', params);
+            
             if (params.neuron_grantable_permissions && params.neuron_grantable_permissions.length > 0) {
                 const grantablePermissions = params.neuron_grantable_permissions[0];
+                console.log('Grantable permissions from SNS:', grantablePermissions.permissions);
                 return grantablePermissions.permissions || [];
             }
+            
+            console.log('No grantable permissions specified in SNS parameters, using defaults');
             
             // Default permissions if not specified - use all available SNS types
             return [
