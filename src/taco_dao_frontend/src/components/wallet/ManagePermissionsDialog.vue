@@ -58,7 +58,7 @@
                   </div>
                   <div class="permission-types">
                     <div 
-                      v-for="permType in availablePermissions" 
+                      v-for="permType in availablePermissionTypes" 
                       :key="permType.value"
                       class="permission-toggle"
                       v-if="!permission.isCurrentUser"
@@ -73,7 +73,7 @@
                           :disabled="loading"
                         >
                         <label class="form-check-label" :for="`perm-toggle-${permission.principal}-${permType.value}`">
-                          {{ permType.name }}
+                          {{ permType.name }} - {{ permType.description }}
                         </label>
                       </div>
                     </div>
@@ -128,7 +128,7 @@
                   <label class="form-label">Permissions to Grant</label>
                   <div class="permission-checkboxes">
                     <div 
-                      v-for="permType in availablePermissions" 
+                      v-for="permType in availablePermissionTypes" 
                       :key="permType.value"
                       class="form-check"
                     >
@@ -231,6 +231,7 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from 'vue'
 import { Principal } from '@dfinity/principal'
+import { SnsNeuronPermissionType } from '@dfinity/sns'
 import { useTacoStore } from '../../stores/taco.store'
 
 interface Props {
@@ -258,12 +259,28 @@ const newPermission = ref({
   selectedPermissions: [] as number[]
 })
 
-// Available permission types
-const availablePermissions = ref([
-  { value: 1, name: 'Configure', description: 'Modify neuron settings (dissolve delay, auto-stake, etc.)' },
-  { value: 2, name: 'Disburse', description: 'Disburse neuron stake and maturity' },
-  { value: 3, name: 'Vote', description: 'Vote on proposals' },
-  { value: 4, name: 'Submit Proposal', description: 'Submit new proposals' }
+// Available permission types using @dfinity/sns enums
+const availablePermissionTypes = ref([
+  { 
+    value: SnsNeuronPermissionType.NEURON_PERMISSION_TYPE_CONFIGURE_DISSOLVE_STATE, 
+    name: 'Configure', 
+    description: 'Modify neuron settings (dissolve delay, auto-stake, etc.)' 
+  },
+  { 
+    value: SnsNeuronPermissionType.NEURON_PERMISSION_TYPE_DISBURSE, 
+    name: 'Disburse', 
+    description: 'Disburse neuron stake and maturity' 
+  },
+  { 
+    value: SnsNeuronPermissionType.NEURON_PERMISSION_TYPE_VOTE, 
+    name: 'Vote', 
+    description: 'Vote on proposals' 
+  },
+  { 
+    value: SnsNeuronPermissionType.NEURON_PERMISSION_TYPE_SUBMIT_PROPOSAL, 
+    name: 'Submit Proposal', 
+    description: 'Submit new proposals' 
+  }
 ])
 
 // Load grantable permissions on mount
@@ -272,7 +289,7 @@ onMounted(async () => {
     const grantablePermissions = await tacoStore.getGrantablePermissions()
     // Filter available permissions based on what's grantable
     if (grantablePermissions.length > 0) {
-      availablePermissions.value = availablePermissions.value.filter(perm => 
+      availablePermissionTypes.value = availablePermissionTypes.value.filter(perm => 
         grantablePermissions.includes(perm.value)
       )
     }
@@ -342,58 +359,6 @@ const addPermission = async () => {
   }
 }
 
-// Show remove permissions modal
-const showRemovePermissions = (permission: any) => {
-  permissionToRemove.value = permission
-  showRemoveModal.value = true
-}
-
-// Close remove permissions modal
-const closeRemoveModal = () => {
-  showRemoveModal.value = false
-  permissionToRemove.value = null
-}
-
-// Confirm remove permissions
-const confirmRemovePermissions = async () => {
-  if (!props.neuron || !permissionToRemove.value) return
-  
-  try {
-    loading.value = true
-    
-    // Convert neuron ID from hex to Uint8Array
-    const neuronIdBytes = new Uint8Array(props.neuron.idHex.match(/.{2}/g).map((byte: string) => parseInt(byte, 16)))
-    
-    await tacoStore.removeNeuronPermissions(
-      neuronIdBytes,
-      permissionToRemove.value.principal,
-      permissionToRemove.value.permissionTypes
-    )
-    
-    tacoStore.addToast({
-      id: Date.now(),
-      code: 'permissions-removed',
-      title: 'Permissions Removed',
-      icon: 'fa-solid fa-check',
-      message: `Successfully removed permissions from ${permissionToRemove.value.principalShort}`
-    })
-    
-    closeRemoveModal()
-    emit('permissions-updated')
-  } catch (error: any) {
-    console.error('Error removing permissions:', error)
-    tacoStore.addToast({
-      id: Date.now(),
-      code: 'permissions-remove-error',
-      title: 'Remove Permissions Failed',
-      icon: 'fa-solid fa-exclamation-triangle',
-      message: error.message || 'Failed to remove permissions'
-    })
-  } finally {
-    loading.value = false
-  }
-}
-
 // Toggle individual permission
 const toggleIndividualPermission = async (permission: any, permissionType: number, event: Event) => {
   const target = event.target as HTMLInputElement
@@ -452,6 +417,58 @@ const toggleIndividualPermission = async (permission: any, permissionType: numbe
       title: 'Permission Update Failed',
       icon: 'fa-solid fa-exclamation-triangle',
       message: error.message || 'Failed to update permission'
+    })
+  } finally {
+    loading.value = false
+  }
+}
+
+// Show remove permissions modal
+const showRemovePermissions = (permission: any) => {
+  permissionToRemove.value = permission
+  showRemoveModal.value = true
+}
+
+// Close remove permissions modal
+const closeRemoveModal = () => {
+  showRemoveModal.value = false
+  permissionToRemove.value = null
+}
+
+// Confirm remove permissions
+const confirmRemovePermissions = async () => {
+  if (!props.neuron || !permissionToRemove.value) return
+  
+  try {
+    loading.value = true
+    
+    // Convert neuron ID from hex to Uint8Array
+    const neuronIdBytes = new Uint8Array(props.neuron.idHex.match(/.{2}/g).map((byte: string) => parseInt(byte, 16)))
+    
+    await tacoStore.removeNeuronPermissions(
+      neuronIdBytes,
+      permissionToRemove.value.principal,
+      permissionToRemove.value.permissionTypes
+    )
+    
+    tacoStore.addToast({
+      id: Date.now(),
+      code: 'permissions-removed',
+      title: 'Permissions Removed',
+      icon: 'fa-solid fa-check',
+      message: `Successfully removed permissions from ${permissionToRemove.value.principalShort}`
+    })
+    
+    closeRemoveModal()
+    emit('permissions-updated')
+  } catch (error: any) {
+    console.error('Error removing permissions:', error)
+    tacoStore.addToast({
+      id: Date.now(),
+      code: 'permissions-remove-error',
+      title: 'Remove Permissions Failed',
+      icon: 'fa-solid fa-exclamation-triangle',
+      message: error.message || 'Failed to remove permissions'
     })
   } finally {
     loading.value = false
@@ -692,4 +709,3 @@ watch(() => props.show, (newShow) => {
   color: #ffc107;
 }
 </style>
-

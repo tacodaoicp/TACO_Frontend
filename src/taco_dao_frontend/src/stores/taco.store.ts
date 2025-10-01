@@ -21,6 +21,7 @@ import { idlFactory as alarmIDL, _SERVICE as AlarmService } from "../../../decla
 import { idlFactory as rewardsIDL } from "../../../declarations/rewards/rewards.did.js"
 import { Principal } from '@dfinity/principal'
 import { AccountIdentifier } from '@dfinity/ledger-icp'
+import { SnsGovernanceCanister, SnsNeuronPermissionType } from '@dfinity/sns'
 import { canisterId as iiCanisterId } from "../../../declarations/internet_identity/index.js"
 import type { Result_1, UserState } from "../../../declarations/dao_backend/DAO_backend.did.d"
 
@@ -6237,12 +6238,22 @@ export const useTacoStore = defineStore('taco', () => {
                 return grantablePermissions.permissions || [];
             }
             
-            // Default permissions if not specified
-            return [1, 2, 3, 4]; // Configure, Disburse, Vote, Submit Proposal
+            // Default permissions if not specified - use SNS types
+            return [
+                SnsNeuronPermissionType.NEURON_PERMISSION_TYPE_CONFIGURE_DISSOLVE_STATE,
+                SnsNeuronPermissionType.NEURON_PERMISSION_TYPE_DISBURSE,
+                SnsNeuronPermissionType.NEURON_PERMISSION_TYPE_VOTE,
+                SnsNeuronPermissionType.NEURON_PERMISSION_TYPE_SUBMIT_PROPOSAL
+            ];
         } catch (error: any) {
             console.error('Error getting grantable permissions:', error);
-            // Return default permissions on error
-            return [1, 2, 3, 4];
+            // Return default permissions on error - use SNS types
+            return [
+                SnsNeuronPermissionType.NEURON_PERMISSION_TYPE_CONFIGURE_DISSOLVE_STATE,
+                SnsNeuronPermissionType.NEURON_PERMISSION_TYPE_DISBURSE,
+                SnsNeuronPermissionType.NEURON_PERMISSION_TYPE_VOTE,
+                SnsNeuronPermissionType.NEURON_PERMISSION_TYPE_SUBMIT_PROPOSAL
+            ];
         }
     }
 
@@ -8635,9 +8646,9 @@ export const useTacoStore = defineStore('taco', () => {
         startDissolving,
         stopDissolving,
         disburseNeuron,
+        getGrantablePermissions,
         addNeuronPermissions,
         removeNeuronPermissions,
-        getGrantablePermissions,
         toggleThreadMenu,
         ensureTokenDetails,
         checkTokenSupportsICRC2,
