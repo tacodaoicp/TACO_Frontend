@@ -374,12 +374,22 @@
                                                 </a>
                                             </td>
                                             <td>
-                                                <router-link 
-                                                    :to="`/nnsvote/${proposal.sns_proposal_id}`"
-                                                    class="text-decoration-none">
-                                                    {{ proposal.sns_proposal_id }}
-                                                    <i class="fas fa-arrow-right ms-1 small text-muted"></i>
-                                                </router-link>
+                                                <div class="d-flex align-items-center gap-2">
+                                                    <router-link 
+                                                        :to="`/nnsvote/${proposal.sns_proposal_id}`"
+                                                        class="text-decoration-none">
+                                                        {{ proposal.sns_proposal_id }}
+                                                        <i class="fas fa-arrow-right ms-1 small text-muted"></i>
+                                                    </router-link>
+                                                    <a 
+                                                        :href="`https://nns.ic0.app/proposal/?u=lacdn-3iaaa-aaaaq-aae3a-cai&proposal=${proposal.sns_proposal_id}`"
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        class="text-decoration-none text-muted"
+                                                        title="View SNS proposal on NNS dApp">
+                                                        <i class="fas fa-external-link-alt small"></i>
+                                                    </a>
+                                                </div>
                                             </td>
                                             <td>
                                                 <span v-if="proposal.time_remaining_seconds !== null">
