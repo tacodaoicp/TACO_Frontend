@@ -143,6 +143,7 @@
                       v-for="permType in availablePermissionTypes" 
                       :key="permType.value"
                       class="form-check"
+                      :class="{ 'debug-enabled': !loading }"
                     >
                       <input 
                         class="form-check-input" 
@@ -150,9 +151,12 @@
                         :id="`perm-${permType.value}`"
                         :value="permType.value"
                         v-model="newPermission.selectedPermissions"
+                        :disabled="loading"
                       >
                       <label class="form-check-label" :for="`perm-${permType.value}`">
                         {{ permType.name }} - {{ permType.description }}
+                        <span v-if="loading" class="text-muted">(Loading...)</span>
+                        <span v-else class="text-success">(Available)</span>
                       </label>
                     </div>
                   </div>
@@ -341,6 +345,8 @@ onMounted(async () => {
     const grantablePermissions = await tacoStore.getGrantablePermissions()
     console.log('Grantable permissions from store:', grantablePermissions)
     console.log('Current user has MANAGE_PRINCIPALS:', currentUserHasManagePrincipalsPermission.value)
+    console.log('Loading state:', loading.value)
+    console.log('Available permission types count:', availablePermissionTypes.value.length)
     
     // If user has MANAGE_PRINCIPALS permission, they can grant all permissions
     if (currentUserHasManagePrincipalsPermission.value) {
@@ -355,6 +361,7 @@ onMounted(async () => {
       availablePermissionTypes.value = availablePermissionTypes.value.filter(perm => 
         grantablePermissions.includes(perm.value)
       )
+      console.log('Filtered permission types count:', availablePermissionTypes.value.length)
     }
   } catch (error) {
     console.warn('Could not load grantable permissions, using defaults:', error)
@@ -800,6 +807,22 @@ watch(() => props.show, (newShow) => {
 .form-check-label {
   font-size: 0.9rem;
   color: #e9ecef;
+}
+
+.form-check.debug-enabled {
+  border-color: #28a745 !important;
+  background: rgba(40, 167, 69, 0.05) !important;
+}
+
+.form-check.debug-enabled .form-check-input {
+  opacity: 1 !important;
+  cursor: pointer !important;
+}
+
+.form-check.debug-enabled .form-check-label {
+  opacity: 1 !important;
+  cursor: pointer !important;
+  color: #e9ecef !important;
 }
 
 .permission-preview {
