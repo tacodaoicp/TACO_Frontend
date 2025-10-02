@@ -5514,89 +5514,97 @@ export const useTacoStore = defineStore('taco', () => {
         // Parse followings - handle both legacy followees and new topic_followees
         const followings: any[] = [];
         
+        // Parse followings for neuron
+        
         // Legacy followees structure (function_id based)
         if (neuron.followees && neuron.followees.length > 0) {
             neuron.followees.forEach((followee: any) => {
-                const functionId = followee[0]; // The function ID (governance function)
-                const followeeList = followee[1]?.followees || [];
-                
+            const functionId = followee[0]; // The function ID (governance function)
+            const followeeList = followee[1]?.followees || [];
+            
                 // Map function IDs to topic names
                 const getTopicFromFunctionId = (id: number) => {
-                    switch (id) {
+                switch (id) {
                         case 0: return 'AllFunctions';
-                        case 1: return 'Motion';
-                        case 2: return 'ManageNervousSystemParameters';
-                        case 3: return 'UpgradeRootToVersion';
-                        case 4: return 'ExecuteGenericNervousSystemFunction';
-                        case 5: return 'ManageDappCanisterSettings';
-                        case 6: return 'TransferSnsTreasuryFunds';
-                        case 7: return 'RegisterDappCanisters';
-                        case 8: return 'DeregisterDappCanisters';
+                    case 1: return 'Motion';
+                    case 2: return 'ManageNervousSystemParameters';
+                    case 3: return 'UpgradeRootToVersion';
+                    case 4: return 'ExecuteGenericNervousSystemFunction';
+                    case 5: return 'ManageDappCanisterSettings';
+                    case 6: return 'TransferSnsTreasuryFunds';
+                    case 7: return 'RegisterDappCanisters';
+                    case 8: return 'DeregisterDappCanisters';
                         default: return `Function${id}`;
-                    }
-                };
-                
-                const followedNeurons = followeeList.map((followedNeuron: any) => {
-                    const neuronId = followedNeuron.id;
-                    const neuronIdHex = neuronId ? Array.from(neuronId as Uint8Array).map((b: number) => b.toString(16).padStart(2, '0')).join('') : 'Unknown';
-                    return {
-                        id: neuronId,
-                        idHex: neuronIdHex,
+                }
+            };
+            
+            const followedNeurons = followeeList.map((followedNeuron: any) => {
+                const neuronId = followedNeuron.id;
+                const neuronIdHex = neuronId ? Array.from(neuronId as Uint8Array).map((b: number) => b.toString(16).padStart(2, '0')).join('') : 'Unknown';
+                return {
+                    id: neuronId,
+                    idHex: neuronIdHex,
                         idShort: neuronIdHex !== 'Unknown' ? `${neuronIdHex.substring(0, 8)}...` : 'Unknown',
                         alias: null
-                    };
-                });
-                
+                };
+            });
+            
                 followings.push({
                     topicId: getTopicFromFunctionId(functionId),
-                    functionId,
+                functionId,
                     functionName: getTopicFromFunctionId(functionId),
-                    followedNeurons,
-                    followedCount: followedNeurons.length
+                followedNeurons,
+                followedCount: followedNeurons.length
                 });
             });
         }
         
         // New topic_followees structure (topic based)
         if (neuron.topic_followees && neuron.topic_followees.length > 0) {
-            const topicFollowees = neuron.topic_followees[0]?.topic_id_to_followees || [];
-            topicFollowees.forEach((topicEntry: any) => {
-                const topicId = topicEntry[0]; // Topic ID (int32)
-                const followeesForTopic = topicEntry[1]; // FolloweesForTopic
+            const topicFolloweesWrapper = neuron.topic_followees[0];
+            if (topicFolloweesWrapper && topicFolloweesWrapper.topic_id_to_followees) {
+                const topicFollowees = topicFolloweesWrapper.topic_id_to_followees;
                 
-                // Map topic IDs to topic names (based on IDL Variant order)
-                const getTopicFromId = (id: number) => {
-                    const topicMap: Record<number, string> = {
-                        0: 'DappCanisterManagement',
-                        1: 'DaoCommunitySettings',
-                        2: 'ApplicationBusinessLogic',
-                        3: 'CriticalDappOperations',
-                        4: 'TreasuryAssetManagement',
-                        5: 'Governance',
-                        6: 'SnsFrameworkManagement'
+                topicFollowees.forEach((topicEntry: any) => {
+                    const topicId = topicEntry[0]; // Topic ID (int32)
+                    const followeesForTopic = topicEntry[1]; // FolloweesForTopic
+                    
+                    // Map topic IDs to topic names (corrected based on actual NNS behavior)
+                    const getTopicFromId = (id: number) => {
+                        const topicMap: Record<number, string> = {
+                            0: 'SnsFrameworkManagement',     // SNS framework management
+                            1: 'DaoCommunitySettings',       // DAO community settings ✓
+                            2: 'ApplicationBusinessLogic',   // Application Business Logic  
+                            3: 'TreasuryAssetManagement',    // Treasury & asset management ✓
+                            4: 'CriticalDappOperations',     // Critical Dapp Operations
+                            5: 'Governance',                 // Governance
+                            6: 'DappCanisterManagement'      // Dapp canister management ✓
+                        };
+                        return topicMap[id] || `Topic${id}`;
                     };
-                    return topicMap[id] || `Topic${id}`;
-                };
-                
-                const followedNeurons = (followeesForTopic.followees || []).map((followee: any) => {
-                    const neuronId = followee.neuron_id && followee.neuron_id.length > 0 ? followee.neuron_id[0].id : null;
-                    const neuronIdHex = neuronId ? Array.from(neuronId as Uint8Array).map((b: number) => b.toString(16).padStart(2, '0')).join('') : 'Unknown';
-                    return {
-                        id: neuronId,
-                        idHex: neuronIdHex,
-                        idShort: neuronIdHex !== 'Unknown' ? `${neuronIdHex.substring(0, 8)}...` : 'Unknown',
-                        alias: followee.alias && followee.alias.length > 0 ? followee.alias[0] : null
-                    };
+                    
+                    const followedNeurons = (followeesForTopic.followees || []).map((followee: any) => {
+                        const neuronId = followee.neuron_id && followee.neuron_id.length > 0 ? followee.neuron_id[0].id : null;
+                        const neuronIdHex = neuronId ? Array.from(neuronId as Uint8Array).map((b: number) => b.toString(16).padStart(2, '0')).join('') : 'Unknown';
+                        return {
+                            id: neuronId,
+                            idHex: neuronIdHex,
+                            idShort: neuronIdHex !== 'Unknown' ? `${neuronIdHex.substring(0, 8)}...` : 'Unknown',
+                            alias: followee.alias && followee.alias.length > 0 ? followee.alias[0] : null
+                        };
+                    });
+                    
+                    const topicName = getTopicFromId(topicId);
+                    
+                    followings.push({
+                        topicId: topicName,
+                        functionId: topicId,
+                        functionName: topicName,
+                        followedNeurons,
+                        followedCount: followedNeurons.length
+                    });
                 });
-                
-                followings.push({
-                    topicId: getTopicFromId(topicId),
-                    functionId: topicId,
-                    functionName: getTopicFromId(topicId),
-                    followedNeurons,
-                    followedCount: followedNeurons.length
-                });
-            });
+            }
         }
         
         // Get custom name from cache if available
@@ -5607,7 +5615,7 @@ export const useTacoStore = defineStore('taco', () => {
         
         const displayName = customName || `Neuron ${neuronIdHex.substring(0, 8)}...`
 
-        return {
+        const neuronData = {
             id: neuronId,
             idHex: neuronIdHex,
             stake: neuron.cached_neuron_stake_e8s,
@@ -5640,6 +5648,10 @@ export const useTacoStore = defineStore('taco', () => {
             permissions,
             followings
         };
+        
+        // Final followings parsed successfully
+        
+        return neuronData;
     }
 
     // Categorize neurons into owned and hotkeyed
@@ -6424,13 +6436,13 @@ export const useTacoStore = defineStore('taco', () => {
                 // Map topic names to IDs (reverse of the display mapping)
                 const getTopicIdFromName = (name: string): number => {
                     const topicMap: Record<string, number> = {
-                        'DappCanisterManagement': 0,
-                        'DaoCommunitySettings': 1,
-                        'ApplicationBusinessLogic': 2,
-                        'CriticalDappOperations': 3,
-                        'TreasuryAssetManagement': 4,
-                        'Governance': 5,
-                        'SnsFrameworkManagement': 6
+                        'SnsFrameworkManagement': 0,     // SNS framework management
+                        'DaoCommunitySettings': 1,        // DAO community settings
+                        'ApplicationBusinessLogic': 2,    // Application Business Logic
+                        'TreasuryAssetManagement': 3,     // Treasury & asset management
+                        'CriticalDappOperations': 4,      // Critical Dapp Operations
+                        'Governance': 5,                  // Governance
+                        'DappCanisterManagement': 6       // Dapp canister management
                     };
                     return topicMap[name] ?? -1;
                 };

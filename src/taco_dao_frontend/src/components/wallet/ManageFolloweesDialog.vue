@@ -26,6 +26,12 @@
             <div class="neuron-info mb-4">
               <h6>{{ neuron.displayName }}</h6>
               <small class="text-muted">{{ neuron.idHex }}</small>
+              <div class="followee-summary mt-2">
+                <small class="text-info">
+                  <i class="fa fa-info-circle me-1"></i>
+                  Following on {{ activeTopicsCount }} of {{ allTopics.length }} topics
+                </small>
+              </div>
             </div>
 
             <!-- Current Followees by Topic -->
@@ -59,7 +65,9 @@
                         Critical
                       </span>
                     </div>
-                    <div class="followee-count">
+                    <div class="followee-count" :class="{ 'has-followees': getFolloweesForTopic(topic.id).length > 0 }">
+                      <i v-if="getFolloweesForTopic(topic.id).length > 0" class="fa fa-check-circle me-1"></i>
+                      <i v-else class="fa fa-circle me-1"></i>
                       {{ getFolloweesForTopic(topic.id).length }} followees
                     </div>
                   </div>
@@ -258,6 +266,12 @@ const bulkFollowTopics = ref<string[]>([])
 // Get all available topics
 const allTopics = computed(() => getAllTopics())
 
+// Count how many topics have active followees
+const activeTopicsCount = computed(() => {
+  if (!props.neuron?.followings) return 0
+  return allTopics.value.filter(topic => getFolloweesForTopic(topic.id).length > 0).length
+})
+
 // Initialize newFollowees object
 onMounted(() => {
   const followeeInputs: Record<string, string> = {}
@@ -269,11 +283,16 @@ onMounted(() => {
 
 // Get followees for a specific topic
 const getFolloweesForTopic = (topicId: string) => {
-  if (!props.neuron?.followings) return []
+  if (!props.neuron?.followings) {
+    return []
+  }
   
   // Find the following entry for this topic
   const topicFollowing = props.neuron.followings.find((f: any) => f.topicId === topicId)
-  if (!topicFollowing) return []
+  
+  if (!topicFollowing) {
+    return []
+  }
   
   return topicFollowing.followedNeurons.map((neuron: any) => ({
     neuronId: neuron.idHex,
@@ -633,6 +652,19 @@ watch(() => props.neuron, (newNeuron) => {
   padding: 0.2rem 0.5rem;
   border-radius: 12px;
   font-size: 0.75rem;
+  display: flex;
+  align-items: center;
+  transition: all 0.2s ease;
+}
+
+.followee-count.has-followees {
+  background: rgba(40, 167, 69, 0.2);
+  color: #28a745;
+  border: 1px solid rgba(40, 167, 69, 0.3);
+}
+
+.followee-count i {
+  font-size: 0.7rem;
 }
 
 .topic-description {
