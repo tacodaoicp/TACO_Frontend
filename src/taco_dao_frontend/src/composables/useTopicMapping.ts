@@ -8,29 +8,22 @@ export interface TopicInfo {
 }
 
 export const useTopicMapping = () => {
+  // Topic mapping based on IDL Variant order
   const topicMap = new Map<string, TopicInfo>([
-    ['DaoCommunitySettings', {
-      id: 'DaoCommunitySettings',
-      name: 'DAO Community Settings',
-      description: 'Proposals related to community governance settings and parameters',
-      icon: 'fa-users',
-      color: '#17a2b8',
-      isCritical: false
-    }],
-    ['SnsFrameworkManagement', {
-      id: 'SnsFrameworkManagement',
-      name: 'SNS Framework Management',
-      description: 'Proposals for managing the SNS framework and core functionality',
-      icon: 'fa-cogs',
-      color: '#6f42c1',
-      isCritical: true
-    }],
     ['DappCanisterManagement', {
       id: 'DappCanisterManagement',
       name: 'Dapp Canister Management',
       description: 'Proposals for managing dapp canisters and their settings',
       icon: 'fa-cube',
       color: '#fd7e14',
+      isCritical: false
+    }],
+    ['DaoCommunitySettings', {
+      id: 'DaoCommunitySettings',
+      name: 'DAO Community Settings',
+      description: 'Proposals related to community governance settings and parameters',
+      icon: 'fa-users',
+      color: '#17a2b8',
       isCritical: false
     }],
     ['ApplicationBusinessLogic', {
@@ -41,12 +34,12 @@ export const useTopicMapping = () => {
       color: '#28a745',
       isCritical: false
     }],
-    ['Governance', {
-      id: 'Governance',
-      name: 'Governance',
-      description: 'Core governance proposals affecting voting and decision-making processes',
-      icon: 'fa-gavel',
-      color: '#dc3545',
+    ['CriticalDappOperations', {
+      id: 'CriticalDappOperations',
+      name: 'Critical Dapp Operations',
+      description: 'Critical proposals affecting core dapp operations and security',
+      icon: 'fa-exclamation-triangle',
+      color: '#e83e8c',
       isCritical: true
     }],
     ['TreasuryAssetManagement', {
@@ -57,12 +50,20 @@ export const useTopicMapping = () => {
       color: '#ffc107',
       isCritical: true
     }],
-    ['CriticalDappOperations', {
-      id: 'CriticalDappOperations',
-      name: 'Critical Dapp Operations',
-      description: 'Critical proposals affecting core dapp operations and security',
-      icon: 'fa-exclamation-triangle',
-      color: '#e83e8c',
+    ['Governance', {
+      id: 'Governance',
+      name: 'Governance',
+      description: 'Core governance proposals affecting voting and decision-making processes',
+      icon: 'fa-gavel',
+      color: '#dc3545',
+      isCritical: true
+    }],
+    ['SnsFrameworkManagement', {
+      id: 'SnsFrameworkManagement',
+      name: 'SNS Framework Management',
+      description: 'Proposals for managing the SNS framework and core functionality',
+      icon: 'fa-cogs',
+      color: '#6f42c1',
       isCritical: true
     }]
   ])

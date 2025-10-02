@@ -5564,16 +5564,16 @@ export const useTacoStore = defineStore('taco', () => {
                 const topicId = topicEntry[0]; // Topic ID (int32)
                 const followeesForTopic = topicEntry[1]; // FolloweesForTopic
                 
-                // Map topic IDs to topic names
+                // Map topic IDs to topic names (based on IDL Variant order)
                 const getTopicFromId = (id: number) => {
                     const topicMap: Record<number, string> = {
-                        0: 'DaoCommunitySettings',
-                        1: 'SnsFrameworkManagement', 
-                        2: 'DappCanisterManagement',
-                        3: 'ApplicationBusinessLogic',
-                        4: 'Governance',
-                        5: 'TreasuryAssetManagement',
-                        6: 'CriticalDappOperations'
+                        0: 'DappCanisterManagement',
+                        1: 'DaoCommunitySettings',
+                        2: 'ApplicationBusinessLogic',
+                        3: 'CriticalDappOperations',
+                        4: 'TreasuryAssetManagement',
+                        5: 'Governance',
+                        6: 'SnsFrameworkManagement'
                     };
                     return topicMap[id] || `Topic${id}`;
                 };
@@ -6413,14 +6413,57 @@ export const useTacoStore = defineStore('taco', () => {
             // Create SNS Governance actor
             const snsGov = await createSnsGovernanceActor(agent, 'lhdfz-wqaaa-aaaaq-aae3q-cai');
             
-            // To remove a followee, we set an empty followees array for that topic
+            // Helper function to map topic IDs to names (based on IDL Variant order)
+            const getTopicNameFromId = (id: number) => {
+                const topicMap: Record<number, string> = {
+                    0: 'DappCanisterManagement',
+                    1: 'DaoCommunitySettings',
+                    2: 'ApplicationBusinessLogic',
+                    3: 'CriticalDappOperations',
+                    4: 'TreasuryAssetManagement',
+                    5: 'Governance',
+                    6: 'SnsFrameworkManagement'
+                };
+                return topicMap[id] || `Topic${id}`;
+            };
+            
+            // Get current followees for this topic and remove the specific one
+            // First, we need to get the current neuron data to see existing followees
+            const currentNeuron = await snsGov.get_neuron({ 
+                neuron_id: [{ id: Array.from(neuronId) }] 
+            }) as any;
+            
+            let existingFollowees: any[] = [];
+            if (currentNeuron.result && currentNeuron.result.length > 0) {
+                const neuronData = currentNeuron.result[0];
+                if (neuronData.topic_followees && neuronData.topic_followees.length > 0) {
+                    const topicFollowees = neuronData.topic_followees[0]?.topic_id_to_followees || [];
+                    const topicEntry = topicFollowees.find((entry: any) => {
+                        const topicName = getTopicNameFromId(entry[0]);
+                        return topicName === topicId;
+                    });
+                    if (topicEntry) {
+                        existingFollowees = topicEntry[1]?.followees || [];
+                    }
+                }
+            }
+            
+            // Filter out the followee we want to remove
+            const updatedFollowees = existingFollowees.filter((followee: any) => {
+                const neuronId = followee.neuron_id && followee.neuron_id.length > 0 ? followee.neuron_id[0].id : null;
+                if (!neuronId) return true;
+                const neuronIdHex = Array.from(neuronId as Uint8Array).map((b: number) => b.toString(16).padStart(2, '0')).join('');
+                const followeeIdHex = Array.from(followeeNeuronId).map((b: number) => b.toString(16).padStart(2, '0')).join('');
+                return neuronIdHex !== followeeIdHex;
+            });
+            
             const manageNeuronRequest = {
                 subaccount: Array.from(neuronId),
                 command: [{
                     SetFollowing: {
                         topic_following: [{
                             topic: [{ [topicId]: null }],
-                            followees: [] // Empty array removes all followees for this topic
+                            followees: updatedFollowees
                         }]
                     }
                 }]

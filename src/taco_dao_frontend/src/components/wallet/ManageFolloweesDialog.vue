@@ -7,7 +7,19 @@
             <i class="fa fa-users me-2"></i>
             Manage Neuron Followees
           </h5>
-          <button type="button" class="btn-close" @click="$emit('close')"></button>
+          <div class="header-actions">
+            <button 
+              type="button" 
+              class="btn btn-outline-secondary btn-sm me-2"
+              @click="refreshNeuronData"
+              :disabled="loading"
+              title="Refresh neuron data"
+            >
+              <i v-if="loading" class="fa fa-spinner fa-spin"></i>
+              <i v-else class="fa fa-refresh"></i>
+            </button>
+            <button type="button" class="btn-close" @click="$emit('close')"></button>
+          </div>
         </div>
         <div class="modal-body">
           <div v-if="neuron">
@@ -230,6 +242,7 @@ const props = defineProps<Props>()
 const emit = defineEmits<{
   (e: 'close'): void
   (e: 'followees-updated'): void
+  (e: 'neuron-refreshed', neuron: any): void
 }>()
 
 const tacoStore = useTacoStore()
@@ -295,6 +308,9 @@ const addFollowee = async (topicId: string) => {
     
     // Clear input
     newFollowees.value[topicId] = ''
+    
+    // Refresh the neuron data to show the new followee
+    await refreshNeuronData()
     emit('followees-updated')
   } catch (error: any) {
     console.error('Error adding followee:', error)
@@ -333,6 +349,8 @@ const removeFollowee = async (topicId: string, followeeNeuronId: string) => {
       message: `Successfully removed followee from ${topicId}`
     })
     
+    // Refresh the neuron data to show the removal
+    await refreshNeuronData()
     emit('followees-updated')
   } catch (error: any) {
     console.error('Error removing followee:', error)
@@ -375,6 +393,9 @@ const confirmBulkFollow = async () => {
     })
     
     closeBulkFollowModal()
+    
+    // Refresh the neuron data to show the new followees
+    await refreshNeuronData()
     emit('followees-updated')
   } catch (error: any) {
     console.error('Error in bulk follow:', error)
@@ -410,6 +431,23 @@ const clearAllFollowees = async () => {
   try {
     loading.value = true
     
+    // Count total followees first
+    let totalFollowees = 0
+    for (const topic of allTopics.value) {
+      totalFollowees += getFolloweesForTopic(topic.id).length
+    }
+    
+    if (totalFollowees === 0) {
+      tacoStore.addToast({
+        id: Date.now(),
+        code: 'no-followees',
+        title: 'No Followees to Clear',
+        icon: 'fa-solid fa-info',
+        message: 'This neuron has no followees to remove'
+      })
+      return
+    }
+    
     // Remove all followees from all topics
     for (const topic of allTopics.value) {
       const followees = getFolloweesForTopic(topic.id)
@@ -426,6 +464,8 @@ const clearAllFollowees = async () => {
       message: 'Successfully removed all followees from all topics'
     })
     
+    // Refresh the neuron data to show the changes
+    await refreshNeuronData()
     emit('followees-updated')
   } catch (error: any) {
     console.error('Error clearing all followees:', error)
@@ -450,6 +490,49 @@ const copyFromAnotherNeuron = () => {
     icon: 'fa-solid fa-info',
     message: 'Copy followees from another neuron feature will be available soon'
   })
+}
+
+// Refresh neuron data to show updated followees
+const refreshNeuronData = async () => {
+  if (!props.neuron) return
+  
+  try {
+    loading.value = true
+    
+    // Get fresh neuron data from SNS governance
+    const neuronIdBytes = new Uint8Array(props.neuron.idHex.match(/.{2}/g).map((byte: string) => parseInt(byte, 16)))
+    
+    const authClient = await tacoStore.getAuthClient()
+    const identity = authClient.getIdentity()
+    
+    const agent = await tacoStore.createAgent({
+      identity,
+      host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+      fetchRootKey: process.env.DFX_NETWORK === "local",
+    })
+
+    const snsGov = await tacoStore.createSnsGovernanceActor(agent, 'lhdfz-wqaaa-aaaaq-aae3q-cai')
+    
+    const freshNeuronData = await snsGov.get_neuron({ 
+      neuron_id: [{ id: Array.from(neuronIdBytes) }] 
+    }) as any
+    
+    if (freshNeuronData.result && freshNeuronData.result.length > 0) {
+      // Update the neuron prop with fresh data by emitting an event
+      emit('neuron-refreshed', freshNeuronData.result[0])
+    }
+  } catch (error) {
+    console.error('Error refreshing neuron data:', error)
+    tacoStore.addToast({
+      id: Date.now(),
+      code: 'refresh-error',
+      title: 'Refresh Failed',
+      icon: 'fa-solid fa-exclamation-triangle',
+      message: 'Failed to refresh neuron data'
+    })
+  } finally {
+    loading.value = false
+  }
 }
 
 // Reset form when dialog closes
@@ -640,5 +723,29 @@ watch(() => props.show, (newShow) => {
 .btn-xs {
   padding: 0.25rem 0.5rem;
   font-size: 0.75rem;
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.header-actions .btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 36px;
+  height: 36px;
+}
+
+.header-actions .btn i {
+  font-size: 0.9rem;
 }
 </style>
