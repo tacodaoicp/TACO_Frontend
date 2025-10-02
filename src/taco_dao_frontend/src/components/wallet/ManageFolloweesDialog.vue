@@ -499,27 +499,16 @@ const refreshNeuronData = async () => {
   try {
     loading.value = true
     
-    // Get fresh neuron data from SNS governance
+    // Get fresh neuron data using the same pattern as the store methods
     const neuronIdBytes = new Uint8Array(props.neuron.idHex.match(/.{2}/g).map((byte: string) => parseInt(byte, 16)))
     
-    const authClient = await tacoStore.getAuthClient()
-    const identity = authClient.getIdentity()
+    // Use the store method to get fresh neuron data
+    const freshNeuronData = await tacoStore.getSingleNeuron(neuronIdBytes)
     
-    const agent = await tacoStore.createAgent({
-      identity,
-      host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-      fetchRootKey: process.env.DFX_NETWORK === "local",
-    })
-
-    const snsGov = await tacoStore.createSnsGovernanceActor(agent, 'lhdfz-wqaaa-aaaaq-aae3q-cai')
-    
-    const freshNeuronData = await snsGov.get_neuron({ 
-      neuron_id: [{ id: Array.from(neuronIdBytes) }] 
-    }) as any
-    
-    if (freshNeuronData.result && freshNeuronData.result.length > 0) {
-      // Update the neuron prop with fresh data by emitting an event
-      emit('neuron-refreshed', freshNeuronData.result[0])
+    if (freshNeuronData) {
+      // Format the fresh neuron data and emit the event
+      const formattedNeuron = tacoStore.formatNeuronForDisplay(freshNeuronData)
+      emit('neuron-refreshed', formattedNeuron)
     }
   } catch (error) {
     console.error('Error refreshing neuron data:', error)
@@ -544,6 +533,13 @@ watch(() => props.show, (newShow) => {
     })
   }
 })
+
+// Watch for neuron changes to ensure the display updates
+watch(() => props.neuron, (newNeuron) => {
+  if (newNeuron) {
+    console.log('Neuron data changed in dialog, updating display:', newNeuron.idHex)
+  }
+}, { deep: true })
 </script>
 
 <style scoped>

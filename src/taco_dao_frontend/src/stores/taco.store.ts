@@ -6413,49 +6413,45 @@ export const useTacoStore = defineStore('taco', () => {
             // Create SNS Governance actor
             const snsGov = await createSnsGovernanceActor(agent, 'lhdfz-wqaaa-aaaaq-aae3q-cai');
             
-            // Helper function to map topic IDs to names (based on IDL Variant order)
-            const getTopicNameFromId = (id: number) => {
-                const topicMap: Record<number, string> = {
-                    0: 'DappCanisterManagement',
-                    1: 'DaoCommunitySettings',
-                    2: 'ApplicationBusinessLogic',
-                    3: 'CriticalDappOperations',
-                    4: 'TreasuryAssetManagement',
-                    5: 'Governance',
-                    6: 'SnsFrameworkManagement'
+            // Get current neuron data to find existing followees for this topic
+            const currentNeuronData = await getSingleNeuron(neuronId);
+            
+            // Find current followees for this topic
+            let currentFollowees: any[] = [];
+            if (currentNeuronData.topic_followees && currentNeuronData.topic_followees.length > 0) {
+                const topicFollowees = currentNeuronData.topic_followees[0]?.topic_id_to_followees || [];
+                
+                // Map topic names to IDs (reverse of the display mapping)
+                const getTopicIdFromName = (name: string): number => {
+                    const topicMap: Record<string, number> = {
+                        'DappCanisterManagement': 0,
+                        'DaoCommunitySettings': 1,
+                        'ApplicationBusinessLogic': 2,
+                        'CriticalDappOperations': 3,
+                        'TreasuryAssetManagement': 4,
+                        'Governance': 5,
+                        'SnsFrameworkManagement': 6
+                    };
+                    return topicMap[name] ?? -1;
                 };
-                return topicMap[id] || `Topic${id}`;
-            };
-            
-            // Get current followees for this topic and remove the specific one
-            // First, we need to get the current neuron data to see existing followees
-            const currentNeuron = await snsGov.get_neuron({ 
-                neuron_id: [{ id: Array.from(neuronId) }] 
-            }) as any;
-            
-            let existingFollowees: any[] = [];
-            if (currentNeuron.result && currentNeuron.result.length > 0) {
-                const neuronData = currentNeuron.result[0];
-                if (neuronData.topic_followees && neuronData.topic_followees.length > 0) {
-                    const topicFollowees = neuronData.topic_followees[0]?.topic_id_to_followees || [];
-                    const topicEntry = topicFollowees.find((entry: any) => {
-                        const topicName = getTopicNameFromId(entry[0]);
-                        return topicName === topicId;
-                    });
-                    if (topicEntry) {
-                        existingFollowees = topicEntry[1]?.followees || [];
-                    }
+                
+                const targetTopicId = getTopicIdFromName(topicId);
+                const topicEntry = topicFollowees.find((entry: any) => entry[0] === targetTopicId);
+                
+                if (topicEntry && topicEntry[1]?.followees) {
+                    currentFollowees = topicEntry[1].followees;
                 }
             }
             
             // Filter out the followee we want to remove
-            const updatedFollowees = existingFollowees.filter((followee: any) => {
-                const neuronId = followee.neuron_id && followee.neuron_id.length > 0 ? followee.neuron_id[0].id : null;
-                if (!neuronId) return true;
-                const neuronIdHex = Array.from(neuronId as Uint8Array).map((b: number) => b.toString(16).padStart(2, '0')).join('');
-                const followeeIdHex = Array.from(followeeNeuronId).map((b: number) => b.toString(16).padStart(2, '0')).join('');
-                return neuronIdHex !== followeeIdHex;
+            const followeeIdHex = Array.from(followeeNeuronId).map((b: number) => b.toString(16).padStart(2, '0')).join('');
+            const updatedFollowees = currentFollowees.filter((followee: any) => {
+                if (!followee.neuron_id || followee.neuron_id.length === 0) return true;
+                const existingIdHex = Array.from(followee.neuron_id[0].id as Uint8Array).map((b: number) => b.toString(16).padStart(2, '0')).join('');
+                return existingIdHex !== followeeIdHex;
             });
+            
+            console.log(`Removing followee ${followeeIdHex} from topic ${topicId}. Current: ${currentFollowees.length}, After: ${updatedFollowees.length}`);
             
             const manageNeuronRequest = {
                 subaccount: Array.from(neuronId),
@@ -6489,6 +6485,40 @@ export const useTacoStore = defineStore('taco', () => {
             throw new Error('Unexpected response format from manage_neuron');
         } catch (error: any) {
             console.error('Error removing neuron followee:', error);
+            throw error;
+        }
+    }
+
+    // Get a single neuron's fresh data from SNS governance
+    const getSingleNeuron = async (neuronId: Uint8Array) => {
+        try {
+            if (!userLoggedIn.value) {
+                throw new Error('User must be logged in');
+            }
+
+            const authClient = await getAuthClient();
+            const identity = authClient.getIdentity();
+            
+            const agent = await createAgent({
+                identity,
+                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            });
+
+            // Create SNS Governance actor
+            const snsGov = await createSnsGovernanceActor(agent, 'lhdfz-wqaaa-aaaaq-aae3q-cai');
+            
+            const result = await snsGov.get_neuron({ 
+                neuron_id: [{ id: Array.from(neuronId) }] 
+            }) as any;
+
+            if (result.result && result.result.length > 0) {
+                return result.result[0];
+            }
+
+            throw new Error('Neuron not found');
+        } catch (error: any) {
+            console.error('Error getting single neuron:', error);
             throw error;
         }
     }
@@ -8887,6 +8917,7 @@ export const useTacoStore = defineStore('taco', () => {
         removeNeuronPermissions,
         addNeuronFollowee,
         removeNeuronFollowee,
+        getSingleNeuron,
         toggleThreadMenu,
         ensureTokenDetails,
         checkTokenSupportsICRC2,

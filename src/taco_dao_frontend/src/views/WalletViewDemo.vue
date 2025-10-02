@@ -823,26 +823,16 @@ const handleFolloweesUpdated = async () => {
   await loadWalletData()
 }
 
-const handleNeuronRefreshed = (freshNeuronData: any) => {
-  console.log('Neuron refreshed with fresh data:', freshNeuronData)
+const handleNeuronRefreshed = async (formattedNeuron: any) => {
+  console.log('Neuron refreshed with fresh data:', formattedNeuron)
   
   // Update the selected neuron with fresh data
-  if (selectedNeuronForFollowees.value && freshNeuronData) {
-    // Format the fresh neuron data using the same formatting as the store
-    const formattedNeuron = tacoStore.formatNeuronForDisplay(freshNeuronData)
+  if (selectedNeuronForFollowees.value && formattedNeuron) {
     selectedNeuronForFollowees.value = formattedNeuron
     
-    // Also update the neuron in the tokens list if it exists
-    const tokenIndex = tokens.value.findIndex(token => 
-      token.neurons?.some((n: any) => n.idHex === formattedNeuron.idHex)
-    )
-    
-    if (tokenIndex !== -1) {
-      const neuronIndex = tokens.value[tokenIndex].neurons.findIndex((n: any) => n.idHex === formattedNeuron.idHex)
-      if (neuronIndex !== -1) {
-        tokens.value[tokenIndex].neurons[neuronIndex] = formattedNeuron
-      }
-    }
+    // Trigger a full wallet data refresh to ensure all displays are updated
+    console.log('Neuron refreshed, triggering wallet data refresh to update all displays')
+    await loadWalletData()
   }
 }
 
