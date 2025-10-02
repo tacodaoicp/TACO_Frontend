@@ -213,6 +213,13 @@
                   >
                     <i class="fa fa-key"></i>
                   </button>
+                  <button 
+                    @click.stop="$emit('manage-followees', neuron)"
+                    class="btn btn-success btn-sm"
+                    title="Manage neuron followees"
+                  >
+                    <i class="fa fa-users"></i>
+                  </button>
                 </div>
               </div>
               
@@ -581,6 +588,8 @@ interface TokenCardEmits {
   (e: 'stake-to-neuron', neuron: any): void
   (e: 'create-neuron'): void
   (e: 'set-dissolve', neuron: any): void
+  (e: 'manage-permissions', neuron: any): void
+  (e: 'manage-followees', neuron: any): void
 }
 
 const props = withDefaults(defineProps<TokenCardProps>(), {

@@ -5511,44 +5511,93 @@ export const useTacoStore = defineStore('taco', () => {
             };
         });
         
-        // Parse followings
-        const followings = (neuron.followees || []).map((followee: any) => {
-            const functionId = followee[0]; // The function ID (governance function)
-            const followeeList = followee[1]?.followees || [];
-            
-            // Map function IDs to readable names
-            const getFunctionName = (id: number) => {
-                switch (id) {
-                    case 0: return 'All Functions';
-                    case 1: return 'Motion';
-                    case 2: return 'ManageNervousSystemParameters';
-                    case 3: return 'UpgradeRootToVersion';
-                    case 4: return 'ExecuteGenericNervousSystemFunction';
-                    case 5: return 'ManageDappCanisterSettings';
-                    case 6: return 'TransferSnsTreasuryFunds';
-                    case 7: return 'RegisterDappCanisters';
-                    case 8: return 'DeregisterDappCanisters';
-                    default: return `Function ${id}`;
-                }
-            };
-            
-            const followedNeurons = followeeList.map((followedNeuron: any) => {
-                const neuronId = followedNeuron.id;
-                const neuronIdHex = neuronId ? Array.from(neuronId as Uint8Array).map((b: number) => b.toString(16).padStart(2, '0')).join('') : 'Unknown';
-                return {
-                    id: neuronId,
-                    idHex: neuronIdHex,
-                    idShort: neuronIdHex !== 'Unknown' ? `${neuronIdHex.substring(0, 8)}...` : 'Unknown'
+        // Parse followings - handle both legacy followees and new topic_followees
+        const followings: any[] = [];
+        
+        // Legacy followees structure (function_id based)
+        if (neuron.followees && neuron.followees.length > 0) {
+            neuron.followees.forEach((followee: any) => {
+                const functionId = followee[0]; // The function ID (governance function)
+                const followeeList = followee[1]?.followees || [];
+                
+                // Map function IDs to topic names
+                const getTopicFromFunctionId = (id: number) => {
+                    switch (id) {
+                        case 0: return 'AllFunctions';
+                        case 1: return 'Motion';
+                        case 2: return 'ManageNervousSystemParameters';
+                        case 3: return 'UpgradeRootToVersion';
+                        case 4: return 'ExecuteGenericNervousSystemFunction';
+                        case 5: return 'ManageDappCanisterSettings';
+                        case 6: return 'TransferSnsTreasuryFunds';
+                        case 7: return 'RegisterDappCanisters';
+                        case 8: return 'DeregisterDappCanisters';
+                        default: return `Function${id}`;
+                    }
                 };
+                
+                const followedNeurons = followeeList.map((followedNeuron: any) => {
+                    const neuronId = followedNeuron.id;
+                    const neuronIdHex = neuronId ? Array.from(neuronId as Uint8Array).map((b: number) => b.toString(16).padStart(2, '0')).join('') : 'Unknown';
+                    return {
+                        id: neuronId,
+                        idHex: neuronIdHex,
+                        idShort: neuronIdHex !== 'Unknown' ? `${neuronIdHex.substring(0, 8)}...` : 'Unknown',
+                        alias: null
+                    };
+                });
+                
+                followings.push({
+                    topicId: getTopicFromFunctionId(functionId),
+                    functionId,
+                    functionName: getTopicFromFunctionId(functionId),
+                    followedNeurons,
+                    followedCount: followedNeurons.length
+                });
             });
-            
-            return {
-                functionId,
-                functionName: getFunctionName(functionId),
-                followedNeurons,
-                followedCount: followedNeurons.length
-            };
-        });
+        }
+        
+        // New topic_followees structure (topic based)
+        if (neuron.topic_followees && neuron.topic_followees.length > 0) {
+            const topicFollowees = neuron.topic_followees[0]?.topic_id_to_followees || [];
+            topicFollowees.forEach((topicEntry: any) => {
+                const topicId = topicEntry[0]; // Topic ID (int32)
+                const followeesForTopic = topicEntry[1]; // FolloweesForTopic
+                
+                // Map topic IDs to topic names
+                const getTopicFromId = (id: number) => {
+                    const topicMap: Record<number, string> = {
+                        0: 'DaoCommunitySettings',
+                        1: 'SnsFrameworkManagement', 
+                        2: 'DappCanisterManagement',
+                        3: 'ApplicationBusinessLogic',
+                        4: 'Governance',
+                        5: 'TreasuryAssetManagement',
+                        6: 'CriticalDappOperations'
+                    };
+                    return topicMap[id] || `Topic${id}`;
+                };
+                
+                const followedNeurons = (followeesForTopic.followees || []).map((followee: any) => {
+                    const neuronId = followee.neuron_id && followee.neuron_id.length > 0 ? followee.neuron_id[0].id : null;
+                    const neuronIdHex = neuronId ? Array.from(neuronId as Uint8Array).map((b: number) => b.toString(16).padStart(2, '0')).join('') : 'Unknown';
+                    return {
+                        id: neuronId,
+                        idHex: neuronIdHex,
+                        idShort: neuronIdHex !== 'Unknown' ? `${neuronIdHex.substring(0, 8)}...` : 'Unknown',
+                        alias: followee.alias && followee.alias.length > 0 ? followee.alias[0] : null
+                    };
+                });
+                
+                followings.push({
+                    topicId: getTopicFromId(topicId),
+                    functionId: topicId,
+                    functionName: getTopicFromId(topicId),
+                    followedNeurons,
+                    followedCount: followedNeurons.length
+                });
+            });
+        }
         
         // Get custom name from cache if available
         const tacoSnsRoot = Principal.fromText('lacdn-3iaaa-aaaaq-aae3a-cai'); // TACO SNS Root (not governance)
@@ -6271,6 +6320,133 @@ export const useTacoStore = defineStore('taco', () => {
                 SnsNeuronPermissionType.NEURON_PERMISSION_TYPE_STAKE_MATURITY,
                 SnsNeuronPermissionType.NEURON_PERMISSION_TYPE_MANAGE_VOTING_PERMISSION
             ];
+        }
+    }
+
+    // Add neuron followee for a specific topic
+    const addNeuronFollowee = async (neuronId: Uint8Array, topicId: string, followeeNeuronId: Uint8Array) => {
+        try {
+            if (!userLoggedIn.value) {
+                throw new Error('User must be logged in');
+            }
+
+            console.log('Adding neuron followee:', {
+                neuronId: Array.from(neuronId).map(b => b.toString(16).padStart(2, '0')).join(''),
+                topicId,
+                followeeNeuronId: Array.from(followeeNeuronId).map(b => b.toString(16).padStart(2, '0')).join('')
+            });
+
+            const authClient = await getAuthClient();
+            const identity = authClient.getIdentity();
+            
+            const agent = await createAgent({
+                identity,
+                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            });
+
+            // Create SNS Governance actor
+            const snsGov = await createSnsGovernanceActor(agent, 'lhdfz-wqaaa-aaaaq-aae3q-cai');
+            
+            // Prepare the manage neuron request for SetFollowing
+            const manageNeuronRequest = {
+                subaccount: Array.from(neuronId),
+                command: [{
+                    SetFollowing: {
+                        topic_following: [{
+                            topic: [{ [topicId]: null }],
+                            followees: [{
+                                neuron_id: [{ id: Array.from(followeeNeuronId) }],
+                                alias: []
+                            }]
+                        }]
+                    }
+                }]
+            };
+
+            console.log('SetFollowing request:', JSON.stringify(manageNeuronRequest, (key, value) =>
+                typeof value === 'bigint' ? value.toString() : value, 2));
+
+            const result = await snsGov.manage_neuron(manageNeuronRequest) as any;
+            console.log('SetFollowing result:', result);
+
+            if (result.command && result.command.length > 0) {
+                const command = result.command[0];
+                if (command.Error) {
+                    throw new Error(`SetFollowing failed: ${JSON.stringify(command)}`);
+                }
+                if (command.SetFollowing !== undefined) {
+                    console.log('Neuron followee added successfully');
+                    return true;
+                }
+            }
+
+            throw new Error('Unexpected response format from manage_neuron');
+        } catch (error: any) {
+            console.error('Error adding neuron followee:', error);
+            throw error;
+        }
+    }
+
+    // Remove neuron followee for a specific topic
+    const removeNeuronFollowee = async (neuronId: Uint8Array, topicId: string, followeeNeuronId: Uint8Array) => {
+        try {
+            if (!userLoggedIn.value) {
+                throw new Error('User must be logged in');
+            }
+
+            console.log('Removing neuron followee:', {
+                neuronId: Array.from(neuronId).map(b => b.toString(16).padStart(2, '0')).join(''),
+                topicId,
+                followeeNeuronId: Array.from(followeeNeuronId).map(b => b.toString(16).padStart(2, '0')).join('')
+            });
+
+            const authClient = await getAuthClient();
+            const identity = authClient.getIdentity();
+            
+            const agent = await createAgent({
+                identity,
+                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            });
+
+            // Create SNS Governance actor
+            const snsGov = await createSnsGovernanceActor(agent, 'lhdfz-wqaaa-aaaaq-aae3q-cai');
+            
+            // To remove a followee, we set an empty followees array for that topic
+            const manageNeuronRequest = {
+                subaccount: Array.from(neuronId),
+                command: [{
+                    SetFollowing: {
+                        topic_following: [{
+                            topic: [{ [topicId]: null }],
+                            followees: [] // Empty array removes all followees for this topic
+                        }]
+                    }
+                }]
+            };
+
+            console.log('RemoveFollowing request:', JSON.stringify(manageNeuronRequest, (key, value) =>
+                typeof value === 'bigint' ? value.toString() : value, 2));
+
+            const result = await snsGov.manage_neuron(manageNeuronRequest) as any;
+            console.log('RemoveFollowing result:', result);
+
+            if (result.command && result.command.length > 0) {
+                const command = result.command[0];
+                if (command.Error) {
+                    throw new Error(`RemoveFollowing failed: ${JSON.stringify(command)}`);
+                }
+                if (command.SetFollowing !== undefined) {
+                    console.log('Neuron followee removed successfully');
+                    return true;
+                }
+            }
+
+            throw new Error('Unexpected response format from manage_neuron');
+        } catch (error: any) {
+            console.error('Error removing neuron followee:', error);
+            throw error;
         }
     }
 
@@ -8666,6 +8842,8 @@ export const useTacoStore = defineStore('taco', () => {
         getGrantablePermissions,
         addNeuronPermissions,
         removeNeuronPermissions,
+        addNeuronFollowee,
+        removeNeuronFollowee,
         toggleThreadMenu,
         ensureTokenDetails,
         checkTokenSupportsICRC2,

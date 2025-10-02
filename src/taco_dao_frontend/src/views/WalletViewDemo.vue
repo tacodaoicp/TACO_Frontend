@@ -56,6 +56,7 @@
       @create-neuron="handleCreateNeuron"
       @set-dissolve="handleSetDissolve"
       @manage-permissions="handleManagePermissions"
+      @manage-followees="handleManageFollowees"
                   />
                 </div>
               </div>
@@ -199,6 +200,14 @@
       @permissions-updated="handlePermissionsUpdated"
     />
 
+    <!-- Manage Followees Dialog -->
+    <ManageFolloweesDialog
+      :show="showManageFolloweesDialog"
+      :neuron="selectedNeuronForFollowees"
+      @close="closeManageFolloweesDialog"
+      @followees-updated="handleFolloweesUpdated"
+    />
+
   </div>
 </template>
 
@@ -214,6 +223,7 @@ import StakeToNeuronDialog from '../components/wallet/StakeToNeuronDialogDemo.vu
 import CreateNeuronDialog from '../components/wallet/CreateNeuronDialogDemo.vue'
 import SetDissolveDialog from '../components/wallet/SetDissolveDialogDemo.vue'
 import ManagePermissionsDialog from '../components/wallet/ManagePermissionsDialog.vue'
+import ManageFolloweesDialog from '../components/wallet/ManageFolloweesDialog.vue'
 import { tokenImages } from '../components/data/TokenData'
 
 interface WalletToken {
@@ -244,6 +254,8 @@ const selectedTokenForSwap = ref<WalletToken | null>(null)
 const swapConfirmData = ref<any | null>(null)
 const showManagePermissionsDialog = ref(false)
 const selectedNeuronForPermissions = ref<any | null>(null)
+const showManageFolloweesDialog = ref(false)
+const selectedNeuronForFollowees = ref<any | null>(null)
 const allTokenBalances = ref<Map<string, bigint>>(new Map())
 const userRegisteredTokenPrincipals = ref<string[]>([])
 const customTokenMetadata = ref<Map<string, any>>(new Map())
@@ -791,6 +803,22 @@ const closeManagePermissionsDialog = () => {
 const handlePermissionsUpdated = async () => {
   console.log('Permissions updated, refreshing wallet data')
   // Refresh wallet data to show updated neuron permissions
+  await loadWalletData()
+}
+
+const handleManageFollowees = (neuron: any) => {
+  console.log('Manage followees for neuron:', neuron)
+  selectedNeuronForFollowees.value = neuron
+  showManageFolloweesDialog.value = true
+}
+
+const closeManageFolloweesDialog = () => {
+  showManageFolloweesDialog.value = false
+  selectedNeuronForFollowees.value = null
+}
+
+const handleFolloweesUpdated = async () => {
+  console.log('Followees updated, refreshing wallet data')
   await loadWalletData()
 }
 
