@@ -10890,7 +10890,7 @@ from spam.
 
                     <!-- paragraph -->
                     <p>
-Effectiveness remains unproven. While allocations that target post URLs have boosted
+The dapp's level of effectiveness remains unknown. While allocations that target post URLs have boosted
 impressions, it's still unclear how much of those impressions translate into meaningful
 engagement, and it will remain unclear until Insane Clown Protocol has long-running return
 customers (having demonstrated effectiveness to them).
