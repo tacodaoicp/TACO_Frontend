@@ -140,6 +140,51 @@
                     <i class="fa fa-info-circle me-2"></i>
                     <strong>Important:</strong> The "Manage Principals" permission allows the recipient to add/remove other principals and manage all permissions. Only grant this to trusted parties.
                   </div>
+                  <!-- Permission Preset Buttons -->
+                  <div class="permission-presets mb-3">
+                    <div class="preset-buttons">
+                      <button 
+                        type="button" 
+                        :class="['btn', 'btn-sm', currentPreset === 'hotkey' ? 'btn-info' : 'btn-outline-info']"
+                        @click="setHotkeyPermissions"
+                        :disabled="loading"
+                      >
+                        <i class="fa fa-key me-1"></i>
+                        Add as Hotkey
+                      </button>
+                      <button 
+                        type="button" 
+                        :class="['btn', 'btn-sm', currentPreset === 'owner' ? 'btn-warning' : 'btn-outline-warning']"
+                        @click="setOwnerPermissions"
+                        :disabled="loading"
+                      >
+                        <i class="fa fa-crown me-1"></i>
+                        Add as Owner
+                      </button>
+                      <button 
+                        type="button" 
+                        :class="['btn', 'btn-sm', currentPreset === 'none' ? 'btn-secondary' : 'btn-outline-secondary']"
+                        @click="clearAllPermissions"
+                        :disabled="loading"
+                      >
+                        <i class="fa fa-times me-1"></i>
+                        Clear All
+                      </button>
+                    </div>
+                    <div class="preset-status">
+                      <small class="text-muted">
+                        <strong>Hotkey:</strong> Vote + Submit Proposal | 
+                        <strong>Owner:</strong> All permissions
+                      </small>
+                      <div class="current-selection mt-1">
+                        <small :class="getPresetStatusClass()">
+                          <i :class="getPresetStatusIcon()"></i>
+                          {{ getPresetStatusText() }}
+                        </small>
+                      </div>
+                    </div>
+                  </div>
+
                   <div class="permission-checkboxes">
                     <div 
                       v-for="permType in availablePermissionTypes" 
@@ -347,6 +392,33 @@ const currentUserHasManagePrincipalsPermission = computed(() => {
   return currentUserPermission.permissionTypes.includes(SnsNeuronPermissionType.NEURON_PERMISSION_TYPE_MANAGE_PRINCIPALS)
 })
 
+// Check which preset is currently selected
+const currentPreset = computed(() => {
+  const selected = newPermission.value.selectedPermissions
+  
+  // Check if it matches hotkey permissions (Vote + Submit Proposal)
+  const hotkeyPerms = [
+    SnsNeuronPermissionType.NEURON_PERMISSION_TYPE_SUBMIT_PROPOSAL,
+    SnsNeuronPermissionType.NEURON_PERMISSION_TYPE_VOTE
+  ]
+  if (selected.length === hotkeyPerms.length && hotkeyPerms.every(perm => selected.includes(perm))) {
+    return 'hotkey'
+  }
+  
+  // Check if it matches owner permissions (all available permissions)
+  const allPerms = availablePermissionTypes.value.map(perm => perm.value)
+  if (selected.length === allPerms.length && allPerms.every(perm => selected.includes(perm))) {
+    return 'owner'
+  }
+  
+  // Check if no permissions selected
+  if (selected.length === 0) {
+    return 'none'
+  }
+  
+  return 'custom'
+})
+
 // Load grantable permissions on mount
 onMounted(async () => {
   try {
@@ -395,6 +467,53 @@ const resetForm = () => {
     selectedPermissions: []
   }
   principalError.value = ''
+}
+
+// Permission preset methods
+const setHotkeyPermissions = () => {
+  newPermission.value.selectedPermissions = [
+    SnsNeuronPermissionType.NEURON_PERMISSION_TYPE_SUBMIT_PROPOSAL,
+    SnsNeuronPermissionType.NEURON_PERMISSION_TYPE_VOTE
+  ]
+}
+
+const setOwnerPermissions = () => {
+  newPermission.value.selectedPermissions = availablePermissionTypes.value.map(perm => perm.value)
+}
+
+const clearAllPermissions = () => {
+  newPermission.value.selectedPermissions = []
+}
+
+// Status display methods
+const getPresetStatusClass = () => {
+  switch (currentPreset.value) {
+    case 'hotkey': return 'text-info fw-bold'
+    case 'owner': return 'text-warning fw-bold'
+    case 'none': return 'text-secondary'
+    case 'custom': return 'text-primary fw-bold'
+    default: return 'text-muted'
+  }
+}
+
+const getPresetStatusIcon = () => {
+  switch (currentPreset.value) {
+    case 'hotkey': return 'fa fa-key'
+    case 'owner': return 'fa fa-crown'
+    case 'none': return 'fa fa-circle'
+    case 'custom': return 'fa fa-cog'
+    default: return 'fa fa-question'
+  }
+}
+
+const getPresetStatusText = () => {
+  switch (currentPreset.value) {
+    case 'hotkey': return `Hotkey selected (${newPermission.value.selectedPermissions.length} permissions)`
+    case 'owner': return `Owner selected (${newPermission.value.selectedPermissions.length} permissions)`
+    case 'none': return 'No permissions selected'
+    case 'custom': return `Custom selection (${newPermission.value.selectedPermissions.length} permissions)`
+    default: return 'Unknown selection'
+  }
 }
 
 // Add permission
@@ -908,5 +1027,49 @@ watch(() => props.show, (newShow) => {
   background: rgba(40, 167, 69, 0.1);
   border-color: rgba(40, 167, 69, 0.3);
   color: #28a745;
+}
+
+.permission-presets {
+  padding: 1rem;
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.preset-buttons {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.preset-buttons .btn {
+  flex: 1;
+  min-width: 120px;
+  font-size: 0.85rem;
+  padding: 0.5rem 0.75rem;
+  transition: all 0.2s ease;
+}
+
+.preset-buttons .btn:hover {
+  transform: translateY(-1px);
+}
+
+.preset-buttons .btn-outline-info:hover {
+  background: #17a2b8;
+  border-color: #17a2b8;
+  color: white;
+}
+
+.preset-buttons .btn-outline-warning:hover {
+  background: #ffc107;
+  border-color: #ffc107;
+  color: #212529;
+}
+
+.preset-buttons .btn-outline-secondary:hover {
+  background: #6c757d;
+  border-color: #6c757d;
+  color: white;
 }
 </style>
