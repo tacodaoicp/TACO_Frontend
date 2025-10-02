@@ -18,10 +18,18 @@
 
             <!-- Current Permissions -->
             <div class="current-permissions mb-4">
-              <h6 class="section-title">
-                <i class="fa fa-users me-2"></i>
-                Current Permissions ({{ neuron.permissions?.length || 0 }})
-              </h6>
+              <div class="section-header">
+                <h6 class="section-title">
+                  <i class="fa fa-users me-2"></i>
+                  Current Permissions ({{ neuron.permissions?.length || 0 }})
+                </h6>
+                <div class="section-description">
+                  <small class="text-muted">
+                    <i class="fa fa-info-circle me-1"></i>
+                    Toggle individual permissions or remove principals entirely
+                  </small>
+                </div>
+              </div>
               <div v-if="neuron.permissions && neuron.permissions.length > 0" class="permissions-list">
                 <div 
                   v-for="permission in neuron.permissions" 
@@ -42,20 +50,44 @@
                       <button 
                         @click="showRemovePermissions(permission)"
                         class="btn btn-outline-danger btn-sm"
-                        title="Remove permissions"
+                        title="Remove all permissions for this principal"
                       >
-                        <i class="fa fa-minus"></i>
+                        <i class="fa fa-trash"></i>
                       </button>
                     </div>
                   </div>
                   <div class="permission-types">
-                    <span 
-                      v-for="permName in permission.permissionNames" 
-                      :key="permName"
-                      class="permission-badge"
+                    <div 
+                      v-for="permType in availablePermissionTypes" 
+                      :key="permType.value"
+                      class="permission-toggle"
+                      v-if="!permission.isCurrentUser"
                     >
-                      {{ permName }}
-                    </span>
+                      <div class="form-check form-switch">
+                        <input 
+                          class="form-check-input" 
+                          type="checkbox" 
+                          :id="`perm-toggle-${permission.principal}-${permType.value}`"
+                          :checked="permission.permissionTypes.includes(permType.value)"
+                          @change="toggleIndividualPermission(permission, permType.value, $event)"
+                          :disabled="loading"
+                        >
+                        <label class="form-check-label" :for="`perm-toggle-${permission.principal}-${permType.value}`">
+                          {{ permType.name }} - {{ permType.description }}
+                        </label>
+                      </div>
+                    </div>
+                    <div v-if="permission.isCurrentUser" class="permission-badges">
+                      <span 
+                        v-for="permType in permission.permissionTypes" 
+                        :key="permType"
+                        class="permission-icon-badge"
+                        :style="{ color: getPermissionColor(permType) }"
+                        :title="getPermissionDescription(permType)"
+                      >
+                        <i :class="`fa ${getPermissionIcon(permType)}`"></i>
+                      </span>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -67,10 +99,18 @@
 
             <!-- Add New Permission -->
             <div class="add-permission">
-              <h6 class="section-title">
-                <i class="fa fa-plus me-2"></i>
-                Grant New Permission
-              </h6>
+              <div class="section-header">
+                <h6 class="section-title">
+                  <i class="fa fa-plus me-2"></i>
+                  Grant New Permission
+                </h6>
+                <div class="section-description">
+                  <small class="text-muted">
+                    <i class="fa fa-info-circle me-1"></i>
+                    Add a new principal and select which permissions to grant
+                  </small>
+                </div>
+              </div>
               <form @submit.prevent="addPermission">
                 <div class="mb-3">
                   <label for="principalId" class="form-label">Principal ID</label>
@@ -88,11 +128,24 @@
                 </div>
                 <div class="mb-3">
                   <label class="form-label">Permissions to Grant</label>
+                  <div v-if="currentUserHasManagePrincipalsPermission" class="alert alert-success mb-3">
+                    <i class="fa fa-check-circle me-2"></i>
+                    <strong>Full Access:</strong> You have "Manage Principals" permission and can grant all available permissions.
+                  </div>
+                  <div v-else class="alert alert-warning mb-3">
+                    <i class="fa fa-exclamation-triangle me-2"></i>
+                    <strong>Limited Access:</strong> Your permissions are restricted by the SNS governance parameters. Only certain permissions can be granted.
+                  </div>
+                  <div class="alert alert-info mb-3">
+                    <i class="fa fa-info-circle me-2"></i>
+                    <strong>Important:</strong> The "Manage Principals" permission allows the recipient to add/remove other principals and manage all permissions. Only grant this to trusted parties.
+                  </div>
                   <div class="permission-checkboxes">
                     <div 
-                      v-for="permType in availablePermissions" 
+                      v-for="permType in availablePermissionTypes" 
                       :key="permType.value"
                       class="form-check"
+                      :class="{ 'debug-enabled': !loading }"
                     >
                       <input 
                         class="form-check-input" 
@@ -100,9 +153,12 @@
                         :id="`perm-${permType.value}`"
                         :value="permType.value"
                         v-model="newPermission.selectedPermissions"
+                        :disabled="loading"
                       >
                       <label class="form-check-label" :for="`perm-${permType.value}`">
                         {{ permType.name }} - {{ permType.description }}
+                        <span v-if="loading" class="text-muted">(Loading...)</span>
+                        <span v-else class="text-success">(Available)</span>
                       </label>
                     </div>
                   </div>
@@ -140,23 +196,35 @@
         <div class="modal-header">
           <h5 class="modal-title">
             <i class="fa fa-exclamation-triangle me-2 text-warning"></i>
-            Remove Permissions
+            Remove Principal from Permissions
           </h5>
           <button type="button" class="btn-close" @click="closeRemoveModal"></button>
         </div>
         <div class="modal-body">
-          <p>Are you sure you want to remove permissions for:</p>
+          <p>Are you sure you want to completely remove this principal from the neuron's permissions?</p>
           <div v-if="permissionToRemove" class="permission-preview">
-            <strong>{{ permissionToRemove.principalShort }}</strong>
-            <div class="permission-types mt-2">
-              <span 
-                v-for="permName in permissionToRemove.permissionNames" 
-                :key="permName"
-                class="permission-badge"
-              >
-                {{ permName }}
-              </span>
+            <div class="principal-info">
+              <strong>Principal:</strong>
+              <code class="ms-2">{{ permissionToRemove.principalShort }}</code>
             </div>
+            <div class="current-permissions mt-3">
+              <strong>Current Permissions:</strong>
+              <div class="permission-badges mt-2">
+                <span 
+                  v-for="permType in permissionToRemove.permissionTypes" 
+                  :key="permType"
+                  class="permission-icon-badge"
+                  :style="{ color: getPermissionColor(permType) }"
+                  :title="getPermissionDescription(permType)"
+                >
+                  <i :class="`fa ${getPermissionIcon(permType)}`"></i>
+                </span>
+              </div>
+            </div>
+          </div>
+          <div class="alert alert-warning mt-3">
+            <i class="fa fa-exclamation-triangle me-2"></i>
+            <strong>Warning:</strong> This will remove ALL permissions for this principal and they will no longer have any access to this neuron.
           </div>
         </div>
         <div class="modal-footer">
@@ -169,7 +237,7 @@
           >
             <i v-if="loading" class="fa fa-spinner fa-spin me-2"></i>
             <i v-else class="fa fa-trash me-2"></i>
-            Remove Permissions
+            Remove Principal
           </button>
         </div>
       </div>
@@ -183,7 +251,9 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from 'vue'
 import { Principal } from '@dfinity/principal'
+import { SnsNeuronPermissionType } from '@dfinity/sns'
 import { useTacoStore } from '../../stores/taco.store'
+import { usePermissionMapping } from '../../composables/usePermissionMapping'
 
 interface Props {
   show: boolean
@@ -198,6 +268,9 @@ const emit = defineEmits<{
 
 const tacoStore = useTacoStore()
 
+// Permission mapping utilities
+const { getPermissionIcon, getPermissionColor, getPermissionDescription } = usePermissionMapping()
+
 // State
 const loading = ref(false)
 const principalError = ref('')
@@ -210,23 +283,93 @@ const newPermission = ref({
   selectedPermissions: [] as number[]
 })
 
-// Available permission types
-const availablePermissions = ref([
-  { value: 1, name: 'Configure', description: 'Modify neuron settings (dissolve delay, auto-stake, etc.)' },
-  { value: 2, name: 'Disburse', description: 'Disburse neuron stake and maturity' },
-  { value: 3, name: 'Vote', description: 'Vote on proposals' },
-  { value: 4, name: 'Submit Proposal', description: 'Submit new proposals' }
+// Available permission types using @dfinity/sns enums
+const availablePermissionTypes = ref([
+  { 
+    value: SnsNeuronPermissionType.NEURON_PERMISSION_TYPE_CONFIGURE_DISSOLVE_STATE, 
+    name: 'Configure Dissolve State', 
+    description: 'Modify neuron dissolve delay and dissolving state' 
+  },
+  { 
+    value: SnsNeuronPermissionType.NEURON_PERMISSION_TYPE_MANAGE_PRINCIPALS, 
+    name: 'Manage Principals', 
+    description: 'Add/remove principals and manage their permissions (ADMIN PERMISSION)' 
+  },
+  { 
+    value: SnsNeuronPermissionType.NEURON_PERMISSION_TYPE_SUBMIT_PROPOSAL, 
+    name: 'Submit Proposal', 
+    description: 'Submit new governance proposals' 
+  },
+  { 
+    value: SnsNeuronPermissionType.NEURON_PERMISSION_TYPE_VOTE, 
+    name: 'Vote', 
+    description: 'Vote on governance proposals' 
+  },
+  { 
+    value: SnsNeuronPermissionType.NEURON_PERMISSION_TYPE_DISBURSE, 
+    name: 'Disburse', 
+    description: 'Disburse neuron stake' 
+  },
+  { 
+    value: SnsNeuronPermissionType.NEURON_PERMISSION_TYPE_SPLIT, 
+    name: 'Split', 
+    description: 'Split neuron into multiple neurons' 
+  },
+  { 
+    value: SnsNeuronPermissionType.NEURON_PERMISSION_TYPE_MERGE_MATURITY, 
+    name: 'Merge Maturity', 
+    description: 'Merge maturity into neuron stake' 
+  },
+  { 
+    value: SnsNeuronPermissionType.NEURON_PERMISSION_TYPE_DISBURSE_MATURITY, 
+    name: 'Disburse Maturity', 
+    description: 'Disburse neuron maturity rewards' 
+  },
+  { 
+    value: SnsNeuronPermissionType.NEURON_PERMISSION_TYPE_STAKE_MATURITY, 
+    name: 'Stake Maturity', 
+    description: 'Stake maturity to increase neuron stake' 
+  },
+  { 
+    value: SnsNeuronPermissionType.NEURON_PERMISSION_TYPE_MANAGE_VOTING_PERMISSION, 
+    name: 'Manage Voting Permission', 
+    description: 'Manage voting and following settings' 
+  }
 ])
+
+// Check if current user has MANAGE_PRINCIPALS permission
+const currentUserHasManagePrincipalsPermission = computed(() => {
+  if (!props.neuron?.permissions) return false
+  
+  const currentUserPermission = props.neuron.permissions.find((p: any) => p.isCurrentUser)
+  if (!currentUserPermission) return false
+  
+  return currentUserPermission.permissionTypes.includes(SnsNeuronPermissionType.NEURON_PERMISSION_TYPE_MANAGE_PRINCIPALS)
+})
 
 // Load grantable permissions on mount
 onMounted(async () => {
   try {
     const grantablePermissions = await tacoStore.getGrantablePermissions()
-    // Filter available permissions based on what's grantable
+    console.log('Grantable permissions from store:', grantablePermissions)
+    console.log('Current user has MANAGE_PRINCIPALS:', currentUserHasManagePrincipalsPermission.value)
+    console.log('Loading state:', loading.value)
+    console.log('Available permission types count:', availablePermissionTypes.value.length)
+    
+    // If user has MANAGE_PRINCIPALS permission, they can grant all permissions
+    if (currentUserHasManagePrincipalsPermission.value) {
+      console.log('User has MANAGE_PRINCIPALS permission, allowing all permission types')
+      // Keep all available permissions
+      return
+    }
+    
+    // Otherwise, filter based on what's grantable from SNS parameters
     if (grantablePermissions.length > 0) {
-      availablePermissions.value = availablePermissions.value.filter(perm => 
+      console.log('Filtering permissions based on SNS grantable permissions')
+      availablePermissionTypes.value = availablePermissionTypes.value.filter(perm => 
         grantablePermissions.includes(perm.value)
       )
+      console.log('Filtered permission types count:', availablePermissionTypes.value.length)
     }
   } catch (error) {
     console.warn('Could not load grantable permissions, using defaults:', error)
@@ -294,6 +437,70 @@ const addPermission = async () => {
   }
 }
 
+// Toggle individual permission
+const toggleIndividualPermission = async (permission: any, permissionType: number, event: Event) => {
+  const target = event.target as HTMLInputElement
+  const isChecked = target.checked
+  
+  if (!props.neuron) return
+  
+  try {
+    loading.value = true
+    
+    // Convert neuron ID from hex to Uint8Array
+    const neuronIdBytes = new Uint8Array(props.neuron.idHex.match(/.{2}/g).map((byte: string) => parseInt(byte, 16)))
+    
+    if (isChecked) {
+      // Add the permission
+      await tacoStore.addNeuronPermissions(
+        neuronIdBytes,
+        permission.principal,
+        [permissionType]
+      )
+      
+      tacoStore.addToast({
+        id: Date.now(),
+        code: 'permission-added',
+        title: 'Permission Added',
+        icon: 'fa-solid fa-check',
+        message: `Successfully added permission for ${permission.principalShort}`
+      })
+    } else {
+      // Remove the permission
+      await tacoStore.removeNeuronPermissions(
+        neuronIdBytes,
+        permission.principal,
+        [permissionType]
+      )
+      
+      tacoStore.addToast({
+        id: Date.now(),
+        code: 'permission-removed',
+        title: 'Permission Removed',
+        icon: 'fa-solid fa-check',
+        message: `Successfully removed permission for ${permission.principalShort}`
+      })
+    }
+    
+    emit('permissions-updated')
+  } catch (error: any) {
+    console.error('Error toggling permission:', error)
+    
+    // Revert the checkbox state on error
+    target.checked = !isChecked
+    
+    tacoStore.addToast({
+      id: Date.now(),
+      code: 'permission-toggle-error',
+      title: 'Permission Update Failed',
+      icon: 'fa-solid fa-exclamation-triangle',
+      message: error.message || 'Failed to update permission'
+    })
+  } finally {
+    loading.value = false
+  }
+}
+
 // Show remove permissions modal
 const showRemovePermissions = (permission: any) => {
   permissionToRemove.value = permission
@@ -346,6 +553,82 @@ const confirmRemovePermissions = async () => {
   }
 }
 
+// Re-evaluate permissions when neuron changes
+watch(() => props.neuron, async () => {
+  if (props.neuron && props.show) {
+    // Re-run the permission loading logic
+    try {
+      const grantablePermissions = await tacoStore.getGrantablePermissions()
+      console.log('Re-evaluating permissions for neuron change')
+      console.log('Current user has MANAGE_PRINCIPALS:', currentUserHasManagePrincipalsPermission.value)
+      
+      // Reset to all permissions first
+      availablePermissionTypes.value = [
+        { 
+          value: SnsNeuronPermissionType.NEURON_PERMISSION_TYPE_CONFIGURE_DISSOLVE_STATE, 
+          name: 'Configure Dissolve State', 
+          description: 'Modify neuron dissolve delay and dissolving state' 
+        },
+        { 
+          value: SnsNeuronPermissionType.NEURON_PERMISSION_TYPE_MANAGE_PRINCIPALS, 
+          name: 'Manage Principals', 
+          description: 'Add/remove principals and manage their permissions (ADMIN PERMISSION)' 
+        },
+        { 
+          value: SnsNeuronPermissionType.NEURON_PERMISSION_TYPE_SUBMIT_PROPOSAL, 
+          name: 'Submit Proposal', 
+          description: 'Submit new governance proposals' 
+        },
+        { 
+          value: SnsNeuronPermissionType.NEURON_PERMISSION_TYPE_VOTE, 
+          name: 'Vote', 
+          description: 'Vote on governance proposals' 
+        },
+        { 
+          value: SnsNeuronPermissionType.NEURON_PERMISSION_TYPE_DISBURSE, 
+          name: 'Disburse', 
+          description: 'Disburse neuron stake' 
+        },
+        { 
+          value: SnsNeuronPermissionType.NEURON_PERMISSION_TYPE_SPLIT, 
+          name: 'Split', 
+          description: 'Split neuron into multiple neurons' 
+        },
+        { 
+          value: SnsNeuronPermissionType.NEURON_PERMISSION_TYPE_MERGE_MATURITY, 
+          name: 'Merge Maturity', 
+          description: 'Merge maturity into neuron stake' 
+        },
+        { 
+          value: SnsNeuronPermissionType.NEURON_PERMISSION_TYPE_DISBURSE_MATURITY, 
+          name: 'Disburse Maturity', 
+          description: 'Disburse neuron maturity rewards' 
+        },
+        { 
+          value: SnsNeuronPermissionType.NEURON_PERMISSION_TYPE_STAKE_MATURITY, 
+          name: 'Stake Maturity', 
+          description: 'Stake maturity to increase neuron stake' 
+        },
+        { 
+          value: SnsNeuronPermissionType.NEURON_PERMISSION_TYPE_MANAGE_VOTING_PERMISSION, 
+          name: 'Manage Voting Permission', 
+          description: 'Manage voting and following settings' 
+        }
+      ]
+      
+      // If user doesn't have MANAGE_PRINCIPALS permission, filter based on grantable permissions
+      if (!currentUserHasManagePrincipalsPermission.value && grantablePermissions.length > 0) {
+        console.log('Filtering permissions based on SNS grantable permissions')
+        availablePermissionTypes.value = availablePermissionTypes.value.filter(perm => 
+          grantablePermissions.includes(perm.value)
+        )
+      }
+    } catch (error) {
+      console.warn('Could not re-evaluate grantable permissions:', error)
+    }
+  }
+})
+
 // Reset form when dialog closes
 watch(() => props.show, (newShow) => {
   if (!newShow) {
@@ -362,13 +645,26 @@ watch(() => props.show, (newShow) => {
   border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
+.section-header {
+  margin-bottom: 1rem;
+}
+
 .section-title {
   color: #fff;
-  margin-bottom: 1rem;
+  margin-bottom: 0.25rem;
   font-size: 0.9rem;
   font-weight: 600;
   display: flex;
   align-items: center;
+}
+
+.section-description {
+  margin-bottom: 0.5rem;
+}
+
+.section-description .text-muted {
+  color: #a0aec0 !important;
+  font-size: 0.8rem;
 }
 
 .permissions-list {
@@ -382,11 +678,21 @@ watch(() => props.show, (newShow) => {
   background: rgba(255, 255, 255, 0.03);
   border-radius: 6px;
   border: 1px solid rgba(255, 255, 255, 0.1);
+  transition: all 0.2s ease;
+}
+
+.permission-item:hover {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.2);
 }
 
 .permission-item.current-user {
   border-color: #007bff;
   background: rgba(0, 123, 255, 0.1);
+}
+
+.permission-item.current-user:hover {
+  background: rgba(0, 123, 255, 0.15);
 }
 
 .permission-header {
@@ -419,6 +725,12 @@ watch(() => props.show, (newShow) => {
 
 .permission-types {
   display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.permission-badges {
+  display: flex;
   flex-wrap: wrap;
   gap: 0.25rem;
 }
@@ -429,6 +741,81 @@ watch(() => props.show, (newShow) => {
   padding: 0.1rem 0.4rem;
   border-radius: 12px;
   font-size: 0.7rem;
+}
+
+.permission-icon-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 50%;
+  margin: 0 2px;
+  font-size: 0.75rem;
+  cursor: help;
+  transition: all 0.2s ease;
+}
+
+.permission-icon-badge:hover {
+  background: rgba(255, 255, 255, 0.2);
+  transform: scale(1.1);
+}
+
+.permission-toggle {
+  padding: 0.25rem 0;
+}
+
+.permission-toggle .form-check {
+  padding: 0.5rem 0.75rem;
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  margin-bottom: 0;
+  transition: all 0.2s ease;
+}
+
+.permission-toggle .form-check:hover {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+.permission-toggle .form-check-label {
+  font-size: 0.85rem;
+  color: #e9ecef;
+  cursor: pointer;
+  font-weight: 500;
+  width: 100%;
+  margin-bottom: 0;
+}
+
+.permission-toggle .form-check-input {
+  cursor: pointer;
+  margin-top: 0.1rem;
+}
+
+.permission-toggle .form-check-input:checked {
+  background-color: #28a745;
+  border-color: #28a745;
+}
+
+.permission-toggle .form-check-input:checked + .form-check-label {
+  color: #28a745;
+}
+
+.permission-toggle .form-check-input:focus {
+  border-color: #28a745;
+  box-shadow: 0 0 0 0.2rem rgba(40, 167, 69, 0.25);
+}
+
+.permission-toggle .form-check-input:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.permission-toggle .form-check-input:disabled + .form-check-label {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .permission-checkboxes {
@@ -449,6 +836,22 @@ watch(() => props.show, (newShow) => {
   color: #e9ecef;
 }
 
+.form-check.debug-enabled {
+  border-color: #28a745 !important;
+  background: rgba(40, 167, 69, 0.05) !important;
+}
+
+.form-check.debug-enabled .form-check-input {
+  opacity: 1 !important;
+  cursor: pointer !important;
+}
+
+.form-check.debug-enabled .form-check-label {
+  opacity: 1 !important;
+  cursor: pointer !important;
+  color: #e9ecef !important;
+}
+
 .permission-preview {
   padding: 1rem;
   background: rgba(255, 255, 255, 0.05);
@@ -460,5 +863,50 @@ watch(() => props.show, (newShow) => {
   padding-top: 1rem;
   border-top: 1px solid rgba(255, 255, 255, 0.1);
 }
-</style>
 
+.principal-info {
+  padding: 0.75rem;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.principal-info code {
+  background: rgba(255, 255, 255, 0.1);
+  color: #e9ecef;
+  padding: 0.2rem 0.4rem;
+  border-radius: 4px;
+  font-size: 0.85rem;
+}
+
+.current-permissions {
+  padding: 0.75rem;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.alert {
+  padding: 0.75rem 1rem;
+  border-radius: 6px;
+  border: 1px solid;
+}
+
+.alert-warning {
+  background: rgba(255, 193, 7, 0.1);
+  border-color: rgba(255, 193, 7, 0.3);
+  color: #ffc107;
+}
+
+.alert-info {
+  background: rgba(23, 162, 184, 0.1);
+  border-color: rgba(23, 162, 184, 0.3);
+  color: #17a2b8;
+}
+
+.alert-success {
+  background: rgba(40, 167, 69, 0.1);
+  border-color: rgba(40, 167, 69, 0.3);
+  color: #28a745;
+}
+</style>

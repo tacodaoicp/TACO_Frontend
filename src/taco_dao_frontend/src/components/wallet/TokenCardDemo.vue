@@ -206,6 +206,13 @@
                   >
                     <i class="fa fa-clock"></i>
                   </button>
+                  <button 
+                    @click.stop="$emit('manage-permissions', neuron)"
+                    class="btn btn-info btn-sm"
+                    title="Manage neuron permissions"
+                  >
+                    <i class="fa fa-key"></i>
+                  </button>
                 </div>
               </div>
               
@@ -297,11 +304,13 @@
                       </div>
                       <div class="permission-types">
                         <span 
-                          v-for="permName in permission.permissionNames" 
-                          :key="permName"
-                          class="permission-badge"
+                          v-for="permType in permission.permissionTypes" 
+                          :key="permType"
+                          class="permission-icon-badge"
+                          :style="{ color: getPermissionColor(permType) }"
+                          :title="getPermissionDescription(permType)"
                         >
-                          {{ permName }}
+                          <i :class="`fa ${getPermissionIcon(permType)}`"></i>
                         </span>
                       </div>
                     </div>
@@ -467,11 +476,13 @@
                       </div>
                       <div class="permission-types">
                         <span 
-                          v-for="permName in permission.permissionNames" 
-                          :key="permName"
-                          class="permission-badge"
+                          v-for="permType in permission.permissionTypes" 
+                          :key="permType"
+                          class="permission-icon-badge"
+                          :style="{ color: getPermissionColor(permType) }"
+                          :title="getPermissionDescription(permType)"
                         >
-                          {{ permName }}
+                          <i :class="`fa ${getPermissionIcon(permType)}`"></i>
                         </span>
                       </div>
                     </div>
@@ -545,6 +556,7 @@ import { ref, onMounted, computed, watch } from 'vue'
 import { useTacoStore } from '../../stores/taco.store'
 import { getLegacyAccountId } from '../../utils/accountUtils'
 import { useClipboard } from '@vueuse/core'
+import { usePermissionMapping } from '../../composables/usePermissionMapping'
 
 interface TokenCardProps {
   token: {
@@ -579,6 +591,9 @@ defineEmits<TokenCardEmits>()
 
 // Taco store for neuron operations
 const tacoStore = useTacoStore()
+
+// Permission mapping utilities
+const { getPermissionIcon, getPermissionColor, getPermissionDescription } = usePermissionMapping()
 
 // Clipboard functionality
 const { copy } = useClipboard()
@@ -1456,6 +1471,25 @@ const formatUSDValue = (balance: bigint, decimals: number, priceUSD: number): st
   font-size: 0.7rem;
   font-weight: 500;
   border: 1px solid rgba(40, 167, 69, 0.3);
+}
+
+.permission-icon-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 50%;
+  margin: 0 2px;
+  font-size: 0.75rem;
+  cursor: help;
+  transition: all 0.2s ease;
+}
+
+.permission-icon-badge:hover {
+  background: rgba(255, 255, 255, 0.2);
+  transform: scale(1.1);
 }
 
 /* Followings styling */

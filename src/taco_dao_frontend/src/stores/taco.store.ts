@@ -21,6 +21,7 @@ import { idlFactory as alarmIDL, _SERVICE as AlarmService } from "../../../decla
 import { idlFactory as rewardsIDL } from "../../../declarations/rewards/rewards.did.js"
 import { Principal } from '@dfinity/principal'
 import { AccountIdentifier } from '@dfinity/ledger-icp'
+import { SnsGovernanceCanister, SnsNeuronPermissionType } from '@dfinity/sns'
 import { canisterId as iiCanisterId } from "../../../declarations/internet_identity/index.js"
 import type { Result_1, UserState } from "../../../declarations/dao_backend/DAO_backend.did.d"
 
@@ -6232,17 +6233,44 @@ export const useTacoStore = defineStore('taco', () => {
             // Get nervous system parameters
             const params = await snsGov.get_nervous_system_parameters(null) as any;
             
+            console.log('SNS Nervous System Parameters:', params);
+            
             if (params.neuron_grantable_permissions && params.neuron_grantable_permissions.length > 0) {
                 const grantablePermissions = params.neuron_grantable_permissions[0];
+                console.log('Grantable permissions from SNS:', grantablePermissions.permissions);
                 return grantablePermissions.permissions || [];
             }
             
-            // Default permissions if not specified
-            return [1, 2, 3, 4]; // Configure, Disburse, Vote, Submit Proposal
+            console.log('No grantable permissions specified in SNS parameters, using defaults');
+            
+            // Default permissions if not specified - use all available SNS types
+            return [
+                SnsNeuronPermissionType.NEURON_PERMISSION_TYPE_CONFIGURE_DISSOLVE_STATE,
+                SnsNeuronPermissionType.NEURON_PERMISSION_TYPE_MANAGE_PRINCIPALS,
+                SnsNeuronPermissionType.NEURON_PERMISSION_TYPE_SUBMIT_PROPOSAL,
+                SnsNeuronPermissionType.NEURON_PERMISSION_TYPE_VOTE,
+                SnsNeuronPermissionType.NEURON_PERMISSION_TYPE_DISBURSE,
+                SnsNeuronPermissionType.NEURON_PERMISSION_TYPE_SPLIT,
+                SnsNeuronPermissionType.NEURON_PERMISSION_TYPE_MERGE_MATURITY,
+                SnsNeuronPermissionType.NEURON_PERMISSION_TYPE_DISBURSE_MATURITY,
+                SnsNeuronPermissionType.NEURON_PERMISSION_TYPE_STAKE_MATURITY,
+                SnsNeuronPermissionType.NEURON_PERMISSION_TYPE_MANAGE_VOTING_PERMISSION
+            ];
         } catch (error: any) {
             console.error('Error getting grantable permissions:', error);
-            // Return default permissions on error
-            return [1, 2, 3, 4];
+            // Return default permissions on error - use all available SNS types
+            return [
+                SnsNeuronPermissionType.NEURON_PERMISSION_TYPE_CONFIGURE_DISSOLVE_STATE,
+                SnsNeuronPermissionType.NEURON_PERMISSION_TYPE_MANAGE_PRINCIPALS,
+                SnsNeuronPermissionType.NEURON_PERMISSION_TYPE_SUBMIT_PROPOSAL,
+                SnsNeuronPermissionType.NEURON_PERMISSION_TYPE_VOTE,
+                SnsNeuronPermissionType.NEURON_PERMISSION_TYPE_DISBURSE,
+                SnsNeuronPermissionType.NEURON_PERMISSION_TYPE_SPLIT,
+                SnsNeuronPermissionType.NEURON_PERMISSION_TYPE_MERGE_MATURITY,
+                SnsNeuronPermissionType.NEURON_PERMISSION_TYPE_DISBURSE_MATURITY,
+                SnsNeuronPermissionType.NEURON_PERMISSION_TYPE_STAKE_MATURITY,
+                SnsNeuronPermissionType.NEURON_PERMISSION_TYPE_MANAGE_VOTING_PERMISSION
+            ];
         }
     }
 
@@ -8635,9 +8663,9 @@ export const useTacoStore = defineStore('taco', () => {
         startDissolving,
         stopDissolving,
         disburseNeuron,
+        getGrantablePermissions,
         addNeuronPermissions,
         removeNeuronPermissions,
-        getGrantablePermissions,
         toggleThreadMenu,
         ensureTokenDetails,
         checkTokenSupportsICRC2,
