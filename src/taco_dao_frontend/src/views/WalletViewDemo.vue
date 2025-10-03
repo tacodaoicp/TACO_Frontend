@@ -826,13 +826,13 @@ const handleFolloweesUpdated = async () => {
 const handleNeuronRefreshed = async (formattedNeuron: any) => {
   console.log('Neuron refreshed with fresh data:', formattedNeuron)
   
-  // Update the selected neuron with fresh data
+  // Update the selected neuron with fresh data - this should trigger reactivity in the dialog
   if (selectedNeuronForFollowees.value && formattedNeuron) {
     selectedNeuronForFollowees.value = formattedNeuron
+    console.log('Updated selectedNeuronForFollowees with fresh data')
     
-    // Trigger a full wallet data refresh to ensure all displays are updated
-    console.log('Neuron refreshed, triggering wallet data refresh to update all displays')
-    await loadWalletData()
+    // No need for full wallet refresh - just update the specific neuron data
+    // The dialog should reactively update when props.neuron changes
   }
 }
 

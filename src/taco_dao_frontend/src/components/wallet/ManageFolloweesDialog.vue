@@ -532,7 +532,19 @@ const refreshNeuronData = async () => {
     if (freshNeuronData) {
       // Format the fresh neuron data and emit the event
       const formattedNeuron = tacoStore.formatNeuronForDisplay(freshNeuronData)
+      
+      console.log('Fresh neuron data formatted:', formattedNeuron)
+      console.log('Fresh followings:', formattedNeuron.followings)
+      
       emit('neuron-refreshed', formattedNeuron)
+      
+      tacoStore.addToast({
+        id: Date.now(),
+        code: 'neuron-refreshed',
+        title: 'Neuron Data Refreshed',
+        icon: 'fa-solid fa-check',
+        message: 'Neuron followee data has been updated'
+      })
     }
   } catch (error) {
     console.error('Error refreshing neuron data:', error)
@@ -559,9 +571,16 @@ watch(() => props.show, (newShow) => {
 })
 
 // Watch for neuron changes to ensure the display updates
-watch(() => props.neuron, (newNeuron) => {
+watch(() => props.neuron, (newNeuron, oldNeuron) => {
   if (newNeuron) {
-    console.log('Neuron data changed in dialog, updating display:', newNeuron.idHex)
+    console.log('Neuron data changed in dialog:', newNeuron.idHex)
+    console.log('New followings count:', newNeuron.followings?.length || 0)
+    console.log('New followings data:', newNeuron.followings)
+    
+    if (oldNeuron) {
+      console.log('Old followings count:', oldNeuron.followings?.length || 0)
+      console.log('Followings changed:', JSON.stringify(newNeuron.followings) !== JSON.stringify(oldNeuron.followings))
+    }
   }
 }, { deep: true })
 </script>
