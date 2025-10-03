@@ -6525,7 +6525,17 @@ export const useTacoStore = defineStore('taco', () => {
             }) as any;
 
             if (result.result && result.result.length > 0) {
-                return result.result[0];
+                const neuron = result.result[0];
+                
+                // The get_neuron response has a different structure than list_neurons
+                // We need to normalize it for formatNeuronForDisplay
+                if (neuron.id && !Array.isArray(neuron.id)) {
+                    // Convert single id to array format expected by formatNeuronForDisplay
+                    neuron.id = [neuron.id];
+                }
+                
+                console.log('Normalized neuron data for formatting:', neuron);
+                return neuron;
             }
 
             throw new Error('Neuron not found');
