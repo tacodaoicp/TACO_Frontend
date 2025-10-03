@@ -2,44 +2,50 @@ import { createPinia } from 'pinia'
 import { createApp } from 'vue'
 import { createRouter, createWebHistory } from "vue-router"
 import './index.scss'
-import 'font-awesome/css/font-awesome.min.css'
+// Load only essential CSS - removed duplicate/unused FontAwesome styles
+import 'bootstrap/dist/css/bootstrap.css'
+import '@fortawesome/fontawesome-pro/css/fontawesome.css'
+import '@fortawesome/fontawesome-pro/css/solid.css'  // Only solid style is used
+import 'animate.css'
 import App from './App.vue'
-import HomeView from "./views/HomeView.vue"
-import DaoView from "./views/DaoView.vue"
-import VoteView from "./views/VoteView.vue"
-import SalesView from "./views/SalesView.vue"
-import SaleDKPSwap from "./components/sales/SaleDKPSwap.vue"
-import InfoView from "./views/InfoView.vue"
-import AdminView from "./views/AdminView.vue"
-import AdminArchiveView from "./views/AdminArchiveView.vue"
-import AdminTradeView from "./views/AdminTradeView.vue"
-import AdminPriceView from "./views/AdminPriceView.vue"
-import AdminPriceHistoryView from "./views/AdminPriceHistoryView.vue"
-import PortfolioHistoryView from "./views/PortfolioHistoryView.vue"
-import AdminNeuronView from "./views/AdminNeuronView.vue"
-import AdminVotesView from "./views/AdminVotesView.vue"
-import AdminRewardsView from "./views/AdminRewardsView.vue"
-import AdminDistributionsView from "./views/AdminDistributionsView.vue"
-import AdminRewardsBalancesView from "./views/AdminRewardsBalancesView.vue"
-import AdminAlarmView from "./views/AdminAlarmView.vue"
-import AdminClaimsView from "./views/AdminClaimsView.vue"
-import AdminNNSView from "./views/AdminNNSView.vue"
-import RewardsView from "./views/RewardsView.vue"
-import ChatView from "./views/ChatView.vue"
-import ReportsView from "./views/ReportsView.vue"
-import ForumView from "./views/ForumView.vue"
-import ThreadView from "./views/ThreadView.vue"
-import NamesView from "./views/NamesView.vue"
-import ProposalsView from "./views/ProposalsView.vue"
-import ProposalView from "./views/ProposalView.vue"
-import WalletView from "./views/WalletView.vue"
-import WalletViewDemo from "./views/WalletViewDemo.vue"
-import WizardView from "./views/WizardView.vue"
-import NNSVoteView from "./views/NNSVoteView.vue"
-import NNSPropView from "./views/NNSPropView.vue"
+// LAZY LOAD ALL VIEWS - Only load when navigating to route
+// This prevents loading 30+ components synchronously on initial load
+const HomeView = () => import('./views/HomeView.vue')
+const DaoView = () => import('./views/DaoView.vue')
+const VoteView = () => import('./views/VoteView.vue')
+const SalesView = () => import('./views/SalesView.vue')
+const SaleDKPSwap = () => import('./components/sales/SaleDKPSwap.vue')
+const InfoView = () => import('./views/InfoView.vue')
+const AdminView = () => import('./views/AdminView.vue')
+const AdminArchiveView = () => import('./views/AdminArchiveView.vue')
+const AdminTradeView = () => import('./views/AdminTradeView.vue')
+const AdminPriceView = () => import('./views/AdminPriceView.vue')
+const AdminPriceHistoryView = () => import('./views/AdminPriceHistoryView.vue')
+const PortfolioHistoryView = () => import('./views/PortfolioHistoryView.vue')
+const AdminNeuronView = () => import('./views/AdminNeuronView.vue')
+const AdminVotesView = () => import('./views/AdminVotesView.vue')
+const AdminRewardsView = () => import('./views/AdminRewardsView.vue')
+const AdminDistributionsView = () => import('./views/AdminDistributionsView.vue')
+const AdminRewardsBalancesView = () => import('./views/AdminRewardsBalancesView.vue')
+const AdminAlarmView = () => import('./views/AdminAlarmView.vue')
+const AdminClaimsView = () => import('./views/AdminClaimsView.vue')
+const AdminNNSView = () => import('./views/AdminNNSView.vue')
+const RewardsView = () => import('./views/RewardsView.vue')
+const ChatView = () => import('./views/ChatView.vue')
+const ReportsView = () => import('./views/ReportsView.vue')
+const ForumView = () => import('./views/ForumView.vue')
+const ThreadView = () => import('./views/ThreadView.vue')
+const NamesView = () => import('./views/NamesView.vue')
+const ProposalsView = () => import('./views/ProposalsView.vue')
+const ProposalView = () => import('./views/ProposalView.vue')
+const WalletView = () => import('./views/WalletView.vue')
+const WalletViewDemo = () => import('./views/WalletViewDemo.vue')
+const WizardView = () => import('./views/WizardView.vue')
+const NNSVoteView = () => import('./views/NNSVoteView.vue')
+const NNSPropView = () => import('./views/NNSPropView.vue')
 import VueApexCharts from 'vue3-apexcharts'
 import VueClickAway from "vue3-click-away"
-import 'animate.css'
+// animate.css already imported at top
 
 const routes = [
     { path: "/", name: "Home", component: HomeView, meta: { robots: 'index' } },

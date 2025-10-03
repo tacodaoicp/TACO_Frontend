@@ -1980,8 +1980,6 @@
   import { ref, onMounted, computed, onUnmounted } from "vue";
   import HeaderBar from "../components/HeaderBar.vue";
   import FooterBar from "../components/FooterBar.vue";
-  import { useTacoStore } from "../stores/taco.store"
-  import { storeToRefs } from "pinia"  
   import TacoCoinIcon from "../assets/tokens/tacoCoinIcon.vue"
   import TacoDaoLogo from "../assets/images/tacoDaoLogo.vue"
   import TacoChefWave from '../assets/images/chef/chef-wave.png'
@@ -2005,6 +2003,8 @@
   import KongSwapLogo from '../assets/images/exchanges/kongSwapLogo.vue'
   import IcpSwapLogo from '../assets/images/exchanges/icpSwapLogo.vue'
   import IcpSwapText from '../assets/images/exchanges/icpSwapText.vue'
+  import { useTacoStore } from "../stores/taco.store"
+  import { storeToRefs } from "pinia"
 
   ///////////
   // Store //
@@ -2014,7 +2014,7 @@
   const tacoStore = useTacoStore()
 
   // # ACTIONS #
-  
+
 
   // # STATE #
 
@@ -2205,19 +2205,24 @@
 
   // on mounted
   onMounted(async () => {
-    
+    const homeMountStart = performance.now()
+    console.log('🏠 [HOME] onMounted START', `(${homeMountStart.toFixed(2)}ms)`)
+
     // log
     // console.log('homepage mounted')
 
     // get the below the fold element
+    const domStart = performance.now()
     const belowTheFold = document.querySelector('.home-view__below-the-fold')
+    const domEnd = performance.now()
+    console.log('🔍 [HOME] DOM query complete', `(${domEnd.toFixed(2)}ms, took ${(domEnd - domStart).toFixed(2)}ms)`)
 
     // check for mobile
     isMobile.value = /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
-    
+
     // if below the fold exists
     if (belowTheFold) {
-      
+
       // create intersection observer
       const observer = new IntersectionObserver(handleIntersection, {
 
@@ -2228,12 +2233,12 @@
 
       // sart observing below the fold
       observer.observe(belowTheFold)
-      
+
       // store observer for cleanup
       ;(window as any).belowTheFoldObserver = observer
 
-    } 
-    
+    }
+
     // else no below the fold element
     else {
 
@@ -2243,8 +2248,12 @@
     }
 
     // lazy load heavy iframes after idle
+    const idleStart = performance.now()
+    console.log('🔍 [HOME] Setting up idle callbacks...', `(${idleStart.toFixed(2)}ms)`)
     if ('requestIdleCallback' in window) {
       ;(window as any).requestIdleCallback(() => {
+        const idleCallbackTime = performance.now()
+        console.log('⏰ [HOME] Idle callback triggered', `(${idleCallbackTime.toFixed(2)}ms)`)
         shouldLoadDex.value = true
         shouldLoadYouTube.value = true
       })
@@ -2254,7 +2263,10 @@
         shouldLoadYouTube.value = true
       }, 1000)
     }
-    
+
+    const homeMountEnd = performance.now()
+    console.log('🏁 [HOME] onMounted COMPLETE', `(${homeMountEnd.toFixed(2)}ms, total took ${(homeMountEnd - homeMountStart).toFixed(2)}ms)`)
+
   })
 
   // clean up observer

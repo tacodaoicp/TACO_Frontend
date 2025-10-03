@@ -8,7 +8,7 @@
     <div v-if="appLoading" class="app__loading-curtain">
 
       <!-- astronaut -->
-      <img :src="astronautLoaderUrl" class="loading-img">
+      <img :src="astronautLoaderUrl" class="loading-img" >
 
     </div>
 
@@ -890,7 +890,7 @@
 
 </style>
 
-<script setup>
+<script setup lang="ts">
 
   /////////////
   // Imports //
@@ -900,13 +900,11 @@
   import { useTacoStore } from "./stores/taco.store";
   import { storeToRefs } from "pinia";
   import { useRoute } from 'vue-router'
-  import 'bootstrap/dist/css/bootstrap.css';
-  import '@fortawesome/fontawesome-pro/css/fontawesome.css';
-  import '@fortawesome/fontawesome-pro/css/light.css';
-  import '@fortawesome/fontawesome-pro/css/regular.css';
-  import '@fortawesome/fontawesome-pro/css/solid.css';
-  import '@fortawesome/fontawesome-pro/css/duotone.css';
+  // CSS imports moved to main.js to avoid duplicate loading
+  // Only solid style is used for icons, removed light/regular/duotone to reduce bundle size
   import astronautLoader from './assets/images/astonautLoader.webp'
+  import { initializeBackgroundProcesses } from './services/backgroundProcesses'
+  import type { UserType } from './services/backgroundProcessManager'
 
   ////////////
   // Stores //
@@ -922,7 +920,7 @@
   const { toasts } = storeToRefs(tacoStore)
 
   // user
-  const { userLoggedIn } = storeToRefs(tacoStore)
+  const { userLoggedIn, userPrincipal } = storeToRefs(tacoStore)
 
   // # ACTIONS #
 
@@ -1004,9 +1002,105 @@
 
   ///////////////////
   // Local Methods //
-  ///////////////////  
+  ///////////////////
 
-  // mounted logic
+  // Admin principals list
+  const ADMIN_PRINCIPALS = [
+    'odoge-dr36c-i3lls-orjen-eapnp-now2f-dj63m-3bdcd-nztox-5gvzy-sqe',
+    'cspwf-4aaaa-aaaan-qz5ia-cai',
+    'tisou-7aaaa-aaaai-atiea-cai',
+    'tgqd4-eqaaa-aaaai-atifa-cai',
+    'tptia-syaaa-aaaai-atieq-cai',
+    'tbrfi-jiaaa-aaaai-atifq-cai',
+    'jlycp-kqaaa-aaaan-qz4xa-cai',
+    'lrekt-uaaaa-aaaan-qz4ya-cai',
+    'l7gh3-pqaaa-aaaan-qz4za-cai',
+    'b6ygs-xaaaa-aaaan-qz5ca-cai',
+    'bzzag-2yaaa-aaaan-qz5cq-cai',
+    'bq2l2-mqaaa-aaaan-qz5da-cai',
+    'cjkka-gyaaa-aaaan-qz5kq-cai',
+    'cajb4-qqaaa-aaaan-qz5la-cai',
+    'vxqw7-iqaaa-aaaan-qzziq-cai',
+    'vzs3x-taaaa-aaaan-qzzjq-cai',
+    'v6t5d-6yaaa-aaaan-qzzja-cai',
+    'th44n-iyaaa-aaaan-qzz5a-cai',
+    'jmze3-hiaaa-aaaan-qz4xq-cai',
+    'bl7x7-wiaaa-aaaan-qz5bq-cai',
+    'bm6rl-3qaaa-aaaan-qz5ba-cai',
+    'c4n3n-hqaaa-aaaan-qz5ja-cai',
+    'cvoqr-ryaaa-aaaan-qz5iq-cai',
+    'dkgdg-saaaa-aaaan-qz5ma-cai',
+    'dnhfs-7yaaa-aaaan-qz5mq-cai',
+    'uuyso-zydjd-tsb4o-lgpgj-dfsvq-awald-j2zfp-e6h72-d2je3-whmjr-xae',
+    '6mxg4-njnu6-qzizq-2ekit-rnagc-4d42s-qyayx-jghoe-nd72w-elbsy-xqe',
+    'yjdlk-jqx52-ha6xa-w6iqe-b4jrr-s5ova-mirv4-crlfi-xgsaa-ib3cg-3ae',
+    'chxs6-z6h3t-hjrgk-i5x57-rm7fm-3tvlz-b352m-heq2g-hu23b-sxasf-kqe',
+    '6q3ra-pds56-nqzzc-itigw-tsw4r-vs235-yqx5u-dg34n-nnsus-kkpqf-aqe',
+    'd7zib-qo5mr-qzmpb-dtyof-l7yiu-pu52k-wk7ng-cbm3n-ffmys-crbkz-nae',
+    'as6jn-gaoo7-k4kji-tdkxg-jlsrk-avxkc-zu76j-vz7hj-di3su-2f74z-qqe',
+    'r27hb-ckxon-xohqv-afcvx-yhemm-xoggl-37dg6-sfyt3-n6jer-ditge-6qe',
+    '5uvsz-em754-ulbgb-vxihq-wqyzd-brdgs-snzlu-mhlqw-k74uu-4l5h3-2qe',
+    'k2xol-5avzc-lf3wt-vwoft-pjx6k-77fjh-7pera-6b7qt-fwt5e-a3ekl-vqe',
+    'hxjcv-hbraf-oathz-repfu-x7szv-j6p2f-2cu6n-fywhf-yxago-plyz5-5ae',
+    '4ggui-2celt-yxv2h-z6zyh-sq5ok-rycog-tjyfl-gzxsj-kiq3y-c4sm4-lqe',
+    'hzeez-ilt5k-pzrtz-hdcg3-pwjq5-564tv-uu46m-esqun-chj7o-uptsv-aae',
+    'nfzo4-i26mj-e2tuj-bt3ba-cuco4-vcqxx-ybjw7-gzyzh-kvyp7-wjeyp-hqe'
+  ]
+
+  // Check if user is an admin
+  const isUserAdmin = (principal: string): boolean => {
+    return ADMIN_PRINCIPALS.includes(principal)
+  }
+
+  // Initialize background processes based on user type
+  const initBackgroundProcesses = async () => {
+    const t3 = performance.now()
+    console.log('🔍 Step 3: Inside initBackgroundProcesses function', `(${t3.toFixed(2)}ms)`)
+
+    // Start with guest type immediately, then upgrade if logged in
+    const t4 = performance.now()
+    console.log('🔍 Step 4: About to call checkIfLoggedIn', `(${t4.toFixed(2)}ms)`)
+
+    // Fire off checkIfLoggedIn in background, don't wait for it
+    checkIfLoggedIn().then(() => {
+      const t5 = performance.now()
+      console.log('🔍 Step 5: checkIfLoggedIn completed', `(${t5.toFixed(2)}ms, took ${(t5 - t4).toFixed(2)}ms)`)
+
+      // Determine user type after login check completes
+      let userType: UserType = 'guest'
+
+      if (userLoggedIn.value) {
+        // Check if user principal is in admin list
+        const isAdmin = isUserAdmin(userPrincipal.value)
+        userType = isAdmin ? 'admin' : 'member'
+        console.log(`👤 User principal: ${userPrincipal.value}`)
+        console.log(`🔑 Is admin: ${isAdmin}`)
+      }
+
+      const t6 = performance.now()
+      console.log('🔍 Step 6: User type determined:', userType, `(${t6.toFixed(2)}ms)`)
+      console.log('🔍 Step 7: About to call initializeBackgroundProcesses', `(${t6.toFixed(2)}ms)`)
+
+      // Start background processes for determined user type
+      initializeBackgroundProcesses(userType).catch(error => {
+        console.error('Error initializing background processes:', error)
+      })
+
+      const t8 = performance.now()
+      console.log('🔍 Step 8: initializeBackgroundProcesses called', `(${t8.toFixed(2)}ms, took ${(t8 - t6).toFixed(2)}ms)`)
+    }).catch(error => {
+      console.error('Error checking login status:', error)
+      // Fallback to guest if login check fails
+      initializeBackgroundProcesses('guest').catch(err => {
+        console.error('Error initializing guest processes:', err)
+      })
+    })
+
+    const t9 = performance.now()
+    console.log('🔍 Step 9: Exiting initBackgroundProcesses (async operations continuing)', `(${t9.toFixed(2)}ms, total ${(t9 - t3).toFixed(2)}ms)`)
+  }
+
+  // mounted logic (for non-homepage routes)
   const mountedLogic = async () => {
 
     // log
@@ -1022,7 +1116,7 @@
   }
 
   // update robots meta
-  const updateRobotsMeta = (robotsContent) => {
+  const updateRobotsMeta = (robotsContent: string) => {
     let tag = document.querySelector('meta[name="robots"]')
     if (!tag) {
       tag = document.createElement('meta')
@@ -1040,7 +1134,7 @@
   watch(
     () => route.meta.robots,
     (robots) => {
-      updateRobotsMeta(robots || 'index')
+      updateRobotsMeta((robots as string) || 'index')
     },
     { immediate: true }
   )  
@@ -1051,6 +1145,14 @@
 
   // onMounted
   onMounted(async () => {
+    const appMountStart = performance.now()
+    console.log('🚀 [APP] onMounted START', `(${appMountStart.toFixed(2)}ms)`)
+
+    // Schedule a check to see when the browser is actually free to render
+    requestAnimationFrame(() => {
+      const firstFrame = performance.now();
+      console.log('🖼️ [RENDER] First animation frame (browser is free to render)', `(${firstFrame.toFixed(2)}ms, ${(firstFrame - appMountStart).toFixed(2)}ms after mount)`);
+    });
 
     // log
     // // console.log('app mounted')
@@ -1062,8 +1164,43 @@
       "\n❤️ Together, We Perfect The Recipe!\n🌮 v1.0.6"
     );
 
-    // run mounted logic
-    mountedLogic()
+    // Check if logged in BEFORE initializing background processes
+    const checkLoginStart = performance.now()
+    console.log('🔍 [APP] Checking login status...', `(${checkLoginStart.toFixed(2)}ms)`)
+    await checkIfLoggedIn()
+    const checkLoginEnd = performance.now()
+    console.log('✅ [APP] Login check complete', `(${checkLoginEnd.toFixed(2)}ms, took ${(checkLoginEnd - checkLoginStart).toFixed(2)}ms)`)
+
+    // Fetch crypto prices (can run in parallel with other init)
+    const cryptoPriceStart = performance.now()
+    console.log('💰 [APP] Fetching crypto prices...', `(${cryptoPriceStart.toFixed(2)}ms)`)
+    fetchCryptoPrices().then(() => {
+      const cryptoPriceEnd = performance.now()
+      console.log('✅ [APP] Crypto prices fetched', `(${cryptoPriceEnd.toFixed(2)}ms, took ${(cryptoPriceEnd - cryptoPriceStart).toFixed(2)}ms)`)
+    }).catch(error => {
+      console.error('❌ [APP] Crypto price fetch error:', error)
+    })
+
+    // Initialize background processes with detailed logging
+    const perfStart = performance.now()
+    console.log('🔍 [APP] About to call initBackgroundProcesses', `(${perfStart.toFixed(2)}ms)`)
+    initBackgroundProcesses().catch(error => {
+      console.error('❌ [APP] Background process initialization error:', error)
+    })
+    const perfAfterCall = performance.now()
+    console.log('🔍 [APP] initBackgroundProcesses called (non-blocking)', `(${perfAfterCall.toFixed(2)}ms, took ${(perfAfterCall - perfStart).toFixed(2)}ms)`)
+
+    // For non-homepage routes, also run the traditional mounted logic
+    if (route.path !== '/') {
+      const mountedLogicStart = performance.now()
+      console.log('🔍 [APP] Running mountedLogic for non-homepage route...', `(${mountedLogicStart.toFixed(2)}ms)`)
+      mountedLogic()
+      const mountedLogicEnd = performance.now()
+      console.log('✅ [APP] mountedLogic complete', `(${mountedLogicEnd.toFixed(2)}ms, took ${(mountedLogicEnd - mountedLogicStart).toFixed(2)}ms)`)
+    }
+
+    const appMountEnd = performance.now()
+    console.log('🏁 [APP] onMounted COMPLETE', `(${appMountEnd.toFixed(2)}ms, total took ${(appMountEnd - appMountStart).toFixed(2)}ms)`)
 
   })
 

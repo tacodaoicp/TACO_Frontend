@@ -3,7 +3,7 @@
 /////////////
 
 // vue
-import { ref, computed } from 'vue'
+import { ref, computed, shallowRef } from 'vue'
 import { defineStore } from 'pinia'
 import { useRouter } from 'vue-router'
 import { useStorage } from "@vueuse/core"
@@ -23,6 +23,24 @@ import { Principal } from '@dfinity/principal'
 import { AccountIdentifier } from '@dfinity/ledger-icp'
 import { canisterId as iiCanisterId } from "../../../declarations/internet_identity/index.js"
 import type { Result_1, UserState } from "../../../declarations/dao_backend/DAO_backend.did.d"
+import { actorManager } from '../services/actorManager'
+import { getCachedOrFetch, DISABLE_ICP_CALLS, getIcrc1Metadata, getIcrc1Balance } from '../services/externalCallRegistry'
+
+// Helper functions for getting actors (reduces duplication)
+const getDaoActor = async (authClient?: AuthClient) => actorManager.getDaoActor(authClient)
+const getAnonymousDaoActor = async () => actorManager.getAnonymousDaoActor()
+const getTreasuryActor = async (authClient?: AuthClient) => actorManager.getTreasuryActor(authClient)
+const getAnonymousTreasuryActor = async () => actorManager.getAnonymousTreasuryActor()
+const getNeuronSnapshotActor = async (authClient?: AuthClient) => actorManager.getNeuronSnapshotActor(authClient)
+const getAnonymousNeuronSnapshotActor = async () => actorManager.getAnonymousNeuronSnapshotActor()
+const getSneedForumActor = async (authClient?: AuthClient) => actorManager.getSneedForumActor(authClient)
+const getAnonymousSneedForumActor = async () => actorManager.getAnonymousSneedForumActor()
+const getAppSneedDaoActor = async (authClient?: AuthClient) => actorManager.getAppSneedDaoActor(authClient)
+const getAnonymousAppSneedDaoActor = async () => actorManager.getAnonymousAppSneedDaoActor()
+const getSnsGovernanceActor = async (authClient?: AuthClient) => actorManager.getSnsGovernanceActor(authClient)
+const getAnonymousSnsGovernanceActor = async () => actorManager.getAnonymousSnsGovernanceActor()
+const getIcrc1Actor = async (canisterId: string, authClient?: AuthClient) => actorManager.getIcrc1Actor(canisterId, authClient)
+const getAnonymousIcrc1Actor = async (canisterId: string) => actorManager.getAnonymousIcrc1Actor(canisterId)
 
 ///////////
 // Types //
@@ -170,7 +188,7 @@ interface NeuronAllocation {
     allocations: [Principal, bigint][];
 }
 interface ProcessedNeuronAllocation {
-    neuronId: Uint8Array;
+    neuronId: Uint8Array | number[];
     votingPower: bigint;
     lastUpdate: bigint;
     lastAllocationMaker: Principal;
@@ -182,7 +200,7 @@ interface NeuronAllocationResponse {
 }
 interface Allocation {
     token: Principal;
-    basisPoints: number;
+    basisPoints: bigint;
 }
 interface SystemParameterResult {
     ok?: null;
@@ -528,11 +546,11 @@ export const useTacoStore = defineStore('taco', () => {
     const dkpPriceUsd = useStorage('dkpPriceUsd', 0)
     const lastPriceUpdate = useStorage('lastPriceUpdate', 0)
 
-    // dao
-    const fetchedTokenDetails = ref<TrustedTokenEntry[]>([])
-    const fetchedAggregateAllocation = ref<[Principal, bigint][]>([])
-    const fetchedVotingPowerMetrics = ref<VotingMetricsResponse | null>(null)
-    const fetchedUserAllocation = ref([])
+    // dao - use shallowRef for large arrays to prevent deep reactivity overhead
+    const fetchedTokenDetails = shallowRef<TrustedTokenEntry[]>([])
+    const fetchedAggregateAllocation = shallowRef<[Principal, bigint][]>([])
+    const fetchedVotingPowerMetrics = shallowRef<VotingMetricsResponse | null>(null)
+    const fetchedUserAllocation = shallowRef([])
     const totalPortfolioValueInUsd = ref(0)
     const totalPortfolioValueInIcp = ref(0)
     const portfolioTokenPricesInUsd = useStorage('portfolioTokenPricesInUsd', [])
@@ -565,39 +583,39 @@ export const useTacoStore = defineStore('taco', () => {
         }
     } as TimerHealth)
 
-    // forum
+    // forum - use shallowRef for arrays with potentially many entries
     const tacoForumId = ref<bigint | null>(null)
     const proposalsTopicId = ref<bigint | null>(null)
-    const fetchedForums = ref<CandidForumResponse[]>([])
-    const fetchedProposalsThreads = ref<CandidThreadResponse[]>([])
-    const fetchedThreadPosts = ref<CandidPostResponse[]>([])
+    const fetchedForums = shallowRef<CandidForumResponse[]>([])
+    const fetchedProposalsThreads = shallowRef<CandidThreadResponse[]>([])
+    const fetchedThreadPosts = shallowRef<CandidPostResponse[]>([])
     const threadMenuOpen = ref(false)
-    
-    // proposals
-    const fetchedTacoProposals = ref<TacoProposal[]>([])
+
+    // proposals - use shallowRef for large proposal arrays
+    const fetchedTacoProposals = shallowRef<TacoProposal[]>([])
     const proposalsLoading = ref(false)
     const proposalsLoadingMore = ref(false)
     const proposalsHasMore = ref(true)
     const proposalsLastId = ref<bigint | null>(null)
-    
-    // naming system  
-    const namesCache = ref<NamesCache>({
+
+    // naming system
+    const namesCache = shallowRef<NamesCache>({
         principals: new Map(),
         neurons: new Map(),
         lastLoaded: null
     })
     const namesLoading = ref(false)
-    
-    // logs
-    const systemLogs = ref<SystemLog[]>([])
-    const tradingLogs = ref<TradingLog[]>([])
 
-    // other
+    // logs - use shallowRef for log arrays
+    const systemLogs = shallowRef<SystemLog[]>([])
+    const tradingLogs = shallowRef<TradingLog[]>([])
+
+    // other - use shallowRef for large arrays
     const tokenMetadataCache = new Map<string, TokenMetadata>();
     const rebalanceConfig = ref<RebalanceConfig | null>(null)
     const systemParameters = ref<GetSystemParameterResult | null>(null)
-    const fetchedVoterDetails = ref<VoterDetails[]>([])
-    const fetchedNeuronAllocations = ref<ProcessedNeuronAllocation[]>([])
+    const fetchedVoterDetails = shallowRef<VoterDetails[]>([])
+    const fetchedNeuronAllocations = shallowRef<ProcessedNeuronAllocation[]>([])
     const snapshotStatus = ref({
         active: false,
         lastSnapshotTime: null as bigint | null,
@@ -928,15 +946,25 @@ export const useTacoStore = defineStore('taco', () => {
 
     // user
     const checkIfLoggedIn = async () => {
+        const checkStart = performance.now();
+        console.log('🔐 [STORE] checkIfLoggedIn START', `(${checkStart.toFixed(2)}ms)`);
 
         // log
         // console.log('checking if user is logged in')
 
         // create auth client
+        const authClientStart = performance.now();
         const authClient = await getAuthClient()
+        const authClientEnd = performance.now();
+        console.log('🔐 [STORE] getAuthClient complete', `(${authClientEnd.toFixed(2)}ms, took ${(authClientEnd - authClientStart).toFixed(2)}ms)`);
 
         // if user is logged in
-        if (await authClient.isAuthenticated()) {
+        const isAuthStart = performance.now();
+        const isAuth = await authClient.isAuthenticated();
+        const isAuthEnd = performance.now();
+        console.log('🔐 [STORE] isAuthenticated check complete:', isAuth, `(${isAuthEnd.toFixed(2)}ms, took ${(isAuthEnd - isAuthStart).toFixed(2)}ms)`);
+
+        if (isAuth) {
 
             // log
             // console.log('user is logged in')
@@ -954,7 +982,12 @@ export const useTacoStore = defineStore('taco', () => {
             // console.log('🔍 Triggering loadAllNames() from checkIfLoggedIn - user is logged in')
 
             // Load names cache in background (non-blocking)
-            loadAllNames().catch(console.error)
+            const loadNamesStart = performance.now();
+            console.log('🔐 [STORE] Starting loadAllNames (background)...', `(${loadNamesStart.toFixed(2)}ms)`);
+            loadAllNames().then(() => {
+                const loadNamesEnd = performance.now();
+                console.log('✅ [STORE] loadAllNames complete', `(${loadNamesEnd.toFixed(2)}ms, took ${(loadNamesEnd - loadNamesStart).toFixed(2)}ms)`);
+            }).catch(console.error)
 
 
         } else {
@@ -972,6 +1005,9 @@ export const useTacoStore = defineStore('taco', () => {
             userLedgerAccountId.value = ''
 
         }
+
+        const checkEnd = performance.now();
+        console.log('🏁 [STORE] checkIfLoggedIn COMPLETE', `(${checkEnd.toFixed(2)}ms, total took ${(checkEnd - checkStart).toFixed(2)}ms)`);
 
     }
     const setUserPrincipal = (principal: string) => {
@@ -1056,6 +1092,9 @@ export const useTacoStore = defineStore('taco', () => {
             // calculate and set user ledger account ID
             userLedgerAccountId.value = calculateAccountId(userPrincipal.value)
 
+            // Reset actors to use new authenticated identity
+            actorManager.resetActors()
+
             // console.log('setting user logged in to true')
 
             // set user logged in to true
@@ -1112,6 +1151,10 @@ export const useTacoStore = defineStore('taco', () => {
 
             // clear cached auth client instance to force fresh instance on next login
             authClientInstance = null
+
+            // Reset all actor instances to clear authentication state
+            actorManager.resetActors()
+            actorManager.resetAnonymousActors()
 
             // set user principal to empty string
             setUserPrincipal('')
@@ -1254,7 +1297,8 @@ export const useTacoStore = defineStore('taco', () => {
         if (now - lastPriceUpdate.value > timeToUpdate) {
 
             // log
-            console.log('✨ fetching new crypto prices')
+            const priceStart = performance.now();
+            console.log('✨ [PRICES] fetching new crypto prices', `(${priceStart.toFixed(2)}ms)`);
 
             // try coingecko standard endpoint for icp, btc, and dkp
             try {
@@ -1262,8 +1306,21 @@ export const useTacoStore = defineStore('taco', () => {
                 // log
                 // console.log('taco.store: fetching new crypto prices - coingecko standard endpoint')
 
-                // fetch
-                const response = await fetch('https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=internet-computer,bitcoin,draggin-karma-points')
+                // fetch with 5-second timeout
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 5000);
+
+                const fetchStart = performance.now();
+                console.log('🌐 [PRICES] Starting CoinGecko fetch...', `(${fetchStart.toFixed(2)}ms)`);
+
+                const response = await fetch('https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=internet-computer,bitcoin,draggin-karma-points', {
+                    signal: controller.signal
+                });
+
+                const fetchEnd = performance.now();
+                console.log('✅ [PRICES] CoinGecko fetch complete', `(${fetchEnd.toFixed(2)}ms, took ${(fetchEnd - fetchStart).toFixed(2)}ms)`);
+
+                clearTimeout(timeoutId);
                 
                 // if not ok, throw error
                 if (!response.ok) throw new Error(`HTTP ${response.status}`)
@@ -1287,10 +1344,13 @@ export const useTacoStore = defineStore('taco', () => {
                 // // set last price update
                 lastPriceUpdate.value = now
 
+                const pricesSet = performance.now();
+                console.log('✅ [PRICES] CoinGecko prices set', `(${pricesSet.toFixed(2)}ms)`);
+
             } catch (error) {
 
                 // log error
-                console.error('error fetching crypto prices from coingecko standard endpoint:', error)
+                console.error('❌ [PRICES] error fetching crypto prices from coingecko standard endpoint:', error)
 
             }
 
@@ -1301,10 +1361,22 @@ export const useTacoStore = defineStore('taco', () => {
                 // console.log('taco.store: fetching new crypto prices - gecko terminal pool endpoint')
 
                 // use pool endpoint instead of token endpoint (previous version caused 500)
+                // Add 5-second timeout protection
+                const controller2 = new AbortController();
+                const timeoutId2 = setTimeout(() => controller2.abort(), 5000);
+
+                const geckoTerminalStart = performance.now();
+                console.log('🌐 [PRICES] Starting GeckoTerminal fetch...', `(${geckoTerminalStart.toFixed(2)}ms)`);
+
                 const resp = await fetch(
                     `https://api.geckoterminal.com/api/v2/networks/icp/pools/vhoia-myaaa-aaaar-qbmja-cai`,
-                    { mode: 'cors' }
-                )
+                    { mode: 'cors', signal: controller2.signal }
+                );
+
+                const geckoTerminalEnd = performance.now();
+                console.log('✅ [PRICES] GeckoTerminal fetch complete', `(${geckoTerminalEnd.toFixed(2)}ms, took ${(geckoTerminalEnd - geckoTerminalStart).toFixed(2)}ms)`);
+
+                clearTimeout(timeoutId2);
 
                 // if not ok, throw error
                 if (!resp.ok) throw new Error(`HTTP ${resp.status}`)
@@ -1350,108 +1422,16 @@ export const useTacoStore = defineStore('taco', () => {
 
     // ledger canisters
     const icrc1Metadata = async (passedCanisterId: string) => {
-
-        // log
-        // console.log('taco.store: icrc1Metadata() - calling for metadata...')
-
-        try {
-
-            // get host
-            const host = process.env.DFX_NETWORK === "local"
-                ? getLocalHost()
-                : "https://ic0.app";
-
-            // create agent
-            const agent = await createAgent({
-                identity: new AnonymousIdentity(),
-                host,
-                fetchRootKey: process.env.DFX_NETWORK === "local",
-            })         
-
-            // create actor
-            const actor = Actor.createActor(idlFactory, {
-                agent,
-                canisterId: passedCanisterId,
-            })
-
-            //////////////////////
-            // post actor logic //
-
-            // get metadata
-            const metadata = await actor.icrc1_metadata()
-
-            // log
-            // console.log('taco.store: icrc1Metadata() - returned metadata:', metadata)
-
-            // return metadata
-            return metadata
-
-        } catch (error) {
-
-            // log error
-            console.error('error fetching metadata from icrc1 canister:', error)
-
-            // return false
-            return false
-
-        }
-
+        // Use cached version from externalCallRegistry
+        // This uses singleton actors and caches results for 5 minutes
+        const metadata = await getIcrc1Metadata(passedCanisterId);
+        return metadata || false;
     }
     const icrc1BalanceOf = async (canisterId: string, owner: Principal, subaccount?: Uint8Array) => {
-        
-        // log
-        // console.log('taco.store: icrc1BalanceOf() - calling for balance...')
-        // console.log('taco.store: icrc1BalanceOf() - canisterId:', canisterId)
-        // console.log('taco.store: icrc1BalanceOf() - owner:', owner.toText())
-
-        try {
-
-            // get host
-            const host = process.env.DFX_NETWORK === "local"
-                ? getLocalHost()
-                : "https://ic0.app";
-
-            // create agent
-            const agent = await createAgent({
-                identity: new AnonymousIdentity(),
-                host,
-                fetchRootKey: process.env.DFX_NETWORK === "local",
-            })         
-
-            // create actor
-            const actor = Actor.createActor(idlFactory, {
-                agent,
-                canisterId: canisterId,
-            })
-
-            //////////////////////
-            // post actor logic //
-
-            // create account identifier
-            const accountId = {
-                owner: owner,
-                subaccount: subaccount ? [subaccount] : []
-            }
-
-            // get balance
-            const balance = await actor.icrc1_balance_of(accountId)
-
-            // log
-            // console.log('taco.store: icrc1BalanceOf() - returned balance:', balance)
-
-            // return balance
-            return balance
-
-        } catch (error) {
-
-            // log error
-            console.error('error fetching balance from icrc1 canister:', error)
-
-            // return false
-            return false
-
-        }
-
+        // Use cached version from externalCallRegistry
+        // This uses singleton actors and caches results for 30 seconds
+        const balance = await getIcrc1Balance(canisterId, owner.toText(), subaccount);
+        return balance !== null ? balance : false;
     }
 
     // sns provided canisters
@@ -1590,60 +1570,45 @@ export const useTacoStore = defineStore('taco', () => {
     // dao backend
     const fetchTokenDetails = async () => {
 
+        const fnStart = performance.now()
+        console.log('🔍 [STORE] fetchTokenDetails START - using cache', `(${fnStart.toFixed(2)}ms)`)
+
+        // Check if ICP calls are disabled
+        if (DISABLE_ICP_CALLS) {
+            console.log('🚫 [STORE] ICP calls disabled - fetchTokenDetails returning immediately')
+            return
+        }
+
         // turn on loading
         appLoadingOn()
 
-        // log
-        // console.log('taco.store: fetchTokenDetails()')
-
-        // // if fetched token details is already set, return
-        // if (fetchedTokenDetails.value.length > 0) {
-
-        //     // log
-        //     console.log('taco.store: fetchTokenDetails() - fetched token details already set')
-
-        //     return true
-        // }
-
-        // log
-        // console.log('taco.store: fetchTokenDetails() - fetched token details not set, fetching...')
-
         try {
 
-            // get host
-            const host = process.env.DFX_NETWORK === "local"
-                ? getLocalHost()
-                : "https://ic0.app";
+            // GET FROM CACHE - background processes handle fetching
+            const cacheStart = performance.now()
+            console.log('🔍 [STORE] Checking cache for treasury.getTokenDetails...', `(${cacheStart.toFixed(2)}ms)`)
+            const tokenDetails = await getCachedOrFetch<any[]>('treasury.getTokenDetails')
+            const cacheEnd = performance.now()
+            console.log('✅ [STORE] Cache check complete', `(${cacheEnd.toFixed(2)}ms, took ${(cacheEnd - cacheStart).toFixed(2)}ms)`)
 
-            // create agent
-            const agent = await createAgent({
-                identity: new AnonymousIdentity(),
-                host,
-                fetchRootKey: process.env.DFX_NETWORK === "local",
-            })
+            if (!tokenDetails || tokenDetails.length === 0) {
+                console.log('⚠️ [STORE] No token details in cache - data will populate when background process completes')
+                return
+            }
 
-            let canisterId = daoBackendCanisterId();
-
-            // create actor
-            const actor = Actor.createActor(daoBackendIDL, {
-                agent,
-                canisterId: daoBackendCanisterId(),
-            })
-            
-            //////////////////////
-            // post actor logic //
-
-            // get token details
-            const tokenDetails = await actor.getTokenDetails()
+            console.log('📊 [STORE] Token details from cache:', tokenDetails.length)
 
             // set fetched token details
+            const assignStart = performance.now()
+            console.log('🔍 [STORE] Assigning cached data to fetchedTokenDetails.value...', `(${assignStart.toFixed(2)}ms)`)
             // @ts-ignore
             fetchedTokenDetails.value = tokenDetails
-
-            // log
-            // console.log('taco.store: fetchTokenDetails() - returned info:', tokenDetails)
+            const assignEnd = performance.now()
+            console.log('✅ [STORE] Assignment complete', `(${assignEnd.toFixed(2)}ms, took ${(assignEnd - assignStart).toFixed(2)}ms)`)
 
             // calculate total portfolio value in USD
+            const usdCalcStart = performance.now()
+            console.log('🔍 [STORE] Calculating USD portfolio value...', `(${usdCalcStart.toFixed(2)}ms)`)
             totalPortfolioValueInUsd.value = fetchedTokenDetails.value.reduce((acc, tokenEntry) => {
 
                 // get token details
@@ -1656,11 +1621,12 @@ export const useTacoStore = defineStore('taco', () => {
                 return acc + tokenValue
 
             }, 0)
-
-            // log
-            // console.log('taco.store: fetchTokenDetails() - total portfolio value in USD:', totalPortfolioValueInUsd.value)
+            const usdCalcEnd = performance.now()
+            console.log('✅ [STORE] USD calculation complete', `(${usdCalcEnd.toFixed(2)}ms, took ${(usdCalcEnd - usdCalcStart).toFixed(2)}ms)`)
 
             // calculate total portfolio value in ICP
+            const icpCalcStart = performance.now()
+            console.log('🔍 [STORE] Calculating ICP portfolio value...', `(${icpCalcStart.toFixed(2)}ms)`)
             totalPortfolioValueInIcp.value = fetchedTokenDetails.value.reduce((acc, tokenEntry) => {
 
                 // get token details
@@ -1673,17 +1639,19 @@ export const useTacoStore = defineStore('taco', () => {
                 return acc + tokenValue
 
             }, 0)
+            const icpCalcEnd = performance.now()
+            console.log('✅ [STORE] ICP calculation complete', `(${icpCalcEnd.toFixed(2)}ms, took ${(icpCalcEnd - icpCalcStart).toFixed(2)}ms)`)
 
-            // log
-            // console.log('taco.store: fetchTokenDetails() - total portfolio value in ICP:', totalPortfolioValueInIcp.value)
+            const fnEnd = performance.now()
+            console.log('🏁 [STORE] fetchTokenDetails COMPLETE', `(${fnEnd.toFixed(2)}ms, total took ${(fnEnd - fnStart).toFixed(2)}ms)`)
 
             // return
-            return            
+            return
 
         } catch (error) {
 
             // log error
-            console.error('error fetching token details from dao backend:', error)
+            console.error('error fetching token details from cache:', error)
 
             // return
             return false
@@ -1716,26 +1684,11 @@ export const useTacoStore = defineStore('taco', () => {
 
         try {
 
-            // get host
-            const host = process.env.DFX_NETWORK === "local"
-                ? getLocalHost()
-                : "https://ic0.app";
-
-            // create agent
-            const agent = await createAgent({
-                identity: new AnonymousIdentity(),
-                host,
-                fetchRootKey: process.env.DFX_NETWORK === "local",
-            })
-
-
-            const actor = Actor.createActor(daoBackendIDL, {
-                agent,
-                canisterId: daoBackendCanisterId(),
-            })
+            // Use singleton anonymous actor for public calls
+            const actor = await actorManager.getAnonymousDaoActor();
 
             //////////////////////
-            // post actor logic //            
+            // post actor logic //
 
             // get aggregate allocation
             const aggregateAllocation = await actor.getAggregateAllocation()
@@ -1781,26 +1734,11 @@ export const useTacoStore = defineStore('taco', () => {
 
         try {
 
-            // get host
-            const host = process.env.DFX_NETWORK === "local"
-                ? getLocalHost()
-                : "https://ic0.app";
-                
-            // create agent
-            const agent = await createAgent({
-                identity: new AnonymousIdentity(),
-                host,
-                fetchRootKey: process.env.DFX_NETWORK === "local",
-            })
-
-            // create actor
-            const actor = Actor.createActor(daoBackendIDL, {
-                agent,
-                canisterId: daoBackendCanisterId(),
-            })
+            // Use singleton anonymous actor for public calls
+            const actor = await actorManager.getAnonymousDaoActor();
 
             //////////////////////
-            // post actor logic //            
+            // post actor logic //
 
             // get voting power metrics
             const response = await actor.votingPowerMetrics() as VotingMetricsResponse;
@@ -1849,29 +1787,11 @@ export const useTacoStore = defineStore('taco', () => {
             // if user is logged in
             if (await authClient.isAuthenticated()) {
 
-                // get host
-                const host = process.env.DFX_NETWORK === "local"
-                    ? getLocalHost()
-                    : "https://ic0.app";                
-
-                // get identity
-                const identity = await authClient.getIdentity()
-
-                // create an agent with the user's identity
-                const agent = await createAgent({
-                    identity,
-                    host,
-                    fetchRootKey: process.env.DFX_NETWORK === "local",
-                })
-
-                // create actor
-                const actor = Actor.createActor(daoBackendIDL, {
-                    agent,
-                    canisterId: daoBackendCanisterId(),
-                })
+                // Use singleton actor with authenticated identity
+                const actor = await actorManager.getDaoActor(authClient);
 
                 //////////////////////
-                // post actor logic //            
+                // post actor logic //
 
                 // call the userState function
                 const userState = await actor.getUserAllocation()
@@ -1881,7 +1801,7 @@ export const useTacoStore = defineStore('taco', () => {
                 fetchedUserAllocation.value = userState
 
                 // log
-                // console.log('taco.store: DAO backend - actor.getUserAllocation() - fetchedUserAllocation.value:', fetchedUserAllocation.value)  
+                // console.log('taco.store: DAO backend - actor.getUserAllocation() - fetchedUserAllocation.value:', fetchedUserAllocation.value)
 
                 // return
                 return true
@@ -1910,7 +1830,7 @@ export const useTacoStore = defineStore('taco', () => {
     const refreshUserVotingPower = async () => {
 
         // log
-        // console.log('taco.store: refreshUserVotingPower()')      
+        // console.log('taco.store: refreshUserVotingPower()')
 
         try {
 
@@ -1920,29 +1840,8 @@ export const useTacoStore = defineStore('taco', () => {
             // if user is logged in
             if (await authClient.isAuthenticated()) {
 
-                // get host
-                const host = process.env.DFX_NETWORK === "local"
-                    ? getLocalHost()
-                    : "https://ic0.app";
-
-                // get identity
-                const identity = await authClient.getIdentity()
-
-                // create an agent with the user's identity
-                const agent = await createAgent({
-                    identity,
-                    host,
-                    fetchRootKey: process.env.DFX_NETWORK === "local",
-                })
-
-                // create actor
-                const actor = Actor.createActor(daoBackendIDL, {
-                    agent,
-                    canisterId: daoBackendCanisterId(),
-                })
-
-                //////////////////////
-                // post actor logic //            
+                // Use singleton authenticated actor
+                const actor = await getDaoActor(authClient);
 
                 // call the refreshUserVotingPower function
                 // @ts-ignore
@@ -2020,7 +1919,7 @@ export const useTacoStore = defineStore('taco', () => {
         // console.log('taco.store: updateAllocation()')
 
         // turn on loading
-        appLoadingOn()        
+        appLoadingOn()
 
         try {
 
@@ -2030,29 +1929,8 @@ export const useTacoStore = defineStore('taco', () => {
             // if user is logged in
             if (await authClient.isAuthenticated()) {
 
-                // get host
-                const host = process.env.DFX_NETWORK === "local"
-                    ? getLocalHost()
-                    : "https://ic0.app";                
-
-                // get identity
-                const identity = await authClient.getIdentity()
-
-                // create an agent with the user's identity
-                const agent = await createAgent({
-                    identity,
-                    host,
-                    fetchRootKey: process.env.DFX_NETWORK === "local",
-                })
-
-                // create actor
-                const actor = Actor.createActor(daoBackendIDL, {
-                    agent,
-                    canisterId: daoBackendCanisterId(),
-                })
-
-                //////////////////////
-                // post actor logic //            
+                // Use singleton authenticated actor
+                const actor = await getDaoActor(authClient);
 
                 // call the updateAllocation function
                 await actor.updateAllocation(allocations)
@@ -2098,7 +1976,7 @@ export const useTacoStore = defineStore('taco', () => {
         // console.log('taco.store: followAllocation()')
 
         // turn on loading
-        appLoadingOn()        
+        appLoadingOn()
 
         try {
 
@@ -2108,29 +1986,8 @@ export const useTacoStore = defineStore('taco', () => {
             // if user is logged in
             if (await authClient.isAuthenticated()) {
 
-                // get host
-                const host = process.env.DFX_NETWORK === "local"
-                    ? getLocalHost()
-                    : "https://ic0.app";                
-
-                // get identity
-                const identity = await authClient.getIdentity()
-
-                // create an agent with the user's identity
-                const agent = await createAgent({
-                    identity,
-                    host,
-                    fetchRootKey: process.env.DFX_NETWORK === "local",
-                })
-
-                // create actor
-                const actor = Actor.createActor(daoBackendIDL, {
-                    agent,
-                    canisterId: daoBackendCanisterId(),
-                })
-
-                //////////////////////
-                // post actor logic //            
+                // Use singleton authenticated actor
+                const actor = await getDaoActor(authClient);
 
                 // call the followAllocation function
                 await actor.followAllocation(principal)
@@ -2176,7 +2033,7 @@ export const useTacoStore = defineStore('taco', () => {
         // console.log('taco.store: unfollowAllocation()')
 
         // turn on loading
-        appLoadingOn()        
+        appLoadingOn()
 
         try {
 
@@ -2186,29 +2043,11 @@ export const useTacoStore = defineStore('taco', () => {
             // if user is logged in
             if (await authClient.isAuthenticated()) {
 
-                // get host
-                const host = process.env.DFX_NETWORK === "local"
-                    ? getLocalHost()
-                    : "https://ic0.app";                
-
-                // get identity
-                const identity = await authClient.getIdentity()
-
-                // create an agent with the user's identity
-                const agent = await createAgent({
-                    identity,
-                    host,
-                    fetchRootKey: process.env.DFX_NETWORK === "local",
-                })
-
-                // create actor
-                const actor = Actor.createActor(daoBackendIDL, {
-                    agent,
-                    canisterId: daoBackendCanisterId(),
-                })
+                // Use singleton authenticated actor
+                const actor = await getDaoActor(authClient);
 
                 // log
-                // console.log('taco.store: DAO backend - actor.unfollowAllocation() - unfollowing allocation:', principal)                  
+                // console.log('taco.store: DAO backend - actor.unfollowAllocation() - unfollowing allocation:', principal)
 
                 // call the unfollowAllocation function
                 await actor.unfollowAllocation(principal)
@@ -2253,30 +2092,12 @@ export const useTacoStore = defineStore('taco', () => {
     const getTradingStatus = async () => {
 
         // log
-        // console.log('taco.store: unfollowAllocation()')   
+        // console.log('taco.store: getTradingStatus()')
 
         try {
 
-            // get host
-            const host = process.env.DFX_NETWORK === "local"
-                ? getLocalHost()
-                : "https://ic0.app"
-
-            // create agent
-            const agent = await createAgent({
-                identity: new AnonymousIdentity(),
-                host,
-                fetchRootKey: process.env.DFX_NETWORK === "local",
-            })
-
-            // create actor
-            const actor = Actor.createActor(treasuryIDL, {
-                agent,
-                canisterId: treasuryCanisterId(),
-            })
-            
-            //////////////////////
-            // post actor logic //
+            // Use singleton anonymous actor
+            const actor = await actorManager.getAnonymousTreasuryActor();
 
             // get trading status
             const tradingStatus = await actor.getTradingStatus()
@@ -2322,28 +2143,8 @@ export const useTacoStore = defineStore('taco', () => {
     const refreshTimerStatus = async () => {
         // console.log('refreshTimerStatus: Starting refresh...');
         try {
-            // get host
-            const host = process.env.DFX_NETWORK === "local"
-                ? getLocalHost()
-                : "https://ic0.app"
-            //console.log('refreshTimerStatus: Using host:', host);
-
-            // create agent
-            const agent = await createAgent({
-                identity: new AnonymousIdentity(),
-                host,
-                fetchRootKey: process.env.DFX_NETWORK === "local",
-            })
-            //console.log('refreshTimerStatus: Agent created');
-
-            // Create DAO actor for snapshot info
-            //console.log('refreshTimerStatus: Using DAO canisterId:', daoCanisterId);
-
-            const daoActor = Actor.createActor(daoBackendIDL, {
-                agent,
-                canisterId: daoBackendCanisterId(),
-            })
-            //console.log('refreshTimerStatus: DAO Actor created');
+            // Use singleton anonymous actor
+            const daoActor = await actorManager.getAnonymousDaoActor();
 
             // Get snapshot info
             const snapshotInfo = await daoActor.getSnapshotInfo() as SnapshotInfo[];
@@ -2364,24 +2165,32 @@ export const useTacoStore = defineStore('taco', () => {
             }
 
             // Create Treasury actor for sync info
-            //console.log('refreshTimerStatus: Using Treasury canisterId:', treasuryCanisterId);
-
-            const treasuryActor = Actor.createActor(treasuryIDL, {
-                agent,
-                canisterId: treasuryCanisterId()
-            })
-            //console.log('refreshTimerStatus: Treasury Actor created');
+            // Use singleton anonymous treasury actor
+            const treasuryStart = performance.now();
+            console.log('🔍 [REFRESH] Getting treasury actor...', `(${treasuryStart.toFixed(2)}ms)`);
+            const treasuryActor = await actorManager.getAnonymousTreasuryActor();
+            const treasuryEnd = performance.now();
+            console.log('✅ [REFRESH] Treasury actor ready', `(${treasuryEnd.toFixed(2)}ms, took ${(treasuryEnd - treasuryStart).toFixed(2)}ms)`);
 
             // Get treasury status and token details in parallel
+            const parallelStart = performance.now();
+            console.log('🔍 [REFRESH] Starting parallel calls (getTradingStatus + getTokenDetails)...', `(${parallelStart.toFixed(2)}ms)`);
             const [tradingStatusResult, tokenDetailsResult] = await Promise.all([
-                treasuryActor.getTradingStatus() as Promise<TradingStatusResult>,
-                daoActor.getTokenDetails() as Promise<TrustedTokenEntry[]>
+                treasuryActor.getTradingStatus(),
+                daoActor.getTokenDetails()
             ]);
+            const parallelEnd = performance.now();
+            console.log('✅ [REFRESH] Parallel calls complete', `(${parallelEnd.toFixed(2)}ms, took ${(parallelEnd - parallelStart).toFixed(2)}ms)`);
+            console.log('📊 [REFRESH] Token details result length:', tokenDetailsResult.length);
             //console.log('refreshTimerStatus: Received trading status:', tradingStatusResult);
             //console.log('refreshTimerStatus: Received token details:', tokenDetailsResult);
 
             // Update token details
-            fetchedTokenDetails.value = tokenDetailsResult;
+            const assignStart = performance.now();
+            console.log('🔍 [REFRESH] Assigning tokenDetailsResult to fetchedTokenDetails.value...', `(${assignStart.toFixed(2)}ms)`);
+            fetchedTokenDetails.value = tokenDetailsResult as any;
+            const assignEnd = performance.now();
+            console.log('✅ [REFRESH] Assignment complete', `(${assignEnd.toFixed(2)}ms, took ${(assignEnd - assignStart).toFixed(2)}ms)`);
 
             if ('ok' in tradingStatusResult && tradingStatusResult.ok) {
                 const { metrics, executedTrades, rebalanceStatus } = tradingStatusResult.ok;
@@ -2401,7 +2210,7 @@ export const useTacoStore = defineStore('taco', () => {
                         avgSlippage: metrics.avgSlippage,
                         successRate: metrics.successRate
                     },
-                    recentTrades: executedTrades
+                    recentTrades: executedTrades as any
                 };
                 
                 // Update trading logs from executed trades
@@ -2413,7 +2222,7 @@ export const useTacoStore = defineStore('taco', () => {
                     //         decimals: t[1]?.tokenDecimals?.toString()
                     //     }))
                     // )
-                    tradingLogs.value = executedTrades.map((trade: Trade) => {
+                    tradingLogs.value = executedTrades.map((trade: any) => {
                         if (trade.error && trade.error.length > 0) {
                             return {
                                 timestamp: trade.timestamp,
@@ -2467,8 +2276,8 @@ export const useTacoStore = defineStore('taco', () => {
                 
                 //console.log('refreshTimerStatus: Updated treasuryStatus:', timerHealth.value.treasury.shortSync);
                 //console.log('refreshTimerStatus: Updated tradingLogs:', tradingLogs.value);
-            } else if (tradingStatusResult.err) {
-                console.error('refreshTimerStatus: Error getting trading status:', tradingStatusResult.err);
+            } else if ((tradingStatusResult as any).err) {
+                console.error('refreshTimerStatus: Error getting trading status:', (tradingStatusResult as any).err);
             }
         } catch (error) {
             console.error('refreshTimerStatus: Error refreshing timer status:', error);
@@ -2476,27 +2285,7 @@ export const useTacoStore = defineStore('taco', () => {
     }
     const triggerManualSnapshot = async () => {
         try {
-            // get host
-            const host = process.env.DFX_NETWORK === "local"
-                ? `http://localhost:54612`
-                : "https://ic0.app"
-
-            // create agent
-            const agent = await createAgent({
-                identity: new AnonymousIdentity(),
-                host,
-                fetchRootKey: process.env.DFX_NETWORK === "local",
-            })
-
-            // determine canisterId based on network
-            let canisterId = daoBackendCanisterId();
-
-
-            // create actor
-            const actor = Actor.createActor(daoBackendIDL, {
-                agent,
-                canisterId,
-            })
+            const actor = await createAlarmActor() as any;
 
             timerHealth.value.snapshot.inProgress = true;
             await actor.triggerSnapshot();
@@ -2509,27 +2298,7 @@ export const useTacoStore = defineStore('taco', () => {
     }
     const restartSnapshotTimer = async () => {
         try {
-            // get host
-            const host = process.env.DFX_NETWORK === "local"
-                ? `http://localhost:54612`
-                : "https://ic0.app"
-
-            // create agent
-            const agent = await createAgent({
-                identity: new AnonymousIdentity(),
-                host,
-                fetchRootKey: process.env.DFX_NETWORK === "local",
-            })
-
-            // determine canisterId based on network
-            let canisterId = daoBackendCanisterId();
-
-
-            // create actor
-            const actor = Actor.createActor(daoBackendIDL, {
-                agent,
-                canisterId,
-            })
+            const actor = await createAlarmActor() as any;
 
             await actor.startSnapshotTimer();
             await refreshTimerStatus();
@@ -2540,24 +2309,8 @@ export const useTacoStore = defineStore('taco', () => {
     const restartTreasurySyncs = async () => {
         // console.log('TacoStore: restartTreasurySyncs called');
         try {
-            // get host
-            const host = process.env.DFX_NETWORK === "local"
-                ? `http://localhost:54612`
-                : "https://ic0.app"
-
-            // create agent
-            const agent = await createAgent({
-                identity: new AnonymousIdentity(),
-                host,
-                fetchRootKey: process.env.DFX_NETWORK === "local",
-            });
-
-            // determine canisterId based on network
-
-            const actor = Actor.createActor(treasuryIDL, {
-                agent,
-                canisterId: treasuryCanisterId(),
-            });
+            const authClient = await getAuthClient();
+            const actor = await getTreasuryActor(authClient) as any;
 
             await actor.admin_restartSyncs();
             await refreshTimerStatus();
@@ -2570,29 +2323,14 @@ export const useTacoStore = defineStore('taco', () => {
     const recoverPoolBalances = async () => {
         // console.log('TacoStore: recoverPoolBalances called');
         try {
-            // Create auth client
             const authClient = await getAuthClient();
-            
-            // Check if user is authenticated
+
             if (!await authClient.isAuthenticated()) {
                 console.error('User not authenticated');
                 throw new Error('User not authenticated');
             }
 
-            // Get authenticated identity
-            const identity = await authClient.getIdentity();
-
-            // Create agent with authenticated identity
-            const agent = await createAgent({
-                identity,
-                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-                fetchRootKey: process.env.DFX_NETWORK === "local",
-            });
-
-            const actor = Actor.createActor(treasuryIDL, {
-                agent,
-                canisterId: treasuryCanisterId(),
-            });
+            const actor = await getTreasuryActor(authClient);
 
             const result = await actor.admin_recoverPoolBalances() as any;
             if ('err' in result) {
@@ -2607,36 +2345,14 @@ export const useTacoStore = defineStore('taco', () => {
     }  
     const triggerManualSync = async () => {
         try {
-            // get host
-            // create auth client
             const authClient = await getAuthClient();
-            
-            // Check if user is authenticated
+
             if (!await authClient.isAuthenticated()) {
                 console.error('User not authenticated');
                 return false;
             }
 
-            // get identity
-            const identity = await authClient.getIdentity();
-
-            // get host
-            const host = process.env.DFX_NETWORK === "local"
-                ? `http://localhost:54612`
-                : "https://ic0.app"
-
-            // create agent with authenticated identity
-            const agent = await createAgent({
-                identity,
-                host,
-                fetchRootKey: process.env.DFX_NETWORK === "local",
-            })
-
-            // create actor
-            const actor = Actor.createActor(treasuryIDL, {
-                agent,
-                canisterId: treasuryCanisterId(),
-            })
+            const actor = await getTreasuryActor(authClient);
 
             await actor.admin_syncWithDao();
             await refreshTimerStatus();
@@ -2647,48 +2363,18 @@ export const useTacoStore = defineStore('taco', () => {
     const fetchSystemLogs = async () => {
         // console.log('fetchSystemLogs: Starting to fetch logs...');
         try {
-            // create auth client
             const authClient = await getAuthClient();
-            
-            // Check if user is authenticated
+
             if (!await authClient.isAuthenticated()) {
                 // console.log('fetchSystemLogs: User not authenticated');
                 return;
             }
 
-            // get identity
-            const identity = await authClient.getIdentity();
-            // console.log('fetchSystemLogs: Got authenticated identity');
+            const actor = await getDaoActor(authClient);
 
-            // get host
-            const host = process.env.DFX_NETWORK === "local"
-                ? `http://localhost:54612`
-                : "https://ic0.app"
-            // console.log('fetchSystemLogs: Using host:', host);
-
-            // create agent with authenticated identity
-            const agent = await createAgent({
-                identity,
-                host,
-                fetchRootKey: process.env.DFX_NETWORK === "local",
-            })
-            // console.log('fetchSystemLogs: Agent created with authenticated identity');
-
-            // determine canisterId based on network
-            let canisterId = daoBackendCanisterId();
-
-            // console.log('fetchSystemLogs: Using canisterId:', canisterId);
-
-            // create actor
-            const actor = Actor.createActor(daoBackendIDL, {
-                agent,
-                canisterId,
-            })
-            // console.log('fetchSystemLogs: Actor created');
-
-            const logs = await actor.getLogs(100) as SystemLog[];
+            const logs = await actor.getLogs(BigInt(100));
             // console.log('fetchSystemLogs: Received logs:', logs);
-            systemLogs.value = logs;
+            systemLogs.value = logs as any;
             // console.log('fetchSystemLogs: Updated systemLogs.value:', systemLogs.value);
         } catch (error) {
             console.error('fetchSystemLogs: Error fetching system logs:', error);
@@ -2698,33 +2384,15 @@ export const useTacoStore = defineStore('taco', () => {
         try {
             // create auth client
             const authClient = await getAuthClient();
-            
+
             // Check if user is authenticated
             if (!await authClient.isAuthenticated()) {
                 console.error('User not authenticated');
                 return false;
             }
 
-            // get identity
-            const identity = await authClient.getIdentity();
-
-            // get host
-            const host = process.env.DFX_NETWORK === "local"
-                ? `http://localhost:54612`
-                : "https://ic0.app"
-
-            // create agent with authenticated identity
-            const agent = await createAgent({
-                identity,
-                host,
-                fetchRootKey: process.env.DFX_NETWORK === "local",
-            })
-
-            // create actor
-            const actor = Actor.createActor(treasuryIDL, {
-                agent,
-                canisterId: treasuryCanisterId(),
-            })
+            // Use singleton treasury actor
+            const actor = await getTreasuryActor(authClient);
 
             const result = await actor.startRebalancing(reason ? [reason] : []) as RebalanceResult;
             if ('err' in result) {
@@ -2741,33 +2409,15 @@ export const useTacoStore = defineStore('taco', () => {
         try {
             // create auth client
             const authClient = await getAuthClient();
-            
+
             // Check if user is authenticated
             if (!await authClient.isAuthenticated()) {
                 console.error('User not authenticated');
                 return false;
             }
 
-            // get identity
-            const identity = await authClient.getIdentity();
-
-            // get host
-            const host = process.env.DFX_NETWORK === "local"
-                ? `http://localhost:54612`
-                : "https://ic0.app"
-
-            // create agent with authenticated identity
-            const agent = await createAgent({
-                identity,
-                host,
-                fetchRootKey: process.env.DFX_NETWORK === "local",
-            })
-
-            // create actor
-            const actor = Actor.createActor(treasuryIDL, {
-                agent,
-                canisterId: treasuryCanisterId(),
-            })
+            // Use singleton treasury actor
+            const actor = await getTreasuryActor(authClient);
 
             const result = await actor.stopRebalancing(reason ? [reason] : []) as RebalanceResult;
             if ('err' in result) {
@@ -2785,32 +2435,13 @@ export const useTacoStore = defineStore('taco', () => {
         try {
             appLoadingOn();
 
-            // NOTE TO AI: DO NOT CHANGE THIS PATTERN FOR OTHER FUNCTIONS
-            // DO NOT INTRODUCE A getTreasuryActor method !!
-            // JUST LEAVE THIS CODE HERE AS IS !!
-            // create auth client
             const authClient = await getAuthClient();
-            
-            // Check if user is authenticated
+
             if (!await authClient.isAuthenticated()) {
                 throw new Error('User not authenticated');
             }
 
-            // Get the identity
-            const identity = await authClient.getIdentity();
-            
-            // Create an agent with the identity
-            const agent = await createAgent({
-                identity,
-                host: import.meta.env.VITE_IC_HOST
-            });
-
-            // Create treasury actor with authenticated identity
-            const treasury = Actor.createActor<TreasuryService>(treasuryIDL, {
-                agent,
-                canisterId: treasuryCanisterId()
-            });
-            // END OF NOTE TO AI!
+            const treasury = await getTreasuryActor(authClient);
 
             const result = await treasury.updateRebalanceConfig(updates, [], reason ? [reason] : []);
             // console.log('TacoStore: updateRebalanceConfig result:', result);
@@ -2864,36 +2495,14 @@ export const useTacoStore = defineStore('taco', () => {
         try {
             appLoadingOn();
 
-            // NOTE TO AI: DO NOT CHANGE THIS PATTERN FOR OTHER FUNCTIONS
-            // DO NOT INTRODUCE A getTreasuryActor method !!
-            // JUST LEAVE THIS CODE HERE AS IS !!
-
-            // create auth client
             const authClient = await getAuthClient();
-            
-            // Check if user is authenticated
+
             if (!await authClient.isAuthenticated()) {
                 throw new Error('User not authenticated');
             }
 
-            // Get the identity
-            const identity = await authClient.getIdentity();
-            
-            // Create an agent with the identity
-            const agent = await createAgent({
-                identity,
-                host: import.meta.env.VITE_IC_HOST
-            });
+            const treasury = await getTreasuryActor(authClient);
 
-            // Create treasury actor with authenticated identity
-            const treasury = Actor.createActor<TreasuryService>(treasuryIDL, {
-                agent,
-                canisterId: treasuryCanisterId()
-            });
-
-            // END OF NOTE TO AI!
-
-            // Get the current config using getSystemParameters
             const config = await treasury.getSystemParameters();
             if (!config) {
                 throw new Error('Failed to get system parameters');
@@ -2912,38 +2521,14 @@ export const useTacoStore = defineStore('taco', () => {
         try {
             appLoadingOn();
 
-            // NOTE TO AI: DO NOT CHANGE THIS PATTERN FOR OTHER FUNCTIONS
-            // DO NOT INTRODUCE A getTreasuryActor method !!
-            // JUST LEAVE THIS CODE HERE AS IS !!
-
-            // create auth client
             const authClient = await getAuthClient();
-            
-            // Check if user is authenticated
+
             if (!await authClient.isAuthenticated()) {
                 throw new Error('User not authenticated');
             }
 
-            // Get the identity
-            const identity = await authClient.getIdentity();
-            
-            // Create an agent with the identity
-            const agent = await createAgent({
-                identity,
-                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-                fetchRootKey: process.env.DFX_NETWORK === "local",
-            });
-            let canisterId = daoBackendCanisterId();
+            const actor = await getDaoActor(authClient);
 
-
-            const actor = Actor.createActor(daoBackendIDL, {
-                agent,
-                canisterId,
-            });
-
-            // END OF NOTE TO AI!
-
-            // Get the current config using getSystemParameters
             const config = await actor.getSystemParameters();
             if (!config) {
                 throw new Error('Failed to get system parameters');
@@ -2961,28 +2546,13 @@ export const useTacoStore = defineStore('taco', () => {
     const executeTradingCycle = async (reason?: string) => {
         appLoadingOn();
         try {
-            // create auth client
             const authClient = await getAuthClient();
-            
-            // Check if user is authenticated
+
             if (!await authClient.isAuthenticated()) {
                 throw new Error('User not authenticated');
             }
 
-            // Get the identity
-            const identity = await authClient.getIdentity();
-            
-            // Create an agent with the identity
-            const agent = await createAgent({
-                identity,
-                host: import.meta.env.VITE_IC_HOST
-            });
-
-            // Create treasury actor with authenticated identity
-            const treasury = Actor.createActor<TreasuryService>(treasuryIDL, {
-                agent,
-                canisterId: treasuryCanisterId()
-            });
+            const treasury = await getTreasuryActor(authClient);
 
             await treasury.admin_executeTradingCycle(reason ? [reason] : []);
         } catch (error) {
@@ -2995,32 +2565,14 @@ export const useTacoStore = defineStore('taco', () => {
     const pauseToken = async (principal: Principal, reason: string): Promise<boolean> => {
         // console.log('TacoStore: pauseToken called for', principal.toText());
         try {
-            // Create auth client
             const authClient = await getAuthClient();
-            
-            // Check if user is authenticated
+
             if (!await authClient.isAuthenticated()) {
                 console.error('User not authenticated');
                 return false;
             }
 
-            // Get authenticated identity
-            const identity = await authClient.getIdentity();
-
-            // Create agent with authenticated identity
-            const agent = await createAgent({
-                identity,
-                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-                fetchRootKey: process.env.DFX_NETWORK === "local",
-            });
-
-            let canisterId = daoBackendCanisterId();
-
-
-            const actor = Actor.createActor(daoBackendIDL, {
-                agent,
-                canisterId,
-            });
+            const actor = await getDaoActor(authClient);
 
             const result = await actor.pauseToken(principal, reason) as Result_1;
             if ('err' in result) {
@@ -3037,32 +2589,14 @@ export const useTacoStore = defineStore('taco', () => {
     const unpauseToken = async (principal: Principal, reason: string): Promise<boolean> => {
         // console.log('TacoStore: unpauseToken called for', principal.toText());
         try {
-            // Create auth client
             const authClient = await getAuthClient();
-            
-            // Check if user is authenticated
+
             if (!await authClient.isAuthenticated()) {
                 console.error('User not authenticated');
                 return false;
             }
 
-            // Get authenticated identity
-            const identity = await authClient.getIdentity();
-
-            // Create agent with authenticated identity
-            const agent = await createAgent({
-                identity,
-                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-                fetchRootKey: process.env.DFX_NETWORK === "local",
-            });
-
-            let canisterId = daoBackendCanisterId();
-
-
-            const actor = Actor.createActor(daoBackendIDL, {
-                agent,
-                canisterId,
-            });
+            const actor = await getDaoActor(authClient);
 
             const result = await actor.unpauseToken(principal, reason) as Result_1;
             if ('err' in result) {
@@ -3081,33 +2615,15 @@ export const useTacoStore = defineStore('taco', () => {
         try {
             // Create auth client
             const authClient = await getAuthClient();
-            
+
             // Check if user is authenticated
             if (!await authClient.isAuthenticated()) {
                 console.error('User not authenticated');
                 return false;
             }
 
-            // Get authenticated identity
-            const identity = await authClient.getIdentity();
-
-
-            const agent = await createAgent({
-                identity,
-                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-                fetchRootKey: process.env.DFX_NETWORK === "local",
-            })
-            // console.log('taco.store: fetchVoterDetails() - Agent created');
-
-            let canisterId = daoBackendCanisterId();
-
-            // console.log('taco.store: fetchVoterDetails() - Using canisterId:', canisterId);
-
-            const actor = Actor.createActor(daoBackendIDL, {
-                agent,
-                canisterId,
-            })
-            // console.log('taco.store: fetchVoterDetails() - Actor created');
+            // Use singleton actor with authenticated identity
+            const actor = await actorManager.getDaoActor(authClient);
 
             const voterDetails = await actor.admin_getUserAllocations();
             // console.log('taco.store: fetchVoterDetails() - Raw response:', voterDetails);
@@ -3139,22 +2655,8 @@ export const useTacoStore = defineStore('taco', () => {
                 return false;
             }
 
-            // Get authenticated identity
-            const identity = await authClient.getIdentity();
-
-            const agent = await createAgent({
-                identity,
-                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-                fetchRootKey: process.env.DFX_NETWORK === "local",
-            });
-
-            let canisterId = daoBackendCanisterId();
-
-
-            const actor = Actor.createActor(daoBackendIDL, {
-                agent,
-                canisterId,
-            });
+            // Use singleton actor with authenticated identity
+            const actor = await actorManager.getDaoActor(authClient);
 
             const result = await actor.admin_getNeuronAllocations();
             // console.log('Raw neuron allocations:', result);
@@ -3170,7 +2672,7 @@ export const useTacoStore = defineStore('taco', () => {
                 votingPower: allocation.votingPower,
                 lastUpdate: allocation.lastUpdate,
                 lastAllocationMaker: allocation.lastAllocationMaker,
-                allocations: allocation.allocations.map((alloc: Allocation) => [alloc.token.toText(), BigInt(alloc.basisPoints)])
+                allocations: allocation.allocations.map((alloc: Allocation) => [alloc.token.toText(), alloc.basisPoints])
             }));
 
             // console.log('Processed neuron allocations:', fetchedNeuronAllocations.value);
@@ -3191,21 +2693,8 @@ export const useTacoStore = defineStore('taco', () => {
                 return null;
             }
 
-            // Get authenticated identity
-            const identity = await authClient.getIdentity();
-
-            const agent = await createAgent({
-                identity,
-                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-                fetchRootKey: process.env.DFX_NETWORK === "local",
-            });
-
-            let canisterId = daoBackendCanisterId();
-
-            const actor = Actor.createActor(daoBackendIDL, {
-                agent,
-                canisterId,
-            });
+            // Use singleton actor with authenticated identity
+            const actor = await actorManager.getDaoActor(authClient);
 
             const result = await actor.admin_getUserAllocation(principal);
             // console.log('taco.store: adminGetUserAllocation() - Raw response:', result);
@@ -3223,33 +2712,16 @@ export const useTacoStore = defineStore('taco', () => {
 
             // create auth client
             const authClient = await getAuthClient();
-            
+
             // Check if user is authenticated
             if (!await authClient.isAuthenticated()) {
                 throw new Error('User not authenticated');
             }
 
-            // Get the identity
-            const identity = await authClient.getIdentity();
-            
-            // Create an agent with the identity
-            const agent = await createAgent({
-                identity,
-                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-                fetchRootKey: process.env.DFX_NETWORK === "local",
-            });
+            // Use singleton authenticated actor
+            const backend = await getDaoActor(authClient);
 
-
-            let canisterId = daoBackendCanisterId();
-
-
-            // Create DAO backend actor with authenticated identity
-            const backend = Actor.createActor(daoBackendIDL, {
-                agent,
-                canisterId
-            });
-
-            const result = await backend.updateSystemParameter(param, reason ? [reason] : []) as SystemParameterResult;
+            const result = await backend.updateSystemParameter(param, reason ? [reason] : []) as any;
             
             if ('ok' in result) {
                 addToast({
@@ -3292,42 +2764,15 @@ export const useTacoStore = defineStore('taco', () => {
         try {
             appLoadingOn();
 
-            // create auth client
             const authClient = await getAuthClient();
-            
-            // Check if user is authenticated
+
             if (!await authClient.isAuthenticated()) {
                 throw new Error('User not authenticated');
             }
 
-            // Get the identity
-            const identity = await authClient.getIdentity();
-            
-            // Create an agent with the identity
-            
-            // Create an agent with the identity
-            const agent = await createAgent({
-                identity,
-                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-                fetchRootKey: process.env.DFX_NETWORK === "local",
-            });
+            const backend = await getDaoActor(authClient);
 
-
-            let canisterId = daoBackendCanisterId();
-
-
-            // Create treasury actor with authenticated identity
-            const backend = Actor.createActor(daoBackendIDL, {
-                agent,
-                canisterId
-            });
-
-            // Create update config with just the snapshot interval
-            //const updateConfig: UpdateConfig = {
-            //    snapshotIntervalNS: [intervalNS]
-            //};
-
-            const result = await backend.updateSystemParameter({ SnapshotInterval: intervalNS }, reason ? [reason] : []) as SystemParameterResult;
+            const result = await backend.updateSystemParameter({ SnapshotInterval: intervalNS }, reason ? [reason] : []) as any;
             
             if ('ok' in result) {
                 addToast({
@@ -3370,22 +2815,12 @@ export const useTacoStore = defineStore('taco', () => {
     const getTreasuryLogs = async (count: number) => {
         try {
             const authClient = await getAuthClient();
-            
+
             if (!await authClient.isAuthenticated()) {
                 throw new Error('User not authenticated');
             }
 
-            const identity = await authClient.getIdentity();
-            const agent = await createAgent({
-                identity,
-                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-                fetchRootKey: process.env.DFX_NETWORK === "local",
-            });
-
-            const treasury = Actor.createActor<TreasuryService>(treasuryIDL, {
-                agent,
-                canisterId: treasuryCanisterId()
-            });
+            const treasury = await getTreasuryActor(authClient);
 
             return await treasury.getLogs(BigInt(count));
         } catch (error: any) {
@@ -3396,22 +2831,12 @@ export const useTacoStore = defineStore('taco', () => {
     const getTreasuryLogsByContext = async (context: string, count: number) => {
         try {
             const authClient = await getAuthClient();
-            
+
             if (!await authClient.isAuthenticated()) {
                 throw new Error('User not authenticated');
             }
 
-            const identity = await authClient.getIdentity();
-            const agent = await createAgent({
-                identity,
-                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-                fetchRootKey: process.env.DFX_NETWORK === "local",
-            });
-
-            const treasury = Actor.createActor<TreasuryService>(treasuryIDL, {
-                agent,
-                canisterId: treasuryCanisterId()
-            });
+            const treasury = await getTreasuryActor(authClient);
 
             return await treasury.getLogsByContext(context, BigInt(count));
         } catch (error: any) {
@@ -3422,22 +2847,12 @@ export const useTacoStore = defineStore('taco', () => {
     const getTreasuryLogsByLevel = async (level: any, count: number) => {
         try {
             const authClient = await getAuthClient();
-            
+
             if (!await authClient.isAuthenticated()) {
                 throw new Error('User not authenticated');
             }
 
-            const identity = await authClient.getIdentity();
-            const agent = await createAgent({
-                identity,
-                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-                fetchRootKey: process.env.DFX_NETWORK === "local",
-            });
-
-            const treasury = Actor.createActor<TreasuryService>(treasuryIDL, {
-                agent,
-                canisterId: treasuryCanisterId()
-            });
+            const treasury = await getTreasuryActor(authClient);
 
             return await treasury.getLogsByLevel(level, BigInt(count));
         } catch (error: any) {
@@ -3448,22 +2863,12 @@ export const useTacoStore = defineStore('taco', () => {
     const clearTreasuryLogs = async () => {
         try {
             const authClient = await getAuthClient();
-            
+
             if (!await authClient.isAuthenticated()) {
                 throw new Error('User not authenticated');
             }
 
-            const identity = await authClient.getIdentity();
-            const agent = await createAgent({
-                identity,
-                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-                fetchRootKey: process.env.DFX_NETWORK === "local",
-            });
-
-            const treasury = Actor.createActor<TreasuryService>(treasuryIDL, {
-                agent,
-                canisterId: treasuryCanisterId()
-            });
+            const treasury = await getTreasuryActor(authClient);
 
             return await treasury.clearLogs();
         } catch (error: any) {
@@ -3476,22 +2881,12 @@ export const useTacoStore = defineStore('taco', () => {
     const listTriggerConditions = async () => {
         try {
             const authClient = await getAuthClient();
-            
+
             if (!await authClient.isAuthenticated()) {
                 throw new Error('User not authenticated');
             }
 
-            const identity = await authClient.getIdentity();
-            const agent = await createAgent({
-                identity,
-                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-                fetchRootKey: process.env.DFX_NETWORK === "local",
-            });
-
-            const treasury = Actor.createActor<TreasuryService>(treasuryIDL, {
-                agent,
-                canisterId: treasuryCanisterId()
-            });
+            const treasury = await getTreasuryActor(authClient);
 
             return await treasury.listTriggerConditions();
         } catch (error: any) {
@@ -3508,22 +2903,12 @@ export const useTacoStore = defineStore('taco', () => {
     ) => {
         try {
             const authClient = await getAuthClient();
-            
+
             if (!await authClient.isAuthenticated()) {
                 throw new Error('User not authenticated');
             }
 
-            const identity = await authClient.getIdentity();
-            const agent = await createAgent({
-                identity,
-                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-                fetchRootKey: process.env.DFX_NETWORK === "local",
-            });
-
-            const treasury = Actor.createActor<TreasuryService>(treasuryIDL, {
-                agent,
-                canisterId: treasuryCanisterId()
-            });
+            const treasury = await getTreasuryActor(authClient);
 
             return await treasury.addTriggerCondition(
                 name,
@@ -3540,22 +2925,12 @@ export const useTacoStore = defineStore('taco', () => {
     const setTriggerConditionActive = async (conditionId: number, isActive: boolean) => {
         try {
             const authClient = await getAuthClient();
-            
+
             if (!await authClient.isAuthenticated()) {
                 throw new Error('User not authenticated');
             }
 
-            const identity = await authClient.getIdentity();
-            const agent = await createAgent({
-                identity,
-                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-                fetchRootKey: process.env.DFX_NETWORK === "local",
-            });
-
-            const treasury = Actor.createActor<TreasuryService>(treasuryIDL, {
-                agent,
-                canisterId: treasuryCanisterId()
-            });
+            const treasury = await getTreasuryActor(authClient);
 
             return await treasury.setTriggerConditionActive(BigInt(conditionId), isActive);
         } catch (error: any) {
@@ -3566,22 +2941,12 @@ export const useTacoStore = defineStore('taco', () => {
     const removeTriggerCondition = async (conditionId: number) => {
         try {
             const authClient = await getAuthClient();
-            
+
             if (!await authClient.isAuthenticated()) {
                 throw new Error('User not authenticated');
             }
 
-            const identity = await authClient.getIdentity();
-            const agent = await createAgent({
-                identity,
-                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-                fetchRootKey: process.env.DFX_NETWORK === "local",
-            });
-
-            const treasury = Actor.createActor<TreasuryService>(treasuryIDL, {
-                agent,
-                canisterId: treasuryCanisterId()
-            });
+            const treasury = await getTreasuryActor(authClient);
 
             return await treasury.removeTriggerCondition(BigInt(conditionId));
         } catch (error: any) {
@@ -3592,22 +2957,12 @@ export const useTacoStore = defineStore('taco', () => {
     const getPriceAlerts = async (offset: number, limit: number) => {
         try {
             const authClient = await getAuthClient();
-            
+
             if (!await authClient.isAuthenticated()) {
                 throw new Error('User not authenticated');
             }
 
-            const identity = await authClient.getIdentity();
-            const agent = await createAgent({
-                identity,
-                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-                fetchRootKey: process.env.DFX_NETWORK === "local",
-            });
-
-            const treasury = Actor.createActor<TreasuryService>(treasuryIDL, {
-                agent,
-                canisterId: treasuryCanisterId()
-            });
+            const treasury = await getTreasuryActor(authClient);
 
             return await treasury.getPriceAlerts(BigInt(offset), BigInt(limit));
         } catch (error: any) {
@@ -3618,22 +2973,12 @@ export const useTacoStore = defineStore('taco', () => {
     const clearPriceAlerts = async () => {
         try {
             const authClient = await getAuthClient();
-            
+
             if (!await authClient.isAuthenticated()) {
                 throw new Error('User not authenticated');
             }
 
-            const identity = await authClient.getIdentity();
-            const agent = await createAgent({
-                identity,
-                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-                fetchRootKey: process.env.DFX_NETWORK === "local",
-            });
-
-            const treasury = Actor.createActor<TreasuryService>(treasuryIDL, {
-                agent,
-                canisterId: treasuryCanisterId()
-            });
+            const treasury = await getTreasuryActor(authClient);
 
             return await treasury.clearPriceAlerts();
         } catch (error: any) {
@@ -3646,22 +2991,12 @@ export const useTacoStore = defineStore('taco', () => {
     const listTradingPauses = async () => {
         try {
             const authClient = await getAuthClient();
-            
+
             if (!await authClient.isAuthenticated()) {
                 throw new Error('User not authenticated');
             }
 
-            const identity = await authClient.getIdentity();
-            const agent = await createAgent({
-                identity,
-                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-                fetchRootKey: process.env.DFX_NETWORK === "local",
-            });
-
-            const treasury = Actor.createActor<TreasuryService>(treasuryIDL, {
-                agent,
-                canisterId: treasuryCanisterId()
-            });
+            const treasury = await getTreasuryActor(authClient);
 
             return await treasury.listTradingPauses();
         } catch (error: any) {
@@ -3672,22 +3007,12 @@ export const useTacoStore = defineStore('taco', () => {
     const getTradingPauseInfo = async (token: Principal) => {
         try {
             const authClient = await getAuthClient();
-            
+
             if (!await authClient.isAuthenticated()) {
                 throw new Error('User not authenticated');
             }
 
-            const identity = await authClient.getIdentity();
-            const agent = await createAgent({
-                identity,
-                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-                fetchRootKey: process.env.DFX_NETWORK === "local",
-            });
-
-            const treasury = Actor.createActor<TreasuryService>(treasuryIDL, {
-                agent,
-                canisterId: treasuryCanisterId()
-            });
+            const treasury = await getTreasuryActor(authClient);
 
             return await treasury.getTradingPauseInfo(token);
         } catch (error: any) {
@@ -3698,22 +3023,12 @@ export const useTacoStore = defineStore('taco', () => {
     const unpauseTokenFromTrading = async (token: Principal, reason?: string) => {
         try {
             const authClient = await getAuthClient();
-            
+
             if (!await authClient.isAuthenticated()) {
                 throw new Error('User not authenticated');
             }
 
-            const identity = await authClient.getIdentity();
-            const agent = await createAgent({
-                identity,
-                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-                fetchRootKey: process.env.DFX_NETWORK === "local",
-            });
-
-            const treasury = Actor.createActor<TreasuryService>(treasuryIDL, {
-                agent,
-                canisterId: treasuryCanisterId()
-            });
+            const treasury = await getTreasuryActor(authClient);
 
             return await treasury.unpauseTokenFromTrading(token, reason ? [reason] : []);
         } catch (error: any) {
@@ -3724,22 +3039,12 @@ export const useTacoStore = defineStore('taco', () => {
     const pauseTokenFromTradingManual = async (token: Principal, reason: string) => {
         try {
             const authClient = await getAuthClient();
-            
+
             if (!await authClient.isAuthenticated()) {
                 throw new Error('User not authenticated');
             }
 
-            const identity = await authClient.getIdentity();
-            const agent = await createAgent({
-                identity,
-                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-                fetchRootKey: process.env.DFX_NETWORK === "local",
-            });
-
-            const treasury = Actor.createActor<TreasuryService>(treasuryIDL, {
-                agent,
-                canisterId: treasuryCanisterId()
-            });
+            const treasury = await getTreasuryActor(authClient);
 
             return await treasury.pauseTokenFromTradingManual(token, reason);
         } catch (error: any) {
@@ -3750,22 +3055,12 @@ export const useTacoStore = defineStore('taco', () => {
     const clearAllTradingPauses = async (reason?: string) => {
         try {
             const authClient = await getAuthClient();
-            
+
             if (!await authClient.isAuthenticated()) {
                 throw new Error('User not authenticated');
             }
 
-            const identity = await authClient.getIdentity();
-            const agent = await createAgent({
-                identity,
-                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-                fetchRootKey: process.env.DFX_NETWORK === "local",
-            });
-
-            const treasury = Actor.createActor<TreasuryService>(treasuryIDL, {
-                agent,
-                canisterId: treasuryCanisterId()
-            });
+            const treasury = await getTreasuryActor(authClient);
 
             return await treasury.clearAllTradingPauses(reason ? [reason] : []);
         } catch (error: any) {
@@ -3776,22 +3071,12 @@ export const useTacoStore = defineStore('taco', () => {
     const getTokenPriceHistory = async (tokens: Principal[]) => {
         try {
             const authClient = await getAuthClient();
-            
+
             if (!await authClient.isAuthenticated()) {
                 throw new Error('User not authenticated');
             }
 
-            const identity = await authClient.getIdentity();
-            const agent = await createAgent({
-                identity,
-                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-                fetchRootKey: process.env.DFX_NETWORK === "local",
-            });
-
-            const treasury = Actor.createActor<TreasuryService>(treasuryIDL, {
-                agent,
-                canisterId: treasuryCanisterId()
-            });
+            const treasury = await getTreasuryActor(authClient);
 
             const result = await treasury.getTokenPriceHistory(tokens);
             if ('ok' in result) {
@@ -3808,22 +3093,12 @@ export const useTacoStore = defineStore('taco', () => {
     const getPortfolioHistory = async (limit: number = 1000) => {
         try {
             const authClient = await getAuthClient();
-            
+
             if (!await authClient.isAuthenticated()) {
                 throw new Error('User not authenticated');
             }
 
-            const identity = await authClient.getIdentity();
-            const agent = await createAgent({
-                identity,
-                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-                fetchRootKey: process.env.DFX_NETWORK === "local",
-            });
-
-            const dao = Actor.createActor(daoBackendIDL, {
-                agent,
-                canisterId: daoBackendCanisterId()
-            });
+            const dao = await getDaoActor(authClient);
 
             const result = await dao.getHistoricBalanceAndAllocation(BigInt(limit));
             return result;
@@ -3835,22 +3110,12 @@ export const useTacoStore = defineStore('taco', () => {
     const getTreasuryPortfolioHistory = async (limit: number = 1000) => {
         try {
             const authClient = await getAuthClient();
-            
+
             if (!await authClient.isAuthenticated()) {
                 throw new Error('User not authenticated');
             }
 
-            const identity = await authClient.getIdentity();
-            const agent = await createAgent({
-                identity,
-                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-                fetchRootKey: process.env.DFX_NETWORK === "local",
-            });
-
-            const treasury = Actor.createActor<TreasuryService>(treasuryIDL, {
-                agent,
-                canisterId: treasuryCanisterId()
-            });
+            const treasury = await getTreasuryActor(authClient);
 
             const result = await treasury.getPortfolioHistory(BigInt(limit));
             if ('ok' in result) {
@@ -3867,22 +3132,12 @@ export const useTacoStore = defineStore('taco', () => {
     const takeManualPortfolioSnapshot = async (reason?: string) => {
         try {
             const authClient = await getAuthClient();
-            
+
             if (!await authClient.isAuthenticated()) {
                 throw new Error('User not authenticated');
             }
 
-            const identity = await authClient.getIdentity();
-            const agent = await createAgent({
-                identity,
-                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-                fetchRootKey: process.env.DFX_NETWORK === "local",
-            });
-
-            const treasury = Actor.createActor<TreasuryService>(treasuryIDL, {
-                agent,
-                canisterId: treasuryCanisterId()
-            });
+            const treasury = await getTreasuryActor(authClient);
 
             const result = await treasury.takeManualPortfolioSnapshot(reason ? [reason] : []);
             if ('ok' in result) {
@@ -3901,17 +3156,7 @@ export const useTacoStore = defineStore('taco', () => {
     // Portfolio snapshot status and management
     const getPortfolioSnapshotStatus = async () => {
         try {
-            const host = process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app";
-            const agent = await createAgent({
-                identity: new AnonymousIdentity(),
-                host,
-                fetchRootKey: process.env.DFX_NETWORK === "local",
-            });
-
-            const treasury = Actor.createActor<TreasuryService>(treasuryIDL, {
-                agent,
-                canisterId: treasuryCanisterId()
-            });
+            const treasury = await getAnonymousTreasuryActor();
 
             const status = await treasury.getPortfolioSnapshotStatus();
             return {
@@ -3932,22 +3177,12 @@ export const useTacoStore = defineStore('taco', () => {
     const startPortfolioSnapshots = async (reason?: string) => {
         try {
             const authClient = await getAuthClient();
-            
+
             if (!await authClient.isAuthenticated()) {
                 throw new Error('User not authenticated');
             }
 
-            const identity = await authClient.getIdentity();
-            const agent = await createAgent({
-                identity,
-                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-                fetchRootKey: process.env.DFX_NETWORK === "local",
-            });
-
-            const treasury = Actor.createActor<TreasuryService>(treasuryIDL, {
-                agent,
-                canisterId: treasuryCanisterId()
-            });
+            const treasury = await getTreasuryActor(authClient);
 
             const result = await treasury.startPortfolioSnapshots(reason ? [reason] : []);
             if ('ok' in result) {
@@ -3965,22 +3200,12 @@ export const useTacoStore = defineStore('taco', () => {
     const stopPortfolioSnapshots = async (reason?: string) => {
         try {
             const authClient = await getAuthClient();
-            
+
             if (!await authClient.isAuthenticated()) {
                 throw new Error('User not authenticated');
             }
 
-            const identity = await authClient.getIdentity();
-            const agent = await createAgent({
-                identity,
-                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-                fetchRootKey: process.env.DFX_NETWORK === "local",
-            });
-
-            const treasury = Actor.createActor<TreasuryService>(treasuryIDL, {
-                agent,
-                canisterId: treasuryCanisterId()
-            });
+            const treasury = await getTreasuryActor(authClient);
 
             const result = await treasury.stopPortfolioSnapshots(reason ? [reason] : []);
             if ('ok' in result) {
@@ -3998,22 +3223,12 @@ export const useTacoStore = defineStore('taco', () => {
     const updatePortfolioSnapshotInterval = async (intervalMinutes: number, reason?: string) => {
         try {
             const authClient = await getAuthClient();
-            
+
             if (!await authClient.isAuthenticated()) {
                 throw new Error('User not authenticated');
             }
 
-            const identity = await authClient.getIdentity();
-            const agent = await createAgent({
-                identity,
-                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-                fetchRootKey: process.env.DFX_NETWORK === "local",
-            });
-
-            const treasury = Actor.createActor<TreasuryService>(treasuryIDL, {
-                agent,
-                canisterId: treasuryCanisterId()
-            });
+            const treasury = await getTreasuryActor(authClient);
 
             const result = await treasury.updatePortfolioSnapshotInterval(BigInt(intervalMinutes), reason ? [reason] : []);
             if ('ok' in result) {
@@ -4032,22 +3247,12 @@ export const useTacoStore = defineStore('taco', () => {
     const listPortfolioCircuitBreakerConditions = async () => {
         try {
             const authClient = await getAuthClient();
-            
+
             if (!await authClient.isAuthenticated()) {
                 throw new Error('User not authenticated');
             }
 
-            const identity = await authClient.getIdentity();
-            const agent = await createAgent({
-                identity,
-                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-                fetchRootKey: process.env.DFX_NETWORK === "local",
-            });
-
-            const treasury = Actor.createActor<TreasuryService>(treasuryIDL, {
-                agent,
-                canisterId: treasuryCanisterId()
-            });
+            const treasury = await getTreasuryActor(authClient);
 
             const result = await treasury.listPortfolioCircuitBreakerConditions();
             return result;
@@ -4065,22 +3270,12 @@ export const useTacoStore = defineStore('taco', () => {
     ) => {
         try {
             const authClient = await getAuthClient();
-            
+
             if (!await authClient.isAuthenticated()) {
                 throw new Error('User not authenticated');
             }
 
-            const identity = await authClient.getIdentity();
-            const agent = await createAgent({
-                identity,
-                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-                fetchRootKey: process.env.DFX_NETWORK === "local",
-            });
-
-            const treasury = Actor.createActor<TreasuryService>(treasuryIDL, {
-                agent,
-                canisterId: treasuryCanisterId()
-            });
+            const treasury = await getTreasuryActor(authClient);
 
             const directionVariant = direction === 'Up' ? { Up: null } : { Down: null };
             const valueTypeVariant = valueType === 'ICP' ? { ICP: null } : { USD: null };
@@ -4108,22 +3303,12 @@ export const useTacoStore = defineStore('taco', () => {
     const setPortfolioCircuitBreakerConditionActive = async (conditionId: number, isActive: boolean) => {
         try {
             const authClient = await getAuthClient();
-            
+
             if (!await authClient.isAuthenticated()) {
                 throw new Error('User not authenticated');
             }
 
-            const identity = await authClient.getIdentity();
-            const agent = await createAgent({
-                identity,
-                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-                fetchRootKey: process.env.DFX_NETWORK === "local",
-            });
-
-            const treasury = Actor.createActor<TreasuryService>(treasuryIDL, {
-                agent,
-                canisterId: treasuryCanisterId()
-            });
+            const treasury = await getTreasuryActor(authClient);
 
             const result = await treasury.setPortfolioCircuitBreakerConditionActive(BigInt(conditionId), isActive);
             
@@ -4142,22 +3327,12 @@ export const useTacoStore = defineStore('taco', () => {
     const removePortfolioCircuitBreakerCondition = async (conditionId: number) => {
         try {
             const authClient = await getAuthClient();
-            
+
             if (!await authClient.isAuthenticated()) {
                 throw new Error('User not authenticated');
             }
 
-            const identity = await authClient.getIdentity();
-            const agent = await createAgent({
-                identity,
-                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-                fetchRootKey: process.env.DFX_NETWORK === "local",
-            });
-
-            const treasury = Actor.createActor<TreasuryService>(treasuryIDL, {
-                agent,
-                canisterId: treasuryCanisterId()
-            });
+            const treasury = await getTreasuryActor(authClient);
 
             const result = await treasury.removePortfolioCircuitBreakerCondition(BigInt(conditionId));
             
@@ -4176,22 +3351,12 @@ export const useTacoStore = defineStore('taco', () => {
     const getPortfolioCircuitBreakerLogs = async (offset: number, limit: number) => {
         try {
             const authClient = await getAuthClient();
-            
+
             if (!await authClient.isAuthenticated()) {
                 throw new Error('User not authenticated');
             }
 
-            const identity = await authClient.getIdentity();
-            const agent = await createAgent({
-                identity,
-                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-                fetchRootKey: process.env.DFX_NETWORK === "local",
-            });
-
-            const treasury = Actor.createActor<TreasuryService>(treasuryIDL, {
-                agent,
-                canisterId: treasuryCanisterId()
-            });
+            const treasury = await getTreasuryActor(authClient);
 
             const result = await treasury.getPortfolioCircuitBreakerLogs(BigInt(offset), BigInt(limit));
             return result;
@@ -4203,22 +3368,12 @@ export const useTacoStore = defineStore('taco', () => {
     const clearPortfolioCircuitBreakerLogs = async () => {
         try {
             const authClient = await getAuthClient();
-            
+
             if (!await authClient.isAuthenticated()) {
                 throw new Error('User not authenticated');
             }
 
-            const identity = await authClient.getIdentity();
-            const agent = await createAgent({
-                identity,
-                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-                fetchRootKey: process.env.DFX_NETWORK === "local",
-            });
-
-            const treasury = Actor.createActor<TreasuryService>(treasuryIDL, {
-                agent,
-                canisterId: treasuryCanisterId()
-            });
+            const treasury = await getTreasuryActor(authClient);
 
             const result = await treasury.clearPortfolioCircuitBreakerLogs();
             
@@ -4238,16 +3393,7 @@ export const useTacoStore = defineStore('taco', () => {
     // neuron snapshots
     const getNeuronSnapshotStatus = async () => {
         try {
-            const agent = await createAgent({
-                identity: new AnonymousIdentity(),
-                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-                fetchRootKey: process.env.DFX_NETWORK === "local",
-            });
-
-            const neuronSnapshot = Actor.createActor<NeuronSnapshotService>(neuronSnapshotIDL, {
-                agent,
-                canisterId: neuronSnapshotCanisterId()
-            });
+            const neuronSnapshot = await getAnonymousNeuronSnapshotActor();
 
             return await neuronSnapshot.get_neuron_snapshot_status();
         } catch (error: any) {
@@ -4257,16 +3403,7 @@ export const useTacoStore = defineStore('taco', () => {
     }
     const getNeuronSnapshotsInfo = async (start: number, length: number) => {
         try {
-            const agent = await createAgent({
-                identity: new AnonymousIdentity(),
-                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-                fetchRootKey: process.env.DFX_NETWORK === "local",
-            });
-
-            const neuronSnapshot = Actor.createActor<NeuronSnapshotService>(neuronSnapshotIDL, {
-                agent,
-                canisterId: neuronSnapshotCanisterId()
-            });
+            const neuronSnapshot = await getAnonymousNeuronSnapshotActor();
 
             return await neuronSnapshot.get_neuron_snapshots_info(BigInt(start), BigInt(length));
         } catch (error: any) {
@@ -4276,16 +3413,7 @@ export const useTacoStore = defineStore('taco', () => {
     }
     const getNeuronSnapshotInfo = async (snapshotId: bigint) => {
         try {
-            const agent = await createAgent({
-                identity: new AnonymousIdentity(),
-                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-                fetchRootKey: process.env.DFX_NETWORK === "local",
-            });
-
-            const neuronSnapshot = Actor.createActor<NeuronSnapshotService>(neuronSnapshotIDL, {
-                agent,
-                canisterId: neuronSnapshotCanisterId()
-            });
+            const neuronSnapshot = await getAnonymousNeuronSnapshotActor();
 
             return await neuronSnapshot.get_neuron_snapshot_info(snapshotId);
         } catch (error: any) {
@@ -4295,16 +3423,7 @@ export const useTacoStore = defineStore('taco', () => {
     }
     const getCumulativeValuesAtSnapshot = async (snapshotId: bigint | null) => {
         try {
-            const agent = await createAgent({
-                identity: new AnonymousIdentity(),
-                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-                fetchRootKey: process.env.DFX_NETWORK === "local",
-            });
-
-            const neuronSnapshot = Actor.createActor<NeuronSnapshotService>(neuronSnapshotIDL, {
-                agent,
-                canisterId: neuronSnapshotCanisterId()
-            });
+            const neuronSnapshot = await getAnonymousNeuronSnapshotActor();
 
             return await neuronSnapshot.getCumulativeValuesAtSnapshot(snapshotId ? [snapshotId] : []);
         } catch (error: any) {
@@ -4314,16 +3433,7 @@ export const useTacoStore = defineStore('taco', () => {
     }
     const getNeuronDataForDAO = async (snapshotId: bigint, start: number, limit: number) => {
         try {
-            const agent = await createAgent({
-                identity: new AnonymousIdentity(),
-                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-                fetchRootKey: process.env.DFX_NETWORK === "local",
-            });
-
-            const neuronSnapshot = Actor.createActor<NeuronSnapshotService>(neuronSnapshotIDL, {
-                agent,
-                canisterId: neuronSnapshotCanisterId()
-            });
+            const neuronSnapshot = await getAnonymousNeuronSnapshotActor();
 
             return await neuronSnapshot.getNeuronDataForDAO(snapshotId, BigInt(start), BigInt(limit));
         } catch (error: any) {
@@ -4334,22 +3444,12 @@ export const useTacoStore = defineStore('taco', () => {
     const takeNeuronSnapshot = async () => {
         try {
             const authClient = await getAuthClient();
-            
+
             if (!await authClient.isAuthenticated()) {
                 throw new Error('User not authenticated');
             }
 
-            const identity = await authClient.getIdentity();
-            const agent = await createAgent({
-                identity,
-                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-                fetchRootKey: process.env.DFX_NETWORK === "local",
-            });
-
-            const neuronSnapshot = Actor.createActor<NeuronSnapshotService>(neuronSnapshotIDL, {
-                agent,
-                canisterId: neuronSnapshotCanisterId()
-            });
+            const neuronSnapshot = await getNeuronSnapshotActor(authClient);
 
             return await neuronSnapshot.take_neuron_snapshot();
         } catch (error: any) {
@@ -4359,16 +3459,7 @@ export const useTacoStore = defineStore('taco', () => {
     }
     const getMaxNeuronSnapshots = async () => {
         try {
-            const agent = await createAgent({
-                identity: new AnonymousIdentity(),
-                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-                fetchRootKey: process.env.DFX_NETWORK === "local",
-            });
-
-            const neuronSnapshot = Actor.createActor<NeuronSnapshotService>(neuronSnapshotIDL, {
-                agent,
-                canisterId: neuronSnapshotCanisterId()
-            });
+            const neuronSnapshot = await getAnonymousNeuronSnapshotActor();
 
             return await neuronSnapshot.getMaxNeuronSnapshots();
         } catch (error: any) {
@@ -4379,22 +3470,12 @@ export const useTacoStore = defineStore('taco', () => {
     const setMaxNeuronSnapshots = async (maxSnapshots: number) => {
         try {
             const authClient = await getAuthClient();
-            
+
             if (!await authClient.isAuthenticated()) {
                 throw new Error('User not authenticated');
             }
 
-            const identity = await authClient.getIdentity();
-            const agent = await createAgent({
-                identity,
-                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-                fetchRootKey: process.env.DFX_NETWORK === "local",
-            });
-
-            const neuronSnapshot = Actor.createActor<NeuronSnapshotService>(neuronSnapshotIDL, {
-                agent,
-                canisterId: neuronSnapshotCanisterId()
-            });
+            const neuronSnapshot = await getNeuronSnapshotActor(authClient);
 
             await neuronSnapshot.setMaxNeuronSnapshots(BigInt(maxSnapshots));
             // console.log('Successfully set max neuron snapshots to:', maxSnapshots);
@@ -4406,16 +3487,7 @@ export const useTacoStore = defineStore('taco', () => {
     }
     const getMaxPriceHistoryEntries = async () => {
         try {
-            const agent = await createAgent({
-                identity: new AnonymousIdentity(),
-                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-                fetchRootKey: process.env.DFX_NETWORK === "local",
-            });
-
-            const treasury = Actor.createActor<TreasuryService>(treasuryIDL, {
-                agent,
-                canisterId: treasuryCanisterId()
-            });
+            const treasury = await getAnonymousTreasuryActor();
 
             return await treasury.getMaxPriceHistoryEntries();
         } catch (error: any) {
@@ -4425,16 +3497,7 @@ export const useTacoStore = defineStore('taco', () => {
     }
     const getMaxPortfolioSnapshots = async () => {
         try {
-            const agent = await createAgent({
-                identity: new AnonymousIdentity(),
-                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-                fetchRootKey: process.env.DFX_NETWORK === "local",
-            });
-
-            const treasury = Actor.createActor<TreasuryService>(treasuryIDL, {
-                agent,
-                canisterId: treasuryCanisterId()
-            });
+            const treasury = await getAnonymousTreasuryActor();
 
             return await (treasury as any).getMaxPortfolioSnapshots();
         } catch (error: any) {
@@ -4445,22 +3508,12 @@ export const useTacoStore = defineStore('taco', () => {
     const updateMaxPortfolioSnapshots = async (newLimit: number, reason?: string) => {
         try {
             const authClient = await getAuthClient();
-            
+
             if (!await authClient.isAuthenticated()) {
                 throw new Error('User not authenticated');
             }
 
-            const identity = await authClient.getIdentity();
-            const agent = await createAgent({
-                identity,
-                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-                fetchRootKey: process.env.DFX_NETWORK === "local",
-            });
-
-            const treasury = Actor.createActor<TreasuryService>(treasuryIDL, {
-                agent,
-                canisterId: treasuryCanisterId()
-            });
+            const treasury = await getTreasuryActor(authClient);
 
             const result = await (treasury as any).updateMaxPortfolioSnapshots(BigInt(newLimit), reason ? [reason] : []);
             if ('ok' in result) {
@@ -4494,16 +3547,7 @@ export const useTacoStore = defineStore('taco', () => {
     }
     const getAllForums = async () => {
         try {
-            const agent = await createAgent({
-                identity: new AnonymousIdentity(),
-                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-                fetchRootKey: process.env.DFX_NETWORK === "local",
-            });
-
-            const forumActor = Actor.createActor<SneedForumService>(sneedForumIDL, {
-                agent,
-                canisterId: sneedForumCanisterId()
-            });
+            const forumActor = await getAnonymousSneedForumActor();
 
             const forums = await forumActor.get_forums();
             fetchedForums.value = forums;
@@ -4516,16 +3560,7 @@ export const useTacoStore = defineStore('taco', () => {
     }
     const findTacoForum = async () => {
         try {
-            const agent = await createAgent({
-                identity: new AnonymousIdentity(),
-                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-                fetchRootKey: process.env.DFX_NETWORK === "local",
-            });
-
-            const forumActor = Actor.createActor<SneedForumService>(sneedForumIDL, {
-                agent,
-                canisterId: sneedForumCanisterId()
-            });
+            const forumActor = await getAnonymousSneedForumActor();
 
             // Direct lookup using SNS root canister ID (much more efficient!)
             const tacoSnsRoot = Principal.fromText(tacoSnsRootCanisterId());
@@ -4547,16 +3582,7 @@ export const useTacoStore = defineStore('taco', () => {
     }
     const getProposalsTopic = async (forumId: bigint) => {
         try {
-            const agent = await createAgent({
-                identity: new AnonymousIdentity(),
-                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-                fetchRootKey: process.env.DFX_NETWORK === "local",
-            });
-
-            const forumActor = Actor.createActor<SneedForumService>(sneedForumIDL, {
-                agent,
-                canisterId: sneedForumCanisterId()
-            });
+            const forumActor = await getAnonymousSneedForumActor();
 
             const proposalsTopicMapping = await forumActor.get_proposals_topic(forumId);
             
@@ -4576,16 +3602,7 @@ export const useTacoStore = defineStore('taco', () => {
     }
     const getProposalsTopicDirect = async () => {
         try {
-            const agent = await createAgent({
-                identity: new AnonymousIdentity(),
-                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-                fetchRootKey: process.env.DFX_NETWORK === "local",
-            });
-
-            const forumActor = Actor.createActor<SneedForumService>(sneedForumIDL, {
-                agent,
-                canisterId: sneedForumCanisterId()
-            });
+            const forumActor = await getAnonymousSneedForumActor();
 
             // Direct lookup using SNS root canister ID - super efficient!
             const tacoSnsRoot = Principal.fromText(tacoSnsRootCanisterId());
@@ -4607,16 +3624,7 @@ export const useTacoStore = defineStore('taco', () => {
     }
     const getThreadsByTopic = async (topicId: bigint) => {
         try {
-            const agent = await createAgent({
-                identity: new AnonymousIdentity(),
-                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-                fetchRootKey: process.env.DFX_NETWORK === "local",
-            });
-
-            const forumActor = Actor.createActor<SneedForumService>(sneedForumIDL, {
-                agent,
-                canisterId: sneedForumCanisterId()
-            });
+            const forumActor = await getAnonymousSneedForumActor();
 
             const threads = await forumActor.get_threads_by_topic(topicId);
             fetchedProposalsThreads.value = threads;
@@ -4629,16 +3637,7 @@ export const useTacoStore = defineStore('taco', () => {
     }
     const getPostsByThread = async (threadId: bigint) => {
         try {
-            const agent = await createAgent({
-                identity: new AnonymousIdentity(),
-                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-                fetchRootKey: process.env.DFX_NETWORK === "local",
-            });
-
-            const forumActor = Actor.createActor<SneedForumService>(sneedForumIDL, {
-                agent,
-                canisterId: sneedForumCanisterId()
-            });
+            const forumActor = await getAnonymousSneedForumActor();
 
             const posts = await forumActor.get_posts_by_thread(threadId);
             fetchedThreadPosts.value = posts;
@@ -4674,16 +3673,7 @@ export const useTacoStore = defineStore('taco', () => {
     }
     const getThread = async (threadId: bigint) => {
         try {
-            const agent = await createAgent({
-                identity: new AnonymousIdentity(),
-                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-                fetchRootKey: process.env.DFX_NETWORK === "local",
-            });
-
-            const forumActor = Actor.createActor<SneedForumService>(sneedForumIDL, {
-                agent,
-                canisterId: sneedForumCanisterId()
-            });
+            const forumActor = await getAnonymousSneedForumActor();
 
             const thread = await forumActor.get_thread(threadId);
             // console.log('Fetched thread:', threadId, thread);
@@ -4697,16 +3687,7 @@ export const useTacoStore = defineStore('taco', () => {
         try {
             // console.log('🔍 Looking up thread for proposal ID:', proposalId.toString());
             
-            const agent = await createAgent({
-                identity: new AnonymousIdentity(),
-                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-                fetchRootKey: process.env.DFX_NETWORK === "local",
-            });
-
-            const forumActor = Actor.createActor<SneedForumService>(sneedForumIDL, {
-                agent,
-                canisterId: sneedForumCanisterId()
-            });
+            const forumActor = await getAnonymousSneedForumActor();
 
             const tacoSnsRoot = Principal.fromText(tacoSnsRootCanisterId());
             const proposalThreadMapping = await forumActor.get_proposal_thread(tacoSnsRoot, proposalId);
@@ -4747,18 +3728,7 @@ export const useTacoStore = defineStore('taco', () => {
             }
 
             const authClient = await getAuthClient();
-            const identity = authClient.getIdentity();
-            
-            const agent = await createAgent({
-                identity,
-                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-                fetchRootKey: process.env.DFX_NETWORK === "local",
-            });
-
-            const forumActor = Actor.createActor<SneedForumService>(sneedForumIDL, {
-                agent,
-                canisterId: sneedForumCanisterId()
-            });
+            const forumActor = await getSneedForumActor(authClient);
 
             const tacoSnsRoot = Principal.fromText(tacoSnsRootCanisterId());
             const result = await forumActor.create_proposal_thread_with_auto_setup({
@@ -4790,18 +3760,7 @@ export const useTacoStore = defineStore('taco', () => {
             }
 
             const authClient = await getAuthClient();
-            const identity = authClient.getIdentity();
-            
-            const agent = await createAgent({
-                identity,
-                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-                fetchRootKey: process.env.DFX_NETWORK === "local",
-            });
-
-            const forumActor = Actor.createActor<SneedForumService>(sneedForumIDL, {
-                agent,
-                canisterId: sneedForumCanisterId()
-            });
+            const forumActor = await getSneedForumActor(authClient);
 
             const result = await forumActor.create_post(
                 threadId,
@@ -4834,18 +3793,7 @@ export const useTacoStore = defineStore('taco', () => {
             }
 
             const authClient = await getAuthClient();
-            const identity = authClient.getIdentity();
-            
-            const agent = await createAgent({
-                identity,
-                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-                fetchRootKey: process.env.DFX_NETWORK === "local",
-            });
-
-            const forumActor = Actor.createActor<SneedForumService>(sneedForumIDL, {
-                agent,
-                canisterId: sneedForumCanisterId()
-            });
+            const forumActor = await getSneedForumActor(authClient);
 
             const voteTypeVariant = voteType === 'upvote' ? { upvote: null } : { downvote: null };
             const result = await forumActor.vote_on_post(postId, voteTypeVariant);
@@ -4873,18 +3821,7 @@ export const useTacoStore = defineStore('taco', () => {
             }
 
             const authClient = await getAuthClient();
-            const identity = authClient.getIdentity();
-            
-            const agent = await createAgent({
-                identity,
-                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-                fetchRootKey: process.env.DFX_NETWORK === "local",
-            });
-
-            const forumActor = Actor.createActor<SneedForumService>(sneedForumIDL, {
-                agent,
-                canisterId: sneedForumCanisterId()
-            });
+            const forumActor = await getSneedForumActor(authClient);
 
             const result = await forumActor.retract_vote(postId);
             
@@ -4906,16 +3843,7 @@ export const useTacoStore = defineStore('taco', () => {
         try {
             // console.log('📊 Getting votes for post ID:', postId.toString());
             
-            const agent = await createAgent({
-                identity: new AnonymousIdentity(),
-                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-                fetchRootKey: process.env.DFX_NETWORK === "local",
-            });
-
-            const forumActor = Actor.createActor<SneedForumService>(sneedForumIDL, {
-                agent,
-                canisterId: sneedForumCanisterId()
-            });
+            const forumActor = await getAnonymousSneedForumActor();
 
             const votes = await forumActor.get_post_votes(postId);
             // console.log('✅ Retrieved votes for post:', votes);
@@ -4944,16 +3872,7 @@ export const useTacoStore = defineStore('taco', () => {
         // console.log('🔍 Fetching TACO DAO proposals...', beforeProposal ? `before ID ${beforeProposal}` : 'from latest');
         // console.log('🔗 Using SNS governance canister:', tacoSnsGovernanceCanisterId());
         
-        const agent = await createAgent({
-            identity: new AnonymousIdentity(),
-            host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-            fetchRootKey: process.env.DFX_NETWORK === "local",
-        });
-
-        const governanceActor = Actor.createActor(snsGovernanceIDL, {
-            agent,
-            canisterId: tacoSnsGovernanceCanisterId()
-        });
+        const governanceActor = await getAnonymousSnsGovernanceActor();
 
         // Create request for list_proposals
         const request = {
@@ -5122,20 +4041,7 @@ export const useTacoStore = defineStore('taco', () => {
             // console.log('🚀 Starting to load all names...');
             namesLoading.value = true;
             
-            const agent = await createAgent({
-                identity: new AnonymousIdentity(),
-                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-                fetchRootKey: process.env.DFX_NETWORK === "local",
-            });
-
-            const canisterId = appSneedDaoCanisterId();
-            // console.log('🔗 Connecting to app_sneeddao_backend canister:', canisterId);
-            // console.log('🌐 DFX_NETWORK:', process.env.DFX_NETWORK);
-            
-            const appSneedDaoActor = Actor.createActor<AppSneedDaoService>(appSneedDaoIDL, {
-                agent,
-                canisterId: canisterId
-            });
+            const appSneedDaoActor = await getAnonymousAppSneedDaoActor();
 
             // Load all principal names and neuron names in parallel
             // console.log('📞 Making API calls to get_all_principal_names() and get_all_neuron_names()...');
@@ -5209,18 +4115,7 @@ export const useTacoStore = defineStore('taco', () => {
             }
 
             const authClient = await getAuthClient();
-            const identity = authClient.getIdentity();
-            
-            const agent = await createAgent({
-                identity,
-                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-                fetchRootKey: process.env.DFX_NETWORK === "local",
-            });
-
-            const appSneedDaoActor = Actor.createActor<AppSneedDaoService>(appSneedDaoIDL, {
-                agent,
-                canisterId: appSneedDaoCanisterId()
-            });
+            const appSneedDaoActor = await getAppSneedDaoActor(authClient);
 
             const result = await appSneedDaoActor.set_principal_name(name);
             
@@ -5249,18 +4144,7 @@ export const useTacoStore = defineStore('taco', () => {
             }
 
             const authClient = await getAuthClient();
-            const identity = authClient.getIdentity();
-            
-            const agent = await createAgent({
-                identity,
-                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-                fetchRootKey: process.env.DFX_NETWORK === "local",
-            });
-
-            const appSneedDaoActor = Actor.createActor<AppSneedDaoService>(appSneedDaoIDL, {
-                agent,
-                canisterId: appSneedDaoCanisterId()
-            });
+            const appSneedDaoActor = await getAppSneedDaoActor(authClient);
 
             // Convert number[] to Uint8Array if needed
             const neuronIdUint8 = neuronId instanceof Uint8Array ? neuronId : new Uint8Array(neuronId);
@@ -5292,18 +4176,7 @@ export const useTacoStore = defineStore('taco', () => {
             }
 
             const authClient = await getAuthClient();
-            const identity = authClient.getIdentity();
-            
-            const agent = await createAgent({
-                identity,
-                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-                fetchRootKey: process.env.DFX_NETWORK === "local",
-            });
-
-            const appSneedDaoActor = Actor.createActor<AppSneedDaoService>(appSneedDaoIDL, {
-                agent,
-                canisterId: appSneedDaoCanisterId()
-            });
+            const appSneedDaoActor = await getAppSneedDaoActor(authClient);
 
             const result = await appSneedDaoActor.get_user_neurons();
             
@@ -7008,40 +5881,22 @@ export const useTacoStore = defineStore('taco', () => {
 
     // Helper function to create alarm actor
     const createAlarmActor = async (useAuth: boolean = true) => {
-        try {
-
-
-            let identity;
-            const authClient = await getAuthClient();
-            
-            if (await authClient.isAuthenticated()) {
-                identity = authClient.getIdentity();
-                if (identity.getPrincipal().isAnonymous()) {
-                    userLoggedIn.value = false;
-                } else{
-                userLoggedIn.value = true;};
-            } else {
-                identity = new AnonymousIdentity();
-                userLoggedIn.value = false;
-            }
-        if (!userLoggedIn.value) {
-                throw new Error('User must be logged in');
-            }
-
-            const agent = await createAgent({
-                identity,
-                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-                fetchRootKey: process.env.DFX_NETWORK === "local",
-            });
-
-            return Actor.createActor<AlarmService>(alarmIDL, {
-                agent,
-                canisterId: alarmCanisterId()
-            });
-        } catch (error) {
-            console.error('Error creating alarm actor:', error);
-            throw error;
+        const authClient = await getAuthClient();
+        
+        if (!await authClient.isAuthenticated()) {
+            userLoggedIn.value = false;
+            throw new Error('User must be logged in');
         }
+        
+        const identity = authClient.getIdentity();
+        if (identity.getPrincipal().isAnonymous()) {
+            userLoggedIn.value = false;
+            throw new Error('User must be logged in');
+        }
+        
+        userLoggedIn.value = true;
+        return await actorManager.getAlarmActor(authClient);
+
     }
 
     const performSystemHealthCheck = async () => {
