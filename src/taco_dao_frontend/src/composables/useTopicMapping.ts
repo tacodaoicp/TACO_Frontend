@@ -24,7 +24,7 @@ export const useTopicMapping = () => {
       description: 'Proposals related to community governance settings and parameters',
       icon: 'fa-users',
       color: '#17a2b8',
-      isCritical: false
+      isCritical: true
     }],
     ['ApplicationBusinessLogic', {
       id: 'ApplicationBusinessLogic',
@@ -56,7 +56,7 @@ export const useTopicMapping = () => {
       description: 'Core governance proposals affecting voting and decision-making processes',
       icon: 'fa-gavel',
       color: '#dc3545',
-      isCritical: true
+      isCritical: false
     }],
     ['SnsFrameworkManagement', {
       id: 'SnsFrameworkManagement',
@@ -64,7 +64,7 @@ export const useTopicMapping = () => {
       description: 'Proposals for managing the SNS framework and core functionality',
       icon: 'fa-cogs',
       color: '#6f42c1',
-      isCritical: true
+      isCritical: false
     }]
   ])
 

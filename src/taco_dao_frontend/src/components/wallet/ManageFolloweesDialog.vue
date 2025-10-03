@@ -58,12 +58,24 @@
                 >
                   <div class="topic-header">
                     <div class="topic-info">
-                      <i :class="`fa ${topic.icon} me-2`" :style="{ color: topic.color }"></i>
-                      <span class="topic-name">{{ topic.name }}</span>
-                      <span v-if="topic.isCritical" class="critical-badge">
-                        <i class="fa fa-exclamation-triangle"></i>
-                        Critical
-                      </span>
+                      <div class="topic-toggle">
+                        <input 
+                          type="checkbox" 
+                          :id="`topic-toggle-${topic.id}`"
+                          class="form-check-input topic-checkbox"
+                          :checked="isTopicFollowingEnabled(topic.id)"
+                          @change="toggleTopicFollowing(topic.id, $event)"
+                          :disabled="loading"
+                        >
+                        <label :for="`topic-toggle-${topic.id}`" class="topic-toggle-label">
+                          <i :class="`fa ${topic.icon} me-2`" :style="{ color: topic.color }"></i>
+                          <span class="topic-name">{{ topic.name }}</span>
+                          <span v-if="topic.isCritical" class="critical-badge">
+                            <i class="fa fa-exclamation-triangle"></i>
+                            Critical
+                          </span>
+                        </label>
+                      </div>
                     </div>
                     <div class="followee-count" :class="{ 'has-followees': getFolloweesForTopic(topic.id).length > 0 }">
                       <i v-if="getFolloweesForTopic(topic.id).length > 0" class="fa fa-check-circle me-1"></i>
@@ -271,6 +283,64 @@ const activeTopicsCount = computed(() => {
   if (!props.neuron?.followings) return 0
   return allTopics.value.filter(topic => getFolloweesForTopic(topic.id).length > 0).length
 })
+
+// Check if a topic has following enabled (has any followees)
+const isTopicFollowingEnabled = (topicId: string) => {
+  return getFolloweesForTopic(topicId).length > 0
+}
+
+// Toggle following for an entire topic
+const toggleTopicFollowing = async (topicId: string, event: Event) => {
+  const target = event.target as HTMLInputElement
+  const isEnabled = target.checked
+  
+  if (!props.neuron) return
+  
+  try {
+    loading.value = true
+    
+    if (isEnabled) {
+      // If enabling, we need the user to specify which neuron to follow
+      // For now, show a message that they need to add a followee
+      tacoStore.addToast({
+        id: Date.now(),
+        code: 'topic-enable-info',
+        title: 'Add Followee Required',
+        icon: 'fa-solid fa-info',
+        message: `To enable following for ${topicId}, please add a neuron ID below`
+      })
+      // Revert the checkbox
+      target.checked = false
+    } else {
+      // If disabling, remove all followees for this topic
+      const followees = getFolloweesForTopic(topicId)
+      for (const followee of followees) {
+        await removeFollowee(topicId, followee.neuronId)
+      }
+      
+      tacoStore.addToast({
+        id: Date.now(),
+        code: 'topic-disabled',
+        title: 'Topic Following Disabled',
+        icon: 'fa-solid fa-check',
+        message: `Disabled following for ${topicId}`
+      })
+    }
+  } catch (error: any) {
+    console.error('Error toggling topic following:', error)
+    tacoStore.addToast({
+      id: Date.now(),
+      code: 'topic-toggle-error',
+      title: 'Toggle Failed',
+      icon: 'fa-solid fa-exclamation-triangle',
+      message: error.message || 'Failed to toggle topic following'
+    })
+    // Revert checkbox state
+    target.checked = !isEnabled
+  } finally {
+    loading.value = false
+  }
+}
 
 // Initialize newFollowees object
 onMounted(() => {
@@ -630,11 +700,33 @@ watch(() => props.neuron, (newNeuron) => {
   display: flex;
   align-items: center;
   gap: 0.5rem;
+  flex: 1;
+}
+
+.topic-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 1;
+}
+
+.topic-checkbox {
+  margin: 0;
+  cursor: pointer;
+}
+
+.topic-toggle-label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  margin: 0;
+  flex: 1;
 }
 
 .topic-name {
   font-weight: 600;
-  color: #fff;
+  color: #2d3748;
 }
 
 .critical-badge {
@@ -697,7 +789,8 @@ watch(() => props.neuron, (newNeuron) => {
 .followee-id {
   font-family: 'Courier New', monospace;
   font-size: 0.85rem;
-  color: #e9ecef;
+  color: #2d3748;
+  font-weight: 600;
 }
 
 .followee-alias {
