@@ -66,8 +66,8 @@ export function icrc1ToLegacyAccountId(
   const data = concat(sep, owner.toUint8Array(), SUB);
 
   // js-sha256 returns hex; convert to bytes
-  const hashHex = sha224.update(data as unknown as number[]).hex(); // 28-byte SHA-224
-  const hash = new Uint8Array(hashHex.match(/.{1,2}/g)!.map(h => parseInt(h, 16)));
+  const hashHex = sha224.update(data as unknown as number[]).hex() // 28-byte SHA-224
+  const hash = new Uint8Array(hashHex.match(/.{1,2}/g)!.map((h: string) => parseInt(h, 16)))
 
   const id = concat(crc32(hash), hash);
   const hex = toHex(id);
