@@ -8168,7 +8168,32 @@ export const useTacoStore = defineStore('taco', () => {
             if ('ok' in result) {
                 return result.ok;
             } else {
-                throw new Error(result.err?.error_message || 'Failed to get SNS proposal');
+                // Fallback: fetch directly from SNS Governance if snapshot returns an error
+                console.warn('Snapshot getSNSProposal err, trying SNS governance directly:', result.err);
+                try {
+                    const authClient = await getAuthClient();
+                    const identity = authClient.getIdentity();
+                    const agent = await createAgent({
+                        identity,
+                        host: process.env.DFX_NETWORK === 'local' ? 'http://localhost:4943' : 'https://ic0.app',
+                        fetchRootKey: process.env.DFX_NETWORK === 'local',
+                    });
+                    const snsGov = await createSnsGovernanceActor(agent, 'lhdfz-wqaaa-aaaaq-aae3q-cai');
+                    const resp = await (snsGov as any).get_proposal({ proposal_id: [{ id: snsProposalId }] });
+                    // Normalize GetProposalResponse -> ProposalData
+                    if (resp?.result && Array.isArray(resp.result) && resp.result.length > 0) {
+                        const inner = resp.result[0];
+                        if (inner?.Proposal) {
+                            return inner.Proposal; // ProposalData shape
+                        } else if (inner?.Ok) {
+                            return inner.Ok;
+                        }
+                    }
+                    throw new Error('Failed to get SNS proposal');
+                } catch (fallbackError) {
+                    console.error('SNS governance fallback failed:', fallbackError);
+                    throw new Error((result.err && (result.err.error_message || result.err)) || 'Failed to get SNS proposal');
+                }
             }
         } catch (error) {
             console.error('Error getting SNS proposal:', error);
