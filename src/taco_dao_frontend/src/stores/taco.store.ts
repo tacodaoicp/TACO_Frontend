@@ -5567,13 +5567,17 @@ export const useTacoStore = defineStore('taco', () => {
                 topicFollowees.forEach((topicEntry: any) => {
                     const topicId = topicEntry[0]; // Topic ID (int32)
                     const followeesForTopic = topicEntry[1]; // FolloweesForTopic
-                    
-                    // Map topic IDs to topic names (corrected based on actual NNS behavior)
-                    const getTopicFromId = (id: number) => {
-                        // Topic variant order from sns_governance.did:
-                        // 0 DaoCommunitySettings, 1 SnsFrameworkManagement,
-                        // 2 DappCanisterManagement, 3 ApplicationBusinessLogic,
-                        // 4 Governance, 5 TreasuryAssetManagement, 6 CriticalDappOperations
+
+                    // Prefer the canonical topic variant from canister response, fall back to id mapping
+                    const getTopicName = (f: any, id: number) => {
+                        try {
+                            if (f?.topic && Array.isArray(f.topic) && f.topic.length > 0) {
+                                const variant = f.topic[0];
+                                const keys = Object.keys(variant);
+                                if (keys.length === 1) return keys[0];
+                            }
+                        } catch (_) {}
+                        // Fallback mapping aligned to DID order
                         const topicMap: Record<number, string> = {
                             0: 'DaoCommunitySettings',
                             1: 'SnsFrameworkManagement',
@@ -5585,7 +5589,7 @@ export const useTacoStore = defineStore('taco', () => {
                         };
                         return topicMap[id] || `Topic${id}`;
                     };
-                    
+
                     const followedNeurons = (followeesForTopic.followees || []).map((followee: any) => {
                         const neuronId = followee.neuron_id && followee.neuron_id.length > 0 ? followee.neuron_id[0].id : null;
                         const neuronIdHex = neuronId ? Array.from(neuronId as Uint8Array).map((b: number) => b.toString(16).padStart(2, '0')).join('') : 'Unknown';
@@ -5597,7 +5601,7 @@ export const useTacoStore = defineStore('taco', () => {
                         };
                     });
                     
-                    const topicName = getTopicFromId(topicId);
+                    const topicName = getTopicName(followeesForTopic, topicId);
                     
                     followings.push({
                         topicId: topicName,
