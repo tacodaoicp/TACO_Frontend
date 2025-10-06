@@ -5570,14 +5570,18 @@ export const useTacoStore = defineStore('taco', () => {
                     
                     // Map topic IDs to topic names (corrected based on actual NNS behavior)
                     const getTopicFromId = (id: number) => {
+                        // Topic variant order from sns_governance.did:
+                        // 0 DaoCommunitySettings, 1 SnsFrameworkManagement,
+                        // 2 DappCanisterManagement, 3 ApplicationBusinessLogic,
+                        // 4 Governance, 5 TreasuryAssetManagement, 6 CriticalDappOperations
                         const topicMap: Record<number, string> = {
-                            0: 'SnsFrameworkManagement',     // SNS framework management
-                            1: 'DaoCommunitySettings',       // DAO community settings ✓
-                            2: 'ApplicationBusinessLogic',   // Application Business Logic  
-                            3: 'TreasuryAssetManagement',    // Treasury & asset management ✓
-                            4: 'CriticalDappOperations',     // Critical Dapp Operations
-                            5: 'Governance',                 // Governance
-                            6: 'DappCanisterManagement'      // Dapp canister management ✓
+                            0: 'DaoCommunitySettings',
+                            1: 'SnsFrameworkManagement',
+                            2: 'DappCanisterManagement',
+                            3: 'ApplicationBusinessLogic',
+                            4: 'Governance',
+                            5: 'TreasuryAssetManagement',
+                            6: 'CriticalDappOperations'
                         };
                         return topicMap[id] || `Topic${id}`;
                     };
@@ -6434,14 +6438,15 @@ export const useTacoStore = defineStore('taco', () => {
                 
                 // Map topic names to IDs (reverse of the display mapping)
                 const getTopicIdFromName = (name: string): number => {
+                    // Reverse mapping aligned to sns_governance.did Topic order
                     const topicMap: Record<string, number> = {
-                        'SnsFrameworkManagement': 0,     // SNS framework management
-                        'DaoCommunitySettings': 1,        // DAO community settings
-                        'ApplicationBusinessLogic': 2,    // Application Business Logic
-                        'TreasuryAssetManagement': 3,     // Treasury & asset management
-                        'CriticalDappOperations': 4,      // Critical Dapp Operations
-                        'Governance': 5,                  // Governance
-                        'DappCanisterManagement': 6       // Dapp canister management
+                        'DaoCommunitySettings': 0,
+                        'SnsFrameworkManagement': 1,
+                        'DappCanisterManagement': 2,
+                        'ApplicationBusinessLogic': 3,
+                        'Governance': 4,
+                        'TreasuryAssetManagement': 5,
+                        'CriticalDappOperations': 6
                     };
                     return topicMap[name] ?? -1;
                 };
