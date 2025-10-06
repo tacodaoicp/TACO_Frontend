@@ -499,13 +499,27 @@
                         <table class="table table-dark table-striped table-sm">
                           <thead class="sticky-top">
                             <tr>
-                              <th>Neuron ID</th>
-                              <th>Performance Score</th>
-                              <th>Voting Power</th>
-                              <th>Reward Score</th>
-                              <th>Reward Amount</th>
-                              <th>% of Total</th>
-                              <th>Makers</th>
+                              <th class="sortable-header" @click="sortNeuronRewards(index, 'neuronId')">
+                                Neuron ID <span class="sort-icon">{{ getSortIcon(index, 'neuronId') }}</span>
+                              </th>
+                              <th class="sortable-header" @click="sortNeuronRewards(index, 'performanceScore')">
+                                Performance Score <span class="sort-icon">{{ getSortIcon(index, 'performanceScore') }}</span>
+                              </th>
+                              <th class="sortable-header" @click="sortNeuronRewards(index, 'votingPower')">
+                                Voting Power <span class="sort-icon">{{ getSortIcon(index, 'votingPower') }}</span>
+                              </th>
+                              <th class="sortable-header" @click="sortNeuronRewards(index, 'rewardScore')">
+                                Reward Score <span class="sort-icon">{{ getSortIcon(index, 'rewardScore') }}</span>
+                              </th>
+                              <th class="sortable-header" @click="sortNeuronRewards(index, 'rewardAmount')">
+                                Reward Amount <span class="sort-icon">{{ getSortIcon(index, 'rewardAmount') }}</span>
+                              </th>
+                              <th class="sortable-header" @click="sortNeuronRewards(index, 'percentage')">
+                                % of Total <span class="sort-icon">{{ getSortIcon(index, 'percentage') }}</span>
+                              </th>
+                              <th class="sortable-header" @click="sortNeuronRewards(index, 'makers')">
+                                Makers <span class="sort-icon">{{ getSortIcon(index, 'makers') }}</span>
+                              </th>
                               <th>Actions</th>
                             </tr>
                           </thead>
@@ -698,7 +712,10 @@ export default {
       selectedPriceType: 'USD',
       refreshInterval: null,
       rewardSkipList: [],
-      newSkipNeuronId: ''
+      newSkipNeuronId: '',
+      // Sorting state for neuron details tables
+      sortColumns: {}, // Track sort column for each distribution
+      sortDirections: {} // Track sort direction for each distribution
     }
   },
 
@@ -1137,6 +1154,18 @@ export default {
         rewards = rewards.filter(reward => 
           this.formatNeuronId(reward.neuronId).toLowerCase().includes(searchTerm.toLowerCase())
         )
+      }
+      
+      // Apply sorting if a column is selected
+      const sortColumn = this.sortColumns[index]
+      const sortDirection = this.sortDirections[index] || 'desc'
+      if (sortColumn) {
+        // Add total reward pot to each reward for percentage calculation
+        const rewardsWithTotal = rewards.map(reward => ({
+          ...reward,
+          totalRewardPot: distribution.totalRewardPot
+        }))
+        rewards = this.sortRewardsArray(rewardsWithTotal, sortColumn, sortDirection)
       }
       
       // Apply limit
@@ -1690,6 +1719,90 @@ export default {
         console.error('Error formatting neuron ID:', error)
         return 'Format Error'
       }
+    },
+
+    // Sorting methods for neuron details table
+    sortNeuronRewards(distributionIndex, column) {
+      // Initialize sort state for this distribution if not exists
+      if (!this.sortColumns[distributionIndex]) {
+        this.sortColumns = { ...this.sortColumns, [distributionIndex]: null }
+        this.sortDirections = { ...this.sortDirections, [distributionIndex]: 'desc' }
+      }
+
+      // Toggle direction if same column, otherwise set to descending
+      if (this.sortColumns[distributionIndex] === column) {
+        this.sortDirections = { 
+          ...this.sortDirections, 
+          [distributionIndex]: this.sortDirections[distributionIndex] === 'desc' ? 'asc' : 'desc' 
+        }
+      } else {
+        this.sortColumns = { ...this.sortColumns, [distributionIndex]: column }
+        this.sortDirections = { ...this.sortDirections, [distributionIndex]: 'desc' }
+      }
+    },
+
+    getSortIcon(distributionIndex, column) {
+      if (this.sortColumns[distributionIndex] !== column) {
+        return '↕️' // Neutral sort icon
+      }
+      return this.sortDirections[distributionIndex] === 'desc' ? '🔽' : '🔼'
+    },
+
+    sortRewardsArray(rewards, column, direction) {
+      const sortedRewards = [...rewards]
+      
+      sortedRewards.sort((a, b) => {
+        let aVal, bVal
+        
+        switch (column) {
+          case 'neuronId':
+            aVal = this.formatNeuronId(a.neuronId).toLowerCase()
+            bVal = this.formatNeuronId(b.neuronId).toLowerCase()
+            break
+          case 'performanceScore':
+            aVal = Number(a.performanceScore)
+            bVal = Number(b.performanceScore)
+            break
+          case 'votingPower':
+            aVal = Number(a.votingPower)
+            bVal = Number(b.votingPower)
+            break
+          case 'rewardScore':
+            aVal = Number(a.rewardScore)
+            bVal = Number(b.rewardScore)
+            break
+          case 'rewardAmount':
+            aVal = Number(a.rewardAmount)
+            bVal = Number(b.rewardAmount)
+            break
+          case 'percentage':
+            // Calculate percentage for sorting
+            aVal = Number(a.rewardAmount) / Number(a.totalRewardPot || 1)
+            bVal = Number(b.rewardAmount) / Number(b.totalRewardPot || 1)
+            break
+          case 'makers':
+            // Sort by number of makers
+            aVal = this.getMakersFromReward(a).length
+            bVal = this.getMakersFromReward(b).length
+            break
+          default:
+            return 0
+        }
+        
+        // Handle string comparison
+        if (typeof aVal === 'string' && typeof bVal === 'string') {
+          return direction === 'desc' ? bVal.localeCompare(aVal) : aVal.localeCompare(bVal)
+        }
+        
+        // Handle numeric comparison
+        if (direction === 'desc') {
+          return bVal - aVal
+        } else {
+          return aVal - bVal
+        }
+      })
+      
+      return sortedRewards
     }
   },
 
@@ -1872,5 +1985,26 @@ small.text-muted {
   text-overflow: ellipsis;
   white-space: nowrap;
   display: inline-block;
+}
+
+/* Sortable header styling */
+.sortable-header {
+  cursor: pointer;
+  user-select: none;
+  transition: background-color 0.2s ease;
+}
+
+.sortable-header:hover {
+  background-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+.sort-icon {
+  font-size: 0.8em;
+  margin-left: 0.25rem;
+  opacity: 0.7;
+}
+
+.sortable-header:hover .sort-icon {
+  opacity: 1;
 }
 </style>

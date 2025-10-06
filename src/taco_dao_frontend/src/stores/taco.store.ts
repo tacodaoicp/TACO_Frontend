@@ -913,7 +913,6 @@ export const useTacoStore = defineStore('taco', () => {
         
         // remove the toast after 5 seconds (5000ms)
         setTimeout(() => {
-
         
             removeToast(toast.id)
 
@@ -1973,14 +1972,14 @@ export const useTacoStore = defineStore('taco', () => {
                     const errorMsg = result && result.err ? JSON.stringify(result.err) : 'Unknown error'
                     console.error('Error refreshing voting power:', errorMsg)
                     
-                    // show error toast
-                    addToast({
-                        id: Date.now(),
-                        code: 'voting-power-error',
-                        title: 'Voting Power Refresh Failed',
-                        icon: 'fa-solid fa-exclamation-triangle',
-                        message: `We may have pushed an update to the site since you last logged in. Try logging out and logging back in`
-                    })
+                    // // show error toast
+                    // addToast({
+                    //     id: Date.now(),
+                    //     code: 'voting-power-error',
+                    //     title: 'Voting Power Refresh Failed',
+                    //     icon: 'fa-solid fa-exclamation-triangle',
+                    //     message: `${errorMsg}`
+                    // })
                     
                     return false
                 }
@@ -2000,14 +1999,14 @@ export const useTacoStore = defineStore('taco', () => {
             // log error
             console.error('error refreshing voting power:', error)
 
-            // show error toast
-            addToast({
-                id: Date.now(),
-                code: 'voting-power-error',
-                title: 'Voting Power Refresh Failed',
-                icon: 'fa-solid fa-exclamation-triangle',
-                message: `We may have pushed an update to the site since you last logged in. Try logging out and logging back in`
-            })
+            // // show error toast
+            // addToast({
+            //     id: Date.now(),
+            //     code: 'voting-power-error',
+            //     title: 'Voting Power Refresh Failed',
+            //     icon: 'fa-solid fa-exclamation-triangle',
+            //     message: `${error}`
+            // })
 
             // return
             return false
@@ -8002,7 +8001,7 @@ export const useTacoStore = defineStore('taco', () => {
             code: 'success',
             title: 'Success',
             message: message,
-            icon: 'fa-solid fa-exclamation-triangle'
+            icon: 'fa-solid fa-check'
         });
     }
 
