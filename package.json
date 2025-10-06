@@ -16,13 +16,24 @@
     "src/taco_dao_frontend"
   ],
   "dependencies": {
-    "@dfinity/agent": "^2.1.2",
-    "@dfinity/auth-client": "^2.1.2",
-    "@dfinity/ledger-icp": "^2.6.1",
-    "@dfinity/principal": "^2.1.2",
+    "@dfinity/agent": "^3.2.7",
+    "@dfinity/auth-client": "^3.2.7",
+    "@dfinity/candid": "^3.2.7",
+    "@dfinity/ledger-icp": "^3.0.0",
+    "@dfinity/principal": "^3.2.7",
     "@dfinity/sns": "^4.0.3",
-    "@dfinity/utils": "^2.5.2",
+    "@dfinity/utils": "^2.13.0",
     "js-sha256": "^0.11.1",
     "vue3-click-away": "^1.2.4"
+  },
+  "overrides": {
+    "@dfinity/agent": "^3.2.7",
+    "@dfinity/auth-client": "^3.2.7",
+    "@dfinity/candid": "^3.2.7",
+    "@dfinity/principal": "^3.2.7",
+    "@dfinity/identity": "^3.2.7",
+    "@dfinity/utils": "^2.13.0",
+    "@dfinity/ledger-icp": "^3.0.0",
+    "@dfinity/ledger-icrc": "^3.0.0"
   }
 }
