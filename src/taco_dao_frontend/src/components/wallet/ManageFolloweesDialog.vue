@@ -791,6 +791,34 @@ watch(() => props.neuron, (newNeuron, oldNeuron) => {
   overflow-y: auto;
 }
 
+/* Ensure checkboxes are visible on dark theme and properly aligned */
+.topic-checkboxes .form-check {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.topic-checkboxes .form-check-input {
+  position: static; /* override bootstrap negative margins */
+  margin: 0;
+  width: 1.1rem;
+  height: 1.1rem;
+  background-color: #1a202c;
+  border-color: #4a5568;
+}
+
+.topic-checkboxes .form-check-input:checked {
+  background-color: #0d6efd;
+  border-color: #0d6efd;
+}
+
+.topic-checkboxes .form-check-label {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
 .form-check {
   padding: 0.5rem;
   background: rgba(255, 255, 255, 0.03);
