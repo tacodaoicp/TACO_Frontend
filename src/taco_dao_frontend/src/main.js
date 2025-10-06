@@ -29,14 +29,17 @@ import ChatView from "./views/ChatView.vue"
 import ReportsView from "./views/ReportsView.vue"
 import ForumView from "./views/ForumView.vue"
 import ThreadView from "./views/ThreadView.vue"
-import NamesView from "./views/NamesView.vue"
+import NamesViewDemo from "./views/NamesViewDemo.vue"
 import ProposalsView from "./views/ProposalsView.vue"
 import ProposalView from "./views/ProposalView.vue"
 import WalletView from "./views/WalletView.vue"
 import WalletViewDemo from "./views/WalletViewDemo.vue"
 import WizardView from "./views/WizardView.vue"
+import WizardViewDemo from "./views/WizardViewDemo.vue"
 import NNSVoteView from "./views/NNSVoteView.vue"
+import NNSVoteViewDemo from "./views/NNSVoteViewDemo.vue"
 import NNSPropView from "./views/NNSPropView.vue"
+import NNSPropViewDemo from "./views/NNSPropViewDemo.vue"
 import VueApexCharts from 'vue3-apexcharts'
 import VueClickAway from "vue3-click-away"
 import 'animate.css'
@@ -51,6 +54,7 @@ const routes = [
     { path: "/wallet", name: "Wallet", component: WalletView, meta: { robots: 'index' } },
     { path: "/walletdemo", name: "WalletDemo", component: WalletViewDemo, meta: { robots: 'noindex' } },
     { path: "/wizard", name: "Wizard", component: WizardView, meta: { robots: 'noindex' } },
+    { path: "/wizarddemo", name: "WizardDemo", component: WizardViewDemo, meta: { robots: 'noindex' } },
     { path: "/rewards", name: "Rewards", component: RewardsView, meta: { robots: 'noindex' } },
     { path: "/chat/oc", name: "ChatOC", component: ChatView, meta: { robots: 'index' } },
     { path: "/chat/sneed", redirect: "/chat/forum", meta: { robots: 'noindex' } }, // keep for historical linking
@@ -89,9 +93,11 @@ const routes = [
     { path: "/admin/nns", name: "AdminNNS", component: AdminNNSView, meta: { robots: 'noindex' } },
     { path: "/forum", name: "Forum", component: ForumView, meta: { robots: 'noindex' } },
     { path: "/forum/thread/:id", name: "Thread", component: ThreadView, meta: { robots: 'noindex' } },
-    { path: "/names", name: "Names", component: NamesView, meta: { robots: 'noindex' } }, //remove once integrated
+    { path: "/namesdemo", name: "NamesDemo", component: NamesViewDemo, meta: { robots: 'noindex' } }, //remove once integrated
     { path: "/nnsvote/:id", name: "NNSVote", component: NNSVoteView, meta: { robots: 'noindex' } },
+    { path: "/nnsvotedemo/:id", name: "NNSVoteDemo", component: NNSVoteViewDemo, meta: { robots: 'noindex' } },
     { path: "/nnsprop/:id", name: "NNSProp", component: NNSPropView, meta: { robots: 'noindex' } },
+    { path: "/nnspropdemo/:id", name: "NNSPropDemo", component: NNSPropViewDemo, meta: { robots: 'noindex' } },
     { path: "/:pathMatch(.*)*", redirect: "/" },
 ]
 

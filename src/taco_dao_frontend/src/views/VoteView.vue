@@ -36,12 +36,17 @@
               <div class="d-flex align-items-center">
 
                 <!-- if logged out, log in title -->
-                <h2 v-if="!userLoggedIn" class="vote-view__top-bar__title py-2">Log in to Vote</h2>                
+                <h2 v-if="!userLoggedIn" class="vote-view__top-bar__title py-2">
+                  Log in to Vote
+                </h2>                
 
                 <!-- if logged in, allocation voting title -->
                 <h2 v-if="userLoggedIn" class="vote-view__top-bar__title py-2">
+
                   <span class="whitespace-nowrap">Welcome, &hellip;{{ truncatedPrincipal }}&nbsp;</span>
+
                   <span v-if="votePower !== '0'" class="vote-view__top-bar__vote-power text-nowrap">({{ votePower }} VP)</span>
+
                   <span v-if="votePower === '0'" class="vote-view__top-bar__vote-power text-nowrap">(0 VP)</span>
                   
                   <!-- refresh voting power button -->
@@ -65,7 +70,7 @@
               <div class="d-flex gap-2 flex-wrap ms-auto">
 
                 <!-- if logged out, login button -->
-                <button v-if="!userLoggedIn" class="btn iid-login m-2 me-2" @click="iidLogIn">
+                <button v-if="!userLoggedIn" class="btn iid-login m-1 me-2" @click="iidLogIn">
                   
                   <!-- dfinity logo -->
                   <DfinityLogo />
@@ -2185,6 +2190,13 @@
   }
 
   ///////////
+  // setup //
+  ///////////  
+
+  // images
+  const astronautLoaderUrl = astronautLoader  
+
+  ///////////
   // store //
   ///////////
 
@@ -2231,9 +2243,6 @@
 
   // dao backend
   const { ensureTokenDetails } = tacoStore
-
-  // images
-  const astronautLoaderUrl = astronautLoader  
 
   /////////////////////
   // local variables //
@@ -3040,7 +3049,7 @@
   // watchers //
   //////////////
 
-  // watch for changes in user logged in state, fire immediately
+  // watch for changes in user logged in state
   watch(userLoggedIn, async (newState) => {
 
     // log
