@@ -283,8 +283,7 @@
                                 </div>
 
                                 <!-- SNS proposal details -->
-                                <!-- v-if="snsProposal" -->
-                                <div class="pt-3">
+                                <div v-if="snsProposal" class="pt-3">
 
                                     <!-- title -->
                                     <h4 style="color: var(--dark-brown-to-white);">
@@ -770,7 +769,7 @@
     // # STATE #
 
     // app
-    const { tacoSnsRootCanisterId } = storeToRefs(tacoStore)
+    // const { tacoSnsRootCanisterId } = storeToRefs(tacoStore)
 
     // user
     const { userLoggedIn } = storeToRefs(tacoStore)
@@ -816,7 +815,7 @@
     const daoAlreadyVoted = ref(false)
     const userNeurons = ref<any[]>([])
     const selectedNeurons = ref<Uint8Array[]>([])
-    const voteDecision = ref<'Adopt' | 'Reject'>('')
+    const voteDecision = ref<'' | 'Adopt' | 'Reject'>('')
     const votingInProgress = ref(false)
     const neuronVoteStatus = ref<Map<string, any>>(new Map())
     const refreshingVP = ref(false)
