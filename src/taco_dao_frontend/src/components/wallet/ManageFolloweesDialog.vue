@@ -258,6 +258,14 @@ const emit = defineEmits<{
 const tacoStore = useTacoStore()
 const { getAllTopics } = useTopicMapping()
 
+// Keep an internal reactive copy of the neuron to avoid timing issues on refresh
+const internalNeuron = ref<any | null>(null)
+
+// Sync internal neuron with prop, immediately and on changes
+watch(() => props.neuron, (newNeuron) => {
+  internalNeuron.value = newNeuron
+}, { immediate: true, deep: true })
+
 // State
 const loading = ref(false)
 const showBulkFollowModal = ref(false)
@@ -270,7 +278,6 @@ const allTopics = computed(() => getAllTopics())
 
 // Count how many topics have active followees
 const activeTopicsCount = computed(() => {
-  if (!props.neuron?.followings) return 0
   return allTopics.value.filter(topic => getFolloweesForTopic(topic.id).length > 0).length
 })
 
@@ -286,24 +293,40 @@ onMounted(() => {
   newFollowees.value = followeeInputs
 })
 
+// Get followees for a specific topic - made reactive with computed
+const followeesByTopic = computed(() => {
+  const followeesMap: Record<string, any[]> = {}
+  
+  if (!internalNeuron.value?.followings) {
+    // Initialize empty arrays for all topics
+    allTopics.value.forEach(topic => {
+      followeesMap[topic.id] = []
+    })
+    return followeesMap
+  }
+  
+  // Initialize all topics with empty arrays first
+  allTopics.value.forEach(topic => {
+    followeesMap[topic.id] = []
+  })
+  
+  // Then populate with actual followees
+  internalNeuron.value.followings.forEach((following: any) => {
+    if (following.followedNeurons && following.followedNeurons.length > 0) {
+      followeesMap[following.topicId] = following.followedNeurons.map((neuron: any) => ({
+        neuronId: neuron.idHex,
+        neuronIdShort: neuron.idShort,
+        alias: neuron.alias || null
+      }))
+    }
+  })
+  
+  return followeesMap
+})
+
 // Get followees for a specific topic
 const getFolloweesForTopic = (topicId: string) => {
-  if (!props.neuron?.followings) {
-    return []
-  }
-  
-  // Find the following entry for this topic
-  const topicFollowing = props.neuron.followings.find((f: any) => f.topicId === topicId)
-  
-  if (!topicFollowing) {
-    return []
-  }
-  
-  return topicFollowing.followedNeurons.map((neuron: any) => ({
-    neuronId: neuron.idHex,
-    neuronIdShort: neuron.idShort,
-    alias: neuron.alias || null
-  }))
+  return followeesByTopic.value[topicId] || []
 }
 
 // Add followee to a topic
@@ -315,10 +338,10 @@ const addFollowee = async (topicId: string) => {
     loading.value = true
     
     // Convert neuron ID from hex to Uint8Array
-    const neuronIdBytes = new Uint8Array(props.neuron.idHex.match(/.{2}/g).map((byte: string) => parseInt(byte, 16)))
+    const neuronIdBytes = new Uint8Array(props.neuron.idHex.match(/.{2}/g)?.map((byte: string) => parseInt(byte, 16)) || [])
     
     // Convert followee neuron ID from hex to Uint8Array
-    const followeeIdBytes = new Uint8Array(neuronId.match(/.{2}/g).map((byte: string) => parseInt(byte, 16)))
+    const followeeIdBytes = new Uint8Array(neuronId.match(/.{2}/g)?.map((byte: string) => parseInt(byte, 16)) || [])
     
     await tacoStore.addNeuronFollowee(neuronIdBytes, topicId, followeeIdBytes)
     
@@ -358,10 +381,10 @@ const removeFollowee = async (topicId: string, followeeNeuronId: string) => {
     loading.value = true
     
     // Convert neuron ID from hex to Uint8Array
-    const neuronIdBytes = new Uint8Array(props.neuron.idHex.match(/.{2}/g).map((byte: string) => parseInt(byte, 16)))
+    const neuronIdBytes = new Uint8Array(props.neuron.idHex.match(/.{2}/g)?.map((byte: string) => parseInt(byte, 16)) || [])
     
     // Convert followee neuron ID from hex to Uint8Array
-    const followeeIdBytes = new Uint8Array(followeeNeuronId.match(/.{2}/g).map((byte: string) => parseInt(byte, 16)))
+    const followeeIdBytes = new Uint8Array(followeeNeuronId.match(/.{2}/g)?.map((byte: string) => parseInt(byte, 16)) || [])
     
     await tacoStore.removeNeuronFollowee(neuronIdBytes, topicId, followeeIdBytes)
     
@@ -440,10 +463,10 @@ const addFolloweeToTopic = async (topicId: string, neuronId: string) => {
   if (!props.neuron) return
   
   // Convert neuron ID from hex to Uint8Array
-  const neuronIdBytes = new Uint8Array(props.neuron.idHex.match(/.{2}/g).map((byte: string) => parseInt(byte, 16)))
+  const neuronIdBytes = new Uint8Array(props.neuron.idHex.match(/.{2}/g)?.map((byte: string) => parseInt(byte, 16)) || [])
   
   // Convert followee neuron ID from hex to Uint8Array
-  const followeeIdBytes = new Uint8Array(neuronId.match(/.{2}/g).map((byte: string) => parseInt(byte, 16)))
+  const followeeIdBytes = new Uint8Array(neuronId.match(/.{2}/g)?.map((byte: string) => parseInt(byte, 16)) || [])
   
   await tacoStore.addNeuronFollowee(neuronIdBytes, topicId, followeeIdBytes)
 }
@@ -524,14 +547,15 @@ const refreshNeuronData = async () => {
     loading.value = true
     
     // Get fresh neuron data using the same pattern as the store methods
-    const neuronIdBytes = new Uint8Array(props.neuron.idHex.match(/.{2}/g).map((byte: string) => parseInt(byte, 16)))
+    const neuronIdBytes = new Uint8Array(props.neuron.idHex.match(/.{2}/g)?.map((byte: string) => parseInt(byte, 16)) || [])
     
     // Use the store method to get fresh neuron data
     const freshNeuronData = await tacoStore.getSingleNeuron(neuronIdBytes)
     
     if (freshNeuronData) {
-      // Format the fresh neuron data and emit the event
+      // Format the fresh neuron data, update internal state, and emit the event
       const formattedNeuron = tacoStore.formatNeuronForDisplay(freshNeuronData)
+      internalNeuron.value = formattedNeuron
       
       console.log('Fresh neuron data formatted:', formattedNeuron)
       console.log('Fresh followings:', formattedNeuron.followings)

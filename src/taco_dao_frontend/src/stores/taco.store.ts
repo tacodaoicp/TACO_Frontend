@@ -6523,21 +6523,50 @@ export const useTacoStore = defineStore('taco', () => {
                 neuron_id: [{ id: Array.from(neuronId) }] 
             }) as any;
 
-            if (result.result && result.result.length > 0) {
-                const neuron = result.result[0];
-                
-                // The get_neuron response has a different structure than list_neurons
-                // We need to normalize it for formatNeuronForDisplay
-                if (neuron.id && !Array.isArray(neuron.id)) {
-                    // Convert single id to array format expected by formatNeuronForDisplay
-                    neuron.id = [neuron.id];
+            // Unwrap SNS variant shape: { result: [{ Ok: {...} }]} or { result: [{ Err: {...} }] }
+            let neuronRaw: any | null = null;
+            if (result?.result && Array.isArray(result.result) && result.result.length > 0) {
+                const inner = result.result[0];
+                if (inner?.Ok) {
+                    neuronRaw = inner.Ok;
+                } else if (inner?.Neuron) { // Some SDKs may return { Neuron: {...} }
+                    neuronRaw = inner.Neuron;
+                } else if (inner && !inner.Err) {
+                    // Already the neuron object
+                    neuronRaw = inner;
+                } else if (inner?.Err) {
+                    throw new Error(`get_neuron error: ${JSON.stringify(inner.Err)}`);
                 }
-                
-                console.log('Normalized neuron data for formatting:', neuron);
-                return neuron;
             }
 
-            throw new Error('Neuron not found');
+            if (!neuronRaw) {
+                throw new Error('Neuron not found');
+            }
+
+            const neuron = neuronRaw;
+
+            // Normalize fields for formatNeuronForDisplay
+            // Ensure id is in array form
+            if (neuron.id && !Array.isArray(neuron.id)) {
+                neuron.id = [neuron.id];
+            }
+
+            // Ensure topic_followees matches list_neurons shape
+            // Some responses may return topic_followees directly (not wrapped); wrap if needed
+            if (neuron.topic_followees && !Array.isArray(neuron.topic_followees)) {
+                neuron.topic_followees = [neuron.topic_followees];
+            }
+
+            // Ensure nested topic_id_to_followees is an array
+            if (neuron.topic_followees && neuron.topic_followees.length > 0) {
+                const wrapper = neuron.topic_followees[0];
+                if (wrapper && wrapper.topic_id_to_followees && !Array.isArray(wrapper.topic_id_to_followees)) {
+                    wrapper.topic_id_to_followees = Array.from(wrapper.topic_id_to_followees);
+                }
+            }
+
+            console.log('Normalized neuron data for formatting:', neuron);
+            return neuron;
         } catch (error: any) {
             console.error('Error getting single neuron:', error);
             throw error;
