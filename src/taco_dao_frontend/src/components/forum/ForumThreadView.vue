@@ -125,6 +125,14 @@
                         {{ posts.length }} comments
                     </span>
 
+                    <!-- vote router link -->
+                    <router-link v-if="proposal && proposal.title.includes('Copy of NNS Proposal')" 
+                                 :to="`/nnsvote/${proposal.id}`"
+                        class="forum-thread-view__header__nns-vote-btn
+                               btn">
+                        Vote
+                    </router-link>
+
                     <!-- refresh button -->
                     <button @click="refreshPosts"
                         class="forum-thread-view__header__refresh btn">
@@ -1220,6 +1228,19 @@
             font-weight: 600;
             text-wrap: nowrap;
             color: var(--black);
+        }
+
+        // vote button
+        &__nns-vote-btn {
+            color: var(--white);
+            font-family: "Rubik";
+            background-color: var(--blue);
+            border: none;
+            margin-left: 0.5rem;  
+            padding: 0.25rem 0.75rem;
+            border-radius: 0.25rem;
+            font-weight: 600;
+            font-family: "Space Mono";         
         }
 
         // add comment button

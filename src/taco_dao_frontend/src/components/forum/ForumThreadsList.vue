@@ -113,6 +113,16 @@
                               <!-- principal -->
                               <span class="forum-threads-list__thread__principal">{{ truncateHex(proposal.proposer) }}</span>
 
+                              <!-- NNS indicator, if proposal.title containes "Copy of NNS Proposal" -->
+                              <span v-if="proposal.title.includes('Copy of NNS Proposal')" 
+                                    class="forum-threads-list__thread__nns-indicator"
+                                    data-bs-toggle="tooltip"
+                                    data-bs-placement="bottom"
+                                    data-bs-custom-class="taco-tooltip"
+                                    title="This proposal is a copy of a NNS proposal for Taco Dao NNS governance voting">
+                                NNS
+                              </span>
+
                           </div>
 
                       </div>
@@ -393,6 +403,18 @@
         font-family: "Rubik";
         text-wrap: nowrap;
         font-weight: 600;
+      }
+
+      // NNS indicator
+      &__nns-indicator {
+        color: var(--white);
+        font-family: "Rubik";
+        font-weight: 600;
+        text-wrap: nowrap;
+        background-color: var(--blue);
+        border-radius: 0.25rem;
+        padding: 0 0.5rem;
+        font-size: 0.75rem;     
       }
 
       /////////////
