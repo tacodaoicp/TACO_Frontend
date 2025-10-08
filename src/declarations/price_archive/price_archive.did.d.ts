@@ -71,10 +71,11 @@ export type LogLevel = { 'INFO' : null } |
   { 'WARN' : null } |
   { 'ERROR' : null };
 export interface PriceArchiveV2 {
-  'archivePriceBlock' : ActorMethod<[PriceBlockData], Result_8>,
+  'archivePriceBlock' : ActorMethod<[PriceBlockData], Result_9>,
   'catchUpImport' : ActorMethod<[], Result_1>,
+  'forceResetMiddleLoop' : ActorMethod<[], Result_1>,
   'getArchiveStats' : ActorMethod<[], ArchiveStatus>,
-  'getArchiveStatus' : ActorMethod<[], Result_7>,
+  'getArchiveStatus' : ActorMethod<[], Result_8>,
   'getBatchImportStatus' : ActorMethod<
     [],
     {
@@ -85,10 +86,12 @@ export interface PriceArchiveV2 {
   >,
   'getLatestPrice' : ActorMethod<[Principal], Result_5>,
   'getLogs' : ActorMethod<[bigint], Array<LogEntry>>,
+  'getPriceAtOrAfterTime' : ActorMethod<[Principal, bigint], Result_5>,
   'getPriceAtTime' : ActorMethod<[Principal, bigint], Result_5>,
   'getPriceHistory' : ActorMethod<[Principal, bigint, bigint], Result_4>,
   'getPricesAtTime' : ActorMethod<[Array<Principal>, bigint], Result_3>,
   'getTimerStatus' : ActorMethod<[], TimerStatus>,
+  'get_canister_cycles' : ActorMethod<[], { 'cycles' : bigint }>,
   'icrc3_get_archives' : ActorMethod<[GetArchivesArgs], GetArchivesResult>,
   'icrc3_get_blocks' : ActorMethod<[GetBlocksArgs], GetBlocksResult>,
   'icrc3_get_tip_certificate' : ActorMethod<[], [] | [DataCertificate]>,
@@ -142,9 +145,9 @@ export type Result_5 = {
     ]
   } |
   { 'err' : ArchiveError };
-export type Result_7 = { 'ok' : ArchiveStatus } |
+export type Result_8 = { 'ok' : ArchiveStatus } |
   { 'err' : ArchiveError };
-export type Result_8 = { 'ok' : bigint } |
+export type Result_9 = { 'ok' : bigint } |
   { 'err' : ArchiveError };
 export type TacoBlockType = { 'NeuronUpdate' : null } |
   { 'VotingPower' : null } |

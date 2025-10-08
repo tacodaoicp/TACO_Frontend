@@ -9,6 +9,12 @@ type neuronSnapshot =
    clearDAOVotedNNSProposals: () -> (nat);
    clearDAOVotesForProposal: (snsProposalId: nat64) -> (nat);
    clearLogs: () -> ();
+   clearNeuronSnapshots: () ->
+    (record {
+       cumulative_values_cleared: nat;
+       neuron_store_entries_cleared: nat;
+       snapshots_cleared: nat;
+     });
    copyNNSProposal: (nnsProposalId: nat64) -> (CopyNNSProposalResult);
    getAutoVotingRoundCounter: () -> (nat64) query;
    getAutoVotingThresholdSeconds: () -> (nat64) query;
@@ -94,6 +100,7 @@ type neuronSnapshot =
         sns_proposal_id: nat64;
         time_remaining_seconds: opt int64;
       });
+   get_canister_cycles: () -> (record {cycles: nat;}) query;
    get_neuron_snapshot_curr_neuron_id: () -> (opt NeuronId) query;
    get_neuron_snapshot_head_id: () -> (SnapshotId) query;
    get_neuron_snapshot_importing_count: () -> (nat) query;
@@ -135,11 +142,6 @@ type neuronSnapshot =
    submitDAOVotes: (snsProposalId: nat64, neuronIds: vec blob, decision:
     DAOVoteDecision) -> (Result_1);
    take_neuron_snapshot: () -> (TakeNeuronSnapshotResult);
-   testProposalTextFormatting: () -> (text) query;
-   testVotingStatus: () -> (vec record {
-                                  text;
-                                  VotingStatus;
-                                }) query;
    voteOnNNSProposal: (snsProposalId: nat64) -> (Result);
  };
 type WaitForQuietState = record {current_deadline_timestamp_seconds: nat64;};

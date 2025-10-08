@@ -29,6 +29,14 @@ export interface ArchivedBlock {
 }
 export interface Block { 'id' : bigint, 'block' : Value }
 export interface BlockType { 'url' : string, 'block_type' : string }
+export interface Candle {
+  'c' : bigint,
+  'h' : bigint,
+  'l' : bigint,
+  'n' : number,
+  'o' : bigint,
+  't_start' : bigint,
+}
 export interface DataCertificate {
   'certificate' : Uint8Array | number[],
   'hash_tree' : Uint8Array | number[],
@@ -79,8 +87,10 @@ export interface OHLCCandle {
 }
 export interface PortfolioArchiveV2 {
   'archivePortfolioBlock' : ActorMethod<[PortfolioBlockData], Result_2>,
+  'backfillOHLC' : ActorMethod<[number], Result_7>,
+  'flushOHLCCarryState' : ActorMethod<[], Result_6>,
   'getArchiveStats' : ActorMethod<[], ArchiveStatus>,
-  'getArchiveStatus' : ActorMethod<[], Result_4>,
+  'getArchiveStatus' : ActorMethod<[], Result_5>,
   'getBatchImportStatus' : ActorMethod<
     [],
     {
@@ -90,19 +100,41 @@ export interface PortfolioArchiveV2 {
     }
   >,
   'getLogs' : ActorMethod<[bigint], Array<LogEntry>>,
-  'getOHLCCandles' : ActorMethod<[bigint, bigint, bigint], Result_3>,
+  'getOHLCBackfillStatus' : ActorMethod<
+    [],
+    {
+      'totalSnapshots' : bigint,
+      'progressPercent' : number,
+      'lastSnapshotIdx' : bigint,
+      'indexedUntilIdx' : bigint,
+      'hasCarryState' : boolean,
+    }
+  >,
+  'getOHLCCandles' : ActorMethod<[bigint, bigint, bigint], Result_4>,
+  'getOHLCStats' : ActorMethod<
+    [],
+    {
+      'shardBreakdown' : Array<[Resolution, bigint]>,
+      'totalCandles' : bigint,
+      'totalShards' : bigint,
+    }
+  >,
   'getTimerStatus' : ActorMethod<[], TimerStatus>,
+  'get_canister_cycles' : ActorMethod<[], { 'cycles' : bigint }>,
+  'get_ohlc' : ActorMethod<[bigint, bigint, Resolution, number], Result_3>,
   'icrc3_get_archives' : ActorMethod<[GetArchivesArgs], GetArchivesResult>,
   'icrc3_get_blocks' : ActorMethod<[GetBlocksArgs], GetBlocksResult>,
   'icrc3_get_tip_certificate' : ActorMethod<[], [] | [DataCertificate]>,
   'icrc3_supported_block_types' : ActorMethod<[], Array<BlockType>>,
   'lower_bound_ts' : ActorMethod<[bigint], Result_2>,
   'resetImportTimestamps' : ActorMethod<[], Result_1>,
+  'resetOHLCSystem' : ActorMethod<[], Result>,
   'runLegacyManualBatchImport' : ActorMethod<[], Result_1>,
   'runManualBatchImport' : ActorMethod<[], Result_1>,
   'setMaxInnerLoopIterations' : ActorMethod<[bigint], Result_1>,
   'startBatchImportSystem' : ActorMethod<[], Result_1>,
   'startLegacyBatchImportSystem' : ActorMethod<[], Result_1>,
+  'startOHLCBackfill' : ActorMethod<[number], Result>,
   'stopAllTimers' : ActorMethod<[], Result_1>,
   'stopBatchImportSystem' : ActorMethod<[], Result_1>,
   'updateConfig' : ActorMethod<[ArchiveConfig], Result>,
@@ -116,15 +148,28 @@ export interface PortfolioBlockData {
   'pausedTokens' : Array<Principal>,
   'reason' : SnapshotReason,
 }
+export type Resolution = { 'day' : null } |
+  { 'month' : null } |
+  { 'hour' : null } |
+  { 'week' : null } |
+  { 'year' : null };
 export type Result = { 'ok' : string } |
   { 'err' : ArchiveError };
 export type Result_1 = { 'ok' : string } |
   { 'err' : string };
 export type Result_2 = { 'ok' : bigint } |
   { 'err' : ArchiveError };
-export type Result_3 = { 'ok' : Array<OHLCCandle> } |
+export type Result_3 = { 'ok' : Array<Candle> } |
   { 'err' : ArchiveError };
-export type Result_4 = { 'ok' : ArchiveStatus } |
+export type Result_4 = { 'ok' : Array<OHLCCandle> } |
+  { 'err' : ArchiveError };
+export type Result_5 = { 'ok' : ArchiveStatus } |
+  { 'err' : ArchiveError };
+export type Result_6 = { 'ok' : { 'flushedCandles' : bigint } } |
+  { 'err' : ArchiveError };
+export type Result_7 = {
+    'ok' : { 'processed' : number, 'newCandlesCreated' : number }
+  } |
   { 'err' : ArchiveError };
 export type SnapshotReason = { 'ManualTrigger' : null } |
   { 'SystemEvent' : null } |

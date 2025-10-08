@@ -267,6 +267,14 @@ export interface neuronSnapshot {
   'clearDAOVotedNNSProposals' : ActorMethod<[], bigint>,
   'clearDAOVotesForProposal' : ActorMethod<[bigint], bigint>,
   'clearLogs' : ActorMethod<[], undefined>,
+  'clearNeuronSnapshots' : ActorMethod<
+    [],
+    {
+      'cumulative_values_cleared' : bigint,
+      'snapshots_cleared' : bigint,
+      'neuron_store_entries_cleared' : bigint,
+    }
+  >,
   'copyNNSProposal' : ActorMethod<[bigint], CopyNNSProposalResult>,
   'getAutoVotingRoundCounter' : ActorMethod<[], bigint>,
   'getAutoVotingThresholdSeconds' : ActorMethod<[], bigint>,
@@ -357,6 +365,7 @@ export interface neuronSnapshot {
       }
     >
   >,
+  'get_canister_cycles' : ActorMethod<[], { 'cycles' : bigint }>,
   'get_neuron_snapshot_curr_neuron_id' : ActorMethod<[], [] | [NeuronId]>,
   'get_neuron_snapshot_head_id' : ActorMethod<[], SnapshotId>,
   'get_neuron_snapshot_importing_count' : ActorMethod<[], bigint>,
@@ -409,8 +418,6 @@ export interface neuronSnapshot {
     Result_1
   >,
   'take_neuron_snapshot' : ActorMethod<[], TakeNeuronSnapshotResult>,
-  'testProposalTextFormatting' : ActorMethod<[], string>,
-  'testVotingStatus' : ActorMethod<[], Array<[string, VotingStatus]>>,
   'voteOnNNSProposal' : ActorMethod<[bigint], Result>,
 }
 export interface _SERVICE extends neuronSnapshot {}

@@ -38,15 +38,33 @@ type SnapshotReason =
    Scheduled;
    SystemEvent;
  };
-type Result_4 = 
+type Result_7 = 
+ variant {
+   err: ArchiveError;
+   ok: record {
+         newCandlesCreated: nat32;
+         processed: nat32;
+       };
+ };
+type Result_6 = 
+ variant {
+   err: ArchiveError;
+   ok: record {flushedCandles: nat;};
+ };
+type Result_5 = 
  variant {
    err: ArchiveError;
    ok: ArchiveStatus;
  };
-type Result_3 = 
+type Result_4 = 
  variant {
    err: ArchiveError;
    ok: vec OHLCCandle;
+ };
+type Result_3 = 
+ variant {
+   err: ArchiveError;
+   ok: vec Candle;
  };
 type Result_2 = 
  variant {
@@ -63,6 +81,14 @@ type Result =
    err: ArchiveError;
    ok: text;
  };
+type Resolution = 
+ variant {
+   day;
+   hour;
+   month;
+   week;
+   year;
+ };
 type PortfolioBlockData = 
  record {
    pausedTokens: vec principal;
@@ -76,8 +102,10 @@ type PortfolioBlockData =
 type PortfolioArchiveV2 = 
  service {
    archivePortfolioBlock: (portfolio: PortfolioBlockData) -> (Result_2);
+   backfillOHLC: (maxSnapshots: nat32) -> (Result_7);
+   flushOHLCCarryState: () -> (Result_6);
    getArchiveStats: () -> (ArchiveStatus) query;
-   getArchiveStatus: () -> (Result_4) query;
+   getArchiveStatus: () -> (Result_5) query;
    getBatchImportStatus: () ->
     (record {
        intervalSeconds: nat;
@@ -85,20 +113,42 @@ type PortfolioArchiveV2 =
        lastPortfolioImportTime: int;
      }) query;
    getLogs: (count: nat) -> (vec LogEntry) query;
+   getOHLCBackfillStatus: () ->
+    (record {
+       hasCarryState: bool;
+       indexedUntilIdx: nat64;
+       lastSnapshotIdx: nat64;
+       progressPercent: float64;
+       totalSnapshots: nat64;
+     }) query;
    getOHLCCandles: (startTime: int, endTime: int, intervalNS: int) ->
-    (Result_3) query;
+    (Result_4) query;
+   getOHLCStats: () ->
+    (record {
+       shardBreakdown: vec record {
+                             Resolution;
+                             nat;
+                           };
+       totalCandles: nat;
+       totalShards: nat;
+     }) query;
    getTimerStatus: () -> (TimerStatus) query;
+   get_canister_cycles: () -> (record {cycles: nat;}) query;
+   get_ohlc: (from_ns: nat64, to_ns: nat64, interval: Resolution, max_points:
+    nat32) -> (Result_3) query;
    icrc3_get_archives: (args: GetArchivesArgs) -> (GetArchivesResult) query;
    icrc3_get_blocks: (args: GetBlocksArgs) -> (GetBlocksResult) query;
    icrc3_get_tip_certificate: () -> (opt DataCertificate) query;
    icrc3_supported_block_types: () -> (vec BlockType) query;
    lower_bound_ts: (ts: int) -> (Result_2) query;
    resetImportTimestamps: () -> (Result_1);
+   resetOHLCSystem: () -> (Result);
    runLegacyManualBatchImport: () -> (Result_1);
    runManualBatchImport: () -> (Result_1);
    setMaxInnerLoopIterations: (iterations: nat) -> (Result_1);
    startBatchImportSystem: () -> (Result_1);
    startLegacyBatchImportSystem: () -> (Result_1);
+   startOHLCBackfill: (chunkSize: nat32) -> (Result);
    stopAllTimers: () -> (Result_1);
    stopBatchImportSystem: () -> (Result_1);
    updateConfig: (newConfig: ArchiveConfig) -> (Result);
@@ -165,6 +215,15 @@ type DataCertificate =
  record {
    certificate: blob;
    hash_tree: blob;
+ };
+type Candle = 
+ record {
+   c: nat64;
+   h: nat64;
+   l: nat64;
+   n: nat32;
+   o: nat64;
+   t_start: nat64;
  };
 type BlockType = 
  record {

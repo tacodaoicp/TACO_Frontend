@@ -237,6 +237,27 @@ type RefreshError =
    SystemInactive;
    UnexpectedError: text;
  };
+type PublicTokenDetailsEntry = 
+ record {
+   principal;
+   PublicTokenDetails;
+ };
+type PublicTokenDetails = 
+ record {
+   Active: bool;
+   balance: nat;
+   epochAdded: int;
+   isPaused: bool;
+   lastTimeSynced: int;
+   pausedDueToSyncFailure: bool;
+   priceInICP: nat;
+   priceInUSD: float64;
+   tokenDecimals: nat;
+   tokenName: text;
+   tokenSymbol: text;
+   tokenTransferFee: nat;
+   tokenType: TokenType;
+ };
 type PricePoint = 
  record {
    icpPrice: nat;
@@ -409,10 +430,13 @@ type ContinuousDAO =
                                  principal;
                                  TokenDetails;
                                }) query;
+   getTokenDetailsWithoutPastPrices: () ->
+    (vec PublicTokenDetailsEntry) query;
    getUserAllocation: () -> (opt UserState) query;
    getUserRegisteredTokens: () -> (vec principal) query;
    getVotingPowerChangesSince: (sinceTimestamp: int, limit: nat) ->
     (Result_8) query;
+   get_canister_cycles: () -> (record {cycles: nat;}) query;
    grantAdminPermission: (admin: principal, function: AdminFunction,
     durationDays: nat) -> (Result_1);
    hasAdminPermission: ("principal": principal, function: AdminFunction) ->

@@ -46,12 +46,12 @@ type TacoBlockType =
    Trade;
    VotingPower;
  };
-type Result_8 = 
+type Result_9 = 
  variant {
    err: ArchiveError;
    ok: nat;
  };
-type Result_7 = 
+type Result_8 = 
  variant {
    err: ArchiveError;
    ok: ArchiveStatus;
@@ -118,10 +118,11 @@ type PriceBlockData =
  };
 type PriceArchiveV2 = 
  service {
-   archivePriceBlock: (price: PriceBlockData) -> (Result_8);
+   archivePriceBlock: (price: PriceBlockData) -> (Result_9);
    catchUpImport: () -> (Result_1);
+   forceResetMiddleLoop: () -> (Result_1);
    getArchiveStats: () -> (ArchiveStatus) query;
-   getArchiveStatus: () -> (Result_7) query;
+   getArchiveStatus: () -> (Result_8) query;
    getBatchImportStatus: () ->
     (record {
        intervalSeconds: nat;
@@ -130,12 +131,15 @@ type PriceArchiveV2 =
      }) query;
    getLatestPrice: (token: principal) -> (Result_5) query;
    getLogs: (count: nat) -> (vec LogEntry) query;
+   getPriceAtOrAfterTime: (token: principal, timestamp: int) ->
+    (Result_5) query;
    getPriceAtTime: (token: principal, timestamp: int) -> (Result_5) query;
    getPriceHistory: (token: principal, startTime: int, endTime: int) ->
     (Result_4) query;
    getPricesAtTime: (tokens: vec principal, timestamp: int) ->
     (Result_3) query;
    getTimerStatus: () -> (TimerStatus) query;
+   get_canister_cycles: () -> (record {cycles: nat;}) query;
    icrc3_get_archives: (args: GetArchivesArgs) -> (GetArchivesResult) query;
    icrc3_get_blocks: (args: GetBlocksArgs) -> (GetBlocksResult) query;
    icrc3_get_tip_certificate: () -> (opt DataCertificate) query;

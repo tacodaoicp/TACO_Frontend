@@ -127,6 +127,7 @@ type DAOAdminArchive =
      }) query;
    getLogs: (count: nat) -> (vec LogEntry) query;
    getTimerStatus: () -> (TimerStatus) query;
+   get_canister_cycles: () -> (record {cycles: nat;}) query;
    icrc3_get_archives: (args: GetArchivesArgs) -> (GetArchivesResult) query;
    icrc3_get_blocks: (args: GetBlocksArgs) -> (GetBlocksResult) query;
    icrc3_get_tip_certificate: () -> (opt DataCertificate) query;

@@ -154,6 +154,7 @@ export interface DAOAdminArchive {
   >,
   'getLogs' : ActorMethod<[bigint], Array<LogEntry>>,
   'getTimerStatus' : ActorMethod<[], TimerStatus>,
+  'get_canister_cycles' : ActorMethod<[], { 'cycles' : bigint }>,
   'icrc3_get_archives' : ActorMethod<[GetArchivesArgs], GetArchivesResult>,
   'icrc3_get_blocks' : ActorMethod<[GetBlocksArgs], GetBlocksResult>,
   'icrc3_get_tip_certificate' : ActorMethod<[], [] | [DataCertificate]>,

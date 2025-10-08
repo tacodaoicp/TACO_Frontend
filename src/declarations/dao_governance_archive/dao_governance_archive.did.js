@@ -174,6 +174,11 @@ export const idlFactory = ({ IDL }) => {
         [Result_1],
         ['query'],
       ),
+    'get_canister_cycles' : IDL.Func(
+        [],
+        [IDL.Record({ 'cycles' : IDL.Nat })],
+        ['query'],
+      ),
     'icrc3_get_archives' : IDL.Func(
         [GetArchivesArgs],
         [GetArchivesResult],

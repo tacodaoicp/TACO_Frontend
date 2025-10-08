@@ -141,9 +141,14 @@ export interface ContinuousDAO {
   >,
   'getSystemParameters' : ActorMethod<[], Array<SystemParameter>>,
   'getTokenDetails' : ActorMethod<[], Array<[Principal, TokenDetails]>>,
+  'getTokenDetailsWithoutPastPrices' : ActorMethod<
+    [],
+    Array<PublicTokenDetailsEntry>
+  >,
   'getUserAllocation' : ActorMethod<[], [] | [UserState]>,
   'getUserRegisteredTokens' : ActorMethod<[], Array<Principal>>,
   'getVotingPowerChangesSince' : ActorMethod<[bigint, bigint], Result_8>,
+  'get_canister_cycles' : ActorMethod<[], { 'cycles' : bigint }>,
   'grantAdminPermission' : ActorMethod<
     [Principal, AdminFunction, bigint],
     Result_1
@@ -271,6 +276,22 @@ export interface PricePoint {
   'time' : bigint,
   'icpPrice' : bigint,
 }
+export interface PublicTokenDetails {
+  'lastTimeSynced' : bigint,
+  'balance' : bigint,
+  'isPaused' : boolean,
+  'Active' : boolean,
+  'epochAdded' : bigint,
+  'priceInICP' : bigint,
+  'priceInUSD' : number,
+  'tokenTransferFee' : bigint,
+  'tokenDecimals' : bigint,
+  'tokenSymbol' : string,
+  'tokenName' : string,
+  'pausedDueToSyncFailure' : boolean,
+  'tokenType' : TokenType,
+}
+export type PublicTokenDetailsEntry = [Principal, PublicTokenDetails];
 export type RefreshError = { 'NotAllowed' : null } |
   { 'NoNeuronsFound' : null } |
   { 'SnsGovernanceError' : string } |

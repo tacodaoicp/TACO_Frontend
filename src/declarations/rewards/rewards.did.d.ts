@@ -182,6 +182,7 @@ export interface Rewards {
   'getUserWithdrawalHistory' : ActorMethod<[[] | [bigint]], Result__1_3>,
   'getWithdrawalStats' : ActorMethod<[], Result__1_2>,
   'getWithdrawalsSince' : ActorMethod<[bigint, bigint], Result__1_1>,
+  'get_canister_cycles' : ActorMethod<[], { 'cycles' : bigint }>,
   'removeFromRewardSkipList' : ActorMethod<[Uint8Array | number[]], Result__1>,
   'setDistributionEnabled' : ActorMethod<[boolean], Result__1>,
   'setDistributionPeriod' : ActorMethod<[bigint], Result__1>,

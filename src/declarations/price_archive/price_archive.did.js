@@ -29,7 +29,7 @@ export const idlFactory = ({ IDL }) => {
     'InvalidBlockType' : IDL.Null,
     'InvalidTimeRange' : IDL.Null,
   });
-  const Result_8 = IDL.Variant({ 'ok' : IDL.Nat, 'err' : ArchiveError });
+  const Result_9 = IDL.Variant({ 'ok' : IDL.Nat, 'err' : ArchiveError });
   const Result_1 = IDL.Variant({ 'ok' : IDL.Text, 'err' : IDL.Text });
   const ArchiveStatus = IDL.Record({
     'supportedBlockTypes' : IDL.Vec(IDL.Text),
@@ -39,7 +39,7 @@ export const idlFactory = ({ IDL }) => {
     'totalBlocks' : IDL.Nat,
     'lastArchiveTime' : IDL.Int,
   });
-  const Result_7 = IDL.Variant({ 'ok' : ArchiveStatus, 'err' : ArchiveError });
+  const Result_8 = IDL.Variant({ 'ok' : ArchiveStatus, 'err' : ArchiveError });
   const Result_5 = IDL.Variant({
     'ok' : IDL.Opt(
       IDL.Record({
@@ -180,10 +180,11 @@ export const idlFactory = ({ IDL }) => {
   });
   const Result = IDL.Variant({ 'ok' : IDL.Text, 'err' : ArchiveError });
   const PriceArchiveV2 = IDL.Service({
-    'archivePriceBlock' : IDL.Func([PriceBlockData], [Result_8], []),
+    'archivePriceBlock' : IDL.Func([PriceBlockData], [Result_9], []),
     'catchUpImport' : IDL.Func([], [Result_1], []),
+    'forceResetMiddleLoop' : IDL.Func([], [Result_1], []),
     'getArchiveStats' : IDL.Func([], [ArchiveStatus], ['query']),
-    'getArchiveStatus' : IDL.Func([], [Result_7], ['query']),
+    'getArchiveStatus' : IDL.Func([], [Result_8], ['query']),
     'getBatchImportStatus' : IDL.Func(
         [],
         [
@@ -197,6 +198,11 @@ export const idlFactory = ({ IDL }) => {
       ),
     'getLatestPrice' : IDL.Func([IDL.Principal], [Result_5], ['query']),
     'getLogs' : IDL.Func([IDL.Nat], [IDL.Vec(LogEntry)], ['query']),
+    'getPriceAtOrAfterTime' : IDL.Func(
+        [IDL.Principal, IDL.Int],
+        [Result_5],
+        ['query'],
+      ),
     'getPriceAtTime' : IDL.Func(
         [IDL.Principal, IDL.Int],
         [Result_5],
@@ -213,6 +219,11 @@ export const idlFactory = ({ IDL }) => {
         ['query'],
       ),
     'getTimerStatus' : IDL.Func([], [TimerStatus], ['query']),
+    'get_canister_cycles' : IDL.Func(
+        [],
+        [IDL.Record({ 'cycles' : IDL.Nat })],
+        ['query'],
+      ),
     'icrc3_get_archives' : IDL.Func(
         [GetArchivesArgs],
         [GetArchivesResult],

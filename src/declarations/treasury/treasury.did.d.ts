@@ -486,6 +486,7 @@ export interface treasury {
   'getTradingStatusSince' : ActorMethod<[bigint], Result_8>,
   'getTreasuryAdminActionsSince' : ActorMethod<[bigint, bigint], Result_7>,
   'getTriggerCondition' : ActorMethod<[bigint], [] | [TriggerCondition]>,
+  'get_canister_cycles' : ActorMethod<[], { 'cycles' : bigint }>,
   'listPortfolioCircuitBreakerConditions' : ActorMethod<
     [],
     Array<PortfolioCircuitBreakerCondition>
@@ -500,6 +501,10 @@ export interface treasury {
   'removePortfolioCircuitBreakerCondition' : ActorMethod<[bigint], Result_3>,
   'removeTriggerCondition' : ActorMethod<[bigint], Result>,
   'resetRebalanceState' : ActorMethod<[[] | [string]], Result_1>,
+  'sendToken' : ActorMethod<
+    [Principal, bigint, Principal, [] | [Subaccount]],
+    undefined
+  >,
   'setPortfolioCircuitBreakerConditionActive' : ActorMethod<
     [bigint, boolean],
     Result_3

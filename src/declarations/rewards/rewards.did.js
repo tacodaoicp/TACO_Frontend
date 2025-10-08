@@ -254,6 +254,11 @@ export const idlFactory = ({ IDL }) => {
         [Result__1_1],
         ['query'],
       ),
+    'get_canister_cycles' : IDL.Func(
+        [],
+        [IDL.Record({ 'cycles' : IDL.Nat })],
+        ['query'],
+      ),
     'removeFromRewardSkipList' : IDL.Func([IDL.Vec(IDL.Nat8)], [Result__1], []),
     'setDistributionEnabled' : IDL.Func([IDL.Bool], [Result__1], []),
     'setDistributionPeriod' : IDL.Func([IDL.Nat], [Result__1], []),

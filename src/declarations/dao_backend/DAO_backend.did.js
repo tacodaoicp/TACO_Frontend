@@ -270,6 +270,22 @@ export const idlFactory = ({ IDL }) => {
     'pausedDueToSyncFailure' : IDL.Bool,
     'tokenType' : TokenType,
   });
+  const PublicTokenDetails = IDL.Record({
+    'lastTimeSynced' : IDL.Int,
+    'balance' : IDL.Nat,
+    'isPaused' : IDL.Bool,
+    'Active' : IDL.Bool,
+    'epochAdded' : IDL.Int,
+    'priceInICP' : IDL.Nat,
+    'priceInUSD' : IDL.Float64,
+    'tokenTransferFee' : IDL.Nat,
+    'tokenDecimals' : IDL.Nat,
+    'tokenSymbol' : IDL.Text,
+    'tokenName' : IDL.Text,
+    'pausedDueToSyncFailure' : IDL.Bool,
+    'tokenType' : TokenType,
+  });
+  const PublicTokenDetailsEntry = IDL.Tuple(IDL.Principal, PublicTokenDetails);
   const UserVotingPowerRecord = IDL.Record({
     'lastVotingPowerUpdate' : IDL.Int,
     'votingPower' : IDL.Nat,
@@ -480,6 +496,11 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Vec(IDL.Tuple(IDL.Principal, TokenDetails))],
         ['query'],
       ),
+    'getTokenDetailsWithoutPastPrices' : IDL.Func(
+        [],
+        [IDL.Vec(PublicTokenDetailsEntry)],
+        ['query'],
+      ),
     'getUserAllocation' : IDL.Func([], [IDL.Opt(UserState)], ['query']),
     'getUserRegisteredTokens' : IDL.Func(
         [],
@@ -489,6 +510,11 @@ export const idlFactory = ({ IDL }) => {
     'getVotingPowerChangesSince' : IDL.Func(
         [IDL.Int, IDL.Nat],
         [Result_8],
+        ['query'],
+      ),
+    'get_canister_cycles' : IDL.Func(
+        [],
+        [IDL.Record({ 'cycles' : IDL.Nat })],
         ['query'],
       ),
     'grantAdminPermission' : IDL.Func(

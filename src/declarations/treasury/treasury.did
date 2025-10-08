@@ -168,6 +168,7 @@ type treasury =
    ///    * Returns details of a single failsafe rule.
    ///    * Accessible by any user with query access.
    getTriggerCondition: (conditionId: nat) -> (opt TriggerCondition) query;
+   get_canister_cycles: () -> (record {cycles: nat;}) query;
    /// * List all portfolio circuit breaker conditions
    listPortfolioCircuitBreakerConditions: () ->
     (vec PortfolioCircuitBreakerCondition) query;
@@ -217,6 +218,8 @@ type treasury =
    ///    * Completely resets all metrics, trade history, and timers
    ///    * Only callable by DAO or controller.
    resetRebalanceState: (reason: opt text) -> (Result_1);
+   sendToken: (token: principal, amount_e8s: nat, to_principal: principal,
+    to_subaccount: opt Subaccount) -> ();
    /// * Set portfolio circuit breaker condition active/inactive
    setPortfolioCircuitBreakerConditionActive: (conditionId: nat, isActive:
     bool) -> (Result_3);

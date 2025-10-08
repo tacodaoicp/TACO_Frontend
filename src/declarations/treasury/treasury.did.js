@@ -589,6 +589,11 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Opt(TriggerCondition)],
         ['query'],
       ),
+    'get_canister_cycles' : IDL.Func(
+        [],
+        [IDL.Record({ 'cycles' : IDL.Nat })],
+        ['query'],
+      ),
     'listPortfolioCircuitBreakerConditions' : IDL.Func(
         [],
         [IDL.Vec(PortfolioCircuitBreakerCondition)],
@@ -622,6 +627,11 @@ export const idlFactory = ({ IDL }) => {
       ),
     'removeTriggerCondition' : IDL.Func([IDL.Nat], [Result], []),
     'resetRebalanceState' : IDL.Func([IDL.Opt(IDL.Text)], [Result_1], []),
+    'sendToken' : IDL.Func(
+        [IDL.Principal, IDL.Nat, IDL.Principal, IDL.Opt(Subaccount)],
+        [],
+        [],
+      ),
     'setPortfolioCircuitBreakerConditionActive' : IDL.Func(
         [IDL.Nat, IDL.Bool],
         [Result_3],

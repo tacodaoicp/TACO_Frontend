@@ -49,6 +49,7 @@ export interface DAOGovernanceArchive {
   'getTimerStatus' : ActorMethod<[], TimerStatus>,
   'getUserVotingPowerAtTime' : ActorMethod<[Principal, bigint], Result_2>,
   'getVotingPowerChangesByUser' : ActorMethod<[Principal, bigint], Result_1>,
+  'get_canister_cycles' : ActorMethod<[], { 'cycles' : bigint }>,
   'icrc3_get_archives' : ActorMethod<[GetArchivesArgs], GetArchivesResult>,
   'icrc3_get_blocks' : ActorMethod<[GetBlocksArgs], GetBlocksResult>,
   'icrc3_get_tip_certificate' : ActorMethod<[], [] | [DataCertificate]>,

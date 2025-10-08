@@ -304,6 +304,17 @@ export const idlFactory = ({ IDL }) => {
     'clearDAOVotedNNSProposals' : IDL.Func([], [IDL.Nat], []),
     'clearDAOVotesForProposal' : IDL.Func([IDL.Nat64], [IDL.Nat], []),
     'clearLogs' : IDL.Func([], [], []),
+    'clearNeuronSnapshots' : IDL.Func(
+        [],
+        [
+          IDL.Record({
+            'cumulative_values_cleared' : IDL.Nat,
+            'snapshots_cleared' : IDL.Nat,
+            'neuron_store_entries_cleared' : IDL.Nat,
+          }),
+        ],
+        [],
+      ),
     'copyNNSProposal' : IDL.Func([IDL.Nat64], [CopyNNSProposalResult], []),
     'getAutoVotingRoundCounter' : IDL.Func([], [IDL.Nat64], ['query']),
     'getAutoVotingThresholdSeconds' : IDL.Func([], [IDL.Nat64], ['query']),
@@ -443,6 +454,11 @@ export const idlFactory = ({ IDL }) => {
         ],
         [],
       ),
+    'get_canister_cycles' : IDL.Func(
+        [],
+        [IDL.Record({ 'cycles' : IDL.Nat })],
+        ['query'],
+      ),
     'get_neuron_snapshot_curr_neuron_id' : IDL.Func(
         [],
         [IDL.Opt(NeuronId)],
@@ -517,12 +533,6 @@ export const idlFactory = ({ IDL }) => {
         [],
       ),
     'take_neuron_snapshot' : IDL.Func([], [TakeNeuronSnapshotResult], []),
-    'testProposalTextFormatting' : IDL.Func([], [IDL.Text], ['query']),
-    'testVotingStatus' : IDL.Func(
-        [],
-        [IDL.Vec(IDL.Tuple(IDL.Text, VotingStatus))],
-        ['query'],
-      ),
     'voteOnNNSProposal' : IDL.Func([IDL.Nat64], [Result], []),
   });
   return neuronSnapshot;

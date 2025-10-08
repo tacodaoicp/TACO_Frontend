@@ -36,6 +36,17 @@ export const idlFactory = ({ IDL }) => {
     'InvalidTimeRange' : IDL.Null,
   });
   const Result_2 = IDL.Variant({ 'ok' : IDL.Nat, 'err' : ArchiveError });
+  const Result_7 = IDL.Variant({
+    'ok' : IDL.Record({
+      'processed' : IDL.Nat32,
+      'newCandlesCreated' : IDL.Nat32,
+    }),
+    'err' : ArchiveError,
+  });
+  const Result_6 = IDL.Variant({
+    'ok' : IDL.Record({ 'flushedCandles' : IDL.Nat }),
+    'err' : ArchiveError,
+  });
   const ArchiveStatus = IDL.Record({
     'supportedBlockTypes' : IDL.Vec(IDL.Text),
     'newestBlock' : IDL.Opt(IDL.Nat),
@@ -44,7 +55,7 @@ export const idlFactory = ({ IDL }) => {
     'totalBlocks' : IDL.Nat,
     'lastArchiveTime' : IDL.Int,
   });
-  const Result_4 = IDL.Variant({ 'ok' : ArchiveStatus, 'err' : ArchiveError });
+  const Result_5 = IDL.Variant({ 'ok' : ArchiveStatus, 'err' : ArchiveError });
   const LogLevel = IDL.Variant({
     'INFO' : IDL.Null,
     'WARN' : IDL.Null,
@@ -72,9 +83,16 @@ export const idlFactory = ({ IDL }) => {
       'open' : IDL.Float64,
     }),
   });
-  const Result_3 = IDL.Variant({
+  const Result_4 = IDL.Variant({
     'ok' : IDL.Vec(OHLCCandle),
     'err' : ArchiveError,
+  });
+  const Resolution = IDL.Variant({
+    'day' : IDL.Null,
+    'month' : IDL.Null,
+    'hour' : IDL.Null,
+    'week' : IDL.Null,
+    'year' : IDL.Null,
   });
   const TimerStatus = IDL.Record({
     'innerLoopRunning' : IDL.Bool,
@@ -94,6 +112,18 @@ export const idlFactory = ({ IDL }) => {
     'innerLoopLastRun' : IDL.Int,
     'innerLoopNextScheduled' : IDL.Int,
     'innerLoopTotalBatches' : IDL.Nat,
+  });
+  const Candle = IDL.Record({
+    'c' : IDL.Nat64,
+    'h' : IDL.Nat64,
+    'l' : IDL.Nat64,
+    'n' : IDL.Nat32,
+    'o' : IDL.Nat64,
+    't_start' : IDL.Nat64,
+  });
+  const Result_3 = IDL.Variant({
+    'ok' : IDL.Vec(Candle),
+    'err' : ArchiveError,
   });
   const GetArchivesArgs = IDL.Record({ 'from' : IDL.Opt(IDL.Principal) });
   const GetArchivesResult = IDL.Vec(
@@ -134,17 +164,19 @@ export const idlFactory = ({ IDL }) => {
   });
   const BlockType = IDL.Record({ 'url' : IDL.Text, 'block_type' : IDL.Text });
   const Result_1 = IDL.Variant({ 'ok' : IDL.Text, 'err' : IDL.Text });
+  const Result = IDL.Variant({ 'ok' : IDL.Text, 'err' : ArchiveError });
   const ArchiveConfig = IDL.Record({
     'maxBlocksPerCanister' : IDL.Nat,
     'blockRetentionPeriodNS' : IDL.Int,
     'autoArchiveEnabled' : IDL.Bool,
     'enableCompression' : IDL.Bool,
   });
-  const Result = IDL.Variant({ 'ok' : IDL.Text, 'err' : ArchiveError });
   const PortfolioArchiveV2 = IDL.Service({
     'archivePortfolioBlock' : IDL.Func([PortfolioBlockData], [Result_2], []),
+    'backfillOHLC' : IDL.Func([IDL.Nat32], [Result_7], []),
+    'flushOHLCCarryState' : IDL.Func([], [Result_6], []),
     'getArchiveStats' : IDL.Func([], [ArchiveStatus], ['query']),
-    'getArchiveStatus' : IDL.Func([], [Result_4], ['query']),
+    'getArchiveStatus' : IDL.Func([], [Result_5], ['query']),
     'getBatchImportStatus' : IDL.Func(
         [],
         [
@@ -157,12 +189,46 @@ export const idlFactory = ({ IDL }) => {
         ['query'],
       ),
     'getLogs' : IDL.Func([IDL.Nat], [IDL.Vec(LogEntry)], ['query']),
+    'getOHLCBackfillStatus' : IDL.Func(
+        [],
+        [
+          IDL.Record({
+            'totalSnapshots' : IDL.Nat64,
+            'progressPercent' : IDL.Float64,
+            'lastSnapshotIdx' : IDL.Nat64,
+            'indexedUntilIdx' : IDL.Nat64,
+            'hasCarryState' : IDL.Bool,
+          }),
+        ],
+        ['query'],
+      ),
     'getOHLCCandles' : IDL.Func(
         [IDL.Int, IDL.Int, IDL.Int],
-        [Result_3],
+        [Result_4],
+        ['query'],
+      ),
+    'getOHLCStats' : IDL.Func(
+        [],
+        [
+          IDL.Record({
+            'shardBreakdown' : IDL.Vec(IDL.Tuple(Resolution, IDL.Nat)),
+            'totalCandles' : IDL.Nat,
+            'totalShards' : IDL.Nat,
+          }),
+        ],
         ['query'],
       ),
     'getTimerStatus' : IDL.Func([], [TimerStatus], ['query']),
+    'get_canister_cycles' : IDL.Func(
+        [],
+        [IDL.Record({ 'cycles' : IDL.Nat })],
+        ['query'],
+      ),
+    'get_ohlc' : IDL.Func(
+        [IDL.Nat64, IDL.Nat64, Resolution, IDL.Nat32],
+        [Result_3],
+        ['query'],
+      ),
     'icrc3_get_archives' : IDL.Func(
         [GetArchivesArgs],
         [GetArchivesResult],
@@ -185,11 +251,13 @@ export const idlFactory = ({ IDL }) => {
       ),
     'lower_bound_ts' : IDL.Func([IDL.Int], [Result_2], ['query']),
     'resetImportTimestamps' : IDL.Func([], [Result_1], []),
+    'resetOHLCSystem' : IDL.Func([], [Result], []),
     'runLegacyManualBatchImport' : IDL.Func([], [Result_1], []),
     'runManualBatchImport' : IDL.Func([], [Result_1], []),
     'setMaxInnerLoopIterations' : IDL.Func([IDL.Nat], [Result_1], []),
     'startBatchImportSystem' : IDL.Func([], [Result_1], []),
     'startLegacyBatchImportSystem' : IDL.Func([], [Result_1], []),
+    'startOHLCBackfill' : IDL.Func([IDL.Nat32], [Result], []),
     'stopAllTimers' : IDL.Func([], [Result_1], []),
     'stopBatchImportSystem' : IDL.Func([], [Result_1], []),
     'updateConfig' : IDL.Func([ArchiveConfig], [Result], []),
