@@ -1,0 +1,275 @@
+<template>
+
+  <div class="standard-view">
+
+    <!-- header bar -->
+    <HeaderBar />
+
+    <!-- scroll container -->
+    <div class="scroll-y-container h-100">
+
+      <!-- bootstrap container -->
+      <div class="container p-0">
+
+        <!-- bootstrap row -->
+        <div class="row h-100 d-flex flex-column flex-nowrap overflow-hidden px-2 px-sm-0">
+
+          <div class="system-view w-100">
+
+            <!-- title row -->
+            <div class="d-flex align-items-center justify-content-between mt-4 mb-2 px-3">
+              <h1 class="taco-title mb-0">
+                <span class="taco-title__icon">🛠️</span>
+                <span class="taco-title__title">System Overview</span>
+              </h1>
+
+              <!-- right controls -->
+              <div class="d-flex align-items-center gap-2">
+                <!-- env switch (admin only) -->
+                <div v-if="isAdmin" class="form-inline d-flex align-items-center gap-2">
+                  <label class="mb-0 small text-muted">Environment</label>
+                  <select class="form-select form-select-sm" v-model="selectedEnv" @change="refreshCycles">
+                    <option value="ic">Production</option>
+                    <option value="staging">Staging</option>
+                  </select>
+                </div>
+                <div v-else class="small text-muted">Environment: Production</div>
+
+                <!-- expand/collapse all -->
+                <div class="btn-group">
+                  <button class="btn btn-sm btn-outline-secondary" @click="expandAll">Expand all</button>
+                  <button class="btn btn-sm btn-outline-secondary" @click="collapseAll">Collapse all</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- main canisters group -->
+            <div class="taco-container taco-container--l1 d-flex flex-column gap-2 p-0 mt-3">
+              <div class="px-3 pt-3 pb-2 d-flex align-items-center justify-content-between">
+                <h2 class="h5 mb-0">Main Canisters</h2>
+              </div>
+              <div class="p-2 d-flex flex-column gap-2">
+                <SystemCanisterCard
+                  v-for="c in mainCanisters"
+                  :key="c.key"
+                  :title="c.title"
+                  :principal="resolvePrincipal(c.key)"
+                  :expanded.sync="expandedMap[c.key]"
+                  :cyclesT="cyclesMap[c.key]"
+                  :loading="loadingMap[c.key]"
+                  @refresh="() => fetchCyclesFor(c.key)"
+                />
+              </div>
+            </div>
+
+            <!-- archives group -->
+            <div class="taco-container taco-container--l1 d-flex flex-column gap-2 p-0 mt-4">
+              <div class="px-3 pt-3 pb-2 d-flex align-items-center justify-content-between">
+                <h2 class="h5 mb-0">Archives</h2>
+              </div>
+              <div class="p-2 d-flex flex-column gap-2">
+                <SystemCanisterCard
+                  v-for="c in archiveCanisters"
+                  :key="c.key"
+                  :title="c.title"
+                  :principal="resolvePrincipal(c.key)"
+                  :expanded.sync="expandedMap[c.key]"
+                  :cyclesT="cyclesMap[c.key]"
+                  :loading="loadingMap[c.key]"
+                  @refresh="() => fetchCyclesFor(c.key)"
+                />
+              </div>
+            </div>
+
+          </div>
+
+        </div>
+
+      </div>
+
+    </div>
+
+    <!-- footer bar -->
+    <FooterBar />
+
+  </div>
+
+</template>
+
+<style scoped lang="scss">
+.system-view {
+  .status-light {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+  }
+}
+</style>
+
+<script setup lang="ts">
+import { ref, reactive, computed, onMounted } from 'vue'
+import HeaderBar from "../components/HeaderBar.vue"
+import FooterBar from "../components/FooterBar.vue"
+// @ts-ignore - Vue SFC import resolution
+import SystemCanisterCard from "../components/system/SystemCanisterCard.vue"
+import { useTacoStore } from "../stores/taco.store"
+import { Actor, HttpAgent } from '@dfinity/agent'
+import { CANISTER_IDS, type EnvKey } from '../constants/canisterIds'
+
+// Minimal IDL with only get_canister_cycles
+const minimalCyclesIdl = ({ IDL }: any) => IDL.Service({
+  'get_canister_cycles': IDL.Func([], IDL.Record({ cycles: IDL.Nat }), ['query'])
+})
+
+const tacoStore = useTacoStore()
+
+// Determine admin: call DAO hasAdminPermission or use a simple check if available
+const isAdmin = ref(false)
+
+// Environment selection
+const selectedEnv = ref<EnvKey>('ic')
+
+// Canister groups and keys
+type CanKey = 'dao_backend' | 'frontend' | 'treasury' | 'rewards' | 'neuronSnapshot'
+  | 'trading_archive' | 'portfolio_archive' | 'price_archive' | 'dao_admin_archive' | 'dao_governance_archive'
+  | 'dao_allocation_archive' | 'dao_neuron_allocation_archive' | 'reward_distribution_archive' | 'reward_withdrawal_archive'
+
+const mainCanisters = [
+  { key: 'dao_backend' as CanKey, title: 'Backend (DAO.mo)' },
+  { key: 'frontend' as CanKey, title: 'Frontend' },
+  { key: 'treasury' as CanKey, title: 'Portfolio (treasury.mo)' },
+  { key: 'rewards' as CanKey, title: 'Rewards (rewards.mo)' },
+  { key: 'neuronSnapshot' as CanKey, title: 'Governance (neuronSnapshot.mo)' },
+]
+
+const archiveCanisters = [
+  { key: 'trading_archive' as CanKey, title: 'Trading Archive' },
+  { key: 'portfolio_archive' as CanKey, title: 'Portfolio Archive' },
+  { key: 'price_archive' as CanKey, title: 'Price Archive' },
+  { key: 'dao_admin_archive' as CanKey, title: 'DAO Admin Archive' },
+  { key: 'dao_governance_archive' as CanKey, title: 'DAO Governance Archive' },
+  { key: 'dao_allocation_archive' as CanKey, title: 'DAO Allocation Archive' },
+  { key: 'dao_neuron_allocation_archive' as CanKey, title: 'DAO Neuron Allocation Archive' },
+  { key: 'reward_distribution_archive' as CanKey, title: 'Reward Distribution Archive' },
+  { key: 'reward_withdrawal_archive' as CanKey, title: 'Reward Withdrawal Archive' },
+]
+
+const resolvePrincipal = (key: CanKey): string => {
+  const rec = CANISTER_IDS[key as keyof typeof CANISTER_IDS]
+  if (!rec) return ''
+  return rec[selectedEnv.value]
+}
+
+// Cycles state
+const cyclesMap = reactive<Record<CanKey, number | null>>({
+  dao_backend: null,
+  frontend: null,
+  treasury: null,
+  rewards: null,
+  neuronSnapshot: null,
+  trading_archive: null,
+  portfolio_archive: null,
+  price_archive: null,
+  dao_admin_archive: null,
+  dao_governance_archive: null,
+  dao_allocation_archive: null,
+  dao_neuron_allocation_archive: null,
+  reward_distribution_archive: null,
+  reward_withdrawal_archive: null
+})
+const loadingMap = reactive<Record<CanKey, boolean>>({
+  dao_backend: false,
+  frontend: false,
+  treasury: false,
+  rewards: false,
+  neuronSnapshot: false,
+  trading_archive: false,
+  portfolio_archive: false,
+  price_archive: false,
+  dao_admin_archive: false,
+  dao_governance_archive: false,
+  dao_allocation_archive: false,
+  dao_neuron_allocation_archive: false,
+  reward_distribution_archive: false,
+  reward_withdrawal_archive: false
+})
+const expandedMap = reactive<Record<CanKey, boolean>>({
+  dao_backend: false,
+  frontend: false,
+  treasury: false,
+  rewards: false,
+  neuronSnapshot: false,
+  trading_archive: false,
+  portfolio_archive: false,
+  price_archive: false,
+  dao_admin_archive: false,
+  dao_governance_archive: false,
+  dao_allocation_archive: false,
+  dao_neuron_allocation_archive: false,
+  reward_distribution_archive: false,
+  reward_withdrawal_archive: false
+})
+
+const createGenericActor = async (canisterId: string) => {
+  const { AuthClient } = await import('@dfinity/auth-client')
+  const authClient = await AuthClient.create()
+  const identity = await authClient.getIdentity()
+  const agent = new HttpAgent({ identity, host: "https://ic0.app" })
+  if (process.env.DFX_NETWORK === 'local') {
+    await agent.fetchRootKey()
+  }
+  return Actor.createActor(minimalCyclesIdl as any, {
+    agent,
+    canisterId
+  }) as any
+}
+
+const fetchCyclesFor = async (key: CanKey) => {
+  try {
+    loadingMap[key] = true
+    const cid = resolvePrincipal(key)
+    if (!cid) { cyclesMap[key] = null; loadingMap[key] = false; return }
+    const actor = await createGenericActor(cid)
+    const res = await actor.get_canister_cycles() as { cycles: bigint }
+    // Convert to T (trillion cycles)
+    const trillion = 1_000_000_000_000n
+    const t = Number(res.cycles / trillion)
+    cyclesMap[key] = t
+  } catch (e) {
+    cyclesMap[key] = null
+  } finally {
+    loadingMap[key] = false
+  }
+}
+
+const refreshCycles = async () => {
+  const allKeys: CanKey[] = [...mainCanisters, ...archiveCanisters].map(x => x.key)
+  await Promise.all(allKeys.map(k => fetchCyclesFor(k)))
+}
+
+const expandAll = () => { Object.keys(expandedMap).forEach(k => expandedMap[k as CanKey] = true) }
+const collapseAll = () => { Object.keys(expandedMap).forEach(k => expandedMap[k as CanKey] = false) }
+
+onMounted(async () => {
+  try {
+    // Determine admin via DAO canister hasAdminPermission(getLogs)
+    const { Actor, HttpAgent } = await import('@dfinity/agent')
+    const { idlFactory: daoIDL } = await import('../../../declarations/dao_backend/DAO_backend.did.js')
+    const { AuthClient } = await import('@dfinity/auth-client')
+    const authClient = await AuthClient.create()
+    const identity = await authClient.getIdentity()
+    const agent = new HttpAgent({ identity, host: "https://ic0.app" })
+    if (process.env.DFX_NETWORK === 'local') { await agent.fetchRootKey() }
+    const daoActor = Actor.createActor(daoIDL, { agent, canisterId: tacoStore.daoBackendCanisterId() }) as any
+    const me = tacoStore.userPrincipal ? tacoStore.userPrincipal : tacoStore.userPrincipal
+    // check permission for a read-safe function like getLogs
+    isAdmin.value = await daoActor.hasAdminPermission(identity.getPrincipal(), { getLogs: null })
+  } catch (_) {
+    isAdmin.value = false
+  }
+  await refreshCycles()
+})
+
+</script>
+
+

@@ -40,6 +40,7 @@ import NNSVoteView from "./views/NNSVoteView.vue"
 import NNSVoteViewDemo from "./views/NNSVoteViewDemo.vue"
 import NNSPropView from "./views/NNSPropView.vue"
 import NNSPropViewDemo from "./views/NNSPropViewDemo.vue"
+import SystemView from "./views/SystemView.vue"
 import VueApexCharts from 'vue3-apexcharts'
 import VueClickAway from "vue3-click-away"
 import 'animate.css'
@@ -48,6 +49,7 @@ const routes = [
     { path: "/", name: "Home", component: HomeView, meta: { robots: 'index' } },
     { path: "/dao", name: "Dao", component: DaoView, meta: { robots: 'index' } },
     { path: "/vote", name: "Vote", component: VoteView, meta: { robots: 'index' } },      
+    { path: "/system", name: "System", component: SystemView, meta: { robots: 'index' } },
     { path: "/sales", name: "Sales", component: SalesView, meta: { robots: 'index' } },
     { path: "/sales/dkp-swap", name: "Sale1", component: SaleDKPSwap, meta: { robots: 'index' } },
     { path: "/info", name: "Info", component: InfoView, meta: { robots: 'index' } },
