@@ -57,6 +57,7 @@
                   v-model:expanded="expandedMap[c.key]"
                   :cyclesT="cyclesMap[c.key]"
                   :loading="loadingMap[c.key]"
+                  :timerStatus="timerStatusMap[c.key]"
                   @refresh="() => fetchCyclesFor(c.key)"
                 />
               </div>
@@ -76,6 +77,7 @@
                   v-model:expanded="expandedMap[c.key]"
                   :cyclesT="cyclesMap[c.key]"
                   :loading="loadingMap[c.key]"
+                  :timerStatus="timerStatusMap[c.key]"
                   @refresh="() => fetchCyclesFor(c.key)"
                 />
               </div>
@@ -193,6 +195,22 @@ const loadingMap = reactive<Record<CanKey, boolean>>({
   reward_distribution_archive: false,
   reward_withdrawal_archive: false
 })
+const timerStatusMap = reactive<Record<CanKey, any>>({
+  dao_backend: null,
+  frontend: null,
+  treasury: null,
+  rewards: null,
+  neuronSnapshot: null,
+  trading_archive: null,
+  portfolio_archive: null,
+  price_archive: null,
+  dao_admin_archive: null,
+  dao_governance_archive: null,
+  dao_allocation_archive: null,
+  dao_neuron_allocation_archive: null,
+  reward_distribution_archive: null,
+  reward_withdrawal_archive: null
+})
 const expandedMap = reactive<Record<CanKey, boolean>>({
   dao_backend: false,
   frontend: false,
@@ -222,12 +240,77 @@ const createGenericActor = async (canisterId: string) => {
   }) as any
 }
 
+const isArchiveKey = (key: CanKey) => (
+  key === 'trading_archive' ||
+  key === 'portfolio_archive' ||
+  key === 'price_archive' ||
+  key === 'dao_admin_archive' ||
+  key === 'dao_governance_archive' ||
+  key === 'dao_allocation_archive' ||
+  key === 'dao_neuron_allocation_archive' ||
+  key === 'reward_distribution_archive' ||
+  key === 'reward_withdrawal_archive'
+)
+
+const createArchiveActor = async (key: CanKey, canisterId: string) => {
+  try {
+    // Use the generated declarations (like AdminArchiveView) so getTimerStatus exists
+    const agent = new HttpAgent({ host: process.env.DFX_NETWORK === 'local' ? 'http://127.0.0.1:4943' : 'https://ic0.app' })
+    if (process.env.DFX_NETWORK === 'local') {
+      await agent.fetchRootKey()
+    }
+    switch (key) {
+      case 'trading_archive': {
+        const mod = await import('../../../declarations/trading_archive')
+        return mod.createActor(canisterId, { agent }) as any
+      }
+      case 'portfolio_archive': {
+        const mod = await import('../../../declarations/portfolio_archive')
+        return mod.createActor(canisterId, { agent }) as any
+      }
+      case 'price_archive': {
+        const mod = await import('../../../declarations/price_archive')
+        return mod.createActor(canisterId, { agent }) as any
+      }
+      case 'dao_admin_archive': {
+        const mod = await import('../../../declarations/dao_admin_archive')
+        return mod.createActor(canisterId, { agent }) as any
+      }
+      case 'dao_governance_archive': {
+        const mod = await import('../../../declarations/dao_governance_archive')
+        return mod.createActor(canisterId, { agent }) as any
+      }
+      case 'dao_allocation_archive': {
+        const mod = await import('../../../declarations/dao_allocation_archive')
+        return mod.createActor(canisterId, { agent }) as any
+      }
+      case 'dao_neuron_allocation_archive': {
+        const mod = await import('../../../declarations/dao_neuron_allocation_archive')
+        return mod.createActor(canisterId, { agent }) as any
+      }
+      case 'reward_distribution_archive': {
+        const mod = await import('../../../declarations/reward_distribution_archive')
+        return mod.createActor(canisterId, { agent }) as any
+      }
+      case 'reward_withdrawal_archive': {
+        const mod = await import('../../../declarations/reward_withdrawal_archive')
+        return mod.createActor(canisterId, { agent }) as any
+      }
+    }
+  } catch (e) {
+    console.error('Failed to create archive actor', key, e)
+    return null
+  }
+  return null
+}
+
 const fetchCyclesFor = async (key: CanKey) => {
   try {
     loadingMap[key] = true
     // Frontend canister is an asset canister and does not expose get_canister_cycles
     if (key === 'frontend') {
       cyclesMap[key] = null
+      timerStatusMap[key] = null
       return
     }
     const cid = resolvePrincipal(key)
@@ -239,9 +322,26 @@ const fetchCyclesFor = async (key: CanKey) => {
     const trillion = 1_000_000_000_000n
     const t = Number((rec?.cycles ?? 0n) / trillion)
     cyclesMap[key] = t
+    // Try fetching timer status if method exists (archives only)
+    try {
+      if (isArchiveKey(key)) {
+        const archiveActor = await createArchiveActor(key, cid)
+        if (archiveActor && typeof archiveActor.getTimerStatus === 'function') {
+          const timerRes = await archiveActor.getTimerStatus()
+          timerStatusMap[key] = timerRes
+        } else {
+          timerStatusMap[key] = null
+        }
+      } else {
+        timerStatusMap[key] = null
+      }
+    } catch (_) {
+      timerStatusMap[key] = null
+    }
   } catch (e) {
     console.error('get_canister_cycles failed for', key, e)
     cyclesMap[key] = null
+    timerStatusMap[key] = null
   } finally {
     loadingMap[key] = false
   }
