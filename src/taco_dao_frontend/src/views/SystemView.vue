@@ -118,7 +118,7 @@ import { CANISTER_IDS, type EnvKey } from '../constants/canisterIds'
 
 // Minimal IDL with only get_canister_cycles
 const minimalCyclesIdl = ({ IDL }: any) => IDL.Service({
-  'get_canister_cycles': IDL.Func([], IDL.Record({ cycles: IDL.Nat }), ['query'])
+  'get_canister_cycles': IDL.Func([], [IDL.Record({ cycles: IDL.Nat })], ['query'])
 })
 
 const tacoStore = useTacoStore()
@@ -228,10 +228,11 @@ const fetchCyclesFor = async (key: CanKey) => {
     const cid = resolvePrincipal(key)
     if (!cid) { cyclesMap[key] = null; loadingMap[key] = false; return }
     const actor = await createGenericActor(cid)
-    const res = await actor.get_canister_cycles() as { cycles: bigint }
+    const res = await actor.get_canister_cycles() as any
+    const rec = Array.isArray(res) ? res[0] : res
     // Convert to T (trillion cycles)
     const trillion = 1_000_000_000_000n
-    const t = Number(res.cycles / trillion)
+    const t = Number((rec?.cycles ?? 0n) / trillion)
     cyclesMap[key] = t
   } catch (e) {
     console.error('get_canister_cycles failed for', key, e)
