@@ -78,13 +78,21 @@
 
                                 </button>
 
+                                <!-- if logged in, back to forum button -->
+                                <router-link v-if="userLoggedIn" 
+                                             :to="`/chat/forum/${route.params.id}`" 
+                                             class="btn taco-btn taco-btn--green">
+                                    Back to Forum
+                                </router-link>
+
                                 <!-- if logged in, refresh button -->
                                 <button v-if="userLoggedIn" 
                                         class="btn taco-nav-btn taco-nav-btn--active"
                                         @click="refreshData">
 
                                     <span class="taco-text-black">
-                                        {{ componentLoading ? 'Refreshing' : 'Refresh Proposal Data' }}
+                                        <!-- {{ componentLoading ? 'Refreshing' : 'Refresh Proposal Data' }} -->
+                                          <i class="fa-solid fa-refresh"></i>
                                     </span>
 
                                 </button>
@@ -121,7 +129,7 @@
                             <p class="taco-text-black-to-white mb-4 text-center">{{ error }}</p>
                             
                             <!-- back to forum button -->
-                            <router-link to="/chat/forum" 
+                            <router-link :to="`/chat/forum/${route.params.id}`" 
                                          class="btn taco-btn taco-btn--green taco-btn--big mb-2"
                                          style="max-width: 24rem;">
                                 Back to Forum
@@ -149,7 +157,7 @@
                             </p>
 
                             <!-- back to forum button -->
-                            <router-link to="/chat/forum" 
+                            <router-link :to="`/chat/forum/${route.params.id}`" 
                                          class="btn taco-btn taco-btn--green taco-btn--big mb-3"
                                          style="max-width: 24rem;">
                                 Back to Forum
