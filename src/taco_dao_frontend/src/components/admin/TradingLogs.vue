@@ -143,7 +143,7 @@ import { storeToRefs } from 'pinia'
 import { tokenData } from '../data/TokenData'
 
 const store = useTacoStore()
-const { tradingLogs } = storeToRefs(store)
+const { tradingLogs, fetchedTokenDetails } = storeToRefs(store)
 const { ensureTokenDetails } = store
 
 const sortedLogs = computed(() => {

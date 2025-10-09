@@ -1196,11 +1196,28 @@ const refreshingVP = ref(false);
 // Trading pauses state
 const tradingPauses = ref<any[]>([]);
 
+// Get store
+const tacoStore = useTacoStore();
+const { 
+  snapshotStatus, 
+  timerHealth, 
+  systemLogs, 
+  fetchedTokenDetails: tokenDetailsRef, 
+  rebalanceConfig,
+  fetchedVotingPowerMetrics,
+  fetchedAggregateAllocation,
+  fetchedVoterDetails,
+  fetchedNeuronAllocations
+} = storeToRefs(tacoStore);
+
+// Destructure utility methods
+const { getPrincipalDisplayName, listTradingPauses } = tacoStore;
+
 // Computed property to sort tokens with paused/inactive tokens first
 const sortedTokenDetails = computed(() => {
-  if (!fetchedTokenDetails.value || !fetchedTokenDetails.value.length) return [];
+  if (!tokenDetailsRef.value || !tokenDetailsRef.value.length) return [];
   
-  return [...fetchedTokenDetails.value].sort(([principalA, tokenA], [principalB, tokenB]) => {
+  return [...tokenDetailsRef.value].sort(([principalA, tokenA], [principalB, tokenB]) => {
     const statusA = getTokenStatusClass(tokenA, principalA);
     const statusB = getTokenStatusClass(tokenB, principalB);
     
@@ -1236,23 +1253,6 @@ const confirmationModal = ref({
   action: null as (() => Promise<void>) | null,
   actionData: null as { principal: string; tokenName: string } | { type: string } | { type: string; intervalMinutes: number } | null
 });
-
-// Get store
-const tacoStore = useTacoStore();
-const { 
-  snapshotStatus, 
-  timerHealth, 
-  systemLogs, 
-  fetchedTokenDetails, 
-  rebalanceConfig,
-  fetchedVotingPowerMetrics,
-  fetchedAggregateAllocation,
-  fetchedVoterDetails,
-  fetchedNeuronAllocations
-} = storeToRefs(tacoStore);
-
-// Destructure utility methods
-const { getPrincipalDisplayName, listTradingPauses } = tacoStore;
 
 // Update voting metrics state with type
 const votingMetrics = ref<VotingMetrics>({
@@ -1938,7 +1938,7 @@ const refreshVotingMetrics = async () => {
       console.log('Processing raw allocations:', rawAllocations);
       
       // Ensure we have token details before processing allocations
-      if (!fetchedTokenDetails.value || !Array.isArray(fetchedTokenDetails.value)) {
+      if (!tokenDetailsRef.value || !Array.isArray(tokenDetailsRef.value)) {
         console.log('Fetching token details first...');
         await tacoStore.fetchTokenDetails();
       }
@@ -1994,12 +1994,12 @@ function calculateUtilization(metrics: typeof votingMetrics.value): string {
 // Cache a lookup map to avoid repeated scans and warnings during render
 const warnedUnknownTokens = new Set<string>();
 const tokenSymbolByPrincipal = computed(() => {
-    if (!Array.isArray(fetchedTokenDetails.value) || fetchedTokenDetails.value.length === 0) {
+    if (!Array.isArray(tokenDetailsRef.value) || tokenDetailsRef.value.length === 0) {
         return new Map<string, string>();
     }
     try {
         const map = new Map<string, string>();
-        (fetchedTokenDetails.value as any[]).forEach((entry: any) => {
+        (tokenDetailsRef.value as any[]).forEach((entry: any) => {
             if (!entry || entry.length < 2) return;
             const p = entry[0];
             const d = entry[1];
