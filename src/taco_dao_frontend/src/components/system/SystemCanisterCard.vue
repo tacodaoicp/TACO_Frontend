@@ -2,15 +2,20 @@
   <div class="taco-container taco-container--l2 p-0">
     <div class="d-flex align-items-center justify-content-between px-3 py-2">
       <div class="d-flex align-items-center gap-2">
+        <!-- cycles status lamp first -->
+        <span :class="['status-light', statusColorClass]"></span>
         <span class="fw-bold">{{ title }}</span>
         <span class="badge bg-light text-dark">{{ cyclesDisplay }}</span>
-        <!-- archive timer lamps -->
+        <!-- archive timer lamps with label/icon -->
         <div v-if="timerStatus" class="d-flex align-items-center gap-2 ms-2">
+          <span class="text-muted small d-inline-flex align-items-center gap-1">
+            <i class="fa-regular fa-clock"></i>
+            Timers:
+          </span>
           <span class="status-indicator" :class="timerStatus.outerLoopRunning ? 'active' : 'inactive'" title="Outer"></span>
           <span class="status-indicator" :class="timerStatus.middleLoopRunning ? 'active' : 'inactive'" title="Middle"></span>
           <span class="status-indicator" :class="timerStatus.innerLoopRunning ? 'active' : 'inactive'" title="Inner"></span>
         </div>
-        <span :class="['status-light', statusColorClass]"></span>
       </div>
       <div class="d-flex align-items-center gap-2">
         <button class="btn btn-sm btn-outline-secondary" @click="$emit('refresh')" :disabled="loading">
