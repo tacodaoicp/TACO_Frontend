@@ -132,7 +132,7 @@ const isAdmin = ref(false)
 const selectedEnv = ref<EnvKey>('ic')
 
 // Canister groups and keys
-type CanKey = 'dao_backend' | 'frontend' | 'treasury' | 'rewards' | 'neuronSnapshot'
+type CanKey = 'dao_backend' | 'frontend' | 'treasury' | 'rewards' | 'neuronSnapshot' | 'validation'
   | 'trading_archive' | 'portfolio_archive' | 'price_archive' | 'dao_admin_archive' | 'dao_governance_archive'
   | 'dao_allocation_archive' | 'dao_neuron_allocation_archive' | 'reward_distribution_archive' | 'reward_withdrawal_archive'
 
@@ -142,6 +142,7 @@ const mainCanisters = [
   { key: 'treasury' as CanKey, title: 'Portfolio (treasury.mo)' },
   { key: 'rewards' as CanKey, title: 'Rewards (rewards.mo)' },
   { key: 'neuronSnapshot' as CanKey, title: 'Governance (neuronSnapshot.mo)' },
+  { key: 'validation' as CanKey, title: 'Validation (validation.mo)' },
 ]
 
 const archiveCanisters = [
@@ -169,6 +170,7 @@ const cyclesMap = reactive<Record<CanKey, number | null>>({
   treasury: null,
   rewards: null,
   neuronSnapshot: null,
+  validation: null,
   trading_archive: null,
   portfolio_archive: null,
   price_archive: null,
@@ -185,6 +187,7 @@ const loadingMap = reactive<Record<CanKey, boolean>>({
   treasury: false,
   rewards: false,
   neuronSnapshot: false,
+  validation: false,
   trading_archive: false,
   portfolio_archive: false,
   price_archive: false,
@@ -201,6 +204,7 @@ const timerStatusMap = reactive<Record<CanKey, any>>({
   treasury: null,
   rewards: null,
   neuronSnapshot: null,
+  validation: null,
   trading_archive: null,
   portfolio_archive: null,
   price_archive: null,
@@ -217,6 +221,7 @@ const expandedMap = reactive<Record<CanKey, boolean>>({
   treasury: false,
   rewards: false,
   neuronSnapshot: false,
+  validation: false,
   trading_archive: false,
   portfolio_archive: false,
   price_archive: false,
