@@ -58,6 +58,7 @@
                   :cyclesT="cyclesMap[c.key]"
                   :loading="loadingMap[c.key]"
                   :timerStatus="timerStatusMap[c.key]"
+                  :treasuryHeader="c.key === 'treasury' ? (treasuryHeader || undefined) : undefined"
                   :isAdmin="isAdmin"
                   :isArchive="false"
                   @refresh="() => fetchCyclesFor(c.key)"
@@ -219,6 +220,13 @@ const timerStatusMap = reactive<Record<CanKey, any>>({
   reward_distribution_archive: null,
   reward_withdrawal_archive: null
 })
+const treasuryHeader = ref<{
+  tradingActive: boolean
+  tradingStale: boolean
+  lastTradeDisplay: string
+  tokenWorst: 'green' | 'orange' | 'red'
+  snapshotActive: boolean
+} | null>(null)
 const expandedMap = reactive<Record<CanKey, boolean>>({
   dao_backend: false,
   frontend: false,
@@ -340,6 +348,62 @@ const fetchCyclesFor = async (key: CanKey) => {
           timerStatusMap[key] = timerRes
         } else {
           timerStatusMap[key] = null
+        }
+      } else if (key === 'treasury') {
+        // Build treasury header indicators from store data
+        try {
+          const { useTacoStore } = await import('../stores/taco.store')
+          const store = useTacoStore()
+          // Refresh timer/trading status in store if needed
+          if (!store.timerHealth?.treasury) {
+            await (store as any).refreshTimerStatus?.()
+          }
+          const state: any = (store as any).timerHealth?.treasury
+          const rebalanceCfg: any = (store as any).rebalanceConfig
+          // Trading active lamp
+          const tradingActive = state?.rebalanceStatus === 'Trading'
+          // Last trade/attempt time and stale calc based on rebalance interval
+          const lastAttemptNs = state?.tradingMetrics?.lastRebalanceAttempt
+          const intervalNs = rebalanceCfg?.rebalanceIntervalNS
+          let tradingStale = false
+          let lastTradeDisplay = 'Never'
+          if (lastAttemptNs) {
+            const ms = Number(BigInt(lastAttemptNs) / 1_000_000n)
+            lastTradeDisplay = new Date(ms).toLocaleString()
+            if (intervalNs) {
+              const nowNs = BigInt(Date.now()) * 1_000_000n
+              const elapsed = nowNs - BigInt(lastAttemptNs)
+              tradingStale = elapsed > BigInt(intervalNs) * 2n // warn if > 2 periods
+            }
+          } else {
+            tradingStale = true
+          }
+          // Token worst status via AdminView helpers logic approximation
+          const tokenDetails: any[] = (store as any).fetchedTokenDetails || []
+          let worst: 'green' | 'orange' | 'red' = 'green'
+          for (const entry of tokenDetails) {
+            const token = entry?.[1]
+            if (!token) continue
+            const paused = token.isPaused || token.pausedDueToSyncFailure
+            const inactive = !token.Active
+            if (inactive || token.pausedDueToSyncFailure) { worst = 'red'; break }
+            if (paused) { worst = 'orange' }
+          }
+          // Snapshot lamp from portfolio snapshot status
+          let snapshotActive = false
+          try {
+            const snap = await (store as any).getPortfolioSnapshotStatus?.()
+            snapshotActive = !!('Running' in snap.status)
+          } catch (_) {}
+          treasuryHeader.value = {
+            tradingActive,
+            tradingStale,
+            lastTradeDisplay,
+            tokenWorst: worst,
+            snapshotActive
+          }
+        } catch (_) {
+          treasuryHeader.value = null
         }
       } else {
         timerStatusMap[key] = null

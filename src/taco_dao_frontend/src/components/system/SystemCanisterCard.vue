@@ -16,6 +16,28 @@
           <span class="status-indicator" :class="timerStatus.innerLoopRunning ? 'active' : 'inactive'" title="Inner"></span>
           <span :class="['small', outerLate ? 'text-danger' : 'text-muted']" :title="'Outer last run'">{{ outerLastRunDisplay }}</span>
         </div>
+        
+        <!-- treasury header indicators -->
+        <div v-if="treasuryHeader" class="d-flex align-items-center gap-2 ms-3">
+          <!-- trading bot lamp + last trade time -->
+          <span class="text-muted small d-inline-flex align-items-center" title="Trading Bot">
+            <i class="fa-solid fa-robot"></i>
+          </span>
+          <span class="status-indicator" :class="treasuryHeader.tradingActive ? 'active' : 'inactive'"></span>
+          <span :class="['small', treasuryHeader.tradingStale ? 'text-danger' : 'text-muted']" :title="'Last trade time'">{{ treasuryHeader.lastTradeDisplay }}</span>
+          
+          <!-- token sync aggregate lamp -->
+          <span class="text-muted small d-inline-flex align-items-center ms-2" title="Token Sync">
+            <i class="fa-solid fa-database"></i>
+          </span>
+          <span class="status-indicator" :class="treasuryHeader.tokenWorst === 'red' ? 'status-red' : treasuryHeader.tokenWorst === 'orange' ? 'status-orange' : 'active'"></span>
+          
+          <!-- snapshot bot lamp -->
+          <span class="text-muted small d-inline-flex align-items-center ms-2" title="Snapshots">
+            <i class="fa-regular fa-image"></i>
+          </span>
+          <span class="status-indicator" :class="treasuryHeader.snapshotActive ? 'active' : 'inactive'"></span>
+        </div>
       </div>
       <div class="d-flex align-items-center gap-2">
         <button class="btn btn-sm btn-outline-secondary" @click="$emit('refresh')" :disabled="loading">
@@ -126,6 +148,13 @@ const props = defineProps<{
   timerStatus?: any
   isAdmin?: boolean
   isArchive?: boolean
+  treasuryHeader?: {
+    tradingActive: boolean
+    tradingStale: boolean
+    lastTradeDisplay: string
+    tokenWorst: 'green' | 'orange' | 'red'
+    snapshotActive: boolean
+  }
 }>()
 
 const emits = defineEmits(['update:expanded','refresh'])
