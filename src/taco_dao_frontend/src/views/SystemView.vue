@@ -54,7 +54,7 @@
                   :key="c.key"
                   :title="c.title"
                   :principal="resolvePrincipal(c.key)"
-                  :expanded.sync="expandedMap[c.key]"
+                  v-model:expanded="expandedMap[c.key]"
                   :cyclesT="cyclesMap[c.key]"
                   :loading="loadingMap[c.key]"
                   @refresh="() => fetchCyclesFor(c.key)"
@@ -73,7 +73,7 @@
                   :key="c.key"
                   :title="c.title"
                   :principal="resolvePrincipal(c.key)"
-                  :expanded.sync="expandedMap[c.key]"
+                  v-model:expanded="expandedMap[c.key]"
                   :cyclesT="cyclesMap[c.key]"
                   :loading="loadingMap[c.key]"
                   @refresh="() => fetchCyclesFor(c.key)"
@@ -211,10 +211,8 @@ const expandedMap = reactive<Record<CanKey, boolean>>({
 })
 
 const createGenericActor = async (canisterId: string) => {
-  const { AuthClient } = await import('@dfinity/auth-client')
-  const authClient = await AuthClient.create()
-  const identity = await authClient.getIdentity()
-  const agent = new HttpAgent({ identity, host: "https://ic0.app" })
+  // Use anonymous identity for public queries to avoid CORS/II session issues
+  const agent = new HttpAgent({ host: "https://ic0.app" })
   if (process.env.DFX_NETWORK === 'local') {
     await agent.fetchRootKey()
   }
@@ -236,6 +234,7 @@ const fetchCyclesFor = async (key: CanKey) => {
     const t = Number(res.cycles / trillion)
     cyclesMap[key] = t
   } catch (e) {
+    console.error('get_canister_cycles failed for', key, e)
     cyclesMap[key] = null
   } finally {
     loadingMap[key] = false

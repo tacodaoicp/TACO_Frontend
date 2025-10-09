@@ -20,7 +20,7 @@
     <transition name="fade">
       <div v-show="expanded" class="px-3 pb-3">
         <div class="small text-muted">Principal</div>
-        <code class="user-select-all">{{ principal }}</code>
+        <code class="user-select-all text-white">{{ principal }}</code>
       </div>
     </transition>
   </div>
