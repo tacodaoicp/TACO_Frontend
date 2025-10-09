@@ -58,6 +58,8 @@
                   :cyclesT="cyclesMap[c.key]"
                   :loading="loadingMap[c.key]"
                   :timerStatus="timerStatusMap[c.key]"
+                  :isAdmin="isAdmin"
+                  :isArchive="false"
                   @refresh="() => fetchCyclesFor(c.key)"
                 />
               </div>
@@ -78,6 +80,8 @@
                   :cyclesT="cyclesMap[c.key]"
                   :loading="loadingMap[c.key]"
                   :timerStatus="timerStatusMap[c.key]"
+                  :isAdmin="isAdmin"
+                  :isArchive="true"
                   @refresh="() => fetchCyclesFor(c.key)"
                 />
               </div>

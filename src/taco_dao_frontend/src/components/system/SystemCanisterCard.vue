@@ -83,6 +83,12 @@
             </div>
           </div>
         </div>
+
+        <div class="d-flex justify-content-end mt-3" v-if="isAdmin && isArchive">
+          <router-link to="/admin/archives" class="btn btn-sm btn-outline-primary">
+            Manage
+          </router-link>
+        </div>
       </div>
     </transition>
   </div>
@@ -118,6 +124,8 @@ const props = defineProps<{
   expanded: boolean
   loading?: boolean
   timerStatus?: any
+  isAdmin?: boolean
+  isArchive?: boolean
 }>()
 
 const emits = defineEmits(['update:expanded','refresh'])
