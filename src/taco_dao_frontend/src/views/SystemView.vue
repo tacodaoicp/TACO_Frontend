@@ -225,6 +225,11 @@ const createGenericActor = async (canisterId: string) => {
 const fetchCyclesFor = async (key: CanKey) => {
   try {
     loadingMap[key] = true
+    // Frontend canister is an asset canister and does not expose get_canister_cycles
+    if (key === 'frontend') {
+      cyclesMap[key] = null
+      return
+    }
     const cid = resolvePrincipal(key)
     if (!cid) { cyclesMap[key] = null; loadingMap[key] = false; return }
     const actor = await createGenericActor(cid)
