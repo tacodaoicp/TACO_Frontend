@@ -1991,35 +1991,44 @@ function calculateUtilization(metrics: typeof votingMetrics.value): string {
     return utilization.toFixed(2);
 }
 
-function getTokenSymbol(principal: Principal): string {
+// Cache a lookup map to avoid repeated scans and warnings during render
+const warnedUnknownTokens = new Set<string>();
+const tokenSymbolByPrincipal = computed(() => {
+    if (!Array.isArray(fetchedTokenDetails.value) || fetchedTokenDetails.value.length === 0) {
+        return new Map<string, string>();
+    }
     try {
-        //console.log('Looking for token symbol for principal:', principal.toString());
-        //console.log('Available tokens:', fetchedTokenDetails.value);
-        
-        if (!fetchedTokenDetails.value || !Array.isArray(fetchedTokenDetails.value)) {
-            console.warn('Token details not available or not in expected format');
-            return 'Unknown';
-        }
-
-        const token = fetchedTokenDetails.value.find(entry => {
-            if (!entry || !Array.isArray(entry) || entry.length < 2) {
-                console.warn('Invalid token entry format:', entry);
-                return false;
-            }
-            try {
-                return entry[0].toString() === principal.toString();
-            } catch (err) {
-                console.warn('Error comparing principals:', err);
-                return false;
-            }
+        const map = new Map<string, string>();
+        (fetchedTokenDetails.value as any[]).forEach((entry: any) => {
+            if (!entry || entry.length < 2) return;
+            const p = entry[0];
+            const d = entry[1];
+            const id = p?.toText ? p.toText() : String(p);
+            map.set(id, d?.tokenSymbol ?? '');
         });
+        return map;
+    } catch {
+        return new Map<string, string>();
+    }
+});
 
-        if (!token || !Array.isArray(token) || !token[1] || !token[1].tokenSymbol) {
-            console.warn('Token not found or invalid format for principal:', principal.toString());
-            return 'Unknown';
+function getTokenSymbol(principal: any): string {
+    try {
+        const principalText = typeof principal === 'string'
+            ? principal
+            : ((principal as any)?.toText ? (principal as any).toText() : String(principal));
+
+        const symbol = tokenSymbolByPrincipal.value.get(principalText);
+        if (symbol) return symbol;
+
+        // If token details aren't loaded yet, avoid spamming warnings during initial renders
+        if (tokenSymbolByPrincipal.value.size === 0) return 'Unknown';
+
+        if (!warnedUnknownTokens.has(principalText)) {
+            console.warn('Token not found for principal:', principalText);
+            warnedUnknownTokens.add(principalText);
         }
-
-        return token[1].tokenSymbol;
+        return 'Unknown';
     } catch (error) {
         console.error('Error getting token symbol:', error);
         return 'Unknown';
