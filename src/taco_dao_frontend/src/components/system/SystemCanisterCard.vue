@@ -6,15 +6,15 @@
         <span :class="['status-light', statusColorClass]"></span>
         <span class="fw-bold">{{ title }}</span>
         <span class="badge bg-light text-dark">{{ cyclesDisplay }}</span>
-        <!-- archive timer lamps with label/icon -->
+        <!-- archive timer lamps with clock icon -->
         <div v-if="timerStatus" class="d-flex align-items-center gap-2 ms-2">
-          <span class="text-muted small d-inline-flex align-items-center gap-1">
+          <span class="text-muted small d-inline-flex align-items-center">
             <i class="fa-regular fa-clock"></i>
-            Timers:
           </span>
           <span class="status-indicator" :class="timerStatus.outerLoopRunning ? 'active' : 'inactive'" title="Outer"></span>
           <span class="status-indicator" :class="timerStatus.middleLoopRunning ? 'active' : 'inactive'" title="Middle"></span>
           <span class="status-indicator" :class="timerStatus.innerLoopRunning ? 'active' : 'inactive'" title="Inner"></span>
+          <span :class="['small', outerLate ? 'text-danger' : 'text-muted']" :title="'Outer last run'">{{ outerLastRunDisplay }}</span>
         </div>
       </div>
       <div class="d-flex align-items-center gap-2">
@@ -142,6 +142,17 @@ const formatTime = (timestamp?: number | bigint | null) => {
   const date = new Date(Number(timestamp) / 1_000_000)
   return date.toLocaleString()
 }
+
+const outerLastRunDisplay = computed(() => formatTime(props.timerStatus?.outerLoopLastRun as any))
+const outerLate = computed(() => {
+  const lastRun = props.timerStatus?.outerLoopLastRun as any
+  if (!lastRun || Number(lastRun) === 0) return true
+  const lastMs = Number(lastRun) / 1_000_000
+  const nowMs = Date.now()
+  // 30 minutes in ms
+  const threshold = 30 * 60 * 1000
+  return nowMs - lastMs > threshold
+})
 
 </script>
 
