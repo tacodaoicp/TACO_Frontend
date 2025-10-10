@@ -358,11 +358,12 @@ const fetchCyclesFor = async (key: CanKey) => {
           const { useTacoStore } = await import('../stores/taco.store')
           const store = useTacoStore()
           // Refresh timer/trading status in store if needed
-          if (!store.timerHealth?.treasury) {
-            await (store as any).refreshTimerStatus?.()
+          await (store as any).refreshTimerStatus?.()
+          if (!(store as any).rebalanceConfig?.value) {
+            await (store as any).getRebalanceConfig?.()
           }
-          const state: any = (store as any).timerHealth?.treasury
-          const rebalanceCfg: any = (store as any).rebalanceConfig
+          const state: any = (store as any).timerHealth?.value?.treasury
+          const rebalanceCfg: any = (store as any).rebalanceConfig?.value
           // Trading active lamp
           const tradingActive = state?.rebalanceStatus === 'Trading'
           // Last trade/attempt time and stale calc based on rebalance interval
@@ -382,7 +383,7 @@ const fetchCyclesFor = async (key: CanKey) => {
             tradingStale = true
           }
           // Token worst status via AdminView helpers logic approximation
-          const tokenDetails: any[] = (store as any).fetchedTokenDetails || []
+          let tokenDetails: any[] = (store as any).fetchedTokenDetails?.value || []
           let worst: 'green' | 'orange' | 'red' = 'green'
           for (const entry of tokenDetails) {
             const token = entry?.[1]
@@ -406,8 +407,8 @@ const fetchCyclesFor = async (key: CanKey) => {
             snapshotActive
           }
           // Read-only details
-          const successRatePct = state?.tradingMetrics?.successRate != null ? `${(state.tradingMetrics.successRate * 100).toFixed(1)}%` : '0.0%'
-          const avgSlippagePct = state?.tradingMetrics?.avgSlippage != null ? `${state.tradingMetrics.avgSlippage.toFixed(2)}%` : '0.00%'
+          const successRatePct = state?.tradingMetrics?.successRate != null ? `${(Number(state.tradingMetrics.successRate) * 100).toFixed(1)}%` : '0.0%'
+          const avgSlippagePct = state?.tradingMetrics?.avgSlippage != null ? `${Number(state.tradingMetrics.avgSlippage).toFixed(2)}%` : '0.00%'
           const lastAttemptDisplay = lastAttemptNs ? new Date(Number(BigInt(lastAttemptNs) / 1_000_000n)).toLocaleString() : 'Never'
           let tradingWarning: any = null
           if (intervalNs && lastAttemptNs) {
@@ -430,8 +431,8 @@ const fetchCyclesFor = async (key: CanKey) => {
           treasuryDetails.value = {
             tradingMetrics: {
               lastRebalanceAttemptDisplay: lastAttemptDisplay,
-              totalTradesExecuted: state?.tradingMetrics?.totalTradesExecuted ?? 0,
-              totalTradesFailed: state?.tradingMetrics?.totalTradesFailed ?? 0,
+              totalTradesExecuted: Number(state?.tradingMetrics?.totalTradesExecuted ?? 0),
+              totalTradesFailed: Number(state?.tradingMetrics?.totalTradesFailed ?? 0),
               successRatePct,
               avgSlippagePct
             },
@@ -442,6 +443,58 @@ const fetchCyclesFor = async (key: CanKey) => {
               intervalMinutes: snapStatus.intervalMinutes,
               lastSnapshotDisplay: new Date(Number(BigInt(snapStatus.lastSnapshotTime) / 1_000_000n)).toLocaleString()
             }
+          }
+
+          // Fallback: if metrics appear zero/missing, fetch directly from treasury canister
+          const metricsEmpty = !state?.tradingMetrics || (Number(state?.tradingMetrics?.totalTradesExecuted || 0) === 0 && Number(state?.tradingMetrics?.totalTradesFailed || 0) === 0)
+          if (metricsEmpty) {
+            try {
+              const { idlFactory: treasuryIDL } = await import('../../../declarations/treasury/treasury.did.js')
+              const agent = new HttpAgent({ host: process.env.DFX_NETWORK === 'local' ? 'http://127.0.0.1:4943' : 'https://ic0.app' })
+              if (process.env.DFX_NETWORK === 'local') { await agent.fetchRootKey() }
+              const tActor: any = Actor.createActor(treasuryIDL, { agent, canisterId: resolvePrincipal('treasury') })
+              const tsRes = await tActor.getTradingStatus()
+              if ('ok' in tsRes) {
+                const m = tsRes.ok.metrics
+                const lastAttemptDisplay2 = m?.lastRebalanceAttempt ? new Date(Number(BigInt(m.lastRebalanceAttempt) / 1_000_000n)).toLocaleString() : 'Never'
+                const successRatePct2 = m?.successRate != null ? `${(Number(m.successRate) * 100).toFixed(1)}%` : '0.0%'
+                const avgSlippagePct2 = m?.avgSlippage != null ? `${Number(m.avgSlippage).toFixed(2)}%` : '0.00%'
+                treasuryDetails.value = {
+                  ...(treasuryDetails.value || {}),
+                  tradingMetrics: {
+                    lastRebalanceAttemptDisplay: lastAttemptDisplay2,
+                    totalTradesExecuted: Number(m?.totalTradesExecuted ?? 0),
+                    totalTradesFailed: Number(m?.totalTradesFailed ?? 0),
+                    successRatePct: successRatePct2,
+                    avgSlippagePct: avgSlippagePct2
+                  }
+                }
+              }
+            } catch (_) {}
+          }
+
+          // Fallback: ensure token details present by fetching from DAO if empty
+          if (!tokenDetails.length) {
+            try {
+              const { idlFactory: daoIDL } = await import('../../../declarations/dao_backend/DAO_backend.did.js')
+              const agent = new HttpAgent({ host: process.env.DFX_NETWORK === 'local' ? 'http://127.0.0.1:4943' : 'https://ic0.app' })
+              if (process.env.DFX_NETWORK === 'local') { await agent.fetchRootKey() }
+              const dActor: any = Actor.createActor(daoIDL, { agent, canisterId: (store as any).daoBackendCanisterId?.() })
+              const tds = await dActor.getTokenDetails()
+              tokenDetails = tds || []
+              const tokens2 = tokenDetails.map((entry: any) => {
+                const token = entry[1]
+                const symbol = token?.tokenSymbol || 'UNKNOWN'
+                const lastSyncDisplay = token?.lastTimeSynced ? new Date(Number(BigInt(token.lastTimeSynced) / 1_000_000n)).toLocaleString() : 'Never'
+                let statusClass = 'active'
+                let statusText = ''
+                if (!token?.Active) statusClass = 'inactive'
+                else if (token?.pausedDueToSyncFailure) { statusClass = 'paused'; statusText = '(Sync Failed)' }
+                else if (token?.isPaused) { statusClass = 'paused'; statusText = '(Manually Paused)' }
+                return { symbol, lastSyncDisplay, statusClass, statusText }
+              })
+              treasuryDetails.value = { ...(treasuryDetails.value || {}), tokens: tokens2 }
+            } catch (_) {}
           }
         } catch (_) {
           treasuryHeader.value = null
