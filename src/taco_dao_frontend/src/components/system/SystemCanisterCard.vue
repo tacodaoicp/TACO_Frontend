@@ -17,6 +17,14 @@
           <span :class="['small', outerLate ? 'text-danger' : 'text-muted']" :title="'Outer last run'">{{ outerLastRunDisplay }}</span>
         </div>
         
+        <!-- generic token sync aggregate lamp (e.g., DAO backend) -->
+        <div v-if="tokenAggregateWorst" class="d-flex align-items-center gap-2 ms-3">
+          <span class="text-muted small d-inline-flex align-items-center" title="Token Sync">
+            <i class="fa-solid fa-database"></i>
+          </span>
+          <span class="status-indicator" :class="tokenAggregateWorst === 'red' ? 'status-red' : tokenAggregateWorst === 'orange' ? 'status-orange' : 'active'"></span>
+        </div>
+
         <!-- treasury header indicators -->
         <div v-if="treasuryHeader" class="d-flex align-items-center gap-2 ms-3">
           <!-- trading bot lamp + last trade time -->
@@ -124,16 +132,7 @@
             <div v-if="treasuryDetails.tradingWarning" :class="['mt-1', treasuryDetails.tradingWarning.level === 'danger' ? 'text-danger' : 'text-warning']">{{ treasuryDetails.tradingWarning.message }}</div>
           </div>
 
-          <h6 class="mb-2 mt-3">Token Sync Status</h6>
-          <div v-if="treasuryDetails.tokens && treasuryDetails.tokens.length" class="d-flex flex-column gap-1">
-            <div v-for="t in treasuryDetails.tokens" :key="t.symbol" class="d-flex align-items-center gap-2 small">
-              <span class="status-indicator" :class="t.statusClass"></span>
-              <span class="token-symbol">{{ t.symbol }}</span>
-              <span class="text-muted">Last Sync: {{ t.lastSyncDisplay }}</span>
-              <span class="text-muted">{{ t.statusText }}</span>
-            </div>
-          </div>
-          <div v-else class="text-muted small">No token data available</div>
+          <!-- token sync list moved to DAO backend card -->
 
           <h6 class="mb-2 mt-3">Portfolio Snapshot Management</h6>
           <div class="d-flex align-items-center gap-3 small">
@@ -141,6 +140,19 @@
             <span><strong>Status:</strong> {{ treasuryDetails.snapshots?.active ? 'Running' : 'Stopped' }}</span>
             <span><strong>Interval:</strong> {{ treasuryDetails.snapshots?.intervalMinutes }} minutes</span>
             <span><strong>Last Snapshot:</strong> {{ treasuryDetails.snapshots?.lastSnapshotDisplay }}</span>
+          </div>
+        </div>
+
+        <!-- DAO Backend read-only token sync list -->
+        <div v-if="tokenList && tokenList.length" class="mt-3">
+          <h6 class="mb-2">Token Sync Status</h6>
+          <div class="d-flex flex-column gap-1">
+            <div v-for="t in tokenList" :key="t.symbol" class="d-flex align-items-center gap-2 small">
+              <span class="status-indicator" :class="t.statusClass"></span>
+              <span class="token-symbol">{{ t.symbol }}</span>
+              <span class="text-muted">Last Sync: {{ t.lastSyncDisplay }}</span>
+              <span class="text-muted">{{ t.statusText }}</span>
+            </div>
           </div>
         </div>
       </div>
@@ -188,6 +200,8 @@ const props = defineProps<{
     snapshotActive: boolean
   }
   treasuryDetails?: any
+  tokenList?: Array<{ symbol: string; lastSyncDisplay: string; statusClass: string; statusText: string }>
+  tokenAggregateWorst?: 'green' | 'orange' | 'red'
 }>()
 
 const emits = defineEmits(['update:expanded','refresh'])

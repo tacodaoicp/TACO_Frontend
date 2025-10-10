@@ -60,6 +60,8 @@
                   :timerStatus="timerStatusMap[c.key]"
                   :treasuryHeader="c.key === 'treasury' ? (treasuryHeader || undefined) : undefined"
                   :treasuryDetails="c.key === 'treasury' ? (treasuryDetails || undefined) : undefined"
+                  :tokenList="c.key === 'dao_backend' ? (daoTokenList || undefined) : undefined"
+                  :tokenAggregateWorst="c.key === 'dao_backend' ? (daoTokenWorst || undefined) : undefined"
                   :isAdmin="isAdmin"
                   :isArchive="false"
                   @refresh="() => fetchCyclesFor(c.key)"
@@ -230,6 +232,8 @@ const treasuryHeader = ref<{
 } | null>(null)
 
 const treasuryDetails = ref<any | null>(null)
+const daoTokenList = ref<Array<{ symbol: string; lastSyncDisplay: string; statusClass: string; statusText: string }> | null>(null)
+const daoTokenWorst = ref<'green' | 'orange' | 'red' | null>(null)
 const expandedMap = reactive<Record<CanKey, boolean>>({
   dao_backend: false,
   frontend: false,
@@ -452,6 +456,36 @@ const fetchCyclesFor = async (key: CanKey) => {
         } catch (_) {
           treasuryHeader.value = null
           treasuryDetails.value = null
+        }
+      } else if (key === 'dao_backend') {
+        // Load DAO token sync list and aggregate lamp from selected env
+        try {
+          const { idlFactory: daoIDL } = await import('../../../declarations/dao_backend/DAO_backend.did.js')
+          const agent = new HttpAgent({ host: process.env.DFX_NETWORK === 'local' ? 'http://127.0.0.1:4943' : 'https://ic0.app' })
+          if (process.env.DFX_NETWORK === 'local') { await agent.fetchRootKey() }
+          const dActor: any = Actor.createActor(daoIDL, { agent, canisterId: resolvePrincipal('dao_backend') })
+          const tokenDetails = await dActor.getTokenDetails()
+          const tokens = (tokenDetails || []).map((entry: any) => {
+            const token = entry[1]
+            const symbol = token?.tokenSymbol || 'UNKNOWN'
+            const lastSyncDisplay = token?.lastTimeSynced ? new Date(Number(BigInt(token.lastTimeSynced) / 1_000_000n)).toLocaleString() : 'Never'
+            let statusClass = 'active'
+            let statusText = ''
+            if (!token?.Active) statusClass = 'inactive'
+            else if (token?.pausedDueToSyncFailure) { statusClass = 'paused'; statusText = '(Sync Failed)' }
+            else if (token?.isPaused) { statusClass = 'paused'; statusText = '(Manually Paused)' }
+            return { symbol, lastSyncDisplay, statusClass, statusText }
+          })
+          let worst: 'green' | 'orange' | 'red' = 'green'
+          for (const t of tokens) {
+            if (t.statusClass === 'inactive') { worst = 'red'; break }
+            if (t.statusClass === 'paused' && (worst === 'green' || worst === 'orange')) worst = 'orange'
+          }
+          daoTokenList.value = tokens
+          daoTokenWorst.value = worst
+        } catch (_) {
+          daoTokenList.value = null
+          daoTokenWorst.value = null
         }
       } else {
         timerStatusMap[key] = null
