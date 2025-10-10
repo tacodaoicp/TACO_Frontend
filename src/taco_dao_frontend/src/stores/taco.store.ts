@@ -531,6 +531,7 @@ export const useTacoStore = defineStore('taco', () => {
 
     // dao
     const fetchedTokenDetails = ref<TrustedTokenEntry[]>([])
+    const fetchedTokenDetailsWithPastPrices = ref<TrustedTokenEntry[]>([])
     const fetchedAggregateAllocation = ref<[Principal, bigint][]>([])
     const fetchedVotingPowerMetrics = ref<VotingMetricsResponse | null>(null)
     const fetchedUserAllocation = ref([])
@@ -1593,21 +1594,6 @@ export const useTacoStore = defineStore('taco', () => {
         // turn on loading
         appLoadingOn()
 
-        // log
-        // console.log('taco.store: fetchTokenDetails()')
-
-        // // if fetched token details is already set, return
-        // if (fetchedTokenDetails.value.length > 0) {
-
-        //     // log
-        //     console.log('taco.store: fetchTokenDetails() - fetched token details already set')
-
-        //     return true
-        // }
-
-        // log
-        // console.log('taco.store: fetchTokenDetails() - fetched token details not set, fetching...')
-
         try {
 
             // get host
@@ -1634,7 +1620,7 @@ export const useTacoStore = defineStore('taco', () => {
             // post actor logic //
 
             // get token details
-            const tokenDetails = await actor.getTokenDetails()
+            const tokenDetails = await actor.getTokenDetailsWithoutPastPrices()
 
             // set fetched token details
             // @ts-ignore
@@ -1696,6 +1682,62 @@ export const useTacoStore = defineStore('taco', () => {
         }
 
     }
+    const fetchTokenDetailsWithPastPrices = async () => {
+
+        // turn on loading
+        appLoadingOn()
+
+        try {
+
+            // get host
+            const host = process.env.DFX_NETWORK === "local"
+                ? getLocalHost()
+                : "https://ic0.app";
+
+            // create agent
+            const agent = await createAgent({
+                identity: new AnonymousIdentity(),
+                host,
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            })
+
+            let canisterId = daoBackendCanisterId();
+
+            // create actor
+            const actor = Actor.createActor(daoBackendIDL, {
+                agent,
+                canisterId: daoBackendCanisterId(),
+            })
+            
+            //////////////////////
+            // post actor logic //
+
+            // get token details
+            const tokenDetails = await actor.getTokenDetails()
+
+            // set fetched token details
+            // @ts-ignore
+            fetchedTokenDetailsWithPastPrices.value = tokenDetails
+
+            // return
+            return            
+
+        } catch (error) {
+
+            // log error
+            console.error('error fetching token details from dao backend:', error)
+
+            // return
+            return false
+
+        } finally {
+
+            // turn off loading
+            appLoadingOff()
+
+        }
+
+    }    
     // ready flag
     const hasTokenDetails = computed(() => fetchedTokenDetails.value.length > 0)
     // single-flight
@@ -8843,6 +8885,7 @@ export const useTacoStore = defineStore('taco', () => {
         lastPriceUpdate,
         truncatedPrincipal,
         fetchedTokenDetails,
+        fetchedTokenDetailsWithPastPrices,
         fetchedAggregateAllocation,
         fetchedVotingPowerMetrics,
         fetchedUserAllocation,
@@ -8890,6 +8933,7 @@ export const useTacoStore = defineStore('taco', () => {
         checkIfLoggedIn,
         icrc1Metadata,
         fetchTokenDetails,
+        fetchTokenDetailsWithPastPrices,
         fetchAggregateAllocation,
         fetchVotingPowerMetrics,
         fetchUserAllocation,
