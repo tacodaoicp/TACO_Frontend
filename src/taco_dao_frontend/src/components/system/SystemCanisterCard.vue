@@ -111,6 +111,38 @@
             Manage
           </router-link>
         </div>
+
+        <!-- Treasury read-only details -->
+        <div v-if="treasuryDetails" class="mt-3">
+          <h6 class="mb-2">Trading Metrics</h6>
+          <div class="d-flex flex-column small gap-1">
+            <div><strong>Last Attempt:</strong> {{ treasuryDetails.tradingMetrics?.lastRebalanceAttemptDisplay || 'Never' }}</div>
+            <div><strong>Total Trades:</strong> {{ treasuryDetails.tradingMetrics?.totalTradesExecuted ?? 0 }}</div>
+            <div><strong>Failed Trades:</strong> {{ treasuryDetails.tradingMetrics?.totalTradesFailed ?? 0 }}</div>
+            <div><strong>Success Rate:</strong> {{ treasuryDetails.tradingMetrics?.successRatePct ?? '0.0%' }}</div>
+            <div><strong>Avg Slippage:</strong> {{ treasuryDetails.tradingMetrics?.avgSlippagePct ?? '0.00%' }}</div>
+            <div v-if="treasuryDetails.tradingWarning" :class="['mt-1', treasuryDetails.tradingWarning.level === 'danger' ? 'text-danger' : 'text-warning']">{{ treasuryDetails.tradingWarning.message }}</div>
+          </div>
+
+          <h6 class="mb-2 mt-3">Token Sync Status</h6>
+          <div v-if="treasuryDetails.tokens && treasuryDetails.tokens.length" class="d-flex flex-column gap-1">
+            <div v-for="t in treasuryDetails.tokens" :key="t.symbol" class="d-flex align-items-center gap-2 small">
+              <span class="status-indicator" :class="t.statusClass"></span>
+              <span class="token-symbol">{{ t.symbol }}</span>
+              <span class="text-muted">Last Sync: {{ t.lastSyncDisplay }}</span>
+              <span class="text-muted">{{ t.statusText }}</span>
+            </div>
+          </div>
+          <div v-else class="text-muted small">No token data available</div>
+
+          <h6 class="mb-2 mt-3">Portfolio Snapshot Management</h6>
+          <div class="d-flex align-items-center gap-3 small">
+            <span class="status-indicator" :class="treasuryDetails.snapshots?.active ? 'active' : 'inactive'"></span>
+            <span><strong>Status:</strong> {{ treasuryDetails.snapshots?.active ? 'Running' : 'Stopped' }}</span>
+            <span><strong>Interval:</strong> {{ treasuryDetails.snapshots?.intervalMinutes }} minutes</span>
+            <span><strong>Last Snapshot:</strong> {{ treasuryDetails.snapshots?.lastSnapshotDisplay }}</span>
+          </div>
+        </div>
       </div>
     </transition>
   </div>
@@ -155,6 +187,7 @@ const props = defineProps<{
     tokenWorst: 'green' | 'orange' | 'red'
     snapshotActive: boolean
   }
+  treasuryDetails?: any
 }>()
 
 const emits = defineEmits(['update:expanded','refresh'])

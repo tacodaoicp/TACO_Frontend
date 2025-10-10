@@ -59,6 +59,7 @@
                   :loading="loadingMap[c.key]"
                   :timerStatus="timerStatusMap[c.key]"
                   :treasuryHeader="c.key === 'treasury' ? (treasuryHeader || undefined) : undefined"
+                  :treasuryDetails="c.key === 'treasury' ? (treasuryDetails || undefined) : undefined"
                   :isAdmin="isAdmin"
                   :isArchive="false"
                   @refresh="() => fetchCyclesFor(c.key)"
@@ -227,6 +228,8 @@ const treasuryHeader = ref<{
   tokenWorst: 'green' | 'orange' | 'red'
   snapshotActive: boolean
 } | null>(null)
+
+const treasuryDetails = ref<any | null>(null)
 const expandedMap = reactive<Record<CanKey, boolean>>({
   dao_backend: false,
   frontend: false,
@@ -402,8 +405,47 @@ const fetchCyclesFor = async (key: CanKey) => {
             tokenWorst: worst,
             snapshotActive
           }
+          // Read-only details
+          const successRatePct = state?.tradingMetrics?.successRate != null ? `${(state.tradingMetrics.successRate * 100).toFixed(1)}%` : '0.0%'
+          const avgSlippagePct = state?.tradingMetrics?.avgSlippage != null ? `${state.tradingMetrics.avgSlippage.toFixed(2)}%` : '0.00%'
+          const lastAttemptDisplay = lastAttemptNs ? new Date(Number(BigInt(lastAttemptNs) / 1_000_000n)).toLocaleString() : 'Never'
+          let tradingWarning: any = null
+          if (intervalNs && lastAttemptNs) {
+            const periods = Number((BigInt(Date.now()) * 1_000_000n - BigInt(lastAttemptNs)) / BigInt(intervalNs))
+            if (periods > 5) tradingWarning = { level: 'danger', message: `Trading bot is ${periods} periods overdue.` }
+            else if (periods > 2) tradingWarning = { level: 'warning', message: `Trading bot is ${periods} periods overdue.` }
+          }
+          const tokens = tokenDetails.map((entry: any) => {
+            const token = entry[1]
+            const symbol = token?.tokenSymbol || 'UNKNOWN'
+            const lastSyncDisplay = token?.lastTimeSynced ? new Date(Number(BigInt(token.lastTimeSynced) / 1_000_000n)).toLocaleString() : 'Never'
+            let statusClass = 'active'
+            let statusText = ''
+            if (!token?.Active) statusClass = 'inactive'
+            else if (token?.pausedDueToSyncFailure) { statusClass = 'paused'; statusText = '(Sync Failed)' }
+            else if (token?.isPaused) { statusClass = 'paused'; statusText = '(Manually Paused)' }
+            return { symbol, lastSyncDisplay, statusClass, statusText }
+          })
+          const snapStatus = await (store as any).getPortfolioSnapshotStatus?.()
+          treasuryDetails.value = {
+            tradingMetrics: {
+              lastRebalanceAttemptDisplay: lastAttemptDisplay,
+              totalTradesExecuted: state?.tradingMetrics?.totalTradesExecuted ?? 0,
+              totalTradesFailed: state?.tradingMetrics?.totalTradesFailed ?? 0,
+              successRatePct,
+              avgSlippagePct
+            },
+            tradingWarning,
+            tokens,
+            snapshots: {
+              active: !!('Running' in snapStatus.status),
+              intervalMinutes: snapStatus.intervalMinutes,
+              lastSnapshotDisplay: new Date(Number(BigInt(snapStatus.lastSnapshotTime) / 1_000_000n)).toLocaleString()
+            }
+          }
         } catch (_) {
           treasuryHeader.value = null
+          treasuryDetails.value = null
         }
       } else {
         timerStatusMap[key] = null
