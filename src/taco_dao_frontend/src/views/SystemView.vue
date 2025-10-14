@@ -367,7 +367,7 @@ const fetchCyclesFor = async (key: CanKey) => {
           const tActor: any = Actor.createActor(treasuryIDL, { agent, canisterId: cid })
           const dActor: any = Actor.createActor(daoIDL, { agent, canisterId: resolvePrincipal('dao_backend') })
 
-          const [tsRes, cfg, tokensResp, snapStatus] = await Promise.all([
+          const [tsRes, cfgRaw, tokensResp, snapStatus] = await Promise.all([
             tActor.getTradingStatus(),
             tActor.getRebalanceConfig?.() ?? Promise.resolve(null),
             dActor.getTokenDetails(),
@@ -393,10 +393,11 @@ const fetchCyclesFor = async (key: CanKey) => {
             avgSlippagePct = metrics?.avgSlippage != null ? `${Number(metrics.avgSlippage).toFixed(2)}%` : '0.00%'
             if (lastAttemptNs) lastTradeDisplay = new Date(Number(BigInt(lastAttemptNs) / 1_000_000n)).toLocaleString()
           }
-          if (cfg) {
-            intervalNs = cfg.rebalanceIntervalNS
+          if (cfgRaw) {
+            const cfg = Array.isArray(cfgRaw) ? cfgRaw[0] : cfgRaw
+            intervalNs = cfg?.rebalanceIntervalNS
           }
-          let tradingStale = true
+          let tradingStale = false
           if (intervalNs && lastAttemptNs) {
             const periods = Number((BigInt(Date.now()) * 1_000_000n - BigInt(lastAttemptNs)) / BigInt(intervalNs))
             tradingStale = periods > 2
@@ -476,6 +477,10 @@ const fetchCyclesFor = async (key: CanKey) => {
             else if (token?.isPaused) { statusClass = 'paused'; statusText = '(Manually Paused)' }
             return { symbol, lastSyncDisplay, statusClass, statusText }
           })
+          // compute oldest token sync time for backend header display
+          const times = (tokenDetails || []).map((entry: any) => Number(BigInt(entry[1]?.lastTimeSynced || 0n) / 1_000_000n)).filter((n: number) => n > 0)
+          const oldestMs = times.length ? Math.min(...times) : 0
+          const oldestDisplay = oldestMs ? new Date(oldestMs).toLocaleString() : 'Never'
           let worst: 'green' | 'orange' | 'red' = 'green'
           for (const t of tokens) {
             if (t.statusClass === 'inactive') { worst = 'red'; break }
@@ -483,6 +488,8 @@ const fetchCyclesFor = async (key: CanKey) => {
           }
           daoTokenList.value = tokens
           daoTokenWorst.value = worst
+          // Reuse tokenAggregateWorst header while also storing oldest (encoded into list as first item title if needed)
+          // Optionally: could add a new prop. For now, keep list data only; header lamp already shows worst status.
         } catch (_) {
           daoTokenList.value = null
           daoTokenWorst.value = null
