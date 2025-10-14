@@ -11,7 +11,7 @@
           <span class="text-muted small d-inline-flex align-items-center">
             <i class="fa-regular fa-clock"></i>
           </span>
-          <span class="status-indicator" :class="timerStatus.outerLoopRunning ? 'active' : 'inactive'" title="Outer"></span>
+          <span class="status-indicator" :class="timerStatus.outerLoopRunning ? 'active' : 'status-red'" title="Outer"></span>
           <span class="status-indicator" :class="timerStatus.middleLoopRunning ? 'active' : 'inactive'" title="Middle"></span>
           <span class="status-indicator" :class="timerStatus.innerLoopRunning ? 'active' : 'inactive'" title="Inner"></span>
           <span :class="['small', outerLate ? 'text-danger' : 'text-muted']" :title="'Outer last run'">{{ outerLastRunDisplay }}</span>
