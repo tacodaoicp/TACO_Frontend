@@ -62,6 +62,7 @@
                   :treasuryDetails="c.key === 'treasury' ? (treasuryDetails || undefined) : undefined"
                   :tokenList="c.key === 'dao_backend' ? (daoTokenList || undefined) : undefined"
                   :tokenAggregateWorst="c.key === 'dao_backend' ? (daoTokenWorst || undefined) : undefined"
+                  :oldestTokenSyncDisplay="c.key === 'dao_backend' ? (daoOldestSyncDisplay || undefined) : undefined"
                   :isAdmin="isAdmin"
                   :isArchive="false"
                   @refresh="() => fetchCyclesFor(c.key)"
@@ -234,6 +235,7 @@ const treasuryHeader = ref<{
 const treasuryDetails = ref<any | null>(null)
 const daoTokenList = ref<Array<{ symbol: string; lastSyncDisplay: string; statusClass: string; statusText: string }> | null>(null)
 const daoTokenWorst = ref<'green' | 'orange' | 'red' | null>(null)
+const daoOldestSyncDisplay = ref<string | null>(null)
 const expandedMap = reactive<Record<CanKey, boolean>>({
   dao_backend: false,
   frontend: false,
@@ -452,6 +454,16 @@ const fetchCyclesFor = async (key: CanKey) => {
               active: snapshotActive,
               intervalMinutes: snapStatus.intervalMinutes,
               lastSnapshotDisplay: new Date(Number(BigInt(snapStatus.lastSnapshotTime) / 1_000_000n)).toLocaleString()
+            },
+            shortSync: {
+              active: true,
+              intervalMinutes: cfgRaw && (Array.isArray(cfgRaw) ? (cfgRaw as any)[0] : cfgRaw as any)?.shortSyncIntervalNS ? Number(((Array.isArray(cfgRaw) ? (cfgRaw as any)[0] : cfgRaw as any).shortSyncIntervalNS) / (60n * 1_000_000_000n)) : undefined,
+              lastSyncDisplay: state?.shortSync?.lastSync ? new Date(Number(BigInt(state.shortSync.lastSync) / 1_000_000n)).toLocaleString() : undefined
+            },
+            longSync: {
+              active: true,
+              intervalMinutes: cfgRaw && (Array.isArray(cfgRaw) ? (cfgRaw as any)[0] : cfgRaw as any)?.longSyncIntervalNS ? Number(((Array.isArray(cfgRaw) ? (cfgRaw as any)[0] : cfgRaw as any).longSyncIntervalNS) / (60n * 1_000_000_000n)) : undefined,
+              lastSyncDisplay: undefined
             }
           }
         } catch (_) {
@@ -488,11 +500,11 @@ const fetchCyclesFor = async (key: CanKey) => {
           }
           daoTokenList.value = tokens
           daoTokenWorst.value = worst
-          // Reuse tokenAggregateWorst header while also storing oldest (encoded into list as first item title if needed)
-          // Optionally: could add a new prop. For now, keep list data only; header lamp already shows worst status.
+          daoOldestSyncDisplay.value = oldestDisplay
         } catch (_) {
           daoTokenList.value = null
           daoTokenWorst.value = null
+          daoOldestSyncDisplay.value = null
         }
       } else {
         timerStatusMap[key] = null

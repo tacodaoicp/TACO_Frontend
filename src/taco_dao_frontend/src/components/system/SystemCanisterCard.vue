@@ -23,6 +23,7 @@
             <i class="fa-solid fa-database"></i>
           </span>
           <span class="status-indicator" :class="tokenAggregateWorst === 'red' ? 'status-red' : tokenAggregateWorst === 'orange' ? 'status-orange' : 'active'"></span>
+          <span v-if="oldestTokenSyncDisplay" class="small text-muted">{{ oldestTokenSyncDisplay }}</span>
         </div>
 
         <!-- treasury header indicators -->
@@ -141,6 +142,20 @@
             <span><strong>Interval:</strong> {{ treasuryDetails.snapshots?.intervalMinutes }} minutes</span>
             <span><strong>Last Snapshot:</strong> {{ treasuryDetails.snapshots?.lastSnapshotDisplay }}</span>
           </div>
+
+          <h6 class="mb-2 mt-3">Portfolio Timers</h6>
+          <div class="row g-3 small">
+            <div class="col-12 col-md-6 d-flex align-items-center gap-2">
+              <span class="status-indicator" :class="treasuryDetails.shortSync?.active ? 'active' : 'inactive'"></span>
+              <span><strong>Short Sync ({{ treasuryDetails.shortSync?.intervalMinutes }}m)</strong></span>
+              <span>Last: {{ treasuryDetails.shortSync?.lastSyncDisplay }}</span>
+            </div>
+            <div class="col-12 col-md-6 d-flex align-items-center gap-2">
+              <span class="status-indicator" :class="treasuryDetails.longSync?.active ? 'active' : 'inactive'"></span>
+              <span><strong>Long Sync ({{ treasuryDetails.longSync?.intervalMinutes }}m)</strong></span>
+              <span>Last: {{ treasuryDetails.longSync?.lastSyncDisplay }}</span>
+            </div>
+          </div>
         </div>
 
         <!-- DAO Backend read-only token sync list -->
@@ -202,6 +217,7 @@ const props = defineProps<{
   treasuryDetails?: any
   tokenList?: Array<{ symbol: string; lastSyncDisplay: string; statusClass: string; statusText: string }>
   tokenAggregateWorst?: 'green' | 'orange' | 'red'
+  oldestTokenSyncDisplay?: string
 }>()
 
 const emits = defineEmits(['update:expanded','refresh'])
