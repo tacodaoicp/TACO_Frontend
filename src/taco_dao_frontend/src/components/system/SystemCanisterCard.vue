@@ -143,7 +143,7 @@
             <span><strong>Last Snapshot:</strong> {{ treasuryDetails.snapshots?.lastSnapshotDisplay }}</span>
           </div>
 
-          <h6 class="mb-2 mt-3">Portfolio Timers</h6>
+          <h6 class="mb-2 mt-3">Sync Timers</h6>
           <div class="row g-3 small">
             <div class="col-12 col-md-6 d-flex align-items-center gap-2">
               <span class="status-indicator" :class="treasuryDetails.shortSync?.active ? 'active' : 'inactive'"></span>

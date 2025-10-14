@@ -440,6 +440,8 @@ const fetchCyclesFor = async (key: CanKey) => {
             else if (periods > 2) tradingWarning = { level: 'warning', message: `Trading bot is ${periods} periods overdue.` }
           }
 
+          // derive latest short sync time from trading metrics (lastUpdate)
+          const metricsObj: any = (tsRes && 'ok' in tsRes) ? tsRes.ok.metrics : null
           treasuryDetails.value = {
             tradingMetrics: {
               lastRebalanceAttemptDisplay: lastTradeDisplay,
@@ -457,12 +459,12 @@ const fetchCyclesFor = async (key: CanKey) => {
             },
             shortSync: {
               active: true,
-              intervalMinutes: cfgRaw && (Array.isArray(cfgRaw) ? (cfgRaw as any)[0] : cfgRaw as any)?.shortSyncIntervalNS ? Number(((Array.isArray(cfgRaw) ? (cfgRaw as any)[0] : cfgRaw as any).shortSyncIntervalNS) / (60n * 1_000_000_000n)) : undefined,
-              lastSyncDisplay: state?.shortSync?.lastSync ? new Date(Number(BigInt(state.shortSync.lastSync) / 1_000_000n)).toLocaleString() : undefined
+              intervalMinutes: cfgRaw && (Array.isArray(cfgRaw) ? (cfgRaw as any)[0] : (cfgRaw as any))?.shortSyncIntervalNS ? Number(((Array.isArray(cfgRaw) ? (cfgRaw as any)[0] : (cfgRaw as any)).shortSyncIntervalNS) / (60n * 1_000_000_000n)) : undefined,
+              lastSyncDisplay: metricsObj?.lastUpdate ? new Date(Number(BigInt(metricsObj.lastUpdate) / 1_000_000n)).toLocaleString() : undefined
             },
             longSync: {
               active: true,
-              intervalMinutes: cfgRaw && (Array.isArray(cfgRaw) ? (cfgRaw as any)[0] : cfgRaw as any)?.longSyncIntervalNS ? Number(((Array.isArray(cfgRaw) ? (cfgRaw as any)[0] : cfgRaw as any).longSyncIntervalNS) / (60n * 1_000_000_000n)) : undefined,
+              intervalMinutes: cfgRaw && (Array.isArray(cfgRaw) ? (cfgRaw as any)[0] : (cfgRaw as any))?.longSyncIntervalNS ? Number(((Array.isArray(cfgRaw) ? (cfgRaw as any)[0] : (cfgRaw as any)).longSyncIntervalNS) / (60n * 1_000_000_000n)) : undefined,
               lastSyncDisplay: undefined
             }
           }
