@@ -26,6 +26,15 @@
           <span v-if="oldestTokenSyncDisplay" class="small text-muted">{{ oldestTokenSyncDisplay }}</span>
         </div>
 
+        <!-- governance snapshot header lamp (when provided) -->
+        <div v-if="governanceHeader" class="d-flex align-items-center gap-2 ms-3">
+          <span class="text-muted small d-inline-flex align-items-center" title="Neuron Snapshot Timer">
+            <i class="fa-regular fa-clock"></i>
+          </span>
+          <span class="status-indicator" :class="governanceHeader.active ? 'active' : 'inactive'"></span>
+          <span class="small text-muted">{{ governanceHeader.lastSnapshotDisplay }}</span>
+        </div>
+
         <!-- treasury header indicators -->
         <div v-if="treasuryHeader" class="d-flex align-items-center gap-2 ms-3">
           <!-- trading bot lamp + last trade time -->
@@ -35,6 +44,18 @@
           <span class="status-indicator" :class="treasuryHeader.tradingActive ? 'active' : 'inactive'"></span>
           <span :class="['small', treasuryHeader.tradingStale ? 'text-danger' : 'text-muted']" :title="'Last trade time'">{{ treasuryHeader.lastTradeDisplay }}</span>
           
+          <!-- short sync lamp -->
+          <span class="text-muted small d-inline-flex align-items-center ms-2" title="Short Sync">
+            <i class="fa-regular fa-clock"></i>
+          </span>
+          <span class="status-indicator" :class="treasuryHeader.shortSyncActive ? 'active' : 'inactive'"></span>
+
+          <!-- long sync lamp -->
+          <span class="text-muted small d-inline-flex align-items-center ms-2" title="Long Sync">
+            <i class="fa-regular fa-clock"></i>
+          </span>
+          <span class="status-indicator" :class="treasuryHeader.longSyncActive ? 'active' : 'inactive'"></span>
+
           <!-- token sync aggregate lamp -->
           <span class="text-muted small d-inline-flex align-items-center ms-2" title="Token Sync">
             <i class="fa-solid fa-database"></i>
@@ -170,6 +191,15 @@
             </div>
           </div>
         </div>
+
+        <!-- Governance read-only snapshot status -->
+        <div v-if="governanceHeader" class="mt-3">
+          <h6 class="mb-2">Neuron Snapshot Timer</h6>
+          <div class="d-flex align-items-center gap-3 small">
+            <span class="status-indicator" :class="governanceHeader.active ? 'active' : 'inactive'"></span>
+            <span><strong>Last Snapshot:</strong> {{ governanceHeader.lastSnapshotDisplay }}</span>
+          </div>
+        </div>
       </div>
     </transition>
   </div>
@@ -213,11 +243,14 @@ const props = defineProps<{
     lastTradeDisplay: string
     tokenWorst: 'green' | 'orange' | 'red'
     snapshotActive: boolean
+    shortSyncActive?: boolean
+    longSyncActive?: boolean
   }
   treasuryDetails?: any
   tokenList?: Array<{ symbol: string; lastSyncDisplay: string; statusClass: string; statusText: string }>
   tokenAggregateWorst?: 'green' | 'orange' | 'red'
   oldestTokenSyncDisplay?: string
+  governanceHeader?: { active: boolean; lastSnapshotDisplay: string }
 }>()
 
 const emits = defineEmits(['update:expanded','refresh'])

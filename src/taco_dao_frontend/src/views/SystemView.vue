@@ -85,6 +85,7 @@
                   :cyclesT="cyclesMap[c.key]"
                   :loading="loadingMap[c.key]"
                   :timerStatus="timerStatusMap[c.key]"
+                  :governanceHeader="c.key === 'neuronSnapshot' ? (governanceHeader || undefined) : undefined"
                   :isAdmin="isAdmin"
                   :isArchive="true"
                   @refresh="() => fetchCyclesFor(c.key)"
@@ -236,6 +237,7 @@ const treasuryDetails = ref<any | null>(null)
 const daoTokenList = ref<Array<{ symbol: string; lastSyncDisplay: string; statusClass: string; statusText: string }> | null>(null)
 const daoTokenWorst = ref<'green' | 'orange' | 'red' | null>(null)
 const daoOldestSyncDisplay = ref<string | null>(null)
+const governanceHeader = ref<{ active: boolean; lastSnapshotDisplay: string } | null>(null)
 const expandedMap = reactive<Record<CanKey, boolean>>({
   dao_backend: false,
   frontend: false,
@@ -507,6 +509,24 @@ const fetchCyclesFor = async (key: CanKey) => {
           daoTokenList.value = null
           daoTokenWorst.value = null
           daoOldestSyncDisplay.value = null
+        }
+      } else if (key === 'neuronSnapshot') {
+        // Load governance snapshot status from selected env
+        try {
+          const { idlFactory: neuronIDL } = await import('../../../declarations/neuronSnapshot/neuronSnapshot.did.js')
+          const agent = new HttpAgent({ host: process.env.DFX_NETWORK === 'local' ? 'http://127.0.0.1:4943' : 'https://ic0.app' })
+          if (process.env.DFX_NETWORK === 'local') { await agent.fetchRootKey() }
+          const nActor: any = Actor.createActor(neuronIDL, { agent, canisterId: resolvePrincipal('neuronSnapshot') })
+          const snapInfoArr = await nActor.getSnapshotInfo()
+          if (Array.isArray(snapInfoArr) && snapInfoArr.length) {
+            const info = snapInfoArr[0]
+            const lastSnapshotDisplay = info?.lastSnapshotTime ? new Date(Number(info.lastSnapshotTime) / 1_000_000).toLocaleString() : 'Never'
+            governanceHeader.value = { active: true, lastSnapshotDisplay }
+          } else {
+            governanceHeader.value = { active: false, lastSnapshotDisplay: 'Never' }
+          }
+        } catch (_) {
+          governanceHeader.value = null
         }
       } else {
         timerStatusMap[key] = null
