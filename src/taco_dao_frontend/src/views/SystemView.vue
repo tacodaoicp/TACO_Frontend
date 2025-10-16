@@ -16,6 +16,25 @@
 
           <div class="system-view w-100">
 
+            <!-- system status group -->
+            <div class="taco-container taco-container--l1 d-flex flex-column gap-2 p-0 mt-3">
+              <div class="px-3 pt-3 pb-2 d-flex align-items-center justify-content-between">
+                <h2 class="h5 mb-0">System Status</h2>
+              </div>
+              <div class="p-2 d-flex flex-column gap-2">
+                <SystemStatusItem
+                  v-for="item in checklist"
+                  :key="item.key"
+                  :title="item.title"
+                  v-model:expanded="item.expanded"
+                  :status="item.status"
+                  :runDisabled="true"
+                >
+                  <div class="text-muted small">Pending implementation…</div>
+                </SystemStatusItem>
+              </div>
+            </div>
+
             <!-- title row -->
             <div class="d-flex align-items-center justify-content-between mt-4 mb-2 px-3">
               <h1 class="taco-title mb-0">
@@ -124,6 +143,7 @@ import HeaderBar from "../components/HeaderBar.vue"
 import FooterBar from "../components/FooterBar.vue"
 // @ts-ignore - Vue SFC import resolution
 import SystemCanisterCard from "../components/system/SystemCanisterCard.vue"
+import SystemStatusItem from "../components/system/SystemStatusItem.vue"
 import { useTacoStore } from "../stores/taco.store"
 import { Actor, HttpAgent } from '@dfinity/agent'
 import { CANISTER_IDS, type EnvKey } from '../constants/canisterIds'
@@ -134,6 +154,19 @@ const minimalCyclesIdl = ({ IDL }: any) => IDL.Service({
 })
 
 const tacoStore = useTacoStore()
+// Checklist state (placeholder layout: all gray)
+const checklist = reactive([
+  { key: 'canisters-running', title: 'Are all canisters running?', status: 'gray', expanded: false },
+  { key: 'canisters-in-gas', title: 'Are all canisters in gas?', status: 'gray', expanded: false },
+  { key: 'trading-regular', title: 'Is the trading bot trading regularly?', status: 'gray', expanded: false },
+  { key: 'rewards-regular', title: 'Are rewards distributed regularly?', status: 'gray', expanded: false },
+  { key: 'snapshots-portfolio', title: 'Are portfolio snapshots regular?', status: 'gray', expanded: false },
+  { key: 'snapshots-neuron', title: 'Are neuron snapshots regular?', status: 'gray', expanded: false },
+  { key: 'price-history', title: 'Is price history updating?', status: 'gray', expanded: false },
+  { key: 'allocation-voting', title: 'Does allocation voting work?', status: 'gray', expanded: false },
+  { key: 'grant-system', title: 'Is grant system cloning and voting?', status: 'gray', expanded: false },
+  { key: 'archives-regular', title: 'Are archives importing regularly?', status: 'gray', expanded: false },
+] as Array<{ key: string; title: string; status: 'gray' | 'green' | 'red'; expanded: boolean }>)
 
 // Determine admin: call DAO hasAdminPermission or use a simple check if available
 const isAdmin = ref(false)
