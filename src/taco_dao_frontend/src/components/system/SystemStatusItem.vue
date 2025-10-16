@@ -2,12 +2,19 @@
   <div class="taco-container taco-container--l2 p-0">
     <div class="d-flex align-items-center justify-content-between px-3 py-2 card-header-clickable" @click="toggle">
       <div class="d-flex align-items-center gap-2">
-        <span :class="['status-indicator', statusClass]"></span>
+        <span v-if="running" class="spinner-border spinner-border-sm text-primary" role="status">
+          <span class="visually-hidden">Running...</span>
+        </span>
+        <span v-else :class="['status-indicator', statusClass]"></span>
         <span class="fw-bold">{{ title }}</span>
       </div>
       <div class="d-flex align-items-center gap-2" @click.stop>
-        <button class="btn btn-sm btn-primary" @click="$emit('run')" :disabled="runDisabled" title="Run check">
-          Run
+        <button class="btn btn-sm btn-primary" @click="runTest" :disabled="runDisabled || running" title="Run check">
+          <span v-if="running">
+            <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+            Running...
+          </span>
+          <span v-else>Run</span>
         </button>
         <button class="btn btn-sm btn-primary" @click="toggle" title="Toggle expand/collapse">
           <span v-if="expanded">Collapse</span>
@@ -65,11 +72,16 @@ const props = defineProps<{
   status?: 'gray' | 'green' | 'red'
   expanded: boolean
   runDisabled?: boolean
+  running?: boolean
 }>()
 
 const emits = defineEmits(['update:expanded','run'])
 
 const toggle = () => emits('update:expanded', !props.expanded)
+const runTest = () => {
+  console.log('SystemStatusItem: Run button clicked, emitting run event')
+  emits('run')
+}
 
 const statusClass = computed(() => {
   switch (props.status) {

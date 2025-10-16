@@ -31,9 +31,12 @@
                   :title="item.title"
                   v-model:expanded="item.expanded"
                   :status="item.status"
-                  :runDisabled="true"
+                  :running="item.running"
+                  :runDisabled="false"
+                  @run="runTest(item.key)"
                 >
-                  <div class="text-muted small">Pending implementation…</div>
+                  <div v-if="item.report" v-html="item.report" class="test-report"></div>
+                  <div v-else class="text-muted small">Click "Run" to execute this test</div>
                 </SystemStatusItem>
               </div>
             </div>
@@ -163,6 +166,17 @@
 .fade-leave-to {
   opacity: 0;
 }
+
+.test-report {
+  margin-top: 0.5rem;
+  font-size: 0.875rem;
+}
+
+.test-report .canister-results {
+  border-left: 2px solid rgba(255, 255, 255, 0.1);
+  padding-left: 1rem;
+  margin-top: 0.5rem;
+}
 </style>
 
 <script setup lang="ts">
@@ -190,19 +204,18 @@ const systemStatusExpanded = ref(true)
 const mainCanistersExpanded = ref(true)
 const archivesExpanded = ref(true)
 
-// Checklist state (placeholder layout: all gray)
+// Checklist state
 const checklist = reactive([
-  { key: 'canisters-running', title: 'Are all canisters running?', status: 'gray', expanded: false },
-  { key: 'canisters-in-gas', title: 'Are all canisters in gas?', status: 'gray', expanded: false },
-  { key: 'trading-regular', title: 'Is the trading bot trading regularly?', status: 'gray', expanded: false },
-  { key: 'rewards-regular', title: 'Are rewards distributed regularly?', status: 'gray', expanded: false },
-  { key: 'snapshots-portfolio', title: 'Are portfolio snapshots regular?', status: 'gray', expanded: false },
-  { key: 'snapshots-neuron', title: 'Are neuron snapshots regular?', status: 'gray', expanded: false },
-  { key: 'price-history', title: 'Is price history updating?', status: 'gray', expanded: false },
-  { key: 'allocation-voting', title: 'Does allocation voting work?', status: 'gray', expanded: false },
-  { key: 'grant-system', title: 'Is grant system cloning and voting?', status: 'gray', expanded: false },
-  { key: 'archives-regular', title: 'Are archives importing regularly?', status: 'gray', expanded: false },
-] as Array<{ key: string; title: string; status: 'gray' | 'green' | 'red'; expanded: boolean }>)
+  { key: 'canisters-running', title: 'Are all canisters running and in gas?', status: 'gray', expanded: false, running: false, report: '' },
+  { key: 'trading-regular', title: 'Is the trading bot trading regularly?', status: 'gray', expanded: false, running: false, report: '' },
+  { key: 'rewards-regular', title: 'Are rewards distributed regularly?', status: 'gray', expanded: false, running: false, report: '' },
+  { key: 'snapshots-portfolio', title: 'Are portfolio snapshots regular?', status: 'gray', expanded: false, running: false, report: '' },
+  { key: 'snapshots-neuron', title: 'Are neuron snapshots regular?', status: 'gray', expanded: false, running: false, report: '' },
+  { key: 'price-history', title: 'Is price history updating?', status: 'gray', expanded: false, running: false, report: '' },
+  { key: 'allocation-voting', title: 'Does allocation voting work?', status: 'gray', expanded: false, running: false, report: '' },
+  { key: 'grant-system', title: 'Is grant system cloning and voting?', status: 'gray', expanded: false, running: false, report: '' },
+  { key: 'archives-regular', title: 'Are archives importing regularly?', status: 'gray', expanded: false, running: false, report: '' },
+] as Array<{ key: string; title: string; status: 'gray' | 'green' | 'red'; expanded: boolean; running: boolean; report: string }>)
 
 // Determine admin: call DAO hasAdminPermission or use a simple check if available
 const isAdmin = ref(false)
@@ -630,6 +643,152 @@ const toggleArchives = () => {
 
 const expandAll = () => { Object.keys(expandedMap).forEach(k => expandedMap[k as CanKey] = true) }
 const collapseAll = () => { Object.keys(expandedMap).forEach(k => expandedMap[k as CanKey] = false) }
+
+// Test runner
+const runTest = async (testKey: string) => {
+  console.log('runTest called with key:', testKey)
+  const test = checklist.find(t => t.key === testKey)
+  console.log('Found test:', test)
+  if (!test) {
+    console.error('Test not found for key:', testKey)
+    return
+  }
+
+  test.running = true
+  test.status = 'gray'
+  test.report = ''
+  test.expanded = true // Auto-expand to show results
+
+  try {
+    if (testKey === 'canisters-running') {
+      console.log('Running canisters test...')
+      await testCanistersRunning(test)
+    } else {
+      // Placeholder for other tests
+      test.status = 'gray'
+      test.report = '<div class="text-muted">Test not yet implemented</div>'
+    }
+  } catch (error) {
+    console.error('Test error:', error)
+    test.status = 'red'
+    test.report = `<div class="text-danger"><strong>Error:</strong> ${error}</div>`
+  } finally {
+    test.running = false
+  }
+}
+
+// Test: Are all canisters running and in gas?
+const testCanistersRunning = async (test: any) => {
+  const allKeys: CanKey[] = [...mainCanisters, ...archiveCanisters].map(x => x.key)
+  const results: Array<{ name: string; key: CanKey; cycles: number | null; status: 'pass' | 'fail' | 'error'; message: string }> = []
+  
+  // Test all canisters in parallel
+  await Promise.all(allKeys.map(async (key) => {
+    const canisterName = [...mainCanisters, ...archiveCanisters].find(c => c.key === key)?.title || key
+    
+    try {
+      // Frontend is an asset canister and doesn't expose get_canister_cycles
+      if (key === 'frontend') {
+        results.push({
+          name: canisterName,
+          key,
+          cycles: null,
+          status: 'pass',
+          message: 'Asset canister (no cycles check available)'
+        })
+        return
+      }
+
+      const cid = resolvePrincipal(key)
+      if (!cid) {
+        results.push({
+          name: canisterName,
+          key,
+          cycles: null,
+          status: 'error',
+          message: 'No canister ID configured'
+        })
+        return
+      }
+
+      const actor = await createGenericActor(cid)
+      const res = await actor.get_canister_cycles() as any
+      const rec = Array.isArray(res) ? res[0] : res
+      const trillion = 1_000_000_000_000n
+      const cyclesT = Number((rec?.cycles ?? 0n) / trillion)
+      
+      // Determine status based on cycles
+      let status: 'pass' | 'fail' = 'pass'
+      let message = `${cyclesT}T cycles`
+      
+      if (cyclesT < 5) {
+        status = 'fail'
+        message = `${cyclesT}T cycles - CRITICAL: Below 5T`
+      } else if (cyclesT < 10) {
+        status = 'fail'
+        message = `${cyclesT}T cycles - WARNING: Below 10T`
+      }
+      
+      results.push({
+        name: canisterName,
+        key,
+        cycles: cyclesT,
+        status,
+        message
+      })
+    } catch (error: any) {
+      results.push({
+        name: canisterName,
+        key,
+        cycles: null,
+        status: 'error',
+        message: `Failed to fetch: ${error.message || 'Unknown error'}`
+      })
+    }
+  }))
+
+  // Generate report
+  const passed = results.filter(r => r.status === 'pass').length
+  const failed = results.filter(r => r.status === 'fail').length
+  const errors = results.filter(r => r.status === 'error').length
+  const total = results.length
+
+  // Overall status
+  if (errors > 0 || failed > 0) {
+    test.status = 'red'
+  } else {
+    test.status = 'green'
+  }
+
+  // Build HTML report
+  let reportHTML = `
+    <div class="mb-3">
+      <strong>Results:</strong> ${passed} passed, ${failed} failed, ${errors} errors out of ${total} canisters
+    </div>
+    <div class="canister-results">
+  `
+
+  results.forEach(result => {
+    const icon = result.status === 'pass' 
+      ? '<i class="fa-solid fa-check-circle text-success"></i>' 
+      : result.status === 'fail'
+      ? '<i class="fa-solid fa-exclamation-triangle text-warning"></i>'
+      : '<i class="fa-solid fa-times-circle text-danger"></i>'
+    
+    const rowClass = result.status === 'pass' ? 'text-success' : result.status === 'fail' ? 'text-warning' : 'text-danger'
+    
+    reportHTML += `
+      <div class="d-flex align-items-center gap-2 py-1 small ${rowClass}">
+        ${icon}
+        <span class="fw-bold" style="min-width: 200px">${result.name}</span>
+        <span>${result.message}</span>
+      </div>
+    `
+  })
+
+  reportHTML += '</div>'
+  test.report = reportHTML
+}
 
 onMounted(() => {
   // CRITICAL FIX: Turn off app loading immediately - SystemView doesn't need it
