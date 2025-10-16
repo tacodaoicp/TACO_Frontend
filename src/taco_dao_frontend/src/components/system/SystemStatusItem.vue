@@ -78,10 +78,7 @@ const props = defineProps<{
 const emits = defineEmits(['update:expanded','run'])
 
 const toggle = () => emits('update:expanded', !props.expanded)
-const runTest = () => {
-  console.log('SystemStatusItem: Run button clicked, emitting run event')
-  emits('run')
-}
+const runTest = () => emits('run')
 
 const statusClass = computed(() => {
   switch (props.status) {

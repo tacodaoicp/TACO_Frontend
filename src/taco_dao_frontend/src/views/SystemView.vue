@@ -19,7 +19,13 @@
             <!-- system status group -->
             <div class="taco-container taco-container--l1 d-flex flex-column gap-2 p-0 mt-3">
               <div class="px-3 pt-3 pb-2 d-flex align-items-center justify-content-between section-header-clickable" @click="toggleSystemStatus">
-                <h2 class="h5 mb-0">System Status</h2>
+                <div class="d-flex align-items-center gap-2">
+                  <span v-if="overallSystemStatus === 'running'" class="spinner-border spinner-border-sm text-primary" role="status">
+                    <span class="visually-hidden">Running tests...</span>
+                  </span>
+                  <span v-else :class="['status-light', `status-${overallSystemStatus}`]"></span>
+                  <h2 class="h5 mb-0">System Status</h2>
+                </div>
                 <button class="btn btn-sm btn-outline-secondary" @click.stop="toggleSystemStatus" :title="systemStatusExpanded ? 'Collapse' : 'Expand'">
                   <i :class="systemStatusExpanded ? 'fa-solid fa-chevron-up' : 'fa-solid fa-chevron-down'"></i>
                 </button>
@@ -145,8 +151,14 @@
     width: 10px;
     height: 10px;
     border-radius: 50%;
+    display: inline-block;
   }
 }
+
+.status-green { background-color: #28a745; }
+.status-orange { background-color: #fd7e14; }
+.status-red { background-color: #dc3545; }
+.status-gray { background-color: #6c757d; }
 
 .section-header-clickable {
   cursor: pointer;
@@ -203,6 +215,20 @@ const { appLoading } = storeToRefs(tacoStore)
 const systemStatusExpanded = ref(true)
 const mainCanistersExpanded = ref(true)
 const archivesExpanded = ref(true)
+
+// Computed: Overall system status based on all checklist items
+const overallSystemStatus = computed(() => {
+  const allGray = checklist.every(item => item.status === 'gray')
+  const anyRunning = checklist.some(item => item.running)
+  const anyRed = checklist.some(item => item.status === 'red')
+  const allGreen = checklist.every(item => item.status === 'green' || item.status === 'gray')
+  
+  if (anyRunning) return 'running'
+  if (anyRed) return 'red'
+  if (allGray) return 'gray'
+  if (allGreen && !allGray) return 'green'
+  return 'gray'
+})
 
 // Checklist state
 const checklist = reactive([
@@ -646,13 +672,8 @@ const collapseAll = () => { Object.keys(expandedMap).forEach(k => expandedMap[k 
 
 // Test runner
 const runTest = async (testKey: string) => {
-  console.log('runTest called with key:', testKey)
   const test = checklist.find(t => t.key === testKey)
-  console.log('Found test:', test)
-  if (!test) {
-    console.error('Test not found for key:', testKey)
-    return
-  }
+  if (!test) return
 
   test.running = true
   test.status = 'gray'
@@ -661,7 +682,6 @@ const runTest = async (testKey: string) => {
 
   try {
     if (testKey === 'canisters-running') {
-      console.log('Running canisters test...')
       await testCanistersRunning(test)
     } else {
       // Placeholder for other tests
@@ -669,7 +689,6 @@ const runTest = async (testKey: string) => {
       test.report = '<div class="text-muted">Test not yet implemented</div>'
     }
   } catch (error) {
-    console.error('Test error:', error)
     test.status = 'red'
     test.report = `<div class="text-danger"><strong>Error:</strong> ${error}</div>`
   } finally {
