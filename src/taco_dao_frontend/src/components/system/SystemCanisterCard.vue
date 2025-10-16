@@ -1,6 +1,6 @@
 <template>
   <div class="taco-container taco-container--l2 p-0">
-    <div class="d-flex align-items-center justify-content-between px-3 py-2">
+    <div class="d-flex align-items-center justify-content-between px-3 py-2 card-header-clickable" @click="toggle">
       <div class="d-flex align-items-center gap-2">
         <!-- cycles status lamp first -->
         <span :class="['status-light', statusColorClass]"></span>
@@ -69,11 +69,11 @@
           <span class="status-indicator" :class="treasuryHeader.snapshotActive ? 'active' : 'inactive'"></span>
         </div>
       </div>
-      <div class="d-flex align-items-center gap-2">
-        <button class="btn btn-sm btn-outline-secondary" @click="$emit('refresh')" :disabled="loading">
+      <div class="d-flex align-items-center gap-2" @click.stop>
+        <button class="btn btn-sm btn-primary" @click="$emit('refresh')" :disabled="loading" title="Refresh">
           <i class="fa-solid fa-rotate"></i>
         </button>
-        <button class="btn btn-sm btn-outline-secondary" @click="toggle">
+        <button class="btn btn-sm btn-primary" @click="toggle" title="Toggle expand/collapse">
           <span v-if="expanded">Collapse</span>
           <span v-else>Expand</span>
         </button>
@@ -223,6 +223,25 @@
 }
 .status-indicator.active { background-color: #28a745; }
 .status-indicator.inactive { background-color: #6c757d; }
+
+.card-header-clickable {
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.card-header-clickable:hover {
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.2s ease;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}
 </style>
 
 <script setup lang="ts">

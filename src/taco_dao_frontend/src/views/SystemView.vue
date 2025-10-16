@@ -18,21 +18,26 @@
 
             <!-- system status group -->
             <div class="taco-container taco-container--l1 d-flex flex-column gap-2 p-0 mt-3">
-              <div class="px-3 pt-3 pb-2 d-flex align-items-center justify-content-between">
+              <div class="px-3 pt-3 pb-2 d-flex align-items-center justify-content-between section-header-clickable" @click="systemStatusExpanded = !systemStatusExpanded">
                 <h2 class="h5 mb-0">System Status</h2>
+                <button class="btn btn-sm btn-outline-secondary" @click.stop="systemStatusExpanded = !systemStatusExpanded">
+                  <i :class="systemStatusExpanded ? 'fa-solid fa-chevron-up' : 'fa-solid fa-chevron-down'"></i>
+                </button>
               </div>
-              <div class="p-2 d-flex flex-column gap-2">
-                <SystemStatusItem
-                  v-for="item in checklist"
-                  :key="item.key"
-                  :title="item.title"
-                  v-model:expanded="item.expanded"
-                  :status="item.status"
-                  :runDisabled="true"
-                >
-                  <div class="text-muted small">Pending implementation…</div>
-                </SystemStatusItem>
-              </div>
+              <transition name="fade">
+                <div v-show="systemStatusExpanded" class="p-2 d-flex flex-column gap-2">
+                  <SystemStatusItem
+                    v-for="item in checklist"
+                    :key="item.key"
+                    :title="item.title"
+                    v-model:expanded="item.expanded"
+                    :status="item.status"
+                    :runDisabled="true"
+                  >
+                    <div class="text-muted small">Pending implementation…</div>
+                  </SystemStatusItem>
+                </div>
+              </transition>
             </div>
 
             <!-- title row -->
@@ -64,52 +69,62 @@
 
             <!-- main canisters group -->
             <div class="taco-container taco-container--l1 d-flex flex-column gap-2 p-0 mt-3">
-              <div class="px-3 pt-3 pb-2 d-flex align-items-center justify-content-between">
+              <div class="px-3 pt-3 pb-2 d-flex align-items-center justify-content-between section-header-clickable" @click="mainCanistersExpanded = !mainCanistersExpanded">
                 <h2 class="h5 mb-0">Main Canisters</h2>
+                <button class="btn btn-sm btn-outline-secondary" @click.stop="mainCanistersExpanded = !mainCanistersExpanded">
+                  <i :class="mainCanistersExpanded ? 'fa-solid fa-chevron-up' : 'fa-solid fa-chevron-down'"></i>
+                </button>
               </div>
-              <div class="p-2 d-flex flex-column gap-2">
-                <SystemCanisterCard
-                  v-for="c in mainCanisters"
-                  :key="c.key"
-                  :title="c.title"
-                  :principal="resolvePrincipal(c.key)"
-                  v-model:expanded="expandedMap[c.key]"
-                  :cyclesT="cyclesMap[c.key]"
-                  :loading="loadingMap[c.key]"
-                  :timerStatus="timerStatusMap[c.key]"
-                  :treasuryHeader="c.key === 'treasury' ? (treasuryHeader || undefined) : undefined"
-                  :treasuryDetails="c.key === 'treasury' ? (treasuryDetails || undefined) : undefined"
-                  :tokenList="c.key === 'dao_backend' ? (daoTokenList || undefined) : undefined"
-                  :tokenAggregateWorst="c.key === 'dao_backend' ? (daoTokenWorst || undefined) : undefined"
-                  :oldestTokenSyncDisplay="c.key === 'dao_backend' ? (daoOldestSyncDisplay || undefined) : undefined"
-                  :isAdmin="isAdmin"
-                  :isArchive="false"
-                  @refresh="() => fetchCyclesFor(c.key)"
-                />
-              </div>
+              <transition name="fade">
+                <div v-show="mainCanistersExpanded" class="p-2 d-flex flex-column gap-2">
+                  <SystemCanisterCard
+                    v-for="c in mainCanisters"
+                    :key="c.key"
+                    :title="c.title"
+                    :principal="resolvePrincipal(c.key)"
+                    v-model:expanded="expandedMap[c.key]"
+                    :cyclesT="cyclesMap[c.key]"
+                    :loading="loadingMap[c.key]"
+                    :timerStatus="timerStatusMap[c.key]"
+                    :treasuryHeader="c.key === 'treasury' ? (treasuryHeader || undefined) : undefined"
+                    :treasuryDetails="c.key === 'treasury' ? (treasuryDetails || undefined) : undefined"
+                    :tokenList="c.key === 'dao_backend' ? (daoTokenList || undefined) : undefined"
+                    :tokenAggregateWorst="c.key === 'dao_backend' ? (daoTokenWorst || undefined) : undefined"
+                    :oldestTokenSyncDisplay="c.key === 'dao_backend' ? (daoOldestSyncDisplay || undefined) : undefined"
+                    :isAdmin="isAdmin"
+                    :isArchive="false"
+                    @refresh="() => fetchCyclesFor(c.key)"
+                  />
+                </div>
+              </transition>
             </div>
 
             <!-- archives group -->
             <div class="taco-container taco-container--l1 d-flex flex-column gap-2 p-0 mt-4">
-              <div class="px-3 pt-3 pb-2 d-flex align-items-center justify-content-between">
+              <div class="px-3 pt-3 pb-2 d-flex align-items-center justify-content-between section-header-clickable" @click="archivesExpanded = !archivesExpanded">
                 <h2 class="h5 mb-0">Archives</h2>
+                <button class="btn btn-sm btn-outline-secondary" @click.stop="archivesExpanded = !archivesExpanded">
+                  <i :class="archivesExpanded ? 'fa-solid fa-chevron-up' : 'fa-solid fa-chevron-down'"></i>
+                </button>
               </div>
-              <div class="p-2 d-flex flex-column gap-2">
-                <SystemCanisterCard
-                  v-for="c in archiveCanisters"
-                  :key="c.key"
-                  :title="c.title"
-                  :principal="resolvePrincipal(c.key)"
-                  v-model:expanded="expandedMap[c.key]"
-                  :cyclesT="cyclesMap[c.key]"
-                  :loading="loadingMap[c.key]"
-                  :timerStatus="timerStatusMap[c.key]"
-                  :governanceHeader="c.key === 'neuronSnapshot' ? (governanceHeader || undefined) : undefined"
-                  :isAdmin="isAdmin"
-                  :isArchive="true"
-                  @refresh="() => fetchCyclesFor(c.key)"
-                />
-              </div>
+              <transition name="fade">
+                <div v-show="archivesExpanded" class="p-2 d-flex flex-column gap-2">
+                  <SystemCanisterCard
+                    v-for="c in archiveCanisters"
+                    :key="c.key"
+                    :title="c.title"
+                    :principal="resolvePrincipal(c.key)"
+                    v-model:expanded="expandedMap[c.key]"
+                    :cyclesT="cyclesMap[c.key]"
+                    :loading="loadingMap[c.key]"
+                    :timerStatus="timerStatusMap[c.key]"
+                    :governanceHeader="c.key === 'neuronSnapshot' ? (governanceHeader || undefined) : undefined"
+                    :isAdmin="isAdmin"
+                    :isArchive="true"
+                    @refresh="() => fetchCyclesFor(c.key)"
+                  />
+                </div>
+              </transition>
             </div>
 
           </div>
@@ -135,6 +150,25 @@
     border-radius: 50%;
   }
 }
+
+.section-header-clickable {
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.section-header-clickable:hover {
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.2s ease;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}
 </style>
 
 <script setup lang="ts">
@@ -154,6 +188,12 @@ const minimalCyclesIdl = ({ IDL }: any) => IDL.Service({
 })
 
 const tacoStore = useTacoStore()
+
+// Section expanded states
+const systemStatusExpanded = ref(true)
+const mainCanistersExpanded = ref(true)
+const archivesExpanded = ref(true)
+
 // Checklist state (placeholder layout: all gray)
 const checklist = reactive([
   { key: 'canisters-running', title: 'Are all canisters running?', status: 'gray', expanded: false },
