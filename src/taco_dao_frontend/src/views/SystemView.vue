@@ -24,20 +24,18 @@
                   <i :class="systemStatusExpanded ? 'fa-solid fa-chevron-up' : 'fa-solid fa-chevron-down'"></i>
                 </button>
               </div>
-              <transition name="fade">
-                <div v-show="systemStatusExpanded" class="p-2 d-flex flex-column gap-2">
-                  <SystemStatusItem
-                    v-for="item in checklist"
-                    :key="item.key"
-                    :title="item.title"
-                    v-model:expanded="item.expanded"
-                    :status="item.status"
-                    :runDisabled="true"
-                  >
-                    <div class="text-muted small">Pending implementation…</div>
-                  </SystemStatusItem>
-                </div>
-              </transition>
+              <div v-if="systemStatusExpanded" class="p-2 d-flex flex-column gap-2">
+                <SystemStatusItem
+                  v-for="item in checklist"
+                  :key="item.key"
+                  :title="item.title"
+                  v-model:expanded="item.expanded"
+                  :status="item.status"
+                  :runDisabled="true"
+                >
+                  <div class="text-muted small">Pending implementation…</div>
+                </SystemStatusItem>
+              </div>
             </div>
 
             <!-- title row -->
@@ -75,28 +73,26 @@
                   <i :class="mainCanistersExpanded ? 'fa-solid fa-chevron-up' : 'fa-solid fa-chevron-down'"></i>
                 </button>
               </div>
-              <transition name="fade">
-                <div v-show="mainCanistersExpanded" class="p-2 d-flex flex-column gap-2">
-                  <SystemCanisterCard
-                    v-for="c in mainCanisters"
-                    :key="c.key"
-                    :title="c.title"
-                    :principal="resolvePrincipal(c.key)"
-                    v-model:expanded="expandedMap[c.key]"
-                    :cyclesT="cyclesMap[c.key]"
-                    :loading="loadingMap[c.key]"
-                    :timerStatus="timerStatusMap[c.key]"
-                    :treasuryHeader="c.key === 'treasury' ? (treasuryHeader || undefined) : undefined"
-                    :treasuryDetails="c.key === 'treasury' ? (treasuryDetails || undefined) : undefined"
-                    :tokenList="c.key === 'dao_backend' ? (daoTokenList || undefined) : undefined"
-                    :tokenAggregateWorst="c.key === 'dao_backend' ? (daoTokenWorst || undefined) : undefined"
-                    :oldestTokenSyncDisplay="c.key === 'dao_backend' ? (daoOldestSyncDisplay || undefined) : undefined"
-                    :isAdmin="isAdmin"
-                    :isArchive="false"
-                    @refresh="() => fetchCyclesFor(c.key)"
-                  />
-                </div>
-              </transition>
+              <div v-if="mainCanistersExpanded" class="p-2 d-flex flex-column gap-2">
+                <SystemCanisterCard
+                  v-for="c in mainCanisters"
+                  :key="c.key"
+                  :title="c.title"
+                  :principal="resolvePrincipal(c.key)"
+                  v-model:expanded="expandedMap[c.key]"
+                  :cyclesT="cyclesMap[c.key]"
+                  :loading="loadingMap[c.key]"
+                  :timerStatus="timerStatusMap[c.key]"
+                  :treasuryHeader="c.key === 'treasury' ? (treasuryHeader || undefined) : undefined"
+                  :treasuryDetails="c.key === 'treasury' ? (treasuryDetails || undefined) : undefined"
+                  :tokenList="c.key === 'dao_backend' ? (daoTokenList || undefined) : undefined"
+                  :tokenAggregateWorst="c.key === 'dao_backend' ? (daoTokenWorst || undefined) : undefined"
+                  :oldestTokenSyncDisplay="c.key === 'dao_backend' ? (daoOldestSyncDisplay || undefined) : undefined"
+                  :isAdmin="isAdmin"
+                  :isArchive="false"
+                  @refresh="() => fetchCyclesFor(c.key)"
+                />
+              </div>
             </div>
 
             <!-- archives group -->
@@ -107,24 +103,22 @@
                   <i :class="archivesExpanded ? 'fa-solid fa-chevron-up' : 'fa-solid fa-chevron-down'"></i>
                 </button>
               </div>
-              <transition name="fade">
-                <div v-show="archivesExpanded" class="p-2 d-flex flex-column gap-2">
-                  <SystemCanisterCard
-                    v-for="c in archiveCanisters"
-                    :key="c.key"
-                    :title="c.title"
-                    :principal="resolvePrincipal(c.key)"
-                    v-model:expanded="expandedMap[c.key]"
-                    :cyclesT="cyclesMap[c.key]"
-                    :loading="loadingMap[c.key]"
-                    :timerStatus="timerStatusMap[c.key]"
-                    :governanceHeader="c.key === 'neuronSnapshot' ? (governanceHeader || undefined) : undefined"
-                    :isAdmin="isAdmin"
-                    :isArchive="true"
-                    @refresh="() => fetchCyclesFor(c.key)"
-                  />
-                </div>
-              </transition>
+              <div v-if="archivesExpanded" class="p-2 d-flex flex-column gap-2">
+                <SystemCanisterCard
+                  v-for="c in archiveCanisters"
+                  :key="c.key"
+                  :title="c.title"
+                  :principal="resolvePrincipal(c.key)"
+                  v-model:expanded="expandedMap[c.key]"
+                  :cyclesT="cyclesMap[c.key]"
+                  :loading="loadingMap[c.key]"
+                  :timerStatus="timerStatusMap[c.key]"
+                  :governanceHeader="c.key === 'neuronSnapshot' ? (governanceHeader || undefined) : undefined"
+                  :isAdmin="isAdmin"
+                  :isArchive="true"
+                  @refresh="() => fetchCyclesFor(c.key)"
+                />
+              </div>
             </div>
 
           </div>
@@ -173,6 +167,7 @@
 
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted } from 'vue'
+import { storeToRefs } from 'pinia'
 import HeaderBar from "../components/HeaderBar.vue"
 import FooterBar from "../components/FooterBar.vue"
 // @ts-ignore - Vue SFC import resolution
@@ -188,6 +183,7 @@ const minimalCyclesIdl = ({ IDL }: any) => IDL.Service({
 })
 
 const tacoStore = useTacoStore()
+const { appLoading } = storeToRefs(tacoStore)
 
 // Section expanded states
 const systemStatusExpanded = ref(true)
@@ -622,34 +618,47 @@ const refreshCycles = () => {
   allKeys.forEach(k => fetchCyclesFor(k))
 }
 
-const toggleSystemStatus = () => { systemStatusExpanded.value = !systemStatusExpanded.value }
-const toggleMainCanisters = () => { mainCanistersExpanded.value = !mainCanistersExpanded.value }
-const toggleArchives = () => { archivesExpanded.value = !archivesExpanded.value }
+const toggleSystemStatus = () => { 
+  systemStatusExpanded.value = !systemStatusExpanded.value 
+}
+const toggleMainCanisters = () => { 
+  mainCanistersExpanded.value = !mainCanistersExpanded.value 
+}
+const toggleArchives = () => { 
+  archivesExpanded.value = !archivesExpanded.value 
+}
 
 const expandAll = () => { Object.keys(expandedMap).forEach(k => expandedMap[k as CanKey] = true) }
 const collapseAll = () => { Object.keys(expandedMap).forEach(k => expandedMap[k as CanKey] = false) }
 
-onMounted(async () => {
+onMounted(() => {
+  // CRITICAL FIX: Turn off app loading immediately - SystemView doesn't need it
+  // The app-level loading curtain was blocking all user interaction
+  if (appLoading.value) {
+    tacoStore.appLoadingOff()
+  }
+  
   // Start data fetching in background without blocking UI
   refreshCycles()
   
   // Check admin permissions asynchronously without blocking
-  try {
-    // Determine admin via DAO canister hasAdminPermission(getLogs)
-    const { Actor, HttpAgent } = await import('@dfinity/agent')
-    const { idlFactory: daoIDL } = await import('../../../declarations/dao_backend/DAO_backend.did.js')
-    const { AuthClient } = await import('@dfinity/auth-client')
-    const authClient = await AuthClient.create()
-    const identity = await authClient.getIdentity()
-    const agent = new HttpAgent({ identity, host: "https://ic0.app" })
-    if (process.env.DFX_NETWORK === 'local') { await agent.fetchRootKey() }
-    const daoActor = Actor.createActor(daoIDL, { agent, canisterId: tacoStore.daoBackendCanisterId() }) as any
-    const me = tacoStore.userPrincipal ? tacoStore.userPrincipal : tacoStore.userPrincipal
-    // check permission for a read-safe function like getLogs
-    isAdmin.value = await daoActor.hasAdminPermission(identity.getPrincipal(), { getLogs: null })
-  } catch (_) {
-    isAdmin.value = false
-  }
+  ;(async () => {
+    try {
+      // Determine admin via DAO canister hasAdminPermission(getLogs)
+      const { Actor, HttpAgent } = await import('@dfinity/agent')
+      const { idlFactory: daoIDL } = await import('../../../declarations/dao_backend/DAO_backend.did.js')
+      const { AuthClient } = await import('@dfinity/auth-client')
+      const authClient = await AuthClient.create()
+      const identity = await authClient.getIdentity()
+      const agent = new HttpAgent({ identity, host: "https://ic0.app" })
+      if (process.env.DFX_NETWORK === 'local') { await agent.fetchRootKey() }
+      const daoActor = Actor.createActor(daoIDL, { agent, canisterId: tacoStore.daoBackendCanisterId() }) as any
+      // check permission for a read-safe function like getLogs
+      isAdmin.value = await daoActor.hasAdminPermission(identity.getPrincipal(), { getLogs: null })
+    } catch (_) {
+      isAdmin.value = false
+    }
+  })()
 })
 
 </script>
