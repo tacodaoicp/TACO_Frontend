@@ -683,6 +683,8 @@ const runTest = async (testKey: string) => {
   try {
     if (testKey === 'canisters-running') {
       await testCanistersRunning(test)
+    } else if (testKey === 'archives-regular') {
+      await testArchivesImporting(test)
     } else {
       // Placeholder for other tests
       test.status = 'gray'
@@ -800,6 +802,138 @@ const testCanistersRunning = async (test: any) => {
       <div class="d-flex align-items-center gap-2 py-1 small ${rowClass}">
         ${icon}
         <span class="fw-bold" style="min-width: 200px">${result.name}</span>
+        <span>${result.message}</span>
+      </div>
+    `
+  })
+
+  reportHTML += '</div>'
+  test.report = reportHTML
+}
+
+// Test: Are archives importing regularly?
+const testArchivesImporting = async (test: any) => {
+  const results: Array<{ name: string; key: CanKey; running: boolean; lastRun: number | null; status: 'pass' | 'fail' | 'error'; message: string }> = []
+  
+  // Test all archive canisters in parallel
+  await Promise.all(archiveCanisters.map(async (canister) => {
+    const key = canister.key
+    const canisterName = canister.title
+    
+    try {
+      const cid = resolvePrincipal(key)
+      if (!cid) {
+        results.push({
+          name: canisterName,
+          key,
+          running: false,
+          lastRun: null,
+          status: 'error',
+          message: 'No canister ID configured'
+        })
+        return
+      }
+
+      // Create archive actor to get timer status
+      const archiveActor = await createArchiveActor(key, cid)
+      if (!archiveActor || typeof archiveActor.getTimerStatus !== 'function') {
+        results.push({
+          name: canisterName,
+          key,
+          running: false,
+          lastRun: null,
+          status: 'error',
+          message: 'Timer status not available'
+        })
+        return
+      }
+
+      const timerStatus = await archiveActor.getTimerStatus()
+      
+      // Check if outer loop is running
+      const isRunning = timerStatus.outerLoopRunning
+      const lastRun = timerStatus.outerLoopLastRun
+      const lastRunMs = lastRun && Number(lastRun) > 0 ? Number(lastRun) / 1_000_000 : null
+      
+      // Calculate time since last run
+      const nowMs = Date.now()
+      const timeSinceLastRun = lastRunMs ? nowMs - lastRunMs : null
+      
+      // Check if last run was within 90 minutes (3 periods of 30 minutes)
+      const maxDelayMs = 90 * 60 * 1000 // 90 minutes in milliseconds
+      
+      let status: 'pass' | 'fail' = 'pass'
+      let message = ''
+      
+      if (!isRunning) {
+        status = 'fail'
+        message = 'Outer timer is NOT running'
+      } else if (!lastRunMs || Number(lastRun) === 0) {
+        status = 'fail'
+        message = 'Never run - no last run time recorded'
+      } else if (timeSinceLastRun && timeSinceLastRun > maxDelayMs) {
+        status = 'fail'
+        const minutesAgo = Math.round(timeSinceLastRun / (60 * 1000))
+        message = `Last run ${minutesAgo} minutes ago (>90 min threshold)`
+      } else {
+        const minutesAgo = timeSinceLastRun ? Math.round(timeSinceLastRun / (60 * 1000)) : 0
+        message = `Running - last import ${minutesAgo} minutes ago`
+      }
+      
+      results.push({
+        name: canisterName,
+        key,
+        running: isRunning,
+        lastRun: lastRunMs,
+        status,
+        message
+      })
+    } catch (error: any) {
+      results.push({
+        name: canisterName,
+        key,
+        running: false,
+        lastRun: null,
+        status: 'error',
+        message: `Failed to check: ${error.message || 'Unknown error'}`
+      })
+    }
+  }))
+
+  // Generate report
+  const passed = results.filter(r => r.status === 'pass').length
+  const failed = results.filter(r => r.status === 'fail').length
+  const errors = results.filter(r => r.status === 'error').length
+  const total = results.length
+
+  // Overall status
+  if (errors > 0 || failed > 0) {
+    test.status = 'red'
+  } else {
+    test.status = 'green'
+  }
+
+  // Build HTML report
+  let reportHTML = `
+    <div class="mb-3">
+      <strong>Results:</strong> ${passed} passed, ${failed} failed, ${errors} errors out of ${total} archive canisters
+    </div>
+    <div class="canister-results">
+  `
+
+  results.forEach(result => {
+    const icon = result.status === 'pass' 
+      ? '<i class="fa-solid fa-check-circle text-success"></i>' 
+      : result.status === 'fail'
+      ? '<i class="fa-solid fa-exclamation-triangle text-warning"></i>'
+      : '<i class="fa-solid fa-times-circle text-danger"></i>'
+    
+    const rowClass = result.status === 'pass' ? 'text-success' : result.status === 'fail' ? 'text-warning' : 'text-danger'
+    
+    reportHTML += `
+      <div class="d-flex align-items-center gap-2 py-1 small ${rowClass}">
+        ${icon}
+        <span class="fw-bold" style="min-width: 250px">${result.name}</span>
         <span>${result.message}</span>
       </div>
     `
