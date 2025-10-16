@@ -18,9 +18,9 @@
 
             <!-- system status group -->
             <div class="taco-container taco-container--l1 d-flex flex-column gap-2 p-0 mt-3">
-              <div class="px-3 pt-3 pb-2 d-flex align-items-center justify-content-between section-header-clickable" @click="systemStatusExpanded = !systemStatusExpanded">
+              <div class="px-3 pt-3 pb-2 d-flex align-items-center justify-content-between section-header-clickable" @click="toggleSystemStatus">
                 <h2 class="h5 mb-0">System Status</h2>
-                <button class="btn btn-sm btn-outline-secondary" @click.stop="systemStatusExpanded = !systemStatusExpanded">
+                <button class="btn btn-sm btn-outline-secondary" @click.stop="toggleSystemStatus" :title="systemStatusExpanded ? 'Collapse' : 'Expand'">
                   <i :class="systemStatusExpanded ? 'fa-solid fa-chevron-up' : 'fa-solid fa-chevron-down'"></i>
                 </button>
               </div>
@@ -69,9 +69,9 @@
 
             <!-- main canisters group -->
             <div class="taco-container taco-container--l1 d-flex flex-column gap-2 p-0 mt-3">
-              <div class="px-3 pt-3 pb-2 d-flex align-items-center justify-content-between section-header-clickable" @click="mainCanistersExpanded = !mainCanistersExpanded">
+              <div class="px-3 pt-3 pb-2 d-flex align-items-center justify-content-between section-header-clickable" @click="toggleMainCanisters">
                 <h2 class="h5 mb-0">Main Canisters</h2>
-                <button class="btn btn-sm btn-outline-secondary" @click.stop="mainCanistersExpanded = !mainCanistersExpanded">
+                <button class="btn btn-sm btn-outline-secondary" @click.stop="toggleMainCanisters" :title="mainCanistersExpanded ? 'Collapse' : 'Expand'">
                   <i :class="mainCanistersExpanded ? 'fa-solid fa-chevron-up' : 'fa-solid fa-chevron-down'"></i>
                 </button>
               </div>
@@ -101,9 +101,9 @@
 
             <!-- archives group -->
             <div class="taco-container taco-container--l1 d-flex flex-column gap-2 p-0 mt-4">
-              <div class="px-3 pt-3 pb-2 d-flex align-items-center justify-content-between section-header-clickable" @click="archivesExpanded = !archivesExpanded">
+              <div class="px-3 pt-3 pb-2 d-flex align-items-center justify-content-between section-header-clickable" @click="toggleArchives">
                 <h2 class="h5 mb-0">Archives</h2>
-                <button class="btn btn-sm btn-outline-secondary" @click.stop="archivesExpanded = !archivesExpanded">
+                <button class="btn btn-sm btn-outline-secondary" @click.stop="toggleArchives" :title="archivesExpanded ? 'Collapse' : 'Expand'">
                   <i :class="archivesExpanded ? 'fa-solid fa-chevron-up' : 'fa-solid fa-chevron-down'"></i>
                 </button>
               </div>
@@ -616,15 +616,24 @@ const fetchCyclesFor = async (key: CanKey) => {
   }
 }
 
-const refreshCycles = async () => {
+const refreshCycles = () => {
   const allKeys: CanKey[] = [...mainCanisters, ...archiveCanisters].map(x => x.key)
-  await Promise.all(allKeys.map(k => fetchCyclesFor(k)))
+  // Fetch each canister independently without blocking - UI updates as each completes
+  allKeys.forEach(k => fetchCyclesFor(k))
 }
+
+const toggleSystemStatus = () => { systemStatusExpanded.value = !systemStatusExpanded.value }
+const toggleMainCanisters = () => { mainCanistersExpanded.value = !mainCanistersExpanded.value }
+const toggleArchives = () => { archivesExpanded.value = !archivesExpanded.value }
 
 const expandAll = () => { Object.keys(expandedMap).forEach(k => expandedMap[k as CanKey] = true) }
 const collapseAll = () => { Object.keys(expandedMap).forEach(k => expandedMap[k as CanKey] = false) }
 
 onMounted(async () => {
+  // Start data fetching in background without blocking UI
+  refreshCycles()
+  
+  // Check admin permissions asynchronously without blocking
   try {
     // Determine admin via DAO canister hasAdminPermission(getLogs)
     const { Actor, HttpAgent } = await import('@dfinity/agent')
@@ -641,7 +650,6 @@ onMounted(async () => {
   } catch (_) {
     isAdmin.value = false
   }
-  await refreshCycles()
 })
 
 </script>
