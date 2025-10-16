@@ -685,6 +685,8 @@ const runTest = async (testKey: string) => {
       await testCanistersRunning(test)
     } else if (testKey === 'archives-regular') {
       await testArchivesImporting(test)
+    } else if (testKey === 'trading-regular') {
+      await testTradingBotRegular(test)
     } else {
       // Placeholder for other tests
       test.status = 'gray'
@@ -941,6 +943,207 @@ const testArchivesImporting = async (test: any) => {
 
   reportHTML += '</div>'
   test.report = reportHTML
+}
+
+// Test: Is the trading bot trading regularly?
+const testTradingBotRegular = async (test: any) => {
+  const checks: Array<{ name: string; status: 'pass' | 'fail' | 'error'; message: string }> = []
+  
+  try {
+    const cid = resolvePrincipal('treasury')
+    const { idlFactory: treasuryIDL } = await import('../../../declarations/treasury/treasury.did.js')
+    const { idlFactory: daoIDL } = await import('../../../declarations/dao_backend/DAO_backend.did.js')
+    const agent = new HttpAgent({ host: process.env.DFX_NETWORK === 'local' ? 'http://127.0.0.1:4943' : 'https://ic0.app' })
+    if (process.env.DFX_NETWORK === 'local') { await agent.fetchRootKey() }
+    const tActor: any = Actor.createActor(treasuryIDL, { agent, canisterId: cid })
+    const dActor: any = Actor.createActor(daoIDL, { agent, canisterId: resolvePrincipal('dao_backend') })
+
+    const [tsRes, cfgRaw, tokensResp] = await Promise.all([
+      tActor.getTradingStatus(),
+      tActor.getRebalanceConfig?.() ?? Promise.resolve(null),
+      dActor.getTokenDetails(),
+    ])
+
+    // Get trading status and interval
+    let tradingActive = false
+    let lastAttemptNs: any = null
+    let intervalNs: any = null
+    
+    if (tsRes && 'ok' in tsRes) {
+      const { metrics, rebalanceStatus } = tsRes.ok
+      tradingActive = !!('Trading' in rebalanceStatus)
+      lastAttemptNs = metrics?.lastRebalanceAttempt
+    }
+    
+    if (cfgRaw) {
+      const cfg = Array.isArray(cfgRaw) ? cfgRaw[0] : cfgRaw
+      intervalNs = cfg?.rebalanceIntervalNS
+    }
+
+    // Check 1: Trading bot running and last trade within 5 periods
+    if (!tradingActive) {
+      checks.push({
+        name: 'Trading Bot Status',
+        status: 'fail',
+        message: 'Trading bot is NOT running'
+      })
+    } else if (!lastAttemptNs || Number(lastAttemptNs) === 0) {
+      checks.push({
+        name: 'Trading Bot Status',
+        status: 'fail',
+        message: 'Never traded - no last trade time recorded'
+      })
+    } else if (!intervalNs) {
+      checks.push({
+        name: 'Trading Bot Status',
+        status: 'error',
+        message: 'Cannot determine interval - config unavailable'
+      })
+    } else {
+      const periods = Number((BigInt(Date.now()) * 1_000_000n - BigInt(lastAttemptNs)) / BigInt(intervalNs))
+      if (periods > 5) {
+        checks.push({
+          name: 'Trading Bot Status',
+          status: 'fail',
+          message: `Last trade ${periods} periods ago (>5 periods threshold)`
+        })
+      } else {
+        checks.push({
+          name: 'Trading Bot Status',
+          status: 'pass',
+          message: `Running - last trade ${periods} periods ago`
+        })
+      }
+    }
+
+    // Parse token data
+    const tokenDetails = tokensResp || []
+    const tokens = tokenDetails.map((entry: any) => {
+      const token = entry[1]
+      return {
+        symbol: token?.tokenSymbol || 'UNKNOWN',
+        active: token?.Active,
+        pausedManually: token?.isPaused,
+        pausedSyncFailure: token?.pausedDueToSyncFailure,
+        isPaused: token?.isPaused || token?.pausedDueToSyncFailure || false
+      }
+    })
+
+    const totalTokens = tokens.length
+    const pausedTokens = tokens.filter((t: any) => t.isPaused)
+    const pausedCount = pausedTokens.length
+    const icpToken = tokens.find((t: any) => t.symbol === 'ICP')
+
+    // Check 2: All tokens paused (circuit breaker hit)
+    if (pausedCount === totalTokens && totalTokens > 0) {
+      checks.push({
+        name: 'Circuit Breaker Status',
+        status: 'fail',
+        message: `All ${totalTokens} tokens are paused - Circuit breaker has hit! DAO must unpause tokens to restart trading.`
+      })
+    } else if (pausedCount === 0) {
+      checks.push({
+        name: 'Circuit Breaker Status',
+        status: 'pass',
+        message: 'No tokens paused - circuit breaker not triggered'
+      })
+    } else {
+      // Check 3: ICP paused but others not (error - circuit breaker should have hit)
+      if (icpToken && icpToken.isPaused) {
+        checks.push({
+          name: 'ICP Token Status',
+          status: 'fail',
+          message: `ICP is paused but ${totalTokens - pausedCount} other tokens are not - Circuit breaker should have hit! DAO must investigate immediately!`
+        })
+      } else {
+        checks.push({
+          name: 'ICP Token Status',
+          status: 'pass',
+          message: 'ICP is trading normally'
+        })
+      }
+
+      // Check 4: 3+ tokens paused but not all (circuit breaker should have hit)
+      if (pausedCount >= 3 && pausedCount < totalTokens) {
+        checks.push({
+          name: 'Multiple Token Pause Check',
+          status: 'fail',
+          message: `${pausedCount} tokens are paused (≥3) but not all - Circuit breaker should have hit! DAO should investigate.`
+        })
+      } else if (pausedCount > 0 && pausedCount < 3) {
+        checks.push({
+          name: 'Multiple Token Pause Check',
+          status: 'pass',
+          message: `${pausedCount} token(s) paused - below circuit breaker threshold`
+        })
+      }
+    }
+
+    // Overall status
+    const anyFailed = checks.some(c => c.status === 'fail')
+    const anyError = checks.some(c => c.status === 'error')
+    
+    if (anyError || anyFailed) {
+      test.status = 'red'
+    } else {
+      test.status = 'green'
+    }
+
+    // Build HTML report
+    const passed = checks.filter(c => c.status === 'pass').length
+    const failed = checks.filter(c => c.status === 'fail').length
+    const errors = checks.filter(c => c.status === 'error').length
+
+    let reportHTML = `
+      <div class="mb-3">
+        <strong>Results:</strong> ${passed} passed, ${failed} failed, ${errors} errors
+      </div>
+      <div class="canister-results">
+    `
+
+    checks.forEach(check => {
+      const icon = check.status === 'pass' 
+        ? '<i class="fa-solid fa-check-circle text-success"></i>' 
+        : check.status === 'fail'
+        ? '<i class="fa-solid fa-exclamation-triangle text-warning"></i>'
+        : '<i class="fa-solid fa-times-circle text-danger"></i>'
+      
+      const rowClass = check.status === 'pass' ? 'text-success' : check.status === 'fail' ? 'text-warning' : 'text-danger'
+      
+      reportHTML += `
+        <div class="d-flex align-items-start gap-2 py-2 small ${rowClass}">
+          <div class="mt-1">${icon}</div>
+          <div>
+            <div class="fw-bold">${check.name}</div>
+            <div>${check.message}</div>
+          </div>
+        </div>
+      `
+    })
+
+    // Add paused tokens list if any
+    if (pausedTokens.length > 0 && pausedTokens.length < totalTokens) {
+      reportHTML += `
+        <div class="mt-3 pt-2 border-top border-secondary">
+          <div class="fw-bold small mb-2">Paused Tokens (${pausedTokens.length}):</div>
+          <div class="d-flex flex-wrap gap-2">
+      `
+      pausedTokens.forEach((token: any) => {
+        const reason = token.pausedSyncFailure ? 'Sync Failed' : 'Manually Paused'
+        reportHTML += `
+          <span class="badge bg-warning text-dark">${token.symbol} (${reason})</span>
+        `
+      })
+      reportHTML += '</div></div>'
+    }
+
+    reportHTML += '</div>'
+    test.report = reportHTML
+
+  } catch (error: any) {
+    test.status = 'red'
+    test.report = `<div class="text-danger"><strong>Error:</strong> ${error.message || 'Failed to check trading bot status'}</div>`
+  }
 }
 
 onMounted(() => {
