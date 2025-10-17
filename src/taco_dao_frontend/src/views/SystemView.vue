@@ -24,8 +24,8 @@
                     <span class="visually-hidden">Running tests...</span>
                   </span>
                   <span v-else :class="['status-light', `status-${overallSystemStatus}`]"></span>
-                  <h2 class="h5 mb-0">System Status</h2>
-                </div>
+                <h2 class="h5 mb-0">System Status</h2>
+              </div>
                 <button class="btn btn-sm btn-outline-secondary" @click.stop="toggleSystemStatus" :title="systemStatusExpanded ? 'Collapse' : 'Expand'">
                   <i :class="systemStatusExpanded ? 'fa-solid fa-chevron-up' : 'fa-solid fa-chevron-down'"></i>
                 </button>
@@ -188,6 +188,19 @@
   border-left: 2px solid rgba(255, 255, 255, 0.1);
   padding-left: 1rem;
   margin-top: 0.5rem;
+}
+
+.test-report .alert-danger {
+  background-color: rgba(220, 53, 69, 0.2);
+  border: 1px solid #dc3545;
+  border-radius: 0.375rem;
+  padding: 0.75rem 1rem;
+  color: #ff6b6b;
+  font-weight: 500;
+}
+
+.test-report .alert-danger strong {
+  color: #ff8787;
 }
 </style>
 
@@ -694,7 +707,7 @@ const runTest = async (testKey: string) => {
     }
   } catch (error) {
     test.status = 'red'
-    test.report = `<div class="text-danger"><strong>Error:</strong> ${error}</div>`
+    test.report = `<div class="alert alert-danger"><strong>Error:</strong> ${error}</div>`
   } finally {
     test.running = false
   }
@@ -975,9 +988,15 @@ const testTradingBotRegular = async (test: any) => {
       lastAttemptNs = metrics?.lastRebalanceAttempt
     }
     
+    // Extract interval from config (same logic as Portfolio section)
     if (cfgRaw) {
-      const cfg = Array.isArray(cfgRaw) ? cfgRaw[0] : cfgRaw
-      intervalNs = cfg?.rebalanceIntervalNS
+      if ('ok' in cfgRaw) {
+        intervalNs = cfgRaw.ok?.rebalanceIntervalNS
+      } else if (Array.isArray(cfgRaw) && cfgRaw.length > 0) {
+        intervalNs = cfgRaw[0]?.rebalanceIntervalNS
+      } else {
+        intervalNs = cfgRaw?.rebalanceIntervalNS
+      }
     }
 
     // Check 1: Trading bot running and last trade within 5 periods
@@ -1142,7 +1161,7 @@ const testTradingBotRegular = async (test: any) => {
 
   } catch (error: any) {
     test.status = 'red'
-    test.report = `<div class="text-danger"><strong>Error:</strong> ${error.message || 'Failed to check trading bot status'}</div>`
+    test.report = `<div class="alert alert-danger"><strong>Error:</strong> ${error.message || 'Failed to check trading bot status'}</div>`
   }
 }
 
@@ -1158,21 +1177,21 @@ onMounted(() => {
   
   // Check admin permissions asynchronously without blocking
   ;(async () => {
-    try {
-      // Determine admin via DAO canister hasAdminPermission(getLogs)
-      const { Actor, HttpAgent } = await import('@dfinity/agent')
-      const { idlFactory: daoIDL } = await import('../../../declarations/dao_backend/DAO_backend.did.js')
-      const { AuthClient } = await import('@dfinity/auth-client')
-      const authClient = await AuthClient.create()
-      const identity = await authClient.getIdentity()
-      const agent = new HttpAgent({ identity, host: "https://ic0.app" })
-      if (process.env.DFX_NETWORK === 'local') { await agent.fetchRootKey() }
-      const daoActor = Actor.createActor(daoIDL, { agent, canisterId: tacoStore.daoBackendCanisterId() }) as any
-      // check permission for a read-safe function like getLogs
-      isAdmin.value = await daoActor.hasAdminPermission(identity.getPrincipal(), { getLogs: null })
-    } catch (_) {
-      isAdmin.value = false
-    }
+  try {
+    // Determine admin via DAO canister hasAdminPermission(getLogs)
+    const { Actor, HttpAgent } = await import('@dfinity/agent')
+    const { idlFactory: daoIDL } = await import('../../../declarations/dao_backend/DAO_backend.did.js')
+    const { AuthClient } = await import('@dfinity/auth-client')
+    const authClient = await AuthClient.create()
+    const identity = await authClient.getIdentity()
+    const agent = new HttpAgent({ identity, host: "https://ic0.app" })
+    if (process.env.DFX_NETWORK === 'local') { await agent.fetchRootKey() }
+    const daoActor = Actor.createActor(daoIDL, { agent, canisterId: tacoStore.daoBackendCanisterId() }) as any
+    // check permission for a read-safe function like getLogs
+    isAdmin.value = await daoActor.hasAdminPermission(identity.getPrincipal(), { getLogs: null })
+  } catch (_) {
+    isAdmin.value = false
+  }
   })()
 })
 
