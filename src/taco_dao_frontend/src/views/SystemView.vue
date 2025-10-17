@@ -1115,6 +1115,96 @@ const testTradingBotRegular = async (test: any) => {
       }
     }
 
+    // Get executed trades and metrics for analysis
+    const executedTrades = tsRes?.ok?.executedTrades || []
+    const metrics = tsRes?.ok?.metrics
+    const allTimeAvgSlippage = metrics?.avgSlippage ? (Number(metrics.avgSlippage) * 100).toFixed(2) : 'N/A'
+    
+    // Get slippage tolerance from config
+    let maxSlippagePct = null
+    if (cfgRaw) {
+      const cfg = Array.isArray(cfgRaw) ? cfgRaw[0] : cfgRaw
+      if (cfg?.maxSlippageBasisPoints) {
+        maxSlippagePct = Number(cfg.maxSlippageBasisPoints) / 100
+      }
+    }
+
+    // Check 5: Failed trades analysis
+    if (executedTrades.length > 0) {
+      const last100 = executedTrades.slice(-100)
+      const failedLast100 = last100.filter((t: any) => !t.success).length
+      const failedAll = executedTrades.filter((t: any) => !t.success).length
+      
+      const failRateLast100 = (failedLast100 / last100.length) * 100
+      const failRateAll = (failedAll / executedTrades.length) * 100
+      
+      let failStatus: 'pass' | 'fail' | 'error' = 'pass'
+      let failMessage = ''
+      
+      if (failRateLast100 > 10) {
+        failStatus = 'fail'
+        failMessage = `❌ <strong>${failedLast100}/${last100.length}</strong> trades failed in last 100 (<strong>${failRateLast100.toFixed(1)}%</strong> > 10% threshold). All trades: ${failedAll}/${executedTrades.length} (<strong>${failRateAll.toFixed(1)}%</strong>).`
+      } else if (failRateAll > 3) {
+        failStatus = 'fail'
+        failMessage = `❌ Overall failure rate is <strong>${failRateAll.toFixed(1)}%</strong> (${failedAll}/${executedTrades.length} trades) > 3% threshold. Last 100: ${failedLast100}/${last100.length} (<strong>${failRateLast100.toFixed(1)}%</strong>).`
+      } else {
+        failMessage = `✅ Failure rates within limits. Last 100: ${failedLast100}/${last100.length} (<strong>${failRateLast100.toFixed(1)}%</strong>). All: ${failedAll}/${executedTrades.length} (<strong>${failRateAll.toFixed(1)}%</strong>).`
+      }
+      
+      checks.push({
+        name: 'Trade Failure Rate',
+        status: failStatus,
+        message: failMessage
+      })
+
+      // Check 6: Slippage analysis
+      const tradesWithSlippage = executedTrades.filter((t: any) => t.success && t.slippage != null)
+      const last100WithSlippage = last100.filter((t: any) => t.success && t.slippage != null)
+      
+      if (tradesWithSlippage.length > 0) {
+        const slippagesLast100 = last100WithSlippage.map((t: any) => Number(t.slippage))
+        const slippagesAll = tradesWithSlippage.map((t: any) => Number(t.slippage))
+        
+        const avgSlippageLast100 = slippagesLast100.reduce((a: number, b: number) => a + b, 0) / slippagesLast100.length
+        const avgSlippageAll = slippagesAll.reduce((a: number, b: number) => a + b, 0) / slippagesAll.length
+        const worstSlippageLast100 = Math.max(...slippagesLast100)
+        
+        const avgSlippageLast100Pct = (avgSlippageLast100 * 100).toFixed(2)
+        const avgSlippageAllPct = (avgSlippageAll * 100).toFixed(2)
+        const worstSlippageLast100Pct = (worstSlippageLast100 * 100).toFixed(2)
+        
+        let slippageStatus: 'pass' | 'fail' | 'error' = 'pass'
+        let slippageMessage = ''
+        
+        if (maxSlippagePct && worstSlippageLast100 * 100 > maxSlippagePct) {
+          slippageStatus = 'fail'
+          slippageMessage = `❌ Worst slippage in last 100 trades: <strong>${worstSlippageLast100Pct}%</strong> exceeds tolerance of <strong>${maxSlippagePct.toFixed(2)}%</strong>. Avg last 100: ${avgSlippageLast100Pct}%. Avg all: ${avgSlippageAllPct}%. All-time avg: ${allTimeAvgSlippage}%.`
+        } else if (maxSlippagePct) {
+          slippageMessage = `✅ Worst slippage: <strong>${worstSlippageLast100Pct}%</strong> ≤ tolerance (${maxSlippagePct.toFixed(2)}%). Avg last 100: <strong>${avgSlippageLast100Pct}%</strong>. Avg all: <strong>${avgSlippageAllPct}%</strong>. All-time: ${allTimeAvgSlippage}%.`
+        } else {
+          slippageMessage = `⚠️ Slippage stats: Worst last 100: <strong>${worstSlippageLast100Pct}%</strong>. Avg last 100: <strong>${avgSlippageLast100Pct}%</strong>. Avg all: <strong>${avgSlippageAllPct}%</strong>. All-time: ${allTimeAvgSlippage}%. (Tolerance not available).`
+        }
+        
+        checks.push({
+          name: 'Slippage Analysis',
+          status: slippageStatus,
+          message: slippageMessage
+        })
+      } else {
+        checks.push({
+          name: 'Slippage Analysis',
+          status: 'error',
+          message: '⚠️ No successful trades with slippage data available for analysis'
+        })
+      }
+    } else {
+      checks.push({
+        name: 'Trade History',
+        status: 'error',
+        message: '⚠️ No trade history available for analysis'
+      })
+    }
+
     // Overall status
     const anyFailed = checks.some(c => c.status === 'fail')
     const anyError = checks.some(c => c.status === 'error')
