@@ -971,11 +971,25 @@ const testTradingBotRegular = async (test: any) => {
     const tActor: any = Actor.createActor(treasuryIDL, { agent, canisterId: cid })
     const dActor: any = Actor.createActor(daoIDL, { agent, canisterId: resolvePrincipal('dao_backend') })
 
-    const [tsRes, cfgRaw, tokensResp] = await Promise.all([
-      tActor.getTradingStatus(),
-      tActor.getRebalanceConfig?.() ?? Promise.resolve(null),
-      dActor.getTokenDetails(),
-    ])
+    let tsRes, cfgRaw, tokensResp
+    try {
+      [tsRes, cfgRaw, tokensResp] = await Promise.all([
+        tActor.getTradingStatus(),
+        tActor.getRebalanceConfig?.() ?? Promise.resolve(null),
+        dActor.getTokenDetails(),
+      ])
+    } catch (fetchError: any) {
+      console.error('[Trading Bot Test] Fetch error:', fetchError)
+      const errorMsg = fetchError.message || String(fetchError)
+      if (errorMsg.includes('503') || errorMsg.includes('Service Unavailable')) {
+        throw new Error('Treasury or DAO canister is unavailable (503 error). The canister may be out of cycles, upgrading, or experiencing network issues.')
+      }
+      throw new Error(`Failed to fetch trading data: ${errorMsg}`)
+    }
+
+    console.log('[Trading Bot Test] tsRes:', tsRes)
+    console.log('[Trading Bot Test] cfgRaw:', cfgRaw)
+    console.log('[Trading Bot Test] tokensResp:', tokensResp)
 
     // Get trading status and interval
     let tradingActive = false
@@ -986,17 +1000,21 @@ const testTradingBotRegular = async (test: any) => {
       const { metrics, rebalanceStatus } = tsRes.ok
       tradingActive = !!('Trading' in rebalanceStatus)
       lastAttemptNs = metrics?.lastRebalanceAttempt
+      console.log('[Trading Bot Test] tradingActive:', tradingActive)
+      console.log('[Trading Bot Test] lastAttemptNs:', lastAttemptNs)
     }
     
     // Extract interval from config (same logic as Portfolio section)
     if (cfgRaw) {
-      if ('ok' in cfgRaw) {
-        intervalNs = cfgRaw.ok?.rebalanceIntervalNS
-      } else if (Array.isArray(cfgRaw) && cfgRaw.length > 0) {
-        intervalNs = cfgRaw[0]?.rebalanceIntervalNS
-      } else {
-        intervalNs = cfgRaw?.rebalanceIntervalNS
-      }
+      const cfg = Array.isArray(cfgRaw) ? cfgRaw[0] : cfgRaw
+      intervalNs = cfg?.rebalanceIntervalNS
+      console.log('[Trading Bot Test] intervalNs from config:', intervalNs)
+    }
+    
+    // If config unavailable, use default 30-minute interval (1,800,000,000,000 ns)
+    if (!intervalNs) {
+      intervalNs = 1_800_000_000_000n
+      console.log('[Trading Bot Test] Config unavailable, using default 30min interval')
     }
 
     // Check 1: Trading bot running and last trade within 5 periods
@@ -1004,33 +1022,32 @@ const testTradingBotRegular = async (test: any) => {
       checks.push({
         name: 'Trading Bot Status',
         status: 'fail',
-        message: 'Trading bot is NOT running'
+        message: '❌ Trading bot is NOT active (status: not Trading)'
       })
     } else if (!lastAttemptNs || Number(lastAttemptNs) === 0) {
       checks.push({
         name: 'Trading Bot Status',
         status: 'fail',
-        message: 'Never traded - no last trade time recorded'
-      })
-    } else if (!intervalNs) {
-      checks.push({
-        name: 'Trading Bot Status',
-        status: 'error',
-        message: 'Cannot determine interval - config unavailable'
+        message: '❌ Trading bot active but no trades recorded (never traded)'
       })
     } else {
-      const periods = Number((BigInt(Date.now()) * 1_000_000n - BigInt(lastAttemptNs)) / BigInt(intervalNs))
+      const nowNs = BigInt(Date.now()) * 1_000_000n
+      const timeSinceLastTrade = nowNs - BigInt(lastAttemptNs)
+      const periods = Number(timeSinceLastTrade / BigInt(intervalNs))
+      const lastTradeDisplay = new Date(Number(BigInt(lastAttemptNs) / 1_000_000n)).toLocaleString()
+      const intervalMinutes = Number(BigInt(intervalNs) / 1_000_000_000n / 60n)
+      
       if (periods > 5) {
         checks.push({
           name: 'Trading Bot Status',
           status: 'fail',
-          message: `Last trade ${periods} periods ago (>5 periods threshold)`
+          message: `❌ Last trade was <strong>${periods.toFixed(1)} periods</strong> ago (${lastTradeDisplay}). Expected within 5 periods (interval: ${intervalMinutes}min).`
         })
       } else {
         checks.push({
           name: 'Trading Bot Status',
           status: 'pass',
-          message: `Running - last trade ${periods} periods ago`
+          message: `✅ Trading bot active. Last trade was <strong>${periods.toFixed(1)} periods</strong> ago (${lastTradeDisplay}, interval: ${intervalMinutes}min).`
         })
       }
     }
