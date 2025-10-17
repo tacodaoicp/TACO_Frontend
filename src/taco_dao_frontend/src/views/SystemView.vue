@@ -1118,15 +1118,23 @@ const testTradingBotRegular = async (test: any) => {
     // Get executed trades and metrics for analysis
     const executedTrades = tsRes?.ok?.executedTrades || []
     const metrics = tsRes?.ok?.metrics
-    const allTimeAvgSlippage = metrics?.avgSlippage ? (Number(metrics.avgSlippage) * 100).toFixed(2) : 'N/A'
+    const allTimeAvgSlippage = metrics?.avgSlippage ? Number(metrics.avgSlippage).toFixed(2) : 'N/A'
     
-    // Get slippage tolerance from config
+    // Get slippage tolerance from config - try store first, then cfgRaw
     let maxSlippagePct = null
-    if (cfgRaw) {
+    
+    // Try from tacoStore first (if already loaded)
+    if (tacoStore.rebalanceConfig?.maxSlippageBasisPoints) {
+      maxSlippagePct = Number(tacoStore.rebalanceConfig.maxSlippageBasisPoints) / 100
+      console.log('[Trading Bot Test] Slippage tolerance from store:', maxSlippagePct)
+    } else if (cfgRaw) {
       const cfg = Array.isArray(cfgRaw) ? cfgRaw[0] : cfgRaw
       if (cfg?.maxSlippageBasisPoints) {
         maxSlippagePct = Number(cfg.maxSlippageBasisPoints) / 100
+        console.log('[Trading Bot Test] Slippage tolerance from cfgRaw:', maxSlippagePct)
       }
+    } else {
+      console.warn('[Trading Bot Test] Slippage tolerance not available from store or config')
     }
 
     // Check 5: Failed trades analysis
@@ -1169,20 +1177,21 @@ const testTradingBotRegular = async (test: any) => {
         const avgSlippageAll = slippagesAll.reduce((a: number, b: number) => a + b, 0) / slippagesAll.length
         const worstSlippageLast100 = Math.max(...slippagesLast100)
         
-        const avgSlippageLast100Pct = (avgSlippageLast100 * 100).toFixed(2)
-        const avgSlippageAllPct = (avgSlippageAll * 100).toFixed(2)
-        const worstSlippageLast100Pct = (worstSlippageLast100 * 100).toFixed(2)
+        // Slippage is already stored as percentage (0.49 = 0.49%), no need to multiply by 100
+        const avgSlippageLast100Pct = avgSlippageLast100.toFixed(2)
+        const avgSlippageAllPct = avgSlippageAll.toFixed(2)
+        const worstSlippageLast100Pct = worstSlippageLast100.toFixed(2)
         
         let slippageStatus: 'pass' | 'fail' | 'error' = 'pass'
         let slippageMessage = ''
         
-        if (maxSlippagePct && worstSlippageLast100 * 100 > maxSlippagePct) {
+        if (maxSlippagePct && worstSlippageLast100 > maxSlippagePct) {
           slippageStatus = 'fail'
           slippageMessage = `❌ Worst slippage in last 100 trades: <strong>${worstSlippageLast100Pct}%</strong> exceeds tolerance of <strong>${maxSlippagePct.toFixed(2)}%</strong>. Avg last 100: ${avgSlippageLast100Pct}%. Avg all: ${avgSlippageAllPct}%. All-time avg: ${allTimeAvgSlippage}%.`
         } else if (maxSlippagePct) {
           slippageMessage = `✅ Worst slippage: <strong>${worstSlippageLast100Pct}%</strong> ≤ tolerance (${maxSlippagePct.toFixed(2)}%). Avg last 100: <strong>${avgSlippageLast100Pct}%</strong>. Avg all: <strong>${avgSlippageAllPct}%</strong>. All-time: ${allTimeAvgSlippage}%.`
         } else {
-          slippageMessage = `⚠️ Slippage stats: Worst last 100: <strong>${worstSlippageLast100Pct}%</strong>. Avg last 100: <strong>${avgSlippageLast100Pct}%</strong>. Avg all: <strong>${avgSlippageAllPct}%</strong>. All-time: ${allTimeAvgSlippage}%. (Tolerance not available).`
+          slippageMessage = `⚠️ Slippage stats: Worst last 100: <strong>${worstSlippageLast100Pct}%</strong>. Avg last 100: <strong>${avgSlippageLast100Pct}%</strong>. Avg all: <strong>${avgSlippageAllPct}%</strong>. All-time: ${allTimeAvgSlippage}%. (Tolerance not available - visit /admin to load config).`
         }
         
         checks.push({
