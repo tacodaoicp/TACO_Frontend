@@ -82,6 +82,20 @@
 
               </button>
 
+              <!-- QR code button -->
+              <button @click="dismissTooltips(); showQRCode(icpAccountId.hex, 'ICP Account ID')"
+                      class="btn taco-btn taco-btn--green ms-1"
+                      style="padding: 0.675rem 0.5rem;"
+                      data-bs-toggle="tooltip"
+                      data-bs-placement="bottom"
+                      data-bs-custom-class="taco-tooltip"
+                      title="Show QR code for ICP account id">
+
+                <!-- icon -->
+                <i class="fa fa-sm fa-qrcode"></i>
+
+              </button>
+
             </div>        
 
           </div>
@@ -811,6 +825,14 @@
 
   </div>
 
+  <!-- QR Code Modal -->
+  <QRCodeModal
+    :show="qrModalShow"
+    :address="qrModalAddress"
+    :title="qrModalTitle"
+    @close="closeQRModal"
+  />
+
 </template>
 
 <style scoped lang="scss">
@@ -971,6 +993,7 @@ import { useTacoStore } from '../../stores/taco.store'
 import { getLegacyAccountId } from '../../utils/accountUtils'
 import { useClipboard } from '@vueuse/core'
 import { Tooltip } from 'bootstrap'
+import QRCodeModal from '../misc/QRCodeModal.vue'
 
 interface TokenCardProps {
   token: {
@@ -1147,6 +1170,11 @@ const neuronBalances = ref<Map<string, number>>(new Map())
 const loadingRewards = ref(false)
 const claimingAllRewards = ref(false)
 const claimingNeurons = ref<Set<string>>(new Set())
+
+// QR Modal state
+const qrModalShow = ref(false)
+const qrModalAddress = ref('')
+const qrModalTitle = ref('')
 
 // Load neurons for TACO token
 const loadNeurons = async () => {
@@ -1327,6 +1355,19 @@ const dismissTooltips = () => {
       tooltip.dispose()
     }
   })
+}
+
+// QR Modal methods
+const showQRCode = (address: string, title: string) => {
+  qrModalAddress.value = address
+  qrModalTitle.value = title
+  qrModalShow.value = true
+}
+
+const closeQRModal = () => {
+  qrModalShow.value = false
+  qrModalAddress.value = ''
+  qrModalTitle.value = ''
 }
 
 // Auto-load neurons and rewards on mount for TACO token
