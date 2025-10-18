@@ -1,29 +1,85 @@
 <template>
+
+  <!-- qr code modal -->
   <div v-if="show" class="qr-modal-overlay" @click="closeModal">
-    <div class="qr-modal" @click.stop>
-      <div class="qr-modal__header">
-        <h3>{{ title }}</h3>
-        <button @click="closeModal" class="btn btn-sm taco-btn taco-btn--green">
+
+    <!-- modal dialog -->
+    <div class="modal-dialog" @click.stop>
+
+      <!-- modal header -->
+      <div class="modal-header">
+
+        <!-- modal title -->
+        <h3 class="modal-title">
+          <i class="fa fa-2x fa-qrcode me-3"></i>
+          {{ title }}
+        </h3>
+
+        <!-- close button -->
+        <button @click="closeModal" 
+                type="button" 
+                class="btn qr-btn-close">
           <i class="fa fa-times"></i>
         </button>
+
       </div>
 
-      <div class="qr-modal__content">
+      <!-- modal content -->
+      <div class="modal-body">
+
+        <!-- qr code container -->
         <div class="qr-code-container">
+
+          <!-- qr code canvas -->
           <canvas ref="qrCanvas"></canvas>
+
         </div>
 
+        <!-- address section -->
         <div class="address-section">
-          <div class="address-label">Address:</div>
+
+          <!-- address label -->
+          <div class="address-label">Address</div>
+
+          <!-- address text -->
           <div class="address-text">{{ address }}</div>
-          <button @click="copyAddress" class="btn taco-btn taco-btn--green mt-2">
+
+        </div>
+
+      </div>
+
+      <!-- footer -->
+      <div class="modal-footer">
+
+        <div class="d-flex justify-content-end flex-wrap w-100">
+
+          <!-- cancel button -->
+          <button @click="closeModal" class="btn" style="font-family: 'Space Mono';">
+
+            <!-- icon -->
+            <i class="fa fa-x-mark me-2"></i>
+            
+            <!-- text -->
+            <span style="color: var(--black-to-white);">Cancel</span>
+            
+          </button>              
+
+          <!-- copy address button -->
+          <button @click="copyAddress" class="btn taco-btn taco-btn--green taco-btn--big mt-2">
+
+            <!-- icon -->
             <i class="fa fa-copy me-2"></i>
             Copy Address
-          </button>
+          </button>        
+
         </div>
-      </div>
+        
+      </div>      
+
     </div>
+
   </div>
+
 </template>
 
 <style scoped lang="scss">
@@ -37,70 +93,106 @@
   display: flex;
   justify-content: center;
   align-items: center;
-  z-index: 10000;
+  z-index: 1000;
 }
 
-.qr-modal {
-  background-color: var(--orange-to-dark-brown);
-  border: 2px solid var(--dark-orange-to-dark-brown);
-  border-radius: 1rem;
-  padding: 2rem;
-  max-width: 400px;
+.modal-dialog {
+  background-color: var(--light-orange-to-dark-brown);
+  border: 1px solid var(--dark-orange);
+  border-radius: .5rem;
+  overflow: clip;
+  max-width: 500px;
   width: 90%;
-  max-height: 90%;
+  max-height: 90vh;
   overflow-y: auto;
+  color: #ffffff;
+  pointer-events: auto;
+  position: relative;
+}
 
-  &__header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 1.5rem;
+.modal-header {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  margin: 0;
+  margin-bottom: 0.5rem;
+  padding: 0;
+  border-bottom: 0;
+  margin-bottom: 0.75rem;
+}
 
-    h3 {
-      margin: 0;
-      color: var(--black-to-white);
-      font-family: 'Space Mono', monospace;
-    }
-  }
+.modal-body {
+  padding: 0.5rem 1.5rem 0 !important;
+}
 
-  &__content {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 1.5rem;
+.modal-title {
+  color: var(--black-to-white);
+  display: flex;
+  align-items: center;
+  margin: 1.5rem 0px 0px 1.5rem;
+  line-height: 1;
+  font-family: 'Space Mono';
+  font-size: 1.5rem;
+  font-weight: 600;
+}
+
+.fa-qrcode {
+  color: var(--dark-brown-to-white);
+}
+
+.qr-btn-close {
+  margin: 1rem .5rem 0 0;
+
+  i {
+    font-size: 1.5rem;
+    color: var(--black-to-white);
   }
 }
 
 .qr-code-container {
-  background-color: white;
-  padding: 1rem;
-  border-radius: 0.5rem;
-  border: 1px solid var(--dark-orange-to-dark-brown);
   display: flex;
   justify-content: center;
   align-items: center;
+  overflow: hidden;
+  border-radius: 0.5rem;
+  margin-bottom: 0.75rem;
+
+  canvas {
+    aspect-ratio: 1/1;
+    width: 100% !important;
+    height: 100% !important;
+  }
 }
 
 .address-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   text-align: center;
   width: 100%;
 
   .address-label {
-    font-weight: bold;
-    margin-bottom: 0.5rem;
+    font-family: 'Space Mono';
+    font-size: 1.25rem;
     color: var(--black-to-white);
   }
 
   .address-text {
-    background-color: var(--light-orange-to-dark-brown);
-    padding: 0.75rem;
-    border-radius: 0.25rem;
-    border: 1px solid var(--dark-orange-to-dark-brown);
     word-break: break-all;
     font-family: monospace;
-    font-size: 0.875rem;
+    font-size: 1rem;
     color: var(--black-to-white);
-    margin-bottom: 0.5rem;
+    margin-bottom: 0.25rem;
+    font-family: 'Rubik';
+  }
+
+}
+
+.modal-footer {
+  padding: 0 0.75rem 0.75rem 0.75rem;
+
+  button {
+    width: fit-content;
   }
 }
 </style>
@@ -160,7 +252,7 @@ const generateQRCode = async (text: string, canvas: HTMLCanvasElement) => {
       width: 256,
       margin: 2,
       color: {
-        dark: '#000000',
+        dark: '#512100',
         light: '#FFFFFF'
       },
       errorCorrectionLevel: 'M'
