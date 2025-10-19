@@ -820,6 +820,14 @@ const refreshBalances = async () => {
     // fetch ICRC1 balance of TACO
     await fetchIcrc1BalanceOfTaco()
 
+    // if icp balance is greater than 1
+    if (fetchedIcpBalance.value >= 1) {
+
+      // get quotes
+      await fetchSwapQuotes()
+
+    }
+
   } catch (error) {
 
     // log error
