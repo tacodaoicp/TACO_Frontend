@@ -44,11 +44,11 @@
 
             <p>Just follow the steps and let the wizard do the rest!</p>
 
-            <p v-if="userLoggedIn" class="text-nowrap">⬇️ Get Started Below ⬇️</p>
+            <p v-if="userLoggedIn" class="text-nowrap mb-4 mt-4">⬇️ Get Started Below ⬇️</p>
 
             <p v-if="!userLoggedIn" class="text-nowrap">Log in to get started</p>
 
-            <button v-if="!userLoggedIn" class="btn d-flex align-items-center gap-2 p-0 mt-4 mx-auto" @click="tacoStore.iidLogIn()">
+            <button v-if="!userLoggedIn" class="btn d-flex align-items-center gap-2 p-0 mt-4 mx-auto mb-4" @click="tacoStore.iidLogIn()">
               <DfinityLogo style="width: 2rem;" />
               <span class="taco-text-black-to-white">Log In</span>
             </button>
@@ -406,7 +406,9 @@
           }
           .wizard__top__right {
             text-align: center;
-            padding-bottom: 1rem;
+          }
+          .wizard__bottom {
+            padding: 0rem 1rem 0rem 1rem;
           }
           .wizard__step {
             flex-direction: column;
@@ -470,7 +472,7 @@
       padding: 2rem 2rem 0rem 2rem;
 
       &__right {
-        padding-bottom: 1.5rem;
+        padding-bottom: 0;
       }
 
       p {

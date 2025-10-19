@@ -299,8 +299,7 @@
             <div v-if="localNeuronsCount < 1" class="home-view__tagline__container mt-4">
 
               <!-- wizard tagline -->
-              <span class="home-view__tagline" 
-                    style="font-size: 1.375rem;">
+              <span class="home-view__tagline">
                 Use the <span @click="toggleTacoWizard" class="home-view__tagline__link">🧙Taco Wizard</span> to start voting and earning rewards!
               </span>
 
