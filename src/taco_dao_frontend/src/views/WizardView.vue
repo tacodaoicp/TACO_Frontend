@@ -48,7 +48,7 @@
 
             <p v-if="!userLoggedIn" class="text-nowrap">Log in to get started</p>
 
-            <button v-if="!userLoggedIn" class="btn d-flex align-items-center gap-2 p-0 mt-4" @click="tacoStore.iidLogIn()">
+            <button v-if="!userLoggedIn" class="btn d-flex align-items-center gap-2 p-0 mt-4 mx-auto" @click="tacoStore.iidLogIn()">
               <DfinityLogo style="width: 2rem;" />
               <span class="taco-text-black-to-white">Log In</span>
             </button>

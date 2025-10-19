@@ -787,6 +787,7 @@
   }
 
   &__below-the-fold {
+    z-index: 1;
     position: relative;
     display: flex;
     flex-direction: column;
