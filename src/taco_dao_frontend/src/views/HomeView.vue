@@ -295,8 +295,19 @@
           <!-- bottom -->
           <div class="home-view__above-the-fold__upper__bottom">
 
+            <!-- wizard tagline container -->
+            <div v-if="localNeuronsCount < 1" class="home-view__tagline__container mt-4">
+
+              <!-- wizard tagline -->
+              <span class="home-view__tagline" 
+                    style="font-size: 1.375rem;">
+                Use the <span @click="toggleTacoWizard" class="home-view__tagline__link">🧙Taco Wizard</span> to start voting and earning rewards!
+              </span>
+
+            </div>
+
             <!-- tagline container -->
-            <div class="home-view__tagline__container">
+            <div class="home-view__tagline__container mt-3">
 
               <!-- tagline line 1 -->
               <span class="home-view__tagline">
@@ -906,7 +917,12 @@
       align-items: center;
       justify-content: center;
       line-height: 1.375;
-      margin-top: 2rem;
+    }
+
+    &__link {
+      color: var(--blue-to-light-blue);
+      text-decoration: underline;
+      cursor: pointer;
     }
 
   }
@@ -2014,9 +2030,17 @@
   const tacoStore = useTacoStore()
 
   // # ACTIONS #
-  
+
+  // wizard
+  const { toggleTacoWizard } = tacoStore
+
+  // user
+  const { checkIfLoggedIn } = tacoStore
 
   // # STATE #
+
+  // user
+  const { userLoggedIn } = storeToRefs(tacoStore)
 
   // dao
   const { totalPortfolioValueInUsd, totalTreasuryValueInUsd, snsTreasuryTacoValueInUsd, snsTreasuryIcpValueInUsd, snsTreasuryDkpValueInUsd } = storeToRefs(tacoStore)  
@@ -2055,6 +2079,9 @@
   const kongSwapLogo = KongSwapLogo
   const icpSwapLogo = IcpSwapLogo
   const icpSwapText = IcpSwapText
+
+  // neurons count
+  const localNeuronsCount = ref(0)
 
   //////////////
   // Computed //
@@ -2209,6 +2236,21 @@
     // log
     // console.log('homepage mounted')
 
+
+    // check if user is logged in
+    await checkIfLoggedIn()    
+
+    // if user is logged in, get neurons count
+    if (userLoggedIn.value) {
+
+      const rawNeurons = await tacoStore.getTacoNeurons()
+      const neuronsCount = rawNeurons.length
+
+      // set neurons count
+      localNeuronsCount.value = neuronsCount
+
+    }      
+
     // get the below the fold element
     const belowTheFold = document.querySelector('.home-view__below-the-fold')
 
@@ -2253,7 +2295,7 @@
         shouldLoadDex.value = true
         shouldLoadYouTube.value = true
       }, 1000)
-    }
+    }  
     
   })
 

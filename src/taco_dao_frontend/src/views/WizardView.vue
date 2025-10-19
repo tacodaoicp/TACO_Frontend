@@ -57,13 +57,6 @@
 
         </div>
 
-        stakingComplete: {{  stakingComplete }}<br></br>
-        <!-- currentStep: {{  currentStep }}<br></br> -->
-        userNeurons.length: {{  userNeurons.length }}<br></br>
-        fetchedIcpBalance: {{ fetchedIcpBalance }}<br></br>
-        fetchedTacoBalance: {{ fetchedTacoBalance }}<br></br>
-        userPrincipal: {{ userPrincipal }}<br></br>
-
         <!-- bottom - steps -->
         <div v-if="userLoggedIn && !loading" class="wizard__bottom">
 
@@ -91,15 +84,35 @@
 
                 <p class="mb-0">Deposit at least <span class="fw-bold">1</span> ICP to get started</p>
 
-                <p class="mb-4">Your current ICP balance is <span class="fw-bold">{{ fetchedIcpBalance.toFixed(8) }}</span></p>
+                <p class="mb-4">Your current ICP balance is <span class="fw-bold">{{ Number(fetchedIcpBalance).toFixed(2).toString() }}</span></p>
 
                 <p class="mb-4">You can buy ICP on exchanges like <a class="wizard__step__link" href="https://www.coinbase.com" target="_blank">Coinbase</a>, <a class="wizard__step__link" href="https://www.binance.com" target="_blank">Binance</a>, or <a class="wizard__step__link" href="https://www.kraken.com" target="_blank">Kraken</a></p>   
 
                 <p class="mb-0">Send some to this address:</p>
 
-                <p class="mb-3"><span class="wizard__step__link"><span style="word-break: break-all;">{{ userPrincipal }}</span> <i class="fa-regular fa-copy"></i></span></p>
+                <p class="mb-3">
 
-                <button class="btn taco-btn taco-btn--green taco-btn--big d-inline-block mb-3" @click="fetchIcrc1BalanceOfIcp(); fetchIcrc1BalanceOfTaco()">Then Refresh</button>
+                  <span class="wizard__step__link">
+                    <span style="word-break: break-all;">
+                      {{ userPrincipal }}
+                    </span>
+                  </span>
+                  
+                  <button @click="copy(userPrincipal); tacoStore.addToast({ id: Date.now(), code: 'copy-success', title: 'Copied!', icon: 'fa-solid fa-check', message: 'Address copied to clipboard' })"
+                          style="color: var(--brown-to-white);"
+                          class="btn m-0 p-0 px-2">
+
+                    <i class="fa-regular fa-copy"></i>
+
+                  </button>
+
+                </p>
+
+                <button :disabled="refreshingBalances"
+                        class="btn taco-btn taco-btn--green taco-btn--big d-inline-block mb-3" 
+                        @click="refreshBalances()">
+                  {{ refreshingBalances ? 'Refreshing...' : 'Then Refresh' }}
+                </button>
 
               </div>
 
@@ -118,7 +131,7 @@
                     <i class="fa-solid fa-check"></i>
                   </span>
                   <span class="wizard__step__circle__text">Deposit</span>
-                  <span class="wizard__step__circle__text">ICP</span>
+                  <span class="wizard__step__circle__text">Tokens</span>
                 </div>
 
               </div>
@@ -160,7 +173,7 @@
                 <!-- your taco balance -->
                 <p v-if="fetchedIcpBalance > 0 && fetchedIcpBalance < 1"
                    class="mb-3">
-                   You have {{ fetchedIcpBalance.toFixed(8) }} ICP
+                   You have {{ Number(fetchedIcpBalance).toFixed(2).toString() }} ICP
                 </p>
 
                 <!-- first sentence -->
@@ -168,23 +181,23 @@
                      class="d-flex align-items-baseline mb-0">
 
                   <!-- swap text -->
-                  <span>Swap your {{ fetchedIcpBalance }} ICP for TACO via {{ bestExchange }}</span>
+                  <span class="taco-text-black-to-white">Swap your {{ Number(fetchedIcpBalance).toFixed(2).toString() }} ICP for TACO via {{ bestExchange }}</span>
 
                 </div>
                 
                 <!-- second sentence -->
                 <p v-if="fetchedIcpBalance >= 1" 
-                   class="wizard-custom-spacing-1" 
-                   style="margin-bottom: 2rem;">
+                   class="mb-3">
                   
                   <!-- text -->
-                  <span>You'll get <span class="fw-bold">{{ swapOutputAmount }} TACO</span> for your <span class="fw-bold">{{ fetchedIcpBalance }} ICP</span></span>
+                  <span>You'll get <span class="fw-bold">{{ Number(swapOutputAmount).toFixed(2).toString() }} TACO</span> for your <span class="fw-bold">{{ Number(fetchedIcpBalance).toFixed(2).toString() }} ICP</span></span>
 
                 </p>
 
-                <button :disabled="fetchedIcpBalance < 1"
+                <button @click="performSwap"
+                        :disabled="fetchedIcpBalance < 1 || Number(swapOutputAmount) < 1 || isSwapping"
                         class="wizard-custom-spacing-2 btn taco-btn taco-btn--green taco-btn--big">
-                  Swap Tokens
+                  {{ isSwapping ? 'Swapping...' : 'Swap Tokens' }}
                 </button>
 
               </div>
@@ -203,8 +216,8 @@
                   <span class="wizard__step__circle__number">
                     <i class="fa-solid fa-check"></i>
                   </span>
-                  <span class="wizard__step__circle__text">Swap</span>
-                  <span class="wizard__step__circle__text">Tokens</span>
+                  <span class="wizard__step__circle__text">Get</span>
+                  <span class="wizard__step__circle__text">TACO</span>
                 </div>
 
               </div>
@@ -229,7 +242,7 @@
                 <div class="wizard__step__circle">
                   <span class="wizard__step__circle__number">3</span>
                   <span class="wizard__step__circle__text">Stake</span>
-                  <span class="wizard__step__circle__text">Tokens</span>
+                  <span class="wizard__step__circle__text">TACO</span>
                 </div>
 
               </div>
@@ -246,12 +259,12 @@
                 <!-- your taco balance -->
                 <p v-if="fetchedTacoBalance > 0 && fetchedTacoBalance < 1"
                    class="mb-3">
-                   You have {{ fetchedTacoBalance.toFixed(8) }} TACO
+                   You have {{ Number(fetchedTacoBalance).toFixed(2).toString() }} TACO
                 </p>
 
                 <p v-if="fetchedTacoBalance >= 1"
                    class="mb-0">
-                   Stake your {{ fetchedTacoBalance }} TACO in a Neuron
+                   Stake your {{ Number(fetchedTacoBalance).toFixed(2).toString() }} TACO in a Neuron
                 </p>
 
                 <p v-if="fetchedTacoBalance >= 1"
@@ -260,9 +273,10 @@
                   We'll stake it for 30 days
                 </p>
 
-                <button :disabled="fetchedTacoBalance < 1"
-                        class="wizard-custom-spacing-2 btn taco-btn taco-btn--green taco-btn--big">
-                  Stake Tokens
+                <button @click="performStake"
+                        :disabled="fetchedTacoBalance < 1 || isStaking"
+                        class="btn taco-btn taco-btn--green taco-btn--big">
+                  {{ isStaking ? 'Staking...' : 'Stake Tokens' }}
                 </button>
 
               </div>
@@ -282,7 +296,7 @@
                     <i class="fa-solid fa-check"></i>
                   </span>
                   <span class="wizard__step__circle__text">Stake</span>
-                  <span class="wizard__step__circle__text">Tokens</span>
+                  <span class="wizard__step__circle__text">TACO</span>
                 </div>
 
               </div>
@@ -292,7 +306,7 @@
 
                 <p class="mb-3">Presto! You've got a Taco Neuron</p>
 
-                <p class="mb-2">You can now <router-link to="/vote" class="btn taco-btn taco-btn--green taco-btn--big d-inline-block">vote</router-link> on DAO allocations and earn rewards!</p>
+                <p class="mb-2">You can now <router-link @click="toggleTacoWizard" to="/vote" class="btn taco-btn taco-btn--green taco-btn--big d-inline-block">vote</router-link> on DAO allocations and earn rewards!</p>
 
                 <p class="mb-3" style="font-size: 1rem;">Rewards are distributed ever Tuesday. Use the <router-link to="/wallet" class="wallet-link" style="color: var(--blue-to-light-blue)">wallet</router-link> to manage your funds, nuerons, and rewards</p>
 
@@ -311,7 +325,7 @@
           <div class="wizard__loading__content">
 
             <!-- loading text -->
-            <span class="taco-text-black-to-white d-block text-center p-5"><i class="fa fa-spinner fa-spin"></i> Loading...</span>
+            <span class="taco-text-black-to-white d-block text-center p-5" style="font-size: 1.25rem;"><span style="font-size: 2rem;">🧙</span> Summoning Steps...</span>
 
           </div>
 
@@ -631,45 +645,23 @@
 // Imports //
 /////////////
 
-import { ref, computed, onMounted, watch, onBeforeUnmount } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { Principal } from '@dfinity/principal'
 import { useTacoStore } from '../stores/taco.store'
 import { useKongStore } from '../stores/kong.store'
 import { useICPSwapStore } from '../stores/icpswap.store'
 import { storeToRefs } from 'pinia'
-import { getLegacyAccountId } from '../utils/accountUtils'
 import { useClipboard } from '@vueuse/core'
-import { tokenImages } from '../components/data/TokenData'
-import SwapDialog from '../components/wallet/SwapDialog.vue'
-import SwapConfirmDialog from '../components/wallet/SwapConfirmDialog.vue'
-import StakeToNeuronDialog from '../components/wallet/StakeToNeuronDialog.vue'
-import CreateNeuronDialog from '../components/wallet/CreateNeuronDialog.vue'
-import SwapStakeProgressDialog from '../components/wallet/SwapStakeProgressDialog.vue'
 import ChefWizard from '../components/misc/chefWizard.vue'
 import DfinityLogo from '../assets/images/dfinityLogo.vue'
 
 ///////////
 // Setup //
 ///////////
+
 const router = useRouter()
 const { copy } = useClipboard()
-
-////////////////
-// Interfaces //
-////////////////
-
-interface WalletToken {
-  principal: string
-  name: string
-  symbol: string
-  logo: string
-  balance: bigint
-  decimals: number
-  fee: bigint
-  priceUSD?: number
-  isRegistered?: boolean
-}
 
 ////////////
 // Stores //
@@ -681,289 +673,50 @@ const kongStore = useKongStore()
 const icpswapStore = useICPSwapStore()
 
 // # STATE #
-const { tacoWizardOpen, userLoggedIn, userPrincipal } = storeToRefs(tacoStore)
+const { userLoggedIn } = storeToRefs(tacoStore)
+const { userPrincipal } = storeToRefs(tacoStore)
 
 // # ACTIONS #
 const { toggleTacoWizard } = tacoStore
-const { ensureTokenDetails } = tacoStore
-const { getUserNeurons } = tacoStore
-
-
-
-const loading = ref(true)
-// const currentStep = ref(1)
-const expandedSteps = ref<Set<number>>(new Set([1]))
-const selectedGetTokenSymbol = ref('ICP')
-const selectedSwapFromToken = ref('')
-const userChangedStep2Selection = ref(false) // Track if user manually changed step 2
-const isSwapping = ref(false)
-const isStaking = ref(false)
-const isSwapAndStake = ref(false) // Flag to track if we're doing swap & stake
-const stakingComplete = ref(false)
-const loadingQuotes = ref(false)
-const bestQuote = ref<any>(null)
-const bestExchange = ref<string>('')
-const newTokenPrincipal = ref('')
-const registeringToken = ref(false)
-const refreshingBalance = ref(false)
-const showRegisterToken = ref(false)
-
-// Token data
-const allTokenBalances = ref<Map<string, bigint>>(new Map())
-const userRegisteredTokenPrincipals = ref<string[]>([])
-const customTokenMetadata = ref<Map<string, any>>(new Map())
-const userNeurons = ref<any[]>([])
-
-// Dialog states
-const showSwapDialog = ref(false)
-const showSwapConfirmDialog = ref(false)
-const showStakeDialog = ref(false)
-const showCreateDialog = ref(false)
-const showProgressDialog = ref(false)
-const selectedNeuron = ref<any | null>(null)
-const progressDialog = ref<any>(null)
-const preselectedSwapToken = ref<WalletToken | null>(null)
-const swapConfirmData = ref<any | null>(null)
-
-// dropdown state
-const isTokenDropdownOpen = ref(false)
-const tokenDropdownRef = ref<HTMLElement | null>(null)
-const isSwapDropdownOpen = ref(false)
-const swapDropdownRef = ref<HTMLElement | null>(null)
-
-const closeTokenDropdownOnClickOutside = (e: MouseEvent) => {
-  const target = e.target as Node
-  if (isTokenDropdownOpen.value && tokenDropdownRef.value && !tokenDropdownRef.value.contains(target)) {
-    isTokenDropdownOpen.value = false
-  }
-  if (isSwapDropdownOpen.value && swapDropdownRef.value && !swapDropdownRef.value.contains(target)) {
-    isSwapDropdownOpen.value = false
-  }
-}
-
-const selectToken = (symbol: string) => {
-  selectedGetTokenSymbol.value = symbol
-  isTokenDropdownOpen.value = false
-}
-
-const selectSwapToken = (principal: string) => {
-  selectedSwapFromToken.value = principal
-  isSwapDropdownOpen.value = false
-  onStep2DropdownChange()
-}
 
 /////////////////////
 // Local Variables //
 /////////////////////
 
-// fetched ICRC1 balance of ICP
+const loading = ref(true)
+const loadingQuotes = ref(false)
+const bestQuote = ref<any>(null)
+const bestExchange = ref<string>('')
+const isSwapping = ref(false)
+const isStaking = ref(false)
+const userNeurons = ref<any[]>([])
 const fetchedIcpBalance = ref<bigint>(0n)
-
-// fetched ICRC1 balance of TACO
+const fetchedIcpRawBalance = ref<bigint>(0n)
+const refreshingBalances = ref(false)
 const fetchedTacoBalance = ref<bigint>(0n)
+const fetchedTacoRawBalance = ref<bigint>(0n)
 
-/////////////////////////
-// Computed Properties //
-/////////////////////////
+////////////////////////
+// Computed Variables //
+////////////////////////
 
-const icpAccountId = computed(() => {
-  if (tacoStore.userLoggedIn && tacoStore.userPrincipal) {
-    return getLegacyAccountId(tacoStore.userPrincipal)
-  }
-  return { hex: '', dashed: '' }
-})
-
-const coreTokens = computed<WalletToken[]>(() => {
-  const tokens: WalletToken[] = []
-  
-  // ICP Token
-  const icpPrincipal = 'ryjl3-tyaaa-aaaaa-aaaba-cai'
-  tokens.push({
-    principal: icpPrincipal,
-    name: 'Internet Computer',
-    symbol: 'ICP',
-    logo: tokenImages['Internet Computer'] || tokenImages['Default'],
-    balance: allTokenBalances.value.get(icpPrincipal) || 0n,
-    decimals: 8,
-    fee: 10000n,
-    priceUSD: tacoStore.icpPriceUsd || 0,
-    isRegistered: false
-  })
-
-  // TACO Token
-  const tacoPrincipal = 'kknbx-zyaaa-aaaaq-aae4a-cai'
-  tokens.push({
-    principal: tacoPrincipal,
-    name: 'TACO DAO Token',
-    symbol: 'TACO',
-    logo: tokenImages['TACO'] || tokenImages['Default'],
-    balance: allTokenBalances.value.get(tacoPrincipal) || 0n,
-    decimals: 8,
-    fee: 10000n,
-    priceUSD: tacoStore.tacoPriceUsd || 0,
-    isRegistered: false
-  })
-
-  return tokens
-})
-
-const trustedTokens = computed<WalletToken[]>(() => {
-  const coreTokenPrincipals = new Set(coreTokens.value.map(t => t.principal))
-  const userRegisteredPrincipals = new Set(userRegisteredTokenPrincipals.value)
-  
-  return tacoStore.fetchedTokenDetails
-    .filter((entry) => {
-      const principal = entry[0]
-      const details = entry[1]
-      return !coreTokenPrincipals.has(principal.toString()) && 
-             !userRegisteredPrincipals.has(principal.toString()) &&
-             details.Active && 
-             !details.isPaused
-    })
-    .map((entry) => {
-      const principal = entry[0]
-      const details = entry[1]
-      const principalStr = principal.toString()
-      
-      const freshMetadata = customTokenMetadata.value.get(principalStr)
-      
-      if (freshMetadata) {
-        return {
-          principal: principalStr,
-          name: freshMetadata.name,
-          symbol: freshMetadata.symbol,
-          logo: freshMetadata.logo || tokenImages[freshMetadata.name] || tokenImages['Default'],
-          balance: allTokenBalances.value.get(principalStr) || 0n,
-          decimals: freshMetadata.decimals,
-          fee: freshMetadata.fee,
-          priceUSD: parseFloat(details.priceInUSD) || 0,
-          isRegistered: false
-        }
-      } else {
-        return {
-          principal: principalStr,
-          name: details.tokenName,
-          symbol: details.tokenSymbol,
-          logo: tokenImages[details.tokenName] || tokenImages['Default'],
-          balance: allTokenBalances.value.get(principalStr) || 0n,
-          decimals: Number(details.tokenDecimals),
-          fee: details.tokenTransferFee,
-          priceUSD: parseFloat(details.priceInUSD) || 0,
-          isRegistered: false
-        }
-      }
-    })
-})
-
-const userRegisteredTokens = computed<WalletToken[]>(() => {
-  const tokenDetailsMap = new Map(tacoStore.fetchedTokenDetails.map((entry) => [entry[0].toString(), entry[1]]))
-  
-  return userRegisteredTokenPrincipals.value
-    .map(principal => {
-      const details = tokenDetailsMap.get(principal)
-      
-      if (details) {
-        return {
-          principal,
-          name: details.tokenName,
-          symbol: details.tokenSymbol,
-          logo: tokenImages[details.tokenName] || tokenImages['Default'],
-          balance: allTokenBalances.value.get(principal) || 0n,
-          decimals: Number(details.tokenDecimals),
-          fee: details.tokenTransferFee,
-          priceUSD: parseFloat(details.priceInUSD) || 0,
-          isRegistered: true
-        }
-      }
-      
-      const metadata = customTokenMetadata.value.get(principal)
-      return {
-        principal,
-        name: metadata?.name || `Custom Token (${principal.slice(0, 5)}...)`,
-        symbol: metadata?.symbol || 'UNKNOWN',
-        logo: metadata?.logo || tokenImages['Default'],
-        balance: allTokenBalances.value.get(principal) || 0n,
-        decimals: metadata?.decimals || 8,
-        fee: metadata?.fee || 10000n,
-        priceUSD: 0,
-        isRegistered: true
-      }
-    })
-})
-
-const allTokens = computed<WalletToken[]>(() => {
-  return [
-    ...coreTokens.value,
-    ...trustedTokens.value,
-    ...userRegisteredTokens.value
-  ]
-})
-
-const tacoToken = computed(() => {
-  return coreTokens.value.find(t => t.symbol === 'TACO') || coreTokens.value[1]
-})
-
-const availableTokensForDeposit = computed(() => {
-  return trustedTokens.value.concat(userRegisteredTokens.value)
-    .filter(t => t.symbol !== 'TACO')
-})
-
-const hasAnyTokens = computed(() => {
-  return allTokens.value.some(token => token.balance > 0n)
-})
-
-const hasSwappableTokens = computed(() => {
-  return allTokens.value.some(token => token.symbol !== 'TACO' && token.balance > token.fee)
-})
-
-const hasTacoTokens = computed(() => {
-  return tacoToken.value.balance > 0n
-})
-
-const swappableTokens = computed(() => {
-  return allTokens.value.filter(token => token.symbol !== 'TACO' && token.balance > token.fee)
-})
-
-const canSwap = computed(() => {
-  if (!selectedSwapFromToken.value) return false
-  
-  const token = getTokenByPrincipal(selectedSwapFromToken.value)
-  if (!token) return false
-  
-  return token.balance > token.fee
-})
-
-const maxTacoAmount = computed(() => {
-  const maxAmount = Number(tacoToken.value.balance - tacoToken.value.fee) / (10 ** tacoToken.value.decimals)
-  return maxAmount.toString()
-})
-
-const selectedSwapToken = computed(() => {
-  return getTokenByPrincipal(selectedSwapFromToken.value)
-})
-
-const swapInputAmount = computed(() => {
-  const token = selectedSwapToken.value
-  if (!token) return '0'
-  
-  // Use available balance minus fees - reserve extra fee for ICPSwap operations
-  const extraFeeReserve = token.fee // Reserve one additional fee for ICPSwap operations
-  const availableAmountBigInt = token.balance - token.fee - extraFeeReserve
-  const availableAmount = Number(availableAmountBigInt) / (10 ** token.decimals)
-  return availableAmount.toFixed(8)
-})
-
+// swap output amount
 const swapOutputAmount = computed(() => {
+
+  // if no best quote, return 0
   if (!bestQuote.value) return '0'
   
-  // Convert from BigInt to decimal
+  // convert from BigInt to decimal
   const outputAmount = Number(bestQuote.value.amountOut) / 1e8 // TACO has 8 decimals
+
+  // return output amount as a string with 8 decimal places
   return outputAmount.toFixed(8)
+
 })
 
-
-
-// Methods
+///////////////////
+// Local Methods //
+///////////////////
 
 // fetch ICRC1 balance of ICP
 const fetchIcrc1BalanceOfIcp = async () => {
@@ -974,17 +727,20 @@ const fetchIcrc1BalanceOfIcp = async () => {
     // fetch ICRC1 balance of ICP
     const balance = await tacoStore.icrc1BalanceOf('ryjl3-tyaaa-aaaaa-aaaba-cai', Principal.fromText(tacoStore.userPrincipal))
 
-    // log
-    console.log('icp balance:', balance)
+    // // log
+    // console.log('icp balance:', balance)
 
     // account for 8 zero decimals
     const balanceWithDecimals = Number(balance as bigint) / 10 ** 8
 
-    // log
-    console.log('icp balanceWithDecimals:', balanceWithDecimals)
+    // // log
+    // console.log('icp balanceWithDecimals:', balanceWithDecimals)
 
     // set fetched ICP balance
     fetchedIcpBalance.value = balanceWithDecimals
+
+    // set fetched ICP raw balance
+    fetchedIcpRawBalance.value = balance as bigint
 
     // // log
     // console.log('fetchedIcpBalance:', fetchedIcpBalance.value)
@@ -1003,192 +759,87 @@ const fetchIcrc1BalanceOfIcp = async () => {
   }
   
 }
+
+// fetch ICRC1 balance of TACO
 const fetchIcrc1BalanceOfTaco = async () => {
 
   // // log
   // console.log('fetching taco balance...')
 
-// try
-try {
-
-  // fetch ICRC1 balance of TACO
-  const balance = await tacoStore.icrc1BalanceOf('kknbx-zyaaa-aaaaq-aae4a-cai', Principal.fromText(tacoStore.userPrincipal))
-
-  // // log
-  // console.log('taco balance:', balance)
-
-  // account for 8 zero decimals
-  const balanceWithDecimals = Number(balance as bigint) / 10 ** 8
-
-  // // log
-  // console.log('taco balanceWithDecimals:', balanceWithDecimals)
-
-  // set fetched TACO balance
-  fetchedTacoBalance.value = balanceWithDecimals
-
-  // // log
-  // console.log('fetchedTacoBalance:', fetchedTacoBalance.value)
-
-} 
-
-// catch
-catch (error) {
-
-  // log error
-  console.error('Error fetching ICRC1 balance of ICP:', error)
-
-  // set fetched ICP balance to 0
-  fetchedIcpBalance.value = 0n
-
-}
-
-}
-
-const loadWalletData = async () => {
+  // try
   try {
-    loading.value = true
-    
-    // await Promise.all([
-    //   tacoStore.fetchTokenDetails(),
-    //   fetchUserRegisteredTokens(),
-    //   loadUserNeurons()
-    // ])
 
-    await ensureTokenDetails()
+    // fetch ICRC1 balance of TACO
+    const balance = await tacoStore.icrc1BalanceOf('kknbx-zyaaa-aaaaq-aae4a-cai', Principal.fromText(tacoStore.userPrincipal))
 
-    await fetchUserRegisteredTokens()
-    await loadUserNeurons()  
-    await loadTrustedTokenMetadata()
-    await loadAllBalances()
-    
-    // Determine starting step based on wallet state
-    determineStartingStep()
-    
+    // // log
+    // console.log('taco balance:', balance)
+
+    // account for 8 zero decimals
+    const balanceWithDecimals = Number(balance as bigint) / 10 ** 8
+
+    // // log
+    // console.log('taco balanceWithDecimals:', balanceWithDecimals)
+
+    // set fetched TACO balance
+    fetchedTacoBalance.value = balanceWithDecimals
+
+    // set fetched TACO raw balance
+    fetchedTacoRawBalance.value = balance as bigint
+
+    // // log
+    // console.log('fetchedTacoBalance:', fetchedTacoBalance.value)
+
+  } 
+
+  // catch
+  catch (error) {
+
+    // log error
+    console.error('Error fetching ICRC1 balance of ICP:', error)
+
+    // set fetched ICP balance to 0
+    fetchedIcpBalance.value = 0n
+
+  }
+
+}
+
+// refresh balances
+const refreshBalances = async () => {
+
+  // try
+  try {
+
+    // turn refreshing balances on
+    refreshingBalances.value = true
+
+    // fetch ICRC1 balance of ICP
+    await fetchIcrc1BalanceOfIcp()
+
+    // fetch ICRC1 balance of TACO
+    await fetchIcrc1BalanceOfTaco()
+
   } catch (error) {
-    console.error('Error loading wallet data:', error)
-    tacoStore.addToast({
-      id: Date.now(),
-      code: 'wallet-error',
-      title: 'Error',
-      icon: 'fa-solid fa-exclamation-triangle',
-      message: 'Failed to load wallet data'
-    })
+
+    // log error
+    console.error('Error refreshing balances:', error)
+
   } finally {
-    loading.value = false
-  }
-}
 
-const refreshTokenBalance = async () => {
-  refreshingBalance.value = true
-  
-  try {
-    // Reload wallet data to refresh all balances
-    await loadWalletData()
-    
-    // Show success toast
-    tacoStore.addToast({
-      id: Date.now(),
-      code: 'balance-refreshed',
-      title: 'Balance Updated',
-      icon: 'fa-solid fa-refresh',
-      message: `${selectedGetTokenSymbol.value} balance refreshed successfully`
-    })
-    
-  } catch (error: any) {
-    console.error('Error refreshing balance:', error)
-    tacoStore.addToast({
-      id: Date.now(),
-      code: 'refresh-error',
-      title: 'Refresh Failed',
-      icon: 'fa-solid fa-exclamation-triangle',
-      message: 'Failed to refresh balance. Please try again.'
-    })
-  } finally {
-    refreshingBalance.value = false
-  }
-}
+    // turn refreshing balances off
+    refreshingBalances.value = false
 
-const fetchUserRegisteredTokens = async () => {
-  try {
-    const registeredTokens = await tacoStore.getUserRegisteredTokens()
-    userRegisteredTokenPrincipals.value = registeredTokens.map(p => p.toString())
-    await loadCustomTokenMetadata()
-  } catch (error) {
-    console.error('Error fetching user registered tokens:', error)
-    userRegisteredTokenPrincipals.value = []
-  }
-}
-
-const loadCustomTokenMetadata = async () => {
-  const tokenDetailsMap = new Map(tacoStore.fetchedTokenDetails.map((entry) => [entry[0].toString(), entry[1]]))
-  
-  for (const principal of userRegisteredTokenPrincipals.value) {
-    if (!tokenDetailsMap.has(principal)) {
-      try {
-        tacoStore.clearTokenMetadataCache(principal)
-        const metadata = await tacoStore.fetchTokenMetadata(principal)
-        customTokenMetadata.value.set(principal, metadata)
-      } catch (error) {
-        console.error(`Error loading metadata for token ${principal}:`, error)
-        const defaultMetadata = {
-          name: `Custom Token (${principal.slice(0, 5)}...)`,
-          symbol: 'UNKNOWN',
-          decimals: 8,
-          fee: 10000n,
-          logo: null
-        }
-        customTokenMetadata.value.set(principal, defaultMetadata)
-      }
+    // if more than 1 icp, get quotes
+    if (fetchedIcpBalance.value > 1) {
+      await fetchSwapQuotes()
     }
+
   }
+
 }
 
-const loadTrustedTokenMetadata = async () => {
-  const trustedTokenPrincipals = tacoStore.fetchedTokenDetails
-    .filter((entry) => {
-      const principal = entry[0]
-      const details = entry[1]
-      const coreTokenPrincipals = new Set(['ryjl3-tyaaa-aaaaa-aaaba-cai', 'kknbx-zyaaa-aaaaq-aae4a-cai'])
-      const userRegisteredPrincipals = new Set(userRegisteredTokenPrincipals.value)
-      
-      return !coreTokenPrincipals.has(principal.toString()) && 
-             !userRegisteredPrincipals.has(principal.toString()) &&
-             details.Active && 
-             !details.isPaused
-    })
-    .map(entry => entry[0].toString())
-  
-  for (const principal of trustedTokenPrincipals) {
-    try {
-      tacoStore.clearTokenMetadataCache(principal)
-      const metadata = await tacoStore.fetchTokenMetadata(principal)
-      customTokenMetadata.value.set(principal, metadata)
-    } catch (error) {
-      console.error(`Error loading metadata for trusted token ${principal}:`, error)
-    }
-  }
-}
-
-const loadAllBalances = async () => {
-  const allTokens = [
-    ...coreTokens.value,
-    ...trustedTokens.value,
-    ...userRegisteredTokens.value
-  ]
-  
-  const balancePromises = allTokens.map(async (token) => {
-    try {
-      const balance = await tacoStore.fetchUserTokenBalance(token.principal, token.decimals)
-      allTokenBalances.value.set(token.principal, balance)
-    } catch (error) {
-      console.error(`Error fetching balance for ${token.symbol}:`, error)
-      allTokenBalances.value.set(token.principal, 0n)
-    }
-  })
-  
-  await Promise.all(balancePromises)
-}
-
+// load user neurons
 const loadUserNeurons = async () => {
   try {
     const rawNeurons = await tacoStore.getTacoNeurons()
@@ -1201,33 +852,33 @@ const loadUserNeurons = async () => {
   }
 }
 
+// fetch swap quotes
 const fetchSwapQuotes = async () => {
-  const token = selectedSwapToken.value
-  if (!token || !tacoToken.value) return
-  
-  const inputAmountBigInt = token.balance - token.fee
-  if (inputAmountBigInt <= 0n) return
-  
+
+  // // log
+  // console.log('get quotes from both exchanges...')
+
   loadingQuotes.value = true
   bestQuote.value = null
   bestExchange.value = ''
   
   try {
-    // Get quotes from both exchanges
+
+    // get quotes from both exchanges
     const [kongQuote, icpSwapQuote] = await Promise.allSettled([
       kongStore.getQuote({
-        sellTokenSymbol: token.symbol,
+        sellTokenSymbol: 'ICP',
         buyTokenSymbol: 'TACO',
-        amountIn: inputAmountBigInt
+        amountIn: fetchedIcpRawBalance.value
       }),
       icpswapStore.getQuote({
-        sellTokenPrincipal: token.principal,
-        buyTokenPrincipal: tacoToken.value.principal,
-        amountIn: inputAmountBigInt
+        sellTokenPrincipal: 'ryjl3-tyaaa-aaaaa-aaaba-cai',
+        buyTokenPrincipal: 'kknbx-zyaaa-aaaaq-aae4a-cai',
+        amountIn: fetchedIcpRawBalance.value
       })
     ])
     
-    // Process quotes and find the best one
+    // process quotes and find the best one
     const quotes = []
     
     if (kongQuote.status === 'fulfilled' && kongQuote.value) {
@@ -1253,10 +904,23 @@ const fetchSwapQuotes = async () => {
     }
     
     if (quotes.length > 0) {
-      // Sort by amount out (highest first) and pick the best
+
+      // sort by amount out (highest first) and pick the best
       const sortedQuotes = quotes.sort((a, b) => Number(b.amountOut) - Number(a.amountOut))
       bestQuote.value = sortedQuotes[0]
       bestExchange.value = sortedQuotes[0].exchange
+
+      // log
+      // console.log('sortedQuotes:', sortedQuotes)
+      // console.log('bestQuote', bestQuote.value)
+      // console.log('bestExchange:', bestExchange.value)
+      // console.log('found a best quote on wizard load')
+
+    } else {
+
+      // // log
+      // console.log('no quotes available')
+
     }
     
   } catch (error) {
@@ -1266,181 +930,45 @@ const fetchSwapQuotes = async () => {
   }
 }
 
-const syncSwapTokenSelection = () => {
-  if (allTokens.value.length === 0) return
-  
-  // Don't sync if user has manually changed step 2 selection
-  if (userChangedStep2Selection.value) return
-  
-  // Try to use the token selected in step 1
-  const selectedGetToken = allTokens.value.find(t => t.symbol === selectedGetTokenSymbol.value)
-  
-  if (selectedGetToken && selectedGetToken.symbol !== 'TACO' && selectedGetToken.balance > selectedGetToken.fee) {
-    selectedSwapFromToken.value = selectedGetToken.principal
-    return
-  }
-  
-  // If step 1 selection isn't swappable, don't change step 2 selection
-}
-
-const initializeTokenSelections = () => {
-  // // Set both dropdowns to ICP by default
-  // selectedGetTokenSymbol.value = 'ICP'
-  
-  // // Find ICP token and set step 2 dropdown
-  // const icpToken = allTokens.value.find(t => t.symbol === 'ICP')
-  // if (icpToken) {
-  //   selectedSwapFromToken.value = icpToken.principal
-  //   // Fetch quotes for initial selection
-  //   setTimeout(() => fetchSwapQuotes(), 100)
-  // }
-  
-  // // Reset the manual change flag
-  // userChangedStep2Selection.value = false
-}
-
-const onStep2DropdownChange = () => {
-  // User manually changed step 2 dropdown
-  userChangedStep2Selection.value = true
-}
-
-// const determineStartingStep = () => {
-//   const minimumSwapThreshold = 100000000n // 1 ICP equivalent threshold
-  
-//   // If user has TACO, go to staking step
-//   if (hasTacoTokens.value) {
-//     currentStep.value = 3
-//     expandedSteps.value = new Set([3])
-//     return
-//   }
-  
-//   // If user has swappable tokens above threshold, go to swap step
-//   if (hasSwappableTokens.value) {
-//     const hasSignificantTokens = swappableTokens.value.some(token => 
-//       token.balance > minimumSwapThreshold || 
-//       (token.priceUSD && token.priceUSD > 0 && 
-//        (Number(token.balance) / (10 ** token.decimals)) * token.priceUSD >= 1)
-//     )
-    
-//     if (hasSignificantTokens) {
-//       currentStep.value = 2
-//       expandedSteps.value = new Set([2])
-//       return
-//     }
-//   }
-  
-//   // Otherwise start with getting tokens
-//   currentStep.value = 1
-//   expandedSteps.value = new Set([1])
-// }
-
-// const toggleStep = (step: number) => {
-//   if (expandedSteps.value.has(step)) {
-//     expandedSteps.value.delete(step)
-//   } else {
-//     expandedSteps.value.add(step)
-//   }
-// }
-
-// const goToStep = (step: number) => {
-//   currentStep.value = step
-//   expandedSteps.value = new Set([step])
-// }
-
-// const copyToClipboard = async (text: string) => {
-//   try {
-//     await copy(text)
-//     tacoStore.addToast({
-//       id: Date.now(),
-//       code: 'copy-success',
-//       title: 'Copied!',
-//       icon: 'fa-solid fa-check',
-//       message: 'Address copied to clipboard'
-//     })
-//   } catch (error) {
-//     console.error('Failed to copy to clipboard:', error)
-//     tacoStore.addToast({
-//       id: Date.now(),
-//       code: 'copy-error',
-//       title: 'Copy Failed',
-//       icon: 'fa-solid fa-exclamation-triangle',
-//       message: 'Failed to copy to clipboard'
-//     })
-//   }
-// }
-
-const getTokenByPrincipal = (principal: string): WalletToken | undefined => {
-  return allTokens.value.find(t => t.principal === principal)
-}
-
-// const getTokenBalance = (symbol: string): bigint => {
-//   const token = allTokens.value.find(t => t.symbol === symbol)
-//   return token ? token.balance : 0n
-// }
-
-// const getTokenDecimals = (symbol: string): number => {
-//   const token = allTokens.value.find(t => t.symbol === symbol)
-//   return token ? token.decimals : 8
-// }
-
+// perform swap
 const performSwap = async () => {
-  if (!canSwap.value) return
-  
-  const token = getTokenByPrincipal(selectedSwapFromToken.value)
-  if (!token) return
-  
-  // Clear the swap & stake flag for regular swaps
-  if (!isSwapAndStake.value) {
-    isSwapAndStake.value = false
-  }
-  
-  preselectedSwapToken.value = token
-  showSwapDialog.value = true
-}
 
-const performSwapAndStake = async () => {
-  if (!canSwap.value) return
-  
-  const token = getTokenByPrincipal(selectedSwapFromToken.value)
-  if (!token) return
-  
-  // Set flags for auto-swap & stake
-  isSwapAndStake.value = true
+  // // log
+  // console.log('performing swap...')
+
+  // turn swapping on
   isSwapping.value = true
   
-  // Show progress dialog and reset state
-  showProgressDialog.value = true
-  progressDialog.value?.reset()
-  
+  // try
   try {
-    // Step 1: Getting quotes
-    progressDialog.value?.setStepActive('quotes')
-    // Calculate max swap amount - reserve extra fee for ICPSwap operations
-    // ICPSwap requires additional fee reserves beyond the basic transfer fee
-    const extraFeeReserve = token.fee // Reserve one additional fee for ICPSwap operations
-    const amountInBigInt = token.balance - token.fee - extraFeeReserve
-    const maxSwapAmount = Number(amountInBigInt) / (10 ** token.decimals)
+
+    const extraFeeReserve = 10000n // reserve one additional fee for ICPSwap operations
+    const amountInBigInt = fetchedIcpRawBalance.value - 10000n - extraFeeReserve
+    const maxSwapAmount = Number(amountInBigInt) / (10 ** 8)
+
+    // // log
+    // console.log('extraFeeReserve:', extraFeeReserve)
+    // console.log('amountInBigInt:', amountInBigInt)
+    // console.log('maxSwapAmount:', maxSwapAmount)
     
-    console.log(`Auto-swapping ${maxSwapAmount} ${token.symbol} (${amountInBigInt} base units) to TACO...`)
-    console.log(`Reserved fees: ${token.fee + extraFeeReserve} base units for exchange operations`)
-    
-    // Get quotes from both exchanges
+    // get quotes from both exchanges
     const [kongQuote, icpSwapQuote] = await Promise.allSettled([
       kongStore.getQuote({
-        sellTokenSymbol: token.symbol,
+        sellTokenSymbol: 'ICP',
         buyTokenSymbol: 'TACO',
         amountIn: amountInBigInt
       }),
       icpswapStore.getQuote({
-        sellTokenPrincipal: token.principal,
-        buyTokenPrincipal: tacoToken.value.principal,
+        sellTokenPrincipal: 'ryjl3-tyaaa-aaaaa-aaaba-cai',
+        buyTokenPrincipal: 'kknbx-zyaaa-aaaaq-aae4a-cai',
         amountIn: amountInBigInt
       })
     ])
     
-    // Process quotes and find the best one
+    // empty quotes array
     const quotes = []
     
+    // if kong quote is fulfilled, push to quotes
     if (kongQuote.status === 'fulfilled' && kongQuote.value) {
       quotes.push({
         exchange: 'Kong',
@@ -1452,6 +980,7 @@ const performSwapAndStake = async () => {
       })
     }
     
+    // if icp swap quote is fulfilled, push to quotes
     if (icpSwapQuote.status === 'fulfilled' && icpSwapQuote.value) {
       quotes.push({
         exchange: 'ICPSwap',
@@ -1463,408 +992,229 @@ const performSwapAndStake = async () => {
       })
     }
     
+    // if no quotes are available, throw an error
     if (quotes.length === 0) {
       throw new Error('No swap quotes available')
     }
     
     // Sort by amount out (highest first) and pick the best
     const bestQuote = quotes.sort((a, b) => Number(b.amountOut) - Number(a.amountOut))[0]
+
+    // // log
+    // console.log('bestQuote on wizard perform swap:', bestQuote)
+    // console.log('found a best quote on wizard perform swap')
     
-    console.log(`Using ${bestQuote.exchange} with expected output: ${Number(bestQuote.amountOut) / 1e8} TACO`)
-    
-    // Complete quotes step and show swap details
-    progressDialog.value?.setStepCompleted('quotes')
-    progressDialog.value?.setSwapDetails({
-      exchange: bestQuote.exchange,
-      inputAmount: maxSwapAmount.toFixed(6),
-      inputSymbol: token.symbol,
-      outputAmount: (Number(bestQuote.amountOut) / 1e8).toFixed(6)
-    })
-    
-    // Step 2: Executing swap
-    progressDialog.value?.setStepActive('swap')
+    // // log
+    // console.log(`Using ${bestQuote.exchange} with expected output: ${Number(bestQuote.amountOut) / 1e8} TACO`)
     
     // Execute the swap using the same approach as SwapConfirmDialog
     let swapResult
-    const slippageTolerance = 0.01 // 1% slippage
+    const slippageTolerance = 0.03 // 3% slippage
     const minAmountOut = BigInt(Math.floor(Number(bestQuote.amountOut) * (1 - slippageTolerance)))
     
     const swapParams = {
-      sellTokenPrincipal: token.principal,
-      sellTokenSymbol: token.symbol,
-      buyTokenPrincipal: tacoToken.value.principal,
+      sellTokenPrincipal: 'ryjl3-tyaaa-aaaaa-aaaba-cai',
+      sellTokenSymbol: 'ICP',
+      buyTokenPrincipal: 'kknbx-zyaaa-aaaaq-aae4a-cai',
       buyTokenSymbol: 'TACO',
       amountIn: amountInBigInt,
       minAmountOut,
       slippageTolerance,
     }
-
-    // Create a step update callback (like SwapConfirmDialog)
-    const updateStep = (step: string) => {
-      console.log('Swap step:', step)
-    }
-
-    // Add step callback to swap params (exactly like SwapConfirmDialog)
-    const swapParamsWithCallback = {
-      ...swapParams,
-      onStep: updateStep
-    }
     
-    // Use the exact same logic as SwapConfirmDialog
+    // if kong quote is best, swap with kong
     if (bestQuote.exchange === 'Kong') {
-      const tokenSupportsICRC2 = await tacoStore.checkTokenSupportsICRC2(token.principal)
-      
-      if (tokenSupportsICRC2) {
-        try {
-          swapResult = await kongStore.icrc2_swap(swapParamsWithCallback)
-        } catch (error) {
-          console.log('Kong ICRC2 failed, trying ICRC1:', error)
-          swapResult = await kongStore.icrc1_swap(swapParamsWithCallback)
-        }
-      } else {
-        swapResult = await kongStore.icrc1_swap(swapParamsWithCallback)
+
+      // // log
+      // console.log('SWAP WITH KONG')
+
+      // try
+      try {
+
+        // swap with kong
+        swapResult = await kongStore.icrc1_swap(swapParams)
+
+      } catch (error) {
+
+        // log error
+        console.error('Kong swap failed:', error)
+
       }
-    } else {
-      // ICPSwap
-      const tokenSupportsICRC2 = await tacoStore.checkTokenSupportsICRC2(token.principal)
-      
-      if (tokenSupportsICRC2) {
-        try {
-          swapResult = await icpswapStore.icrc2_swap(swapParamsWithCallback)
-        } catch (error) {
-          console.log('ICPSwap ICRC2 failed, trying ICRC1:', error)
-          swapResult = await icpswapStore.icrc1_swap(swapParamsWithCallback)
-        }
-      } else {
-        swapResult = await icpswapStore.icrc1_swap(swapParamsWithCallback)
+
+    } 
+    
+    // else use icpswap
+    else {
+
+      // try
+      try {
+
+        // // log
+        // console.log('SWAP WITH ICPSWAP')
+
+        // // swap with icpswap
+        swapResult = await icpswapStore.icrc2_swap(swapParams)
+
+      } catch (error) {
+
+        // log error
+        console.error('ICPSwap swap failed:', error)
+
       }
+
     }
     
-    // Kong/ICPSwap stores return results directly, not wrapped in success/error objects
-    console.log('Swap successful, proceeding with auto-staking...')
-    
-    // Complete swap step
-    progressDialog.value?.setStepCompleted('swap')
-    
-    await handleSwapSuccess(swapResult)
-    
-  } catch (error: any) {
-    console.error('Auto-swap & stake failed:', error)
-    
-    // Show error in progress dialog
-    progressDialog.value?.setError(error.message || 'Failed to execute swap & stake')
-    
+  } 
+  
+  // catch
+  catch (error: any) {
+
+    // log error
+    console.error('Swap failed:', error)
+
+    // show error toast
     tacoStore.addToast({
       id: Date.now(),
-      code: 'swap-stake-failed',
-      title: 'Swap & Stake Failed',
+      code: 'swap-failed',
+      title: 'Swap Failed',
       icon: 'fa-solid fa-exclamation-triangle',
-      message: error.message || 'Failed to execute swap & stake. Please try manual swap.'
+      message: error.message || 'Failed to execute swap. Please try again.'
     })
-  } finally {
+
+  } 
+  
+  // finally
+  finally {
+
+    // // log
+    // console.log('swap over')
+
+    // turn swapping off
     isSwapping.value = false
-    isSwapAndStake.value = false
+
+    // wait for 2 seconds then refresh balances
+    setTimeout(async () => {
+      await refreshBalances()
+    }, 2000)
+
   }
+
 }
 
-const openSwapDialog = (token: WalletToken) => {
-  preselectedSwapToken.value = token.symbol === 'TACO' ? null : token
-  showSwapDialog.value = true
-}
+// perform stake
+const performStake = async () => {
 
-const closeSwapDialog = () => {
-  showSwapDialog.value = false
-  preselectedSwapToken.value = null
-}
+  // // log
+  // console.log('performing stake...')
 
-const handleSwapConfirm = (swapData: any) => {
-  swapConfirmData.value = swapData
-  showSwapDialog.value = false
-  showSwapConfirmDialog.value = true
-}
-
-const closeSwapConfirmDialog = () => {
-  showSwapConfirmDialog.value = false
-  swapConfirmData.value = null
-}
-
-const handleSwapSuccess = async (result: any) => {
-  console.log('Swap successful:', result)
-  
-  closeSwapConfirmDialog()
-  
-  // Refresh wallet data first to get updated TACO balance
-  await loadWalletData()
-  
-  if (isSwapAndStake.value) {
-    // Auto-stake all the TACO we just received
-    console.log('Auto-staking TACO after swap...')
+  // try
+  try {
     
-    // Step 3: Creating neuron
-    progressDialog.value?.setStepActive('stake')
+    // turn staking on
+    isStaking.value = true
+
+    // max stakeable amount (balance - fee)
+    const maxStakeAmount = fetchedTacoRawBalance.value - 10000n
+
+    // // log
+    // console.log('max stakeable amount:', maxStakeAmount)
     
-    try {
-      isStaking.value = true
+    // if a minimum of 1 TACO
+    if (maxStakeAmount >= 100000000n) {
+
+      // create neuron with all available TACO and default dissolve delay
+      const result = await tacoStore.createNeuron(maxStakeAmount)
       
-      // Calculate max stakeable amount (balance - fee)
-      const maxStakeAmount = tacoToken.value.balance - tacoToken.value.fee
-      
-      if (maxStakeAmount >= 100000000n) { // Minimum 1 TACO
-        // Create neuron with all available TACO and default dissolve period
-        const result = await tacoStore.createNeuron(maxStakeAmount)
+      // if neuron created successfully
+      if (result.success && result.subaccount) {
         
-        if (result.success && result.subaccount) {
-          // Complete stake step and start dissolve step
-          progressDialog.value?.setStepCompleted('stake')
-          progressDialog.value?.setStepActive('dissolve')
-          
-          // Set default dissolve delay (28 days)
-          try {
-            const defaultDissolveDays = 28
-            const delayMonths = defaultDissolveDays / 30
-            await tacoStore.setNeuronDissolveDelay(result.subaccount, delayMonths)
-            console.log(`Auto-set dissolve delay to ${defaultDissolveDays} days`)
-            
-            // Complete dissolve step
-            progressDialog.value?.setStepCompleted('dissolve')
-          } catch (dissolveError: any) {
-            console.warn('Failed to set dissolve delay for auto-created neuron:', dissolveError)
-            progressDialog.value?.setStepError('dissolve')
-          }
-          
-          // Show success message
-          tacoStore.addToast({
-            id: Date.now(),
-            code: 'swap-stake-success',
-            title: 'Swap & Stake Complete!',
-            icon: 'fa-solid fa-magic',
-            message: `Successfully swapped and staked ${formatBalance(maxStakeAmount, 8)} TACO in a new neuron!`
-          })
-          
-          // Refresh neurons list to show the new neuron
-          await loadUserNeurons()
-          
-          // Mark staking as complete and move to final step
-          stakingComplete.value = true
-          
-          // Auto-close progress dialog after 3 seconds
-          setTimeout(() => {
-            showProgressDialog.value = false
-            goToStep(3)
-          }, 3000)
-          
-        } else {
-          progressDialog.value?.setStepError('stake')
-          throw new Error('Failed to create neuron')
+        // try
+        try {
+
+          // define dissolve delay in months
+          const delayMonths = 1
+
+          // set dissolve delay
+          await tacoStore.setNeuronDissolveDelay(result.subaccount, delayMonths)
+
+          // // log
+          // console.log(`dissolve delay successfully set to 1 month`)
+
+        } 
+        
+        // catch
+        catch (dissolveError: any) {
+
+          // log error
+          console.error('failed to set dissolve delay to 1 month:', dissolveError)
+
         }
-      } else {
-        throw new Error('Insufficient TACO balance to create neuron (minimum 1 TACO required)')
+        
+        // Show success message
+        tacoStore.addToast({
+          id: Date.now(),
+          code: 'swap-stake-success',
+          title: 'Swap & Stake Complete!',
+          icon: 'fa-solid fa-magic',
+          message: `Successfully staked ${formatBalance(maxStakeAmount, 8)} TACO in a new neuron!`
+        })
+        
+        // Refresh neurons list to show the new neuron
+        await loadUserNeurons()
+        
+        
+      } 
+      
+      // else failed to create neuron
+      else {
+
+        // log error
+        console.error('failed to create neuron')
+
       }
-      
-    } catch (error: any) {
-      console.error('Auto-staking failed:', error)
-      
-      // Show error in progress dialog
-      progressDialog.value?.setError(`Swap completed successfully, but staking failed: ${error.message}`)
-      
-      // Show error and fall back to manual staking
-      tacoStore.addToast({
-        id: Date.now(),
-        code: 'swap-success-stake-failed',
-        title: 'Swap Successful, Staking Failed',
-        icon: 'fa-solid fa-exclamation-triangle',
-        message: `Swap completed successfully, but auto-staking failed: ${error.message}. Please stake manually.`
-      })
-      
-      // Refresh neurons list for manual staking
-      await loadUserNeurons()
-      
-      // Auto-close progress dialog and move to staking step for manual staking
-      setTimeout(() => {
-        showProgressDialog.value = false
-        goToStep(3)
-      }, 3000)
-    } finally {
-      isStaking.value = false
-      isSwapAndStake.value = false // Reset the flag
+
+    } 
+    
+    // else insufficient taco
+    else {
+
+      // log error
+      console.error('insufficient taco balance to create neuron (minimum 1 TACO required)')
+
     }
     
-  } else {
-    // Regular swap - just show success message and move to staking step
-    tacoStore.addToast({
-      id: Date.now(),
-      code: 'swap-success',
-      title: 'Swap Successful',
-      icon: 'fa-solid fa-check',
-      message: `Successfully swapped to TACO`
-    })
+  } 
+  
+  // catch
+  catch (error: any) {
+
+    // log error
+    console.error('staking failed:', error)
+
+    // refresh balances
+    await refreshBalances()
     
-    // Move to staking step
-    goToStep(3)
+    // refresh user neurons
+    await loadUserNeurons()
+    
+  } 
+  
+  // finally
+  finally {
+
+    // turn staking off
+    isStaking.value = false
+
+    // wait for 2 seconds then load user neurons
+    setTimeout(async () => {
+      await loadUserNeurons()
+    }, 2000)      
+
   }
+
 }
 
-const handleSwapError = (error: string) => {
-  console.error('Swap failed:', error)
-  
-  tacoStore.addToast({
-    id: Date.now(),
-    code: 'swap-error',
-    title: 'Swap Failed',
-    icon: 'fa-solid fa-exclamation-triangle',
-    message: error
-  })
-}
-
-// const stakeToExistingNeuron = (neuron: any) => {
-//   selectedNeuron.value = neuron
-//   showStakeDialog.value = true
-// }
-
-const createNewNeuron = () => {
-  showCreateDialog.value = true
-}
-
-const closeStakeDialog = () => {
-  showStakeDialog.value = false
-  selectedNeuron.value = null
-}
-
-const closeCreateDialog = () => {
-  showCreateDialog.value = false
-}
-
-const closeProgressDialog = () => {
-  showProgressDialog.value = false
-}
-
-const handleStakeCompleted = async (neuron: any) => {
-  console.log('Stake completed for neuron:', neuron)
-  
-  // Refresh neurons list to show updated stake
-  await loadUserNeurons()
-  
-  // Close dialog
-  closeStakeDialog()
-  
-  // Show success message
-  tacoStore.addToast({
-    id: Date.now(),
-    code: 'stake-success',
-    title: 'Stake Added Successfully',
-    icon: 'fa-solid fa-check',
-    message: `Successfully added stake to ${neuron?.displayName || 'neuron'}`
-  })
-}
-
-const handleNeuronCreated = async () => {
-  console.log('Neuron created successfully')
-  
-  // Refresh neurons list to show new neuron
-  await loadUserNeurons()
-  
-  // Close dialog
-  closeCreateDialog()
-  
-  // Show success message
-  tacoStore.addToast({
-    id: Date.now(),
-    code: 'neuron-created-success',
-    title: 'Neuron Created Successfully',
-    icon: 'fa-solid fa-check',
-    message: 'New neuron created successfully'
-  })
-}
-
-// const goToWallet = () => {
-//   router.push('/wallet')
-// }
-
-// const resetWizard = () => {
-//   currentStep.value = 1
-//   expandedSteps.value = new Set([1])
-//   selectedSwapFromToken.value = ''
-//   stakingComplete.value = false
-//   isSwapAndStake.value = false
-//   loadWalletData()
-// }
-
-// const registerCustomToken = async () => {
-//   if (!newTokenPrincipal.value.trim()) return
-  
-//   try {
-//     registeringToken.value = true
-    
-//     // Validate principal format
-//     try {
-//       Principal.fromText(newTokenPrincipal.value.trim())
-//     } catch (error) {
-//       tacoStore.addToast({
-//         id: Date.now(),
-//         code: 'invalid-principal',
-//         title: 'Invalid Principal',
-//         icon: 'fa-solid fa-exclamation-triangle',
-//         message: 'Please enter a valid principal ID'
-//       })
-//       return
-//     }
-    
-//     // Check if token is already registered
-//     if (userRegisteredTokenPrincipals.value.includes(newTokenPrincipal.value.trim())) {
-//       tacoStore.addToast({
-//         id: Date.now(),
-//         code: 'already-registered',
-//         title: 'Already Registered',
-//         icon: 'fa-solid fa-exclamation-triangle',
-//         message: 'This token is already in your wallet'
-//       })
-//       return
-//     }
-    
-//     // Register the token
-//     await tacoStore.registerUserToken(newTokenPrincipal.value.trim())
-    
-//     // Clear input and refresh
-//     const registeredPrincipal = newTokenPrincipal.value.trim()
-//     newTokenPrincipal.value = ''
-    
-//     // Refresh registered tokens list
-//     await fetchUserRegisteredTokens()
-    
-//     // Load balance for the new token
-//     await loadAllBalances()
-    
-//     // Get the metadata for the registered token for the toast
-//     const metadata = customTokenMetadata.value.get(registeredPrincipal)
-//     const tokenName = metadata?.symbol || 'Custom Token'
-    
-//     tacoStore.addToast({
-//       id: Date.now(),
-//       code: 'register-success',
-//       title: 'Token Registered',
-//       icon: 'fa-solid fa-check',
-//       message: `${tokenName} added to your wallet`
-//     })
-    
-//     // Update the dropdown to include the new token
-//     if (metadata?.symbol && metadata.symbol !== 'TACO') {
-//       selectedGetTokenSymbol.value = metadata.symbol
-//     }
-    
-//   } catch (error) {
-//     console.error('Error registering custom token:', error)
-//     tacoStore.addToast({
-//       id: Date.now(),
-//       code: 'register-error',
-//       title: 'Registration Failed',
-//       icon: 'fa-solid fa-exclamation-triangle',
-//       message: 'Failed to register custom token'
-//     })
-//   } finally {
-//     registeringToken.value = false
-//   }
-// }
-
+// format balance
 const formatBalance = (balance: bigint, decimals: number): string => {
   const divisor = BigInt(10 ** decimals)
   const wholePart = balance / divisor
@@ -1884,45 +1234,6 @@ const formatBalance = (balance: bigint, decimals: number): string => {
   return `${wholePart}.${trimmedFractional}`
 }
 
-// const formatUSDValue = (balance: bigint, decimals: number, priceUSD: number): string => {
-//   const balanceNum = Number(balance) / (10 ** decimals)
-//   const usdValue = balanceNum * priceUSD
-  
-//   if (usdValue < 0.01) {
-//     return '< 0.01'
-//   }
-  
-//   return usdValue.toLocaleString('en-US', {
-//     minimumFractionDigits: 2,
-//     maximumFractionDigits: 2
-//   })
-// }
-
-//////////////
-// Watchers //
-//////////////
-
-// // Watchers to sync token selections
-// watch(selectedGetTokenSymbol, (newSymbol) => {
-//   // Sync step 2 when step 1 changes (unless user manually changed step 2)
-//   if (!newSymbol || allTokens.value.length === 0) return
-//   syncSwapTokenSelection()
-// })
-
-// // Watch for swap token changes to fetch quotes
-// watch(selectedSwapFromToken, (newToken) => {
-//   if (newToken && allTokens.value.length > 0) {
-//     fetchSwapQuotes()
-//   }
-// })
-
-// // Initialize selections when token data loads
-// watch(allTokens, (newTokens) => {
-//   if (newTokens.length > 0 && !selectedSwapFromToken.value) {
-//     initializeTokenSelections()
-//   }
-// }, { deep: true })
-
 /////////////////////
 // Lifecycle Hooks //
 /////////////////////
@@ -1933,37 +1244,56 @@ onMounted(async () => {
   // try
   try {
 
-    // wait for authentication to be checked first
+    // check if logged in
     await tacoStore.checkIfLoggedIn()
 
     // wait for 100ms
     await new Promise(resolve => setTimeout(resolve, 100))
 
-    await fetchIcrc1BalanceOfIcp()
-    await fetchIcrc1BalanceOfTaco()
-
     // if user is logged in
     if (tacoStore.userLoggedIn) {
 
-      selectedGetTokenSymbol.value = 'ICP'
-
+      // get user neurons
       await loadUserNeurons()
-
-      // load wallet data
-      await loadWalletData()
       
-      // Initialize token selections after data loads
-      if (allTokens.value.length > 0) {
-        initializeTokenSelections()
+      // if user has neurons, return early
+      if (userNeurons.value.length > 0) {
+        
+        // return early
+        return
+        
       }
 
-    } 
-    
-    // else user not logged in
-    else {
+      // // log
+      // console.log('user has no neurons, continuing...')
 
-      // turn app loading off
-      loading.value = false
+      // get user taco balance
+      await fetchIcrc1BalanceOfTaco()
+      
+      // if user has taco balance, return early
+      if (fetchedTacoBalance.value >= 1) {
+        
+        // return early
+        return
+        
+      }
+
+      // // log
+      // console.log('user has no taco balance, continuing...')
+
+      // get user icp balance
+      await fetchIcrc1BalanceOfIcp()
+
+      // if user has icp balance greater that or equal to 1, get quotes
+      if (fetchedIcpBalance.value >= 1) {
+
+        // // log
+        // console.log('user has icp balance, fetching quotes...')
+        
+        // fetch quotes
+        await fetchSwapQuotes()
+        
+      }
 
     }
 
@@ -1974,6 +1304,14 @@ onMounted(async () => {
 
     // log error
     console.error('Error in wizard onMounted:', error)
+
+    // turn app loading off
+    loading.value = false
+
+  }
+
+  // finally
+  finally {
 
     // turn app loading off
     loading.value = false

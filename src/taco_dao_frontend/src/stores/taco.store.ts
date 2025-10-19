@@ -498,7 +498,7 @@ export const useTacoStore = defineStore('taco', () => {
     }[]>([])
     let authClientInstance: AuthClient | null = null
     // const tacoWizardOpen = ref(false)
-    const tacoWizardOpen = ref(true)
+    const tacoWizardOpen = ref(false)
 
     // user
     const userLoggedIn = ref(false)
