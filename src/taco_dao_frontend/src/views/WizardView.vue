@@ -1,622 +1,643 @@
 <template>
-  <div class="container-fluid">
-    <div class="row">
-      <div class="col-12">
-        
-        <!-- Page Title -->
-        <div class="page-title">
-          <h1>
-            <i class="fa fa-magic me-3"></i>
-            Swap & Stake Wizard
-          </h1>
-          <p class="text-muted">Easy 3-step process to get tokens, swap to TACO, and stake in neurons</p>
+
+  <!-- message modal -->
+  <div class="wizard__message">
+    
+    <!-- message -->
+    <div class="wizard__message__dialog">
+      
+      <!-- message top -->
+      <div class="wizard__message__dialog__top px-2 p-2">
+
+        <!-- message top left -->
+        <div class="taco-text-white">Taco Wizard</div>
+
+        <!-- message top right -->
+        <div class="taco-text-black-to-white">
+
+            <!-- close button -->
+            <button class="btn btn-sm p-0 text-white px-2"
+                    @click="toggleTacoWizard">
+              <i class="fa-solid fa-xmark"></i>
+            </button>
+
         </div>
 
-        <!-- Loading state -->
-        <div v-if="loading" class="text-center py-5">
-          <div class="spinner-border text-primary" role="status">
-            <span class="visually-hidden">Loading...</span>
+      </div>
+
+      <!-- message middle -->
+      <div class="wizard__message__dialog__middle">
+
+        <!-- top - wizard and intro text -->
+        <div class="wizard__top">
+
+          <!-- top left -->
+          <ChefWizard />
+
+          <!-- top right -->
+          <div class="wizard__top__right flex-grow-1">
+            
+            <!--  -->
+            <p class="fw-bold mb-0" style="font-size: 1.25rem;">Welcome to the Taco Wizard!</p>
+
+            <p class="mb-4">He'll help you do everything you need to vote and get rewards <i class="fa-regular fa-coins"></i></p>
+
+            <p>Just follow the steps and let the wizard do the rest!</p>
+
+            <p v-if="userLoggedIn" class="text-nowrap">⬇️ Get Started Below ⬇️</p>
+
+            <p v-if="!userLoggedIn" class="text-nowrap">Log in to get started</p>
+
+            <button v-if="!userLoggedIn" class="btn d-flex align-items-center gap-2 p-0 mt-4" @click="tacoStore.iidLogIn()">
+              <DfinityLogo style="width: 2rem;" />
+              <span class="taco-text-black-to-white">Log In</span>
+            </button>
+
           </div>
-          <p class="mt-2">Analyzing your wallet...</p>
+
         </div>
 
-        <!-- Login required state -->
-        <div v-else-if="!tacoStore.userLoggedIn" class="text-center py-5">
-          <div class="card">
-            <div class="card-body py-5">
-              <i class="fa fa-lock fa-4x text-muted mb-4"></i>
-              <h3 class="mb-3">Login Required</h3>
-              <p class="text-muted mb-4">You need to log in to use the Swap & Stake Wizard.</p>
-              <button 
-                @click="tacoStore.iidLogIn()" 
-                class="btn btn-primary btn-lg"
-              >
-                <i class="fa fa-sign-in-alt me-2"></i>
-                Login with Internet Identity
-              </button>
+        stakingComplete: {{  stakingComplete }}<br></br>
+        <!-- currentStep: {{  currentStep }}<br></br> -->
+        userNeurons.length: {{  userNeurons.length }}<br></br>
+        fetchedIcpBalance: {{ fetchedIcpBalance }}<br></br>
+        fetchedTacoBalance: {{ fetchedTacoBalance }}<br></br>
+        userPrincipal: {{ userPrincipal }}<br></br>
+
+        <!-- bottom - steps -->
+        <div v-if="userLoggedIn && !loading" class="wizard__bottom">
+
+          <!-- wizard steps -->
+          <div class="wizard__steps">
+
+            <!-- step 1 - Get Tokens -->
+            <div v-if="userNeurons.length === 0 && fetchedIcpBalance <  1 && fetchedTacoBalance < 1" 
+                 class="wizard__step">
+
+              <!-- left - step info -->
+              <div class="wizard__step__info">
+
+                <!-- step circle -->
+                <div class="wizard__step__circle">
+                  <span class="wizard__step__circle__number">1</span>
+                  <span class="wizard__step__circle__text">Deposit</span>
+                  <span class="wizard__step__circle__text">Tokens</span>
+                </div>
+
+              </div>
+
+              <!-- right - step content -->
+              <div class="wizard__step__content">
+
+                <p class="mb-0">Deposit at least <span class="fw-bold">1</span> ICP to get started</p>
+
+                <p class="mb-4">Your current ICP balance is <span class="fw-bold">{{ fetchedIcpBalance.toFixed(8) }}</span></p>
+
+                <p class="mb-4">You can buy ICP on exchanges like <a class="wizard__step__link" href="https://www.coinbase.com" target="_blank">Coinbase</a>, <a class="wizard__step__link" href="https://www.binance.com" target="_blank">Binance</a>, or <a class="wizard__step__link" href="https://www.kraken.com" target="_blank">Kraken</a></p>   
+
+                <p class="mb-0">Send some to this address:</p>
+
+                <p class="mb-3"><span class="wizard__step__link"><span style="word-break: break-all;">{{ userPrincipal }}</span> <i class="fa-regular fa-copy"></i></span></p>
+
+                <button class="btn taco-btn taco-btn--green taco-btn--big d-inline-block mb-3" @click="fetchIcrc1BalanceOfIcp(); fetchIcrc1BalanceOfTaco()">Then Refresh</button>
+
+              </div>
+
             </div>
+
+            <!-- step 1 - Get Tokens (completed) -->
+            <div v-if="userNeurons.length > 0 || fetchedIcpBalance >= 1 || fetchedTacoBalance >= 1" 
+                 class="wizard__step wizard__step--completed">
+
+              <!-- left - step info -->
+              <div class="wizard__step__info">
+
+                <!-- step circle -->
+                <div class="wizard__step__circle wizard__step__circle--completed">
+                  <span class="wizard__step__circle__number">
+                    <i class="fa-solid fa-check"></i>
+                  </span>
+                  <span class="wizard__step__circle__text">Deposit</span>
+                  <span class="wizard__step__circle__text">ICP</span>
+                </div>
+
+              </div>
+
+              <!-- right - step content -->
+              <div class="wizard__step__content">
+
+                <p>Alakazam! First step is done!</p>
+
+              </div>
+
+            </div>
+
+            <!-- step 2 - Swap Tokens -->
+            <div v-if="userNeurons.length === 0 && fetchedTacoBalance < 1" 
+                 class="wizard__step">
+
+              <!-- left - step info -->
+              <div class="wizard__step__info">
+
+                <!-- step circle -->
+                <div class="wizard__step__circle">
+                  <span class="wizard__step__circle__number">2</span>
+                  <span class="wizard__step__circle__text">Get</span>
+                  <span class="wizard__step__circle__text">TACO</span>
+                </div>
+
+              </div>
+
+              <!-- right - step content -->
+              <div class="wizard__step__content">
+
+                <!-- not enough text -->
+                <p v-if="fetchedIcpBalance < 1"
+                   :class="{ 'mb-0': fetchedIcpBalance > 0, 'mb-3': fetchedIcpBalance <= 0 }">
+                   You need <span class="fw-bold">1</span> ICP to swap
+                </p>
+
+                <!-- your taco balance -->
+                <p v-if="fetchedIcpBalance > 0 && fetchedIcpBalance < 1"
+                   class="mb-3">
+                   You have {{ fetchedIcpBalance.toFixed(8) }} ICP
+                </p>
+
+                <!-- first sentence -->
+                <div v-if="fetchedIcpBalance >= 1" 
+                     class="d-flex align-items-baseline mb-0">
+
+                  <!-- swap text -->
+                  <span>Swap your {{ fetchedIcpBalance }} ICP for TACO via {{ bestExchange }}</span>
+
+                </div>
+                
+                <!-- second sentence -->
+                <p v-if="fetchedIcpBalance >= 1" 
+                   class="wizard-custom-spacing-1" 
+                   style="margin-bottom: 2rem;">
+                  
+                  <!-- text -->
+                  <span>You'll get <span class="fw-bold">{{ swapOutputAmount }} TACO</span> for your <span class="fw-bold">{{ fetchedIcpBalance }} ICP</span></span>
+
+                </p>
+
+                <button :disabled="fetchedIcpBalance < 1"
+                        class="wizard-custom-spacing-2 btn taco-btn taco-btn--green taco-btn--big">
+                  Swap Tokens
+                </button>
+
+              </div>
+
+            </div>
+
+            <!-- step 2 - Swap Tokens (completed) -->
+            <div v-if="userNeurons.length || fetchedTacoBalance >= 1" 
+                 class="wizard__step wizard__step--completed">
+
+              <!-- left - step info -->
+              <div class="wizard__step__info">
+
+                <!-- step circle -->
+                <div class="wizard__step__circle wizard__step__circle--completed">
+                  <span class="wizard__step__circle__number">
+                    <i class="fa-solid fa-check"></i>
+                  </span>
+                  <span class="wizard__step__circle__text">Swap</span>
+                  <span class="wizard__step__circle__text">Tokens</span>
+                </div>
+
+              </div>
+
+              <!-- right - step content -->
+              <div class="wizard__step__content">
+
+                <p>Whalah! You've got TACO</p>
+
+              </div>
+
+            </div>                 
+
+            <!-- step 3 - Stake Tokens -->
+            <div v-if="!userNeurons.length" 
+                 class="wizard__step">
+
+              <!-- left - step info -->
+              <div class="wizard__step__info">
+
+                <!-- step circle -->
+                <div class="wizard__step__circle">
+                  <span class="wizard__step__circle__number">3</span>
+                  <span class="wizard__step__circle__text">Stake</span>
+                  <span class="wizard__step__circle__text">Tokens</span>
+                </div>
+
+              </div>
+
+              <!-- right - step content -->
+              <div class="wizard__step__content">
+
+                <!-- not enough text -->
+                <p v-if="fetchedTacoBalance < 1"
+                   :class="{ 'mb-0': fetchedTacoBalance > 0, 'mb-3': fetchedTacoBalance <= 0 }">
+                   You need <span class="fw-bold">1</span> TACO to stake
+                </p>
+
+                <!-- your taco balance -->
+                <p v-if="fetchedTacoBalance > 0 && fetchedTacoBalance < 1"
+                   class="mb-3">
+                   You have {{ fetchedTacoBalance.toFixed(8) }} TACO
+                </p>
+
+                <p v-if="fetchedTacoBalance >= 1"
+                   class="mb-0">
+                   Stake your {{ fetchedTacoBalance }} TACO in a Neuron
+                </p>
+
+                <p v-if="fetchedTacoBalance >= 1"
+                   class="wizard-custom-spacing-1" 
+                   style="margin-bottom: 2rem;">
+                  We'll stake it for 30 days
+                </p>
+
+                <button :disabled="fetchedTacoBalance < 1"
+                        class="wizard-custom-spacing-2 btn taco-btn taco-btn--green taco-btn--big">
+                  Stake Tokens
+                </button>
+
+              </div>
+
+            </div>
+
+            <!-- step 3 - Stake Tokens (completed) -->
+            <div v-if="userNeurons.length" 
+                 class="wizard__step wizard__step--completed">
+
+              <!-- left - step info -->
+              <div class="wizard__step__info">
+
+                <!-- step circle -->
+                <div class="wizard__step__circle wizard__step__circle--completed">
+                  <span class="wizard__step__circle__number">
+                    <i class="fa-solid fa-check"></i>
+                  </span>
+                  <span class="wizard__step__circle__text">Stake</span>
+                  <span class="wizard__step__circle__text">Tokens</span>
+                </div>
+
+              </div>
+
+              <!-- right - step content -->
+              <div class="wizard__step__content">
+
+                <p class="mb-3">Presto! You've got a Taco Neuron</p>
+
+                <p class="mb-2">You can now <router-link to="/vote" class="btn taco-btn taco-btn--green taco-btn--big d-inline-block">vote</router-link> on DAO allocations and earn rewards!</p>
+
+                <p class="mb-3" style="font-size: 1rem;">Rewards are distributed ever Tuesday. Use the <router-link to="/wallet" class="wallet-link" style="color: var(--blue-to-light-blue)">wallet</router-link> to manage your funds, nuerons, and rewards</p>
+
+              </div>
+
+            </div>              
+
           </div>
+
         </div>
 
-        <!-- Wizard Content -->
-        <div v-else class="wizard-container">
-          
-          <!-- Progress Indicator -->
-          <div class="wizard-progress">
-            <div class="progress-steps">
-              <div class="step" :class="{ 
-                'active': currentStep >= 1, 
-                'completed': currentStep > 1,
-                'current': currentStep === 1 
-              }">
-                <div class="step-number">1</div>
-                <div class="step-label">Get Tokens</div>
-              </div>
-              <div class="step-connector" :class="{ 'completed': currentStep > 1 }"></div>
-              <div class="step" :class="{ 
-                'active': currentStep >= 2, 
-                'completed': currentStep > 2,
-                'current': currentStep === 2 
-              }">
-                <div class="step-number">2</div>
-                <div class="step-label">Swap to TACO</div>
-              </div>
-              <div class="step-connector" :class="{ 'completed': currentStep > 2 }"></div>
-              <div class="step" :class="{ 
-                'active': currentStep >= 3,
-                'current': currentStep === 3 
-              }">
-                <div class="step-number">3</div>
-                <div class="step-label">Stake TACO</div>
-              </div>
-            </div>
-          </div>
+        <!-- or loading -->
+        <div v-if="loading" class="wizard__loading">
 
-          <!-- Step 1: Get Tokens -->
-          <div class="wizard-step-card">
-            <div class="step-header" @click="toggleStep(1)">
-              <div class="step-info">
-                <h3 class="step-title">
-                  <i class="fa fa-wallet me-2"></i>
-                  Step 1: Get Tokens to Your Wallet
-                </h3>
-                <p class="step-description">
-                  Transfer tokens from an exchange or another wallet to start swapping
-                </p>
-              </div>
-              <div class="step-controls">
-                <div v-if="currentStep === 1" class="current-step-badge">
-                  <i class="fa fa-arrow-right"></i> Current Step
-                </div>
-                <div v-else-if="currentStep > 1" class="completed-badge">
-                  <i class="fa fa-check"></i> Completed
-                </div>
-                <button class="expand-button">
-                  <i :class="expandedSteps.has(1) ? 'fa fa-chevron-up' : 'fa fa-chevron-down'"></i>
-                </button>
-              </div>
-            </div>
-            
-            <div v-show="expandedSteps.has(1) || currentStep === 1" class="step-content">
-              <div class="get-tokens-section">
-                <!-- Token Selection -->
-                <div class="token-selection">
-                  <label class="form-label">Select Token to Receive:</label>
-                  <select v-model="selectedGetTokenSymbol" class="form-select">
-                    <option value="ICP">ICP (Recommended)</option>
-                    <option v-for="token in availableTokensForDeposit" :key="token.symbol" :value="token.symbol">
-                      {{ token.symbol }} - {{ token.name }}
-                    </option>
-                  </select>
-                  
-                  <!-- Token Balance Display with Refresh -->
-                  <div class="token-balance-display">
-                    <div class="balance-info">
-                      <span class="balance-label">Current Balance:</span>
-                      <span class="balance-amount">
-                        {{ formatBalance(getTokenBalance(selectedGetTokenSymbol), getTokenDecimals(selectedGetTokenSymbol)) }} {{ selectedGetTokenSymbol }}
-                      </span>
-                    </div>
-                    <button 
-                      type="button"
-                      class="btn btn-sm btn-outline-primary refresh-btn"
-                      @click="refreshTokenBalance"
-                      :disabled="refreshingBalance"
-                      title="Refresh balance to check if tokens arrived"
-                    >
-                      <i v-if="refreshingBalance" class="fa fa-spinner fa-spin"></i>
-                      <i v-else class="fa fa-refresh"></i>
-                    </button>
-                  </div>
-                </div>
+          <!-- loading content -->
+          <div class="wizard__loading__content">
 
-                <!-- Instructions for selected token -->
-                <div class="deposit-instructions">
-                  <div v-if="selectedGetTokenSymbol === 'ICP'" class="icp-instructions">
-                    <div class="instruction-card">
-                      <div class="instruction-header">
-                        <i class="fa fa-info-circle me-2"></i>
-                        <h5>How to get ICP to your wallet:</h5>
-                      </div>
-                      <ol class="instruction-list">
-                        <li>Buy ICP on a centralized exchange like Coinbase, Binance, or Kraken</li>
-                        <li>Copy your ICP Legacy Account ID below</li>
-                        <li>Withdraw ICP from the exchange to this address</li>
-                        <li>Wait for the transaction to confirm (usually within a few seconds)</li>
-                      </ol>
-                    </div>
+            <!-- loading text -->
+            <span class="taco-text-black-to-white d-block text-center p-5"><i class="fa fa-spinner fa-spin"></i> Loading...</span>
 
-                    <!-- ICP Account Display -->
-                    <div class="account-display">
-                      <div class="account-header">
-                        <h6>Your ICP Legacy Account ID:</h6>
-                      </div>
-                      <div class="account-id-container">
-                        <code class="account-id">{{ icpAccountId.hex }}</code>
-                        <button 
-                          @click="copyToClipboard(icpAccountId.hex)"
-                          class="btn btn-outline-primary btn-sm"
-                          title="Copy to clipboard"
-                        >
-                          <i class="fa fa-copy"></i>
-                        </button>
-                      </div>
-                      <small class="account-help-text">
-                        This is your unique ICP address. Use this exact address when withdrawing from exchanges.
-                      </small>
-                    </div>
-                  </div>
-
-                  <div v-else class="other-token-instructions">
-                    <div class="instruction-card">
-                      <div class="instruction-header">
-                        <i class="fa fa-info-circle me-2"></i>
-                        <h5>How to get {{ selectedGetTokenSymbol }} to your wallet:</h5>
-                      </div>
-                      <ol class="instruction-list">
-                        <li>Get {{ selectedGetTokenSymbol }} from a DEX or transfer from another wallet</li>
-                        <li>Copy your Principal ID below</li>
-                        <li>Send {{ selectedGetTokenSymbol }} to this Principal ID</li>
-                        <li>Wait for the transaction to confirm</li>
-                      </ol>
-                    </div>
-
-                    <!-- Principal ID Display -->
-                    <div class="account-display">
-                      <div class="account-header">
-                        <h6>Your Principal ID:</h6>
-                      </div>
-                      <div class="account-id-container">
-                        <code class="account-id">{{ tacoStore.userPrincipal }}</code>
-                        <button 
-                          @click="copyToClipboard(tacoStore.userPrincipal)"
-                          class="btn btn-outline-primary btn-sm"
-                          title="Copy to clipboard"
-                        >
-                          <i class="fa fa-copy"></i>
-                        </button>
-                      </div>
-                      <small class="account-help-text">
-                        This is your Principal ID. Use this when sending ICRC-1 tokens.
-                      </small>
-                    </div>
-                  </div>
-                </div>
-
-                <!-- Register Custom Token Section -->
-                <div class="register-token-section">
-                  <div class="register-token-header" @click="showRegisterToken = !showRegisterToken">
-                    <h6>Register Custom ICRC1 Token</h6>
-                    <button class="collapse-toggle-btn" type="button">
-                      <i :class="showRegisterToken ? 'fa fa-chevron-up' : 'fa fa-chevron-down'"></i>
-                    </button>
-                  </div>
-                  
-                  <div v-show="showRegisterToken" class="register-token-content">
-                    <p class="section-description">
-                      If you have a custom ICRC1 token that's not listed above, you can register it here:
-                    </p>
-                    <div class="register-token-form">
-                      <div class="input-group">
-                        <input 
-                          v-model="newTokenPrincipal"
-                          placeholder="Token principal (e.g., rdmx6-jaaaa-aaaah-qcaiq-cai)"
-                          class="form-control"
-                          :disabled="registeringToken"
-                        />
-                        <button 
-                          @click="registerCustomToken" 
-                          :disabled="!newTokenPrincipal.trim() || registeringToken"
-                          class="btn btn-outline-primary"
-                        >
-                          <i v-if="registeringToken" class="fa fa-spinner fa-spin me-1"></i>
-                          <i v-else class="fa fa-plus me-1"></i>
-                          {{ registeringToken ? 'Registering...' : 'Register Token' }}
-                        </button>
-                      </div>
-                      <small class="form-text text-muted">
-                        Enter the principal ID of an ICRC1 token to add it to your wallet
-                      </small>
-                    </div>
-                  </div>
-                </div>
-
-                <!-- Current Balance Display -->
-                <div class="current-balance">
-                  <h6>Current Balance:</h6>
-                  <div class="balance-grid">
-                    <div v-for="token in coreTokens.concat(trustedTokens).concat(userRegisteredTokens)" 
-                         :key="token.principal" 
-                         v-show="token.balance > 0n"
-                         class="balance-item">
-                      <img :src="token.logo" :alt="token.symbol" class="balance-token-logo" />
-                      <div class="balance-info">
-                        <div class="balance-amount">
-                          {{ formatBalance(token.balance, token.decimals) }} {{ token.symbol }}
-                        </div>
-                        <div v-if="token.priceUSD && token.priceUSD > 0" class="balance-usd">
-                          ${{ formatUSDValue(token.balance, token.decimals, token.priceUSD) }}
-                        </div>
-                      </div>
-                    </div>
-                    <div v-if="!hasAnyTokens" class="no-tokens">
-                      <i class="fa fa-info-circle me-2"></i>
-                      No tokens found in your wallet yet
-                    </div>
-                  </div>
-                </div>
-
-                <!-- Next Step Button -->
-                <div v-if="hasSwappableTokens" class="step-actions">
-                  <button @click="goToStep(2)" class="btn btn-primary btn-lg">
-                    <i class="fa fa-arrow-right me-2"></i>
-                    Continue to Swap
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Step 2: Swap Tokens -->
-          <div class="wizard-step-card">
-            <div class="step-header" @click="toggleStep(2)">
-              <div class="step-info">
-                <h3 class="step-title">
-                  <i class="fa fa-exchange-alt me-2"></i>
-                  Step 2: Swap to TACO
-                </h3>
-                <p class="step-description">
-                  Exchange your tokens for TACO to prepare for staking
-                </p>
-              </div>
-              <div class="step-controls">
-                <div v-if="currentStep === 2" class="current-step-badge">
-                  <i class="fa fa-arrow-right"></i> Current Step
-                </div>
-                <div v-else-if="currentStep > 2" class="completed-badge">
-                  <i class="fa fa-check"></i> Completed
-                </div>
-                <button class="expand-button">
-                  <i :class="expandedSteps.has(2) ? 'fa fa-chevron-up' : 'fa fa-chevron-down'"></i>
-                </button>
-              </div>
-            </div>
-            
-            <div v-show="expandedSteps.has(2) || currentStep === 2" class="step-content">
-              <div class="swap-section">
-                <!-- Token Selection for Swap -->
-                <div class="swap-input">
-                  <div class="token-input-group">
-                    <select v-model="selectedSwapFromToken" class="form-select" @change="onStep2DropdownChange">
-                      <option value="">Select token to swap from</option>
-                      <option v-for="token in swappableTokens" :key="token.principal" :value="token.principal">
-                        {{ token.symbol }} - Balance: {{ formatBalance(token.balance, token.decimals) }}
-                      </option>
-                    </select>
-                  </div>
-                  
-                  <!-- Token Info Display -->
-                  <div v-if="selectedSwapFromToken" class="token-info-display">
-                    <div class="selected-token-info">
-                      <img :src="getTokenByPrincipal(selectedSwapFromToken)?.logo" :alt="getTokenByPrincipal(selectedSwapFromToken)?.symbol" class="token-logo-small" />
-                      <div class="token-details">
-                        <div class="token-name">{{ getTokenByPrincipal(selectedSwapFromToken)?.name }}</div>
-                        <div class="token-amount">
-                          <span v-if="loadingQuotes" class="loading-text">
-                            <i class="fa fa-spinner fa-spin me-1"></i>Loading...
-                          </span>
-                          <span v-else class="amount-display">
-                            {{ swapInputAmount }} {{ getTokenByPrincipal(selectedSwapFromToken)?.symbol }}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                  
-                  <!-- Swap Arrow -->
-                  <div class="swap-arrow">
-                    <i class="fa fa-arrow-down"></i>
-                  </div>
-                </div>
-
-                <!-- TACO Output -->
-                <div class="swap-output">
-                  <div class="token-output-display">
-                    <img :src="tacoToken.logo" :alt="tacoToken.symbol" class="token-logo" />
-                    <div class="token-info">
-                      <div class="token-name">{{ tacoToken.symbol }}</div>
-                      <div class="token-amount">
-                        <span v-if="loadingQuotes" class="loading-text">
-                          <i class="fa fa-spinner fa-spin me-1"></i>Loading...
-                        </span>
-                        <span v-else-if="bestQuote" class="amount-display">
-                          {{ swapOutputAmount }} TACO
-                          <small class="exchange-badge">via {{ bestExchange }}</small>
-                        </span>
-                        <span v-else class="amount-display">
-                          0.00000000 TACO
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <!-- Swap & Stake Information -->
-                <div v-if="selectedSwapFromToken" class="swap-stake-info mb-4">
-                  <div class="info-box">
-                    <h6><i class="fa fa-magic me-2"></i>Swap & Stake Preview:</h6>
-                    <div class="preview-items">
-                      <div class="preview-item">
-                        <span class="label">Will swap:</span>
-                        <span class="value">
-                          <span v-if="loadingQuotes">
-                            <i class="fa fa-spinner fa-spin me-1"></i>Loading...
-                          </span>
-                          <span v-else>
-                            {{ swapInputAmount }} {{ selectedSwapToken?.symbol || '' }}
-                          </span>
-                        </span>
-                      </div>
-                      <div class="preview-item">
-                        <span class="label">Will receive:</span>
-                        <span class="value">
-                          <span v-if="loadingQuotes">
-                            <i class="fa fa-spinner fa-spin me-1"></i>Loading...
-                          </span>
-                          <span v-else-if="bestQuote">
-                            {{ swapOutputAmount }} TACO ({{ bestExchange }})
-                          </span>
-                          <span v-else>
-                            0.00000000 TACO
-                          </span>
-                        </span>
-                      </div>
-                      <div class="preview-item">
-                        <span class="label">Auto-stake:</span>
-                        <span class="value">All received TACO</span>
-                      </div>
-                      <div class="preview-item">
-                        <span class="label">Dissolve period:</span>
-                        <span class="value">28 days (default)</span>
-                      </div>
-                    </div>
-                    <p class="info-note">
-                      <i class="fa fa-info-circle me-1"></i>
-                      For custom amounts or dissolve periods, use "Swap" then "Stake" separately.
-                    </p>
-                  </div>
-                </div>
-
-                <!-- Swap Actions -->
-                <div v-if="selectedSwapFromToken" class="swap-actions">
-                  <button 
-                    @click="performSwapAndStake"
-                    class="btn btn-success btn-lg me-3 primary-action-btn"
-                    :disabled="isSwapping"
-                  >
-                    <i v-if="isSwapping" class="fa fa-spinner fa-spin me-2"></i>
-                    <i v-else class="fa fa-magic me-2"></i>
-                    {{ isSwapping ? 'Processing...' : 'Swap & Stake All' }}
-                  </button>
-                  
-                  <button 
-                    @click="performSwap"
-                    class="btn btn-outline-primary btn-lg"
-                    :disabled="isSwapping"
-                  >
-                    <i v-if="isSwapping" class="fa fa-spinner fa-spin me-2"></i>
-                    <i v-else class="fa fa-exchange-alt me-2"></i>
-                    {{ isSwapping ? 'Swapping...' : 'Swap to TACO' }}
-                  </button>
-                </div>
-
-                <!-- Next Step Button (if has TACO) -->
-                <div v-if="hasTacoTokens" class="step-actions">
-                  <button @click="goToStep(3)" class="btn btn-primary btn-lg">
-                    <i class="fa fa-arrow-right me-2"></i>
-                    Continue to Staking
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Step 3: Stake TACO -->
-          <div class="wizard-step-card">
-            <div class="step-header" @click="toggleStep(3)">
-              <div class="step-info">
-                <h3 class="step-title">
-                  <i class="fa fa-coins me-2"></i>
-                  Step 3: Stake TACO in Neurons
-                </h3>
-                <p class="step-description">
-                  Create neurons or stake to existing ones to earn rewards and participate in governance
-                </p>
-              </div>
-              <div class="step-controls">
-                <div v-if="currentStep === 3" class="current-step-badge">
-                  <i class="fa fa-arrow-right"></i> Current Step
-                </div>
-                <button class="expand-button">
-                  <i :class="expandedSteps.has(3) ? 'fa fa-chevron-up' : 'fa fa-chevron-down'"></i>
-                </button>
-              </div>
-            </div>
-            
-            <div v-show="expandedSteps.has(3) || currentStep === 3" class="step-content">
-              <div class="stake-section">
-                <!-- TACO Balance -->
-                <div class="taco-balance-display">
-                  <h5>Available TACO Balance:</h5>
-                  <div class="balance-amount">
-                    {{ formatBalance(tacoToken.balance, tacoToken.decimals) }} TACO
-                  </div>
-                  <div v-if="tacoToken.priceUSD && tacoToken.priceUSD > 0" class="balance-usd">
-                    ${{ formatUSDValue(tacoToken.balance, tacoToken.decimals, tacoToken.priceUSD) }}
-                  </div>
-                </div>
-
-                <!-- Staking Options -->
-                <div class="staking-options">
-
-                  <!-- Stake to Existing Neuron Section -->
-                  <div v-if="userNeurons.length > 0" class="staking-section">
-                    <h6 class="section-header">
-                      <i class="fa fa-plus me-2"></i>
-                      Stake to Existing Neuron
-                    </h6>
-                    <p class="section-description">
-                      Add more TACO tokens to your existing neurons. Each dialog will let you specify the amount.
-                    </p>
-                    <div class="neurons-list">
-                      <div v-for="neuron in userNeurons" :key="neuron.idHex" class="neuron-item" :class="neuron.relationship">
-                        <div class="neuron-info">
-                          <div class="neuron-name">
-                            <i v-if="neuron.relationship === 'owned'" class="fa fa-crown me-1" title="Owned"></i>
-                            <i v-else-if="neuron.relationship === 'hotkeyed'" class="fa fa-key me-1" title="Hotkeyed"></i>
-                            {{ neuron.displayName }}
-                          </div>
-                          <div class="neuron-stake">
-                            Stake: {{ formatBalance(neuron.stake, 8) }} TACO
-                          </div>
-                        </div>
-                        <button 
-                          @click="stakeToExistingNeuron(neuron)"
-                          class="btn btn-outline-primary btn-sm"
-                          :disabled="!hasTacoTokens || isStaking"
-                        >
-                          <i v-if="isStaking" class="fa fa-spinner fa-spin me-1"></i>
-                          <i v-else class="fa fa-plus me-1"></i>
-                          {{ isStaking ? 'Staking...' : 'Add Stake' }}
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-
-                  <!-- Create New Neuron Section -->
-                  <div class="staking-section">
-                    <h6 class="section-header">
-                      <i class="fa fa-brain me-2"></i>
-                      Create New Neuron
-                    </h6>
-                    <div class="create-neuron-content">
-                      <p class="section-description">
-                        Create a new neuron with your TACO tokens. The dialog will let you specify the amount and dissolve period.
-                      </p>
-                      
-                      <button 
-                        @click="createNewNeuron"
-                        class="btn btn-success btn-lg"
-                        :disabled="!hasTacoTokens || isStaking"
-                      >
-                        <i v-if="isStaking" class="fa fa-spinner fa-spin me-2"></i>
-                        <i v-else class="fa fa-brain me-2"></i>
-                        {{ isStaking ? 'Creating...' : 'Create New Neuron' }}
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
-                <!-- Success Message -->
-                <div v-if="stakingComplete" class="success-message">
-                  <div class="alert alert-success">
-                    <i class="fa fa-check-circle me-2"></i>
-                    <strong>Congratulations!</strong> You've successfully completed the Swap & Stake process. 
-                    Your TACO tokens are now staked and earning rewards!
-                  </div>
-                  <div class="final-actions">
-                    <button @click="goToWallet" class="btn btn-outline-primary me-3">
-                      <i class="fa fa-wallet me-2"></i>
-                      View Wallet
-                    </button>
-                    <button @click="resetWizard" class="btn btn-outline-secondary">
-                      <i class="fa fa-refresh me-2"></i>
-                      Start Over
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
           </div>
 
         </div>
 
       </div>
+
+      <!-- message bottom -->
+      <div class="wizard__message__dialog__bottom p-2">
+
+        <!-- message bottom left -->
+        <div class="taco-text-black-to-white"></div>
+
+        <!-- message bottom right -->
+        <div class="taco-text-black-to-white">
+
+          <!-- close button -->
+          <button class="btn taco-nav-btn"
+                  @click="toggleTacoWizard">
+            Close
+          </button>
+
+        </div>
+
+      </div>
+
     </div>
+    
+  </div>    
 
-    <!-- Swap Dialog -->
-    <SwapDialog
-      :show="showSwapDialog"
-      :preselected-token="preselectedSwapToken"
-      :available-tokens="allTokens"
-      @close="closeSwapDialog"
-      @confirm="handleSwapConfirm"
-    />
-
-    <!-- Swap Confirm Dialog -->
-    <SwapConfirmDialog
-      :show="showSwapConfirmDialog"
-      :swap-data="swapConfirmData"
-      @close="closeSwapConfirmDialog"
-      @success="handleSwapSuccess"
-      @error="handleSwapError"
-    />
-
-    <!-- Stake to Neuron Dialog -->
-    <StakeToNeuronDialog
-      :show="showStakeDialog"
-      :neuron="selectedNeuron"
-      :taco-balance="tacoToken.balance"
-      @close="closeStakeDialog"
-      @staked="handleStakeCompleted"
-    />
-
-    <!-- Create Neuron Dialog -->
-    <CreateNeuronDialog
-      :show="showCreateDialog"
-      :taco-balance="tacoToken.balance"
-      :prefilled-amount="maxTacoAmount"
-      @close="closeCreateDialog"
-      @created="handleNeuronCreated"
-    />
-
-    <!-- Swap & Stake Progress Dialog -->
-    <SwapStakeProgressDialog
-      ref="progressDialog"
-      :show="showProgressDialog"
-      @close="closeProgressDialog"
-    />
-
-  </div>
 </template>
 
+<style scoped lang="scss">
+
+  // wizard
+  .wizard {
+
+    // message modal
+    &__message {
+      position: fixed;
+      top: 0;
+      left: 0;
+      display: flex;
+      justify-content: center;
+      align-items: start;
+      width: 100%;
+      height: 100%;
+      background-color: var(--curtain-bg);
+      z-index: 1001;
+      margin: 0;
+      padding: 0;
+      overflow: auto;
+
+      // dialog
+      &__dialog {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        width: 100%;
+        max-width: 65rem;
+        border-radius: 0.5rem;
+        background-color: var(--light-orange-to-dark-brown);
+        border: 1px solid var(--dark-orange);
+        overflow: clip;
+        margin: 2rem 2rem 2rem;
+        container: wizard-dialog / inline-size;
+
+        // container queries
+        @container wizard-dialog (inline-size > 600px) {
+          // placeholder
+        }
+        @container wizard-dialog (inline-size < 600px) {
+          .wizard__top {
+            flex-direction: column;
+            align-items: center;
+            gap: 0.5rem;
+          }
+          .wizard__top__right {
+            text-align: center;
+            padding-bottom: 1rem;
+          }
+          .wizard__step {
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+          }
+          .wizard__step__content {
+            display: flex;
+            flex-direction: column;
+            padding: 0rem 1rem 1rem;
+            justify-content: center;
+            width: 100%;
+          }
+          .wizard-custom-spacing-1 {
+            margin-bottom: 1rem !important;
+          }
+          .wizard-custom-spacing-2 {
+            margin-bottom: 0.5rem !important;
+          }
+
+        }
+
+        // top and bottom
+        &__top, &__bottom {
+          display: flex;
+          width: 100%;
+          justify-content: space-between;
+          background-color: var(--dark-orange);
+        }
+
+        // top
+        &__top {
+          
+          &__right {
+            flex-grow: 1;
+          }
+
+        }
+
+        // middle
+        &__middle {
+          width: 100%;
+        }        
+
+        // bottom
+        &__bottom {
+          // placeholder
+          min-height: 0;
+        }
+
+      }
+
+    }
+
+    // top
+    &__top {
+      display: flex;
+      align-items: end;
+      justify-content: space-between;
+      gap: 3rem;
+      padding: 2rem 2rem 0rem 2rem;
+
+      &__right {
+        padding-bottom: 1.5rem;
+      }
+
+      p {
+        color: var(--black-to-white);
+        margin-bottom: 0.5rem;
+        font-size: 1rem;
+      }
+
+    }
+
+    // bottom
+    &__bottom {
+      padding: 0rem 2rem 0rem 2rem;
+
+      p {
+        color: var(--black-to-white);
+        margin-bottom: 0.5rem;
+        font-size: 1rem;
+      }
+
+    }
+    // wizard steps
+    &__steps {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+      padding-bottom: 1.5rem;
+    }
+
+    // wizard step
+    &__step {
+      display: flex;
+      background-color: var(--orange-to-brown);
+      border-radius: 0.5rem;
+      border: 1px solid var(--dark-orange);
+
+      // info
+      &__info {
+        padding: 1.5rem;
+      }
+
+      // circle
+      &__circle {
+        aspect-ratio: 1/1;
+        width: 10rem;
+        height: 10rem;
+        border-radius: 999rem;
+        background-color: var(--light-orange-to-light-brown);
+        // border: 1px solid var(--dark-orange);
+        border: none;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        
+        // circle number
+        &__number {
+          color: var(--dark-brown-to-white);
+          font-size: 4rem;
+          font-weight: 800;
+          font-family: 'Rubik', sans-serif;
+          line-height: 1;
+        }
+
+        // circle text
+        &__text {
+          color: var(--dark-brown-to-white);
+          display: block;
+          font-size: 1rem;
+          font-weight: 500;
+          font-family: 'Rubik', sans-serif;
+          line-height: 1.125;
+        }
+
+        // completed
+        &--completed {
+          background-color: var(--green-to-success-green);
+
+          .wizard__step__circle__number {
+            color: var(--white-to-black);
+          }
+
+          .wizard__step__circle__text {
+            color: var(--white-to-black);
+          }
+
+        }
+
+      }
+
+      // content
+      &__content {
+        padding: 1.5rem 1.5rem 0 0;
+      }
+
+      // link
+      &__link {
+        font-family: 'Space Mono';
+        color: var(--brown-to-dark-orange);
+      }
+
+      // dropdown
+      &__dropdown {
+        position: relative;
+        display: inline-block;
+        background-color: transparent;
+      }
+
+      &__dropdown__menu {
+        position: absolute;
+        top: 100%;
+        left: 0;
+        color: var(--black-to-white);
+        background-color: var(--light-orange-to-light-brown);
+        border: 1px solid var(--dark-orange);
+        border-radius: 0.5rem;
+        overflow: hidden;
+        overflow-y: auto;
+        z-index: 1002;
+        margin-top: 0.25rem;
+      }
+
+      &__dropdown__item {
+        padding: 0.5rem 0.75rem;
+        cursor: pointer;
+        color: var(--black-to-white);
+        white-space: nowrap;
+      }
+
+      &__dropdown__item:hover {
+        background-color: var(--orange-to-brown);
+      }
+
+      // completed
+      &--completed {
+        align-items: center;
+
+        .wizard__step__content {
+          padding: 0;
+          p {
+            margin-bottom: 0;
+          }
+        }
+      }
+
+    }
+
+    // loading
+    &__loading {
+      padding: 0 2rem 1rem;
+
+      // loading content
+      &__content {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        width: 100%;
+        background-color: var(--orange-to-brown);
+        border-radius: 0.5rem;
+        border: 1px solid var(--dark-orange);
+      }
+
+    }
+
+  }
+
+</style>
+
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
+
+/////////////
+// Imports //
+/////////////
+
+import { ref, computed, onMounted, watch, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
 import { Principal } from '@dfinity/principal'
 import { useTacoStore } from '../stores/taco.store'
 import { useKongStore } from '../stores/kong.store'
 import { useICPSwapStore } from '../stores/icpswap.store'
+import { storeToRefs } from 'pinia'
 import { getLegacyAccountId } from '../utils/accountUtils'
 import { useClipboard } from '@vueuse/core'
 import { tokenImages } from '../components/data/TokenData'
@@ -625,6 +646,18 @@ import SwapConfirmDialog from '../components/wallet/SwapConfirmDialog.vue'
 import StakeToNeuronDialog from '../components/wallet/StakeToNeuronDialog.vue'
 import CreateNeuronDialog from '../components/wallet/CreateNeuronDialog.vue'
 import SwapStakeProgressDialog from '../components/wallet/SwapStakeProgressDialog.vue'
+import ChefWizard from '../components/misc/chefWizard.vue'
+import DfinityLogo from '../assets/images/dfinityLogo.vue'
+
+///////////
+// Setup //
+///////////
+const router = useRouter()
+const { copy } = useClipboard()
+
+////////////////
+// Interfaces //
+////////////////
 
 interface WalletToken {
   principal: string
@@ -638,15 +671,27 @@ interface WalletToken {
   isRegistered?: boolean
 }
 
-const router = useRouter()
+////////////
+// Stores //
+////////////
+
+// # SETUP #
 const tacoStore = useTacoStore()
 const kongStore = useKongStore()
 const icpswapStore = useICPSwapStore()
-const { copy } = useClipboard()
 
-// State
+// # STATE #
+const { tacoWizardOpen, userLoggedIn, userPrincipal } = storeToRefs(tacoStore)
+
+// # ACTIONS #
+const { toggleTacoWizard } = tacoStore
+const { ensureTokenDetails } = tacoStore
+const { getUserNeurons } = tacoStore
+
+
+
 const loading = ref(true)
-const currentStep = ref(1)
+// const currentStep = ref(1)
 const expandedSteps = ref<Set<number>>(new Set([1]))
 const selectedGetTokenSymbol = ref('ICP')
 const selectedSwapFromToken = ref('')
@@ -680,7 +725,47 @@ const progressDialog = ref<any>(null)
 const preselectedSwapToken = ref<WalletToken | null>(null)
 const swapConfirmData = ref<any | null>(null)
 
-// Computed properties
+// dropdown state
+const isTokenDropdownOpen = ref(false)
+const tokenDropdownRef = ref<HTMLElement | null>(null)
+const isSwapDropdownOpen = ref(false)
+const swapDropdownRef = ref<HTMLElement | null>(null)
+
+const closeTokenDropdownOnClickOutside = (e: MouseEvent) => {
+  const target = e.target as Node
+  if (isTokenDropdownOpen.value && tokenDropdownRef.value && !tokenDropdownRef.value.contains(target)) {
+    isTokenDropdownOpen.value = false
+  }
+  if (isSwapDropdownOpen.value && swapDropdownRef.value && !swapDropdownRef.value.contains(target)) {
+    isSwapDropdownOpen.value = false
+  }
+}
+
+const selectToken = (symbol: string) => {
+  selectedGetTokenSymbol.value = symbol
+  isTokenDropdownOpen.value = false
+}
+
+const selectSwapToken = (principal: string) => {
+  selectedSwapFromToken.value = principal
+  isSwapDropdownOpen.value = false
+  onStep2DropdownChange()
+}
+
+/////////////////////
+// Local Variables //
+/////////////////////
+
+// fetched ICRC1 balance of ICP
+const fetchedIcpBalance = ref<bigint>(0n)
+
+// fetched ICRC1 balance of TACO
+const fetchedTacoBalance = ref<bigint>(0n)
+
+/////////////////////////
+// Computed Properties //
+/////////////////////////
+
 const icpAccountId = computed(() => {
   if (tacoStore.userLoggedIn && tacoStore.userPrincipal) {
     return getLegacyAccountId(tacoStore.userPrincipal)
@@ -879,16 +964,100 @@ const swapOutputAmount = computed(() => {
 
 
 // Methods
+
+// fetch ICRC1 balance of ICP
+const fetchIcrc1BalanceOfIcp = async () => {
+
+  // try
+  try {
+
+    // fetch ICRC1 balance of ICP
+    const balance = await tacoStore.icrc1BalanceOf('ryjl3-tyaaa-aaaaa-aaaba-cai', Principal.fromText(tacoStore.userPrincipal))
+
+    // log
+    console.log('icp balance:', balance)
+
+    // account for 8 zero decimals
+    const balanceWithDecimals = Number(balance as bigint) / 10 ** 8
+
+    // log
+    console.log('icp balanceWithDecimals:', balanceWithDecimals)
+
+    // set fetched ICP balance
+    fetchedIcpBalance.value = balanceWithDecimals
+
+    // // log
+    // console.log('fetchedIcpBalance:', fetchedIcpBalance.value)
+
+  } 
+  
+  // catch
+  catch (error) {
+
+    // log error
+    console.error('Error fetching ICRC1 balance of ICP:', error)
+
+    // set fetched ICP balance to 0
+    fetchedIcpBalance.value = 0n
+
+  }
+  
+}
+const fetchIcrc1BalanceOfTaco = async () => {
+
+  // // log
+  // console.log('fetching taco balance...')
+
+// try
+try {
+
+  // fetch ICRC1 balance of TACO
+  const balance = await tacoStore.icrc1BalanceOf('kknbx-zyaaa-aaaaq-aae4a-cai', Principal.fromText(tacoStore.userPrincipal))
+
+  // // log
+  // console.log('taco balance:', balance)
+
+  // account for 8 zero decimals
+  const balanceWithDecimals = Number(balance as bigint) / 10 ** 8
+
+  // // log
+  // console.log('taco balanceWithDecimals:', balanceWithDecimals)
+
+  // set fetched TACO balance
+  fetchedTacoBalance.value = balanceWithDecimals
+
+  // // log
+  // console.log('fetchedTacoBalance:', fetchedTacoBalance.value)
+
+} 
+
+// catch
+catch (error) {
+
+  // log error
+  console.error('Error fetching ICRC1 balance of ICP:', error)
+
+  // set fetched ICP balance to 0
+  fetchedIcpBalance.value = 0n
+
+}
+
+}
+
 const loadWalletData = async () => {
   try {
     loading.value = true
     
-    await Promise.all([
-      tacoStore.fetchTokenDetails(),
-      fetchUserRegisteredTokens(),
-      loadUserNeurons()
-    ])
-    
+    // await Promise.all([
+    //   tacoStore.fetchTokenDetails(),
+    //   fetchUserRegisteredTokens(),
+    //   loadUserNeurons()
+    // ])
+
+    await ensureTokenDetails()
+
+    await fetchUserRegisteredTokens()
+    await loadUserNeurons()  
     await loadTrustedTokenMetadata()
     await loadAllBalances()
     
@@ -1115,19 +1284,19 @@ const syncSwapTokenSelection = () => {
 }
 
 const initializeTokenSelections = () => {
-  // Set both dropdowns to ICP by default
-  selectedGetTokenSymbol.value = 'ICP'
+  // // Set both dropdowns to ICP by default
+  // selectedGetTokenSymbol.value = 'ICP'
   
-  // Find ICP token and set step 2 dropdown
-  const icpToken = allTokens.value.find(t => t.symbol === 'ICP')
-  if (icpToken) {
-    selectedSwapFromToken.value = icpToken.principal
-    // Fetch quotes for initial selection
-    setTimeout(() => fetchSwapQuotes(), 100)
-  }
+  // // Find ICP token and set step 2 dropdown
+  // const icpToken = allTokens.value.find(t => t.symbol === 'ICP')
+  // if (icpToken) {
+  //   selectedSwapFromToken.value = icpToken.principal
+  //   // Fetch quotes for initial selection
+  //   setTimeout(() => fetchSwapQuotes(), 100)
+  // }
   
-  // Reset the manual change flag
-  userChangedStep2Selection.value = false
+  // // Reset the manual change flag
+  // userChangedStep2Selection.value = false
 }
 
 const onStep2DropdownChange = () => {
@@ -1135,88 +1304,84 @@ const onStep2DropdownChange = () => {
   userChangedStep2Selection.value = true
 }
 
-const determineStartingStep = () => {
-  const minimumSwapThreshold = 100000000n // 1 ICP equivalent threshold
+// const determineStartingStep = () => {
+//   const minimumSwapThreshold = 100000000n // 1 ICP equivalent threshold
   
-  // If user has TACO, go to staking step
-  if (hasTacoTokens.value) {
-    currentStep.value = 3
-    expandedSteps.value = new Set([3])
-    return
-  }
+//   // If user has TACO, go to staking step
+//   if (hasTacoTokens.value) {
+//     currentStep.value = 3
+//     expandedSteps.value = new Set([3])
+//     return
+//   }
   
-  // If user has swappable tokens above threshold, go to swap step
-  if (hasSwappableTokens.value) {
-    const hasSignificantTokens = swappableTokens.value.some(token => 
-      token.balance > minimumSwapThreshold || 
-      (token.priceUSD && token.priceUSD > 0 && 
-       (Number(token.balance) / (10 ** token.decimals)) * token.priceUSD >= 1)
-    )
+//   // If user has swappable tokens above threshold, go to swap step
+//   if (hasSwappableTokens.value) {
+//     const hasSignificantTokens = swappableTokens.value.some(token => 
+//       token.balance > minimumSwapThreshold || 
+//       (token.priceUSD && token.priceUSD > 0 && 
+//        (Number(token.balance) / (10 ** token.decimals)) * token.priceUSD >= 1)
+//     )
     
-    if (hasSignificantTokens) {
-      currentStep.value = 2
-      expandedSteps.value = new Set([2])
-      return
-    }
-  }
+//     if (hasSignificantTokens) {
+//       currentStep.value = 2
+//       expandedSteps.value = new Set([2])
+//       return
+//     }
+//   }
   
-  // Otherwise start with getting tokens
-  currentStep.value = 1
-  expandedSteps.value = new Set([1])
-}
+//   // Otherwise start with getting tokens
+//   currentStep.value = 1
+//   expandedSteps.value = new Set([1])
+// }
 
-const toggleStep = (step: number) => {
-  if (expandedSteps.value.has(step)) {
-    expandedSteps.value.delete(step)
-  } else {
-    expandedSteps.value.add(step)
-  }
-}
+// const toggleStep = (step: number) => {
+//   if (expandedSteps.value.has(step)) {
+//     expandedSteps.value.delete(step)
+//   } else {
+//     expandedSteps.value.add(step)
+//   }
+// }
 
-const goToStep = (step: number) => {
-  currentStep.value = step
-  expandedSteps.value = new Set([step])
-}
+// const goToStep = (step: number) => {
+//   currentStep.value = step
+//   expandedSteps.value = new Set([step])
+// }
 
-const copyToClipboard = async (text: string) => {
-  try {
-    await copy(text)
-    tacoStore.addToast({
-      id: Date.now(),
-      code: 'copy-success',
-      title: 'Copied!',
-      icon: 'fa-solid fa-check',
-      message: 'Address copied to clipboard'
-    })
-  } catch (error) {
-    console.error('Failed to copy to clipboard:', error)
-    tacoStore.addToast({
-      id: Date.now(),
-      code: 'copy-error',
-      title: 'Copy Failed',
-      icon: 'fa-solid fa-exclamation-triangle',
-      message: 'Failed to copy to clipboard'
-    })
-  }
-}
+// const copyToClipboard = async (text: string) => {
+//   try {
+//     await copy(text)
+//     tacoStore.addToast({
+//       id: Date.now(),
+//       code: 'copy-success',
+//       title: 'Copied!',
+//       icon: 'fa-solid fa-check',
+//       message: 'Address copied to clipboard'
+//     })
+//   } catch (error) {
+//     console.error('Failed to copy to clipboard:', error)
+//     tacoStore.addToast({
+//       id: Date.now(),
+//       code: 'copy-error',
+//       title: 'Copy Failed',
+//       icon: 'fa-solid fa-exclamation-triangle',
+//       message: 'Failed to copy to clipboard'
+//     })
+//   }
+// }
 
 const getTokenByPrincipal = (principal: string): WalletToken | undefined => {
   return allTokens.value.find(t => t.principal === principal)
 }
 
-const getTokenBalance = (symbol: string): bigint => {
-  const token = allTokens.value.find(t => t.symbol === symbol)
-  return token ? token.balance : 0n
-}
+// const getTokenBalance = (symbol: string): bigint => {
+//   const token = allTokens.value.find(t => t.symbol === symbol)
+//   return token ? token.balance : 0n
+// }
 
-const getTokenDecimals = (symbol: string): number => {
-  const token = allTokens.value.find(t => t.symbol === symbol)
-  return token ? token.decimals : 8
-}
-
-
-
-
+// const getTokenDecimals = (symbol: string): number => {
+//   const token = allTokens.value.find(t => t.symbol === symbol)
+//   return token ? token.decimals : 8
+// }
 
 const performSwap = async () => {
   if (!canSwap.value) return
@@ -1551,12 +1716,10 @@ const handleSwapError = (error: string) => {
   })
 }
 
-const stakeToExistingNeuron = (neuron: any) => {
-  selectedNeuron.value = neuron
-  showStakeDialog.value = true
-}
-
-
+// const stakeToExistingNeuron = (neuron: any) => {
+//   selectedNeuron.value = neuron
+//   showStakeDialog.value = true
+// }
 
 const createNewNeuron = () => {
   showCreateDialog.value = true
@@ -1613,98 +1776,94 @@ const handleNeuronCreated = async () => {
   })
 }
 
+// const goToWallet = () => {
+//   router.push('/wallet')
+// }
 
+// const resetWizard = () => {
+//   currentStep.value = 1
+//   expandedSteps.value = new Set([1])
+//   selectedSwapFromToken.value = ''
+//   stakingComplete.value = false
+//   isSwapAndStake.value = false
+//   loadWalletData()
+// }
 
-
-
-const goToWallet = () => {
-  router.push('/wallet')
-}
-
-const resetWizard = () => {
-  currentStep.value = 1
-  expandedSteps.value = new Set([1])
-  selectedSwapFromToken.value = ''
-  stakingComplete.value = false
-  isSwapAndStake.value = false
-  loadWalletData()
-}
-
-const registerCustomToken = async () => {
-  if (!newTokenPrincipal.value.trim()) return
+// const registerCustomToken = async () => {
+//   if (!newTokenPrincipal.value.trim()) return
   
-  try {
-    registeringToken.value = true
+//   try {
+//     registeringToken.value = true
     
-    // Validate principal format
-    try {
-      Principal.fromText(newTokenPrincipal.value.trim())
-    } catch (error) {
-      tacoStore.addToast({
-        id: Date.now(),
-        code: 'invalid-principal',
-        title: 'Invalid Principal',
-        icon: 'fa-solid fa-exclamation-triangle',
-        message: 'Please enter a valid principal ID'
-      })
-      return
-    }
+//     // Validate principal format
+//     try {
+//       Principal.fromText(newTokenPrincipal.value.trim())
+//     } catch (error) {
+//       tacoStore.addToast({
+//         id: Date.now(),
+//         code: 'invalid-principal',
+//         title: 'Invalid Principal',
+//         icon: 'fa-solid fa-exclamation-triangle',
+//         message: 'Please enter a valid principal ID'
+//       })
+//       return
+//     }
     
-    // Check if token is already registered
-    if (userRegisteredTokenPrincipals.value.includes(newTokenPrincipal.value.trim())) {
-      tacoStore.addToast({
-        id: Date.now(),
-        code: 'already-registered',
-        title: 'Already Registered',
-        icon: 'fa-solid fa-exclamation-triangle',
-        message: 'This token is already in your wallet'
-      })
-      return
-    }
+//     // Check if token is already registered
+//     if (userRegisteredTokenPrincipals.value.includes(newTokenPrincipal.value.trim())) {
+//       tacoStore.addToast({
+//         id: Date.now(),
+//         code: 'already-registered',
+//         title: 'Already Registered',
+//         icon: 'fa-solid fa-exclamation-triangle',
+//         message: 'This token is already in your wallet'
+//       })
+//       return
+//     }
     
-    // Register the token
-    await tacoStore.registerUserToken(newTokenPrincipal.value.trim())
+//     // Register the token
+//     await tacoStore.registerUserToken(newTokenPrincipal.value.trim())
     
-    // Clear input and refresh
-    const registeredPrincipal = newTokenPrincipal.value.trim()
-    newTokenPrincipal.value = ''
+//     // Clear input and refresh
+//     const registeredPrincipal = newTokenPrincipal.value.trim()
+//     newTokenPrincipal.value = ''
     
-    // Refresh registered tokens list
-    await fetchUserRegisteredTokens()
+//     // Refresh registered tokens list
+//     await fetchUserRegisteredTokens()
     
-    // Load balance for the new token
-    await loadAllBalances()
+//     // Load balance for the new token
+//     await loadAllBalances()
     
-    // Get the metadata for the registered token for the toast
-    const metadata = customTokenMetadata.value.get(registeredPrincipal)
-    const tokenName = metadata?.symbol || 'Custom Token'
+//     // Get the metadata for the registered token for the toast
+//     const metadata = customTokenMetadata.value.get(registeredPrincipal)
+//     const tokenName = metadata?.symbol || 'Custom Token'
     
-    tacoStore.addToast({
-      id: Date.now(),
-      code: 'register-success',
-      title: 'Token Registered',
-      icon: 'fa-solid fa-check',
-      message: `${tokenName} added to your wallet`
-    })
+//     tacoStore.addToast({
+//       id: Date.now(),
+//       code: 'register-success',
+//       title: 'Token Registered',
+//       icon: 'fa-solid fa-check',
+//       message: `${tokenName} added to your wallet`
+//     })
     
-    // Update the dropdown to include the new token
-    if (metadata?.symbol && metadata.symbol !== 'TACO') {
-      selectedGetTokenSymbol.value = metadata.symbol
-    }
+//     // Update the dropdown to include the new token
+//     if (metadata?.symbol && metadata.symbol !== 'TACO') {
+//       selectedGetTokenSymbol.value = metadata.symbol
+//     }
     
-  } catch (error) {
-    console.error('Error registering custom token:', error)
-    tacoStore.addToast({
-      id: Date.now(),
-      code: 'register-error',
-      title: 'Registration Failed',
-      icon: 'fa-solid fa-exclamation-triangle',
-      message: 'Failed to register custom token'
-    })
-  } finally {
-    registeringToken.value = false
-  }
-}
+//   } catch (error) {
+//     console.error('Error registering custom token:', error)
+//     tacoStore.addToast({
+//       id: Date.now(),
+//       code: 'register-error',
+//       title: 'Registration Failed',
+//       icon: 'fa-solid fa-exclamation-triangle',
+//       message: 'Failed to register custom token'
+//     })
+//   } finally {
+//     registeringToken.value = false
+//   }
+// }
 
 const formatBalance = (balance: bigint, decimals: number): string => {
   const divisor = BigInt(10 ** decimals)
@@ -1725,1091 +1884,102 @@ const formatBalance = (balance: bigint, decimals: number): string => {
   return `${wholePart}.${trimmedFractional}`
 }
 
-const formatUSDValue = (balance: bigint, decimals: number, priceUSD: number): string => {
-  const balanceNum = Number(balance) / (10 ** decimals)
-  const usdValue = balanceNum * priceUSD
+// const formatUSDValue = (balance: bigint, decimals: number, priceUSD: number): string => {
+//   const balanceNum = Number(balance) / (10 ** decimals)
+//   const usdValue = balanceNum * priceUSD
   
-  if (usdValue < 0.01) {
-    return '< 0.01'
-  }
+//   if (usdValue < 0.01) {
+//     return '< 0.01'
+//   }
   
-  return usdValue.toLocaleString('en-US', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2
-  })
-}
+//   return usdValue.toLocaleString('en-US', {
+//     minimumFractionDigits: 2,
+//     maximumFractionDigits: 2
+//   })
+// }
 
-// Watchers to sync token selections
-watch(selectedGetTokenSymbol, (newSymbol) => {
-  // Sync step 2 when step 1 changes (unless user manually changed step 2)
-  if (!newSymbol || allTokens.value.length === 0) return
-  syncSwapTokenSelection()
-})
+//////////////
+// Watchers //
+//////////////
 
-// Watch for swap token changes to fetch quotes
-watch(selectedSwapFromToken, (newToken) => {
-  if (newToken && allTokens.value.length > 0) {
-    fetchSwapQuotes()
-  }
-})
+// // Watchers to sync token selections
+// watch(selectedGetTokenSymbol, (newSymbol) => {
+//   // Sync step 2 when step 1 changes (unless user manually changed step 2)
+//   if (!newSymbol || allTokens.value.length === 0) return
+//   syncSwapTokenSelection()
+// })
 
-// Initialize selections when token data loads
-watch(allTokens, (newTokens) => {
-  if (newTokens.length > 0 && !selectedSwapFromToken.value) {
-    initializeTokenSelections()
-  }
-}, { deep: true })
+// // Watch for swap token changes to fetch quotes
+// watch(selectedSwapFromToken, (newToken) => {
+//   if (newToken && allTokens.value.length > 0) {
+//     fetchSwapQuotes()
+//   }
+// })
 
-// Lifecycle
+// // Initialize selections when token data loads
+// watch(allTokens, (newTokens) => {
+//   if (newTokens.length > 0 && !selectedSwapFromToken.value) {
+//     initializeTokenSelections()
+//   }
+// }, { deep: true })
+
+/////////////////////
+// Lifecycle Hooks //
+/////////////////////
+
+// on mounted
 onMounted(async () => {
+
+  // try
   try {
+
+    // wait for authentication to be checked first
     await tacoStore.checkIfLoggedIn()
+
+    // wait for 100ms
     await new Promise(resolve => setTimeout(resolve, 100))
-    
+
+    await fetchIcrc1BalanceOfIcp()
+    await fetchIcrc1BalanceOfTaco()
+
+    // if user is logged in
     if (tacoStore.userLoggedIn) {
+
+      selectedGetTokenSymbol.value = 'ICP'
+
+      await loadUserNeurons()
+
+      // load wallet data
       await loadWalletData()
       
       // Initialize token selections after data loads
       if (allTokens.value.length > 0) {
         initializeTokenSelections()
       }
-    } else {
+
+    } 
+    
+    // else user not logged in
+    else {
+
+      // turn app loading off
       loading.value = false
+
     }
-  } catch (error) {
+
+  } 
+  
+  // catch
+  catch (error) {
+
+    // log error
     console.error('Error in wizard onMounted:', error)
+
+    // turn app loading off
     loading.value = false
+
   }
+
 })
+
 </script>
-
-<style scoped>
-.page-title {
-  margin-bottom: 2rem;
-  padding-bottom: 1rem;
-  border-bottom: 1px solid var(--border-color);
-}
-
-.page-title h1 {
-  font-size: 2.5rem;
-  font-weight: 600;
-  margin-bottom: 0.5rem;
-  color: white;
-}
-
-.wizard-container {
-  max-width: 1000px;
-  margin: 0 auto;
-}
-
-.wizard-progress {
-  margin-bottom: 2rem;
-  padding: 1.5rem;
-  background: linear-gradient(135deg, #1a202c, #2d3748);
-  border-radius: 12px;
-  border: 1px solid #4a5568;
-}
-
-.progress-steps {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 1rem;
-}
-
-.step {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  text-align: center;
-  min-width: 120px;
-}
-
-.step-number {
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 600;
-  font-size: 1.1rem;
-  margin-bottom: 0.5rem;
-  transition: all 0.3s ease;
-  background: #4a5568;
-  color: #a0aec0;
-  border: 2px solid #4a5568;
-}
-
-.step.active .step-number {
-  background: var(--primary-color);
-  color: white;
-  border-color: var(--primary-color);
-}
-
-.step.completed .step-number {
-  background: var(--success-color);
-  color: white;
-  border-color: var(--success-color);
-}
-
-.step.current .step-number {
-  background: var(--primary-color);
-  color: white;
-  border-color: var(--primary-color);
-  box-shadow: 0 0 0 4px rgba(var(--primary-color-rgb), 0.2);
-  transform: scale(1.1);
-}
-
-.step-label {
-  font-size: 0.9rem;
-  font-weight: 500;
-  color: #a0aec0;
-}
-
-.step.active .step-label {
-  color: white;
-}
-
-.step-connector {
-  flex: 1;
-  height: 2px;
-  background: #4a5568;
-  transition: all 0.3s ease;
-}
-
-.step-connector.completed {
-  background: var(--success-color);
-}
-
-.wizard-step-card {
-  background: #2d3748;
-  border: 1px solid #4a5568;
-  border-radius: 12px;
-  margin-bottom: 1.5rem;
-  overflow: hidden;
-  transition: all 0.3s ease;
-}
-
-.wizard-step-card:hover {
-  border-color: #718096;
-}
-
-.step-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 1.5rem;
-  cursor: pointer;
-  transition: background-color 0.2s ease;
-}
-
-.step-header:hover {
-  background: rgba(255, 255, 255, 0.05);
-}
-
-.step-info {
-  flex: 1;
-}
-
-.step-title {
-  font-size: 1.25rem;
-  font-weight: 600;
-  margin-bottom: 0.5rem;
-  color: white;
-}
-
-.step-description {
-  color: #a0aec0;
-  margin: 0;
-}
-
-.step-controls {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-}
-
-.current-step-badge {
-  background: var(--primary-color);
-  color: white;
-  padding: 0.5rem 1rem;
-  border-radius: 20px;
-  font-size: 0.85rem;
-  font-weight: 500;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.completed-badge {
-  background: var(--success-color);
-  color: white;
-  padding: 0.5rem 1rem;
-  border-radius: 20px;
-  font-size: 0.85rem;
-  font-weight: 500;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.expand-button {
-  background: none;
-  border: none;
-  color: #a0aec0;
-  font-size: 1.2rem;
-  padding: 0.5rem;
-  border-radius: 6px;
-  transition: all 0.2s ease;
-}
-
-.expand-button:hover {
-  color: white;
-  background: rgba(255, 255, 255, 0.1);
-}
-
-.step-content {
-  padding: 0 1.5rem 1.5rem 1.5rem;
-  border-top: 1px solid #4a5568;
-  animation: slideDown 0.3s ease-out;
-}
-
-@keyframes slideDown {
-  from {
-    opacity: 0;
-    transform: translateY(-10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.get-tokens-section,
-.swap-section,
-.stake-section {
-  display: flex;
-  flex-direction: column;
-  gap: 1.5rem;
-}
-
-.token-selection,
-.swap-input,
-.amount-input,
-.stake-amount-input {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.form-label {
-  font-weight: 600;
-  color: white;
-  margin-bottom: 0.5rem;
-}
-
-.form-select,
-.form-control {
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  color: white;
-  border-radius: 6px;
-}
-
-.form-select option {
-  background: #2d3748;
-  color: white;
-}
-
-.form-select:focus,
-.form-control:focus {
-  background: rgba(255, 255, 255, 0.15);
-  border-color: var(--primary-color);
-  box-shadow: 0 0 0 0.2rem rgba(var(--primary-color-rgb), 0.25);
-  color: white;
-}
-
-.form-control::placeholder {
-  color: rgba(255, 255, 255, 0.5);
-}
-
-.instruction-card {
-  background: rgba(0, 123, 255, 0.1);
-  border: 1px solid rgba(0, 123, 255, 0.3);
-  border-radius: 8px;
-  padding: 1.5rem;
-}
-
-.instruction-header {
-  display: flex;
-  align-items: center;
-  margin-bottom: 1rem;
-  color: #87ceeb;
-}
-
-.instruction-list {
-  margin: 0;
-  padding-left: 1.5rem;
-  color: #a0aec0;
-}
-
-.instruction-list li {
-  margin-bottom: 0.5rem;
-}
-
-.account-display {
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 8px;
-  padding: 1rem;
-}
-
-.account-header h6 {
-  color: white;
-  margin-bottom: 0.75rem;
-}
-
-.account-id-container {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  margin-bottom: 0.5rem;
-}
-
-.account-id {
-  font-family: 'Courier New', monospace;
-  background: #1a202c;
-  border: 1px solid #4a5568;
-  border-radius: 4px;
-  padding: 0.5rem;
-  color: white;
-  word-break: break-all;
-  flex: 1;
-  font-size: 0.85rem;
-}
-
-.register-token-section {
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 8px;
-  padding: 1.5rem;
-  margin-bottom: 1.5rem;
-}
-
-.register-token-section h6 {
-  color: white;
-  margin-bottom: 0.75rem;
-  font-weight: 600;
-}
-
-.register-token-form {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.register-token-form .input-group {
-  display: flex;
-  gap: 0.5rem;
-}
-
-.register-token-form .form-control {
-  flex: 1;
-}
-
-.register-token-form .btn {
-  white-space: nowrap;
-}
-
-.current-balance {
-  background: rgba(255, 255, 255, 0.05);
-  border-radius: 8px;
-  padding: 1rem;
-}
-
-.current-balance h6 {
-  color: white;
-  margin-bottom: 0.75rem;
-}
-
-.balance-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: 0.75rem;
-}
-
-.balance-item {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  padding: 0.75rem;
-  background: rgba(255, 255, 255, 0.05);
-  border-radius: 6px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.balance-token-logo {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  border: 2px solid rgba(255, 255, 255, 0.2);
-}
-
-.balance-info {
-  flex: 1;
-}
-
-.balance-amount {
-  font-weight: 600;
-  color: white;
-  font-size: 0.9rem;
-}
-
-.balance-usd {
-  color: #a0aec0;
-  font-size: 0.8rem;
-}
-
-.no-tokens {
-  grid-column: 1 / -1;
-  text-align: center;
-  color: #a0aec0;
-  padding: 1rem;
-  font-style: italic;
-}
-
-.token-input-group {
-  display: flex;
-  gap: 0.5rem;
-}
-
-.token-info-display {
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 8px;
-  padding: 1rem;
-}
-
-.selected-token-info {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-}
-
-.token-logo-small {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  border: 2px solid rgba(255, 255, 255, 0.2);
-}
-
-.token-details .token-name {
-  font-weight: 600;
-  color: white;
-  margin-bottom: 0.25rem;
-}
-
-.token-details .token-balance {
-  color: #a0aec0;
-  font-size: 0.85rem;
-}
-
-.swap-arrow {
-  display: flex;
-  justify-content: center;
-  padding: 1rem 0;
-}
-
-.swap-arrow i {
-  font-size: 1.5rem;
-  color: var(--primary-color);
-  background: rgba(var(--primary-color-rgb), 0.1);
-  padding: 0.75rem;
-  border-radius: 50%;
-  border: 2px solid var(--primary-color);
-}
-
-.token-output-display {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  padding: 1rem;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 8px;
-}
-
-.token-logo {
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  border: 2px solid rgba(255, 255, 255, 0.2);
-}
-
-.token-info {
-  flex: 1;
-}
-
-.token-name {
-  font-weight: 600;
-  color: white;
-  margin-bottom: 0.25rem;
-}
-
-.token-balance {
-  color: #a0aec0;
-  font-size: 0.85rem;
-}
-
-.taco-balance-display {
-  text-align: center;
-  padding: 1.5rem;
-  background: rgba(0, 128, 0, 0.1);
-  border: 1px solid rgba(0, 128, 0, 0.3);
-  border-radius: 8px;
-}
-
-.taco-balance-display h5 {
-  color: white;
-  margin-bottom: 1rem;
-}
-
-.taco-balance-display .balance-amount {
-  font-size: 2rem;
-  font-weight: 700;
-  color: var(--success-color);
-  margin-bottom: 0.5rem;
-}
-
-.taco-balance-display .balance-usd {
-  color: #a0aec0;
-}
-
-.existing-neurons {
-  background: rgba(255, 255, 255, 0.05);
-  border-radius: 8px;
-  padding: 1rem;
-}
-
-.existing-neurons h6 {
-  color: white;
-  margin-bottom: 0.75rem;
-}
-
-.neurons-list {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-}
-
-.neuron-item {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 1rem;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 6px;
-  position: relative;
-}
-
-.neuron-item.owned {
-  border-left: 3px solid #ffd700; /* Gold for owned */
-}
-
-.neuron-item.hotkeyed {
-  border-left: 3px solid #87ceeb; /* Light blue for hotkeyed */
-}
-
-.neuron-name {
-  font-weight: 600;
-  color: white;
-  margin-bottom: 0.25rem;
-}
-
-.neuron-stake {
-  color: #a0aec0;
-  font-size: 0.85rem;
-  font-family: monospace;
-}
-
-.staking-options {
-  display: flex;
-  flex-direction: column;
-  gap: 2rem;
-}
-
-.staking-section {
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 8px;
-  padding: 1.5rem;
-}
-
-.section-header {
-  color: white;
-  margin-bottom: 1rem;
-  font-size: 1.1rem;
-  font-weight: 600;
-  display: flex;
-  align-items: center;
-  padding-bottom: 0.75rem;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.section-description {
-  color: #a0aec0;
-  margin-bottom: 1rem;
-  line-height: 1.5;
-}
-
-.create-neuron-content {
-  display: flex;
-  flex-direction: column;
-  gap: 1.5rem;
-}
-
-
-
-.create-neuron-content .btn-success {
-  align-self: center;
-}
-
-.swap-stake-info {
-  margin-bottom: 1.5rem;
-}
-
-.info-box {
-  background: rgba(0, 123, 255, 0.1);
-  border: 1px solid rgba(0, 123, 255, 0.3);
-  border-radius: 8px;
-  padding: 1rem;
-}
-
-.info-box h6 {
-  margin: 0 0 0.75rem 0;
-  color: #ffffff;
-  font-weight: 600;
-}
-
-.preview-items {
-  margin-bottom: 0.75rem;
-}
-
-.preview-item {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 0.5rem;
-  font-size: 0.9rem;
-}
-
-.preview-item:last-child {
-  margin-bottom: 0;
-}
-
-.preview-item .label {
-  color: #a0aec0;
-  font-weight: 500;
-}
-
-.preview-item .value {
-  color: #ffffff;
-  font-weight: 600;
-  text-align: right;
-}
-
-.info-note {
-  margin: 0;
-  padding: 0.5rem;
-  background: rgba(255, 255, 255, 0.05);
-  border-radius: 4px;
-  font-size: 0.85rem;
-  color: #a0aec0;
-  border-left: 3px solid rgba(0, 123, 255, 0.5);
-}
-
-.primary-action-btn {
-  border: 2px solid rgba(40, 167, 69, 0.6) !important;
-  box-shadow: 0 0 0 2px rgba(40, 167, 69, 0.2);
-  transition: all 0.2s ease;
-}
-
-.primary-action-btn:hover:not(:disabled) {
-  border-color: rgba(40, 167, 69, 0.8) !important;
-  box-shadow: 0 0 0 3px rgba(40, 167, 69, 0.3);
-  transform: translateY(-1px);
-}
-
-.register-token-section {
-  margin-top: 2rem;
-  padding: 1.5rem;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 8px;
-}
-
-.register-token-form {
-  margin-top: 1rem;
-}
-
-.register-token-form .input-group {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.75rem;
-  align-items: stretch;
-}
-
-.register-token-form .form-control {
-  flex: 1;
-  min-width: 250px;
-  max-width: 100%;
-}
-
-.register-token-form .btn {
-  flex-shrink: 0;
-  white-space: nowrap;
-  min-width: 140px;
-}
-
-@media (max-width: 768px) {
-  .register-token-form .input-group {
-    flex-direction: column;
-  }
-  
-  .register-token-form .form-control {
-    min-width: 100%;
-  }
-}
-
-.account-help-text {
-  color: #a0aec0 !important;
-  font-size: 0.85rem;
-  line-height: 1.4;
-  margin-top: 0.5rem;
-  display: block;
-}
-
-.token-balance-display {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-top: 0.75rem;
-  padding: 0.75rem;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 8px;
-}
-
-.balance-info {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-}
-
-.balance-label {
-  font-size: 0.875rem;
-  color: #a0aec0;
-  font-weight: 500;
-}
-
-.balance-amount {
-  font-size: 1rem;
-  font-weight: 600;
-  color: white;
-  font-family: monospace;
-}
-
-.refresh-btn {
-  flex-shrink: 0;
-  width: 36px;
-  height: 36px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 6px;
-  transition: all 0.2s ease;
-}
-
-.refresh-btn:hover:not(:disabled) {
-  transform: scale(1.05);
-}
-
-.refresh-btn:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.register-token-section {
-  margin-top: 1.5rem;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 8px;
-  overflow: hidden;
-}
-
-.register-token-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0.75rem 1rem;
-  background: rgba(255, 255, 255, 0.05);
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.register-token-header:hover {
-  background: rgba(255, 255, 255, 0.08);
-}
-
-.register-token-header h6 {
-  margin: 0;
-  font-size: 0.95rem;
-  font-weight: 600;
-  color: white;
-}
-
-.collapse-toggle-btn {
-  background: none;
-  border: none;
-  color: #a0aec0;
-  font-size: 0.875rem;
-  cursor: pointer;
-  padding: 0.25rem;
-  border-radius: 4px;
-  transition: all 0.2s ease;
-  pointer-events: none; /* Let the parent handle the click */
-}
-
-.register-token-header:hover .collapse-toggle-btn {
-  color: white;
-}
-
-.register-token-content {
-  padding: 1rem;
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
-  background: rgba(255, 255, 255, 0.02);
-}
-
-.register-token-content .section-description {
-  font-size: 0.875rem;
-  color: #a0aec0;
-  margin-bottom: 1rem;
-  line-height: 1.4;
-}
-
-.token-amount {
-  font-size: 1.1rem;
-  font-weight: 600;
-  color: #ffffff;
-}
-
-.amount-display {
-  color: #ffffff;
-}
-
-.loading-text {
-  color: #a0aec0;
-  font-style: italic;
-}
-
-.exchange-badge {
-  display: block;
-  font-size: 0.75rem;
-  color: #4ade80;
-  font-weight: 500;
-  margin-top: 0.25rem;
-}
-
-.swap-section {
-  display: flex;
-  flex-direction: column;
-  position: relative;
-}
-
-.swap-input {
-  position: relative;
-  z-index: 2;
-}
-
-.swap-input .swap-arrow {
-  position: absolute;
-  bottom: -20px; /* Position at bottom of input card */
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 3;
-  width: 40px;
-  height: 40px;
-  background: #374151;
-  border: 2px solid #4b5563;
-  border-radius: 50%;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  color: #ffffff;
-  font-size: 1.1rem;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
-}
-
-.swap-output {
-  position: relative;
-  z-index: 1;
-  margin-top: -20px; /* Overlap the cards */
-}
-
-.swap-arrow i {
-  color: #ffffff;
-}
-
-/* Add circular cutouts to the cards */
-.swap-input .token-info-display::after {
-  content: '';
-  position: absolute;
-  bottom: -20px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 44px;
-  height: 22px;
-  background: #374151; /* Match card background */
-  border-radius: 0 0 22px 22px;
-  z-index: 1;
-}
-
-.swap-output .token-output-display::before {
-  content: '';
-  position: absolute;
-  top: -20px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 44px;
-  height: 22px;
-  background: #374151; /* Match card background */
-  border-radius: 22px 22px 0 0;
-  z-index: 1;
-}
-
-.step-actions,
-.swap-actions,
-.stake-actions {
-  display: flex;
-  gap: 1rem;
-  padding-top: 1rem;
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
-  justify-content: center;
-}
-
-.btn-lg {
-  padding: 0.75rem 2rem;
-  font-size: 1.125rem;
-  border-radius: 8px;
-  font-weight: 600;
-}
-
-.btn-primary {
-  background: linear-gradient(135deg, var(--primary-color), var(--primary-hover));
-  border: none;
-  transition: all 0.3s ease;
-}
-
-.btn-primary:hover:not(:disabled) {
-  background: linear-gradient(135deg, var(--primary-hover), var(--primary-color));
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(var(--primary-color-rgb), 0.3);
-}
-
-.btn-success {
-  background: linear-gradient(135deg, var(--success-color), var(--success-hover));
-  border: none;
-  transition: all 0.3s ease;
-}
-
-.btn-success:hover:not(:disabled) {
-  background: linear-gradient(135deg, var(--success-hover), var(--success-color));
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(var(--success-color-rgb), 0.3);
-}
-
-.btn:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-  transform: none !important;
-}
-
-.success-message {
-  text-align: center;
-  padding: 2rem;
-}
-
-.success-message .alert {
-  margin-bottom: 1.5rem;
-}
-
-.final-actions {
-  display: flex;
-  gap: 1rem;
-  justify-content: center;
-}
-
-.card {
-  background: #2d3748 !important;
-  border: 1px solid #4a5568 !important;
-  border-radius: 12px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
-  color: white !important;
-}
-
-.card-body {
-  padding: 1.5rem;
-  color: white !important;
-}
-
-.spinner-border {
-  width: 3rem;
-  height: 3rem;
-}
-
-/* Mobile responsiveness */
-@media (max-width: 768px) {
-  .page-title h1 {
-    font-size: 2rem;
-  }
-  
-  .progress-steps {
-    flex-direction: column;
-    gap: 1rem;
-  }
-  
-  .step-connector {
-    width: 2px;
-    height: 30px;
-    align-self: center;
-  }
-  
-  .step-header {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 1rem;
-  }
-  
-  .step-controls {
-    align-self: flex-end;
-  }
-  
-  .swap-actions,
-  .stake-actions {
-    flex-direction: column;
-  }
-  
-  .balance-grid {
-    grid-template-columns: 1fr;
-  }
-  
-  .register-token-form .input-group {
-    flex-direction: column;
-  }
-  
-  .register-token-form .btn {
-    margin-top: 0.5rem;
-  }
-}
-</style>

@@ -497,6 +497,8 @@ export const useTacoStore = defineStore('taco', () => {
         tokenInitIdentifier?: string;
     }[]>([])
     let authClientInstance: AuthClient | null = null
+    // const tacoWizardOpen = ref(false)
+    const tacoWizardOpen = ref(true)
 
     // user
     const userLoggedIn = ref(false)
@@ -783,6 +785,7 @@ export const useTacoStore = defineStore('taco', () => {
             root.style.setProperty("--green-to-orange", "#FED66C") // orange
             root.style.setProperty("--green-to-brown", "#934a17") // green
             root.style.setProperty("--green-to-yellow", "#FEC800") // yellow
+            root.style.setProperty("--green-to-success-green", "#B7CD02") // green
             root.style.setProperty("--dark-green-to-light-green", "#B4C2E9") // light green
             root.style.setProperty("--success-green-to-success-green-hover", "#19B229") // success green hover
             root.style.setProperty("--success-green-hover-to-success-green", "#179F25") // success green
@@ -863,6 +866,7 @@ export const useTacoStore = defineStore('taco', () => {
             root.style.setProperty("--success-green-hover-to-light-green", "#179F25") // light green
             root.style.setProperty("--dark-green-to-dark-brown", "#7D8828") // dark green
             root.style.setProperty("--green-to-brown", "#B7CD02") // brown
+            root.style.setProperty("--green-to-success-green", "#19B229") // success green
             root.style.setProperty("--blue-to-light-blue", "#546595") // blue
             root.style.setProperty("--brown-to-white", "#934a17") // brown
             root.style.setProperty("--brown-to-orange", "#934a17") // brown
@@ -925,6 +929,9 @@ export const useTacoStore = defineStore('taco', () => {
         // remove the toast from the array
         toasts.value = toasts.value.filter((toast) => toast.id !== id)
 
+    }
+    const toggleTacoWizard = () => {
+        tacoWizardOpen.value = !tacoWizardOpen.value
     }
 
     // user
@@ -8922,6 +8929,7 @@ export const useTacoStore = defineStore('taco', () => {
         namesLoading,
         threadMenuOpen,
         hasTokenDetails,
+        tacoWizardOpen,
         // actions
         changeRoute,
         toggleDarkMode,
@@ -9049,6 +9057,7 @@ export const useTacoStore = defineStore('taco', () => {
         toggleThreadMenu,
         ensureTokenDetails,
         checkTokenSupportsICRC2,
+        toggleTacoWizard,
 
         //Wallet functions
         getUserRegisteredTokens,

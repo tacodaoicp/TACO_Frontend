@@ -82,13 +82,20 @@
           <span class="header-bar__rl-span">Code</span>
         
         </a>  
+
+        <!-- wizard - router link -->
+        <a href="#" @click="toggleTacoWizard()" class="header-bar__rl">
+          
+          <span class="header-bar__rl-span">Wizard</span>
+        
+        </a>        
         
         <!-- wallet - router link -->
         <router-link to="/wallet" class="header-bar__rl">
           
           <span class="header-bar__rl-span">Wallet</span>
         
-        </router-link>         
+        </router-link>  
 
       </div>
 
@@ -265,6 +272,15 @@
           <span>Code</span>
 
         </a>  
+
+        <!-- wizard - router link -->
+        <a class="list-group-item"
+           href="#"
+           @click.prevent="toggleTacoWizard(), togglePagesMenu()">
+          
+          <!-- item text -->
+          <span>Wizard</span>
+        </a>          
         
         <!-- wallet - router link -->
         <router-link @click="togglePagesMenu()" to="/wallet" class="list-group-item">
@@ -316,6 +332,9 @@
     </div>
 
   </div>
+
+  <!-- wizard modal -->
+  <WizardModal v-if="tacoWizardOpen"/>
 
 </template>
 
@@ -658,7 +677,8 @@
   import DfinityLogo from "../assets/images/dfinityLogo.vue"
   import DarkModeToggle from "./theme/DarkModeToggle.vue"
   import { Tooltip } from 'bootstrap'
-  import EnvironmentIndicator from './misc/EnvironmentIndicator.vue'
+  // import EnvironmentIndicator from './misc/EnvironmentIndicator.vue'
+  import WizardModal from "../views/WizardView.vue"
 
   ////////////
   // Stores //
@@ -672,11 +692,13 @@
   const { iidLogOut } = tacoStore // not reactive
   const { addToast } = tacoStore // not reactive
   const { checkIfLoggedIn } = tacoStore // not reactive
+  const { toggleTacoWizard } = tacoStore // not reactive
 
   // state and getters
   const { userLoggedIn } = storeToRefs(tacoStore) // reactive
   const { userPrincipal } = storeToRefs(tacoStore) // reactive
   const { truncatedPrincipal } = storeToRefs(tacoStore); // reactive
+  const { tacoWizardOpen } = storeToRefs(tacoStore); // reactive
 
   /////////////////////
   // Local Variables //
@@ -687,6 +709,9 @@
 
   // pages menu visiblility
   const pagesMenuIsVisible = ref(false)
+
+  // show wizard modal
+  const showWizardModal = ref(true)
 
   ///////////////////
   // Local Methods //
@@ -736,13 +761,13 @@
   // on mounted
   onMounted(async () => {
 
-      // check if user is logged in
-      await checkIfLoggedIn()
+    // check if user is logged in
+    await checkIfLoggedIn()
 
-      // if user is logged in, fetch user state
-      if (userLoggedIn.value) {
+    // // if user is logged in, fetch user state
+    // if (userLoggedIn.value) {
 
-      }
+    // }
 
     // init bootstrap tooltips
     new Tooltip(document.body, {
