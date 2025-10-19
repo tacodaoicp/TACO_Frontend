@@ -422,6 +422,10 @@
             justify-content: center;
             width: 100%;
           }
+          .wizard__step--completed .wizard__step__content {
+            padding: 0rem 2rem 1.5rem;
+          }
+          
           .wizard-custom-spacing-1 {
             margin-bottom: 1rem !important;
           }

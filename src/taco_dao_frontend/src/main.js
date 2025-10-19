@@ -34,8 +34,7 @@ import ProposalsView from "./views/ProposalsView.vue"
 import ProposalView from "./views/ProposalView.vue"
 import WalletView from "./views/WalletView.vue"
 import WalletViewDemo from "./views/WalletViewDemo.vue"
-import WizardView from "./views/WizardView.vue"
-import WizardViewDemo from "./views/WizardViewDemo.vue"
+// import WizardViewDemo from "./views/WizardViewDemo.vue"
 import NNSVoteView from "./views/NNSVoteView.vue"
 import NNSVoteViewDemo from "./views/NNSVoteViewDemo.vue"
 import NNSPropView from "./views/NNSPropView.vue"
@@ -55,8 +54,7 @@ const routes = [
     { path: "/info", name: "Info", component: InfoView, meta: { robots: 'index' } },
     { path: "/wallet", name: "Wallet", component: WalletView, meta: { robots: 'index' } },
     { path: "/walletdemo", name: "WalletDemo", component: WalletViewDemo, meta: { robots: 'noindex' } },
-    { path: "/wizard", name: "Wizard", component: WizardView, meta: { robots: 'noindex' } },
-    { path: "/wizarddemo", name: "WizardDemo", component: WizardViewDemo, meta: { robots: 'noindex' } },
+    // { path: "/wizarddemo", name: "WizardDemo", component: WizardViewDemo, meta: { robots: 'noindex' } },
     { path: "/rewards", name: "Rewards", component: RewardsView, meta: { robots: 'noindex' } },
     { path: "/chat/oc", name: "ChatOC", component: ChatView, meta: { robots: 'index' } },
     { path: "/chat/sneed", redirect: "/chat/forum", meta: { robots: 'noindex' } }, // keep for historical linking
