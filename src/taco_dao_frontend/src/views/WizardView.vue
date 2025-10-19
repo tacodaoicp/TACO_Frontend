@@ -190,7 +190,7 @@
                    class="mb-3">
                   
                   <!-- text -->
-                  <span>You'll get <span class="fw-bold">{{ Number(swapOutputAmount).toFixed(2).toString() }} TACO</span> for your <span class="fw-bold">{{ Number(fetchedIcpBalance).toFixed(2).toString() }} ICP</span></span>
+                  <span>You'll get ~<span class="fw-bold">{{ Number(swapOutputAmount).toFixed(2).toString() }} TACO</span> for your <span class="fw-bold">{{ Number(fetchedIcpBalance).toFixed(2).toString() }} ICP</span></span>
 
                 </p>
 
