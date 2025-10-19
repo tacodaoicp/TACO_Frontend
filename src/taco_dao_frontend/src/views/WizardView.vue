@@ -1103,7 +1103,7 @@ const performSwap = async () => {
     // wait for 2 seconds then refresh balances
     setTimeout(async () => {
       await refreshBalances()
-    }, 2000)
+    }, 3000)
 
   }
 
