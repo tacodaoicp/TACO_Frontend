@@ -972,6 +972,11 @@ const testArchivesImporting = async (test: any) => {
   test.report = reportHTML
 }
 
+// Helper function to format nanosecond timestamps
+const formatNanoTime = (nanoTime: bigint): string => {
+  return new Date(Number(nanoTime / 1_000_000n)).toLocaleString()
+}
+
 // Test: Is the trading bot trading regularly?
 const testTradingBotRegular = async (test: any) => {
   const checks: Array<{ name: string; status: 'pass' | 'fail' | 'error'; message: string }> = []
@@ -985,12 +990,13 @@ const testTradingBotRegular = async (test: any) => {
     const tActor: any = Actor.createActor(treasuryIDL, { agent, canisterId: cid })
     const dActor: any = Actor.createActor(daoIDL, { agent, canisterId: resolvePrincipal('dao_backend') })
 
-    let tsRes, tokensResp
+    let tsRes, tokensResp, longSyncTimerRes
     try {
-      [tsRes, tokensResp] = await Promise.all([
+      [tsRes, tokensResp, , longSyncTimerRes] = await Promise.all([
         tActor.getTradingStatus(),
         dActor.getTokenDetails(),
-        tacoStore.getRebalanceConfig().catch(() => null), // Fetch config into store
+        tacoStore.getRebalanceConfig().catch(() => null), // Fetch config into store (no variable needed)
+        tActor.getLongSyncTimerStatus?.() ?? Promise.resolve(null),
       ])
     } catch (fetchError: any) {
       console.error('[Trading Bot Test] Fetch error:', fetchError)
@@ -1095,35 +1101,47 @@ const testTradingBotRegular = async (test: any) => {
         message: 'No tokens paused - circuit breaker not triggered'
       })
     } else {
-      // Check 3: ICP paused but others not (error - circuit breaker should have hit)
-      if (icpToken && icpToken.isPaused) {
-        checks.push({
-          name: 'ICP Token Status',
-          status: 'fail',
-          message: `ICP is paused but ${totalTokens - pausedCount} other tokens are not - Circuit breaker should have hit! DAO must investigate immediately!`
-        })
-      } else {
-        checks.push({
-          name: 'ICP Token Status',
-          status: 'pass',
-          message: 'ICP is trading normally'
-        })
-      }
+      checks.push({
+        name: 'Circuit Breaker Status',
+        status: 'pass',
+        message: `${pausedCount} token(s) paused - circuit breaker not triggered`
+      })
+    }
 
-      // Check 4: 3+ tokens paused but not all (circuit breaker should have hit)
-      if (pausedCount >= 3 && pausedCount < totalTokens) {
-        checks.push({
-          name: 'Multiple Token Pause Check',
-          status: 'fail',
-          message: `${pausedCount} tokens are paused (≥3) but not all - Circuit breaker should have hit! DAO should investigate.`
-        })
-      } else if (pausedCount > 0 && pausedCount < 3) {
-        checks.push({
-          name: 'Multiple Token Pause Check',
-          status: 'pass',
-          message: `${pausedCount} token(s) paused - below circuit breaker threshold`
-        })
-      }
+    // Check 3: ICP paused but others not (error - circuit breaker should have hit)
+    if (icpToken && icpToken.isPaused) {
+      checks.push({
+        name: 'ICP Token Status',
+        status: 'fail',
+        message: `ICP is paused but ${totalTokens - pausedCount} other tokens are not - Circuit breaker should have hit! DAO must investigate immediately!`
+      })
+    } else {
+      checks.push({
+        name: 'ICP Token Status',
+        status: 'pass',
+        message: 'ICP is trading normally'
+      })
+    }
+
+    // Check 4: 3+ tokens paused but not all (circuit breaker should have hit)
+    if (pausedCount >= 3 && pausedCount < totalTokens) {
+      checks.push({
+        name: 'Multiple Token Pause Check',
+        status: 'fail',
+        message: `${pausedCount} tokens are paused (≥3) but not all - Circuit breaker should have hit! DAO should investigate.`
+      })
+    } else if (pausedCount > 0 && pausedCount < 3) {
+      checks.push({
+        name: 'Multiple Token Pause Check',
+        status: 'pass',
+        message: `${pausedCount} token(s) paused - below circuit breaker threshold`
+      })
+    } else {
+      checks.push({
+        name: 'Multiple Token Pause Check',
+        status: 'pass',
+        message: 'All tokens trading normally - no pauses detected'
+      })
     }
 
     // Get executed trades and metrics for analysis
@@ -1214,6 +1232,83 @@ const testTradingBotRegular = async (test: any) => {
         name: 'Trade History',
         status: 'error',
         message: '⚠️ No trade history available for analysis'
+      })
+    }
+
+    // ===== Check 7: Short Sync Timer Status =====
+    const shortSyncActive = tsRes && 'ok' in tsRes ? tsRes.ok.metrics?.lastUpdate : null
+    const shortSyncIntervalNs = 900_000_000_000n // 15 minutes
+    const shortSyncMaxDelayNs = shortSyncIntervalNs * 5n // 5 periods
+    
+    if (shortSyncActive) {
+      const nowNs = BigInt(Date.now()) * 1_000_000n
+      const shortSyncLastNs = BigInt(shortSyncActive)
+      const shortSyncDelayNs = nowNs - shortSyncLastNs
+      const shortSyncPeriodsBehind = Number(shortSyncDelayNs / shortSyncIntervalNs)
+      
+      let shortSyncStatus: 'pass' | 'fail' | 'error' = 'pass'
+      let shortSyncMessage = ''
+      
+      if (shortSyncDelayNs > shortSyncMaxDelayNs) {
+        shortSyncStatus = 'fail'
+        shortSyncMessage = `❌ Short sync is overdue by <strong>${shortSyncPeriodsBehind.toFixed(1)}</strong> periods (last sync: ${formatNanoTime(shortSyncLastNs)}). Maximum allowed: 5 periods.`
+      } else {
+        shortSyncMessage = `✅ Short sync is on schedule (last sync: ${formatNanoTime(shortSyncLastNs)}, <strong>${shortSyncPeriodsBehind.toFixed(1)}</strong> periods ago).`
+      }
+      
+      checks.push({
+        name: 'Short Sync Timer',
+        status: shortSyncStatus,
+        message: shortSyncMessage
+      })
+    } else {
+      checks.push({
+        name: 'Short Sync Timer',
+        status: 'error',
+        message: '⚠️ Unable to determine short sync timer status'
+      })
+    }
+
+    // ===== Check 8: Long Sync Timer Status =====
+    if (longSyncTimerRes) {
+      const timerStatus: any = longSyncTimerRes
+      const longSyncRunning = timerStatus.isRunning || false
+      const longSyncLastRun = timerStatus.lastRunTime || null
+      const longSyncIntervalNs = timerStatus.intervalNS ? BigInt(timerStatus.intervalNS) : 18_000_000_000_000n // 5 hours default
+      const longSyncMaxDelayNs = longSyncIntervalNs * 5n // 5 periods
+      
+      let longSyncStatus: 'pass' | 'fail' | 'error' = 'pass'
+      let longSyncMessage = ''
+      
+      if (!longSyncRunning) {
+        longSyncStatus = 'fail'
+        longSyncMessage = `❌ Long sync timer is <strong>not running</strong>.`
+      } else if (longSyncLastRun) {
+        const nowNs = BigInt(Date.now()) * 1_000_000n
+        const longSyncLastNs = BigInt(longSyncLastRun)
+        const longSyncDelayNs = nowNs - longSyncLastNs
+        const longSyncPeriodsBehind = Number(longSyncDelayNs / longSyncIntervalNs)
+        
+        if (longSyncDelayNs > longSyncMaxDelayNs) {
+          longSyncStatus = 'fail'
+          longSyncMessage = `❌ Long sync is overdue by <strong>${longSyncPeriodsBehind.toFixed(1)}</strong> periods (last sync: ${formatNanoTime(longSyncLastNs)}). Maximum allowed: 5 periods.`
+        } else {
+          longSyncMessage = `✅ Long sync is on schedule (last sync: ${formatNanoTime(longSyncLastNs)}, <strong>${longSyncPeriodsBehind.toFixed(1)}</strong> periods ago).`
+        }
+      } else {
+        longSyncMessage = `✅ Long sync timer is running (no previous run recorded yet).`
+      }
+      
+      checks.push({
+        name: 'Long Sync Timer',
+        status: longSyncStatus,
+        message: longSyncMessage
+      })
+    } else {
+      checks.push({
+        name: 'Long Sync Timer',
+        status: 'error',
+        message: '⚠️ Unable to fetch long sync timer status'
       })
     }
 
