@@ -971,12 +971,12 @@ const testTradingBotRegular = async (test: any) => {
     const tActor: any = Actor.createActor(treasuryIDL, { agent, canisterId: cid })
     const dActor: any = Actor.createActor(daoIDL, { agent, canisterId: resolvePrincipal('dao_backend') })
 
-    let tsRes, cfgRaw, tokensResp
+    let tsRes, tokensResp
     try {
-      [tsRes, cfgRaw, tokensResp] = await Promise.all([
+      [tsRes, tokensResp] = await Promise.all([
         tActor.getTradingStatus(),
-        tActor.getRebalanceConfig?.() ?? Promise.resolve(null),
         dActor.getTokenDetails(),
+        tacoStore.getRebalanceConfig().catch(() => null), // Fetch config into store
       ])
     } catch (fetchError: any) {
       console.error('[Trading Bot Test] Fetch error:', fetchError)
@@ -988,7 +988,7 @@ const testTradingBotRegular = async (test: any) => {
     }
 
     console.log('[Trading Bot Test] tsRes:', tsRes)
-    console.log('[Trading Bot Test] cfgRaw:', cfgRaw)
+    console.log('[Trading Bot Test] rebalanceConfig:', tacoStore.rebalanceConfig)
     console.log('[Trading Bot Test] tokensResp:', tokensResp)
 
     // Get trading status and interval
@@ -1004,15 +1004,12 @@ const testTradingBotRegular = async (test: any) => {
       console.log('[Trading Bot Test] lastAttemptNs:', lastAttemptNs)
     }
     
-    // Extract interval from config (same logic as Portfolio section)
-    if (cfgRaw) {
-      const cfg = Array.isArray(cfgRaw) ? cfgRaw[0] : cfgRaw
-      intervalNs = cfg?.rebalanceIntervalNS
-      console.log('[Trading Bot Test] intervalNs from config:', intervalNs)
-    }
-    
-    // If config unavailable, use default 30-minute interval (1,800,000,000,000 ns)
-    if (!intervalNs) {
+    // Extract interval from config (now loaded into store)
+    if (tacoStore.rebalanceConfig?.rebalanceIntervalNS) {
+      intervalNs = tacoStore.rebalanceConfig.rebalanceIntervalNS
+      console.log('[Trading Bot Test] intervalNs from store:', intervalNs)
+    } else {
+      // If config unavailable, use default 30-minute interval (1,800,000,000,000 ns)
       intervalNs = 1_800_000_000_000n
       console.log('[Trading Bot Test] Config unavailable, using default 30min interval')
     }
@@ -1120,21 +1117,13 @@ const testTradingBotRegular = async (test: any) => {
     const metrics = tsRes?.ok?.metrics
     const allTimeAvgSlippage = metrics?.avgSlippage ? Number(metrics.avgSlippage).toFixed(2) : 'N/A'
     
-    // Get slippage tolerance from config - try store first, then cfgRaw
+    // Get slippage tolerance from config (now loaded into store)
     let maxSlippagePct = null
-    
-    // Try from tacoStore first (if already loaded)
     if (tacoStore.rebalanceConfig?.maxSlippageBasisPoints) {
       maxSlippagePct = Number(tacoStore.rebalanceConfig.maxSlippageBasisPoints) / 100
-      console.log('[Trading Bot Test] Slippage tolerance from store:', maxSlippagePct)
-    } else if (cfgRaw) {
-      const cfg = Array.isArray(cfgRaw) ? cfgRaw[0] : cfgRaw
-      if (cfg?.maxSlippageBasisPoints) {
-        maxSlippagePct = Number(cfg.maxSlippageBasisPoints) / 100
-        console.log('[Trading Bot Test] Slippage tolerance from cfgRaw:', maxSlippagePct)
-      }
+      console.log('[Trading Bot Test] Slippage tolerance from store:', maxSlippagePct, '%')
     } else {
-      console.warn('[Trading Bot Test] Slippage tolerance not available from store or config')
+      console.warn('[Trading Bot Test] Slippage tolerance not available - config not loaded')
     }
 
     // Check 5: Failed trades analysis
@@ -1191,7 +1180,7 @@ const testTradingBotRegular = async (test: any) => {
         } else if (maxSlippagePct) {
           slippageMessage = `✅ Worst slippage: <strong>${worstSlippageLast100Pct}%</strong> ≤ tolerance (${maxSlippagePct.toFixed(2)}%). Avg last 100: <strong>${avgSlippageLast100Pct}%</strong>. Avg all: <strong>${avgSlippageAllPct}%</strong>. All-time: ${allTimeAvgSlippage}%.`
         } else {
-          slippageMessage = `⚠️ Slippage stats: Worst last 100: <strong>${worstSlippageLast100Pct}%</strong>. Avg last 100: <strong>${avgSlippageLast100Pct}%</strong>. Avg all: <strong>${avgSlippageAllPct}%</strong>. All-time: ${allTimeAvgSlippage}%. (Tolerance not available - visit /admin to load config).`
+          slippageMessage = `⚠️ Slippage stats: Worst last 100: <strong>${worstSlippageLast100Pct}%</strong>. Avg last 100: <strong>${avgSlippageLast100Pct}%</strong>. Avg all: <strong>${avgSlippageAllPct}%</strong>. All-time: ${allTimeAvgSlippage}%. (Tolerance not available - failed to fetch config).`
         }
         
         checks.push({
