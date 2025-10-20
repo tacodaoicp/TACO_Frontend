@@ -64,6 +64,10 @@ interface TimerHealth {
             active: boolean;
             lastSync: bigint | null;
         };
+        longSync: {
+            active: boolean;
+            lastSync: bigint | null;
+        };
         rebalanceStatus: 'Idle' | 'Trading' | 'Failed';
         rebalanceError?: string;
         tradingMetrics?: {
@@ -561,6 +565,10 @@ export const useTacoStore = defineStore('taco', () => {
         },
         treasury: {
             shortSync: {
+                active: false,
+                lastSync: null
+            },
+            longSync: {
                 active: false,
                 lastSync: null
             },
@@ -2421,12 +2429,14 @@ export const useTacoStore = defineStore('taco', () => {
             })
             //console.log('refreshTimerStatus: Treasury Actor created');
 
-            // Get treasury status and token details in parallel
-            const [tradingStatusResult, tokenDetailsResult] = await Promise.all([
+            // Get treasury status, long sync timer, and token details in parallel
+            const [tradingStatusResult, longSyncTimerResult, tokenDetailsResult] = await Promise.all([
                 treasuryActor.getTradingStatus() as Promise<TradingStatusResult>,
+                (treasuryActor as any).getLongSyncTimerStatus?.() as Promise<any> || Promise.resolve(null),
                 daoActor.getTokenDetails() as Promise<TrustedTokenEntry[]>
             ]);
             //console.log('refreshTimerStatus: Received trading status:', tradingStatusResult);
+            //console.log('refreshTimerStatus: Received long sync timer:', longSyncTimerResult);
             //console.log('refreshTimerStatus: Received token details:', tokenDetailsResult);
 
             // Update token details
@@ -2434,10 +2444,24 @@ export const useTacoStore = defineStore('taco', () => {
 
             if ('ok' in tradingStatusResult && tradingStatusResult.ok) {
                 const { metrics, executedTrades, rebalanceStatus } = tradingStatusResult.ok;
+                
+                // Extract long sync info from timer status
+                let longSyncActive = false;
+                let longSyncLastRun = null;
+                if (longSyncTimerResult) {
+                    const timerStatus = longSyncTimerResult;
+                    longSyncActive = timerStatus.isRunning || false;
+                    longSyncLastRun = timerStatus.lastRunTime ? BigInt(timerStatus.lastRunTime) : null;
+                }
+                
                 timerHealth.value.treasury = {
                     shortSync: {
                         active: true,
                         lastSync: BigInt(metrics.lastUpdate)
+                    },
+                    longSync: {
+                        active: longSyncActive,
+                        lastSync: longSyncLastRun
                     },
                     rebalanceStatus: 'Idle' in rebalanceStatus ? 'Idle' 
                         : 'Trading' in rebalanceStatus ? 'Trading'

@@ -109,6 +109,12 @@
                     <span>Short Sync (15m)</span>
                     <span>Last: {{ formatTime(timerHealth.treasury.shortSync.lastSync) }}</span>
                   </div>
+                  <!-- Long Sync -->
+                  <div class="d-flex gap-3 align-items-center">
+                    <div class="status-indicator" :class="timerHealth.treasury.longSync?.active ? 'active' : 'inactive'"></div>
+                    <span>Long Sync</span>
+                    <span>Last: {{ formatTime(timerHealth.treasury.longSync?.lastSync) }}</span>
+                  </div>
                   <!-- Trading Status -->
                   <div class="d-flex gap-3 align-items-center">
                     <div class="status-indicator" :class="timerHealth.treasury.rebalanceStatus === 'Trading' ? 'active' : 'inactive'"></div>

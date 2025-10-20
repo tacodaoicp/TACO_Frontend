@@ -495,11 +495,12 @@ const fetchCyclesFor = async (key: CanKey) => {
           const tActor: any = Actor.createActor(treasuryIDL, { agent, canisterId: cid })
           const dActor: any = Actor.createActor(daoIDL, { agent, canisterId: resolvePrincipal('dao_backend') })
 
-          const [tsRes, cfgRaw, tokensResp, snapStatus] = await Promise.all([
+          const [tsRes, cfgRaw, tokensResp, snapStatus, longSyncTimerRes] = await Promise.all([
             tActor.getTradingStatus(),
             tActor.getRebalanceConfig?.() ?? Promise.resolve(null),
             dActor.getTokenDetails(),
-            tActor.getPortfolioSnapshotStatus()
+            tActor.getPortfolioSnapshotStatus(),
+            tActor.getLongSyncTimerStatus?.() ?? Promise.resolve(null)
           ])
 
           // Trading metrics and status
@@ -568,6 +569,16 @@ const fetchCyclesFor = async (key: CanKey) => {
 
           // derive latest short sync time from trading metrics (lastUpdate)
           const metricsObj: any = (tsRes && 'ok' in tsRes) ? tsRes.ok.metrics : null
+          
+          // Extract long sync timer status
+          let longSyncActive = false
+          let longSyncLastRun = null
+          if (longSyncTimerRes) {
+            const timerStatus = longSyncTimerRes
+            longSyncActive = timerStatus.isRunning || false
+            longSyncLastRun = timerStatus.lastRunTime || null
+          }
+          
           treasuryDetails.value = {
             tradingMetrics: {
               lastRebalanceAttemptDisplay: lastTradeDisplay,
@@ -589,9 +600,9 @@ const fetchCyclesFor = async (key: CanKey) => {
               lastSyncDisplay: metricsObj?.lastUpdate ? new Date(Number(BigInt(metricsObj.lastUpdate) / 1_000_000n)).toLocaleString() : undefined
             },
             longSync: {
-              active: true,
+              active: longSyncActive,
               intervalMinutes: cfgRaw && (Array.isArray(cfgRaw) ? (cfgRaw as any)[0] : (cfgRaw as any))?.longSyncIntervalNS ? Number(((Array.isArray(cfgRaw) ? (cfgRaw as any)[0] : (cfgRaw as any)).longSyncIntervalNS) / (60n * 1_000_000_000n)) : undefined,
-              lastSyncDisplay: undefined
+              lastSyncDisplay: longSyncLastRun ? new Date(Number(BigInt(longSyncLastRun) / 1_000_000n)).toLocaleString() : undefined
             }
           }
         } catch (_) {
