@@ -56,8 +56,8 @@
 
               <!-- right controls -->
               <div class="d-flex align-items-center gap-2">
-                <!-- env switch (admin only) -->
-                <div v-if="isAdmin" class="form-inline d-flex align-items-center gap-2">
+                <!-- env switch (admin or running on staging) -->
+                <div v-if="isAdmin || isRunningOnStaging" class="form-inline d-flex align-items-center gap-2">
                   <label class="mb-0 small text-muted">Environment</label>
                   <select class="form-select form-select-sm" v-model="selectedEnv" @change="refreshCycles">
                     <option value="ic">Production</option>
@@ -259,8 +259,11 @@ const checklist = reactive([
 // Determine admin: call DAO hasAdminPermission or use a simple check if available
 const isAdmin = ref(false)
 
-// Environment selection
-const selectedEnv = ref<EnvKey>('ic')
+// Check if running on staging network
+const isRunningOnStaging = computed(() => process.env.DFX_NETWORK === 'staging')
+
+// Environment selection - default to staging if running on staging
+const selectedEnv = ref<EnvKey>(process.env.DFX_NETWORK === 'staging' ? 'staging' : 'ic')
 
 // Canister groups and keys
 type CanKey = 'dao_backend' | 'frontend' | 'treasury' | 'rewards' | 'neuronSnapshot' | 'validation'
