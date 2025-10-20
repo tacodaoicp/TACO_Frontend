@@ -1244,7 +1244,7 @@ const testTradingBotRegular = async (test: any) => {
       const nowNs = BigInt(Date.now()) * 1_000_000n
       const shortSyncLastNs = BigInt(shortSyncActive)
       const shortSyncDelayNs = nowNs - shortSyncLastNs
-      const shortSyncPeriodsBehind = Number(shortSyncDelayNs / shortSyncIntervalNs)
+      const shortSyncPeriodsBehind = Number(shortSyncDelayNs) / Number(shortSyncIntervalNs)
       
       let shortSyncStatus: 'pass' | 'fail' | 'error' = 'pass'
       let shortSyncMessage = ''
@@ -1287,7 +1287,7 @@ const testTradingBotRegular = async (test: any) => {
         const nowNs = BigInt(Date.now()) * 1_000_000n
         const longSyncLastNs = BigInt(longSyncLastRun)
         const longSyncDelayNs = nowNs - longSyncLastNs
-        const longSyncPeriodsBehind = Number(longSyncDelayNs / longSyncIntervalNs)
+        const longSyncPeriodsBehind = Number(longSyncDelayNs) / Number(longSyncIntervalNs)
         
         if (longSyncDelayNs > longSyncMaxDelayNs) {
           longSyncStatus = 'fail'
