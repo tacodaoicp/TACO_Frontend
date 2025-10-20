@@ -50,6 +50,24 @@ type treasury =
    /// * Get the last N log entries for a specific level
    ///    * Only accessible by master admin, controller, or DAO
    getLogsByLevel: (level: LogLevel, count: nat) -> (vec LogEntry) query;
+   /// * Get Long Sync Timer status
+   ///    *
+   ///    * Returns information about the Long Sync Timer including:
+   ///    * - lastRunTime: The last time the timer executed (0 if never run)
+   ///    * - nextScheduledTime: The next scheduled execution time (0 if not scheduled)
+   ///    * - isRunning: Whether the timer is currently active
+   ///    * - timerId: The timer ID (0 if not running)
+   ///    * - intervalNS: The configured interval in nanoseconds
+   ///    *
+   ///    * Accessible by any user with query access.
+   getLongSyncTimerStatus: () ->
+    (record {
+       intervalNS: nat;
+       isRunning: bool;
+       lastRunTime: int;
+       nextScheduledTime: int;
+       timerId: nat;
+     }) query;
    /// * Get the current maximum portfolio snapshots limit
    ///    * 
    ///    * Returns the current limit for portfolio snapshots storage.
@@ -223,9 +241,6 @@ type treasury =
    /// * Set portfolio circuit breaker condition active/inactive
    setPortfolioCircuitBreakerConditionActive: (conditionId: nat, isActive:
     bool) -> (Result_3);
-   /// * Set test mode (modifies safety parameters)
-   ///    * Only callable by DAO.
-   setTest: (a: bool) -> ();
    /// * Activate or deactivate a trigger condition
    ///    *
    ///    * Enables or disables a failsafe rule without deleting it.

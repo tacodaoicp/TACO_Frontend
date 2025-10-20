@@ -430,6 +430,16 @@ export interface treasury {
   'getLogs' : ActorMethod<[bigint], Array<LogEntry>>,
   'getLogsByContext' : ActorMethod<[string, bigint], Array<LogEntry>>,
   'getLogsByLevel' : ActorMethod<[LogLevel, bigint], Array<LogEntry>>,
+  'getLongSyncTimerStatus' : ActorMethod<
+    [],
+    {
+      'nextScheduledTime' : bigint,
+      'lastRunTime' : bigint,
+      'intervalNS' : bigint,
+      'timerId' : bigint,
+      'isRunning' : boolean,
+    }
+  >,
   'getMaxPortfolioSnapshots' : ActorMethod<[], bigint>,
   'getMaxPriceHistoryEntries' : ActorMethod<[], bigint>,
   'getPausedTokenThresholdForCircuitBreaker' : ActorMethod<[], bigint>,
@@ -509,7 +519,6 @@ export interface treasury {
     [bigint, boolean],
     Result_3
   >,
-  'setTest' : ActorMethod<[boolean], undefined>,
   'setTriggerConditionActive' : ActorMethod<[bigint, boolean], Result>,
   'startPortfolioSnapshots' : ActorMethod<[[] | [string]], Result_2>,
   'startRebalancing' : ActorMethod<[[] | [string]], Result_1>,

@@ -482,6 +482,19 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Vec(LogEntry)],
         ['query'],
       ),
+    'getLongSyncTimerStatus' : IDL.Func(
+        [],
+        [
+          IDL.Record({
+            'nextScheduledTime' : IDL.Int,
+            'lastRunTime' : IDL.Int,
+            'intervalNS' : IDL.Nat,
+            'timerId' : IDL.Nat,
+            'isRunning' : IDL.Bool,
+          }),
+        ],
+        ['query'],
+      ),
     'getMaxPortfolioSnapshots' : IDL.Func([], [IDL.Nat], ['query']),
     'getMaxPriceHistoryEntries' : IDL.Func([], [IDL.Nat], ['query']),
     'getPausedTokenThresholdForCircuitBreaker' : IDL.Func(
@@ -637,7 +650,6 @@ export const idlFactory = ({ IDL }) => {
         [Result_3],
         [],
       ),
-    'setTest' : IDL.Func([IDL.Bool], [], []),
     'setTriggerConditionActive' : IDL.Func([IDL.Nat, IDL.Bool], [Result], []),
     'startPortfolioSnapshots' : IDL.Func([IDL.Opt(IDL.Text)], [Result_2], []),
     'startRebalancing' : IDL.Func([IDL.Opt(IDL.Text)], [Result_1], []),
