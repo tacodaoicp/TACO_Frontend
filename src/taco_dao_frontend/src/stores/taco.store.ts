@@ -497,6 +497,8 @@ export const useTacoStore = defineStore('taco', () => {
         tokenInitIdentifier?: string;
     }[]>([])
     let authClientInstance: AuthClient | null = null
+    // const tacoWizardOpen = ref(false)
+    const tacoWizardOpen = ref(false)
 
     // user
     const userLoggedIn = ref(false)
@@ -783,6 +785,7 @@ export const useTacoStore = defineStore('taco', () => {
             root.style.setProperty("--green-to-orange", "#FED66C") // orange
             root.style.setProperty("--green-to-brown", "#934a17") // green
             root.style.setProperty("--green-to-yellow", "#FEC800") // yellow
+            root.style.setProperty("--green-to-success-green", "#B7CD02") // green
             root.style.setProperty("--dark-green-to-light-green", "#B4C2E9") // light green
             root.style.setProperty("--success-green-to-success-green-hover", "#19B229") // success green hover
             root.style.setProperty("--success-green-hover-to-success-green", "#179F25") // success green
@@ -863,6 +866,7 @@ export const useTacoStore = defineStore('taco', () => {
             root.style.setProperty("--success-green-hover-to-light-green", "#179F25") // light green
             root.style.setProperty("--dark-green-to-dark-brown", "#7D8828") // dark green
             root.style.setProperty("--green-to-brown", "#B7CD02") // brown
+            root.style.setProperty("--green-to-success-green", "#19B229") // success green
             root.style.setProperty("--blue-to-light-blue", "#546595") // blue
             root.style.setProperty("--brown-to-white", "#934a17") // brown
             root.style.setProperty("--brown-to-orange", "#934a17") // brown
@@ -925,6 +929,9 @@ export const useTacoStore = defineStore('taco', () => {
         // remove the toast from the array
         toasts.value = toasts.value.filter((toast) => toast.id !== id)
 
+    }
+    const toggleTacoWizard = () => {
+        tacoWizardOpen.value = !tacoWizardOpen.value
     }
 
     // user
@@ -6208,11 +6215,11 @@ export const useTacoStore = defineStore('taco', () => {
                 throw new Error('User must be logged in');
             }
 
-            console.log('Adding neuron permissions:', {
-                neuronId: Array.from(neuronId).map(b => b.toString(16).padStart(2, '0')).join(''),
-                principalId,
-                permissionTypes
-            });
+            // console.log('Adding neuron permissions:', {
+            //     neuronId: Array.from(neuronId).map(b => b.toString(16).padStart(2, '0')).join(''),
+            //     principalId,
+            //     permissionTypes
+            // });
 
             const authClient = await getAuthClient();
             const identity = authClient.getIdentity();
@@ -6239,11 +6246,11 @@ export const useTacoStore = defineStore('taco', () => {
                 }]
             };
 
-            console.log('AddNeuronPermissions request:', JSON.stringify(manageNeuronRequest, (key, value) =>
-                typeof value === 'bigint' ? value.toString() : value, 2));
+            // console.log('AddNeuronPermissions request:', JSON.stringify(manageNeuronRequest, (key, value) =>
+            //     typeof value === 'bigint' ? value.toString() : value, 2));
 
             const result = await snsGov.manage_neuron(manageNeuronRequest) as any;
-            console.log('AddNeuronPermissions result:', result);
+            // console.log('AddNeuronPermissions result:', result);
 
             if (result.command && result.command.length > 0) {
                 const command = result.command[0];
@@ -6251,7 +6258,7 @@ export const useTacoStore = defineStore('taco', () => {
                     throw new Error(`AddNeuronPermissions failed: ${JSON.stringify(command)}`);
                 }
                 if (command.AddNeuronPermission !== undefined) {
-                    console.log('Neuron permissions added successfully');
+                    // console.log('Neuron permissions added successfully');
                     return true;
                 }
             }
@@ -6270,11 +6277,11 @@ export const useTacoStore = defineStore('taco', () => {
                 throw new Error('User must be logged in');
             }
 
-            console.log('Removing neuron permissions:', {
-                neuronId: Array.from(neuronId).map(b => b.toString(16).padStart(2, '0')).join(''),
-                principalId,
-                permissionTypes
-            });
+            // console.log('Removing neuron permissions:', {
+            //     neuronId: Array.from(neuronId).map(b => b.toString(16).padStart(2, '0')).join(''),
+            //     principalId,
+            //     permissionTypes
+            // });
 
             const authClient = await getAuthClient();
             const identity = authClient.getIdentity();
@@ -6301,11 +6308,11 @@ export const useTacoStore = defineStore('taco', () => {
                 }]
             };
 
-            console.log('RemoveNeuronPermissions request:', JSON.stringify(manageNeuronRequest, (key, value) =>
-                typeof value === 'bigint' ? value.toString() : value, 2));
+            // console.log('RemoveNeuronPermissions request:', JSON.stringify(manageNeuronRequest, (key, value) =>
+            //     typeof value === 'bigint' ? value.toString() : value, 2));
 
             const result = await snsGov.manage_neuron(manageNeuronRequest) as any;
-            console.log('RemoveNeuronPermissions result:', result);
+            // console.log('RemoveNeuronPermissions result:', result);
 
             if (result.command && result.command.length > 0) {
                 const command = result.command[0];
@@ -6313,7 +6320,7 @@ export const useTacoStore = defineStore('taco', () => {
                     throw new Error(`RemoveNeuronPermissions failed: ${JSON.stringify(command)}`);
                 }
                 if (command.RemoveNeuronPermission !== undefined) {
-                    console.log('Neuron permissions removed successfully');
+                    // console.log('Neuron permissions removed successfully');
                     return true;
                 }
             }
@@ -6343,7 +6350,7 @@ export const useTacoStore = defineStore('taco', () => {
             // Get nervous system parameters
             const params = await snsGov.get_nervous_system_parameters(null) as any;
             
-            console.log('SNS Nervous System Parameters:', params);
+            // console.log('SNS Nervous System Parameters:', params);
             
             if (params.neuron_grantable_permissions && params.neuron_grantable_permissions.length > 0) {
                 const grantablePermissions = params.neuron_grantable_permissions[0];
@@ -6351,7 +6358,7 @@ export const useTacoStore = defineStore('taco', () => {
                 return grantablePermissions.permissions || [];
             }
             
-            console.log('No grantable permissions specified in SNS parameters, using defaults');
+            // console.log('No grantable permissions specified in SNS parameters, using defaults');
             
             // Default permissions if not specified - use all available SNS types
             return [
@@ -6391,11 +6398,11 @@ export const useTacoStore = defineStore('taco', () => {
                 throw new Error('User must be logged in');
             }
 
-            console.log('Adding neuron followee:', {
-                neuronId: Array.from(neuronId).map(b => b.toString(16).padStart(2, '0')).join(''),
-                topicId,
-                followeeNeuronId: Array.from(followeeNeuronId).map(b => b.toString(16).padStart(2, '0')).join('')
-            });
+            // console.log('Adding neuron followee:', {
+            //     neuronId: Array.from(neuronId).map(b => b.toString(16).padStart(2, '0')).join(''),
+            //     topicId,
+            //     followeeNeuronId: Array.from(followeeNeuronId).map(b => b.toString(16).padStart(2, '0')).join('')
+            // });
 
             const authClient = await getAuthClient();
             const identity = authClient.getIdentity();
@@ -6425,11 +6432,11 @@ export const useTacoStore = defineStore('taco', () => {
                 }]
             };
 
-            console.log('SetFollowing request:', JSON.stringify(manageNeuronRequest, (key, value) =>
-                typeof value === 'bigint' ? value.toString() : value, 2));
+            // console.log('SetFollowing request:', JSON.stringify(manageNeuronRequest, (key, value) =>
+            //     typeof value === 'bigint' ? value.toString() : value, 2));
 
             const result = await snsGov.manage_neuron(manageNeuronRequest) as any;
-            console.log('SetFollowing result:', result);
+            // console.log('SetFollowing result:', result);
 
             if (result.command && result.command.length > 0) {
                 const command = result.command[0];
@@ -6437,7 +6444,7 @@ export const useTacoStore = defineStore('taco', () => {
                     throw new Error(`SetFollowing failed: ${JSON.stringify(command)}`);
                 }
                 if (command.SetFollowing !== undefined) {
-                    console.log('Neuron followee added successfully');
+                    // console.log('Neuron followee added successfully');
                     return true;
                 }
             }
@@ -6456,11 +6463,11 @@ export const useTacoStore = defineStore('taco', () => {
                 throw new Error('User must be logged in');
             }
 
-            console.log('Removing neuron followee:', {
-                neuronId: Array.from(neuronId).map(b => b.toString(16).padStart(2, '0')).join(''),
-                topicId,
-                followeeNeuronId: Array.from(followeeNeuronId).map(b => b.toString(16).padStart(2, '0')).join('')
-            });
+            // console.log('Removing neuron followee:', {
+            //     neuronId: Array.from(neuronId).map(b => b.toString(16).padStart(2, '0')).join(''),
+            //     topicId,
+            //     followeeNeuronId: Array.from(followeeNeuronId).map(b => b.toString(16).padStart(2, '0')).join('')
+            // });
 
             const authClient = await getAuthClient();
             const identity = authClient.getIdentity();
@@ -6513,7 +6520,7 @@ export const useTacoStore = defineStore('taco', () => {
                 return existingIdHex !== followeeIdHex;
             });
             
-            console.log(`Removing followee ${followeeIdHex} from topic ${topicId}. Current: ${currentFollowees.length}, After: ${updatedFollowees.length}`);
+            // console.log(`Removing followee ${followeeIdHex} from topic ${topicId}. Current: ${currentFollowees.length}, After: ${updatedFollowees.length}`);
             
             const manageNeuronRequest = {
                 subaccount: Array.from(neuronId),
@@ -6527,11 +6534,11 @@ export const useTacoStore = defineStore('taco', () => {
                 }]
             };
 
-            console.log('RemoveFollowing request:', JSON.stringify(manageNeuronRequest, (key, value) =>
-                typeof value === 'bigint' ? value.toString() : value, 2));
+            // console.log('RemoveFollowing request:', JSON.stringify(manageNeuronRequest, (key, value) =>
+            //     typeof value === 'bigint' ? value.toString() : value, 2));
 
             const result = await snsGov.manage_neuron(manageNeuronRequest) as any;
-            console.log('RemoveFollowing result:', result);
+            // console.log('RemoveFollowing result:', result);
 
             if (result.command && result.command.length > 0) {
                 const command = result.command[0];
@@ -6539,7 +6546,7 @@ export const useTacoStore = defineStore('taco', () => {
                     throw new Error(`RemoveFollowing failed: ${JSON.stringify(command)}`);
                 }
                 if (command.SetFollowing !== undefined) {
-                    console.log('Neuron followee removed successfully');
+                    // console.log('Neuron followee removed successfully');
                     return true;
                 }
             }
@@ -6616,7 +6623,7 @@ export const useTacoStore = defineStore('taco', () => {
                 }
             }
 
-            console.log('Normalized neuron data for formatting:', neuron);
+            // console.log('Normalized neuron data for formatting:', neuron);
             return neuron;
         } catch (error: any) {
             console.error('Error getting single neuron:', error);
@@ -8420,10 +8427,10 @@ export const useTacoStore = defineStore('taco', () => {
     // Get auto-voting threshold in seconds
     const getAutoVotingThresholdSeconds = async () => {
         try {
-            console.log('Getting auto-voting threshold...');
+            // console.log('Getting auto-voting threshold...');
             const actor = await createNeuronSnapshotActor();
             const result = await (actor as any).getAutoVotingThresholdSeconds();
-            console.log('Auto-voting threshold result:', result);
+            // console.log('Auto-voting threshold result:', result);
             return result;
         } catch (error) {
             console.error('Error getting auto-voting threshold:', error);
@@ -8434,10 +8441,10 @@ export const useTacoStore = defineStore('taco', () => {
     // Get highest processed NNS proposal ID
     const getHighestProcessedNNSProposalId = async () => {
         try {
-            console.log('Getting highest processed NNS proposal ID...');
+            // console.log('Getting highest processed NNS proposal ID...');
             const actor = await createNeuronSnapshotActor();
             const result = await (actor as any).getHighestProcessedNNSProposalId();
-            console.log('Highest processed NNS proposal ID result:', result);
+            // console.log('Highest processed NNS proposal ID result:', result);
             return result;
         } catch (error) {
             console.error('Error getting highest processed NNS proposal ID:', error);
@@ -8459,10 +8466,10 @@ export const useTacoStore = defineStore('taco', () => {
     // Set highest processed NNS proposal ID
     const setHighestProcessedNNSProposalId = async (proposalId: bigint) => {
         try {
-            console.log('Setting highest processed NNS proposal ID to:', proposalId.toString());
+            // console.log('Setting highest processed NNS proposal ID to:', proposalId.toString());
             const actor = await createNeuronSnapshotActor();
             await (actor as any).setHighestProcessedNNSProposalId(proposalId);
-            console.log('Successfully set highest processed NNS proposal ID to:', proposalId.toString());
+            // console.log('Successfully set highest processed NNS proposal ID to:', proposalId.toString());
         } catch (error) {
             console.error('Error setting highest processed NNS proposal ID:', error);
             throw error;
@@ -8573,10 +8580,10 @@ export const useTacoStore = defineStore('taco', () => {
     // Copy NNS proposal to SNS
     const copyNNSProposal = async (nnsProposalId: bigint) => {
         try {
-            console.log('Copying NNS proposal:', nnsProposalId.toString());
+            // console.log('Copying NNS proposal:', nnsProposalId.toString());
             const actor = await createNeuronSnapshotActor();
             const result = await (actor as any).copyNNSProposal(nnsProposalId);
-            console.log('Copy NNS proposal result:', result);
+            // console.log('Copy NNS proposal result:', result);
             return result;
         } catch (error) {
             console.error('Error copying NNS proposal:', error);
@@ -8608,10 +8615,10 @@ export const useTacoStore = defineStore('taco', () => {
     // Remove NNS-SNS proposal mapping
     const removeCopiedNNSProposal = async (nnsProposalId: bigint) => {
         try {
-            console.log('Removing NNS-SNS proposal mapping for NNS proposal:', nnsProposalId.toString());
+            // console.log('Removing NNS-SNS proposal mapping for NNS proposal:', nnsProposalId.toString());
             const actor = await createNeuronSnapshotActor();
             await (actor as any).removeCopiedNNSProposal(nnsProposalId);
-            console.log('Successfully removed NNS-SNS proposal mapping for:', nnsProposalId.toString());
+            // console.log('Successfully removed NNS-SNS proposal mapping for:', nnsProposalId.toString());
         } catch (error) {
             console.error('Error removing NNS-SNS proposal mapping:', error);
             throw error;
@@ -8708,10 +8715,10 @@ export const useTacoStore = defineStore('taco', () => {
     // Get proposer subaccount
     const getProposerSubaccount = async () => {
         try {
-            console.log('Getting proposer subaccount...');
+            // console.log('Getting proposer subaccount...');
             const actor = await createNeuronSnapshotActor();
             const result = await (actor as any).getProposerSubaccount();
-            console.log('Proposer subaccount result:', result);
+            // console.log('Proposer subaccount result:', result);
             return result;
         } catch (error) {
             console.error('Error getting proposer subaccount:', error);
@@ -8733,10 +8740,10 @@ export const useTacoStore = defineStore('taco', () => {
     // Get TACO DAO neuron ID
     const getTacoDAONeuronId = async () => {
         try {
-            console.log('Getting TACO DAO neuron ID...');
+            // console.log('Getting TACO DAO neuron ID...');
             const actor = await createNeuronSnapshotActor();
             const result = await (actor as any).getTacoDAONeuronId();
-            console.log('TACO DAO neuron ID result:', result);
+            // console.log('TACO DAO neuron ID result:', result);
             return result;
         } catch (error) {
             console.error('Error getting TACO DAO neuron ID:', error);
@@ -8843,10 +8850,10 @@ export const useTacoStore = defineStore('taco', () => {
     // Get default vote behavior
     const getDefaultVoteBehavior = async () => {
         try {
-            console.log('Getting default vote behavior...');
+            // console.log('Getting default vote behavior...');
             const actor = await createNeuronSnapshotActor();
             const result = await (actor as any).getDefaultVoteBehavior();
-            console.log('Default vote behavior result:', result);
+            // console.log('Default vote behavior result:', result);
             return result;
         } catch (error) {
             console.error('Error getting default vote behavior:', error);
@@ -8922,6 +8929,7 @@ export const useTacoStore = defineStore('taco', () => {
         namesLoading,
         threadMenuOpen,
         hasTokenDetails,
+        tacoWizardOpen,
         // actions
         changeRoute,
         toggleDarkMode,
@@ -9049,6 +9057,7 @@ export const useTacoStore = defineStore('taco', () => {
         toggleThreadMenu,
         ensureTokenDetails,
         checkTokenSupportsICRC2,
+        toggleTacoWizard,
 
         //Wallet functions
         getUserRegisteredTokens,

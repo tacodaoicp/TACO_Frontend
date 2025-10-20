@@ -81,14 +81,21 @@
           
           <span class="header-bar__rl-span">Code</span>
         
-        </a>  
+        </a>        
         
         <!-- wallet - router link -->
         <router-link to="/wallet" class="header-bar__rl">
           
           <span class="header-bar__rl-span">Wallet</span>
         
-        </router-link>         
+        </router-link>  
+
+        <!-- wizard - router link -->
+        <a v-if="localNeuronsCount < 1" href="#" @click="toggleTacoWizard()" class="header-bar__rl">
+          
+          <span class="header-bar__rl-span">🧙Taco Wizard</span>
+        
+        </a>          
 
       </div>
 
@@ -188,6 +195,16 @@
       <!-- list group -->
       <div class="list-group">
 
+        <!-- wizard - router link -->
+        <a v-if="localNeuronsCount < 1"
+           class="list-group-item"
+           href="#"
+           @click.prevent="toggleTacoWizard(), togglePagesMenu()">
+          
+          <!-- item text -->
+          <span>🧙Taco Wizard</span>
+        </a>          
+
         <!-- home - router link -->
         <router-link @click="togglePagesMenu()" to="/" class="list-group-item">
 
@@ -264,7 +281,7 @@
           <!-- item text -->
           <span>Code</span>
 
-        </a>  
+        </a>       
         
         <!-- wallet - router link -->
         <router-link @click="togglePagesMenu()" to="/wallet" class="list-group-item">
@@ -272,7 +289,7 @@
           <!-- item text -->
           <span>Wallet</span>
 
-        </router-link>        
+        </router-link>                   
 
       </div>
 
@@ -316,6 +333,9 @@
     </div>
 
   </div>
+
+  <!-- wizard modal -->
+  <WizardModal v-if="tacoWizardOpen"/>
 
 </template>
 
@@ -658,7 +678,8 @@
   import DfinityLogo from "../assets/images/dfinityLogo.vue"
   import DarkModeToggle from "./theme/DarkModeToggle.vue"
   import { Tooltip } from 'bootstrap'
-  import EnvironmentIndicator from './misc/EnvironmentIndicator.vue'
+  // import EnvironmentIndicator from './misc/EnvironmentIndicator.vue'
+  import WizardModal from "../views/WizardView.vue"
 
   ////////////
   // Stores //
@@ -672,11 +693,13 @@
   const { iidLogOut } = tacoStore // not reactive
   const { addToast } = tacoStore // not reactive
   const { checkIfLoggedIn } = tacoStore // not reactive
+  const { toggleTacoWizard } = tacoStore // not reactive
 
-  // state and getters
+  // state
   const { userLoggedIn } = storeToRefs(tacoStore) // reactive
   const { userPrincipal } = storeToRefs(tacoStore) // reactive
   const { truncatedPrincipal } = storeToRefs(tacoStore); // reactive
+  const { tacoWizardOpen } = storeToRefs(tacoStore); // reactive
 
   /////////////////////
   // Local Variables //
@@ -687,6 +710,9 @@
 
   // pages menu visiblility
   const pagesMenuIsVisible = ref(false)
+
+  // neurons count
+  const localNeuronsCount = ref(0)
 
   ///////////////////
   // Local Methods //
@@ -736,13 +762,19 @@
   // on mounted
   onMounted(async () => {
 
-      // check if user is logged in
-      await checkIfLoggedIn()
+    // check if user is logged in
+    await checkIfLoggedIn()
 
-      // if user is logged in, fetch user state
-      if (userLoggedIn.value) {
+    // if user is logged in, get neurons count
+    if (userLoggedIn.value) {
 
-      }
+      const rawNeurons = await tacoStore.getTacoNeurons()
+      const neuronsCount = rawNeurons.length
+
+      // set neurons count
+      localNeuronsCount.value = neuronsCount
+
+    }
 
     // init bootstrap tooltips
     new Tooltip(document.body, {

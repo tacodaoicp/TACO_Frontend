@@ -397,7 +397,7 @@
 import HeaderBar from "../components/HeaderBar.vue";
 import FooterBar from "../components/FooterBar.vue";
 import TacoTitle from '../components/misc/TacoTitle.vue'
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useTacoStore } from '../stores/taco.store'
 import { Principal } from '@dfinity/principal'
 import TokenCard from '../components/wallet/TokenCard.vue'
@@ -1167,6 +1167,15 @@ onMounted(async () => {
 
   }
 
+})
+
+// watch user login state and refresh balances when it changes
+watch(() => tacoStore.userLoggedIn, async () => {
+  try {
+    await loadAllBalances()
+  } catch (e) {
+    console.error('error reloading balances on auth change', e)
+  }
 })
 
 </script>
