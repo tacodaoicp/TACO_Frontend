@@ -714,6 +714,8 @@ const runTest = async (testKey: string) => {
       await testArchivesImporting(test)
     } else if (testKey === 'trading-regular') {
       await testTradingBotRegular(test)
+    } else if (testKey === 'snapshots-portfolio') {
+      await testPortfolioSnapshots(test)
     } else {
       // Placeholder for other tests
       test.status = 'gray'
@@ -1376,6 +1378,120 @@ const testTradingBotRegular = async (test: any) => {
   } catch (error: any) {
     test.status = 'red'
     test.report = `<div class="alert alert-danger"><strong>Error:</strong> ${error.message || 'Failed to check trading bot status'}</div>`
+  }
+}
+
+// Test: Are portfolio snapshots regular?
+const testPortfolioSnapshots = async (test: any) => {
+  const checks: Array<{ name: string; status: 'pass' | 'fail' | 'error'; message: string }> = []
+  
+  try {
+    const cid = resolvePrincipal('treasury')
+    const { idlFactory: treasuryIDL } = await import('../../../declarations/treasury/treasury.did.js')
+    const agent = new HttpAgent({ host: process.env.DFX_NETWORK === 'local' ? 'http://127.0.0.1:4943' : 'https://ic0.app' })
+    if (process.env.DFX_NETWORK === 'local') { await agent.fetchRootKey() }
+    const tActor: any = Actor.createActor(treasuryIDL, { agent, canisterId: cid })
+
+    // Fetch snapshot status
+    const snapStatus = await tActor.getPortfolioSnapshotStatus()
+    
+    // Check 1: Snapshot timer running
+    const snapshotRunning = !!('Running' in snapStatus.status)
+    
+    if (!snapshotRunning) {
+      checks.push({
+        name: 'Snapshot Timer Status',
+        status: 'fail',
+        message: '❌ Portfolio snapshot timer is <strong>not running</strong>.'
+      })
+    } else {
+      checks.push({
+        name: 'Snapshot Timer Status',
+        status: 'pass',
+        message: '✅ Portfolio snapshot timer is running.'
+      })
+    }
+    
+    // Check 2: Last snapshot not too old
+    if (snapStatus.lastSnapshotTime && snapStatus.intervalMinutes) {
+      const intervalNs = BigInt(snapStatus.intervalMinutes) * 60n * 1_000_000_000n // Convert minutes to nanoseconds
+      const maxDelayNs = intervalNs * 5n // 5 periods
+      const nowNs = BigInt(Date.now()) * 1_000_000n
+      const lastSnapshotNs = BigInt(snapStatus.lastSnapshotTime)
+      const delayNs = nowNs - lastSnapshotNs
+      const periodsBehind = Number(delayNs) / Number(intervalNs)
+      
+      let snapshotTimingStatus: 'pass' | 'fail' | 'error' = 'pass'
+      let snapshotTimingMessage = ''
+      
+      if (delayNs > maxDelayNs) {
+        snapshotTimingStatus = 'fail'
+        snapshotTimingMessage = `❌ Last snapshot is overdue by <strong>${periodsBehind.toFixed(1)}</strong> periods (last snapshot: ${formatNanoTime(lastSnapshotNs)}). Maximum allowed: 5 periods. Interval: ${snapStatus.intervalMinutes} minutes.`
+      } else {
+        snapshotTimingMessage = `✅ Snapshots are on schedule (last snapshot: ${formatNanoTime(lastSnapshotNs)}, <strong>${periodsBehind.toFixed(1)}</strong> periods ago). Interval: ${snapStatus.intervalMinutes} minutes.`
+      }
+      
+      checks.push({
+        name: 'Snapshot Timing',
+        status: snapshotTimingStatus,
+        message: snapshotTimingMessage
+      })
+    } else {
+      checks.push({
+        name: 'Snapshot Timing',
+        status: 'error',
+        message: '⚠️ Unable to determine snapshot timing (missing lastSnapshotTime or intervalMinutes)'
+      })
+    }
+    
+    // Overall status
+    const anyFailed = checks.some(c => c.status === 'fail')
+    const anyError = checks.some(c => c.status === 'error')
+    
+    if (anyError || anyFailed) {
+      test.status = 'red'
+    } else {
+      test.status = 'green'
+    }
+
+    // Build HTML report
+    const passed = checks.filter(c => c.status === 'pass').length
+    const failed = checks.filter(c => c.status === 'fail').length
+    const errors = checks.filter(c => c.status === 'error').length
+
+    let reportHTML = `
+      <div class="mb-3">
+        <strong>Results:</strong> ${passed} passed, ${failed} failed, ${errors} errors
+      </div>
+      <div class="canister-results">
+    `
+
+    checks.forEach(check => {
+      const icon = check.status === 'pass' 
+        ? '<i class="fa-solid fa-check-circle text-success"></i>' 
+        : check.status === 'fail'
+        ? '<i class="fa-solid fa-exclamation-triangle text-warning"></i>'
+        : '<i class="fa-solid fa-times-circle text-danger"></i>'
+      
+      const rowClass = check.status === 'pass' ? 'text-success' : check.status === 'fail' ? 'text-warning' : 'text-danger'
+      
+      reportHTML += `
+        <div class="d-flex align-items-start gap-2 py-2 small ${rowClass}">
+          <div class="mt-1">${icon}</div>
+          <div>
+            <div class="fw-bold">${check.name}</div>
+            <div>${check.message}</div>
+          </div>
+        </div>
+      `
+    })
+
+    reportHTML += '</div>'
+    test.report = reportHTML
+
+  } catch (error: any) {
+    test.status = 'red'
+    test.report = `<div class="alert alert-danger"><strong>Error:</strong> ${error.message || 'Failed to check portfolio snapshot status'}</div>`
   }
 }
 
