@@ -145,13 +145,17 @@
         <!-- Treasury read-only details -->
         <div v-if="treasuryDetails" class="mt-3">
           <h6 class="mb-2">Trading Metrics</h6>
+          <div class="d-flex align-items-center gap-2 mb-2">
+            <span class="status-indicator" :class="treasuryDetails.tradingActive ? 'active' : 'inactive'"></span>
+            <span class="small"><strong>Trading Status:</strong> {{ treasuryDetails.tradingActive ? 'Trading' : 'Idle' }}</span>
+          </div>
           <div class="d-flex flex-column small gap-1">
             <div><strong>Last Attempt:</strong> {{ treasuryDetails.tradingMetrics?.lastRebalanceAttemptDisplay || 'Never' }}</div>
             <div><strong>Total Trades:</strong> {{ treasuryDetails.tradingMetrics?.totalTradesExecuted ?? 0 }}</div>
             <div><strong>Failed Trades:</strong> {{ treasuryDetails.tradingMetrics?.totalTradesFailed ?? 0 }}</div>
             <div><strong>Success Rate:</strong> {{ treasuryDetails.tradingMetrics?.successRatePct ?? '0.0%' }}</div>
             <div><strong>Avg Slippage:</strong> {{ treasuryDetails.tradingMetrics?.avgSlippagePct ?? '0.00%' }}</div>
-            <div v-if="treasuryDetails.tradingWarning" :class="['mt-1', treasuryDetails.tradingWarning.level === 'danger' ? 'text-danger' : 'text-warning']">{{ treasuryDetails.tradingWarning.message }}</div>
+            <div v-if="treasuryDetails.tradingWarning" :class="['mt-1', treasuryDetails.tradingWarning.level === 'danger' ? 'text-danger' : 'text-warning']">⚠️ {{ treasuryDetails.tradingWarning.message }}</div>
           </div>
 
           <!-- token sync list moved to DAO backend card -->

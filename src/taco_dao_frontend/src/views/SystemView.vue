@@ -526,6 +526,10 @@ const fetchCyclesFor = async (key: CanKey) => {
             const cfg = Array.isArray(cfgRaw) ? cfgRaw[0] : cfgRaw
             intervalNs = cfg?.rebalanceIntervalNS
           }
+          // Fallback to store config if cfgRaw failed
+          if (!intervalNs && tacoStore.rebalanceConfig?.rebalanceIntervalNS) {
+            intervalNs = tacoStore.rebalanceConfig.rebalanceIntervalNS
+          }
           let tradingStale = false
           if (intervalNs && lastAttemptNs) {
             const periods = Number((BigInt(Date.now()) * 1_000_000n - BigInt(lastAttemptNs)) / BigInt(intervalNs))
@@ -562,8 +566,13 @@ const fetchCyclesFor = async (key: CanKey) => {
 
           let tradingWarning: any = null
           if (intervalNs && lastAttemptNs) {
-            const periods = Number((BigInt(Date.now()) * 1_000_000n - BigInt(lastAttemptNs)) / BigInt(intervalNs))
-            if (periods > 5) tradingWarning = { level: 'danger', message: `Trading bot is ${periods} periods overdue.` }
+            const nowNs = BigInt(Date.now()) * 1_000_000n
+            const lastAttemptBigInt = BigInt(lastAttemptNs)
+            const intervalBigInt = BigInt(intervalNs)
+            const delayNs = nowNs - lastAttemptBigInt
+            const periods = Math.floor(Number(delayNs) / Number(intervalBigInt))
+            console.log('[Treasury Warning] Now:', Date.now(), 'Last:', lastAttemptNs, 'Interval:', intervalNs, 'Periods:', periods)
+            if (periods > 5) tradingWarning = { level: 'danger', message: `Trading bot is ${periods} periods overdue! Last attempt was ${periods} intervals ago.` }
             else if (periods > 2) tradingWarning = { level: 'warning', message: `Trading bot is ${periods} periods overdue.` }
           }
 
@@ -580,6 +589,7 @@ const fetchCyclesFor = async (key: CanKey) => {
           }
           
           treasuryDetails.value = {
+            tradingActive, // Add trading status
             tradingMetrics: {
               lastRebalanceAttemptDisplay: lastTradeDisplay,
               totalTradesExecuted,
