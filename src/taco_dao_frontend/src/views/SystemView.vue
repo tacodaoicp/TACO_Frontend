@@ -1189,7 +1189,49 @@ const testTradingBotRegular = async (test: any) => {
       console.warn('[Trading Bot Test] Slippage tolerance not available - config not loaded')
     }
 
-    // Check 5: Failed trades analysis
+    // Check 5: Last successful trade timing (same as portfolio snapshot timing check)
+    if (executedTrades.length > 0) {
+      const successfulTrades = executedTrades.filter((t: any) => t.success)
+      
+      if (successfulTrades.length > 0) {
+        const lastSuccessfulTrade = successfulTrades[successfulTrades.length - 1]
+        const lastTradeTimestampNs = BigInt(lastSuccessfulTrade.timestamp)
+        const nowNs = BigInt(Date.now()) * 1_000_000n
+        const timeSinceLastTrade = nowNs - lastTradeTimestampNs
+        const periods = Number(timeSinceLastTrade / BigInt(intervalNs))
+        const maxDelayNs = BigInt(intervalNs) * 5n // 5 periods
+        const lastTradeDisplay = new Date(Number(lastTradeTimestampNs / 1_000_000n)).toLocaleString()
+        const intervalMinutes = Number(BigInt(intervalNs) / 1_000_000_000n / 60n)
+        
+        if (timeSinceLastTrade > maxDelayNs) {
+          checks.push({
+            name: 'Last Successful Trade Timing',
+            status: 'fail',
+            message: `❌ Last successful trade is overdue by <strong>${periods.toFixed(1)}</strong> periods (${lastTradeDisplay}). Maximum allowed: 5 periods. Interval: ${intervalMinutes} minutes.`
+          })
+        } else {
+          checks.push({
+            name: 'Last Successful Trade Timing',
+            status: 'pass',
+            message: `✅ Last successful trade is on schedule (${lastTradeDisplay}, <strong>${periods.toFixed(1)}</strong> periods ago). Interval: ${intervalMinutes} minutes.`
+          })
+        }
+      } else {
+        checks.push({
+          name: 'Last Successful Trade Timing',
+          status: 'fail',
+          message: '❌ No successful trades recorded - all trades have failed!'
+        })
+      }
+    } else {
+      checks.push({
+        name: 'Last Successful Trade Timing',
+        status: 'error',
+        message: '⚠️ No trade history available to determine last successful trade timing'
+      })
+    }
+
+    // Check 6: Failed trades analysis
     if (executedTrades.length > 0) {
       const last100 = executedTrades.slice(-100)
       const failedLast100 = last100.filter((t: any) => !t.success).length
@@ -1217,7 +1259,7 @@ const testTradingBotRegular = async (test: any) => {
         message: failMessage
       })
 
-      // Check 6: Slippage analysis
+      // Check 7: Slippage analysis
       const tradesWithSlippage = executedTrades.filter((t: any) => t.success && t.slippage != null)
       const last100WithSlippage = last100.filter((t: any) => t.success && t.slippage != null)
       
@@ -1266,7 +1308,7 @@ const testTradingBotRegular = async (test: any) => {
       })
     }
 
-    // ===== Check 7: Short Sync Timer Status =====
+    // ===== Check 8: Short Sync Timer Status =====
     const shortSyncActive = tsRes && 'ok' in tsRes ? tsRes.ok.metrics?.lastUpdate : null
     const shortSyncIntervalNs = 900_000_000_000n // 15 minutes
     const shortSyncMaxDelayNs = shortSyncIntervalNs * 5n // 5 periods
@@ -1300,7 +1342,7 @@ const testTradingBotRegular = async (test: any) => {
       })
     }
 
-    // ===== Check 8: Long Sync Timer Status =====
+    // ===== Check 9: Long Sync Timer Status =====
     if (longSyncTimerRes) {
       const timerStatus: any = longSyncTimerRes
       const longSyncRunning = timerStatus.isRunning || false
