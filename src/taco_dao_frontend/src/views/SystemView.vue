@@ -1054,38 +1054,41 @@ const testCanistersRunning = async (test: any) => {
 
 // Test: Are archives importing regularly?
 const testArchivesImporting = async (test: any) => {
-  const results: Array<{ name: string; key: CanKey; running: boolean; lastRun: number | null; status: 'pass' | 'fail' | 'error'; message: string }> = []
+  const results: Array<{ name: string; key: CanKey; checks: Array<{ name: string; status: 'pass' | 'fail' | 'error'; message: string }> }> = []
+  
+  // Archive period: 30 minutes
+  const archivePeriodMinutes = 30
+  const archivePeriodMs = archivePeriodMinutes * 60 * 1000
+  const maxPeriodsOverdue = 3
+  const maxDelayMs = maxPeriodsOverdue * archivePeriodMs // 90 minutes
   
   // Test all archive canisters in parallel
   await Promise.all(archiveCanisters.map(async (canister) => {
     const key = canister.key
     const canisterName = canister.title
+    const checks: Array<{ name: string; status: 'pass' | 'fail' | 'error'; message: string }> = []
     
     try {
       const cid = resolvePrincipal(key)
       if (!cid) {
-        results.push({
-          name: canisterName,
-          key,
-          running: false,
-          lastRun: null,
+        checks.push({
+          name: 'Configuration',
           status: 'error',
           message: 'No canister ID configured'
         })
+        results.push({ name: canisterName, key, checks })
         return
       }
 
       // Create archive actor to get timer status
       const archiveActor = await createArchiveActor(key, cid)
       if (!archiveActor || typeof archiveActor.getTimerStatus !== 'function') {
-        results.push({
-          name: canisterName,
-          key,
-          running: false,
-          lastRun: null,
+        checks.push({
+          name: 'Timer Status',
           status: 'error',
           message: 'Timer status not available'
         })
+        results.push({ name: canisterName, key, checks })
         return
       }
 
@@ -1096,59 +1099,87 @@ const testArchivesImporting = async (test: any) => {
       const lastRun = timerStatus.outerLoopLastRun
       const lastRunMs = lastRun && Number(lastRun) > 0 ? Number(lastRun) / 1_000_000 : null
       
-      // Calculate time since last run
-      const nowMs = Date.now()
-      const timeSinceLastRun = lastRunMs ? nowMs - lastRunMs : null
-      
-      // Check if last run was within 90 minutes (3 periods of 30 minutes)
-      const maxDelayMs = 90 * 60 * 1000 // 90 minutes in milliseconds
-      
-      let status: 'pass' | 'fail' = 'pass'
-      let message = ''
-      
+      // Check 1: Timer is running
       if (!isRunning) {
-        status = 'fail'
-        message = 'Outer timer is NOT running'
-      } else if (!lastRunMs || Number(lastRun) === 0) {
-        status = 'fail'
-        message = 'Never run - no last run time recorded'
-      } else if (timeSinceLastRun && timeSinceLastRun > maxDelayMs) {
-        status = 'fail'
-        const minutesAgo = Math.round(timeSinceLastRun / (60 * 1000))
-        message = `Last run ${minutesAgo} minutes ago (>90 min threshold)`
+        checks.push({
+          name: 'Outer Timer Running',
+          status: 'fail',
+          message: '❌ Outer timer is <strong>NOT running</strong>. Archive imports will not happen automatically.'
+        })
       } else {
-        const minutesAgo = timeSinceLastRun ? Math.round(timeSinceLastRun / (60 * 1000)) : 0
-        message = `Running - last import ${minutesAgo} minutes ago`
+        checks.push({
+          name: 'Outer Timer Running',
+          status: 'pass',
+          message: '✅ Outer timer is running.'
+        })
+      }
+      
+      // Check 2: Last run timing (within 3 periods)
+      if (!lastRunMs || Number(lastRun) === 0) {
+        checks.push({
+          name: 'Last Import Timing',
+          status: 'fail',
+          message: '❌ Never run - no last run time recorded.'
+        })
+      } else {
+        const nowMs = Date.now()
+        const timeSinceLastRun = nowMs - lastRunMs
+        const periodsOverdue = timeSinceLastRun / archivePeriodMs
+        const minutesAgo = Math.round(timeSinceLastRun / (60 * 1000))
+        const lastRunDisplay = new Date(lastRunMs).toLocaleString()
+        
+        if (periodsOverdue > maxPeriodsOverdue) {
+          checks.push({
+            name: 'Last Import Timing',
+            status: 'fail',
+            message: `❌ Last import was <strong>${periodsOverdue.toFixed(1)} periods</strong> ago (${minutesAgo} minutes, ${lastRunDisplay}). Expected within ${maxPeriodsOverdue} periods (${maxPeriodsOverdue * archivePeriodMinutes} minutes).`
+          })
+        } else {
+          checks.push({
+            name: 'Last Import Timing',
+            status: 'pass',
+            message: `✅ Last import was <strong>${periodsOverdue.toFixed(1)} periods</strong> ago (${minutesAgo} minutes, ${lastRunDisplay}, period: ${archivePeriodMinutes}min).`
+          })
+        }
       }
       
       results.push({
         name: canisterName,
         key,
-        running: isRunning,
-        lastRun: lastRunMs,
-        status,
-        message
+        checks
       })
     } catch (error: any) {
+      checks.push({
+        name: 'Error',
+        status: 'error',
+        message: `Failed to check: ${error.message || 'Unknown error'}`
+      })
       results.push({
         name: canisterName,
         key,
-        running: false,
-        lastRun: null,
-        status: 'error',
-        message: `Failed to check: ${error.message || 'Unknown error'}`
+        checks
       })
     }
   }))
 
   // Generate report
-  const passed = results.filter(r => r.status === 'pass').length
-  const failed = results.filter(r => r.status === 'fail').length
-  const errors = results.filter(r => r.status === 'error').length
-  const total = results.length
+  // Count all checks across all archives
+  let totalChecks = 0
+  let passedChecks = 0
+  let failedChecks = 0
+  let errorChecks = 0
+  
+  results.forEach(result => {
+    result.checks.forEach(check => {
+      totalChecks++
+      if (check.status === 'pass') passedChecks++
+      else if (check.status === 'fail') failedChecks++
+      else errorChecks++
+    })
+  })
 
-  // Overall status
-  if (errors > 0 || failed > 0) {
+  // Overall status - fail if ANY check fails or errors
+  if (errorChecks > 0 || failedChecks > 0) {
     test.status = 'red'
   } else {
     test.status = 'green'
@@ -1157,27 +1188,55 @@ const testArchivesImporting = async (test: any) => {
   // Build HTML report
   let reportHTML = `
     <div class="mb-3">
-      <strong>Results:</strong> ${passed} passed, ${failed} failed, ${errors} errors out of ${total} archive canisters
+      <strong>Results:</strong> ${passedChecks} passed, ${failedChecks} failed, ${errorChecks} errors out of ${totalChecks} checks across ${results.length} archives
     </div>
-    <div class="canister-results">
+    <div class="archive-results">
   `
 
   results.forEach(result => {
-    const icon = result.status === 'pass' 
-      ? '<i class="fa-solid fa-check-circle text-success"></i>' 
-      : result.status === 'fail'
-      ? '<i class="fa-solid fa-exclamation-triangle text-warning"></i>'
-      : '<i class="fa-solid fa-times-circle text-danger"></i>'
+    // Determine overall status for this archive
+    const hasError = result.checks.some(c => c.status === 'error')
+    const hasFail = result.checks.some(c => c.status === 'fail')
+    const allPass = result.checks.every(c => c.status === 'pass')
     
-    const rowClass = result.status === 'pass' ? 'text-success' : result.status === 'fail' ? 'text-warning' : 'text-danger'
+    const archiveStatusIcon = allPass 
+      ? '<i class="fa-solid fa-check-circle text-success"></i>' 
+      : hasFail
+      ? '<i class="fa-solid fa-times-circle text-danger"></i>'
+      : '<i class="fa-solid fa-exclamation-triangle text-warning"></i>'
+    
+    const archiveRowClass = allPass ? 'text-success' : hasFail ? 'text-danger' : 'text-warning'
     
     reportHTML += `
-      <div class="d-flex align-items-center gap-2 py-1 small ${rowClass}">
-        ${icon}
-        <span class="fw-bold" style="min-width: 250px">${result.name}</span>
-        <span>${result.message}</span>
-      </div>
+      <div class="mb-3 border-bottom pb-2">
+        <div class="d-flex align-items-center gap-2 py-1 ${archiveRowClass}">
+          ${archiveStatusIcon}
+          <span class="fw-bold">${result.name}</span>
+        </div>
     `
+    
+    // Show each check for this archive
+    result.checks.forEach(check => {
+      const checkIcon = check.status === 'pass' 
+        ? '<i class="fa-solid fa-check-circle text-success"></i>' 
+        : check.status === 'fail'
+        ? '<i class="fa-solid fa-times-circle text-danger"></i>'
+        : '<i class="fa-solid fa-exclamation-triangle text-warning"></i>'
+      
+      const checkRowClass = check.status === 'pass' ? 'text-success' : check.status === 'fail' ? 'text-danger' : 'text-warning'
+      
+      reportHTML += `
+        <div class="d-flex align-items-start gap-2 py-1 small ${checkRowClass} ms-4">
+          <div style="min-width: 20px; margin-top: 2px;">${checkIcon}</div>
+          <div>
+            <div class="fw-bold" style="font-size: 0.85rem;">${check.name}</div>
+            <div style="font-size: 0.8rem;">${check.message}</div>
+          </div>
+        </div>
+      `
+    })
+    
+    reportHTML += `</div>`
   })
 
   reportHTML += '</div>'
