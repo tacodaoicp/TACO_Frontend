@@ -729,7 +729,8 @@ const fetchCyclesFor = async (key: CanKey) => {
             
             const lastRunTime = periodicStatus.last_run_time
             if (lastRunTime && Number(lastRunTime) > 0) {
-              const lastRunMs = Number(lastRunTime) / 1_000_000
+              // Timestamps are in seconds, convert to milliseconds
+              const lastRunMs = Number(lastRunTime) * 1000
               lastPeriodicRunDisplay = new Date(lastRunMs).toLocaleString()
               
               // Calculate staleness based on periods (1 period = interval seconds)
@@ -749,7 +750,12 @@ const fetchCyclesFor = async (key: CanKey) => {
             
             const nextRunTime = periodicStatus.next_run_time
             if (nextRunTime && Number(nextRunTime) > 0) {
-              nextRunDisplay = new Date(Number(nextRunTime) / 1_000_000).toLocaleString()
+              // Timestamps are in seconds, convert to milliseconds
+              nextRunDisplay = new Date(Number(nextRunTime) * 1000).toLocaleString()
+            } else if (lastRunTime && Number(lastRunTime) > 0 && periodicTimerRunning) {
+              // If next run time not provided but we have last run time, calculate it
+              const calculatedNextRunMs = (Number(lastRunTime) + intervalSeconds) * 1000
+              nextRunDisplay = new Date(calculatedNextRunMs).toLocaleString()
             }
           }
           
