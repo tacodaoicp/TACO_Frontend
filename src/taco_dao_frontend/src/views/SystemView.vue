@@ -500,7 +500,8 @@ const fetchCyclesFor = async (key: CanKey) => {
             tActor.getRebalanceConfig?.() ?? Promise.resolve(null),
             dActor.getTokenDetails(),
             tActor.getPortfolioSnapshotStatus(),
-            tActor.getLongSyncTimerStatus?.() ?? Promise.resolve(null)
+            tActor.getLongSyncTimerStatus?.() ?? Promise.resolve(null),
+            tacoStore.getRebalanceConfig().catch(() => null) // Ensure store config is loaded
           ])
 
           // Trading metrics and status
@@ -526,10 +527,14 @@ const fetchCyclesFor = async (key: CanKey) => {
             const cfg = Array.isArray(cfgRaw) ? cfgRaw[0] : cfgRaw
             intervalNs = cfg?.rebalanceIntervalNS
           }
+          console.log('[Treasury Data] cfgRaw:', cfgRaw, 'intervalNs from cfgRaw:', intervalNs)
+          console.log('[Treasury Data] tacoStore.rebalanceConfig:', tacoStore.rebalanceConfig)
           // Fallback to store config if cfgRaw failed
           if (!intervalNs && tacoStore.rebalanceConfig?.rebalanceIntervalNS) {
             intervalNs = tacoStore.rebalanceConfig.rebalanceIntervalNS
+            console.log('[Treasury Data] Using intervalNs from store:', intervalNs)
           }
+          console.log('[Treasury Data] Final intervalNs:', intervalNs, 'lastAttemptNs:', lastAttemptNs)
           let tradingStale = false
           if (intervalNs && lastAttemptNs) {
             const periods = Number((BigInt(Date.now()) * 1_000_000n - BigInt(lastAttemptNs)) / BigInt(intervalNs))
@@ -588,8 +593,22 @@ const fetchCyclesFor = async (key: CanKey) => {
             longSyncLastRun = timerStatus.lastRunTime || null
           }
           
+          // Calculate trading interval and periods for display
+          let tradingIntervalMinutes = null
+          let periodsSinceLastTrade = null
+          if (intervalNs && lastAttemptNs) {
+            tradingIntervalMinutes = Math.round(Number(intervalNs) / (60 * 1_000_000_000))
+            const nowNs = BigInt(Date.now()) * 1_000_000n
+            const lastAttemptBigInt = BigInt(lastAttemptNs)
+            const intervalBigInt = BigInt(intervalNs)
+            const delayNs = nowNs - lastAttemptBigInt
+            periodsSinceLastTrade = Math.floor(Number(delayNs) / Number(intervalBigInt))
+          }
+
           treasuryDetails.value = {
             tradingActive, // Add trading status
+            tradingIntervalMinutes,
+            periodsSinceLastTrade,
             tradingMetrics: {
               lastRebalanceAttemptDisplay: lastTradeDisplay,
               totalTradesExecuted,
