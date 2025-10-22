@@ -94,6 +94,8 @@
                   :timerStatus="timerStatusMap[c.key]"
                   :treasuryHeader="c.key === 'treasury' ? (treasuryHeader || undefined) : undefined"
                   :treasuryDetails="c.key === 'treasury' ? (treasuryDetails || undefined) : undefined"
+                  :rewardsHeader="c.key === 'rewards' ? (rewardsHeader || undefined) : undefined"
+                  :rewardsDetails="c.key === 'rewards' ? (rewardsDetails || undefined) : undefined"
                   :tokenList="c.key === 'dao_backend' ? (daoTokenList || undefined) : undefined"
                   :tokenAggregateWorst="c.key === 'dao_backend' ? (daoTokenWorst || undefined) : undefined"
                   :oldestTokenSyncDisplay="c.key === 'dao_backend' ? (daoOldestSyncDisplay || undefined) : undefined"
@@ -358,6 +360,12 @@ const treasuryHeader = ref<{
 } | null>(null)
 
 const treasuryDetails = ref<any | null>(null)
+const rewardsHeader = ref<{
+  timerRunning: boolean
+  distributionStale: boolean
+  lastDistributionDisplay: string
+} | null>(null)
+const rewardsDetails = ref<any | null>(null)
 const daoTokenList = ref<Array<{ symbol: string; lastSyncDisplay: string; statusClass: string; statusText: string }> | null>(null)
 const daoTokenWorst = ref<'green' | 'orange' | 'red' | null>(null)
 const daoOldestSyncDisplay = ref<string | null>(null)
@@ -691,6 +699,79 @@ const fetchCyclesFor = async (key: CanKey) => {
           }
         } catch (_) {
           governanceHeader.value = null
+        }
+      } else if (key === 'rewards') {
+        // Load rewards distribution status from selected env
+        try {
+          const { idlFactory: rewardsIDL } = await import('../../../declarations/rewards/rewards.did.js')
+          const agent = new HttpAgent({ host: process.env.DFX_NETWORK === 'local' ? 'http://127.0.0.1:4943' : 'https://ic0.app' })
+          if (process.env.DFX_NETWORK === 'local') { await agent.fetchRootKey() }
+          const rActor: any = Actor.createActor(rewardsIDL, { agent, canisterId: resolvePrincipal('rewards') })
+          
+          // Fetch config and status
+          const [config, totalDistributed, tacoBalance, currentNeuronBalances] = await Promise.all([
+            rActor.getConfiguration(),
+            rActor.getTotalDistributed?.() ?? Promise.resolve(0),
+            rActor.getTacoBalance?.() ?? Promise.resolve(0),
+            rActor.getCurrentNeuronBalances?.() ?? Promise.resolve(0),
+          ])
+          
+          const timerRunning = config?.timerRunning || false
+          const lastDistributionTime = config?.lastDistributionTime || 0
+          const nextScheduledDistribution = config?.nextScheduledDistribution || null
+          const totalDistributions = config?.totalDistributions || 0
+          const distributionPeriodNS = config?.distributionPeriodNS || 0
+          const periodicRewardPot = config?.periodicRewardPot || 0
+          
+          // Format timestamps
+          const lastDistributionDisplay = lastDistributionTime ? new Date(Number(BigInt(lastDistributionTime) / 1_000_000n)).toLocaleString() : 'Never'
+          const nextScheduledDisplay = nextScheduledDistribution ? new Date(Number(BigInt(nextScheduledDistribution) / 1_000_000n)).toLocaleString() : 'Not scheduled'
+          
+          // Check if distribution is stale (more than 2 periods overdue)
+          const now = Date.now() * 1_000_000
+          const periodNS = Number(distributionPeriodNS)
+          const timeSinceLastDistribution = now - Number(lastDistributionTime)
+          const periodsOverdue = periodNS > 0 ? timeSinceLastDistribution / periodNS : 0
+          const distributionStale = periodsOverdue > 2
+          
+          // Distribution warning similar to trading bot
+          let distributionWarning = null
+          if (periodsOverdue > 5) {
+            distributionWarning = {
+              level: 'danger',
+              message: `Distribution is ${Math.floor(periodsOverdue)} periods overdue! Last distribution was ${Math.floor(periodsOverdue)} periods ago.`
+            }
+          } else if (periodsOverdue > 2) {
+            distributionWarning = {
+              level: 'warning',
+              message: `Distribution is ${Math.floor(periodsOverdue)} periods overdue. Last distribution was ${Math.floor(periodsOverdue)} periods ago.`
+            }
+          }
+          
+          rewardsHeader.value = {
+            timerRunning,
+            distributionStale,
+            lastDistributionDisplay
+          }
+          
+          rewardsDetails.value = {
+            timerRunning,
+            distributionWarning,
+            lastDistributionDisplay,
+            nextScheduledDisplay,
+            totalDistributions,
+            distributionPeriodDays: Math.round(periodNS / (24 * 60 * 60 * 1_000_000_000)),
+            periodicRewardPot: periodicRewardPot.toString(),
+            tacoBalance: (typeof tacoBalance === 'object' && 'e8s' in tacoBalance) ? (Number(tacoBalance.e8s) / 1e8).toFixed(2) : '0.00',
+            currentNeuronBalances: (typeof currentNeuronBalances === 'object' && 'e8s' in currentNeuronBalances) ? (Number(currentNeuronBalances.e8s) / 1e8).toFixed(2) : '0.00',
+            totalDistributed: (typeof totalDistributed === 'object' && 'e8s' in totalDistributed) ? (Number(totalDistributed.e8s) / 1e8).toFixed(2) : '0.00',
+            availableBalance: (typeof tacoBalance === 'object' && 'e8s' in tacoBalance && typeof currentNeuronBalances === 'object' && 'e8s' in currentNeuronBalances) 
+              ? ((Number(tacoBalance.e8s) - Number(currentNeuronBalances.e8s)) / 1e8).toFixed(2) 
+              : '0.00'
+          }
+        } catch (_) {
+          rewardsHeader.value = null
+          rewardsDetails.value = null
         }
       } else {
         timerStatusMap[key] = null

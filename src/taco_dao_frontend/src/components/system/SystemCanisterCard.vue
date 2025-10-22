@@ -68,6 +68,16 @@
           </span>
           <span class="status-indicator" :class="treasuryHeader.snapshotActive ? 'active' : 'inactive'"></span>
         </div>
+
+        <!-- rewards header indicators -->
+        <div v-if="rewardsHeader" class="d-flex align-items-center gap-2 ms-3">
+          <!-- distribution timer lamp + last distribution time -->
+          <span class="text-muted small d-inline-flex align-items-center" title="Distribution Timer">
+            <i class="fa-regular fa-clock"></i>
+          </span>
+          <span class="status-indicator" :class="rewardsHeader.timerRunning ? 'active' : 'inactive'"></span>
+          <span :class="['small', rewardsHeader.distributionStale ? 'text-danger' : 'text-muted']" :title="'Last distribution time'">{{ rewardsHeader.lastDistributionDisplay }}</span>
+        </div>
       </div>
       <div class="d-flex align-items-center gap-2" @click.stop>
         <button class="btn btn-sm btn-primary" @click="$emit('refresh')" :disabled="loading" title="Refresh">
@@ -185,6 +195,37 @@
           </div>
         </div>
 
+        <!-- Rewards read-only details -->
+        <div v-if="rewardsDetails" class="mt-3">
+          <h6 class="mb-2">Distribution Status</h6>
+          <div class="d-flex align-items-center gap-2 mb-2">
+            <span class="status-indicator" :class="rewardsDetails.timerRunning ? 'active' : 'inactive'"></span>
+            <span class="small"><strong>Auto Timer:</strong> {{ rewardsDetails.timerRunning ? 'Running' : 'Stopped' }}</span>
+          </div>
+          <div v-if="rewardsDetails.distributionWarning" :class="['mb-2 alert', rewardsDetails.distributionWarning.level === 'danger' ? 'alert-danger' : 'alert-warning']">⚠️ {{ rewardsDetails.distributionWarning.message }}</div>
+          <div class="d-flex flex-column small gap-1">
+            <div><strong>Last Distribution:</strong> {{ rewardsDetails.lastDistributionDisplay || 'Never' }}</div>
+            <div><strong>Next Scheduled:</strong> {{ rewardsDetails.nextScheduledDisplay || 'Not scheduled' }}</div>
+            <div><strong>Total Distributions:</strong> {{ rewardsDetails.totalDistributions ?? 0 }}</div>
+            <div><strong>Distribution Period:</strong> {{ rewardsDetails.distributionPeriodDays }} days</div>
+            <div><strong>Current Reward Pot:</strong> {{ rewardsDetails.periodicRewardPot }} TACO</div>
+          </div>
+
+          <h6 class="mb-2 mt-3">Balances</h6>
+          <div class="d-flex flex-column small gap-1">
+            <div><strong>Canister TACO Balance:</strong> {{ rewardsDetails.tacoBalance }} TACO</div>
+            <div><strong>Current Neuron Balances:</strong> {{ rewardsDetails.currentNeuronBalances }} TACO</div>
+            <div><strong>Available for Distribution:</strong> {{ rewardsDetails.availableBalance }} TACO</div>
+            <div><strong>Total Distributed (All Time):</strong> {{ rewardsDetails.totalDistributed }} TACO</div>
+          </div>
+
+          <div class="d-flex justify-content-end mt-3" v-if="isAdmin">
+            <router-link to="/admin/distributions" class="btn btn-sm btn-outline-primary">
+              Manage Distributions
+            </router-link>
+          </div>
+        </div>
+
         <!-- DAO Backend read-only token sync list -->
         <div v-if="tokenList && tokenList.length" class="mt-3">
           <h6 class="mb-2">Token Sync Status</h6>
@@ -272,6 +313,12 @@ const props = defineProps<{
     longSyncActive?: boolean
   }
   treasuryDetails?: any
+  rewardsHeader?: {
+    timerRunning: boolean
+    distributionStale: boolean
+    lastDistributionDisplay: string
+  }
+  rewardsDetails?: any
   tokenList?: Array<{ symbol: string; lastSyncDisplay: string; statusClass: string; statusText: string }>
   tokenAggregateWorst?: 'green' | 'orange' | 'red'
   oldestTokenSyncDisplay?: string
