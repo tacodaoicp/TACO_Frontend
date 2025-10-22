@@ -99,6 +99,8 @@
                   :tokenList="c.key === 'dao_backend' ? (daoTokenList || undefined) : undefined"
                   :tokenAggregateWorst="c.key === 'dao_backend' ? (daoTokenWorst || undefined) : undefined"
                   :oldestTokenSyncDisplay="c.key === 'dao_backend' ? (daoOldestSyncDisplay || undefined) : undefined"
+                  :governanceHeader="c.key === 'neuronSnapshot' ? (governanceHeader || undefined) : undefined"
+                  :governanceDetails="c.key === 'neuronSnapshot' ? (governanceDetails || undefined) : undefined"
                   :isAdmin="isAdmin"
                   :isArchive="false"
                   @refresh="() => fetchCyclesFor(c.key)"
@@ -370,7 +372,14 @@ const rewardsDetails = ref<any | null>(null)
 const daoTokenList = ref<Array<{ symbol: string; lastSyncDisplay: string; statusClass: string; statusText: string }> | null>(null)
 const daoTokenWorst = ref<'green' | 'orange' | 'red' | null>(null)
 const daoOldestSyncDisplay = ref<string | null>(null)
-const governanceHeader = ref<{ active: boolean; lastSnapshotDisplay: string } | null>(null)
+const governanceHeader = ref<{ 
+  snapshotActive: boolean
+  lastSnapshotDisplay: string
+  periodicTimerRunning: boolean
+  lastPeriodicRunDisplay: string
+  periodicTimerStale: 'green' | 'orange' | 'red'
+} | null>(null)
+const governanceDetails = ref<any | null>(null)
 const expandedMap = reactive<Record<CanKey, boolean>>({
   dao_backend: false,
   frontend: false,
@@ -684,22 +693,90 @@ const fetchCyclesFor = async (key: CanKey) => {
           daoOldestSyncDisplay.value = null
         }
       } else if (key === 'neuronSnapshot') {
-        // Load governance snapshot status from selected env
+        // Load governance snapshot status and NNS periodic timer from selected env
         try {
           const { idlFactory: neuronIDL } = await import('../../../declarations/neuronSnapshot/neuronSnapshot.did.js')
           const agent = new HttpAgent({ host: process.env.DFX_NETWORK === 'local' ? 'http://127.0.0.1:4943' : 'https://ic0.app' })
           if (process.env.DFX_NETWORK === 'local') { await agent.fetchRootKey() }
           const nActor: any = Actor.createActor(neuronIDL, { agent, canisterId: resolvePrincipal('neuronSnapshot') })
-          const snapInfoArr = await nActor.getSnapshotInfo()
+          
+          const [snapInfoArr, periodicStatus, autoProcessing, autoVoting] = await Promise.all([
+            nActor.get_neuron_snapshots_info(0, 1), // Get the latest snapshot
+            nActor.getPeriodicTimerStatus?.() ?? Promise.resolve(null),
+            nActor.isAutoProcessingRunning?.() ?? Promise.resolve(false),
+            nActor.isAutoVotingRunning?.() ?? Promise.resolve(false),
+          ])
+          
+          // Process snapshot info
+          let snapshotActive = false
+          let lastSnapshotDisplay = 'Never'
           if (Array.isArray(snapInfoArr) && snapInfoArr.length) {
             const info = snapInfoArr[0]
-            const lastSnapshotDisplay = info?.lastSnapshotTime ? new Date(Number(info.lastSnapshotTime) / 1_000_000).toLocaleString() : 'Never'
-            governanceHeader.value = { active: true, lastSnapshotDisplay }
-          } else {
-            governanceHeader.value = { active: false, lastSnapshotDisplay: 'Never' }
+            snapshotActive = true
+            lastSnapshotDisplay = info?.timestamp ? new Date(Number(info.timestamp) / 1_000_000).toLocaleString() : 'Never'
           }
-        } catch (_) {
+          
+          // Process periodic timer status
+          let periodicTimerRunning = false
+          let lastPeriodicRunDisplay = 'Never'
+          let periodicTimerStale: 'green' | 'orange' | 'red' = 'green'
+          let intervalSeconds = 3600 // Default 1 hour
+          let nextRunDisplay = 'Not scheduled'
+          
+          if (periodicStatus) {
+            periodicTimerRunning = periodicStatus.is_running || false
+            intervalSeconds = Number(periodicStatus.interval_seconds || 3600)
+            
+            const lastRunTime = periodicStatus.last_run_time
+            if (lastRunTime && Number(lastRunTime) > 0) {
+              const lastRunMs = Number(lastRunTime) / 1_000_000
+              lastPeriodicRunDisplay = new Date(lastRunMs).toLocaleString()
+              
+              // Calculate staleness based on periods (1 period = interval seconds)
+              const nowMs = Date.now()
+              const timeSinceLastRun = nowMs - lastRunMs
+              const periodMs = intervalSeconds * 1000
+              const periodsOverdue = timeSinceLastRun / periodMs
+              
+              if (periodsOverdue > 3) {
+                periodicTimerStale = 'red' // More than 3 periods
+              } else if (periodsOverdue > 1) {
+                periodicTimerStale = 'orange' // More than 1 period
+              } else {
+                periodicTimerStale = 'green' // Within 1 period
+              }
+            }
+            
+            const nextRunTime = periodicStatus.next_run_time
+            if (nextRunTime && Number(nextRunTime) > 0) {
+              nextRunDisplay = new Date(Number(nextRunTime) / 1_000_000).toLocaleString()
+            }
+          }
+          
+          governanceHeader.value = {
+            snapshotActive,
+            lastSnapshotDisplay,
+            periodicTimerRunning,
+            lastPeriodicRunDisplay,
+            periodicTimerStale
+          }
+          
+          governanceDetails.value = {
+            snapshotActive,
+            lastSnapshotDisplay,
+            periodicTimerRunning,
+            lastPeriodicRunDisplay,
+            nextRunDisplay,
+            intervalSeconds,
+            intervalDisplay: formatSeconds(intervalSeconds),
+            autoProcessingRunning: autoProcessing || false,
+            autoVotingRunning: autoVoting || false,
+            periodicTimerStale
+          }
+        } catch (err) {
+          console.error('[SystemView] Error loading governance data:', err)
           governanceHeader.value = null
+          governanceDetails.value = null
         }
       } else if (key === 'rewards') {
         // Load rewards distribution status from selected env
@@ -876,6 +953,19 @@ const fetchCyclesFor = async (key: CanKey) => {
   }
 }
 
+// Utility: Format seconds to human-readable duration
+const formatSeconds = (seconds: number): string => {
+  if (seconds < 60) return `${seconds}s`
+  if (seconds < 3600) {
+    const mins = Math.floor(seconds / 60)
+    return `${mins} minute${mins !== 1 ? 's' : ''}`
+  }
+  const hours = Math.floor(seconds / 3600)
+  const mins = Math.floor((seconds % 3600) / 60)
+  if (mins === 0) return `${hours} hour${hours !== 1 ? 's' : ''}`
+  return `${hours}h ${mins}m`
+}
+
 const refreshCycles = () => {
   // Clear all cached header/detail data when switching environments
   treasuryHeader.value = null
@@ -883,6 +973,7 @@ const refreshCycles = () => {
   rewardsHeader.value = null
   rewardsDetails.value = null
   governanceHeader.value = null
+  governanceDetails.value = null
   daoTokenList.value = null
   daoTokenWorst.value = null
   daoOldestSyncDisplay.value = null

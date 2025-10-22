@@ -26,13 +26,18 @@
           <span v-if="oldestTokenSyncDisplay" class="small text-muted">{{ oldestTokenSyncDisplay }}</span>
         </div>
 
-        <!-- governance snapshot header lamp (when provided) -->
+        <!-- governance header indicators -->
         <div v-if="governanceHeader" class="d-flex align-items-center gap-2 ms-3">
-          <span class="text-muted small d-inline-flex align-items-center" title="Neuron Snapshot Timer">
-            <i class="fa-regular fa-clock"></i>
+          <!-- periodic timer lamp + last run time -->
+          <span class="text-muted small d-inline-flex align-items-center" title="NNS Periodic Timer (Master)">
+            <i class="fa-solid fa-robot"></i>
           </span>
-          <span class="status-indicator" :class="governanceHeader.active ? 'active' : 'inactive'"></span>
-          <span class="small text-muted">{{ governanceHeader.lastSnapshotDisplay }}</span>
+          <span class="status-indicator" :class="governanceHeader.periodicTimerRunning ? 'active' : 'inactive'"></span>
+          <span 
+            :class="['small', governanceHeader.periodicTimerStale === 'red' ? 'text-danger' : governanceHeader.periodicTimerStale === 'orange' ? 'text-warning' : 'text-muted']" 
+            :title="'NNS Periodic Timer Last Run'">
+            {{ governanceHeader.lastPeriodicRunDisplay }}
+          </span>
         </div>
 
         <!-- treasury header indicators -->
@@ -270,12 +275,49 @@
           </div>
         </div>
 
-        <!-- Governance read-only snapshot status -->
-        <div v-if="governanceHeader" class="mt-3">
-          <h6 class="mb-2">Neuron Snapshot Timer</h6>
-          <div class="d-flex align-items-center gap-3 small">
-            <span class="status-indicator" :class="governanceHeader.active ? 'active' : 'inactive'"></span>
-            <span><strong>Last Snapshot:</strong> {{ governanceHeader.lastSnapshotDisplay }}</span>
+        <!-- Governance read-only details -->
+        <div v-if="governanceDetails" class="mt-3">
+          <h6 class="mb-2">NNS Periodic Timer (Master)</h6>
+          <div class="d-flex align-items-center gap-2 mb-2">
+            <span class="status-indicator" :class="governanceDetails.periodicTimerRunning ? 'active' : 'inactive'"></span>
+            <span class="small"><strong>Timer Status:</strong> {{ governanceDetails.periodicTimerRunning ? 'Running' : 'Stopped' }}</span>
+          </div>
+          
+          <!-- Warning if more than 1 period old -->
+          <div v-if="governanceDetails.periodicTimerStale === 'orange' || governanceDetails.periodicTimerStale === 'red'" 
+               :class="['mb-2 alert', governanceDetails.periodicTimerStale === 'red' ? 'alert-danger' : 'alert-warning']">
+            ⚠️ NNS Periodic Timer last ran more than 1 period ago ({{ governanceDetails.lastPeriodicRunDisplay }}). 
+            Grant system automation may not be processing regularly.
+          </div>
+          
+          <div class="d-flex flex-column small gap-1">
+            <div><strong>Interval:</strong> {{ governanceDetails.intervalDisplay }}</div>
+            <div><strong>Last Run:</strong> {{ governanceDetails.lastPeriodicRunDisplay }}</div>
+            <div><strong>Next Run:</strong> {{ governanceDetails.nextRunDisplay }}</div>
+          </div>
+          
+          <h6 class="mb-2 mt-3">NNS Automation Status</h6>
+          <div class="d-flex flex-column small gap-1">
+            <div class="d-flex align-items-center gap-2">
+              <span class="status-indicator" :class="governanceDetails.autoProcessingRunning ? 'active' : 'inactive'"></span>
+              <span><strong>Auto NNS Processing:</strong> {{ governanceDetails.autoProcessingRunning ? 'Running' : 'Stopped' }}</span>
+            </div>
+            <div class="d-flex align-items-center gap-2">
+              <span class="status-indicator" :class="governanceDetails.autoVotingRunning ? 'active' : 'inactive'"></span>
+              <span><strong>Auto Urgent Voting:</strong> {{ governanceDetails.autoVotingRunning ? 'Running' : 'Stopped' }}</span>
+            </div>
+          </div>
+          
+          <h6 class="mb-2 mt-3">Neuron Snapshot Timer</h6>
+          <div class="d-flex align-items-center gap-2">
+            <span class="status-indicator" :class="governanceDetails.snapshotActive ? 'active' : 'inactive'"></span>
+            <span class="small"><strong>Last Snapshot:</strong> {{ governanceDetails.lastSnapshotDisplay }}</span>
+          </div>
+          
+          <div v-if="isAdmin" class="d-flex justify-content-end mt-3">
+            <router-link to="/admin/nns" class="btn btn-sm btn-outline-primary">
+              Manage NNS Automation
+            </router-link>
           </div>
         </div>
       </div>
@@ -354,7 +396,14 @@ const props = defineProps<{
   tokenList?: Array<{ symbol: string; lastSyncDisplay: string; statusClass: string; statusText: string }>
   tokenAggregateWorst?: 'green' | 'orange' | 'red'
   oldestTokenSyncDisplay?: string
-  governanceHeader?: { active: boolean; lastSnapshotDisplay: string }
+  governanceHeader?: {
+    snapshotActive: boolean
+    lastSnapshotDisplay: string
+    periodicTimerRunning: boolean
+    lastPeriodicRunDisplay: string
+    periodicTimerStale: 'green' | 'orange' | 'red'
+  }
+  governanceDetails?: any
 }>()
 
 const emits = defineEmits(['update:expanded','refresh'])
