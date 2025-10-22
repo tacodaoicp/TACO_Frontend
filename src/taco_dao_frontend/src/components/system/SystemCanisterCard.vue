@@ -233,8 +233,8 @@
           </div>
 
           <!-- Funding runway report -->
-          <div v-if="rewardsDetails.fundingReport" class="mt-3 p-2 bg-dark border rounded">
-            <h6 class="mb-2 small">📊 Funding Runway</h6>
+          <div v-if="rewardsDetails.fundingReport" class="mt-3 p-2 bg-dark border rounded text-white">
+            <h6 class="mb-2 small text-white">📊 Funding Runway</h6>
             <div class="d-flex flex-column small gap-1">
               <div>
                 <strong>Distributions Funded:</strong> 
@@ -244,7 +244,7 @@
                 <strong>Time Coverage:</strong> 
                 <span :class="rewardsDetails.fundingReport.periodsClass">{{ rewardsDetails.fundingReport.timeDisplay }}</span>
               </div>
-              <div v-if="rewardsDetails.fundingReport.nextFundingDate" class="text-muted">
+              <div v-if="rewardsDetails.fundingReport.nextFundingDate" class="text-light">
                 <small>Funds will be depleted around: {{ rewardsDetails.fundingReport.nextFundingDate }}</small>
               </div>
             </div>

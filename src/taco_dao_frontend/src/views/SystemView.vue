@@ -861,6 +861,16 @@ const fetchCyclesFor = async (key: CanKey) => {
 }
 
 const refreshCycles = () => {
+  // Clear all cached header/detail data when switching environments
+  treasuryHeader.value = null
+  treasuryDetails.value = null
+  rewardsHeader.value = null
+  rewardsDetails.value = null
+  governanceHeader.value = null
+  daoTokenList.value = null
+  daoTokenWorst.value = null
+  daoOldestSyncDisplay.value = null
+  
   const allKeys: CanKey[] = [...mainCanisters, ...archiveCanisters].map(x => x.key)
   // Fetch each canister independently without blocking - UI updates as each completes
   allKeys.forEach(k => fetchCyclesFor(k))
