@@ -736,8 +736,17 @@ const fetchCyclesFor = async (key: CanKey) => {
           const distributionStale = periodsOverdue > 2
           
           // Calculate available balance and check if underfunded
-          const tacoBalanceNum = (typeof tacoBalance === 'object' && 'e8s' in tacoBalance) ? Number(tacoBalance.e8s) / 1e8 : 0
-          const currentNeuronBalancesNum = (typeof currentNeuronBalances === 'object' && 'e8s' in currentNeuronBalances) ? Number(currentNeuronBalances.e8s) / 1e8 : 0
+          // Balances are in e8s format (could be BigInt or object with e8s property)
+          const tacoBalanceNum = (typeof tacoBalance === 'object' && 'e8s' in tacoBalance) 
+            ? Number(tacoBalance.e8s) / 1e8 
+            : (typeof tacoBalance === 'bigint' || typeof tacoBalance === 'number') 
+              ? Number(tacoBalance) / 1e8 
+              : 0
+          const currentNeuronBalancesNum = (typeof currentNeuronBalances === 'object' && 'e8s' in currentNeuronBalances) 
+            ? Number(currentNeuronBalances.e8s) / 1e8 
+            : (typeof currentNeuronBalances === 'bigint' || typeof currentNeuronBalances === 'number') 
+              ? Number(currentNeuronBalances) / 1e8 
+              : 0
           const availableBalanceNum = tacoBalanceNum - currentNeuronBalancesNum
           const periodicRewardPotNum = Number(periodicRewardPot)
           
@@ -826,6 +835,13 @@ const fetchCyclesFor = async (key: CanKey) => {
             isUnderfunded
           }
           
+          // Format totalDistributed (also in e8s format)
+          const totalDistributedNum = (typeof totalDistributed === 'object' && 'e8s' in totalDistributed) 
+            ? Number(totalDistributed.e8s) / 1e8 
+            : (typeof totalDistributed === 'bigint' || typeof totalDistributed === 'number') 
+              ? Number(totalDistributed) / 1e8 
+              : 0
+          
           rewardsDetails.value = {
             timerRunning,
             distributionWarning,
@@ -838,7 +854,7 @@ const fetchCyclesFor = async (key: CanKey) => {
             periodicRewardPot: periodicRewardPotNum.toString(),
             tacoBalance: tacoBalanceNum.toFixed(2),
             currentNeuronBalances: currentNeuronBalancesNum.toFixed(2),
-            totalDistributed: (typeof totalDistributed === 'object' && 'e8s' in totalDistributed) ? (Number(totalDistributed.e8s) / 1e8).toFixed(2) : '0.00',
+            totalDistributed: totalDistributedNum.toFixed(2),
             availableBalance: availableBalanceNum.toFixed(2)
           }
         } catch (_) {
