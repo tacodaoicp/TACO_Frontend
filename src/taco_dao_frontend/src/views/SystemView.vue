@@ -768,6 +768,57 @@ const fetchCyclesFor = async (key: CanKey) => {
             }
           }
           
+          // Funding runway report
+          let fundingReport = null
+          if (periodicRewardPotNum > 0) {
+            const periodsFunded = Math.floor(availableBalanceNum / periodicRewardPotNum)
+            const distributionPeriodDays = Math.round(periodNS / (24 * 60 * 60 * 1_000_000_000))
+            const daysCovered = periodsFunded * distributionPeriodDays
+            
+            // Format time display
+            let timeDisplay = ''
+            if (daysCovered === 0) {
+              timeDisplay = '< 1 period'
+            } else if (daysCovered < 7) {
+              timeDisplay = `${daysCovered} day${daysCovered !== 1 ? 's' : ''}`
+            } else if (daysCovered < 30) {
+              const weeks = Math.floor(daysCovered / 7)
+              const remainingDays = daysCovered % 7
+              timeDisplay = `${weeks} week${weeks !== 1 ? 's' : ''}${remainingDays > 0 ? ` ${remainingDays} day${remainingDays !== 1 ? 's' : ''}` : ''}`
+            } else if (daysCovered < 365) {
+              const months = Math.floor(daysCovered / 30)
+              const remainingDays = daysCovered % 30
+              timeDisplay = `${months} month${months !== 1 ? 's' : ''}${remainingDays > 0 ? ` ${remainingDays} day${remainingDays !== 1 ? 's' : ''}` : ''}`
+            } else {
+              const years = Math.floor(daysCovered / 365)
+              const remainingMonths = Math.floor((daysCovered % 365) / 30)
+              timeDisplay = `${years} year${years !== 1 ? 's' : ''}${remainingMonths > 0 ? ` ${remainingMonths} month${remainingMonths !== 1 ? 's' : ''}` : ''}`
+            }
+            
+            // Calculate next funding date (when funds will be depleted)
+            let nextFundingDate = null
+            if (lastDistributionTime && periodsFunded > 0) {
+              const lastDistMs = Number(BigInt(lastDistributionTime) / 1_000_000n)
+              const depletionMs = lastDistMs + (daysCovered * 24 * 60 * 60 * 1000)
+              nextFundingDate = new Date(depletionMs).toLocaleString()
+            }
+            
+            // Determine color class based on funding level
+            let periodsClass = 'text-success'
+            if (periodsFunded < 1) {
+              periodsClass = 'text-danger fw-bold'
+            } else if (periodsFunded < 3) {
+              periodsClass = 'text-warning fw-bold'
+            }
+            
+            fundingReport = {
+              periodsFunded: periodsFunded > 0 ? periodsFunded : '< 1',
+              timeDisplay,
+              nextFundingDate,
+              periodsClass
+            }
+          }
+          
           rewardsHeader.value = {
             timerRunning,
             distributionStale,
@@ -779,6 +830,7 @@ const fetchCyclesFor = async (key: CanKey) => {
             timerRunning,
             distributionWarning,
             fundingWarning,
+            fundingReport,
             lastDistributionDisplay,
             nextScheduledDisplay,
             totalDistributions,

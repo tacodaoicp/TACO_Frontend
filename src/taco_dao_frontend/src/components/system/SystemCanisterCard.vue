@@ -232,6 +232,24 @@
             <div><strong>Total Distributed (All Time):</strong> {{ rewardsDetails.totalDistributed }} TACO</div>
           </div>
 
+          <!-- Funding runway report -->
+          <div v-if="rewardsDetails.fundingReport" class="mt-3 p-2 bg-dark border rounded">
+            <h6 class="mb-2 small">📊 Funding Runway</h6>
+            <div class="d-flex flex-column small gap-1">
+              <div>
+                <strong>Distributions Funded:</strong> 
+                <span :class="rewardsDetails.fundingReport.periodsClass">{{ rewardsDetails.fundingReport.periodsFunded }}</span> periods
+              </div>
+              <div>
+                <strong>Time Coverage:</strong> 
+                <span :class="rewardsDetails.fundingReport.periodsClass">{{ rewardsDetails.fundingReport.timeDisplay }}</span>
+              </div>
+              <div v-if="rewardsDetails.fundingReport.nextFundingDate" class="text-muted">
+                <small>Funds will be depleted around: {{ rewardsDetails.fundingReport.nextFundingDate }}</small>
+              </div>
+            </div>
+          </div>
+
           <div class="d-flex justify-content-end mt-3" v-if="isAdmin">
             <router-link to="/admin/distributions" class="btn btn-sm btn-outline-primary">
               Manage Distributions
