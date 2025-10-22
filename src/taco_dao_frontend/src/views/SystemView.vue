@@ -714,7 +714,7 @@ const fetchCyclesFor = async (key: CanKey) => {
             rActor.getConfiguration(),
             rActor.getTotalDistributed?.() ?? Promise.resolve(0),
             rActor.getTacoBalance?.() ?? Promise.resolve(0),
-            rActor.getCurrentNeuronBalances?.() ?? Promise.resolve(0),
+            rActor.getCurrentTotalNeuronBalances?.() ?? Promise.resolve(0),
           ])
           
           const timerRunning = config?.timerRunning || false
