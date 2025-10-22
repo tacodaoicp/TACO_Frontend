@@ -922,6 +922,8 @@ const runTest = async (testKey: string) => {
       await testArchivesImporting(test)
     } else if (testKey === 'trading-regular') {
       await testTradingBotRegular(test)
+    } else if (testKey === 'rewards-regular') {
+      await testRewardsRegular(test)
     } else if (testKey === 'snapshots-portfolio') {
       await testPortfolioSnapshots(test)
     } else {
@@ -1628,6 +1630,198 @@ const testTradingBotRegular = async (test: any) => {
   } catch (error: any) {
     test.status = 'red'
     test.report = `<div class="alert alert-danger"><strong>Error:</strong> ${error.message || 'Failed to check trading bot status'}</div>`
+  }
+}
+
+// Test: Are rewards distributed regularly?
+const testRewardsRegular = async (test: any) => {
+  const checks: Array<{ name: string; status: 'pass' | 'fail' | 'error'; message: string }> = []
+  
+  try {
+    const cid = resolvePrincipal('rewards')
+    const { idlFactory: rewardsIDL } = await import('../../../declarations/rewards/rewards.did.js')
+    const agent = new HttpAgent({ host: process.env.DFX_NETWORK === 'local' ? 'http://127.0.0.1:4943' : 'https://ic0.app' })
+    if (process.env.DFX_NETWORK === 'local') { await agent.fetchRootKey() }
+    const rActor: any = Actor.createActor(rewardsIDL, { agent, canisterId: cid })
+
+    // Fetch config and balances
+    const [config, tacoBalance, currentNeuronBalances] = await Promise.all([
+      rActor.getConfiguration(),
+      rActor.getTacoBalance?.() ?? Promise.resolve(0),
+      rActor.getCurrentTotalNeuronBalances?.() ?? Promise.resolve(0),
+    ])
+
+    const timerRunning = config?.timerRunning || false
+    const lastDistributionTime = config?.lastDistributionTime || 0
+    const nextScheduledDistribution = config?.nextScheduledDistribution || null
+    const distributionPeriodNS = config?.distributionPeriodNS || 0
+    const periodicRewardPot = config?.periodicRewardPot || 0
+
+    // Parse balances (in e8s format)
+    const tacoBalanceNum = (typeof tacoBalance === 'object' && 'e8s' in tacoBalance) 
+      ? Number(tacoBalance.e8s) / 1e8 
+      : (typeof tacoBalance === 'bigint' || typeof tacoBalance === 'number') 
+        ? Number(tacoBalance) / 1e8 
+        : 0
+    const currentNeuronBalancesNum = (typeof currentNeuronBalances === 'object' && 'e8s' in currentNeuronBalances) 
+      ? Number(currentNeuronBalances.e8s) / 1e8 
+      : (typeof currentNeuronBalances === 'bigint' || typeof currentNeuronBalances === 'number') 
+        ? Number(currentNeuronBalances) / 1e8 
+        : 0
+    const availableBalanceNum = tacoBalanceNum - currentNeuronBalancesNum
+    const periodicRewardPotNum = Number(periodicRewardPot)
+    const periodNS = Number(distributionPeriodNS)
+
+    // Check 1: Auto timer is running
+    if (!timerRunning) {
+      checks.push({
+        name: 'Distribution Timer Status',
+        status: 'fail',
+        message: '❌ Distribution timer is <strong>not running</strong>. Rewards will not be distributed automatically.'
+      })
+    } else {
+      checks.push({
+        name: 'Distribution Timer Status',
+        status: 'pass',
+        message: '✅ Distribution timer is running.'
+      })
+    }
+
+    // Check 2: Last distribution date was not more than 2 periods ago
+    if (lastDistributionTime && Number(lastDistributionTime) > 0 && periodNS > 0) {
+      const nowNs = Date.now() * 1_000_000
+      const timeSinceLastDistribution = nowNs - Number(lastDistributionTime)
+      const periodsOverdue = timeSinceLastDistribution / periodNS
+      const lastDistributionDisplay = new Date(Number(BigInt(lastDistributionTime) / 1_000_000n)).toLocaleString()
+      const distributionPeriodDays = Math.round(periodNS / (24 * 60 * 60 * 1_000_000_000))
+
+      if (periodsOverdue > 2) {
+        checks.push({
+          name: 'Last Distribution Timing',
+          status: 'fail',
+          message: `❌ Last distribution was <strong>${Math.floor(periodsOverdue)} periods</strong> ago (${lastDistributionDisplay}). Expected within 2 periods (period: ${distributionPeriodDays} days).`
+        })
+      } else {
+        checks.push({
+          name: 'Last Distribution Timing',
+          status: 'pass',
+          message: `✅ Last distribution was <strong>${periodsOverdue.toFixed(1)} periods</strong> ago (${lastDistributionDisplay}, period: ${distributionPeriodDays} days).`
+        })
+      }
+    } else {
+      checks.push({
+        name: 'Last Distribution Timing',
+        status: 'fail',
+        message: '❌ No distribution history available or period not configured.'
+      })
+    }
+
+    // Check 3: Next distribution date is scheduled and not more than 1 period in the future
+    if (nextScheduledDistribution && Number(nextScheduledDistribution) > 0 && periodNS > 0) {
+      const nowNs = Date.now() * 1_000_000
+      const timeUntilNextDistribution = Number(nextScheduledDistribution) - nowNs
+      const periodsUntilNext = timeUntilNextDistribution / periodNS
+      const nextDistributionDisplay = new Date(Number(BigInt(nextScheduledDistribution) / 1_000_000n)).toLocaleString()
+
+      if (periodsUntilNext > 1) {
+        checks.push({
+          name: 'Next Distribution Scheduling',
+          status: 'fail',
+          message: `❌ Next distribution is scheduled <strong>${periodsUntilNext.toFixed(1)} periods</strong> in the future (${nextDistributionDisplay}). Expected within 1 period.`
+        })
+      } else if (periodsUntilNext < -1) {
+        checks.push({
+          name: 'Next Distribution Scheduling',
+          status: 'fail',
+          message: `❌ Next distribution was scheduled <strong>${Math.abs(periodsUntilNext).toFixed(1)} periods</strong> ago (${nextDistributionDisplay}) but hasn't been executed.`
+        })
+      } else {
+        checks.push({
+          name: 'Next Distribution Scheduling',
+          status: 'pass',
+          message: `✅ Next distribution scheduled for ${nextDistributionDisplay} (<strong>${periodsUntilNext.toFixed(1)} periods</strong> away).`
+        })
+      }
+    } else {
+      checks.push({
+        name: 'Next Distribution Scheduling',
+        status: 'fail',
+        message: '❌ No next distribution is scheduled.'
+      })
+    }
+
+    // Check 4: Next 3 distribution periods are funded
+    if (periodicRewardPotNum > 0) {
+      const periodsFunded = Math.floor(availableBalanceNum / periodicRewardPotNum)
+      
+      if (periodsFunded < 3) {
+        checks.push({
+          name: 'Funding for Next 3 Periods',
+          status: 'fail',
+          message: `❌ Only <strong>${periodsFunded} period(s)</strong> funded. Available: ${availableBalanceNum.toFixed(2)} TACO, Need for 3 periods: ${(periodicRewardPotNum * 3).toFixed(2)} TACO. Shortfall: ${((periodicRewardPotNum * 3) - availableBalanceNum).toFixed(2)} TACO.`
+        })
+      } else {
+        checks.push({
+          name: 'Funding for Next 3 Periods',
+          status: 'pass',
+          message: `✅ <strong>${periodsFunded} periods</strong> funded. Available: ${availableBalanceNum.toFixed(2)} TACO (${periodicRewardPotNum.toFixed(2)} TACO per period).`
+        })
+      }
+    } else {
+      checks.push({
+        name: 'Funding for Next 3 Periods',
+        status: 'error',
+        message: '❌ Reward pot not configured (0 TACO).'
+      })
+    }
+
+    // Generate final report
+    const passed = checks.filter(c => c.status === 'pass').length
+    const failed = checks.filter(c => c.status === 'fail').length
+    const errors = checks.filter(c => c.status === 'error').length
+    const total = checks.length
+
+    // Overall status
+    if (errors > 0 || failed > 0) {
+      test.status = 'red'
+    } else {
+      test.status = 'green'
+    }
+
+    // Build HTML report
+    let reportHTML = `
+      <div class="mb-3">
+        <strong>Results:</strong> ${passed} passed, ${failed} failed, ${errors} errors out of ${total} checks
+      </div>
+      <div class="checks-results">
+    `
+
+    checks.forEach(check => {
+      const icon = check.status === 'pass' 
+        ? '<i class="fa-solid fa-check-circle text-success"></i>' 
+        : check.status === 'fail'
+        ? '<i class="fa-solid fa-times-circle text-danger"></i>'
+        : '<i class="fa-solid fa-exclamation-triangle text-warning"></i>'
+      
+      const rowClass = check.status === 'pass' ? 'text-success' : check.status === 'fail' ? 'text-danger' : 'text-warning'
+      
+      reportHTML += `
+        <div class="d-flex align-items-start gap-2 py-2 small ${rowClass}">
+          <div style="min-width: 20px; margin-top: 2px;">${icon}</div>
+          <div>
+            <div class="fw-bold mb-1">${check.name}</div>
+            <div>${check.message}</div>
+          </div>
+        </div>
+      `
+    })
+
+    reportHTML += '</div>'
+    test.report = reportHTML
+
+  } catch (error: any) {
+    test.status = 'red'
+    test.report = `<div class="alert alert-danger"><strong>Error:</strong> ${error.message || 'Failed to check rewards distribution status'}</div>`
   }
 }
 
