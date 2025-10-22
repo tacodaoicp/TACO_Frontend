@@ -364,6 +364,7 @@ const rewardsHeader = ref<{
   timerRunning: boolean
   distributionStale: boolean
   lastDistributionDisplay: string
+  isUnderfunded: boolean
 } | null>(null)
 const rewardsDetails = ref<any | null>(null)
 const daoTokenList = ref<Array<{ symbol: string; lastSyncDisplay: string; statusClass: string; statusText: string }> | null>(null)
@@ -734,6 +735,16 @@ const fetchCyclesFor = async (key: CanKey) => {
           const periodsOverdue = periodNS > 0 ? timeSinceLastDistribution / periodNS : 0
           const distributionStale = periodsOverdue > 2
           
+          // Calculate available balance and check if underfunded
+          const tacoBalanceNum = (typeof tacoBalance === 'object' && 'e8s' in tacoBalance) ? Number(tacoBalance.e8s) / 1e8 : 0
+          const currentNeuronBalancesNum = (typeof currentNeuronBalances === 'object' && 'e8s' in currentNeuronBalances) ? Number(currentNeuronBalances.e8s) / 1e8 : 0
+          const availableBalanceNum = tacoBalanceNum - currentNeuronBalancesNum
+          const periodicRewardPotNum = Number(periodicRewardPot)
+          
+          // Check if next distribution is scheduled and underfunded
+          const hasScheduledDistribution = nextScheduledDistribution && Number(nextScheduledDistribution) > 0
+          const isUnderfunded = hasScheduledDistribution && availableBalanceNum < periodicRewardPotNum
+          
           // Distribution warning similar to trading bot
           let distributionWarning = null
           if (periodsOverdue > 5) {
@@ -748,26 +759,35 @@ const fetchCyclesFor = async (key: CanKey) => {
             }
           }
           
+          // Funding warning
+          let fundingWarning = null
+          if (isUnderfunded) {
+            const shortfall = periodicRewardPotNum - availableBalanceNum
+            fundingWarning = {
+              message: `Available balance (${availableBalanceNum.toFixed(2)} TACO) is insufficient for the next scheduled distribution. Reward pot requires ${periodicRewardPotNum.toFixed(2)} TACO. Shortfall: ${shortfall.toFixed(2)} TACO. Please fund the rewards canister before the next distribution.`
+            }
+          }
+          
           rewardsHeader.value = {
             timerRunning,
             distributionStale,
-            lastDistributionDisplay
+            lastDistributionDisplay,
+            isUnderfunded
           }
           
           rewardsDetails.value = {
             timerRunning,
             distributionWarning,
+            fundingWarning,
             lastDistributionDisplay,
             nextScheduledDisplay,
             totalDistributions,
             distributionPeriodDays: Math.round(periodNS / (24 * 60 * 60 * 1_000_000_000)),
-            periodicRewardPot: periodicRewardPot.toString(),
-            tacoBalance: (typeof tacoBalance === 'object' && 'e8s' in tacoBalance) ? (Number(tacoBalance.e8s) / 1e8).toFixed(2) : '0.00',
-            currentNeuronBalances: (typeof currentNeuronBalances === 'object' && 'e8s' in currentNeuronBalances) ? (Number(currentNeuronBalances.e8s) / 1e8).toFixed(2) : '0.00',
+            periodicRewardPot: periodicRewardPotNum.toString(),
+            tacoBalance: tacoBalanceNum.toFixed(2),
+            currentNeuronBalances: currentNeuronBalancesNum.toFixed(2),
             totalDistributed: (typeof totalDistributed === 'object' && 'e8s' in totalDistributed) ? (Number(totalDistributed.e8s) / 1e8).toFixed(2) : '0.00',
-            availableBalance: (typeof tacoBalance === 'object' && 'e8s' in tacoBalance && typeof currentNeuronBalances === 'object' && 'e8s' in currentNeuronBalances) 
-              ? ((Number(tacoBalance.e8s) - Number(currentNeuronBalances.e8s)) / 1e8).toFixed(2) 
-              : '0.00'
+            availableBalance: availableBalanceNum.toFixed(2)
           }
         } catch (_) {
           rewardsHeader.value = null

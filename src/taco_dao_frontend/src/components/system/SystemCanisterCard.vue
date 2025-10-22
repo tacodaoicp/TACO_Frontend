@@ -77,6 +77,12 @@
           </span>
           <span class="status-indicator" :class="rewardsHeader.timerRunning ? 'active' : 'inactive'"></span>
           <span :class="['small', rewardsHeader.distributionStale ? 'text-danger' : 'text-muted']" :title="'Last distribution time'">{{ rewardsHeader.lastDistributionDisplay }}</span>
+          
+          <!-- underfunded warning icon -->
+          <span v-if="rewardsHeader.isUnderfunded" class="text-danger small d-inline-flex align-items-center ms-2" title="Distribution is underfunded!">
+            <i class="fa-solid fa-exclamation-triangle"></i>
+            <span class="ms-1">underfunded</span>
+          </span>
         </div>
       </div>
       <div class="d-flex align-items-center gap-2" @click.stop>
@@ -202,6 +208,13 @@
             <span class="status-indicator" :class="rewardsDetails.timerRunning ? 'active' : 'inactive'"></span>
             <span class="small"><strong>Auto Timer:</strong> {{ rewardsDetails.timerRunning ? 'Running' : 'Stopped' }}</span>
           </div>
+          
+          <!-- Underfunded warning - prominent -->
+          <div v-if="rewardsDetails.fundingWarning" class="mb-2 alert alert-danger">
+            <strong><i class="fa-solid fa-exclamation-triangle"></i> Distribution Underfunded!</strong><br>
+            {{ rewardsDetails.fundingWarning.message }}
+          </div>
+          
           <div v-if="rewardsDetails.distributionWarning" :class="['mb-2 alert', rewardsDetails.distributionWarning.level === 'danger' ? 'alert-danger' : 'alert-warning']">⚠️ {{ rewardsDetails.distributionWarning.message }}</div>
           <div class="d-flex flex-column small gap-1">
             <div><strong>Last Distribution:</strong> {{ rewardsDetails.lastDistributionDisplay || 'Never' }}</div>
@@ -317,6 +330,7 @@ const props = defineProps<{
     timerRunning: boolean
     distributionStale: boolean
     lastDistributionDisplay: string
+    isUnderfunded: boolean
   }
   rewardsDetails?: any
   tokenList?: Array<{ symbol: string; lastSyncDisplay: string; statusClass: string; statusText: string }>
