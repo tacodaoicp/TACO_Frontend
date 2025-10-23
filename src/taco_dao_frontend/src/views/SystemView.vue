@@ -1019,6 +1019,8 @@ const runTest = async (testKey: string) => {
       await testRewardsRegular(test)
     } else if (testKey === 'grant-system') {
       await testGrantSystem(test)
+    } else if (testKey === 'snapshots-neuron') {
+      await testNeuronSnapshots(test)
     } else if (testKey === 'snapshots-portfolio') {
       await testPortfolioSnapshots(test)
     } else {
@@ -1145,6 +1147,136 @@ const testCanistersRunning = async (test: any) => {
 
   reportHTML += '</div>'
   test.report = reportHTML
+}
+
+// Test: Are neuron snapshots regular?
+const testNeuronSnapshots = async (test: any) => {
+  const checks: Array<{ name: string; status: 'pass' | 'fail' | 'error'; message: string }> = []
+  
+  try {
+    const cid = resolvePrincipal('neuronSnapshot')
+    const { idlFactory: neuronIDL } = await import('../../../declarations/neuronSnapshot/neuronSnapshot.did.js')
+    const agent = new HttpAgent({ host: process.env.DFX_NETWORK === 'local' ? 'http://127.0.0.1:4943' : 'https://ic0.app' })
+    if (process.env.DFX_NETWORK === 'local') { await agent.fetchRootKey() }
+    const nActor: any = Actor.createActor(neuronIDL, { agent, canisterId: cid })
+
+    // Fetch snapshot status and latest snapshot info
+    const [snapshotStatus, headId, latestSnapshotArr] = await Promise.all([
+      nActor.get_neuron_snapshot_status?.() ?? Promise.resolve(null),
+      nActor.get_neuron_snapshot_head_id?.() ?? Promise.resolve(0),
+      nActor.get_neuron_snapshots_info(0, 1), // Get the latest snapshot
+    ])
+
+    // Expected snapshot interval: 15 minutes
+    const snapshotIntervalMinutes = 15
+    const snapshotIntervalMs = snapshotIntervalMinutes * 60 * 1000
+
+    // Check 1: Snapshots exist
+    const headIdNum = Number(headId)
+    if (headIdNum > 0) {
+      checks.push({ 
+        name: 'Snapshots Exist', 
+        status: 'pass', 
+        message: `${headIdNum} neuron snapshots have been created` 
+      })
+    } else {
+      checks.push({ 
+        name: 'Snapshots Exist', 
+        status: 'fail', 
+        message: '❌ No neuron snapshots have been created yet' 
+      })
+    }
+
+    // Check 2: Snapshot status is not stuck
+    if (snapshotStatus) {
+      const statusKey = Object.keys(snapshotStatus)[0]
+      if (statusKey === 'Ready') {
+        checks.push({ 
+          name: 'Snapshot Status', 
+          status: 'pass', 
+          message: 'System is ready to take snapshots' 
+        })
+      } else if (statusKey === 'TakingSnapshot' || statusKey === 'StoringSnapshot') {
+        // These are temporary states, so they're OK if recent
+        checks.push({ 
+          name: 'Snapshot Status', 
+          status: 'pass', 
+          message: `System is currently ${statusKey === 'TakingSnapshot' ? 'taking' : 'storing'} a snapshot` 
+        })
+      } else {
+        checks.push({ 
+          name: 'Snapshot Status', 
+          status: 'fail', 
+          message: `⚠️ Unexpected status: ${statusKey}` 
+        })
+      }
+    } else {
+      checks.push({ name: 'Snapshot Status', status: 'fail', message: '❌ Could not retrieve snapshot status' })
+    }
+
+    // Check 3: Last snapshot timing and result
+    if (Array.isArray(latestSnapshotArr) && latestSnapshotArr.length > 0) {
+      const latestSnapshot = latestSnapshotArr[0]
+      const snapshotTimestampNs = BigInt(latestSnapshot.timestamp)
+      const snapshotTimestampMs = Number(snapshotTimestampNs / 1_000_000n)
+      const nowMs = Date.now()
+      const timeSinceLastSnapshot = nowMs - snapshotTimestampMs
+      const periodsOverdue = timeSinceLastSnapshot / snapshotIntervalMs
+      const maxPeriodsOverdue = 3 // Allow up to 3 periods (45 minutes)
+      const lastSnapshotDisplay = new Date(snapshotTimestampMs).toLocaleString()
+
+      // Check if snapshot was successful
+      const resultKey = Object.keys(latestSnapshot.result)[0]
+      if (resultKey === 'Ok') {
+        checks.push({ 
+          name: 'Last Snapshot Successful', 
+          status: 'pass', 
+          message: `Last snapshot (ID ${latestSnapshot.id}) completed successfully` 
+        })
+      } else {
+        checks.push({ 
+          name: 'Last Snapshot Successful', 
+          status: 'fail', 
+          message: `❌ Last snapshot (ID ${latestSnapshot.id}) failed: ${JSON.stringify(latestSnapshot.result)}` 
+        })
+      }
+
+      // Check timing
+      if (periodsOverdue <= maxPeriodsOverdue) {
+        checks.push({ 
+          name: 'Last Snapshot Timing', 
+          status: 'pass', 
+          message: `Last snapshot: ${lastSnapshotDisplay} (within ${maxPeriodsOverdue} periods of ${snapshotIntervalMinutes} minutes)` 
+        })
+      } else {
+        checks.push({ 
+          name: 'Last Snapshot Timing', 
+          status: 'fail', 
+          message: `❌ Last snapshot was ${periodsOverdue.toFixed(1)} periods ago (${lastSnapshotDisplay}). Maximum: ${maxPeriodsOverdue} periods` 
+        })
+      }
+    } else {
+      checks.push({ name: 'Last Snapshot Timing', status: 'fail', message: '❌ No snapshot information available' })
+    }
+
+    // Generate report
+    const allPass = checks.every(c => c.status === 'pass')
+
+    let reportHtml = '<div class="d-flex flex-column gap-2">'
+    for (const check of checks) {
+      const icon = check.status === 'pass' ? '✅' : '❌'
+      const colorClass = check.status === 'pass' ? 'text-success' : 'text-danger'
+      reportHtml += `<div class="${colorClass}"><strong>${icon} ${check.name}:</strong> ${check.message}</div>`
+    }
+    reportHtml += '</div>'
+
+    test.status = allPass ? 'green' : 'red'
+    test.report = reportHtml
+  } catch (error: any) {
+    console.error('Neuron snapshot test error:', error)
+    test.status = 'red'
+    test.report = `<div class="alert alert-danger"><strong>Error:</strong> ${error.message || 'Failed to check neuron snapshot status'}</div>`
+  }
 }
 
 // Test: Is grant system cloning and voting?
