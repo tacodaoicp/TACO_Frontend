@@ -16,6 +16,18 @@
 
           <div class="system-view w-100">
 
+            <!-- environment selector -->
+            <div v-if="isAdmin || isRunningOnStaging" class="d-flex align-items-center justify-content-end gap-2 mt-3 px-3">
+              <label class="mb-0 small text-muted">Environment</label>
+              <select class="form-select form-select-sm" style="width: auto;" v-model="selectedEnv" @change="handleEnvironmentChange">
+                <option value="ic">Production</option>
+                <option value="staging">Staging</option>
+              </select>
+            </div>
+            <div v-else class="d-flex align-items-center justify-content-end mt-3 px-3">
+              <span class="small text-muted">Environment: Production</span>
+            </div>
+
             <!-- system status group -->
             <div class="taco-container taco-container--l1 d-flex flex-column gap-2 p-0 mt-3">
               <div class="px-3 pt-3 pb-2 d-flex align-items-center justify-content-between section-header-clickable" @click="toggleSystemStatus">
@@ -98,16 +110,6 @@
 
               <!-- right controls -->
               <div class="d-flex align-items-center gap-2">
-                <!-- env switch (admin or running on staging) -->
-                <div v-if="isAdmin || isRunningOnStaging" class="form-inline d-flex align-items-center gap-2">
-                  <label class="mb-0 small text-muted">Environment</label>
-                  <select class="form-select form-select-sm" v-model="selectedEnv" @change="refreshCycles">
-                    <option value="ic">Production</option>
-                    <option value="staging">Staging</option>
-                  </select>
-                </div>
-                <div v-else class="small text-muted">Environment: Production</div>
-
                 <!-- expand/collapse all -->
                 <div class="btn-group">
                   <button class="btn btn-sm btn-outline-secondary" @click="expandAll">Expand all</button>
@@ -1260,6 +1262,43 @@ const refreshCycles = () => {
   const allKeys: CanKey[] = [...mainCanisters, ...archiveCanisters].map(x => x.key)
   // Fetch each canister independently without blocking - UI updates as each completes
   allKeys.forEach(k => fetchCyclesFor(k))
+}
+
+// Handle environment change - run full auto-run sequence
+const handleEnvironmentChange = async () => {
+  console.log('[Environment Change] Switching to:', selectedEnv.value)
+  
+  // Clear all cached data
+  treasuryHeader.value = null
+  treasuryDetails.value = null
+  rewardsHeader.value = null
+  rewardsDetails.value = null
+  governanceHeader.value = null
+  governanceDetails.value = null
+  daoTokenList.value = null
+  daoTokenWorst.value = null
+  daoOldestSyncDisplay.value = null
+  
+  try {
+    console.log('[Environment Change] Starting full auto-run sequence...')
+    
+    // Step 1: Run all tests
+    console.log('[Environment Change] Step 1: Running all tests...')
+    await runAllTests()
+    console.log('[Environment Change] All tests completed')
+    
+    // Step 2: Refresh main canisters
+    console.log('[Environment Change] Step 2: Refreshing main canisters...')
+    refreshMainCanisters()
+    
+    // Step 3: Refresh archive canisters
+    console.log('[Environment Change] Step 3: Refreshing archive canisters...')
+    refreshArchiveCanisters()
+    
+    console.log('[Environment Change] Full auto-run sequence completed')
+  } catch (error) {
+    console.error('[Environment Change] Error in auto-run sequence:', error)
+  }
 }
 
 const toggleSystemStatus = () => { 
