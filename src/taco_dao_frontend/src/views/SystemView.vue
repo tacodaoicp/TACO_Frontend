@@ -119,10 +119,18 @@
             <!-- main canisters group -->
             <div class="taco-container taco-container--l1 d-flex flex-column gap-2 p-0 mt-3">
               <div class="px-3 pt-3 pb-2 d-flex align-items-center justify-content-between section-header-clickable" @click="toggleMainCanisters">
-                <h2 class="h5 mb-0">Main Canisters</h2>
-                <button class="btn btn-sm btn-outline-secondary" @click.stop="toggleMainCanisters" :title="mainCanistersExpanded ? 'Collapse' : 'Expand'">
-                  <i :class="mainCanistersExpanded ? 'fa-solid fa-chevron-up' : 'fa-solid fa-chevron-down'"></i>
-                </button>
+                <div class="d-flex align-items-center gap-2">
+                  <span :class="['status-light', `status-${mainCanistersStatus}`]"></span>
+                  <h2 class="h5 mb-0">Main Canisters</h2>
+                </div>
+                <div class="d-flex align-items-center gap-2">
+                  <button class="btn btn-sm btn-outline-primary" @click.stop="refreshMainCanisters" title="Refresh all main canisters">
+                    <i class="fa-solid fa-rotate me-1"></i>Refresh All
+                  </button>
+                  <button class="btn btn-sm btn-outline-secondary" @click.stop="toggleMainCanisters" :title="mainCanistersExpanded ? 'Collapse' : 'Expand'">
+                    <i :class="mainCanistersExpanded ? 'fa-solid fa-chevron-up' : 'fa-solid fa-chevron-down'"></i>
+                  </button>
+                </div>
               </div>
               <div v-if="mainCanistersExpanded" class="p-2 d-flex flex-column gap-2">
                 <SystemCanisterCard
@@ -153,10 +161,18 @@
             <!-- archives group -->
             <div class="taco-container taco-container--l1 d-flex flex-column gap-2 p-0 mt-4">
               <div class="px-3 pt-3 pb-2 d-flex align-items-center justify-content-between section-header-clickable" @click="toggleArchives">
-                <h2 class="h5 mb-0">Archives</h2>
-                <button class="btn btn-sm btn-outline-secondary" @click.stop="toggleArchives" :title="archivesExpanded ? 'Collapse' : 'Expand'">
-                  <i :class="archivesExpanded ? 'fa-solid fa-chevron-up' : 'fa-solid fa-chevron-down'"></i>
-                </button>
+                <div class="d-flex align-items-center gap-2">
+                  <span :class="['status-light', `status-${archiveCanistersStatus}`]"></span>
+                  <h2 class="h5 mb-0">Archives</h2>
+                </div>
+                <div class="d-flex align-items-center gap-2">
+                  <button class="btn btn-sm btn-outline-primary" @click.stop="refreshArchiveCanisters" title="Refresh all archive canisters">
+                    <i class="fa-solid fa-rotate me-1"></i>Refresh All
+                  </button>
+                  <button class="btn btn-sm btn-outline-secondary" @click.stop="toggleArchives" :title="archivesExpanded ? 'Collapse' : 'Expand'">
+                    <i :class="archivesExpanded ? 'fa-solid fa-chevron-up' : 'fa-solid fa-chevron-down'"></i>
+                  </button>
+                </div>
               </div>
               <div v-if="archivesExpanded" class="p-2 d-flex flex-column gap-2">
                 <SystemCanisterCard
@@ -308,6 +324,58 @@ const overallSystemStatus = computed(() => {
   if (allGray) return 'gray'
   if (allGreen && !allGray) return 'green'
   return 'gray'
+})
+
+// Computed: Main canisters overall status
+const mainCanistersStatus = computed(() => {
+  const keys = mainCanisters.map(c => c.key)
+  const anyLoading = keys.some(k => loadingMap[k])
+  const allNull = keys.every(k => cyclesMap[k] === null)
+  
+  if (anyLoading) return 'gray'
+  if (allNull) return 'gray'
+  
+  // Check if any canister is low on cycles (< 10T)
+  const anyLow = keys.some(k => {
+    const cycles = cyclesMap[k]
+    return cycles !== null && cycles < 10
+  })
+  
+  // Check if any canister is critical (< 5T)
+  const anyCritical = keys.some(k => {
+    const cycles = cyclesMap[k]
+    return cycles !== null && cycles < 5
+  })
+  
+  if (anyCritical) return 'red'
+  if (anyLow) return 'orange'
+  return 'green'
+})
+
+// Computed: Archive canisters overall status
+const archiveCanistersStatus = computed(() => {
+  const keys = archiveCanisters.map(c => c.key)
+  const anyLoading = keys.some(k => loadingMap[k])
+  const allNull = keys.every(k => cyclesMap[k] === null)
+  
+  if (anyLoading) return 'gray'
+  if (allNull) return 'gray'
+  
+  // Check if any canister is low on cycles (< 10T)
+  const anyLow = keys.some(k => {
+    const cycles = cyclesMap[k]
+    return cycles !== null && cycles < 10
+  })
+  
+  // Check if any canister is critical (< 5T)
+  const anyCritical = keys.some(k => {
+    const cycles = cyclesMap[k]
+    return cycles !== null && cycles < 5
+  })
+  
+  if (anyCritical) return 'red'
+  if (anyLow) return 'orange'
+  return 'green'
 })
 
 // Checklist state
@@ -1060,6 +1128,17 @@ const toggleArchives = () => {
 
 const expandAll = () => { Object.keys(expandedMap).forEach(k => expandedMap[k as CanKey] = true) }
 const collapseAll = () => { Object.keys(expandedMap).forEach(k => expandedMap[k as CanKey] = false) }
+
+// Refresh functions for sections
+const refreshMainCanisters = () => {
+  console.log('[RefreshMainCanisters] Refreshing all main canisters')
+  mainCanisters.forEach(c => fetchCyclesFor(c.key))
+}
+
+const refreshArchiveCanisters = () => {
+  console.log('[RefreshArchiveCanisters] Refreshing all archive canisters')
+  archiveCanisters.forEach(c => fetchCyclesFor(c.key))
+}
 
 // Test runner
 const runTest = async (testKey: string) => {
