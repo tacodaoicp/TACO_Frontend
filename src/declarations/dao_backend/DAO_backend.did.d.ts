@@ -90,6 +90,14 @@ export interface AllocationChangesSinceResponse {
   'totalCount' : bigint,
   'changes' : Array<PastAllocationRecord>,
 }
+export interface AllocationStats {
+  'neuronsWithAllocations' : bigint,
+  'recentUpdatesCount' : bigint,
+  'totalUserVotingPower' : bigint,
+  'mostRecentUpdateTime' : bigint,
+  'totalNeuronVotingPower' : bigint,
+  'usersWithAllocations' : bigint,
+}
 export type AuthorizationError = { 'NotAllowed' : null } |
   { 'NotAdmin' : null } |
   { 'UnexpectedError' : string };
@@ -114,6 +122,7 @@ export interface ContinuousDAO {
   >,
   'getAggregateAllocation' : ActorMethod<[], Array<[Principal, bigint]>>,
   'getAllocationChangesSince' : ActorMethod<[bigint, bigint], Result_12>,
+  'getAllocationStats' : ActorMethod<[], AllocationStats>,
   'getFollowActionsSince' : ActorMethod<[bigint, bigint], Result_11>,
   'getFollowersWithNeuronCounts' : ActorMethod<[], Array<[Principal, bigint]>>,
   'getHistoricBalanceAndAllocation' : ActorMethod<

@@ -399,6 +399,7 @@ type ContinuousDAO =
                                       }) query;
    getAllocationChangesSince: (sinceTimestamp: int, limit: nat) ->
     (Result_12) query;
+   getAllocationStats: () -> (AllocationStats) query;
    getFollowActionsSince: (sinceTimestamp: int, limit: nat) ->
     (Result_11) query;
    getFollowersWithNeuronCounts: () -> (vec record {
@@ -485,6 +486,15 @@ type AuthorizationError =
    NotAdmin;
    NotAllowed;
    UnexpectedError: text;
+ };
+type AllocationStats = 
+ record {
+   mostRecentUpdateTime: int;
+   neuronsWithAllocations: nat;
+   recentUpdatesCount: nat;
+   totalNeuronVotingPower: nat;
+   totalUserVotingPower: nat;
+   usersWithAllocations: nat;
  };
 type AllocationChangesSinceResponse = 
  record {

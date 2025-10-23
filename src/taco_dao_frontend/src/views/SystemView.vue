@@ -1446,29 +1446,48 @@ const testAllocationVoting = async (test: any) => {
     if (process.env.DFX_NETWORK === 'local') { await agent.fetchRootKey() }
     const daoActor: any = Actor.createActor(daoIDL, { agent, canisterId: cid })
 
-    // Fetch user allocations and aggregate allocation
-    const [userAllocations, aggregateAllocation] = await Promise.all([
-      daoActor.admin_getUserAllocations?.() ?? [],
+    // Fetch allocation stats and aggregate allocation (both publicly accessible)
+    const [allocationStats, aggregateAllocation] = await Promise.all([
+      daoActor.getAllocationStats?.() ?? null,
       daoActor.getAggregateAllocation?.() ?? [],
     ])
 
-    // Check 1: Users with allocations
-    const usersWithAllocations = userAllocations.filter((entry: any) => {
-      const userState = entry[1]
-      return Array.isArray(userState?.allocations) && userState.allocations.length > 0
-    })
+    console.log('[Allocation Test] Allocation stats:', allocationStats)
+    console.log('[Allocation Test] Aggregate allocation tokens:', aggregateAllocation.length)
 
-    if (usersWithAllocations.length > 0) {
+    if (!allocationStats) {
       checks.push({ 
-        name: 'Users Have Set Allocations', 
+        name: 'Stats Available', 
+        status: 'fail', 
+        message: '❌ Unable to fetch allocation statistics' 
+      })
+      throw new Error('getAllocationStats returned null')
+    }
+
+    const totalAllocators = Number(allocationStats.usersWithAllocations || 0) + Number(allocationStats.neuronsWithAllocations || 0)
+    const usersCount = Number(allocationStats.usersWithAllocations || 0)
+    const neuronsCount = Number(allocationStats.neuronsWithAllocations || 0)
+
+    // Check 1: Users or neurons with allocations
+    if (totalAllocators > 0) {
+      let message = ''
+      if (usersCount > 0 && neuronsCount > 0) {
+        message = `${usersCount} users and ${neuronsCount} neurons have set token allocations`
+      } else if (usersCount > 0) {
+        message = `${usersCount} users have set token allocations`
+      } else {
+        message = `${neuronsCount} neurons have set token allocations`
+      }
+      checks.push({ 
+        name: 'Allocations Exist', 
         status: 'pass', 
-        message: `${usersWithAllocations.length} users have set token allocations` 
+        message 
       })
     } else {
       checks.push({ 
-        name: 'Users Have Set Allocations', 
+        name: 'Allocations Exist', 
         status: 'fail', 
-        message: '❌ No users have set token allocations yet' 
+        message: '❌ No users or neurons have set token allocations yet' 
       })
     }
 
@@ -1488,21 +1507,14 @@ const testAllocationVoting = async (test: any) => {
     }
 
     // Check 3: Recent allocation activity (at least one update in the past 30 days)
-    if (usersWithAllocations.length > 0) {
-      const nowMs = Date.now()
-      const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000
-      
-      const recentUpdates = usersWithAllocations.filter((entry: any) => {
-        const userState = entry[1]
-        const lastUpdateMs = userState?.lastAllocationUpdate ? Number(BigInt(userState.lastAllocationUpdate) / 1_000_000n) : 0
-        return lastUpdateMs > 0 && (nowMs - lastUpdateMs) < thirtyDaysMs
-      })
+    if (totalAllocators > 0) {
+      const recentCount = Number(allocationStats.recentUpdatesCount || 0)
 
-      if (recentUpdates.length > 0) {
+      if (recentCount > 0) {
         checks.push({ 
           name: 'Recent Allocation Activity', 
           status: 'pass', 
-          message: `${recentUpdates.length} users have updated allocations in the past 30 days` 
+          message: `${recentCount} allocation updates in the past 30 days` 
         })
       } else {
         checks.push({ 
@@ -1513,15 +1525,12 @@ const testAllocationVoting = async (test: any) => {
       }
 
       // Check 4: Find most recent allocation update (informational)
-      const allUpdates = usersWithAllocations.map((entry: any) => {
-        const userState = entry[1]
-        return userState?.lastAllocationUpdate ? Number(BigInt(userState.lastAllocationUpdate) / 1_000_000n) : 0
-      }).filter((t: number) => t > 0)
-
-      if (allUpdates.length > 0) {
-        const mostRecent = Math.max(...allUpdates)
-        const mostRecentDisplay = new Date(mostRecent).toLocaleString()
-        const ageHours = Math.round((nowMs - mostRecent) / (60 * 60 * 1000))
+      const mostRecentTime = allocationStats.mostRecentUpdateTime
+      if (mostRecentTime && Number(mostRecentTime) > 0) {
+        const mostRecentMs = Number(BigInt(mostRecentTime) / 1_000_000n)
+        const nowMs = Date.now()
+        const mostRecentDisplay = new Date(mostRecentMs).toLocaleString()
+        const ageHours = Math.round((nowMs - mostRecentMs) / (60 * 60 * 1000))
         const ageDays = Math.floor(ageHours / 24)
         const ageDisplay = ageDays > 0 ? `${ageDays}d ${ageHours % 24}h ago` : `${ageHours}h ago`
         
@@ -1533,27 +1542,31 @@ const testAllocationVoting = async (test: any) => {
       }
     }
 
-    // Check 5: Voting power distribution (users have VP)
-    const usersWithVP = usersWithAllocations.filter((entry: any) => {
-      const userState = entry[1]
-      return Number(userState?.votingPower || 0) > 0
-    })
+    // Check 5: Voting power distribution (users and neurons have VP)
+    const userVP = Number(allocationStats.totalUserVotingPower || 0)
+    const neuronVP = Number(allocationStats.totalNeuronVotingPower || 0)
+    const totalVP = userVP + neuronVP
 
-    if (usersWithVP.length > 0) {
-      const totalVP = usersWithVP.reduce((sum: number, entry: any) => {
-        return sum + Number(entry[1]?.votingPower || 0)
-      }, 0)
+    if (totalVP > 0) {
+      let message = ''
+      if (userVP > 0 && neuronVP > 0) {
+        message = `${usersCount} users and ${neuronsCount} neurons with voting power (total: ${totalVP.toLocaleString()} VP)`
+      } else if (userVP > 0) {
+        message = `${usersCount} users with voting power (total: ${totalVP.toLocaleString()} VP)`
+      } else {
+        message = `${neuronsCount} neurons with voting power (total: ${totalVP.toLocaleString()} VP)`
+      }
       
       checks.push({ 
         name: 'Voting Power Active', 
         status: 'pass', 
-        message: `${usersWithVP.length} users with voting power (total: ${totalVP.toLocaleString()} VP)` 
+        message 
       })
     } else {
       checks.push({ 
         name: 'Voting Power Active', 
         status: 'fail', 
-        message: '⚠️ No users have voting power (allocations won\'t affect portfolio)' 
+        message: '⚠️ No users or neurons have voting power (allocations won\'t affect portfolio)' 
       })
     }
 

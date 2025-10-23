@@ -175,6 +175,14 @@ export const idlFactory = ({ IDL }) => {
     'ok' : AllocationChangesSinceResponse,
     'err' : AuthorizationError,
   });
+  const AllocationStats = IDL.Record({
+    'neuronsWithAllocations' : IDL.Nat,
+    'recentUpdatesCount' : IDL.Nat,
+    'totalUserVotingPower' : IDL.Nat,
+    'mostRecentUpdateTime' : IDL.Int,
+    'totalNeuronVotingPower' : IDL.Nat,
+    'usersWithAllocations' : IDL.Nat,
+  });
   const UnfollowRecord = IDL.Record({
     'followed' : IDL.Principal,
     'follower' : IDL.Principal,
@@ -436,6 +444,7 @@ export const idlFactory = ({ IDL }) => {
         [Result_12],
         ['query'],
       ),
+    'getAllocationStats' : IDL.Func([], [AllocationStats], ['query']),
     'getFollowActionsSince' : IDL.Func(
         [IDL.Int, IDL.Nat],
         [Result_11],
