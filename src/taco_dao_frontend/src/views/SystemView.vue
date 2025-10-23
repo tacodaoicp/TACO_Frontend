@@ -309,7 +309,7 @@ const tacoStore = useTacoStore()
 const { appLoading } = storeToRefs(tacoStore)
 
 // Section expanded states
-const systemStatusExpanded = ref(true)
+const systemStatusExpanded = ref(false) // Default collapsed, expand on test failure
 const mainCanistersExpanded = ref(false) // Default collapsed
 const archivesExpanded = ref(false) // Default collapsed
 
@@ -3135,6 +3135,15 @@ watch(archiveCanistersStatus, (newStatus) => {
   }
 })
 
+// Watch checklist for failures and auto-expand System Status if needed
+watch(() => checklist.map(item => item.status), (statuses) => {
+  const anyFailed = statuses.some(status => status === 'red')
+  if (anyFailed && !systemStatusExpanded.value) {
+    systemStatusExpanded.value = true
+    console.log('[SystemStatus] Auto-expanding due to test failure')
+  }
+}, { deep: true })
+
 onMounted(() => {
   // CRITICAL FIX: Turn off app loading immediately - SystemView doesn't need it
   // The app-level loading curtain was blocking all user interaction
@@ -3142,8 +3151,29 @@ onMounted(() => {
     tacoStore.appLoadingOff()
   }
   
-  // Start data fetching in background without blocking UI
-  refreshCycles()
+  // Auto-run sequence: Tests first, then canister refreshes
+  ;(async () => {
+    try {
+      console.log('[SystemView] Starting auto-run sequence...')
+      
+      // Step 1: Run all tests
+      console.log('[SystemView] Step 1: Running all tests...')
+      await runAllTests()
+      console.log('[SystemView] All tests completed')
+      
+      // Step 2: Refresh main canisters
+      console.log('[SystemView] Step 2: Refreshing main canisters...')
+      refreshMainCanisters()
+      
+      // Step 3: Refresh archive canisters
+      console.log('[SystemView] Step 3: Refreshing archive canisters...')
+      refreshArchiveCanisters()
+      
+      console.log('[SystemView] Auto-run sequence completed')
+    } catch (error) {
+      console.error('[SystemView] Error in auto-run sequence:', error)
+    }
+  })()
   
   // Check admin permissions asynchronously without blocking
   ;(async () => {
