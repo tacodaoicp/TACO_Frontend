@@ -119,9 +119,20 @@
             <!-- main canisters group -->
             <div class="taco-container taco-container--l1 d-flex flex-column gap-2 p-0 mt-3">
               <div class="px-3 pt-3 pb-2 d-flex align-items-center justify-content-between section-header-clickable" @click="toggleMainCanisters">
-                <div class="d-flex align-items-center gap-2">
+                <div class="d-flex align-items-center gap-3">
                   <span :class="['status-light', `status-${mainCanistersStatus}`]"></span>
                   <h2 class="h5 mb-0">Main Canisters</h2>
+                  <div v-if="mainCanistersSummary.total > 0" class="d-flex align-items-center gap-2 small">
+                    <span v-if="mainCanistersSummary.passing > 0" class="badge bg-success" title="Canisters with sufficient cycles (≥10T)">
+                      <i class="fa-solid fa-check me-1"></i>{{ mainCanistersSummary.passing }}
+                    </span>
+                    <span v-if="mainCanistersSummary.failing > 0" class="badge bg-danger" title="Canisters with low cycles (<10T)">
+                      <i class="fa-solid fa-xmark me-1"></i>{{ mainCanistersSummary.failing }}
+                    </span>
+                    <span v-if="mainCanistersSummary.unknown > 0" class="badge bg-secondary" title="Canisters with unknown status">
+                      <i class="fa-solid fa-question me-1"></i>{{ mainCanistersSummary.unknown }}
+                    </span>
+                  </div>
                 </div>
                 <div class="d-flex align-items-center gap-2">
                   <button class="btn btn-sm btn-outline-primary" @click.stop="refreshMainCanisters" title="Refresh all main canisters">
@@ -161,9 +172,20 @@
             <!-- archives group -->
             <div class="taco-container taco-container--l1 d-flex flex-column gap-2 p-0 mt-4">
               <div class="px-3 pt-3 pb-2 d-flex align-items-center justify-content-between section-header-clickable" @click="toggleArchives">
-                <div class="d-flex align-items-center gap-2">
+                <div class="d-flex align-items-center gap-3">
                   <span :class="['status-light', `status-${archiveCanistersStatus}`]"></span>
                   <h2 class="h5 mb-0">Archives</h2>
+                  <div v-if="archiveCanistersSummary.total > 0" class="d-flex align-items-center gap-2 small">
+                    <span v-if="archiveCanistersSummary.passing > 0" class="badge bg-success" title="Canisters with sufficient cycles (≥10T)">
+                      <i class="fa-solid fa-check me-1"></i>{{ archiveCanistersSummary.passing }}
+                    </span>
+                    <span v-if="archiveCanistersSummary.failing > 0" class="badge bg-danger" title="Canisters with low cycles (<10T)">
+                      <i class="fa-solid fa-xmark me-1"></i>{{ archiveCanistersSummary.failing }}
+                    </span>
+                    <span v-if="archiveCanistersSummary.unknown > 0" class="badge bg-secondary" title="Canisters with unknown status">
+                      <i class="fa-solid fa-question me-1"></i>{{ archiveCanistersSummary.unknown }}
+                    </span>
+                  </div>
                 </div>
                 <div class="d-flex align-items-center gap-2">
                   <button class="btn btn-sm btn-outline-primary" @click.stop="refreshArchiveCanisters" title="Refresh all archive canisters">
@@ -267,7 +289,7 @@
 </style>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import HeaderBar from "../components/HeaderBar.vue"
 import FooterBar from "../components/FooterBar.vue"
@@ -288,8 +310,8 @@ const { appLoading } = storeToRefs(tacoStore)
 
 // Section expanded states
 const systemStatusExpanded = ref(true)
-const mainCanistersExpanded = ref(true)
-const archivesExpanded = ref(true)
+const mainCanistersExpanded = ref(false) // Default collapsed
+const archivesExpanded = ref(false) // Default collapsed
 
 // Run all tests state
 const runningAllTests = ref(false)
@@ -376,6 +398,48 @@ const archiveCanistersStatus = computed(() => {
   if (anyCritical) return 'red'
   if (anyLow) return 'orange'
   return 'green'
+})
+
+// Computed: Main canisters summary counts
+const mainCanistersSummary = computed(() => {
+  const keys = mainCanisters.map(c => c.key)
+  let passing = 0
+  let failing = 0
+  let unknown = 0
+  
+  keys.forEach(k => {
+    const cycles = cyclesMap[k]
+    if (cycles === null) {
+      unknown++
+    } else if (cycles < 10) {
+      failing++
+    } else {
+      passing++
+    }
+  })
+  
+  return { passing, failing, unknown, total: keys.length }
+})
+
+// Computed: Archive canisters summary counts
+const archiveCanistersSummary = computed(() => {
+  const keys = archiveCanisters.map(c => c.key)
+  let passing = 0
+  let failing = 0
+  let unknown = 0
+  
+  keys.forEach(k => {
+    const cycles = cyclesMap[k]
+    if (cycles === null) {
+      unknown++
+    } else if (cycles < 10) {
+      failing++
+    } else {
+      passing++
+    }
+  })
+  
+  return { passing, failing, unknown, total: keys.length }
 })
 
 // Checklist state
@@ -1132,12 +1196,36 @@ const collapseAll = () => { Object.keys(expandedMap).forEach(k => expandedMap[k 
 // Refresh functions for sections
 const refreshMainCanisters = () => {
   console.log('[RefreshMainCanisters] Refreshing all main canisters')
-  mainCanisters.forEach(c => fetchCyclesFor(c.key))
+  mainCanisters.forEach(c => {
+    fetchCyclesFor(c.key).then(() => {
+      // After refresh, expand/collapse individual cards based on status
+      const cycles = cyclesMap[c.key]
+      if (cycles !== null) {
+        if (cycles < 10) {
+          expandedMap[c.key] = true // Expand if failing (red or orange)
+        } else {
+          expandedMap[c.key] = false // Collapse if passing (green)
+        }
+      }
+    })
+  })
 }
 
 const refreshArchiveCanisters = () => {
   console.log('[RefreshArchiveCanisters] Refreshing all archive canisters')
-  archiveCanisters.forEach(c => fetchCyclesFor(c.key))
+  archiveCanisters.forEach(c => {
+    fetchCyclesFor(c.key).then(() => {
+      // After refresh, expand/collapse individual cards based on status
+      const cycles = cyclesMap[c.key]
+      if (cycles !== null) {
+        if (cycles < 10) {
+          expandedMap[c.key] = true // Expand if failing (red or orange)
+        } else {
+          expandedMap[c.key] = false // Collapse if passing (green)
+        }
+      }
+    })
+  })
 }
 
 // Test runner
@@ -2916,6 +3004,28 @@ const testPortfolioSnapshots = async (test: any) => {
     test.totalCount = 1
   }
 }
+
+// Watch main canisters status and auto-expand/collapse section
+watch(mainCanistersStatus, (newStatus) => {
+  if (newStatus === 'red') {
+    mainCanistersExpanded.value = true
+    console.log('[MainCanisters] Auto-expanding section due to red status')
+  } else if (newStatus === 'green') {
+    mainCanistersExpanded.value = false
+    console.log('[MainCanisters] Auto-collapsing section due to green status')
+  }
+})
+
+// Watch archive canisters status and auto-expand/collapse section
+watch(archiveCanistersStatus, (newStatus) => {
+  if (newStatus === 'red') {
+    archivesExpanded.value = true
+    console.log('[ArchiveCanisters] Auto-expanding section due to red status')
+  } else if (newStatus === 'green') {
+    archivesExpanded.value = false
+    console.log('[ArchiveCanisters] Auto-collapsing section due to green status')
+  }
+})
 
 onMounted(() => {
   // CRITICAL FIX: Turn off app loading immediately - SystemView doesn't need it
