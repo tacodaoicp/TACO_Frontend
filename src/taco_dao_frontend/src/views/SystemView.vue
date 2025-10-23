@@ -19,12 +19,23 @@
             <!-- system status group -->
             <div class="taco-container taco-container--l1 d-flex flex-column gap-2 p-0 mt-3">
               <div class="px-3 pt-3 pb-2 d-flex align-items-center justify-content-between section-header-clickable" @click="toggleSystemStatus">
-                <div class="d-flex align-items-center gap-2">
+                <div class="d-flex align-items-center gap-3">
                   <span v-if="overallSystemStatus === 'running'" class="spinner-border spinner-border-sm text-primary" role="status">
                     <span class="visually-hidden">Running tests...</span>
                   </span>
                   <span v-else :class="['status-light', `status-${overallSystemStatus}`]"></span>
-                <h2 class="h5 mb-0">System Status</h2>
+                  <h2 class="h5 mb-0">System Status</h2>
+                  <div class="d-flex align-items-center gap-2 small">
+                    <span v-if="testSummary.green > 0" class="badge bg-success" title="Passing tests">
+                      <i class="fa-solid fa-check me-1"></i>{{ testSummary.green }}
+                    </span>
+                    <span v-if="testSummary.red > 0" class="badge bg-danger" title="Failing tests">
+                      <i class="fa-solid fa-xmark me-1"></i>{{ testSummary.red }}
+                    </span>
+                    <span v-if="testSummary.gray > 0" class="badge bg-secondary" title="Not yet run">
+                      <i class="fa-solid fa-minus me-1"></i>{{ testSummary.gray }}
+                    </span>
+                  </div>
               </div>
                 <div class="d-flex align-items-center gap-2">
                   <button 
@@ -248,6 +259,16 @@ const archivesExpanded = ref(true)
 
 // Run all tests state
 const runningAllTests = ref(false)
+
+// Computed: Test summary counts
+const testSummary = computed(() => {
+  const green = checklist.filter(item => item.status === 'green').length
+  const red = checklist.filter(item => item.status === 'red').length
+  const gray = checklist.filter(item => item.status === 'gray').length
+  const total = checklist.length
+  
+  return { green, red, gray, total }
+})
 
 // Computed: Overall system status based on all checklist items
 const overallSystemStatus = computed(() => {
