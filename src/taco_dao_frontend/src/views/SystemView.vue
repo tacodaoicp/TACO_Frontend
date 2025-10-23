@@ -1023,6 +1023,8 @@ const runTest = async (testKey: string) => {
       await testNeuronSnapshots(test)
     } else if (testKey === 'price-history') {
       await testPriceHistory(test)
+    } else if (testKey === 'allocation-voting') {
+      await testAllocationVoting(test)
     } else if (testKey === 'snapshots-portfolio') {
       await testPortfolioSnapshots(test)
     } else {
@@ -1430,6 +1432,148 @@ const testPriceHistory = async (test: any) => {
     console.error('Price history test error:', error)
     test.status = 'red'
     test.report = `<div class="alert alert-danger"><strong>Error:</strong> ${error.message || 'Failed to check price history status'}</div>`
+  }
+}
+
+// Test: Does allocation voting work?
+const testAllocationVoting = async (test: any) => {
+  const checks: Array<{ name: string; status: 'pass' | 'fail' | 'error'; message: string }> = []
+  
+  try {
+    const cid = resolvePrincipal('dao_backend')
+    const { idlFactory: daoIDL } = await import('../../../declarations/dao_backend/DAO_backend.did.js')
+    const agent = new HttpAgent({ host: process.env.DFX_NETWORK === 'local' ? 'http://127.0.0.1:4943' : 'https://ic0.app' })
+    if (process.env.DFX_NETWORK === 'local') { await agent.fetchRootKey() }
+    const daoActor: any = Actor.createActor(daoIDL, { agent, canisterId: cid })
+
+    // Fetch user allocations and aggregate allocation
+    const [userAllocations, aggregateAllocation] = await Promise.all([
+      daoActor.admin_getUserAllocations?.() ?? [],
+      daoActor.getAggregateAllocation?.() ?? [],
+    ])
+
+    // Check 1: Users with allocations
+    const usersWithAllocations = userAllocations.filter((entry: any) => {
+      const userState = entry[1]
+      return Array.isArray(userState?.allocations) && userState.allocations.length > 0
+    })
+
+    if (usersWithAllocations.length > 0) {
+      checks.push({ 
+        name: 'Users Have Set Allocations', 
+        status: 'pass', 
+        message: `${usersWithAllocations.length} users have set token allocations` 
+      })
+    } else {
+      checks.push({ 
+        name: 'Users Have Set Allocations', 
+        status: 'fail', 
+        message: '❌ No users have set token allocations yet' 
+      })
+    }
+
+    // Check 2: Aggregate allocation computed
+    if (aggregateAllocation.length > 0) {
+      checks.push({ 
+        name: 'Aggregate Allocation Computed', 
+        status: 'pass', 
+        message: `Aggregate allocation includes ${aggregateAllocation.length} tokens` 
+      })
+    } else {
+      checks.push({ 
+        name: 'Aggregate Allocation Computed', 
+        status: 'fail', 
+        message: '❌ No aggregate allocation computed (no tokens receiving votes)' 
+      })
+    }
+
+    // Check 3: Recent allocation activity (at least one update in the past 30 days)
+    if (usersWithAllocations.length > 0) {
+      const nowMs = Date.now()
+      const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000
+      
+      const recentUpdates = usersWithAllocations.filter((entry: any) => {
+        const userState = entry[1]
+        const lastUpdateMs = userState?.lastAllocationUpdate ? Number(BigInt(userState.lastAllocationUpdate) / 1_000_000n) : 0
+        return lastUpdateMs > 0 && (nowMs - lastUpdateMs) < thirtyDaysMs
+      })
+
+      if (recentUpdates.length > 0) {
+        checks.push({ 
+          name: 'Recent Allocation Activity', 
+          status: 'pass', 
+          message: `${recentUpdates.length} users have updated allocations in the past 30 days` 
+        })
+      } else {
+        checks.push({ 
+          name: 'Recent Allocation Activity', 
+          status: 'fail', 
+          message: '⚠️ No allocation updates in the past 30 days (system may be stale)' 
+        })
+      }
+
+      // Check 4: Find most recent allocation update (informational)
+      const allUpdates = usersWithAllocations.map((entry: any) => {
+        const userState = entry[1]
+        return userState?.lastAllocationUpdate ? Number(BigInt(userState.lastAllocationUpdate) / 1_000_000n) : 0
+      }).filter((t: number) => t > 0)
+
+      if (allUpdates.length > 0) {
+        const mostRecent = Math.max(...allUpdates)
+        const mostRecentDisplay = new Date(mostRecent).toLocaleString()
+        const ageHours = Math.round((nowMs - mostRecent) / (60 * 60 * 1000))
+        const ageDays = Math.floor(ageHours / 24)
+        const ageDisplay = ageDays > 0 ? `${ageDays}d ${ageHours % 24}h ago` : `${ageHours}h ago`
+        
+        checks.push({ 
+          name: 'Most Recent Update', 
+          status: 'pass', 
+          message: `Most recent allocation update: ${mostRecentDisplay} (${ageDisplay})` 
+        })
+      }
+    }
+
+    // Check 5: Voting power distribution (users have VP)
+    const usersWithVP = usersWithAllocations.filter((entry: any) => {
+      const userState = entry[1]
+      return Number(userState?.votingPower || 0) > 0
+    })
+
+    if (usersWithVP.length > 0) {
+      const totalVP = usersWithVP.reduce((sum: number, entry: any) => {
+        return sum + Number(entry[1]?.votingPower || 0)
+      }, 0)
+      
+      checks.push({ 
+        name: 'Voting Power Active', 
+        status: 'pass', 
+        message: `${usersWithVP.length} users with voting power (total: ${totalVP.toLocaleString()} VP)` 
+      })
+    } else {
+      checks.push({ 
+        name: 'Voting Power Active', 
+        status: 'fail', 
+        message: '⚠️ No users have voting power (allocations won\'t affect portfolio)' 
+      })
+    }
+
+    // Generate report
+    const allPass = checks.every(c => c.status === 'pass')
+
+    let reportHtml = '<div class="d-flex flex-column gap-2">'
+    for (const check of checks) {
+      const icon = check.status === 'pass' ? '✅' : '❌'
+      const colorClass = check.status === 'pass' ? 'text-success' : 'text-danger'
+      reportHtml += `<div class="${colorClass}"><strong>${icon} ${check.name}:</strong> ${check.message}</div>`
+    }
+    reportHtml += '</div>'
+
+    test.status = allPass ? 'green' : 'red'
+    test.report = reportHtml
+  } catch (error: any) {
+    console.error('Allocation voting test error:', error)
+    test.status = 'red'
+    test.report = `<div class="alert alert-danger"><strong>Error:</strong> ${error.message || 'Failed to check allocation voting status'}</div>`
   }
 }
 
