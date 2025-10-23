@@ -1021,6 +1021,8 @@ const runTest = async (testKey: string) => {
       await testGrantSystem(test)
     } else if (testKey === 'snapshots-neuron') {
       await testNeuronSnapshots(test)
+    } else if (testKey === 'price-history') {
+      await testPriceHistory(test)
     } else if (testKey === 'snapshots-portfolio') {
       await testPortfolioSnapshots(test)
     } else {
@@ -1276,6 +1278,158 @@ const testNeuronSnapshots = async (test: any) => {
     console.error('Neuron snapshot test error:', error)
     test.status = 'red'
     test.report = `<div class="alert alert-danger"><strong>Error:</strong> ${error.message || 'Failed to check neuron snapshot status'}</div>`
+  }
+}
+
+// Test: Is price history updating?
+const testPriceHistory = async (test: any) => {
+  const checks: Array<{ name: string; status: 'pass' | 'fail' | 'error'; message: string }> = []
+  
+  try {
+    const cid = resolvePrincipal('dao_backend')
+    const { idlFactory: daoIDL } = await import('../../../declarations/dao_backend/DAO_backend.did.js')
+    const agent = new HttpAgent({ host: process.env.DFX_NETWORK === 'local' ? 'http://127.0.0.1:4943' : 'https://ic0.app' })
+    if (process.env.DFX_NETWORK === 'local') { await agent.fetchRootKey() }
+    const daoActor: any = Actor.createActor(daoIDL, { agent, canisterId: cid })
+
+    // Fetch token details
+    const tokenDetails = await daoActor.getTokenDetailsWithoutPastPrices?.() ?? []
+
+    // Expected sync interval: tokens should sync at least once per day
+    const maxSyncAgeMs = 24 * 60 * 60 * 1000 // 24 hours
+
+    // Check 1: Tokens exist
+    if (tokenDetails.length > 0) {
+      checks.push({ 
+        name: 'Tokens Exist', 
+        status: 'pass', 
+        message: `${tokenDetails.length} tokens are configured` 
+      })
+    } else {
+      checks.push({ 
+        name: 'Tokens Exist', 
+        status: 'fail', 
+        message: '❌ No tokens are configured in the system' 
+      })
+    }
+
+    // Check 2: Active tokens count
+    const activeTokens = tokenDetails.filter((entry: any) => entry[1]?.Active)
+    if (activeTokens.length > 0) {
+      checks.push({ 
+        name: 'Active Tokens', 
+        status: 'pass', 
+        message: `${activeTokens.length} tokens are active` 
+      })
+    } else {
+      checks.push({ 
+        name: 'Active Tokens', 
+        status: 'fail', 
+        message: '❌ No active tokens found' 
+      })
+    }
+
+    // Check 3: Recent price sync for all active tokens
+    const nowMs = Date.now()
+    const staleTokens: Array<{ symbol: string; lastSync: string; ageHours: number }> = []
+    const failedTokens: Array<{ symbol: string }> = []
+    let allSynced = true
+
+    for (const entry of activeTokens) {
+      const token = entry[1]
+      const symbol = token?.tokenSymbol || 'UNKNOWN'
+      
+      // Check if token has sync failure
+      if (token?.pausedDueToSyncFailure) {
+        failedTokens.push({ symbol })
+        allSynced = false
+        continue
+      }
+
+      // Check last sync time
+      const lastSyncMs = token?.lastTimeSynced ? Number(BigInt(token.lastTimeSynced) / 1_000_000n) : 0
+      if (lastSyncMs === 0) {
+        staleTokens.push({ symbol, lastSync: 'Never', ageHours: Infinity })
+        allSynced = false
+      } else {
+        const ageMs = nowMs - lastSyncMs
+        const ageHours = ageMs / (60 * 60 * 1000)
+        if (ageMs > maxSyncAgeMs) {
+          staleTokens.push({ 
+            symbol, 
+            lastSync: new Date(lastSyncMs).toLocaleString(), 
+            ageHours: Math.round(ageHours) 
+          })
+          allSynced = false
+        }
+      }
+    }
+
+    // Report on failed tokens
+    if (failedTokens.length > 0) {
+      checks.push({ 
+        name: 'Sync Failures', 
+        status: 'fail', 
+        message: `❌ ${failedTokens.length} token(s) paused due to sync failure: ${failedTokens.map(t => t.symbol).join(', ')}` 
+      })
+    }
+
+    // Report on stale tokens
+    if (staleTokens.length > 0) {
+      let message = `❌ ${staleTokens.length} token(s) with stale prices (>24h old): `
+      message += staleTokens.map(t => `${t.symbol} (${t.ageHours === Infinity ? 'never synced' : t.ageHours + 'h ago'})`).join(', ')
+      checks.push({ 
+        name: 'Price Freshness', 
+        status: 'fail', 
+        message 
+      })
+    } else if (allSynced && activeTokens.length > 0) {
+      checks.push({ 
+        name: 'Price Freshness', 
+        status: 'pass', 
+        message: `All ${activeTokens.length} active tokens have recent price data (within 24 hours)` 
+      })
+    }
+
+    // Check 4: Find oldest sync time for informational purposes
+    if (activeTokens.length > 0) {
+      const times = activeTokens.map((entry: any) => {
+        const token = entry[1]
+        return {
+          symbol: token?.tokenSymbol || 'UNKNOWN',
+          time: token?.lastTimeSynced ? Number(BigInt(token.lastTimeSynced) / 1_000_000n) : 0
+        }
+      }).filter((t: any) => t.time > 0)
+
+      if (times.length > 0) {
+        const oldest = times.reduce((prev: any, curr: any) => prev.time < curr.time ? prev : curr)
+        const oldestDisplay = new Date(oldest.time).toLocaleString()
+        const ageHours = Math.round((nowMs - oldest.time) / (60 * 60 * 1000))
+        checks.push({ 
+          name: 'Oldest Price Update', 
+          status: 'pass', 
+          message: `Oldest synced token: ${oldest.symbol} at ${oldestDisplay} (${ageHours}h ago)` 
+        })
+      }
+    }
+
+    // Generate report
+    const allPass = checks.every(c => c.status === 'pass')
+
+    let reportHtml = '<div class="d-flex flex-column gap-2">'
+    for (const check of checks) {
+      const icon = check.status === 'pass' ? '✅' : '❌'
+      const colorClass = check.status === 'pass' ? 'text-success' : 'text-danger'
+      reportHtml += `<div class="${colorClass}"><strong>${icon} ${check.name}:</strong> ${check.message}</div>`
+    }
+    reportHtml += '</div>'
+
+    test.status = allPass ? 'green' : 'red'
+    test.report = reportHtml
+  } catch (error: any) {
+    console.error('Price history test error:', error)
+    test.status = 'red'
+    test.report = `<div class="alert alert-danger"><strong>Error:</strong> ${error.message || 'Failed to check price history status'}</div>`
   }
 }
 
