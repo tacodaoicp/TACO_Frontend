@@ -296,18 +296,6 @@
             <div><strong>Next Run:</strong> {{ governanceDetails.nextRunDisplay }}</div>
           </div>
           
-          <h6 class="mb-2 mt-3">NNS Automation Status</h6>
-          <div class="d-flex flex-column small gap-1">
-            <div class="d-flex align-items-center gap-2">
-              <span class="status-indicator" :class="governanceDetails.autoProcessingRunning ? 'active' : 'inactive'"></span>
-              <span><strong>Auto NNS Processing:</strong> {{ governanceDetails.autoProcessingRunning ? 'Running' : 'Stopped' }}</span>
-            </div>
-            <div class="d-flex align-items-center gap-2">
-              <span class="status-indicator" :class="governanceDetails.autoVotingRunning ? 'active' : 'inactive'"></span>
-              <span><strong>Auto Urgent Voting:</strong> {{ governanceDetails.autoVotingRunning ? 'Running' : 'Stopped' }}</span>
-            </div>
-          </div>
-          
           <h6 class="mb-2 mt-3">Neuron Snapshot Timer</h6>
           <div class="d-flex align-items-center gap-2">
             <span class="status-indicator" :class="governanceDetails.snapshotActive ? 'active' : 'inactive'"></span>

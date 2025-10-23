@@ -700,11 +700,9 @@ const fetchCyclesFor = async (key: CanKey) => {
           if (process.env.DFX_NETWORK === 'local') { await agent.fetchRootKey() }
           const nActor: any = Actor.createActor(neuronIDL, { agent, canisterId: resolvePrincipal('neuronSnapshot') })
           
-          const [snapInfoArr, periodicStatus, autoProcessing, autoVoting] = await Promise.all([
+          const [snapInfoArr, periodicStatus] = await Promise.all([
             nActor.get_neuron_snapshots_info(0, 1), // Get the latest snapshot
             nActor.getPeriodicTimerStatus?.() ?? Promise.resolve(null),
-            nActor.isAutoProcessingRunning?.() ?? Promise.resolve(false),
-            nActor.isAutoVotingRunning?.() ?? Promise.resolve(false),
           ])
           
           // Process snapshot info
@@ -775,8 +773,6 @@ const fetchCyclesFor = async (key: CanKey) => {
             nextRunDisplay,
             intervalSeconds,
             intervalDisplay: formatSeconds(intervalSeconds),
-            autoProcessingRunning: autoProcessing || false,
-            autoVotingRunning: autoVoting || false,
             periodicTimerStale
           }
         } catch (err) {
@@ -1163,10 +1159,8 @@ const testGrantSystem = async (test: any) => {
     const nActor: any = Actor.createActor(neuronIDL, { agent, canisterId: cid })
 
     // Fetch timer status and activity counts
-    const [periodicStatus, autoProcessing, autoVoting, copiedCount, votedCount, highestProcessedId] = await Promise.all([
+    const [periodicStatus, copiedCount, votedCount, highestProcessedId] = await Promise.all([
       nActor.getPeriodicTimerStatus?.() ?? Promise.resolve(null),
-      nActor.isAutoProcessingRunning?.() ?? Promise.resolve(false),
-      nActor.isAutoVotingRunning?.() ?? Promise.resolve(false),
       nActor.getCopiedNNSProposalsCount?.() ?? Promise.resolve(0),
       nActor.getDAOVotedNNSProposalsCount?.() ?? Promise.resolve(0),
       nActor.getHighestProcessedNNSProposalId?.() ?? Promise.resolve(0),
@@ -1208,21 +1202,7 @@ const testGrantSystem = async (test: any) => {
       checks.push({ name: 'Last Timer Run Recent', status: 'fail', message: '❌ No last run time recorded' })
     }
 
-    // Check 3: Auto-processing is running
-    if (autoProcessing) {
-      checks.push({ name: 'Auto-Processing Active', status: 'pass', message: 'NNS proposal auto-processing is running' })
-    } else {
-      checks.push({ name: 'Auto-Processing Active', status: 'fail', message: '❌ NNS proposal auto-processing is NOT running' })
-    }
-
-    // Check 4: Auto-voting is running
-    if (autoVoting) {
-      checks.push({ name: 'Auto-Voting Active', status: 'pass', message: 'Urgent proposal auto-voting is running' })
-    } else {
-      checks.push({ name: 'Auto-Voting Active', status: 'fail', message: '❌ Urgent proposal auto-voting is NOT running' })
-    }
-
-    // Check 5: Cloning activity (copied proposals count)
+    // Check 3: Cloning activity (copied proposals count)
     const copiedCountNum = Number(copiedCount)
     if (copiedCountNum > 0) {
       checks.push({ 
@@ -1238,7 +1218,7 @@ const testGrantSystem = async (test: any) => {
       })
     }
 
-    // Check 6: Voting activity (voted proposals count)
+    // Check 4: Voting activity (voted proposals count)
     const votedCountNum = Number(votedCount)
     if (votedCountNum > 0) {
       checks.push({ 
@@ -1254,7 +1234,7 @@ const testGrantSystem = async (test: any) => {
       })
     }
 
-    // Check 7: Highest processed NNS proposal ID is reasonable
+    // Check 5: Highest processed NNS proposal ID is reasonable
     const highestIdNum = Number(highestProcessedId)
     if (highestIdNum > 0) {
       checks.push({ 
