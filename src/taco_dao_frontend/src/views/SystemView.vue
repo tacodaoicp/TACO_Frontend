@@ -176,10 +176,10 @@
                   <span :class="['status-light', `status-${archiveCanistersStatus}`]"></span>
                   <h2 class="h5 mb-0">Archives</h2>
                   <div v-if="archiveCanistersSummary.total > 0" class="d-flex align-items-center gap-2 small">
-                    <span v-if="archiveCanistersSummary.passing > 0" class="badge bg-success" title="Canisters with sufficient cycles (≥10T)">
+                    <span v-if="archiveCanistersSummary.passing > 0" class="badge bg-success" title="Canisters with sufficient cycles (≥10T) AND timer running">
                       <i class="fa-solid fa-check me-1"></i>{{ archiveCanistersSummary.passing }}
                     </span>
-                    <span v-if="archiveCanistersSummary.failing > 0" class="badge bg-danger" title="Canisters with low cycles (<10T)">
+                    <span v-if="archiveCanistersSummary.failing > 0" class="badge bg-danger" title="Canisters with low cycles (<10T) OR timer not running">
                       <i class="fa-solid fa-xmark me-1"></i>{{ archiveCanistersSummary.failing }}
                     </span>
                     <span v-if="archiveCanistersSummary.unknown > 0" class="badge bg-secondary" title="Canisters with unknown status">
@@ -383,16 +383,18 @@ const archiveCanistersStatus = computed(() => {
   if (anyLoading) return 'gray'
   if (allNull) return 'gray'
   
-  // Check if any canister is low on cycles (< 10T)
+  // Check if any canister is low on cycles (< 10T) OR timer is not running
   const anyLow = keys.some(k => {
     const cycles = cyclesMap[k]
-    return cycles !== null && cycles < 10
+    const timerRunning = timerStatusMap[k]?.running ?? false
+    return (cycles !== null && cycles < 10) || !timerRunning
   })
   
-  // Check if any canister is critical (< 5T)
+  // Check if any canister is critical (< 5T) OR timer is not running
   const anyCritical = keys.some(k => {
     const cycles = cyclesMap[k]
-    return cycles !== null && cycles < 5
+    const timerRunning = timerStatusMap[k]?.running ?? false
+    return (cycles !== null && cycles < 5) || !timerRunning
   })
   
   if (anyCritical) return 'red'
@@ -430,11 +432,15 @@ const archiveCanistersSummary = computed(() => {
   
   keys.forEach(k => {
     const cycles = cyclesMap[k]
+    const timerRunning = timerStatusMap[k]?.running ?? false
+    
     if (cycles === null) {
       unknown++
-    } else if (cycles < 10) {
+    } else if (cycles < 10 || !timerRunning) {
+      // Failing if low cycles OR timer not running
       failing++
     } else {
+      // Passing only if sufficient cycles AND timer running
       passing++
     }
   })
@@ -1216,12 +1222,15 @@ const refreshArchiveCanisters = () => {
   archiveCanisters.forEach(c => {
     fetchCyclesFor(c.key).then(() => {
       // After refresh, expand/collapse individual cards based on status
+      // Archives require BOTH sufficient cycles AND timer running
       const cycles = cyclesMap[c.key]
+      const timerRunning = timerStatusMap[c.key]?.running ?? false
+      
       if (cycles !== null) {
-        if (cycles < 10) {
-          expandedMap[c.key] = true // Expand if failing (red or orange)
+        if (cycles < 10 || !timerRunning) {
+          expandedMap[c.key] = true // Expand if failing (low cycles OR timer not running)
         } else {
-          expandedMap[c.key] = false // Collapse if passing (green)
+          expandedMap[c.key] = false // Collapse if passing (sufficient cycles AND timer running)
         }
       }
     })
