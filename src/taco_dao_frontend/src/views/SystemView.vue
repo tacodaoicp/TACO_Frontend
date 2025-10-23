@@ -26,9 +26,22 @@
                   <span v-else :class="['status-light', `status-${overallSystemStatus}`]"></span>
                 <h2 class="h5 mb-0">System Status</h2>
               </div>
-                <button class="btn btn-sm btn-outline-secondary" @click.stop="toggleSystemStatus" :title="systemStatusExpanded ? 'Collapse' : 'Expand'">
-                  <i :class="systemStatusExpanded ? 'fa-solid fa-chevron-up' : 'fa-solid fa-chevron-down'"></i>
-                </button>
+                <div class="d-flex align-items-center gap-2">
+                  <button 
+                    class="btn btn-sm btn-primary" 
+                    @click.stop="runAllTests" 
+                    :disabled="runningAllTests"
+                    title="Run all tests">
+                    <span v-if="runningAllTests" class="spinner-border spinner-border-sm me-1" role="status">
+                      <span class="visually-hidden">Running...</span>
+                    </span>
+                    <i v-else class="fa-solid fa-play me-1"></i>
+                    {{ runningAllTests ? 'Running...' : 'Run All Tests' }}
+                  </button>
+                  <button class="btn btn-sm btn-outline-secondary" @click.stop="toggleSystemStatus" :title="systemStatusExpanded ? 'Collapse' : 'Expand'">
+                    <i :class="systemStatusExpanded ? 'fa-solid fa-chevron-up' : 'fa-solid fa-chevron-down'"></i>
+                  </button>
+                </div>
               </div>
               <div v-if="systemStatusExpanded" class="p-2 d-flex flex-column gap-2">
                 <SystemStatusItem
@@ -232,6 +245,9 @@ const { appLoading } = storeToRefs(tacoStore)
 const systemStatusExpanded = ref(true)
 const mainCanistersExpanded = ref(true)
 const archivesExpanded = ref(true)
+
+// Run all tests state
+const runningAllTests = ref(false)
 
 // Computed: Overall system status based on all checklist items
 const overallSystemStatus = computed(() => {
@@ -1037,6 +1053,40 @@ const runTest = async (testKey: string) => {
     test.report = `<div class="alert alert-danger"><strong>Error:</strong> ${error}</div>`
   } finally {
     test.running = false
+  }
+}
+
+// Run all tests sequentially
+const runAllTests = async () => {
+  if (runningAllTests.value) return
+  
+  runningAllTests.value = true
+  systemStatusExpanded.value = true // Ensure section is expanded
+  
+  try {
+    // Run each test sequentially
+    for (const item of checklist) {
+      console.log(`[Run All Tests] Starting test: ${item.key}`)
+      await runTest(item.key)
+      
+      // After test completes, expand if failed, collapse if passed
+      if (item.status === 'red') {
+        item.expanded = true
+        console.log(`[Run All Tests] ${item.key} FAILED - expanding`)
+      } else if (item.status === 'green') {
+        item.expanded = false
+        console.log(`[Run All Tests] ${item.key} PASSED - collapsing`)
+      }
+      
+      // Small delay between tests to avoid overwhelming the UI
+      await new Promise(resolve => setTimeout(resolve, 100))
+    }
+    
+    console.log('[Run All Tests] All tests completed')
+  } catch (error) {
+    console.error('[Run All Tests] Error:', error)
+  } finally {
+    runningAllTests.value = false
   }
 }
 
