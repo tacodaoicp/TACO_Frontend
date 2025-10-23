@@ -25,16 +25,34 @@
                   </span>
                   <span v-else :class="['status-light', `status-${overallSystemStatus}`]"></span>
                   <h2 class="h5 mb-0">System Status</h2>
-                  <div class="d-flex align-items-center gap-2 small">
-                    <span v-if="testSummary.green > 0" class="badge bg-success" title="Passing tests">
-                      <i class="fa-solid fa-check me-1"></i>{{ testSummary.green }}
-                    </span>
-                    <span v-if="testSummary.red > 0" class="badge bg-danger" title="Failing tests">
-                      <i class="fa-solid fa-xmark me-1"></i>{{ testSummary.red }}
-                    </span>
-                    <span v-if="testSummary.gray > 0" class="badge bg-secondary" title="Not yet run">
-                      <i class="fa-solid fa-minus me-1"></i>{{ testSummary.gray }}
-                    </span>
+                  <div class="d-flex align-items-center gap-3 small">
+                    <!-- Checklist items summary -->
+                    <div class="d-flex align-items-center gap-2">
+                      <span class="text-muted small">Items:</span>
+                      <span v-if="testSummary.green > 0" class="badge bg-success" title="Passing checklist items">
+                        <i class="fa-solid fa-check me-1"></i>{{ testSummary.green }}
+                      </span>
+                      <span v-if="testSummary.red > 0" class="badge bg-danger" title="Failing checklist items">
+                        <i class="fa-solid fa-xmark me-1"></i>{{ testSummary.red }}
+                      </span>
+                      <span v-if="testSummary.gray > 0" class="badge bg-secondary" title="Not yet run">
+                        <i class="fa-solid fa-minus me-1"></i>{{ testSummary.gray }}
+                      </span>
+                    </div>
+                    
+                    <!-- Divider -->
+                    <span v-if="testSummary.totalTests > 0" class="text-muted">|</span>
+                    
+                    <!-- Individual tests summary -->
+                    <div v-if="testSummary.totalTests > 0" class="d-flex align-items-center gap-2">
+                      <span class="text-muted small">Tests:</span>
+                      <span v-if="testSummary.totalPassingTests > 0" class="badge bg-success" title="Passing individual tests">
+                        <i class="fa-solid fa-check me-1"></i>{{ testSummary.totalPassingTests }}
+                      </span>
+                      <span v-if="testSummary.totalFailingTests > 0" class="badge bg-danger" title="Failing individual tests">
+                        <i class="fa-solid fa-xmark me-1"></i>{{ testSummary.totalFailingTests }}
+                      </span>
+                    </div>
                   </div>
               </div>
                 <div class="d-flex align-items-center gap-2">
@@ -267,7 +285,15 @@ const testSummary = computed(() => {
   const gray = checklist.filter(item => item.status === 'gray').length
   const total = checklist.length
   
-  return { green, red, gray, total }
+  // Sum up individual test counts across all checklist items
+  const totalPassingTests = checklist.reduce((sum, item) => sum + item.passCount, 0)
+  const totalFailingTests = checklist.reduce((sum, item) => sum + item.failCount, 0)
+  const totalTests = checklist.reduce((sum, item) => sum + item.totalCount, 0)
+  
+  return { 
+    green, red, gray, total,
+    totalPassingTests, totalFailingTests, totalTests
+  }
 })
 
 // Computed: Overall system status based on all checklist items
@@ -286,16 +312,16 @@ const overallSystemStatus = computed(() => {
 
 // Checklist state
 const checklist = reactive([
-  { key: 'canisters-running', title: 'Are all canisters running and in gas?', status: 'gray', expanded: false, running: false, report: '' },
-  { key: 'trading-regular', title: 'Is the trading bot trading regularly?', status: 'gray', expanded: false, running: false, report: '' },
-  { key: 'rewards-regular', title: 'Are rewards distributed regularly?', status: 'gray', expanded: false, running: false, report: '' },
-  { key: 'snapshots-portfolio', title: 'Are portfolio snapshots regular?', status: 'gray', expanded: false, running: false, report: '' },
-  { key: 'snapshots-neuron', title: 'Are neuron snapshots regular?', status: 'gray', expanded: false, running: false, report: '' },
-  { key: 'price-history', title: 'Is price history updating?', status: 'gray', expanded: false, running: false, report: '' },
-  { key: 'allocation-voting', title: 'Does allocation voting work?', status: 'gray', expanded: false, running: false, report: '' },
-  { key: 'grant-system', title: 'Is grant system cloning and voting?', status: 'gray', expanded: false, running: false, report: '' },
-  { key: 'archives-regular', title: 'Are archives importing regularly?', status: 'gray', expanded: false, running: false, report: '' },
-] as Array<{ key: string; title: string; status: 'gray' | 'green' | 'red'; expanded: boolean; running: boolean; report: string }>)
+  { key: 'canisters-running', title: 'Are all canisters running and in gas?', status: 'gray', expanded: false, running: false, report: '', passCount: 0, failCount: 0, totalCount: 0 },
+  { key: 'trading-regular', title: 'Is the trading bot trading regularly?', status: 'gray', expanded: false, running: false, report: '', passCount: 0, failCount: 0, totalCount: 0 },
+  { key: 'rewards-regular', title: 'Are rewards distributed regularly?', status: 'gray', expanded: false, running: false, report: '', passCount: 0, failCount: 0, totalCount: 0 },
+  { key: 'snapshots-portfolio', title: 'Are portfolio snapshots regular?', status: 'gray', expanded: false, running: false, report: '', passCount: 0, failCount: 0, totalCount: 0 },
+  { key: 'snapshots-neuron', title: 'Are neuron snapshots regular?', status: 'gray', expanded: false, running: false, report: '', passCount: 0, failCount: 0, totalCount: 0 },
+  { key: 'price-history', title: 'Is price history updating?', status: 'gray', expanded: false, running: false, report: '', passCount: 0, failCount: 0, totalCount: 0 },
+  { key: 'allocation-voting', title: 'Does allocation voting work?', status: 'gray', expanded: false, running: false, report: '', passCount: 0, failCount: 0, totalCount: 0 },
+  { key: 'grant-system', title: 'Is grant system cloning and voting?', status: 'gray', expanded: false, running: false, report: '', passCount: 0, failCount: 0, totalCount: 0 },
+  { key: 'archives-regular', title: 'Are archives importing regularly?', status: 'gray', expanded: false, running: false, report: '', passCount: 0, failCount: 0, totalCount: 0 },
+] as Array<{ key: string; title: string; status: 'gray' | 'green' | 'red'; expanded: boolean; running: boolean; report: string; passCount: number; failCount: number; totalCount: number }>)
 
 // Determine admin: call DAO hasAdminPermission or use a simple check if available
 const isAdmin = ref(false)
@@ -1092,6 +1118,9 @@ const runAllTests = async () => {
       item.report = ''
       item.running = false
       item.expanded = false
+      item.passCount = 0
+      item.failCount = 0
+      item.totalCount = 0
     }
     
     // Small delay to let UI update and show reset state
@@ -1198,6 +1227,11 @@ const testCanistersRunning = async (test: any) => {
   const failed = results.filter(r => r.status === 'fail').length
   const errors = results.filter(r => r.status === 'error').length
   const total = results.length
+
+  // Set counts
+  test.passCount = passed
+  test.failCount = failed + errors
+  test.totalCount = total
 
   // Overall status
   if (errors > 0 || failed > 0) {
@@ -1348,6 +1382,11 @@ const testNeuronSnapshots = async (test: any) => {
 
     // Generate report
     const allPass = checks.every(c => c.status === 'pass')
+    
+    // Count passes and fails
+    test.passCount = checks.filter(c => c.status === 'pass').length
+    test.failCount = checks.filter(c => c.status === 'fail' || c.status === 'error').length
+    test.totalCount = checks.length
 
     let reportHtml = '<div class="d-flex flex-column gap-2">'
     for (const check of checks) {
@@ -1363,6 +1402,9 @@ const testNeuronSnapshots = async (test: any) => {
     console.error('Neuron snapshot test error:', error)
     test.status = 'red'
     test.report = `<div class="alert alert-danger"><strong>Error:</strong> ${error.message || 'Failed to check neuron snapshot status'}</div>`
+    test.passCount = 0
+    test.failCount = 1
+    test.totalCount = 1
   }
 }
 
@@ -1500,6 +1542,11 @@ const testPriceHistory = async (test: any) => {
 
     // Generate report
     const allPass = checks.every(c => c.status === 'pass')
+    
+    // Count passes and fails
+    test.passCount = checks.filter(c => c.status === 'pass').length
+    test.failCount = checks.filter(c => c.status === 'fail' || c.status === 'error').length
+    test.totalCount = checks.length
 
     let reportHtml = '<div class="d-flex flex-column gap-2">'
     for (const check of checks) {
@@ -1515,6 +1562,9 @@ const testPriceHistory = async (test: any) => {
     console.error('Price history test error:', error)
     test.status = 'red'
     test.report = `<div class="alert alert-danger"><strong>Error:</strong> ${error.message || 'Failed to check price history status'}</div>`
+    test.passCount = 0
+    test.failCount = 1
+    test.totalCount = 1
   }
 }
 
@@ -1655,6 +1705,11 @@ const testAllocationVoting = async (test: any) => {
 
     // Generate report
     const allPass = checks.every(c => c.status === 'pass')
+    
+    // Count passes and fails
+    test.passCount = checks.filter(c => c.status === 'pass').length
+    test.failCount = checks.filter(c => c.status === 'fail' || c.status === 'error').length
+    test.totalCount = checks.length
 
     let reportHtml = '<div class="d-flex flex-column gap-2">'
     for (const check of checks) {
@@ -1670,6 +1725,9 @@ const testAllocationVoting = async (test: any) => {
     console.error('Allocation voting test error:', error)
     test.status = 'red'
     test.report = `<div class="alert alert-danger"><strong>Error:</strong> ${error.message || 'Failed to check allocation voting status'}</div>`
+    test.passCount = 0
+    test.failCount = 1
+    test.totalCount = 1
   }
 }
 
@@ -1779,6 +1837,11 @@ const testGrantSystem = async (test: any) => {
     // Generate report
     const allPass = checks.every(c => c.status === 'pass')
     const anyFail = checks.some(c => c.status === 'fail')
+    
+    // Count passes and fails
+    test.passCount = checks.filter(c => c.status === 'pass').length
+    test.failCount = checks.filter(c => c.status === 'fail').length
+    test.totalCount = checks.length
 
     let reportHtml = '<div class="d-flex flex-column gap-2">'
     for (const check of checks) {
@@ -1794,6 +1857,9 @@ const testGrantSystem = async (test: any) => {
     console.error('Grant system test error:', error)
     test.status = 'red'
     test.report = `<div class="alert alert-danger"><strong>Error:</strong> ${error.message || 'Failed to check grant system status'}</div>`
+    test.passCount = 0
+    test.failCount = 1
+    test.totalCount = 1
   }
 }
 
@@ -1929,6 +1995,11 @@ const testArchivesImporting = async (test: any) => {
   } else {
     test.status = 'green'
   }
+  
+  // Set counts
+  test.passCount = passedChecks
+  test.failCount = failedChecks + errorChecks
+  test.totalCount = totalChecks
 
   // Build HTML report
   let reportHTML = `
@@ -2384,6 +2455,11 @@ const testTradingBotRegular = async (test: any) => {
     const passed = checks.filter(c => c.status === 'pass').length
     const failed = checks.filter(c => c.status === 'fail').length
     const errors = checks.filter(c => c.status === 'error').length
+    
+    // Set counts
+    test.passCount = passed
+    test.failCount = failed + errors
+    test.totalCount = checks.length
 
     let reportHTML = `
       <div class="mb-3">
@@ -2434,6 +2510,9 @@ const testTradingBotRegular = async (test: any) => {
   } catch (error: any) {
     test.status = 'red'
     test.report = `<div class="alert alert-danger"><strong>Error:</strong> ${error.message || 'Failed to check trading bot status'}</div>`
+    test.passCount = 0
+    test.failCount = 1
+    test.totalCount = 1
   }
 }
 
@@ -2585,6 +2664,11 @@ const testRewardsRegular = async (test: any) => {
     const errors = checks.filter(c => c.status === 'error').length
     const total = checks.length
 
+    // Set counts
+    test.passCount = passed
+    test.failCount = failed + errors
+    test.totalCount = total
+
     // Overall status
     if (errors > 0 || failed > 0) {
       test.status = 'red'
@@ -2626,6 +2710,9 @@ const testRewardsRegular = async (test: any) => {
   } catch (error: any) {
     test.status = 'red'
     test.report = `<div class="alert alert-danger"><strong>Error:</strong> ${error.message || 'Failed to check rewards distribution status'}</div>`
+    test.passCount = 0
+    test.failCount = 1
+    test.totalCount = 1
   }
 }
 
@@ -2706,6 +2793,11 @@ const testPortfolioSnapshots = async (test: any) => {
     const passed = checks.filter(c => c.status === 'pass').length
     const failed = checks.filter(c => c.status === 'fail').length
     const errors = checks.filter(c => c.status === 'error').length
+    
+    // Set counts
+    test.passCount = passed
+    test.failCount = failed + errors
+    test.totalCount = checks.length
 
     let reportHTML = `
       <div class="mb-3">
@@ -2740,6 +2832,9 @@ const testPortfolioSnapshots = async (test: any) => {
   } catch (error: any) {
     test.status = 'red'
     test.report = `<div class="alert alert-danger"><strong>Error:</strong> ${error.message || 'Failed to check portfolio snapshot status'}</div>`
+    test.passCount = 0
+    test.failCount = 1
+    test.totalCount = 1
   }
 }
 
