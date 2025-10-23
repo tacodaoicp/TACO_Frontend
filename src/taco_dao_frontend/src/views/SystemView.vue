@@ -1021,6 +1021,8 @@ const runTest = async (testKey: string) => {
       await testTradingBotRegular(test)
     } else if (testKey === 'rewards-regular') {
       await testRewardsRegular(test)
+    } else if (testKey === 'grant-system') {
+      await testGrantSystem(test)
     } else if (testKey === 'snapshots-portfolio') {
       await testPortfolioSnapshots(test)
     } else {
@@ -1147,6 +1149,146 @@ const testCanistersRunning = async (test: any) => {
 
   reportHTML += '</div>'
   test.report = reportHTML
+}
+
+// Test: Is grant system cloning and voting?
+const testGrantSystem = async (test: any) => {
+  const checks: Array<{ name: string; status: 'pass' | 'fail' | 'error'; message: string }> = []
+  
+  try {
+    const cid = resolvePrincipal('neuronSnapshot')
+    const { idlFactory: neuronIDL } = await import('../../../declarations/neuronSnapshot/neuronSnapshot.did.js')
+    const agent = new HttpAgent({ host: process.env.DFX_NETWORK === 'local' ? 'http://127.0.0.1:4943' : 'https://ic0.app' })
+    if (process.env.DFX_NETWORK === 'local') { await agent.fetchRootKey() }
+    const nActor: any = Actor.createActor(neuronIDL, { agent, canisterId: cid })
+
+    // Fetch timer status and activity counts
+    const [periodicStatus, autoProcessing, autoVoting, copiedCount, votedCount, highestProcessedId] = await Promise.all([
+      nActor.getPeriodicTimerStatus?.() ?? Promise.resolve(null),
+      nActor.isAutoProcessingRunning?.() ?? Promise.resolve(false),
+      nActor.isAutoVotingRunning?.() ?? Promise.resolve(false),
+      nActor.getCopiedNNSProposalsCount?.() ?? Promise.resolve(0),
+      nActor.getDAOVotedNNSProposalsCount?.() ?? Promise.resolve(0),
+      nActor.getHighestProcessedNNSProposalId?.() ?? Promise.resolve(0),
+    ])
+
+    // Check 1: Periodic timer is running
+    const timerRunning = periodicStatus?.is_running || false
+    if (timerRunning) {
+      checks.push({ name: 'Periodic Timer Running', status: 'pass', message: 'Master periodic timer is active' })
+    } else {
+      checks.push({ name: 'Periodic Timer Running', status: 'fail', message: '❌ Master periodic timer is NOT running' })
+    }
+
+    // Check 2: Last periodic run timing
+    if (periodicStatus && periodicStatus.last_run_time && Number(periodicStatus.last_run_time) > 0) {
+      const intervalSeconds = Number(periodicStatus.interval_seconds || 3600)
+      const lastRunMs = Number(periodicStatus.last_run_time) * 1000
+      const nowMs = Date.now()
+      const timeSinceLastRun = nowMs - lastRunMs
+      const periodMs = intervalSeconds * 1000
+      const periodsOverdue = timeSinceLastRun / periodMs
+      const maxPeriodsOverdue = 3
+      const lastRunDisplay = new Date(lastRunMs).toLocaleString()
+
+      if (periodsOverdue <= maxPeriodsOverdue) {
+        checks.push({ 
+          name: 'Last Timer Run Recent', 
+          status: 'pass', 
+          message: `Last run: ${lastRunDisplay} (within ${maxPeriodsOverdue} periods)` 
+        })
+      } else {
+        checks.push({ 
+          name: 'Last Timer Run Recent', 
+          status: 'fail', 
+          message: `❌ Last run was ${periodsOverdue.toFixed(1)} periods ago (${lastRunDisplay}). Maximum: ${maxPeriodsOverdue} periods` 
+        })
+      }
+    } else {
+      checks.push({ name: 'Last Timer Run Recent', status: 'fail', message: '❌ No last run time recorded' })
+    }
+
+    // Check 3: Auto-processing is running
+    if (autoProcessing) {
+      checks.push({ name: 'Auto-Processing Active', status: 'pass', message: 'NNS proposal auto-processing is running' })
+    } else {
+      checks.push({ name: 'Auto-Processing Active', status: 'fail', message: '❌ NNS proposal auto-processing is NOT running' })
+    }
+
+    // Check 4: Auto-voting is running
+    if (autoVoting) {
+      checks.push({ name: 'Auto-Voting Active', status: 'pass', message: 'Urgent proposal auto-voting is running' })
+    } else {
+      checks.push({ name: 'Auto-Voting Active', status: 'fail', message: '❌ Urgent proposal auto-voting is NOT running' })
+    }
+
+    // Check 5: Cloning activity (copied proposals count)
+    const copiedCountNum = Number(copiedCount)
+    if (copiedCountNum > 0) {
+      checks.push({ 
+        name: 'Cloning Activity', 
+        status: 'pass', 
+        message: `${copiedCountNum} NNS proposals have been cloned to SNS` 
+      })
+    } else {
+      checks.push({ 
+        name: 'Cloning Activity', 
+        status: 'fail', 
+        message: '⚠️ No NNS proposals have been cloned yet' 
+      })
+    }
+
+    // Check 6: Voting activity (voted proposals count)
+    const votedCountNum = Number(votedCount)
+    if (votedCountNum > 0) {
+      checks.push({ 
+        name: 'Voting Activity', 
+        status: 'pass', 
+        message: `${votedCountNum} NNS proposals have been voted on by DAO` 
+      })
+    } else {
+      checks.push({ 
+        name: 'Voting Activity', 
+        status: 'fail', 
+        message: '⚠️ No NNS proposals have been voted on yet' 
+      })
+    }
+
+    // Check 7: Highest processed NNS proposal ID is reasonable
+    const highestIdNum = Number(highestProcessedId)
+    if (highestIdNum > 0) {
+      checks.push({ 
+        name: 'NNS Processing Activity', 
+        status: 'pass', 
+        message: `Highest processed NNS proposal ID: ${highestIdNum}` 
+      })
+    } else {
+      checks.push({ 
+        name: 'NNS Processing Activity', 
+        status: 'fail', 
+        message: '⚠️ No NNS proposals have been processed yet' 
+      })
+    }
+
+    // Generate report
+    const allPass = checks.every(c => c.status === 'pass')
+    const anyFail = checks.some(c => c.status === 'fail')
+
+    let reportHtml = '<div class="d-flex flex-column gap-2">'
+    for (const check of checks) {
+      const icon = check.status === 'pass' ? '✅' : '❌'
+      const colorClass = check.status === 'pass' ? 'text-success' : 'text-danger'
+      reportHtml += `<div class="${colorClass}"><strong>${icon} ${check.name}:</strong> ${check.message}</div>`
+    }
+    reportHtml += '</div>'
+
+    test.status = allPass ? 'green' : 'red'
+    test.report = reportHtml
+  } catch (error: any) {
+    console.error('Grant system test error:', error)
+    test.status = 'red'
+    test.report = `<div class="alert alert-danger"><strong>Error:</strong> ${error.message || 'Failed to check grant system status'}</div>`
+  }
 }
 
 // Test: Are archives importing regularly?
