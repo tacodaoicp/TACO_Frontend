@@ -123,10 +123,10 @@
                   <span :class="['status-light', `status-${mainCanistersStatus}`]"></span>
                   <h2 class="h5 mb-0">Main Canisters</h2>
                   <div v-if="mainCanistersSummary.total > 0" class="d-flex align-items-center gap-2 small">
-                    <span v-if="mainCanistersSummary.passing > 0" class="badge bg-success" title="Canisters with sufficient cycles (≥10T)">
+                    <span v-if="mainCanistersSummary.passing > 0" class="badge bg-success" title="Canisters with sufficient cycles (≥10T) AND all critical services running">
                       <i class="fa-solid fa-check me-1"></i>{{ mainCanistersSummary.passing }}
                     </span>
-                    <span v-if="mainCanistersSummary.failing > 0" class="badge bg-danger" title="Canisters with low cycles (<10T)">
+                    <span v-if="mainCanistersSummary.failing > 0" class="badge bg-danger" title="Canisters with low cycles (<10T) OR critical services not running">
                       <i class="fa-solid fa-xmark me-1"></i>{{ mainCanistersSummary.failing }}
                     </span>
                     <span v-if="mainCanistersSummary.unknown > 0" class="badge bg-secondary" title="Canisters with unknown status">
@@ -357,20 +357,57 @@ const mainCanistersStatus = computed(() => {
   if (anyLoading) return 'gray'
   if (allNull) return 'gray'
   
-  // Check if any canister is low on cycles (< 10T)
-  const anyLow = keys.some(k => {
-    const cycles = cyclesMap[k]
-    return cycles !== null && cycles < 10
-  })
+  // Check cycles AND important lamps for each canister
+  let hasIssue = false
+  let hasCritical = false
   
-  // Check if any canister is critical (< 5T)
-  const anyCritical = keys.some(k => {
+  for (const k of keys) {
     const cycles = cyclesMap[k]
-    return cycles !== null && cycles < 5
-  })
+    
+    // Check cycles
+    if (cycles !== null && cycles < 5) {
+      hasCritical = true
+      break
+    }
+    if (cycles !== null && cycles < 10) {
+      hasIssue = true
+    }
+    
+    // Check canister-specific important lamps
+    if (k === 'treasury') {
+      // Trading and snapshot status
+      if (treasuryHeader.value) {
+        if (!treasuryHeader.value.tradingActive || !treasuryHeader.value.snapshotActive) {
+          hasIssue = true
+        }
+      }
+    } else if (k === 'rewards') {
+      // Distribution timer status
+      if (rewardsHeader.value) {
+        if (!rewardsHeader.value.timerRunning) {
+          hasIssue = true
+        }
+      }
+    } else if (k === 'neuronSnapshot') {
+      // Periodic timer and snapshot status
+      if (governanceHeader.value) {
+        if (!governanceHeader.value.periodicTimerRunning || !governanceHeader.value.snapshotActive) {
+          hasIssue = true
+        }
+      }
+    } else if (k === 'dao_backend') {
+      // Token sync status (red = critical, orange = issue)
+      if (daoTokenWorst.value === 'red') {
+        hasCritical = true
+        break
+      } else if (daoTokenWorst.value === 'orange') {
+        hasIssue = true
+      }
+    }
+  }
   
-  if (anyCritical) return 'red'
-  if (anyLow) return 'orange'
+  if (hasCritical) return 'red'
+  if (hasIssue) return 'orange'
   return 'green'
 })
 
@@ -411,9 +448,48 @@ const mainCanistersSummary = computed(() => {
   
   keys.forEach(k => {
     const cycles = cyclesMap[k]
+    let hasFail = false
+    
     if (cycles === null) {
       unknown++
-    } else if (cycles < 10) {
+      return
+    }
+    
+    // Check cycles
+    if (cycles < 10) {
+      hasFail = true
+    }
+    
+    // Check canister-specific important lamps
+    if (k === 'treasury') {
+      // Trading and snapshot status
+      if (treasuryHeader.value) {
+        if (!treasuryHeader.value.tradingActive || !treasuryHeader.value.snapshotActive) {
+          hasFail = true
+        }
+      }
+    } else if (k === 'rewards') {
+      // Distribution timer status
+      if (rewardsHeader.value) {
+        if (!rewardsHeader.value.timerRunning) {
+          hasFail = true
+        }
+      }
+    } else if (k === 'neuronSnapshot') {
+      // Periodic timer and snapshot status
+      if (governanceHeader.value) {
+        if (!governanceHeader.value.periodicTimerRunning || !governanceHeader.value.snapshotActive) {
+          hasFail = true
+        }
+      }
+    } else if (k === 'dao_backend') {
+      // Token sync status (red or orange = failing)
+      if (daoTokenWorst.value === 'red' || daoTokenWorst.value === 'orange') {
+        hasFail = true
+      }
+    }
+    
+    if (hasFail) {
       failing++
     } else {
       passing++
@@ -1205,13 +1281,36 @@ const refreshMainCanisters = () => {
   mainCanisters.forEach(c => {
     fetchCyclesFor(c.key).then(() => {
       // After refresh, expand/collapse individual cards based on status
+      // Check both cycles AND important lamps
       const cycles = cyclesMap[c.key]
+      let hasFail = false
+      
       if (cycles !== null) {
+        // Check cycles
         if (cycles < 10) {
-          expandedMap[c.key] = true // Expand if failing (red or orange)
-        } else {
-          expandedMap[c.key] = false // Collapse if passing (green)
+          hasFail = true
         }
+        
+        // Check canister-specific important lamps
+        if (c.key === 'treasury') {
+          if (treasuryHeader.value && (!treasuryHeader.value.tradingActive || !treasuryHeader.value.snapshotActive)) {
+            hasFail = true
+          }
+        } else if (c.key === 'rewards') {
+          if (rewardsHeader.value && !rewardsHeader.value.timerRunning) {
+            hasFail = true
+          }
+        } else if (c.key === 'neuronSnapshot') {
+          if (governanceHeader.value && (!governanceHeader.value.periodicTimerRunning || !governanceHeader.value.snapshotActive)) {
+            hasFail = true
+          }
+        } else if (c.key === 'dao_backend') {
+          if (daoTokenWorst.value === 'red' || daoTokenWorst.value === 'orange') {
+            hasFail = true
+          }
+        }
+        
+        expandedMap[c.key] = hasFail // Expand if failing, collapse if passing
       }
     })
   })
