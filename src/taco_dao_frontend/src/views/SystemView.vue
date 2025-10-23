@@ -1085,6 +1085,18 @@ const runAllTests = async () => {
   systemStatusExpanded.value = true // Ensure section is expanded
   
   try {
+    // Reset all checklist items before starting
+    console.log('[Run All Tests] Resetting all checklist items...')
+    for (const item of checklist) {
+      item.status = 'gray'
+      item.report = ''
+      item.running = false
+      item.expanded = false
+    }
+    
+    // Small delay to let UI update and show reset state
+    await new Promise(resolve => setTimeout(resolve, 100))
+    
     // Run each test sequentially
     for (const item of checklist) {
       console.log(`[Run All Tests] Starting test: ${item.key}`)
