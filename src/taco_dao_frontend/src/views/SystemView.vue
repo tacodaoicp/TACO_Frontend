@@ -16,16 +16,32 @@
 
           <div class="system-view w-100">
 
-            <!-- environment selector -->
-            <div v-if="isAdmin || isRunningOnStaging" class="d-flex align-items-center justify-content-end gap-2 mt-3 px-3">
-              <label class="mb-0 small text-muted">Environment</label>
-              <select class="form-select form-select-sm" style="width: auto;" v-model="selectedEnv" @change="handleEnvironmentChange">
-                <option value="ic">Production</option>
-                <option value="staging">Staging</option>
-              </select>
-            </div>
-            <div v-else class="d-flex align-items-center justify-content-end mt-3 px-3">
-              <span class="small text-muted">Environment: Production</span>
+            <!-- environment selector and auto-refresh interval -->
+            <div class="d-flex align-items-center justify-content-end gap-3 mt-3 px-3">
+              <!-- environment selector -->
+              <div v-if="isAdmin || isRunningOnStaging" class="d-flex align-items-center gap-2">
+                <label class="mb-0 small text-muted">Environment</label>
+                <select class="form-select form-select-sm" style="width: auto;" v-model="selectedEnv" @change="handleEnvironmentChange">
+                  <option value="ic">Production</option>
+                  <option value="staging">Staging</option>
+                </select>
+              </div>
+              <div v-else class="d-flex align-items-center gap-2">
+                <span class="small text-muted">Environment: Production</span>
+              </div>
+
+              <!-- auto-refresh interval selector -->
+              <div class="d-flex align-items-center gap-2">
+                <label class="mb-0 small text-muted">Auto-refresh</label>
+                <select class="form-select form-select-sm" style="width: auto;" v-model="autoRunInterval" @change="handleIntervalChange">
+                  <option :value="0">Off</option>
+                  <option :value="5">Every 5 min</option>
+                  <option :value="10">Every 10 min</option>
+                  <option :value="15">Every 15 min</option>
+                  <option :value="30">Every 30 min</option>
+                  <option :value="60">Every 1 hour</option>
+                </select>
+              </div>
             </div>
 
             <!-- system status group -->
@@ -291,7 +307,7 @@
 </style>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted, watch } from 'vue'
+import { ref, reactive, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import HeaderBar from "../components/HeaderBar.vue"
 import FooterBar from "../components/FooterBar.vue"
@@ -547,6 +563,10 @@ const isRunningOnStaging = computed(() => process.env.DFX_NETWORK === 'staging')
 
 // Environment selection - default to staging if running on staging
 const selectedEnv = ref<EnvKey>(process.env.DFX_NETWORK === 'staging' ? 'staging' : 'ic')
+
+// Auto-refresh interval (in minutes, 0 = off)
+const autoRunInterval = ref<number>(30) // Default: every 30 minutes
+let autoRunTimerId: number | null = null
 
 // Canister groups and keys
 type CanKey = 'dao_backend' | 'frontend' | 'treasury' | 'rewards' | 'neuronSnapshot' | 'validation'
@@ -1264,6 +1284,30 @@ const refreshCycles = () => {
   allKeys.forEach(k => fetchCyclesFor(k))
 }
 
+// Full auto-run sequence (used by initial load, environment change, and auto-refresh)
+const runFullAutoRunSequence = async () => {
+  try {
+    console.log('[Auto-Run] Starting full auto-run sequence...')
+    
+    // Step 1: Run all tests
+    console.log('[Auto-Run] Step 1: Running all tests...')
+    await runAllTests()
+    console.log('[Auto-Run] All tests completed')
+    
+    // Step 2: Refresh main canisters
+    console.log('[Auto-Run] Step 2: Refreshing main canisters...')
+    refreshMainCanisters()
+    
+    // Step 3: Refresh archive canisters
+    console.log('[Auto-Run] Step 3: Refreshing archive canisters...')
+    refreshArchiveCanisters()
+    
+    console.log('[Auto-Run] Full auto-run sequence completed')
+  } catch (error) {
+    console.error('[Auto-Run] Error in auto-run sequence:', error)
+  }
+}
+
 // Handle environment change - run full auto-run sequence
 const handleEnvironmentChange = async () => {
   console.log('[Environment Change] Switching to:', selectedEnv.value)
@@ -1279,26 +1323,37 @@ const handleEnvironmentChange = async () => {
   daoTokenWorst.value = null
   daoOldestSyncDisplay.value = null
   
-  try {
-    console.log('[Environment Change] Starting full auto-run sequence...')
-    
-    // Step 1: Run all tests
-    console.log('[Environment Change] Step 1: Running all tests...')
-    await runAllTests()
-    console.log('[Environment Change] All tests completed')
-    
-    // Step 2: Refresh main canisters
-    console.log('[Environment Change] Step 2: Refreshing main canisters...')
-    refreshMainCanisters()
-    
-    // Step 3: Refresh archive canisters
-    console.log('[Environment Change] Step 3: Refreshing archive canisters...')
-    refreshArchiveCanisters()
-    
-    console.log('[Environment Change] Full auto-run sequence completed')
-  } catch (error) {
-    console.error('[Environment Change] Error in auto-run sequence:', error)
+  await runFullAutoRunSequence()
+}
+
+// Set up auto-refresh timer
+const setupAutoRefreshTimer = () => {
+  // Clear existing timer if any
+  if (autoRunTimerId !== null) {
+    clearInterval(autoRunTimerId)
+    autoRunTimerId = null
   }
+  
+  // If interval is 0 (off), don't set up timer
+  if (autoRunInterval.value === 0) {
+    console.log('[Auto-Refresh] Auto-refresh disabled')
+    return
+  }
+  
+  // Set up new timer
+  const intervalMs = autoRunInterval.value * 60 * 1000 // Convert minutes to milliseconds
+  console.log(`[Auto-Refresh] Setting up auto-refresh every ${autoRunInterval.value} minutes`)
+  
+  autoRunTimerId = window.setInterval(() => {
+    console.log(`[Auto-Refresh] Triggering scheduled refresh (every ${autoRunInterval.value} min)`)
+    runFullAutoRunSequence()
+  }, intervalMs)
+}
+
+// Handle interval change
+const handleIntervalChange = () => {
+  console.log('[Auto-Refresh] Interval changed to:', autoRunInterval.value === 0 ? 'Off' : `${autoRunInterval.value} min`)
+  setupAutoRefreshTimer()
 }
 
 const toggleSystemStatus = () => { 
@@ -3190,29 +3245,11 @@ onMounted(() => {
     tacoStore.appLoadingOff()
   }
   
-  // Auto-run sequence: Tests first, then canister refreshes
-  ;(async () => {
-    try {
-      console.log('[SystemView] Starting auto-run sequence...')
-      
-      // Step 1: Run all tests
-      console.log('[SystemView] Step 1: Running all tests...')
-      await runAllTests()
-      console.log('[SystemView] All tests completed')
-      
-      // Step 2: Refresh main canisters
-      console.log('[SystemView] Step 2: Refreshing main canisters...')
-      refreshMainCanisters()
-      
-      // Step 3: Refresh archive canisters
-      console.log('[SystemView] Step 3: Refreshing archive canisters...')
-      refreshArchiveCanisters()
-      
-      console.log('[SystemView] Auto-run sequence completed')
-    } catch (error) {
-      console.error('[SystemView] Error in auto-run sequence:', error)
-    }
-  })()
+  // Initial auto-run sequence
+  runFullAutoRunSequence()
+  
+  // Set up auto-refresh timer
+  setupAutoRefreshTimer()
   
   // Check admin permissions asynchronously without blocking
   ;(async () => {
@@ -3232,6 +3269,15 @@ onMounted(() => {
     isAdmin.value = false
   }
   })()
+})
+
+onBeforeUnmount(() => {
+  // Clean up auto-refresh timer
+  if (autoRunTimerId !== null) {
+    console.log('[Auto-Refresh] Cleaning up timer on component unmount')
+    clearInterval(autoRunTimerId)
+    autoRunTimerId = null
+  }
 })
 
 </script>
