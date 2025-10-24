@@ -42,6 +42,22 @@
                   <option :value="60">Every 1 hour</option>
                 </select>
               </div>
+
+              <!-- auto-expand checkbox -->
+              <div class="d-flex align-items-center gap-2">
+                <div class="form-check mb-0">
+                  <input 
+                    class="form-check-input" 
+                    type="checkbox" 
+                    id="autoExpandCheck" 
+                    v-model="autoExpandOnRed"
+                    @change="handleAutoExpandChange"
+                  >
+                  <label class="form-check-label small text-muted" for="autoExpandCheck">
+                    Auto-expand on errors
+                  </label>
+                </div>
+              </div>
             </div>
 
             <!-- system status group -->
@@ -567,6 +583,22 @@ const selectedEnv = ref<EnvKey>(process.env.DFX_NETWORK === 'staging' ? 'staging
 // Auto-refresh interval (in minutes, 0 = off)
 const autoRunInterval = ref<number>(30) // Default: every 30 minutes
 let autoRunTimerId: number | null = null
+
+// Auto-expand on red status setting (default: false)
+const autoExpandOnRed = ref<boolean>(false)
+
+// Load auto-expand setting from localStorage
+const loadAutoExpandSetting = () => {
+  const saved = localStorage.getItem('taco-system-auto-expand')
+  if (saved !== null) {
+    autoExpandOnRed.value = saved === 'true'
+  }
+}
+
+// Save auto-expand setting to localStorage
+const handleAutoExpandChange = () => {
+  localStorage.setItem('taco-system-auto-expand', String(autoExpandOnRed.value))
+}
 
 // Canister groups and keys
 type CanKey = 'dao_backend' | 'frontend' | 'treasury' | 'rewards' | 'neuronSnapshot' | 'validation'
@@ -1433,7 +1465,10 @@ const refreshMainCanisters = () => {
           }
         }
         
-        expandedMap[c.key] = hasFail // Expand if failing, collapse if passing
+        // Only auto-expand/collapse if setting is enabled
+        if (autoExpandOnRed.value) {
+          expandedMap[c.key] = hasFail // Expand if failing, collapse if passing
+        }
       }
     })
   })
@@ -1443,16 +1478,18 @@ const refreshArchiveCanisters = () => {
   console.log('[RefreshArchiveCanisters] Refreshing all archive canisters')
   archiveCanisters.forEach(c => {
     fetchCyclesFor(c.key).then(() => {
-      // After refresh, expand/collapse individual cards based on status
+      // After refresh, expand/collapse individual cards based on status (only if auto-expand enabled)
       // Archives require BOTH sufficient cycles AND timer running
-      const cycles = cyclesMap[c.key]
-      const timerRunning = timerStatusMap[c.key]?.running ?? false
-      
-      if (cycles !== null) {
-        if (cycles < 10 || !timerRunning) {
-          expandedMap[c.key] = true // Expand if failing (low cycles OR timer not running)
-        } else {
-          expandedMap[c.key] = false // Collapse if passing (sufficient cycles AND timer running)
+      if (autoExpandOnRed.value) {
+        const cycles = cyclesMap[c.key]
+        const timerRunning = timerStatusMap[c.key]?.running ?? false
+        
+        if (cycles !== null) {
+          if (cycles < 10 || !timerRunning) {
+            expandedMap[c.key] = true // Expand if failing (low cycles OR timer not running)
+          } else {
+            expandedMap[c.key] = false // Collapse if passing (sufficient cycles AND timer running)
+          }
         }
       }
     })
@@ -1552,13 +1589,15 @@ const runAllTests = async () => {
       console.log(`[Run All Tests] Starting test: ${item.key}`)
       await runTest(item.key)
       
-      // After test completes, expand if failed, collapse if passed
-      if (item.status === 'red') {
-        item.expanded = true
-        console.log(`[Run All Tests] ${item.key} FAILED - expanding`)
-      } else if (item.status === 'green') {
-        item.expanded = false
-        console.log(`[Run All Tests] ${item.key} PASSED - collapsing`)
+      // After test completes, expand if failed, collapse if passed (only if auto-expand enabled)
+      if (autoExpandOnRed.value) {
+        if (item.status === 'red') {
+          item.expanded = true
+          console.log(`[Run All Tests] ${item.key} FAILED - expanding`)
+        } else if (item.status === 'green') {
+          item.expanded = false
+          console.log(`[Run All Tests] ${item.key} PASSED - collapsing`)
+        }
       }
       
       // Small delay between tests to avoid overwhelming the UI
@@ -3395,6 +3434,8 @@ const testPortfolioSnapshots = async (test: any) => {
 
 // Watch main canisters status and auto-expand/collapse section
 watch(mainCanistersStatus, (newStatus) => {
+  if (!autoExpandOnRed.value) return // Skip auto-expand if disabled
+  
   if (newStatus === 'red') {
     mainCanistersExpanded.value = true
     console.log('[MainCanisters] Auto-expanding section due to red status')
@@ -3406,6 +3447,8 @@ watch(mainCanistersStatus, (newStatus) => {
 
 // Watch archive canisters status and auto-expand/collapse section
 watch(archiveCanistersStatus, (newStatus) => {
+  if (!autoExpandOnRed.value) return // Skip auto-expand if disabled
+  
   if (newStatus === 'red') {
     archivesExpanded.value = true
     console.log('[ArchiveCanisters] Auto-expanding section due to red status')
@@ -3417,6 +3460,8 @@ watch(archiveCanistersStatus, (newStatus) => {
 
 // Watch checklist for failures and auto-expand System Status if needed
 watch(() => checklist.map(item => item.status), (statuses) => {
+  if (!autoExpandOnRed.value) return // Skip auto-expand if disabled
+  
   const anyFailed = statuses.some(status => status === 'red')
   if (anyFailed && !systemStatusExpanded.value) {
     systemStatusExpanded.value = true
@@ -3425,6 +3470,9 @@ watch(() => checklist.map(item => item.status), (statuses) => {
 }, { deep: true })
 
 onMounted(() => {
+  // Load auto-expand setting from localStorage
+  loadAutoExpandSetting()
+  
   // CRITICAL FIX: Turn off app loading immediately - SystemView doesn't need it
   // The app-level loading curtain was blocking all user interaction
   if (appLoading.value) {
