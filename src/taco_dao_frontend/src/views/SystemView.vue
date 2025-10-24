@@ -1308,11 +1308,32 @@ const runFullAutoRunSequence = async () => {
   }
 }
 
-// Handle environment change - run full auto-run sequence
+// Handle environment change - clear all state and run full auto-run sequence
 const handleEnvironmentChange = async () => {
   console.log('[Environment Change] Switching to:', selectedEnv.value)
+  console.log('[Environment Change] Clearing all previous state...')
   
-  // Clear all cached data
+  // 1. Clear all checklist items (System Status section)
+  checklist.forEach(item => {
+    item.status = 'gray'
+    item.report = ''
+    item.running = false
+    item.expanded = false
+    item.passCount = 0
+    item.failCount = 0
+    item.totalCount = 0
+  })
+  
+  // 2. Clear all canister data (Main Canisters & Archives sections)
+  const allKeys: CanKey[] = [...mainCanisters, ...archiveCanisters].map(x => x.key)
+  allKeys.forEach(k => {
+    cyclesMap[k] = null
+    loadingMap[k] = false
+    timerStatusMap[k] = null
+    expandedMap[k] = false // Collapse all individual canister cards
+  })
+  
+  // 3. Clear all cached header/detail data
   treasuryHeader.value = null
   treasuryDetails.value = null
   rewardsHeader.value = null
@@ -1323,6 +1344,14 @@ const handleEnvironmentChange = async () => {
   daoTokenWorst.value = null
   daoOldestSyncDisplay.value = null
   
+  // 4. Collapse all sections to start fresh
+  systemStatusExpanded.value = false
+  mainCanistersExpanded.value = false
+  archivesExpanded.value = false
+  
+  console.log('[Environment Change] State cleared. Running full auto-run sequence...')
+  
+  // 5. Run full auto-run sequence in order: tests, main canisters, archives
   await runFullAutoRunSequence()
 }
 
