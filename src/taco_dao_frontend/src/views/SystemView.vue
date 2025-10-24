@@ -52,7 +52,7 @@
                     <span class="visually-hidden">Running tests...</span>
                   </span>
                   <span v-else :class="['status-light', `status-${overallSystemStatus}`]"></span>
-                  <h2 class="h5 mb-0">System Status</h2>
+                <h2 class="h5 mb-0">System Status</h2>
                   <div class="d-flex align-items-center gap-3 small">
                     <!-- Checklist items summary -->
                     <div class="d-flex align-items-center gap-2">
@@ -66,7 +66,7 @@
                       <span v-if="testSummary.gray > 0" class="badge bg-secondary" title="Not yet run">
                         <i class="fa-solid fa-minus me-1"></i>{{ testSummary.gray }}
                       </span>
-                    </div>
+              </div>
                     
                     <!-- Divider -->
                     <span v-if="testSummary.totalTests > 0" class="text-muted">|</span>
@@ -95,9 +95,9 @@
                     <i v-else class="fa-solid fa-play me-1"></i>
                     {{ runningAllTests ? 'Running...' : 'Run All Tests' }}
                   </button>
-                  <button class="btn btn-sm btn-outline-secondary" @click.stop="toggleSystemStatus" :title="systemStatusExpanded ? 'Collapse' : 'Expand'">
-                    <i :class="systemStatusExpanded ? 'fa-solid fa-chevron-up' : 'fa-solid fa-chevron-down'"></i>
-                  </button>
+                <button class="btn btn-sm btn-outline-secondary" @click.stop="toggleSystemStatus" :title="systemStatusExpanded ? 'Collapse' : 'Expand'">
+                  <i :class="systemStatusExpanded ? 'fa-solid fa-chevron-up' : 'fa-solid fa-chevron-down'"></i>
+                </button>
                 </div>
               </div>
               <div v-if="systemStatusExpanded" class="p-2 d-flex flex-column gap-2">
@@ -135,11 +135,11 @@
             </div>
 
             <!-- main canisters group -->
-            <div class="taco-container taco-container--l1 d-flex flex-column gap-2 p-0 mt-3">
+            <div id="main-canisters-section" class="taco-container taco-container--l1 d-flex flex-column gap-2 p-0 mt-3">
               <div class="px-3 pt-3 pb-2 d-flex align-items-center justify-content-between section-header-clickable" @click="toggleMainCanisters">
                 <div class="d-flex align-items-center gap-3">
                   <span :class="['status-light', `status-${mainCanistersStatus}`]"></span>
-                  <h2 class="h5 mb-0">Main Canisters</h2>
+                <h2 class="h5 mb-0">Main Canisters</h2>
                   <div v-if="mainCanistersSummary.total > 0" class="d-flex align-items-center gap-2 small">
                     <span v-if="mainCanistersSummary.passing > 0" class="badge bg-success" title="Canisters with sufficient cycles (≥10T) AND all critical services running">
                       <i class="fa-solid fa-check me-1"></i>{{ mainCanistersSummary.passing }}
@@ -156,9 +156,9 @@
                   <button class="btn btn-sm btn-outline-primary" @click.stop="refreshMainCanisters" title="Refresh all main canisters">
                     <i class="fa-solid fa-rotate me-1"></i>Refresh All
                   </button>
-                  <button class="btn btn-sm btn-outline-secondary" @click.stop="toggleMainCanisters" :title="mainCanistersExpanded ? 'Collapse' : 'Expand'">
-                    <i :class="mainCanistersExpanded ? 'fa-solid fa-chevron-up' : 'fa-solid fa-chevron-down'"></i>
-                  </button>
+                <button class="btn btn-sm btn-outline-secondary" @click.stop="toggleMainCanisters" :title="mainCanistersExpanded ? 'Collapse' : 'Expand'">
+                  <i :class="mainCanistersExpanded ? 'fa-solid fa-chevron-up' : 'fa-solid fa-chevron-down'"></i>
+                </button>
                 </div>
               </div>
               <div v-if="mainCanistersExpanded" class="p-2 d-flex flex-column gap-2">
@@ -188,11 +188,11 @@
             </div>
 
             <!-- archives group -->
-            <div class="taco-container taco-container--l1 d-flex flex-column gap-2 p-0 mt-4">
+            <div id="archives-section" class="taco-container taco-container--l1 d-flex flex-column gap-2 p-0 mt-4">
               <div class="px-3 pt-3 pb-2 d-flex align-items-center justify-content-between section-header-clickable" @click="toggleArchives">
                 <div class="d-flex align-items-center gap-3">
                   <span :class="['status-light', `status-${archiveCanistersStatus}`]"></span>
-                  <h2 class="h5 mb-0">Archives</h2>
+                <h2 class="h5 mb-0">Archives</h2>
                   <div v-if="archiveCanistersSummary.total > 0" class="d-flex align-items-center gap-2 small">
                     <span v-if="archiveCanistersSummary.passing > 0" class="badge bg-success" title="Canisters with sufficient cycles (≥10T) AND timer running">
                       <i class="fa-solid fa-check me-1"></i>{{ archiveCanistersSummary.passing }}
@@ -209,9 +209,9 @@
                   <button class="btn btn-sm btn-outline-primary" @click.stop="refreshArchiveCanisters" title="Refresh all archive canisters">
                     <i class="fa-solid fa-rotate me-1"></i>Refresh All
                   </button>
-                  <button class="btn btn-sm btn-outline-secondary" @click.stop="toggleArchives" :title="archivesExpanded ? 'Collapse' : 'Expand'">
-                    <i :class="archivesExpanded ? 'fa-solid fa-chevron-up' : 'fa-solid fa-chevron-down'"></i>
-                  </button>
+                <button class="btn btn-sm btn-outline-secondary" @click.stop="toggleArchives" :title="archivesExpanded ? 'Collapse' : 'Expand'">
+                  <i :class="archivesExpanded ? 'fa-solid fa-chevron-up' : 'fa-solid fa-chevron-down'"></i>
+                </button>
                 </div>
               </div>
               <div v-if="archivesExpanded" class="p-2 d-flex flex-column gap-2">
@@ -1040,7 +1040,7 @@ const fetchCyclesFor = async (key: CanKey) => {
                 periodicTimerStale = 'red' // More than 3 periods
               } else if (periodsOverdue > 1) {
                 periodicTimerStale = 'orange' // More than 1 period
-              } else {
+          } else {
                 periodicTimerStale = 'green' // Within 1 period
               }
             }
@@ -1459,6 +1459,29 @@ const refreshArchiveCanisters = () => {
   })
 }
 
+// Helper: Scroll to and expand a section
+const scrollToSection = (sectionId: string) => {
+  const element = document.getElementById(sectionId)
+  if (element) {
+    element.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    // Expand the section if it's collapsed
+    if (sectionId === 'main-canisters-section') {
+      mainCanistersExpanded.value = true
+    } else if (sectionId === 'archives-section') {
+      archivesExpanded.value = true
+    }
+  }
+}
+
+// Helper: Expand a specific canister card
+const expandCanister = (canisterKey: CanKey) => {
+  expandedMap[canisterKey] = true
+  const sectionId = mainCanisters.some(c => c.key === canisterKey) 
+    ? 'main-canisters-section' 
+    : 'archives-section'
+  scrollToSection(sectionId)
+}
+
 // Test runner
 const runTest = async (testKey: string) => {
   const test = checklist.find(t => t.key === testKey)
@@ -1665,6 +1688,22 @@ const testCanistersRunning = async (test: any) => {
   })
 
   reportHTML += '</div>'
+  
+  // Add links section
+  reportHTML += `
+    <div class="mt-3 pt-2 border-top">
+      <small class="text-muted d-block mb-2"><strong>📍 View details:</strong></small>
+      <div class="d-flex gap-2 flex-wrap">
+        <button class="btn btn-sm btn-outline-secondary" onclick="document.getElementById('main-canisters-section').scrollIntoView({behavior:'smooth'})">
+          Main Canisters Section ↓
+        </button>
+        <button class="btn btn-sm btn-outline-secondary" onclick="document.getElementById('archives-section').scrollIntoView({behavior:'smooth'})">
+          Archives Section ↓
+        </button>
+      </div>
+    </div>
+  `
+  
   test.report = reportHTML
 }
 
@@ -1793,6 +1832,18 @@ const testNeuronSnapshots = async (test: any) => {
       reportHtml += `<div class="${colorClass}"><strong>${icon} ${check.name}:</strong> ${check.message}</div>`
     }
     reportHtml += '</div>'
+    
+    // Add links section
+    reportHtml += `
+      <div class="mt-3 pt-2 border-top">
+        <small class="text-muted d-block mb-2"><strong>📍 View details:</strong></small>
+        <div class="d-flex gap-2 flex-wrap">
+          <a href="/admin/nns" class="btn btn-sm btn-outline-primary">
+            NNS Admin Page →
+          </a>
+        </div>
+      </div>
+    `
 
     test.status = allPass ? 'green' : 'red'
     test.report = reportHtml
@@ -1953,6 +2004,18 @@ const testPriceHistory = async (test: any) => {
       reportHtml += `<div class="${colorClass}"><strong>${icon} ${check.name}:</strong> ${check.message}</div>`
     }
     reportHtml += '</div>'
+    
+    // Add links section
+    reportHtml += `
+      <div class="mt-3 pt-2 border-top">
+        <small class="text-muted d-block mb-2"><strong>📍 View details:</strong></small>
+        <div class="d-flex gap-2 flex-wrap">
+          <button class="btn btn-sm btn-outline-secondary" onclick="document.getElementById('main-canisters-section').scrollIntoView({behavior:'smooth'})">
+            DAO Backend Section ↓
+          </button>
+        </div>
+      </div>
+    `
 
     test.status = allPass ? 'green' : 'red'
     test.report = reportHtml
@@ -2116,6 +2179,18 @@ const testAllocationVoting = async (test: any) => {
       reportHtml += `<div class="${colorClass}"><strong>${icon} ${check.name}:</strong> ${check.message}</div>`
     }
     reportHtml += '</div>'
+    
+    // Add links section
+    reportHtml += `
+      <div class="mt-3 pt-2 border-top">
+        <small class="text-muted d-block mb-2"><strong>📍 View details:</strong></small>
+        <div class="d-flex gap-2 flex-wrap">
+          <button class="btn btn-sm btn-outline-secondary" onclick="document.getElementById('main-canisters-section').scrollIntoView({behavior:'smooth'})">
+            DAO Backend Section ↓
+          </button>
+        </div>
+      </div>
+    `
 
     test.status = allPass ? 'green' : 'red'
     test.report = reportHtml
@@ -2248,6 +2323,18 @@ const testGrantSystem = async (test: any) => {
       reportHtml += `<div class="${colorClass}"><strong>${icon} ${check.name}:</strong> ${check.message}</div>`
     }
     reportHtml += '</div>'
+    
+    // Add links section
+    reportHtml += `
+      <div class="mt-3 pt-2 border-top">
+        <small class="text-muted d-block mb-2"><strong>📍 View details:</strong></small>
+        <div class="d-flex gap-2 flex-wrap">
+          <a href="/admin/nns" class="btn btn-sm btn-outline-primary">
+            NNS Admin Page →
+          </a>
+        </div>
+      </div>
+    `
 
     test.status = allPass ? 'green' : 'red'
     test.report = reportHtml
@@ -2343,7 +2430,7 @@ const testArchivesImporting = async (test: any) => {
             status: 'fail',
             message: `❌ Last import was <strong>${periodsOverdue.toFixed(1)} periods</strong> ago (${minutesAgo} minutes, ${lastRunDisplay}). Expected within ${maxPeriodsOverdue} periods (${maxPeriodsOverdue * archivePeriodMinutes} minutes).`
           })
-        } else {
+      } else {
           checks.push({
             name: 'Last Import Timing',
             status: 'pass',
@@ -2446,8 +2533,8 @@ const testArchivesImporting = async (test: any) => {
             <div class="fw-bold" style="font-size: 0.85rem;">${check.name}</div>
             <div style="font-size: 0.8rem;">${check.message}</div>
           </div>
-        </div>
-      `
+      </div>
+    `
     })
     
     reportHTML += `</div>`
