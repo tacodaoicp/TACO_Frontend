@@ -2541,6 +2541,19 @@ const testArchivesImporting = async (test: any) => {
   })
 
   reportHTML += '</div>'
+  
+  // Add links section
+  reportHTML += `
+    <div class="mt-3 pt-2 border-top">
+      <small class="text-muted d-block mb-2"><strong>📍 View details:</strong></small>
+      <div class="d-flex gap-2 flex-wrap">
+        <button class="btn btn-sm btn-outline-secondary" onclick="document.getElementById('archives-section').scrollIntoView({behavior:'smooth'})">
+          Archives Section ↓
+        </button>
+      </div>
+    </div>
+  `
+  
   test.report = reportHTML
 }
 
@@ -2990,6 +3003,19 @@ const testTradingBotRegular = async (test: any) => {
     }
 
     reportHTML += '</div>'
+    
+    // Add links section
+    reportHTML += `
+      <div class="mt-3 pt-2 border-top">
+        <small class="text-muted d-block mb-2"><strong>📍 View details:</strong></small>
+        <div class="d-flex gap-2 flex-wrap">
+          <button class="btn btn-sm btn-outline-secondary" onclick="document.getElementById('main-canisters-section').scrollIntoView({behavior:'smooth'})">
+            Treasury Section ↓
+          </button>
+        </div>
+      </div>
+    `
+    
     test.report = reportHTML
 
   } catch (error: any) {
@@ -3190,6 +3216,22 @@ const testRewardsRegular = async (test: any) => {
     })
 
     reportHTML += '</div>'
+    
+    // Add links section
+    reportHTML += `
+      <div class="mt-3 pt-2 border-top">
+        <small class="text-muted d-block mb-2"><strong>📍 View details:</strong></small>
+        <div class="d-flex gap-2 flex-wrap">
+          <button class="btn btn-sm btn-outline-secondary" onclick="document.getElementById('main-canisters-section').scrollIntoView({behavior:'smooth'})">
+            Rewards Section ↓
+          </button>
+          <a href="/admin/distributions" class="btn btn-sm btn-outline-primary">
+            Distributions Admin Page →
+          </a>
+        </div>
+      </div>
+    `
+    
     test.report = reportHTML
 
   } catch (error: any) {
@@ -3312,6 +3354,19 @@ const testPortfolioSnapshots = async (test: any) => {
     })
 
     reportHTML += '</div>'
+    
+    // Add links section
+    reportHTML += `
+      <div class="mt-3 pt-2 border-top">
+        <small class="text-muted d-block mb-2"><strong>📍 View details:</strong></small>
+        <div class="d-flex gap-2 flex-wrap">
+          <button class="btn btn-sm btn-outline-secondary" onclick="document.getElementById('main-canisters-section').scrollIntoView({behavior:'smooth'})">
+            Treasury Section ↓
+          </button>
+        </div>
+      </div>
+    `
+    
     test.report = reportHTML
 
   } catch (error: any) {

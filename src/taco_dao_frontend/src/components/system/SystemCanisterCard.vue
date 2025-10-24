@@ -255,9 +255,9 @@
             </div>
           </div>
 
-          <div class="d-flex justify-content-end mt-3" v-if="isAdmin">
+          <div class="d-flex justify-content-end mt-3">
             <router-link to="/admin/distributions" class="btn btn-sm btn-outline-primary">
-              Manage Distributions
+              View Distributions →
             </router-link>
           </div>
         </div>
@@ -302,9 +302,9 @@
             <span class="small"><strong>Last Snapshot:</strong> {{ governanceDetails.lastSnapshotDisplay }}</span>
           </div>
           
-          <div v-if="isAdmin" class="d-flex justify-content-end mt-3">
+          <div class="d-flex justify-content-end mt-3">
             <router-link to="/admin/nns" class="btn btn-sm btn-outline-primary">
-              Manage NNS Automation
+              View NNS Automation →
             </router-link>
           </div>
         </div>
