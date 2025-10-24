@@ -157,9 +157,9 @@
           </div>
         </div>
 
-        <div class="d-flex justify-content-end mt-3" v-if="isAdmin && isArchive">
+        <div class="d-flex justify-content-end mt-3" v-if="isArchive">
           <router-link to="/admin/archives" class="btn btn-sm btn-outline-primary">
-            Manage
+            View Archives Admin →
           </router-link>
         </div>
 
@@ -203,6 +203,18 @@
               <span><strong>Long Sync ({{ treasuryDetails.longSync?.intervalMinutes }}m)</strong></span>
               <span>Last: {{ treasuryDetails.longSync?.lastSyncDisplay }}</span>
             </div>
+          </div>
+          
+          <div class="d-flex justify-content-end mt-3 gap-2">
+            <router-link to="/admin/trade" class="btn btn-sm btn-outline-primary">
+              Trading →
+            </router-link>
+            <router-link to="/admin/price" class="btn btn-sm btn-outline-primary">
+              Prices →
+            </router-link>
+            <router-link to="/admin/pricehistory" class="btn btn-sm btn-outline-primary">
+              Price History →
+            </router-link>
           </div>
         </div>
 
@@ -255,9 +267,18 @@
             </div>
           </div>
 
-          <div class="d-flex justify-content-end mt-3">
+          <div class="d-flex justify-content-end mt-3 gap-2">
+            <router-link to="/admin/rewards" class="btn btn-sm btn-outline-primary">
+              Rewards Config →
+            </router-link>
+            <router-link to="/admin/rewards/balances" class="btn btn-sm btn-outline-primary">
+              Balances →
+            </router-link>
             <router-link to="/admin/distributions" class="btn btn-sm btn-outline-primary">
-              View Distributions →
+              Distributions →
+            </router-link>
+            <router-link to="/admin/claims" class="btn btn-sm btn-outline-primary">
+              Claims →
             </router-link>
           </div>
         </div>
@@ -272,6 +293,12 @@
               <span class="text-muted">Last Sync: {{ t.lastSyncDisplay }}</span>
               <span class="text-muted">{{ t.statusText }}</span>
             </div>
+          </div>
+          
+          <div class="d-flex justify-content-end mt-3">
+            <router-link to="/admin/votes" class="btn btn-sm btn-outline-primary">
+              View Voting Admin →
+            </router-link>
           </div>
         </div>
 
@@ -302,9 +329,12 @@
             <span class="small"><strong>Last Snapshot:</strong> {{ governanceDetails.lastSnapshotDisplay }}</span>
           </div>
           
-          <div class="d-flex justify-content-end mt-3">
+          <div class="d-flex justify-content-end mt-3 gap-2">
+            <router-link to="/admin/neuron" class="btn btn-sm btn-outline-primary">
+              Neuron Admin →
+            </router-link>
             <router-link to="/admin/nns" class="btn btn-sm btn-outline-primary">
-              View NNS Automation →
+              NNS Automation →
             </router-link>
           </div>
         </div>

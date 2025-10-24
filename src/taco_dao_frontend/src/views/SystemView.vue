@@ -2011,8 +2011,14 @@ const testPriceHistory = async (test: any) => {
         <small class="text-muted d-block mb-2"><strong>📍 View details:</strong></small>
         <div class="d-flex gap-2 flex-wrap">
           <button class="btn btn-sm btn-outline-secondary" onclick="document.getElementById('main-canisters-section').scrollIntoView({behavior:'smooth'})">
-            DAO Backend Section ↓
+            Treasury Section ↓
           </button>
+          <a href="/admin/price" class="btn btn-sm btn-outline-primary">
+            Price Admin →
+          </a>
+          <a href="/admin/pricehistory" class="btn btn-sm btn-outline-primary">
+            Price History →
+          </a>
         </div>
       </div>
     `
@@ -2188,6 +2194,9 @@ const testAllocationVoting = async (test: any) => {
           <button class="btn btn-sm btn-outline-secondary" onclick="document.getElementById('main-canisters-section').scrollIntoView({behavior:'smooth'})">
             DAO Backend Section ↓
           </button>
+          <a href="/admin/votes" class="btn btn-sm btn-outline-primary">
+            Voting Admin →
+          </a>
         </div>
       </div>
     `
@@ -2550,6 +2559,9 @@ const testArchivesImporting = async (test: any) => {
         <button class="btn btn-sm btn-outline-secondary" onclick="document.getElementById('archives-section').scrollIntoView({behavior:'smooth'})">
           Archives Section ↓
         </button>
+        <a href="/admin/archives" class="btn btn-sm btn-outline-primary">
+          Archives Admin →
+        </a>
       </div>
     </div>
   `
@@ -3012,6 +3024,9 @@ const testTradingBotRegular = async (test: any) => {
           <button class="btn btn-sm btn-outline-secondary" onclick="document.getElementById('main-canisters-section').scrollIntoView({behavior:'smooth'})">
             Treasury Section ↓
           </button>
+          <a href="/admin/trade" class="btn btn-sm btn-outline-primary">
+            Trading Admin →
+          </a>
         </div>
       </div>
     `
