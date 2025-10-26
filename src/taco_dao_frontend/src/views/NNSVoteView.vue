@@ -122,11 +122,16 @@
                                     p-4 d-flex flex-column align-items-center gap-0 mb-4 shadow">
 
                             <!-- error icon -->
-                            <i class="fa-solid fa-exclamation-triangle fa-4x mt-3 mb-2"
+                            <i class="fa-solid fa-alarm-clock fa-4x mt-3 mb-4"
                                 style="color: var(--dark-orange);"></i>
 
+                            <!-- vote ended text -->
+                            <p class="taco-text-black-to-white mb-4 text-center">
+                                Voting has ended for this proposal
+                            </p>
+
                             <!-- error message -->
-                            <p class="taco-text-black-to-white mb-4 text-center">{{ error }}</p>
+                            <!-- <p class="taco-text-black-to-white mb-4 text-center">{{ error }}</p> -->
                             
                             <!-- back to forum button -->
                             <router-link :to="`/chat/forum/${route.params.id}`" 
