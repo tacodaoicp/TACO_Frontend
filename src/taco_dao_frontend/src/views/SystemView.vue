@@ -1527,7 +1527,7 @@ const runTest = async (testKey: string) => {
   test.running = true
   test.status = 'gray'
   test.report = ''
-  test.expanded = true // Auto-expand to show results
+  // Don't auto-expand here - let it be controlled by the auto-expand setting after test completes
 
   try {
     if (testKey === 'canisters-running') {
@@ -1558,6 +1558,11 @@ const runTest = async (testKey: string) => {
     test.report = `<div class="alert alert-danger"><strong>Error:</strong> ${error}</div>`
   } finally {
     test.running = false
+    
+    // After test completes, conditionally expand/collapse based on status and setting
+    if (autoExpandOnRed.value) {
+      test.expanded = test.status === 'red' // Expand if red, collapse otherwise
+    }
   }
 }
 
@@ -1588,17 +1593,7 @@ const runAllTests = async () => {
     for (const item of checklist) {
       console.log(`[Run All Tests] Starting test: ${item.key}`)
       await runTest(item.key)
-      
-      // After test completes, expand if failed, collapse if passed (only if auto-expand enabled)
-      if (autoExpandOnRed.value) {
-        if (item.status === 'red') {
-          item.expanded = true
-          console.log(`[Run All Tests] ${item.key} FAILED - expanding`)
-        } else if (item.status === 'green') {
-          item.expanded = false
-          console.log(`[Run All Tests] ${item.key} PASSED - collapsing`)
-        }
-      }
+      // Note: expand/collapse is now handled in runTest's finally block based on autoExpandOnRed setting
       
       // Small delay between tests to avoid overwhelming the UI
       await new Promise(resolve => setTimeout(resolve, 100))
