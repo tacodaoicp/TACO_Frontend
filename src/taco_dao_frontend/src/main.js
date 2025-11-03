@@ -40,6 +40,7 @@ import NNSVoteViewDemo from "./views/NNSVoteViewDemo.vue"
 import NNSPropView from "./views/NNSPropView.vue"
 import NNSPropViewDemo from "./views/NNSPropViewDemo.vue"
 import SystemView from "./views/SystemView.vue"
+import TestPropView from "./views/TestPropView.vue"
 import VueApexCharts from 'vue3-apexcharts'
 import VueClickAway from "vue3-click-away"
 import 'animate.css'
@@ -98,6 +99,7 @@ const routes = [
     { path: "/nnsvotedemo/:id", name: "NNSVoteDemo", component: NNSVoteViewDemo, meta: { robots: 'noindex' } },
     { path: "/nnsprop/:id", name: "NNSProp", component: NNSPropView, meta: { robots: 'noindex' } },
     { path: "/nnspropdemo/:id", name: "NNSPropDemo", component: NNSPropViewDemo, meta: { robots: 'noindex' } },
+    { path: "/test_prop", name: "TestProp", component: TestPropView, meta: { robots: 'noindex' } },
     { path: "/:pathMatch(.*)*", redirect: "/" },
 ]
 
