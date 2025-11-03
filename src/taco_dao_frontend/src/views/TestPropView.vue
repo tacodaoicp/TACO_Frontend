@@ -170,143 +170,24 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
-import { useTacoStore } from '../stores/taco.store'
 import HeaderBar from '../components/HeaderBar.vue'
 import FooterBar from '../components/FooterBar.vue'
 import TacoTitle from '../components/misc/TacoTitle.vue'
+import { useProposalEligibility } from '../composables/useProposalEligibility'
 
-const tacoStore = useTacoStore()
-
-// State
-const checking = ref(false)
-const eligibilityChecked = ref(false)
-const errorMessage = ref<string | null>(null)
-
-// Eligibility results
-const isLoggedIn = ref(false)
-const hasProposalPermission = ref(false)
-const hasSufficientTaco = ref(false)
-const eligibleNeurons = ref<any[]>([])
-
-// Computed
-const isEligible = computed(() => {
-  return isLoggedIn.value && hasProposalPermission.value && hasSufficientTaco.value
-})
-
-// Methods
-const checkEligibility = async () => {
-  checking.value = true
-  eligibilityChecked.value = false
-  errorMessage.value = null
-  
-  // Reset results
-  isLoggedIn.value = false
-  hasProposalPermission.value = false
-  hasSufficientTaco.value = false
-  eligibleNeurons.value = []
-
-  try {
-    // Check 1: Is user logged in?
-    isLoggedIn.value = tacoStore.userLoggedIn
-    
-    if (!isLoggedIn.value) {
-      eligibilityChecked.value = true
-      checking.value = false
-      return
-    }
-
-    // Check 2 & 3: Fetch neurons and check permissions and TACO amount
-    const neurons = await tacoStore.getTacoNeurons()
-    
-    if (!neurons || neurons.length === 0) {
-      eligibilityChecked.value = true
-      checking.value = false
-      return
-    }
-
-    // Get user's principal
-    const userPrincipalStr = tacoStore.userPrincipal
-
-    // Check each neuron for proposal permission and sufficient undissolved TACO
-    const minTacoE8s = BigInt(7_00000000) // 7 TACO in e8s
-    
-    for (const neuron of neurons) {
-      let hasSubmitProposalPermission = false
-      
-      // Check if user has submit proposal permission (type 4) on this neuron
-      if (neuron.permissions && Array.isArray(neuron.permissions)) {
-        for (const permission of neuron.permissions) {
-          if (permission.principal && permission.principal.length > 0) {
-            const permissionPrincipal = permission.principal[0]
-            
-            // Check if this permission is for the current user
-            if (permissionPrincipal.toText() === userPrincipalStr) {
-              const permissionTypes = permission.permission_type || []
-              
-              // Check for submit proposal permission (type 4)
-              if (permissionTypes.includes(4)) {
-                hasSubmitProposalPermission = true
-                break
-              }
-            }
-          }
-        }
-      }
-      
-      if (hasSubmitProposalPermission) {
-        hasProposalPermission.value = true
-        
-        // Get neuron stake
-        const stake = neuron.cached_neuron_stake_e8s || BigInt(0)
-        
-        // Check dissolve state - neuron should not be dissolved
-        const dissolveState = neuron.dissolve_state || []
-        let isUndissolved = true
-        
-        if (dissolveState.length > 0) {
-          const state = dissolveState[0]
-          
-          // If WhenDissolvedTimestampSeconds exists and is in the past, it's dissolved
-          if (state.WhenDissolvedTimestampSeconds !== undefined) {
-            const dissolveTimestamp = Number(state.WhenDissolvedTimestampSeconds) * 1000
-            const now = Date.now()
-            
-            if (dissolveTimestamp <= now) {
-              isUndissolved = false
-            }
-          }
-        }
-        
-        const meetsRequirements = isUndissolved && stake >= minTacoE8s
-        
-        if (meetsRequirements && !hasSufficientTaco.value) {
-          hasSufficientTaco.value = true
-        }
-        
-        // Add to eligible neurons list
-        eligibleNeurons.value.push({
-          id: neuron.id,
-          stake: stake,
-          isUndissolved: isUndissolved,
-          meetsRequirements: meetsRequirements
-        })
-      }
-    }
-    
-  } catch (error: any) {
-    console.error('Error checking eligibility:', error)
-    errorMessage.value = error.message || 'Failed to check eligibility. Please try again.'
-  } finally {
-    checking.value = false
-    eligibilityChecked.value = true
-  }
-}
-
-const formatTaco = (e8s: bigint): string => {
-  const taco = Number(e8s) / 100000000
-  return taco.toFixed(2)
-}
+// Use the proposal eligibility composable
+const {
+  checking,
+  eligibilityChecked,
+  errorMessage,
+  isLoggedIn,
+  hasProposalPermission,
+  hasSufficientTaco,
+  eligibleNeurons,
+  isEligible,
+  checkEligibility,
+  formatTaco
+} = useProposalEligibility()
 </script>
 
 <style scoped lang="scss">
