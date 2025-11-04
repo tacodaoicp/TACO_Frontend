@@ -530,3 +530,4 @@ Verify that the IDL types match the expected Candid signature of the target meth
 ### "NervousSystemFunction must have a topic"
 Ensure the GNSF was registered with a topic assigned
 
+

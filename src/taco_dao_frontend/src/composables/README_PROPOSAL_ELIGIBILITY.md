@@ -264,3 +264,4 @@ const checkForStandardProposal = async () => {
 - TACO amounts are handled in e8s internally (1 TACO = 100,000,000 e8s)
 - A neuron is considered "undissolved" if its `WhenDissolvedTimestampSeconds` is in the future or doesn't exist
 
+

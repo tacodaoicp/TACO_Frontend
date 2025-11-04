@@ -148,7 +148,10 @@ export function useProposalEligibility() {
       
       // Get user's principal
       const userPrincipalStr = tacoStore.userPrincipal
-      const minTacoE8s = BigInt(minTacoAmount * 100000000) // Convert to e8s
+      
+      // Ensure minTacoAmount is a valid number
+      const minAmount = typeof minTacoAmount === 'number' && !isNaN(minTacoAmount) ? minTacoAmount : 7
+      const minTacoE8s = BigInt(Math.floor(minAmount * 100000000)) // Convert to e8s
       
       // Check each neuron for proposal permission and sufficient undissolved TACO
       for (const neuron of neurons) {
@@ -220,7 +223,10 @@ export function useProposalEligibility() {
       }
       
       const userPrincipalStr = tacoStore.userPrincipal
-      const minTacoE8s = BigInt(minTacoAmount * 100000000)
+      
+      // Ensure minTacoAmount is a valid number
+      const minAmount = typeof minTacoAmount === 'number' && !isNaN(minTacoAmount) ? minTacoAmount : 7
+      const minTacoE8s = BigInt(Math.floor(minAmount * 100000000))
       
       for (const neuron of neurons) {
         if (hasSubmitProposalPermission(neuron, userPrincipalStr)) {

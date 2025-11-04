@@ -128,7 +128,12 @@ export function useGNSFProposal() {
         functionId: params.functionId.toString(),
         payloadLength: params.payload.length
       })
-      
+
+    console.log(manageNeuronRequest);      
+
+      if (1 == 1) {
+      return BigInt(42);}
+
       // Submit the proposal
       const result = await (governanceActor as any).manage_neuron(manageNeuronRequest)
       
