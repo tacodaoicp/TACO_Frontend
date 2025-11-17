@@ -25,15 +25,15 @@
                           home-view__canted__container--left">
 
                 <!-- current discussion -->
-                <span class="home-view__canted__title">Upcoming Discussion</span>
+                <span class="home-view__canted__title">Current Discussions</span>
 
                 <!-- current discussion link -->
-                <!-- <router-link to="/chat/forum/142" 
+                <router-link to="/chat/forum" 
                             class="home-view__canted__link">
-                  Dragginz Karma Points
-                </router-link> -->
+                  See the Forum
+                </router-link>
 
-                <span class="home-view__canted__link">Dragginz Karma Points</span>
+                <!-- <span class="home-view__canted__link">TBD</span> -->
                 
               </div>
 
