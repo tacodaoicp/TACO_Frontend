@@ -25,13 +25,15 @@
                           home-view__canted__container--left">
 
                 <!-- current discussion -->
-                <span class="home-view__canted__title">Current Discussion</span>
+                <span class="home-view__canted__title">Upcoming Discussion</span>
 
                 <!-- current discussion link -->
-                <router-link to="/chat/forum/142" 
+                <!-- <router-link to="/chat/forum/142" 
                             class="home-view__canted__link">
-                  Insane Clown Protocol
-                </router-link>
+                  Dragginz Karma Points
+                </router-link> -->
+
+                <span class="home-view__canted__link">Dragginz Karma Points</span>
                 
               </div>
 
@@ -68,10 +70,10 @@
                 <span class="home-view__canted__title">Latest Report</span>
 
                 <!-- latest report link -->
-                <router-link to="/reports/clown" 
+                <router-link to="/reports/dkp" 
                             class="home-view__canted__link">
                   <!-- Insane Clown Protocol -->
-                  Insane Clown Protocol
+                  Dragginz Karma Points
                 </router-link>
 
               </div>

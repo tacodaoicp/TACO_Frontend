@@ -77,6 +77,7 @@ const routes = [
     { path: "/reports/kongswap", component: ReportsView, meta: { robots: 'noindex' } },
     { path: "/reports/neutrinite", component: ReportsView, meta: { robots: 'noindex' } },
     { path: "/reports/clown", component: ReportsView, meta: { robots: 'noindex' } },
+    { path: "/reports/dkp", component: ReportsView, meta: { robots: 'noindex' } },
     { path: "/admin", name: "Admin", component: AdminView, meta: { robots: 'noindex' } },
     { path: "/admin/archives", name: "AdminArchive", component: AdminArchiveView, meta: { robots: 'noindex' } },
     { path: "/admin/trade", name: "AdminTrade", component: AdminTradeView, meta: { robots: 'noindex' } },

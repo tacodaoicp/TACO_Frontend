@@ -54,6 +54,29 @@
                 <!-- reports list -->
                 <ul class="taco-report-explorer__list">
 
+                  <!-- dkp - report item -->
+                  <li class="taco-report-explorer__list-item" @click="toggleReportMenuOnMobile(); router.push('/reports/dkp')">
+                    
+                    <!-- report -->
+                    <div class="taco-report-explorer__list-report"
+                    :class="{ 'taco-report-explorer__list-report--active': reportId === 10 }">
+                      
+                      <!-- report title icon -->              
+                      <div class="taco-report-explorer__list-report__icon"
+                          :style="{ backgroundImage: `url(${dkpIconUrl})` }"></div>            
+                      
+                      <!-- report title container -->
+                      <div class="taco-report-explorer__list-report__title-container">
+                        
+                        <!-- report title -->
+                        <span class="taco-report-explorer__list-report__title">DUE DILIGENCE PROCESS Dragginz Karma Points (DKP)</span>
+                        
+                      </div>
+                      
+                    </div>
+                    
+                  </li>                  
+
                   <!-- clown - report item -->
                   <li class="taco-report-explorer__list-item" @click="toggleReportMenuOnMobile(); router.push('/reports/clown')">
                     
@@ -10982,7 +11005,1283 @@ about the projects that create allocations.
 
                 </div>
                 
-              </div>              
+              </div>    
+              
+              <!-- dkp dd report -->
+              <div v-if="reportId === 10" class="taco-report-explorer__report-container">
+
+                <!-- inner -->
+                <div class="taco-report-explorer__report-container__inner">
+                
+                  <!-- report header -->
+                  <div class="taco-report-explorer__report-header">
+                    
+                    <!-- report title -->
+                    <h2 class="taco-report-explorer__report-header__title">DUE DILIGENCE PROCESS Dragginz Karma Points (DKP)</h2>
+
+                    <!-- report metadata continer -->
+                    <div class="taco-report-explorer__report-header__metadata-container">
+
+                      <!-- report metadata -->
+                      <span class="taco-report-explorer__report-header__metadata">
+                        <i class="fa-solid fa-luchador-mask"></i> 
+                        <span> Written by TrickyVik & Manilpwn</span>
+                        <span class="small"> 11/2025</span>
+                      </span>
+
+                    </div>        
+                    
+                  </div>
+
+                  <!-- report body -->
+                  <div class="taco-report-explorer__report-body">
+                    
+                    <!-- heading -->
+                    <h3 class="taco-report-explorer__report-heading
+                              taco-report-explorer__report-heading--h1">
+                      Team Background
+                      <i class="fa-solid fa-circle-info" 
+                        data-bs-toggle="tooltip" 
+                        data-bs-placement="top" 
+                        title="Assess the founding team's transparency, credibility, experience, and any past contributions to the ICP ecosystem"></i>
+                    </h3>
+
+                    <h4 class="taco-report-explorer__report-heading
+                              taco-report-explorer__report-heading--h2 mt-4">
+                      DKP
+                    </h4>                    
+                    
+                    <!-- paragraph -->
+                    <p>
+DKP is majority controlled by Adam Powell (@borovan) and Donna Powell (@thyassa). While it was
+previously worked on by a development team consisting of over ten remote workers, there is currently no
+one working on it. The Powells have shifted their full focus on creating the Toko NFT Marketplace
+(Toko), which a total of 15 people (including the Powells) are working on. It has been stated that Toko is
+essential for the DKP project, therefore working on it does not represent a shift away from DKP
+development.
+                    </p>
+
+                    <!-- paragraph -->
+                    <p>
+The leadership of the DKP team has been open with their engagement with the community. They have
+discussed various topics across multiple channels, and have given multiple updates on the development
+progress of their project. For instance, the 'Blockworld Editor' of Dragginz was released to the public in
+an early form.
+                    </p>
+                    
+                    <!-- paragraph -->
+                    <p>
+Regarding experience, the Powell's previously created <span class="fst-italic">Neopets</span>, a 1999 online video game which within
+less than a decade accrued 140 million accounts. The Powell's went on to form Meteor Games after
+selling <span class="fst-italic">Neopets</span>, which, among other projects, created a Facebook game named <span class="fst-italic">Island Paradise</span>, which at
+its peak claimed 6.8 million monthly users.
+                    </p>      
+                    
+                    <h4 class="taco-report-explorer__report-heading
+                              taco-report-explorer__report-heading--h2 mt-4">
+                      SNS-1
+                    </h4>     
+                    
+                    <!-- paragraph -->
+                    <p>
+SNS-1 was the original SNS DAO for ICP, which existed as a framework and a test run launched in 2022
+to experiment with the decentralisation process for governance over dApps. It served as a blank slate, and
+a community gathered, putting forth multiple ideas on how best to utilise the technology, debating what
+direction should be taken. The only project created during this period was ICPCoins, an index of the
+eponymous tokens circulating around the ecosystem.
+                    </p>    
+                    
+                    <!-- paragraph -->
+                    <p>
+On the 11th of June, 2023, the SNS-1 community and development Discord server received the following
+messages in its general chat from @pwd, later @borovan:
+                    </p>    
+
+                    <!-- quote -->
+                    <div class="taco-report-explorer__report-quote">
+                      <blockquote cite="#">
+                        <p>
+                          hey, you dont know me but I own a lot of SNS-1 <br></br>
+                          and i have a question <br></br>
+                          actually, not a question, im taking control of SNS-1 and there's nothing you can do about it make your time <br></br>
+                          ha ha ha ha <br></br>
+                          check ic light house <br></br>
+                          a completely insane person has decided to use SNS-1 for his project. I'm going to buy as much as I can,
+lock it for 100 years, and the rest of the tokens will be used to purchase things in the game im making
+it wont be a governance token but you'll use it to pay for stuff in the game <br></br>
+                          actually prob wont stake for now but will just put it on ICP Swap as liquidity, I moved it over from
+Infinityswap a few days ago <br></br>
+                        </p>
+                      </blockquote>
+                      <p class="fst-italic">—Borovan, SNS-1 community and development Discord server</p>
+                    </div>                    
+                    
+                    <!-- paragraph -->
+                    <p>
+This was Adam Powell's takeover of SNS-1 by purchasing a majority stake. Powell's takeover turned the
+DAO from one containing multiple directions to one with a single, unified direction: creating a video
+game, one that they've been wanting to make since 1998. Later, he used his voting power to update the
+name and the total supply to cement this change.
+                    </p>    
+                    
+                    <!-- paragraph -->
+                    <p>
+ICPCoins was released from the control of SNS-1/DKP to later be a part of the Neutrinite (NTN) and
+Sneed (SNEED) was created as a successor to the 'blank-slate' concept of SNS-1. Communities from
+these projects still maintain ties to DKP.
+                    </p>   
+                    
+                    <h4 class="taco-report-explorer__report-heading
+                              taco-report-explorer__report-heading--h2 mt-4">
+                      Broader Involvement
+                    </h4>   
+                    
+                    <!-- paragraph -->
+                    <p>
+Adam Powell was an ICP investor before ICP's mainnet. He has also invested in other cryptocurrency
+projects. Within the ICP ecosystem, he has supported projects such as Neutrinite, KongSwap, and TACO
+DAO. The Powells also have two named neurons: Thyassa and DragginCorp.
+                    </p>   
+                    
+                    <!-- paragraph -->
+                    <p>
+The Powells' influence on the ICP ecosystem has been controversial. They started/contributed to a
+movement dubbed <span class="fst-italic">drain the swamp</span> with the stated objective of discovering and uprooting entities that
+they perceived to have been conducting unsavoury activities. This movement primarily focused on node
+provider collusion, drainage of the neurons' fund, and potentially backdoored projects. Subjectively
+speaking, it split the ICP community into opposing sides - one side believing that the movement was
+worth pursuing, the other believing that it was causing undue uncertainty and disruption within the
+ecosystem.
+                    </p>   
+                    
+                    <!-- paragraph -->
+                    <p>
+IC nodes are independently run replica servers that join IC subnets to execute canister smart contracts,
+store state, and participate in consensus for NNS-set rewards. <a href="https://wiki.internetcomputer.org/wiki/Node_Provider_Remuneration" target="_blank">As established by an approved NNS motion
+proposal</a>, a node provider cannot have more than 42 nodes. The Powells believe that entities have
+collaborated to undermine the intent of this rule. By coordinating across shell identities, colluding node
+providers could seize de-facto control of subnets and gut consensus, putting the Internet Computer at risk
+of catastrophic failure. For example, if 10 of the 34 node operators in the subnet managing the ckBTC
+smart contract module were to collude, they could steal all the BTC backing ckBTC. Even if it falls short
+of compromising the network's integrity, such collusion effectively redirects an excessive portion of ICP's
+inflation to those involved. According to Anvil, the lead developer behind Neutrinite, a node pays for
+itself in roughly 13 months, though this may be the most optimistic scenario. Nevertheless, if this estimate
+is close to the truth, then hosting nodes is a very profitable endeavour, much more so than staking ICP for
+the maximum dissolve delay of 8 years. A circulating theory within the ICP community suggests that
+node rewards create an asymmetric incentive, allowing providers to short ICP with minimal risk. Because
+their rewards are minted each month in fixed fiat-equivalent value, a falling ICP price results in more ICP
+being issued, which they can use to cover those shorts.
+                    </p>   
+                    
+                    <!-- paragraph -->
+                    <p>
+We will not endeavour to go deep into discussions that took place related to the node provider part of the
+drain the swamp movement. From what we've gathered, some broad accusations were cast pertaining to a
+conspiracy involving multiple parties. One outcome of these accusations and the discussions they
+prompted was <a href="https://forum.dfinity.org/t/ic-wiki-maintenance/42199" target="_blank"></a>a removal of no longer active node providers from the IC Wiki, essentially a clean-up of
+out-of-date information. Another outcome was the prompting of DFINITY to suggest enhancements to
+the network's decentralisation, including proposals for improved <a href="https://forum.dfinity.org/t/enhancing-network-decentralization-proposals-for-identity-verification-and-subnet-allocation/42664" target="_blank">identity verification, subnet allocation</a>,
+and <a href="https://forum.dfinity.org/t/enhancing-network-decentralization-proposals-for-node-provider-standards/43053" target="_blank">node provider standards</a>. It could also be said that the ICP community became more familiar with and
+focused on this topic. The Powells made an attempt to become node providers by adding DragginCorp as
+a node provider, however, they were unable to obtain nodes and have now removed DragginCorp as a
+node provider. It is perhaps relevant to mention the recent implementation of <a href="https://x.com/neilhillman/status/1986147361601524209" target="_blank">Performance-Based node
+rewards</a>, which rewards more ICP to nodes with more uptime.
+                    </p>   
+                    
+                    <!-- paragraph -->
+                    <p>
+SNS decentralisation swaps are the means by which SNS DAOs are created. During a decentralization
+swap, participants exchange ICP tokens for SNS-specific neurons, which represent voting power and a
+share of the DAO's governance, while collecting funds to bootstrap the SNS treasury. The Neurons' Fund
+(NF) is a pooled resource drawn from the maturity of opted-in ICP neurons, designed to match and
+amplify community interest in promising SNS launches by contributing additional ICP proportionally to
+direct participant commitments. Reportedly, Adam's ICP neurons are among the biggest to opt into the
+NF. Due to an identified and exploited design flaw, the NF has been paused. To demonstrate this flaw, we
+will first demonstrate a manner by which an SNS decentralisation swap can be exploited without
+considering the NF. If an SNS team were to assign a large quantity of SNS governance tokens to
+themselves at genesis, and, on top of this, make a large contribution to the decentralisation swap, they
+could theoretically obtain enough voting power (>67%) at genesis to drain the entire SNS treasury. This
+theft would contain both the ICP tokens contributed by themselves and all other participants in the SNS
+decentralisation swap. The Neurons' Fund added more tokens to SNS treasuries, upping the gain for this
+exploit. Under a forum topic titled <a href="https://forum.dfinity.org/t/fomowell-sns-sale-investigation-icpex-yuku-ai-ties-linked-wallets-temporal-clusters/43129" target="_blank">“FomoWell SNS Sale Investigation: ICPEx, Yuku AI Ties, Linked
+Wallets, Temporal Clusters”</a>, an investigation provided evidence for a case of this exploit occurring, the
+forum's discussion eventually leading to its supposed ringleader, an individual with the username Tiger,
+<a href="https://forum.dfinity.org/t/fomowell-sns-sale-investigation-icpex-yuku-ai-ties-linked-wallets-temporal-clusters/43129/53?" target="_blank">admitting to organising it</a>. The information provided above underpins the drainage of the NF/corrupt SNS
+teams component of the drain the swamp movement. As with the node provider component, broad
+accusations were cast at multiple parties. The Powells posited that multiple 'fake' SNS projects were
+created with the intent to exploit SNS swap participants and the NF, and that existing 'real' SNS projects
+had not been delivering anything worthy of what they were withdrawing from treasuries for team pay.
+Other complex topics were also brought up. <a href="https://forum.dfinity.org/t/statement-addressing-borovan-and-thyassas-recent-activity-and-future-plans/44561" target="_blank">Adam used this reasoning to justify 51% attacking multiple
+SNS DAOs</a>. There may have been other reasonings, however, we will not endeavour to discover these.
+Some projects that were successfully attacked were changed to new projects, similar to how SNS-1 was
+changed to DKP. These new projects included Mimic and Swampies. We could certainly endeavour to
+dive deeper on this 'SNS Wars' topic, but we will not. Our intent here was to summarise outcomes and
+give context, we did not cover everything and some information may be inaccurate.
+                    </p>   
+                    
+                    <!-- paragraph -->
+                    <p>
+The Powells have recently retired from pursuing the drain the swamp movement in order to put their full
+focus on building the Toko NFT Marketplace.
+                    </p>                       
+
+                    <hr>
+
+                    <!-- heading -->
+                    <h3 class="taco-report-explorer__report-heading
+                              taco-report-explorer__report-heading--h1">
+                      Token Utility
+                      <i class="fa-solid fa-circle-info" 
+                        data-bs-toggle="tooltip" 
+                        data-bs-placement="top" 
+                        title="Examine the token's purpose and functionality within its ecosystem to ensure it provides tangible value and practical use cases"></i>
+                    </h3>               
+
+                    <!-- paragraph -->
+                    <p>
+The game that DKP is utilised for, that being <span class="fst-italic">Dragginz</span>, is a 3D MMORPG - massively multiplayer online
+role-playing game - where players collect, hatch, breed, and raise virtual creatures as they go on
+adventures. The game utilises features such as spells, cooking, gardening, alchemy and so forth for the
+player's enjoyment. The world of <span class="fst-italic">Dragginz</span> is described as one in which players can make 'real changes
+to the story and gameplay'.
+                    </p>
+
+                    <!-- paragraph -->
+                    <p>
+While what was initially SNS-1 is no longer a DAO with plural voting, it does still maintain the
+technological capacities associated with it. Token holders are still capable of creating proposals and
+voting upon them, which, combined with the aforementioned openness, creates a pseudo-petition system
+where ideas and concerns can be raised towards the development team.
+                    </p>
+                    
+                    <!-- paragraph -->
+                    <p>
+Holding/staking the token itself (DKP) has been discussed as a method by which one can earn/trade for
+cosmetic NFTs and items within the game itself. Because of this, the token gains value with these as a
+base. The team has put forth that they will be selling some DKP to <a href="https://forum.dfinity.org/t/dragginz-dkp-sns-1-tokenomics/23321/15" target="_blank">cover development costs</a>.
+                    </p>
+                    
+                    <!-- paragraph -->
+                    <p>
+From the official Discord server, the following announcement on the 9th of October 2023 covered
+potential utilities of the token:
+                    </p>  
+                    
+                    <!-- quote -->
+                    <div class="taco-report-explorer__report-quote">
+                      <blockquote cite="#">
+                        <p>
+There will be incentives to participate in the governance. These incentives will be some form of rewards
+embedded in the game mechanism of Dragginz , i.e., not be in (the) form of any direct financial rewards.
+The exact form depends on what we can do in the game and may even be subject to a vote itself.
+                        </p>
+                        <p>
+                          Some ideas are:
+                        </p>
+                        <ul>
+                          <li>
+                            <p>
+                              social status - exclusive titles, hairstyles, clothing, crowns, pets etc
+                            </p>
+                          </li>
+                          <li>
+                            <p>
+                              access to special ranks which allow you to do things that regular players and non-DKP holders
+cannot do. (Not game breaking, no pay to win mechanics though)
+                            </p>
+                          </li>
+                          <li>
+                            <p>
+                              we also wish to have a way to recognize how long a person has locked their DKP for in-game
+(opt in of course).
+                            </p>
+                          </li>
+                        </ul>
+                        <p>
+                          The governance decisions regarding which we intend to invite the community to provide their opinions
+on shall include:
+                        </p>
+                        <ul>
+                          <li>
+                            <p>
+                              which features are released next
+                            </p>
+                          </li>
+                          <li>
+                            <p>
+                              names and personalities of NPCs
+                            </p>
+                          </li>
+                          <li>
+                            <p>
+                              which Dragginz are designed and released
+                            </p>
+                          </li>
+                          <li>
+                            <p>
+                              which storylines are developed
+                            </p>
+                          </li>
+                          <li>
+                            <p>
+                              ui/ux changes
+                            </p>
+                          </li>
+                          <li>
+                            <p>
+                              Etc…
+                            </p>
+                          </li>
+                        </ul>
+                      </blockquote>
+                      <p class="fst-italic">— official DKP Discord server</p>
+                    </div>   
+
+                    <!-- paragraph -->
+                    <p>
+And from Donna (@thyassa) on the 8th of April 2024:
+                    </p>  
+
+                    <!-- quote -->
+                    <div class="taco-report-explorer__report-quote">
+                      <blockquote cite="#">
+                        <p>
+Still wip but plan is for aesthetic personal upgrades and to vote on new content, features, storyline
+development etc.
+                        </p>
+                      </blockquote>
+                      <p class="fst-italic">— Donna, official DKP Discord server</p>
+                    </div>                     
+
+                    <h4 class="taco-report-explorer__report-heading
+                              taco-report-explorer__report-heading--h2 mt-4">
+                      Game Setting & Mechanics
+                    </h4>
+
+                    <!-- paragraph -->
+                    <p>
+The following is an excerpt from the <a href="http://dragginz.io/" target="_blank">dragginz.io</a> homepage:
+                    </p>
+
+                    <!-- quote -->
+                    <div class="taco-report-explorer__report-quote">
+                      <blockquote cite="#">
+                        <p>
+Dragginz is a 3D MMORPG set on a strange planet full of weird, wonderful and slightly crazy creatures.
+Play the game your way! Hatch and raise Dragginz to accompany you on your adventures. Harness the
+planet's latent magic as you explore, battle and learn key skills. Alchemy, Gardening and Cooking are just
+a few such skills, each of which can be enjoyed casually or as a way of life. Alternatively you can help
+shape the physical world and make real changes to the story and gameplay. We provide the setting, how
+you play is for you to decide…
+                        </p>
+                      </blockquote>
+                      <p class="fst-italic">— <cite><a href="https://dragginz.io/" target="_blank" class="taco-text-blue-to-light-blue">dragginz.io</a></cite></p>
+                    </div>   
+                    
+                    <!-- paragraph -->
+                    <p>
+The <a href="https://dragginz.io/faq" target="_blank">story</a> of <span class="fst-italic">Dragginz</span> is set on a distant planet that was once destroyed and later reborn through the
+sacrifice of its guardian creatures, the Dragginz. Over time, the planet's history faded into legend until
+explorers known as the Cartographers Guild uncovered ancient caverns containing dormant Draggin eggs.
+The setting is a world in recovery—rich in mystery, natural magic, and remnants of past
+civilizations—forming the backdrop for the game's exploration and creature-raising mechanics.
+                    </p>  
+                    
+                    <!-- paragraph -->
+                    <p>
+The game will feature a magic system based on measurable energy called Flow, originating from the
+planet's core. This is distributed throughout the world to all living and conceptual entities. It operates
+across eight domains - Bloom, Bramble, Fire, Water, Air, Rock, Shadow, and Nothing. Flow scales
+hierarchically, with high-ranking beings controlling vast bandwidths of flow and passing portions down to
+lesser entities, including players. Using up flow on something like casting a spell will take from the
+shared network of flow.
+                    </p>  
+                    
+                    <!-- paragraph -->
+                    <p>
+The game world will begin inside a vast hollowed-out cube of rock, called the Chunk, which serves as the
+first major fragment of the shattered planet. Players can claim and modify small 8-meter cubic sections of
+this environment and submit their changes to the game's DAO for inclusion. While the Dragginz Team
+defines the overarching narrative, the environment itself is built collaboratively by the community,
+evolving through iterative versions as systems like quests, creatures, and lighting are added. The Chunk is
+only the starting point, with long-term plans for additional world fragments, airborne travel, and large
+interconnected regions.
+                    </p>  
+                    
+                    <!-- paragraph -->
+                    <p>
+The <a href="https://x.com/dragginzgame/status/1963596142022742232" target="_blank">Dataworld Update post</a> on X provides a good summary of some of the features that'll be in the game,
+these include:
+                    </p>      
+                    
+                    <!-- unordered list -->
+                    <ul>
+                      
+                      <!-- list item -->
+                      <li>
+
+                        <!-- paragraph -->
+                        <p>
+Quests that grant items and in-game currency
+                        </p>
+
+                      </li>
+
+                      <!-- list item -->
+                      <li>
+
+                        <!-- paragraph -->
+                        <p>
+Cooking system with skill progression, recipes, recipe proficiency, and experimental-based
+discovery. Hunger bar to go with it
+                        </p>
+
+                      </li>
+
+                      <!-- list item -->
+                      <li>
+
+                        <!-- paragraph -->
+                        <p>
+Gardening
+                        </p>
+
+                      </li>
+
+                      <!-- list item -->
+                      <li>
+
+                        <!-- paragraph -->
+                        <p>
+Pets that you raise, feed, and interact with
+                        </p>
+
+                      </li>
+
+                      <!-- list item -->
+                      <li>
+
+                        <!-- paragraph -->
+                        <p>
+An interactable world
+                        </p>
+
+                      </li>
+
+                      <!-- list item -->
+                      <li>
+
+                        <!-- paragraph -->
+                        <p>
+Items and inventory
+                        </p>
+
+                      </li>
+
+                      <!-- list item -->
+                      <li>
+
+                        <!-- paragraph -->
+                        <p>
+Dynamic day/night cycle
+                        </p>
+
+                      </li>
+
+                      <!-- list item -->
+                      <li>
+
+                        <!-- paragraph -->
+                        <p>
+Character creation
+                        </p>
+
+                      </li>
+
+                      <!-- list item -->
+                      <li>
+
+                        <!-- paragraph -->
+                        <p>
+Ambient flora & fauna
+                        </p>
+
+                      </li>
+
+                      <!-- list item -->
+                      <li>
+
+                        <!-- paragraph -->
+                        <p>
+World-building tools
+                        </p>
+
+                      </li>
+
+                    </ul>      
+                    
+                    <h4 class="taco-report-explorer__report-heading
+                              taco-report-explorer__report-heading--h2 mt-4">
+                      NFTs
+                    </h4>     
+                    
+                    <!-- paragraph -->
+                    <p>
+Regarding the usage of NFTs in the game, Donna (@thyassa) posted on the 10th of September 2023:
+                    </p> 
+
+                    <!-- quote -->
+                    <div class="taco-report-explorer__report-quote">
+                      <blockquote cite="#">
+                        <p>
+Dragginz, players will be able to turn some of their tradeable Spells and Items into NFTs. These can
+then be traded on any NFT marketplace to another Dragginz player. Doing this is a great way to freeze
+something in time and facilitate the transfer of ownership to another person
+                        </p>
+                      </blockquote>
+                      <p class="fst-italic">— Donna</p>
+                    </div>                     
+                    
+                    <!-- paragraph -->
+                    <p>
+The 'any NFT marketplace' part of the above may be not on the table for now, as, since this post, the
+Powells' have declared that existing ICP-native NFT marketplaces are not fit for purpose and have
+resolved to create their own.
+                    </p> 
+                    
+                    <!-- paragraph -->
+                    <p>
+We will not bloat this section with excessive details on the Toko NFT Marketplace as we have provided
+this information in the Motoko DAO due diligence report (which we need to update, but the info on Toko
+is still there for now). One point we see worth pointing out is the cross-IP NFT utility that Toko has stated
+it intends to support. Cross-IP utility refers to the ability for an NFT created for one project, such as a
+Dragginz item or creature, to be recognised and usable within other games, projects, and whatevers, as
+well as the inverse of foreign NFTs being recognized within Dragginz.
+                    </p> 
+                    
+                    <!-- paragraph -->
+                    <p>
+Beyond this, we will note that the Toko NFT marketplace is promised to be quite advanced at its full
+actualisation. The <a href="https://x.com/dragginzgame/status/1911722859723973071" target="_blank">2025/04/14 - Weekly Update</a> on X is a good resource to speculate on how this will
+serve Dragginz. In that update, the team outlined several advanced features under development for Toko's
+NFT Maker and marketplace, including rule-based minting, support for divisible and mergeable NFTs,
+flexible rarity structures, and the ability to whitelist only approved collections. For Dragginz, this means
+any future items, pets, or cosmetics minted through Toko could be designed with fine-grained control over
+utility, scarcity, transfer rules, or progression.
+                    </p> 
+                    
+                    <!-- paragraph -->
+                    <p>
+The Ledger canister and Index canister for the TOKO token <a href="https://x.com/tacodaoicp/status/1976683397054632231" target="_blank">has been registered under DKP DAO's
+governance</a>. It has been stated that Toko will not have its own SNS. It could be speculated that, similar to
+the Dragginz game, DKP holders will have partial say in the governance and future of the Toko NFT
+Marketplace.
+                    </p>                     
+                    
+                    <hr>
+
+                    <!-- heading -->
+                    <h3 class="taco-report-explorer__report-heading
+                              taco-report-explorer__report-heading--h1">
+                      Ecosystem Alignment
+                      <i class="fa-solid fa-circle-info" 
+                        data-bs-toggle="tooltip" 
+                        data-bs-placement="top" 
+                        title="Evaluate the token's synergy with other ICP projects, including any existing collaborations and suitability for inclusion in the Salsa Season rewards program."></i>
+                    </h3>
+
+                    <h4 class="taco-report-explorer__report-heading
+                              taco-report-explorer__report-heading--h2 mt-4">
+                      SNS-1 Roots
+                    </h4>
+
+                    <!-- paragraph -->
+                    <p>
+The team behind the TACO DAO converged in the ecosystem surrounding SNS-1/DKP. Due to the team's
+roots in the project as well as its promising future, DKP was utilised as an initial investment medium for
+buyers of TACO DAO's pre-swap, making it the first trusted token to be added to the shared portfolio.
+                    </p>                      
+                    
+                    <h4 class="taco-report-explorer__report-heading
+                              taco-report-explorer__report-heading--h2 mt-4">
+                      ICP Exposure
+                    </h4>
+
+                    <!-- paragraph -->
+                    <p>
+Most notably, the potential for an online video game hosted entirely on the ICP ecosystem to drive
+massive amounts of engagement to the chain will certainly impact adoption to an unknown extent, as
+evidenced by Neopets' impact on certain youths developing connection with the internet as whole. For
+example:
+                    </p>  
+                    
+                    <!-- paragraph -->
+                    <p>
+Vox <a href="https://www.vox.com/culture/2019/11/19/20966900/neopets-relaunch-memories-1999-comeback" target="_blank">writes that</a> <span class="fst-italic">'The profile pages where users could show off their family of pets were fully customizable
+through basic HTML and CSS, a veritable first lesson in coding' and that 'Neopets is remembered fondly
+as an influential moment for many of us in the Very Online Generation.'</span> Its broadly customisable profiles,
+and interesting yet child-oriented mechanisms, ranging from its rudimentary stock market to the playful
+nature of caring for virtual pets, did introduce many children to sectors of life that they may not have
+otherwise been able to engage in.
+                    </p>  
+                    
+                    <!-- paragraph -->
+                    <p>
+Online media journalist Nimrod Aldea <a href="https://cheezburger.com/30969863/the-unbelievable-history-of-neopets-the-late-90s-social-game-that-refuses-to-die" target="_blank">draws the connection between the customisation options used in
+Neopets</a> to later customisation-centric social medias, particularly MySpace - 'pioneering many elements
+of social media, online economies, and even basic coding that kids would later use on sites like MySpace'
+- purporting that, indeed, such projects can further development in ways initially unknown to the
+developers themselves. Ergo, the introduction of an unknown amount of new users to the ICP ecosystem
+can indeed spur further outside interest in the programming language Motoko, alongside concepts such as
+SNS and DAO systems, and the applicability of NFTs.
+                    </p>                      
+                    
+                    <h4 class="taco-report-explorer__report-heading
+                              taco-report-explorer__report-heading--h2 mt-4">
+                      Mimic
+                    </h4>                    
+
+                    <!-- paragraph -->
+                    <p>
+The Dragginz team have been developing Mimic, further described in the technology section below, as
+part of the backend infrastructure for the game. When it is open-sourced, it will allow other ICP
+developers to benefit from the tooling refined through Dragginz's development.
+                    </p>              
+
+                    <hr>
+
+                    <!-- heading -->
+                    <h3 class="taco-report-explorer__report-heading
+                              taco-report-explorer__report-heading--h1">
+                      Community
+                      <i class="fa-solid fa-circle-info" 
+                        data-bs-toggle="tooltip" 
+                        data-bs-placement="top" 
+                        title="Assess the size and engagement of the token's community to gauge long-term adoption potential"></i>
+                    </h3>
+
+                    <!-- paragraph -->
+                    <p>
+Official Discord (shut down for now): 2081 members
+                    </p>
+
+                    <!-- unordered list -->
+                    <ul>
+                      
+                      <!-- list item -->
+                      <li>
+
+                        <!-- paragraph -->
+                        <p>
+                          <a href="https://discord.gg/kshGUcsEWf" target="_blank">Toko Discord</a>: 707 members
+                        </p>
+
+                      </li>
+
+                      <!-- list item -->
+                      <li>
+
+                        <!-- paragraph -->
+                        <p>
+                          <a href="https://oc.app/community/24t4l-hyaaa-aaaar-ar2rq-cai/?ref=ylxco-ayaaa-aaaaf-a7vra-cai" target="_blank">OpenChat</a>: 8140 members
+                        </p>
+
+                      </li>
+                      
+                      <!-- list item -->
+                      <li>
+
+                        <!-- paragraph -->
+                        <p>
+                          <a href="https://x.com/dragginzgame" target="_blank">Dragginz X</a>: 3934 followers
+                        </p>
+
+                      </li>
+                      
+                      <!-- list item -->
+                      <li>
+
+                        <!-- paragraph -->
+                        <p>
+                          <a href="https://x.com/Toko_app" target="_blank">Toko X</a>: 400 followers
+                        </p>
+
+                      </li>
+                      
+                      <!-- list item -->
+                      <li>
+
+                        <!-- paragraph -->
+                        <p>
+                          <a href="https://www.youtube.com/@dragginzgame" target="_blank">Youtube</a>: 483 subscribers
+                        </p>
+
+                      </li>                      
+
+                    </ul>                        
+                    
+                    <hr>
+
+                    <!-- heading -->
+                    <h3 class="taco-report-explorer__report-heading
+                              taco-report-explorer__report-heading--h1">
+                      Technology
+                      <i class="fa-solid fa-circle-info" 
+                        data-bs-toggle="tooltip" 
+                        data-bs-placement="top" 
+                        title="Review the project's technical foundation, focusing on code quality, scalability, and how effectively it leverages ICP's capabilities"></i>
+                    </h3>
+
+                    <h4 class="taco-report-explorer__report-heading
+                              taco-report-explorer__report-heading--h2 mt-4">
+                      Governance
+                    </h4>                     
+
+                    <!-- paragraph -->
+                    <p>
+The SNS framework is regularly updated and vetted by the Network Nervous System (NNS) community,
+which oversees the entire ICP ecosystem. This vigilance ensures the adherence of DKP's governance
+framework to the most rigorous standards of security and efficiency.
+                    </p>
+
+                    <!-- paragraph -->
+                    <p>
+From a technological standpoint, ICP capabilities such as proposals are effectively rendered moot by the
+fact that the heads of the project own a majority of the supply, meaning all voting will always go in a
+single direction should this voting power be used. In the ICP ecosystem, votes not cast do not impact the
+voting. Therefore, should the top holder not engage in voting, propositions would proceed as normal.
+                    </p>                    
+
+                    <h4 class="taco-report-explorer__report-heading
+                              taco-report-explorer__report-heading--h2 mt-4">
+                      Game
+                    </h4>   
+                    
+                    <!-- paragraph -->
+                    <p>
+The game Dragginz is being built on the Unity engine, making it easily possible to deploy across multiple
+clients.
+                    </p>
+                    
+                    <!-- paragraph -->
+                    <p>
+Mimic is an open-source Rust-based ORM (object-relational mapping), framework, and database layer
+specifically designed for developing canisters (smart contracts) on the Internet Computer. It acts as an
+abstraction layer on top of the IC-CDK (Internet Computer Canister Development Kit), enabling
+developers to define data models, implement logic, and handle canister architecture more efficiently. Key
+features include strong typing and validation, query language support, sort keys for faster data retrieval,
+multiple indexes, and memory optimizations. The relation between Mimic and Dragginz is that Mimic
+was created by the Dragginz development team as part of their backend infrastructure for the game. The
+github repo for Mimic is not currently available.
+                    </p>                    
+                    
+                    <hr>
+
+                    <!-- anon container -->
+                    <div class="d-flex flex-wrap" style="gap: 1rem 3rem;">
+
+                      <!-- left -->
+                      <div>
+
+                        <!-- heading -->
+                        <h3 class="taco-report-explorer__report-heading
+                                  taco-report-explorer__report-heading--h1">
+                          Tokenomics
+                          <i class="fa-solid fa-circle-info" 
+                            data-bs-toggle="tooltip" 
+                            data-bs-placement="top" 
+                            title="Analyse the supply and distribution of the token; any inflationary/deflationary mechanisms; and any incentive structures, to ensure sustainability and fair distribution"></i>
+                        </h3>
+
+                        <!-- unordered list -->
+                        <ul>
+
+                          <!-- list item -->
+                          <li>
+                            
+                            <!-- paragraph -->
+                            <p>
+                              Initial Total Supply: 8,000,000,000 DKP
+                            </p>
+                            
+                          </li>  
+                          
+                          <!-- list item -->
+                          <li>
+                            
+                            <!-- paragraph -->
+                            <p>
+                              Circulating Supply: 3,386,635,079 DKP
+                            </p>
+                            
+                          </li>     
+                          
+                          <!-- list item -->
+                          <li>
+                            
+                            <!-- paragraph -->
+                            <p>
+                              Unlocked Circulating Supply: 2,938,634,873 DKP
+                            </p>
+                            
+                          </li>   
+                          
+                          <!-- list item -->
+                          <li>
+                            
+                            <!-- paragraph -->
+                            <p>
+                              Burn per transaction: 0.001 DKP
+                            </p>
+                            
+                          </li>
+                          
+                          <!-- holders -->
+                          <li>
+                            
+                            <!-- paragraph -->
+                            <p>
+                              Holders:
+                            </p>
+
+                            <!-- unordered list -->
+                            <ul style="list-style-type: disc">
+
+                              <!-- list item -->
+                              <li>
+                                
+                                <!-- paragraph -->
+                                <p>
+                                  Top - 50.11%
+                                </p>
+
+                              </li>
+
+                              <!-- list item -->
+                              <li>
+                                
+                                <!-- paragraph -->
+                                <p>
+                                  Second - 6.13% (Treasury)
+                                </p>
+                                
+                              </li>
+                              
+                              <!-- list item -->
+                              <li>
+                                
+                                <!-- paragraph -->
+                                <p>
+                                  Third - 1.99%
+                                </p>
+                                
+                              </li>
+                              
+                              <!-- list item -->
+                              <li>
+                                
+                                <!-- paragraph -->
+                                <p>
+                                  Mean of Top 25 - 2.9224%
+                                </p>
+                                
+                              </li>
+                              
+                              <!-- list item -->
+                              <li>
+                                
+                                <!-- paragraph -->
+                                <p>
+                                  Median of Top 25 - 0.58%
+                                </p>
+                                
+                              </li>
+                              
+                              <!-- list item -->
+                              <li>
+                                
+                                <!-- paragraph -->
+                                <p>
+                                  Top 25 Total - 73.06%
+                                </p>
+                                
+                              </li>
+                              
+                              <!-- list item -->
+                              <li>
+                                
+                                <!-- paragraph -->
+                                <p>
+                                  Mean of Top 100 - 0.827%
+                                </p>
+                                
+                              </li>
+                              
+                              <!-- list item -->
+                              <li>
+                                
+                                <!-- paragraph -->
+                                <p>
+                                  Median of Top 100 - 0.13%
+                                </p>
+                                
+                              </li>
+                              
+                              <!-- list item -->
+                              <li>
+                                
+                                <!-- paragraph -->
+                                <p>
+                                  Top 100 Total - 82.70%
+                                </p>
+                                
+                              </li>                          
+
+                            </ul>
+                            
+                          </li>
+
+                        </ul>
+
+                        <!-- paragraph -->
+                        <p>
+As per direct contact with @borovan, 50.11% of the total supply is held by the creators, and they have no
+intention of growing this stake further.
+                        </p>                        
+
+                      </div>
+
+                      <!-- center -->
+                      <div>
+
+                        <!-- heading -->
+                        <h3 class="taco-report-explorer__report-heading
+                                  taco-report-explorer__report-heading--h1">
+                          Market Metrics
+                          <i class="fa-solid fa-circle-info" 
+                            data-bs-toggle="tooltip" 
+                            data-bs-placement="top" 
+                            title="Review key indicators such as trading volume and historical market performance."></i>
+                        </h3>
+
+                        <!-- unordered list -->
+                        <ul>
+
+                          <!-- list item -->
+                          <li>
+                            
+                            <!-- paragraph -->
+                            <p>
+                              All Time High (USD): 0.0113
+                            </p>
+                            
+                          </li>
+
+                          <!-- list item -->
+                          <li>
+                            
+                            <!-- paragraph -->
+                            <p>
+                              All Time Low (USD): 0.0002
+                            </p>
+                            
+                          </li>
+                          
+                          <!-- list item -->
+                          <li>
+                            
+                            <!-- paragraph -->
+                            <p>
+                              As at 11/11/25 (USD): 0.0007154
+                            </p>
+                            
+                          </li>
+                          
+                          <!-- list item -->
+                          <li>
+                            
+                            <!-- paragraph -->
+                            <p>
+                              Change from ATH USD: -93.67%
+                            </p>
+                            
+                          </li>                      
+
+                          <!-- list item -->
+                          <li>
+                            
+                            <!-- paragraph -->
+                            <p>
+                              Change from ATL USD: 257.7%
+                            </p>
+
+                          </li>
+
+                          <!-- list item -->
+                          <li>
+                            
+                            <!-- paragraph -->
+                            <p>
+                              USD Volume 24H as at 11/11/25: 11,955
+                            </p>
+                            
+                          </li>
+
+                        </ul>                        
+
+                      </div>
+
+                      <!-- right -->
+                      <div>
+
+                        <!-- heading -->
+                        <h3 class="taco-report-explorer__report-heading
+                                  taco-report-explorer__report-heading--h1">
+                          Liquidity
+                        </h3>
+
+                        <!-- paragraph -->
+                        <p>
+                          As per <a href="https://swaprunner.com" target="_blank">SwapRunner</a> on the 10th of November, a single transaction of:
+                        </p>
+
+                        <!-- unordered list -->
+                        <ul>
+
+                          <!-- list item -->
+                          <li>
+                            
+                            <!-- paragraph -->
+                            <p>
+20,000 ICP ($140,950) will result in a trade to 11,623,626 DKP ($8982). 93.62% lost to price
+impact
+                            </p>
+                            
+                          </li>
+
+                          <!-- list item -->
+                          <li>
+                            
+                            <!-- paragraph -->
+                            <p>
+10,000 ICP ($70,419) will result in a trade to 11,253,854 DKP ($8818). 87.47% lost to price
+impact
+                            </p>
+                            
+                          </li>
+                          
+                          <!-- list item -->
+                          <li>
+                            
+                            <!-- paragraph -->
+                            <p>
+1000 ICP ($7041) will result in a trade to 5,713,996 DKP ($4477). 36.41% lost to price impact
+                            </p>
+                            
+                          </li>
+                          
+                          <!-- list item -->
+                          <li>
+                            
+                            <!-- paragraph -->
+                            <p>
+250 ICP ($1760) will result in a trade to 1,943,343 DKP ($1509) 14.26% lost to price impact
+                            </p>
+                            
+                          </li>
+
+                        </ul>
+
+                        <!-- paragraph -->
+                        <p>
+As can be seen, liquidity for DKP is abysmally limited. If liquidity is not recycled, and there are no 'sells'
+between the DAO's 'buys', the effective slippage rate will be identical regardless of whether multiple
+small transactions or one large one take place.
+                        </p>
+
+                      </div>                      
+
+                    </div>
+
+                    <hr>
+
+                    <!-- headings -->
+                    <h3 class="taco-report-explorer__report-heading
+                              taco-report-explorer__report-heading--h1">
+                      Competitors
+                      <i class="fa-solid fa-circle-info" 
+                        data-bs-toggle="tooltip" 
+                        data-bs-placement="top" 
+                        title="Identify similar projects and assess the token's differentiators alongside the perceived competitive positioning within its niche"></i>
+                    </h3>
+
+                    <!-- paragraph -->
+                    <p>
+Probably the single most significant cryptocurrency-based video game is Axie Infinity: in terms of market
+cap, its main token AXS, peaked at just over $10 billion USD in the November of 2021. Nowadays, it
+fluctuates at around half a billion. The game itself drew an average of just over 30,000 players per day
+during January 2025.
+                    </p>
+
+                    <!-- paragraph -->
+                    <p>
+AXS is built on the Ronin Network, an Ethereum-linked sidechain developed by Sky Mavis. In March
+2022, hackers compromised the Ronin Network, stealing approximately $620 million worth of
+cryptocurrency. This attack was executed via social engineering. The hackers contacted a senior engineer
+at Sky Mavis posing as recruiters, and eventually sent a malware-infected PDF file disguised as a job
+offer that the engineer downloaded and opened on a company computer, giving hackers access to Sky
+Mavis's internal systems. The Ronin Network relied on nine validator nodes to secure transactions,
+requiring five to approve any withdrawal. Sky Mavis controlled four of the five required nodes to make
+transactions, but in the November of 2021 Sky Mavis asked for control of a fifth node run entirely by the
+Axie DAO. With this control, the autonomy of the DAO was overturned by a central power, and, when
+that centralised power was compromised, so was the DAO by extension. In total, five nodes were then
+compromised. With majority control of the validators, the hackers forged transactions and drained funds
+from the Ronin Bridge, a mechanism that connects the Ronin Network to Ethereum for asset transfers.
+                    </p>
+                    
+                    <!-- paragraph -->
+                    <p>
+ICP's architecture doesn't rely on a small group of employees managing validators in the same centralized
+way Sky Mavis did. The network is run by a distributed set of independent node providers across
+numerous data centers globally, coordinated by the NNS. This wipes out the potential of a single human
+error compromising ICP.
+                    </p>
+                    
+                    <!-- paragraph -->
+                    <p>
+Outside the crypto sphere, World of Warcraft (WOW) is the most popular MMO video game, estimated to
+be receiving 400,000 players daily as of March 2025. WOW is estimated to have generated over $10
+billion in revenue since its launch in 2004.
+                    </p>
+                    
+                    <!-- paragraph -->
+                    <p>
+Unlike Web2.0, and the mix of centralisation and decentralisation employed by the creators of Axie, the
+infrastructure utilised on the ICP network differs entirely in that total control cannot be overridden by a
+centralised force. All voting is done by a pool of holders. Because the game is run on a DAO, the baseline
+elements that make an RPG game - that being the story and the world etc. - can be directly influenced and
+changed by the player in a frictionless and decentralised manner.
+                    </p>                    
+
+                    <hr>
+                   
+                    <!-- heading -->
+                    <h3 class="taco-report-explorer__report-heading
+                              taco-report-explorer__report-heading--h1">
+                      Security Risks
+                      <i class="fa-solid fa-circle-info" 
+                        data-bs-toggle="tooltip" 
+                        data-bs-placement="top" 
+                        title="Investigate perceived vulnerabilities, any audit reports, and adherence to security and regulatory standards"></i>
+                    </h3>
+
+                    <h4 class="taco-report-explorer__report-heading
+                              taco-report-explorer__report-heading--h2 mt-4">
+                      Centralisation
+                    </h4>
+
+                    <!-- paragraph -->
+                    <p>
+Because a majority of the supply of the governance token is held by a single individual, should this
+individual be subject to a legal ruling or computer hacking, the future can be shaky as the majority vote
+falls into potentially malicious hands.
+                    </p>
+
+                    <h4 class="taco-report-explorer__report-heading
+                              taco-report-explorer__report-heading--h2 mt-4">
+                      Timeline
+                    </h4>
+
+                    <!-- paragraph -->
+                    <p>
+It should be noted that a timely or even eventual launch of Dragginz is not guaranteed, particularly given
+the current development pause while the team prioritises the Toko marketplace. On the 11th of November,
+it was <a href="https://x.com/Toko_app/status/1988053742554321343" target="_blank">announced</a> that the team of remote workers working on Dragginz had been let go, and that the
+Powells may consider starting development again in 6 months. ICP's bad price action contributed to this
+decision, indicating that the project's funding runway fluctuates with ICP's market value. In the
+<a href="https://x.com/dragginzgame/status/1963596142022742232" target="_blank">Dataworld Update</a> (4th September), the team claimed that the game was four months of development
+away from being playable.
+                    </p>
+
+                    <hr>
+                    
+                    <!-- back to top link -->
+                    <a href="#" @click.prevent="scrollToTop" class="taco-report-explorer__report-link text-center w-100 d-inline-block mt-2">Back to top</a>
+                    
+                  </div>
+
+                  <!-- report footer -->
+                  <div class="taco-report-explorer__report-footer">
+                    
+                    <!-- left -->
+                    <div class="taco-report-explorer__report-footer__left">
+                      
+                      ❤️🌮
+                      
+                    </div>
+                    
+                    <!-- center -->
+                    <div class="taco-report-explorer__report-footer__center text-center">
+                      
+                      &copy;2025 Taco Dao
+                      
+                    </div>
+                    
+                    <!-- right -->
+                    <div class="taco-report-explorer__report-footer__right">
+
+                      <!-- link group -->
+                      <!-- <span class="d-flex flex-column align-items-end">
+
+                        <span class="text-end">#45 Add Token</span>
+
+                        <span class="d-flex gap-2">
+
+                          <a href="https://nns.ic0.app/proposal/?u=lacdn-3iaaa-aaaaq-aae3a-cai&proposal=45" class="taco-text-blue-to-light-blue text-end" target="_blank">NNS</a>                        
+
+                          <a href="https://app.sneeddao.com/proposal?proposalid=45&sns=lacdn-3iaaa-aaaaq-aae3a-cai" class="taco-text-blue-to-light-blue text-end" target="_blank">Sneed Hub</a>
+
+                        </span>
+                        
+                      </span> -->
+                      
+                      <!-- link group -->
+                      <!-- <span class="d-flex flex-column align-items-end">
+
+                        <span class="text-end">#142 Motion to Discuss</span>
+
+                        <span class="d-flex gap-2">
+
+                          <a href="https://nns.ic0.app/proposal/?u=lacdn-3iaaa-aaaaq-aae3a-cai&proposal=142" class="taco-text-blue-to-light-blue text-end" target="_blank">NNS</a>
+
+                          <a href="https://tacodao.com/chat/forum/142" class="taco-text-blue-to-light-blue text-end">Taco Forum</a>
+
+                        </span>
+                        
+                      </span> -->
+
+                      <!-- link group -->
+                      <!-- <span class="d-flex flex-column align-items-end">
+
+                        <span class="text-end">#31 Motion to Research</span>
+
+                        <span class="d-flex gap-2">
+
+                          <a href="https://nns.ic0.app/proposal/?u=lacdn-3iaaa-aaaaq-aae3a-cai&proposal=31" class="taco-text-blue-to-light-blue text-end" target="_blank">NNS</a>
+
+                          <a href="https://tacodao.com/chat/forum/31" class="taco-text-blue-to-light-blue text-end">Taco Forum</a>
+
+                        </span>
+                        
+                      </span>                       -->
+
+                    </div>
+                    
+                  </div>
+
+                </div>
+                
+              </div>                  
               
             </div>
             
@@ -11515,6 +12814,7 @@ about the projects that create allocations.
   import kongSwapIcon from '../assets/tokens/snspng/kongswap.png'
   import neutriniteIcon from '../assets/tokens/snspng/neutrinite.png'
   import clownIcon from '../assets/tokens/clown.png'
+  import dkpIcon from '../assets/tokens/dkp.png'
   
   ///////////
   // store //
@@ -11552,6 +12852,7 @@ about the projects that create allocations.
   const kongSwapIconUrl = kongSwapIcon
   const neutriniteIconUrl = neutriniteIcon
   const clownIconUrl = clownIcon
+  const dkpIconUrl = dkpIcon
 
   // show report menu on mobile
   const showReportMenuOnMobile = ref(false)
@@ -11648,10 +12949,13 @@ about the projects that create allocations.
       reportId.value = 8
     } else if (newPath === '/reports/clown') {
       reportId.value = 9
-    } else if (newPath === '/reports/example') {
+    } else if (newPath === '/reports/dkp') {
+      reportId.value = 10
+    }
+    else if (newPath === '/reports/example') {
       reportId.value = 0
     } else {
-      reportId.value = 9
+      reportId.value = 10
     }
 
   }, { immediate: true })
