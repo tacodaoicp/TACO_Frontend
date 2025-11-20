@@ -698,7 +698,10 @@
 
                         <!-- status value -->
                         <span class="forum-thread-view__details__value forum-thread-view__details__value__status"
-                            :class="[{ 'forum-thread-view__details__value__passed': proposal.status === 'Executed', 'forum-thread-view__details__value__failed': proposal.status === 'Rejected' }]">
+                            :class="[{ 
+                                'forum-thread-view__details__value__passed': proposal.status === 'Executed' || proposal.status === 'Adopted', 
+                                'forum-thread-view__details__value__failed': proposal.status === 'Rejected' || proposal.status === 'Failed' 
+                            }]">
                             {{ formatStatus(proposal.status) }}
                         </span>
 
@@ -796,7 +799,7 @@
                     </div>
 
                     <!-- vote on proposal -->
-                    <div v-if="proposal.status === 'Open'" class="forum-thread-view__details__vote-section">
+                    <div v-if="proposal.status === 'Open' || proposal.status === 'Adopted'" class="forum-thread-view__details__vote-section">
 
                         <!-- vote section key -->
                         <span class="forum-thread-view__details__key">Cast Your Vote</span>
@@ -2448,6 +2451,9 @@
                 // set proposal to found proposal
                 proposal.value = foundProposal
 
+                // log proposal status for debugging
+                console.log('Proposal loaded - ID:', foundProposal.id.toString(), 'Status:', foundProposal.status)
+
                 // load thread data
                 await loadThreadData()
 
@@ -3116,7 +3122,10 @@
     // format status
     const formatStatus = (status: string) => {
       if (status === "Executed") return "PASSED"
+      if (status === "Adopted") return "ADOPTED"
       if (status === "Rejected") return "FAILED"
+      if (status === "Failed") return "FAILED"
+      if (status === "Open") return "OPEN"
       return status
     }
 
@@ -3583,8 +3592,9 @@
 
         } else {
 
-            // if user logs in and is on details tab with an open proposal
-            if (threadNavigation.value === 'details' && proposalId.value && proposal.value?.status === 'Open') {
+            // if user logs in and is on details tab with an open or adopted proposal
+            if (threadNavigation.value === 'details' && proposalId.value && 
+                (proposal.value?.status === 'Open' || proposal.value?.status === 'Adopted')) {
                 await refreshVotingData()
             }
 
@@ -3595,8 +3605,9 @@
     // watch for tab navigation changes
     watch(threadNavigation, async (newTab) => {
         
-        // if navigating to details tab and user is logged in
-        if (newTab === 'details' && userLoggedIn.value && proposalId.value && proposal.value?.status === 'Open') {
+        // if navigating to details tab and user is logged in with open or adopted proposal
+        if (newTab === 'details' && userLoggedIn.value && proposalId.value && 
+            (proposal.value?.status === 'Open' || proposal.value?.status === 'Adopted')) {
             await refreshVotingData()
         }
         
