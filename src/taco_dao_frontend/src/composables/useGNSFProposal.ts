@@ -131,6 +131,7 @@ export function useGNSFProposal() {
 
     console.log(manageNeuronRequest);      
 
+      // REMOVE TO ACTIVATE
       if (1 == 1) {
       return BigInt(42);}
 
