@@ -12947,6 +12947,10 @@ away from being playable.
       reportId.value = 7
     } else if (newPath === '/reports/neutrinite') {
       reportId.value = 8
+    } else if (newPath === '/reports/ntn') {
+      reportId.value = 8
+    } else if (newPath === '/reports/cicp') {
+      reportId.value = 8
     } else if (newPath === '/reports/clown') {
       reportId.value = 9
     } else if (newPath === '/reports/dkp') {
