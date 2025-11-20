@@ -76,6 +76,8 @@ const routes = [
     { path: "/reports/openchat", component: ReportsView, meta: { robots: 'noindex' } },
     { path: "/reports/kongswap", component: ReportsView, meta: { robots: 'noindex' } },
     { path: "/reports/neutrinite", component: ReportsView, meta: { robots: 'noindex' } },
+    { path: "/reports/ntn", component: ReportsView, meta: { robots: 'noindex' } },
+    { path: "/reports/cicp", component: ReportsView, meta: { robots: 'noindex' } },
     { path: "/reports/clown", component: ReportsView, meta: { robots: 'noindex' } },
     { path: "/reports/dkp", component: ReportsView, meta: { robots: 'noindex' } },
     { path: "/admin", name: "Admin", component: AdminView, meta: { robots: 'noindex' } },

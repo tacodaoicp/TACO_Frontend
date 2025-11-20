@@ -55,6 +55,7 @@ import fuelEvToken from "../../assets/tokens/snspng/fuelev.png"
 import sgldtToken from "../../assets/tokens/sgldt.png"
 import cicpToken from "../../assets/tokens/cicp.png"
 import clownToken from "../../assets/tokens/clown.png"
+import ckethToken from "../../assets/tokens/cketh.png"
 
 //////////////
 // mappings //
@@ -112,6 +113,7 @@ export const tokenImages: { [key: string]: string } = {
 "sGLDT": sgldtToken,
 "cICP": cicpToken,
 "Clown": clownToken,
+"Chainkey ETH": ckethToken,
 }  
 
 //////////
@@ -182,7 +184,16 @@ export const tokenData = [
         icon: ckbtcToken,
         description: `ckBTC is a pair of ICP smart contracts building on the Bitcoin canister and ckECDSA services. The contracts work together to enable users and canister smart contracts on ICP to send and receive BTC value within seconds — far faster than is possible with native BTC chain transactions, while also always allowing users and smart contracts to send and receive value to and from native BTC network addresses.`,
         color: '#5122b5'
-    },    
+    },   
+    {
+        title: 'Chainkey ETH',
+        symbol: 'cketh',
+        link: 'https://dashboard.internetcomputer.org/ethereum',
+        icpCoinsLink: 'https://neutrinite.io/currencies/ckETH',
+        icon: ckethToken,
+        description: `Chain-key Ethereum (ckETH) is an ICRC-2-compliant token that is backed 1:1 by ETH held 100% on the mainnet.`,
+        color: '#b199e3'
+    },
     {
         title: 'CYCLES-TRANSFER-STATION',
         symbol: 'cts',
