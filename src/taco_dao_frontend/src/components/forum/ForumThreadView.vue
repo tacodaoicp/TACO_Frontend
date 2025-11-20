@@ -795,6 +795,111 @@
 
                     </div>
 
+                    <!-- vote on proposal -->
+                    <div v-if="proposal.status === 'Open'" class="forum-thread-view__details__vote-section">
+
+                        <!-- vote section key -->
+                        <span class="forum-thread-view__details__key">Cast Your Vote</span>
+
+                        <!-- not logged in message -->
+                        <div v-if="!userLoggedIn" class="forum-thread-view__details__vote-login mt-3">
+                            <button class="btn iid-login" @click="iidLogIn">
+                                <DfinityLogo style="width: 1.375rem;" />
+                                <span style="color: var(--white);">Login to Vote</span>
+                            </button>
+                        </div>
+
+                        <!-- loading neurons -->
+                        <div v-else-if="votingState.loading" class="d-flex align-items-center gap-2 mt-3">
+                            <div class="spinner-border spinner-border-sm" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                            <span style="color: var(--dark-brown-to-white);">Loading your neurons...</span>
+                        </div>
+
+                        <!-- voting error -->
+                        <div v-else-if="votingState.error" class="alert alert-danger mt-3">
+                            {{ votingState.error }}
+                        </div>
+
+                        <!-- no neurons -->
+                        <div v-else-if="votingState.neurons.length === 0" class="alert alert-info mt-3">
+                            You don't have any neurons to vote with. Create a neuron by staking TACO tokens.
+                        </div>
+
+                        <!-- neurons list -->
+                        <div v-else class="forum-thread-view__details__neurons-list mt-3">
+                            
+                            <div v-for="neuron in votingState.neurons" 
+                                 :key="neuron.displayId"
+                                 class="forum-thread-view__details__neuron-item">
+                                
+                                <!-- neuron info -->
+                                <div class="forum-thread-view__details__neuron-info">
+                                    <div class="forum-thread-view__details__neuron-id">
+                                        Neuron: {{ neuron.displayId.substring(0, 8) }}...{{ neuron.displayId.substring(neuron.displayId.length - 8) }}
+                                    </div>
+                                    <div class="forum-thread-view__details__neuron-vp">
+                                        Voting Power: {{ Number((Number(neuron.votingPower) / 100000000).toFixed(0)).toLocaleString() }}
+                                    </div>
+                                </div>
+
+                                <!-- voting status -->
+                                <div class="forum-thread-view__details__neuron-actions">
+                                    
+                                    <!-- already voted -->
+                                    <div v-if="neuron.hasVoted" class="forum-thread-view__details__vote-status">
+                                        <span v-if="neuron.vote === 'yes'" class="badge bg-success">Voted Yes</span>
+                                        <span v-else-if="neuron.vote === 'no'" class="badge bg-danger">Voted No</span>
+                                        <span v-else class="badge bg-secondary">Already Voted</span>
+                                    </div>
+
+                                    <!-- can vote -->
+                                    <div v-else-if="neuron.canVote" class="d-flex gap-2">
+                                        <button 
+                                            class="btn btn-sm btn-success"
+                                            :disabled="votingState.voting"
+                                            @click="castVoteOnProposal(neuron.id, 'yes')">
+                                            <i class="fa-solid fa-check"></i> Vote Yes
+                                        </button>
+                                        <button 
+                                            class="btn btn-sm btn-danger"
+                                            :disabled="votingState.voting"
+                                            @click="castVoteOnProposal(neuron.id, 'no')">
+                                            <i class="fa-solid fa-times"></i> Vote No
+                                        </button>
+                                    </div>
+
+                                    <!-- cannot vote -->
+                                    <div v-else class="text-muted small">
+                                        Cannot vote (no voting power)
+                                    </div>
+
+                                </div>
+
+                            </div>
+
+                            <!-- refresh button -->
+                            <button 
+                                v-if="votingState.neurons.length > 0"
+                                class="btn taco-nav-btn taco-nav-btn--active btn-sm mt-3"
+                                :disabled="votingState.loading || votingState.voting"
+                                @click="refreshVotingData">
+                                <i class="fa-solid fa-refresh"></i> Refresh
+                            </button>
+
+                        </div>
+
+                    </div>
+
+                    <!-- proposal closed -->
+                    <div v-else-if="userLoggedIn" class="forum-thread-view__details__vote-section mt-3">
+                        <span class="forum-thread-view__details__key">Voting</span>
+                        <div class="alert alert-secondary mt-2">
+                            Voting is closed for this proposal.
+                        </div>
+                    </div>
+
                 </div>
 
             </div>
@@ -1959,6 +2064,80 @@
 
         }
 
+        // vote section
+        &__vote-section {
+            margin-top: 2rem;
+            padding-top: 1rem;
+            border-top: 1px solid var(--dark-orange);
+        }
+
+        // vote login
+        &__vote-login {
+            .iid-login {
+                display: flex;
+                align-items: center;
+                gap: 0.5rem;
+                padding: 0.5rem 1rem;
+            }
+        }
+
+        // neurons list
+        &__neurons-list {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        // neuron item
+        &__neuron-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1rem;
+            background-color: var(--orange-to-brown);
+            border: 1px solid var(--dark-orange);
+            border-radius: 0.5rem;
+            gap: 1rem;
+            flex-wrap: wrap;
+        }
+
+        // neuron info
+        &__neuron-info {
+            display: flex;
+            flex-direction: column;
+            gap: 0.25rem;
+            flex: 1;
+            min-width: 200px;
+        }
+
+        // neuron id
+        &__neuron-id {
+            font-size: 0.875rem;
+            font-weight: 600;
+            word-break: break-all;
+        }
+
+        // neuron voting power
+        &__neuron-vp {
+            font-size: 0.75rem;
+            color: var(--dark-brown-to-white);
+        }
+
+        // neuron actions
+        &__neuron-actions {
+            display: flex;
+            gap: 0.5rem;
+            align-items: center;
+        }
+
+        // vote status
+        &__vote-status {
+            .badge {
+                padding: 0.375rem 0.75rem;
+                font-size: 0.875rem;
+            }
+        }
+
         // inputs
         input {
             padding: 0rem 0.5rem;
@@ -2093,6 +2272,7 @@
     import { useRoute } from 'vue-router'
     import { useTacoStore } from '../../stores/taco.store'
     import { storeToRefs } from 'pinia'
+    import { useVoting } from '../../composables/useVoting'
     import TwistyArrow from '../../assets/images/twistyArrow.vue'
     import WigglyArrow from '../../assets/images/wigglyArrow.vue'
     import SneedHeadTiny from '../../assets/images/sneed-head-tiny.png'
@@ -2196,7 +2376,26 @@
     const sneedHeadTiny = SneedHeadTiny
 
     // error
-    const error = ref<string | null>(null)    
+    const error = ref<string | null>(null)
+
+    // voting composable
+    const { 
+        loading: votingLoading,
+        voting,
+        error: votingError,
+        neurons: votingNeurons,
+        fetchNeurons,
+        castVote,
+        reset: resetVoting
+    } = useVoting()
+
+    // voting state
+    const votingState = computed(() => ({
+        loading: votingLoading.value,
+        voting: voting.value,
+        error: votingError.value,
+        neurons: votingNeurons.value
+    }))
 
     ///////////////////
     // local methods //
@@ -2921,6 +3120,50 @@
       return status
     }
 
+    // cast vote on proposal
+    const castVoteOnProposal = async (neuronId: Uint8Array, vote: 'yes' | 'no') => {
+        
+        try {
+            await castVote({
+                proposalId: BigInt(proposalId.value!),
+                neuronId,
+                vote
+            })
+            
+            // show success toast
+            tacoStore.addToast({
+                id: Date.now(),
+                code: 'vote-success',
+                title: 'Vote Cast',
+                icon: 'fa-solid fa-check-circle',
+                message: `Your vote "${vote}" has been cast successfully!`
+            })
+            
+        } catch (error: any) {
+            console.error('Error casting vote:', error)
+            
+            // show error toast
+            tacoStore.addToast({
+                id: Date.now(),
+                code: 'vote-error',
+                title: 'Vote Failed',
+                icon: 'fa-solid fa-exclamation-triangle',
+                message: `Failed to cast vote: ${error.message || 'Unknown error'}`
+            })
+        }
+    }
+
+    // refresh voting data
+    const refreshVotingData = async () => {
+        if (proposalId.value && userLoggedIn.value) {
+            try {
+                await fetchNeurons(BigInt(proposalId.value))
+            } catch (error) {
+                console.error('Error refreshing voting data:', error)
+            }
+        }
+    }
+
     // save account name
     const saveAccountName = async () => {
 
@@ -3335,8 +3578,28 @@
             // set replying to post to null
             replyingToPost.value = null
 
+            // reset voting state
+            resetVoting()
+
+        } else {
+
+            // if user logs in and is on details tab with an open proposal
+            if (threadNavigation.value === 'details' && proposalId.value && proposal.value?.status === 'Open') {
+                await refreshVotingData()
+            }
+
         }
 
+    })
+
+    // watch for tab navigation changes
+    watch(threadNavigation, async (newTab) => {
+        
+        // if navigating to details tab and user is logged in
+        if (newTab === 'details' && userLoggedIn.value && proposalId.value && proposal.value?.status === 'Open') {
+            await refreshVotingData()
+        }
+        
     })
   
     /////////////////////
