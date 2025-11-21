@@ -87,19 +87,15 @@ export function useVoting() {
         throw new Error('User must be logged in to view neurons')
       }
       
-      const governanceActor = await createSnsGovernanceActor()
+      // Use the store's method to get all user neurons (owned + hotkeyed)
+      const userNeurons = await tacoStore.getUserNeurons()
       
-      // Fetch neurons for this user
-      const neuronsResult = await (governanceActor as any).list_neurons({
-        of_principal: [Principal.fromText(tacoStore.userPrincipal)],
-        limit: 1000,
-        start_page_at: []
-      })
-      
-      if (!neuronsResult.neurons || neuronsResult.neurons.length === 0) {
+      if (!userNeurons || userNeurons.length === 0) {
         neurons.value = []
         return
       }
+      
+      const governanceActor = await createSnsGovernanceActor()
       
       // Get proposal data to check which neurons have voted
       const proposalResponse = await (governanceActor as any).get_proposal({
@@ -110,12 +106,37 @@ export function useVoting() {
       const ballots = proposal?.ballots || []
       
       // Format neurons with voting status
-      neurons.value = neuronsResult.neurons.map((neuron: any) => {
+      neurons.value = userNeurons.map((neuron: any) => {
         const neuronId = neuron.id && neuron.id.length > 0 ? neuron.id[0].id : null
         if (!neuronId) return null
         
         const displayId = neuronIdToHex(neuronId)
         const votingPower = neuron.voting_power || BigInt(0)
+        
+        // Check if user has vote permission for this neuron
+        const userPrincipal = Principal.fromText(tacoStore.userPrincipal!)
+        let hasVotePermission = false
+        
+        if (neuron.permissions && Array.isArray(neuron.permissions)) {
+          for (const permission of neuron.permissions) {
+            if (permission.principal && permission.principal.length > 0) {
+              const permissionPrincipal = permission.principal[0]
+              if (permissionPrincipal.toText() === userPrincipal.toText()) {
+                const permissionTypes = permission.permission_type || []
+                // Permission type 3 is Vote permission
+                if (permissionTypes.includes(3)) {
+                  hasVotePermission = true
+                  break
+                }
+              }
+            }
+          }
+        }
+        
+        // Skip neurons where user doesn't have vote permission
+        if (!hasVotePermission) {
+          return null
+        }
         
         // Check if this neuron has voted
         const neuronIdHex = displayId
