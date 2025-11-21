@@ -117,7 +117,15 @@ export function useVoting() {
         }
         
         const displayId = neuronIdToHex(neuronId)
-        const votingPower = neuron.voting_power || BigInt(0)
+        
+        // Calculate voting power - can be directly available or needs to be calculated from stake
+        let votingPower = BigInt(0)
+        if (neuron.voting_power !== undefined) {
+          votingPower = BigInt(neuron.voting_power)
+        } else if (neuron.cached_neuron_stake_e8s !== undefined) {
+          // Use cached stake as fallback
+          votingPower = BigInt(neuron.cached_neuron_stake_e8s)
+        }
         
         console.log('Processing neuron:', displayId, 'Voting Power:', votingPower.toString())
         
