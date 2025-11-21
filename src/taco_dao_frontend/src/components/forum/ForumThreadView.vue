@@ -833,6 +833,29 @@
                         <!-- neurons list -->
                         <div v-else class="forum-thread-view__details__neurons-list mt-3">
                             
+                            <!-- bulk voting buttons -->
+                            <div v-if="eligibleNeuronsCount > 0" class="forum-thread-view__details__bulk-vote mb-3">
+                                <div class="forum-thread-view__details__bulk-vote__info">
+                                    <strong>{{ eligibleNeuronsCount }}</strong> neuron{{ eligibleNeuronsCount > 1 ? 's' : '' }} ready to vote
+                                    <span class="text-muted small">({{ formatVotingPower(eligibleVotingPower) }} VP)</span>
+                                </div>
+                                <div class="d-flex gap-2">
+                                    <button 
+                                        class="btn btn-success"
+                                        :disabled="votingState.voting"
+                                        @click="castBulkVoteOnProposal('yes')">
+                                        <i class="fa-solid fa-check"></i> Vote Yes with All
+                                    </button>
+                                    <button 
+                                        class="btn btn-danger"
+                                        :disabled="votingState.voting"
+                                        @click="castBulkVoteOnProposal('no')">
+                                        <i class="fa-solid fa-times"></i> Vote No with All
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- individual neurons -->
                             <div v-for="neuron in votingState.neurons" 
                                  :key="neuron.displayId"
                                  class="forum-thread-view__details__neuron-item">
@@ -2091,6 +2114,43 @@
             gap: 1rem;
         }
 
+        // bulk vote section
+        &__bulk-vote {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+            padding: 1rem;
+            background-color: var(--light-orange-to-dark-brown);
+            border: 2px solid var(--dark-orange);
+            border-radius: 0.5rem;
+
+            &__info {
+                display: flex;
+                flex-direction: column;
+                gap: 0.25rem;
+                color: var(--dark-brown-to-white);
+                
+                strong {
+                    font-size: 1.125rem;
+                }
+            }
+
+            .btn {
+                flex: 1;
+                min-width: 150px;
+            }
+
+            @media (max-width: 575.98px) {
+                .d-flex {
+                    flex-direction: column;
+                }
+                
+                .btn {
+                    width: 100%;
+                }
+            }
+        }
+
         // neuron item
         &__neuron-item {
             display: flex;
@@ -2389,6 +2449,7 @@
         neurons: votingNeurons,
         fetchNeurons,
         castVote,
+        castBulkVote,
         reset: resetVoting
     } = useVoting()
 
@@ -2399,6 +2460,24 @@
         error: votingError.value,
         neurons: votingNeurons.value
     }))
+
+    // count of neurons that can vote
+    const eligibleNeuronsCount = computed(() => {
+        return votingNeurons.value.filter(n => n.canVote).length
+    })
+
+    // total voting power of eligible neurons
+    const eligibleVotingPower = computed(() => {
+        return votingNeurons.value
+            .filter(n => n.canVote)
+            .reduce((sum, n) => sum + n.votingPower, BigInt(0))
+    })
+
+    // format voting power for display
+    const formatVotingPower = (vp: bigint): string => {
+        const formatted = Number(vp) / 100000000
+        return formatted.toLocaleString('en-US', { maximumFractionDigits: 0 })
+    }
 
     ///////////////////
     // local methods //
@@ -3158,6 +3237,42 @@
                 title: 'Vote Failed',
                 icon: 'fa-solid fa-exclamation-triangle',
                 message: `Failed to cast vote: ${error.message || 'Unknown error'}`
+            })
+        }
+    }
+
+    // cast bulk vote with all eligible neurons
+    const castBulkVoteOnProposal = async (vote: 'yes' | 'no') => {
+        
+        try {
+            const result = await castBulkVote(BigInt(proposalId.value!), vote)
+            
+            // show success toast with results
+            const vpFormatted = formatVotingPower(result.totalVP)
+            let message = `Successfully voted "${vote}" with ${result.successful} neuron${result.successful > 1 ? 's' : ''} (${vpFormatted} VP)`
+            
+            if (result.failed > 0) {
+                message += `\n${result.failed} vote${result.failed > 1 ? 's' : ''} failed.`
+            }
+            
+            tacoStore.addToast({
+                id: Date.now(),
+                code: 'bulk-vote-success',
+                title: 'Bulk Vote Complete',
+                icon: 'fa-solid fa-check-circle',
+                message
+            })
+            
+        } catch (error: any) {
+            console.error('Error casting bulk vote:', error)
+            
+            // show error toast
+            tacoStore.addToast({
+                id: Date.now(),
+                code: 'bulk-vote-error',
+                title: 'Bulk Vote Failed',
+                icon: 'fa-solid fa-exclamation-triangle',
+                message: `Failed to cast bulk vote: ${error.message || 'Unknown error'}`
             })
         }
     }

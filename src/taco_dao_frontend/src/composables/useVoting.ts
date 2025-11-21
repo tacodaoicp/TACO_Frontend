@@ -315,8 +315,9 @@ export function useVoting() {
    * Cast a vote on a proposal
    * 
    * @param params - Vote parameters including proposal ID, neuron ID, and vote choice
+   * @param skipRefresh - If true, skip refreshing neurons after voting (for bulk operations)
    */
-  const castVote = async (params: VoteParams): Promise<void> => {
+  const castVote = async (params: VoteParams, skipRefresh: boolean = false): Promise<void> => {
     voting.value = true
     error.value = null
     
@@ -361,14 +362,17 @@ export function useVoting() {
         }
         
         if (command.RegisterVote) {
-          console.log('Vote cast successfully, refreshing neuron list...')
+          console.log('Vote cast successfully')
           
-          // Wait a moment for the vote to be registered on-chain
-          await new Promise(resolve => setTimeout(resolve, 1000))
-          
-          // Refresh neurons to update voting status
-          await fetchNeurons(params.proposalId)
-          console.log('Neuron list refreshed after vote')
+          if (!skipRefresh) {
+            console.log('Refreshing neuron list...')
+            // Wait a moment for the vote to be registered on-chain
+            await new Promise(resolve => setTimeout(resolve, 1000))
+            
+            // Refresh neurons to update voting status
+            await fetchNeurons(params.proposalId)
+            console.log('Neuron list refreshed after vote')
+          }
           return
         }
       }
@@ -384,6 +388,82 @@ export function useVoting() {
     }
   }
   
+  /**
+   * Cast votes with all eligible neurons
+   * 
+   * @param proposalId - The proposal ID
+   * @param vote - The vote choice (yes/no)
+   */
+  const castBulkVote = async (proposalId: bigint, vote: 'yes' | 'no'): Promise<{ 
+    successful: number, 
+    failed: number,
+    totalVP: bigint 
+  }> => {
+    voting.value = true
+    error.value = null
+    
+    try {
+      if (!tacoStore.userLoggedIn) {
+        throw new Error('User must be logged in to vote')
+      }
+      
+      // Get all neurons that can vote
+      const eligibleNeurons = neurons.value.filter(n => n.canVote)
+      
+      if (eligibleNeurons.length === 0) {
+        throw new Error('No eligible neurons to vote with')
+      }
+      
+      console.log(`Casting ${vote} vote with ${eligibleNeurons.length} neurons...`)
+      
+      let successful = 0
+      let failed = 0
+      let totalVP = BigInt(0)
+      const errors: string[] = []
+      
+      // Vote with each neuron (skip refresh on individual votes)
+      for (const neuron of eligibleNeurons) {
+        try {
+          await castVote({
+            proposalId,
+            neuronId: neuron.id,
+            vote
+          }, true) // Skip refresh for individual votes
+          successful++
+          totalVP += neuron.votingPower
+          console.log(`✓ Voted with neuron ${neuron.displayId.substring(0, 8)}...`)
+        } catch (err: any) {
+          failed++
+          const errorMsg = err.message || 'Unknown error'
+          errors.push(`Neuron ${neuron.displayId.substring(0, 8)}...: ${errorMsg}`)
+          console.error(`✗ Failed to vote with neuron ${neuron.displayId.substring(0, 8)}...`, err)
+        }
+      }
+      
+      if (errors.length > 0 && successful === 0) {
+        // All votes failed
+        throw new Error(`All votes failed:\n${errors.join('\n')}`)
+      }
+      
+      // Wait a moment for all votes to be registered on-chain
+      console.log('All votes cast, waiting for blockchain confirmation...')
+      await new Promise(resolve => setTimeout(resolve, 2000))
+      
+      // Refresh neuron list once after all voting is complete
+      console.log('Refreshing neuron list...')
+      await fetchNeurons(proposalId)
+      
+      return { successful, failed, totalVP }
+      
+    } catch (err: any) {
+      console.error('Error casting bulk vote:', err)
+      error.value = err.message || 'Failed to cast bulk vote'
+      throw err
+    } finally {
+      voting.value = false
+    }
+  }
+
   /**
    * Reset state
    */
@@ -404,6 +484,7 @@ export function useVoting() {
     // Methods
     fetchNeurons,
     castVote,
+    castBulkVote,
     reset
   }
 }
