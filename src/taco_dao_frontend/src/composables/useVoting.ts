@@ -88,9 +88,12 @@ export function useVoting() {
       }
       
       // Use the store's method to get all user neurons (owned + hotkeyed)
-      const userNeurons = await tacoStore.getUserNeurons()
+      console.log('Fetching user neurons...')
+      const userNeurons = await tacoStore.getTacoNeurons()
+      console.log('User neurons fetched:', userNeurons?.length || 0, 'neurons')
       
       if (!userNeurons || userNeurons.length === 0) {
+        console.log('No neurons found')
         neurons.value = []
         return
       }
@@ -108,35 +111,50 @@ export function useVoting() {
       // Format neurons with voting status
       neurons.value = userNeurons.map((neuron: any) => {
         const neuronId = neuron.id && neuron.id.length > 0 ? neuron.id[0].id : null
-        if (!neuronId) return null
+        if (!neuronId) {
+          console.log('Skipping neuron with no ID')
+          return null
+        }
         
         const displayId = neuronIdToHex(neuronId)
         const votingPower = neuron.voting_power || BigInt(0)
+        
+        console.log('Processing neuron:', displayId, 'Voting Power:', votingPower.toString())
         
         // Check if user has vote permission for this neuron
         const userPrincipal = Principal.fromText(tacoStore.userPrincipal!)
         let hasVotePermission = false
         
         if (neuron.permissions && Array.isArray(neuron.permissions)) {
+          console.log('Neuron has', neuron.permissions.length, 'permission entries')
           for (const permission of neuron.permissions) {
             if (permission.principal && permission.principal.length > 0) {
               const permissionPrincipal = permission.principal[0]
+              const permissionTypes = permission.permission_type || []
+              console.log('  Permission for:', permissionPrincipal.toText().substring(0, 15) + '...', 'Types:', permissionTypes)
+              
               if (permissionPrincipal.toText() === userPrincipal.toText()) {
-                const permissionTypes = permission.permission_type || []
+                console.log('  -> Matches current user! Permission types:', permissionTypes)
                 // Permission type 3 is Vote permission
                 if (permissionTypes.includes(3)) {
                   hasVotePermission = true
+                  console.log('  -> Has VOTE permission (type 3)')
                   break
                 }
               }
             }
           }
+        } else {
+          console.log('Neuron has no permissions array')
         }
         
         // Skip neurons where user doesn't have vote permission
         if (!hasVotePermission) {
+          console.log('-> Neuron filtered out: no vote permission for current user')
           return null
         }
+        
+        console.log('-> Neuron INCLUDED with vote permission')
         
         // Check if this neuron has voted
         const neuronIdHex = displayId
