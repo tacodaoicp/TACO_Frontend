@@ -799,7 +799,7 @@
                     </div>
 
                     <!-- vote on proposal -->
-                    <div v-if="proposal.status === 'Open' || proposal.status === 'Adopted'" class="forum-thread-view__details__vote-section">
+                    <div v-if="isVotingOpen" class="forum-thread-view__details__vote-section">
 
                         <!-- vote section key -->
                         <span class="forum-thread-view__details__key">Cast Your Vote</span>
@@ -919,10 +919,10 @@
                     </div>
 
                     <!-- proposal closed -->
-                    <div v-else-if="userLoggedIn" class="forum-thread-view__details__vote-section mt-3">
+                    <div v-else-if="userLoggedIn && !isVotingOpen" class="forum-thread-view__details__vote-section mt-3">
                         <span class="forum-thread-view__details__key">Voting</span>
                         <div class="alert alert-secondary mt-2">
-                            Voting is closed for this proposal.
+                            Voting period has ended for this proposal.
                         </div>
                     </div>
 
@@ -2331,7 +2331,7 @@
     // Imports //
     /////////////
 
-    import { ref, onMounted, computed, watch } from 'vue'
+    import { ref, onMounted, onUnmounted, computed, watch } from 'vue'
     import { useRoute } from 'vue-router'
     import { useTacoStore } from '../../stores/taco.store'
     import { storeToRefs } from 'pinia'
@@ -2441,6 +2441,11 @@
     // error
     const error = ref<string | null>(null)
 
+    // proposal deadline tracking
+    const proposalDeadline = ref<bigint | null>(null)
+    const currentTime = ref(Date.now())
+    let deadlineTimer: ReturnType<typeof setInterval> | null = null
+
     // voting composable
     const { 
         loading: votingLoading,
@@ -2478,6 +2483,16 @@
         const formatted = Number(vp) / 100000000
         return formatted.toLocaleString('en-US', { maximumFractionDigits: 0 })
     }
+
+    // determine if voting period still active based on deadline
+    const isVotingOpen = computed(() => {
+        if (!proposalDeadline.value) {
+            // Assume open until we fetch actual deadline to avoid hiding UI prematurely
+            return true
+        }
+        const deadlineMs = Number(proposalDeadline.value) * 1000
+        return currentTime.value < deadlineMs
+    })
 
     ///////////////////
     // local methods //
@@ -2530,8 +2545,14 @@
                 // set proposal to found proposal
                 proposal.value = foundProposal
 
+                // reset deadline before fetching fresh data
+                proposalDeadline.value = null
+
                 // log proposal status for debugging
                 console.log('Proposal loaded - ID:', foundProposal.id.toString(), 'Status:', foundProposal.status)
+
+                // fetch proposal deadline to determine voting window
+                await fetchProposalDeadline(foundProposal.id)
 
                 // load thread data
                 await loadThreadData()
@@ -3277,6 +3298,66 @@
         }
     }
 
+    // fetch proposal deadline from SNS governance
+    const fetchProposalDeadline = async (propId: bigint) => {
+        try {
+            const { createAgent } = await import('@dfinity/utils')
+            const { AnonymousIdentity } = await import('@dfinity/agent')
+            const { Actor } = await import('@dfinity/agent')
+
+            const agent = await createAgent({
+                identity: new AnonymousIdentity(),
+                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+                fetchRootKey: process.env.DFX_NETWORK === "local",
+            })
+
+            const { idlFactory } = await import('../../../../declarations/sns_governance')
+            const governanceCanisterId = 'lhdfz-wqaaa-aaaaq-aae3q-cai'
+
+            const governanceActor = Actor.createActor(idlFactory, {
+                agent,
+                canisterId: governanceCanisterId
+            })
+
+            const proposalResponse = await (governanceActor as any).get_proposal({
+                proposal_id: [{ id: propId }]
+            })
+
+            const proposalData = proposalResponse?.result?.[0]?.Proposal
+
+            let deadlineSeconds: bigint | null = null
+
+            const toBigInt = (value: any): bigint | null => {
+                if (typeof value === 'bigint') return value
+                if (typeof value === 'number') return BigInt(value)
+                if (typeof value === 'string') return BigInt(value)
+                return null
+            }
+
+            if (proposalData) {
+                const wfqStateArray = proposalData.wait_for_quiet_state
+                const wfqState = Array.isArray(wfqStateArray) ? wfqStateArray[0] : wfqStateArray
+
+                if (wfqState && wfqState.current_deadline_timestamp_seconds !== undefined) {
+                    deadlineSeconds = toBigInt(wfqState.current_deadline_timestamp_seconds)
+                }
+
+                if (!deadlineSeconds) {
+                    const creationSeconds = toBigInt(proposalData.proposal_creation_timestamp_seconds)
+                    const votingPeriod = toBigInt(proposalData.initial_voting_period_seconds)
+                    if (creationSeconds !== null && votingPeriod !== null) {
+                        deadlineSeconds = creationSeconds + votingPeriod
+                    }
+                }
+            }
+
+            proposalDeadline.value = deadlineSeconds
+        } catch (error) {
+            console.error('Error fetching proposal deadline:', error)
+            proposalDeadline.value = null
+        }
+    }
+
     // refresh voting data
     const refreshVotingData = async () => {
         if (proposalId.value && userLoggedIn.value) {
@@ -3318,7 +3399,7 @@
         }
 
         // catch
-        catch (error) {
+        catch (error: any) {
 
             // log error
             console.error('Error saving account name:', error)
@@ -3707,9 +3788,8 @@
 
         } else {
 
-            // if user logs in and is on details tab with an open or adopted proposal
-            if (threadNavigation.value === 'details' && proposalId.value && 
-                (proposal.value?.status === 'Open' || proposal.value?.status === 'Adopted')) {
+            // if user logs in and is on details tab with a still-open voting window
+            if (threadNavigation.value === 'details' && proposalId.value && isVotingOpen.value) {
                 await refreshVotingData()
             }
 
@@ -3720,9 +3800,8 @@
     // watch for tab navigation changes
     watch(threadNavigation, async (newTab) => {
         
-        // if navigating to details tab and user is logged in with open or adopted proposal
-        if (newTab === 'details' && userLoggedIn.value && proposalId.value && 
-            (proposal.value?.status === 'Open' || proposal.value?.status === 'Adopted')) {
+        // if navigating to details tab and user is logged in while voting window is open
+        if (newTab === 'details' && userLoggedIn.value && proposalId.value && isVotingOpen.value) {
             await refreshVotingData()
         }
         
@@ -3734,6 +3813,10 @@
 
     // on mounted
     onMounted(async () => {
+
+        deadlineTimer = setInterval(() => {
+            currentTime.value = Date.now()
+        }, 1000)
 
         // log
         // console.log('forum discussion view mounted')
@@ -3768,6 +3851,13 @@
             
         }
 
+    })
+
+    onUnmounted(() => {
+        if (deadlineTimer) {
+            clearInterval(deadlineTimer)
+            deadlineTimer = null
+        }
     })
 
 </script>
