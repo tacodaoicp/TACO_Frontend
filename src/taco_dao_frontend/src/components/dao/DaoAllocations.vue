@@ -787,7 +787,7 @@ LOCAL METHODS
 
         // update current token holdings and percentage with fetchedTokenDetails
         if (selectedToken2) {
-            currentTokenHoldings.value = Number(selectedToken2.balance) / Math.pow(10, 8)
+            currentTokenHoldings.value = Number(selectedToken2.balance) / Math.pow(10, Number((selectedToken2 as any).tokenDecimals ?? 8))
             currentTokenPrice.value = Number(selectedToken2.priceInUSD)
         }
 
@@ -1030,15 +1030,27 @@ LOCAL METHODS
                 // console.log('holdings', holdings)
 
                 // calculate total value across all tokens
-                const totalValue = holdings.reduce((sum, [_, token]) => {
-                    return sum + (Number(token.balance) * Number(token.priceInICP))
-                }, 0)
+                // use bigint scaling to normalize by token decimals without precision loss
+                const ICP_SCALE = 100000000n
+                const toScaledValueIcp = (t: any) => {
+                    const balance = BigInt(t.balance)
+                    const decimals = BigInt(t.tokenDecimals ?? 8n)
+                    const denom = 10n ** decimals
+                    const priceScaled = BigInt(Math.round(Number(t.priceInICP) * Number(ICP_SCALE)))
+                    return (balance * priceScaled) / denom
+                }
+                const totalValueScaled = holdings.reduce((sum: bigint, [_, token]: any) => {
+                    return sum + toScaledValueIcp(token)
+                }, 0n)
+
+                // log
+                // console.log('totalValue', Number(totalValueScaled) / Number(ICP_SCALE))
 
                 // create percentages array
                 const percentages = holdings.map(([_, token]) => {
-                    if (totalValue === 0) return 0
-                    const tokenValue = Number(token.balance) * Number(token.priceInICP)
-                    const percentage = (tokenValue / totalValue) * 100
+                    if (totalValueScaled === 0n) return 0
+                    const tokenScaled = toScaledValueIcp(token)
+                    const percentage = (Number(tokenScaled) / Number(totalValueScaled)) * 100
                     return Number(percentage.toFixed(2))
                 })
 
@@ -1061,7 +1073,7 @@ LOCAL METHODS
                 // console.log('colors:', colors)
 
                 // if there are no holdings of value, show no holdings message
-                if (totalValue === 0) {
+                if (totalValueScaled === 0n) {
 
                     // log
                     // console.log('no holdings of value')

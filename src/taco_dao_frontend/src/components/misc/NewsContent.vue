@@ -8,6 +8,17 @@
             <!-- news item -->
             <div class="news-content__item">
                 <h3 class="news-content__title">
+                    We've got a wizard!
+                </h3>
+                <span class="news-content__date">🍽️ October 19, 2025</span>
+                <p class="news-content__text">
+                    We've added a wizard to the site! He'll help you do everything you need to vote and get rewards, all without leaving the site!
+                </p>
+            </div>            
+
+            <!-- news item -->
+            <div class="news-content__item">
+                <h3 class="news-content__title">
                     We've got a wallet!
                 </h3>
                 <span class="news-content__date">🍽️ September 16, 2025</span>
