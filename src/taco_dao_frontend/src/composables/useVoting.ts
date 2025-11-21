@@ -92,6 +92,18 @@ export function useVoting() {
       const userNeurons = await tacoStore.getTacoNeurons()
       console.log('User neurons fetched:', userNeurons?.length || 0, 'neurons')
       
+      // Log first neuron to see structure
+      if (userNeurons && userNeurons.length > 0) {
+        console.log('Sample neuron structure:', {
+          hasVotingPower: 'voting_power' in userNeurons[0],
+          hasStake: 'cached_neuron_stake_e8s' in userNeurons[0],
+          hasMultiplier: 'voting_power_percentage_multiplier' in userNeurons[0],
+          votingPowerValue: userNeurons[0].voting_power,
+          stakeValue: userNeurons[0].cached_neuron_stake_e8s,
+          multiplierValue: userNeurons[0].voting_power_percentage_multiplier
+        })
+      }
+      
       if (!userNeurons || userNeurons.length === 0) {
         console.log('No neurons found')
         neurons.value = []
@@ -118,16 +130,29 @@ export function useVoting() {
         
         const displayId = neuronIdToHex(neuronId)
         
-        // Calculate voting power - can be directly available or needs to be calculated from stake
+        // Calculate voting power properly with bonuses
         let votingPower = BigInt(0)
-        if (neuron.voting_power !== undefined) {
-          votingPower = BigInt(neuron.voting_power)
-        } else if (neuron.cached_neuron_stake_e8s !== undefined) {
-          // Use cached stake as fallback
-          votingPower = BigInt(neuron.cached_neuron_stake_e8s)
+        
+        // The SNS neuron should have voting_power_percentage_multiplier
+        // This is a bigint representing the multiplier as a percentage (e.g., 150 = 1.5x)
+        const stake = neuron.cached_neuron_stake_e8s ? BigInt(neuron.cached_neuron_stake_e8s) : BigInt(0)
+        
+        // Get multiplier - it should be a bigint
+        let multiplier = BigInt(100) // Default 100 = 1x (no bonus)
+        if (neuron.voting_power_percentage_multiplier !== undefined && neuron.voting_power_percentage_multiplier !== null) {
+          multiplier = BigInt(neuron.voting_power_percentage_multiplier)
         }
         
-        console.log('Processing neuron:', displayId, 'Voting Power:', votingPower.toString())
+        // Voting power = stake * (multiplier / 100)
+        if (stake > BigInt(0)) {
+          votingPower = (stake * multiplier) / BigInt(100)
+        }
+        
+        console.log('Processing neuron:', displayId, 
+                    '\n  Stake:', stake.toString(),
+                    '\n  Multiplier:', multiplier.toString(), 
+                    '\n  Calculated VP:', votingPower.toString(),
+                    '\n  Direct VP field:', neuron.voting_power?.toString() || 'N/A')
         
         // Check if user has vote permission for this neuron
         const userPrincipal = Principal.fromText(tacoStore.userPrincipal!)
@@ -166,31 +191,96 @@ export function useVoting() {
         
         // Check if this neuron has voted
         const neuronIdHex = displayId
+        console.log('Looking for ballot for neuron:', neuronIdHex)
+        console.log('Total ballots in proposal:', ballots.length)
+        
+        // Log first ballot to understand structure
+        if (ballots.length > 0) {
+          const firstBallot = ballots[0]
+          console.log('First ballot structure:', {
+            key: typeof firstBallot[0],
+            keyValue: firstBallot[0],
+            hasId: firstBallot[0]?.id ? true : false
+          })
+        }
+        
         const ballot = ballots.find((b: any) => {
-          const ballotNeuronId = b[0] // First element is the neuron ID
-          if (ballotNeuronId && typeof ballotNeuronId === 'object' && ballotNeuronId.id) {
-            const ballotIdHex = neuronIdToHex(ballotNeuronId.id)
-            return ballotIdHex === neuronIdHex
+          const ballotKey = b[0] // First element is the ballot key (neuron ID in some format)
+          
+          // The ballot key might be a string (hex) or an object with id
+          if (typeof ballotKey === 'string') {
+            // Direct hex comparison
+            const matches = ballotKey === neuronIdHex
+            if (matches) console.log('Match found via string comparison:', ballotKey)
+            return matches
+          } else if (ballotKey && typeof ballotKey === 'object' && ballotKey.id) {
+            // Object with id field (Uint8Array)
+            const ballotIdHex = neuronIdToHex(ballotKey.id)
+            const matches = ballotIdHex === neuronIdHex
+            if (matches) console.log('Match found via object id:', ballotIdHex)
+            return matches
           }
+          
           return false
         })
         
         let hasVoted = false
         let vote: 'yes' | 'no' | null = null
         
-        if (ballot && ballot[1]) {
-          const voteValue = ballot[1].vote?.[0]
-          if (voteValue !== undefined) {
-            hasVoted = true
-            // Vote values: 1 = Yes, 2 = No
-            vote = voteValue === 1 ? 'yes' : voteValue === 2 ? 'no' : null
+        // Use voting power from ballot if available (includes bonuses)
+        if (ballot && ballot[1] && ballot[1].voting_power) {
+          const ballotVP = ballot[1].voting_power
+          if (ballotVP) {
+            votingPower = BigInt(ballotVP)
+            console.log('Using ballot voting power (with bonuses):', votingPower.toString())
           }
+        }
+        
+        if (ballot) {
+          console.log('Found ballot for neuron! Ballot:', JSON.stringify(ballot, (key, value) =>
+            typeof value === 'bigint' ? value.toString() : value
+          ))
+          const ballotData = ballot[1]
+          
+          // Check different ballot formats
+          if (ballotData) {
+            // Try to get vote value from different possible structures
+            let voteValue = undefined
+            
+            // Try different structures
+            if (Array.isArray(ballotData.vote) && ballotData.vote.length > 0) {
+              voteValue = ballotData.vote[0]
+            } else if (typeof ballotData.vote === 'number' || typeof ballotData.vote === 'bigint') {
+              voteValue = Number(ballotData.vote)
+            } else if (ballotData.vote && typeof ballotData.vote === 'object') {
+              // Might be a variant like { Yes: null } or { No: null }
+              if ('Yes' in ballotData.vote || 1 in ballotData.vote) {
+                voteValue = 1
+              } else if ('No' in ballotData.vote || 2 in ballotData.vote) {
+                voteValue = 2
+              }
+            }
+            
+            console.log('Vote value from ballot:', voteValue, 'Type:', typeof voteValue)
+            
+            // IMPORTANT: vote: 0 means NOT voted, vote: 1 = Yes, vote: 2 = No
+            if (voteValue !== undefined && voteValue !== null && voteValue !== 0) {
+              hasVoted = true
+              // Vote values: 1 = Yes, 2 = No
+              vote = voteValue === 1 ? 'yes' : voteValue === 2 ? 'no' : null
+              console.log('Neuron HAS VOTED:', vote)
+            } else {
+              console.log('Neuron has NOT voted yet (vote value:', voteValue, ')')
+            }
+          }
+        } else {
+          console.log('No ballot found for neuron - neuron has NOT voted')
         }
         
         // Can vote if has voting power and hasn't voted yet
         const canVote = votingPower > BigInt(0) && !hasVoted
         
-        return {
+        const neuronData = {
           id: neuronId,
           displayId,
           votingPower,
@@ -198,7 +288,19 @@ export function useVoting() {
           hasVoted,
           vote
         }
+        
+        console.log('Final neuron data:', {
+          id: displayId,
+          votingPower: votingPower.toString(),
+          canVote,
+          hasVoted,
+          vote
+        })
+        
+        return neuronData
       }).filter(Boolean) as Neuron[]
+      
+      console.log('Total neurons with vote permission:', neurons.value.length)
       
     } catch (err: any) {
       console.error('Error fetching neurons:', err)
@@ -259,9 +361,14 @@ export function useVoting() {
         }
         
         if (command.RegisterVote) {
-          console.log('Vote cast successfully')
+          console.log('Vote cast successfully, refreshing neuron list...')
+          
+          // Wait a moment for the vote to be registered on-chain
+          await new Promise(resolve => setTimeout(resolve, 1000))
+          
           // Refresh neurons to update voting status
           await fetchNeurons(params.proposalId)
+          console.log('Neuron list refreshed after vote')
           return
         }
       }
