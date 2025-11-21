@@ -2557,6 +2557,16 @@
                 // load thread data
                 await loadThreadData()
 
+                // refresh voting data if user is already viewing the details tab
+                if (
+                    userLoggedIn.value &&
+                    threadNavigation.value === 'details' &&
+                    proposalId.value &&
+                    isVotingOpen.value
+                ) {
+                    await refreshVotingData()
+                }
+
             } 
             
             // else
