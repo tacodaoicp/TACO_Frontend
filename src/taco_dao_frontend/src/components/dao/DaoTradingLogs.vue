@@ -45,11 +45,11 @@
                     <tr v-for="log in logs" :key="log.id">
 
                         <!-- Sold -->
-                        <td class="pe-3">{{ formatAmount(log.amountSold, 8) }} <span style="text-transform: uppercase;">{{ getTokenInfo(log.tokenSold)?.symbol || '???' }}</span></td>
+                        <td class="pe-3">{{ formatAmount(log.amountSold, getTokenDecimals(log.tokenSold)) }} <span style="text-transform: uppercase;">{{ getTokenInfo(log.tokenSold)?.symbol || '???' }}</span></td>
 
                         <!-- For -->
                         <td class="pe-3">
-                            {{ formatAmount(log.amountBought, 8) }} <span style="text-transform: uppercase;">{{ getTokenInfo(log.tokenBought)?.symbol || '???' }}</span>
+                            {{ formatAmount(log.amountBought, getTokenDecimals(log.tokenBought)) }} <span style="text-transform: uppercase;">{{ getTokenInfo(log.tokenBought)?.symbol || '???' }}</span>
 
                           <!-- failed indicator -->
                           <span v-if="!log.success"
@@ -324,46 +324,87 @@
 
     // format amount
     const formatAmount = (amount: string | bigint, decimals: number | bigint) => {
+
         try {
-            let strAmount: string;
-            // Convert decimals to number to ensure string operations work
-            const decimalPlaces = Number(decimals);
+
+            let strAmount: string
+
+            // convert decimals to number to ensure string operations work
+            const decimalPlaces = Number(decimals)
             
             if (typeof amount === 'bigint') {
-                // Convert BigInt to string and pad with zeros if needed
-                strAmount = amount.toString();
-                // Pad with leading zeros if necessary
+
+                // convert BigInt to string and pad with zeros if needed
+                strAmount = amount.toString()
+
+                // pad with leading zeros if necessary
                 if (strAmount.length <= decimalPlaces) {
-                    strAmount = '0'.repeat(decimalPlaces - strAmount.length + 1) + strAmount;
+
+                    strAmount = '0'.repeat(decimalPlaces - strAmount.length + 1) + strAmount
+
                 }
-                // Insert decimal point from right
-                const insertIndex = strAmount.length - decimalPlaces;
-                strAmount = strAmount.slice(0, insertIndex) + '.' + strAmount.slice(insertIndex);
-                // Remove trailing zeros and decimal point if no decimals
-                strAmount = strAmount.replace(/\.?0+$/, '');
+
+                // insert decimal point from right
+                const insertIndex = strAmount.length - decimalPlaces
+
+                strAmount = strAmount.slice(0, insertIndex) + '.' + strAmount.slice(insertIndex)
+
+                // remove trailing zeros and decimal point if no decimals
+                strAmount = strAmount.replace(/\.?0+$/, '')
+
             } else {
-                strAmount = amount;
+
+                strAmount = amount
+                
+                // if the string is an integer-like value, treat it like bigint and decimalize
+                const isIntegerString = /^[0-9]+$/.test(strAmount)
+                if (isIntegerString) {
+                    if (strAmount.length <= decimalPlaces) {
+                        strAmount = '0'.repeat(decimalPlaces - strAmount.length + 1) + strAmount
+                    }
+                    const insertIndex = strAmount.length - decimalPlaces
+                    strAmount = strAmount.slice(0, insertIndex) + '.' + strAmount.slice(insertIndex)
+                }
+                
+                // remove trailing zeros and decimal point if no decimals
+                strAmount = strAmount.replace(/\.?0+$/, '')
+
             }
 
-            // Parse the string amount
-            const numAmount = parseFloat(strAmount);
-            if (isNaN(numAmount)) return '0.00';
+            // parse the string amount
+            const numAmount = parseFloat(strAmount)
+            if (isNaN(numAmount)) return '0.00'
             
-            // Split into integer and decimal parts
-            const [integerPart, decimalPart = ''] = strAmount.split('.');
+            // split into integer and decimal parts
+            const [integerPart, decimalPart = ''] = strAmount.split('.')
             
-            // Add commas to the integer part
-            const formattedInteger = integerPart.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+            // add commas to the integer part
+            const formattedInteger = integerPart.replace(/\B(?=(\d{3})+(?!\d))/g, ',')
             
-            // Pad or truncate decimal part as needed
-            const formattedDecimal = decimalPart.padEnd(2, '0').slice(0, decimalPlaces);
+            // pad or truncate decimal part as needed (max 8 decimals on screen)
+            const maxDisplayDecimals = 8
+            const targetLen = Math.max(2, Math.min(maxDisplayDecimals, decimalPart.length))
+            const formattedDecimal = decimalPart.padEnd(2, '0').slice(0, targetLen)
             
-            // Return the formatted number
-            return formattedDecimal ? `${formattedInteger}.${formattedDecimal}` : `${formattedInteger}.00`;
+            // return the formatted number
+            return formattedDecimal ? `${formattedInteger}.${formattedDecimal}` : `${formattedInteger}.00`
+
         } catch (error) {
-            console.error('Error formatting amount:', error);
-            return '0.00';
+
+          // log
+          console.error('Error formatting amount:', error)
+
+          // return 0.00
+          return '0.00'
+
         }
+        
+    }
+
+    // get token decimals by principal from fetched token details
+    const getTokenDecimals = (principal: string) => {
+        const tokenDetail = fetchedTokenDetails.value?.find((entry) => entry[0].toString() === principal.toString())?.[1]
+        return Number(tokenDetail?.tokenDecimals ?? 8)
     }
 
     // get token info
