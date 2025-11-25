@@ -24,6 +24,7 @@ import { AccountIdentifier } from '@dfinity/ledger-icp'
 import { SnsGovernanceCanister, SnsNeuronPermissionType } from '@dfinity/sns'
 import { canisterId as iiCanisterId } from "../../../declarations/internet_identity/index.js"
 import type { Result_1, UserState } from "../../../declarations/dao_backend/DAO_backend.did.d"
+import { IDL } from '@dfinity/candid'
 
 ///////////
 // Types //
@@ -471,6 +472,51 @@ export interface AlarmCanisterActor {
     // Admin Action Logs
     getAdminActionLogs(limit: number[]): Promise<{ ok: any[] } | { err: string }>
 
+}
+
+///////////////////
+// GNSF Registry //
+///////////////////
+
+export interface GNSFunctionInfo {
+    functionId: bigint
+    displayName: string
+    description: string
+    parameterTypes: any[]  // IDL types
+    requiresReason: boolean
+}
+
+// Registry of admin functions that can be called via GNSF proposals
+// Function IDs start at 4000
+export const GNSF_REGISTRY: Record<string, GNSFunctionInfo> = {
+    'stopRebalancing': {
+        functionId: BigInt(4000),
+        displayName: 'Stop Trading Bot',
+        description: 'Stops the automated trading and rebalancing system',
+        parameterTypes: [IDL.Opt(IDL.Text)],
+        requiresReason: true
+    },
+    'startRebalancing': {
+        functionId: BigInt(4001),
+        displayName: 'Start Trading Bot',
+        description: 'Starts the automated trading and rebalancing system',
+        parameterTypes: [IDL.Opt(IDL.Text)],
+        requiresReason: true
+    },
+    'executeTradingCycle': {
+        functionId: BigInt(4002),
+        displayName: 'Execute Trading Cycle',
+        description: 'Manually executes one trading cycle immediately',
+        parameterTypes: [IDL.Opt(IDL.Text)],
+        requiresReason: true
+    },
+    'takeManualPortfolioSnapshot': {
+        functionId: BigInt(4003),
+        displayName: 'Take Portfolio Snapshot',
+        description: 'Manually captures the current state of all portfolio positions',
+        parameterTypes: [IDL.Opt(IDL.Text)],
+        requiresReason: true
+    }
 }
 
 /////////////

@@ -870,6 +870,15 @@
       @cancel="hideConfirmationModal"
     />
     
+    <!-- GNSF Proposal Dialog for Non-Admin Users -->
+    <GNSFProposalDialog
+      :show="showProposalDialog"
+      :function-name="proposalFunctionName"
+      :reason-placeholder="proposalReasonPlaceholder"
+      @close="showProposalDialog = false"
+      @success="handleProposalSuccess"
+    />
+    
     <!-- footer bar -->
     <FooterBar />
   </div>
@@ -1181,7 +1190,9 @@ import FooterBar from "../components/FooterBar.vue";
 import TacoTitle from '../components/misc/TacoTitle.vue';
 import TradingLogs from '../components/admin/TradingLogs.vue';
 import AdminConfirmationModal from '../components/admin/AdminConfirmationModal.vue';
+import GNSFProposalDialog from '../components/proposals/GNSFProposalDialog.vue';
 import { Principal } from '@dfinity/principal';
+import { useAdminCheck } from '../composables/useAdminCheck';
 
 // Add interface for VotingMetrics
 interface VotingMetrics {
@@ -1218,6 +1229,14 @@ const {
 
 // Destructure utility methods
 const { getPrincipalDisplayName, listTradingPauses } = tacoStore;
+
+// Admin check composable
+const { isAdmin, checkAdminStatus } = useAdminCheck();
+
+// GNSF Proposal Dialog state
+const showProposalDialog = ref(false);
+const proposalFunctionName = ref('');
+const proposalReasonPlaceholder = ref('');
 
 // Computed property to sort tokens with paused/inactive tokens first
 const sortedTokenDetails = computed(() => {
@@ -1366,9 +1385,20 @@ function formatTime(timestamp: number | bigint | null): string {
     return date.toLocaleString();
 }
 
+// Handle proposal success
+const handleProposalSuccess = (proposalId: bigint) => {
+    console.log('Proposal created successfully:', proposalId);
+    tacoStore.showSuccess(`Proposal ${proposalId} created successfully!`);
+    // Optionally refresh any relevant data
+};
+
 // Lifecycle hooks
 onMounted(async () => {
     console.log('AdminView: Component mounted');
+    
+    // Check admin status in background
+    checkAdminStatus().catch(console.error);
+    
     const params = await tacoStore.getSystemParameters() as any[];
     const snapshotParam = params.find(p => 'SnapshotInterval' in p);
     if (snapshotParam?.SnapshotInterval) {
@@ -1395,7 +1425,17 @@ async function startRebalancing() {
 
 async function stopRebalancing() {
     console.log('AdminView: stopRebalancing called');
-    showStopRebalancingConfirmation();
+    
+    // Check if user is admin
+    if (isAdmin.value) {
+        // User is admin - show direct action confirmation
+        showStopRebalancingConfirmation();
+    } else {
+        // User is not admin - show proposal creation dialog
+        proposalFunctionName.value = 'stopRebalancing';
+        proposalReasonPlaceholder.value = 'Please explain why trading should be stopped...';
+        showProposalDialog.value = true;
+    }
 }
 
 async function recoverPoolBalances() {
