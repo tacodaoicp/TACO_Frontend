@@ -495,35 +495,35 @@ export interface GNSFunctionInfo {
 // Function IDs start at 4000
 export const GNSF_REGISTRY: Record<string, GNSFunctionInfo> = {
     'stopRebalancing': {
-        functionId: BigInt(4000),
+        functionId: BigInt(3003),
         displayName: 'Stop Trading Bot',
         description: 'Stops the automated trading and rebalancing system',
         parameterTypes: [IDL.Opt(IDL.Text)],
         requiresReason: true
     },
     'startRebalancing': {
-        functionId: BigInt(4001),
+        functionId: BigInt(3004),
         displayName: 'Start Trading Bot',
         description: 'Starts the automated trading and rebalancing system',
         parameterTypes: [IDL.Opt(IDL.Text)],
         requiresReason: true
     },
     'executeTradingCycle': {
-        functionId: BigInt(4002),
+        functionId: BigInt(3005),
         displayName: 'Execute Trading Cycle',
         description: 'Manually executes one trading cycle immediately',
         parameterTypes: [IDL.Opt(IDL.Text)],
         requiresReason: true
     },
     'takeManualPortfolioSnapshot': {
-        functionId: BigInt(4003),
+        functionId: BigInt(3006),
         displayName: 'Take Portfolio Snapshot',
         description: 'Manually captures the current state of all portfolio positions',
         parameterTypes: [IDL.Opt(IDL.Text)],
         requiresReason: true
     },
     'pauseToken': {
-        functionId: BigInt(4004),
+        functionId: BigInt(3007),
         displayName: 'Pause Token',
         description: 'Pauses a token from being traded by the treasury',
         parameterTypes: [IDL.Principal, IDL.Text],
@@ -535,7 +535,7 @@ export const GNSF_REGISTRY: Record<string, GNSFunctionInfo> = {
         }]
     },
     'unpauseToken': {
-        functionId: BigInt(4005),
+        functionId: BigInt(3008),
         displayName: 'Unpause Token',
         description: 'Resumes trading for a previously paused token',
         parameterTypes: [IDL.Principal, IDL.Text],
