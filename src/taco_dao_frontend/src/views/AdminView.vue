@@ -1306,7 +1306,19 @@ async function refreshTimerStatus() {
 
 async function triggerManualSnapshot() {
     console.log('AdminView: triggerManualSnapshot called');
-    showManualSnapshotConfirmation();
+    
+    // Check if user is admin (await to ensure we have current status)
+    await checkAdminStatus();
+    
+    if (isAdmin.value) {
+        // User is admin - show direct action confirmation
+        showManualSnapshotConfirmation();
+    } else {
+        // User is not admin - show proposal creation dialog
+        proposalFunctionName.value = 'takeManualPortfolioSnapshot';
+        proposalReasonPlaceholder.value = 'Please explain why a manual snapshot should be taken...';
+        showProposalDialog.value = true;
+    }
 }
 
 async function triggerManualSync() {
@@ -1420,7 +1432,19 @@ onMounted(async () => {
 // New functions
 async function startRebalancing() {
     console.log('AdminView: startRebalancing called');
-    showStartRebalancingConfirmation();
+    
+    // Check if user is admin (await to ensure we have current status)
+    await checkAdminStatus();
+    
+    if (isAdmin.value) {
+        // User is admin - show direct action confirmation
+        showStartRebalancingConfirmation();
+    } else {
+        // User is not admin - show proposal creation dialog
+        proposalFunctionName.value = 'startRebalancing';
+        proposalReasonPlaceholder.value = 'Please explain why trading should be started...';
+        showProposalDialog.value = true;
+    }
 }
 
 async function stopRebalancing() {
@@ -1674,7 +1698,19 @@ async function refreshTradingLogs() {
 
 async function executeTradingCycle() {
   console.log('AdminView: executeTradingCycle called');
-  showExecuteTradingCycleConfirmation();
+  
+  // Check if user is admin (await to ensure we have current status)
+  await checkAdminStatus();
+  
+  if (isAdmin.value) {
+      // User is admin - show direct action confirmation
+      showExecuteTradingCycleConfirmation();
+  } else {
+      // User is not admin - show proposal creation dialog
+      proposalFunctionName.value = 'executeTradingCycle';
+      proposalReasonPlaceholder.value = 'Please explain why a trading cycle should be executed...';
+      showProposalDialog.value = true;
+  }
 }
 
 // Add these functions
