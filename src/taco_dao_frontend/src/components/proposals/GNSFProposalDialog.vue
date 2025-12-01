@@ -266,7 +266,7 @@ const submitProposal = async () => {
     const parameters = functionInfo.value.requiresReason ? [{
       name: 'reason',
       type: IDL.Opt(IDL.Text),
-      value: [[reason.value]]  // Optional text
+      value: [reason.value]  // Optional text - single array wrapper for Opt
     }] : []
 
     // Submit proposal
