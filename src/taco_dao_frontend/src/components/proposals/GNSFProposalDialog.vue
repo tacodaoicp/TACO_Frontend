@@ -167,10 +167,12 @@ interface Props {
   show: boolean
   functionName: string
   reasonPlaceholder?: string
+  contextParams?: Record<string, any>  // Additional context parameters (e.g., token principal)
 }
 
 const props = withDefaults(defineProps<Props>(), {
-  reasonPlaceholder: 'Please explain why this action is needed...'
+  reasonPlaceholder: 'Please explain why this action is needed...',
+  contextParams: () => ({})
 })
 
 const emit = defineEmits<{
@@ -263,11 +265,35 @@ const submitProposal = async () => {
     const summary = `${functionInfo.value.description}\n\nReason: ${reason.value}`
 
     // Create parameters based on function requirements
-    const parameters = functionInfo.value.requiresReason ? [{
-      name: 'reason',
-      type: IDL.Opt(IDL.Text),
-      value: [reason.value]  // Optional text - single array wrapper for Opt
-    }] : []
+    const parameters: { name: string; type: any; value: any }[] = []
+    
+    // Add additional parameters first (e.g., token principal)
+    if (functionInfo.value.additionalParams) {
+      for (const param of functionInfo.value.additionalParams) {
+        const contextValue = props.contextParams?.[param.name]
+        if (contextValue !== undefined) {
+          parameters.push({
+            name: param.name,
+            type: param.type,
+            value: contextValue
+          })
+        }
+      }
+    }
+    
+    // Add reason parameter
+    if (functionInfo.value.requiresReason) {
+      // Check if reason is optional or required based on parameterTypes
+      const reasonIsOptional = functionInfo.value.parameterTypes.some(
+        (type: any) => type?.name === 'opt' || type?.toString().includes('Opt')
+      )
+      
+      parameters.push({
+        name: 'reason',
+        type: reasonIsOptional ? IDL.Opt(IDL.Text) : IDL.Text,
+        value: reasonIsOptional ? [reason.value] : reason.value
+      })
+    }
 
     // Submit proposal
     const id = await createProposalWithCustomParams(

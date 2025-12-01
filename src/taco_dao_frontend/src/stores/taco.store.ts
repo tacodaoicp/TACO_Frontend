@@ -484,6 +484,11 @@ export interface GNSFunctionInfo {
     description: string
     parameterTypes: any[]  // IDL types
     requiresReason: boolean
+    additionalParams?: {  // Additional parameters beyond reason
+        name: string
+        type: any  // IDL type
+        displayName?: string  // For UI display
+    }[]
 }
 
 // Registry of admin functions that can be called via GNSF proposals
@@ -516,6 +521,30 @@ export const GNSF_REGISTRY: Record<string, GNSFunctionInfo> = {
         description: 'Manually captures the current state of all portfolio positions',
         parameterTypes: [IDL.Opt(IDL.Text)],
         requiresReason: true
+    },
+    'pauseToken': {
+        functionId: BigInt(4004),
+        displayName: 'Pause Token',
+        description: 'Pauses a token from being traded by the treasury',
+        parameterTypes: [IDL.Principal, IDL.Text],
+        requiresReason: true,
+        additionalParams: [{
+            name: 'tokenPrincipal',
+            type: IDL.Principal,
+            displayName: 'Token'
+        }]
+    },
+    'unpauseToken': {
+        functionId: BigInt(4005),
+        displayName: 'Unpause Token',
+        description: 'Resumes trading for a previously paused token',
+        parameterTypes: [IDL.Principal, IDL.Text],
+        requiresReason: true,
+        additionalParams: [{
+            name: 'tokenPrincipal',
+            type: IDL.Principal,
+            displayName: 'Token'
+        }]
     }
 }
 

@@ -875,6 +875,7 @@
       :show="showProposalDialog"
       :function-name="proposalFunctionName"
       :reason-placeholder="proposalReasonPlaceholder"
+      :context-params="proposalContextParams"
       @close="showProposalDialog = false"
       @success="handleProposalSuccess"
     />
@@ -1237,6 +1238,7 @@ const { isAdmin, checkAdminStatus } = useAdminCheck();
 const showProposalDialog = ref(false);
 const proposalFunctionName = ref('');
 const proposalReasonPlaceholder = ref('');
+const proposalContextParams = ref<Record<string, any>>({});
 
 // Computed property to sort tokens with paused/inactive tokens first
 const sortedTokenDetails = computed(() => {
@@ -1773,34 +1775,62 @@ const getTokenStatusText = (token: any, principal?: Principal) => {
 };
 
 // Modal helper functions
-const showPauseConfirmation = (principal: string, tokenName: string) => {
-  confirmationModal.value = {
-    show: true,
-    title: 'Pause Token',
-    message: `Are you sure you want to pause ${tokenName}?`,
-    extraData: `Principal: ${principal}`,
-    confirmButtonText: 'Pause Token',
-    confirmButtonClass: 'btn-warning',
-    reasonPlaceholder: 'Please explain why this token should be paused...',
-    submitting: false,
-    action: null,
-    actionData: { principal, tokenName }
-  };
+const showPauseConfirmation = async (principal: string, tokenName: string) => {
+  // Check if user is admin (await to ensure we have current status)
+  await checkAdminStatus();
+  
+  if (isAdmin.value) {
+    // User is admin - show direct action confirmation
+    confirmationModal.value = {
+      show: true,
+      title: 'Pause Token',
+      message: `Are you sure you want to pause ${tokenName}?`,
+      extraData: `Principal: ${principal}`,
+      confirmButtonText: 'Pause Token',
+      confirmButtonClass: 'btn-warning',
+      reasonPlaceholder: 'Please explain why this token should be paused...',
+      submitting: false,
+      action: null,
+      actionData: { principal, tokenName }
+    };
+  } else {
+    // User is not admin - show proposal creation dialog
+    proposalFunctionName.value = 'pauseToken';
+    proposalReasonPlaceholder.value = `Please explain why ${tokenName} should be paused...`;
+    proposalContextParams.value = {
+      tokenPrincipal: Principal.fromText(principal)
+    };
+    showProposalDialog.value = true;
+  }
 };
 
-const showUnpauseConfirmation = (principal: string, tokenName: string) => {
-  confirmationModal.value = {
-    show: true,
-    title: 'Unpause Token',
-    message: `Are you sure you want to unpause ${tokenName}?`,
-    extraData: `Principal: ${principal}`,
-    confirmButtonText: 'Unpause Token',
-    confirmButtonClass: 'btn-success',
-    reasonPlaceholder: 'Please explain why this token should be unpaused...',
-    submitting: false,
-    action: null,
-    actionData: { principal, tokenName }
-  };
+const showUnpauseConfirmation = async (principal: string, tokenName: string) => {
+  // Check if user is admin (await to ensure we have current status)
+  await checkAdminStatus();
+  
+  if (isAdmin.value) {
+    // User is admin - show direct action confirmation
+    confirmationModal.value = {
+      show: true,
+      title: 'Unpause Token',
+      message: `Are you sure you want to unpause ${tokenName}?`,
+      extraData: `Principal: ${principal}`,
+      confirmButtonText: 'Unpause Token',
+      confirmButtonClass: 'btn-success',
+      reasonPlaceholder: 'Please explain why this token should be unpaused...',
+      submitting: false,
+      action: null,
+      actionData: { principal, tokenName }
+    };
+  } else {
+    // User is not admin - show proposal creation dialog
+    proposalFunctionName.value = 'unpauseToken';
+    proposalReasonPlaceholder.value = `Please explain why ${tokenName} should be unpaused...`;
+    proposalContextParams.value = {
+      tokenPrincipal: Principal.fromText(principal)
+    };
+    showProposalDialog.value = true;
+  }
 };
 
 const showConfigUpdateConfirmation = () => {
