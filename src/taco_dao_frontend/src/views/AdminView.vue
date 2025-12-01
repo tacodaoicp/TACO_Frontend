@@ -1426,7 +1426,9 @@ async function startRebalancing() {
 async function stopRebalancing() {
     console.log('AdminView: stopRebalancing called');
     
-    // Check if user is admin
+    // Check if user is admin (await to ensure we have current status)
+    await checkAdminStatus();
+    
     if (isAdmin.value) {
         // User is admin - show direct action confirmation
         showStopRebalancingConfirmation();
