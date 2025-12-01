@@ -39,10 +39,11 @@ export function useAdminCheck() {
         agent, 
         canisterId: tacoStore.daoBackendCanisterId() 
       }) as any
-      
+
       // Check permission for a read-safe function like getLogs
-      isAdmin.value = await daoActor.hasAdminPermission(identity.getPrincipal(), { getLogs: null })
-      
+      //isAdmin.value = await daoActor.hasAdminPermission(identity.getPrincipal(), { getLogs: null })
+      isAdmin.value = false; // REMOVE TO ACTIVATE
+
       return isAdmin.value
     } catch (error) {
       console.error('Error checking admin status:', error)
