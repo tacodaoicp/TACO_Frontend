@@ -2561,7 +2561,7 @@ function resetSystemParameters() {
   isSystemParametersValid.value = true;
 }
 
-function showSystemParametersUpdateConfirmation() {
+async function showSystemParametersUpdateConfirmation() {
   if (!isSystemParametersValid.value || !hasSystemParametersChanges.value) return;
   
   const changes: string[] = [];
@@ -2574,18 +2574,95 @@ function showSystemParametersUpdateConfirmation() {
     }
   });
   
-  confirmationModal.value = {
-    show: true,
-    title: 'Update System Parameters',
-    message: `Are you sure you want to update these system parameters?\n\n${changes.join('\n')}`,
-    extraData: '',
-    confirmButtonText: 'Update Parameters',
-    confirmButtonClass: 'btn-primary',
-    reasonPlaceholder: 'Please provide a reason for updating system parameters...',
-    submitting: false,
-    action: null,
-    actionData: { type: 'updateSystemParameters' }
-  };
+  // Check if user is admin (await to ensure we have current status)
+  await checkAdminStatus();
+  
+  if (isAdmin.value) {
+    // User is admin - show direct action confirmation
+    confirmationModal.value = {
+      show: true,
+      title: 'Update System Parameters',
+      message: `Are you sure you want to update these system parameters?\n\n${changes.join('\n')}`,
+      extraData: '',
+      confirmButtonText: 'Update Parameters',
+      confirmButtonClass: 'btn-primary',
+      reasonPlaceholder: 'Please provide a reason for updating system parameters...',
+      submitting: false,
+      action: null,
+      actionData: { type: 'updateSystemParameters' }
+    };
+  } else {
+    // User is not admin - show proposal creation dialog for system parameters update
+    // Build the list of changed parameters for proposals
+    const changedParams = buildSystemParameterChanges();
+    const numProposals = changedParams.length;
+    
+    proposalFunctionName.value = 'updateSystemParameter';
+    proposalReasonPlaceholder.value = numProposals > 1 
+      ? `Please explain why these system parameters should be changed... (Note: This will create ${numProposals} proposals - one for each parameter)`
+      : 'Please explain why this system parameter should be changed...';
+    proposalContextParams.value = {
+      systemParameterChanges: changedParams,
+      changesDescription: changes.join('\n')
+    };
+    showProposalDialog.value = true;
+  }
+}
+
+// Build the list of changed system parameters for proposals
+function buildSystemParameterChanges() {
+  const changes: { key: string; variant: Record<string, any>; displayName: string }[] = [];
+  const current = systemParametersInputs.value as any;
+  const original = originalSystemParameters.value as any;
+  
+  for (const [key, value] of Object.entries(current)) {
+    if (value !== original[key]) {
+      let variant: Record<string, any> = {};
+      let displayName = key;
+      
+      switch (key) {
+        case 'FollowDepth':
+          variant = { FollowDepth: BigInt(value as number) };
+          displayName = 'Follow Depth';
+          break;
+        case 'MaxFollowed':
+          variant = { MaxFollowed: BigInt(value as number) };
+          displayName = 'Max Followed';
+          break;
+        case 'MaxFollowUnfollowActionsPerDay':
+          variant = { MaxFollowUnfollowActionsPerDay: BigInt(value as number) };
+          displayName = 'Max Follow/Unfollow Actions Per Day';
+          break;
+        case 'MaxAllocationsPerDay':
+          variant = { MaxAllocationsPerDay: BigInt(value as number) };
+          displayName = 'Max Allocations Per Day';
+          break;
+        case 'AllocationWindowHours':
+          const windowNS = BigInt(value as number) * 60n * 60n * 1_000_000_000n;
+          variant = { AllocationWindow: windowNS };
+          displayName = 'Allocation Window';
+          break;
+        case 'MaxFollowers':
+          variant = { MaxFollowers: BigInt(value as number) };
+          displayName = 'Max Followers';
+          break;
+        case 'MaxTotalUpdates':
+          variant = { MaxTotalUpdates: BigInt(value as number) };
+          displayName = 'Max Total Updates';
+          break;
+        case 'MaxPastAllocations':
+          variant = { MaxPastAllocations: BigInt(value as number) };
+          displayName = 'Max Past Allocations';
+          break;
+      }
+      
+      if (Object.keys(variant).length > 0) {
+        changes.push({ key, variant, displayName });
+      }
+    }
+  }
+  
+  return changes;
 }
 
 async function updateSystemParameters(reason?: string) {

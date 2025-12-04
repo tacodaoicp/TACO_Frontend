@@ -605,6 +605,43 @@ export const GNSF_REGISTRY: Record<string, GNSFunctionInfo> = {
             type: IDL.Nat,
             displayName: 'New Limit'
         }]
+    },
+    'updateSystemParameter': {
+        functionId: BigInt(3011),
+        displayName: 'Update System Parameter',
+        description: 'Updates a single DAO system parameter',
+        parameterTypes: [
+            IDL.Variant({
+                'AllocationWindow': IDL.Nat,
+                'FollowDepth': IDL.Nat,
+                'LogAdmin': IDL.Principal,
+                'MaxAllocationsPerDay': IDL.Int,
+                'MaxFollowUnfollowActionsPerDay': IDL.Nat,
+                'MaxFollowed': IDL.Nat,
+                'MaxFollowers': IDL.Nat,
+                'MaxPastAllocations': IDL.Nat,
+                'MaxTotalUpdates': IDL.Nat,
+                'SnapshotInterval': IDL.Nat
+            }),
+            IDL.Opt(IDL.Text)
+        ],
+        requiresReason: true,
+        additionalParams: [{
+            name: 'systemParameter',
+            type: IDL.Variant({
+                'AllocationWindow': IDL.Nat,
+                'FollowDepth': IDL.Nat,
+                'LogAdmin': IDL.Principal,
+                'MaxAllocationsPerDay': IDL.Int,
+                'MaxFollowUnfollowActionsPerDay': IDL.Nat,
+                'MaxFollowed': IDL.Nat,
+                'MaxFollowers': IDL.Nat,
+                'MaxPastAllocations': IDL.Nat,
+                'MaxTotalUpdates': IDL.Nat,
+                'SnapshotInterval': IDL.Nat
+            }),
+            displayName: 'Parameter'
+        }]
     }
 }
 

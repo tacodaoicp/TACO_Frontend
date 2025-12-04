@@ -311,6 +311,52 @@ const submitConfigUpdateProposals = async (neuronIdBytes: Uint8Array) => {
   emit('success', proposalIds[0])
 }
 
+// Submit multiple proposals for system parameter updates
+const submitSystemParameterProposals = async (neuronIdBytes: Uint8Array) => {
+  const paramInfo = GNSF_REGISTRY['updateSystemParameter']
+  
+  if (!paramInfo) {
+    throw new Error('System parameter function not found in registry')
+  }
+
+  const changes = props.contextParams?.systemParameterChanges || []
+  const proposalIds: bigint[] = []
+  
+  for (const change of changes) {
+    const params = [
+      {
+        name: 'systemParameter',
+        type: paramInfo.additionalParams?.[0]?.type,
+        value: change.variant
+      },
+      {
+        name: 'reason',
+        type: IDL.Opt(IDL.Text),
+        value: [reason.value]
+      }
+    ]
+    
+    const id = await createProposalWithCustomParams(
+      neuronIdBytes,
+      paramInfo.functionId,
+      `Update System Parameter: ${change.displayName}`,
+      proposalUrl.value,
+      `${paramInfo.description}\n\nParameter: ${change.displayName}\n\nReason: ${reason.value}`,
+      {
+        functionName: 'updateSystemParameter',
+        parameters: params
+      }
+    )
+    proposalIds.push(id)
+  }
+  
+  // Set the first proposal ID for display
+  proposalId.value = proposalIds[0]
+  
+  // Emit success
+  emit('success', proposalIds[0])
+}
+
 // Submit proposal
 const submitProposal = async () => {
   if (!functionInfo.value) {
@@ -344,6 +390,12 @@ const submitProposal = async () => {
     // Handle special case for config updates (may need two proposals)
     if (props.functionName === 'updateRebalanceConfig' && props.contextParams?.needsMaxPortfolioSnapshotsProposal) {
       await submitConfigUpdateProposals(neuronIdBytes)
+      return
+    }
+    
+    // Handle special case for system parameter updates (may need multiple proposals)
+    if (props.functionName === 'updateSystemParameter' && props.contextParams?.systemParameterChanges?.length > 0) {
+      await submitSystemParameterProposals(neuronIdBytes)
       return
     }
 
