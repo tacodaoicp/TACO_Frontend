@@ -231,6 +231,86 @@ const checkElig = async () => {
   await checkEligibility()
 }
 
+// Submit two proposals for config updates (updateRebalanceConfig + updateMaxPortfolioSnapshots)
+const submitConfigUpdateProposals = async (neuronIdBytes: Uint8Array) => {
+  const rebalanceConfigInfo = GNSF_REGISTRY['updateRebalanceConfig']
+  const maxSnapshotsInfo = GNSF_REGISTRY['updateMaxPortfolioSnapshots']
+  
+  if (!rebalanceConfigInfo || !maxSnapshotsInfo) {
+    throw new Error('Config update functions not found in registry')
+  }
+
+  const needsRebalanceConfig = props.contextParams?.needsRebalanceConfigProposal
+  const proposalIds: bigint[] = []
+  
+  // Submit updateRebalanceConfig proposal if needed
+  if (needsRebalanceConfig) {
+    const rebalanceParams = [
+      {
+        name: 'updateConfig',
+        type: rebalanceConfigInfo.additionalParams?.[0]?.type,
+        value: props.contextParams?.updateConfig
+      },
+      {
+        name: 'rebalanceStateNew',
+        type: IDL.Opt(IDL.Bool),
+        value: []
+      },
+      {
+        name: 'reason',
+        type: IDL.Opt(IDL.Text),
+        value: [reason.value]
+      }
+    ]
+    
+    const rebalanceId = await createProposalWithCustomParams(
+      neuronIdBytes,
+      rebalanceConfigInfo.functionId,
+      'Update Rebalance Configuration',
+      proposalUrl.value,
+      `${rebalanceConfigInfo.description}\n\nReason: ${reason.value}`,
+      {
+        functionName: 'updateRebalanceConfig',
+        parameters: rebalanceParams
+      }
+    )
+    proposalIds.push(rebalanceId)
+  }
+  
+  // Submit updateMaxPortfolioSnapshots proposal
+  const snapshotsParams = [
+    {
+      name: 'newLimit',
+      type: IDL.Nat,
+      value: props.contextParams?.newLimit
+    },
+    {
+      name: 'reason',
+      type: IDL.Opt(IDL.Text),
+      value: [reason.value]
+    }
+  ]
+  
+  const snapshotsId = await createProposalWithCustomParams(
+    neuronIdBytes,
+    maxSnapshotsInfo.functionId,
+    'Update Max Portfolio Snapshots',
+    proposalUrl.value,
+    `${maxSnapshotsInfo.description}\n\nReason: ${reason.value}`,
+    {
+      functionName: 'updateMaxPortfolioSnapshots',
+      parameters: snapshotsParams
+    }
+  )
+  proposalIds.push(snapshotsId)
+  
+  // Set the first proposal ID for display
+  proposalId.value = proposalIds[0]
+  
+  // Emit success with note about multiple proposals
+  emit('success', proposalIds[0])
+}
+
 // Submit proposal
 const submitProposal = async () => {
   if (!functionInfo.value) {
@@ -261,38 +341,76 @@ const submitProposal = async () => {
       throw new Error('Invalid neuron ID format')
     }
 
+    // Handle special case for config updates (may need two proposals)
+    if (props.functionName === 'updateRebalanceConfig' && props.contextParams?.needsMaxPortfolioSnapshotsProposal) {
+      await submitConfigUpdateProposals(neuronIdBytes)
+      return
+    }
+
     // Build summary with reason
     const summary = `${functionInfo.value.description}\n\nReason: ${reason.value}`
 
     // Create parameters based on function requirements
     const parameters: { name: string; type: any; value: any }[] = []
     
-    // Add additional parameters first (e.g., token principal)
-    if (functionInfo.value.additionalParams) {
-      for (const param of functionInfo.value.additionalParams) {
-        const contextValue = props.contextParams?.[param.name]
-        if (contextValue !== undefined) {
-          parameters.push({
-            name: param.name,
-            type: param.type,
-            value: contextValue
-          })
-        }
-      }
-    }
-    
-    // Add reason parameter
-    if (functionInfo.value.requiresReason) {
-      // Check if reason is optional or required based on parameterTypes
-      const reasonIsOptional = functionInfo.value.parameterTypes.some(
-        (type: any) => type?.name === 'opt' || type?.toString().includes('Opt')
-      )
-      
+    // Special handling for updateRebalanceConfig (complex record type)
+    if (props.functionName === 'updateRebalanceConfig') {
+      parameters.push({
+        name: 'updateConfig',
+        type: functionInfo.value.additionalParams?.[0]?.type,
+        value: props.contextParams?.updateConfig
+      })
+      parameters.push({
+        name: 'rebalanceStateNew',
+        type: IDL.Opt(IDL.Bool),
+        value: []  // Keep current state
+      })
       parameters.push({
         name: 'reason',
-        type: reasonIsOptional ? IDL.Opt(IDL.Text) : IDL.Text,
-        value: reasonIsOptional ? [reason.value] : reason.value
+        type: IDL.Opt(IDL.Text),
+        value: [reason.value]
       })
+    } else if (props.functionName === 'updateMaxPortfolioSnapshots') {
+      // Special handling for updateMaxPortfolioSnapshots
+      parameters.push({
+        name: 'newLimit',
+        type: IDL.Nat,
+        value: props.contextParams?.newLimit
+      })
+      parameters.push({
+        name: 'reason',
+        type: IDL.Opt(IDL.Text),
+        value: [reason.value]
+      })
+    } else {
+      // Standard parameter handling for other functions
+      // Add additional parameters first (e.g., token principal)
+      if (functionInfo.value.additionalParams) {
+        for (const param of functionInfo.value.additionalParams) {
+          const contextValue = props.contextParams?.[param.name]
+          if (contextValue !== undefined) {
+            parameters.push({
+              name: param.name,
+              type: param.type,
+              value: contextValue
+            })
+          }
+        }
+      }
+      
+      // Add reason parameter
+      if (functionInfo.value.requiresReason) {
+        // Check if reason is optional or required based on parameterTypes
+        const reasonIsOptional = functionInfo.value.parameterTypes.some(
+          (type: any) => type?.name === 'opt' || type?.toString().includes('Opt')
+        )
+        
+        parameters.push({
+          name: 'reason',
+          type: reasonIsOptional ? IDL.Opt(IDL.Text) : IDL.Text,
+          value: reasonIsOptional ? [reason.value] : reason.value
+        })
+      }
     }
 
     // Submit proposal

@@ -545,6 +545,66 @@ export const GNSF_REGISTRY: Record<string, GNSFunctionInfo> = {
             type: IDL.Principal,
             displayName: 'Token'
         }]
+    },
+    'updateRebalanceConfig': {
+        functionId: BigInt(3009),
+        displayName: 'Update Rebalance Configuration',
+        description: 'Updates trading bot configuration parameters',
+        parameterTypes: [
+            IDL.Record({
+                longSyncIntervalNS: IDL.Opt(IDL.Nat),
+                maxKongswapAttempts: IDL.Opt(IDL.Nat),
+                maxPriceHistoryEntries: IDL.Opt(IDL.Nat),
+                maxSlippageBasisPoints: IDL.Opt(IDL.Nat),
+                maxTradeAttemptsPerInterval: IDL.Opt(IDL.Nat),
+                maxTradeValueICP: IDL.Opt(IDL.Nat),
+                maxTradesStored: IDL.Opt(IDL.Nat),
+                minTradeValueICP: IDL.Opt(IDL.Nat),
+                portfolioRebalancePeriodNS: IDL.Opt(IDL.Nat),
+                priceUpdateIntervalNS: IDL.Opt(IDL.Nat),
+                rebalanceIntervalNS: IDL.Opt(IDL.Nat),
+                shortSyncIntervalNS: IDL.Opt(IDL.Nat),
+                tokenSyncTimeoutNS: IDL.Opt(IDL.Nat)
+            }),
+            IDL.Opt(IDL.Bool),
+            IDL.Opt(IDL.Text)
+        ],
+        requiresReason: true,
+        additionalParams: [{
+            name: 'updateConfig',
+            type: IDL.Record({
+                longSyncIntervalNS: IDL.Opt(IDL.Nat),
+                maxKongswapAttempts: IDL.Opt(IDL.Nat),
+                maxPriceHistoryEntries: IDL.Opt(IDL.Nat),
+                maxSlippageBasisPoints: IDL.Opt(IDL.Nat),
+                maxTradeAttemptsPerInterval: IDL.Opt(IDL.Nat),
+                maxTradeValueICP: IDL.Opt(IDL.Nat),
+                maxTradesStored: IDL.Opt(IDL.Nat),
+                minTradeValueICP: IDL.Opt(IDL.Nat),
+                portfolioRebalancePeriodNS: IDL.Opt(IDL.Nat),
+                priceUpdateIntervalNS: IDL.Opt(IDL.Nat),
+                rebalanceIntervalNS: IDL.Opt(IDL.Nat),
+                shortSyncIntervalNS: IDL.Opt(IDL.Nat),
+                tokenSyncTimeoutNS: IDL.Opt(IDL.Nat)
+            }),
+            displayName: 'Configuration Updates'
+        }, {
+            name: 'rebalanceStateNew',
+            type: IDL.Opt(IDL.Bool),
+            displayName: 'Rebalance State'
+        }]
+    },
+    'updateMaxPortfolioSnapshots': {
+        functionId: BigInt(3010),
+        displayName: 'Update Max Portfolio Snapshots',
+        description: 'Updates the maximum number of portfolio snapshots to store',
+        parameterTypes: [IDL.Nat, IDL.Opt(IDL.Text)],
+        requiresReason: true,
+        additionalParams: [{
+            name: 'newLimit',
+            type: IDL.Nat,
+            displayName: 'New Limit'
+        }]
     }
 }
 

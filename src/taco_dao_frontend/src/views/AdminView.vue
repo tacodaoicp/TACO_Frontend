@@ -1833,18 +1833,98 @@ const showUnpauseConfirmation = async (principal: string, tokenName: string) => 
   }
 };
 
-const showConfigUpdateConfirmation = () => {
-  confirmationModal.value = {
-    show: true,
-    title: 'Update Configuration',
-    message: 'Are you sure you want to update the rebalance configuration?',
-    extraData: 'This will change how the Treasury manages rebalancing operations.',
-    confirmButtonText: 'Update Configuration',
-    confirmButtonClass: 'btn-primary',
-    reasonPlaceholder: 'Please explain why this configuration change is needed...',
-    submitting: false,
-    action: null,
-    actionData: { type: 'configUpdate' }
+const showConfigUpdateConfirmation = async () => {
+  // Check if user is admin (await to ensure we have current status)
+  await checkAdminStatus();
+  
+  if (isAdmin.value) {
+    // User is admin - show direct action confirmation
+    confirmationModal.value = {
+      show: true,
+      title: 'Update Configuration',
+      message: 'Are you sure you want to update the rebalance configuration?',
+      extraData: 'This will change how the Treasury manages rebalancing operations.',
+      confirmButtonText: 'Update Configuration',
+      confirmButtonClass: 'btn-primary',
+      reasonPlaceholder: 'Please explain why this configuration change is needed...',
+      submitting: false,
+      action: null,
+      actionData: { type: 'configUpdate' }
+    };
+  } else {
+    // User is not admin - show proposal creation dialog for config update
+    // Determine if we need one or two proposals
+    const needsMaxPortfolioSnapshotsProposal = configInputs.value.maxPortfolioSnapshots !== originalMaxPortfolioSnapshots.value;
+    const needsRebalanceConfigProposal = hasRebalanceConfigChanges();
+    
+    if (needsRebalanceConfigProposal && needsMaxPortfolioSnapshotsProposal) {
+      // Need two proposals - show info first
+      proposalFunctionName.value = 'updateRebalanceConfig';
+      proposalReasonPlaceholder.value = 'Please explain why this configuration change is needed... (Note: This will create 2 proposals - one for config updates and one for max portfolio snapshots)';
+    } else if (needsMaxPortfolioSnapshotsProposal) {
+      proposalFunctionName.value = 'updateMaxPortfolioSnapshots';
+      proposalReasonPlaceholder.value = 'Please explain why the max portfolio snapshots limit should be changed...';
+    } else {
+      proposalFunctionName.value = 'updateRebalanceConfig';
+      proposalReasonPlaceholder.value = 'Please explain why this configuration change is needed...';
+    }
+    
+    // Build the context params with the config updates
+    proposalContextParams.value = buildConfigProposalParams();
+    showProposalDialog.value = true;
+  }
+};
+
+// Helper function to check if any rebalance config values (excluding maxPortfolioSnapshots) have changed
+const hasRebalanceConfigChanges = () => {
+  if (!rebalanceConfig.value) return false;
+  const current = configInputs.value;
+  const original = rebalanceConfig.value;
+  
+  return (
+    current.maxSlippageBasisPoints * 100 !== Number(original.maxSlippageBasisPoints) ||
+    current.minTradeValueICP !== Number(original.minTradeValueICP) ||
+    current.maxTradeValueICP !== Number(original.maxTradeValueICP) ||
+    current.maxTradesStored !== Number(original.maxTradesStored) ||
+    current.maxTradeAttemptsPerInterval !== Number(original.maxTradeAttemptsPerInterval) ||
+    current.maxKongswapAttempts !== Number(original.maxKongswapAttempts) ||
+    String(minutesToNs(current.rebalanceIntervalMinutes)) !== String(original.rebalanceIntervalNS) ||
+    String(minutesToNs(current.portfolioRebalancePeriodMinutes)) !== String(original.portfolioRebalancePeriodNS) ||
+    String(secondsToNs(current.shortSyncIntervalSeconds)) !== String(original.shortSyncIntervalNS) ||
+    String(minutesToNs(current.longSyncIntervalMinutes)) !== String(original.longSyncIntervalNS) ||
+    String(secondsToNs(current.tokenSyncTimeoutSeconds)) !== String(original.tokenSyncTimeoutNS) ||
+    current.maxPriceHistoryEntries !== originalMaxPriceHistoryEntries.value
+  );
+};
+
+// Build the config proposal parameters
+const buildConfigProposalParams = () => {
+  const needsMaxPortfolioSnapshotsProposal = configInputs.value.maxPortfolioSnapshots !== originalMaxPortfolioSnapshots.value;
+  const needsRebalanceConfigProposal = hasRebalanceConfigChanges();
+  
+  // Build UpdateConfig record with only changed values as optional
+  const updateConfig = {
+    maxSlippageBasisPoints: [BigInt(Math.round(configInputs.value.maxSlippageBasisPoints * 100))],
+    minTradeValueICP: [BigInt(Math.round(configInputs.value.minTradeValueICP))],
+    maxTradeValueICP: [BigInt(Math.round(configInputs.value.maxTradeValueICP))],
+    maxTradesStored: [BigInt(Math.round(configInputs.value.maxTradesStored))],
+    maxTradeAttemptsPerInterval: [BigInt(Math.round(configInputs.value.maxTradeAttemptsPerInterval))],
+    maxKongswapAttempts: [BigInt(Math.round(configInputs.value.maxKongswapAttempts))],
+    rebalanceIntervalNS: [minutesToNs(configInputs.value.rebalanceIntervalMinutes)],
+    portfolioRebalancePeriodNS: [minutesToNs(configInputs.value.portfolioRebalancePeriodMinutes)],
+    shortSyncIntervalNS: [secondsToNs(configInputs.value.shortSyncIntervalSeconds)],
+    longSyncIntervalNS: [minutesToNs(configInputs.value.longSyncIntervalMinutes)],
+    tokenSyncTimeoutNS: configInputs.value.tokenSyncTimeoutSeconds > 0 ? [secondsToNs(configInputs.value.tokenSyncTimeoutSeconds)] : [],
+    maxPriceHistoryEntries: configInputs.value.maxPriceHistoryEntries > 0 ? [BigInt(Math.round(configInputs.value.maxPriceHistoryEntries))] : [],
+    priceUpdateIntervalNS: []
+  };
+  
+  return {
+    updateConfig,
+    rebalanceStateNew: [],  // Keep current state
+    newLimit: BigInt(configInputs.value.maxPortfolioSnapshots),
+    needsRebalanceConfigProposal,
+    needsMaxPortfolioSnapshotsProposal
   };
 };
 
