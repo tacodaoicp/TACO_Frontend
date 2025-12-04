@@ -668,6 +668,13 @@ export const GNSF_REGISTRY: Record<string, GNSFunctionInfo> = {
             type: IDL.Nat,
             displayName: 'Interval (minutes)'
         }]
+    },
+    'takeNeuronSnapshot': {
+        functionId: BigInt(3015),
+        displayName: 'Take Neuron Snapshot',
+        description: 'Manually captures a snapshot of all neuron voting power data',
+        parameterTypes: [],
+        requiresReason: false  // No parameters - the neuron snapshot function takes no args
     }
 }
 

@@ -86,7 +86,7 @@
                 <div class="d-flex gap-2">
                   <button 
                     class="btn btn-warning" 
-                    @click="triggerManualSnapshot"
+                    @click="triggerManualNeuronSnapshot"
                     :disabled="snapshotStatus.inProgress">
                     Trigger Manual Snapshot
                   </button>
@@ -272,7 +272,7 @@
                   </button>
                   <button 
                     class="btn btn-warning" 
-                    @click="triggerManualSnapshot">
+                    @click="triggerManualPortfolioSnapshot">
                     Take Manual Snapshot
                   </button>
                 </div>
@@ -1306,21 +1306,45 @@ async function refreshTimerStatus() {
   console.log('AdminView: refreshTimerStatus completed');
 }
 
-async function triggerManualSnapshot() {
-    console.log('AdminView: triggerManualSnapshot called');
+async function triggerManualPortfolioSnapshot() {
+    console.log('AdminView: triggerManualPortfolioSnapshot called');
     
     // Check if user is admin (await to ensure we have current status)
     await checkAdminStatus();
     
     if (isAdmin.value) {
         // User is admin - show direct action confirmation
-        showManualSnapshotConfirmation();
+        showManualPortfolioSnapshotConfirmation();
     } else {
         // User is not admin - show proposal creation dialog
         proposalFunctionName.value = 'takeManualPortfolioSnapshot';
-        proposalReasonPlaceholder.value = 'Please explain why a manual snapshot should be taken...';
+        proposalReasonPlaceholder.value = 'Please explain why a manual portfolio snapshot should be taken...';
+        proposalContextParams.value = {};
         showProposalDialog.value = true;
     }
+}
+
+async function triggerManualNeuronSnapshot() {
+    console.log('AdminView: triggerManualNeuronSnapshot called');
+    
+    // Check if user is admin (await to ensure we have current status)
+    await checkAdminStatus();
+    
+    if (isAdmin.value) {
+        // User is admin - show direct action confirmation
+        showManualNeuronSnapshotConfirmation();
+    } else {
+        // User is not admin - show proposal creation dialog
+        proposalFunctionName.value = 'takeNeuronSnapshot';
+        proposalReasonPlaceholder.value = 'Please explain why a manual neuron snapshot should be taken...';
+        proposalContextParams.value = {};
+        showProposalDialog.value = true;
+    }
+}
+
+// Legacy alias for backwards compatibility
+async function triggerManualSnapshot() {
+    await triggerManualPortfolioSnapshot();
 }
 
 async function triggerManualSync() {
@@ -1958,20 +1982,38 @@ const showStopRebalancingConfirmation = () => {
   };
 };
 
-const showManualSnapshotConfirmation = () => {
+const showManualPortfolioSnapshotConfirmation = () => {
   confirmationModal.value = {
     show: true,
-    title: 'Trigger Manual Snapshot',
+    title: 'Take Manual Portfolio Snapshot',
     message: 'Are you sure you want to trigger a manual portfolio snapshot?',
     extraData: 'This will capture the current state of all portfolio positions.',
     confirmButtonText: 'Take Snapshot',
     confirmButtonClass: 'btn-warning',
-    reasonPlaceholder: 'Please explain why a manual snapshot is needed...',
+    reasonPlaceholder: 'Please explain why a manual portfolio snapshot is needed...',
     submitting: false,
     action: null,
-    actionData: { type: 'manualSnapshot' }
+    actionData: { type: 'manualPortfolioSnapshot' }
   };
 };
+
+const showManualNeuronSnapshotConfirmation = () => {
+  confirmationModal.value = {
+    show: true,
+    title: 'Take Manual Neuron Snapshot',
+    message: 'Are you sure you want to trigger a manual neuron snapshot?',
+    extraData: 'This will capture the current state of all neuron voting power data.',
+    confirmButtonText: 'Take Snapshot',
+    confirmButtonClass: 'btn-warning',
+    reasonPlaceholder: 'Please explain why a manual neuron snapshot is needed...',
+    submitting: false,
+    action: null,
+    actionData: { type: 'manualNeuronSnapshot' }
+  };
+};
+
+// Legacy alias
+const showManualSnapshotConfirmation = showManualPortfolioSnapshotConfirmation;
 
 const showExecuteTradingCycleConfirmation = () => {
   confirmationModal.value = {
@@ -2022,10 +2064,15 @@ const handleConfirmAction = async (reason: string) => {
         await refreshTimerStatus();
         console.log('AdminView: Trading stopped');
       }
-    } else if (actionData.type === 'manualSnapshot') {
-      // Handle manual snapshot
+    } else if (actionData.type === 'manualSnapshot' || actionData.type === 'manualPortfolioSnapshot') {
+      // Handle manual portfolio snapshot
       await tacoStore.takeManualPortfolioSnapshot(reason);
-      console.log('AdminView: Manual snapshot triggered');
+      console.log('AdminView: Manual portfolio snapshot triggered');
+      success = true;
+    } else if (actionData.type === 'manualNeuronSnapshot') {
+      // Handle manual neuron snapshot
+      await tacoStore.takeNeuronSnapshot();
+      console.log('AdminView: Manual neuron snapshot triggered');
       success = true;
     } else if (actionData.type === 'executeTradingCycle') {
       // Handle execute trading cycle
