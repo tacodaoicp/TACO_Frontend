@@ -669,8 +669,22 @@ export const GNSF_REGISTRY: Record<string, GNSFunctionInfo> = {
             displayName: 'Interval (minutes)'
         }]
     },
-    'takeNeuronSnapshot': {
+    'syncWithDao': {
         functionId: BigInt(3015),
+        displayName: 'Force Treasury Sync',
+        description: 'Forces a manual synchronization between the treasury and DAO, including balance updates and price syncing',
+        parameterTypes: [],
+        requiresReason: false  // No parameters
+    },
+    'recoverPoolBalances': {
+        functionId: BigInt(3016),
+        displayName: 'Recover Pool Balances',
+        description: 'Recovers any unused or forgotten balances from ICPSwap liquidity pools',
+        parameterTypes: [],
+        requiresReason: false  // No parameters
+    },
+    'takeNeuronSnapshot': {
+        functionId: BigInt(3017), // on neuronSnapshot.mo
         displayName: 'Take Neuron Snapshot',
         description: 'Manually captures a snapshot of all neuron voting power data',
         parameterTypes: [],

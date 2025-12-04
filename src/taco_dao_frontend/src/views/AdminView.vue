@@ -1349,9 +1349,29 @@ async function triggerManualSnapshot() {
 
 async function triggerManualSync() {
     console.log('AdminView: triggerManualSync called');
-    if (confirm('Are you sure you want to force a treasury sync?')) {
-        await tacoStore.triggerManualSync();
-        console.log('AdminView: Manual sync triggered');
+    
+    // Check if user is admin (await to ensure we have current status)
+    await checkAdminStatus();
+    
+    if (isAdmin.value) {
+        // User is admin - show direct action confirmation
+        confirmationModal.value = {
+            show: true,
+            title: 'Force Treasury Sync',
+            message: 'Are you sure you want to force a treasury sync?',
+            extraData: 'This will synchronize data between the treasury and DAO, update balances, and sync prices with DEX.',
+            confirmButtonText: 'Force Sync',
+            confirmButtonClass: 'btn-warning',
+            reasonPlaceholder: 'Please explain why the treasury needs to be force-synced...',
+            submitting: false,
+            action: null,
+            actionData: { type: 'syncWithDao' }
+        };
+    } else {
+        // User is not admin - show proposal creation dialog
+        proposalFunctionName.value = 'syncWithDao';
+        proposalReasonPlaceholder.value = 'Please explain why the treasury needs to be force-synced...';
+        showProposalDialog.value = true;
     }
 }
 
@@ -1492,16 +1512,29 @@ async function stopRebalancing() {
 
 async function recoverPoolBalances() {
     console.log('AdminView: recoverPoolBalances called');
-    if (confirm('Are you sure you want to recover balances from ICPSwap pools?')) {
-        isRecoveringBalances.value = true;
-        try {
-            await tacoStore.recoverPoolBalances();
-            console.log('AdminView: Pool balances recovered');
-        } catch (error) {
-            console.error('AdminView: Error recovering pool balances:', error);
-        } finally {
-            isRecoveringBalances.value = false;
-        }
+    
+    // Check if user is admin (await to ensure we have current status)
+    await checkAdminStatus();
+    
+    if (isAdmin.value) {
+        // User is admin - show direct action confirmation
+        confirmationModal.value = {
+            show: true,
+            title: 'Recover Pool Balances',
+            message: 'Are you sure you want to recover balances from ICPSwap pools?',
+            extraData: 'This will scan all ICPSwap liquidity pools and recover any unused or forgotten token balances.',
+            confirmButtonText: 'Recover Balances',
+            confirmButtonClass: 'btn-warning',
+            reasonPlaceholder: 'Please explain why pool balances need to be recovered...',
+            submitting: false,
+            action: null,
+            actionData: { type: 'recoverPoolBalances' }
+        };
+    } else {
+        // User is not admin - show proposal creation dialog
+        proposalFunctionName.value = 'recoverPoolBalances';
+        proposalReasonPlaceholder.value = 'Please explain why pool balances need to be recovered...';
+        showProposalDialog.value = true;
     }
 }
 
@@ -2111,6 +2144,25 @@ const handleConfirmAction = async (reason: string) => {
       success = await updateSystemParameters(reason);
       if (success) {
         console.log('AdminView: System parameters updated');
+      }
+    } else if (actionData.type === 'syncWithDao') {
+      // Handle force treasury sync
+      await tacoStore.triggerManualSync();
+      await refreshTimerStatus();
+      console.log('AdminView: Manual sync triggered');
+      success = true;
+    } else if (actionData.type === 'recoverPoolBalances') {
+      // Handle recover pool balances
+      isRecoveringBalances.value = true;
+      try {
+        await tacoStore.recoverPoolBalances();
+        console.log('AdminView: Pool balances recovered');
+        success = true;
+      } catch (error) {
+        console.error('AdminView: Error recovering pool balances:', error);
+        success = false;
+      } finally {
+        isRecoveringBalances.value = false;
       }
     } else if (actionData.principal && actionData.tokenName) {
       // Handle token pause/unpause actions
