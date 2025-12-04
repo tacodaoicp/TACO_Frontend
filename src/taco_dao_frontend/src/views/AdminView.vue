@@ -2484,19 +2484,42 @@ const fetchTradingPauses = async () => {
     }
 };
 
-const showUpdateSnapshotIntervalConfirmation = () => {
+const showUpdateSnapshotIntervalConfirmation = async () => {
   if (!snapshotIntervalMinutes.value || snapshotIntervalMinutes.value < 1) return;
   
-  confirmationModal.value = {
-    show: true,
-    title: 'Update Snapshot Interval',
-    message: `Are you sure you want to update the snapshot interval to ${snapshotIntervalMinutes.value} minutes?`,
-    extraData: 'This will change how frequently the system takes snapshots of token balances and prices.',
-    confirmText: 'Update Interval',
-    cancelText: 'Cancel',
-    requireReason: true,
-    actionData: { type: 'updateSnapshotInterval' }
-  };
+  // Check if user is admin (await to ensure we have current status)
+  await checkAdminStatus();
+  
+  if (isAdmin.value) {
+    // User is admin - show direct action confirmation
+    confirmationModal.value = {
+      show: true,
+      title: 'Update Neuron Snapshot Interval',
+      message: `Are you sure you want to update the neuron snapshot interval to ${snapshotIntervalMinutes.value} minutes?`,
+      extraData: 'This will change how frequently the system takes snapshots of neuron voting power data.',
+      confirmButtonText: 'Update Interval',
+      confirmButtonClass: 'btn-primary',
+      reasonPlaceholder: 'Please explain why the neuron snapshot interval should be changed...',
+      submitting: false,
+      action: null,
+      actionData: { type: 'updateSnapshotInterval' }
+    };
+  } else {
+    // User is not admin - show proposal creation dialog
+    // This uses the updateSystemParameter function with SnapshotInterval variant
+    const intervalNS = BigInt(snapshotIntervalMinutes.value) * 60n * 1_000_000_000n;
+    
+    proposalFunctionName.value = 'updateSystemParameter';
+    proposalReasonPlaceholder.value = `Please explain why the neuron snapshot interval should be changed to ${snapshotIntervalMinutes.value} minutes...`;
+    proposalContextParams.value = {
+      systemParameterChanges: [{
+        key: 'SnapshotInterval',
+        variant: { SnapshotInterval: intervalNS },
+        displayName: 'Neuron Snapshot Interval'
+      }]
+    };
+    showProposalDialog.value = true;
+  }
 };
 
 async function updateSnapshotInterval(reason?: string) {
