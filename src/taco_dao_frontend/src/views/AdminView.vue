@@ -2339,52 +2339,90 @@ async function refreshPortfolioSnapshotStatus() {
     }
 }
 
-function showStartPortfolioSnapshotsConfirmation() {
-    confirmationModal.value = {
-        show: true,
-        title: 'Start Portfolio Snapshots',
-        message: 'Are you sure you want to start automatic portfolio snapshots?',
-        extraData: '',
-        confirmButtonText: 'Start',
-        confirmButtonClass: 'btn-success',
-        reasonPlaceholder: 'Please provide a reason for starting portfolio snapshots...',
-        submitting: false,
-        action: null,
-        actionData: { type: 'startPortfolioSnapshots' }
-    };
+async function showStartPortfolioSnapshotsConfirmation() {
+    // Check if user is admin (await to ensure we have current status)
+    await checkAdminStatus();
+    
+    if (isAdmin.value) {
+        // User is admin - show direct action confirmation
+        confirmationModal.value = {
+            show: true,
+            title: 'Start Portfolio Snapshots',
+            message: 'Are you sure you want to start automatic portfolio snapshots?',
+            extraData: '',
+            confirmButtonText: 'Start',
+            confirmButtonClass: 'btn-success',
+            reasonPlaceholder: 'Please provide a reason for starting portfolio snapshots...',
+            submitting: false,
+            action: null,
+            actionData: { type: 'startPortfolioSnapshots' }
+        };
+    } else {
+        // User is not admin - show proposal creation dialog
+        proposalFunctionName.value = 'startPortfolioSnapshots';
+        proposalReasonPlaceholder.value = 'Please explain why portfolio snapshots should be started...';
+        proposalContextParams.value = {};
+        showProposalDialog.value = true;
+    }
 }
 
-function showStopPortfolioSnapshotsConfirmation() {
-    confirmationModal.value = {
-        show: true,
-        title: 'Stop Portfolio Snapshots',
-        message: 'Are you sure you want to stop automatic portfolio snapshots?',
-        extraData: '',
-        confirmButtonText: 'Stop',
-        confirmButtonClass: 'btn-danger',
-        reasonPlaceholder: 'Please provide a reason for stopping portfolio snapshots...',
-        submitting: false,
-        action: null,
-        actionData: { type: 'stopPortfolioSnapshots' }
-    };
+async function showStopPortfolioSnapshotsConfirmation() {
+    // Check if user is admin (await to ensure we have current status)
+    await checkAdminStatus();
+    
+    if (isAdmin.value) {
+        // User is admin - show direct action confirmation
+        confirmationModal.value = {
+            show: true,
+            title: 'Stop Portfolio Snapshots',
+            message: 'Are you sure you want to stop automatic portfolio snapshots?',
+            extraData: '',
+            confirmButtonText: 'Stop',
+            confirmButtonClass: 'btn-danger',
+            reasonPlaceholder: 'Please provide a reason for stopping portfolio snapshots...',
+            submitting: false,
+            action: null,
+            actionData: { type: 'stopPortfolioSnapshots' }
+        };
+    } else {
+        // User is not admin - show proposal creation dialog
+        proposalFunctionName.value = 'stopPortfolioSnapshots';
+        proposalReasonPlaceholder.value = 'Please explain why portfolio snapshots should be stopped...';
+        proposalContextParams.value = {};
+        showProposalDialog.value = true;
+    }
 }
 
-function showUpdatePortfolioSnapshotIntervalConfirmation() {
-    confirmationModal.value = {
-        show: true,
-        title: 'Update Portfolio Snapshot Interval',
-        message: `Are you sure you want to update the portfolio snapshot interval to ${newPortfolioSnapshotInterval.value} minutes?`,
-        extraData: '',
-        confirmButtonText: 'Update',
-        confirmButtonClass: 'btn-primary',
-        reasonPlaceholder: 'Please provide a reason for updating the interval...',
-        submitting: false,
-        action: null,
-        actionData: { 
-            type: 'updatePortfolioSnapshotInterval',
-            intervalMinutes: newPortfolioSnapshotInterval.value
-        }
-    };
+async function showUpdatePortfolioSnapshotIntervalConfirmation() {
+    // Check if user is admin (await to ensure we have current status)
+    await checkAdminStatus();
+    
+    if (isAdmin.value) {
+        // User is admin - show direct action confirmation
+        confirmationModal.value = {
+            show: true,
+            title: 'Update Portfolio Snapshot Interval',
+            message: `Are you sure you want to update the portfolio snapshot interval to ${newPortfolioSnapshotInterval.value} minutes?`,
+            extraData: '',
+            confirmButtonText: 'Update',
+            confirmButtonClass: 'btn-primary',
+            reasonPlaceholder: 'Please provide a reason for updating the interval...',
+            submitting: false,
+            action: null,
+            actionData: { 
+                type: 'updatePortfolioSnapshotInterval',
+                intervalMinutes: newPortfolioSnapshotInterval.value
+            }
+        };
+    } else {
+        // User is not admin - show proposal creation dialog
+        proposalFunctionName.value = 'updatePortfolioSnapshotInterval';
+        proposalReasonPlaceholder.value = `Please explain why the portfolio snapshot interval should be changed to ${newPortfolioSnapshotInterval.value} minutes...`;
+        proposalContextParams.value = {
+            intervalMinutes: BigInt(newPortfolioSnapshotInterval.value)
+        };
+        showProposalDialog.value = true;
+    }
 }
 
 // Fetch trading pauses

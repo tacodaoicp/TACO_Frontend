@@ -642,6 +642,32 @@ export const GNSF_REGISTRY: Record<string, GNSFunctionInfo> = {
             }),
             displayName: 'Parameter'
         }]
+    },
+    'startPortfolioSnapshots': {
+        functionId: BigInt(3012),
+        displayName: 'Start Portfolio Snapshots',
+        description: 'Starts automatic portfolio snapshot collection',
+        parameterTypes: [IDL.Opt(IDL.Text)],
+        requiresReason: true
+    },
+    'stopPortfolioSnapshots': {
+        functionId: BigInt(3013),
+        displayName: 'Stop Portfolio Snapshots',
+        description: 'Stops automatic portfolio snapshot collection',
+        parameterTypes: [IDL.Opt(IDL.Text)],
+        requiresReason: true
+    },
+    'updatePortfolioSnapshotInterval': {
+        functionId: BigInt(3014),
+        displayName: 'Update Portfolio Snapshot Interval',
+        description: 'Updates the interval between automatic portfolio snapshots',
+        parameterTypes: [IDL.Nat, IDL.Opt(IDL.Text)],
+        requiresReason: true,
+        additionalParams: [{
+            name: 'intervalMinutes',
+            type: IDL.Nat,
+            displayName: 'Interval (minutes)'
+        }]
     }
 }
 
