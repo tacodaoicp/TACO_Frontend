@@ -3926,16 +3926,14 @@ export const useTacoStore = defineStore('taco', () => {
     // trading pause management functions
     const listTradingPauses = async () => {
         try {
-            const authClient = await getAuthClient();
-            
-            if (!await authClient.isAuthenticated()) {
-                throw new Error('User not authenticated');
-            }
+            // Use anonymous identity for public query (no authentication required)
+            const host = process.env.DFX_NETWORK === "local"
+                ? getLocalHost()
+                : "https://ic0.app";
 
-            const identity = await authClient.getIdentity();
             const agent = await createAgent({
-                identity,
-                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+                identity: new AnonymousIdentity(),
+                host,
                 fetchRootKey: process.env.DFX_NETWORK === "local",
             });
 
