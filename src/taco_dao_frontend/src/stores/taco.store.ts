@@ -2939,49 +2939,28 @@ export const useTacoStore = defineStore('taco', () => {
     const fetchSystemLogs = async () => {
         // console.log('fetchSystemLogs: Starting to fetch logs...');
         try {
-            // create auth client
-            const authClient = await getAuthClient();
-            
-            // Check if user is authenticated
-            if (!await authClient.isAuthenticated()) {
-                // console.log('fetchSystemLogs: User not authenticated');
-                return;
-            }
-
-            // get identity
-            const identity = await authClient.getIdentity();
-            // console.log('fetchSystemLogs: Got authenticated identity');
-
-            // get host
+            // Use anonymous identity for public query (no authentication required)
             const host = process.env.DFX_NETWORK === "local"
-                ? `http://localhost:54612`
+                ? getLocalHost()
                 : "https://ic0.app"
-            // console.log('fetchSystemLogs: Using host:', host);
 
-            // create agent with authenticated identity
             const agent = await createAgent({
-                identity,
+                identity: new AnonymousIdentity(),
                 host,
                 fetchRootKey: process.env.DFX_NETWORK === "local",
             })
-            // console.log('fetchSystemLogs: Agent created with authenticated identity');
 
             // determine canisterId based on network
             let canisterId = daoBackendCanisterId();
-
-            // console.log('fetchSystemLogs: Using canisterId:', canisterId);
 
             // create actor
             const actor = Actor.createActor(daoBackendIDL, {
                 agent,
                 canisterId,
             })
-            // console.log('fetchSystemLogs: Actor created');
 
             const logs = await actor.getLogs(100) as SystemLog[];
-            // console.log('fetchSystemLogs: Received logs:', logs);
             systemLogs.value = logs;
-            // console.log('fetchSystemLogs: Updated systemLogs.value:', systemLogs.value);
         } catch (error) {
             console.error('fetchSystemLogs: Error fetching system logs:', error);
         }
@@ -3360,38 +3339,25 @@ export const useTacoStore = defineStore('taco', () => {
     const fetchVoterDetails = async () => {
         // console.log('taco.store: fetchVoterDetails() - Starting fetch...');
         try {
-            // Create auth client
-            const authClient = await getAuthClient();
-            
-            // Check if user is authenticated
-            if (!await authClient.isAuthenticated()) {
-                console.error('User not authenticated');
-                return false;
-            }
-
-            // Get authenticated identity
-            const identity = await authClient.getIdentity();
-
+            // Use anonymous identity for public query (no authentication required)
+            const host = process.env.DFX_NETWORK === "local"
+                ? getLocalHost()
+                : "https://ic0.app";
 
             const agent = await createAgent({
-                identity,
-                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+                identity: new AnonymousIdentity(),
+                host,
                 fetchRootKey: process.env.DFX_NETWORK === "local",
             })
-            // console.log('taco.store: fetchVoterDetails() - Agent created');
 
             let canisterId = daoBackendCanisterId();
-
-            // console.log('taco.store: fetchVoterDetails() - Using canisterId:', canisterId);
 
             const actor = Actor.createActor(daoBackendIDL, {
                 agent,
                 canisterId,
             })
-            // console.log('taco.store: fetchVoterDetails() - Actor created');
 
             const voterDetails = await actor.admin_getUserAllocations();
-            // console.log('taco.store: fetchVoterDetails() - Raw response:', voterDetails);
 
             if (!voterDetails || !Array.isArray(voterDetails)) {
                 console.error('taco.store: fetchVoterDetails() - Invalid response format:', voterDetails);
@@ -3402,7 +3368,6 @@ export const useTacoStore = defineStore('taco', () => {
                 principal,
                 state
             }));
-            // console.log('taco.store: fetchVoterDetails() - Updated state:', fetchedVoterDetails.value);
             return;
         } catch (error) {
             console.error('taco.store: fetchVoterDetails() - Error:', error);
@@ -3411,26 +3376,18 @@ export const useTacoStore = defineStore('taco', () => {
     }
     const fetchNeuronAllocations = async () => {
         try {
-            // Create auth client
-            const authClient = await getAuthClient();
-
-            // Check if user is authenticated
-            if (!await authClient.isAuthenticated()) {
-                console.error('User not authenticated');
-                return false;
-            }
-
-            // Get authenticated identity
-            const identity = await authClient.getIdentity();
+            // Use anonymous identity for public query (no authentication required)
+            const host = process.env.DFX_NETWORK === "local"
+                ? getLocalHost()
+                : "https://ic0.app";
 
             const agent = await createAgent({
-                identity,
-                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+                identity: new AnonymousIdentity(),
+                host,
                 fetchRootKey: process.env.DFX_NETWORK === "local",
             });
 
             let canisterId = daoBackendCanisterId();
-
 
             const actor = Actor.createActor(daoBackendIDL, {
                 agent,
@@ -3438,7 +3395,6 @@ export const useTacoStore = defineStore('taco', () => {
             });
 
             const result = await actor.admin_getNeuronAllocations();
-            // console.log('Raw neuron allocations:', result);
 
             if (!Array.isArray(result)) {
                 console.error('Expected array response from admin_getNeuronAllocations, got:', typeof result);
@@ -3453,8 +3409,6 @@ export const useTacoStore = defineStore('taco', () => {
                 lastAllocationMaker: allocation.lastAllocationMaker,
                 allocations: allocation.allocations.map((alloc: Allocation) => [alloc.token.toText(), BigInt(alloc.basisPoints)])
             }));
-
-            // console.log('Processed neuron allocations:', fetchedNeuronAllocations.value);
         } catch (error) {
             console.error('Error fetching neuron allocations:', error);
             fetchedNeuronAllocations.value = [];
