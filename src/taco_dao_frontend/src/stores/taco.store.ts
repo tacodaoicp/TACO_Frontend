@@ -523,7 +523,7 @@ export const GNSF_REGISTRY: Record<string, GNSFunctionInfo> = {
         requiresReason: true
     },
     'pauseToken': {
-        functionId: BigInt(3007),
+        functionId: BigInt(3009),
         displayName: 'Pause Token',
         description: 'Pauses a token from being traded by the treasury',
         parameterTypes: [IDL.Principal, IDL.Text],
@@ -535,7 +535,7 @@ export const GNSF_REGISTRY: Record<string, GNSFunctionInfo> = {
         }]
     },
     'unpauseToken': {
-        functionId: BigInt(3008),
+        functionId: BigInt(3010),
         displayName: 'Unpause Token',
         description: 'Resumes trading for a previously paused token',
         parameterTypes: [IDL.Principal, IDL.Text],
@@ -547,7 +547,7 @@ export const GNSF_REGISTRY: Record<string, GNSFunctionInfo> = {
         }]
     },
     'updateRebalanceConfig': {
-        functionId: BigInt(3009),
+        functionId: BigInt(3011),
         displayName: 'Update Rebalance Configuration',
         description: 'Updates trading bot configuration parameters',
         parameterTypes: [
@@ -595,7 +595,7 @@ export const GNSF_REGISTRY: Record<string, GNSFunctionInfo> = {
         }]
     },
     'updateMaxPortfolioSnapshots': {
-        functionId: BigInt(3010),
+        functionId: BigInt(3012),
         displayName: 'Update Max Portfolio Snapshots',
         description: 'Updates the maximum number of portfolio snapshots to store',
         parameterTypes: [IDL.Nat, IDL.Opt(IDL.Text)],
@@ -607,7 +607,7 @@ export const GNSF_REGISTRY: Record<string, GNSFunctionInfo> = {
         }]
     },
     'updateSystemParameter': {
-        functionId: BigInt(3011),
+        functionId: BigInt(3013),
         displayName: 'Update System Parameter',
         description: 'Updates a single DAO system parameter',
         parameterTypes: [
@@ -644,21 +644,21 @@ export const GNSF_REGISTRY: Record<string, GNSFunctionInfo> = {
         }]
     },
     'startPortfolioSnapshots': {
-        functionId: BigInt(3012),
+        functionId: BigInt(3014),
         displayName: 'Start Portfolio Snapshots',
         description: 'Starts automatic portfolio snapshot collection',
         parameterTypes: [IDL.Opt(IDL.Text)],
         requiresReason: true
     },
     'stopPortfolioSnapshots': {
-        functionId: BigInt(3013),
+        functionId: BigInt(3015),
         displayName: 'Stop Portfolio Snapshots',
         description: 'Stops automatic portfolio snapshot collection',
         parameterTypes: [IDL.Opt(IDL.Text)],
         requiresReason: true
     },
     'updatePortfolioSnapshotInterval': {
-        functionId: BigInt(3014),
+        functionId: BigInt(3016),
         displayName: 'Update Portfolio Snapshot Interval',
         description: 'Updates the interval between automatic portfolio snapshots',
         parameterTypes: [IDL.Nat, IDL.Opt(IDL.Text)],
@@ -670,21 +670,21 @@ export const GNSF_REGISTRY: Record<string, GNSFunctionInfo> = {
         }]
     },
     'syncWithDao': {
-        functionId: BigInt(3015),
+        functionId: BigInt(3017),
         displayName: 'Force Treasury Sync',
         description: 'Forces a manual synchronization between the treasury and DAO, including balance updates and price syncing',
         parameterTypes: [],
         requiresReason: false  // No parameters
     },
     'recoverPoolBalances': {
-        functionId: BigInt(3016),
+        functionId: BigInt(3018),
         displayName: 'Recover Pool Balances',
         description: 'Recovers any unused or forgotten balances from ICPSwap liquidity pools',
         parameterTypes: [],
         requiresReason: false  // No parameters
     },
     'takeNeuronSnapshot': {
-        functionId: BigInt(3017), // on neuronSnapshot.mo
+        functionId: BigInt(3019), // on neuronSnapshot.mo
         displayName: 'Take Neuron Snapshot',
         description: 'Manually captures a snapshot of all neuron voting power data',
         parameterTypes: [],
