@@ -182,8 +182,7 @@
 <script>
 import { useAdminStore } from '../stores/admin.store'
 import { useTacoStore } from '../stores/taco.store'
-import { AuthClient } from '@dfinity/auth-client'
-import { Actor } from '@dfinity/agent'
+import { Actor, AnonymousIdentity } from '@dfinity/agent'
 import { createAgent } from '@dfinity/utils'
 import { idlFactory as rewardsIDL } from '../../../declarations/rewards/rewards.did.js'
 
@@ -244,17 +243,9 @@ export default {
           throw new Error('Rewards canister ID not found')
         }
 
-        const authClient = await AuthClient.create({
-          idleOptions: { disableIdle: true }
-        })
-
-        if (!await authClient.isAuthenticated()) {
-          throw new Error('User not authenticated')
-        }
-
-        const identity = authClient.getIdentity()
+        // Use anonymous identity for public query (no authentication required)
         const agent = await createAgent({
-          identity,
+          identity: new AnonymousIdentity(),
           host: process.env.DFX_NETWORK === 'local' ? 'http://localhost:4943' : 'https://ic0.app'
         })
 
