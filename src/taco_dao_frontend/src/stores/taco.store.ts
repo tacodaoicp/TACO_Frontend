@@ -863,6 +863,21 @@ export const GNSF_REGISTRY: Record<string, GNSFunctionInfo> = {
             type: IDL.Nat,
             displayName: 'Condition ID'
         }]
+    },
+    // Neuron Snapshot Functions (neuronSnapshot.mo)
+    'setMaxNeuronSnapshots': {
+        functionId: BigInt(3029),
+        displayName: 'Set Max Neuron Snapshots',
+        description: 'Updates the maximum number of neuron snapshots to keep in storage',
+        parameterTypes: [
+            IDL.Nat  // maxSnapshots
+        ],
+        requiresReason: false,
+        additionalParams: [{
+            name: 'maxSnapshots',
+            type: IDL.Nat,
+            displayName: 'Maximum Snapshots'
+        }]
     }
 }
 

@@ -286,6 +286,16 @@
       </div>
     </div>
   </div>
+  
+  <!-- GNSF Proposal Dialog for Non-Admin Users -->
+  <GNSFProposalDialog
+    :show="showProposalDialog"
+    :function-name="proposalFunctionName"
+    :reason-placeholder="proposalReasonPlaceholder"
+    :context-params="proposalContextParams"
+    @close="showProposalDialog = false"
+    @success="handleProposalSuccess"
+  />
 </template>
 
 <script setup lang="ts">
@@ -293,9 +303,20 @@ import { ref, onMounted } from 'vue'
 import { useTacoStore } from '../stores/taco.store'
 import HeaderBar from '../components/HeaderBar.vue'
 import TacoTitle from '../components/misc/TacoTitle.vue'
+import GNSFProposalDialog from '../components/proposals/GNSFProposalDialog.vue'
+import { useAdminCheck } from '../composables/useAdminCheck'
 import { Principal } from '@dfinity/principal'
 
 const store = useTacoStore()
+
+// Admin check
+const { isAdmin, checking, checkAdminStatus } = useAdminCheck()
+
+// GNSF Proposal Dialog state
+const showProposalDialog = ref(false)
+const proposalFunctionName = ref('')
+const proposalReasonPlaceholder = ref('')
+const proposalContextParams = ref<any>({})
 
 // Reactive state
 const currentMaxSnapshots = ref(100)
@@ -385,65 +406,94 @@ const loadCurrentConfig = async () => {
 const updateMaxSnapshots = async () => {
   if (!newMaxSnapshots.value || newMaxSnapshots.value < 1) return
   
-  updatingLimit.value = true
-  try {
-    await store.setMaxNeuronSnapshots(newMaxSnapshots.value)
-    currentMaxSnapshots.value = newMaxSnapshots.value
-    newMaxSnapshots.value = null
-    
-    // Show success message
-    store.addToast({
-      id: Date.now(),
-      code: 'success',
-      title: 'Success',
-      icon: '✅',
-      message: `Snapshot limit updated to ${currentMaxSnapshots.value}`
-    })
-  } catch (error) {
-    console.error('Error updating max snapshots:', error)
-    store.addToast({
-      id: Date.now(),
-      code: 'error',
-      title: 'Error',
-      icon: '❌',
-      message: 'Failed to update snapshot limit'
-    })
-  } finally {
-    updatingLimit.value = false
+  // Check if user is admin
+  await checkAdminStatus()
+  
+  // Capture value before potentially closing
+  const newLimit = newMaxSnapshots.value
+  
+  if (isAdmin.value) {
+    // Admin path - direct call
+    updatingLimit.value = true
+    try {
+      await store.setMaxNeuronSnapshots(newLimit)
+      currentMaxSnapshots.value = newLimit
+      newMaxSnapshots.value = null
+      
+      // Show success message
+      store.addToast({
+        id: Date.now(),
+        code: 'success',
+        title: 'Success',
+        icon: '✅',
+        message: `Snapshot limit updated to ${currentMaxSnapshots.value}`
+      })
+    } catch (error) {
+      console.error('Error updating max snapshots:', error)
+      store.addToast({
+        id: Date.now(),
+        code: 'error',
+        title: 'Error',
+        icon: '❌',
+        message: 'Failed to update snapshot limit'
+      })
+    } finally {
+      updatingLimit.value = false
+    }
+  } else {
+    // Non-admin path - show proposal dialog
+    proposalFunctionName.value = 'setMaxNeuronSnapshots'
+    proposalReasonPlaceholder.value = `Please explain why the maximum neuron snapshots should be changed to ${newLimit}...`
+    proposalContextParams.value = {
+      maxSnapshots: BigInt(newLimit)
+    }
+    showProposalDialog.value = true
   }
 }
 
 const takeSnapshot = async () => {
-  takingSnapshot.value = true
-  try {
-    const result = await store.takeNeuronSnapshot()
-    
-    if ('Ok' in result) {
-      snapshotStatus.value = 'TakingSnapshot'
+  // Check if user is admin
+  await checkAdminStatus()
+  
+  if (isAdmin.value) {
+    // Admin path - direct call
+    takingSnapshot.value = true
+    try {
+      const result = await store.takeNeuronSnapshot()
+      
+      if ('Ok' in result) {
+        snapshotStatus.value = 'TakingSnapshot'
+        store.addToast({
+          id: Date.now(),
+          code: 'info',
+          title: 'Snapshot Started',
+          icon: '📸',
+          message: `Neuron snapshot has been initiated (ID: ${result.Ok.toString()})`
+        })
+      } else {
+        throw new Error(`Snapshot failed: ${JSON.stringify(result.Err)}`)
+      }
+      
+      // Refresh snapshots after a delay
+      setTimeout(refreshSnapshots, 2000)
+    } catch (error) {
+      console.error('Error taking snapshot:', error)
       store.addToast({
         id: Date.now(),
-        code: 'info',
-        title: 'Snapshot Started',
-        icon: '📸',
-        message: `Neuron snapshot has been initiated (ID: ${result.Ok.toString()})`
+        code: 'error',
+        title: 'Error',
+        icon: '❌',
+        message: 'Failed to take snapshot'
       })
-    } else {
-      throw new Error(`Snapshot failed: ${JSON.stringify(result.Err)}`)
+    } finally {
+      takingSnapshot.value = false
     }
-    
-    // Refresh snapshots after a delay
-    setTimeout(refreshSnapshots, 2000)
-  } catch (error) {
-    console.error('Error taking snapshot:', error)
-    store.addToast({
-      id: Date.now(),
-      code: 'error',
-      title: 'Error',
-      icon: '❌',
-      message: 'Failed to take snapshot'
-    })
-  } finally {
-    takingSnapshot.value = false
+  } else {
+    // Non-admin path - show proposal dialog
+    proposalFunctionName.value = 'takeNeuronSnapshot'
+    proposalReasonPlaceholder.value = 'Please explain why a neuron snapshot should be taken now...'
+    proposalContextParams.value = {}
+    showProposalDialog.value = true
   }
 }
 
@@ -558,8 +608,18 @@ const loadMoreNeuronData = async () => {
   }
 }
 
+// Handle successful proposal submission
+const handleProposalSuccess = async () => {
+  showProposalDialog.value = false
+  proposalFunctionName.value = ''
+  proposalReasonPlaceholder.value = ''
+  proposalContextParams.value = {}
+  console.log('AdminNeuronView: Proposal submitted successfully')
+}
+
 // Initialize component
 onMounted(async () => {
+  await checkAdminStatus()
   await loadCurrentConfig()
   await refreshSnapshots()
 })
