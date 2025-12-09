@@ -4245,16 +4245,14 @@ export const useTacoStore = defineStore('taco', () => {
     // portfolio circuit breaker
     const listPortfolioCircuitBreakerConditions = async () => {
         try {
-            const authClient = await getAuthClient();
-            
-            if (!await authClient.isAuthenticated()) {
-                throw new Error('User not authenticated');
-            }
+            // Use anonymous identity for public query (no authentication required)
+            const host = process.env.DFX_NETWORK === "local"
+                ? getLocalHost()
+                : "https://ic0.app";
 
-            const identity = await authClient.getIdentity();
             const agent = await createAgent({
-                identity,
-                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+                identity: new AnonymousIdentity(),
+                host,
                 fetchRootKey: process.env.DFX_NETWORK === "local",
             });
 
@@ -4389,16 +4387,14 @@ export const useTacoStore = defineStore('taco', () => {
     }
     const getPortfolioCircuitBreakerLogs = async (offset: number, limit: number) => {
         try {
-            const authClient = await getAuthClient();
-            
-            if (!await authClient.isAuthenticated()) {
-                throw new Error('User not authenticated');
-            }
+            // Use anonymous identity for public query (no authentication required)
+            const host = process.env.DFX_NETWORK === "local"
+                ? getLocalHost()
+                : "https://ic0.app";
 
-            const identity = await authClient.getIdentity();
             const agent = await createAgent({
-                identity,
-                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+                identity: new AnonymousIdentity(),
+                host,
                 fetchRootKey: process.env.DFX_NETWORK === "local",
             });
 
