@@ -804,18 +804,22 @@ const submitCondition = async () => {
   // Check if user is admin (await to ensure we have current status)
   await checkAdminStatus()
   
+  // Capture form values before potentially closing modal
+  const conditionName = newCondition.value.name
+  const conditionDirection = newCondition.value.direction
+  const conditionPercentage = newCondition.value.percentage
   const timeWindowNS = BigInt(newCondition.value.timeValue * getTimeMultiplier() * 1_000_000_000)
   const applicableTokens: any[] = [] // Empty array means all tokens
-  const directionVariant = newCondition.value.direction === 'Up' ? { Up: null } : { Down: null }
+  const directionVariant = conditionDirection === 'Up' ? { Up: null } : { Down: null }
   
   if (isAdmin.value) {
     // Admin path - direct call
     submitting.value = true
     try {
       await store.addTriggerCondition(
-        newCondition.value.name,
-        newCondition.value.direction,
-        newCondition.value.percentage,
+        conditionName,
+        conditionDirection,
+        conditionPercentage,
         timeWindowNS,
         applicableTokens
       )
@@ -830,11 +834,11 @@ const submitCondition = async () => {
     // Non-admin path - show proposal dialog
     closeModal()
     proposalFunctionName.value = 'addTriggerCondition'
-    proposalReasonPlaceholder.value = `Please explain why this price trigger condition "${newCondition.value.name}" should be added...`
+    proposalReasonPlaceholder.value = `Please explain why this price trigger condition "${conditionName}" should be added...`
     proposalContextParams.value = {
-      name: newCondition.value.name,
+      name: conditionName,
       direction: directionVariant,
-      percentage: newCondition.value.percentage,
+      percentage: conditionPercentage,
       timeWindowNS: timeWindowNS,
       applicableTokens: applicableTokens
     }
@@ -1084,20 +1088,25 @@ const submitPortfolioCondition = async () => {
   // Check if user is admin
   await checkAdminStatus()
   
+  // Capture form values before potentially closing modal
+  const conditionName = newPortfolioCondition.value.name
+  const conditionDirection = newPortfolioCondition.value.direction
+  const conditionPercentage = newPortfolioCondition.value.percentage
+  const conditionValueType = newPortfolioCondition.value.valueType
   const timeWindowNS = BigInt(newPortfolioCondition.value.timeValue * getTimeMultiplier() * 1_000_000_000)
-  const directionVariant = newPortfolioCondition.value.direction === 'Up' ? { Up: null } : { Down: null }
-  const valueTypeVariant = newPortfolioCondition.value.valueType === 'ICP' ? { ICP: null } : { USD: null }
+  const directionVariant = conditionDirection === 'Up' ? { Up: null } : { Down: null }
+  const valueTypeVariant = conditionValueType === 'ICP' ? { ICP: null } : { USD: null }
   
   if (isAdmin.value) {
     // Admin path - direct call
     submittingPortfolio.value = true
     try {
       await store.addPortfolioCircuitBreakerCondition(
-        newPortfolioCondition.value.name,
-        newPortfolioCondition.value.direction,
-        newPortfolioCondition.value.percentage,
+        conditionName,
+        conditionDirection,
+        conditionPercentage,
         timeWindowNS,
-        newPortfolioCondition.value.valueType
+        conditionValueType
       )
       
       await refreshPortfolioConditions()
@@ -1110,11 +1119,11 @@ const submitPortfolioCondition = async () => {
     // Non-admin path - show proposal dialog
     closePortfolioModal()
     proposalFunctionName.value = 'addPortfolioCircuitBreakerCondition'
-    proposalReasonPlaceholder.value = `Please explain why this portfolio circuit breaker "${newPortfolioCondition.value.name}" should be added...`
+    proposalReasonPlaceholder.value = `Please explain why this portfolio circuit breaker "${conditionName}" should be added...`
     proposalContextParams.value = {
-      name: newPortfolioCondition.value.name,
+      name: conditionName,
       direction: directionVariant,
-      percentage: newPortfolioCondition.value.percentage,
+      percentage: conditionPercentage,
       timeWindowNS: timeWindowNS,
       valueType: valueTypeVariant
     }
