@@ -569,6 +569,16 @@
     @confirm="handleConfirmAction"
     @cancel="hideConfirmationModal"
   />
+  
+  <!-- GNSF Proposal Dialog for Non-Admin Users -->
+  <GNSFProposalDialog
+    :show="showProposalDialog"
+    :function-name="proposalFunctionName"
+    :reason-placeholder="proposalReasonPlaceholder"
+    :context-params="proposalContextParams"
+    @close="showProposalDialog = false"
+    @success="handleProposalSuccess"
+  />
 </template>
 
 <script setup lang="ts">
@@ -577,6 +587,8 @@ import { useTacoStore } from '../stores/taco.store'
 import HeaderBar from '../components/HeaderBar.vue'
 import TacoTitle from '../components/misc/TacoTitle.vue'
 import AdminConfirmationModal from '../components/admin/AdminConfirmationModal.vue'
+import GNSFProposalDialog from '../components/proposals/GNSFProposalDialog.vue'
+import { useAdminCheck } from '../composables/useAdminCheck'
 import { Principal } from '@dfinity/principal'
 
 interface PriceDirection {
@@ -615,6 +627,15 @@ interface PriceAlertLog {
 }
 
 const store = useTacoStore()
+
+// Admin check
+const { isAdmin, checking, checkAdminStatus } = useAdminCheck()
+
+// GNSF Proposal Dialog state
+const showProposalDialog = ref(false)
+const proposalFunctionName = ref('')
+const proposalReasonPlaceholder = ref('')
+const proposalContextParams = ref<any>({})
 
 // State
 const conditions = ref<TriggerCondition[]>([])
@@ -712,22 +733,59 @@ const refreshAlerts = async () => {
 }
 
 const toggleActive = async (id: number, isActive: boolean) => {
-  try {
-    await store.setTriggerConditionActive(id, isActive)
-    await refreshConditions()
-  } catch (error) {
-    console.error('Failed to toggle condition:', error)
+  // Check if user is admin
+  await checkAdminStatus()
+  
+  // Find condition name for display
+  const condition = conditions.value.find(c => Number(c.id) === id)
+  const conditionName = condition?.name || `ID ${id}`
+  
+  if (isAdmin.value) {
+    // Admin path - direct call
+    try {
+      await store.setTriggerConditionActive(id, isActive)
+      await refreshConditions()
+    } catch (error) {
+      console.error('Failed to toggle condition:', error)
+    }
+  } else {
+    // Non-admin path - show proposal dialog
+    proposalFunctionName.value = 'setTriggerConditionActive'
+    proposalReasonPlaceholder.value = `Please explain why the price trigger condition "${conditionName}" should be ${isActive ? 'activated' : 'deactivated'}...`
+    proposalContextParams.value = {
+      conditionId: BigInt(id),
+      isActive: isActive
+    }
+    showProposalDialog.value = true
   }
 }
 
 const deleteCondition = async (id: number) => {
-  if (!confirm('Are you sure you want to delete this condition?')) return
+  // Check if user is admin
+  await checkAdminStatus()
   
-  try {
-    await store.removeTriggerCondition(id)
-    await refreshConditions()
-  } catch (error) {
-    console.error('Failed to delete condition:', error)
+  // Find condition name for display
+  const condition = conditions.value.find(c => Number(c.id) === id)
+  const conditionName = condition?.name || `ID ${id}`
+  
+  if (isAdmin.value) {
+    // Admin path - confirm and direct call
+    if (!confirm('Are you sure you want to delete this condition?')) return
+    
+    try {
+      await store.removeTriggerCondition(id)
+      await refreshConditions()
+    } catch (error) {
+      console.error('Failed to delete condition:', error)
+    }
+  } else {
+    // Non-admin path - show proposal dialog
+    proposalFunctionName.value = 'removeTriggerCondition'
+    proposalReasonPlaceholder.value = `Please explain why the price trigger condition "${conditionName}" should be removed...`
+    proposalContextParams.value = {
+      conditionId: BigInt(id)
+    }
+    showProposalDialog.value = true
   }
 }
 
@@ -743,25 +801,45 @@ const clearAlerts = async () => {
 }
 
 const submitCondition = async () => {
-  submitting.value = true
-  try {
-    const timeWindowNS = BigInt(newCondition.value.timeValue * getTimeMultiplier() * 1_000_000_000)
-    const applicableTokens: any[] = [] // Empty array means all tokens
-    
-    await store.addTriggerCondition(
-      newCondition.value.name,
-      newCondition.value.direction,
-      newCondition.value.percentage,
-      timeWindowNS,
-      applicableTokens
-    )
-    
-    await refreshConditions()
+  // Check if user is admin (await to ensure we have current status)
+  await checkAdminStatus()
+  
+  const timeWindowNS = BigInt(newCondition.value.timeValue * getTimeMultiplier() * 1_000_000_000)
+  const applicableTokens: any[] = [] // Empty array means all tokens
+  const directionVariant = newCondition.value.direction === 'Up' ? { Up: null } : { Down: null }
+  
+  if (isAdmin.value) {
+    // Admin path - direct call
+    submitting.value = true
+    try {
+      await store.addTriggerCondition(
+        newCondition.value.name,
+        newCondition.value.direction,
+        newCondition.value.percentage,
+        timeWindowNS,
+        applicableTokens
+      )
+      
+      await refreshConditions()
+      closeModal()
+    } catch (error) {
+      console.error('Failed to add condition:', error)
+    }
+    submitting.value = false
+  } else {
+    // Non-admin path - show proposal dialog
     closeModal()
-  } catch (error) {
-    console.error('Failed to add condition:', error)
+    proposalFunctionName.value = 'addTriggerCondition'
+    proposalReasonPlaceholder.value = `Please explain why this price trigger condition "${newCondition.value.name}" should be added...`
+    proposalContextParams.value = {
+      name: newCondition.value.name,
+      direction: directionVariant,
+      percentage: newCondition.value.percentage,
+      timeWindowNS: timeWindowNS,
+      applicableTokens: applicableTokens
+    }
+    showProposalDialog.value = true
   }
-  submitting.value = false
 }
 
 const getTimeMultiplier = () => {
@@ -798,11 +876,39 @@ const refreshTradingPauses = async () => {
 }
 
 const unpauseToken = async (token: any) => {
-  showUnpauseTokenConfirmation(token)
+  // Check if user is admin
+  await checkAdminStatus()
+  
+  const tokenSymbol = getTokenSymbol(token)
+  
+  if (isAdmin.value) {
+    // Admin path - show confirmation modal
+    showUnpauseTokenConfirmation(token)
+  } else {
+    // Non-admin path - show proposal dialog
+    proposalFunctionName.value = 'unpauseTokenFromTrading'
+    proposalReasonPlaceholder.value = `Please explain why ${tokenSymbol} should be unpaused from trading...`
+    proposalContextParams.value = {
+      token: token
+    }
+    showProposalDialog.value = true
+  }
 }
 
 const clearAllTradingPauses = async () => {
-  showClearAllTradingPausesConfirmation()
+  // Check if user is admin
+  await checkAdminStatus()
+  
+  if (isAdmin.value) {
+    // Admin path - show confirmation modal
+    showClearAllTradingPausesConfirmation()
+  } else {
+    // Non-admin path - show proposal dialog
+    proposalFunctionName.value = 'clearAllTradingPauses'
+    proposalReasonPlaceholder.value = `Please explain why all ${tradingPauses.value.length} trading pause(s) should be cleared...`
+    proposalContextParams.value = {}
+    showProposalDialog.value = true
+  }
 }
 
 const getPauseReasonText = (reason: any) => {
@@ -837,16 +943,34 @@ const getPauseDuration = (pausedAt: bigint) => {
 }
 
 const submitManualPause = async () => {
-  submittingPause.value = true
-  try {
-    const tokenPrincipal = Principal.fromText(manualPauseForm.value.tokenPrincipal)
-    await store.pauseTokenFromTradingManual(tokenPrincipal, manualPauseForm.value.reason)
-    await refreshTradingPauses()
+  // Check if user is admin
+  await checkAdminStatus()
+  
+  const tokenPrincipal = Principal.fromText(manualPauseForm.value.tokenPrincipal)
+  const reason = manualPauseForm.value.reason
+  
+  if (isAdmin.value) {
+    // Admin path - direct call
+    submittingPause.value = true
+    try {
+      await store.pauseTokenFromTradingManual(tokenPrincipal, reason)
+      await refreshTradingPauses()
+      closeManualPauseModal()
+    } catch (error) {
+      console.error('Failed to pause token manually:', error)
+    }
+    submittingPause.value = false
+  } else {
+    // Non-admin path - show proposal dialog
     closeManualPauseModal()
-  } catch (error) {
-    console.error('Failed to pause token manually:', error)
+    proposalFunctionName.value = 'pauseTokenFromTradingManual'
+    proposalReasonPlaceholder.value = reason // Use the reason they already entered
+    proposalContextParams.value = {
+      token: tokenPrincipal,
+      manualPauseReason: reason
+    }
+    showProposalDialog.value = true
   }
-  submittingPause.value = false
 }
 
 const closeManualPauseModal = () => {
@@ -881,22 +1005,59 @@ const refreshPortfolioLogs = async () => {
 }
 
 const togglePortfolioActive = async (id: number, isActive: boolean) => {
-  try {
-    await store.setPortfolioCircuitBreakerConditionActive(id, isActive)
-    await refreshPortfolioConditions()
-  } catch (error) {
-    console.error('Failed to toggle portfolio condition:', error)
+  // Check if user is admin
+  await checkAdminStatus()
+  
+  // Find condition name for display
+  const condition = portfolioConditions.value.find((c: any) => Number(c.id) === id)
+  const conditionName = condition?.name || `ID ${id}`
+  
+  if (isAdmin.value) {
+    // Admin path - direct call
+    try {
+      await store.setPortfolioCircuitBreakerConditionActive(id, isActive)
+      await refreshPortfolioConditions()
+    } catch (error) {
+      console.error('Failed to toggle portfolio condition:', error)
+    }
+  } else {
+    // Non-admin path - show proposal dialog
+    proposalFunctionName.value = 'setPortfolioCircuitBreakerConditionActive'
+    proposalReasonPlaceholder.value = `Please explain why the portfolio circuit breaker "${conditionName}" should be ${isActive ? 'activated' : 'deactivated'}...`
+    proposalContextParams.value = {
+      conditionId: BigInt(id),
+      isActive: isActive
+    }
+    showProposalDialog.value = true
   }
 }
 
 const deletePortfolioCondition = async (id: number) => {
-  if (!confirm('Are you sure you want to delete this portfolio condition?')) return
+  // Check if user is admin
+  await checkAdminStatus()
   
-  try {
-    await store.removePortfolioCircuitBreakerCondition(id)
-    await refreshPortfolioConditions()
-  } catch (error) {
-    console.error('Failed to delete portfolio condition:', error)
+  // Find condition name for display
+  const condition = portfolioConditions.value.find((c: any) => Number(c.id) === id)
+  const conditionName = condition?.name || `ID ${id}`
+  
+  if (isAdmin.value) {
+    // Admin path - confirm and direct call
+    if (!confirm('Are you sure you want to delete this portfolio condition?')) return
+    
+    try {
+      await store.removePortfolioCircuitBreakerCondition(id)
+      await refreshPortfolioConditions()
+    } catch (error) {
+      console.error('Failed to delete portfolio condition:', error)
+    }
+  } else {
+    // Non-admin path - show proposal dialog
+    proposalFunctionName.value = 'removePortfolioCircuitBreakerCondition'
+    proposalReasonPlaceholder.value = `Please explain why the portfolio circuit breaker "${conditionName}" should be removed...`
+    proposalContextParams.value = {
+      conditionId: BigInt(id)
+    }
+    showProposalDialog.value = true
   }
 }
 
@@ -920,24 +1081,45 @@ const formatPortfolioValue = (value: number, valueType: any) => {
 }
 
 const submitPortfolioCondition = async () => {
-  submittingPortfolio.value = true
-  try {
-    const timeWindowNS = BigInt(newPortfolioCondition.value.timeValue * getTimeMultiplier() * 1_000_000_000)
-    
-    await store.addPortfolioCircuitBreakerCondition(
-      newPortfolioCondition.value.name,
-      newPortfolioCondition.value.direction,
-      newPortfolioCondition.value.percentage,
-      timeWindowNS,
-      newPortfolioCondition.value.valueType
-    )
-    
-    await refreshPortfolioConditions()
+  // Check if user is admin
+  await checkAdminStatus()
+  
+  const timeWindowNS = BigInt(newPortfolioCondition.value.timeValue * getTimeMultiplier() * 1_000_000_000)
+  const directionVariant = newPortfolioCondition.value.direction === 'Up' ? { Up: null } : { Down: null }
+  const valueTypeVariant = newPortfolioCondition.value.valueType === 'ICP' ? { ICP: null } : { USD: null }
+  
+  if (isAdmin.value) {
+    // Admin path - direct call
+    submittingPortfolio.value = true
+    try {
+      await store.addPortfolioCircuitBreakerCondition(
+        newPortfolioCondition.value.name,
+        newPortfolioCondition.value.direction,
+        newPortfolioCondition.value.percentage,
+        timeWindowNS,
+        newPortfolioCondition.value.valueType
+      )
+      
+      await refreshPortfolioConditions()
+      closePortfolioModal()
+    } catch (error) {
+      console.error('Failed to add portfolio condition:', error)
+    }
+    submittingPortfolio.value = false
+  } else {
+    // Non-admin path - show proposal dialog
     closePortfolioModal()
-  } catch (error) {
-    console.error('Failed to add portfolio condition:', error)
+    proposalFunctionName.value = 'addPortfolioCircuitBreakerCondition'
+    proposalReasonPlaceholder.value = `Please explain why this portfolio circuit breaker "${newPortfolioCondition.value.name}" should be added...`
+    proposalContextParams.value = {
+      name: newPortfolioCondition.value.name,
+      direction: directionVariant,
+      percentage: newPortfolioCondition.value.percentage,
+      timeWindowNS: timeWindowNS,
+      valueType: valueTypeVariant
+    }
+    showProposalDialog.value = true
   }
-  submittingPortfolio.value = false
 }
 
 const closePortfolioModal = () => {
@@ -1027,8 +1209,18 @@ const handleConfirmAction = async (reason: string) => {
   }
 }
 
+// Handle successful proposal submission
+const handleProposalSuccess = async () => {
+  showProposalDialog.value = false
+  proposalFunctionName.value = ''
+  proposalReasonPlaceholder.value = ''
+  proposalContextParams.value = {}
+  console.log('AdminPriceView: Proposal submitted successfully')
+}
+
 // Lifecycle
 onMounted(async () => {
+  await checkAdminStatus()
   await refreshConditions()
   await refreshAlerts()
   await refreshTradingPauses()

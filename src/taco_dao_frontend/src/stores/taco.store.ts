@@ -689,6 +689,180 @@ export const GNSF_REGISTRY: Record<string, GNSFunctionInfo> = {
         description: 'Manually captures a snapshot of all neuron voting power data',
         parameterTypes: [],
         requiresReason: false  // No parameters - the neuron snapshot function takes no args
+    },
+    // Price Failsafe Functions (treasury.mo)
+    'addTriggerCondition': {
+        functionId: BigInt(3020),
+        displayName: 'Add Price Trigger Condition',
+        description: 'Adds a new price trigger condition that can pause trading when price thresholds are breached',
+        parameterTypes: [
+            IDL.Text,  // name
+            IDL.Variant({ Up: IDL.Null, Down: IDL.Null }),  // direction
+            IDL.Float64,  // percentage
+            IDL.Nat,  // timeWindowNS
+            IDL.Vec(IDL.Principal)  // applicableTokens
+        ],
+        requiresReason: false,
+        additionalParams: [{
+            name: 'name',
+            type: IDL.Text,
+            displayName: 'Condition Name'
+        }, {
+            name: 'direction',
+            type: IDL.Variant({ Up: IDL.Null, Down: IDL.Null }),
+            displayName: 'Price Direction'
+        }, {
+            name: 'percentage',
+            type: IDL.Float64,
+            displayName: 'Threshold Percentage'
+        }, {
+            name: 'timeWindowNS',
+            type: IDL.Nat,
+            displayName: 'Time Window (nanoseconds)'
+        }, {
+            name: 'applicableTokens',
+            type: IDL.Vec(IDL.Principal),
+            displayName: 'Applicable Tokens'
+        }]
+    },
+    'setTriggerConditionActive': {
+        functionId: BigInt(3021),
+        displayName: 'Set Trigger Condition Active',
+        description: 'Enables or disables a price trigger condition',
+        parameterTypes: [
+            IDL.Nat,  // conditionId
+            IDL.Bool  // isActive
+        ],
+        requiresReason: false,
+        additionalParams: [{
+            name: 'conditionId',
+            type: IDL.Nat,
+            displayName: 'Condition ID'
+        }, {
+            name: 'isActive',
+            type: IDL.Bool,
+            displayName: 'Is Active'
+        }]
+    },
+    'removeTriggerCondition': {
+        functionId: BigInt(3022),
+        displayName: 'Remove Trigger Condition',
+        description: 'Removes a price trigger condition from the system',
+        parameterTypes: [
+            IDL.Nat  // conditionId
+        ],
+        requiresReason: false,
+        additionalParams: [{
+            name: 'conditionId',
+            type: IDL.Nat,
+            displayName: 'Condition ID'
+        }]
+    },
+    'unpauseTokenFromTrading': {
+        functionId: BigInt(3023),
+        displayName: 'Unpause Token From Trading',
+        description: 'Resumes trading for a token that was paused due to price alerts or circuit breakers',
+        parameterTypes: [
+            IDL.Principal,  // token
+            IDL.Opt(IDL.Text)  // reason
+        ],
+        requiresReason: true,
+        additionalParams: [{
+            name: 'token',
+            type: IDL.Principal,
+            displayName: 'Token Principal'
+        }]
+    },
+    'pauseTokenFromTradingManual': {
+        functionId: BigInt(3024),
+        displayName: 'Pause Token From Trading (Manual)',
+        description: 'Manually pauses a token from trading with a specified reason',
+        parameterTypes: [
+            IDL.Principal,  // token
+            IDL.Text  // reason
+        ],
+        requiresReason: true,
+        additionalParams: [{
+            name: 'token',
+            type: IDL.Principal,
+            displayName: 'Token Principal'
+        }]
+    },
+    'clearAllTradingPauses': {
+        functionId: BigInt(3025),
+        displayName: 'Clear All Trading Pauses',
+        description: 'Clears all trading pauses, allowing all tokens to resume trading',
+        parameterTypes: [
+            IDL.Opt(IDL.Text)  // reason
+        ],
+        requiresReason: true
+    },
+    'addPortfolioCircuitBreakerCondition': {
+        functionId: BigInt(3026),
+        displayName: 'Add Portfolio Circuit Breaker',
+        description: 'Adds a new portfolio circuit breaker condition that can halt all trading when portfolio value thresholds are breached',
+        parameterTypes: [
+            IDL.Text,  // name
+            IDL.Variant({ Up: IDL.Null, Down: IDL.Null }),  // direction
+            IDL.Float64,  // percentage
+            IDL.Nat,  // timeWindowNS
+            IDL.Variant({ ICP: IDL.Null, USD: IDL.Null })  // valueType
+        ],
+        requiresReason: false,
+        additionalParams: [{
+            name: 'name',
+            type: IDL.Text,
+            displayName: 'Condition Name'
+        }, {
+            name: 'direction',
+            type: IDL.Variant({ Up: IDL.Null, Down: IDL.Null }),
+            displayName: 'Portfolio Direction'
+        }, {
+            name: 'percentage',
+            type: IDL.Float64,
+            displayName: 'Threshold Percentage'
+        }, {
+            name: 'timeWindowNS',
+            type: IDL.Nat,
+            displayName: 'Time Window (nanoseconds)'
+        }, {
+            name: 'valueType',
+            type: IDL.Variant({ ICP: IDL.Null, USD: IDL.Null }),
+            displayName: 'Value Type'
+        }]
+    },
+    'setPortfolioCircuitBreakerConditionActive': {
+        functionId: BigInt(3027),
+        displayName: 'Set Portfolio Circuit Breaker Active',
+        description: 'Enables or disables a portfolio circuit breaker condition',
+        parameterTypes: [
+            IDL.Nat,  // conditionId
+            IDL.Bool  // isActive
+        ],
+        requiresReason: false,
+        additionalParams: [{
+            name: 'conditionId',
+            type: IDL.Nat,
+            displayName: 'Condition ID'
+        }, {
+            name: 'isActive',
+            type: IDL.Bool,
+            displayName: 'Is Active'
+        }]
+    },
+    'removePortfolioCircuitBreakerCondition': {
+        functionId: BigInt(3028),
+        displayName: 'Remove Portfolio Circuit Breaker',
+        description: 'Removes a portfolio circuit breaker condition from the system',
+        parameterTypes: [
+            IDL.Nat  // conditionId
+        ],
+        requiresReason: false,
+        additionalParams: [{
+            name: 'conditionId',
+            type: IDL.Nat,
+            displayName: 'Condition ID'
+        }]
     }
 }
 
