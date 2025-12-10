@@ -11646,7 +11646,18 @@ SNS and DAO systems, and the applicability of NFTs.
 The Dragginz team have been developing Mimic, further described in the technology section below, as
 part of the backend infrastructure for the game. When it is open-sourced, it will allow other ICP
 developers to benefit from the tooling refined through Dragginz's development.
-                    </p>              
+                    </p>     
+                    
+                    <h4 class="taco-report-explorer__report-heading
+                              taco-report-explorer__report-heading--h2 mt-4">
+                      Toko Airdrop
+                    </h4>
+
+                    <!-- paragraph -->
+                    <p>
+In this <a href="https://x.com/dragginzgame/status/1988684542962516313" target="_blank">X post</a>, it was announced that $DKP holders will receive an airdrop of $TOKO tokens when
+it goes live. The exact numbers, timing, or tokenomics are unknown.
+                    </p>                    
 
                     <hr>
 
@@ -11746,12 +11757,36 @@ framework to the most rigorous standards of security and efficiency.
 
                     <!-- paragraph -->
                     <p>
-From a technological standpoint, ICP capabilities such as proposals are effectively rendered moot by the
-fact that the heads of the project own a majority of the supply, meaning all voting will always go in a
-single direction should this voting power be used. In the ICP ecosystem, votes not cast do not impact the
-voting. Therefore, should the top holder not engage in voting, propositions would proceed as normal.
-                    </p>                    
+From a technological standpoint, ICP capabilities such as proposals are effectively rendered
+moot by the fact that the heads of the project own a majority of the supply, meaning all voting
+will always go in a single direction should this voting power be used. In the ICP ecosystem, votes
+not cast do not impact the voting. Therefore, should the top holder not engage in voting,
+propositions would proceed as normal.
+                    </p>      
 
+                    <p>
+In response to this report, borovan wrote the following in the Toko discord server:                      
+                    </p>
+                    
+                    <!-- quote -->
+                    <div class="taco-report-explorer__report-quote">
+                      <blockquote cite="#">
+                        <p>
+                          "And I dont think I need 51% any more, all of the reasons behind that dont make a lot of sense any more
+                        </p>
+                      </blockquote>
+                      <p>—borovan</p>
+                    </div>                  
+
+                    <p>
+We're unsure on how to interpret this, as, currently, borovan has more than 50% of the total DKP
+supply staked in a neuron locked for 888 years. It could mean that the intent may be to change
+the lock up times to unlock this neuron and sell parts of it. It could also mean that the intent
+may be to mint more DKP tokens and distribute them through some means. In both of these
+potential scenarios, the outcome would be that the DKP DAO may become decentralized once
+again.                      
+                    </p>
+                    
                     <h4 class="taco-report-explorer__report-heading
                               taco-report-explorer__report-heading--h2 mt-4">
                       Game
@@ -11941,13 +11976,7 @@ github repo for Mimic is not currently available.
                             
                           </li>
 
-                        </ul>
-
-                        <!-- paragraph -->
-                        <p>
-As per direct contact with @borovan, 50.11% of the total supply is held by the creators, and they have no
-intention of growing this stake further.
-                        </p>                        
+                        </ul>                  
 
                       </div>
 
