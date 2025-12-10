@@ -1466,10 +1466,9 @@ const clearSkipList = async () => {
       currentAction.value = ''
     }
   } else {
-    proposalFunctionName.value = 'clearRewardSkipList'
-    proposalReasonPlaceholder.value = `Please explain why the entire reward skip list (${rewardSkipList.value.length} neurons) should be cleared...`
-    proposalContextParams.value = {}
-    showProposalDialog.value = true
+    // Show dialog saying Admin Only  
+    errorMessage.value = 'This action is only available to administrators'  
+    showProposalDialog.value = false
   }
 }
 

@@ -1008,13 +1008,6 @@ export const GNSF_REGISTRY: Record<string, GNSFunctionInfo> = {
             type: IDL.Vec(IDL.Nat8),
             displayName: 'Neuron ID'
         }]
-    },
-    'clearRewardSkipList': {
-        functionId: BigInt(3040),
-        displayName: 'Clear Reward Skip List',
-        description: 'Clears the entire reward skip list, allowing all neurons to receive rewards',
-        parameterTypes: [],
-        requiresReason: false
     }
 }
 
