@@ -115,7 +115,7 @@
               </div>
               
               <!-- Configuration Controls -->
-              <div class="row">
+              <div class="row mt-4">
                 <div class="col-md-6">
                   <label for="rewardPot" class="form-label">Periodic Reward Pot:</label>
                   <div class="input-group">
@@ -352,8 +352,8 @@
                 </div>
                 <div class="col-md-4">
                   <strong>Auto Timer:</strong><br>
-                  <span :class="configuration?.timerRunning ? 'text-success' : 'text-warning'">
-                    {{ configuration?.timerRunning ? '✅ Running' : '⚠️ Stopped' }}
+                  <span :class="timerRunning ? 'text-success' : 'text-warning'">
+                    {{ timerRunning ? '✅ Running' : '⚠️ Stopped' }}
                   </span>
                 </div>
               </div>
@@ -669,1159 +669,1026 @@
       </div>
     </div>
   </div>
+  
+  <!-- GNSF Proposal Dialog for Non-Admin Users -->
+  <GNSFProposalDialog
+    :show="showProposalDialog"
+    :function-name="proposalFunctionName"
+    :reason-placeholder="proposalReasonPlaceholder"
+    :context-params="proposalContextParams"
+    @close="showProposalDialog = false"
+    @success="handleProposalSuccess"
+  />
 </template>
 
-<script>
+<script setup lang="ts">
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
+import { useRouter } from 'vue-router'
 import { useTacoStore } from '../stores/taco.store'
 import { useAdminStore } from '../stores/admin.store'
+import { useAdminCheck } from '../composables/useAdminCheck'
 import HeaderBar from '../components/HeaderBar.vue'
 import TacoTitle from '../components/misc/TacoTitle.vue'
+import GNSFProposalDialog from '../components/proposals/GNSFProposalDialog.vue'
 import { createActor as createRewardsActor } from '../../../declarations/rewards'
 import { AnonymousIdentity } from '@dfinity/agent'
 
-export default {
-  name: 'AdminDistributionsView',
-  components: {
-    HeaderBar,
-    TacoTitle
-  },
+const router = useRouter()
+const tacoStore = useTacoStore()
+const adminStore = useAdminStore()
 
-  data() {
-    return {
-      isLoading: false,
-      currentAction: '',
-      errorMessage: '',
-      successMessage: '',
-      distributionStatus: null,
-      configuration: null,
-      distributionHistory: [],
-      totalDistributed: 0,
-      tacoBalance: 0,
-      currentNeuronBalances: 0,
-      availableBalance: 0,
-      showRewardDetails: {},
-      rewardDisplayLimits: {},
-      rewardSearchTerms: {},
-      newRewardPot: 1000,
-      newDistributionPeriod: 7,
-      newPerformanceScorePower: 1.0,
-      newVotingPowerPower: 1.0,
-      timerRunning: false,
-      customStartTime: '',
-      customEndTime: '',
-      selectedPriceType: 'USD',
-      refreshInterval: null,
-      rewardSkipList: [],
-      newSkipNeuronId: '',
-      // Sorting state for neuron details tables
-      sortColumns: {}, // Track sort column for each distribution
-      sortDirections: {} // Track sort direction for each distribution
+// Admin check
+const { isAdmin, checking, checkAdminStatus } = useAdminCheck()
+
+// GNSF Proposal Dialog state
+const showProposalDialog = ref(false)
+const proposalFunctionName = ref('')
+const proposalReasonPlaceholder = ref('')
+const proposalContextParams = ref<any>({})
+
+// Loading state
+const isLoading = ref(false)
+const currentAction = ref('')
+const errorMessage = ref('')
+const successMessage = ref('')
+
+// Distribution state
+const distributionStatus = ref<any>(null)
+const configuration = ref<any>(null)
+const distributionHistory = ref<any[]>([])
+const totalDistributed = ref(0)
+const tacoBalance = ref(0)
+const currentNeuronBalances = ref(0)
+const availableBalance = ref(0)
+
+// UI state
+const showRewardDetails = ref<Record<number, boolean>>({})
+const rewardDisplayLimits = ref<Record<number, number>>({})
+const rewardSearchTerms = ref<Record<number, string>>({})
+
+// Form inputs
+const newRewardPot = ref(1000)
+const newDistributionPeriod = ref(7)
+const newPerformanceScorePower = ref(1.0)
+const newVotingPowerPower = ref(1.0)
+const customStartTime = ref('')
+const customEndTime = ref('')
+const selectedPriceType = ref('USD')
+
+// Skip list state
+const rewardSkipList = ref<any[]>([])
+const newSkipNeuronId = ref('')
+
+// Sorting state
+const sortColumns = ref<Record<number, string | null>>({})
+const sortDirections = ref<Record<number, 'asc' | 'desc'>>({})
+
+// Refresh interval
+let refreshInterval: any = null
+
+// Computed properties
+const distributionInProgress = computed(() => distributionStatus.value?.inProgress || false)
+
+const timerRunning = computed(() => {
+  if (!configuration.value?.nextScheduledDistribution) return false
+  const scheduledTimeNS = Number(configuration.value.nextScheduledDistribution)
+  const nowNS = Date.now() * 1_000_000
+  return scheduledTimeNS > nowNS
+})
+
+const shouldShowStartButton = computed(() => !timerRunning.value)
+const shouldShowStopButton = computed(() => timerRunning.value)
+
+const isValidCustomInput = computed(() => {
+  if (!customStartTime.value || !customEndTime.value) return false
+  const startDate = new Date(customStartTime.value)
+  const endDate = new Date(customEndTime.value)
+  return startDate < endDate
+})
+
+// Helper functions
+const getRewardsActor = async () => {
+  try {
+    const canisterId = tacoStore.rewardsCanisterId()
+    if (!canisterId) throw new Error('Rewards canister ID not found')
+
+    const host = process.env.DFX_NETWORK === 'local' ? 'http://localhost:4943' : 'https://ic0.app'
+    const actor = createRewardsActor(canisterId, {
+      agentOptions: {
+        identity: new AnonymousIdentity(),
+        host
+      }
+    })
+    return actor
+  } catch (error) {
+    console.error('Error creating rewards actor:', error)
+    throw error
+  }
+}
+
+const clearMessages = () => {
+  errorMessage.value = ''
+  successMessage.value = ''
+}
+
+const formatError = (error: any) => {
+  if (typeof error === 'string') return error
+  if (error.SystemError) return `System Error: ${error.SystemError}`
+  if (error.NotAuthorized) return 'Not authorized to perform this action'
+  if (error.DistributionInProgress) return 'Distribution already in progress'
+  if (error.InvalidTimeRange) return 'Invalid time range: start time must be before end time'
+  if (error.InsufficientRewardPot) return 'Insufficient reward pot'
+  if (error.NeuronNotFound) return 'Neuron not found'
+  if (error.AllocationDataMissing) return 'Allocation data missing for this neuron'
+  if (error.PriceDataMissing) {
+    return `Price data missing for token ${error.PriceDataMissing.token} at timestamp ${error.PriceDataMissing.timestamp}`
+  }
+  return `Unknown error: ${JSON.stringify(error)}`
+}
+
+const formatTimestamp = (timestamp: any) => {
+  try {
+    if (!timestamp || timestamp === 0) return 'Never'
+    const timestampNum = typeof timestamp === 'bigint' ? Number(timestamp) : Number(timestamp)
+    const date = new Date(timestampNum / 1_000_000)
+    if (isNaN(date.getTime())) return 'Invalid Date'
+    return date.toLocaleString()
+  } catch (error) {
+    return 'Format Error'
+  }
+}
+
+const formatNeuronId = (neuronId: any) => {
+  try {
+    if (Array.isArray(neuronId)) {
+      return neuronId.map(b => b.toString(16).padStart(2, '0')).join('')
+    } else if (neuronId && neuronId._arr) {
+      return Array.from(neuronId._arr as Uint8Array).map((b: number) => b.toString(16).padStart(2, '0')).join('')
+    } else if (neuronId && typeof neuronId === 'object' && neuronId.constructor === Uint8Array) {
+      return Array.from(neuronId).map((b: number) => b.toString(16).padStart(2, '0')).join('')
+    } else if (typeof neuronId === 'string') {
+      return neuronId
     }
-  },
+    return 'Invalid format'
+  } catch (error) {
+    return 'Format Error'
+  }
+}
 
-  computed: {
-    tacoStore() {
-      return useTacoStore()
-    },
+const formatVotingPower = (votingPower: any) => {
+  const vp = Number(votingPower)
+  if (vp >= 1000000000) return (vp / 1000000000).toFixed(1) + 'B VP'
+  if (vp >= 1000000) return (vp / 1000000).toFixed(1) + 'M VP'
+  if (vp >= 1000) return (vp / 1000).toFixed(1) + 'K VP'
+  return vp.toLocaleString() + ' VP'
+}
 
-    adminStore() {
-      return useAdminStore()
-    },
+const formatPrincipal = (principal: any) => {
+  try {
+    const principalStr = typeof principal === 'string' ? principal : principal.toString()
+    return adminStore.formatPrincipal(principalStr)
+  } catch (error) {
+    return 'Invalid Principal'
+  }
+}
 
-    distributionInProgress() {
-      return this.distributionStatus?.inProgress || false
-    },
+const formatTacoAmountShort = (satoshis: any) => adminStore.formatTacoPrecise(satoshis)
 
+const calculateRewardPercentage = (rewardAmount: any, totalRewardPot: any) => {
+  try {
+    const rewardBI = typeof rewardAmount === 'bigint' ? rewardAmount : BigInt(rewardAmount || 0)
+    const totalBI = typeof totalRewardPot === 'bigint' ? totalRewardPot : BigInt(totalRewardPot || 1)
+    const rewardTaco = adminStore.tacoSatoshisToTokens(rewardBI)
+    const totalTaco = Number(totalBI) * 1
+    return adminStore.calculatePercentage(rewardTaco, totalTaco)
+  } catch (error) {
+    return '0.00'
+  }
+}
 
+const getStatusText = (status: any) => {
+  if (!status) return 'Unknown'
+  if (status.InProgress || status['InProgress']) return 'In Progress'
+  if (status.Completed || status['Completed']) return 'Completed'
+  if (status.PartiallyCompleted || status['PartiallyCompleted']) {
+    const partial = status.PartiallyCompleted || status['PartiallyCompleted']
+    return `Partially Completed (${partial.successfulNeurons}/${partial.successfulNeurons + partial.failedNeurons})`
+  }
+  if (status.Failed || status['Failed']) return 'Failed'
+  if (typeof status === 'string') return status.charAt(0).toUpperCase() + status.slice(1)
+  const keys = Object.keys(status)
+  if (keys.length === 1) {
+    const key = keys[0]
+    return key.charAt(0).toUpperCase() + key.slice(1).replace(/([A-Z])/g, ' $1')
+  }
+  return 'Unknown'
+}
 
-    nextDistributionTime() {
-      // Use actual scheduled time from backend, fallback to computed time
-      if (this.configuration?.nextScheduledDistribution) {
-        return Number(this.configuration.nextScheduledDistribution)
+const getStatusBadgeClass = (status: any) => {
+  if (!status) return 'bg-secondary'
+  if (status.InProgress || status['InProgress']) return 'bg-warning'
+  if (status.Completed || status['Completed']) return 'bg-success'
+  if (status.PartiallyCompleted || status['PartiallyCompleted']) return 'bg-warning'
+  if (status.Failed || status['Failed']) return 'bg-danger'
+  return 'bg-secondary'
+}
+
+const isInProgress = (status: any) => status && (status.InProgress || status['InProgress'])
+
+const getProgressPercent = (status: any) => {
+  if (!status) return 0
+  const inProgress = status.InProgress || status['InProgress']
+  if (!inProgress) return 0
+  const current = Number(inProgress.currentNeuron || 0)
+  const total = Number(inProgress.totalNeurons || 1)
+  return (current / total) * 100
+}
+
+const getPerformanceScoreClass = (score: number) => {
+  if (score > 1.1) return 'text-success fw-bold'
+  if (score > 1.0) return 'text-success'
+  if (score > 0.9) return 'text-warning'
+  return 'text-danger'
+}
+
+const getAveragePerformance = (rewards: any[]) => {
+  if (!rewards || rewards.length === 0) return 0
+  const total = rewards.reduce((sum, reward) => sum + reward.performanceScore, 0)
+  return total / rewards.length
+}
+
+const getTotalVotingPower = (rewards: any[]) => {
+  if (!rewards || rewards.length === 0) return 0
+  return rewards.reduce((sum, reward) => sum + Number(reward.votingPower), 0)
+}
+
+const getMakersFromReward = (reward: any) => {
+  try {
+    if (!reward.checkpoints || !Array.isArray(reward.checkpoints)) return []
+    const makers: any[] = []
+    const seenMakers = new Set()
+    for (const checkpoint of reward.checkpoints) {
+      if (checkpoint.maker && !seenMakers.has(checkpoint.maker.toString())) {
+        makers.push(checkpoint.maker)
+        seenMakers.add(checkpoint.maker.toString())
       }
-      if (!this.distributionStatus || !this.configuration) return 0
-      return Number(this.distributionStatus.lastDistributionTime) + Number(this.configuration.distributionPeriodNS)
-    },
-
-    // Timer is running if there's a scheduled time in the future
-    timerRunning() {
-      if (!this.configuration?.nextScheduledDistribution) return false
-      const scheduledTimeNS = Number(this.configuration.nextScheduledDistribution)
-      const nowNS = Date.now() * 1_000_000 // Convert milliseconds to nanoseconds
-      
-      console.log('Timer check:', {
-        scheduledTimeNS,
-        nowNS,
-        scheduledDate: new Date(scheduledTimeNS / 1_000_000).toLocaleString(),
-        nowDate: new Date().toLocaleString(),
-        isRunning: scheduledTimeNS > nowNS
-      })
-      
-      return scheduledTimeNS > nowNS
-    },
-
-    // Start button should be active when timer is NOT running
-    shouldShowStartButton() {
-      return !this.timerRunning
-    },
-
-    // Stop button should be active when timer IS running  
-    shouldShowStopButton() {
-      return this.timerRunning
-    },
-
-    isValidCustomInput() {
-      if (!this.customStartTime || !this.customEndTime) return false
-      const startDate = new Date(this.customStartTime)
-      const endDate = new Date(this.customEndTime)
-      return startDate < endDate
     }
-  },
+    return makers
+  } catch (error) {
+    return []
+  }
+}
 
-  async mounted() {
-    await this.loadData()
-    await this.loadTotalDistributed()
-    await this.loadTacoBalance()
-    this.setDefaultCustomTimes()
-    // Auto-refresh every 30 seconds
-    this.refreshInterval = setInterval(() => {
-      this.loadData()
-    }, 30000)
-  },
-
-  beforeUnmount() {
-    if (this.refreshInterval) {
-      clearInterval(this.refreshInterval)
+const neuronIdToFullHex = (neuronId: any) => {
+  try {
+    if (Array.isArray(neuronId)) {
+      return neuronId.map(b => b.toString(16).padStart(2, '0')).join('')
+    } else if (typeof neuronId === 'string') {
+      return neuronId.replace(/^0x/, '')
+    } else if (neuronId && neuronId._arr) {
+      return Array.from(neuronId._arr as Uint8Array).map((b: number) => b.toString(16).padStart(2, '0')).join('')
+    } else if (neuronId && typeof neuronId === 'object' && neuronId.constructor === Uint8Array) {
+      return Array.from(neuronId).map((b: number) => b.toString(16).padStart(2, '0')).join('')
     }
-  },
+    throw new Error('Unknown neuron ID format')
+  } catch (error) {
+    throw error
+  }
+}
 
-  methods: {
-    async loadData() {
-      try {
-        await Promise.all([
-          this.loadDistributionStatus(),
-          this.loadConfiguration(),
-          this.loadDistributionHistory()
-        ])
-      } catch (error) {
-        console.error('Error loading data:', error)
-        this.errorMessage = 'Failed to load distribution data'
-      }
-    },
-
-    async getRewardsActor() {
-      try {
-        console.log('Getting rewards canister ID...')
-        const canisterId = this.tacoStore.rewardsCanisterId()
-        console.log('Canister ID:', canisterId)
-        
-        if (!canisterId) {
-          throw new Error('Rewards canister ID not found')
-        }
-
-        // Use anonymous identity for public query (no authentication required)
-        const host = process.env.DFX_NETWORK === 'local' ? 'http://localhost:4943' : 'https://ic0.app'
-
-        const actor = createRewardsActor(canisterId, {
-          agentOptions: {
-            identity: new AnonymousIdentity(),
-            host
-          }
-        })
-        
-        console.log('Created actor:', actor)
-        return actor
-      } catch (error) {
-        console.error('Error creating rewards actor:', error)
-        throw error
-      }
-    },
-
-    async loadDistributionStatus() {
-      try {
-        const actor = await this.getRewardsActor()
-        const config = await actor.getConfiguration()
-        
-        console.log('Distribution status data:', {
-          config,
-          lastDistributionTime: 'Not available in current backend'
-        })
-        
-        // Use configuration data directly
-        this.distributionStatus = {
-          lastDistributionTime: config.lastDistributionTime,
-          totalDistributions: config.totalDistributions,
-          distributionEnabled: config.distributionEnabled,
-          currentDistributionId: null,
-          inProgress: false
-        }
-      } catch (error) {
-        console.error('Error loading distribution status:', error)
-        throw error
-      }
-    },
-
-    async loadConfiguration() {
-      try {
-        const actor = await this.getRewardsActor()
-        this.configuration = await actor.getConfiguration()
-        this.newRewardPot = this.configuration.periodicRewardPot
-        this.newDistributionPeriod = Math.round(Number(this.configuration.distributionPeriodNS) / (24 * 60 * 60 * 1_000_000_000))
-        this.newPerformanceScorePower = this.configuration.performanceScorePower
-        this.newVotingPowerPower = this.configuration.votingPowerPower
-      } catch (error) {
-        console.error('Error loading configuration:', error)
-        throw error
-      }
-    },
-
-    async loadDistributionHistory() {
-      try {
-        const actor = await this.getRewardsActor()
-        const history = await actor.getDistributionHistory([10]) // Get last 10
-        // Reverse to show newest distributions first
-        this.distributionHistory = history.reverse()
-      } catch (error) {
-        console.error('Error loading distribution history:', error)
-        throw error
-      }
-    },
-
-    async triggerDistribution() {
-      this.clearMessages()
-      this.isLoading = true
-      this.currentAction = 'trigger'
-      
-      try {
-        const actor = await this.getRewardsActor()
-        const result = await actor.triggerDistribution()
-        
-        if ('ok' in result) {
-          this.successMessage = result.ok
-          await this.loadData()
-        } else {
-          this.errorMessage = this.formatError(result.err)
-        }
-      } catch (error) {
-        console.error('Error triggering distribution:', error)
-        this.errorMessage = 'Failed to trigger distribution: ' + error.message
-      } finally {
-        this.isLoading = false
-        this.currentAction = ''
-      }
-    },
-
-    async startDistributionTimer() {
-      this.clearMessages()
-      this.isLoading = true
-      this.currentAction = 'start'
-      
-      try {
-        const actor = await this.getRewardsActor()
-        const result = await actor.startDistributionTimer()
-        
-        if ('ok' in result) {
-          this.successMessage = result.ok
-          await this.loadConfiguration() // Refresh to get new timer status
-        } else {
-          this.errorMessage = this.formatError(result.err)
-        }
-      } catch (error) {
-        console.error('Error starting distribution timer:', error)
-        this.errorMessage = 'Failed to start distribution timer: ' + error.message
-      } finally {
-        this.isLoading = false
-        this.currentAction = ''
-      }
-    },
-
-    async stopDistributionTimer() {
-      this.clearMessages()
-      this.isLoading = true
-      this.currentAction = 'stop'
-      
-      try {
-        const actor = await this.getRewardsActor()
-        const result = await actor.stopDistributionTimer()
-        
-        if ('ok' in result) {
-          this.successMessage = result.ok
-          await this.loadConfiguration() // Refresh to get new timer status
-        } else {
-          this.errorMessage = this.formatError(result.err)
-        }
-      } catch (error) {
-        console.error('Error stopping distribution timer:', error)
-        this.errorMessage = 'Failed to stop distribution timer: ' + error.message
-      } finally {
-        this.isLoading = false
-        this.currentAction = ''
-      }
-    },
-
-    async updateRewardPot() {
-      this.clearMessages()
-      this.isLoading = true
-      
-      try {
-        const actor = await this.getRewardsActor()
-        const result = await actor.setPeriodicRewardPot(this.newRewardPot)
-        
-        if ('ok' in result) {
-          this.successMessage = result.ok
-          await this.loadConfiguration()
-        } else {
-          this.errorMessage = this.formatError(result.err)
-        }
-      } catch (error) {
-        console.error('Error updating reward pot:', error)
-        this.errorMessage = 'Failed to update reward pot: ' + error.message
-      } finally {
-        this.isLoading = false
-      }
-    },
-
-    async updateDistributionPeriod() {
-      this.clearMessages()
-      this.isLoading = true
-      
-      try {
-        const actor = await this.getRewardsActor()
-        const periodNS = BigInt(Math.round(this.newDistributionPeriod * 24 * 60 * 60 * 1_000_000_000))
-        const result = await actor.setDistributionPeriod(periodNS)
-        
-        if ('ok' in result) {
-          this.successMessage = result.ok
-          await this.loadConfiguration()
-        } else {
-          this.errorMessage = this.formatError(result.err)
-        }
-      } catch (error) {
-        console.error('Error updating distribution period:', error)
-        this.errorMessage = 'Failed to update distribution period: ' + error.message
-      } finally {
-        this.isLoading = false
-      }
-    },
-
-    async updatePerformanceScorePower() {
-      this.clearMessages()
-      this.isLoading = true
-      
-      try {
-        const actor = await this.getRewardsActor()
-        const result = await actor.setPerformanceScorePower(this.newPerformanceScorePower)
-        
-        if ('ok' in result) {
-          this.successMessage = result.ok
-          await this.loadConfiguration()
-        } else {
-          this.errorMessage = this.formatError(result.err)
-        }
-      } catch (error) {
-        console.error('Error updating performance score power:', error)
-        this.errorMessage = 'Failed to update performance score power: ' + error.message
-      } finally {
-        this.isLoading = false
-      }
-    },
-
-    async updateVotingPowerPower() {
-      this.clearMessages()
-      this.isLoading = true
-      
-      try {
-        const actor = await this.getRewardsActor()
-        const result = await actor.setVotingPowerPower(this.newVotingPowerPower)
-        
-        if ('ok' in result) {
-          this.successMessage = result.ok
-          await this.loadConfiguration()
-        } else {
-          this.errorMessage = this.formatError(result.err)
-        }
-      } catch (error) {
-        console.error('Error updating voting power power:', error)
-        this.errorMessage = 'Failed to update voting power power: ' + error.message
-      } finally {
-        this.isLoading = false
-      }
-    },
-
-    async triggerCustomDistribution() {
-      this.clearMessages()
-      this.isLoading = true
-      this.currentAction = 'triggerCustom'
-      
-      try {
-        const actor = await this.getRewardsActor()
-        
-        // Convert datetime-local to nanosecond timestamps
-        const startDate = new Date(this.customStartTime)
-        const endDate = new Date(this.customEndTime)
-        const startTimeNS = BigInt(startDate.getTime() * 1_000_000)
-        const endTimeNS = BigInt(endDate.getTime() * 1_000_000)
-        
-        // Convert price type to backend format
-        const priceType = this.selectedPriceType === 'USD' ? { USD: null } : { ICP: null }
-        
-        const result = await actor.triggerDistributionCustom(startTimeNS, endTimeNS, priceType)
-        
-        if ('ok' in result) {
-          this.successMessage = result.ok
-          await this.loadData()
-        } else {
-          this.errorMessage = this.formatError(result.err)
-        }
-      } catch (error) {
-        console.error('Error triggering custom distribution:', error)
-        this.errorMessage = 'Failed to trigger custom distribution: ' + error.message
-      } finally {
-        this.isLoading = false
-        this.currentAction = ''
-      }
-    },
-
-    setDefaultCustomTimes() {
-      // Set default to last 7 days
-      const now = new Date()
-      const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
-      
-      // Format for datetime-local input (YYYY-MM-DDTHH:MM)
-      this.customEndTime = now.toISOString().slice(0, 16)
-      this.customStartTime = weekAgo.toISOString().slice(0, 16)
-    },
-
-    async refreshHistory() {
-      this.clearMessages()
-      this.isLoading = true
-      this.currentAction = 'refresh'
-      
-      try {
-        await this.loadData()
-        this.successMessage = 'Distribution data refreshed'
-      } catch (error) {
-        console.error('Error refreshing history:', error)
-        this.errorMessage = 'Failed to refresh distribution data'
-      } finally {
-        this.isLoading = false
-        this.currentAction = ''
-      }
-    },
-
-    toggleRewardDetails(index) {
-      this.showRewardDetails = {
-        ...this.showRewardDetails,
-        [index]: !this.showRewardDetails[index]
-      }
-      
-      // Initialize display limit and search term if not already set
-      if (!this.rewardDisplayLimits[index]) {
-        this.rewardDisplayLimits = {
-          ...this.rewardDisplayLimits,
-          [index]: 20
-        }
-      }
-      if (!this.rewardSearchTerms[index]) {
-        this.rewardSearchTerms = {
-          ...this.rewardSearchTerms,
-          [index]: ''
-        }
-      }
-    },
-
-    getFilteredRewards(distribution, index) {
-      if (!distribution.neuronRewards) return []
-      
-      let rewards = [...distribution.neuronRewards]
-      
-      // Apply search filter
-      const searchTerm = this.rewardSearchTerms[index] || ''
-      if (searchTerm) {
-        rewards = rewards.filter(reward => 
-          this.formatNeuronId(reward.neuronId).toLowerCase().includes(searchTerm.toLowerCase())
-        )
-      }
-      
-      // Apply sorting if a column is selected
-      const sortColumn = this.sortColumns[index]
-      const sortDirection = this.sortDirections[index] || 'desc'
-      if (sortColumn) {
-        // Add total reward pot to each reward for percentage calculation
-        const rewardsWithTotal = rewards.map(reward => ({
-          ...reward,
-          totalRewardPot: distribution.totalRewardPot
-        }))
-        rewards = this.sortRewardsArray(rewardsWithTotal, sortColumn, sortDirection)
-      }
-      
-      // Apply limit
-      const limit = this.rewardDisplayLimits[index] || 20
-      return rewards.slice(0, Number(limit))
-    },
-
-    getPerformanceScoreClass(score) {
-      if (score > 1.1) return 'text-success fw-bold'
-      if (score > 1.0) return 'text-success'
-      if (score > 0.9) return 'text-warning'
-      return 'text-danger'
-    },
-
-    formatVotingPower(votingPower) {
-      const vp = Number(votingPower)
-      if (vp >= 1000000000) {
-        return (vp / 1000000000).toFixed(1) + 'B VP'
-      } else if (vp >= 1000000) {
-        return (vp / 1000000).toFixed(1) + 'M VP'
-      } else if (vp >= 1000) {
-        return (vp / 1000).toFixed(1) + 'K VP'
-      }
-      return vp.toLocaleString() + ' VP'
-    },
-
-    getAveragePerformance(rewards) {
-      if (!rewards || rewards.length === 0) return 0
-      const total = rewards.reduce((sum, reward) => sum + reward.performanceScore, 0)
-      return total / rewards.length
-    },
-
-    getTotalVotingPower(rewards) {
-      if (!rewards || rewards.length === 0) return 0
-      return rewards.reduce((sum, reward) => sum + Number(reward.votingPower), 0)
-    },
-
-    clearMessages() {
-      this.errorMessage = ''
-      this.successMessage = ''
-    },
-
-    formatError(error) {
-      if (typeof error === 'string') return error
-      
-      // Handle different error types from the backend
-      if (error.SystemError) return `System Error: ${error.SystemError}`
-      if (error.NotAuthorized) return 'Not authorized to perform this action'
-      if (error.DistributionInProgress) return 'Distribution already in progress'
-      if (error.InvalidTimeRange) return 'Invalid time range: start time must be before end time'
-      if (error.InsufficientRewardPot) return 'Insufficient reward pot'
-      if (error.NeuronNotFound) return 'Neuron not found'
-      if (error.AllocationDataMissing) return 'Allocation data missing for this neuron'
-      if (error.PriceDataMissing) {
-        return `Price data missing for token ${error.PriceDataMissing.token} at timestamp ${error.PriceDataMissing.timestamp}`
-      }
-      
-      // Log the unknown error for debugging
-      console.error('Unknown error format:', error)
-      return `Unknown error: ${JSON.stringify(error)}`
-    },
-
-    formatTimestamp(timestamp) {
-      try {
-        // Handle both BigInt and regular numbers
-        const timestampNum = typeof timestamp === 'bigint' ? Number(timestamp) : Number(timestamp)
-        const date = new Date(timestampNum / 1_000_000)
-        return date.toLocaleString()
-      } catch (error) {
-        return 'Invalid date'
-      }
-    },
-
-    formatNeuronId(neuronId) {
-      try {
-        // Handle different neuron ID formats
-        if (Array.isArray(neuronId)) {
-          // Convert byte array to hex string
-          const hex = neuronId.map(b => b.toString(16).padStart(2, '0')).join('')
-          return hex.substring(0, 8) + '...' + hex.substring(hex.length - 4)
-        } else if (typeof neuronId === 'string') {
-          // Already a string, just truncate
-          return neuronId.length > 12 ? neuronId.substring(0, 8) + '...' + neuronId.substring(neuronId.length - 4) : neuronId
-        } else if (neuronId && neuronId._arr) {
-          // Handle Uint8Array format
-          const hex = Array.from(neuronId._arr).map(b => b.toString(16).padStart(2, '0')).join('')
-          return hex.substring(0, 8) + '...' + hex.substring(hex.length - 4)
-        } else if (neuronId && typeof neuronId === 'object' && neuronId.constructor === Uint8Array) {
-          // Handle Uint8Array directly
-          const hex = Array.from(neuronId).map(b => b.toString(16).padStart(2, '0')).join('')
-          return hex.substring(0, 8) + '...' + hex.substring(hex.length - 4)
-        }
-        
-        console.log('Unknown neuron ID format:', neuronId)
-        return 'Unknown Format'
-      } catch (error) {
-        console.error('Error formatting neuron ID:', error, neuronId)
-        return 'Format Error'
-      }
-    },
-
-    getStatusText(status) {
-      if (!status) {
-        console.log('Status is null/undefined')
-        return 'Unknown'
-      }
-      
-      // Debug: log the actual status object
-      console.log('Status object:', status, 'Type:', typeof status, 'Keys:', Object.keys(status))
-      
-      // Handle different status formats
-      if (status.InProgress || status['InProgress']) return 'In Progress'
-      if (status.Completed || status['Completed']) return 'Completed'  
-      if (status.PartiallyCompleted || status['PartiallyCompleted']) {
-        const partial = status.PartiallyCompleted || status['PartiallyCompleted']
-        return `Partially Completed (${partial.successfulNeurons}/${partial.successfulNeurons + partial.failedNeurons})`
-      }
-      if (status.Failed || status['Failed']) return 'Failed'
-      
-      // Check if it's a string status
-      if (typeof status === 'string') {
-        return status.charAt(0).toUpperCase() + status.slice(1)
-      }
-      
-      // Check for variant-style status (Motoko/Candid format)
-      const keys = Object.keys(status)
-      if (keys.length === 1) {
-        const key = keys[0]
-        if (key.toLowerCase().includes('progress')) return 'In Progress'
-        if (key.toLowerCase().includes('completed')) return 'Completed'
-        if (key.toLowerCase().includes('partiallycompleted')) {
-          const partial = status[key]
-          return `Partially Completed (${partial.successfulNeurons}/${partial.successfulNeurons + partial.failedNeurons})`
-        }
-        if (key.toLowerCase().includes('failed')) return 'Failed'
-        
-        // Return the key as-is, formatted
-        return key.charAt(0).toUpperCase() + key.slice(1).replace(/([A-Z])/g, ' $1')
-      }
-      
-      console.log('Unknown status format:', status)
-      return 'Unknown'
-    },
-
-    getStatusBadgeClass(status) {
-      if (!status) return 'bg-secondary'
-      
-      // Handle different status formats
-      if (status.InProgress || status['InProgress']) return 'bg-warning'
-      if (status.Completed || status['Completed']) return 'bg-success'
-      if (status.PartiallyCompleted || status['PartiallyCompleted']) return 'bg-warning'
-      if (status.Failed || status['Failed']) return 'bg-danger'
-      
-      // Check for variant-style status (Motoko/Candid format)
-      const keys = Object.keys(status)
-      if (keys.length === 1) {
-        const key = keys[0]
-        if (key.toLowerCase().includes('progress')) return 'bg-warning'
-        if (key.toLowerCase().includes('completed')) return 'bg-success'
-        if (key.toLowerCase().includes('partiallycompleted')) return 'bg-warning'
-        if (key.toLowerCase().includes('failed')) return 'bg-danger'
-      }
-      
-      return 'bg-secondary'
-    },
-
-    isInProgress(status) {
-      return status && (status.InProgress || status['InProgress'])
-    },
-
-    getProgressPercent(status) {
-      if (!status) return 0
-      
-      const inProgress = status.InProgress || status['InProgress']
-      if (!inProgress) return 0
-      
-      const current = Number(inProgress.currentNeuron || 0)
-      const total = Number(inProgress.totalNeurons || 1)
-      return (current / total) * 100
-    },
-
-    viewNeuronPerformance(neuronId, distribution) {
-      try {
-        // Convert neuron ID to full hex format
-        const fullHexId = this.neuronIdToFullHex(neuronId)
-        
-        // Get the distribution period and price type from the distribution
-        const startTimeNS = distribution.startTime
-        const endTimeNS = distribution.endTime
-        
-        // Determine price type - check if the distribution has price type info
-        // For now, default to USD as it seems to be the most common
-        const priceType = distribution.priceType || 'USD'
-        
-        // Navigate to the rewards page with all parameters
-        this.$router.push({
-          path: '/admin/rewards',
-          query: {
-            neuronId: fullHexId,
-            startTime: startTimeNS.toString(),
-            endTime: endTimeNS.toString(),
-            priceType: priceType
-          }
-        })
-      } catch (error) {
-        console.error('Error navigating to neuron performance:', error)
-        this.errorMessage = 'Failed to navigate to neuron performance details'
-      }
-    },
-
-    neuronIdToFullHex(neuronId) {
-      try {
-        // Convert neuron ID to full hex string (not truncated)
-        if (Array.isArray(neuronId)) {
-          // Convert byte array to hex string
-          return neuronId.map(b => b.toString(16).padStart(2, '0')).join('')
-        } else if (typeof neuronId === 'string') {
-          // If it's already a hex string, return as-is (remove any 0x prefix if present)
-          return neuronId.replace(/^0x/, '')
-        } else if (neuronId && neuronId._arr) {
-          // Handle Uint8Array format
-          return Array.from(neuronId._arr).map(b => b.toString(16).padStart(2, '0')).join('')
-        } else if (neuronId && typeof neuronId === 'object' && neuronId.constructor === Uint8Array) {
-          // Handle Uint8Array directly
-          return Array.from(neuronId).map(b => b.toString(16).padStart(2, '0')).join('')
-        }
-        
-        throw new Error('Unknown neuron ID format')
-      } catch (error) {
-        console.error('Error converting neuron ID to hex:', error, neuronId)
-        throw error
-      }
-    },
-
-    getMakersFromReward(reward) {
-      try {
-        if (!reward.checkpoints || !Array.isArray(reward.checkpoints)) {
-          return []
-        }
-
-        // Extract unique makers from checkpoints in chronological order
-        const makers = []
-        const seenMakers = new Set()
-        
-        for (const checkpoint of reward.checkpoints) {
-          if (checkpoint.maker && !seenMakers.has(checkpoint.maker.toString())) {
-            makers.push(checkpoint.maker)
-            seenMakers.add(checkpoint.maker.toString())
-          }
-        }
-        
-        return makers
-      } catch (error) {
-        console.error('Error extracting makers from reward:', error, reward)
-        return []
-      }
-    },
-
-    async loadTotalDistributed() {
-      try {
-        const actor = await this.getRewardsActor()
-        const total = await actor.getTotalDistributed()
-        this.totalDistributed = total
-      } catch (error) {
-        console.error('Error loading total distributed:', error)
-        // Don't show error message to user for this non-critical data
-      }
-    },
-
-    async loadTacoBalance() {
-      try {
-        const actor = await this.getRewardsActor()
-        const balance = await actor.getTacoBalance()
-        this.tacoBalance = balance
-      } catch (error) {
-        console.error('Error loading TACO balance:', error)
-        // Don't show error message to user for this non-critical data
-      }
-    },
-
-    async loadCurrentNeuronBalances() {
-      try {
-        const actor = await this.getRewardsActor()
-        this.currentNeuronBalances = await actor.getCurrentTotalNeuronBalances()
-      } catch (error) {
-        console.error('Error loading current neuron balances:', error)
-        // Don't show error message to user for this non-critical data
-      }
-    },
-
-    async loadAvailableBalance() {
-      try {
-        const actor = await this.getRewardsActor()
-        this.availableBalance = await actor.getAvailableBalance()
-      } catch (error) {
-        console.error('Error loading available balance:', error)
-        // Don't show error message to user for this non-critical data
-      }
-    },
-
-    startPeriodicUpdates() {
-      // Start periodic updates every 10 seconds for active distributions
-      if (this.refreshInterval) {
-        clearInterval(this.refreshInterval)
-      }
-      
-      this.refreshInterval = setInterval(async () => {
-        try {
-          // Only refresh status and history if there's an active distribution
-          if (this.distributionInProgress) {
-            await Promise.all([
-              this.loadDistributionStatus(),
-              this.loadDistributionHistory()
-            ])
-          }
-        } catch (error) {
-          console.error('Error in periodic update:', error)
-          // Don't show error to user for background updates
-        }
-      }, 10000) // Update every 10 seconds
-    },
-
-    setDefaultCustomTimes() {
-      const now = new Date()
-      const sevenDaysAgo = new Date(now.getTime() - (7 * 24 * 60 * 60 * 1000))
-      
-      // Format for datetime-local input (YYYY-MM-DDTHH:MM)
-      this.customEndTime = now.toISOString().slice(0, 16)
-      this.customStartTime = sevenDaysAgo.toISOString().slice(0, 16)
-    },
-
-    formatPrincipal(principal) {
-      try {
-        const principalStr = typeof principal === 'string' ? principal : principal.toString()
-        return this.adminStore.formatPrincipal(principalStr)
-      } catch (error) {
-        console.error('Error formatting principal:', error, principal)
-        return 'Invalid Principal'
-      }
-    },
-
-    // TACO token formatting functions
-    formatTacoAmount(satoshis) {
-      return this.adminStore.formatTacoFixed(satoshis, 8)
-    },
-
-    formatTacoAmountShort(satoshis) {
-      return this.adminStore.formatTacoPrecise(satoshis)
-    },
-
-    calculateRewardPercentage(rewardAmount, totalRewardPot) {
-      try {
-        // Both amounts are now in whole TACO tokens (BigInt), convert to numbers for percentage calculation
-        const rewardBI = typeof rewardAmount === 'bigint' ? rewardAmount : BigInt(rewardAmount || 0)
-        const totalBI = typeof totalRewardPot === 'bigint' ? totalRewardPot : BigInt(totalRewardPot || 1)
-        
-        // Convert to TACO tokens for calculation
-        const rewardTaco = this.adminStore.tacoSatoshisToTokens(rewardBI)
-        const totalTaco = Number(totalBI) * 1 // totalRewardPot is already in whole TACO tokens
-        
-        return this.adminStore.calculatePercentage(rewardTaco, totalTaco)
-      } catch (error) {
-        console.error('Error calculating reward percentage:', error, rewardAmount, totalRewardPot)
-        return '0.00'
-      }
-    },
-
-    formatTimestamp(timestampNS) {
-      try {
-        if (!timestampNS || timestampNS === 0) {
-          return 'Never'
-        }
-        
-        // Convert nanoseconds to milliseconds for JavaScript Date
-        const timestampMS = Number(timestampNS) / 1_000_000
-        const date = new Date(timestampMS)
-        
-        if (isNaN(date.getTime())) {
-          return 'Invalid Date'
-        }
-        
-        return date.toLocaleString()
-      } catch (error) {
-        console.error('Error formatting timestamp:', error, timestampNS)
-        return 'Format Error'
-      }
-    },
-
-    async refreshHistory() {
-      this.clearMessages()
-      this.isLoading = true
-      this.currentAction = 'refresh'
-      
-      try {
-        await Promise.all([
-          this.loadDistributionStatus(),
-          this.loadDistributionHistory(),
-          this.loadTotalDistributed(),
-          this.loadTacoBalance(),
-          this.loadCurrentNeuronBalances(),
-          this.loadAvailableBalance()
-        ])
-      } catch (error) {
-        console.error('Error refreshing data:', error)
-        this.errorMessage = 'Failed to refresh distribution data'
-      } finally {
-        this.isLoading = false
-        this.currentAction = ''
-      }
-    },
-
-    // Skip List Management Methods
-    async loadRewardSkipList() {
-      try {
-        const actor = await this.getRewardsActor()
-        const result = await actor.getRewardSkipList()
-        if (result.ok) {
-          this.rewardSkipList = result.ok
-        } else {
-          throw new Error('Failed to load skip list: ' + (result.err?.SystemError || 'Unknown error'))
-        }
-      } catch (error) {
-        console.error('Error loading reward skip list:', error)
-        this.errorMessage = 'Failed to load reward skip list'
-      }
-    },
-
-    async addToSkipList() {
-      if (!this.newSkipNeuronId.trim()) return
-      
-      this.clearMessages()
-      this.isLoading = true
-      this.currentAction = 'addSkip'
-      
-      try {
-        // Convert hex string to Uint8Array
-        const neuronIdHex = this.newSkipNeuronId.trim().replace(/^0x/, '')
-        if (neuronIdHex.length % 2 !== 0) {
-          throw new Error('Invalid hex string length')
-        }
-        
-        const neuronIdBytes = new Uint8Array(
-          neuronIdHex.match(/.{2}/g).map(byte => parseInt(byte, 16))
-        )
-        
-        const actor = await this.getRewardsActor()
-        const result = await actor.addToRewardSkipList(neuronIdBytes)
-        
-        if (result.ok) {
-          this.successMessage = result.ok
-          this.newSkipNeuronId = ''
-          await this.loadRewardSkipList() // Refresh the list
-        } else {
-          throw new Error(result.err?.SystemError || result.err?.NotAuthorized ? 'Not authorized' : 'Unknown error')
-        }
-      } catch (error) {
-        console.error('Error adding neuron to skip list:', error)
-        this.errorMessage = 'Failed to add neuron to skip list: ' + error.message
-      } finally {
-        this.isLoading = false
-        this.currentAction = ''
-      }
-    },
-
-    async removeFromSkipList(neuronId) {
-      this.clearMessages()
-      this.isLoading = true
-      this.currentAction = 'removeSkip'
-      
-      try {
-        const actor = await this.getRewardsActor()
-        const result = await actor.removeFromRewardSkipList(neuronId)
-        
-        if (result.ok) {
-          this.successMessage = result.ok
-          await this.loadRewardSkipList() // Refresh the list
-        } else {
-          throw new Error(result.err?.SystemError || result.err?.NotAuthorized ? 'Not authorized' : 'Unknown error')
-        }
-      } catch (error) {
-        console.error('Error removing neuron from skip list:', error)
-        this.errorMessage = 'Failed to remove neuron from skip list: ' + error.message
-      } finally {
-        this.isLoading = false
-        this.currentAction = ''
-      }
-    },
-
-    async clearSkipList() {
-      if (!confirm('Are you sure you want to clear the entire skip list? This will allow all neurons to receive rewards again.')) {
-        return
-      }
-      
-      this.clearMessages()
-      this.isLoading = true
-      this.currentAction = 'clearSkip'
-      
-      try {
-        const actor = await this.getRewardsActor()
-        const result = await actor.setRewardSkipList([])
-        
-        if (result.ok) {
-          this.successMessage = 'Skip list cleared successfully'
-          await this.loadRewardSkipList() // Refresh the list
-        } else {
-          throw new Error(result.err?.SystemError || result.err?.NotAuthorized ? 'Not authorized' : 'Unknown error')
-        }
-      } catch (error) {
-        console.error('Error clearing skip list:', error)
-        this.errorMessage = 'Failed to clear skip list: ' + error.message
-      } finally {
-        this.isLoading = false
-        this.currentAction = ''
-      }
-    },
-
-    async refreshSkipList() {
-      this.clearMessages()
-      this.isLoading = true
-      this.currentAction = 'refreshSkip'
-      
-      try {
-        await this.loadRewardSkipList()
-        this.successMessage = 'Skip list refreshed'
-      } catch (error) {
-        console.error('Error refreshing skip list:', error)
-        this.errorMessage = 'Failed to refresh skip list'
-      } finally {
-        this.isLoading = false
-        this.currentAction = ''
-      }
-    },
-
-    formatNeuronId(neuronId) {
-      try {
-        // Convert neuron ID to hex string for display
-        if (Array.isArray(neuronId)) {
-          return neuronId.map(b => b.toString(16).padStart(2, '0')).join('')
-        } else if (neuronId && neuronId._arr) {
-          // Handle Uint8Array format
-          return Array.from(neuronId._arr).map(b => b.toString(16).padStart(2, '0')).join('')
-        } else if (neuronId && typeof neuronId === 'object' && neuronId.constructor === Uint8Array) {
-          // Handle Uint8Array directly
-          return Array.from(neuronId).map(b => b.toString(16).padStart(2, '0')).join('')
-        } else if (typeof neuronId === 'string') {
-          return neuronId
-        }
-        
-        return 'Invalid format'
-      } catch (error) {
-        console.error('Error formatting neuron ID:', error)
-        return 'Format Error'
-      }
-    },
-
-    // Sorting methods for neuron details table
-    sortNeuronRewards(distributionIndex, column) {
-      // Initialize sort state for this distribution if not exists
-      if (!this.sortColumns[distributionIndex]) {
-        this.sortColumns = { ...this.sortColumns, [distributionIndex]: null }
-        this.sortDirections = { ...this.sortDirections, [distributionIndex]: 'desc' }
-      }
-
-      // Toggle direction if same column, otherwise set to descending
-      if (this.sortColumns[distributionIndex] === column) {
-        this.sortDirections = { 
-          ...this.sortDirections, 
-          [distributionIndex]: this.sortDirections[distributionIndex] === 'desc' ? 'asc' : 'desc' 
-        }
-      } else {
-        this.sortColumns = { ...this.sortColumns, [distributionIndex]: column }
-        this.sortDirections = { ...this.sortDirections, [distributionIndex]: 'desc' }
-      }
-    },
-
-    getSortIcon(distributionIndex, column) {
-      if (this.sortColumns[distributionIndex] !== column) {
-        return '↕️' // Neutral sort icon
-      }
-      return this.sortDirections[distributionIndex] === 'desc' ? '🔽' : '🔼'
-    },
-
-    sortRewardsArray(rewards, column, direction) {
-      const sortedRewards = [...rewards]
-      
-      sortedRewards.sort((a, b) => {
-        let aVal, bVal
-        
-        switch (column) {
-          case 'neuronId':
-            aVal = this.formatNeuronId(a.neuronId).toLowerCase()
-            bVal = this.formatNeuronId(b.neuronId).toLowerCase()
-            break
-          case 'performanceScore':
-            aVal = Number(a.performanceScore)
-            bVal = Number(b.performanceScore)
-            break
-          case 'votingPower':
-            aVal = Number(a.votingPower)
-            bVal = Number(b.votingPower)
-            break
-          case 'rewardScore':
-            aVal = Number(a.rewardScore)
-            bVal = Number(b.rewardScore)
-            break
-          case 'rewardAmount':
-            aVal = Number(a.rewardAmount)
-            bVal = Number(b.rewardAmount)
-            break
-          case 'percentage':
-            // Calculate percentage for sorting
-            aVal = Number(a.rewardAmount) / Number(a.totalRewardPot || 1)
-            bVal = Number(b.rewardAmount) / Number(b.totalRewardPot || 1)
-            break
-          case 'makers':
-            // Sort by number of makers
-            aVal = this.getMakersFromReward(a).length
-            bVal = this.getMakersFromReward(b).length
-            break
-          default:
-            return 0
-        }
-        
-        // Handle string comparison
-        if (typeof aVal === 'string' && typeof bVal === 'string') {
-          return direction === 'desc' ? bVal.localeCompare(aVal) : aVal.localeCompare(bVal)
-        }
-        
-        // Handle numeric comparison
-        if (direction === 'desc') {
-          return bVal - aVal
-        } else {
-          return aVal - bVal
-        }
-      })
-      
-      return sortedRewards
+// Data loading functions
+const loadDistributionStatus = async () => {
+  try {
+    const actor = await getRewardsActor()
+    const config = await actor.getConfiguration()
+    distributionStatus.value = {
+      lastDistributionTime: config.lastDistributionTime,
+      totalDistributions: config.totalDistributions,
+      distributionEnabled: config.distributionEnabled,
+      currentDistributionId: null,
+      inProgress: false
     }
-  },
+  } catch (error) {
+    console.error('Error loading distribution status:', error)
+    throw error
+  }
+}
 
-  async mounted() {
-    this.setDefaultCustomTimes()
+const loadConfiguration = async () => {
+  try {
+    const actor = await getRewardsActor()
+    configuration.value = await actor.getConfiguration()
+    newRewardPot.value = configuration.value.periodicRewardPot
+    newDistributionPeriod.value = Math.round(Number(configuration.value.distributionPeriodNS) / (24 * 60 * 60 * 1_000_000_000))
+    newPerformanceScorePower.value = configuration.value.performanceScorePower
+    newVotingPowerPower.value = configuration.value.votingPowerPower
+  } catch (error) {
+    console.error('Error loading configuration:', error)
+    throw error
+  }
+}
+
+const loadDistributionHistory = async () => {
+  try {
+    const actor = await getRewardsActor()
+    const history = await actor.getDistributionHistory([10])
+    distributionHistory.value = history.reverse()
+  } catch (error) {
+    console.error('Error loading distribution history:', error)
+    throw error
+  }
+}
+
+const loadTotalDistributed = async () => {
+  try {
+    const actor = await getRewardsActor()
+    totalDistributed.value = await actor.getTotalDistributed()
+  } catch (error) {
+    console.error('Error loading total distributed:', error)
+  }
+}
+
+const loadTacoBalance = async () => {
+  try {
+    const actor = await getRewardsActor()
+    tacoBalance.value = await actor.getTacoBalance()
+  } catch (error) {
+    console.error('Error loading TACO balance:', error)
+  }
+}
+
+const loadCurrentNeuronBalances = async () => {
+  try {
+    const actor = await getRewardsActor()
+    currentNeuronBalances.value = await actor.getCurrentTotalNeuronBalances()
+  } catch (error) {
+    console.error('Error loading current neuron balances:', error)
+  }
+}
+
+const loadAvailableBalance = async () => {
+  try {
+    const actor = await getRewardsActor()
+    availableBalance.value = await actor.getAvailableBalance()
+  } catch (error) {
+    console.error('Error loading available balance:', error)
+  }
+}
+
+const loadRewardSkipList = async () => {
+  try {
+    const actor = await getRewardsActor()
+    const result = await actor.getRewardSkipList()
+    if (result.ok) {
+      rewardSkipList.value = result.ok
+    } else {
+      throw new Error('Failed to load skip list')
+    }
+  } catch (error) {
+    console.error('Error loading reward skip list:', error)
+  }
+}
+
+const loadData = async () => {
+  try {
+    await Promise.all([
+      loadDistributionStatus(),
+      loadConfiguration(),
+      loadDistributionHistory()
+    ])
+  } catch (error) {
+    console.error('Error loading data:', error)
+    errorMessage.value = 'Failed to load distribution data'
+  }
+}
+
+const setDefaultCustomTimes = () => {
+  const now = new Date()
+  const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
+  customEndTime.value = now.toISOString().slice(0, 16)
+  customStartTime.value = weekAgo.toISOString().slice(0, 16)
+}
+
+// Admin action functions (with admin/non-admin pattern)
+const triggerDistribution = async () => {
+  await checkAdminStatus()
+  
+  if (isAdmin.value) {
+    clearMessages()
+    isLoading.value = true
+    currentAction.value = 'trigger'
     
     try {
-      await Promise.all([
-        this.loadDistributionStatus(),
-        this.loadConfiguration(),
-        this.loadDistributionHistory(),
-        this.loadTotalDistributed(),
-        this.loadTacoBalance(),
-        this.loadCurrentNeuronBalances(),
-        this.loadAvailableBalance(),
-        this.loadRewardSkipList()
-      ])
-      this.startPeriodicUpdates()
-    } catch (error) {
-      console.error('Error loading initial data:', error)
-      this.errorMessage = 'Failed to load distribution data'
+      const actor = await getRewardsActor()
+      const result = await actor.triggerDistribution()
+      
+      if ('ok' in result) {
+        successMessage.value = result.ok
+        await loadData()
+      } else {
+        errorMessage.value = formatError(result.err)
+      }
+    } catch (error: any) {
+      console.error('Error triggering distribution:', error)
+      errorMessage.value = 'Failed to trigger distribution: ' + error.message
+    } finally {
+      isLoading.value = false
+      currentAction.value = ''
     }
-  },
-
-  beforeUnmount() {
-    if (this.refreshInterval) {
-      clearInterval(this.refreshInterval)
-    }
-  },
-
-
+  } else {
+    proposalFunctionName.value = 'triggerDistribution'
+    proposalReasonPlaceholder.value = 'Please explain why a rewards distribution should be triggered now...'
+    proposalContextParams.value = {}
+    showProposalDialog.value = true
+  }
 }
+
+const startDistributionTimer = async () => {
+  await checkAdminStatus()
+  
+  if (isAdmin.value) {
+    clearMessages()
+    isLoading.value = true
+    currentAction.value = 'start'
+    
+    try {
+      const actor = await getRewardsActor()
+      const result = await actor.startDistributionTimer()
+      
+      if ('ok' in result) {
+        successMessage.value = result.ok
+        await loadConfiguration()
+      } else {
+        errorMessage.value = formatError(result.err)
+      }
+    } catch (error: any) {
+      console.error('Error starting distribution timer:', error)
+      errorMessage.value = 'Failed to start distribution timer: ' + error.message
+    } finally {
+      isLoading.value = false
+      currentAction.value = ''
+    }
+  } else {
+    proposalFunctionName.value = 'startDistributionTimer'
+    proposalReasonPlaceholder.value = 'Please explain why the automatic distribution timer should be started...'
+    proposalContextParams.value = {}
+    showProposalDialog.value = true
+  }
+}
+
+const stopDistributionTimer = async () => {
+  await checkAdminStatus()
+  
+  if (isAdmin.value) {
+    clearMessages()
+    isLoading.value = true
+    currentAction.value = 'stop'
+    
+    try {
+      const actor = await getRewardsActor()
+      const result = await actor.stopDistributionTimer()
+      
+      if ('ok' in result) {
+        successMessage.value = result.ok
+        await loadConfiguration()
+      } else {
+        errorMessage.value = formatError(result.err)
+      }
+    } catch (error: any) {
+      console.error('Error stopping distribution timer:', error)
+      errorMessage.value = 'Failed to stop distribution timer: ' + error.message
+    } finally {
+      isLoading.value = false
+      currentAction.value = ''
+    }
+  } else {
+    proposalFunctionName.value = 'stopDistributionTimer'
+    proposalReasonPlaceholder.value = 'Please explain why the automatic distribution timer should be stopped...'
+    proposalContextParams.value = {}
+    showProposalDialog.value = true
+  }
+}
+
+const triggerCustomDistribution = async () => {
+  await checkAdminStatus()
+  
+  const startDate = new Date(customStartTime.value)
+  const endDate = new Date(customEndTime.value)
+  const startTimeNS = BigInt(startDate.getTime() * 1_000_000)
+  const endTimeNS = BigInt(endDate.getTime() * 1_000_000)
+  const priceType = selectedPriceType.value === 'USD' ? { USD: null } : { ICP: null }
+  
+  if (isAdmin.value) {
+    clearMessages()
+    isLoading.value = true
+    currentAction.value = 'triggerCustom'
+    
+    try {
+      const actor = await getRewardsActor()
+      const result = await actor.triggerDistributionCustom(startTimeNS, endTimeNS, priceType)
+      
+      if ('ok' in result) {
+        successMessage.value = result.ok
+        await loadData()
+      } else {
+        errorMessage.value = formatError(result.err)
+      }
+    } catch (error: any) {
+      console.error('Error triggering custom distribution:', error)
+      errorMessage.value = 'Failed to trigger custom distribution: ' + error.message
+    } finally {
+      isLoading.value = false
+      currentAction.value = ''
+    }
+  } else {
+    proposalFunctionName.value = 'triggerDistributionCustom'
+    proposalReasonPlaceholder.value = `Please explain why a custom distribution from ${startDate.toLocaleString()} to ${endDate.toLocaleString()} should be triggered...`
+    proposalContextParams.value = {
+      startTimeNS,
+      endTimeNS,
+      priceType
+    }
+    showProposalDialog.value = true
+  }
+}
+
+const updateRewardPot = async () => {
+  await checkAdminStatus()
+  
+  const newValue = newRewardPot.value
+  
+  if (isAdmin.value) {
+    clearMessages()
+    isLoading.value = true
+    
+    try {
+      const actor = await getRewardsActor()
+      const result = await actor.setPeriodicRewardPot(newValue)
+      
+      if ('ok' in result) {
+        successMessage.value = result.ok
+        await loadConfiguration()
+      } else {
+        errorMessage.value = formatError(result.err)
+      }
+    } catch (error: any) {
+      console.error('Error updating reward pot:', error)
+      errorMessage.value = 'Failed to update reward pot: ' + error.message
+    } finally {
+      isLoading.value = false
+    }
+  } else {
+    proposalFunctionName.value = 'setPeriodicRewardPot'
+    proposalReasonPlaceholder.value = `Please explain why the periodic reward pot should be changed to ${newValue}...`
+    proposalContextParams.value = {
+      rewardPot: newValue
+    }
+    showProposalDialog.value = true
+  }
+}
+
+const updateDistributionPeriod = async () => {
+  await checkAdminStatus()
+  
+  const periodDays = newDistributionPeriod.value
+  const periodNS = BigInt(Math.round(periodDays * 24 * 60 * 60 * 1_000_000_000))
+  
+  if (isAdmin.value) {
+    clearMessages()
+    isLoading.value = true
+    
+    try {
+      const actor = await getRewardsActor()
+      const result = await actor.setDistributionPeriod(periodNS)
+      
+      if ('ok' in result) {
+        successMessage.value = result.ok
+        await loadConfiguration()
+      } else {
+        errorMessage.value = formatError(result.err)
+      }
+    } catch (error: any) {
+      console.error('Error updating distribution period:', error)
+      errorMessage.value = 'Failed to update distribution period: ' + error.message
+    } finally {
+      isLoading.value = false
+    }
+  } else {
+    proposalFunctionName.value = 'setDistributionPeriod'
+    proposalReasonPlaceholder.value = `Please explain why the distribution period should be changed to ${periodDays} days...`
+    proposalContextParams.value = {
+      periodNS
+    }
+    showProposalDialog.value = true
+  }
+}
+
+const updatePerformanceScorePower = async () => {
+  await checkAdminStatus()
+  
+  const newValue = newPerformanceScorePower.value
+  
+  if (isAdmin.value) {
+    clearMessages()
+    isLoading.value = true
+    
+    try {
+      const actor = await getRewardsActor()
+      const result = await actor.setPerformanceScorePower(newValue)
+      
+      if ('ok' in result) {
+        successMessage.value = result.ok
+        await loadConfiguration()
+      } else {
+        errorMessage.value = formatError(result.err)
+      }
+    } catch (error: any) {
+      console.error('Error updating performance score power:', error)
+      errorMessage.value = 'Failed to update performance score power: ' + error.message
+    } finally {
+      isLoading.value = false
+    }
+  } else {
+    proposalFunctionName.value = 'setPerformanceScorePower'
+    proposalReasonPlaceholder.value = `Please explain why the performance score power should be changed to ${newValue}...`
+    proposalContextParams.value = {
+      power: newValue
+    }
+    showProposalDialog.value = true
+  }
+}
+
+const updateVotingPowerPower = async () => {
+  await checkAdminStatus()
+  
+  const newValue = newVotingPowerPower.value
+  
+  if (isAdmin.value) {
+    clearMessages()
+    isLoading.value = true
+    
+    try {
+      const actor = await getRewardsActor()
+      const result = await actor.setVotingPowerPower(newValue)
+      
+      if ('ok' in result) {
+        successMessage.value = result.ok
+        await loadConfiguration()
+      } else {
+        errorMessage.value = formatError(result.err)
+      }
+    } catch (error: any) {
+      console.error('Error updating voting power power:', error)
+      errorMessage.value = 'Failed to update voting power power: ' + error.message
+    } finally {
+      isLoading.value = false
+    }
+  } else {
+    proposalFunctionName.value = 'setVotingPowerPower'
+    proposalReasonPlaceholder.value = `Please explain why the voting power power should be changed to ${newValue}...`
+    proposalContextParams.value = {
+      power: newValue
+    }
+    showProposalDialog.value = true
+  }
+}
+
+const addToSkipList = async () => {
+  if (!newSkipNeuronId.value.trim()) return
+  
+  await checkAdminStatus()
+  
+  const neuronIdHex = newSkipNeuronId.value.trim().replace(/^0x/, '')
+  if (neuronIdHex.length % 2 !== 0) {
+    errorMessage.value = 'Invalid hex string length'
+    return
+  }
+  
+  const neuronIdBytes = new Uint8Array(
+    neuronIdHex.match(/.{2}/g)!.map(byte => parseInt(byte, 16))
+  )
+  
+  if (isAdmin.value) {
+    clearMessages()
+    isLoading.value = true
+    currentAction.value = 'addSkip'
+    
+    try {
+      const actor = await getRewardsActor()
+      const result = await actor.addToRewardSkipList(neuronIdBytes)
+      
+      if (result.ok) {
+        successMessage.value = result.ok
+        newSkipNeuronId.value = ''
+        await loadRewardSkipList()
+      } else {
+        throw new Error(result.err?.SystemError || 'Unknown error')
+      }
+    } catch (error: any) {
+      console.error('Error adding neuron to skip list:', error)
+      errorMessage.value = 'Failed to add neuron to skip list: ' + error.message
+    } finally {
+      isLoading.value = false
+      currentAction.value = ''
+    }
+  } else {
+    proposalFunctionName.value = 'addToRewardSkipList'
+    proposalReasonPlaceholder.value = `Please explain why neuron ${neuronIdHex.substring(0, 16)}... should be added to the skip list...`
+    proposalContextParams.value = {
+      neuronId: neuronIdBytes
+    }
+    showProposalDialog.value = true
+  }
+}
+
+const removeFromSkipList = async (neuronId: any) => {
+  await checkAdminStatus()
+  
+  if (isAdmin.value) {
+    clearMessages()
+    isLoading.value = true
+    currentAction.value = 'removeSkip'
+    
+    try {
+      const actor = await getRewardsActor()
+      const result = await actor.removeFromRewardSkipList(neuronId)
+      
+      if (result.ok) {
+        successMessage.value = result.ok
+        await loadRewardSkipList()
+      } else {
+        throw new Error(result.err?.SystemError || 'Unknown error')
+      }
+    } catch (error: any) {
+      console.error('Error removing neuron from skip list:', error)
+      errorMessage.value = 'Failed to remove neuron from skip list: ' + error.message
+    } finally {
+      isLoading.value = false
+      currentAction.value = ''
+    }
+  } else {
+    proposalFunctionName.value = 'removeFromRewardSkipList'
+    proposalReasonPlaceholder.value = `Please explain why this neuron should be removed from the skip list...`
+    proposalContextParams.value = {
+      neuronId: neuronId
+    }
+    showProposalDialog.value = true
+  }
+}
+
+const clearSkipList = async () => {
+  await checkAdminStatus()
+  
+  if (isAdmin.value) {
+    if (!confirm('Are you sure you want to clear the entire skip list? This will allow all neurons to receive rewards again.')) {
+      return
+    }
+    
+    clearMessages()
+    isLoading.value = true
+    currentAction.value = 'clearSkip'
+    
+    try {
+      const actor = await getRewardsActor()
+      const result = await actor.setRewardSkipList([])
+      
+      if (result.ok) {
+        successMessage.value = 'Skip list cleared successfully'
+        await loadRewardSkipList()
+      } else {
+        throw new Error(result.err?.SystemError || 'Unknown error')
+      }
+    } catch (error: any) {
+      console.error('Error clearing skip list:', error)
+      errorMessage.value = 'Failed to clear skip list: ' + error.message
+    } finally {
+      isLoading.value = false
+      currentAction.value = ''
+    }
+  } else {
+    proposalFunctionName.value = 'clearRewardSkipList'
+    proposalReasonPlaceholder.value = `Please explain why the entire reward skip list (${rewardSkipList.value.length} neurons) should be cleared...`
+    proposalContextParams.value = {}
+    showProposalDialog.value = true
+  }
+}
+
+// Non-admin functions (data fetching only)
+const refreshHistory = async () => {
+  clearMessages()
+  isLoading.value = true
+  currentAction.value = 'refresh'
+  
+  try {
+    await Promise.all([
+      loadDistributionStatus(),
+      loadDistributionHistory(),
+      loadTotalDistributed(),
+      loadTacoBalance(),
+      loadCurrentNeuronBalances(),
+      loadAvailableBalance()
+    ])
+  } catch (error) {
+    console.error('Error refreshing data:', error)
+    errorMessage.value = 'Failed to refresh distribution data'
+  } finally {
+    isLoading.value = false
+    currentAction.value = ''
+  }
+}
+
+const refreshSkipList = async () => {
+  clearMessages()
+  isLoading.value = true
+  currentAction.value = 'refreshSkip'
+  
+  try {
+    await loadRewardSkipList()
+    successMessage.value = 'Skip list refreshed'
+  } catch (error) {
+    console.error('Error refreshing skip list:', error)
+    errorMessage.value = 'Failed to refresh skip list'
+  } finally {
+    isLoading.value = false
+    currentAction.value = ''
+  }
+}
+
+// UI functions
+const toggleRewardDetails = (index: number) => {
+  showRewardDetails.value = {
+    ...showRewardDetails.value,
+    [index]: !showRewardDetails.value[index]
+  }
+  
+  if (!rewardDisplayLimits.value[index]) {
+    rewardDisplayLimits.value = { ...rewardDisplayLimits.value, [index]: 20 }
+  }
+  if (!rewardSearchTerms.value[index]) {
+    rewardSearchTerms.value = { ...rewardSearchTerms.value, [index]: '' }
+  }
+}
+
+const getFilteredRewards = (distribution: any, index: number) => {
+  if (!distribution.neuronRewards) return []
+  
+  let rewards = [...distribution.neuronRewards]
+  
+  const searchTerm = rewardSearchTerms.value[index] || ''
+  if (searchTerm) {
+    rewards = rewards.filter(reward =>
+      formatNeuronId(reward.neuronId).toLowerCase().includes(searchTerm.toLowerCase())
+    )
+  }
+  
+  const sortColumn = sortColumns.value[index]
+  const sortDirection = sortDirections.value[index] || 'desc'
+  if (sortColumn) {
+    const rewardsWithTotal = rewards.map(reward => ({
+      ...reward,
+      totalRewardPot: distribution.totalRewardPot
+    }))
+    rewards = sortRewardsArray(rewardsWithTotal, sortColumn, sortDirection)
+  }
+  
+  const limit = rewardDisplayLimits.value[index] || 20
+  return rewards.slice(0, Number(limit))
+}
+
+const sortNeuronRewards = (distributionIndex: number, column: string) => {
+  if (!sortColumns.value[distributionIndex]) {
+    sortColumns.value = { ...sortColumns.value, [distributionIndex]: null }
+    sortDirections.value = { ...sortDirections.value, [distributionIndex]: 'desc' }
+  }
+
+  if (sortColumns.value[distributionIndex] === column) {
+    sortDirections.value = {
+      ...sortDirections.value,
+      [distributionIndex]: sortDirections.value[distributionIndex] === 'desc' ? 'asc' : 'desc'
+    }
+  } else {
+    sortColumns.value = { ...sortColumns.value, [distributionIndex]: column }
+    sortDirections.value = { ...sortDirections.value, [distributionIndex]: 'desc' }
+  }
+}
+
+const getSortIcon = (distributionIndex: number, column: string) => {
+  if (sortColumns.value[distributionIndex] !== column) return '↕️'
+  return sortDirections.value[distributionIndex] === 'desc' ? '🔽' : '🔼'
+}
+
+const sortRewardsArray = (rewards: any[], column: string, direction: 'asc' | 'desc') => {
+  const sorted = [...rewards]
+  
+  sorted.sort((a, b) => {
+    let aVal: any, bVal: any
+    
+    switch (column) {
+      case 'neuronId':
+        aVal = formatNeuronId(a.neuronId).toLowerCase()
+        bVal = formatNeuronId(b.neuronId).toLowerCase()
+        break
+      case 'performanceScore':
+        aVal = Number(a.performanceScore)
+        bVal = Number(b.performanceScore)
+        break
+      case 'votingPower':
+        aVal = Number(a.votingPower)
+        bVal = Number(b.votingPower)
+        break
+      case 'rewardScore':
+        aVal = Number(a.rewardScore)
+        bVal = Number(b.rewardScore)
+        break
+      case 'rewardAmount':
+        aVal = Number(a.rewardAmount)
+        bVal = Number(b.rewardAmount)
+        break
+      case 'percentage':
+        aVal = Number(a.rewardAmount) / Number(a.totalRewardPot || 1)
+        bVal = Number(b.rewardAmount) / Number(b.totalRewardPot || 1)
+        break
+      case 'makers':
+        aVal = getMakersFromReward(a).length
+        bVal = getMakersFromReward(b).length
+        break
+      default:
+        return 0
+    }
+    
+    if (typeof aVal === 'string' && typeof bVal === 'string') {
+      return direction === 'desc' ? bVal.localeCompare(aVal) : aVal.localeCompare(bVal)
+    }
+    
+    return direction === 'desc' ? bVal - aVal : aVal - bVal
+  })
+  
+  return sorted
+}
+
+const viewNeuronPerformance = (neuronId: any, distribution: any) => {
+  try {
+    const fullHexId = neuronIdToFullHex(neuronId)
+    const startTimeNS = distribution.startTime
+    const endTimeNS = distribution.endTime
+    const priceType = distribution.priceType || 'USD'
+    
+    router.push({
+      path: '/admin/rewards',
+      query: {
+        neuronId: fullHexId,
+        startTime: startTimeNS.toString(),
+        endTime: endTimeNS.toString(),
+        priceType: priceType
+      }
+    })
+  } catch (error) {
+    console.error('Error navigating to neuron performance:', error)
+    errorMessage.value = 'Failed to navigate to neuron performance details'
+  }
+}
+
+// Handle successful proposal submission
+const handleProposalSuccess = async () => {
+  showProposalDialog.value = false
+  proposalFunctionName.value = ''
+  proposalReasonPlaceholder.value = ''
+  proposalContextParams.value = {}
+  console.log('AdminDistributionsView: Proposal submitted successfully')
+}
+
+// Lifecycle hooks
+onMounted(async () => {
+  setDefaultCustomTimes()
+  await checkAdminStatus()
+  
+  try {
+    await Promise.all([
+      loadDistributionStatus(),
+      loadConfiguration(),
+      loadDistributionHistory(),
+      loadTotalDistributed(),
+      loadTacoBalance(),
+      loadCurrentNeuronBalances(),
+      loadAvailableBalance(),
+      loadRewardSkipList()
+    ])
+    
+    // Auto-refresh every 30 seconds
+    refreshInterval = setInterval(() => {
+      loadData()
+    }, 30000)
+  } catch (error) {
+    console.error('Error loading initial data:', error)
+    errorMessage.value = 'Failed to load distribution data'
+  }
+})
+
+onBeforeUnmount(() => {
+  if (refreshInterval) {
+    clearInterval(refreshInterval)
+  }
+})
 </script>
 
 <style scoped>
@@ -1864,7 +1731,6 @@ export default {
   font-size: 0.9em;
 }
 
-/* Enhanced neuron details styling */
 .table-responsive {
   border-radius: 6px;
   border: 1px solid #444;
@@ -1883,7 +1749,6 @@ export default {
 .card.border-warning { border-color: #d69e2e !important; }
 .card.border-primary { border-color: #3182ce !important; }
 
-/* Search and pagination controls */
 .input-group-text {
   background-color: #2d3748;
   border-color: #4a5568;
@@ -1903,7 +1768,6 @@ export default {
   box-shadow: 0 0 0 0.2rem rgba(99, 179, 237, 0.25);
 }
 
-/* Fix text visibility issues */
 .text-muted {
   color: #a0aec0 !important;
 }
@@ -1912,7 +1776,6 @@ export default {
   color: #a0aec0 !important;
 }
 
-/* Summary card text */
 .card .text-muted {
   color: #9ca3af !important;
 }
@@ -1921,22 +1784,18 @@ export default {
   color: #f7fafc !important;
 }
 
-/* Timestamp and other muted text */
 small.text-muted {
   color: #cbd5e0 !important;
 }
 
-/* Bottom status text */
 .mt-2.d-block.text-muted {
   color: #a0aec0 !important;
 }
 
-/* Ranking badges */
 .badge.bg-secondary {
   background-color: #4a5568 !important;
 }
 
-/* Performance score colors */
 .text-success.fw-bold {
   color: #38a169 !important;
   font-weight: 700 !important;
@@ -1954,13 +1813,11 @@ small.text-muted {
   color: #fc8181 !important;
 }
 
-/* Button styles */
 .btn-xs {
   padding: 0.15rem 0.3rem;
   font-size: 0.7rem;
 }
 
-/* Makers list styling */
 .makers-list {
   max-width: 200px;
 }
@@ -1974,7 +1831,6 @@ small.text-muted {
   display: inline-block;
 }
 
-/* Sortable header styling */
 .sortable-header {
   cursor: pointer;
   user-select: none;

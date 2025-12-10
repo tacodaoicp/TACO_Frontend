@@ -878,6 +878,143 @@ export const GNSF_REGISTRY: Record<string, GNSFunctionInfo> = {
             type: IDL.Nat,
             displayName: 'Maximum Snapshots'
         }]
+    },
+    // Rewards Distribution Functions (rewards.mo)
+    'triggerDistribution': {
+        functionId: BigInt(3030),
+        displayName: 'Trigger Distribution',
+        description: 'Triggers a default rewards distribution to eligible neurons',
+        parameterTypes: [],
+        requiresReason: false
+    },
+    'startDistributionTimer': {
+        functionId: BigInt(3031),
+        displayName: 'Start Distribution Timer',
+        description: 'Starts the automatic periodic rewards distribution timer',
+        parameterTypes: [],
+        requiresReason: false
+    },
+    'stopDistributionTimer': {
+        functionId: BigInt(3032),
+        displayName: 'Stop Distribution Timer',
+        description: 'Stops the automatic periodic rewards distribution timer',
+        parameterTypes: [],
+        requiresReason: false
+    },
+    'triggerDistributionCustom': {
+        functionId: BigInt(3033),
+        displayName: 'Trigger Custom Distribution',
+        description: 'Triggers a custom rewards distribution with specified time range and price type',
+        parameterTypes: [
+            IDL.Nat,  // startTimeNS
+            IDL.Nat,  // endTimeNS
+            IDL.Variant({ USD: IDL.Null, ICP: IDL.Null })  // priceType
+        ],
+        requiresReason: false,
+        additionalParams: [{
+            name: 'startTimeNS',
+            type: IDL.Nat,
+            displayName: 'Start Time (nanoseconds)'
+        }, {
+            name: 'endTimeNS',
+            type: IDL.Nat,
+            displayName: 'End Time (nanoseconds)'
+        }, {
+            name: 'priceType',
+            type: IDL.Variant({ USD: IDL.Null, ICP: IDL.Null }),
+            displayName: 'Price Type'
+        }]
+    },
+    'setPeriodicRewardPot': {
+        functionId: BigInt(3034),
+        displayName: 'Set Periodic Reward Pot',
+        description: 'Sets the amount of TACO tokens to distribute in each periodic distribution',
+        parameterTypes: [
+            IDL.Float64  // rewardPot
+        ],
+        requiresReason: false,
+        additionalParams: [{
+            name: 'rewardPot',
+            type: IDL.Float64,
+            displayName: 'Reward Pot Amount'
+        }]
+    },
+    'setDistributionPeriod': {
+        functionId: BigInt(3035),
+        displayName: 'Set Distribution Period',
+        description: 'Sets the time period between automatic reward distributions',
+        parameterTypes: [
+            IDL.Nat  // periodNS
+        ],
+        requiresReason: false,
+        additionalParams: [{
+            name: 'periodNS',
+            type: IDL.Nat,
+            displayName: 'Period (nanoseconds)'
+        }]
+    },
+    'setPerformanceScorePower': {
+        functionId: BigInt(3036),
+        displayName: 'Set Performance Score Power',
+        description: 'Sets the exponent applied to performance scores in reward calculations',
+        parameterTypes: [
+            IDL.Float64  // power
+        ],
+        requiresReason: false,
+        additionalParams: [{
+            name: 'power',
+            type: IDL.Float64,
+            displayName: 'Performance Score Power'
+        }]
+    },
+    'setVotingPowerPower': {
+        functionId: BigInt(3037),
+        displayName: 'Set Voting Power Power',
+        description: 'Sets the exponent applied to voting power in reward calculations',
+        parameterTypes: [
+            IDL.Float64  // power
+        ],
+        requiresReason: false,
+        additionalParams: [{
+            name: 'power',
+            type: IDL.Float64,
+            displayName: 'Voting Power Power'
+        }]
+    },
+    'addToRewardSkipList': {
+        functionId: BigInt(3038),
+        displayName: 'Add to Reward Skip List',
+        description: 'Adds a neuron to the skip list, excluding it from future reward distributions',
+        parameterTypes: [
+            IDL.Vec(IDL.Nat8)  // neuronId
+        ],
+        requiresReason: false,
+        additionalParams: [{
+            name: 'neuronId',
+            type: IDL.Vec(IDL.Nat8),
+            displayName: 'Neuron ID'
+        }]
+    },
+    'removeFromRewardSkipList': {
+        functionId: BigInt(3039),
+        displayName: 'Remove from Reward Skip List',
+        description: 'Removes a neuron from the skip list, allowing it to receive rewards again',
+        parameterTypes: [
+            IDL.Vec(IDL.Nat8)  // neuronId
+        ],
+        requiresReason: false,
+        additionalParams: [{
+            name: 'neuronId',
+            type: IDL.Vec(IDL.Nat8),
+            displayName: 'Neuron ID'
+        }]
+    },
+    'clearRewardSkipList': {
+        functionId: BigInt(3040),
+        displayName: 'Clear Reward Skip List',
+        description: 'Clears the entire reward skip list, allowing all neurons to receive rewards',
+        parameterTypes: [],
+        requiresReason: false
     }
 }
 
