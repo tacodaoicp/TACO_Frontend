@@ -385,25 +385,28 @@ const overallSystemStatus = computed(() => {
 // Computed: Main canisters overall status
 const mainCanistersStatus = computed(() => {
   const keys = mainCanisters.map(c => c.key)
-  const anyLoading = keys.some(k => loadingMap[k])
+  const allLoading = keys.every(k => loadingMap[k])
   const allNull = keys.every(k => cyclesMap[k] === null)
   
-  if (anyLoading) return 'gray'
-  if (allNull) return 'gray'
+  // Only show gray if ALL are loading or ALL are null (no data yet)
+  if (allLoading || allNull) return 'gray'
   
-  // Check cycles AND important lamps for each canister
+  // Check cycles AND important lamps for each canister (only those that have loaded)
   let hasIssue = false
   let hasCritical = false
   
   for (const k of keys) {
     const cycles = cyclesMap[k]
     
+    // Skip canisters that haven't loaded yet
+    if (cycles === null) continue
+    
     // Check cycles
-    if (cycles !== null && cycles < 5) {
+    if (cycles < 5) {
       hasCritical = true
       break
     }
-    if (cycles !== null && cycles < 10) {
+    if (cycles < 10) {
       hasIssue = true
     }
     
@@ -448,28 +451,30 @@ const mainCanistersStatus = computed(() => {
 // Computed: Archive canisters overall status
 const archiveCanistersStatus = computed(() => {
   const keys = archiveCanisters.map(c => c.key)
-  const anyLoading = keys.some(k => loadingMap[k])
+  const allLoading = keys.every(k => loadingMap[k])
   const allNull = keys.every(k => cyclesMap[k] === null)
   
-  if (anyLoading) return 'gray'
-  if (allNull) return 'gray'
+  // Only show gray if ALL are loading or ALL are null (no data yet)
+  if (allLoading || allNull) return 'gray'
   
-  // Check if any canister is low on cycles (< 10T) OR timer is not running
+  // Check if any canister is low on cycles (< 10T) OR timer is not running (only loaded ones)
   const anyLow = keys.some(k => {
     const cycles = cyclesMap[k]
+    if (cycles === null) return false // Skip unloaded
     const timerStatus = timerStatusMap[k]
     // Only check timer if we have status loaded; archives use outerLoopRunning
     const timerRunning = timerStatus ? (timerStatus.outerLoopRunning ?? true) : true
-    return (cycles !== null && cycles < 10) || !timerRunning
+    return cycles < 10 || !timerRunning
   })
   
-  // Check if any canister is critical (< 5T) OR timer is not running
+  // Check if any canister is critical (< 5T) OR timer is not running (only loaded ones)
   const anyCritical = keys.some(k => {
     const cycles = cyclesMap[k]
+    if (cycles === null) return false // Skip unloaded
     const timerStatus = timerStatusMap[k]
     // Only check timer if we have status loaded; archives use outerLoopRunning
     const timerRunning = timerStatus ? (timerStatus.outerLoopRunning ?? true) : true
-    return (cycles !== null && cycles < 5) || !timerRunning
+    return cycles < 5 || !timerRunning
   })
   
   if (anyCritical) return 'red'
