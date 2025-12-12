@@ -603,7 +603,7 @@ const handleAutoExpandChange = () => {
 // Canister groups and keys
 type CanKey = 'dao_backend' | 'frontend' | 'treasury' | 'rewards' | 'neuronSnapshot' | 'validation'
   | 'trading_archive' | 'portfolio_archive' | 'price_archive' | 'dao_admin_archive' | 'dao_governance_archive'
-  | 'dao_allocation_archive' | 'dao_neuron_allocation_archive' | 'reward_distribution_archive' | 'reward_withdrawal_archive'
+  | 'dao_neuron_allocation_archive' | 'reward_distribution_archive' | 'reward_withdrawal_archive'
 
 const mainCanisters = [
   { key: 'dao_backend' as CanKey, title: 'Backend (DAO.mo)' },
@@ -620,7 +620,6 @@ const archiveCanisters = [
   { key: 'price_archive' as CanKey, title: 'Price Archive' },
   { key: 'dao_admin_archive' as CanKey, title: 'DAO Admin Archive' },
   { key: 'dao_governance_archive' as CanKey, title: 'DAO Governance Archive' },
-  { key: 'dao_allocation_archive' as CanKey, title: 'DAO Allocation Archive' },
   { key: 'dao_neuron_allocation_archive' as CanKey, title: 'DAO Neuron Allocation Archive' },
   { key: 'reward_distribution_archive' as CanKey, title: 'Reward Distribution Archive' },
   { key: 'reward_withdrawal_archive' as CanKey, title: 'Reward Withdrawal Archive' },
@@ -645,7 +644,6 @@ const cyclesMap = reactive<Record<CanKey, number | null>>({
   price_archive: null,
   dao_admin_archive: null,
   dao_governance_archive: null,
-  dao_allocation_archive: null,
   dao_neuron_allocation_archive: null,
   reward_distribution_archive: null,
   reward_withdrawal_archive: null
@@ -662,7 +660,6 @@ const loadingMap = reactive<Record<CanKey, boolean>>({
   price_archive: false,
   dao_admin_archive: false,
   dao_governance_archive: false,
-  dao_allocation_archive: false,
   dao_neuron_allocation_archive: false,
   reward_distribution_archive: false,
   reward_withdrawal_archive: false
@@ -679,7 +676,6 @@ const timerStatusMap = reactive<Record<CanKey, any>>({
   price_archive: null,
   dao_admin_archive: null,
   dao_governance_archive: null,
-  dao_allocation_archive: null,
   dao_neuron_allocation_archive: null,
   reward_distribution_archive: null,
   reward_withdrawal_archive: null
@@ -723,7 +719,6 @@ const expandedMap = reactive<Record<CanKey, boolean>>({
   price_archive: false,
   dao_admin_archive: false,
   dao_governance_archive: false,
-  dao_allocation_archive: false,
   dao_neuron_allocation_archive: false,
   reward_distribution_archive: false,
   reward_withdrawal_archive: false
@@ -747,7 +742,6 @@ const isArchiveKey = (key: CanKey) => (
   key === 'price_archive' ||
   key === 'dao_admin_archive' ||
   key === 'dao_governance_archive' ||
-  key === 'dao_allocation_archive' ||
   key === 'dao_neuron_allocation_archive' ||
   key === 'reward_distribution_archive' ||
   key === 'reward_withdrawal_archive'
@@ -779,10 +773,6 @@ const createArchiveActor = async (key: CanKey, canisterId: string) => {
       }
       case 'dao_governance_archive': {
         const mod = await import('../../../declarations/dao_governance_archive')
-        return mod.createActor(canisterId, { agent }) as any
-      }
-      case 'dao_allocation_archive': {
-        const mod = await import('../../../declarations/dao_allocation_archive')
         return mod.createActor(canisterId, { agent }) as any
       }
       case 'dao_neuron_allocation_archive': {
@@ -1921,6 +1911,7 @@ const testPriceHistory = async (test: any) => {
     // Fetch token details
     const tokenDetails = await daoActor.getTokenDetailsWithoutPastPrices?.() ?? []
 
+    console.log('[Price History Test] Token details:', tokenDetails)
     // Expected sync interval: tokens should sync at least once per day
     const maxSyncAgeMs = 24 * 60 * 60 * 1000 // 24 hours
 
