@@ -393,7 +393,10 @@
           <!-- Distribution History -->
           <div class="card bg-dark text-white mb-4">
             <div class="card-header d-flex justify-content-between align-items-center">
-              <h3 class="mb-0">Distribution History</h3>
+              <h3 class="mb-0">
+                Distribution History
+                <span v-if="historyTotal > 0" class="badge bg-secondary ms-2">{{ distributionHistory.length }} / {{ historyTotal }}</span>
+              </h3>
               <button 
                 class="btn btn-outline-primary btn-sm" 
                 @click="refreshHistory"
@@ -655,7 +658,22 @@
                   </div>
                 </div>
               </div>
-              <div v-else-if="!isLoading" class="text-center text-muted">
+              <!-- Load More Button -->
+              <div v-if="historyHasMore" class="text-center mt-4">
+                <button 
+                  class="btn btn-outline-info" 
+                  @click="loadMoreHistory"
+                  :disabled="isLoadingMore"
+                >
+                  <span v-if="isLoadingMore" class="spinner-border spinner-border-sm me-2" role="status"></span>
+                  {{ isLoadingMore ? 'Loading...' : '📜 Load More' }}
+                </button>
+                <p class="text-muted mt-2 mb-0">
+                  <small>Showing {{ distributionHistory.length }} of {{ historyTotal }} distributions</small>
+                </p>
+              </div>
+              
+              <div v-else-if="!isLoading && distributionHistory.length === 0" class="text-center text-muted">
                 <p>No distribution history available</p>
               </div>
               <div v-if="isLoading && currentAction === 'refresh'" class="text-center">
@@ -720,6 +738,13 @@ const totalDistributed = ref(0)
 const tacoBalance = ref(0)
 const currentNeuronBalances = ref(0)
 const availableBalance = ref(0)
+
+// Pagination state for distribution history
+const historyPageSize = 5
+const historyOffset = ref(0)
+const historyTotal = ref(0)
+const historyHasMore = ref(false)
+const isLoadingMore = ref(false)
 
 // UI state
 const showRewardDetails = ref<Record<number, boolean>>({})
@@ -988,14 +1013,44 @@ const loadConfiguration = async () => {
   }
 }
 
-const loadDistributionHistory = async () => {
+const loadDistributionHistory = async (reset: boolean = true) => {
   try {
     const actor = await getRewardsActor()
-    const history = await actor.getDistributionHistory([10])
-    distributionHistory.value = history.reverse()
+    
+    if (reset) {
+      historyOffset.value = 0
+      distributionHistory.value = []
+    }
+    
+    const result = await actor.getDistributionHistory(BigInt(historyOffset.value), BigInt(historyPageSize))
+    
+    if (reset) {
+      distributionHistory.value = result.records
+    } else {
+      // Append to existing history
+      distributionHistory.value = [...distributionHistory.value, ...result.records]
+    }
+    
+    historyTotal.value = Number(result.total)
+    historyHasMore.value = result.hasMore
+    historyOffset.value += result.records.length
   } catch (error) {
     console.error('Error loading distribution history:', error)
     throw error
+  }
+}
+
+const loadMoreHistory = async () => {
+  if (isLoadingMore.value || !historyHasMore.value) return
+  
+  isLoadingMore.value = true
+  try {
+    await loadDistributionHistory(false)
+  } catch (error) {
+    console.error('Error loading more history:', error)
+    errorMessage.value = 'Failed to load more distribution history'
+  } finally {
+    isLoadingMore.value = false
   }
 }
 
@@ -1054,7 +1109,7 @@ const loadData = async () => {
     await Promise.all([
       loadDistributionStatus(),
       loadConfiguration(),
-      loadDistributionHistory()
+      loadDistributionHistory(true) // Reset pagination when loading data
     ])
   } catch (error) {
     console.error('Error loading data:', error)
@@ -1481,7 +1536,7 @@ const refreshHistory = async () => {
   try {
     await Promise.all([
       loadDistributionStatus(),
-      loadDistributionHistory(),
+      loadDistributionHistory(true), // Reset pagination when refreshing
       loadTotalDistributed(),
       loadTacoBalance(),
       loadCurrentNeuronBalances(),
@@ -1665,7 +1720,7 @@ onMounted(async () => {
     await Promise.all([
       loadDistributionStatus(),
       loadConfiguration(),
-      loadDistributionHistory(),
+      loadDistributionHistory(true), // Reset pagination on mount
       loadTotalDistributed(),
       loadTacoBalance(),
       loadCurrentNeuronBalances(),

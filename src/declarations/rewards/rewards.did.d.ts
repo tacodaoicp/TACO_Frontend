@@ -167,8 +167,12 @@ export interface Rewards {
   >,
   'getCurrentTotalNeuronBalances' : ActorMethod<[], bigint>,
   'getDistributionHistory' : ActorMethod<
-    [[] | [bigint]],
-    Array<DistributionRecord>
+    [bigint, bigint],
+    {
+      'total' : bigint,
+      'hasMore' : boolean,
+      'records' : Array<DistributionRecord>,
+    }
   >,
   'getDistributionsSince' : ActorMethod<[bigint, bigint], Result__1_5>,
   'getNeuronRewardBalance' : ActorMethod<[Uint8Array | number[]], bigint>,

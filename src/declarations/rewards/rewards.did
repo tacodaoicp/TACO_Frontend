@@ -90,7 +90,12 @@ type Rewards =
        nextDistributionTime: int;
      }) query;
    getCurrentTotalNeuronBalances: () -> (nat) query;
-   getDistributionHistory: (limit: opt nat) -> (vec DistributionRecord) query;
+   getDistributionHistory: (offset: nat, limit: nat) ->
+    (record {
+       hasMore: bool;
+       records: vec DistributionRecord;
+       total: nat;
+     }) query;
    getDistributionsSince: (sinceTimestamp: int, limit: nat) ->
     (Result__1_5) query;
    getNeuronRewardBalance: (neuronId: blob) -> (nat) query;

@@ -221,8 +221,14 @@ export const idlFactory = ({ IDL }) => {
       ),
     'getCurrentTotalNeuronBalances' : IDL.Func([], [IDL.Nat], ['query']),
     'getDistributionHistory' : IDL.Func(
-        [IDL.Opt(IDL.Nat)],
-        [IDL.Vec(DistributionRecord)],
+        [IDL.Nat, IDL.Nat],
+        [
+          IDL.Record({
+            'total' : IDL.Nat,
+            'hasMore' : IDL.Bool,
+            'records' : IDL.Vec(DistributionRecord),
+          }),
+        ],
         ['query'],
       ),
     'getDistributionsSince' : IDL.Func(
