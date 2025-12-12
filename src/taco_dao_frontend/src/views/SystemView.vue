@@ -1748,20 +1748,31 @@ const testNeuronSnapshots = async (test: any) => {
   try {
     const cid = resolvePrincipal('neuronSnapshot')
     const { idlFactory: neuronIDL } = await import('../../../declarations/neuronSnapshot/neuronSnapshot.did.js')
+    const { idlFactory: daoIDL } = await import('../../../declarations/dao_backend/DAO_backend.did.js')
     const agent = new HttpAgent({ host: process.env.DFX_NETWORK === 'local' ? 'http://127.0.0.1:4943' : 'https://ic0.app' })
     if (process.env.DFX_NETWORK === 'local') { await agent.fetchRootKey() }
     const nActor: any = Actor.createActor(neuronIDL, { agent, canisterId: cid })
+    const dActor: any = Actor.createActor(daoIDL, { agent, canisterId: resolvePrincipal('dao_backend') })
 
-    // Fetch snapshot status and latest snapshot info
-    const [snapshotStatus, headId, latestSnapshotArr] = await Promise.all([
+    // Fetch snapshot status, latest snapshot info, and system parameters (for interval)
+    const [snapshotStatus, headId, latestSnapshotArr, systemParams] = await Promise.all([
       nActor.get_neuron_snapshot_status?.() ?? Promise.resolve(null),
       nActor.get_neuron_snapshot_head_id?.() ?? Promise.resolve(0),
       nActor.get_neuron_snapshots_info(0, 1), // Get the latest snapshot
+      dActor.getSystemParameters?.() ?? Promise.resolve([]),
     ])
 
-    // Expected snapshot interval: 15 minutes
-    const snapshotIntervalMinutes = 15
-    const snapshotIntervalMs = snapshotIntervalMinutes * 60 * 1000
+    // Get snapshot interval from DAO system parameters (stored in nanoseconds)
+    // Default to 24 hours (86400000000000 ns) if not available
+    let snapshotIntervalNs = 86400n * 1_000_000_000n // Default 24 hours in ns
+    if (Array.isArray(systemParams)) {
+      const snapshotParam = systemParams.find((p: any) => 'SnapshotInterval' in p)
+      if (snapshotParam?.SnapshotInterval) {
+        snapshotIntervalNs = BigInt(snapshotParam.SnapshotInterval)
+      }
+    }
+    const snapshotIntervalMinutes = Math.round(Number(snapshotIntervalNs / 1_000_000_000n) / 60)
+    const snapshotIntervalMs = Number(snapshotIntervalNs / 1_000_000n)
 
     // Check 1: Snapshots exist
     const headIdNum = Number(headId)
@@ -1834,17 +1845,22 @@ const testNeuronSnapshots = async (test: any) => {
       }
 
       // Check timing
+      // Format interval display (show hours if >= 60 minutes)
+      const intervalDisplay = snapshotIntervalMinutes >= 60 
+        ? `${(snapshotIntervalMinutes / 60).toFixed(snapshotIntervalMinutes % 60 === 0 ? 0 : 1)} hours` 
+        : `${snapshotIntervalMinutes} minutes`
+      
       if (periodsOverdue <= maxPeriodsOverdue) {
         checks.push({ 
           name: 'Last Snapshot Timing', 
           status: 'pass', 
-          message: `Last snapshot: ${lastSnapshotDisplay} (within ${maxPeriodsOverdue} periods of ${snapshotIntervalMinutes} minutes)` 
+          message: `Last snapshot: ${lastSnapshotDisplay} (within ${maxPeriodsOverdue} periods of ${intervalDisplay})` 
         })
       } else {
         checks.push({ 
           name: 'Last Snapshot Timing', 
           status: 'fail', 
-          message: `❌ Last snapshot was ${periodsOverdue.toFixed(1)} periods ago (${lastSnapshotDisplay}). Maximum: ${maxPeriodsOverdue} periods` 
+          message: `❌ Last snapshot was ${periodsOverdue.toFixed(1)} periods ago (${lastSnapshotDisplay}). Maximum: ${maxPeriodsOverdue} periods of ${intervalDisplay}` 
         })
       }
     } else {
