@@ -457,14 +457,18 @@ const archiveCanistersStatus = computed(() => {
   // Check if any canister is low on cycles (< 10T) OR timer is not running
   const anyLow = keys.some(k => {
     const cycles = cyclesMap[k]
-    const timerRunning = timerStatusMap[k]?.running ?? false
+    const timerStatus = timerStatusMap[k]
+    // Only check timer if we have status loaded; archives use outerLoopRunning
+    const timerRunning = timerStatus ? (timerStatus.outerLoopRunning ?? true) : true
     return (cycles !== null && cycles < 10) || !timerRunning
   })
   
   // Check if any canister is critical (< 5T) OR timer is not running
   const anyCritical = keys.some(k => {
     const cycles = cyclesMap[k]
-    const timerRunning = timerStatusMap[k]?.running ?? false
+    const timerStatus = timerStatusMap[k]
+    // Only check timer if we have status loaded; archives use outerLoopRunning
+    const timerRunning = timerStatus ? (timerStatus.outerLoopRunning ?? true) : true
     return (cycles !== null && cycles < 5) || !timerRunning
   })
   
@@ -542,7 +546,9 @@ const archiveCanistersSummary = computed(() => {
   
   keys.forEach(k => {
     const cycles = cyclesMap[k]
-    const timerRunning = timerStatusMap[k]?.running ?? false
+    const timerStatus = timerStatusMap[k]
+    // Only check timer if we have status loaded; archives use outerLoopRunning
+    const timerRunning = timerStatus ? (timerStatus.outerLoopRunning ?? true) : true
     
     if (cycles === null) {
       unknown++
@@ -1472,7 +1478,9 @@ const refreshArchiveCanisters = () => {
       // Archives require BOTH sufficient cycles AND timer running
       if (autoExpandOnRed.value) {
         const cycles = cyclesMap[c.key]
-        const timerRunning = timerStatusMap[c.key]?.running ?? false
+        const timerStatus = timerStatusMap[c.key]
+        // Only check timer if we have status loaded; archives use outerLoopRunning
+        const timerRunning = timerStatus ? (timerStatus.outerLoopRunning ?? true) : true
         
         if (cycles !== null) {
           if (cycles < 10 || !timerRunning) {
