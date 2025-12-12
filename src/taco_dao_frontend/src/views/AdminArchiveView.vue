@@ -604,16 +604,31 @@
       </div>
     </div>
     <div v-if="showConfigModal" class="modal-backdrop fade show" @click="showConfigModal = false"></div>
+    
+    <!-- GNSF Proposal Dialog for Non-Admin Users -->
+    <GNSFProposalDialog
+      :show="showProposalDialog"
+      :function-name="proposalFunctionName"
+      :reason-placeholder="proposalReasonPlaceholder"
+      :context-params="proposalContextParams"
+      @close="showProposalDialog = false"
+      @success="handleProposalSuccess"
+    />
   </div>
 </template>
 
 <script>
+import { ref } from 'vue'
 import HeaderBar from '../components/HeaderBar.vue'
 import TacoTitle from '../components/misc/TacoTitle.vue'
+import GNSFProposalDialog from '../components/proposals/GNSFProposalDialog.vue'
 import { useTacoStore } from '../stores/taco.store'
 import { mapStores } from 'pinia'
 import { Principal } from '@dfinity/principal'
 import ApexCharts from 'apexcharts'
+
+// Import composables
+import { useAdminCheck } from '../composables/useAdminCheck'
 
 // Import archive actors
 import { createActor as createTradingActor } from '../../../declarations/trading_archive'
@@ -626,11 +641,45 @@ import { createActor as createDaoGovernanceActor } from '../../../declarations/d
 import { createActor as createRewardDistributionActor } from '../../../declarations/reward_distribution_archive'
 import { createActor as createRewardWithdrawalActor } from '../../../declarations/reward_withdrawal_archive'
 
+// Archive canister IDs (mapped from archive type to principal)
+const ARCHIVE_CANISTER_IDS = {
+  trading_archive: 'jlycp-kqaaa-aaaan-qz4xa-cai',
+  portfolio_archive: 'lrekt-uaaaa-aaaan-qz4ya-cai',
+  price_archive: 'l7gh3-pqaaa-aaaan-qz4za-cai',
+  dao_admin_archive: 'b6ygs-xaaaa-aaaan-qz5ca-cai',
+  dao_governance_archive: 'bzzag-2yaaa-aaaan-qz5cq-cai',
+  dao_allocation_archive: 'bq2l2-mqaaa-aaaan-qz5da-cai',
+  dao_neuron_allocation_archive: 'cajb4-qqaaa-aaaan-qz5la-cai',
+  reward_distribution_archive: 'cq4d3-3qaaa-aaaan-qz5lq-cai',
+  reward_withdrawal_archive: 'c4ful-6iaaa-aaaan-qz5ma-cai'
+}
+
 export default {
   name: 'AdminArchiveView',
   components: {
     HeaderBar,
-    TacoTitle
+    TacoTitle,
+    GNSFProposalDialog
+  },
+  setup() {
+    // Use admin check composable
+    const { isAdmin, checking: adminChecking, checkAdminStatus } = useAdminCheck()
+    
+    // GNSF Proposal Dialog state
+    const showProposalDialog = ref(false)
+    const proposalFunctionName = ref('')
+    const proposalReasonPlaceholder = ref('')
+    const proposalContextParams = ref({})
+    
+    return {
+      isAdmin,
+      adminChecking,
+      checkAdminStatus,
+      showProposalDialog,
+      proposalFunctionName,
+      proposalReasonPlaceholder,
+      proposalContextParams
+    }
   },
   data() {
     return {
@@ -1054,67 +1103,98 @@ export default {
     },
 
     async startBatchImportSystem() {
-      //console.log('startBatchImportSystem called')
-      this.loading = true
-      this.clearMessages()
+      // Check if user is admin
+      await this.checkAdminStatus()
       
-      try {
-        //console.log('Calling startBatchImportSystem on actor:', this.currentArchiveActor)
-        const result = await this.currentArchiveActor.startBatchImportSystem()
-        //console.log('startBatchImportSystem result:', result)
-        if (result.ok) {
-          this.successMessage = result.ok
-        } else {
-          this.errorMessage = result.err
+      if (this.isAdmin) {
+        // Admin path - direct call
+        this.loading = true
+        this.clearMessages()
+        
+        try {
+          const result = await this.currentArchiveActor.startBatchImportSystem()
+          if (result.ok) {
+            this.successMessage = result.ok
+          } else {
+            this.errorMessage = result.err
+          }
+          await this.refreshStatus()
+        } catch (error) {
+          console.error('startBatchImportSystem error:', error)
+          this.errorMessage = `Failed to start batch import system: ${error.message}`
         }
-        await this.refreshStatus()
-      } catch (error) {
-        console.error('startBatchImportSystem error:', error)
-        this.errorMessage = `Failed to start batch import system: ${error.message}`
+        
+        this.loading = false
+      } else {
+        // Non-admin path - open proposal dialog
+        this.openProposalDialog(
+          'archiveProxy_startBatchImportSystem',
+          'Please explain why the batch import system should be started on this archive...'
+        )
       }
-      
-      this.loading = false
     },
 
     async stopBatchImportSystem() {
-      this.loading = true
-      this.clearMessages()
+      // Check if user is admin
+      await this.checkAdminStatus()
       
-      try {
-        const result = await this.currentArchiveActor.stopBatchImportSystem()
-        if (result.ok) {
-          this.successMessage = result.ok
-        } else {
-          this.errorMessage = result.err
+      if (this.isAdmin) {
+        // Admin path - direct call
+        this.loading = true
+        this.clearMessages()
+        
+        try {
+          const result = await this.currentArchiveActor.stopBatchImportSystem()
+          if (result.ok) {
+            this.successMessage = result.ok
+          } else {
+            this.errorMessage = result.err
+          }
+          await this.refreshStatus()
+        } catch (error) {
+          this.errorMessage = `Failed to stop batch import system: ${error.message}`
         }
-        await this.refreshStatus()
-      } catch (error) {
-        this.errorMessage = `Failed to stop batch import system: ${error.message}`
+        
+        this.loading = false
+      } else {
+        // Non-admin path - open proposal dialog
+        this.openProposalDialog(
+          'archiveProxy_stopBatchImportSystem',
+          'Please explain why the batch import system should be stopped on this archive...'
+        )
       }
-      
-      this.loading = false
     },
 
     async resetImportTimestamps() {
-      //console.log('resetImportTimestamps called')
-      this.loading = true
-      this.clearMessages()
+      // Check if user is admin
+      await this.checkAdminStatus()
       
-      try {
-        const result = await this.currentArchiveActor.resetImportTimestamps()
-        //console.log('resetImportTimestamps result:', result)
-        if (result.ok) {
-          this.successMessage = `Import timestamps reset: ${result.ok}`
-        } else {
-          this.errorMessage = `Failed to reset timestamps: ${result.err}`
+      if (this.isAdmin) {
+        // Admin path - direct call
+        this.loading = true
+        this.clearMessages()
+        
+        try {
+          const result = await this.currentArchiveActor.resetImportTimestamps()
+          if (result.ok) {
+            this.successMessage = `Import timestamps reset: ${result.ok}`
+          } else {
+            this.errorMessage = `Failed to reset timestamps: ${result.err}`
+          }
+          await this.refreshStatus()
+        } catch (error) {
+          console.error('resetImportTimestamps error:', error)
+          this.errorMessage = `Failed to reset import timestamps: ${error.message}`
         }
-        await this.refreshStatus()
-      } catch (error) {
-        console.error('resetImportTimestamps error:', error)
-        this.errorMessage = `Failed to reset import timestamps: ${error.message}`
+        
+        this.loading = false
+      } else {
+        // Non-admin path - open proposal dialog
+        this.openProposalDialog(
+          'archiveProxy_resetImportTimestamps',
+          'Please explain why the import timestamps should be reset on this archive (this will re-import all historical data)...'
+        )
       }
-      
-      this.loading = false
     },
 
     async runArchiveSpecificImport(methodName) {
@@ -1140,74 +1220,142 @@ export default {
     },
 
     async stopAllTimers() {
-      this.loading = true
-      this.clearMessages()
+      // Check if user is admin
+      await this.checkAdminStatus()
       
-      try {
-        const result = await this.currentArchiveActor.stopAllTimers()
-        if (result.ok) {
-          this.successMessage = result.ok
-        } else {
-          this.errorMessage = result.err
+      if (this.isAdmin) {
+        // Admin path - direct call
+        this.loading = true
+        this.clearMessages()
+        
+        try {
+          const result = await this.currentArchiveActor.stopAllTimers()
+          if (result.ok) {
+            this.successMessage = result.ok
+          } else {
+            this.errorMessage = result.err
+          }
+          await this.refreshStatus()
+        } catch (error) {
+          this.errorMessage = `Failed to stop all timers: ${error.message}`
         }
-        await this.refreshStatus()
-      } catch (error) {
-        this.errorMessage = `Failed to stop all timers: ${error.message}`
+        
+        this.loading = false
+      } else {
+        // Non-admin path - open proposal dialog
+        this.openProposalDialog(
+          'archiveProxy_stopAllTimers',
+          'Please explain why all timers should be emergency stopped on this archive...'
+        )
       }
-      
-      this.loading = false
     },
 
     async runManualBatchImport() {
-      //console.log('runManualBatchImport called')
-      this.loading = true
-      this.clearMessages()
-      this.successMessage = 'Manual batch import started. Check logs for progress...'
+      // Check if user is admin
+      await this.checkAdminStatus()
       
-      try {
-        //console.log('Calling runManualBatchImport on actor:', this.currentArchiveActor)
-        const result = await this.currentArchiveActor.runManualBatchImport()
-        //console.log('runManualBatchImport result:', result)
-        if (result.ok) {
-          this.successMessage = result.ok
-        } else {
-          this.errorMessage = result.err
+      if (this.isAdmin) {
+        // Admin path - direct call
+        this.loading = true
+        this.clearMessages()
+        this.successMessage = 'Manual batch import started. Check logs for progress...'
+        
+        try {
+          const result = await this.currentArchiveActor.runManualBatchImport()
+          if (result.ok) {
+            this.successMessage = result.ok
+          } else {
+            this.errorMessage = result.err
+          }
+          await this.refreshStatus()
+          await this.refreshLogs()
+        } catch (error) {
+          console.error('runManualBatchImport error:', error)
+          this.errorMessage = `Failed to run manual batch import: ${error.message}`
         }
-        await this.refreshStatus()
-        await this.refreshLogs()
-      } catch (error) {
-        console.error('runManualBatchImport error:', error)
-        this.errorMessage = `Failed to run manual batch import: ${error.message}`
+        
+        this.loading = false
+      } else {
+        // Non-admin path - open proposal dialog
+        this.openProposalDialog(
+          'archiveProxy_runManualBatchImport',
+          'Please explain why a manual batch import should be triggered on this archive...'
+        )
       }
-      
-      this.loading = false
     },
 
     async updateConfiguration() {
-      this.loading = true
-      this.clearMessages()
+      // Check if user is admin
+      await this.checkAdminStatus()
       
-      try {
-        const result = await this.currentArchiveActor.setMaxInnerLoopIterations(
-          parseInt(this.configMaxIterations)
-        )
-        if (result.ok) {
-          this.successMessage = result.ok
-          this.showConfigModal = false
-        } else {
-          this.errorMessage = result.err
+      if (this.isAdmin) {
+        // Admin path - direct call
+        this.loading = true
+        this.clearMessages()
+        
+        try {
+          const result = await this.currentArchiveActor.setMaxInnerLoopIterations(
+            parseInt(this.configMaxIterations)
+          )
+          if (result.ok) {
+            this.successMessage = result.ok
+            this.showConfigModal = false
+          } else {
+            this.errorMessage = result.err
+          }
+          await this.refreshStatus()
+        } catch (error) {
+          this.errorMessage = `Failed to update configuration: ${error.message}`
         }
-        await this.refreshStatus()
-      } catch (error) {
-        this.errorMessage = `Failed to update configuration: ${error.message}`
+        
+        this.loading = false
+      } else {
+        // Non-admin path - open proposal dialog with iterations parameter
+        this.showConfigModal = false
+        this.openProposalDialog(
+          'archiveProxy_setMaxInnerLoopIterations',
+          'Please explain why the max inner loop iterations should be changed on this archive...',
+          { iterations: parseInt(this.configMaxIterations) }
+        )
       }
-      
-      this.loading = false
     },
 
     clearMessages() {
       this.errorMessage = ''
       this.successMessage = ''
+    },
+
+    // Get the current archive canister principal
+    getCurrentArchivePrincipal() {
+      const principalId = ARCHIVE_CANISTER_IDS[this.selectedArchive]
+      if (!principalId) {
+        console.error('Unknown archive type:', this.selectedArchive)
+        return null
+      }
+      return Principal.fromText(principalId)
+    },
+
+    // Handle successful proposal submission
+    handleProposalSuccess(proposalId) {
+      console.log('Proposal created successfully:', proposalId)
+      this.successMessage = `Proposal ${proposalId} created successfully! The archive operation will be executed when the proposal passes.`
+    },
+
+    // Open proposal dialog for non-admin users
+    openProposalDialog(functionName, reasonPlaceholder, additionalParams = {}) {
+      const archivePrincipal = this.getCurrentArchivePrincipal()
+      if (!archivePrincipal) {
+        this.errorMessage = 'Could not determine archive canister principal'
+        return
+      }
+      
+      this.proposalFunctionName = functionName
+      this.proposalReasonPlaceholder = reasonPlaceholder
+      this.proposalContextParams = {
+        archivePrincipal: archivePrincipal,
+        ...additionalParams
+      }
+      this.showProposalDialog = true
     },
 
     formatTime(timestamp) {

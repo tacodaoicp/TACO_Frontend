@@ -1008,6 +1008,97 @@ export const GNSF_REGISTRY: Record<string, GNSFunctionInfo> = {
             type: IDL.Vec(IDL.Nat8),
             displayName: 'Neuron ID'
         }]
+    },
+    // Archive Proxy Functions (neuronSnapshot.mo)
+    // These proxy functions allow the SNS DAO to control archive canisters via proposals
+    'archiveProxy_startBatchImportSystem': {
+        functionId: BigInt(3040),
+        displayName: 'Archive: Start Batch Import System',
+        description: 'Starts the automated batch import system on the specified archive canister',
+        parameterTypes: [
+            IDL.Principal  // archivePrincipal
+        ],
+        requiresReason: false,
+        additionalParams: [{
+            name: 'archivePrincipal',
+            type: IDL.Principal,
+            displayName: 'Archive Canister'
+        }]
+    },
+    'archiveProxy_stopBatchImportSystem': {
+        functionId: BigInt(3041),
+        displayName: 'Archive: Stop Batch Import System',
+        description: 'Stops the automated batch import system on the specified archive canister',
+        parameterTypes: [
+            IDL.Principal  // archivePrincipal
+        ],
+        requiresReason: false,
+        additionalParams: [{
+            name: 'archivePrincipal',
+            type: IDL.Principal,
+            displayName: 'Archive Canister'
+        }]
+    },
+    'archiveProxy_stopAllTimers': {
+        functionId: BigInt(3042),
+        displayName: 'Archive: Emergency Stop All Timers',
+        description: 'Emergency stops all timers on the specified archive canister',
+        parameterTypes: [
+            IDL.Principal  // archivePrincipal
+        ],
+        requiresReason: false,
+        additionalParams: [{
+            name: 'archivePrincipal',
+            type: IDL.Principal,
+            displayName: 'Archive Canister'
+        }]
+    },
+    'archiveProxy_runManualBatchImport': {
+        functionId: BigInt(3043),
+        displayName: 'Archive: Run Manual Batch Import',
+        description: 'Runs a manual batch import on the specified archive canister',
+        parameterTypes: [
+            IDL.Principal  // archivePrincipal
+        ],
+        requiresReason: false,
+        additionalParams: [{
+            name: 'archivePrincipal',
+            type: IDL.Principal,
+            displayName: 'Archive Canister'
+        }]
+    },
+    'archiveProxy_setMaxInnerLoopIterations': {
+        functionId: BigInt(3044),
+        displayName: 'Archive: Set Max Inner Loop Iterations',
+        description: 'Sets the maximum number of inner loop iterations on the specified archive canister',
+        parameterTypes: [
+            IDL.Principal,  // archivePrincipal
+            IDL.Nat  // iterations
+        ],
+        requiresReason: false,
+        additionalParams: [{
+            name: 'archivePrincipal',
+            type: IDL.Principal,
+            displayName: 'Archive Canister'
+        }, {
+            name: 'iterations',
+            type: IDL.Nat,
+            displayName: 'Max Iterations'
+        }]
+    },
+    'archiveProxy_resetImportTimestamps': {
+        functionId: BigInt(3045),
+        displayName: 'Archive: Reset Import Timestamps',
+        description: 'Resets import timestamps on the specified archive canister to re-import all historical data',
+        parameterTypes: [
+            IDL.Principal  // archivePrincipal
+        ],
+        requiresReason: false,
+        additionalParams: [{
+            name: 'archivePrincipal',
+            type: IDL.Principal,
+            displayName: 'Archive Canister'
+        }]
     }
 }
 
