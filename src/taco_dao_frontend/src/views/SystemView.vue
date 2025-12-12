@@ -607,13 +607,12 @@ const handleAutoExpandChange = () => {
 }
 
 // Canister groups and keys
-type CanKey = 'dao_backend' | 'frontend' | 'treasury' | 'rewards' | 'neuronSnapshot' | 'validation'
+type CanKey = 'dao_backend' | 'treasury' | 'rewards' | 'neuronSnapshot' | 'validation'
   | 'trading_archive' | 'portfolio_archive' | 'price_archive' | 'dao_admin_archive' | 'dao_governance_archive'
   | 'dao_neuron_allocation_archive' | 'reward_distribution_archive' | 'reward_withdrawal_archive'
 
 const mainCanisters = [
   { key: 'dao_backend' as CanKey, title: 'Backend (DAO.mo)' },
-  { key: 'frontend' as CanKey, title: 'Frontend' },
   { key: 'treasury' as CanKey, title: 'Portfolio (treasury.mo)' },
   { key: 'rewards' as CanKey, title: 'Rewards (rewards.mo)' },
   { key: 'neuronSnapshot' as CanKey, title: 'Governance (neuronSnapshot.mo)' },
@@ -640,7 +639,6 @@ const resolvePrincipal = (key: CanKey): string => {
 // Cycles state
 const cyclesMap = reactive<Record<CanKey, number | null>>({
   dao_backend: null,
-  frontend: null,
   treasury: null,
   rewards: null,
   neuronSnapshot: null,
@@ -656,7 +654,6 @@ const cyclesMap = reactive<Record<CanKey, number | null>>({
 })
 const loadingMap = reactive<Record<CanKey, boolean>>({
   dao_backend: false,
-  frontend: false,
   treasury: false,
   rewards: false,
   neuronSnapshot: false,
@@ -672,7 +669,6 @@ const loadingMap = reactive<Record<CanKey, boolean>>({
 })
 const timerStatusMap = reactive<Record<CanKey, any>>({
   dao_backend: null,
-  frontend: null,
   treasury: null,
   rewards: null,
   neuronSnapshot: null,
@@ -715,7 +711,6 @@ const governanceHeader = ref<{
 const governanceDetails = ref<any | null>(null)
 const expandedMap = reactive<Record<CanKey, boolean>>({
   dao_backend: false,
-  frontend: false,
   treasury: false,
   rewards: false,
   neuronSnapshot: false,
@@ -804,12 +799,6 @@ const createArchiveActor = async (key: CanKey, canisterId: string) => {
 const fetchCyclesFor = async (key: CanKey) => {
   try {
     loadingMap[key] = true
-    // Frontend canister is an asset canister and does not expose get_canister_cycles
-    if (key === 'frontend') {
-      cyclesMap[key] = null
-      timerStatusMap[key] = null
-      return
-    }
     const cid = resolvePrincipal(key)
     if (!cid) { cyclesMap[key] = null; loadingMap[key] = false; return }
     const actor = await createGenericActor(cid)
@@ -1615,18 +1604,6 @@ const testCanistersRunning = async (test: any) => {
     const canisterName = [...mainCanisters, ...archiveCanisters].find(c => c.key === key)?.title || key
     
     try {
-      // Frontend is an asset canister and doesn't expose get_canister_cycles
-      if (key === 'frontend') {
-        results.push({
-          name: canisterName,
-          key,
-          cycles: null,
-          status: 'pass',
-          message: 'Asset canister (no cycles check available)'
-        })
-        return
-      }
-
       const cid = resolvePrincipal(key)
       if (!cid) {
         results.push({
