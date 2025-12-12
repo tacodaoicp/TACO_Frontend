@@ -693,6 +693,8 @@ const treasuryHeader = ref<{
   lastTradeDisplay: string
   tokenWorst: 'green' | 'orange' | 'red'
   snapshotActive: boolean
+  shortSyncActive: boolean
+  longSyncActive: boolean
 } | null>(null)
 
 const treasuryDetails = ref<any | null>(null)
@@ -899,13 +901,24 @@ const fetchCyclesFor = async (key: CanKey) => {
 
           // Snapshot status from selected treasury
           const snapshotActive = !!('Running' in snapStatus.status)
+          
+          // Extract long sync timer status (needed for header)
+          let longSyncActive = false
+          let longSyncLastRun = null
+          if (longSyncTimerRes) {
+            const timerStatus = longSyncTimerRes
+            longSyncActive = timerStatus.isRunning || false
+            longSyncLastRun = timerStatus.lastRunTime || null
+          }
 
           treasuryHeader.value = {
             tradingActive,
             tradingStale,
             lastTradeDisplay,
             tokenWorst: worst,
-            snapshotActive
+            snapshotActive,
+            shortSyncActive: true, // Short sync is always active when trading is running
+            longSyncActive
           }
 
           let tradingWarning: any = null
@@ -922,15 +935,6 @@ const fetchCyclesFor = async (key: CanKey) => {
 
           // derive latest short sync time from trading metrics (lastUpdate)
           const metricsObj: any = (tsRes && 'ok' in tsRes) ? tsRes.ok.metrics : null
-          
-          // Extract long sync timer status
-          let longSyncActive = false
-          let longSyncLastRun = null
-          if (longSyncTimerRes) {
-            const timerStatus = longSyncTimerRes
-            longSyncActive = timerStatus.isRunning || false
-            longSyncLastRun = timerStatus.lastRunTime || null
-          }
           
           // Calculate trading interval and periods for display
           let tradingIntervalMinutes = null

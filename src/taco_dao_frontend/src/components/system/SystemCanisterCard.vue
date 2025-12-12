@@ -60,12 +60,6 @@
             <i class="fa-regular fa-clock"></i>
           </span>
           <span class="status-indicator" :class="treasuryHeader.longSyncActive ? 'active' : 'inactive'"></span>
-
-          <!-- token sync aggregate lamp -->
-          <span class="text-muted small d-inline-flex align-items-center ms-2" title="Token Sync">
-            <i class="fa-solid fa-database"></i>
-          </span>
-          <span class="status-indicator" :class="treasuryHeader.tokenWorst === 'red' ? 'status-red' : treasuryHeader.tokenWorst === 'orange' ? 'status-orange' : 'active'"></span>
           
           <!-- snapshot bot lamp -->
           <span class="text-muted small d-inline-flex align-items-center ms-2" title="Snapshots">
