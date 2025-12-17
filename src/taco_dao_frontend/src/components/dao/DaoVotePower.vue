@@ -357,53 +357,38 @@
   // Watch for userAllocation data arriving from worker (update display when cached data arrives)
   watch(fetchedUserAllocation, (newData) => {
     if (newData && newData.length > 0) {
-      console.log('DaoVotePower.vue: fetchedUserAllocation updated from worker')
       handleFetchedUserAllocation(newData)
       componentLoading.value = false
     }
   })
 
-  // watch user logged in, run immediately
-  watch(userLoggedIn, async () => {
+  // Track if initial load has been done
+  const initialLoadDone = ref(false)
+
+  // watch user logged in changes (NOT immediate - onMounted handles initial load)
+  watch(userLoggedIn, async (newValue, oldValue) => {
+    // Skip if this is the initial value (handled by onMounted)
+    if (!initialLoadDone.value) return
 
     // log
-    // console.log('DaoVotePower.vue: userLoggedIn changed')
+    // console.log('DaoVotePower.vue: userLoggedIn changed from', oldValue, 'to', newValue)
 
-    // if user is logged in
-    if (userLoggedIn.value) {
-
+    // if user just logged in
+    if (newValue && !oldValue) {
       // Check if we already have cached data
       const hasCachedData = fetchedUserAllocation.value && fetchedUserAllocation.value.length > 0
 
-      // If we have cached data, use it immediately (no loading spinner)
       if (hasCachedData) {
-        console.log('DaoVotePower.vue: Using cached userAllocation data')
         handleFetchedUserAllocation(fetchedUserAllocation.value)
-
-        // Trigger background refresh (fire-and-forget)
-        fetchUserAllocation().catch(console.error)
-      } else {
-        // No cached data - show loading and fetch
-        componentLoading.value = true
-
-        try {
-          await fetchUserAllocation()
-          handleFetchedUserAllocation(fetchedUserAllocation.value)
-        } catch (error) {
-          console.error('DaoVotePower.vue: error fetching user allocation', error)
-        } finally {
-          componentLoading.value = false
-        }
       }
-
-    } else {
-
+      // Always trigger background fetch - watcher will handle data arrival
+      // No spinner needed - identity will be sent and worker will deliver cached data
+      fetchUserAllocation().catch(console.error)
+    } else if (!newValue) {
       // User logged out - clear the formatted allocation
       formattedUserAllocation.value = null
-
     }
-
-  }, { immediate: true })
+  })
 
   /////////////
   // mounted //
@@ -411,19 +396,25 @@
 
   // on mounted
   onMounted(async () => {
+    // Check if user is logged in and handle data loading
+    if (userLoggedIn.value) {
+      // Check if we already have cached data in the store
+      const hasCachedData = fetchedUserAllocation.value && fetchedUserAllocation.value.length > 0
 
-    // log
-    // console.log('DaoVotePower.vue: onMounted')
+      if (hasCachedData) {
+        handleFetchedUserAllocation(fetchedUserAllocation.value)
+        // Background refresh (fire-and-forget)
+        fetchUserAllocation().catch(console.error)
+      } else {
+        // No cached data yet - but DON'T show spinner
+        // The auth worker will deliver cached data when identity is set
+        // Just trigger a fetch in background, watcher will handle data arrival
+        fetchUserAllocation().catch(console.error)
+      }
+    }
 
-    // turn component loading on
-    componentLoading.value = true
-
-    // refresh voting power
-    await refreshVotingPower()
-
-    // turn component loading off
-    componentLoading.value = false
-
+    // Mark initial load as complete
+    initialLoadDone.value = true
   })
   
 </script>

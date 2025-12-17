@@ -126,15 +126,6 @@
                       
                     </div>
 
-                    <!-- loader container -->
-                    <div class="position-absolute top-0 start-0 w-100 h-100"
-                          style="z-index: 1;">
-
-                      <!-- astronaut -->
-                      <img :src="astronautLoaderUrl" :style="{ zoom: !isMobile ? 2 : 1 }" class="loading-img">
-
-                    </div>                    
-
                   </div>
 
                 </div>
@@ -160,17 +151,14 @@
 
                   <!-- video iframe - lazy loaded, using nocookie for faster load -->
                   <iframe v-if="shouldLoadYouTube"
+                    ref="youtubeIframeRef"
                     loading="lazy"
-                    src="https://www.youtube-nocookie.com/embed/ikNBuHYMkNs"
+                    src="https://www.youtube-nocookie.com/embed/ikNBuHYMkNs?enablejsapi=1"
                     title="YouTube video player"
                     frameborder="0"
                     allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                     allowfullscreen
-                    style="z-index: 2;"
                     ></iframe>
-
-                  <!-- astronaut -->
-                  <img :src="astronautLoaderUrl" class="loading-img">
 
                 </div>
                 
@@ -1990,11 +1978,17 @@
 
 <script setup lang="ts">
 
+  // Component name for keep-alive matching
+  defineOptions({
+    name: 'HomeView'
+  })
+
   /////////////
   // Imports //
   /////////////
 
-  import { ref, onMounted, computed, onUnmounted } from "vue";
+  import { ref, onMounted, computed, onUnmounted, watch } from "vue";
+  import { useRoute } from 'vue-router'
   import HeaderBar from "../components/HeaderBar.vue";
   import FooterBar from "../components/FooterBar.vue";
   import { useTacoStore } from "../stores/taco.store"
@@ -2008,7 +2002,6 @@
   import TacoDaoTaco from '../assets/images/tacoDaoTaco.svg'
   import icpLogo from "../assets/tokens/snspng/icp.png"
   import dkpLogo from "../assets/tokens/snspng/dragginz.png"
-  import astronautLoader from '../assets/images/astonautLoader.webp'
   import TaggrSocialImg from '../assets/images/social/taggr.vue'
   import CatalyzeSocialImg from '../assets/images/social/catalyze.vue'
   import GithubSocialImg from '../assets/images/social/github.vue'
@@ -2059,10 +2052,21 @@
   // viewing chart modal
   const viewingChartModal = ref(false)
 
-  // images
-  const astronautLoaderUrl =  astronautLoader 
+  // lazy loading flags for iframes
   const shouldLoadDex = ref(false)
   const shouldLoadYouTube = ref(false)
+  const youtubeIframeRef = ref<HTMLIFrameElement | null>(null)
+
+  // Route for watching navigation
+  const route = useRoute()
+
+  // Pause YouTube video when navigating away from home
+  watch(() => route.path, (newPath) => {
+    if (newPath !== '/' && youtubeIframeRef.value) {
+      // Send postMessage to pause the YouTube video
+      youtubeIframeRef.value.contentWindow?.postMessage('{"event":"command","func":"pauseVideo","args":""}', '*')
+    }
+  })
 
   // social links
   const xSocialImg = XSocialImg

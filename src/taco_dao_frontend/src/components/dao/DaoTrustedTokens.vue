@@ -526,7 +526,7 @@ LOCAL METHODS
   // # ACTIONS #
 
   // otc backend
-  const { ensureTokenDetails } = tacoStore
+  const { ensureTokenDetails, fetchTokenDetails } = tacoStore
 
   /////////////////////
   // local variables //
@@ -673,7 +673,6 @@ LOCAL METHODS
   // Watch for data arriving from worker (update display when cached data arrives)
   watch(fetchedTokenDetails, (newData) => {
     if (newData && newData.length > 0) {
-      console.log('DaoTrustedTokens.vue: fetchedTokenDetails updated from worker, updating display')
       handleFetchedTokenDetails(newData)
       componentLoading.value = false
     }
@@ -691,7 +690,6 @@ LOCAL METHODS
 
     // If we have cached data, use it immediately (no loading spinner)
     if (hasCachedData) {
-      console.log('DaoTrustedTokens.vue: Using cached data immediately')
       handleFetchedTokenDetails(fetchedTokenDetails.value)
 
       // Trigger background refresh (fire-and-forget)
@@ -712,8 +710,6 @@ LOCAL METHODS
 
     // Refresh every minute - NO loading animation, just silent update
     refreshTimer.value = window.setInterval(async () => {
-      console.log('DaoTrustedTokens.vue: Background refresh...')
-
       try {
         // Fetch in background - no loading spinner
         await fetchTokenDetails()

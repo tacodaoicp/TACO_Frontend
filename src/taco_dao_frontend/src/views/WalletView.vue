@@ -70,7 +70,7 @@
                     <!-- refresh button -->
                     <button class="btn btn-sm taco-btn taco-btn--green"
                             style="padding: 0.75rem 1rem !important;"
-                            @click="loadAllBalances()">
+                            @click="loadAllBalances(true)">
                       <i class="fa fa-refresh"></i>
                     </button>
 
@@ -80,20 +80,20 @@
                   <div class="d-flex flex-column gap-2">
 
                     <!-- core token -->
-                    <div v-for="token in coreTokens" 
+                    <div v-for="token in coreTokens"
                         :key="token.principal">
 
                       <!-- core token card -->
-                      <TokenCard 
+                      <TokenCard
                         ref="tacoTokenCardRef"
-                        :token="token" 
+                        :token="token"
                         @send="openSendDialog"
-                        @swap="openSwapDialog" 
+                        @swap="openSwapDialog"
                         @unregister="unregisterToken"
                         @stake-to-neuron="handleStakeToNeuron"
                         @create-neuron="handleCreateNeuron"
                         @set-dissolve="handleSetDissolve"
-                        @refresh-balances="loadAllBalances" />
+                        @refresh-balances="() => loadAllBalances(true)" />
 
                     </div>
 
@@ -112,7 +112,7 @@
                     <!-- refresh button -->
                     <button class="btn btn-sm taco-btn taco-btn--green"
                             style="padding: 0.75rem 1rem !important;"
-                            @click="loadAllBalances()">
+                            @click="loadAllBalances(true)">
                       <i class="fa fa-refresh"></i>
                     </button>
 
@@ -151,10 +151,10 @@
                     <!-- refresh button -->
                     <button class="btn btn-sm taco-btn taco-btn--green"
                             style="padding: 0.75rem 1rem !important;"
-                            @click="loadAllBalances()">
+                            @click="loadAllBalances(true)">
                       <i class="fa fa-refresh"></i>
-                    </button> 
-                    
+                    </button>
+
                   </div>
 
                   <!-- register a token -->
@@ -534,11 +534,17 @@ const trustedTokens = computed<WalletToken[]>(() => {
       
       if (freshMetadata) {
         // Use fresh ICRC1 metadata
+        // Try multiple lookups: name, symbol (upper), symbol (as-is)
+        const logo = freshMetadata.logo
+          || tokenImages[freshMetadata.name]
+          || tokenImages[freshMetadata.symbol?.toUpperCase()]
+          || tokenImages[freshMetadata.symbol]
+          || tokenImages['Default']
         return {
           principal: principalStr,
           name: freshMetadata.name,
           symbol: freshMetadata.symbol,
-          logo: freshMetadata.logo || tokenImages[freshMetadata.name] || tokenImages['Default'],
+          logo,
           balance: allTokenBalances.value.get(principalStr) || 0n,
           decimals: freshMetadata.decimals,
           fee: freshMetadata.fee,
@@ -547,11 +553,16 @@ const trustedTokens = computed<WalletToken[]>(() => {
         }
       } else {
         // Fall back to original metadata
+        // Try multiple lookups: tokenName, symbol (upper), symbol (as-is)
+        const logo = tokenImages[details.tokenName]
+          || tokenImages[details.tokenSymbol?.toUpperCase()]
+          || tokenImages[details.tokenSymbol]
+          || tokenImages['Default']
         return {
           principal: principalStr,
           name: details.tokenName,
           symbol: details.tokenSymbol,
-          logo: tokenImages[details.tokenName] || tokenImages['Default'],
+          logo,
           balance: allTokenBalances.value.get(principalStr) || 0n,
           decimals: Number(details.tokenDecimals),
           fee: details.tokenTransferFee,
@@ -565,18 +576,23 @@ const trustedTokens = computed<WalletToken[]>(() => {
 // User registered tokens
 const userRegisteredTokens = computed<WalletToken[]>(() => {
   const tokenDetailsMap = new Map(tacoStore.fetchedTokenDetails.map((entry) => [entry[0].toString(), entry[1]]))
-  
+
   return userRegisteredTokenPrincipals.value
     .map(principal => {
       const details = tokenDetailsMap.get(principal)
-      
+
       // If token is in trusted tokens, use those details
       if (details) {
+        // Try multiple lookups: tokenName, symbol (upper), symbol (as-is)
+        const logo = tokenImages[details.tokenName]
+          || tokenImages[details.tokenSymbol?.toUpperCase()]
+          || tokenImages[details.tokenSymbol]
+          || tokenImages['Default']
         return {
           principal,
           name: details.tokenName,
           symbol: details.tokenSymbol,
-          logo: tokenImages[details.tokenName] || tokenImages['Default'],
+          logo,
           balance: allTokenBalances.value.get(principal) || 0n,
           decimals: Number(details.tokenDecimals),
           fee: details.tokenTransferFee,
@@ -584,14 +600,20 @@ const userRegisteredTokens = computed<WalletToken[]>(() => {
           isRegistered: true
         }
       }
-      
+
       // For custom ICRC1 tokens not in trusted list, use cached metadata or defaults
       const metadata = customTokenMetadata.value.get(principal)
+      // Try multiple lookups for custom tokens too
+      const logo = metadata?.logo
+        || tokenImages[metadata?.name]
+        || tokenImages[metadata?.symbol?.toUpperCase()]
+        || tokenImages[metadata?.symbol]
+        || tokenImages['Default']
       return {
         principal,
         name: metadata?.name || `Custom Token (${principal.slice(0, 5)}...)`,
         symbol: metadata?.symbol || 'UNKNOWN',
-        logo: metadata?.logo || tokenImages['Default'],
+        logo,
         balance: allTokenBalances.value.get(principal) || 0n,
         decimals: metadata?.decimals || 8,
         fee: metadata?.fee || 10000n,
@@ -615,33 +637,30 @@ const allTokens = computed<WalletToken[]>(() => {
 ///////////////////
 
 // load wallet data
-const loadWalletData = async () => {
+const loadWalletData = async (showSpinner = true) => {
   try {
-    
-    // turn app loading on
-    appLoadingOn()
-    
-    // Load token details and user registered tokens
+    // Check if we already have cached token details
+    const hasCachedTokenDetails = tacoStore.fetchedTokenDetails && tacoStore.fetchedTokenDetails.length > 0
+
+    // Only show app loading if no cached data and spinner requested
+    if (showSpinner && !hasCachedTokenDetails) {
+      appLoadingOn()
+    }
+
+    // Load token details and user registered tokens in parallel
+    // fetchTokenDetails will be fast if worker already has cached data
     await Promise.all([
       tacoStore.fetchTokenDetails(),
       fetchUserRegisteredTokens()
     ])
 
-    // turn app loading on
-    appLoadingOn()    
-    
-    // Load fresh metadata for trusted tokens using ICRC1 calls
-    await loadTrustedTokenMetadata()
-
-    // turn app loading on
-    appLoadingOn()    
-    
-    // Load balances for all tokens
+    // Load balances for all tokens (this is the critical path)
     await loadAllBalances()
 
-    // turn app loading on
-    appLoadingOn()    
-    
+    // Load fresh metadata for trusted tokens in the BACKGROUND (not blocking)
+    // This enriches display with ICRC1 data but isn't required for initial render
+    loadTrustedTokenMetadata().catch(console.error)
+
   } catch (error) {
     console.error('Error loading wallet data:', error)
     tacoStore.addToast({
@@ -713,8 +732,6 @@ const loadCustomTokenMetadata = async () => {
 
 // load trusted token metadata
 const loadTrustedTokenMetadata = async () => {
-  // console.log('Loading fresh metadata for trusted tokens')
-  
   // Get all trusted token principals
   const trustedTokenPrincipals = tacoStore.fetchedTokenDetails
     .filter((entry) => {
@@ -722,46 +739,47 @@ const loadTrustedTokenMetadata = async () => {
       const details = entry[1]
       const coreTokenPrincipals = new Set(['ryjl3-tyaaa-aaaaa-aaaba-cai', 'kknbx-zyaaa-aaaaq-aae4a-cai']) // ICP and TACO
       const userRegisteredPrincipals = new Set(userRegisteredTokenPrincipals.value)
-      
-      return !coreTokenPrincipals.has(principal.toString()) && 
+
+      return !coreTokenPrincipals.has(principal.toString()) &&
              !userRegisteredPrincipals.has(principal.toString()) &&
-             details.Active && 
+             details.Active &&
              !details.isPaused
     })
     .map(entry => entry[0].toString())
-  
-  // console.log('Trusted token principals to refresh:', trustedTokenPrincipals)
-  
-  // Load fresh metadata for each trusted token
-  for (const principal of trustedTokenPrincipals) {
+
+  // Load metadata in parallel for speed (don't clear cache - use cached data when available)
+  const metadataPromises = trustedTokenPrincipals.map(async (principal) => {
     try {
-      // console.log(`Loading fresh metadata for trusted token: ${principal}`)
-      // Clear cache to ensure we get fresh data
-      tacoStore.clearTokenMetadataCache(principal)
       const metadata = await tacoStore.fetchTokenMetadata(principal)
-      // console.log(`Fetched fresh metadata for ${principal}:`, metadata)
-      customTokenMetadata.value.set(principal, metadata)
+      return { principal, metadata }
     } catch (error) {
       console.error(`Error loading metadata for trusted token ${principal}:`, error)
-      // Keep the original metadata from fetchedTokenDetails as fallback
+      return null
     }
-  }
-  
-  // console.log('Finished loading trusted token metadata')
+  })
+
+  const results = await Promise.all(metadataPromises)
+  results.forEach(result => {
+    if (result) {
+      customTokenMetadata.value.set(result.principal, result.metadata)
+    }
+  })
 }
 
 // load all balances
-const loadAllBalances = async () => {
+const loadAllBalances = async (showSpinner = false) => {
 
-  // turn app loading on
-  appLoadingOn()
-  
+  // turn app loading on only if requested
+  if (showSpinner) {
+    appLoadingOn()
+  }
+
   const allTokens = [
     ...coreTokens.value,
     ...trustedTokens.value,
     ...userRegisteredTokens.value
   ]
-  
+
   const balancePromises = allTokens.map(async (token) => {
     try {
       const balance = await tacoStore.fetchUserTokenBalance(token.principal, token.decimals)
@@ -769,18 +787,16 @@ const loadAllBalances = async () => {
     } catch (error) {
       console.error(`Error fetching balance for ${token.symbol}:`, error)
       allTokenBalances.value.set(token.principal, 0n)
-
-      // turn app loading off
-      appLoadingOff()
-
     }
   })
-  
+
   await Promise.all(balancePromises)
 
   // turn app loading off
-  appLoadingOff()
-  
+  if (showSpinner) {
+    appLoadingOff()
+  }
+
 }
 
 // open send dialog
@@ -950,6 +966,29 @@ const handleSetDissolve = (neuron: any) => {
 const closeDissolveDialog = () => {
   showDissolveDialog.value = false
   selectedNeuron.value = null
+}
+
+// close permissions dialog
+const closePermissionsDialog = () => {
+  showPermissionsDialog.value = false
+  selectedNeuron.value = null
+}
+
+// handle permissions updated
+const handlePermissionsUpdated = async () => {
+  // refresh the wallet data to show updated balances etc
+  await loadWalletData()
+  // then refresh neurons in the taco token card specifically
+  try {
+    const refVal = tacoTokenCardRef.value as any
+    // handle both single and v-for array refs
+    const instances = Array.isArray(refVal) ? refVal : [refVal]
+    for (const inst of instances) {
+      if (inst && typeof inst.loadNeurons === 'function') await inst.loadNeurons()
+    }
+  } catch (e) {
+    console.error('error refreshing neurons after permissions update', e)
+  }
 }
 
 // handle dissolve set
@@ -1126,47 +1165,21 @@ const handleSwapError = (error: string) => {
 
 // on mounted
 onMounted(async () => {
-
-  // try
   try {
-
-    // wait for authentication to be checked first
+    // Wait for authentication to be checked
     await tacoStore.checkIfLoggedIn()
-    
-    // small delay to ensure state is fully updated
-    await new Promise(resolve => setTimeout(resolve, 100))
-    
-    // if user is logged in, load wallet data
+
+    // If user is logged in, load wallet data
     if (tacoStore.userLoggedIn) {
-
-      // log
-      // console.log('User is logged in, loading wallet data')
-
-      // load wallet data
       await loadWalletData()
-
-    } 
-    
-    // else user not logged in
-    else {
-
-      // log
-      // console.log('User not logged in, showing login prompt')
-
-      // turn app loading off
+    } else {
+      // Not logged in - no loading needed
       appLoadingOff()
-
     }
   } catch (error) {
-
-    // log error
     console.error('Error in wallet onMounted:', error)
-
-    // turn app loading off
     appLoadingOff()
-
   }
-
 })
 
 // watch user login state and refresh balances when it changes

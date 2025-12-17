@@ -7,9 +7,12 @@ import { ref, computed } from 'vue'
 import { defineStore } from 'pinia'
 import { useRouter } from 'vue-router'
 import { useStorage } from "@vueuse/core"
-import { AuthClient } from "@dfinity/auth-client"
+import { AuthClient, IdbStorage, KEY_STORAGE_KEY } from "@dfinity/auth-client"
 import { Actor, AnonymousIdentity } from "@dfinity/agent"
 import { createAgent } from '@dfinity/utils'
+import { DelegationIdentity } from '@dfinity/identity'
+import { workerBridge, fetchAndWait } from './worker-bridge'
+import { deserializeFromTransfer } from '../workers/shared/fetch-functions'
 import { idlFactory } from "../../../declarations/ledger_canister/ledger_canister.did.js"
 import { idlFactory as daoBackendIDL } from "../../../declarations/dao_backend/DAO_backend.did.js"
 import { Result_4, idlFactory as treasuryIDL, UpdateConfig, RebalanceConfig, _SERVICE as TreasuryService } from "../../../declarations/treasury/treasury.did.js"
@@ -1175,6 +1178,10 @@ export const useTacoStore = defineStore('taco', () => {
     const portfolioTokenPricesInUsd = useStorage('portfolioTokenPricesInUsd', [])
     const portfolioTokenPricesInIcp = useStorage('portfolioTokenPricesInIcp', [])
 
+    // Cached neurons for wallet (in-memory, cleared on logout)
+    const cachedTacoNeurons = ref<any[]>([])
+    const cachedNeuronRewardBalances = ref<Map<string, number>>(new Map())
+
     // sns provided canisters
     const snsTreasuryTacoValueInUsd = ref(0)
     const snsTreasuryIcpValueInUsd = ref(0)
@@ -1245,6 +1252,296 @@ export const useTacoStore = defineStore('taco', () => {
         nextExpectedSnapshot: null as bigint | null,
         inProgress: false
     })
+
+    // # WORKER SUBSCRIPTIONS #
+    // Subscribe to worker updates to populate state from SharedWorkers
+
+    const workerUnsubscribers: (() => void)[] = []
+
+    const setupWorkerSubscriptions = () => {
+        // Only setup if not already subscribed
+        if (workerUnsubscribers.length > 0) return
+
+        // cryptoPrices - updates multiple price refs
+        workerUnsubscribers.push(
+            workerBridge.subscribe('cryptoPrices', (data: unknown) => {
+                if (data && typeof data === 'object') {
+                    const prices = data as { icp: number; btc: number; taco: number; tacoIcp: number }
+                    icpPriceUsd.value = prices.icp
+                    btcPriceUsd.value = prices.btc
+                    tacoPriceUsd.value = prices.taco
+                    tacoPriceIcp.value = prices.tacoIcp
+                    lastPriceUpdate.value = Date.now()
+                }
+            })
+        )
+
+        // tokenDetails - also compute portfolio value from this data
+        workerUnsubscribers.push(
+            workerBridge.subscribe('tokenDetails', (data: unknown) => {
+                if (data && Array.isArray(data)) {
+                    // Deserialize BigInt values from worker
+                    const tokenDetails = deserializeFromTransfer(data) as TrustedTokenEntry[]
+                    fetchedTokenDetails.value = tokenDetails
+
+                    // Also compute portfolio value directly from tokenDetails
+                    // This ensures it's always up-to-date, even when served from cache
+                    const portfolioValue = tokenDetails.reduce((acc, tokenEntry) => {
+                        const details = tokenEntry[1]
+                        const balance = Number(details.balance)
+                        const decimals = Number(details.tokenDecimals)
+                        const priceUsd = Number(details.priceInUSD)
+                        const tokenValue = priceUsd * (balance / Math.pow(10, decimals))
+                        return acc + tokenValue
+                    }, 0)
+
+                    if (portfolioValue > 0) {
+                        totalPortfolioValueInUsd.value = portfolioValue
+                    }
+                }
+            })
+        )
+
+        // totalTreasuryValueInUsd from worker = Portfolio value (multi-asset basket)
+        // This is a backup subscription - the primary source is now computed from tokenDetails above
+        workerUnsubscribers.push(
+            workerBridge.subscribe('totalTreasuryValueInUsd', (data: unknown) => {
+                if (typeof data === 'number' && data > 0) {
+                    // Only update if we get a valid non-zero value
+                    totalPortfolioValueInUsd.value = data
+                }
+            })
+        )
+
+        // aggregateAllocation
+        workerUnsubscribers.push(
+            workerBridge.subscribe('aggregateAllocation', (data: unknown) => {
+                if (data && Array.isArray(data)) {
+                    // Deserialize BigInt/Principal values from worker
+                    fetchedAggregateAllocation.value = deserializeFromTransfer(data) as [Principal, bigint][]
+                }
+            })
+        )
+
+        // tradingStatus
+        workerUnsubscribers.push(
+            workerBridge.subscribe('tradingStatus', (data: unknown) => {
+                if (data) {
+                    // Deserialize BigInt values from worker
+                    fetchedTradingStatus.value = deserializeFromTransfer(data)
+                }
+            })
+        )
+
+        // timerStatus - updates timerHealth ref
+        workerUnsubscribers.push(
+            workerBridge.subscribe('timerStatus', (data: unknown) => {
+                if (data && typeof data === 'object') {
+                    // Deserialize BigInt values from worker
+                    const statusData = deserializeFromTransfer(data) as { snapshotInfo: any; tradingStatus: any; tokenDetails: any[] }
+                    // Update timerHealth based on snapshotInfo and tradingStatus
+                    if (statusData.snapshotInfo) {
+                        timerHealth.value.snapshot = {
+                            active: true,
+                            lastSnapshotTime: statusData.snapshotInfo.lastSnapshotTime,
+                            nextExpectedSnapshot: null,
+                            inProgress: false
+                        }
+                    }
+                    if (statusData.tradingStatus?.ok) {
+                        const ts = statusData.tradingStatus.ok
+                        timerHealth.value.treasury = {
+                            shortSync: {
+                                active: true,
+                                lastSync: ts.metrics?.lastUpdate || null
+                            },
+                            longSync: {
+                                active: true,
+                                lastSync: ts.metrics?.lastUpdate || null
+                            },
+                            rebalanceStatus: ts.rebalanceStatus?.Idle !== undefined ? 'Idle' :
+                                ts.rebalanceStatus?.Trading !== undefined ? 'Trading' : 'Failed',
+                            rebalanceError: ts.rebalanceStatus?.Failed,
+                            tradingMetrics: ts.metrics,
+                            recentTrades: ts.executedTrades
+                        }
+                    }
+                }
+            })
+        )
+
+        // votingPowerMetrics
+        workerUnsubscribers.push(
+            workerBridge.subscribe('votingPowerMetrics', (data: unknown) => {
+                if (data) {
+                    // Deserialize BigInt values from worker
+                    fetchedVotingPowerMetrics.value = deserializeFromTransfer(data) as VotingMetricsResponse
+                }
+            })
+        )
+
+        // tacoProposals
+        workerUnsubscribers.push(
+            workerBridge.subscribe('tacoProposals', (data: unknown) => {
+                if (data && Array.isArray(data)) {
+                    // Deserialize BigInt values from worker, then process
+                    const deserialized = deserializeFromTransfer(data) as ProposalData[]
+                    const processed = deserialized.map(processProposalData).filter(Boolean) as TacoProposal[]
+                    fetchedTacoProposals.value = processed
+                }
+            })
+        )
+
+        // proposalsThreads
+        workerUnsubscribers.push(
+            workerBridge.subscribe('proposalsThreads', (data: unknown) => {
+                if (data && Array.isArray(data)) {
+                    // Deserialize BigInt values from worker
+                    fetchedProposalsThreads.value = deserializeFromTransfer(data) as CandidThreadResponse[]
+                }
+            })
+        )
+
+        // allNames - updates namesCache
+        workerUnsubscribers.push(
+            workerBridge.subscribe('allNames', (data: unknown) => {
+                if (data && typeof data === 'object') {
+                    const namesData = data as {
+                        principalNames: Record<string, { name: string; verified: boolean }>
+                        neuronNames: Record<string, { name: string; verified: boolean }>
+                    }
+                    // Convert from serialized object back to Maps
+                    namesCache.value.principals = new Map(Object.entries(namesData.principalNames))
+                    namesCache.value.neurons = new Map(Object.entries(namesData.neuronNames))
+                    namesCache.value.lastLoaded = Date.now()
+                }
+            })
+        )
+
+        // userAllocation (authenticated)
+        workerUnsubscribers.push(
+            workerBridge.subscribe('userAllocation', (data: unknown) => {
+                if (data) {
+                    // Deserialize BigInt values from worker
+                    fetchedUserAllocation.value = deserializeFromTransfer(data) as any
+                }
+            })
+        )
+
+        // systemLogs (admin)
+        workerUnsubscribers.push(
+            workerBridge.subscribe('systemLogs', (data: unknown) => {
+                if (data && Array.isArray(data)) {
+                    // Deserialize BigInt values from worker
+                    systemLogs.value = deserializeFromTransfer(data) as SystemLog[]
+                }
+            })
+        )
+
+        // voterDetails (admin)
+        workerUnsubscribers.push(
+            workerBridge.subscribe('voterDetails', (data: unknown) => {
+                if (data && Array.isArray(data)) {
+                    // Deserialize BigInt values from worker
+                    fetchedVoterDetails.value = deserializeFromTransfer(data) as VoterDetails[]
+                }
+            })
+        )
+
+        // neuronAllocations (admin)
+        workerUnsubscribers.push(
+            workerBridge.subscribe('neuronAllocations', (data: unknown) => {
+                if (data && Array.isArray(data)) {
+                    // Deserialize BigInt values from worker
+                    fetchedNeuronAllocations.value = deserializeFromTransfer(data) as ProcessedNeuronAllocation[]
+                }
+            })
+        )
+
+        // rebalanceConfig (admin)
+        workerUnsubscribers.push(
+            workerBridge.subscribe('rebalanceConfig', (data: unknown) => {
+                if (data) {
+                    // Deserialize BigInt values from worker
+                    rebalanceConfig.value = deserializeFromTransfer(data) as RebalanceConfig
+                }
+            })
+        )
+
+        // systemParameters (admin)
+        workerUnsubscribers.push(
+            workerBridge.subscribe('systemParameters', (data: unknown) => {
+                if (data) {
+                    // Deserialize BigInt values from worker
+                    systemParameters.value = deserializeFromTransfer(data) as GetSystemParameterResult
+                }
+            })
+        )
+    }
+
+    const cleanupWorkerSubscriptions = () => {
+        workerUnsubscribers.forEach(unsub => unsub())
+        workerUnsubscribers.length = 0
+    }
+
+    // Helper to process raw proposal data
+    const processProposalData = (proposal: ProposalData): TacoProposal | null => {
+        // Robust validation - check both proposal.id and proposal.id.id exist
+        if (!proposal.id || proposal.id.id === undefined || proposal.id.id === null) {
+            return null
+        }
+
+        // Extract the id value - handle both bigint and deserialized string forms
+        let proposalId: bigint
+        try {
+            const idValue = proposal.id.id as unknown
+            if (typeof idValue === 'bigint') {
+                proposalId = idValue
+            } else if (typeof idValue === 'number') {
+                proposalId = BigInt(idValue)
+            } else if (typeof idValue === 'string') {
+                // Handle serialized bigint format or regular string number
+                if (idValue.startsWith('__bigint__')) {
+                    proposalId = BigInt(idValue.slice(10))
+                } else {
+                    proposalId = BigInt(idValue)
+                }
+            } else {
+                return null
+            }
+        } catch (error) {
+            return null
+        }
+
+        const getStatus = (): TacoProposal['status'] => {
+            if (proposal.executed_timestamp_seconds > 0n) return 'Executed'
+            if (proposal.failed_timestamp_seconds > 0n) return 'Failed'
+            if (proposal.decided_timestamp_seconds > 0n) {
+                const yes = proposal.latest_tally?.yes || 0n
+                const no = proposal.latest_tally?.no || 0n
+                return yes > no ? 'Adopted' : 'Rejected'
+            }
+            return 'Open'
+        }
+
+        return {
+            id: proposalId,
+            title: proposal.proposal?.title || 'Untitled',
+            summary: proposal.proposal?.summary || '',
+            url: proposal.proposal?.url || '',
+            status: getStatus(),
+            createdAt: new Date(Number(proposal.proposal_creation_timestamp_seconds) * 1000),
+            decidedAt: proposal.decided_timestamp_seconds > 0n
+                ? new Date(Number(proposal.decided_timestamp_seconds) * 1000) : undefined,
+            executedAt: proposal.executed_timestamp_seconds > 0n
+                ? new Date(Number(proposal.executed_timestamp_seconds) * 1000) : undefined,
+            proposer: proposal.proposer?.id
+                ? Array.from(proposal.proposer.id).map(b => b.toString(16).padStart(2, '0')).join('') : undefined,
+            yesVotes: proposal.latest_tally?.yes || 0n,
+            noVotes: proposal.latest_tally?.no || 0n,
+            totalVotes: proposal.latest_tally?.total || 0n,
+        }
+    }
 
     // alarm
     let alarmActor: AlarmCanisterActor | null = null
@@ -1324,6 +1621,7 @@ export const useTacoStore = defineStore('taco', () => {
     const getAuthClient = async (): Promise<AuthClient> => {
         if (!authClientInstance) {
             authClientInstance = await AuthClient.create({
+                keyType: 'Ed25519', // Use Ed25519 for serializable keys (required for worker)
                 idleOptions: {
                     disableIdle: true
                 }
@@ -1595,12 +1893,17 @@ export const useTacoStore = defineStore('taco', () => {
             // set user logged in to true
             userLoggedIn.value = true
 
+            // Send identity to auth worker so it can deliver cached user data
+            sendIdentityToWorker(authClient).catch(console.error)
+
             // log
             // console.log('🔍 Triggering loadAllNames() from checkIfLoggedIn - user is logged in')
 
             // Load names cache in background (non-blocking)
             loadAllNames().catch(console.error)
 
+            // Preload neurons for wallet in background (non-blocking)
+            preloadTacoNeurons().catch(console.error)
 
         } else {
 
@@ -1652,6 +1955,34 @@ export const useTacoStore = defineStore('taco', () => {
         return accountId.toHex()
 
     }
+    /**
+     * Serialize the current identity and send it to the auth worker.
+     * This allows the worker to make authenticated calls and deliver cached user data.
+     */
+    const sendIdentityToWorker = async (authClient: AuthClient) => {
+        try {
+            const identity = authClient.getIdentity()
+
+            // Check if this is a DelegationIdentity (user is logged in)
+            if (identity instanceof DelegationIdentity) {
+                const delegation = identity.getDelegation()
+
+                // Get the session key from storage (Ed25519)
+                const storage = new IdbStorage()
+                const storedKey = await storage.get(KEY_STORAGE_KEY)
+
+                if (storedKey && typeof storedKey === 'string') {
+                    // Serialize and send to worker
+                    workerBridge.setIdentity({
+                        delegationChainJson: JSON.stringify(delegation.toJSON()),
+                        sessionKeyJson: storedKey
+                    })
+                }
+            }
+        } catch (error) {
+            console.error('[TacoStore] Error sending identity to worker:', error)
+        }
+    }
     const iidLogIn = async () => {
 
         // turn app loading on
@@ -1673,6 +2004,9 @@ export const useTacoStore = defineStore('taco', () => {
 
                 // calculate and set user ledger account ID
                 userLedgerAccountId.value = calculateAccountId(userPrincipal.value)
+
+                // Send identity to auth worker
+                sendIdentityToWorker(authClient).catch(console.error)
 
                 // turn app loading off
                 appLoadingOff()
@@ -1709,9 +2043,15 @@ export const useTacoStore = defineStore('taco', () => {
             // calculate and set user ledger account ID
             userLedgerAccountId.value = calculateAccountId(userPrincipal.value)
 
+            // Send identity to auth worker so it can make authenticated calls
+            sendIdentityToWorker(authClient).catch(console.error)
+
             // Load names cache in background (non-blocking)
             // console.log('🔍 Triggering loadAllNames() from iidLogIn - after successful login');
             loadAllNames().catch(console.error)
+
+            // Preload neurons for wallet in background (non-blocking)
+            preloadTacoNeurons().catch(console.error)
 
             // turn app loading off
             appLoadingOff()
@@ -1757,6 +2097,12 @@ export const useTacoStore = defineStore('taco', () => {
 
             // clear cached auth client instance to force fresh instance on next login
             authClientInstance = null
+
+            // Clear identity from auth worker
+            workerBridge.clearIdentity()
+
+            // Clear neuron cache on logout
+            clearNeuronCache()
 
             // set user principal to empty string
             setUserPrincipal('')
@@ -1898,9 +2244,6 @@ export const useTacoStore = defineStore('taco', () => {
         // if time to update has passed, fetch new prices
         if (now - lastPriceUpdate.value > timeToUpdate) {
 
-            // log
-            console.log('✨ fetching new crypto prices')
-
             // try coingecko standard endpoint for icp, btc, and dkp
             try {
 
@@ -1983,12 +2326,7 @@ export const useTacoStore = defineStore('taco', () => {
         
         // else, use saved prices
         else {
-
-            console.log('💾 using saved crypto prices')
-            // console.log('💾 ICP price in USD:', icpPriceUsd.value)
-            // console.log('💾 BTC price in USD:', btcPriceUsd.value)
-            // console.log('💾 Taco price in ICP:', tacoPriceIcp.value)
-
+            // Using cached crypto prices
         }
 
     }
@@ -2235,8 +2573,8 @@ export const useTacoStore = defineStore('taco', () => {
     // dao backend
     const fetchTokenDetails = async () => {
 
-        // turn on loading
-        appLoadingOn()
+        // Note: No appLoadingOn here - let components control their own loading states
+        // This prevents the full-page spinner when cached data exists
 
         try {
 
@@ -2308,7 +2646,7 @@ export const useTacoStore = defineStore('taco', () => {
             // console.log('taco.store: fetchTokenDetails() - total portfolio value in ICP:', totalPortfolioValueInIcp.value)
 
             // return
-            return            
+            return
 
         } catch (error) {
 
@@ -2318,18 +2656,12 @@ export const useTacoStore = defineStore('taco', () => {
             // return
             return false
 
-        } finally {
-
-            // turn off loading
-            appLoadingOff()
-
         }
 
     }
     const fetchTokenDetailsWithPastPrices = async () => {
 
-        // turn on loading
-        appLoadingOn()
+        // Note: No appLoadingOn here - let components control their own loading states
 
         try {
 
@@ -2364,7 +2696,7 @@ export const useTacoStore = defineStore('taco', () => {
             fetchedTokenDetailsWithPastPrices.value = tokenDetails
 
             // return
-            return            
+            return
 
         } catch (error) {
 
@@ -2374,14 +2706,9 @@ export const useTacoStore = defineStore('taco', () => {
             // return
             return false
 
-        } finally {
-
-            // turn off loading
-            appLoadingOff()
-
         }
 
-    }    
+    }
     // ready flag
     const hasTokenDetails = computed(() => fetchedTokenDetails.value.length > 0)
     // single-flight
@@ -5935,15 +6262,20 @@ export const useTacoStore = defineStore('taco', () => {
     }
 
     // TACO Neuron methods for staking
-    const getTacoNeurons = async () => {
+    const getTacoNeurons = async (forceRefresh = false) => {
         try {
             if (!userLoggedIn.value) {
                 throw new Error('User must be logged in');
             }
 
+            // Return cached data if available and not forcing refresh
+            if (!forceRefresh && cachedTacoNeurons.value.length > 0) {
+                return cachedTacoNeurons.value;
+            }
+
             const authClient = await getAuthClient();
             const identity = authClient.getIdentity();
-            
+
             const agent = await createAgent({
                 identity,
                 host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
@@ -5952,18 +6284,43 @@ export const useTacoStore = defineStore('taco', () => {
 
             // Create SNS Governance actor
             const snsGov = await createSnsGovernanceActor(agent, 'lhdfz-wqaaa-aaaaq-aae3q-cai');
-            
+
             const neuronsResult = await snsGov.list_neurons({
                 of_principal: [Principal.fromText(userPrincipal.value)],
                 limit: 1000,
                 start_page_at: []
             }) as any;
 
-            return neuronsResult.neurons || [];
+            const neurons = neuronsResult.neurons || [];
+            // Cache the neurons
+            cachedTacoNeurons.value = neurons;
+
+            return neurons;
         } catch (error: any) {
             console.error('Error getting TACO neurons:', error);
             throw error;
         }
+    }
+
+    // Preload neurons and rewards (call this on login or app init)
+    const preloadTacoNeurons = async () => {
+        if (userLoggedIn.value && cachedTacoNeurons.value.length === 0) {
+            try {
+                const neurons = await getTacoNeurons(true);
+                // Also preload reward balances
+                if (neurons.length > 0) {
+                    await loadNeuronRewardBalances(neurons);
+                }
+            } catch (error) {
+                console.error('[TacoStore] Error preloading neurons:', error);
+            }
+        }
+    }
+
+    // Clear neuron cache (call on logout)
+    const clearNeuronCache = () => {
+        cachedTacoNeurons.value = [];
+        cachedNeuronRewardBalances.value = new Map();
     }
 
     const createSnsGovernanceActor = async (agent: any, canisterId: string) => {
@@ -6351,21 +6708,18 @@ export const useTacoStore = defineStore('taco', () => {
                 }
                 
                 if (!neuronIdBlob) {
-                    console.warn('Invalid neuron structure - no valid ID found:', neuron)
                     return
                 }
-                
+
                 // Ensure it's a valid Uint8Array
                 if (!(neuronIdBlob instanceof Uint8Array) && !Array.isArray(neuronIdBlob)) {
-                    console.warn('Invalid neuron ID format (not Uint8Array or Array):', neuronIdBlob)
                     return
                 }
-                
+
                 // Convert to Uint8Array if it's a regular array
                 const validBlob = neuronIdBlob instanceof Uint8Array ? neuronIdBlob : new Uint8Array(neuronIdBlob)
-                
+
                 if (validBlob.length === 0) {
-                    console.warn('Empty neuron ID blob')
                     return
                 }
                 
@@ -6373,7 +6727,6 @@ export const useTacoStore = defineStore('taco', () => {
             })
 
             if (neuronIdBlobs.length === 0) {
-                console.warn('No valid neuron IDs found after filtering')
                 return new Map()
             }
 
@@ -6390,6 +6743,10 @@ export const useTacoStore = defineStore('taco', () => {
             }
 
             // console.log(`Successfully loaded ${neuronBalances.size} neuron balances`)
+
+            // Cache the reward balances
+            cachedNeuronRewardBalances.value = new Map(neuronBalances)
+
             return neuronBalances
 
         } catch (error) {
@@ -6921,7 +7278,6 @@ export const useTacoStore = defineStore('taco', () => {
             
             if (params.neuron_grantable_permissions && params.neuron_grantable_permissions.length > 0) {
                 const grantablePermissions = params.neuron_grantable_permissions[0];
-                console.log('Grantable permissions from SNS:', grantablePermissions.permissions);
                 return grantablePermissions.permissions || [];
             }
             
@@ -8785,7 +9141,6 @@ export const useTacoStore = defineStore('taco', () => {
                 return result.ok;
             } else {
                 // Fallback: fetch directly from SNS Governance if snapshot returns an error
-                console.warn('Snapshot getSNSProposal err, trying SNS governance directly:', result.err);
                 try {
                     const authClient = await getAuthClient();
                     const identity = authClient.getIdentity();
@@ -9603,6 +9958,10 @@ export const useTacoStore = defineStore('taco', () => {
         setNeuronName,
         getUserNeurons,
         getTacoNeurons,
+        preloadTacoNeurons,
+        clearNeuronCache,
+        cachedTacoNeurons,
+        cachedNeuronRewardBalances,
         formatNeuronForDisplay,
         categorizeNeurons,
         loadNeuronRewardBalances,
@@ -9742,5 +10101,9 @@ export const useTacoStore = defineStore('taco', () => {
         getSNSProposalIdForNNS,
         getDefaultVoteBehavior,
         setDefaultVoteBehavior,
+
+        // Worker subscriptions
+        setupWorkerSubscriptions,
+        cleanupWorkerSubscriptions,
     }
 })

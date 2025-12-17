@@ -56,9 +56,6 @@ import personalDaoToken from "../../assets/tokens/snspng/personal-dao.png"
 import dolrToken from "../../assets/tokens/snspng/dolr.png"
 import fuelEvToken from "../../assets/tokens/snspng/fuelev.png"
 import sgldtToken from "../../assets/tokens/sgldt.png"
-import cicpToken from "../../assets/tokens/cicp.png"
-import clownToken from "../../assets/tokens/clown.png"
-import ckethToken from "../../assets/tokens/cketh.png"
 
 //////////////
 // mappings //
@@ -119,6 +116,43 @@ export const tokenImages: { [key: string]: string } = {
 "Chainkey ETH": ckethToken,
 "Compound ICP": cicpToken,
 "CLOWN": clownToken,
+// Additional name variations for wallet compatibility
+"CHAT": openchatToken,
+"Chat": openchatToken,
+"GoldDAO": goldDaoToken,
+"GOLDDAO": goldDaoToken,
+"GoldAO": goldDaoToken,
+"GOLDAO": goldDaoToken,
+"Goldao": goldDaoToken,
+"GLDGov": goldDaoToken,
+"GLDGOV": goldDaoToken,
+"Gold Dao": goldDaoToken,
+"Gold": goldDaoToken,
+"GOLD": goldDaoToken,
+"GLD": goldDaoToken,
+"ckBTC": ckbtcToken,
+"CKBTC": ckbtcToken,
+"ckETH": ckethToken,
+"CKETH": ckethToken,
+"ckUSDC": ckusdcToken,
+"CKUSDC": ckusdcToken,
+"ICP": icpToken,
+"NTN": neutriniteToken,
+"Ntn": neutriniteToken,
+"SNEED": sneedToken,
+"Sneed DAO": sneedToken,
+"KONG": kongSwapToken,
+"Kong": kongSwapToken,
+"DKP": dragginzToken,
+"MOT": motokoToken,
+"MOTOKO": motokoToken,
+"OGY": origynToken,
+"BOOM": boomDaoToken,
+"ICL": icLightHouseToken,
+"KINIC": kinicToken,
+"ELNA": elnaAiToken,
+"WTN": waterneuronToken,
+"PANDA": icpandaDaoToken,
 }  
 
 //////////

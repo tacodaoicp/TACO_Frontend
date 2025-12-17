@@ -12,8 +12,13 @@
 
     </div>
 
-    <!-- router view -->
-    <router-view></router-view>
+    <!-- Persistent HomeView to prevent iframe reloads -->
+    <HomeView v-show="route.path === '/'" />
+
+    <!-- Router view for all other pages (exclude home to avoid duplicate) -->
+    <router-view v-slot="{ Component }">
+      <component v-if="route.path !== '/'" :is="Component" />
+    </router-view>
 
     <!-- toast container -->
     <TransitionGroup name="fade" tag="div" class="toast-container position-fixed bottom-0 end-0 m-3">
@@ -900,6 +905,7 @@
   import { useTacoStore } from "./stores/taco.store";
   import { storeToRefs } from "pinia";
   import { useRoute } from 'vue-router'
+  import HomeView from './views/HomeView.vue'
   import 'bootstrap/dist/css/bootstrap.css';
   import '@fortawesome/fontawesome-pro/css/fontawesome.css';
   import '@fortawesome/fontawesome-pro/css/light.css';

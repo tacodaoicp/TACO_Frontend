@@ -637,7 +637,7 @@ LOCAL METHODS
     const { icrc1Metadata } = tacoStore
 
     // dao backend
-    const { ensureTokenDetails } = tacoStore
+    const { ensureTokenDetails, fetchTokenDetails } = tacoStore
 
     /////////////////////
     // local variables //
@@ -836,12 +836,6 @@ LOCAL METHODS
     // handle apply allocation data to chart
     const handleApplyDataToChart = async (seriesParams: number[], seriesNamesParams: string[], colorsParams: string[]) => {
 
-        console.log('DaoAllocations.vue: handleApplyDataToChart called with:', {
-            series: seriesParams,
-            names: seriesNamesParams,
-            colors: colorsParams
-        })
-
         // Update all values at once using nextTick (matches VoteView pattern)
         nextTick(() => {
             series.value = seriesParams
@@ -979,9 +973,6 @@ LOCAL METHODS
 
         if (newVal) {
 
-            // log
-            console.log('DaoAllocations.vue: showCurrentAllocations selected')
-
             // Check if we already have allocation data
             const hasExistingData = fetchedAggregateAllocation.value && fetchedAggregateAllocation.value.length > 0
 
@@ -1083,7 +1074,6 @@ LOCAL METHODS
                     }
 
                     // Fall back to icrc1Metadata call (slow path)
-                    console.log('DaoAllocations.vue: Fetching metadata for canisterId (slow path):', canisterId)
                     const fetchedMetadata = await icrc1Metadata(canisterId)
                     const symbolEntry = fetchedMetadata.find((entry: any) => entry[0] === "icrc1:symbol")
                     if (symbolEntry && symbolEntry[1]?.Text) {
@@ -1163,14 +1153,8 @@ LOCAL METHODS
     // watch for current holdings
     watch(showCurrentHoldings, async (newVal) => {
 
-        // log
-        console.log('DaoAllocations.vue: showCurrentHoldings:', newVal)
-
         // if showCurrentHoldings is true
         if (newVal) {
-
-            // log
-            console.log('DaoAllocations.vue: showCurrentHoldings selected')
 
             // Check if we already have token details data
             const hasExistingData = fetchedTokenDetails.value && fetchedTokenDetails.value.length > 0
@@ -1192,33 +1176,6 @@ LOCAL METHODS
                 // safely extract holdings data
                 const holdings = fetchedTokenDetails.value || []
 
-                // Debug logging for holdings data
-                console.log('DaoAllocations.vue: holdings data:', holdings)
-                if (holdings.length > 0) {
-                    const sampleToken = holdings[0][1]
-                    console.log('DaoAllocations.vue: sample token:', {
-                        symbol: sampleToken.tokenSymbol,
-                        balance: sampleToken.balance,
-                        balanceType: typeof sampleToken.balance,
-                        decimals: sampleToken.tokenDecimals,
-                        priceInICP: sampleToken.priceInICP,
-                        priceInUSD: sampleToken.priceInUSD,
-                    })
-                }
-
-                // Helper to calculate normalized token value (accounting for decimals)
-                const getTokenValue = (token: any): number => {
-                    const balance = Number(token.balance)
-                    const decimals = Number(token.tokenDecimals)
-                    // priceInICP is stored with 8 decimal places (ICP standard)
-                    const priceInICP = Number(token.priceInICP) / 1e8
-                    // Normalize balance by its decimals
-                    const normalizedBalance = balance / Math.pow(10, decimals)
-                    const value = normalizedBalance * priceInICP
-                    console.log(`DaoAllocations.vue: getTokenValue ${token.tokenSymbol}: balance=${balance}, decimals=${decimals}, priceInICP_raw=${token.priceInICP}, priceInICP=${priceInICP}, normalizedBalance=${normalizedBalance}, value=${value}`)
-                    return value
-                }
-
                 // calculate total value across all tokens
                 // use bigint scaling to normalize by token decimals without precision loss
                 const ICP_SCALE = 100000000n
@@ -1234,17 +1191,11 @@ LOCAL METHODS
                 }, 0n)
                 const totalValue = Number(totalValueScaled) / Number(ICP_SCALE)
 
-                // log
-                // console.log('totalValue', totalValue)
-
-                console.log('DaoAllocations.vue: totalValue (in ICP):', totalValue)
-
-                // create percentages array with debug info
+                // create percentages array
                 const percentages = holdings.map(([_, token]) => {
                     if (totalValueScaled === 0n) return 0
                     const tokenScaled = toScaledValueIcp(token)
                     const percentage = (Number(tokenScaled) / Number(totalValueScaled)) * 100
-                    console.log(`DaoAllocations.vue: ${token.tokenSymbol} percentage=${percentage.toFixed(2)}%`)
                     return Number(percentage.toFixed(2))
                 })
 
@@ -1309,7 +1260,6 @@ LOCAL METHODS
     // Watch for data arriving from worker (re-trigger display when cached data arrives)
     watch(fetchedAggregateAllocation, (newData) => {
         if (newData && newData.length > 0 && showCurrentAllocations.value) {
-            console.log('DaoAllocations.vue: fetchedAggregateAllocation updated, re-triggering allocations display')
             // Re-trigger the allocations watcher by toggling
             showCurrentAllocations.value = false
             nextTick(() => {
@@ -1320,7 +1270,6 @@ LOCAL METHODS
 
     watch(fetchedTokenDetails, (newData) => {
         if (newData && newData.length > 0 && showCurrentHoldings.value) {
-            console.log('DaoAllocations.vue: fetchedTokenDetails updated, re-triggering holdings display')
             // Re-trigger the holdings watcher by toggling
             showCurrentHoldings.value = false
             nextTick(() => {
@@ -1336,14 +1285,21 @@ LOCAL METHODS
     // on mounted
     onMounted(async () => {
 
-        // Ensure token details are loaded
-        await ensureTokenDetails()
-
-        // Only show loading if we don't have cached data
+        // Check for cached data FIRST before any await calls
         const hasAllocationsData = fetchedAggregateAllocation.value && fetchedAggregateAllocation.value.length > 0
         const hasTokenDetailsData = fetchedTokenDetails.value && fetchedTokenDetails.value.length > 0
+
+        // Only show loading if we don't have cached data
         if (!hasAllocationsData && !hasTokenDetailsData) {
             componentLoading.value = true
+        }
+
+        // Ensure token details are loaded (background if cached, blocking if not)
+        if (hasTokenDetailsData) {
+            // Trigger background refresh (fire-and-forget)
+            ensureTokenDetails().catch(console.error)
+        } else {
+            await ensureTokenDetails()
         }
 
         // handle taco chart max height
@@ -1359,9 +1315,6 @@ LOCAL METHODS
 
         // refresh every minute - NO loading spinner, just silent update
         refreshTimer.value = window.setInterval(async () => {
-
-            // log
-            console.log('refreshing allocations tile...')
 
             // try - no loading spinner for background refresh
             try {

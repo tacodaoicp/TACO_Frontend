@@ -2548,9 +2548,6 @@
                 // reset deadline before fetching fresh data
                 proposalDeadline.value = null
 
-                // log proposal status for debugging
-                console.log('Proposal loaded - ID:', foundProposal.id.toString(), 'Status:', foundProposal.status)
-
                 // fetch proposal deadline to determine voting window
                 await fetchProposalDeadline(foundProposal.id)
 
@@ -3382,29 +3379,20 @@
     // save account name
     const saveAccountName = async () => {
 
-        // log
-        console.log('saving account name')
-
         // if name is empty, return
-        if (!nameBeingEdited.value.trim()) return     
-        
+        if (!nameBeingEdited.value.trim()) return
+
         // if name being edited is the same as the current principal name, return
         if (nameBeingEdited.value.trim() === currentPrincipalName.value) return
 
         // try
         try {
 
-            // log
-            console.log('trying to save account name', nameBeingEdited.value.trim())
-
             // show loading curtain
             componentLoading.value = true
 
             // set account name
             await setPrincipalName(nameBeingEdited.value.trim())
-
-            // log
-            console.log('account name saved successfully')
             
         }
 
@@ -3459,9 +3447,6 @@
             //     neuronNameInputs.value[key] = ''
             //     neuronNameSaving.value[key] = false
             // })
-            
-            // log
-            console.log('loaded user neurons:', neurons)
 
         } 
         
@@ -3853,12 +3838,9 @@
         // if user is logged in
         if (userLoggedIn.value) {
 
-            // log
-            console.log('user is logged in, loading user neurons')
-
             // load user neurons
             await loadUserNeurons()
-            
+
         }
 
     })

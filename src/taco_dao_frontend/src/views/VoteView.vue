@@ -2229,8 +2229,6 @@
   // app
   const { addToast } = tacoStore
   const { acceptHotkeyTutorial } = tacoStore
-  const { appLoadingOn } = tacoStore
-  const { appLoadingOff } = tacoStore
 
   // dao backend
   const { updateAllocation } = tacoStore
@@ -2319,7 +2317,8 @@
   let updatedArray: any[] = []  
 
   // handle fetched token details
-  const handleFetchedTokenDetails = async (tokenDetails: any) => {
+  // Optional: pass initialPercentages to avoid equal-segment animation when we already have allocation data
+  const handleFetchedTokenDetails = async (tokenDetails: any, initialPercentages?: number[]) => {
 
     // log
     // console.log('VoteView.vue: fetchedTokenDetails:', tokenDetails)
@@ -2343,8 +2342,8 @@
     // console.log('VoteView.vue: allTokens:', allTokens)
     // console.log('VoteView.vue: extractedTokens (filtered):', extractedTokens)
 
-    // evenly distribute percentages at first
-    const percentages = extractedTokens.map((token: any) => 100 / extractedTokens.length)
+    // Use initialPercentages if provided, otherwise evenly distribute
+    const percentages = initialPercentages || extractedTokens.map((token: any) => 100 / extractedTokens.length)
 
     // create array for symbols
     let symbols: string[] = extractedTokens.map((token: [any, { tokenSymbol: string }]) => token[1].tokenSymbol)
@@ -2477,7 +2476,6 @@
         }
 
         // Fall back to icrc1Metadata call (slow path) - only if not in tokenDetails
-        console.log('VoteView.vue: Fetching metadata for canisterId (slow path):', canisterId)
         const fetchedMetadata = await icrc1Metadata(canisterId)
         // @ts-ignore
         const symbolEntry = fetchedMetadata.find((entry: any) => entry[0] === "icrc1:symbol")
@@ -2704,19 +2702,10 @@
     // confirm allocations sum to 10000 basis points
     const sum = allocations.reduce((acc: number, curr: any) => acc + curr.basisPoints, 0)
 
-    // if allocations do not sum to 10000, log values and total and do not continue
+    // if allocations do not sum to 10000, return to allocation sliders and do not continue
     if (Math.abs(sum - 10000) > 1) {
-
-      // log
-      console.log('VoteView.vue: allocations do not sum to 10000 basis points!')
-      console.log('VoteView.vue: sum is:', sum)
-
-      // return to allocation sliders
       userLockedVote.value = false
-
-      // do not continue
       return
-
     }
 
     // log
@@ -2727,9 +2716,6 @@
 
       // cast vote with backend
       await updateAllocation(allocations)
-
-      // log
-      console.log('... Vote Cast!')
 
       // refresh everything (must await handlers in order)
       await ensureTokenDetails()
@@ -3095,35 +3081,44 @@
   // on mounted
   onMounted(async () => {
 
-    // turn on left loading
-    leftLoading.value = true
-
-    // turn on right loading
-    rightLoading.value = true
-
-    await ensureTokenDetails()
-
-    // log
-    console.log('VoteView.vue: mounted')
-
     // chart stuff
     setTacoChartMaxHeight()
     window.addEventListener('resize', setTacoChartMaxHeight)
 
-    // Check for existing cached data first - use it immediately if available
+    // Check for existing cached data FIRST before any await calls or loading flags
     const hasCachedTokenDetails = fetchedTokenDetails.value && fetchedTokenDetails.value.length > 0
     const hasCachedAggregateAllocation = fetchedAggregateAllocation.value && fetchedAggregateAllocation.value.length > 0
     const hasCachedVotingPowerMetrics = fetchedVotingPowerMetrics.value !== null
 
-    console.log('VoteView.vue: cached data check:', { hasCachedTokenDetails, hasCachedAggregateAllocation, hasCachedVotingPowerMetrics })
-
     // If we have all cached data, use it immediately without showing loading
     if (hasCachedTokenDetails && hasCachedAggregateAllocation) {
-      console.log('VoteView.vue: Using cached data immediately')
 
-      // IMPORTANT: Must await handleFetchedTokenDetails first because
-      // handleFetchedAggregateAllocation uses fetchedTokenDetails for symbol lookup
-      await handleFetchedTokenDetails(fetchedTokenDetails.value)
+      // Extract initial percentages from aggregate allocation to avoid equal-segment animation
+      // This builds a map of principal -> percentage, then maps it to token order
+      const allocationMap = new Map<string, number>()
+      for (const allocation of fetchedAggregateAllocation.value as any[]) {
+        const principal = String(allocation[0]?.toString?.() || allocation[0])
+        const percentage = Number(allocation[1]) / 100 // basis points to percentage
+        allocationMap.set(principal, percentage)
+      }
+
+      // Get active tokens and their initial percentages in the correct order
+      const activeTokens = (fetchedTokenDetails.value as any[]).filter((token: any) => token[1]?.Active === true)
+      const initialPercentages = activeTokens.map((token: any) => {
+        const principal = String(token[0]?.toString?.() || token[0])
+        return allocationMap.get(principal) || 0
+      })
+
+      // Ensure percentages sum to 100 (adjust largest if needed due to rounding)
+      const sum = initialPercentages.reduce((a: number, b: number) => a + b, 0)
+      if (Math.abs(sum - 100) >= 0.01 && initialPercentages.length > 0) {
+        const diff = 100 - sum
+        const largestIndex = initialPercentages.indexOf(Math.max(...initialPercentages))
+        initialPercentages[largestIndex] = Number((initialPercentages[largestIndex] + diff).toFixed(2))
+      }
+
+      // Pass initial percentages to avoid equal-segment animation
+      await handleFetchedTokenDetails(fetchedTokenDetails.value, initialPercentages)
       await handleFetchedAggregateAllocation(fetchedAggregateAllocation.value)
       if (hasCachedVotingPowerMetrics) {
         await handleFetchedVotingPowerMetrics(fetchedVotingPowerMetrics.value)
@@ -3135,7 +3130,6 @@
           // Check if we already have cached userAllocation
           const hasCachedUserAllocation = fetchedUserAllocation.value && fetchedUserAllocation.value.length > 0
           if (hasCachedUserAllocation) {
-            console.log('VoteView.vue: Using cached userAllocation')
             handleFetchedUserAllocation(fetchedUserAllocation.value)
             // Background refresh (fire-and-forget)
             fetchUserAllocation().catch(console.error)
@@ -3154,9 +3148,10 @@
       return // Early return - we're done with immediate rendering
     }
 
-    // No cached data - show loading and fetch everything
-    console.log('VoteView.vue: No cached data, fetching...')
-    appLoadingOn()
+    // No cached data - turn on component-level loading spinners only
+    // (no full-page appLoadingOn - let component spinners handle it)
+    leftLoading.value = true
+    rightLoading.value = true
 
     try {
       // Fetch all data in parallel for faster loading
@@ -3166,8 +3161,28 @@
         fetchVotingPowerMetrics(),
       ])
 
-      // Handle the fetched data (must await in order - aggregateAllocation needs tokenDetails)
-      await handleFetchedTokenDetails(fetchedTokenDetails.value)
+      // Extract initial percentages to avoid equal-segment animation
+      const allocationMap = new Map<string, number>()
+      for (const allocation of fetchedAggregateAllocation.value as any[]) {
+        const principal = String(allocation[0]?.toString?.() || allocation[0])
+        const percentage = Number(allocation[1]) / 100
+        allocationMap.set(principal, percentage)
+      }
+      const activeTokens = (fetchedTokenDetails.value as any[]).filter((token: any) => token[1]?.Active === true)
+      const initialPercentages = activeTokens.map((token: any) => {
+        const principal = String(token[0]?.toString?.() || token[0])
+        return allocationMap.get(principal) || 0
+      })
+      // Adjust for rounding
+      const sum = initialPercentages.reduce((a: number, b: number) => a + b, 0)
+      if (Math.abs(sum - 100) >= 0.01 && initialPercentages.length > 0) {
+        const diff = 100 - sum
+        const largestIndex = initialPercentages.indexOf(Math.max(...initialPercentages))
+        initialPercentages[largestIndex] = Number((initialPercentages[largestIndex] + diff).toFixed(2))
+      }
+
+      // Handle the fetched data with initial percentages (avoid equal-segment animation)
+      await handleFetchedTokenDetails(fetchedTokenDetails.value, initialPercentages)
       await handleFetchedAggregateAllocation(fetchedAggregateAllocation.value)
       await handleFetchedVotingPowerMetrics(fetchedVotingPowerMetrics.value)
 
@@ -3179,7 +3194,6 @@
         // Check if we already have cached userAllocation
         const hasCachedUserAllocation = fetchedUserAllocation.value && fetchedUserAllocation.value.length > 0
         if (hasCachedUserAllocation) {
-          console.log('VoteView.vue: Using cached userAllocation (non-cached path)')
           handleFetchedUserAllocation(fetchedUserAllocation.value)
           // Background refresh (fire-and-forget)
           fetchUserAllocation().catch(console.error)
@@ -3192,7 +3206,6 @@
     } catch (error) {
       console.error('VoteView.vue: error on mounted:', error)
     } finally {
-      appLoadingOff()
       leftLoading.value = false
       rightLoading.value = false
     }
@@ -3207,11 +3220,29 @@
     if (tokenDetails && tokenDetails.length > 0 &&
         aggregateAllocation && aggregateAllocation.length > 0 &&
         !hasProcessedInitialData) {
-      console.log('VoteView.vue: Data arrived from worker, processing...')
       hasProcessedInitialData = true
-      appLoadingOff()
 
-      await handleFetchedTokenDetails(tokenDetails)
+      // Extract initial percentages to avoid equal-segment animation
+      const allocationMap = new Map<string, number>()
+      for (const allocation of aggregateAllocation as any[]) {
+        const principal = String(allocation[0]?.toString?.() || allocation[0])
+        const percentage = Number(allocation[1]) / 100
+        allocationMap.set(principal, percentage)
+      }
+      const activeTokens = (tokenDetails as any[]).filter((token: any) => token[1]?.Active === true)
+      const initialPercentages = activeTokens.map((token: any) => {
+        const principal = String(token[0]?.toString?.() || token[0])
+        return allocationMap.get(principal) || 0
+      })
+      // Adjust for rounding
+      const sum = initialPercentages.reduce((a: number, b: number) => a + b, 0)
+      if (Math.abs(sum - 100) >= 0.01 && initialPercentages.length > 0) {
+        const diff = 100 - sum
+        const largestIndex = initialPercentages.indexOf(Math.max(...initialPercentages))
+        initialPercentages[largestIndex] = Number((initialPercentages[largestIndex] + diff).toFixed(2))
+      }
+
+      await handleFetchedTokenDetails(tokenDetails, initialPercentages)
       await handleFetchedAggregateAllocation(aggregateAllocation)
 
       if (fetchedVotingPowerMetrics.value) {
@@ -3223,7 +3254,6 @@
   // Watch for userAllocation data arriving from worker (for logged-in users)
   watch(fetchedUserAllocation, (newData) => {
     if (newData && newData.length > 0 && userLoggedIn.value) {
-      console.log('VoteView.vue: fetchedUserAllocation updated from worker')
       handleFetchedUserAllocation(newData)
     }
   })
