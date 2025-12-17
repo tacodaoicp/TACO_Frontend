@@ -110,11 +110,10 @@
                       <i class="fa-solid fa-expand"></i>
                     </button>
 
-                    <!-- if desktop, chart iframe -->
-                    <iframe v-if="!isMobile && shouldLoadDex" 
+                    <!-- chart iframe - lazy loaded for performance -->
+                    <iframe v-if="!isMobile && shouldLoadDex"
                             loading="lazy"
-                            style="border-radius: 0.5rem; 
-                                   z-index: 2;" 
+                            style="border-radius: 0.5rem; z-index: 2;"
                             src="https://dexscreener.com/icp/vhoia-myaaa-aaaar-qbmja-cai?embed=1&loadChartSettings=0&trades=0&tabs=0&info=0&chartLeftToolbar=0&chartTheme=dark&theme=dark&chartStyle=1&chartType=usd&interval=15"></iframe>
 
                     <!-- if mobile, tap to view -->
@@ -159,13 +158,13 @@
                 <!-- tile container inner -->
                 <div class="home-view__tile__inner taco-container taco-container--l2 p-0">
 
-                  <!-- video iframe (lazy) -->
+                  <!-- video iframe - lazy loaded, using nocookie for faster load -->
                   <iframe v-if="shouldLoadYouTube"
                     loading="lazy"
-                    src="https://www.youtube.com/embed/ikNBuHYMkNs"
-                    title="YouTube video player" 
-                    frameborder="0" 
-                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+                    src="https://www.youtube-nocookie.com/embed/ikNBuHYMkNs"
+                    title="YouTube video player"
+                    frameborder="0"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                     allowfullscreen
                     style="z-index: 2;"
                     ></iframe>

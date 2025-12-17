@@ -354,48 +354,54 @@
   // watchers //
   //////////////
 
+  // Watch for userAllocation data arriving from worker (update display when cached data arrives)
+  watch(fetchedUserAllocation, (newData) => {
+    if (newData && newData.length > 0) {
+      console.log('DaoVotePower.vue: fetchedUserAllocation updated from worker')
+      handleFetchedUserAllocation(newData)
+      componentLoading.value = false
+    }
+  })
+
   // watch user logged in, run immediately
   watch(userLoggedIn, async () => {
 
     // log
     // console.log('DaoVotePower.vue: userLoggedIn changed')
 
-    try {
+    // if user is logged in
+    if (userLoggedIn.value) {
 
-      // if user is logged in, fetch user state
-      if (userLoggedIn.value) {
+      // Check if we already have cached data
+      const hasCachedData = fetchedUserAllocation.value && fetchedUserAllocation.value.length > 0
 
-        // turn on loading curtain
+      // If we have cached data, use it immediately (no loading spinner)
+      if (hasCachedData) {
+        console.log('DaoVotePower.vue: Using cached userAllocation data')
+        handleFetchedUserAllocation(fetchedUserAllocation.value)
+
+        // Trigger background refresh (fire-and-forget)
+        fetchUserAllocation().catch(console.error)
+      } else {
+        // No cached data - show loading and fetch
         componentLoading.value = true
 
-        // // fetch and handle user allocation
-        // await fetchUserAllocation()
-        // handleFetchedUserAllocation(fetchedUserAllocation.value)
-
-        // refresh voting power
-        await refreshVotingPower()
-
-      } else {
-
-        // log
-        // console.log('DaoVotePower.vue: user is not logged in')
-
-        // return
-        return
-
+        try {
+          await fetchUserAllocation()
+          handleFetchedUserAllocation(fetchedUserAllocation.value)
+        } catch (error) {
+          console.error('DaoVotePower.vue: error fetching user allocation', error)
+        } finally {
+          componentLoading.value = false
+        }
       }
 
-    } catch (error) {
+    } else {
 
-      // log
-      console.error('DaoVotePower.vue: error fetching user allocation', error)
+      // User logged out - clear the formatted allocation
+      formattedUserAllocation.value = null
 
-    } finally {
-
-      // turn off loading curtain
-      componentLoading.value = false
-
-    }    
+    }
 
   }, { immediate: true })
 

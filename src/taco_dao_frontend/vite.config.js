@@ -25,6 +25,13 @@ export default defineConfig({
       },
     },
   },
+  worker: {
+    format: 'es',
+    plugins: [
+      environment('all', { prefix: 'CANISTER_' }),
+      environment('all', { prefix: 'DFX_' }),
+    ],
+  },
   plugins: [
     vue(),
     environment('all', { prefix: 'CANISTER_' }),

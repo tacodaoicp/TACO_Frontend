@@ -896,7 +896,7 @@
   // Imports //
   /////////////
 
-  import { onMounted, watch, computed } from 'vue';
+  import { onMounted, onUnmounted, watch, computed } from 'vue';
   import { useTacoStore } from "./stores/taco.store";
   import { storeToRefs } from "pinia";
   import { useRoute } from 'vue-router'
@@ -907,6 +907,8 @@
   import '@fortawesome/fontawesome-pro/css/solid.css';
   import '@fortawesome/fontawesome-pro/css/duotone.css';
   import astronautLoader from './assets/images/astonautLoader.webp'
+  import { initWorkerBridge, setCurrentRoute, setNetwork } from './stores/worker-bridge'
+  import { initNetworkConfig } from './config/network-config'
 
   ////////////
   // Stores //
@@ -935,6 +937,9 @@
 
   // misc
   const { fetchCryptoPrices } = tacoStore
+
+  // worker subscriptions
+  const { setupWorkerSubscriptions, cleanupWorkerSubscriptions } = tacoStore
   
   /////////////////////
   // Local Variables //
@@ -1012,11 +1017,23 @@
     // log
     // // console.log('running app mounted logic')
 
+    // Initialize SharedWorkers for data fetching
+    initWorkerBridge()
+
+    // Initialize network config with worker bridge (allows runtime network switching)
+    initNetworkConfig(setNetwork)
+
+    // Setup store subscriptions to worker updates
+    setupWorkerSubscriptions()
+
+    // Set initial route for priority calculation
+    setCurrentRoute(route.path)
+
     // check if user is logged in (this will trigger name loading if logged in)
     //console.log('🚀 Running app initialization - checking login status...');
     await checkIfLoggedIn()
 
-    // fetch crypto prices
+    // fetch crypto prices (now triggers worker fetch)
     fetchCryptoPrices()
 
   }
@@ -1043,6 +1060,14 @@
       updateRobotsMeta(robots || 'index')
     },
     { immediate: true }
+  )
+
+  // watch for route changes to update worker priorities
+  watch(
+    () => route.path,
+    (newPath) => {
+      setCurrentRoute(newPath)
+    }
   )  
 
   /////////////////////
@@ -1065,6 +1090,11 @@
     // run mounted logic
     mountedLogic()
 
+  })
+
+  // onUnmounted - cleanup worker subscriptions
+  onUnmounted(() => {
+    cleanupWorkerSubscriptions()
   })
 
 </script>

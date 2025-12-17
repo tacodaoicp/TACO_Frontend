@@ -505,7 +505,7 @@ LOCAL METHODS
   // Imports //
   /////////////
 
-  import { ref, onMounted, computed, onBeforeUnmount } from "vue"
+  import { ref, onMounted, computed, onBeforeUnmount, watch } from "vue"
   import { useTacoStore } from "../../stores/taco.store"
   import { storeToRefs } from "pinia"
   import astronautLoader from '../../assets/images/astonautLoader.webp'
@@ -661,9 +661,22 @@ LOCAL METHODS
 
   // computed
   computed(() => {
-    
-    // 
 
+    //
+
+  })
+
+  //////////////
+  // watchers //
+  //////////////
+
+  // Watch for data arriving from worker (update display when cached data arrives)
+  watch(fetchedTokenDetails, (newData) => {
+    if (newData && newData.length > 0) {
+      console.log('DaoTrustedTokens.vue: fetchedTokenDetails updated from worker, updating display')
+      handleFetchedTokenDetails(newData)
+      componentLoading.value = false
+    }
   })
 
   /////////////
@@ -673,58 +686,45 @@ LOCAL METHODS
   // on mounted
   onMounted(async () => {
 
-    // turn on loading
-    componentLoading.value = true
+    // Check if we already have cached data
+    const hasCachedData = fetchedTokenDetails.value && fetchedTokenDetails.value.length > 0
 
-    // try
-    try { 
+    // If we have cached data, use it immediately (no loading spinner)
+    if (hasCachedData) {
+      console.log('DaoTrustedTokens.vue: Using cached data immediately')
+      handleFetchedTokenDetails(fetchedTokenDetails.value)
 
-      // ensure token details are loaded once
-      await ensureTokenDetails()
+      // Trigger background refresh (fire-and-forget)
+      fetchTokenDetails().catch(console.error)
+    } else {
+      // No cached data - show loading and fetch
+      componentLoading.value = true
 
-      // handle fetched token details
-      handleFetchedTokenDetails( fetchedTokenDetails.value )
-
-    } catch (error) {
-
-      // log
-      console.error('error fetching token details:', error)
-
-    } finally {
-
-      // turn off loading
-      componentLoading.value = false
-
+      try {
+        await fetchTokenDetails()
+        handleFetchedTokenDetails(fetchedTokenDetails.value)
+      } catch (error) {
+        console.error('error fetching token details:', error)
+      } finally {
+        componentLoading.value = false
+      }
     }
 
-    // // refresh every minute
-    // refreshTimer.value = window.setInterval(async () => {
+    // Refresh every minute - NO loading animation, just silent update
+    refreshTimer.value = window.setInterval(async () => {
+      console.log('DaoTrustedTokens.vue: Background refresh...')
 
-    //   // log
-    //   console.log('refreshing trusted tokens tile...')
+      try {
+        // Fetch in background - no loading spinner
+        await fetchTokenDetails()
+        // Update the table with new data
+        handleFetchedTokenDetails(fetchedTokenDetails.value)
+      } catch (error) {
+        console.error('error refreshing token details:', error)
+      }
+      // No loading animation - data updates silently
 
-    //   // turn on loading
-    //   componentLoading.value = true
-
-    //   // try
-    //   try {
-
-    //     // handle fetched token details
-    //     handleFetchedTokenDetails(fetchedTokenDetails.value)
-
-    //   } catch (error) {
-
-    //     // log
-    //     console.error('error refreshing token details:', error)
-
-    //   } finally {
-
-    //     // turn off loading
-    //     componentLoading.value = false
-
-    //   }
-
-    // }, 60000) // 60000ms = 1 minute    
+    }, 60000) // 60000ms = 1 minute
 
   })
 

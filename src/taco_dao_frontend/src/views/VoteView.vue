@@ -2171,7 +2171,7 @@
   import FooterBar from "../components/FooterBar.vue"
   import { ref, onMounted, onBeforeUnmount, computed, watch, nextTick } from "vue"
   import { useTacoStore } from "../stores/taco.store"
-  import { storeToRefs } from "pinia"  
+  import { storeToRefs } from "pinia"
   import { tokenData } from "../components/data/TokenData"
   import DfinityLogo from "../assets/images/dfinityLogo.vue"
   import { Principal } from "@dfinity/principal"
@@ -2229,6 +2229,8 @@
   // app
   const { addToast } = tacoStore
   const { acceptHotkeyTutorial } = tacoStore
+  const { appLoadingOn } = tacoStore
+  const { appLoadingOff } = tacoStore
 
   // dao backend
   const { updateAllocation } = tacoStore
@@ -2450,35 +2452,41 @@
       // log
       // console.log('canisterIds:', canisterIds)
 
-      // create symbols array
+      // create symbols array - use tokenDetails for fast lookup instead of icrc1Metadata
       let symbols: string[] = []
 
-      // get metadata for each canister id
-      for (const canisterId of canisterIds) {
+      // Build a map from principal -> symbol using fetchedTokenDetails (fast path)
+      const tokenDetailsMap = new Map<string, string>()
+      if (fetchedTokenDetails.value && fetchedTokenDetails.value.length > 0) {
+        for (const entry of fetchedTokenDetails.value) {
+          const principal = entry[0]
+          const details = entry[1]
+          const principalStr = typeof principal === 'string' ? principal : principal?.toString?.() || ''
+          if (principalStr && details?.tokenSymbol) {
+            tokenDetailsMap.set(principalStr, details.tokenSymbol)
+          }
+        }
+      }
 
-        // fetch metadata
+      // Map canister IDs to symbols
+      for (const canisterId of canisterIds) {
+        // Check tokenDetails map first (fast path)
+        if (tokenDetailsMap.has(canisterId)) {
+          symbols.push(tokenDetailsMap.get(canisterId)!)
+          continue
+        }
+
+        // Fall back to icrc1Metadata call (slow path) - only if not in tokenDetails
+        console.log('VoteView.vue: Fetching metadata for canisterId (slow path):', canisterId)
         const fetchedMetadata = await icrc1Metadata(canisterId)
-        
-        // find the symbol entry and extract its value
         // @ts-ignore
         const symbolEntry = fetchedMetadata.find((entry: any) => entry[0] === "icrc1:symbol")
-        
-        // if symbol entry and text, push symbol to symbols array
+
         if (symbolEntry && symbolEntry[1]?.Text) {
-
-          // push symbol to symbols array
           symbols.push(symbolEntry[1].Text)
-
-        }
-
-        // else there is a problem
-        else {
-
-          // log error
+        } else {
           console.error('VoteView.vue: error fetching metadata for canister id:', canisterId)
-
         }
-
       }
 
       // log
@@ -2723,7 +2731,8 @@
       // log
       console.log('... Vote Cast!')
 
-      // refresh everything
+      // refresh everything (must await handlers in order)
+      await ensureTokenDetails()
       await handleFetchedTokenDetails(fetchedTokenDetails.value)
       await fetchAggregateAllocation()
       await handleFetchedAggregateAllocation(fetchedAggregateAllocation.value)
@@ -3095,72 +3104,134 @@
     await ensureTokenDetails()
 
     // log
-    // console.log('vote page mounted')
+    console.log('VoteView.vue: mounted')
 
     // chart stuff
     setTacoChartMaxHeight()
     window.addEventListener('resize', setTacoChartMaxHeight)
 
-    try {
+    // Check for existing cached data first - use it immediately if available
+    const hasCachedTokenDetails = fetchedTokenDetails.value && fetchedTokenDetails.value.length > 0
+    const hasCachedAggregateAllocation = fetchedAggregateAllocation.value && fetchedAggregateAllocation.value.length > 0
+    const hasCachedVotingPowerMetrics = fetchedVotingPowerMetrics.value !== null
 
+    console.log('VoteView.vue: cached data check:', { hasCachedTokenDetails, hasCachedAggregateAllocation, hasCachedVotingPowerMetrics })
+
+    // If we have all cached data, use it immediately without showing loading
+    if (hasCachedTokenDetails && hasCachedAggregateAllocation) {
+      console.log('VoteView.vue: Using cached data immediately')
+
+      // IMPORTANT: Must await handleFetchedTokenDetails first because
+      // handleFetchedAggregateAllocation uses fetchedTokenDetails for symbol lookup
       await handleFetchedTokenDetails(fetchedTokenDetails.value)
-      // console.log('fetchedTokenDetails', fetchedTokenDetails.value)
-      await fetchAggregateAllocation()
       await handleFetchedAggregateAllocation(fetchedAggregateAllocation.value)
-      // console.log('fetchedAggregateAllocation', fetchedAggregateAllocation.value)
-      await fetchVotingPowerMetrics()
+      if (hasCachedVotingPowerMetrics) {
+        await handleFetchedVotingPowerMetrics(fetchedVotingPowerMetrics.value)
+      }
+
+      // Check login and user allocation in background (don't block)
+      checkIfLoggedIn().then(async () => {
+        if (userLoggedIn.value) {
+          // Check if we already have cached userAllocation
+          const hasCachedUserAllocation = fetchedUserAllocation.value && fetchedUserAllocation.value.length > 0
+          if (hasCachedUserAllocation) {
+            console.log('VoteView.vue: Using cached userAllocation')
+            handleFetchedUserAllocation(fetchedUserAllocation.value)
+            // Background refresh (fire-and-forget)
+            fetchUserAllocation().catch(console.error)
+          } else {
+            await fetchUserAllocation()
+            handleFetchedUserAllocation(fetchedUserAllocation.value)
+          }
+        }
+      })
+
+      // Trigger background refresh (fire-and-forget, don't await)
+      ensureTokenDetails().catch(console.error)
+      fetchAggregateAllocation().catch(console.error)
+      fetchVotingPowerMetrics().catch(console.error)
+
+      return // Early return - we're done with immediate rendering
+    }
+
+    // No cached data - show loading and fetch everything
+    console.log('VoteView.vue: No cached data, fetching...')
+    appLoadingOn()
+
+    try {
+      // Fetch all data in parallel for faster loading
+      await Promise.all([
+        ensureTokenDetails(),
+        fetchAggregateAllocation(),
+        fetchVotingPowerMetrics(),
+      ])
+
+      // Handle the fetched data (must await in order - aggregateAllocation needs tokenDetails)
+      await handleFetchedTokenDetails(fetchedTokenDetails.value)
+      await handleFetchedAggregateAllocation(fetchedAggregateAllocation.value)
       await handleFetchedVotingPowerMetrics(fetchedVotingPowerMetrics.value)
-      // console.log('fetchedVotingPowerMetrics', fetchedVotingPowerMetrics.value)
 
       // check if user is logged in
       await checkIfLoggedIn()
 
       // if user is logged in, fetch user state
       if (userLoggedIn.value) {
-
-        // log
-        // console.log('VoteView.vue: user is logged in')
-
-        // fetch and handle user allocation
-        await fetchUserAllocation()
-
-        // log
-        // console.log('fetchedUserAllocation', fetchedUserAllocation.value)
-
-        // handle fetched user allocation
-        await handleFetchedUserAllocation(fetchedUserAllocation.value)
-
-        // refresh voting power
-        await refreshVotingPower()
-
-      } else {
-
-        // log
-        // console.log('VoteView.vue: user is not logged in')
-
+        // Check if we already have cached userAllocation
+        const hasCachedUserAllocation = fetchedUserAllocation.value && fetchedUserAllocation.value.length > 0
+        if (hasCachedUserAllocation) {
+          console.log('VoteView.vue: Using cached userAllocation (non-cached path)')
+          handleFetchedUserAllocation(fetchedUserAllocation.value)
+          // Background refresh (fire-and-forget)
+          fetchUserAllocation().catch(console.error)
+        } else {
+          await fetchUserAllocation()
+          handleFetchedUserAllocation(fetchedUserAllocation.value)
+        }
       }
 
     } catch (error) {
-
-      // log
       console.error('VoteView.vue: error on mounted:', error)
-
     } finally {
-
-      // turn off left loading
+      appLoadingOff()
       leftLoading.value = false
-
-      // turn off right loading
       rightLoading.value = false
-
     }
 
-  })    
+  })
+
+  // Watch for data arriving from worker (update display when cached data arrives)
+  let hasProcessedInitialData = false
+
+  watch([fetchedTokenDetails, fetchedAggregateAllocation], async ([tokenDetails, aggregateAllocation]) => {
+    // Only process if we have both sets of data and haven't loaded yet
+    if (tokenDetails && tokenDetails.length > 0 &&
+        aggregateAllocation && aggregateAllocation.length > 0 &&
+        !hasProcessedInitialData) {
+      console.log('VoteView.vue: Data arrived from worker, processing...')
+      hasProcessedInitialData = true
+      appLoadingOff()
+
+      await handleFetchedTokenDetails(tokenDetails)
+      await handleFetchedAggregateAllocation(aggregateAllocation)
+
+      if (fetchedVotingPowerMetrics.value) {
+        await handleFetchedVotingPowerMetrics(fetchedVotingPowerMetrics.value)
+      }
+    }
+  })
+
+  // Watch for userAllocation data arriving from worker (for logged-in users)
+  watch(fetchedUserAllocation, (newData) => {
+    if (newData && newData.length > 0 && userLoggedIn.value) {
+      console.log('VoteView.vue: fetchedUserAllocation updated from worker')
+      handleFetchedUserAllocation(newData)
+    }
+  })
 
   // on before unmounted
   onBeforeUnmount(() => {
 
-      // 
+      //
       window.removeEventListener('resize', setTacoChartMaxHeight)
 
   })
@@ -3176,14 +3247,14 @@
         animations: {
             enabled: true,
             easing: 'easeout',
-            speed: 350,
+            speed: 300,
             animateGradually: {
-                enabled: true,
-                delay: 1000
+                enabled: false,  // disable "popping up" animation on initial load
+                delay: 0
             },
             dynamicAnimation: {
-                enabled: true,
-                speed: 500
+                enabled: true,   // keep smooth transitions when data changes
+                speed: 300
             }
         },
         fontFamily: 'Space Mono',
