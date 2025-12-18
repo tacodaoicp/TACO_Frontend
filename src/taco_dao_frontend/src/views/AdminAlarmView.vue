@@ -695,13 +695,31 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import { storeToRefs } from 'pinia'
 import { useTacoStore } from '../stores/taco.store'
 import HeaderBar from '../components/HeaderBar.vue'
 import FooterBar from '../components/FooterBar.vue'
 import TacoTitle from '../components/misc/TacoTitle.vue'
 import AdminConfirmationModal from '../components/admin/AdminConfirmationModal.vue'
+import * as workerBridge from '../stores/worker-bridge'
 
 const tacoStore = useTacoStore()
+
+// Extract cached refs from store for reactive binding
+const {
+  cachedAlarmContacts,
+  cachedMonitoringStatus,
+  cachedPendingAlarms,
+  cachedSystemErrors,
+  cachedInternalErrors,
+  cachedMonitoredCanisters,
+  cachedConfigurationIntervals,
+  cachedQueueStatus,
+  cachedSentMessages,
+  cachedAlarmAcknowledgments,
+  cachedAdminActionLogs,
+  cachedAlarmSystemStatus
+} = storeToRefs(tacoStore)
 
 // Reactive state
 const loading = ref(false)
@@ -797,35 +815,30 @@ const filteredSystemErrors = computed(() => {
     : systemErrors.value
 })
 
-// Auto-refresh function
-async function refreshData() {
-  try {
-    await Promise.all([
-      fetchSystemStatus(),
-      fetchContacts(),
-      fetchPendingAlarms(),
-      fetchSystemErrors(),
-      fetchInternalErrors(),
-      fetchConfigIntervals(),
-      fetchQueueStatus(),
-      fetchSentMessages(),
-      fetchAlarmAcknowledgments(),
-      fetchAdminActionLogs(),
-      fetchMonitoredCanisters()
-    ])
-  } catch (error) {
-    console.error('Error during auto-refresh:', error)
-  }
+// Auto-refresh function - use workers for non-blocking fetches
+function refreshData() {
+  console.log('AdminAlarmView: Triggering worker refresh for all alarm data')
+  workerBridge.fetch('alarmSystemStatus', true)
+  workerBridge.fetch('alarmContacts', true)
+  workerBridge.fetch('pendingAlarms', true)
+  workerBridge.fetch('systemErrors', true)
+  workerBridge.fetch('internalErrors', true)
+  workerBridge.fetch('configurationIntervals', true)
+  workerBridge.fetch('queueStatus', true)
+  workerBridge.fetch('sentMessages', true)
+  workerBridge.fetch('alarmAcknowledgments', true)
+  workerBridge.fetch('adminActionLogs', true)
+  workerBridge.fetch('monitoredCanisters', true)
 }
 
 function startAutoRefresh() {
-  refreshInterval.value = setInterval(async () => {
+  refreshInterval.value = setInterval(() => {
     refreshCount.value++
     if (refreshCount.value > maxRefreshCount) {
       stopAutoRefresh()
       return
     }
-    await refreshData()
+    refreshData()
   }, 60000) // Refresh every 1 minute (60000 milliseconds)
 }
 
@@ -836,11 +849,72 @@ function stopAutoRefresh() {
   }
 }
 
+// Watchers to sync cached data to local refs
+watch(cachedAlarmContacts, (newVal) => {
+  if (newVal?.length > 0) contacts.value = newVal
+}, { immediate: true })
+
+watch(cachedAlarmSystemStatus, (newVal) => {
+  if (newVal) systemStatus.value = { ...systemStatus.value, ...newVal }
+}, { immediate: true })
+
+watch(cachedMonitoringStatus, (newVal) => {
+  if (newVal) systemStatus.value = { ...systemStatus.value, ...newVal }
+}, { immediate: true })
+
+watch(cachedPendingAlarms, (newVal) => {
+  if (newVal?.length > 0) pendingAlarms.value = newVal
+}, { immediate: true })
+
+watch(cachedSystemErrors, (newVal) => {
+  if (newVal?.length > 0) systemErrors.value = newVal
+}, { immediate: true })
+
+watch(cachedInternalErrors, (newVal) => {
+  if (newVal?.length > 0) internalErrors.value = newVal
+}, { immediate: true })
+
+watch(cachedMonitoredCanisters, (newVal) => {
+  if (newVal?.length > 0) monitoredCanisters.value = newVal
+}, { immediate: true })
+
+watch(cachedConfigurationIntervals, (newVal) => {
+  if (newVal) configIntervals.value = newVal
+}, { immediate: true })
+
+watch(cachedQueueStatus, (newVal) => {
+  if (newVal) queueStatus.value = newVal
+}, { immediate: true })
+
+watch(cachedSentMessages, (newVal) => {
+  if (newVal?.length > 0) sentMessages.value = newVal
+}, { immediate: true })
+
+watch(cachedAlarmAcknowledgments, (newVal) => {
+  if (newVal?.length > 0) alarmAcknowledgments.value = newVal
+}, { immediate: true })
+
+watch(cachedAdminActionLogs, (newVal) => {
+  if (newVal?.length > 0) adminActionLogs.value = newVal
+}, { immediate: true })
+
 // Lifecycle
-onMounted(async () => {
-  // Initial data load
-  await refreshData()
-  // Start auto-refresh
+onMounted(() => {
+  // Trigger worker fetches for alarm data
+  workerBridge.fetch('alarmSystemStatus', false)
+  workerBridge.fetch('alarmContacts', false)
+  workerBridge.fetch('monitoringStatus', false)
+  workerBridge.fetch('pendingAlarms', false)
+  workerBridge.fetch('systemErrors', false)
+  workerBridge.fetch('internalErrors', false)
+  workerBridge.fetch('monitoredCanisters', false)
+  workerBridge.fetch('configurationIntervals', false)
+  workerBridge.fetch('queueStatus', false)
+  workerBridge.fetch('sentMessages', false)
+  workerBridge.fetch('alarmAcknowledgments', false)
+  workerBridge.fetch('adminActionLogs', false)
+
+  // Start auto-refresh for periodic updates
   startAutoRefresh()
 })
 

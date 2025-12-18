@@ -242,6 +242,9 @@ import TacoTitle from '../components/misc/TacoTitle.vue'
 import { createActor as createRewardsActor } from '../../../declarations/rewards'
 import { AnonymousIdentity } from '@dfinity/agent'
 
+// Cached rewards actor instance
+let cachedRewardsActor = null
+
 export default {
   name: 'AdminRewardsBalancesView',
   components: {
@@ -333,6 +336,11 @@ export default {
     await this.refreshBalances()
   },
 
+  beforeUnmount() {
+    // Clear cached actor when component is destroyed
+    cachedRewardsActor = null
+  },
+
   methods: {
     async refreshBalances() {
       this.clearMessages()
@@ -393,11 +401,14 @@ export default {
     },
 
     async getRewardsActor() {
+      // Return cached actor if available
+      if (cachedRewardsActor) {
+        return cachedRewardsActor
+      }
+
       try {
-        console.log('Getting rewards canister ID...')
         const canisterId = this.tacoStore.rewardsCanisterId()
-        console.log('Canister ID:', canisterId)
-        
+
         if (!canisterId) {
           throw new Error('Rewards canister ID not found')
         }
@@ -405,15 +416,14 @@ export default {
         // Use anonymous identity for public query (no authentication required)
         const host = process.env.DFX_NETWORK === 'local' ? 'http://localhost:4943' : 'https://ic0.app'
 
-        const actor = createRewardsActor(canisterId, {
+        cachedRewardsActor = createRewardsActor(canisterId, {
           agentOptions: {
             identity: new AnonymousIdentity(),
             host
           }
         })
-        
-        console.log('Created actor:', actor)
-        return actor
+
+        return cachedRewardsActor
       } catch (error) {
         console.error('Error creating rewards actor:', error)
         throw error

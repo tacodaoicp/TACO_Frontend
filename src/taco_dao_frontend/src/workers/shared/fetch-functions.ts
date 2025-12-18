@@ -22,7 +22,11 @@ import {
   getAppSneedDaoCanisterId,
   getTacoSnsGovernanceCanisterId,
   getTacoSnsRootCanisterId,
+  getAlarmCanisterId,
+  getRewardsCanisterId,
 } from './canister-ids'
+import { idlFactory as alarmIDL, type _SERVICE as AlarmService } from '../../../../declarations/alarm/alarm.did.js'
+import { idlFactory as rewardsIDL, type _SERVICE as RewardsService } from '../../../../declarations/rewards/rewards.did.js'
 
 // ============================================================================
 // Serialization Helper
@@ -508,6 +512,519 @@ export async function fetchSystemParametersData(agent: HttpAgent): Promise<any> 
   })
 
   return await actor.getSystemParameters()
+}
+
+// ============================================================================
+// Worker 3: Admin Data Fetchers (Treasury/Trading)
+// ============================================================================
+
+/**
+ * Fetch price alerts from Treasury (admin only)
+ */
+export async function fetchPriceAlertsData(agent: HttpAgent, offset: number = 0, limit: number = 100): Promise<any> {
+  const actor = Actor.createActor<TreasuryService>(treasuryIDL, {
+    agent,
+    canisterId: getTreasuryCanisterId(),
+  })
+
+  // Returns { alerts: PriceAlertLog[], totalCount: bigint }
+  return await actor.getPriceAlerts(BigInt(offset), BigInt(limit))
+}
+
+/**
+ * Fetch trading pauses from Treasury (admin only)
+ */
+export async function fetchTradingPausesData(agent: HttpAgent): Promise<any> {
+  const actor = Actor.createActor<TreasuryService>(treasuryIDL, {
+    agent,
+    canisterId: getTreasuryCanisterId(),
+  })
+
+  // Returns TradingPausesResponse
+  return await actor.listTradingPauses()
+}
+
+/**
+ * Fetch price history from Treasury (admin only)
+ * Uses getTokenPriceHistory for all tokens
+ */
+export async function fetchPriceHistoryData(agent: HttpAgent, tokens: Principal[] = []): Promise<any> {
+  const actor = Actor.createActor<TreasuryService>(treasuryIDL, {
+    agent,
+    canisterId: getTreasuryCanisterId(),
+  })
+
+  const result = await actor.getTokenPriceHistory(tokens)
+  if ('ok' in result) {
+    return result.ok
+  }
+  throw new Error('err' in result ? String(result.err) : 'Failed to get price history')
+}
+
+/**
+ * Fetch portfolio history from Treasury (admin only)
+ */
+export async function fetchPortfolioHistoryData(agent: HttpAgent, limit: number = 1000): Promise<any> {
+  const actor = Actor.createActor<TreasuryService>(treasuryIDL, {
+    agent,
+    canisterId: getTreasuryCanisterId(),
+  })
+
+  const result = await actor.getPortfolioHistory(BigInt(limit))
+  if ('ok' in result) {
+    return result.ok
+  }
+  throw new Error('err' in result ? String(result.err) : 'Failed to get portfolio history')
+}
+
+/**
+ * Fetch circuit breaker logs from Treasury (admin only)
+ */
+export async function fetchCircuitBreakerLogsData(agent: HttpAgent, offset: number = 0, limit: number = 100): Promise<any> {
+  const actor = Actor.createActor<TreasuryService>(treasuryIDL, {
+    agent,
+    canisterId: getTreasuryCanisterId(),
+  })
+
+  return await actor.getPortfolioCircuitBreakerLogs(BigInt(offset), BigInt(limit))
+}
+
+/**
+ * Fetch circuit breaker conditions from Treasury (admin only)
+ */
+export async function fetchCircuitBreakerConditionsData(agent: HttpAgent): Promise<any> {
+  const actor = Actor.createActor<TreasuryService>(treasuryIDL, {
+    agent,
+    canisterId: getTreasuryCanisterId(),
+  })
+
+  return await actor.listPortfolioCircuitBreakerConditions()
+}
+
+/**
+ * Fetch portfolio circuit breaker conditions from Treasury (admin only)
+ */
+export async function fetchPortfolioCircuitBreakerConditionsData(agent: HttpAgent): Promise<any> {
+  const actor = Actor.createActor<TreasuryService>(treasuryIDL, {
+    agent,
+    canisterId: getTreasuryCanisterId(),
+  })
+
+  return await actor.listPortfolioCircuitBreakerConditions()
+}
+
+/**
+ * Fetch max price history entries from Treasury (admin only)
+ */
+export async function fetchMaxPriceHistoryEntriesData(agent: HttpAgent): Promise<bigint> {
+  const actor = Actor.createActor<TreasuryService>(treasuryIDL, {
+    agent,
+    canisterId: getTreasuryCanisterId(),
+  })
+
+  return await actor.getMaxPriceHistoryEntries() as bigint
+}
+
+/**
+ * Fetch max portfolio snapshots from Treasury (admin only)
+ */
+export async function fetchMaxPortfolioSnapshotsData(agent: HttpAgent): Promise<bigint> {
+  const actor = Actor.createActor<TreasuryService>(treasuryIDL, {
+    agent,
+    canisterId: getTreasuryCanisterId(),
+  })
+
+  return await actor.getMaxPortfolioSnapshots() as bigint
+}
+
+// ============================================================================
+// Worker 3: Admin Data Fetchers (Neuron Snapshots)
+// ============================================================================
+
+/**
+ * Fetch neuron snapshots from NeuronSnapshot canister (admin only)
+ */
+export async function fetchNeuronSnapshotsData(agent: HttpAgent, start: number = 0, length: number = 100): Promise<any[]> {
+  const actor = Actor.createActor<NeuronSnapshotService>(neuronSnapshotIDL, {
+    agent,
+    canisterId: getNeuronSnapshotCanisterId(),
+  })
+
+  return await actor.get_neuron_snapshots_info(BigInt(start), BigInt(length)) as any[]
+}
+
+/**
+ * Fetch max neuron snapshots from NeuronSnapshot canister (admin only)
+ */
+export async function fetchMaxNeuronSnapshotsData(agent: HttpAgent): Promise<bigint> {
+  const actor = Actor.createActor<NeuronSnapshotService>(neuronSnapshotIDL, {
+    agent,
+    canisterId: getNeuronSnapshotCanisterId(),
+  })
+
+  return await actor.getMaxNeuronSnapshots() as bigint
+}
+
+// ============================================================================
+// Worker 3: Admin Data Fetchers (Alarm System)
+// ============================================================================
+
+/**
+ * Fetch alarm system status (admin only)
+ */
+export async function fetchAlarmSystemStatusData(agent: HttpAgent): Promise<any> {
+  const actor = Actor.createActor<AlarmService>(alarmIDL, {
+    agent,
+    canisterId: getAlarmCanisterId(),
+  })
+
+  const result = await actor.getMonitoringStatus()
+  if ('ok' in result) {
+    return result.ok
+  }
+  throw new Error('err' in result ? result.err : 'Failed to get alarm system status')
+}
+
+/**
+ * Fetch alarm contacts (admin only)
+ */
+export async function fetchAlarmContactsData(agent: HttpAgent): Promise<any[]> {
+  const actor = Actor.createActor<AlarmService>(alarmIDL, {
+    agent,
+    canisterId: getAlarmCanisterId(),
+  })
+
+  const result = await actor.getContacts()
+  if ('ok' in result) {
+    return result.ok as any[]
+  }
+  throw new Error('err' in result ? result.err : 'Failed to get alarm contacts')
+}
+
+/**
+ * Fetch monitoring status (admin only)
+ */
+export async function fetchMonitoringStatusData(agent: HttpAgent): Promise<any> {
+  const actor = Actor.createActor<AlarmService>(alarmIDL, {
+    agent,
+    canisterId: getAlarmCanisterId(),
+  })
+
+  const result = await actor.getMonitoringStatus()
+  if ('ok' in result) {
+    return result.ok
+  }
+  throw new Error('err' in result ? result.err : 'Failed to get monitoring status')
+}
+
+/**
+ * Fetch pending alarms (admin only)
+ */
+export async function fetchPendingAlarmsData(agent: HttpAgent): Promise<any[]> {
+  const actor = Actor.createActor<AlarmService>(alarmIDL, {
+    agent,
+    canisterId: getAlarmCanisterId(),
+  })
+
+  const result = await actor.getPendingAlarms()
+  if ('ok' in result) {
+    return result.ok as any[]
+  }
+  throw new Error('err' in result ? result.err : 'Failed to get pending alarms')
+}
+
+/**
+ * Fetch system errors (admin only)
+ */
+export async function fetchSystemErrorsData(agent: HttpAgent, limit: number = 100): Promise<any[]> {
+  const actor = Actor.createActor<AlarmService>(alarmIDL, {
+    agent,
+    canisterId: getAlarmCanisterId(),
+  })
+
+  const result = await actor.getSystemErrors([BigInt(limit)])
+  if ('ok' in result) {
+    return result.ok as any[]
+  }
+  throw new Error('err' in result ? result.err : 'Failed to get system errors')
+}
+
+/**
+ * Fetch internal errors (admin only)
+ */
+export async function fetchInternalErrorsData(agent: HttpAgent, limit: number = 100): Promise<any[]> {
+  const actor = Actor.createActor<AlarmService>(alarmIDL, {
+    agent,
+    canisterId: getAlarmCanisterId(),
+  })
+
+  const result = await actor.getInternalErrors([BigInt(limit)])
+  if ('ok' in result) {
+    return result.ok as any[]
+  }
+  throw new Error('err' in result ? String(result.err) : 'Failed to get internal errors')
+}
+
+/**
+ * Fetch monitored canisters (admin only)
+ */
+export async function fetchMonitoredCanistersData(agent: HttpAgent): Promise<any[]> {
+  const actor = Actor.createActor<AlarmService>(alarmIDL, {
+    agent,
+    canisterId: getAlarmCanisterId(),
+  })
+
+  const result = await actor.getMonitoredCanisters()
+  if ('ok' in result) {
+    return result.ok as any[]
+  }
+  throw new Error('err' in result ? result.err : 'Failed to get monitored canisters')
+}
+
+/**
+ * Fetch configuration intervals (admin only)
+ */
+export async function fetchConfigurationIntervalsData(agent: HttpAgent): Promise<any> {
+  const actor = Actor.createActor<AlarmService>(alarmIDL, {
+    agent,
+    canisterId: getAlarmCanisterId(),
+  })
+
+  const result = await actor.getConfigurationIntervals()
+  if ('ok' in result) {
+    return result.ok
+  }
+  throw new Error('err' in result ? result.err : 'Failed to get configuration intervals')
+}
+
+/**
+ * Fetch queue status (admin only)
+ */
+export async function fetchQueueStatusData(agent: HttpAgent): Promise<any> {
+  const actor = Actor.createActor<AlarmService>(alarmIDL, {
+    agent,
+    canisterId: getAlarmCanisterId(),
+  })
+
+  const result = await actor.getQueueStatus()
+  if ('ok' in result) {
+    return result.ok
+  }
+  throw new Error('err' in result ? result.err : 'Failed to get queue status')
+}
+
+/**
+ * Fetch sent SMS messages (admin only)
+ */
+export async function fetchSentSMSMessagesData(agent: HttpAgent, limit: number = 100): Promise<any[]> {
+  const actor = Actor.createActor<AlarmService>(alarmIDL, {
+    agent,
+    canisterId: getAlarmCanisterId(),
+  })
+
+  const result = await actor.getSentSMSMessages([BigInt(limit)])
+  if ('ok' in result) {
+    return result.ok as any[]
+  }
+  throw new Error('err' in result ? result.err : 'Failed to get sent SMS messages')
+}
+
+/**
+ * Fetch sent email messages (admin only)
+ */
+export async function fetchSentEmailMessagesData(agent: HttpAgent, limit: number = 100): Promise<any[]> {
+  const actor = Actor.createActor<AlarmService>(alarmIDL, {
+    agent,
+    canisterId: getAlarmCanisterId(),
+  })
+
+  const result = await actor.getSentEmailMessages([BigInt(limit)])
+  if ('ok' in result) {
+    return result.ok as any[]
+  }
+  throw new Error('err' in result ? result.err : 'Failed to get sent email messages')
+}
+
+/**
+ * Fetch sent messages (admin only)
+ */
+export async function fetchSentMessagesData(agent: HttpAgent, limit: number = 100): Promise<any[]> {
+  const actor = Actor.createActor<AlarmService>(alarmIDL, {
+    agent,
+    canisterId: getAlarmCanisterId(),
+  })
+
+  const result = await actor.getSentMessages([BigInt(limit)])
+  if ('ok' in result) {
+    return result.ok as any[]
+  }
+  throw new Error('err' in result ? result.err : 'Failed to get sent messages')
+}
+
+/**
+ * Fetch alarm acknowledgments (admin only)
+ */
+export async function fetchAlarmAcknowledgmentsData(agent: HttpAgent, limit: number = 100): Promise<any[]> {
+  const actor = Actor.createActor<AlarmService>(alarmIDL, {
+    agent,
+    canisterId: getAlarmCanisterId(),
+  })
+
+  const result = await actor.getAlarmAcknowledgments([BigInt(limit)])
+  if ('ok' in result) {
+    return result.ok as any[]
+  }
+  throw new Error('err' in result ? result.err : 'Failed to get alarm acknowledgments')
+}
+
+/**
+ * Fetch admin action logs (admin only)
+ */
+export async function fetchAdminActionLogsData(agent: HttpAgent, limit: number = 100): Promise<any[]> {
+  const actor = Actor.createActor<AlarmService>(alarmIDL, {
+    agent,
+    canisterId: getAlarmCanisterId(),
+  })
+
+  const result = await actor.getAdminActionLogs([BigInt(limit)])
+  if ('ok' in result) {
+    return result.ok as any[]
+  }
+  throw new Error('err' in result ? result.err : 'Failed to get admin action logs')
+}
+
+// ============================================================================
+// Worker 3: Admin Data Fetchers (NNS Automation)
+// ============================================================================
+
+/**
+ * Fetch votable proposals (admin only)
+ */
+export async function fetchVotableProposalsData(agent: HttpAgent): Promise<any[]> {
+  const actor = Actor.createActor<NeuronSnapshotService>(neuronSnapshotIDL, {
+    agent,
+    canisterId: getNeuronSnapshotCanisterId(),
+  })
+
+  return await (actor as any).getVotableProposals() as any[]
+}
+
+/**
+ * Fetch periodic timer status (admin only)
+ */
+export async function fetchPeriodicTimerStatusData(agent: HttpAgent): Promise<any> {
+  const actor = Actor.createActor<NeuronSnapshotService>(neuronSnapshotIDL, {
+    agent,
+    canisterId: getNeuronSnapshotCanisterId(),
+  })
+
+  return await (actor as any).getPeriodicTimerStatus()
+}
+
+/**
+ * Fetch auto voting threshold (admin only)
+ */
+export async function fetchAutoVotingThresholdData(agent: HttpAgent): Promise<bigint> {
+  const actor = Actor.createActor<NeuronSnapshotService>(neuronSnapshotIDL, {
+    agent,
+    canisterId: getNeuronSnapshotCanisterId(),
+  })
+
+  return await (actor as any).getAutoVotingThresholdSeconds() as bigint
+}
+
+/**
+ * Fetch proposer subaccount (admin only)
+ */
+export async function fetchProposerSubaccountData(agent: HttpAgent): Promise<any> {
+  const actor = Actor.createActor<NeuronSnapshotService>(neuronSnapshotIDL, {
+    agent,
+    canisterId: getNeuronSnapshotCanisterId(),
+  })
+
+  return await (actor as any).getProposerSubaccount()
+}
+
+/**
+ * Fetch TACO DAO neuron ID (admin only)
+ */
+export async function fetchTacoDAONeuronIdData(agent: HttpAgent): Promise<any> {
+  const actor = Actor.createActor<NeuronSnapshotService>(neuronSnapshotIDL, {
+    agent,
+    canisterId: getNeuronSnapshotCanisterId(),
+  })
+
+  return await (actor as any).getTacoDAONeuronId()
+}
+
+/**
+ * Fetch default vote behavior (admin only)
+ */
+export async function fetchDefaultVoteBehaviorData(agent: HttpAgent): Promise<any> {
+  const actor = Actor.createActor<NeuronSnapshotService>(neuronSnapshotIDL, {
+    agent,
+    canisterId: getNeuronSnapshotCanisterId(),
+  })
+
+  return await (actor as any).getDefaultVoteBehavior()
+}
+
+/**
+ * Fetch highest processed NNS proposal ID (admin only)
+ */
+export async function fetchHighestProcessedNNSProposalIdData(agent: HttpAgent): Promise<bigint> {
+  const actor = Actor.createActor<NeuronSnapshotService>(neuronSnapshotIDL, {
+    agent,
+    canisterId: getNeuronSnapshotCanisterId(),
+  })
+
+  return await (actor as any).getHighestProcessedNNSProposalId() as bigint
+}
+
+// ============================================================================
+// Rewards Canister Functions
+// ============================================================================
+
+/**
+ * Fetch rewards configuration (admin only - but public read)
+ * Returns configuration including distribution settings
+ */
+export async function fetchRewardsConfigurationData(agent: HttpAgent): Promise<any> {
+  const actor = Actor.createActor<RewardsService>(rewardsIDL, {
+    agent,
+    canisterId: getRewardsCanisterId(),
+  })
+
+  const config = await actor.getConfiguration()
+
+  // Also fetch related balances in parallel for complete configuration view
+  const [totalDistributed, tacoBalance, currentNeuronBalances, availableBalance] = await Promise.all([
+    actor.getTotalDistributed(),
+    actor.getTacoBalance(),
+    actor.getCurrentTotalNeuronBalances(),
+    actor.getAvailableBalance(),
+  ])
+
+  return {
+    ...config,
+    totalDistributed,
+    tacoBalance,
+    currentNeuronBalances,
+    availableBalance,
+  }
+}
+
+/**
+ * Fetch distribution history (admin only - but public read)
+ * Returns paginated distribution records
+ */
+export async function fetchDistributionHistoryData(agent: HttpAgent, offset: number = 0, limit: number = 5): Promise<any> {
+  const actor = Actor.createActor<RewardsService>(rewardsIDL, {
+    agent,
+    canisterId: getRewardsCanisterId(),
+  })
+
+  return await actor.getDistributionHistory(BigInt(offset), BigInt(limit))
 }
 
 // ============================================================================

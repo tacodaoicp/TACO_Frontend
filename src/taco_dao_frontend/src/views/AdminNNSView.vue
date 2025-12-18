@@ -709,10 +709,20 @@ import { useTacoStore } from '../stores/taco.store'
 import HeaderBar from '../components/HeaderBar.vue'
 import TacoTitle from '../components/misc/TacoTitle.vue'
 import astronautLoader from '../assets/images/astonautLoader.webp'
+import * as workerBridge from '../stores/worker-bridge'
 
 // Store
 const tacoStore = useTacoStore()
-const { userLoggedIn } = storeToRefs(tacoStore)
+const {
+  userLoggedIn,
+  cachedVotableProposals,
+  cachedPeriodicTimerStatus,
+  cachedAutoVotingThreshold,
+  cachedProposerSubaccount,
+  cachedTacoDAONeuronId,
+  cachedDefaultVoteBehavior,
+  cachedHighestProcessedNNSProposalId
+} = storeToRefs(tacoStore)
 
 // Component state
 const loading = ref(true)
@@ -1063,25 +1073,10 @@ const updateHighestProcessedNNSProposalId = async () => {
     }
 }
 
-// Proposal methods
-const refreshVotableProposals = async () => {
-    try {
-        proposalsLoading.value = true
-        const proposals = await tacoStore.getVotableProposalsWithTimeLeft()
-        
-        // Convert BigInt values to Numbers to avoid JSON serialization issues
-        votableProposals.value = (proposals || []).map((proposal: any) => ({
-            ...proposal,
-            nns_proposal_id: Number(proposal.nns_proposal_id),
-            sns_proposal_id: Number(proposal.sns_proposal_id),
-            time_remaining_seconds: Number(proposal.time_remaining_seconds)
-        }))
-    } catch (error: any) {
-        console.error('Error loading votable proposals:', error)
-        tacoStore.showError('Error loading votable proposals: ' + error.message)
-    } finally {
-        proposalsLoading.value = false
-    }
+// Proposal methods - use worker for non-blocking fetch
+const refreshVotableProposals = () => {
+    console.log('AdminNNSView: Triggering worker refresh for votable proposals')
+    workerBridge.fetch('votableProposals', true)
 }
 
 const forceVoteOnProposal = async (snsProposalId: number) => {
@@ -1438,221 +1433,121 @@ const removeProposalMapping = async (nnsProposalId: number) => {
     }
 }
 
-// Load data methods
-const loadTimerStatus = async () => {
-    try {
-        const [periodicStatus, autoProcessing, autoVoting] = await Promise.all([
-            tacoStore.getPeriodicTimerStatus(),
-            tacoStore.isAutoProcessingRunning(),
-            tacoStore.isAutoVotingRunning()
-        ])
-        
-        // Convert BigInt values to Numbers to avoid JSON serialization issues
-        if (periodicStatus) {
-            periodicTimerStatus.value = {
-                is_running: periodicStatus.is_running,
-                interval_seconds: Number(periodicStatus.interval_seconds),
-                last_run_time: periodicStatus.last_run_time ? Number(periodicStatus.last_run_time) : null,
-                next_run_time: periodicStatus.next_run_time ? Number(periodicStatus.next_run_time) : null,
-                timer_id: periodicStatus.timer_id ? Number(periodicStatus.timer_id) : null
-            }
-        }
-        
-        isAutoProcessingRunning.value = autoProcessing || false
-        isAutoVotingRunning.value = autoVoting || false
-        
-        // Update form values
-        newPeriodicInterval.value = periodicTimerStatus.value.interval_seconds
-    } catch (error: any) {
-        console.error('Error loading timer status:', error)
-        tacoStore.showError('Error loading timer status: ' + error.message)
-    }
+// Load data methods - use workers for non-blocking fetches
+const loadTimerStatus = () => {
+    console.log('AdminNNSView: Triggering worker refresh for timer status')
+    workerBridge.fetch('periodicTimerStatus', true)
 }
 
-const loadConfiguration = async () => {
-    try {
-        console.log('Loading configuration...')
-        console.log('TacoStore methods available:', {
-            getAutoVotingThresholdSeconds: typeof tacoStore.getAutoVotingThresholdSeconds,
-            getProposerSubaccount: typeof tacoStore.getProposerSubaccount,
-            getTacoDAONeuronId: typeof tacoStore.getTacoDAONeuronId
-        })
-        
-        const [votingThreshold, proposerSubaccount, tacoDAONeuronId, defaultVoteBehavior, highestProcessedNNSProposalId] = await Promise.all([
-            tacoStore.getAutoVotingThresholdSeconds(),
-            tacoStore.getProposerSubaccount(),
-            tacoStore.getTacoDAONeuronId(),
-            tacoStore.getDefaultVoteBehavior(),
-            tacoStore.getHighestProcessedNNSProposalId()
-        ])
-        
-        console.log('Raw responses:', { votingThreshold, proposerSubaccount, tacoDAONeuronId })
-        
-        // Voting threshold
-        currentVotingThreshold.value = Number(votingThreshold || 7200)
-        newVotingThreshold.value = currentVotingThreshold.value
-        
-        // Proposer subaccount
-        if (proposerSubaccount) {
-            try {
-                // Handle different possible formats
-                let bytes: Uint8Array
-                if (proposerSubaccount instanceof Uint8Array) {
-                    bytes = proposerSubaccount
-                } else if (Array.isArray(proposerSubaccount)) {
-                    bytes = new Uint8Array(proposerSubaccount)
-                } else if (proposerSubaccount._buffer) {
-                    // Handle ArrayBuffer-like objects
-                    bytes = new Uint8Array(proposerSubaccount._buffer || proposerSubaccount)
-                } else {
-                    console.warn('Unknown proposer subaccount format:', proposerSubaccount)
-                    bytes = new Uint8Array()
-                }
-                
-                const hexString = bytesToHex(bytes)
-                console.log('Proposer subaccount hex:', hexString)
-                
-                if (bytes.length === 0) {
-                    currentProposerSubaccount.value = 'Empty (needs to be set)'
-                    newProposerSubaccount.value = '712b9424940499b2a59979c3605c83772b636f8fce15bc963937da4812f89928' // Default to the correct value
-                } else {
-                    currentProposerSubaccount.value = hexString
-                    newProposerSubaccount.value = hexString
-                }
-            } catch (subError) {
-                console.error('Error processing proposer subaccount:', subError)
-                currentProposerSubaccount.value = 'Error loading'
-                newProposerSubaccount.value = ''
-            }
-        } else {
-            currentProposerSubaccount.value = 'Not set'
-            newProposerSubaccount.value = '712b9424940499b2a59979c3605c83772b636f8fce15bc963937da4812f89928' // Default to the correct value
-        }
-        
-        // TACO DAO neuron ID
-        if (tacoDAONeuronId) {
-            try {
-                console.log('Neuron ID object:', tacoDAONeuronId)
-                let neuronIdValue: bigint | number
-                
-                if (tacoDAONeuronId.id !== undefined) {
-                    neuronIdValue = tacoDAONeuronId.id
-                } else if (typeof tacoDAONeuronId === 'object' && Object.keys(tacoDAONeuronId).length === 1) {
-                    // Handle case where the response might be wrapped
-                    neuronIdValue = Object.values(tacoDAONeuronId)[0] as bigint | number
-                } else {
-                    neuronIdValue = tacoDAONeuronId as bigint | number
-                }
-                
-                const neuronIdString = neuronIdValue.toString()
-                console.log('Neuron ID string:', neuronIdString)
-                currentTacoDAONeuronId.value = neuronIdString
-                newTacoDAONeuronId.value = neuronIdString
-            } catch (neuronError) {
-                console.error('Error processing neuron ID:', neuronError)
-                currentTacoDAONeuronId.value = 'Error loading'
-                newTacoDAONeuronId.value = ''
-            }
-        } else {
-            currentTacoDAONeuronId.value = 'Not set'
-            newTacoDAONeuronId.value = ''
-        }
-        
-        // Default vote behavior
-        if (defaultVoteBehavior) {
-            try {
-                console.log('Default vote behavior object:', defaultVoteBehavior)
-                
-                // Handle different possible formats from backend
-                let behaviorKey = null
-                if (typeof defaultVoteBehavior === 'object' && defaultVoteBehavior !== null) {
-                    // Find the key that has a non-undefined value (variant format)
-                    const keys = Object.keys(defaultVoteBehavior)
-                    behaviorKey = keys.find(key => defaultVoteBehavior[key] !== undefined) || keys[0]
-                } else if (typeof defaultVoteBehavior === 'string') {
-                    behaviorKey = defaultVoteBehavior
-                }
-                
-                console.log('Default vote behavior key:', behaviorKey)
-                
-                if (behaviorKey && ['VoteAdopt', 'VoteReject', 'Skip'].includes(behaviorKey)) {
-                    currentDefaultVoteBehavior.value = behaviorKey
-                    newDefaultVoteBehavior.value = behaviorKey
-                } else {
-                    currentDefaultVoteBehavior.value = 'VoteAdopt' // Default fallback
-                    newDefaultVoteBehavior.value = 'VoteAdopt'
-                }
-            } catch (behaviorError) {
-                console.error('Error processing default vote behavior:', behaviorError)
-                currentDefaultVoteBehavior.value = 'Error loading'
-                newDefaultVoteBehavior.value = 'VoteAdopt'
-            }
-        } else {
-            currentDefaultVoteBehavior.value = 'VoteAdopt' // Default fallback
-            newDefaultVoteBehavior.value = 'VoteAdopt'
-        }
-        
-        // Highest processed NNS proposal ID
-        if (highestProcessedNNSProposalId !== null && highestProcessedNNSProposalId !== undefined) {
-            try {
-                console.log('Highest processed NNS proposal ID:', highestProcessedNNSProposalId)
-                const proposalIdString = highestProcessedNNSProposalId.toString()
-                currentHighestProcessedNNSProposalId.value = proposalIdString
-                newHighestProcessedNNSProposalId.value = proposalIdString
-            } catch (proposalIdError) {
-                console.error('Error processing highest processed NNS proposal ID:', proposalIdError)
-                currentHighestProcessedNNSProposalId.value = 'Error loading'
-                newHighestProcessedNNSProposalId.value = ''
-            }
-        } else {
-            currentHighestProcessedNNSProposalId.value = 'Not set'
-            newHighestProcessedNNSProposalId.value = ''
-        }
-        
-        // Initialize discovery start ID with current highest + 1
-        if (currentHighestProcessedNNSProposalId.value && currentHighestProcessedNNSProposalId.value !== 'Not set' && currentHighestProcessedNNSProposalId.value !== 'Error loading') {
-            discoveryStartId.value = (Number(currentHighestProcessedNNSProposalId.value) + 1).toString()
-        }
-        
-        console.log('Final values:', {
-            currentVotingThreshold: currentVotingThreshold.value,
-            currentProposerSubaccount: currentProposerSubaccount.value,
-            currentTacoDAONeuronId: currentTacoDAONeuronId.value,
-            currentDefaultVoteBehavior: currentDefaultVoteBehavior.value,
-            currentHighestProcessedNNSProposalId: currentHighestProcessedNNSProposalId.value
-        })
-        
-    } catch (error: any) {
-        console.error('Error loading configuration:', error)
-        tacoStore.showError('Error loading configuration: ' + error.message)
-    }
+// Load configuration - use workers for non-blocking fetches
+// Watchers will process and sync to local refs when data arrives
+const loadConfiguration = () => {
+    console.log('AdminNNSView: Triggering worker refresh for NNS configuration')
+    workerBridge.fetch('autoVotingThreshold', true)
+    workerBridge.fetch('proposerSubaccount', true)
+    workerBridge.fetch('tacoDAONeuronId', true)
+    workerBridge.fetch('defaultVoteBehavior', true)
+    workerBridge.fetch('highestProcessedNNSProposalId', true)
 }
+
+// Watchers to sync cached data to local refs
+watch(cachedVotableProposals, (newVal) => {
+    if (newVal?.length > 0) {
+        votableProposals.value = newVal.map((proposal: any) => ({
+            ...proposal,
+            nns_proposal_id: Number(proposal.nns_proposal_id),
+            sns_proposal_id: Number(proposal.sns_proposal_id),
+            time_remaining_seconds: Number(proposal.time_remaining_seconds)
+        }))
+        loading.value = false
+    }
+}, { immediate: true })
+
+watch(cachedPeriodicTimerStatus, (status) => {
+    if (status) {
+        periodicTimerStatus.value = {
+            is_running: status.is_running,
+            interval_seconds: Number(status.interval_seconds),
+            last_run_time: status.last_run_time ? Number(status.last_run_time) : null,
+            next_run_time: status.next_run_time ? Number(status.next_run_time) : null,
+            timer_id: status.timer_id ? Number(status.timer_id) : null
+        }
+        newPeriodicInterval.value = periodicTimerStatus.value.interval_seconds
+        loading.value = false
+    }
+}, { immediate: true })
+
+watch(cachedAutoVotingThreshold, (newVal) => {
+    if (newVal) {
+        currentVotingThreshold.value = Number(newVal)
+        newVotingThreshold.value = currentVotingThreshold.value
+    }
+}, { immediate: true })
+
+watch(cachedHighestProcessedNNSProposalId, (newVal) => {
+    if (newVal) {
+        currentHighestProcessedNNSProposalId.value = newVal.toString()
+        discoveryStartId.value = (Number(newVal) + 1).toString()
+    }
+}, { immediate: true })
+
+watch(cachedProposerSubaccount, (newVal) => {
+    if (newVal) {
+        currentProposerSubaccount.value = newVal
+    }
+}, { immediate: true })
+
+watch(cachedTacoDAONeuronId, (newVal) => {
+    if (newVal) {
+        currentTacoDAONeuronId.value = newVal.toString()
+    }
+}, { immediate: true })
+
+watch(cachedDefaultVoteBehavior, (newVal) => {
+    if (newVal) {
+        currentDefaultVoteBehavior.value = newVal
+        newDefaultVoteBehavior.value = newVal
+    }
+}, { immediate: true })
 
 // Function to initialize data
 const initializeData = async () => {
     console.log('Initializing admin data, user logged in:', userLoggedIn.value)
-    
+
     if (!userLoggedIn.value) {
         console.log('User not logged in, skipping initialization')
         loading.value = false
         return
     }
-    
-    try {
-        console.log('Starting to load admin data...')
-        await Promise.all([
-            loadTimerStatus(),
-            loadConfiguration(), 
-            refreshVotableProposals()
-        ])
-        console.log('All admin data loaded successfully')
-    } catch (error: any) {
-        console.error('Error initializing admin NNS page:', error)
-        tacoStore.showError('Error loading admin data: ' + error.message)
-    } finally {
-        console.log('Setting loading to false')
+
+    // Check if we have any cached data - if so, hide loading
+    const hasCachedData = !!(
+        cachedVotableProposals.value?.length > 0 ||
+        cachedPeriodicTimerStatus.value ||
+        cachedAutoVotingThreshold.value
+    )
+
+    if (hasCachedData) {
         loading.value = false
     }
+
+    // Trigger worker fetches for NNS data
+    workerBridge.fetch('votableProposals', false)
+    workerBridge.fetch('periodicTimerStatus', false)
+    workerBridge.fetch('autoVotingThreshold', false)
+    workerBridge.fetch('proposerSubaccount', false)
+    workerBridge.fetch('tacoDAONeuronId', false)
+    workerBridge.fetch('defaultVoteBehavior', false)
+    workerBridge.fetch('highestProcessedNNSProposalId', false)
+
+    // Hide loading after a short delay if no cached data
+    if (!hasCachedData) {
+        setTimeout(() => {
+            loading.value = false
+        }, 2000) // 2 second max wait
+    }
+
+    console.log('AdminNNSView: Triggered worker fetches for NNS data')
 }
 
 // Watch for login state changes and initialize when user logs in

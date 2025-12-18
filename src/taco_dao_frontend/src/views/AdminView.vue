@@ -1185,7 +1185,7 @@
 import { ref, computed, onMounted, watch } from 'vue';
 import { Actor } from '@dfinity/agent';
 import { useTacoStore, type GetSystemParameterResult } from '../stores/taco.store';
-import { storeToRefs } from "pinia"  
+import { storeToRefs } from "pinia"
 import HeaderBar from "../components/HeaderBar.vue";
 import FooterBar from "../components/FooterBar.vue";
 import TacoTitle from '../components/misc/TacoTitle.vue';
@@ -1194,6 +1194,7 @@ import AdminConfirmationModal from '../components/admin/AdminConfirmationModal.v
 import GNSFProposalDialog from '../components/proposals/GNSFProposalDialog.vue';
 import { Principal } from '@dfinity/principal';
 import { useAdminCheck } from '../composables/useAdminCheck';
+import * as workerBridge from '../stores/worker-bridge';
 
 // Add interface for VotingMetrics
 interface VotingMetrics {
@@ -1214,18 +1215,46 @@ const refreshingVP = ref(false);
 // Trading pauses state
 const tradingPauses = ref<any[]>([]);
 
+// Portfolio snapshot management - defined early for watcher access
+const snapshotIntervalMinutes = ref(15); // Default to 15 minutes
+const portfolioSnapshotStatus = ref({
+  status: { Stopped: null } as { Running: null } | { Stopped: null },
+  intervalMinutes: 60,
+  lastSnapshotTime: 0
+});
+const newPortfolioSnapshotInterval = ref(60);
+
+// System Parameters - defined early for watcher access
+const systemParametersData = ref(null as any);
+const systemParametersInputs = ref({
+  FollowDepth: 1,
+  MaxFollowed: 3,
+  MaxFollowUnfollowActionsPerDay: 10,
+  MaxAllocationsPerDay: 5,
+  AllocationWindowHours: 24,
+  MaxFollowers: 500,
+  MaxTotalUpdates: 2000,
+  MaxPastAllocations: 100
+});
+const originalSystemParameters = ref({} as any);
+const isSystemParametersValid = ref(true);
+const hasSystemParametersChanges = ref(false);
+
 // Get store
 const tacoStore = useTacoStore();
-const { 
-  snapshotStatus, 
-  timerHealth, 
-  systemLogs, 
-  fetchedTokenDetails: tokenDetailsRef, 
+const {
+  snapshotStatus,
+  timerHealth,
+  systemLogs,
+  fetchedTokenDetails: tokenDetailsRef,
   rebalanceConfig,
+  systemParameters,
   fetchedVotingPowerMetrics,
   fetchedAggregateAllocation,
   fetchedVoterDetails,
-  fetchedNeuronAllocations
+  fetchedNeuronAllocations,
+  cachedTradingPauses,
+  cachedPortfolioSnapshotStatus
 } = storeToRefs(tacoStore);
 
 // Destructure utility methods
@@ -1298,12 +1327,12 @@ const uniqueComponents = computed(() => {
   return Array.from(components).sort();
 });
 
-// Timer status functions
-async function refreshTimerStatus() {
-  console.log('AdminView: refreshTimerStatus called');
-  await tacoStore.refreshTimerStatus();
-  await fetchTradingPauses();
-  console.log('AdminView: refreshTimerStatus completed');
+// Timer status functions - use worker for non-blocking refresh
+function refreshTimerStatus() {
+  console.log('AdminView: Triggering worker refresh for timer status');
+  workerBridge.fetch('timerStatus', true);
+  workerBridge.fetch('tradingStatus', true);
+  workerBridge.fetch('tradingPauses', true);
 }
 
 async function triggerManualPortfolioSnapshot() {
@@ -1387,11 +1416,10 @@ async function restartTreasurySyncs() {
     }
 }
 
-// Log management
-async function refreshLogs() {
-    console.log('AdminView: refreshLogs called');
-    await tacoStore.fetchSystemLogs();
-    console.log('AdminView: refreshLogs completed, systemLogs:', systemLogs.value);
+// Log management - use worker for non-blocking refresh
+function refreshLogs() {
+    console.log('AdminView: Triggering worker refresh for system logs');
+    workerBridge.fetch('systemLogs', true);
 }
 
 // Add these helper functions
@@ -1451,29 +1479,84 @@ const handleProposalSuccess = (proposalId: bigint) => {
 };
 
 // Lifecycle hooks
-onMounted(async () => {
+onMounted(() => {
     console.log('AdminView: Component mounted');
-    
-    // Check admin status in background
+
+    // Check admin status in background (don't block data loading)
     checkAdminStatus().catch(console.error);
-    
-    const params = await tacoStore.getSystemParameters() as any[];
-    const snapshotParam = params.find(p => 'SnapshotInterval' in p);
-    if (snapshotParam?.SnapshotInterval) {
-        snapshotIntervalMinutes.value = Number(snapshotParam.SnapshotInterval) / (60 * 1_000_000_000);
-    }
-    await Promise.all([
-        refreshTimerStatus(),
-        loadConfig(),
-        refreshLogs(),
-        refreshVotingMetrics(),
-        refreshVoterDetails(),
-        refreshNeuronAllocations(),
-        refreshPortfolioSnapshotStatus(),
-        refreshSystemParameters()
-    ]);
-    console.log('AdminView: Initial data loaded');
+
+    // Trigger worker fetches immediately - route change already triggered some via updatePrioritiesForRoute
+    // but we ensure all needed data is requested
+    workerBridge.fetch('systemLogs', false);
+    workerBridge.fetch('timerStatus', false);
+    workerBridge.fetch('tradingStatus', false);
+    workerBridge.fetch('tokenDetails', false);
+    workerBridge.fetch('rebalanceConfig', false);
+    workerBridge.fetch('systemParameters', false);
+    workerBridge.fetch('voterDetails', false);
+    workerBridge.fetch('portfolioSnapshotStatus', false);
+    workerBridge.fetch('votingPowerMetrics', false);
+    workerBridge.fetch('aggregateAllocation', false);
+    workerBridge.fetch('tradingPauses', false);
+    workerBridge.fetch('neuronAllocations', false);
+
+    console.log('AdminView: Mounted, triggered worker fetches');
 });
+
+// Watch cached data and sync to local refs
+watch(cachedTradingPauses, (newVal) => {
+    if (newVal?.pausedTokens) {
+        tradingPauses.value = newVal.pausedTokens;
+    }
+}, { immediate: true });
+
+watch(cachedPortfolioSnapshotStatus, (newVal) => {
+    if (newVal) {
+        portfolioSnapshotStatus.value = newVal;
+        if (newVal.intervalMinutes && !newPortfolioSnapshotInterval.value) {
+            newPortfolioSnapshotInterval.value = newVal.intervalMinutes;
+        }
+    }
+}, { immediate: true });
+
+// Watch systemParameters to update snapshotIntervalMinutes and process for inputs
+watch(systemParameters, (params) => {
+    if (params && Array.isArray(params)) {
+        const snapshotParam = params.find((p: any) => 'SnapshotInterval' in p);
+        if (snapshotParam?.SnapshotInterval) {
+            snapshotIntervalMinutes.value = Number(snapshotParam.SnapshotInterval) / (60 * 1_000_000_000);
+        }
+        // Also process for system parameters inputs
+        processSystemParameters(params);
+    }
+}, { immediate: true });
+
+// Watch fetchedVotingPowerMetrics and sync to local votingMetrics ref
+watch(fetchedVotingPowerMetrics, (rawMetrics) => {
+    if (rawMetrics?.ok) {
+        votingMetrics.value = {
+            totalVotingPower: rawMetrics.ok.totalVotingPower,
+            totalVotingPowerByHotkeySetters: rawMetrics.ok.totalVotingPowerByHotkeySetters,
+            allocatedVotingPower: rawMetrics.ok.allocatedVotingPower,
+            principalCount: rawMetrics.ok.principalCount,
+            neuronCount: rawMetrics.ok.neuronCount
+        };
+    }
+}, { immediate: true });
+
+// Watch fetchedAggregateAllocation and sync to local aggregateAllocation ref
+watch(fetchedAggregateAllocation, (rawAllocations) => {
+    if (rawAllocations && Array.isArray(rawAllocations)) {
+        aggregateAllocation.value = rawAllocations.map(([token, basisPoints]) => {
+            if (!token || basisPoints === undefined) return null;
+            return {
+                token: token,
+                basisPoints: Number(basisPoints),
+                votingPower: calculateVotingPower(basisPoints, votingMetrics.value.allocatedVotingPower)
+            };
+        }).filter(Boolean) as { token: Principal; basisPoints: number; votingPower: bigint; }[];
+    }
+}, { immediate: true });
 
 // New functions
 async function startRebalancing() {
@@ -1748,11 +1831,11 @@ const retryLoadConfig = () => {
   loadConfig();
 };
 
-// New function for refreshing trading logs
-async function refreshTradingLogs() {
-  console.log('AdminView: refreshTradingLogs called');
-  await tacoStore.refreshTimerStatus();
-  console.log('AdminView: refreshTradingLogs completed');
+// Refresh trading logs via worker (non-blocking)
+function refreshTradingLogs() {
+  console.log('AdminView: Triggering worker refresh for trading logs');
+  workerBridge.fetch('timerStatus', true);
+  workerBridge.fetch('tradingStatus', true);
 }
 
 async function executeTradingCycle() {
@@ -2195,75 +2278,14 @@ const handleConfirmAction = async (reason: string) => {
 
 // Legacy pauseToken and unpauseToken functions replaced by modal approach above
 
-// Add refreshVotingMetrics function
-const refreshVotingMetrics = async () => {
-  try {
-    // Fetch metrics and allocations in parallel
-    await Promise.all([
-      tacoStore.fetchVotingPowerMetrics(),
-      tacoStore.fetchAggregateAllocation()
-    ]);
-
-    // Get the metrics from the store using the reactive ref
-    const rawMetrics = fetchedVotingPowerMetrics.value;
-    console.log('Raw metrics from backend:', rawMetrics);
-
-    // Get the allocations from the store using the reactive ref
-    const rawAllocations = fetchedAggregateAllocation.value;
-    console.log('Raw allocations from backend:', rawAllocations);
-
-    // Update voting metrics
-    if (rawMetrics?.ok) {
-      votingMetrics.value = {
-        totalVotingPower: rawMetrics.ok.totalVotingPower,
-        totalVotingPowerByHotkeySetters: rawMetrics.ok.totalVotingPowerByHotkeySetters,
-        allocatedVotingPower: rawMetrics.ok.allocatedVotingPower,
-        principalCount: rawMetrics.ok.principalCount,
-        neuronCount: rawMetrics.ok.neuronCount
-      };
-      console.log('Updated voting metrics:', votingMetrics.value);
-    } else {
-      console.error('Invalid metrics format:', rawMetrics);
-    }
-
-    // Update aggregate allocation
-    if (rawAllocations && Array.isArray(rawAllocations)) {
-      console.log('Processing raw allocations:', rawAllocations);
-      
-      // Ensure we have token details before processing allocations
-      if (!tokenDetailsRef.value || !Array.isArray(tokenDetailsRef.value)) {
-        console.log('Fetching token details first...');
-        await tacoStore.fetchTokenDetails();
-      }
-      
-      aggregateAllocation.value = rawAllocations.map(([token, basisPoints]) => {
-        try {
-          if (!token || !basisPoints) {
-            console.warn('Invalid allocation entry:', { token, basisPoints });
-            return null;
-          }
-          
-          const allocation = {
-            token: token,
-            basisPoints: Number(basisPoints),
-            votingPower: calculateVotingPower(basisPoints, votingMetrics.value.allocatedVotingPower)
-          };
-          console.log('Processed allocation:', allocation);
-          return allocation;
-        } catch (err) {
-          console.error('Error processing allocation entry:', err);
-          return null;
-        }
-      }).filter(Boolean); // Remove any null entries
-      
-      console.log('Updated aggregate allocation:', aggregateAllocation.value);
-    } else {
-      console.error('Invalid allocations format:', rawAllocations);
-    }
-
-  } catch (error) {
-    console.error('Error refreshing voting metrics:', error);
-  }
+// Add refreshVotingMetrics function - uses worker to fetch in background (non-blocking)
+const refreshVotingMetrics = () => {
+  console.log('AdminView: Triggering worker refresh for voting metrics');
+  // Request fresh data via workers (force=true bypasses cache)
+  // Watchers will automatically sync to local refs when data arrives
+  workerBridge.fetch('votingPowerMetrics', true);
+  workerBridge.fetch('aggregateAllocation', true);
+  workerBridge.fetch('tokenDetails', true);
 };
 
 // Add helper functions
@@ -2328,15 +2350,10 @@ function getTokenSymbol(principal: any): string {
     }
 }
 
-// Add new function for refreshing voter details
-async function refreshVoterDetails() {
-  console.log('AdminView: refreshVoterDetails called');
-  try {
-    await tacoStore.fetchVoterDetails();
-    console.log('AdminView: Voter details refreshed');
-  } catch (error) {
-    console.error('AdminView: Error refreshing voter details:', error);
-  }
+// Refresh voter details via worker (non-blocking)
+function refreshVoterDetails() {
+  console.log('AdminView: Triggering worker refresh for voter details');
+  workerBridge.fetch('voterDetails', true);
 }
 
 // Add helper function for formatting allocations
@@ -2368,15 +2385,10 @@ const filteredVoterDetails = computed(() => {
   });
 });
 
-// Add this function with other functions
-async function refreshNeuronAllocations() {
-  console.log('AdminView: refreshNeuronAllocations called');
-  try {
-    await tacoStore.fetchNeuronAllocations();
-    console.log('AdminView: Neuron allocations refreshed');
-  } catch (error) {
-    console.error('AdminView: Error refreshing neuron allocations:', error);
-  }
+// Refresh neuron allocations via worker (non-blocking)
+function refreshNeuronAllocations() {
+  console.log('AdminView: Triggering worker refresh for neuron allocations');
+  workerBridge.fetch('neuronAllocations', true);
 }
 
 // Add this function with other utility functions
@@ -2385,33 +2397,6 @@ function uint8ArrayToHex(array: Uint8Array): string {
     .map(b => b.toString(16).padStart(2, '0'))
     .join('');
 }
-
-// Add new function for updating snapshot interval
-const snapshotIntervalMinutes = ref(15); // Default to 15 minutes
-
-// Portfolio snapshot management
-const portfolioSnapshotStatus = ref({
-  status: { Stopped: null } as { Running: null } | { Stopped: null },
-  intervalMinutes: 60,
-  lastSnapshotTime: 0
-});
-const newPortfolioSnapshotInterval = ref(60);
-
-// System Parameters
-const systemParametersData = ref(null as any);
-const systemParametersInputs = ref({
-  FollowDepth: 1,
-  MaxFollowed: 3,
-  MaxFollowUnfollowActionsPerDay: 10,
-  MaxAllocationsPerDay: 5,
-  AllocationWindowHours: 24,
-  MaxFollowers: 500,
-  MaxTotalUpdates: 2000,
-  MaxPastAllocations: 100
-});
-const originalSystemParameters = ref({} as any);
-const isSystemParametersValid = ref(true);
-const hasSystemParametersChanges = ref(false);
 
 // Add refresh user voting power function
 async function refreshUserVotingPower() {
@@ -2426,16 +2411,10 @@ async function refreshUserVotingPower() {
     }
 }
 
-// Portfolio snapshot management functions
-async function refreshPortfolioSnapshotStatus() {
-    try {
-        const status = await tacoStore.getPortfolioSnapshotStatus();
-        portfolioSnapshotStatus.value = status;
-        newPortfolioSnapshotInterval.value = status.intervalMinutes;
-        console.log('AdminView: Portfolio snapshot status refreshed');
-    } catch (error) {
-        console.error('AdminView: Error refreshing portfolio snapshot status:', error);
-    }
+// Portfolio snapshot management functions - use worker (non-blocking)
+function refreshPortfolioSnapshotStatus() {
+    console.log('AdminView: Triggering worker refresh for portfolio snapshot status');
+    workerBridge.fetch('portfolioSnapshotStatus', true);
 }
 
 async function showStartPortfolioSnapshotsConfirmation() {
@@ -2628,36 +2607,33 @@ const getTradingBotWarning = (): { level: 'none' | 'warning' | 'danger', message
   return { level: 'none', message: '' };
 };
 
-// System Parameters Functions
-async function refreshSystemParameters() {
-  try {
-    const params = await tacoStore.getSystemParameters();
-    systemParametersData.value = params;
-    
-    // Convert parameters to input format
-    const inputs = { ...systemParametersInputs.value };
-    
-    if (params && Array.isArray(params)) {
-      params.forEach((param: any) => {
-        if ('FollowDepth' in param) inputs.FollowDepth = Number(param.FollowDepth);
-        else if ('MaxFollowed' in param) inputs.MaxFollowed = Number(param.MaxFollowed);
-        else if ('MaxFollowUnfollowActionsPerDay' in param) inputs.MaxFollowUnfollowActionsPerDay = Number(param.MaxFollowUnfollowActionsPerDay);
-        else if ('MaxAllocationsPerDay' in param) inputs.MaxAllocationsPerDay = Number(param.MaxAllocationsPerDay);
-        else if ('AllocationWindow' in param) inputs.AllocationWindowHours = Number(param.AllocationWindow) / (60 * 60 * 1_000_000_000);
-        else if ('MaxFollowers' in param) inputs.MaxFollowers = Number(param.MaxFollowers);
-        else if ('MaxTotalUpdates' in param) inputs.MaxTotalUpdates = Number(param.MaxTotalUpdates);
-        else if ('MaxPastAllocations' in param) inputs.MaxPastAllocations = Number(param.MaxPastAllocations);
-      });
-    }
-    
-    systemParametersInputs.value = inputs;
-    originalSystemParameters.value = { ...inputs };
-    hasSystemParametersChanges.value = false;
-    
-    console.log('AdminView: System parameters refreshed');
-  } catch (error) {
-    console.error('AdminView: Error refreshing system parameters:', error);
-  }
+// System Parameters Functions - use worker (non-blocking)
+function refreshSystemParameters() {
+  console.log('AdminView: Triggering worker refresh for system parameters');
+  workerBridge.fetch('systemParameters', true);
+}
+
+// Process system parameters when they change from worker
+function processSystemParameters(params: any) {
+  if (!params || !Array.isArray(params)) return;
+
+  systemParametersData.value = params;
+  const inputs = { ...systemParametersInputs.value };
+
+  params.forEach((param: any) => {
+    if ('FollowDepth' in param) inputs.FollowDepth = Number(param.FollowDepth);
+    else if ('MaxFollowed' in param) inputs.MaxFollowed = Number(param.MaxFollowed);
+    else if ('MaxFollowUnfollowActionsPerDay' in param) inputs.MaxFollowUnfollowActionsPerDay = Number(param.MaxFollowUnfollowActionsPerDay);
+    else if ('MaxAllocationsPerDay' in param) inputs.MaxAllocationsPerDay = Number(param.MaxAllocationsPerDay);
+    else if ('AllocationWindow' in param) inputs.AllocationWindowHours = Number(param.AllocationWindow) / (60 * 60 * 1_000_000_000);
+    else if ('MaxFollowers' in param) inputs.MaxFollowers = Number(param.MaxFollowers);
+    else if ('MaxTotalUpdates' in param) inputs.MaxTotalUpdates = Number(param.MaxTotalUpdates);
+    else if ('MaxPastAllocations' in param) inputs.MaxPastAllocations = Number(param.MaxPastAllocations);
+  });
+
+  systemParametersInputs.value = inputs;
+  originalSystemParameters.value = { ...inputs };
+  hasSystemParametersChanges.value = false;
 }
 
 function validateSystemParameterInput(field: string) {

@@ -5,9 +5,11 @@
     <div class="container-fluid mt-4">
       <div class="row">
         <div class="col-12">
-          <TacoTitle 
-            title="Price History" 
-            subtitle="View historical price data for treasury tokens" 
+          <TacoTitle
+            level="h2"
+            emoji="📊"
+            title="Price History"
+            subtitle="View historical price data for treasury tokens"
           />
           
           <!-- Quick Navigation -->

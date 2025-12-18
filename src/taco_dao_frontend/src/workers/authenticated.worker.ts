@@ -14,7 +14,7 @@
 
 /// <reference lib="webworker" />
 
-import { HttpAgent, Identity } from '@dfinity/agent'
+import { HttpAgent, Identity, AnonymousIdentity } from '@dfinity/agent'
 import { DelegationChain, DelegationIdentity, Ed25519KeyIdentity } from '@dfinity/identity'
 import { createAgent } from '@dfinity/utils'
 import { PriorityQueue } from './shared/priority-queue'
@@ -28,6 +28,44 @@ import {
   fetchNeuronAllocationsData,
   fetchRebalanceConfigData,
   fetchSystemParametersData,
+  // Treasury/Trading admin data
+  fetchPriceAlertsData,
+  fetchTradingPausesData,
+  fetchPriceHistoryData,
+  fetchPortfolioHistoryData,
+  fetchCircuitBreakerLogsData,
+  fetchCircuitBreakerConditionsData,
+  fetchPortfolioCircuitBreakerConditionsData,
+  fetchMaxPriceHistoryEntriesData,
+  fetchMaxPortfolioSnapshotsData,
+  // Neuron Snapshots admin data
+  fetchNeuronSnapshotsData,
+  fetchMaxNeuronSnapshotsData,
+  // Alarm system admin data
+  fetchAlarmSystemStatusData,
+  fetchAlarmContactsData,
+  fetchMonitoringStatusData,
+  fetchPendingAlarmsData,
+  fetchSystemErrorsData,
+  fetchInternalErrorsData,
+  fetchMonitoredCanistersData,
+  fetchConfigurationIntervalsData,
+  fetchQueueStatusData,
+  fetchSentSMSMessagesData,
+  fetchSentEmailMessagesData,
+  fetchSentMessagesData,
+  fetchAlarmAcknowledgmentsData,
+  fetchAdminActionLogsData,
+  // NNS Automation admin data
+  fetchVotableProposalsData,
+  fetchPeriodicTimerStatusData,
+  fetchAutoVotingThresholdData,
+  fetchProposerSubaccountData,
+  fetchTacoDAONeuronIdData,
+  fetchDefaultVoteBehaviorData,
+  fetchHighestProcessedNNSProposalIdData,
+  fetchRewardsConfigurationData,
+  fetchDistributionHistoryData,
   serializeForTransfer,
 } from './shared/fetch-functions'
 import type {
@@ -59,16 +97,103 @@ const HANDLED_KEYS: DataKey[] = [
   'neuronAllocations',
   'rebalanceConfig',
   'systemParameters',
+  // Treasury/Trading admin data
+  'priceAlerts',
+  'tradingPauses',
+  'priceHistory',
+  'portfolioHistory',
+  'circuitBreakerLogs',
+  'circuitBreakerConditions',
+  'portfolioCircuitBreakerConditions',
+  'maxPriceHistoryEntries',
+  'maxPortfolioSnapshots',
+  // Neuron Snapshots admin data
+  'neuronSnapshots',
+  'maxNeuronSnapshots',
+  // Alarm system admin data
+  'alarmSystemStatus',
+  'alarmContacts',
+  'monitoringStatus',
+  'pendingAlarms',
+  'systemErrors',
+  'internalErrors',
+  'monitoredCanisters',
+  'configurationIntervals',
+  'queueStatus',
+  'sentSMSMessages',
+  'sentEmailMessages',
+  'sentMessages',
+  'alarmAcknowledgments',
+  'adminActionLogs',
+  // NNS Automation admin data
+  'votableProposals',
+  'periodicTimerStatus',
+  'autoVotingThreshold',
+  'proposerSubaccount',
+  'tacoDAONeuronId',
+  'defaultVoteBehavior',
+  'highestProcessedNNSProposalId',
+  // Rewards/Distributions admin data
+  'rewardsConfiguration',
+  'distributionHistory',
 ]
 
 const USER_KEYS: DataKey[] = ['userAllocation']
-const ADMIN_KEYS: DataKey[] = [
+
+// Keys that REQUIRE authentication - canister enforces caller identity check
+const AUTH_REQUIRED_KEYS: DataKey[] = [
+  // Alarm system - uses canister_inspect_message
+  'queueStatus',
+  'sentSMSMessages',
+  'sentEmailMessages',
+  'sentMessages',
+  'alarmAcknowledgments',
+  'adminActionLogs',
+  'configurationIntervals',
+  'pendingAlarms',
+  'systemErrors',
+  'internalErrors',
+  'alarmContacts',
+  'monitoredCanisters',
+  'alarmSystemStatus',
+  'monitoringStatus',
+  // NNS Automation - may require auth
+  'votableProposals',
+  'periodicTimerStatus',
+  'autoVotingThreshold',
+  'proposerSubaccount',
+  'tacoDAONeuronId',
+  'defaultVoteBehavior',
+  'highestProcessedNNSProposalId',
+]
+
+// Keys that can be read publicly (anonymous agent works)
+const PUBLIC_ADMIN_KEYS: DataKey[] = [
   'systemLogs',
   'voterDetails',
   'neuronAllocations',
   'rebalanceConfig',
   'systemParameters',
+  // Treasury/Trading admin data - typically public reads
+  'priceAlerts',
+  'tradingPauses',
+  'priceHistory',
+  'portfolioHistory',
+  'circuitBreakerLogs',
+  'circuitBreakerConditions',
+  'portfolioCircuitBreakerConditions',
+  'maxPriceHistoryEntries',
+  'maxPortfolioSnapshots',
+  // Neuron Snapshots admin data
+  'neuronSnapshots',
+  'maxNeuronSnapshots',
+  // Rewards/Distributions admin data - public reads
+  'rewardsConfiguration',
+  'distributionHistory',
 ]
+
+// Combined for backward compatibility
+const ADMIN_KEYS: DataKey[] = [...AUTH_REQUIRED_KEYS, ...PUBLIC_ADMIN_KEYS]
 
 // ============================================================================
 // State
@@ -83,6 +208,7 @@ const backoff = new BackoffTracker()
 let isProcessing = false
 let isBackgroundTab = false
 let authenticatedAgent: HttpAgent | null = null
+let anonymousAgent: HttpAgent | null = null  // For public read-only queries
 let currentIdentity: Identity | null = null
 let isAdmin = false
 let isAuthenticated = false
@@ -120,6 +246,10 @@ async function init(): Promise<void> {
     console.error('[AuthWorker] Error loading cache:', error)
   }
 
+  // Create anonymous agent for public read-only queries
+  // This allows fetching admin-labeled data even before user logs in
+  await createAnonymousAgent()
+
   // Mark as initialized
   isInitialized = true
 
@@ -148,7 +278,15 @@ async function init(): Promise<void> {
   // Start processing loop
   processQueue()
 
-  console.log('[AuthWorker] Initialized (waiting for identity)')
+  console.log('[AuthWorker] Initialized with anonymous agent (ready for public reads)')
+}
+
+async function createAnonymousAgent(): Promise<void> {
+  anonymousAgent = await createAgent({
+    identity: new AnonymousIdentity(),
+    host: getHost(),
+    fetchRootKey: shouldFetchRootKey(),
+  })
 }
 
 // ============================================================================
@@ -247,6 +385,7 @@ self.onconnect = (event: MessageEvent) => {
   console.log(`[AuthWorker] Port connected. Total: ${connectedPorts.size}`)
 
   port.onmessage = (e: MessageEvent<WorkerRequest>) => {
+    console.log(`[AuthWorker] Message received: ${e.data?.type}, dataKey=${e.data?.payload?.dataKey}`)
     handleMessage(port, e.data)
   }
 
@@ -274,23 +413,30 @@ self.onconnect = (event: MessageEvent) => {
     return
   }
 
-  // Already initialized - send cached data if authenticated
-  if (isAuthenticated) {
-    for (const key of HANDLED_KEYS) {
+  // Already initialized - send cached data for keys we have
+  // USER_KEYS and AUTH_REQUIRED_KEYS require authentication
+  // For those, we can still send stale cached data
+  for (const key of HANDLED_KEYS) {
+    const requiresAuth = USER_KEYS.includes(key) || AUTH_REQUIRED_KEYS.includes(key)
+    // Skip auth-required keys if not authenticated AND no cached data
+    if (requiresAuth && !isAuthenticated) {
+      // Still send cached data if we have it (will be marked stale)
       const state = dataStates.get(key)
-      if (state?.data) {
-        sendResponse(port, {
-          id: generateMessageId(),
-          timestamp: Date.now(),
-          type: 'CACHE_HIT',
-          payload: {
-            dataKey: key,
-            data: state.data,
-            state,
-            fromCache: true,
-          },
-        })
-      }
+      if (!state?.data) continue
+    }
+    const state = dataStates.get(key)
+    if (state?.data) {
+      sendResponse(port, {
+        id: generateMessageId(),
+        timestamp: Date.now(),
+        type: 'CACHE_HIT',
+        payload: {
+          dataKey: key,
+          data: state.data,
+          state,
+          fromCache: true,
+        },
+      })
     }
   }
 }
@@ -387,43 +533,38 @@ function handleSetAdmin(message: WorkerRequest): void {
 
 function handleFetch(port: MessagePort, message: WorkerRequest): void {
   const { dataKey, priority = 'medium', force = false } = message.payload
-  if (!dataKey || !HANDLED_KEYS.includes(dataKey)) return
-
-  // Check authentication requirements
-  if (!isAuthenticated) {
-    sendResponse(port, {
-      id: message.id,
-      timestamp: Date.now(),
-      type: 'FETCH_ERROR',
-      payload: {
-        dataKey,
-        error: 'Not authenticated',
-        state: createInitialState(),
-        fromCache: false,
-      },
-    })
+  if (!dataKey || !HANDLED_KEYS.includes(dataKey)) {
+    console.log(`[AuthWorker] FETCH ignored - dataKey=${dataKey} not in HANDLED_KEYS`)
     return
   }
+  console.log(`[AuthWorker] FETCH request: ${dataKey}, force=${force}, isAuth=${isAuthenticated}, hasAnon=${!!anonymousAgent}`)
 
-  // Check admin requirements
-  if (ADMIN_KEYS.includes(dataKey) && !isAdmin) {
-    sendResponse(port, {
-      id: message.id,
-      timestamp: Date.now(),
-      type: 'FETCH_ERROR',
-      payload: {
-        dataKey,
-        error: 'Admin access required',
-        state: createInitialState(),
-        fromCache: false,
-      },
-    })
+  // USER_KEYS and AUTH_REQUIRED_KEYS require authentication
+  // The canister will reject anonymous calls for these
+  const requiresAuth = USER_KEYS.includes(dataKey) || AUTH_REQUIRED_KEYS.includes(dataKey)
+  if (requiresAuth && !isAuthenticated) {
+    // For auth-required keys, return cached data if available (stale is okay)
+    const currentState = dataStates.get(dataKey)
+    if (currentState?.data) {
+      sendResponse(port, {
+        id: message.id,
+        timestamp: Date.now(),
+        type: 'CACHE_HIT',
+        payload: {
+          dataKey,
+          data: currentState.data,
+          state: { ...currentState, stale: true },
+          fromCache: true,
+        },
+      })
+    }
+    // Don't queue for refresh - will fail without auth
     return
   }
 
   const currentState = dataStates.get(dataKey)
 
-  // Stale-while-revalidate
+  // Stale-while-revalidate - return cached data if available
   if (currentState?.data && !force) {
     sendResponse(port, {
       id: message.id,
@@ -439,7 +580,9 @@ function handleFetch(port: MessagePort, message: WorkerRequest): void {
   }
 
   // Queue for refresh if needed
+  // The queue processor will wait for agent initialization before processing
   if (force || !currentState?.data || isStale(dataKey, currentState.lastUpdated)) {
+    console.log(`[AuthWorker] Queuing ${dataKey} for fetch (force=${force}, hasData=${!!currentState?.data}, queueSize=${queue.size})`)
     queue.enqueue(dataKey, priority)
   }
 }
@@ -550,25 +693,28 @@ async function handleSetNetwork(message: WorkerRequest): Promise<void> {
     console.error('[AuthWorker] Error clearing cache:', err)
   }
 
-  // If authenticated, recreate agent with new network settings
+  // Always recreate anonymous agent with new network settings
+  await createAnonymousAgent()
+
+  // If authenticated, recreate authenticated agent with new network settings
   if (isAuthenticated && currentIdentity) {
     authenticatedAgent = await createAgent({
       identity: currentIdentity,
       host: getHost(),
       fetchRootKey: shouldFetchRootKey(),
     })
+  }
 
-    // Clear in-memory state and queue for refetch
-    for (const key of HANDLED_KEYS) {
-      dataStates.set(key, createInitialState())
-      if (USER_KEYS.includes(key) || (ADMIN_KEYS.includes(key) && isAdmin)) {
-        queue.enqueue(key, 'high')
-      }
+  // Clear in-memory state and queue for refetch
+  for (const key of HANDLED_KEYS) {
+    dataStates.set(key, createInitialState())
+    // Queue all ADMIN_KEYS since they can be fetched with anonymous agent
+    if (ADMIN_KEYS.includes(key)) {
+      queue.enqueue(key, 'high')
     }
-  } else {
-    // Just clear in-memory state even if not authenticated
-    for (const key of HANDLED_KEYS) {
-      dataStates.set(key, createInitialState())
+    // Queue USER_KEYS only if authenticated
+    if (USER_KEYS.includes(key) && isAuthenticated) {
+      queue.enqueue(key, 'high')
     }
   }
 }
@@ -578,32 +724,42 @@ async function handleSetNetwork(message: WorkerRequest): Promise<void> {
 // ============================================================================
 
 // Maximum concurrent fetches - higher priority items are dequeued first
-const MAX_CONCURRENT_FETCHES = 3
+// Bumped to 5 to handle 41 admin data keys more efficiently
+const MAX_CONCURRENT_FETCHES = 5
 let activeFetchCount = 0
 
 async function processQueue(): Promise<void> {
   if (isProcessing) return
   isProcessing = true
+  console.log('[AuthWorker] processQueue started')
 
   while (true) {
     // Start new fetches up to the limit (priority queue returns highest priority first)
     while (activeFetchCount < MAX_CONCURRENT_FETCHES) {
       // Get next highest-priority item (queue.dequeue handles deduplication internally)
       const item = queue.dequeue()
+      if (item) {
+        console.log(`[AuthWorker] Dequeued ${item.dataKey}, activeFetches=${activeFetchCount}`)
+      }
 
       if (!item) {
         break
       }
 
-      // Skip if not authenticated
-      if (!isAuthenticated || !authenticatedAgent) {
+      // USER_KEYS and AUTH_REQUIRED_KEYS require authentication
+      // Skip for now - will be fetched when user authenticates
+      const requiresAuth = USER_KEYS.includes(item.dataKey) || AUTH_REQUIRED_KEYS.includes(item.dataKey)
+      if (requiresAuth && (!isAuthenticated || !authenticatedAgent)) {
+        console.log(`[AuthWorker] Skipping ${item.dataKey} - requires auth but not authenticated`)
         queue.complete(item.dataKey)
         continue
       }
 
-      // Skip admin keys if not admin
-      if (ADMIN_KEYS.includes(item.dataKey) && !isAdmin) {
-        queue.complete(item.dataKey)
+      // PUBLIC_ADMIN_KEYS can use anonymous agent - they're publicly readable
+      // If no agent available yet, re-queue and wait for init to complete
+      if (!anonymousAgent && !authenticatedAgent) {
+        console.log(`[AuthWorker] Retrying ${item.dataKey} - no agent available yet`)
+        queue.retry(item.dataKey)
         continue
       }
 
@@ -636,19 +792,25 @@ async function processSingleFetch(item: { dataKey: DataKey; retryCount: number }
       console.log('[AuthWorker] Admin confirmed by successful call')
     }
   } catch (error) {
-    console.error(`[AuthWorker] Error fetching ${item.dataKey}:`, error)
     backoff.recordFailure(item.dataKey)
 
-    // Check if error indicates not admin
+    // Check if error indicates not admin or access denied
     const errorMsg = error instanceof Error ? error.message : String(error)
-    if (errorMsg.includes('not authorized') || errorMsg.includes('admin')) {
-      // Not admin, don't retry admin calls
-      if (ADMIN_KEYS.includes(item.dataKey)) {
-        isAdmin = false
-        queue.complete(item.dataKey)
-        return
-      }
+    const isAccessDenied = errorMsg.includes('not authorized') ||
+      errorMsg.includes('admin') ||
+      errorMsg.includes('canister_inspect_message') ||
+      errorMsg.includes('refused message')
+
+    if (isAccessDenied && ADMIN_KEYS.includes(item.dataKey)) {
+      // Not admin or not authorized for this canister - don't retry, don't spam logs
+      console.log(`[AuthWorker] Access denied for ${item.dataKey} - skipping`)
+      isAdmin = false
+      queue.complete(item.dataKey)
+      return
     }
+
+    // Log other errors
+    console.error(`[AuthWorker] Error fetching ${item.dataKey}:`, error)
 
     updateState(item.dataKey, {
       loading: false,
@@ -664,8 +826,18 @@ async function processSingleFetch(item: { dataKey: DataKey; retryCount: number }
 }
 
 async function fetchData(dataKey: DataKey): Promise<void> {
-  if (!authenticatedAgent) {
-    throw new Error('No authenticated agent')
+  // Choose the appropriate agent:
+  // - USER_KEYS and AUTH_REQUIRED_KEYS require authenticated agent
+  // - PUBLIC_ADMIN_KEYS can use anonymous agent (publicly readable queries)
+  const requiresAuth = USER_KEYS.includes(dataKey) || AUTH_REQUIRED_KEYS.includes(dataKey)
+  const agent = requiresAuth
+    ? authenticatedAgent
+    : (authenticatedAgent || anonymousAgent)
+
+  if (!agent) {
+    throw new Error(requiresAuth
+      ? 'No authenticated agent'
+      : 'No agent available')
   }
 
   updateState(dataKey, { loading: true, error: null })
@@ -674,27 +846,169 @@ async function fetchData(dataKey: DataKey): Promise<void> {
 
   switch (dataKey) {
     case 'userAllocation':
-      data = serializeForTransfer(await fetchUserAllocationData(authenticatedAgent))
+      // userAllocation requires authenticated agent (user-specific data)
+      data = serializeForTransfer(await fetchUserAllocationData(authenticatedAgent!))
       break
 
     case 'systemLogs':
-      data = serializeForTransfer(await fetchSystemLogsData(authenticatedAgent))
+      data = serializeForTransfer(await fetchSystemLogsData(agent))
       break
 
     case 'voterDetails':
-      data = serializeForTransfer(await fetchVoterDetailsData(authenticatedAgent))
+      data = serializeForTransfer(await fetchVoterDetailsData(agent))
       break
 
     case 'neuronAllocations':
-      data = serializeForTransfer(await fetchNeuronAllocationsData(authenticatedAgent))
+      data = serializeForTransfer(await fetchNeuronAllocationsData(agent))
       break
 
     case 'rebalanceConfig':
-      data = serializeForTransfer(await fetchRebalanceConfigData(authenticatedAgent))
+      data = serializeForTransfer(await fetchRebalanceConfigData(agent))
       break
 
     case 'systemParameters':
-      data = serializeForTransfer(await fetchSystemParametersData(authenticatedAgent))
+      data = serializeForTransfer(await fetchSystemParametersData(agent))
+      break
+
+    // Treasury/Trading admin data
+    case 'priceAlerts':
+      data = serializeForTransfer(await fetchPriceAlertsData(agent))
+      break
+
+    case 'tradingPauses':
+      data = serializeForTransfer(await fetchTradingPausesData(agent))
+      break
+
+    case 'priceHistory':
+      data = serializeForTransfer(await fetchPriceHistoryData(agent))
+      break
+
+    case 'portfolioHistory':
+      data = serializeForTransfer(await fetchPortfolioHistoryData(agent))
+      break
+
+    case 'circuitBreakerLogs':
+      data = serializeForTransfer(await fetchCircuitBreakerLogsData(agent))
+      break
+
+    case 'circuitBreakerConditions':
+      data = serializeForTransfer(await fetchCircuitBreakerConditionsData(agent))
+      break
+
+    case 'portfolioCircuitBreakerConditions':
+      data = serializeForTransfer(await fetchPortfolioCircuitBreakerConditionsData(agent))
+      break
+
+    case 'maxPriceHistoryEntries':
+      data = serializeForTransfer(await fetchMaxPriceHistoryEntriesData(agent))
+      break
+
+    case 'maxPortfolioSnapshots':
+      data = serializeForTransfer(await fetchMaxPortfolioSnapshotsData(agent))
+      break
+
+    // Neuron Snapshots admin data
+    case 'neuronSnapshots':
+      data = serializeForTransfer(await fetchNeuronSnapshotsData(agent))
+      break
+
+    case 'maxNeuronSnapshots':
+      data = serializeForTransfer(await fetchMaxNeuronSnapshotsData(agent))
+      break
+
+    // Alarm system admin data
+    case 'alarmSystemStatus':
+      data = serializeForTransfer(await fetchAlarmSystemStatusData(agent))
+      break
+
+    case 'alarmContacts':
+      data = serializeForTransfer(await fetchAlarmContactsData(agent))
+      break
+
+    case 'monitoringStatus':
+      data = serializeForTransfer(await fetchMonitoringStatusData(agent))
+      break
+
+    case 'pendingAlarms':
+      data = serializeForTransfer(await fetchPendingAlarmsData(agent))
+      break
+
+    case 'systemErrors':
+      data = serializeForTransfer(await fetchSystemErrorsData(agent))
+      break
+
+    case 'internalErrors':
+      data = serializeForTransfer(await fetchInternalErrorsData(agent))
+      break
+
+    case 'monitoredCanisters':
+      data = serializeForTransfer(await fetchMonitoredCanistersData(agent))
+      break
+
+    case 'configurationIntervals':
+      data = serializeForTransfer(await fetchConfigurationIntervalsData(agent))
+      break
+
+    case 'queueStatus':
+      data = serializeForTransfer(await fetchQueueStatusData(agent))
+      break
+
+    case 'sentSMSMessages':
+      data = serializeForTransfer(await fetchSentSMSMessagesData(agent))
+      break
+
+    case 'sentEmailMessages':
+      data = serializeForTransfer(await fetchSentEmailMessagesData(agent))
+      break
+
+    case 'sentMessages':
+      data = serializeForTransfer(await fetchSentMessagesData(agent))
+      break
+
+    case 'alarmAcknowledgments':
+      data = serializeForTransfer(await fetchAlarmAcknowledgmentsData(agent))
+      break
+
+    case 'adminActionLogs':
+      data = serializeForTransfer(await fetchAdminActionLogsData(agent))
+      break
+
+    // NNS Automation admin data
+    case 'votableProposals':
+      data = serializeForTransfer(await fetchVotableProposalsData(agent))
+      break
+
+    case 'periodicTimerStatus':
+      data = serializeForTransfer(await fetchPeriodicTimerStatusData(agent))
+      break
+
+    case 'autoVotingThreshold':
+      data = serializeForTransfer(await fetchAutoVotingThresholdData(agent))
+      break
+
+    case 'proposerSubaccount':
+      data = serializeForTransfer(await fetchProposerSubaccountData(agent))
+      break
+
+    case 'tacoDAONeuronId':
+      data = serializeForTransfer(await fetchTacoDAONeuronIdData(agent))
+      break
+
+    case 'defaultVoteBehavior':
+      data = serializeForTransfer(await fetchDefaultVoteBehaviorData(agent))
+      break
+
+    case 'highestProcessedNNSProposalId':
+      data = serializeForTransfer(await fetchHighestProcessedNNSProposalIdData(agent))
+      break
+
+    // Rewards/Distributions data
+    case 'rewardsConfiguration':
+      data = serializeForTransfer(await fetchRewardsConfigurationData(agent))
+      break
+
+    case 'distributionHistory':
+      data = serializeForTransfer(await fetchDistributionHistoryData(agent))
       break
 
     default:

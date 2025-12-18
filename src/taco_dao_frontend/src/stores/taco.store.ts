@@ -1253,6 +1253,41 @@ export const useTacoStore = defineStore('taco', () => {
         inProgress: false
     })
 
+    // Admin data refs (populated by worker subscriptions)
+    const cachedPriceAlerts = ref<any>(null)
+    const cachedTradingPauses = ref<any>(null)
+    const cachedPriceHistory = ref<any>(null)
+    const cachedPortfolioHistory = ref<any>(null)
+    const cachedCircuitBreakerLogs = ref<any[]>([])
+    const cachedCircuitBreakerConditions = ref<any[]>([])
+    const cachedPortfolioCircuitBreakerConditions = ref<any[]>([])
+    const cachedMaxPriceHistoryEntries = ref<bigint | null>(null)
+    const cachedMaxPortfolioSnapshots = ref<bigint | null>(null)
+    const cachedNeuronSnapshots = ref<any[]>([])
+    const cachedMaxNeuronSnapshots = ref<bigint | null>(null)
+    const cachedAlarmSystemStatus = ref<any>(null)
+    const cachedAlarmContacts = ref<any[]>([])
+    const cachedMonitoringStatus = ref<any>(null)
+    const cachedPendingAlarms = ref<any[]>([])
+    const cachedSystemErrors = ref<any[]>([])
+    const cachedInternalErrors = ref<any[]>([])
+    const cachedMonitoredCanisters = ref<any[]>([])
+    const cachedConfigurationIntervals = ref<any>(null)
+    const cachedQueueStatus = ref<any>(null)
+    const cachedSentSMSMessages = ref<any[]>([])
+    const cachedSentEmailMessages = ref<any[]>([])
+    const cachedSentMessages = ref<any[]>([])
+    const cachedAlarmAcknowledgments = ref<any[]>([])
+    const cachedAdminActionLogs = ref<any[]>([])
+    const cachedVotableProposals = ref<any[]>([])
+    const cachedPeriodicTimerStatus = ref<any>(null)
+    const cachedAutoVotingThreshold = ref<bigint | null>(null)
+    const cachedProposerSubaccount = ref<any>(null)
+    const cachedTacoDAONeuronId = ref<any>(null)
+    const cachedDefaultVoteBehavior = ref<any>(null)
+    const cachedHighestProcessedNNSProposalId = ref<bigint | null>(null)
+    const cachedPortfolioSnapshotStatus = ref<any>(null)
+
     // # WORKER SUBSCRIPTIONS #
     // Subscribe to worker updates to populate state from SharedWorkers
 
@@ -1333,7 +1368,7 @@ export const useTacoStore = defineStore('taco', () => {
             })
         )
 
-        // timerStatus - updates timerHealth ref
+        // timerStatus - updates timerHealth ref AND tradingLogs
         workerUnsubscribers.push(
             workerBridge.subscribe('timerStatus', (data: unknown) => {
                 if (data && typeof data === 'object') {
@@ -1364,6 +1399,59 @@ export const useTacoStore = defineStore('taco', () => {
                             rebalanceError: ts.rebalanceStatus?.Failed,
                             tradingMetrics: ts.metrics,
                             recentTrades: ts.executedTrades
+                        }
+
+                        // Also populate tradingLogs from executedTrades
+                        const executedTrades = ts.executedTrades
+                        if (executedTrades && executedTrades.length > 0) {
+                            tradingLogs.value = executedTrades.map((trade: Trade) => {
+                                if (trade.error && trade.error.length > 0) {
+                                    return {
+                                        timestamp: trade.timestamp,
+                                        message: `Failed: ${trade.error[0]}`
+                                    };
+                                }
+
+                                // Find token details from our trusted tokens list
+                                const soldToken = fetchedTokenDetails.value.find(t => {
+                                    try {
+                                        const tradeTokenId = (trade.tokenSold as Principal).toText();
+                                        const listTokenId = (t[0] as Principal).toText();
+                                        return tradeTokenId === listTokenId;
+                                    } catch {
+                                        return false;
+                                    }
+                                })?.[1];
+
+                                const boughtToken = fetchedTokenDetails.value.find(t => {
+                                    try {
+                                        const tradeTokenId = (trade.tokenBought as Principal).toText();
+                                        const listTokenId = (t[0] as Principal).toText();
+                                        return tradeTokenId === listTokenId;
+                                    } catch {
+                                        return false;
+                                    }
+                                })?.[1];
+
+                                if (!soldToken || !boughtToken) {
+                                    return {
+                                        timestamp: trade.timestamp,
+                                        message: `Trade with unknown tokens: ${(trade.tokenSold as Principal).toText()} -> ${(trade.tokenBought as Principal).toText()}`
+                                    };
+                                }
+
+                                // Format amounts using token decimals from our trusted tokens
+                                const formattedSoldAmount = Number(trade.amountSold) / Math.pow(10, Number(soldToken.tokenDecimals));
+                                const formattedBoughtAmount = Number(trade.amountBought) / Math.pow(10, Number(boughtToken.tokenDecimals));
+
+                                // Extract exchange name from the variant
+                                const exchangeName = Object.keys(trade.exchange)[0];
+
+                                return {
+                                    timestamp: trade.timestamp,
+                                    message: `${formattedSoldAmount} ${soldToken.tokenSymbol} → ${formattedBoughtAmount} ${boughtToken.tokenSymbol} on ${exchangeName}`
+                                };
+                            });
                         }
                     }
                 }
@@ -1475,6 +1563,183 @@ export const useTacoStore = defineStore('taco', () => {
                     // Deserialize BigInt values from worker
                     systemParameters.value = deserializeFromTransfer(data) as GetSystemParameterResult
                 }
+            })
+        )
+
+        // portfolioSnapshotStatus (admin) - from secondary-public worker
+        workerUnsubscribers.push(
+            workerBridge.subscribe('portfolioSnapshotStatus', (data: unknown) => {
+                if (data) {
+                    cachedPortfolioSnapshotStatus.value = deserializeFromTransfer(data)
+                }
+            })
+        )
+
+        // Treasury/Trading admin data subscriptions
+        workerUnsubscribers.push(
+            workerBridge.subscribe('priceAlerts', (data: unknown) => {
+                if (data) cachedPriceAlerts.value = deserializeFromTransfer(data)
+            })
+        )
+        workerUnsubscribers.push(
+            workerBridge.subscribe('tradingPauses', (data: unknown) => {
+                if (data) cachedTradingPauses.value = deserializeFromTransfer(data)
+            })
+        )
+        workerUnsubscribers.push(
+            workerBridge.subscribe('priceHistory', (data: unknown) => {
+                if (data) cachedPriceHistory.value = deserializeFromTransfer(data)
+            })
+        )
+        workerUnsubscribers.push(
+            workerBridge.subscribe('portfolioHistory', (data: unknown) => {
+                if (data) cachedPortfolioHistory.value = deserializeFromTransfer(data)
+            })
+        )
+        workerUnsubscribers.push(
+            workerBridge.subscribe('circuitBreakerLogs', (data: unknown) => {
+                if (data && Array.isArray(data)) cachedCircuitBreakerLogs.value = deserializeFromTransfer(data) as any[]
+            })
+        )
+        workerUnsubscribers.push(
+            workerBridge.subscribe('circuitBreakerConditions', (data: unknown) => {
+                if (data && Array.isArray(data)) cachedCircuitBreakerConditions.value = deserializeFromTransfer(data) as any[]
+            })
+        )
+        workerUnsubscribers.push(
+            workerBridge.subscribe('portfolioCircuitBreakerConditions', (data: unknown) => {
+                if (data && Array.isArray(data)) cachedPortfolioCircuitBreakerConditions.value = deserializeFromTransfer(data) as any[]
+            })
+        )
+        workerUnsubscribers.push(
+            workerBridge.subscribe('maxPriceHistoryEntries', (data: unknown) => {
+                if (data !== null && data !== undefined) cachedMaxPriceHistoryEntries.value = deserializeFromTransfer(data) as bigint
+            })
+        )
+        workerUnsubscribers.push(
+            workerBridge.subscribe('maxPortfolioSnapshots', (data: unknown) => {
+                if (data !== null && data !== undefined) cachedMaxPortfolioSnapshots.value = deserializeFromTransfer(data) as bigint
+            })
+        )
+
+        // Neuron snapshot admin data subscriptions
+        workerUnsubscribers.push(
+            workerBridge.subscribe('neuronSnapshots', (data: unknown) => {
+                if (data && Array.isArray(data)) cachedNeuronSnapshots.value = deserializeFromTransfer(data) as any[]
+            })
+        )
+        workerUnsubscribers.push(
+            workerBridge.subscribe('maxNeuronSnapshots', (data: unknown) => {
+                if (data !== null && data !== undefined) cachedMaxNeuronSnapshots.value = deserializeFromTransfer(data) as bigint
+            })
+        )
+
+        // Alarm system admin data subscriptions
+        workerUnsubscribers.push(
+            workerBridge.subscribe('alarmSystemStatus', (data: unknown) => {
+                if (data) cachedAlarmSystemStatus.value = deserializeFromTransfer(data)
+            })
+        )
+        workerUnsubscribers.push(
+            workerBridge.subscribe('alarmContacts', (data: unknown) => {
+                if (data && Array.isArray(data)) cachedAlarmContacts.value = deserializeFromTransfer(data) as any[]
+            })
+        )
+        workerUnsubscribers.push(
+            workerBridge.subscribe('monitoringStatus', (data: unknown) => {
+                if (data) cachedMonitoringStatus.value = deserializeFromTransfer(data)
+            })
+        )
+        workerUnsubscribers.push(
+            workerBridge.subscribe('pendingAlarms', (data: unknown) => {
+                if (data && Array.isArray(data)) cachedPendingAlarms.value = deserializeFromTransfer(data) as any[]
+            })
+        )
+        workerUnsubscribers.push(
+            workerBridge.subscribe('systemErrors', (data: unknown) => {
+                if (data && Array.isArray(data)) cachedSystemErrors.value = deserializeFromTransfer(data) as any[]
+            })
+        )
+        workerUnsubscribers.push(
+            workerBridge.subscribe('internalErrors', (data: unknown) => {
+                if (data && Array.isArray(data)) cachedInternalErrors.value = deserializeFromTransfer(data) as any[]
+            })
+        )
+        workerUnsubscribers.push(
+            workerBridge.subscribe('monitoredCanisters', (data: unknown) => {
+                if (data && Array.isArray(data)) cachedMonitoredCanisters.value = deserializeFromTransfer(data) as any[]
+            })
+        )
+        workerUnsubscribers.push(
+            workerBridge.subscribe('configurationIntervals', (data: unknown) => {
+                if (data) cachedConfigurationIntervals.value = deserializeFromTransfer(data)
+            })
+        )
+        workerUnsubscribers.push(
+            workerBridge.subscribe('queueStatus', (data: unknown) => {
+                if (data) cachedQueueStatus.value = deserializeFromTransfer(data)
+            })
+        )
+        workerUnsubscribers.push(
+            workerBridge.subscribe('sentSMSMessages', (data: unknown) => {
+                if (data && Array.isArray(data)) cachedSentSMSMessages.value = deserializeFromTransfer(data) as any[]
+            })
+        )
+        workerUnsubscribers.push(
+            workerBridge.subscribe('sentEmailMessages', (data: unknown) => {
+                if (data && Array.isArray(data)) cachedSentEmailMessages.value = deserializeFromTransfer(data) as any[]
+            })
+        )
+        workerUnsubscribers.push(
+            workerBridge.subscribe('sentMessages', (data: unknown) => {
+                if (data && Array.isArray(data)) cachedSentMessages.value = deserializeFromTransfer(data) as any[]
+            })
+        )
+        workerUnsubscribers.push(
+            workerBridge.subscribe('alarmAcknowledgments', (data: unknown) => {
+                if (data && Array.isArray(data)) cachedAlarmAcknowledgments.value = deserializeFromTransfer(data) as any[]
+            })
+        )
+        workerUnsubscribers.push(
+            workerBridge.subscribe('adminActionLogs', (data: unknown) => {
+                if (data && Array.isArray(data)) cachedAdminActionLogs.value = deserializeFromTransfer(data) as any[]
+            })
+        )
+
+        // NNS Automation admin data subscriptions
+        workerUnsubscribers.push(
+            workerBridge.subscribe('votableProposals', (data: unknown) => {
+                if (data && Array.isArray(data)) cachedVotableProposals.value = deserializeFromTransfer(data) as any[]
+            })
+        )
+        workerUnsubscribers.push(
+            workerBridge.subscribe('periodicTimerStatus', (data: unknown) => {
+                if (data) cachedPeriodicTimerStatus.value = deserializeFromTransfer(data)
+            })
+        )
+        workerUnsubscribers.push(
+            workerBridge.subscribe('autoVotingThreshold', (data: unknown) => {
+                if (data !== null && data !== undefined) cachedAutoVotingThreshold.value = deserializeFromTransfer(data) as bigint
+            })
+        )
+        workerUnsubscribers.push(
+            workerBridge.subscribe('proposerSubaccount', (data: unknown) => {
+                if (data) cachedProposerSubaccount.value = deserializeFromTransfer(data)
+            })
+        )
+        workerUnsubscribers.push(
+            workerBridge.subscribe('tacoDAONeuronId', (data: unknown) => {
+                if (data) cachedTacoDAONeuronId.value = deserializeFromTransfer(data)
+            })
+        )
+        workerUnsubscribers.push(
+            workerBridge.subscribe('defaultVoteBehavior', (data: unknown) => {
+                if (data) cachedDefaultVoteBehavior.value = deserializeFromTransfer(data)
+            })
+        )
+        workerUnsubscribers.push(
+            workerBridge.subscribe('highestProcessedNNSProposalId', (data: unknown) => {
+                if (data !== null && data !== undefined) cachedHighestProcessedNNSProposalId.value = deserializeFromTransfer(data) as bigint
             })
         )
     }
@@ -9831,6 +10096,7 @@ export const useTacoStore = defineStore('taco', () => {
         systemLogs,
         tradingLogs,
         rebalanceConfig,
+        systemParameters,
         fetchedVoterDetails,
         fetchedNeuronAllocations,
         fetchedTradingStatus,
@@ -10105,5 +10371,40 @@ export const useTacoStore = defineStore('taco', () => {
         // Worker subscriptions
         setupWorkerSubscriptions,
         cleanupWorkerSubscriptions,
+
+        // Cached admin data refs (populated by worker subscriptions)
+        cachedPriceAlerts,
+        cachedTradingPauses,
+        cachedPriceHistory,
+        cachedPortfolioHistory,
+        cachedCircuitBreakerLogs,
+        cachedCircuitBreakerConditions,
+        cachedPortfolioCircuitBreakerConditions,
+        cachedMaxPriceHistoryEntries,
+        cachedMaxPortfolioSnapshots,
+        cachedNeuronSnapshots,
+        cachedMaxNeuronSnapshots,
+        cachedAlarmSystemStatus,
+        cachedAlarmContacts,
+        cachedMonitoringStatus,
+        cachedPendingAlarms,
+        cachedSystemErrors,
+        cachedInternalErrors,
+        cachedMonitoredCanisters,
+        cachedConfigurationIntervals,
+        cachedQueueStatus,
+        cachedSentSMSMessages,
+        cachedSentEmailMessages,
+        cachedSentMessages,
+        cachedAlarmAcknowledgments,
+        cachedAdminActionLogs,
+        cachedVotableProposals,
+        cachedPeriodicTimerStatus,
+        cachedAutoVotingThreshold,
+        cachedProposerSubaccount,
+        cachedTacoDAONeuronId,
+        cachedDefaultVoteBehavior,
+        cachedHighestProcessedNNSProposalId,
+        cachedPortfolioSnapshotStatus,
     }
 })

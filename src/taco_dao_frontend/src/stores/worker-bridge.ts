@@ -190,7 +190,18 @@ function handleWorkerMessage(response: WorkerResponse, workerName: string): void
           })
         }
       }
-      console.error(`[WorkerBridge] Fetch error for ${payload.dataKey}:`, payload.error)
+      // Don't spam console for access denied errors
+      const isAccessDenied = payload.error && (
+        payload.error.includes('canister_inspect_message') ||
+        payload.error.includes('refused message') ||
+        payload.error.includes('not authorized') ||
+        payload.error.includes('is not a function')
+      )
+      if (isAccessDenied) {
+        console.log(`[WorkerBridge] Access denied for ${payload.dataKey}`)
+      } else {
+        console.error(`[WorkerBridge] Fetch error for ${payload.dataKey}:`, payload.error)
+      }
       break
 
     case 'PONG':
