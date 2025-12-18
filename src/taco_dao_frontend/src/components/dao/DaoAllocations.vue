@@ -896,12 +896,13 @@ LOCAL METHODS
         ////////////////////////////////
         
         // find matching token
-        const selectedToken2 = fetchedTokenDetails.value.find(([_, token]) => {
+        const selectedToken2 = fetchedTokenDetails.value.find((entry) => {
+            const token = entry[1]
             const tokenSymbol = token.tokenSymbol?.toLowerCase()
             const searchSymbol = selectedSymbol.toLowerCase()
-            
+
             // match exact symbols or special case for ICP/LICP
-            return tokenSymbol === searchSymbol || 
+            return tokenSymbol === searchSymbol ||
                    (tokenSymbol === 'icp' && searchSymbol === 'licp') ||
                    (tokenSymbol === 'licp' && searchSymbol === 'icp')
         })?.[1]
@@ -920,7 +921,7 @@ LOCAL METHODS
         // update current token trusted date with fetchedTokenDetails
         if (selectedToken2) {
             const timestamp = selectedToken2.epochAdded
-            currentTokenTrusted.value = formatTimestampDateOnly(timestamp)
+            currentTokenTrusted.value = formatTimestampDateOnly(String(timestamp))
         }
 
         // update current token icp coins link with tokenData
@@ -1049,7 +1050,9 @@ LOCAL METHODS
                 // First try to get symbols from fetchedTokenDetails (fast path)
                 const tokenDetailsMap = new Map<string, string>()
                 if (fetchedTokenDetails.value && fetchedTokenDetails.value.length > 0) {
-                    for (const [principal, details] of fetchedTokenDetails.value) {
+                    for (const entry of fetchedTokenDetails.value) {
+                        const principal = entry[0]
+                        const details = entry[1]
                         const principalStr = typeof principal === 'string' ? principal : principal?.toString?.() || ''
                         if (principalStr && details?.tokenSymbol) {
                             tokenDetailsMap.set(principalStr, details.tokenSymbol)
@@ -1074,8 +1077,8 @@ LOCAL METHODS
                     }
 
                     // Fall back to icrc1Metadata call (slow path)
-                    const fetchedMetadata = await icrc1Metadata(canisterId)
-                    const symbolEntry = fetchedMetadata.find((entry: any) => entry[0] === "icrc1:symbol")
+                    const fetchedMetadata = await icrc1Metadata(canisterId) as Array<[string, { Text?: string }]>
+                    const symbolEntry = fetchedMetadata.find((entry) => entry[0] === "icrc1:symbol")
                     if (symbolEntry && symbolEntry[1]?.Text) {
                         symbols.push(symbolEntry[1].Text)
                         tokenSymbolCache.set(canisterId, symbolEntry[1].Text)
@@ -1186,21 +1189,21 @@ LOCAL METHODS
                     const priceScaled = BigInt(Math.round(Number(t.priceInICP) * Number(ICP_SCALE)))
                     return (balance * priceScaled) / denom
                 }
-                const totalValueScaled = holdings.reduce((sum: bigint, [_, token]: any) => {
-                    return sum + toScaledValueIcp(token)
+                const totalValueScaled = holdings.reduce((sum: bigint, entry) => {
+                    return sum + toScaledValueIcp(entry[1])
                 }, 0n)
                 const totalValue = Number(totalValueScaled) / Number(ICP_SCALE)
 
                 // create percentages array
-                const percentages = holdings.map(([_, token]) => {
+                const percentages = holdings.map((entry) => {
                     if (totalValueScaled === 0n) return 0
-                    const tokenScaled = toScaledValueIcp(token)
+                    const tokenScaled = toScaledValueIcp(entry[1])
                     const percentage = (Number(tokenScaled) / Number(totalValueScaled)) * 100
                     return Number(percentage.toFixed(2))
                 })
 
                 // create symbols array
-                const symbols = holdings.map(([_, token]) => token.tokenSymbol.toLowerCase())
+                const symbols = holdings.map((entry) => entry[1].tokenSymbol.toLowerCase())
 
                 // log
                 // console.log('symbols:', symbols)

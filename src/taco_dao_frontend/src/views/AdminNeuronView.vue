@@ -569,7 +569,7 @@ const loadNeuronData = async () => {
       neuronDataPageSize.value
     )
     
-    if (result && result.length > 0) {
+    if (result && result.length > 0 && result[0]) {
       neuronData.value = result[0].entries
       neuronDataInfo.value = result[0]
     } else {
@@ -596,7 +596,7 @@ const loadMoreNeuronData = async () => {
       neuronDataPageSize.value
     )
     
-    if (result && result.length > 0) {
+    if (result && result.length > 0 && result[0]) {
       neuronData.value.push(...result[0].entries)
       neuronDataInfo.value = result[0]
     }

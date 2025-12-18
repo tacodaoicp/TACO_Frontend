@@ -1,15 +1,8 @@
 /**
- * Authenticated Data SharedWorker
+ * Authenticated Data Dedicated Worker (Fallback for SharedWorker)
  *
- * Handles data that requires authentication:
- * - userAllocation (requires user login)
- * - systemLogs (admin only)
- * - voterDetails (admin only)
- * - neuronAllocations (admin only)
- * - rebalanceConfig (admin only)
- * - systemParameters (admin only)
- *
- * Identity is passed from main thread via SET_IDENTITY message.
+ * This is a dedicated worker version for browsers that don't support SharedWorker.
+ * Handles data that requires authentication.
  */
 
 /// <reference lib="webworker" />
@@ -28,7 +21,6 @@ import {
   fetchNeuronAllocationsData,
   fetchRebalanceConfigData,
   fetchSystemParametersData,
-  // Treasury/Trading admin data
   fetchPriceAlertsData,
   fetchTradingPausesData,
   fetchPriceHistoryData,
@@ -38,10 +30,8 @@ import {
   fetchPortfolioCircuitBreakerConditionsData,
   fetchMaxPriceHistoryEntriesData,
   fetchMaxPortfolioSnapshotsData,
-  // Neuron Snapshots admin data
   fetchNeuronSnapshotsData,
   fetchMaxNeuronSnapshotsData,
-  // Alarm system admin data
   fetchAlarmSystemStatusData,
   fetchAlarmContactsData,
   fetchMonitoringStatusData,
@@ -56,7 +46,6 @@ import {
   fetchSentMessagesData,
   fetchAlarmAcknowledgmentsData,
   fetchAdminActionLogsData,
-  // NNS Automation admin data
   fetchVotableProposalsData,
   fetchPeriodicTimerStatusData,
   fetchAutoVotingThresholdData,
@@ -82,10 +71,9 @@ import {
   IDLE_TIMEOUT_MS,
   generateMessageId,
   createInitialState,
-  ADMIN_PRELOAD_KEYS,
 } from './types'
 
-declare const self: SharedWorkerGlobalScope
+declare const self: DedicatedWorkerGlobalScope
 
 // ============================================================================
 // Data keys handled by this worker
@@ -98,7 +86,6 @@ const HANDLED_KEYS: DataKey[] = [
   'neuronAllocations',
   'rebalanceConfig',
   'systemParameters',
-  // Treasury/Trading admin data
   'priceAlerts',
   'tradingPauses',
   'priceHistory',
@@ -108,10 +95,8 @@ const HANDLED_KEYS: DataKey[] = [
   'portfolioCircuitBreakerConditions',
   'maxPriceHistoryEntries',
   'maxPortfolioSnapshots',
-  // Neuron Snapshots admin data
   'neuronSnapshots',
   'maxNeuronSnapshots',
-  // Alarm system admin data
   'alarmSystemStatus',
   'alarmContacts',
   'monitoringStatus',
@@ -126,7 +111,6 @@ const HANDLED_KEYS: DataKey[] = [
   'sentMessages',
   'alarmAcknowledgments',
   'adminActionLogs',
-  // NNS Automation admin data
   'votableProposals',
   'periodicTimerStatus',
   'autoVotingThreshold',
@@ -134,16 +118,13 @@ const HANDLED_KEYS: DataKey[] = [
   'tacoDAONeuronId',
   'defaultVoteBehavior',
   'highestProcessedNNSProposalId',
-  // Rewards/Distributions admin data
   'rewardsConfiguration',
   'distributionHistory',
 ]
 
 const USER_KEYS: DataKey[] = ['userAllocation']
 
-// Keys that REQUIRE authentication - canister enforces caller identity check
 const AUTH_REQUIRED_KEYS: DataKey[] = [
-  // Alarm system - uses canister_inspect_message
   'queueStatus',
   'sentSMSMessages',
   'sentEmailMessages',
@@ -158,7 +139,6 @@ const AUTH_REQUIRED_KEYS: DataKey[] = [
   'monitoredCanisters',
   'alarmSystemStatus',
   'monitoringStatus',
-  // NNS Automation - may require auth
   'votableProposals',
   'periodicTimerStatus',
   'autoVotingThreshold',
@@ -168,14 +148,12 @@ const AUTH_REQUIRED_KEYS: DataKey[] = [
   'highestProcessedNNSProposalId',
 ]
 
-// Keys that can be read publicly (anonymous agent works)
 const PUBLIC_ADMIN_KEYS: DataKey[] = [
   'systemLogs',
   'voterDetails',
   'neuronAllocations',
   'rebalanceConfig',
   'systemParameters',
-  // Treasury/Trading admin data - typically public reads
   'priceAlerts',
   'tradingPauses',
   'priceHistory',
@@ -185,15 +163,12 @@ const PUBLIC_ADMIN_KEYS: DataKey[] = [
   'portfolioCircuitBreakerConditions',
   'maxPriceHistoryEntries',
   'maxPortfolioSnapshots',
-  // Neuron Snapshots admin data
   'neuronSnapshots',
   'maxNeuronSnapshots',
-  // Rewards/Distributions admin data - public reads
   'rewardsConfiguration',
   'distributionHistory',
 ]
 
-// Combined for backward compatibility
 const ADMIN_KEYS: DataKey[] = [...AUTH_REQUIRED_KEYS, ...PUBLIC_ADMIN_KEYS]
 
 // ============================================================================
@@ -201,8 +176,7 @@ const ADMIN_KEYS: DataKey[] = [...AUTH_REQUIRED_KEYS, ...PUBLIC_ADMIN_KEYS]
 // ============================================================================
 
 const dataStates = new Map<DataKey, DataState>()
-const connectedPorts = new Set<MessagePort>()
-const subscriptions = new Map<DataKey, Set<MessagePort>>()
+const subscriptions = new Set<DataKey>()
 const queue = new PriorityQueue()
 const backoff = new BackoffTracker()
 
@@ -211,85 +185,72 @@ let isBackgroundTab = false
 let isIdle = false
 let lastActivityTime = Date.now()
 let authenticatedAgent: HttpAgent | null = null
-let anonymousAgent: HttpAgent | null = null  // For public read-only queries
+let anonymousAgent: HttpAgent | null = null
 let currentIdentity: Identity | null = null
 let isAdmin = false
 let isAuthenticated = false
 let isInitialized = false
 
-// Queue of ports waiting for cached data after init
-const pendingCacheDeliveries: Array<{ port: MessagePort; keys: DataKey[] }> = []
-
 // ============================================================================
-// Initialization
+// Helper Functions
 // ============================================================================
 
-async function init(): Promise<void> {
-  console.log('[AuthWorker] Initializing...')
-
-  // Initialize all data states
-  for (const key of HANDLED_KEYS) {
-    dataStates.set(key, createInitialState())
-    subscriptions.set(key, new Set())
-  }
-
-  // Load cached data from IndexedDB
-  try {
-    const cached = await getAllCached()
-    for (const [key, state] of cached) {
-      if (HANDLED_KEYS.includes(key)) {
-        dataStates.set(key, {
-          ...state,
-          stale: isStale(key, state.lastUpdated),
-        })
-        console.log(`[AuthWorker] Loaded cached ${key}`)
-      }
-    }
-  } catch (error) {
-    console.error('[AuthWorker] Error loading cache:', error)
-  }
-
-  // Create anonymous agent for public read-only queries
-  // This allows fetching admin-labeled data even before user logs in
-  await createAnonymousAgent()
-
-  // Mark as initialized
-  isInitialized = true
-
-  // Deliver cached data to any ports that connected during init
-  console.log(`[AuthWorker] Delivering cached data to ${pendingCacheDeliveries.length} pending ports`)
-  for (const { port, keys } of pendingCacheDeliveries) {
-    for (const key of keys) {
-      const state = dataStates.get(key)
-      if (state?.data) {
-        sendResponse(port, {
-          id: generateMessageId(),
-          timestamp: Date.now(),
-          type: 'CACHE_HIT',
-          payload: {
-            dataKey: key,
-            data: state.data,
-            state,
-            fromCache: true,
-          },
-        })
-      }
-    }
-  }
-  pendingCacheDeliveries.length = 0 // Clear the queue
-
-  // Start processing loop
-  processQueue()
-
-  console.log('[AuthWorker] Initialized with anonymous agent (ready for public reads)')
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
-async function createAnonymousAgent(): Promise<void> {
-  anonymousAgent = await createAgent({
-    identity: new AnonymousIdentity(),
-    host: getHost(),
-    fetchRootKey: shouldFetchRootKey(),
-  })
+function checkIdleStatus(): void {
+  const wasIdle = isIdle
+  isIdle = Date.now() - lastActivityTime > IDLE_TIMEOUT_MS
+  if (isIdle && !wasIdle) {
+    console.log('[AuthWorker-Dedicated] Entering idle mode - pausing refreshes')
+  } else if (!isIdle && wasIdle) {
+    console.log('[AuthWorker-Dedicated] Exiting idle mode - resuming refreshes')
+  }
+}
+
+function recordActivity(): void {
+  lastActivityTime = Date.now()
+  if (isIdle) {
+    isIdle = false
+    console.log('[AuthWorker-Dedicated] Activity detected - resuming refreshes')
+  }
+}
+
+function isStale(dataKey: DataKey, lastUpdated: number | null): boolean {
+  if (!lastUpdated) return true
+  const threshold = STALENESS_THRESHOLDS[dataKey] || 60_000
+  const effectiveThreshold = isBackgroundTab ? threshold * BACKGROUND_MULTIPLIER : threshold
+  return Date.now() - lastUpdated > effectiveThreshold
+}
+
+function sendResponse(response: WorkerResponse): void {
+  self.postMessage(response)
+}
+
+function updateState(dataKey: DataKey, updates: Partial<DataState>): void {
+  const current = dataStates.get(dataKey) || createInitialState()
+  const newState = { ...current, ...updates }
+  dataStates.set(dataKey, newState)
+}
+
+function broadcastUpdate(dataKey: DataKey, data: unknown, fromCache: boolean = false): void {
+  const state = dataStates.get(dataKey)
+  if (!state) return
+
+  if (subscriptions.has(dataKey)) {
+    sendResponse({
+      id: generateMessageId(),
+      timestamp: Date.now(),
+      type: 'DATA_UPDATE',
+      payload: {
+        dataKey,
+        data,
+        state,
+        fromCache,
+      },
+    })
+  }
 }
 
 // ============================================================================
@@ -297,14 +258,9 @@ async function createAnonymousAgent(): Promise<void> {
 // ============================================================================
 
 function deserializeIdentity(serialized: SerializedIdentity): DelegationIdentity {
-  try {
-    const delegationChain = DelegationChain.fromJSON(JSON.parse(serialized.delegationChainJson))
-    const sessionKey = Ed25519KeyIdentity.fromJSON(serialized.sessionKeyJson)
-    return DelegationIdentity.fromDelegation(sessionKey, delegationChain)
-  } catch (error) {
-    console.error('[AuthWorker] Error deserializing identity:', error)
-    throw error
-  }
+  const delegationChain = DelegationChain.fromJSON(JSON.parse(serialized.delegationChainJson))
+  const sessionKey = Ed25519KeyIdentity.fromJSON(serialized.sessionKeyJson)
+  return DelegationIdentity.fromDelegation(sessionKey, delegationChain)
 }
 
 async function setIdentity(serialized: SerializedIdentity): Promise<void> {
@@ -318,15 +274,13 @@ async function setIdentity(serialized: SerializedIdentity): Promise<void> {
       fetchRootKey: shouldFetchRootKey(),
     })
 
-    console.log('[AuthWorker] Identity set, agent created')
+    console.log('[AuthWorker-Dedicated] Identity set, agent created')
 
-    // Immediately deliver any cached user data to all subscribed ports
-    // This ensures components get cached data without waiting for a new fetch
+    // Deliver cached user data
     for (const key of USER_KEYS) {
       const state = dataStates.get(key)
-      if (state?.data) {
-        console.log(`[AuthWorker] Delivering cached ${key} after authentication`)
-        broadcastToSubscribers(key, {
+      if (state?.data && subscriptions.has(key)) {
+        sendResponse({
           id: generateMessageId(),
           timestamp: Date.now(),
           type: 'CACHE_HIT',
@@ -340,17 +294,15 @@ async function setIdentity(serialized: SerializedIdentity): Promise<void> {
       }
     }
 
-    // Queue user data fetch for background refresh
     queue.enqueue('userAllocation', 'critical')
 
-    // If admin, queue admin data
     if (isAdmin) {
       for (const key of ADMIN_KEYS) {
         queue.enqueue(key, 'high')
       }
     }
   } catch (error) {
-    console.error('[AuthWorker] Error setting identity:', error)
+    console.error('[AuthWorker-Dedicated] Error setting identity:', error)
     isAuthenticated = false
     currentIdentity = null
     authenticatedAgent = null
@@ -363,7 +315,6 @@ function clearIdentity(): void {
   isAuthenticated = false
   isAdmin = false
 
-  // Clear user-specific data from state (but keep in cache for quick restore)
   for (const key of HANDLED_KEYS) {
     const state = dataStates.get(key)
     if (state) {
@@ -371,33 +322,47 @@ function clearIdentity(): void {
     }
   }
 
-  // Clear queue
   queue.clear()
-
-  console.log('[AuthWorker] Identity cleared')
+  console.log('[AuthWorker-Dedicated] Identity cleared')
 }
 
 // ============================================================================
-// Connection Handling
+// Initialization
 // ============================================================================
 
-self.onconnect = (event: MessageEvent) => {
-  const port = event.ports[0]
-  connectedPorts.add(port)
+async function init(): Promise<void> {
+  console.log('[AuthWorker-Dedicated] Initializing...')
 
-  console.log(`[AuthWorker] Port connected. Total: ${connectedPorts.size}`)
-
-  port.onmessage = (e: MessageEvent<WorkerRequest>) => {
-    console.log(`[AuthWorker] Message received: ${e.data?.type}, dataKey=${e.data?.payload?.dataKey}`)
-    handleMessage(port, e.data)
+  for (const key of HANDLED_KEYS) {
+    dataStates.set(key, createInitialState())
   }
 
-  port.onmessageerror = () => {
-    disconnectPort(port)
+  try {
+    const cached = await getAllCached()
+    for (const [key, state] of cached) {
+      if (HANDLED_KEYS.includes(key)) {
+        dataStates.set(key, {
+          ...state,
+          stale: isStale(key, state.lastUpdated),
+        })
+        console.log(`[AuthWorker-Dedicated] Loaded cached ${key}`)
+      }
+    }
+  } catch (error) {
+    console.error('[AuthWorker-Dedicated] Error loading cache:', error)
   }
 
-  // Send connected message
-  sendResponse(port, {
+  // Create anonymous agent for public reads
+  anonymousAgent = await createAgent({
+    identity: new AnonymousIdentity(),
+    host: getHost(),
+    fetchRootKey: shouldFetchRootKey(),
+  })
+
+  isInitialized = true
+  processQueue()
+
+  sendResponse({
     id: generateMessageId(),
     timestamp: Date.now(),
     type: 'CONNECTED',
@@ -405,58 +370,18 @@ self.onconnect = (event: MessageEvent) => {
       dataKey: 'userAllocation',
       state: dataStates.get('userAllocation') || createInitialState(),
       fromCache: false,
-      tabCount: connectedPorts.size,
+      tabCount: 1,
     },
   })
 
-  // If not yet initialized, queue cached data delivery for when init completes
-  if (!isInitialized) {
-    console.log(`[AuthWorker] Port connected before init, queuing cache delivery`)
-    pendingCacheDeliveries.push({ port, keys: HANDLED_KEYS })
-    return
-  }
-
-  // Already initialized - send cached data for keys we have
-  // USER_KEYS and AUTH_REQUIRED_KEYS require authentication
-  // For those, we can still send stale cached data
-  for (const key of HANDLED_KEYS) {
-    const requiresAuth = USER_KEYS.includes(key) || AUTH_REQUIRED_KEYS.includes(key)
-    // Skip auth-required keys if not authenticated AND no cached data
-    if (requiresAuth && !isAuthenticated) {
-      // Still send cached data if we have it (will be marked stale)
-      const state = dataStates.get(key)
-      if (!state?.data) continue
-    }
-    const state = dataStates.get(key)
-    if (state?.data) {
-      sendResponse(port, {
-        id: generateMessageId(),
-        timestamp: Date.now(),
-        type: 'CACHE_HIT',
-        payload: {
-          dataKey: key,
-          data: state.data,
-          state,
-          fromCache: true,
-        },
-      })
-    }
-  }
-}
-
-function disconnectPort(port: MessagePort): void {
-  connectedPorts.delete(port)
-  for (const subscribers of subscriptions.values()) {
-    subscribers.delete(port)
-  }
-  console.log(`[AuthWorker] Port disconnected. Total: ${connectedPorts.size}`)
+  console.log('[AuthWorker-Dedicated] Initialized with anonymous agent')
 }
 
 // ============================================================================
 // Message Handling
 // ============================================================================
 
-function handleMessage(port: MessagePort, message: WorkerRequest): void {
+function handleMessage(message: WorkerRequest): void {
   switch (message.type) {
     case 'SET_IDENTITY':
       if (message.payload.identity) {
@@ -473,7 +398,7 @@ function handleMessage(port: MessagePort, message: WorkerRequest): void {
       break
 
     case 'FETCH':
-      handleFetch(port, message)
+      handleFetch(message)
       break
 
     case 'SET_PRIORITY':
@@ -491,28 +416,28 @@ function handleMessage(port: MessagePort, message: WorkerRequest): void {
       recordActivity()
       break
 
-    case 'GET_CACHED':
-      handleGetCached(port, message)
+    case 'SET_NETWORK':
+      handleSetNetwork(message)
       break
 
     case 'SUBSCRIBE':
-      handleSubscribe(port, message)
+      handleSubscribe(message)
       break
 
     case 'UNSUBSCRIBE':
-      handleUnsubscribe(port, message)
+      handleUnsubscribe(message)
+      break
+
+    case 'GET_CACHED':
+      handleGetCached(message)
       break
 
     case 'INVALIDATE':
       handleInvalidate(message)
       break
 
-    case 'SET_NETWORK':
-      handleSetNetwork(message)
-      break
-
     case 'PING':
-      sendResponse(port, {
+      sendResponse({
         id: message.id,
         timestamp: Date.now(),
         type: 'PONG',
@@ -520,7 +445,7 @@ function handleMessage(port: MessagePort, message: WorkerRequest): void {
           dataKey: 'userAllocation',
           state: createInitialState(),
           fromCache: false,
-          tabCount: connectedPorts.size,
+          tabCount: 1,
         },
       })
       break
@@ -531,9 +456,8 @@ function handleSetAdmin(message: WorkerRequest): void {
   const wasAdmin = isAdmin
   isAdmin = message.payload.isAdmin || false
 
-  console.log(`[AuthWorker] Admin status: ${isAdmin}`)
+  console.log(`[AuthWorker-Dedicated] Admin status: ${isAdmin}`)
 
-  // If newly admin and authenticated, queue admin data
   if (isAdmin && !wasAdmin && isAuthenticated) {
     for (const key of ADMIN_KEYS) {
       queue.enqueue(key, 'high')
@@ -541,22 +465,18 @@ function handleSetAdmin(message: WorkerRequest): void {
   }
 }
 
-function handleFetch(port: MessagePort, message: WorkerRequest): void {
+function handleFetch(message: WorkerRequest): void {
   const { dataKey, priority = 'medium', force = false } = message.payload
+
   if (!dataKey || !HANDLED_KEYS.includes(dataKey)) {
-    console.log(`[AuthWorker] FETCH ignored - dataKey=${dataKey} not in HANDLED_KEYS`)
     return
   }
-  console.log(`[AuthWorker] FETCH request: ${dataKey}, force=${force}, isAuth=${isAuthenticated}, hasAnon=${!!anonymousAgent}`)
 
-  // USER_KEYS and AUTH_REQUIRED_KEYS require authentication
-  // The canister will reject anonymous calls for these
   const requiresAuth = USER_KEYS.includes(dataKey) || AUTH_REQUIRED_KEYS.includes(dataKey)
   if (requiresAuth && !isAuthenticated) {
-    // For auth-required keys, return cached data if available (stale is okay)
     const currentState = dataStates.get(dataKey)
     if (currentState?.data) {
-      sendResponse(port, {
+      sendResponse({
         id: message.id,
         timestamp: Date.now(),
         type: 'CACHE_HIT',
@@ -568,15 +488,13 @@ function handleFetch(port: MessagePort, message: WorkerRequest): void {
         },
       })
     }
-    // Don't queue for refresh - will fail without auth
     return
   }
 
   const currentState = dataStates.get(dataKey)
 
-  // Stale-while-revalidate - return cached data if available
   if (currentState?.data && !force) {
-    sendResponse(port, {
+    sendResponse({
       id: message.id,
       timestamp: Date.now(),
       type: 'CACHE_HIT',
@@ -589,10 +507,7 @@ function handleFetch(port: MessagePort, message: WorkerRequest): void {
     })
   }
 
-  // Queue for refresh if needed
-  // The queue processor will wait for agent initialization before processing
   if (force || !currentState?.data || isStale(dataKey, currentState.lastUpdated)) {
-    console.log(`[AuthWorker] Queuing ${dataKey} for fetch (force=${force}, hasData=${!!currentState?.data}, queueSize=${queue.size})`)
     queue.enqueue(dataKey, priority)
   }
 }
@@ -603,51 +518,19 @@ function handleSetPriority(message: WorkerRequest): void {
   queue.updatePriority(dataKey, priority)
 }
 
-function handleGetCached(port: MessagePort, message: WorkerRequest): void {
-  const { dataKey } = message.payload
-  if (!dataKey || !HANDLED_KEYS.includes(dataKey)) return
+function handleSubscribe(message: WorkerRequest): void {
+  const { dataKey, dataKeys: keysToSubscribe } = message.payload
+  const keys = keysToSubscribe || (dataKey ? [dataKey] : [])
+  const validKeys = keys.filter((key: DataKey) => HANDLED_KEYS.includes(key))
 
-  const state = dataStates.get(dataKey)
-  if (state) {
-    sendResponse(port, {
-      id: message.id,
-      timestamp: Date.now(),
-      type: 'CACHE_HIT',
-      payload: {
-        dataKey,
-        data: state.data,
-        state,
-        fromCache: true,
-      },
-    })
-  }
-}
-
-function handleSubscribe(port: MessagePort, message: WorkerRequest): void {
-  const { dataKey, dataKeys } = message.payload
-  const keysToSubscribe = dataKeys || (dataKey ? [dataKey] : [])
-  const validKeys = keysToSubscribe.filter((key: DataKey) => HANDLED_KEYS.includes(key))
-
-  // Add to subscriptions immediately - ensure Set exists first
   for (const key of validKeys) {
-    if (!subscriptions.has(key)) {
-      subscriptions.set(key, new Set())
-    }
-    subscriptions.get(key)!.add(port)
+    subscriptions.add(key)
   }
 
-  // If not yet initialized, queue this port for cache delivery when init completes
-  if (!isInitialized) {
-    console.log(`[AuthWorker] Not yet initialized, queuing cache delivery for ${validKeys.length} keys`)
-    pendingCacheDeliveries.push({ port, keys: validKeys })
-    return
-  }
-
-  // Already initialized - send cached data immediately
   for (const key of validKeys) {
     const state = dataStates.get(key)
     if (state?.data) {
-      sendResponse(port, {
+      sendResponse({
         id: generateMessageId(),
         timestamp: Date.now(),
         type: 'CACHE_HIT',
@@ -662,13 +545,29 @@ function handleSubscribe(port: MessagePort, message: WorkerRequest): void {
   }
 }
 
-function handleUnsubscribe(port: MessagePort, message: WorkerRequest): void {
-  const { dataKey, dataKeys } = message.payload
-  const keysToUnsubscribe = dataKeys || (dataKey ? [dataKey] : [])
-
-  for (const key of keysToUnsubscribe) {
-    subscriptions.get(key)?.delete(port)
+function handleUnsubscribe(message: WorkerRequest): void {
+  const { dataKey } = message.payload
+  if (dataKey && HANDLED_KEYS.includes(dataKey)) {
+    subscriptions.delete(dataKey)
   }
+}
+
+function handleGetCached(message: WorkerRequest): void {
+  const { dataKey } = message.payload
+  if (!dataKey || !HANDLED_KEYS.includes(dataKey)) return
+
+  const state = dataStates.get(dataKey)
+  sendResponse({
+    id: message.id,
+    timestamp: Date.now(),
+    type: 'CACHE_HIT',
+    payload: {
+      dataKey,
+      data: state?.data || null,
+      state: state || createInitialState(),
+      fromCache: true,
+    },
+  })
 }
 
 function handleInvalidate(message: WorkerRequest): void {
@@ -679,11 +578,8 @@ function handleInvalidate(message: WorkerRequest): void {
     if (HANDLED_KEYS.includes(key)) {
       const state = dataStates.get(key)
       if (state) {
-        state.stale = true
-        dataStates.set(key, state)
-      }
-      if (isAuthenticated && (USER_KEYS.includes(key) || (ADMIN_KEYS.includes(key) && isAdmin))) {
-        queue.enqueue(key, 'critical')
+        dataStates.set(key, { ...state, stale: true })
+        queue.enqueue(key, 'high')
       }
     }
   }
@@ -691,20 +587,22 @@ function handleInvalidate(message: WorkerRequest): void {
 
 async function handleSetNetwork(message: WorkerRequest): Promise<void> {
   const { network } = message.payload
-  console.log(`[AuthWorker] Network override set to: ${network || 'auto'}`)
   setWorkerNetworkOverride(network || null)
 
   // Clear IndexedDB cache - data is from a different network
   try {
     const { clearAllCached } = await import('./shared/indexed-db')
     await clearAllCached()
-    console.log('[AuthWorker] Cleared IndexedDB cache due to network change')
   } catch (err) {
-    console.error('[AuthWorker] Error clearing cache:', err)
+    console.error('[AuthWorker-Dedicated] Error clearing cache:', err)
   }
 
-  // Always recreate anonymous agent with new network settings
-  await createAnonymousAgent()
+  // Recreate anonymous agent with new network settings
+  anonymousAgent = await createAgent({
+    identity: new AnonymousIdentity(),
+    host: getHost(),
+    fetchRootKey: shouldFetchRootKey(),
+  })
 
   // If authenticated, recreate authenticated agent with new network settings
   if (isAuthenticated && currentIdentity) {
@@ -718,8 +616,8 @@ async function handleSetNetwork(message: WorkerRequest): Promise<void> {
   // Clear in-memory state and queue for refetch
   for (const key of HANDLED_KEYS) {
     dataStates.set(key, createInitialState())
-    // Queue all ADMIN_KEYS since they can be fetched with anonymous agent
-    if (ADMIN_KEYS.includes(key)) {
+    // Queue PUBLIC_ADMIN_KEYS since they can be fetched with anonymous agent
+    if (PUBLIC_ADMIN_KEYS.includes(key)) {
       queue.enqueue(key, 'high')
     }
     // Queue USER_KEYS only if authenticated
@@ -730,45 +628,29 @@ async function handleSetNetwork(message: WorkerRequest): Promise<void> {
 }
 
 // ============================================================================
-// Queue Processing (Parallel)
+// Queue Processing
 // ============================================================================
 
-// Maximum concurrent fetches - higher priority items are dequeued first
-// Bumped to 5 to handle 41 admin data keys more efficiently
 const MAX_CONCURRENT_FETCHES = 5
 let activeFetchCount = 0
 
 async function processQueue(): Promise<void> {
   if (isProcessing) return
   isProcessing = true
-  console.log('[AuthWorker] processQueue started')
 
   while (true) {
-    // Start new fetches up to the limit (priority queue returns highest priority first)
     while (activeFetchCount < MAX_CONCURRENT_FETCHES) {
-      // Get next highest-priority item (queue.dequeue handles deduplication internally)
       const item = queue.dequeue()
-      if (item) {
-        console.log(`[AuthWorker] Dequeued ${item.dataKey}, activeFetches=${activeFetchCount}`)
-      }
 
-      if (!item) {
-        break
-      }
+      if (!item) break
 
-      // USER_KEYS and AUTH_REQUIRED_KEYS require authentication
-      // Skip for now - will be fetched when user authenticates
       const requiresAuth = USER_KEYS.includes(item.dataKey) || AUTH_REQUIRED_KEYS.includes(item.dataKey)
       if (requiresAuth && (!isAuthenticated || !authenticatedAgent)) {
-        console.log(`[AuthWorker] Skipping ${item.dataKey} - requires auth but not authenticated`)
         queue.complete(item.dataKey)
         continue
       }
 
-      // PUBLIC_ADMIN_KEYS can use anonymous agent - they're publicly readable
-      // If no agent available yet, re-queue and wait for init to complete
       if (!anonymousAgent && !authenticatedAgent) {
-        console.log(`[AuthWorker] Retrying ${item.dataKey} - no agent available yet`)
         queue.retry(item.dataKey)
         continue
       }
@@ -778,7 +660,6 @@ async function processQueue(): Promise<void> {
         continue
       }
 
-      // Start fetch in parallel (don't await) - critical/high priority items start first
       activeFetchCount++
       processSingleFetch(item).finally(() => {
         activeFetchCount--
@@ -796,15 +677,13 @@ async function processSingleFetch(item: { dataKey: DataKey; retryCount: number }
     backoff.recordSuccess(item.dataKey)
     queue.complete(item.dataKey)
 
-    // If first successful admin call, we're confirmed admin
     if (ADMIN_KEYS.includes(item.dataKey) && !isAdmin) {
       isAdmin = true
-      console.log('[AuthWorker] Admin confirmed by successful call')
+      console.log('[AuthWorker-Dedicated] Admin confirmed by successful call')
     }
   } catch (error) {
     backoff.recordFailure(item.dataKey)
 
-    // Check if error indicates not admin or access denied
     const errorMsg = error instanceof Error ? error.message : String(error)
     const isAccessDenied = errorMsg.includes('not authorized') ||
       errorMsg.includes('admin') ||
@@ -812,15 +691,13 @@ async function processSingleFetch(item: { dataKey: DataKey; retryCount: number }
       errorMsg.includes('refused message')
 
     if (isAccessDenied && ADMIN_KEYS.includes(item.dataKey)) {
-      // Not admin or not authorized for this canister - don't retry, don't spam logs
-      console.log(`[AuthWorker] Access denied for ${item.dataKey} - skipping`)
+      console.log(`[AuthWorker-Dedicated] Access denied for ${item.dataKey} - skipping`)
       isAdmin = false
       queue.complete(item.dataKey)
       return
     }
 
-    // Log other errors
-    console.error(`[AuthWorker] Error fetching ${item.dataKey}:`, error)
+    console.error(`[AuthWorker-Dedicated] Error fetching ${item.dataKey}:`, error)
 
     updateState(item.dataKey, {
       loading: false,
@@ -836,18 +713,13 @@ async function processSingleFetch(item: { dataKey: DataKey; retryCount: number }
 }
 
 async function fetchData(dataKey: DataKey): Promise<void> {
-  // Choose the appropriate agent:
-  // - USER_KEYS and AUTH_REQUIRED_KEYS require authenticated agent
-  // - PUBLIC_ADMIN_KEYS can use anonymous agent (publicly readable queries)
   const requiresAuth = USER_KEYS.includes(dataKey) || AUTH_REQUIRED_KEYS.includes(dataKey)
   const agent = requiresAuth
     ? authenticatedAgent
     : (authenticatedAgent || anonymousAgent)
 
   if (!agent) {
-    throw new Error(requiresAuth
-      ? 'No authenticated agent'
-      : 'No agent available')
+    throw new Error(requiresAuth ? 'No authenticated agent' : 'No agent available')
   }
 
   updateState(dataKey, { loading: true, error: null })
@@ -856,259 +728,139 @@ async function fetchData(dataKey: DataKey): Promise<void> {
 
   switch (dataKey) {
     case 'userAllocation':
-      // userAllocation requires authenticated agent (user-specific data)
       data = serializeForTransfer(await fetchUserAllocationData(authenticatedAgent!))
       break
-
     case 'systemLogs':
       data = serializeForTransfer(await fetchSystemLogsData(agent))
       break
-
     case 'voterDetails':
       data = serializeForTransfer(await fetchVoterDetailsData(agent))
       break
-
     case 'neuronAllocations':
       data = serializeForTransfer(await fetchNeuronAllocationsData(agent))
       break
-
     case 'rebalanceConfig':
       data = serializeForTransfer(await fetchRebalanceConfigData(agent))
       break
-
     case 'systemParameters':
       data = serializeForTransfer(await fetchSystemParametersData(agent))
       break
-
-    // Treasury/Trading admin data
     case 'priceAlerts':
       data = serializeForTransfer(await fetchPriceAlertsData(agent))
       break
-
     case 'tradingPauses':
       data = serializeForTransfer(await fetchTradingPausesData(agent))
       break
-
     case 'priceHistory':
       data = serializeForTransfer(await fetchPriceHistoryData(agent))
       break
-
     case 'portfolioHistory':
       data = serializeForTransfer(await fetchPortfolioHistoryData(agent))
       break
-
     case 'circuitBreakerLogs':
       data = serializeForTransfer(await fetchCircuitBreakerLogsData(agent))
       break
-
     case 'circuitBreakerConditions':
       data = serializeForTransfer(await fetchCircuitBreakerConditionsData(agent))
       break
-
     case 'portfolioCircuitBreakerConditions':
       data = serializeForTransfer(await fetchPortfolioCircuitBreakerConditionsData(agent))
       break
-
     case 'maxPriceHistoryEntries':
       data = serializeForTransfer(await fetchMaxPriceHistoryEntriesData(agent))
       break
-
     case 'maxPortfolioSnapshots':
       data = serializeForTransfer(await fetchMaxPortfolioSnapshotsData(agent))
       break
-
-    // Neuron Snapshots admin data
     case 'neuronSnapshots':
       data = serializeForTransfer(await fetchNeuronSnapshotsData(agent))
       break
-
     case 'maxNeuronSnapshots':
       data = serializeForTransfer(await fetchMaxNeuronSnapshotsData(agent))
       break
-
-    // Alarm system admin data
     case 'alarmSystemStatus':
       data = serializeForTransfer(await fetchAlarmSystemStatusData(agent))
       break
-
     case 'alarmContacts':
       data = serializeForTransfer(await fetchAlarmContactsData(agent))
       break
-
     case 'monitoringStatus':
       data = serializeForTransfer(await fetchMonitoringStatusData(agent))
       break
-
     case 'pendingAlarms':
       data = serializeForTransfer(await fetchPendingAlarmsData(agent))
       break
-
     case 'systemErrors':
       data = serializeForTransfer(await fetchSystemErrorsData(agent))
       break
-
     case 'internalErrors':
       data = serializeForTransfer(await fetchInternalErrorsData(agent))
       break
-
     case 'monitoredCanisters':
       data = serializeForTransfer(await fetchMonitoredCanistersData(agent))
       break
-
     case 'configurationIntervals':
       data = serializeForTransfer(await fetchConfigurationIntervalsData(agent))
       break
-
     case 'queueStatus':
       data = serializeForTransfer(await fetchQueueStatusData(agent))
       break
-
     case 'sentSMSMessages':
       data = serializeForTransfer(await fetchSentSMSMessagesData(agent))
       break
-
     case 'sentEmailMessages':
       data = serializeForTransfer(await fetchSentEmailMessagesData(agent))
       break
-
     case 'sentMessages':
       data = serializeForTransfer(await fetchSentMessagesData(agent))
       break
-
     case 'alarmAcknowledgments':
       data = serializeForTransfer(await fetchAlarmAcknowledgmentsData(agent))
       break
-
     case 'adminActionLogs':
       data = serializeForTransfer(await fetchAdminActionLogsData(agent))
       break
-
-    // NNS Automation admin data
     case 'votableProposals':
       data = serializeForTransfer(await fetchVotableProposalsData(agent))
       break
-
     case 'periodicTimerStatus':
       data = serializeForTransfer(await fetchPeriodicTimerStatusData(agent))
       break
-
     case 'autoVotingThreshold':
       data = serializeForTransfer(await fetchAutoVotingThresholdData(agent))
       break
-
     case 'proposerSubaccount':
       data = serializeForTransfer(await fetchProposerSubaccountData(agent))
       break
-
     case 'tacoDAONeuronId':
       data = serializeForTransfer(await fetchTacoDAONeuronIdData(agent))
       break
-
     case 'defaultVoteBehavior':
       data = serializeForTransfer(await fetchDefaultVoteBehaviorData(agent))
       break
-
     case 'highestProcessedNNSProposalId':
       data = serializeForTransfer(await fetchHighestProcessedNNSProposalIdData(agent))
       break
-
-    // Rewards/Distributions data
     case 'rewardsConfiguration':
       data = serializeForTransfer(await fetchRewardsConfigurationData(agent))
       break
-
     case 'distributionHistory':
       data = serializeForTransfer(await fetchDistributionHistoryData(agent))
       break
-
     default:
       throw new Error(`Unknown dataKey: ${dataKey}`)
   }
 
   updateState(dataKey, {
     data,
-    lastUpdated: Date.now(),
     loading: false,
     error: null,
+    lastUpdated: Date.now(),
     stale: false,
   })
 
-  await setCached(dataKey, data)
-}
-
-// ============================================================================
-// State Management
-// ============================================================================
-
-function updateState(dataKey: DataKey, partial: Partial<DataState>): void {
-  const current = dataStates.get(dataKey) || createInitialState()
-  const updated = { ...current, ...partial }
-  dataStates.set(dataKey, updated)
-
-  const response: WorkerResponse = {
-    id: generateMessageId(),
-    timestamp: Date.now(),
-    type: partial.error ? 'FETCH_ERROR' : 'DATA_UPDATE',
-    payload: {
-      dataKey,
-      data: updated.data,
-      error: partial.error || undefined,
-      state: updated,
-      fromCache: false,
-    },
-  }
-
-  broadcastToSubscribers(dataKey, response)
-}
-
-function broadcastToSubscribers(dataKey: DataKey, response: WorkerResponse): void {
-  const subscribers = subscriptions.get(dataKey)
-  if (!subscribers) return
-
-  for (const port of subscribers) {
-    sendResponse(port, response)
-  }
-}
-
-function sendResponse(port: MessagePort, response: WorkerResponse): void {
-  try {
-    port.postMessage(response)
-  } catch {
-    disconnectPort(port)
-  }
-}
-
-// ============================================================================
-// Utility Functions
-// ============================================================================
-
-function isStale(dataKey: DataKey, lastUpdated: number | null): boolean {
-  if (!lastUpdated) return true
-  const threshold = STALENESS_THRESHOLDS[dataKey]
-  const multiplier = isBackgroundTab ? BACKGROUND_MULTIPLIER : 1
-  return Date.now() - lastUpdated > threshold * multiplier
-}
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms))
-}
-
-function checkIdleStatus(): void {
-  const wasIdle = isIdle
-  isIdle = Date.now() - lastActivityTime > IDLE_TIMEOUT_MS
-  if (isIdle && !wasIdle) {
-    console.log('[AuthWorker] Entering idle mode - pausing refreshes')
-  } else if (!isIdle && wasIdle) {
-    console.log('[AuthWorker] Exiting idle mode - resuming refreshes')
-  }
-}
-
-function recordActivity(): void {
-  lastActivityTime = Date.now()
-  if (isIdle) {
-    isIdle = false
-    console.log('[AuthWorker] Activity detected - resuming refreshes')
-  }
+  broadcastUpdate(dataKey, data)
+  await setCached(dataKey, dataStates.get(dataKey)!)
 }
 
 // ============================================================================
@@ -1117,17 +869,14 @@ function recordActivity(): void {
 
 async function autoRefreshLoop(): Promise<void> {
   while (true) {
-    await sleep(15000) // Check every 15 seconds
+    await sleep(15000)
 
     // Check if we should enter idle mode
     checkIdleStatus()
 
     // Skip auto-refresh if idle or not authenticated
-    if (isIdle || !isAuthenticated) {
-      continue
-    }
+    if (isIdle || !isAuthenticated) continue
 
-    // Refresh user data
     for (const dataKey of USER_KEYS) {
       const state = dataStates.get(dataKey)
       if (state && isStale(dataKey, state.lastUpdated) && !queue.has(dataKey)) {
@@ -1135,7 +884,6 @@ async function autoRefreshLoop(): Promise<void> {
       }
     }
 
-    // Refresh admin data if admin
     if (isAdmin) {
       for (const dataKey of ADMIN_KEYS) {
         const state = dataStates.get(dataKey)
@@ -1150,6 +898,10 @@ async function autoRefreshLoop(): Promise<void> {
 // ============================================================================
 // Start Worker
 // ============================================================================
+
+self.onmessage = (e: MessageEvent<WorkerRequest>) => {
+  handleMessage(e.data)
+}
 
 init().then(() => {
   autoRefreshLoop()

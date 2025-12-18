@@ -408,7 +408,7 @@ const sliderPercent = computed(() => {
 // Holdings chart configuration
 const holdingsChartOptions = computed(() => ({
   chart: {
-    type: 'pie',
+    type: 'pie' as const,
     fontFamily: 'Space Mono',
     animations: { enabled: true, easing: 'easeout', speed: 350 }
   },
@@ -443,7 +443,7 @@ const holdingsChartOptions = computed(() => ({
 
 const allocationsChartOptions = computed(() => ({
   chart: {
-    type: 'pie',
+    type: 'pie' as const,
     fontFamily: 'Space Mono',
     animations: { enabled: true, easing: 'easeout', speed: 350 }
   },

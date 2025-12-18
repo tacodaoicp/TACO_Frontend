@@ -696,10 +696,10 @@ const bestExchange = ref<string>('')
 const isSwapping = ref(false)
 const isStaking = ref(false)
 const userNeurons = ref<any[]>([])
-const fetchedIcpBalance = ref<bigint>(0n)
+const fetchedIcpBalance = ref<number>(0)
 const fetchedIcpRawBalance = ref<bigint>(0n)
 const refreshingBalances = ref(false)
-const fetchedTacoBalance = ref<bigint>(0n)
+const fetchedTacoBalance = ref<number>(0)
 const fetchedTacoRawBalance = ref<bigint>(0n)
 
 ////////////////////////
@@ -760,10 +760,10 @@ const fetchIcrc1BalanceOfIcp = async () => {
     console.error('Error fetching ICRC1 balance of ICP:', error)
 
     // set fetched ICP balance to 0
-    fetchedIcpBalance.value = 0n
+    fetchedIcpBalance.value = 0
 
   }
-  
+
 }
 
 // fetch ICRC1 balance of TACO
@@ -802,10 +802,10 @@ const fetchIcrc1BalanceOfTaco = async () => {
   catch (error) {
 
     // log error
-    console.error('Error fetching ICRC1 balance of ICP:', error)
+    console.error('Error fetching ICRC1 balance of TACO:', error)
 
-    // set fetched ICP balance to 0
-    fetchedIcpBalance.value = 0n
+    // set fetched TACO balance to 0
+    fetchedTacoBalance.value = 0
 
   }
 

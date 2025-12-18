@@ -103,6 +103,6 @@
   // local variables //
   /////////////////////
 
-  const currentYear = ref(/\d{4}/.exec(Date())[0])
+  const currentYear = ref(new Date().getFullYear().toString())
 
 </script>

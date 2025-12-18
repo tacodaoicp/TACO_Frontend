@@ -27,7 +27,7 @@
               <span class="send-token-title">Send {{ token?.symbol || 'Token' }}</span>
 
               <!-- token name -->
-              <span class="send-token-name">{{ token.name }}</span>
+              <span class="send-token-name">{{ token?.name }}</span>
 
             </div>
 

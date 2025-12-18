@@ -33,8 +33,8 @@
           <div class="taco-container taco-container--l1 mt-3 p-4">
             <h5 class="mb-3">Check Your Eligibility</h5>
             
-            <button 
-              @click="checkEligibility" 
+            <button
+              @click="() => checkEligibility()"
               class="btn btn-primary btn-lg"
               :disabled="checking"
             >

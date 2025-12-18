@@ -1,8 +1,12 @@
 /**
  * Worker Bridge Store
  *
- * Manages SharedWorker lifecycle, route-based priority updates,
+ * Manages Worker lifecycle, route-based priority updates,
  * visibility tracking, and identity management for the auth worker.
+ *
+ * Automatically uses SharedWorker when available (desktop browsers),
+ * falls back to dedicated Worker for browsers without SharedWorker support
+ * (iOS Safari, some mobile browsers).
  */
 
 import { ref, watch, computed } from 'vue'
@@ -14,14 +18,18 @@ import {
   generateMessageId,
   getRoutePriorities,
 } from '../workers/types'
+import { createWorkerAdapter, isSharedWorkerSupported, type WorkerAdapter } from '../workers/worker-adapter'
 
 // ============================================================================
 // Worker Instances (singletons)
 // ============================================================================
 
-let coreWorker: SharedWorker | null = null
-let secondaryWorker: SharedWorker | null = null
-let authWorker: SharedWorker | null = null
+let coreWorker: WorkerAdapter | null = null
+let secondaryWorker: WorkerAdapter | null = null
+let authWorker: WorkerAdapter | null = null
+
+// Track worker type for logging
+let workerType: 'shared' | 'dedicated' = 'shared'
 
 // Track initialization
 let initialized = false
@@ -56,43 +64,43 @@ const workersConnected = ref(false)
 // Worker Getters
 // ============================================================================
 
-function getCoreWorker(): SharedWorker {
+function getCoreWorker(): WorkerAdapter {
   if (!coreWorker) {
-    coreWorker = new SharedWorker(
+    coreWorker = createWorkerAdapter(
       new URL('../workers/core-public.worker.ts', import.meta.url),
-      { type: 'module', name: 'taco-core-public' }
+      'taco-core-public'
     )
-    setupWorkerPort(coreWorker, 'core')
+    setupWorkerAdapter(coreWorker, 'core')
   }
   return coreWorker
 }
 
-function getSecondaryWorker(): SharedWorker {
+function getSecondaryWorker(): WorkerAdapter {
   if (!secondaryWorker) {
-    secondaryWorker = new SharedWorker(
+    secondaryWorker = createWorkerAdapter(
       new URL('../workers/secondary-public.worker.ts', import.meta.url),
-      { type: 'module', name: 'taco-secondary-public' }
+      'taco-secondary-public'
     )
-    setupWorkerPort(secondaryWorker, 'secondary')
+    setupWorkerAdapter(secondaryWorker, 'secondary')
   }
   return secondaryWorker
 }
 
-function getAuthWorker(): SharedWorker {
+function getAuthWorker(): WorkerAdapter {
   if (!authWorker) {
-    authWorker = new SharedWorker(
+    authWorker = createWorkerAdapter(
       new URL('../workers/authenticated.worker.ts', import.meta.url),
-      { type: 'module', name: 'taco-authenticated' }
+      'taco-authenticated'
     )
-    setupWorkerPort(authWorker, 'auth')
+    setupWorkerAdapter(authWorker, 'auth')
   }
   return authWorker
 }
 
-function getWorkerForKey(dataKey: DataKey): SharedWorker {
-  const workerType = WORKER_ASSIGNMENT[dataKey]
+function getWorkerForKey(dataKey: DataKey): WorkerAdapter {
+  const assignment = WORKER_ASSIGNMENT[dataKey]
 
-  switch (workerType) {
+  switch (assignment) {
     case 'core':
       return getCoreWorker()
     case 'secondary':
@@ -121,27 +129,24 @@ function getStoredNetworkOverride(): 'ic' | 'staging' | 'local' | null {
   return null
 }
 
-function setupWorkerPort(worker: SharedWorker, workerName: string): void {
-  const port = worker.port
-
+function setupWorkerAdapter(worker: WorkerAdapter, workerName: string): void {
   // Handle worker errors (e.g., syntax errors, import failures)
   worker.onerror = (event) => {
     console.error(`[WorkerBridge] Worker ${workerName} error:`, event)
-    console.error(`[WorkerBridge] Error details:`, event.message, event.filename, event.lineno)
+    if (event) {
+      console.error(`[WorkerBridge] Error details:`, event.message, event.filename, event.lineno)
+    }
   }
 
-  port.onmessage = (event: MessageEvent<WorkerResponse>) => {
+  worker.onmessage = (event: MessageEvent<WorkerResponse>) => {
     handleWorkerMessage(event.data, workerName)
   }
 
-  port.onmessageerror = (event) => {
+  worker.onmessageerror = (event) => {
     console.error(`[WorkerBridge] Message error from ${workerName}:`, event)
   }
 
-  // Start the port
-  port.start()
-
-  // CRITICAL: Send network override immediately after port starts
+  // CRITICAL: Send network override immediately after setup
   // Workers can't access localStorage, so we must tell them the network setting
   const networkOverride = getStoredNetworkOverride()
   if (networkOverride) {
@@ -190,16 +195,14 @@ function handleWorkerMessage(response: WorkerResponse, workerName: string): void
           })
         }
       }
-      // Don't spam console for access denied errors
+      // Only log unexpected errors (not access denied)
       const isAccessDenied = payload.error && (
         payload.error.includes('canister_inspect_message') ||
         payload.error.includes('refused message') ||
         payload.error.includes('not authorized') ||
         payload.error.includes('is not a function')
       )
-      if (isAccessDenied) {
-        console.log(`[WorkerBridge] Access denied for ${payload.dataKey}`)
-      } else {
+      if (!isAccessDenied) {
         console.error(`[WorkerBridge] Fetch error for ${payload.dataKey}:`, payload.error)
       }
       break
@@ -245,8 +248,8 @@ function updateDataStore(dataKey: DataKey, state: DataState): void {
 // Worker Communication
 // ============================================================================
 
-function sendToWorker(worker: SharedWorker, message: WorkerRequest): void {
-  worker.port.postMessage(message)
+function sendToWorker(worker: WorkerAdapter, message: WorkerRequest): void {
+  worker.postMessage(message)
 }
 
 function broadcastToAllWorkers(message: WorkerRequest): void {
@@ -265,18 +268,28 @@ function broadcastToAllWorkers(message: WorkerRequest): void {
 export function initWorkerBridge(): void {
   if (initialized) return
 
+  // Determine worker type
+  workerType = isSharedWorkerSupported() ? 'shared' : 'dedicated'
+
   // Set up promise for initial cache delivery
   cacheDeliveryPromise = new Promise((resolve) => {
     cacheDeliveryResolve = resolve
   })
 
   // Create all workers
-  getCoreWorker()
-  getSecondaryWorker()
-  getAuthWorker()
+  try {
+    getCoreWorker()
+    getSecondaryWorker()
+    getAuthWorker()
+  } catch (error) {
+    console.error('[WorkerBridge] Failed to create workers:', error)
+  }
 
   // Set up visibility tracking
   setupVisibilityTracking()
+
+  // Set up activity tracking for idle detection
+  setupActivityTracking()
 
   // Resolve cache delivery promise after a short delay
   // This gives workers time to load from IndexedDB and send cached data
@@ -517,6 +530,37 @@ function setupVisibilityTracking(): void {
       payload: { visible },
     })
   })
+}
+
+// ============================================================================
+// User Activity Tracking (for idle detection in workers)
+// ============================================================================
+
+let activityThrottleTimer: ReturnType<typeof setTimeout> | null = null
+
+function notifyUserActivity(): void {
+  // Throttle activity notifications to every 30 seconds max
+  if (activityThrottleTimer) return
+
+  activityThrottleTimer = setTimeout(() => {
+    activityThrottleTimer = null
+  }, 30000)
+
+  broadcastToAllWorkers({
+    id: generateMessageId(),
+    timestamp: Date.now(),
+    type: 'USER_ACTIVITY',
+    payload: {},
+  })
+}
+
+function setupActivityTracking(): void {
+  // Track user interactions that indicate active usage
+  const activityEvents = ['click', 'keydown', 'scroll', 'mousemove', 'touchstart']
+
+  for (const event of activityEvents) {
+    document.addEventListener(event, notifyUserActivity, { passive: true })
+  }
 }
 
 // ============================================================================

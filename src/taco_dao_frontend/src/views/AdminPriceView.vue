@@ -669,7 +669,18 @@ const showManualPauseModal = ref(false)
 const showAddPortfolioModal = ref(false)
 
 // Confirmation modal state
-const confirmationModal = ref({
+const confirmationModal = ref<{
+  show: boolean
+  title: string
+  message: string
+  extraData: string
+  confirmButtonText: string
+  confirmButtonClass: string
+  reasonPlaceholder: string
+  submitting: boolean
+  action: (() => Promise<void>) | null
+  actionData: { type: string; token?: any; tokenSymbol?: string } | null
+}>({
   show: false,
   title: '',
   message: '',

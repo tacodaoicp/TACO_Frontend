@@ -223,6 +223,9 @@ export const STALENESS_THRESHOLDS: Record<DataKey, number> = {
 // Background tab multiplier (3x slower)
 export const BACKGROUND_MULTIPLIER = 3
 
+// Idle timeout - stop refreshes after 5 minutes of inactivity
+export const IDLE_TIMEOUT_MS = 5 * 60 * 1000 // 5 minutes
+
 // ============================================================================
 // Data State
 // ============================================================================
@@ -268,6 +271,7 @@ export type WorkerRequestType =
   | 'INVALIDATE'
   | 'SET_NETWORK'
   | 'PING'
+  | 'USER_ACTIVITY' // Signal user activity to reset idle timer
 
 export interface WorkerRequest extends BaseMessage {
   type: WorkerRequestType

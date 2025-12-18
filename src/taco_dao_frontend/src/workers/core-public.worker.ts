@@ -37,6 +37,7 @@ import type {
 import {
   STALENESS_THRESHOLDS,
   BACKGROUND_MULTIPLIER,
+  IDLE_TIMEOUT_MS,
   generateMessageId,
   createInitialState,
 } from './types'
@@ -68,6 +69,8 @@ const backoff = new BackoffTracker()
 
 let isProcessing = false
 let isBackgroundTab = false
+let isIdle = false
+let lastActivityTime = Date.now()
 let agent: HttpAgent | null = null
 let initPromise: Promise<void> | null = null
 let isInitialized = false
@@ -229,6 +232,13 @@ function handleMessage(port: MessagePort, message: WorkerRequest): void {
     case 'SET_VISIBILITY':
       isBackgroundTab = !message.payload.visible
       console.log(`[CoreWorker] Visibility: ${message.payload.visible ? 'visible' : 'hidden'}`)
+      if (message.payload.visible) {
+        recordActivity()
+      }
+      break
+
+    case 'USER_ACTIVITY':
+      recordActivity()
       break
 
     case 'GET_CACHED':
@@ -610,6 +620,24 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
+function checkIdleStatus(): void {
+  const wasIdle = isIdle
+  isIdle = Date.now() - lastActivityTime > IDLE_TIMEOUT_MS
+  if (isIdle && !wasIdle) {
+    console.log('[CoreWorker] Entering idle mode - pausing refreshes')
+  } else if (!isIdle && wasIdle) {
+    console.log('[CoreWorker] Exiting idle mode - resuming refreshes')
+  }
+}
+
+function recordActivity(): void {
+  lastActivityTime = Date.now()
+  if (isIdle) {
+    isIdle = false
+    console.log('[CoreWorker] Activity detected - resuming refreshes')
+  }
+}
+
 // ============================================================================
 // Auto-refresh Loop
 // ============================================================================
@@ -618,6 +646,14 @@ async function autoRefreshLoop(): Promise<void> {
   while (true) {
     // Wait for base interval
     await sleep(5000) // Check every 5 seconds
+
+    // Check if we should enter idle mode
+    checkIdleStatus()
+
+    // Skip auto-refresh if idle
+    if (isIdle) {
+      continue
+    }
 
     // Queue stale data for refresh
     for (const dataKey of HANDLED_KEYS) {

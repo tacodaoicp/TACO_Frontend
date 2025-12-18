@@ -93,6 +93,7 @@ interface SystemLog {
     timestamp: bigint;
     level: string;
     message: string;
+    component?: string;
 }
 interface TradingLog {
     timestamp: bigint;
@@ -6379,7 +6380,7 @@ export const useTacoStore = defineStore('taco', () => {
     }
 
     // get principal name
-    const getPrincipalDisplayName = (principal: Principal | string): string => {
+    const getPrincipalDisplayName = (principal: Principal | string | { toString: () => string }): string => {
         const principalStr = typeof principal === 'string' ? principal : principal.toString();
         const cachedName = namesCache.value.principals.get(principalStr);
         

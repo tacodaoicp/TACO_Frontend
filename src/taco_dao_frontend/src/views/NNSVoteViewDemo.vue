@@ -327,6 +327,7 @@ import { useTacoStore } from '../stores/taco.store'
 import HeaderBar from '../components/HeaderBar.vue'
 import TacoTitle from '../components/misc/TacoTitle.vue'
 import DfinityLogo from '../assets/images/dfinityLogo.vue'
+import astronautLoader from '../assets/images/astonautLoader.webp'
 
 // Store and router
 const tacoStore = useTacoStore()
@@ -352,7 +353,7 @@ const votingInProgress = ref(false)
 const neuronVoteStatus = ref<Map<string, any>>(new Map())
 
 // Computed properties
-const astronautLoaderUrl = computed(() => tacoStore.astronautLoaderUrl)
+const astronautLoaderUrl = astronautLoader
 
 // Calculate total voting power from all user neurons
 const votePower = computed(() => {
@@ -650,12 +651,11 @@ onMounted(async () => {
 })
 
 // Expose store methods to template
-const { 
-    iidLogIn, 
-    uint8ArrayToHex, 
-    formatTokenAmount, 
+const {
+    iidLogIn,
+    uint8ArrayToHex,
+    formatTokenAmount,
     getNeuronDisplayName,
-    tacoSnsRootCanisterId,
     checkIfLoggedIn
 } = tacoStore
 </script>

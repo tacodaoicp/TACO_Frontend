@@ -625,7 +625,7 @@
                               :class="{'ready-to-vote': userLockedVote}" placeholder="0" min="0" max="100"
                               style="width: 6rem;" :step="step" :value="control.currentPercentage.toFixed(2)"
                               :disabled="control.isLocked || userLockedVote || unlockedCount === currentSliders.length - 1"
-                              @input="onAllocationChange(index, $event.target.valueAsNumber)">
+                              @input="onAllocationChange(index, ($event.target as HTMLInputElement).valueAsNumber)">
 
                             <!-- lock icon -->
                             <button v-if="!userLockedVote" class="btn" @click="toggleLock(index)">
@@ -659,7 +659,7 @@
                             :id="'slider' + (control.symbol)" :value="control.currentPercentage" min="0" max="100"
                             :step="step"
                             :disabled="control.isLocked || userLockedVote || unlockedCount === currentSliders.length - 1"
-                            @input="onAllocationChange(index, $event.target.valueAsNumber)">
+                            @input="onAllocationChange(index, ($event.target as HTMLInputElement).valueAsNumber)">
 
                         </div>
 
@@ -800,7 +800,7 @@
                                   <tbody>
                                     <tr v-if="formattedUserAllocation" v-for="currentAllocation in formattedUserAllocation?.allocations">
                                       <td>
-                                        <span>{{ fetchedTokenDetails?.find(([p]) => p.toString() === currentAllocation.token.toString())?.[1]?.tokenSymbol || currentAllocation.token }}</span>
+                                        <span>{{ fetchedTokenDetails?.find((entry) => entry[0].toString() === currentAllocation.token.toString())?.[1]?.tokenSymbol || currentAllocation.token }}</span>
                                       </td>
                                       <td>
                                         <span>{{ Number(currentAllocation.basisPoints) / 100 }}%</span>
@@ -874,7 +874,7 @@
                                   <tbody>
                                     <tr v-for="actualAllocation in pastAllocation.allocation">
                                       <td>
-                                        <span>{{ fetchedTokenDetails?.find(([p]) => p.toString() === actualAllocation.token.toString())?.[1]?.tokenSymbol || actualAllocation.token }}</span>
+                                        <span>{{ fetchedTokenDetails?.find((entry) => entry[0].toString() === actualAllocation.token.toString())?.[1]?.tokenSymbol || actualAllocation.token }}</span>
                                       </td>
                                       <td>
                                         <span>{{ Number(actualAllocation.basisPoints) / 100 }}%</span>
@@ -2774,7 +2774,25 @@
     }
 
   }
-  
+
+  // handle add follow
+  const handleAddFollow = async (principalStr: string) => {
+    try {
+      await followAllocation(Principal.fromText(principalStr))
+    } catch (error) {
+      console.error('VoteView.vue: error following allocation:', error)
+    }
+  }
+
+  // handle remove follow
+  const handleRemoveFollow = async (principalStr: string) => {
+    try {
+      await unfollowAllocation(Principal.fromText(principalStr))
+    } catch (error) {
+      console.error('VoteView.vue: error unfollowing allocation:', error)
+    }
+  }
+
   // match dao
   const matchDao = () => {
 
@@ -3018,11 +3036,11 @@
     if (!formattedUserAllocation.value?.allocations) return false
 
     // return true if all sliders match their corresponding last allocation
-    return currentSliders.value.every(slider => {
+    return currentSliders.value.every((slider: any) => {
 
       // find matching allocation by canister id
       const matchingAllocation = formattedUserAllocation.value.allocations.find(
-        allocation => allocation.token.toString() === slider.canisterId
+        (allocation: any) => allocation.token.toString() === slider.canisterId
       )
 
       // compare current percentage with last allocation (converting basis points to percentage)
@@ -3613,7 +3631,7 @@
 
   // how many history allocations to show
   const initialDisplayCount = 3
-  const displayedPastAllocations = ref([])
+  const displayedPastAllocations = ref<any[]>([])
 
   // watch for changes in pastAllocations
   watch(() => formattedUserAllocation.value?.pastAllocations, (newVal) => {

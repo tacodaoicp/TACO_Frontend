@@ -163,26 +163,26 @@
                   <div class="token-sync-status mt-2">
                     <h5>Token Sync Status</h5>
                     <div v-if="sortedTokenDetails.length" class="token-list">
-                      <div v-for="[principal, token] in sortedTokenDetails" :key="principal.toString()" class="token-sync-item">
+                      <div v-for="entry in sortedTokenDetails" :key="entry[0].toString()" class="token-sync-item">
                         <div class="d-flex gap-3 align-items-center justify-content-between">
                           <div class="d-flex gap-3 align-items-center">
-                            <div class="status-indicator" :class="getTokenStatusClass(token, principal)"></div>
-                            <span class="token-symbol">{{ token.tokenSymbol }}</span>
-                            <span class="token-status">{{ getTokenStatusText(token, principal) }}</span>
-                            <span>Last Sync: {{ formatTime(token.lastTimeSynced) }}</span>
+                            <div class="status-indicator" :class="getTokenStatusClass(entry[1], entry[0])"></div>
+                            <span class="token-symbol">{{ entry[1].tokenSymbol }}</span>
+                            <span class="token-status">{{ getTokenStatusText(entry[1], entry[0]) }}</span>
+                            <span>Last Sync: {{ formatTime(entry[1].lastTimeSynced) }}</span>
                           </div>
                           <div class="d-flex gap-2">
-                            <button 
-                              v-if="!token.isPaused" 
+                            <button
+                              v-if="!entry[1].isPaused"
                               class="btn btn-warning btn-sm"
-                              @click="showPauseConfirmation(principal.toString(), token.tokenSymbol)"
+                              @click="showPauseConfirmation(entry[0].toString(), entry[1].tokenSymbol)"
                             >
                               Pause
                             </button>
-                            <button 
-                              v-else 
+                            <button
+                              v-else
                               class="btn btn-success btn-sm"
-                              @click="showUnpauseConfirmation(principal.toString(), token.tokenSymbol)"
+                              @click="showUnpauseConfirmation(entry[0].toString(), entry[1].tokenSymbol)"
                             >
                               Unpause
                             </button>
@@ -339,7 +339,7 @@
                       </tr>
                     </thead>
                     <tbody>
-                      <tr v-for="allocation in aggregateAllocation" :key="allocation.token">
+                      <tr v-for="allocation in aggregateAllocation" :key="allocation.token.toString()">
                         <td>{{ getTokenSymbol(allocation.token) }}</td>
                         <td>{{ (allocation.basisPoints / 100).toFixed(2) }}%</td>
                         <td>{{ formatNumber(allocation.votingPower) }}</td>
@@ -455,8 +455,8 @@
                         </td>
                         <td>{{ formatNumber(voter.state.votingPower) }}</td>
                         <td>
-                          <div v-for="neuron in voter.state.neurons" :key="neuron.neuronId">
-                            ID: {{ uint8ArrayToHex(neuron.neuronId) }}<br>
+                          <div v-for="neuron in voter.state.neurons" :key="uint8ArrayToHex(neuron.neuronId as any)">
+                            ID: {{ uint8ArrayToHex(neuron.neuronId as any) }}<br>
                             VP: {{ formatNumber(neuron.votingPower) }}
                           </div>
                         </td>
@@ -514,7 +514,7 @@
             </div>
             <div class="card-body p-0">
               <div class="log-container">
-                <div v-for="log in systemLogs" :key="log.timestamp" 
+                <div v-for="log in systemLogs" :key="String(log.timestamp)" 
                      :class="['log-entry', getLogLevelClass(log.level)]"
                      v-show="(logLevel === 'all' || getLogLevelClass(log.level) === logLevel) && 
                             (selectedComponent === 'all' || log.component === selectedComponent)">
@@ -1272,25 +1272,29 @@ const proposalContextParams = ref<Record<string, any>>({});
 // Computed property to sort tokens with paused/inactive tokens first
 const sortedTokenDetails = computed(() => {
   if (!tokenDetailsRef.value || !tokenDetailsRef.value.length) return [];
-  
-  return [...tokenDetailsRef.value].sort(([principalA, tokenA], [principalB, tokenB]) => {
+
+  return [...tokenDetailsRef.value].sort((entryA, entryB) => {
+    const principalA = entryA[0];
+    const tokenA = entryA[1];
+    const principalB = entryB[0];
+    const tokenB = entryB[1];
     const statusA = getTokenStatusClass(tokenA, principalA);
     const statusB = getTokenStatusClass(tokenB, principalB);
-    
+
     // Priority: inactive > paused > active
     const getPriority = (status: string) => {
       if (status.includes('inactive')) return 0;
       if (status.includes('paused')) return 1;
       return 2; // active
     };
-    
+
     const priorityA = getPriority(statusA);
     const priorityB = getPriority(statusB);
-    
+
     if (priorityA !== priorityB) {
       return priorityA - priorityB;
     }
-    
+
     // If same priority, sort by token symbol alphabetically
     return tokenA.tokenSymbol.localeCompare(tokenB.tokenSymbol);
   });
@@ -1444,14 +1448,14 @@ function getLogLevelString(level: any): string {
 const filteredLogs = computed(() => {
     console.log('AdminView: Computing filteredLogs with level:', logLevel.value, 'and component:', selectedComponent.value);
     let filtered = systemLogs.value;
-    
+
     // Filter by log level
     if (logLevel.value !== 'all') {
-        filtered = logLevel.value === 'error' 
-            ? filtered.filter(log => log.level.ERROR !== undefined)
-            : filtered.filter(log => log.level.ERROR !== undefined || log.level.WARN !== undefined);
+        filtered = logLevel.value === 'error'
+            ? filtered.filter(log => log.level.toLowerCase() === 'error')
+            : filtered.filter(log => log.level.toLowerCase() === 'error' || log.level.toLowerCase() === 'warn');
     }
-    
+
     // Filter by component
     if (selectedComponent.value !== 'all') {
         filtered = filtered.filter(log => log.component === selectedComponent.value);
@@ -1857,7 +1861,7 @@ async function executeTradingCycle() {
 
 // Add these functions
 // Helper function to get trading pause info for a token
-const getTradingPauseInfo = (tokenPrincipal: Principal) => {
+const getTradingPauseInfo = (tokenPrincipal: Principal | { toString: () => string }) => {
   const pause = tradingPauses.value.find(p => p.token.toString() === tokenPrincipal.toString());
   if (!pause) return null;
   
@@ -1878,7 +1882,7 @@ const getTradingPauseInfo = (tokenPrincipal: Principal) => {
   return null;
 };
 
-const getTokenStatusClass = (token: any, principal?: Principal) => {
+const getTokenStatusClass = (token: any, principal?: Principal | { toString: () => string }) => {
   if (!token.Active) return 'inactive';
   
   const tradingPause = principal ? getTradingPauseInfo(principal) : null;
@@ -1893,7 +1897,7 @@ const getTokenStatusClass = (token: any, principal?: Principal) => {
   return 'active';
 };
 
-const getTokenStatusText = (token: any, principal?: Principal) => {
+const getTokenStatusText = (token: any, principal?: Principal | { toString: () => string }) => {
   if (!token.Active) return '(Inactive)';
   
   let statuses = [];
@@ -2573,7 +2577,7 @@ function calculateNextExpectedSnapshot(): bigint | null {
 }
 
 // Helper function to create vote history link
-const createVoteHistoryLink = (principal: Principal | string): string => {
+const createVoteHistoryLink = (principal: Principal | string | { toString: () => string }): string => {
   const principalStr = typeof principal === 'string' ? principal : principal.toString();
   return `/admin/votes?principal=${encodeURIComponent(principalStr)}`;
 };
@@ -2803,9 +2807,9 @@ function buildSystemParameterChanges() {
 
 async function updateSystemParameters(reason?: string) {
   try {
-    const current = systemParametersInputs.value as any;
-    const original = originalSystemParameters.value as any;
-    
+    const current = systemParametersInputs.value as Record<string, string | number | bigint | boolean>;
+    const original = originalSystemParameters.value as Record<string, string | number | bigint | boolean>;
+
     // Update each changed parameter
     for (const [key, value] of Object.entries(current)) {
       if (value !== original[key]) {

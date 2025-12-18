@@ -1202,7 +1202,7 @@ const startDistributionTimer = async () => {
       
       if ('ok' in result) {
         successMessage.value = result.ok
-        await loadConfiguration()
+        await loadConfigurationAndStatus()
       } else {
         errorMessage.value = formatError(result.err)
       }
@@ -1235,7 +1235,7 @@ const stopDistributionTimer = async () => {
       
       if ('ok' in result) {
         successMessage.value = result.ok
-        await loadConfiguration()
+        await loadConfigurationAndStatus()
       } else {
         errorMessage.value = formatError(result.err)
       }
@@ -1312,7 +1312,7 @@ const updateRewardPot = async () => {
       
       if ('ok' in result) {
         successMessage.value = result.ok
-        await loadConfiguration()
+        await loadConfigurationAndStatus()
       } else {
         errorMessage.value = formatError(result.err)
       }
@@ -1348,7 +1348,7 @@ const updateDistributionPeriod = async () => {
       
       if ('ok' in result) {
         successMessage.value = result.ok
-        await loadConfiguration()
+        await loadConfigurationAndStatus()
       } else {
         errorMessage.value = formatError(result.err)
       }
@@ -1383,7 +1383,7 @@ const updatePerformanceScorePower = async () => {
       
       if ('ok' in result) {
         successMessage.value = result.ok
-        await loadConfiguration()
+        await loadConfigurationAndStatus()
       } else {
         errorMessage.value = formatError(result.err)
       }
@@ -1418,7 +1418,7 @@ const updateVotingPowerPower = async () => {
       
       if ('ok' in result) {
         successMessage.value = result.ok
-        await loadConfiguration()
+        await loadConfigurationAndStatus()
       } else {
         errorMessage.value = formatError(result.err)
       }
