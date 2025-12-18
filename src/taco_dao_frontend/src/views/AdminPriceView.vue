@@ -1263,7 +1263,7 @@ watch(cachedCircuitBreakerLogs, (newVal) => {
 }, { immediate: true })
 
 // Lifecycle
-onMounted(async () => {
+onMounted(() => {
   // Only set loading if data isn't already available from cache
   if (!cachedCircuitBreakerConditions.value) loadingConditions.value = true
   if (!cachedPriceAlerts.value) loadingAlerts.value = true
@@ -1271,8 +1271,8 @@ onMounted(async () => {
   if (!cachedPortfolioCircuitBreakerConditions.value) loadingPortfolioConditions.value = true
   if (!cachedCircuitBreakerLogs.value) loadingPortfolioLogs.value = true
 
-  // Check admin status first (sets isAdmin flag for worker fetches)
-  await checkAdminStatus()
+  // Check admin status in background (don't block data loading or navigation)
+  checkAdminStatus().catch(console.error)
 
   // Trigger worker fetches for data needed by this view
   // Workers will update cached refs, which watchers will sync to local refs

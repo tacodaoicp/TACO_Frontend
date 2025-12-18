@@ -633,12 +633,12 @@ watch(cachedMaxNeuronSnapshots, (newVal) => {
 }, { immediate: true })
 
 // Initialize component
-onMounted(async () => {
+onMounted(() => {
   // Set loading state before fetching
   loadingSnapshots.value = true
 
-  // Check admin status first
-  await checkAdminStatus()
+  // Check admin status in background (don't block data loading or navigation)
+  checkAdminStatus().catch(console.error)
 
   // Trigger worker fetches for neuron snapshot data
   workerBridge.fetch('neuronSnapshots', false)
