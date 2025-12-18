@@ -64,11 +64,14 @@ const workersConnected = ref(false)
 // Worker Getters
 // ============================================================================
 
+// Increment to force browser to load fresh SharedWorker code
+const WORKER_VERSION = 'v2'
+
 function getCoreWorker(): WorkerAdapter {
   if (!coreWorker) {
     coreWorker = createWorkerAdapter(
       new URL('../workers/core-public.worker.ts', import.meta.url),
-      'taco-core-public'
+      `taco-core-public-${WORKER_VERSION}`
     )
     setupWorkerAdapter(coreWorker, 'core')
   }
@@ -79,7 +82,7 @@ function getSecondaryWorker(): WorkerAdapter {
   if (!secondaryWorker) {
     secondaryWorker = createWorkerAdapter(
       new URL('../workers/secondary-public.worker.ts', import.meta.url),
-      'taco-secondary-public'
+      `taco-secondary-public-${WORKER_VERSION}`
     )
     setupWorkerAdapter(secondaryWorker, 'secondary')
   }
@@ -90,7 +93,7 @@ function getAuthWorker(): WorkerAdapter {
   if (!authWorker) {
     authWorker = createWorkerAdapter(
       new URL('../workers/authenticated.worker.ts', import.meta.url),
-      'taco-authenticated'
+      `taco-authenticated-${WORKER_VERSION}`
     )
     setupWorkerAdapter(authWorker, 'auth')
   }
@@ -117,16 +120,22 @@ function getWorkerForKey(dataKey: DataKey): WorkerAdapter {
 // ============================================================================
 
 /**
- * Read network override from localStorage (called in main thread context)
+ * Get the effective network for workers (main thread context)
+ * Workers can't reliably access process.env or localStorage, so main thread must tell them
  */
-function getStoredNetworkOverride(): 'ic' | 'staging' | 'local' | null {
+function getEffectiveNetwork(): 'ic' | 'staging' | 'local' {
   if (typeof localStorage !== 'undefined') {
     const override = localStorage.getItem('taco_network_override')
     if (override === 'ic' || override === 'staging' || override === 'local') {
       return override
     }
   }
-  return null
+  // @ts-ignore - Vite/dfx injects this at build time
+  const envNetwork = process.env.DFX_NETWORK
+  if (envNetwork === 'ic' || envNetwork === 'staging') {
+    return envNetwork
+  }
+  return 'local'
 }
 
 function setupWorkerAdapter(worker: WorkerAdapter, workerName: string): void {
@@ -146,17 +155,14 @@ function setupWorkerAdapter(worker: WorkerAdapter, workerName: string): void {
     console.error(`[WorkerBridge] Message error from ${workerName}:`, event)
   }
 
-  // CRITICAL: Send network override immediately after setup
-  // Workers can't access localStorage, so we must tell them the network setting
-  const networkOverride = getStoredNetworkOverride()
-  if (networkOverride) {
-    sendToWorker(worker, {
-      id: generateMessageId(),
-      timestamp: Date.now(),
-      type: 'SET_NETWORK',
-      payload: { network: networkOverride },
-    })
-  }
+  // CRITICAL: Always send network to workers immediately after setup
+  // Workers can't reliably access process.env or localStorage
+  sendToWorker(worker, {
+    id: generateMessageId(),
+    timestamp: Date.now(),
+    type: 'SET_NETWORK',
+    payload: { network: getEffectiveNetwork() },
+  })
 }
 
 function handleWorkerMessage(response: WorkerResponse, workerName: string): void {
@@ -285,6 +291,18 @@ export function initWorkerBridge(): void {
     console.error('[WorkerBridge] Failed to create workers:', error)
   }
 
+  // Send RESET to all workers to clear any stale state from previous page load
+  // This ensures fast refreshes don't get blocked by stuck backoff/queue/fetch states
+  const resetMessage = {
+    id: generateMessageId(),
+    timestamp: Date.now(),
+    type: 'RESET' as const,
+    payload: {},
+  }
+  sendToWorker(getCoreWorker(), resetMessage)
+  sendToWorker(getSecondaryWorker(), resetMessage)
+  sendToWorker(getAuthWorker(), resetMessage)
+
   // Set up visibility tracking
   setupVisibilityTracking()
 
@@ -327,7 +345,15 @@ export function subscribe(
 
   subscriptions.get(dataKey)!.add(callback)
 
-  // Subscribe to worker
+  // Immediately call callback with cached data if available
+  // This provides instant data on navigation without waiting for worker round-trip
+  const cachedState = dataStore.get(dataKey)
+  if (cachedState?.data) {
+    // Use setTimeout to ensure callback runs after subscription is fully set up
+    setTimeout(() => callback(cachedState.data, cachedState), 0)
+  }
+
+  // Subscribe to worker for updates
   const worker = getWorkerForKey(dataKey)
   sendToWorker(worker, {
     id: generateMessageId(),

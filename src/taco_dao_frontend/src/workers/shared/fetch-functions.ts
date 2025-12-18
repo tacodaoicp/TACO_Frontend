@@ -433,7 +433,7 @@ export async function fetchUserAllocationData(agent: HttpAgent): Promise<any> {
 /**
  * Fetch system logs (admin only)
  */
-export async function fetchSystemLogsData(agent: HttpAgent, count: number = 100): Promise<any[]> {
+export async function fetchSystemLogsData(agent: HttpAgent, count: number = 68): Promise<any[]> {
   const actor = Actor.createActor(daoBackendIDL, {
     agent,
     canisterId: getDaoBackendCanisterId(),
@@ -521,7 +521,7 @@ export async function fetchSystemParametersData(agent: HttpAgent): Promise<any> 
 /**
  * Fetch price alerts from Treasury (admin only)
  */
-export async function fetchPriceAlertsData(agent: HttpAgent, offset: number = 0, limit: number = 100): Promise<any> {
+export async function fetchPriceAlertsData(agent: HttpAgent, offset: number = 0, limit: number = 68): Promise<any> {
   const actor = Actor.createActor<TreasuryService>(treasuryIDL, {
     agent,
     canisterId: getTreasuryCanisterId(),
@@ -564,7 +564,7 @@ export async function fetchPriceHistoryData(agent: HttpAgent, tokens: Principal[
 /**
  * Fetch portfolio history from Treasury (admin only)
  */
-export async function fetchPortfolioHistoryData(agent: HttpAgent, limit: number = 1000): Promise<any> {
+export async function fetchPortfolioHistoryData(agent: HttpAgent, limit: number = 270): Promise<any> {
   const actor = Actor.createActor<TreasuryService>(treasuryIDL, {
     agent,
     canisterId: getTreasuryCanisterId(),
@@ -580,7 +580,7 @@ export async function fetchPortfolioHistoryData(agent: HttpAgent, limit: number 
 /**
  * Fetch circuit breaker logs from Treasury (admin only)
  */
-export async function fetchCircuitBreakerLogsData(agent: HttpAgent, offset: number = 0, limit: number = 100): Promise<any> {
+export async function fetchCircuitBreakerLogsData(agent: HttpAgent, offset: number = 0, limit: number = 68): Promise<any> {
   const actor = Actor.createActor<TreasuryService>(treasuryIDL, {
     agent,
     canisterId: getTreasuryCanisterId(),
@@ -644,7 +644,7 @@ export async function fetchMaxPortfolioSnapshotsData(agent: HttpAgent): Promise<
 /**
  * Fetch neuron snapshots from NeuronSnapshot canister (admin only)
  */
-export async function fetchNeuronSnapshotsData(agent: HttpAgent, start: number = 0, length: number = 100): Promise<any[]> {
+export async function fetchNeuronSnapshotsData(agent: HttpAgent, start: number = 0, length: number = 68): Promise<any[]> {
   const actor = Actor.createActor<NeuronSnapshotService>(neuronSnapshotIDL, {
     agent,
     canisterId: getNeuronSnapshotCanisterId(),
@@ -736,7 +736,7 @@ export async function fetchPendingAlarmsData(agent: HttpAgent): Promise<any[]> {
 /**
  * Fetch system errors (admin only)
  */
-export async function fetchSystemErrorsData(agent: HttpAgent, limit: number = 100): Promise<any[]> {
+export async function fetchSystemErrorsData(agent: HttpAgent, limit: number = 68): Promise<any[]> {
   const actor = Actor.createActor<AlarmService>(alarmIDL, {
     agent,
     canisterId: getAlarmCanisterId(),
@@ -752,7 +752,7 @@ export async function fetchSystemErrorsData(agent: HttpAgent, limit: number = 10
 /**
  * Fetch internal errors (admin only)
  */
-export async function fetchInternalErrorsData(agent: HttpAgent, limit: number = 100): Promise<any[]> {
+export async function fetchInternalErrorsData(agent: HttpAgent, limit: number = 68): Promise<any[]> {
   const actor = Actor.createActor<AlarmService>(alarmIDL, {
     agent,
     canisterId: getAlarmCanisterId(),
@@ -816,7 +816,7 @@ export async function fetchQueueStatusData(agent: HttpAgent): Promise<any> {
 /**
  * Fetch sent SMS messages (admin only)
  */
-export async function fetchSentSMSMessagesData(agent: HttpAgent, limit: number = 100): Promise<any[]> {
+export async function fetchSentSMSMessagesData(agent: HttpAgent, limit: number = 68): Promise<any[]> {
   const actor = Actor.createActor<AlarmService>(alarmIDL, {
     agent,
     canisterId: getAlarmCanisterId(),
@@ -832,7 +832,7 @@ export async function fetchSentSMSMessagesData(agent: HttpAgent, limit: number =
 /**
  * Fetch sent email messages (admin only)
  */
-export async function fetchSentEmailMessagesData(agent: HttpAgent, limit: number = 100): Promise<any[]> {
+export async function fetchSentEmailMessagesData(agent: HttpAgent, limit: number = 68): Promise<any[]> {
   const actor = Actor.createActor<AlarmService>(alarmIDL, {
     agent,
     canisterId: getAlarmCanisterId(),
@@ -848,7 +848,7 @@ export async function fetchSentEmailMessagesData(agent: HttpAgent, limit: number
 /**
  * Fetch sent messages (admin only)
  */
-export async function fetchSentMessagesData(agent: HttpAgent, limit: number = 100): Promise<any[]> {
+export async function fetchSentMessagesData(agent: HttpAgent, limit: number = 68): Promise<any[]> {
   const actor = Actor.createActor<AlarmService>(alarmIDL, {
     agent,
     canisterId: getAlarmCanisterId(),
@@ -864,7 +864,7 @@ export async function fetchSentMessagesData(agent: HttpAgent, limit: number = 10
 /**
  * Fetch alarm acknowledgments (admin only)
  */
-export async function fetchAlarmAcknowledgmentsData(agent: HttpAgent, limit: number = 100): Promise<any[]> {
+export async function fetchAlarmAcknowledgmentsData(agent: HttpAgent, limit: number = 68): Promise<any[]> {
   const actor = Actor.createActor<AlarmService>(alarmIDL, {
     agent,
     canisterId: getAlarmCanisterId(),
@@ -880,7 +880,7 @@ export async function fetchAlarmAcknowledgmentsData(agent: HttpAgent, limit: num
 /**
  * Fetch admin action logs (admin only)
  */
-export async function fetchAdminActionLogsData(agent: HttpAgent, limit: number = 100): Promise<any[]> {
+export async function fetchAdminActionLogsData(agent: HttpAgent, limit: number = 68): Promise<any[]> {
   const actor = Actor.createActor<AlarmService>(alarmIDL, {
     agent,
     canisterId: getAlarmCanisterId(),

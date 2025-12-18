@@ -147,6 +147,14 @@ export class PriorityQueue {
   }
 
   /**
+   * Clear only the processing set (for when connections reset)
+   * Items stay in queue but are no longer marked as processing
+   */
+  clearProcessing(): void {
+    this.processing.clear()
+  }
+
+  /**
    * Sort queue by priority (lower value = higher priority), then by addedAt
    */
   private sort(): void {

@@ -1205,6 +1205,12 @@ interface VotingMetrics {
     neuronCount: bigint;
 }
 
+// Helper function - defined early for use in initialization
+function calculateVotingPower(basisPoints: bigint, totalVotingPower: bigint): bigint {
+    if (!totalVotingPower) return 0n;
+    return (totalVotingPower * basisPoints) / 10000n;
+}
+
 const logLevel = ref('all');
 const selectedComponent = ref('all');
 const isRecoveringBalances = ref(false);
@@ -1212,17 +1218,36 @@ const showOnlyActive = ref(false);
 const showOnlyFollowing = ref(false);
 const refreshingVP = ref(false);
 
-// Trading pauses state
-const tradingPauses = ref<any[]>([]);
+// Get store FIRST so we can initialize local refs with current values
+const tacoStore = useTacoStore();
+const {
+  snapshotStatus,
+  timerHealth,
+  systemLogs,
+  fetchedTokenDetails: tokenDetailsRef,
+  rebalanceConfig,
+  systemParameters,
+  fetchedVotingPowerMetrics,
+  fetchedAggregateAllocation,
+  fetchedVoterDetails,
+  fetchedNeuronAllocations,
+  cachedTradingPauses,
+  cachedPortfolioSnapshotStatus
+} = storeToRefs(tacoStore);
 
-// Portfolio snapshot management - defined early for watcher access
+// Trading pauses state - initialize with current store value if available
+const tradingPauses = ref<any[]>(cachedTradingPauses.value?.pausedTokens || []);
+
+// Portfolio snapshot management - initialize with current store value if available
 const snapshotIntervalMinutes = ref(15); // Default to 15 minutes
-const portfolioSnapshotStatus = ref({
-  status: { Stopped: null } as { Running: null } | { Stopped: null },
-  intervalMinutes: 60,
-  lastSnapshotTime: 0
-});
-const newPortfolioSnapshotInterval = ref(60);
+const portfolioSnapshotStatus = ref(
+  cachedPortfolioSnapshotStatus.value || {
+    status: { Stopped: null } as { Running: null } | { Stopped: null },
+    intervalMinutes: 60,
+    lastSnapshotTime: 0
+  }
+);
+const newPortfolioSnapshotInterval = ref(cachedPortfolioSnapshotStatus.value?.intervalMinutes || 60);
 
 // System Parameters - defined early for watcher access
 const systemParametersData = ref(null as any);
@@ -1239,23 +1264,6 @@ const systemParametersInputs = ref({
 const originalSystemParameters = ref({} as any);
 const isSystemParametersValid = ref(true);
 const hasSystemParametersChanges = ref(false);
-
-// Get store
-const tacoStore = useTacoStore();
-const {
-  snapshotStatus,
-  timerHealth,
-  systemLogs,
-  fetchedTokenDetails: tokenDetailsRef,
-  rebalanceConfig,
-  systemParameters,
-  fetchedVotingPowerMetrics,
-  fetchedAggregateAllocation,
-  fetchedVoterDetails,
-  fetchedNeuronAllocations,
-  cachedTradingPauses,
-  cachedPortfolioSnapshotStatus
-} = storeToRefs(tacoStore);
 
 // Destructure utility methods
 const { getPrincipalDisplayName, listTradingPauses } = tacoStore;
@@ -1314,15 +1322,17 @@ const confirmationModal = ref({
   actionData: null as { principal: string; tokenName: string } | { type: string } | { type: string; intervalMinutes: number } | null
 });
 
-// Update voting metrics state with type
+// Update voting metrics state with type - initialize from store if available
+const initialVotingMetrics = fetchedVotingPowerMetrics.value?.ok;
 const votingMetrics = ref<VotingMetrics>({
-    totalVotingPower: 0n,
-    totalVotingPowerByHotkeySetters: 0n,
-    allocatedVotingPower: 0n,
-    principalCount: 0n,
-    neuronCount: 0n
+    totalVotingPower: initialVotingMetrics?.totalVotingPower ?? 0n,
+    totalVotingPowerByHotkeySetters: initialVotingMetrics?.totalVotingPowerByHotkeySetters ?? 0n,
+    allocatedVotingPower: initialVotingMetrics?.allocatedVotingPower ?? 0n,
+    principalCount: initialVotingMetrics?.principalCount ?? 0n,
+    neuronCount: initialVotingMetrics?.neuronCount ?? 0n
 });
 
+// Aggregate allocation - watcher will populate from store (transformation needed)
 const aggregateAllocation = ref<{ token: Principal; basisPoints: number; votingPower: bigint; }[]>([]);
 
 // Add this computed property to get unique components from logs
@@ -1446,7 +1456,6 @@ function getLogLevelString(level: any): string {
 }
 
 const filteredLogs = computed(() => {
-    console.log('AdminView: Computing filteredLogs with level:', logLevel.value, 'and component:', selectedComponent.value);
     let filtered = systemLogs.value;
 
     // Filter by log level
@@ -1484,13 +1493,11 @@ const handleProposalSuccess = (proposalId: bigint) => {
 
 // Lifecycle hooks
 onMounted(() => {
-    console.log('AdminView: Component mounted');
-
     // Check admin status in background (don't block data loading)
     checkAdminStatus().catch(console.error);
 
-    // Trigger worker fetches immediately - route change already triggered some via updatePrioritiesForRoute
-    // but we ensure all needed data is requested
+    // Trigger worker fetches - these will return cached data immediately if available
+    // The store refs should already have data from persistent subscriptions
     workerBridge.fetch('systemLogs', false);
     workerBridge.fetch('timerStatus', false);
     workerBridge.fetch('tradingStatus', false);
@@ -1503,8 +1510,6 @@ onMounted(() => {
     workerBridge.fetch('aggregateAllocation', false);
     workerBridge.fetch('tradingPauses', false);
     workerBridge.fetch('neuronAllocations', false);
-
-    console.log('AdminView: Mounted, triggered worker fetches');
 });
 
 // Watch cached data and sync to local refs
@@ -2293,11 +2298,6 @@ const refreshVotingMetrics = () => {
 };
 
 // Add helper functions
-function calculateVotingPower(basisPoints: bigint, totalVotingPower: bigint): bigint {
-    if (!totalVotingPower) return 0n;
-    return (totalVotingPower * basisPoints) / 10000n;
-}
-
 function formatNumber(value: bigint | number | undefined): string {
     if (value === undefined) return '0';
     const numValue = typeof value === 'bigint' ? Number(value) : value;

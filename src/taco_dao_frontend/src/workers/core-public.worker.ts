@@ -159,6 +159,12 @@ self.onconnect = (event: MessageEvent) => {
 
   console.log(`[CoreWorker] Port connected. Total: ${connectedPorts.size}`)
 
+  // Reset backoff tracker, queue processing state, and active fetch count on new connection
+  // This prevents stale states from blocking new page loads after fast refreshes
+  backoff.resetAll()
+  queue.clearProcessing()
+  activeFetchCount = 0
+
   port.onmessage = (e: MessageEvent<WorkerRequest>) => {
     handleMessage(port, e.data)
   }
@@ -166,6 +172,8 @@ self.onconnect = (event: MessageEvent) => {
   port.onmessageerror = () => {
     disconnectPort(port)
   }
+
+  port.start()
 
   // Send connected message with current state
   sendResponse(port, {
@@ -273,6 +281,31 @@ function handleMessage(port: MessagePort, message: WorkerRequest): void {
           tabCount: connectedPorts.size,
         },
       })
+      break
+
+    case 'RESET':
+      // Reset all state that could block fetches after fast page refresh
+      console.log('[CoreWorker] RESET received - clearing backoff, queue, fetch count, and re-sending cache')
+      backoff.resetAll()
+      queue.clearProcessing()
+      activeFetchCount = 0
+      // Re-send all cached data to this port (new page load needs it)
+      for (const key of HANDLED_KEYS) {
+        const state = dataStates.get(key)
+        if (state?.data) {
+          sendResponse(port, {
+            id: generateMessageId(),
+            timestamp: Date.now(),
+            type: 'CACHE_HIT',
+            payload: {
+              dataKey: key,
+              data: state.data,
+              state,
+              fromCache: true,
+            },
+          })
+        }
+      }
       break
   }
 }

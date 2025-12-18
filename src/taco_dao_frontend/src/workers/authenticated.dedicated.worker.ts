@@ -449,6 +449,31 @@ function handleMessage(message: WorkerRequest): void {
         },
       })
       break
+
+    case 'RESET':
+      // Reset all state that could block fetches after fast page refresh
+      console.log('[AuthWorker-Dedicated] RESET received - clearing backoff, queue, fetch count, and re-sending cache')
+      backoff.resetAll()
+      queue.clearProcessing()
+      activeFetchCount = 0
+      // Re-send all cached data (new page load needs it)
+      for (const key of HANDLED_KEYS) {
+        const state = dataStates.get(key)
+        if (state?.data) {
+          sendResponse({
+            id: generateMessageId(),
+            timestamp: Date.now(),
+            type: 'CACHE_HIT',
+            payload: {
+              dataKey: key,
+              data: state.data,
+              state,
+              fromCache: true,
+            },
+          })
+        }
+      }
+      break
   }
 }
 

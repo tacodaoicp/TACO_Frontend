@@ -272,6 +272,7 @@ export type WorkerRequestType =
   | 'SET_NETWORK'
   | 'PING'
   | 'USER_ACTIVITY' // Signal user activity to reset idle timer
+  | 'RESET' // Reset worker state (backoff, queue, fetch count) for fresh start
 
 export interface WorkerRequest extends BaseMessage {
   type: WorkerRequestType

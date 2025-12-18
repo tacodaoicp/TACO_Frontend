@@ -508,6 +508,7 @@ const takeSnapshot = async () => {
 // Refresh snapshots via worker (non-blocking)
 const refreshSnapshots = () => {
   console.log('AdminNeuronView: Triggering worker refresh for neuron snapshots')
+  loadingSnapshots.value = true
   // Reset pagination
   snapshotStartIndex.value = 0
   workerBridge.fetch('neuronSnapshots', true)
@@ -633,6 +634,9 @@ watch(cachedMaxNeuronSnapshots, (newVal) => {
 
 // Initialize component
 onMounted(async () => {
+  // Set loading state before fetching
+  loadingSnapshots.value = true
+
   // Check admin status first
   await checkAdminStatus()
 

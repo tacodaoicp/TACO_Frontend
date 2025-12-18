@@ -648,17 +648,18 @@ const proposalFunctionName = ref('')
 const proposalReasonPlaceholder = ref('')
 const proposalContextParams = ref<any>({})
 
-// State
-const conditions = ref<TriggerCondition[]>([])
-const alerts = ref<PriceAlertLog[]>([])
-const tradingPauses = ref<any[]>([])
-const portfolioConditions = ref<any[]>([])
-const portfolioLogs = ref<any[]>([])
-const loadingConditions = ref(false)
-const loadingAlerts = ref(false)
-const loadingTradingPauses = ref(false)
-const loadingPortfolioConditions = ref(false)
-const loadingPortfolioLogs = ref(false)
+// State - initialize from cache if available for instant display on navigation
+const conditions = ref<TriggerCondition[]>(cachedCircuitBreakerConditions.value || [])
+const alerts = ref<PriceAlertLog[]>(cachedPriceAlerts.value?.alerts || [])
+const tradingPauses = ref<any[]>(cachedTradingPauses.value?.pausedTokens || [])
+const portfolioConditions = ref<any[]>(cachedPortfolioCircuitBreakerConditions.value || [])
+const portfolioLogs = ref<any[]>(cachedCircuitBreakerLogs.value || [])
+// Only show loading if no cached data
+const loadingConditions = ref(!cachedCircuitBreakerConditions.value)
+const loadingAlerts = ref(!cachedPriceAlerts.value)
+const loadingTradingPauses = ref(!cachedTradingPauses.value)
+const loadingPortfolioConditions = ref(!cachedPortfolioCircuitBreakerConditions.value)
+const loadingPortfolioLogs = ref(!cachedCircuitBreakerLogs.value)
 const submitting = ref(false)
 const submittingPause = ref(false)
 const submittingPortfolio = ref(false)
@@ -735,11 +736,13 @@ const getTokenSymbol = (principal: any) => {
 // Refresh functions - use workers for non-blocking fetches
 const refreshConditions = () => {
   console.log('AdminPriceView: Triggering worker refresh for conditions')
+  loadingConditions.value = true
   workerBridge.fetch('circuitBreakerConditions', true)
 }
 
 const refreshAlerts = () => {
   console.log('AdminPriceView: Triggering worker refresh for alerts')
+  loadingAlerts.value = true
   workerBridge.fetch('priceAlerts', true)
 }
 
@@ -881,6 +884,7 @@ const closeModal = () => {
 // Trading pause functions - use worker for non-blocking fetch
 const refreshTradingPauses = () => {
   console.log('AdminPriceView: Triggering worker refresh for trading pauses')
+  loadingTradingPauses.value = true
   workerBridge.fetch('tradingPauses', true)
 }
 
@@ -993,11 +997,13 @@ const closeManualPauseModal = () => {
 // Portfolio circuit breaker functions - use workers for non-blocking fetches
 const refreshPortfolioConditions = () => {
   console.log('AdminPriceView: Triggering worker refresh for portfolio conditions')
+  loadingPortfolioConditions.value = true
   workerBridge.fetch('portfolioCircuitBreakerConditions', true)
 }
 
 const refreshPortfolioLogs = () => {
   console.log('AdminPriceView: Triggering worker refresh for portfolio logs')
+  loadingPortfolioLogs.value = true
   workerBridge.fetch('circuitBreakerLogs', true)
 }
 
@@ -1222,42 +1228,49 @@ const handleProposalSuccess = async () => {
 
 // Watch cached data and sync to local refs
 watch(cachedCircuitBreakerConditions, (newVal) => {
-  if (newVal?.length > 0) {
-    conditions.value = newVal
+  if (newVal !== undefined && newVal !== null) {
+    conditions.value = newVal || []
     loadingConditions.value = false
   }
 }, { immediate: true })
 
 watch(cachedPriceAlerts, (newVal) => {
-  if (newVal?.alerts) {
-    alerts.value = newVal.alerts
+  if (newVal !== undefined && newVal !== null) {
+    alerts.value = newVal?.alerts || []
     loadingAlerts.value = false
   }
 }, { immediate: true })
 
 watch(cachedTradingPauses, (newVal) => {
-  if (newVal?.pausedTokens) {
-    tradingPauses.value = newVal.pausedTokens
+  if (newVal !== undefined && newVal !== null) {
+    tradingPauses.value = newVal?.pausedTokens || []
     loadingTradingPauses.value = false
   }
 }, { immediate: true })
 
 watch(cachedPortfolioCircuitBreakerConditions, (newVal) => {
-  if (newVal?.length > 0) {
-    portfolioConditions.value = newVal
+  if (newVal !== undefined && newVal !== null) {
+    portfolioConditions.value = newVal || []
     loadingPortfolioConditions.value = false
   }
 }, { immediate: true })
 
 watch(cachedCircuitBreakerLogs, (newVal) => {
-  if (newVal?.length > 0) {
-    portfolioLogs.value = newVal
+  if (newVal !== undefined && newVal !== null) {
+    portfolioLogs.value = newVal || []
     loadingPortfolioLogs.value = false
   }
 }, { immediate: true })
 
 // Lifecycle
 onMounted(async () => {
+  // Only set loading if data isn't already available from cache
+  if (!cachedCircuitBreakerConditions.value) loadingConditions.value = true
+  if (!cachedPriceAlerts.value) loadingAlerts.value = true
+  if (!cachedTradingPauses.value) loadingTradingPauses.value = true
+  if (!cachedPortfolioCircuitBreakerConditions.value) loadingPortfolioConditions.value = true
+  if (!cachedCircuitBreakerLogs.value) loadingPortfolioLogs.value = true
+
   // Check admin status first (sets isAdmin flag for worker fetches)
   await checkAdminStatus()
 
@@ -1268,6 +1281,15 @@ onMounted(async () => {
   workerBridge.fetch('tradingPauses', false)
   workerBridge.fetch('portfolioCircuitBreakerConditions', false)
   workerBridge.fetch('circuitBreakerLogs', false)
+
+  // Fallback: clear loading states after 10 seconds if data never arrives
+  setTimeout(() => {
+    loadingConditions.value = false
+    loadingAlerts.value = false
+    loadingTradingPauses.value = false
+    loadingPortfolioConditions.value = false
+    loadingPortfolioLogs.value = false
+  }, 10000)
 })
 </script>
 
