@@ -291,17 +291,18 @@ export function initWorkerBridge(): void {
     console.error('[WorkerBridge] Failed to create workers:', error)
   }
 
-  // Send RESET to all workers to clear any stale state from previous page load
-  // This ensures fast refreshes don't get blocked by stuck backoff/queue/fetch states
-  const resetMessage = {
+  // Send INITIAL_LOAD with route to workers for selective data loading
+  // This tells workers to only send/fetch critical+high priority data for this route initially
+  const initialRoute = currentRoute.value || '/'
+  const initialLoadMessage = {
     id: generateMessageId(),
     timestamp: Date.now(),
-    type: 'RESET' as const,
-    payload: {},
+    type: 'INITIAL_LOAD' as const,
+    payload: { route: initialRoute },
   }
-  sendToWorker(getCoreWorker(), resetMessage)
-  sendToWorker(getSecondaryWorker(), resetMessage)
-  sendToWorker(getAuthWorker(), resetMessage)
+  sendToWorker(getCoreWorker(), initialLoadMessage)
+  sendToWorker(getSecondaryWorker(), initialLoadMessage)
+  sendToWorker(getAuthWorker(), initialLoadMessage)
 
   // Set up visibility tracking
   setupVisibilityTracking()

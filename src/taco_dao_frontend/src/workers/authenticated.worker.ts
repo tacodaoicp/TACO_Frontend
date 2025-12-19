@@ -83,6 +83,7 @@ import {
   generateMessageId,
   createInitialState,
   ADMIN_PRELOAD_KEYS,
+  getInitialLoadKeys,
 } from './types'
 
 declare const self: SharedWorkerGlobalScope
@@ -216,6 +217,11 @@ let currentIdentity: Identity | null = null
 let isAdmin = false
 let isAuthenticated = false
 let isInitialized = false
+
+// Initial load state - track which keys are priority for current route
+let initialLoadKeys: Set<DataKey> = new Set()
+let pendingPriorityKeys: Set<DataKey> = new Set() // Keys still being fetched
+let deferredLoadTriggered = false
 
 // Queue of ports waiting for cached data after init
 const pendingCacheDeliveries: Array<{ port: MessagePort; keys: DataKey[] }> = []
@@ -387,11 +393,7 @@ self.onconnect = (event: MessageEvent) => {
 
   console.log(`[AuthWorker] Port connected. Total: ${connectedPorts.size}`)
 
-  // Reset backoff tracker, queue processing state, and active fetch count on new connection
-  // This prevents stale states from blocking new page loads after fast refreshes
-  backoff.resetAll()
-  queue.clearProcessing()
-  activeFetchCount = 0
+  // Don't reset state here - INITIAL_LOAD message will handle that with route context
 
   port.onmessage = (e: MessageEvent<WorkerRequest>) => {
     console.log(`[AuthWorker] Message received: ${e.data?.type}, dataKey=${e.data?.payload?.dataKey}`)
@@ -404,7 +406,7 @@ self.onconnect = (event: MessageEvent) => {
 
   port.start()
 
-  // Send connected message
+  // Send connected message only - don't send all cached data automatically
   sendResponse(port, {
     id: generateMessageId(),
     timestamp: Date.now(),
@@ -417,38 +419,8 @@ self.onconnect = (event: MessageEvent) => {
     },
   })
 
-  // If not yet initialized, queue cached data delivery for when init completes
   if (!isInitialized) {
-    console.log(`[AuthWorker] Port connected before init, queuing cache delivery`)
-    pendingCacheDeliveries.push({ port, keys: HANDLED_KEYS })
-    return
-  }
-
-  // Already initialized - send cached data for keys we have
-  // USER_KEYS and AUTH_REQUIRED_KEYS require authentication
-  // For those, we can still send stale cached data
-  for (const key of HANDLED_KEYS) {
-    const requiresAuth = USER_KEYS.includes(key) || AUTH_REQUIRED_KEYS.includes(key)
-    // Skip auth-required keys if not authenticated AND no cached data
-    if (requiresAuth && !isAuthenticated) {
-      // Still send cached data if we have it (will be marked stale)
-      const state = dataStates.get(key)
-      if (!state?.data) continue
-    }
-    const state = dataStates.get(key)
-    if (state?.data) {
-      sendResponse(port, {
-        id: generateMessageId(),
-        timestamp: Date.now(),
-        type: 'CACHE_HIT',
-        payload: {
-          dataKey: key,
-          data: state.data,
-          state,
-          fromCache: true,
-        },
-      })
-    }
+    console.log(`[AuthWorker] Port connected before init - waiting for INITIAL_LOAD`)
   }
 }
 
@@ -557,6 +529,131 @@ function handleMessage(port: MessagePort, message: WorkerRequest): void {
         }
       }
       break
+
+    case 'INITIAL_LOAD':
+      handleInitialLoad(port, message)
+      break
+  }
+}
+
+/**
+ * Handle initial page load - only send/fetch critical+high priority data for the route
+ * Deferred data loads after all priority keys have loaded
+ */
+function handleInitialLoad(port: MessagePort, message: WorkerRequest): void {
+  const route = message.payload.route || '/'
+  console.log(`[AuthWorker] INITIAL_LOAD for route: ${route}`)
+
+  // Reset state for fresh page load
+  backoff.resetAll()
+  queue.clearProcessing()
+  activeFetchCount = 0
+  deferredLoadTriggered = false
+  pendingPriorityKeys.clear()
+
+  // Get priority keys for this route
+  const priorityKeys = getInitialLoadKeys(route)
+  initialLoadKeys = new Set(priorityKeys.filter(key => HANDLED_KEYS.includes(key)))
+
+  // Add userAllocation if authenticated (commonly needed)
+  if (isAuthenticated && !initialLoadKeys.has('userAllocation')) {
+    initialLoadKeys.add('userAllocation')
+  }
+
+  console.log(`[AuthWorker] Priority keys for route: ${Array.from(initialLoadKeys).join(', ') || 'none'}`)
+
+  // Send cached data ONLY for priority keys immediately
+  for (const key of initialLoadKeys) {
+    const requiresAuth = USER_KEYS.includes(key) || AUTH_REQUIRED_KEYS.includes(key)
+    // Skip auth-required keys if not authenticated AND no cached data
+    if (requiresAuth && !isAuthenticated) {
+      const state = dataStates.get(key)
+      if (!state?.data) continue
+    }
+
+    const state = dataStates.get(key)
+    if (state?.data) {
+      sendResponse(port, {
+        id: generateMessageId(),
+        timestamp: Date.now(),
+        type: 'CACHE_HIT',
+        payload: {
+          dataKey: key,
+          data: state.data,
+          state,
+          fromCache: true,
+        },
+      })
+    }
+    // Queue fetch for stale priority data and track it
+    if (!state?.data || isStale(key, state.lastUpdated)) {
+      const canFetch = !requiresAuth || isAuthenticated || PUBLIC_ADMIN_KEYS.includes(key)
+      if (canFetch) {
+        pendingPriorityKeys.add(key)
+        queue.enqueue(key, 'critical')
+      }
+    }
+  }
+
+  // If no priority keys need fetching, trigger deferred load immediately
+  if (pendingPriorityKeys.size === 0) {
+    triggerDeferredLoad()
+  }
+}
+
+/**
+ * Called when a priority key finishes loading - triggers deferred load when all done
+ */
+function onPriorityKeyLoaded(dataKey: DataKey): void {
+  if (!pendingPriorityKeys.has(dataKey)) return
+
+  pendingPriorityKeys.delete(dataKey)
+  console.log(`[AuthWorker] Priority key loaded: ${dataKey}, remaining: ${pendingPriorityKeys.size}`)
+
+  // When all priority keys are loaded, trigger deferred loading immediately (non-blocking)
+  if (pendingPriorityKeys.size === 0 && !deferredLoadTriggered) {
+    triggerDeferredLoad()
+  }
+}
+
+/**
+ * Load non-priority keys after priority keys are done
+ */
+function triggerDeferredLoad(): void {
+  if (deferredLoadTriggered) return
+  deferredLoadTriggered = true
+
+  console.log('[AuthWorker] All priority keys loaded - starting deferred load for non-priority keys')
+
+  // Send cached data and queue fetches for remaining keys
+  for (const key of HANDLED_KEYS) {
+    if (initialLoadKeys.has(key)) continue // Already handled
+
+    const requiresAuth = USER_KEYS.includes(key) || AUTH_REQUIRED_KEYS.includes(key)
+    if (requiresAuth && !isAuthenticated) continue
+
+    const state = dataStates.get(key)
+    // Send cached data to all subscribers
+    if (state?.data) {
+      broadcastToSubscribers(key, {
+        id: generateMessageId(),
+        timestamp: Date.now(),
+        type: 'CACHE_HIT',
+        payload: {
+          dataKey: key,
+          data: state.data,
+          state,
+          fromCache: true,
+        },
+      })
+    }
+    // Queue fetch if stale
+    if (!state?.data || isStale(key, state.lastUpdated)) {
+      const canFetch = !requiresAuth || isAuthenticated || PUBLIC_ADMIN_KEYS.includes(key)
+      if (canFetch) {
+        queue.enqueue(key, 'low')
+      }
+    }
   }
 }
 
@@ -1067,6 +1164,9 @@ async function fetchData(dataKey: DataKey): Promise<void> {
   })
 
   await setCached(dataKey, data)
+
+  // Notify that this priority key has loaded (triggers deferred load when all done)
+  onPriorityKeyLoaded(dataKey)
 }
 
 // ============================================================================

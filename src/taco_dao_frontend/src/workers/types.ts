@@ -273,6 +273,7 @@ export type WorkerRequestType =
   | 'PING'
   | 'USER_ACTIVITY' // Signal user activity to reset idle timer
   | 'RESET' // Reset worker state (backoff, queue, fetch count) for fresh start
+  | 'INITIAL_LOAD' // Tell worker the initial route for selective data loading
 
 export interface WorkerRequest extends BaseMessage {
   type: WorkerRequestType
@@ -285,6 +286,7 @@ export interface WorkerRequest extends BaseMessage {
     force?: boolean
     isAdmin?: boolean
     network?: 'ic' | 'staging' | 'local' | null
+    route?: string // Current route for INITIAL_LOAD
   }
 }
 
@@ -541,4 +543,26 @@ export function getRoutePriorities(
   })
 
   return priorities
+}
+
+/**
+ * Get critical and high priority keys for a route (used for initial selective loading)
+ * Returns only the keys that should be loaded immediately for a given route
+ */
+export function getInitialLoadKeys(route: string): DataKey[] {
+  // Find matching route config
+  let config = ROUTE_PRIORITIES[route]
+  if (!config) {
+    const routePrefix = Object.keys(ROUTE_PRIORITIES).find(
+      (r) => route.startsWith(r) && r !== '/'
+    )
+    config = routePrefix ? ROUTE_PRIORITIES[routePrefix] : ROUTE_PRIORITIES['/']
+  }
+
+  // Return only critical and high priority keys
+  const keys = new Set<DataKey>()
+  config.critical.forEach((key) => keys.add(key))
+  config.high.forEach((key) => keys.add(key))
+
+  return Array.from(keys)
 }
