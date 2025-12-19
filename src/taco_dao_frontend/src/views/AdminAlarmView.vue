@@ -674,8 +674,6 @@
         </div>
       </div>
     </div>
-    
-    <FooterBar />
 
     <!-- Confirmation Modal -->
     <AdminConfirmationModal
@@ -695,7 +693,6 @@
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useTacoStore } from '../stores/taco.store'
-import FooterBar from '../components/FooterBar.vue'
 import TacoTitle from '../components/misc/TacoTitle.vue'
 import AdminConfirmationModal from '../components/admin/AdminConfirmationModal.vue'
 import * as workerBridge from '../stores/worker-bridge'

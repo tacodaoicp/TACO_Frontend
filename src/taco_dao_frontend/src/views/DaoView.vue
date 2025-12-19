@@ -111,9 +111,6 @@
 
     </div>
 
-    <!-- footer bar -->
-    <FooterBar />
-
   </div>
 
 </template>
@@ -246,7 +243,6 @@
   // Imports //
   /////////////
 
-  import FooterBar from "../components/FooterBar.vue";
   import TacoTitle from '../components/misc/TacoTitle.vue'
   import DaoAllocations from "../components/dao/DaoAllocations.vue";
   import DaoTrustedTokens from "../components/dao/DaoTrustedTokens.vue";

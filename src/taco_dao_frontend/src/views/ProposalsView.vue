@@ -154,16 +154,12 @@
         </div>
       </div>
     </div>
-
-    <!-- footer bar -->
-    <FooterBar />
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
 import { useTacoStore } from '../stores/taco.store'
-import FooterBar from '../components/FooterBar.vue'
 import TacoTitle from '../components/misc/TacoTitle.vue'
 
 const tacoStore = useTacoStore()

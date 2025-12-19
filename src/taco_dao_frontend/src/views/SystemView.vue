@@ -253,9 +253,6 @@
 
     </div>
 
-    <!-- footer bar -->
-    <FooterBar />
-
   </div>
 
 </template>
@@ -322,7 +319,6 @@
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { storeToRefs } from 'pinia'
-import FooterBar from "../components/FooterBar.vue"
 // @ts-ignore - Vue SFC import resolution
 import SystemCanisterCard from "../components/system/SystemCanisterCard.vue"
 import SystemStatusItem from "../components/system/SystemStatusItem.vue"

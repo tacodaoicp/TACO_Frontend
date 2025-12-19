@@ -220,9 +220,6 @@
 
     </div>
 
-    <!-- footer bar -->
-    <FooterBar />    
-
     <!-- Send Token Dialog -->
     <SendTokenDialog 
       :show="showSendDialog"
@@ -391,7 +388,6 @@
 // imports //
 /////////////
 
-import FooterBar from "../components/FooterBar.vue";
 import TacoTitle from '../components/misc/TacoTitle.vue'
 import { ref, computed, onMounted, watch } from 'vue'
 import { useTacoStore } from '../stores/taco.store'

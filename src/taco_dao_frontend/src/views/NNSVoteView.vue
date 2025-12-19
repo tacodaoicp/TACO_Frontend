@@ -587,9 +587,6 @@
 
         </div>
 
-        <!-- footer bar -->
-        <FooterBar />
-
     </div>
 
 </template>
@@ -745,7 +742,6 @@
   // imports //
   /////////////
 
-    import FooterBar from '../components/FooterBar.vue'
     import { ref, computed, onMounted, watch } from "vue"
     import { useRoute, useRouter } from "vue-router"
     import { storeToRefs } from 'pinia'

@@ -409,9 +409,6 @@
         </div>
       </div>
     </div>
-
-    <!-- footer bar -->
-    <FooterBar />
   </div>
 </template>
 
@@ -419,7 +416,6 @@
 import { ref, onMounted, computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { useTacoStore } from '../stores/taco.store'
-import FooterBar from '../components/FooterBar.vue'
 import TacoTitle from '../components/misc/TacoTitle.vue'
 
 const route = useRoute()

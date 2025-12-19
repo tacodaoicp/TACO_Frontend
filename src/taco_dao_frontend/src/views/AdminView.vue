@@ -876,9 +876,6 @@
       @close="showProposalDialog = false"
       @success="handleProposalSuccess"
     />
-    
-    <!-- footer bar -->
-    <FooterBar />
   </div>
 </template>
 
@@ -1183,7 +1180,6 @@ import { ref, computed, onMounted, watch } from 'vue';
 import { Actor } from '@dfinity/agent';
 import { useTacoStore, type GetSystemParameterResult } from '../stores/taco.store';
 import { storeToRefs } from "pinia"
-import FooterBar from "../components/FooterBar.vue";
 import TacoTitle from '../components/misc/TacoTitle.vue';
 import TradingLogs from '../components/admin/TradingLogs.vue';
 import AdminConfirmationModal from '../components/admin/AdminConfirmationModal.vue';

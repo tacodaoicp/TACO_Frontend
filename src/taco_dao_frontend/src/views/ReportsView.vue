@@ -12319,9 +12319,6 @@ away from being playable.
 
     </div>
 
-    <!-- footer bar -->
-    <FooterBar />
-
     <!-- message modal -->
     <div v-if="!userAcceptedReportsDisclaimer || userReshownReportsDisclaimer" class="reports__message">
       
@@ -12825,7 +12822,6 @@ away from being playable.
   // Imports //
   /////////////
 
-  import FooterBar from "../components/FooterBar.vue"
   import { ref, onMounted, watch, computed } from "vue"
   import { useTacoStore } from "../stores/taco.store"
   import { storeToRefs } from "pinia"  

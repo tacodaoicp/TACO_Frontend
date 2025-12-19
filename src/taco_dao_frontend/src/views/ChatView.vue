@@ -87,9 +87,6 @@
 
     </div>
 
-    <!-- footer bar -->
-    <FooterBar />
-
     <!-- gated access tutorial modal -->
     <div v-if="userShownAccessTutorial" class="access__message">
       
@@ -395,7 +392,6 @@
   // Imports //
   /////////////
 
-  import FooterBar from "../components/FooterBar.vue"
   import ForumView from "../components/forum/ForumView.vue"
   import { ref, onMounted, watch } from "vue"
   import { initialise } from '@open-ic/openchat-xframe'

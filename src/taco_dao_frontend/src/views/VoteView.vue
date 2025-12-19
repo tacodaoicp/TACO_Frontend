@@ -1005,9 +1005,6 @@
 
     </div>
 
-    <!-- footer bar -->
-    <FooterBar />
-
     <!-- message modal -->
     <div v-if="!userAcceptedHotkeyTutorial || userReshownHotkeyTutorial" class="vote__message">
       
@@ -2164,7 +2161,6 @@
   // imports //
   /////////////
 
-  import FooterBar from "../components/FooterBar.vue"
   import { ref, onMounted, onBeforeUnmount, computed, watch, nextTick } from "vue"
   import { useTacoStore } from "../stores/taco.store"
   import { storeToRefs } from "pinia"

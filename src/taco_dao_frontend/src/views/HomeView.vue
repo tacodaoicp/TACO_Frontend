@@ -579,9 +579,6 @@
 
         </a>
 
-        <!-- footer bar -->
-        <FooterBar style="width: 100%;" />
-
         <!-- upper taco dao background taco -->
         <img :src="TacoDaoTaco" 
               alt="placeholder" 
@@ -1986,7 +1983,6 @@
 
   import { ref, onMounted, computed, onUnmounted, watch } from "vue";
   import { useRoute } from 'vue-router'
-  import FooterBar from "../components/FooterBar.vue";
   import { useTacoStore } from "../stores/taco.store"
   import { storeToRefs } from "pinia"  
   import TacoCoinIcon from "../assets/tokens/tacoCoinIcon.vue"
@@ -2243,27 +2239,21 @@
   }
 
   // on mounted
-  onMounted(async () => {
+  onMounted(() => {
 
     // log
     // console.log('homepage mounted')
 
-    // Prefetch common routes in background
+    // Prefetch common routes in background (non-blocking)
     prefetchRoutes()
 
-    // check if user is logged in
-    await checkIfLoggedIn()    
-
-    // if user is logged in, get neurons count
+    // Fetch neurons count in background if user is already logged in
+    // Note: checkIfLoggedIn is already called in App.vue
     if (userLoggedIn.value) {
-
-      const rawNeurons = await tacoStore.getTacoNeurons()
-      const neuronsCount = rawNeurons.length
-
-      // set neurons count
-      localNeuronsCount.value = neuronsCount
-
-    }      
+      tacoStore.getTacoNeurons().then(rawNeurons => {
+        localNeuronsCount.value = rawNeurons.length
+      })
+    }
 
     // get the below the fold element
     const belowTheFold = document.querySelector('.home-view__below-the-fold')
@@ -2310,7 +2300,18 @@
         shouldLoadYouTube.value = true
       }, 1000)
     }  
-    
+
+  })
+
+  // Watch for login state changes to update neurons count
+  watch(userLoggedIn, (loggedIn) => {
+    if (loggedIn) {
+      tacoStore.getTacoNeurons().then(rawNeurons => {
+        localNeuronsCount.value = rawNeurons.length
+      })
+    } else {
+      localNeuronsCount.value = 0
+    }
   })
 
   // clean up observer

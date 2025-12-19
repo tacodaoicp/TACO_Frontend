@@ -15,13 +15,19 @@
     <!-- Persistent HeaderBar - renders once and stays across all routes -->
     <HeaderBar />
 
-    <!-- Persistent HomeView to prevent iframe reloads -->
-    <HomeView v-show="route.path === '/'" />
+    <!-- Main content area with persistent footer -->
+    <div class="app__content">
+      <!-- Persistent HomeView to prevent iframe reloads -->
+      <HomeView v-show="route.path === '/'" />
 
-    <!-- Router view for all other pages (exclude home to avoid duplicate) -->
-    <router-view v-slot="{ Component }">
-      <component v-if="route.path !== '/'" :is="Component" />
-    </router-view>
+      <!-- Router view for all other pages (exclude home to avoid duplicate) -->
+      <router-view v-slot="{ Component }">
+        <component v-if="route.path !== '/'" :is="Component" />
+      </router-view>
+
+      <!-- Persistent FooterBar - renders once and stays across all routes -->
+      <FooterBar />
+    </div>
 
     <!-- toast container -->
     <TransitionGroup name="fade" tag="div" class="toast-container position-fixed bottom-0 end-0 m-3">
@@ -98,6 +104,20 @@
 
     // default text color black
     color: var(--black);
+
+    // app content area - flex container for views and footer
+    &__content {
+      display: flex;
+      flex-direction: column;
+      height: calc(100dvh - 56px); // subtract header height
+      overflow: hidden;
+
+      // Make views expand to fill available space
+      > :first-child {
+        flex: 1;
+        overflow: auto;
+      }
+    }
 
   }
 
@@ -912,8 +932,9 @@
   // Lazy load HomeView to reduce initial bundle
   const HomeView = defineAsyncComponent(() => import('./views/HomeView.vue'))
 
-  // HeaderBar is rendered once in App.vue and persists across all routes
+  // HeaderBar and FooterBar are rendered once in App.vue and persist across all routes
   import HeaderBar from './components/HeaderBar.vue'
+  import FooterBar from './components/FooterBar.vue'
 
   import 'bootstrap/dist/css/bootstrap.css';
   import '@fortawesome/fontawesome-pro/css/fontawesome.css';
@@ -1032,10 +1053,7 @@
     // log
     // // console.log('running app mounted logic')
 
-    // Initialize @dfinity shims early so they're ready for all components
-    await tacoStore.initializeShims()
-
-    // Initialize SharedWorkers for data fetching
+    // Initialize SharedWorkers for data fetching FIRST (non-blocking, fast)
     initWorkerBridge()
 
     // Initialize network config with worker bridge (allows runtime network switching)
@@ -1047,7 +1065,12 @@
     // Set initial route for priority calculation
     setCurrentRoute(route.path)
 
+    // Start loading @dfinity shims in background (don't block UI)
+    // Functions that need shims will await initializeShims() themselves
+    tacoStore.initializeShims()
+
     // check if user is logged in (this will trigger name loading if logged in)
+    // Note: checkIfLoggedIn internally calls initializeShims if needed
     //console.log('🚀 Running app initialization - checking login status...');
     await checkIfLoggedIn()
 

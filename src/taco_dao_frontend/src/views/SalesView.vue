@@ -263,10 +263,7 @@
 
         </div>
 
-    </div>  
-
-    <!-- footer bar -->
-    <FooterBar />
+    </div>
 
   </div>
 
@@ -580,7 +577,6 @@
   // Imports //
   /////////////
 
-  import FooterBar from "../components/FooterBar.vue";
   import {ref} from "vue";
   import TacoTitle from '../components/misc/TacoTitle.vue';
 

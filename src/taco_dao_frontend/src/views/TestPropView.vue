@@ -283,16 +283,12 @@
         </div>
       </div>
     </div>
-
-    <!-- footer bar -->
-    <FooterBar />
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { Principal } from '@dfinity/principal'
-import FooterBar from '../components/FooterBar.vue'
 import TacoTitle from '../components/misc/TacoTitle.vue'
 import { useProposalEligibility } from '../composables/useProposalEligibility'
 import { useGNSFProposal } from '../composables/useGNSFProposal'
