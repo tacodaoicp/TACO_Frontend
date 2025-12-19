@@ -1,7 +1,5 @@
 <template>
   <div class="standard-view">
-    <HeaderBar />
-    
     <div class="scroll-y-container h-100">
       <div class="container">
         <div class="row">
@@ -697,7 +695,6 @@
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useTacoStore } from '../stores/taco.store'
-import HeaderBar from '../components/HeaderBar.vue'
 import FooterBar from '../components/FooterBar.vue'
 import TacoTitle from '../components/misc/TacoTitle.vue'
 import AdminConfirmationModal from '../components/admin/AdminConfirmationModal.vue'

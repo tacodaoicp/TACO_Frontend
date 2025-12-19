@@ -1,8 +1,5 @@
 <template>
   <div class="standard-view">
-    <!-- header bar -->
-    <HeaderBar />
-    
     <div class="scroll-y-container h-100">
       <div class="container">
         <div class="row">
@@ -237,7 +234,6 @@
 <script>
 import { useTacoStore } from '../stores/taco.store'
 import { useAdminStore } from '../stores/admin.store'
-import HeaderBar from '../components/HeaderBar.vue'
 import TacoTitle from '../components/misc/TacoTitle.vue'
 import { createActor as createRewardsActor } from '../../../declarations/rewards'
 import { AnonymousIdentity } from '@dfinity/agent'

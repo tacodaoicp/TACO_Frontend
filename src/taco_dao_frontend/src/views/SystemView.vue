@@ -2,9 +2,6 @@
 
   <div class="standard-view">
 
-    <!-- header bar -->
-    <HeaderBar />
-
     <!-- scroll container -->
     <div class="scroll-y-container h-100">
 
@@ -325,7 +322,6 @@
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { storeToRefs } from 'pinia'
-import HeaderBar from "../components/HeaderBar.vue"
 import FooterBar from "../components/FooterBar.vue"
 // @ts-ignore - Vue SFC import resolution
 import SystemCanisterCard from "../components/system/SystemCanisterCard.vue"

@@ -1,8 +1,5 @@
 <template>
   <div class="standard-view">
-    <!-- header bar -->
-    <HeaderBar />
-    
     <div class="scroll-y-container h-100">
       <div class="container">
         <div class="row">
@@ -1186,7 +1183,6 @@ import { ref, computed, onMounted, watch } from 'vue';
 import { Actor } from '@dfinity/agent';
 import { useTacoStore, type GetSystemParameterResult } from '../stores/taco.store';
 import { storeToRefs } from "pinia"
-import HeaderBar from "../components/HeaderBar.vue";
 import FooterBar from "../components/FooterBar.vue";
 import TacoTitle from '../components/misc/TacoTitle.vue';
 import TradingLogs from '../components/admin/TradingLogs.vue';

@@ -7,27 +7,284 @@ import { ref, computed } from 'vue'
 import { defineStore } from 'pinia'
 import { useRouter } from 'vue-router'
 import { useStorage } from "@vueuse/core"
-import { AuthClient, IdbStorage, KEY_STORAGE_KEY } from "@dfinity/auth-client"
-import { Actor, AnonymousIdentity } from "@dfinity/agent"
-import { createAgent } from '@dfinity/utils'
-import { DelegationIdentity } from '@dfinity/identity'
 import { workerBridge, fetchAndWait } from './worker-bridge'
 import { deserializeFromTransfer } from '../workers/shared/fetch-functions'
-import { idlFactory } from "../../../declarations/ledger_canister/ledger_canister.did.js"
-import { idlFactory as daoBackendIDL } from "../../../declarations/dao_backend/DAO_backend.did.js"
-import { Result_4, idlFactory as treasuryIDL, UpdateConfig, RebalanceConfig, _SERVICE as TreasuryService } from "../../../declarations/treasury/treasury.did.js"
-import { idlFactory as neuronSnapshotIDL, _SERVICE as NeuronSnapshotService } from "../../../declarations/neuronSnapshot/neuronSnapshot.did.js"
-import { idlFactory as sneedForumIDL, _SERVICE as SneedForumService } from "../../../declarations/sneed_sns_forum/sneed_sns_forum.did.js"
-import { idlFactory as appSneedDaoIDL, _SERVICE as AppSneedDaoService } from "../../../declarations/app_sneeddao_backend/app_sneeddao_backend.did.js"
-import { idlFactory as snsGovernanceIDL } from "../../../declarations/sns_governance/sns_governance.did.js"
-import { idlFactory as alarmIDL, _SERVICE as AlarmService } from "../../../declarations/alarm/alarm.did.js"
-import { idlFactory as rewardsIDL } from "../../../declarations/rewards/rewards.did.js"
+
+// Only import Principal synchronously - it's small and used everywhere
 import { Principal } from '@dfinity/principal'
-import { AccountIdentifier } from '@dfinity/ledger-icp'
-import { SnsGovernanceCanister, SnsNeuronPermissionType } from '@dfinity/sns'
-import { canisterId as iiCanisterId } from "../../../declarations/internet_identity/index.js"
+
+// Type-only imports (no runtime cost)
+import type { AuthClient as AuthClientType, IdbStorage as IdbStorageType } from "@dfinity/auth-client"
+import type { Actor as ActorType, AnonymousIdentity as AnonymousIdentityType, HttpAgent } from "@dfinity/agent"
+import type { DelegationIdentity as DelegationIdentityType } from '@dfinity/identity'
+import type { AccountIdentifier as AccountIdentifierType } from '@dfinity/ledger-icp'
+import type { SnsGovernanceCanister as SnsGovernanceCanisterType } from '@dfinity/sns'
+import type { IDL as IDLType } from '@dfinity/candid'
 import type { Result_1, UserState } from "../../../declarations/dao_backend/DAO_backend.did.d"
-import { IDL } from '@dfinity/candid'
+import type { Result_4, UpdateConfig, RebalanceConfig, _SERVICE as TreasuryService } from "../../../declarations/treasury/treasury.did.js"
+import type { _SERVICE as NeuronSnapshotService } from "../../../declarations/neuronSnapshot/neuronSnapshot.did.js"
+import type { _SERVICE as SneedForumService } from "../../../declarations/sneed_sns_forum/sneed_sns_forum.did.js"
+import type { _SERVICE as AppSneedDaoService } from "../../../declarations/app_sneeddao_backend/app_sneeddao_backend.did.js"
+import type { _SERVICE as AlarmService } from "../../../declarations/alarm/alarm.did.js"
+
+// Canister ID import (small, needed early)
+import { canisterId as iiCanisterId } from "../../../declarations/internet_identity/index.js"
+
+// ============================================================================
+// Lazy Module Loaders - Heavy @dfinity packages loaded on demand
+// ============================================================================
+
+let _authClientModule: typeof import('@dfinity/auth-client') | null = null
+let _agentModule: typeof import('@dfinity/agent') | null = null
+let _utilsModule: typeof import('@dfinity/utils') | null = null
+let _identityModule: typeof import('@dfinity/identity') | null = null
+let _ledgerIcpModule: typeof import('@dfinity/ledger-icp') | null = null
+let _snsModule: typeof import('@dfinity/sns') | null = null
+let _candidModule: typeof import('@dfinity/candid') | null = null
+
+// IDL factory modules (lazy loaded)
+let _ledgerIDL: any = null
+let _daoBackendIDL: any = null
+let _treasuryIDL: any = null
+let _neuronSnapshotIDL: any = null
+let _sneedForumIDL: any = null
+let _appSneedDaoIDL: any = null
+let _snsGovernanceIDL: any = null
+let _alarmIDL: any = null
+let _rewardsIDL: any = null
+
+async function getAuthClientModule() {
+    if (!_authClientModule) {
+        _authClientModule = await import('@dfinity/auth-client')
+    }
+    return _authClientModule
+}
+
+async function getAgentModule() {
+    if (!_agentModule) {
+        _agentModule = await import('@dfinity/agent')
+    }
+    return _agentModule
+}
+
+async function getUtilsModule() {
+    if (!_utilsModule) {
+        _utilsModule = await import('@dfinity/utils')
+    }
+    return _utilsModule
+}
+
+async function getIdentityModule() {
+    if (!_identityModule) {
+        _identityModule = await import('@dfinity/identity')
+    }
+    return _identityModule
+}
+
+async function getLedgerIcpModule() {
+    if (!_ledgerIcpModule) {
+        _ledgerIcpModule = await import('@dfinity/ledger-icp')
+    }
+    return _ledgerIcpModule
+}
+
+async function getSnsModule() {
+    if (!_snsModule) {
+        _snsModule = await import('@dfinity/sns')
+    }
+    return _snsModule
+}
+
+async function getCandidModule() {
+    if (!_candidModule) {
+        _candidModule = await import('@dfinity/candid')
+    }
+    return _candidModule
+}
+
+// IDL factory loaders
+async function getLedgerIDL() {
+    if (!_ledgerIDL) {
+        const mod = await import("../../../declarations/ledger_canister/ledger_canister.did.js")
+        _ledgerIDL = mod.idlFactory
+    }
+    return _ledgerIDL
+}
+
+async function getDaoBackendIDL() {
+    if (!_daoBackendIDL) {
+        const mod = await import("../../../declarations/dao_backend/DAO_backend.did.js")
+        _daoBackendIDL = mod.idlFactory
+    }
+    return _daoBackendIDL
+}
+
+async function getTreasuryIDL() {
+    if (!_treasuryIDL) {
+        const mod = await import("../../../declarations/treasury/treasury.did.js")
+        _treasuryIDL = mod.idlFactory
+    }
+    return _treasuryIDL
+}
+
+async function getNeuronSnapshotIDL() {
+    if (!_neuronSnapshotIDL) {
+        const mod = await import("../../../declarations/neuronSnapshot/neuronSnapshot.did.js")
+        _neuronSnapshotIDL = mod.idlFactory
+    }
+    return _neuronSnapshotIDL
+}
+
+async function getSneedForumIDL() {
+    if (!_sneedForumIDL) {
+        const mod = await import("../../../declarations/sneed_sns_forum/sneed_sns_forum.did.js")
+        _sneedForumIDL = mod.idlFactory
+    }
+    return _sneedForumIDL
+}
+
+async function getAppSneedDaoIDL() {
+    if (!_appSneedDaoIDL) {
+        const mod = await import("../../../declarations/app_sneeddao_backend/app_sneeddao_backend.did.js")
+        _appSneedDaoIDL = mod.idlFactory
+    }
+    return _appSneedDaoIDL
+}
+
+async function getSnsGovernanceIDL() {
+    if (!_snsGovernanceIDL) {
+        const mod = await import("../../../declarations/sns_governance/sns_governance.did.js")
+        _snsGovernanceIDL = mod.idlFactory
+    }
+    return _snsGovernanceIDL
+}
+
+async function getAlarmIDL() {
+    if (!_alarmIDL) {
+        const mod = await import("../../../declarations/alarm/alarm.did.js")
+        _alarmIDL = mod.idlFactory
+    }
+    return _alarmIDL
+}
+
+async function getRewardsIDL() {
+    if (!_rewardsIDL) {
+        const mod = await import("../../../declarations/rewards/rewards.did.js")
+        _rewardsIDL = mod.idlFactory
+    }
+    return _rewardsIDL
+}
+
+// ============================================================================
+// Shim Variables - Populated on first blockchain interaction
+// ============================================================================
+
+let _shimsInitialized = false
+let AuthClient: typeof import('@dfinity/auth-client').AuthClient
+let IdbStorage: typeof import('@dfinity/auth-client').IdbStorage
+let KEY_STORAGE_KEY: string
+let Actor: typeof import('@dfinity/agent').Actor
+let AnonymousIdentity: typeof import('@dfinity/agent').AnonymousIdentity
+let createAgent: typeof import('@dfinity/utils').createAgent
+let DelegationIdentity: typeof import('@dfinity/identity').DelegationIdentity
+let AccountIdentifier: typeof import('@dfinity/ledger-icp').AccountIdentifier
+let SnsGovernanceCanister: typeof import('@dfinity/sns').SnsGovernanceCanister
+let SnsNeuronPermissionType: typeof import('@dfinity/sns').SnsNeuronPermissionType
+let IDL: typeof import('@dfinity/candid').IDL
+
+// IDL factories (populated lazily)
+let idlFactory: any
+let daoBackendIDL: any
+let treasuryIDL: any
+let neuronSnapshotIDL: any
+let sneedForumIDL: any
+let appSneedDaoIDL: any
+let snsGovernanceIDL: any
+let alarmIDL: any
+let rewardsIDL: any
+
+/**
+ * Initialize all shims - call this before any blockchain operation
+ */
+async function initializeShims() {
+    if (_shimsInitialized) return
+
+    // Load all modules in parallel for speed
+    const [
+        authClientMod,
+        agentMod,
+        utilsMod,
+        identityMod,
+        ledgerIcpMod,
+        snsMod,
+        candidMod,
+        ledgerIdl,
+        daoIdl,
+        treasuryIdl,
+        neuronIdl,
+        forumIdl,
+        appIdl,
+        govIdl,
+        alarmIdl,
+        rewardsIdl
+    ] = await Promise.all([
+        getAuthClientModule(),
+        getAgentModule(),
+        getUtilsModule(),
+        getIdentityModule(),
+        getLedgerIcpModule(),
+        getSnsModule(),
+        getCandidModule(),
+        getLedgerIDL(),
+        getDaoBackendIDL(),
+        getTreasuryIDL(),
+        getNeuronSnapshotIDL(),
+        getSneedForumIDL(),
+        getAppSneedDaoIDL(),
+        getSnsGovernanceIDL(),
+        getAlarmIDL(),
+        getRewardsIDL()
+    ])
+
+    // Populate shims
+    AuthClient = authClientMod.AuthClient
+    IdbStorage = authClientMod.IdbStorage
+    KEY_STORAGE_KEY = authClientMod.KEY_STORAGE_KEY
+    Actor = agentMod.Actor
+    AnonymousIdentity = agentMod.AnonymousIdentity
+    createAgent = utilsMod.createAgent
+    DelegationIdentity = identityMod.DelegationIdentity
+    AccountIdentifier = ledgerIcpMod.AccountIdentifier
+    SnsGovernanceCanister = snsMod.SnsGovernanceCanister
+    SnsNeuronPermissionType = snsMod.SnsNeuronPermissionType
+    IDL = candidMod.IDL
+
+    // IDL factories
+    idlFactory = ledgerIdl
+    daoBackendIDL = daoIdl
+    treasuryIDL = treasuryIdl
+    neuronSnapshotIDL = neuronIdl
+    sneedForumIDL = forumIdl
+    appSneedDaoIDL = appIdl
+    snsGovernanceIDL = govIdl
+    alarmIDL = alarmIdl
+    rewardsIDL = rewardsIdl
+
+    _shimsInitialized = true
+}
+
+/**
+ * Helper to create an anonymous agent with proper initialization
+ * This ensures shims are loaded before using AnonymousIdentity
+ */
+async function createAnonymousAgent(host: string) {
+    await initializeShims()
+    return createAgent({
+        identity: new AnonymousIdentity(),
+        host,
+        fetchRootKey: process.env.DFX_NETWORK === "local",
+    })
+}
 
 ///////////
 // Types //
@@ -425,7 +682,15 @@ export interface GNSFunctionInfo {
 
 // Registry of admin functions that can be called via GNSF proposals
 // Function IDs start at 4000
-export const GNSF_REGISTRY: Record<string, GNSFunctionInfo> = {
+// NOTE: Converted to async getter for lazy loading of @dfinity/candid (IDL)
+let _gnsfRegistryCache: Record<string, GNSFunctionInfo> | null = null
+export async function getGNSFRegistry(): Promise<Record<string, GNSFunctionInfo>> {
+    if (_gnsfRegistryCache) return _gnsfRegistryCache
+
+    // Lazy load IDL module
+    const { IDL } = await getCandidModule()
+
+    _gnsfRegistryCache = {
     'stopRebalancing': {
         functionId: BigInt(3003),
         displayName: 'Stop Trading Bot',
@@ -1032,6 +1297,9 @@ export const GNSF_REGISTRY: Record<string, GNSFunctionInfo> = {
             displayName: 'Archive Canister'
         }]
     }
+    }
+
+    return _gnsfRegistryCache
 }
 
 /////////////
@@ -1061,7 +1329,7 @@ export const useTacoStore = defineStore('taco', () => {
         tradeLimit?: string;
         tokenInitIdentifier?: string;
     }[]>([])
-    let authClientInstance: AuthClient | null = null
+    let authClientInstance: any = null  // AuthClient instance, initialized lazily
     // const tacoWizardOpen = ref(false)
     const tacoWizardOpen = ref(false)
 
@@ -1812,7 +2080,10 @@ export const useTacoStore = defineStore('taco', () => {
         return `http://localhost:${port}`
 
     }
-    const getAuthClient = async (): Promise<AuthClient> => {
+    const getAuthClient = async (): Promise<any> => {
+        // Initialize shims on first call (lazy load @dfinity modules)
+        await initializeShims()
+
         if (!authClientInstance) {
             authClientInstance = await AuthClient.create({
                 keyType: 'Ed25519', // Use Ed25519 for serializable keys (required for worker)
@@ -2153,7 +2424,7 @@ export const useTacoStore = defineStore('taco', () => {
      * Serialize the current identity and send it to the auth worker.
      * This allows the worker to make authenticated calls and deliver cached user data.
      */
-    const sendIdentityToWorker = async (authClient: AuthClient) => {
+    const sendIdentityToWorker = async (authClient: any) => {
         try {
             const identity = authClient.getIdentity()
 
@@ -2532,6 +2803,8 @@ export const useTacoStore = defineStore('taco', () => {
         // console.log('taco.store: icrc1Metadata() - calling for metadata...')
 
         try {
+            // Ensure shims are initialized before using them
+            await initializeShims()
 
             // get host
             const host = process.env.DFX_NETWORK === "local"
@@ -2575,13 +2848,15 @@ export const useTacoStore = defineStore('taco', () => {
 
     }
     const icrc1BalanceOf = async (canisterId: string, owner: Principal, subaccount?: Uint8Array) => {
-        
+
         // log
         // console.log('taco.store: icrc1BalanceOf() - calling for balance...')
         // console.log('taco.store: icrc1BalanceOf() - canisterId:', canisterId)
         // console.log('taco.store: icrc1BalanceOf() - owner:', owner.toText())
 
         try {
+            // Ensure shims are initialized before using them
+            await initializeShims()
 
             // get host
             const host = process.env.DFX_NETWORK === "local"
@@ -2771,6 +3046,8 @@ export const useTacoStore = defineStore('taco', () => {
         // This prevents the full-page spinner when cached data exists
 
         try {
+            // Ensure shims are initialized before using them
+            await initializeShims()
 
             // get host
             const host = process.env.DFX_NETWORK === "local"
@@ -2858,6 +3135,8 @@ export const useTacoStore = defineStore('taco', () => {
         // Note: No appLoadingOn here - let components control their own loading states
 
         try {
+            // Ensure shims are initialized before using them
+            await initializeShims()
 
             // get host
             const host = process.env.DFX_NETWORK === "local"
@@ -10335,5 +10614,8 @@ export const useTacoStore = defineStore('taco', () => {
         cachedDefaultVoteBehavior,
         cachedHighestProcessedNNSProposalId,
         cachedPortfolioSnapshotStatus,
+
+        // Initialization helpers
+        initializeShims,
     }
 })

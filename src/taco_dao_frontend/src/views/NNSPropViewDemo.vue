@@ -1,7 +1,5 @@
 <template>
     <div>
-        <HeaderBar />
-        
         <!-- Loading State -->
         <div v-if="loading" class="d-flex justify-content-center align-items-center min-vh-100">
             <div class="text-center">
@@ -48,7 +46,6 @@
 import { ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useTacoStore } from '../stores/taco.store'
-import HeaderBar from '../components/HeaderBar.vue'
 
 const route = useRoute()
 const router = useRouter()

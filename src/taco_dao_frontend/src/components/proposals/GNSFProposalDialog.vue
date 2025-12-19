@@ -157,11 +157,13 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
-import { IDL } from '@dfinity/candid'
+import { ref, computed, watch, onMounted } from 'vue'
 import { useProposalEligibility } from '../../composables/useProposalEligibility'
 import { useGNSFProposal } from '../../composables/useGNSFProposal'
-import { GNSF_REGISTRY, type GNSFunctionInfo } from '../../stores/taco.store'
+import { getGNSFRegistry, type GNSFunctionInfo } from '../../stores/taco.store'
+
+// Lazy load IDL module
+let IDL: typeof import('@dfinity/candid').IDL
 
 interface Props {
   show: boolean
@@ -180,9 +182,26 @@ const emit = defineEmits<{
   'success': [proposalId: bigint]
 }>()
 
+// Registry loaded asynchronously
+const registry = ref<Record<string, GNSFunctionInfo> | null>(null)
+
+// Load registry when dialog shows
+watch(() => props.show, async (show) => {
+  if (show && !registry.value) {
+    // Load IDL and registry in parallel
+    const [candidMod, reg] = await Promise.all([
+      import('@dfinity/candid'),
+      getGNSFRegistry()
+    ])
+    IDL = candidMod.IDL
+    registry.value = reg
+  }
+}, { immediate: true })
+
 // Get function info from registry
 const functionInfo = computed<GNSFunctionInfo | undefined>(() => {
-  return GNSF_REGISTRY[props.functionName]
+  if (!registry.value) return undefined
+  return registry.value[props.functionName]
 })
 
 // Eligibility composable
@@ -233,8 +252,9 @@ const checkElig = async () => {
 
 // Submit two proposals for config updates (updateRebalanceConfig + updateMaxPortfolioSnapshots)
 const submitConfigUpdateProposals = async (neuronIdBytes: Uint8Array) => {
-  const rebalanceConfigInfo = GNSF_REGISTRY['updateRebalanceConfig']
-  const maxSnapshotsInfo = GNSF_REGISTRY['updateMaxPortfolioSnapshots']
+  if (!registry.value) throw new Error('Registry not loaded')
+  const rebalanceConfigInfo = registry.value['updateRebalanceConfig']
+  const maxSnapshotsInfo = registry.value['updateMaxPortfolioSnapshots']
   
   if (!rebalanceConfigInfo || !maxSnapshotsInfo) {
     throw new Error('Config update functions not found in registry')
@@ -313,8 +333,9 @@ const submitConfigUpdateProposals = async (neuronIdBytes: Uint8Array) => {
 
 // Submit multiple proposals for system parameter updates
 const submitSystemParameterProposals = async (neuronIdBytes: Uint8Array) => {
-  const paramInfo = GNSF_REGISTRY['updateSystemParameter']
-  
+  if (!registry.value) throw new Error('Registry not loaded')
+  const paramInfo = registry.value['updateSystemParameter']
+
   if (!paramInfo) {
     throw new Error('System parameter function not found in registry')
   }

@@ -1,8 +1,5 @@
 <template>
   <div class="standard-view">
-    <!-- header bar -->
-    <HeaderBar />
-
     <!-- scroll container -->
     <div class="scroll-y-container h-100">
       <!-- bootstrap container -->
@@ -295,7 +292,6 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { Principal } from '@dfinity/principal'
-import HeaderBar from '../components/HeaderBar.vue'
 import FooterBar from '../components/FooterBar.vue'
 import TacoTitle from '../components/misc/TacoTitle.vue'
 import { useProposalEligibility } from '../composables/useProposalEligibility'

@@ -2,9 +2,6 @@
 
   <div class="standard-view">
 
-    <!-- header bar -->
-    <HeaderBar />
-
     <!-- scroll container - app util class -->
     <div class="scroll-y-container h-100">
 
@@ -398,7 +395,6 @@
   // Imports //
   /////////////
 
-  import HeaderBar from "../components/HeaderBar.vue"
   import FooterBar from "../components/FooterBar.vue"
   import ForumView from "../components/forum/ForumView.vue"
   import { ref, onMounted, watch } from "vue"

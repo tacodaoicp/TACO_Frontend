@@ -1,8 +1,5 @@
 <template>
     <div class="standard-view">
-        <!-- Header Bar -->
-        <HeaderBar />
-
         <!-- Scroll Container -->
         <div class="scroll-y-container h-100">
             <!-- Bootstrap Container -->
@@ -706,7 +703,6 @@
 import { ref, computed, onMounted, watch, nextTick } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useTacoStore } from '../stores/taco.store'
-import HeaderBar from '../components/HeaderBar.vue'
 import TacoTitle from '../components/misc/TacoTitle.vue'
 import astronautLoader from '../assets/images/astonautLoader.webp'
 import * as workerBridge from '../stores/worker-bridge'

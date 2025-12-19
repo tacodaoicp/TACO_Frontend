@@ -1,9 +1,6 @@
 <template>
     <div class="standard-view">
 
-        <!-- header bar -->
-        <HeaderBar />
-
         <!-- scroll container -->
         <div class="scroll-y-container h-100">
 
@@ -324,7 +321,6 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { useTacoStore } from '../stores/taco.store'
-import HeaderBar from '../components/HeaderBar.vue'
 import TacoTitle from '../components/misc/TacoTitle.vue'
 import DfinityLogo from '../assets/images/dfinityLogo.vue'
 import astronautLoader from '../assets/images/astonautLoader.webp'

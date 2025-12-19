@@ -29,6 +29,47 @@ import { idlFactory as alarmIDL, type _SERVICE as AlarmService } from '../../../
 import { idlFactory as rewardsIDL, type _SERVICE as RewardsService } from '../../../../declarations/rewards/rewards.did.js'
 
 // ============================================================================
+// Principal Caching (for serialization performance)
+// ============================================================================
+
+// Cache for Principal.fromText() - avoids repeated expensive CRC32/Base32 conversions
+const principalCache = new Map<string, Principal>()
+const MAX_PRINCIPAL_CACHE_SIZE = 1000
+
+// Cache for Principal.toText() - uses WeakMap so Principals can be GC'd
+const principalToTextCache = new WeakMap<Principal, string>()
+
+/**
+ * Get a cached Principal from text, creating and caching if needed
+ */
+function getCachedPrincipal(text: string): Principal {
+  let principal = principalCache.get(text)
+  if (!principal) {
+    principal = Principal.fromText(text)
+    // Limit cache size to prevent memory issues
+    if (principalCache.size >= MAX_PRINCIPAL_CACHE_SIZE) {
+      const firstKey = principalCache.keys().next().value
+      if (firstKey) principalCache.delete(firstKey)
+    }
+    principalCache.set(text, principal)
+    principalToTextCache.set(principal, text) // Cache reverse direction too
+  }
+  return principal
+}
+
+/**
+ * Get cached text from a Principal, caching if needed
+ */
+function getCachedPrincipalText(principal: Principal): string {
+  let text = principalToTextCache.get(principal)
+  if (!text) {
+    text = principal.toText()
+    principalToTextCache.set(principal, text)
+  }
+  return text
+}
+
+// ============================================================================
 // Serialization Helper
 // ============================================================================
 
@@ -52,7 +93,8 @@ export function serializeForTransfer(obj: unknown): unknown {
   }
 
   if (obj instanceof Principal) {
-    return `__principal__${obj.toText()}`
+    // Use cached toText() for performance
+    return `__principal__${getCachedPrincipalText(obj)}`
   }
 
   if (Array.isArray(obj)) {
@@ -87,7 +129,8 @@ export function deserializeFromTransfer(obj: unknown): unknown {
       return new Uint8Array(arr)
     }
     if (obj.startsWith('__principal__')) {
-      return Principal.fromText(obj.slice(13))
+      // Use cached fromText() for performance
+      return getCachedPrincipal(obj.slice(13))
     }
     return obj
   }

@@ -2,9 +2,6 @@
 
   <div class="standard-view">
 
-    <!-- header bar -->
-    <HeaderBar />
-
     <!-- scroll container -->
     <div class="scroll-y-container h-100">
 
@@ -2167,7 +2164,6 @@
   // imports //
   /////////////
 
-  import HeaderBar from "../components/HeaderBar.vue"
   import FooterBar from "../components/FooterBar.vue"
   import { ref, onMounted, onBeforeUnmount, computed, watch, nextTick } from "vue"
   import { useTacoStore } from "../stores/taco.store"

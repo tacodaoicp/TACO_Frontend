@@ -1,8 +1,5 @@
 <template>
   <div class="standard-view">
-    <!-- header bar -->
-    <HeaderBar />
-    
     <div class="scroll-y-container h-100">
       <div class="container">
         <div class="row">
@@ -619,7 +616,6 @@
 
 <script>
 import { ref } from 'vue'
-import HeaderBar from '../components/HeaderBar.vue'
 import TacoTitle from '../components/misc/TacoTitle.vue'
 import GNSFProposalDialog from '../components/proposals/GNSFProposalDialog.vue'
 import { useTacoStore } from '../stores/taco.store'

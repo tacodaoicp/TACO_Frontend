@@ -8,9 +8,6 @@
       <!-- above the fold -->
       <div class="home-view__above-the-fold">
 
-        <!-- header bar -->
-        <HeaderBar />
-
         <!-- upper -->
         <div class="container home-view__above-the-fold__upper">
 
@@ -1989,7 +1986,6 @@
 
   import { ref, onMounted, computed, onUnmounted, watch } from "vue";
   import { useRoute } from 'vue-router'
-  import HeaderBar from "../components/HeaderBar.vue";
   import FooterBar from "../components/FooterBar.vue";
   import { useTacoStore } from "../stores/taco.store"
   import { storeToRefs } from "pinia"  
@@ -2235,12 +2231,25 @@
   // Lifecycle Hooks //
   /////////////////////
 
+  // Prefetch common routes - starts immediately but with low priority
+  const prefetchRoutes = () => {
+    // Use link rel=prefetch for browser-level low priority prefetching
+    const prefetchChunks = ['VoteView', 'DaoView']
+
+    // Also trigger dynamic imports to warm up the module cache
+    // These run in parallel and don't block anything
+    import('./VoteView.vue')
+    import('./DaoView.vue')
+  }
+
   // on mounted
   onMounted(async () => {
-    
+
     // log
     // console.log('homepage mounted')
 
+    // Prefetch common routes in background
+    prefetchRoutes()
 
     // check if user is logged in
     await checkIfLoggedIn()    

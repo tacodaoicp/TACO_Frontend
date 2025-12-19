@@ -12,6 +12,9 @@
 
     </div>
 
+    <!-- Persistent HeaderBar - renders once and stays across all routes -->
+    <HeaderBar />
+
     <!-- Persistent HomeView to prevent iframe reloads -->
     <HomeView v-show="route.path === '/'" />
 
@@ -901,11 +904,17 @@
   // Imports //
   /////////////
 
-  import { onMounted, onUnmounted, watch, computed } from 'vue';
+  import { onMounted, onUnmounted, watch, computed, defineAsyncComponent } from 'vue';
   import { useTacoStore } from "./stores/taco.store";
   import { storeToRefs } from "pinia";
   import { useRoute } from 'vue-router'
-  import HomeView from './views/HomeView.vue'
+
+  // Lazy load HomeView to reduce initial bundle
+  const HomeView = defineAsyncComponent(() => import('./views/HomeView.vue'))
+
+  // HeaderBar is rendered once in App.vue and persists across all routes
+  import HeaderBar from './components/HeaderBar.vue'
+
   import 'bootstrap/dist/css/bootstrap.css';
   import '@fortawesome/fontawesome-pro/css/fontawesome.css';
   import '@fortawesome/fontawesome-pro/css/light.css';
@@ -1022,6 +1031,9 @@
 
     // log
     // // console.log('running app mounted logic')
+
+    // Initialize @dfinity shims early so they're ready for all components
+    await tacoStore.initializeShims()
 
     // Initialize SharedWorkers for data fetching
     initWorkerBridge()

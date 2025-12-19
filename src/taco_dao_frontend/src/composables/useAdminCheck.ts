@@ -1,8 +1,24 @@
 import { ref } from 'vue'
-import { Actor, HttpAgent } from '@dfinity/agent'
-import { AuthClient } from '@dfinity/auth-client'
 import { useTacoStore } from '../stores/taco.store'
 import { setAdminStatus } from '../stores/worker-bridge'
+
+// Lazy-load heavy @dfinity modules to reduce initial bundle size
+let _agentModule: typeof import('@dfinity/agent') | null = null
+let _authClientModule: typeof import('@dfinity/auth-client') | null = null
+
+async function getAgentModule() {
+  if (!_agentModule) {
+    _agentModule = await import('@dfinity/agent')
+  }
+  return _agentModule
+}
+
+async function getAuthClientModule() {
+  if (!_authClientModule) {
+    _authClientModule = await import('@dfinity/auth-client')
+  }
+  return _authClientModule
+}
 
 /**
  * Hardcoded list of admin principals
@@ -67,6 +83,9 @@ export function useAdminCheck() {
     checking.value = true
 
     try {
+      // Lazy-load auth client module
+      const { AuthClient } = await getAuthClientModule()
+
       // Get auth client and identity
       const authClient = await AuthClient.create()
       const identity = authClient.getIdentity()
@@ -83,6 +102,9 @@ export function useAdminCheck() {
       if (backendCheckDone) {
         return isAdmin.value
       }
+
+      // Lazy-load agent module
+      const { Actor, HttpAgent } = await getAgentModule()
 
       // Fall back to backend verification (only once)
       const agent = new HttpAgent({

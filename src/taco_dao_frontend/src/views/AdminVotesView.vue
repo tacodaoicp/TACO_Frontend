@@ -1,8 +1,5 @@
 <template>
   <div class="standard-view">
-    <!-- header bar -->
-    <HeaderBar />
-    
     <div class="scroll-y-container h-100">
       <div class="container">
         <div class="row">
@@ -329,7 +326,6 @@ import { useRoute, useRouter } from 'vue-router';
 import { Principal } from '@dfinity/principal';
 import { useTacoStore } from '../stores/taco.store';
 import { storeToRefs } from "pinia";
-import HeaderBar from "../components/HeaderBar.vue";
 import TacoTitle from '../components/misc/TacoTitle.vue';
 
 // Get route and router

@@ -1,8 +1,5 @@
 <template>
   <div class="standard-view">
-    <!-- header bar -->
-    <HeaderBar />
-    
     <!-- scroll container -->
     <div class="scroll-y-container h-100">
       <!-- bootstrap container -->
@@ -358,7 +355,6 @@
 // Imports //
 /////////////
 
-import HeaderBar from "../components/HeaderBar.vue"
 import { ref, onMounted, computed, watch } from "vue"
 import { useTacoStore } from "../stores/taco.store"
 import { storeToRefs } from "pinia"
