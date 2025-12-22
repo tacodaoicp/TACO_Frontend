@@ -653,7 +653,6 @@ const ARCHIVE_CANISTER_IDS = {
 export default {
   name: 'AdminArchiveView',
   components: {
-    HeaderBar,
     TacoTitle,
     GNSFProposalDialog
   },

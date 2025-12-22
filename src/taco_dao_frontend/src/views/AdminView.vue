@@ -511,7 +511,7 @@
             </div>
             <div class="card-body p-0">
               <div class="log-container">
-                <div v-for="log in systemLogs" :key="String(log.timestamp)" 
+                <div v-for="(log, index) in systemLogs" :key="`${log.timestamp}-${index}`"
                      :class="['log-entry', getLogLevelClass(log.level)]"
                      v-show="(logLevel === 'all' || getLogLevelClass(log.level) === logLevel) && 
                             (selectedComponent === 'all' || log.component === selectedComponent)">

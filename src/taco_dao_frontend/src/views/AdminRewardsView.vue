@@ -227,7 +227,6 @@ import { createActor as createRewardsActor } from '../../../declarations/rewards
 export default {
   name: 'AdminRewardsView',
   components: {
-    HeaderBar,
     TacoTitle
   },
   computed: {

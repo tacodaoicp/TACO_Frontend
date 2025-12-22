@@ -368,7 +368,6 @@ import { idlFactory as rewardsIDL } from '../../../declarations/rewards/rewards.
 export default {
   name: 'RewardsView',
   components: {
-    HeaderBar,
     DfinityLogo
   },
 

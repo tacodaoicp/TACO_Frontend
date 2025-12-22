@@ -244,7 +244,6 @@ let cachedRewardsActor = null
 export default {
   name: 'AdminRewardsBalancesView',
   components: {
-    HeaderBar,
     TacoTitle
   },
 
