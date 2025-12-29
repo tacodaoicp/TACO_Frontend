@@ -1233,6 +1233,8 @@
         flex-direction: row;
         align-items: start;
         gap: 2rem;
+        flex: 1;
+        min-height: 0; // Allow shrinking in flexbox
       }
 
     }
