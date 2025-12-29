@@ -2236,15 +2236,30 @@
   // Lifecycle Hooks //
   /////////////////////
 
-  // Prefetch common routes - starts immediately but with low priority
+  // Prefetch routes based on user state - saves RAM by only loading what's needed
   const prefetchRoutes = () => {
-    // Use link rel=prefetch for browser-level low priority prefetching
-    const prefetchChunks = ['VoteView', 'DaoView']
-
-    // Also trigger dynamic imports to warm up the module cache
-    // These run in parallel and don't block anything
+    // Always prefetch public pages
     import('./VoteView.vue')
     import('./DaoView.vue')
+
+    // If logged in, also prefetch wallet
+    if (userLoggedIn.value) {
+      import('./WalletView.vue')
+    }
+
+    // If admin (quick check against hardcoded list), also prefetch admin
+    const principalText = tacoStore.userPrincipal
+    const ADMIN_PRINCIPALS = [
+      'odoge-dr36c-i3lls-orjen-eapnp-now2f-dj63m-3bdcd-nztox-5gvzy-sqe',
+      'uuyso-zydjd-tsb4o-lgpgj-dfsvq-awald-j2zfp-e6h72-d2je3-whmjr-xae',
+      '6mxg4-njnu6-qzizq-2ekit-rnagc-4d42s-qyayx-jghoe-nd72w-elbsy-xqe',
+      'yjdlk-jqx52-ha6xa-w6iqe-b4jrr-s5ova-mirv4-crlfi-xgsaa-ib3cg-3ae',
+      'chxs6-z6h3t-hjrgk-i5x57-rm7fm-3tvlz-b352m-heq2g-hu23b-sxasf-kqe',
+      '6q3ra-pds56-nqzzc-itigw-tsw4r-vs235-yqx5u-dg34n-nnsus-kkpqf-aqe',
+    ]
+    if (principalText && ADMIN_PRINCIPALS.includes(principalText)) {
+      import('./AdminView.vue')
+    }
   }
 
   // on mounted
