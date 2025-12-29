@@ -109,6 +109,7 @@
 
                     <!-- chart iframe - lazy loaded for performance -->
                     <iframe v-if="!isMobile && shouldLoadDex"
+                            ref="dexIframeRef"
                             loading="lazy"
                             style="border-radius: 0.5rem; z-index: 2;"
                             src="https://dexscreener.com/icp/vhoia-myaaa-aaaar-qbmja-cai?embed=1&loadChartSettings=0&trades=0&tabs=0&info=0&chartLeftToolbar=0&chartTheme=dark&theme=dark&chartStyle=1&chartType=usd&interval=15"></iframe>
@@ -2048,15 +2049,21 @@
   const shouldLoadDex = ref(false)
   const shouldLoadYouTube = ref(false)
   const youtubeIframeRef = ref<HTMLIFrameElement | null>(null)
+  const dexIframeRef = ref<HTMLIFrameElement | null>(null)
 
   // Route for watching navigation
   const route = useRoute()
 
-  // Pause YouTube video when navigating away from home
+  // Pause YouTube when navigating away from home (HomeView stays in DOM via KeepAlive + v-show)
   watch(() => route.path, (newPath) => {
-    if (newPath !== '/' && youtubeIframeRef.value) {
-      // Send postMessage to pause the YouTube video
-      youtubeIframeRef.value.contentWindow?.postMessage('{"event":"command","func":"pauseVideo","args":""}', '*')
+    if (newPath !== '/') {
+      // Navigating away from home - pause YouTube video
+      if (youtubeIframeRef.value) {
+        // Send postMessage to pause the YouTube video
+        youtubeIframeRef.value.contentWindow?.postMessage('{"event":"command","func":"pauseVideo","args":""}', '*')
+      }
+      // Close chart modal if open
+      viewingChartModal.value = false
     }
   })
 

@@ -75,6 +75,7 @@ let lastActivityTime = Date.now()
 let agent: HttpAgent | null = null
 let initPromise: Promise<void> | null = null
 let isInitialized = false
+let currentNetwork: 'ic' | 'staging' | 'local' | null = null // Track current network to detect changes
 
 // Initial load state - track which keys are priority for current route
 let initialLoadKeys: Set<DataKey> = new Set()
@@ -83,6 +84,12 @@ let deferredLoadTriggered = false
 
 // Queue of ports waiting for cached data after init
 const pendingCacheDeliveries: Array<{ port: MessagePort; keys: DataKey[] }> = []
+
+// Pending INITIAL_LOAD message to process after init completes
+let pendingInitialLoad: { port: MessagePort; message: WorkerRequest } | null = null
+
+// Track which ports have received INITIAL_CACHE_READY to prevent duplicates
+const portsReceivedCacheReady = new WeakSet<MessagePort>()
 
 // ============================================================================
 // Initialization
@@ -97,7 +104,11 @@ async function init(): Promise<void> {
     subscriptions.set(key, new Set())
   }
 
-  // Load cached data from IndexedDB
+  // DON'T start agent creation here - wait for SET_NETWORK message
+  // The network override must be set before we know which host to connect to
+  // Agent creation will be triggered by handleSetNetwork
+
+  // Load cached data from IndexedDB (runs in parallel with agent creation)
   try {
     const cached = await getAllCached()
     for (const [key, state] of cached) {
@@ -113,13 +124,12 @@ async function init(): Promise<void> {
     console.error('[SecondaryWorker] Error loading cache:', error)
   }
 
-  // Create anonymous agent
-  await createAnonymousAgent()
-
-  // Mark as initialized
+  // Mark as initialized IMMEDIATELY after cache load (before agent is ready)
+  // This allows cached data to be delivered without waiting for agent
   isInitialized = true
 
   // Deliver cached data to any ports that connected during init
+  // Also queue fetches for stale/missing data
   console.log(`[SecondaryWorker] Delivering cached data to ${pendingCacheDeliveries.length} pending ports`)
   for (const { port, keys } of pendingCacheDeliveries) {
     for (const key of keys) {
@@ -137,14 +147,30 @@ async function init(): Promise<void> {
           },
         })
       }
+      // Queue fetch if data is missing or stale
+      if ((!state?.data || isStale(key, state.lastUpdated)) && !queue.has(key)) {
+        queue.enqueue(key, 'high')
+      }
     }
+    // Note: Don't send INITIAL_CACHE_READY here - it will be sent by handleInitialLoad
+    // which runs right after this when processing pendingInitialLoad
   }
   pendingCacheDeliveries.length = 0 // Clear the queue
 
-  // Start processing loop
+  // Process pending INITIAL_LOAD if one arrived before init completed
+  if (pendingInitialLoad) {
+    console.log('[SecondaryWorker] Processing pending INITIAL_LOAD')
+    handleInitialLoad(pendingInitialLoad.port, pendingInitialLoad.message)
+    pendingInitialLoad = null
+  }
+
+  console.log('[SecondaryWorker] Cache initialized, agent will be created when SET_NETWORK is received')
+
+  // Don't wait for agent here - it will be created by handleSetNetwork
+  // Start processing loop - it will wait for agent to be available before fetching
   processQueue()
 
-  console.log('[SecondaryWorker] Initialized')
+  console.log('[SecondaryWorker] Init complete, waiting for SET_NETWORK')
 }
 
 async function createAnonymousAgent(): Promise<void> {
@@ -302,6 +328,13 @@ function handleInitialLoad(port: MessagePort, message: WorkerRequest): void {
   const route = message.payload.route || '/'
   console.log(`[SecondaryWorker] INITIAL_LOAD for route: ${route}`)
 
+  // If not initialized yet, queue this for processing after init completes
+  if (!isInitialized) {
+    console.log(`[SecondaryWorker] Not initialized, queuing INITIAL_LOAD for route: ${route}`)
+    pendingInitialLoad = { port, message }
+    return
+  }
+
   // Reset state for fresh page load
   backoff.resetAll()
   queue.clearProcessing()
@@ -336,6 +369,22 @@ function handleInitialLoad(port: MessagePort, message: WorkerRequest): void {
       pendingPriorityKeys.add(key)
       queue.enqueue(key, 'critical')
     }
+  }
+
+  // Signal that initial cache delivery is complete for this worker
+  // Only send once per port to prevent duplicate signals
+  if (!portsReceivedCacheReady.has(port)) {
+    portsReceivedCacheReady.add(port)
+    sendResponse(port, {
+      id: generateMessageId(),
+      timestamp: Date.now(),
+      type: 'INITIAL_CACHE_READY',
+      payload: {
+        dataKey: 'votingPowerMetrics', // placeholder key (required by type)
+        state: createInitialState(),
+        fromCache: true,
+      },
+    })
   }
 
   // If no priority keys need fetching, trigger deferred load immediately
@@ -464,9 +513,11 @@ function handleSubscribe(port: MessagePort, message: WorkerRequest): void {
     return
   }
 
-  // Already initialized - send cached data immediately
+  // Already initialized - send cached data and queue fetches for stale/missing data
   for (const key of validKeys) {
     const state = dataStates.get(key)
+
+    // Send cached data if available
     if (state?.data) {
       sendResponse(port, {
         id: generateMessageId(),
@@ -479,6 +530,11 @@ function handleSubscribe(port: MessagePort, message: WorkerRequest): void {
           fromCache: true,
         },
       })
+    }
+
+    // Queue fetch if data is missing or stale
+    if ((!state?.data || isStale(key, state.lastUpdated)) && !queue.has(key)) {
+      queue.enqueue(key, 'high')
     }
   }
 }
@@ -510,25 +566,36 @@ function handleInvalidate(message: WorkerRequest): void {
 
 async function handleSetNetwork(message: WorkerRequest): Promise<void> {
   const { network } = message.payload
-  console.log(`[SecondaryWorker] Network override set to: ${network || 'auto'}`)
+  const newNetwork = network || 'ic' // Default to 'ic' if not specified
+
+  // Check if this is the first SET_NETWORK or if network actually changed
+  const isFirstSetup = currentNetwork === null
+  const networkChanged = currentNetwork !== null && currentNetwork !== newNetwork
+
+  console.log(`[SecondaryWorker] SET_NETWORK: ${newNetwork} (current: ${currentNetwork}, isFirst: ${isFirstSetup}, changed: ${networkChanged})`)
+
+  // Update tracked network
+  currentNetwork = newNetwork
   setWorkerNetworkOverride(network || null)
 
   // Recreate agent with new network settings
   await createAnonymousAgent()
 
-  // Clear IndexedDB cache - data is from a different network
-  try {
-    const { clearAllCached } = await import('./shared/indexed-db')
-    await clearAllCached()
-    console.log('[SecondaryWorker] Cleared IndexedDB cache due to network change')
-  } catch (err) {
-    console.error('[SecondaryWorker] Error clearing cache:', err)
-  }
+  // Only clear cache if network actually changed (not on first setup)
+  if (networkChanged) {
+    try {
+      const { clearAllCached } = await import('./shared/indexed-db')
+      await clearAllCached()
+      console.log('[SecondaryWorker] Cleared IndexedDB cache due to network change')
+    } catch (err) {
+      console.error('[SecondaryWorker] Error clearing cache:', err)
+    }
 
-  // Clear in-memory state and queue for refetch
-  for (const key of HANDLED_KEYS) {
-    dataStates.set(key, createInitialState())
-    queue.enqueue(key, 'high')
+    // Clear in-memory state and queue for refetch
+    for (const key of HANDLED_KEYS) {
+      dataStates.set(key, createInitialState())
+      queue.enqueue(key, 'high')
+    }
   }
 }
 
@@ -545,12 +612,25 @@ async function processQueue(): Promise<void> {
   isProcessing = true
 
   while (true) {
+    // If no agent available yet, wait before trying to process
+    // This prevents spinning the CPU waiting for SET_NETWORK
+    if (!agent) {
+      await sleep(100)
+      continue
+    }
+
     // Start new fetches up to the limit (priority queue returns highest priority first)
     while (activeFetchCount < MAX_CONCURRENT_FETCHES) {
       // Get next highest-priority item (queue.dequeue handles deduplication internally)
       const item = queue.dequeue()
 
       if (!item) {
+        break
+      }
+
+      // Double-check agent is still available
+      if (!agent) {
+        queue.retry(item.dataKey)
         break
       }
 

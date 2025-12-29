@@ -17,12 +17,14 @@
 
     <!-- Main content area with persistent footer -->
     <div class="app__content">
-      <!-- Persistent HomeView to prevent iframe reloads -->
-      <HomeView v-show="route.path === '/'" />
+      <!-- HomeView with KeepAlive - use v-show to keep in DOM and preserve iframe state -->
+      <KeepAlive>
+        <HomeView v-if="routerReady" v-show="route.path === '/'" />
+      </KeepAlive>
 
-      <!-- Router view for all other pages (exclude home to avoid duplicate) -->
+      <!-- Router view for all other pages - only render after router is ready -->
       <router-view v-slot="{ Component }">
-        <component v-if="route.path !== '/'" :is="Component" />
+        <component v-if="routerReady && route.path !== '/'" :is="Component" />
       </router-view>
 
       <!-- Persistent FooterBar - renders once and stays across all routes -->
@@ -924,10 +926,10 @@
   // Imports //
   /////////////
 
-  import { onMounted, onUnmounted, watch, computed, defineAsyncComponent } from 'vue';
+  import { onMounted, onUnmounted, watch, computed, defineAsyncComponent, ref } from 'vue';
   import { useTacoStore } from "./stores/taco.store";
   import { storeToRefs } from "pinia";
-  import { useRoute } from 'vue-router'
+  import { useRoute, useRouter } from 'vue-router'
 
   // Lazy load HomeView to reduce initial bundle
   const HomeView = defineAsyncComponent(() => import('./views/HomeView.vue'))
@@ -983,6 +985,13 @@
 
   // route
   const route = useRoute()
+  const router = useRouter()
+
+  // Track if router is ready (prevents flash when navigating directly to non-home routes)
+  const routerReady = ref(false)
+  router.isReady().then(() => {
+    routerReady.value = true
+  })
 
   // images
   const astronautLoaderUrl = astronautLoader
@@ -1053,8 +1062,12 @@
     // log
     // // console.log('running app mounted logic')
 
-    // Initialize SharedWorkers for data fetching FIRST (non-blocking, fast)
-    initWorkerBridge()
+    // Wait for router to resolve the URL before initializing workers
+    // This ensures /admin gets admin data prioritized, not homepage data
+    await router.isReady()
+
+    // Initialize SharedWorkers with the current route for correct priority loading
+    initWorkerBridge(route.path)
 
     // Initialize network config with worker bridge (allows runtime network switching)
     initNetworkConfig(setNetwork)
@@ -1062,17 +1075,14 @@
     // Setup store subscriptions to worker updates
     setupWorkerSubscriptions()
 
-    // Set initial route for priority calculation
-    setCurrentRoute(route.path)
-
     // Start loading @dfinity shims in background (don't block UI)
     // Functions that need shims will await initializeShims() themselves
     tacoStore.initializeShims()
 
     // check if user is logged in (this will trigger name loading if logged in)
     // Note: checkIfLoggedIn internally calls initializeShims if needed
-    //console.log('🚀 Running app initialization - checking login status...');
-    await checkIfLoggedIn()
+    // Non-blocking: UI will reactively update when userLoggedIn.value changes
+    checkIfLoggedIn().catch(console.error)
 
     // fetch crypto prices (now triggers worker fetch)
     fetchCryptoPrices()

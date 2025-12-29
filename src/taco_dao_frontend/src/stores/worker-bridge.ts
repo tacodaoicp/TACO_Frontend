@@ -21,6 +21,12 @@ import {
 import { createWorkerAdapter, isSharedWorkerSupported, type WorkerAdapter } from '../workers/worker-adapter'
 
 // ============================================================================
+// Debug Mode (set VITE_WORKER_DEBUG=true to enable worker logs in console)
+// ============================================================================
+
+const WORKER_DEBUG = import.meta.env.VITE_WORKER_DEBUG === 'true'
+
+// ============================================================================
 // Worker Instances (singletons)
 // ============================================================================
 
@@ -37,6 +43,8 @@ let initialized = false
 // Track when workers have delivered initial cache
 let cacheDeliveryPromise: Promise<void> | null = null
 let cacheDeliveryResolve: (() => void) | null = null
+let workersReportedCacheReady = 0
+const EXPECTED_WORKERS_FOR_CACHE = 2 // core + secondary (auth waits for identity)
 
 // ============================================================================
 // State
@@ -177,7 +185,13 @@ function handleWorkerMessage(response: WorkerResponse, workerName: string): void
     case 'CACHE_HIT':
     case 'FETCH_COMPLETE':
       if (payload.dataKey && payload.state) {
+        if (WORKER_DEBUG) {
+          const dataInfo = payload.state?.data ? (Array.isArray(payload.state.data) ? `array[${payload.state.data.length}]` : typeof payload.state.data) : 'null'
+          console.log(`[WorkerBridge] ${type} received for ${payload.dataKey} from ${workerName}, data=${dataInfo}`)
+        }
         updateDataStore(payload.dataKey, payload.state)
+      } else if (WORKER_DEBUG) {
+        console.warn(`[WorkerBridge] ${type} received but missing dataKey or state`, payload)
       }
       break
 
@@ -216,6 +230,24 @@ function handleWorkerMessage(response: WorkerResponse, workerName: string): void
     case 'PONG':
       // Health check response
       break
+
+    case 'INITIAL_CACHE_READY':
+      workersReportedCacheReady++
+      if (WORKER_DEBUG) {
+        console.log(`[WorkerBridge] ${workerName} reported cache ready (${workersReportedCacheReady}/${EXPECTED_WORKERS_FOR_CACHE})`)
+      }
+      if (workersReportedCacheReady >= EXPECTED_WORKERS_FOR_CACHE && cacheDeliveryResolve) {
+        cacheDeliveryResolve()
+        cacheDeliveryResolve = null
+      }
+      break
+
+    case 'DEBUG_LOG':
+      // Forward worker logs to main thread console for debugging (only if debug mode enabled)
+      if (WORKER_DEBUG && payload.debugMessage) {
+        console.log(`[Worker:${workerName}] ${payload.debugMessage}`)
+      }
+      break
   }
 }
 
@@ -227,6 +259,9 @@ function updateDataStore(dataKey: DataKey, state: DataState): void {
 
   // Notify subscribers FIRST so they can process/deserialize the data
   const callbacks = subscriptions.get(dataKey)
+  if (WORKER_DEBUG) {
+    console.log(`[WorkerBridge] updateDataStore for ${dataKey}, hasData=${!!state?.data}, subscriberCount=${callbacks?.size || 0}`)
+  }
   if (callbacks) {
     for (const callback of callbacks) {
       try {
@@ -270,9 +305,14 @@ function broadcastToAllWorkers(message: WorkerRequest): void {
 
 /**
  * Initialize all workers and set up visibility tracking
+ * @param route - The initial route path (e.g., '/admin') to prioritize correct data
  */
-export function initWorkerBridge(): void {
+export function initWorkerBridge(route?: string): void {
   if (initialized) return
+
+  if (WORKER_DEBUG) {
+    console.log('[WorkerBridge] initWorkerBridge called with route:', route)
+  }
 
   // Determine worker type
   workerType = isSharedWorkerSupported() ? 'shared' : 'dedicated'
@@ -293,16 +333,27 @@ export function initWorkerBridge(): void {
 
   // Send INITIAL_LOAD with route to workers for selective data loading
   // This tells workers to only send/fetch critical+high priority data for this route initially
-  const initialRoute = currentRoute.value || '/'
+  // Use provided route, or fall back to stored value, or default to '/'
+  const initialRoute = route || currentRoute.value || '/'
+  currentRoute.value = initialRoute // Sync the stored route
   const initialLoadMessage = {
     id: generateMessageId(),
     timestamp: Date.now(),
     type: 'INITIAL_LOAD' as const,
     payload: { route: initialRoute },
   }
+  // Reset cache ready counter for fresh initialization
+  workersReportedCacheReady = 0
+
+  if (WORKER_DEBUG) {
+    console.log('[WorkerBridge] Sending INITIAL_LOAD to workers...')
+  }
   sendToWorker(getCoreWorker(), initialLoadMessage)
   sendToWorker(getSecondaryWorker(), initialLoadMessage)
   sendToWorker(getAuthWorker(), initialLoadMessage)
+  if (WORKER_DEBUG) {
+    console.log('[WorkerBridge] INITIAL_LOAD sent to all workers')
+  }
 
   // Set up visibility tracking
   setupVisibilityTracking()
@@ -310,13 +361,17 @@ export function initWorkerBridge(): void {
   // Set up activity tracking for idle detection
   setupActivityTracking()
 
-  // Resolve cache delivery promise after a short delay
-  // This gives workers time to load from IndexedDB and send cached data
+  // Safety fallback timeout in case worker messages are lost
+  // Normally resolved earlier by INITIAL_CACHE_READY signals from workers
   setTimeout(() => {
     if (cacheDeliveryResolve) {
+      if (WORKER_DEBUG) {
+        console.warn('[WorkerBridge] Cache delivery timeout - proceeding anyway')
+      }
       cacheDeliveryResolve()
+      cacheDeliveryResolve = null
     }
-  }, 150) // 150ms should be enough for IndexedDB read + message passing
+  }, 500) // Increased timeout as fallback only
 
   initialized = true
 }
@@ -345,11 +400,17 @@ export function subscribe(
   }
 
   subscriptions.get(dataKey)!.add(callback)
+  if (WORKER_DEBUG) {
+    console.log(`[WorkerBridge] subscribe called for ${dataKey}, total subscribers now: ${subscriptions.get(dataKey)!.size}`)
+  }
 
   // Immediately call callback with cached data if available
   // This provides instant data on navigation without waiting for worker round-trip
   const cachedState = dataStore.get(dataKey)
   if (cachedState?.data) {
+    if (WORKER_DEBUG) {
+      console.log(`[WorkerBridge] subscribe: found cached data for ${dataKey}, calling callback`)
+    }
     // Use setTimeout to ensure callback runs after subscription is fully set up
     setTimeout(() => callback(cachedState.data, cachedState), 0)
   }
@@ -545,8 +606,15 @@ export function setNetwork(network: 'ic' | 'staging' | 'local' | null): void {
 // Visibility Tracking
 // ============================================================================
 
+// Track if listeners have been set up to prevent duplicates
+let listenersSetup = false
+let visibilityHandler: (() => void) | null = null
+
 function setupVisibilityTracking(): void {
-  document.addEventListener('visibilitychange', () => {
+  // Only setup once to prevent duplicate listeners
+  if (visibilityHandler) return
+
+  visibilityHandler = () => {
     const visible = document.visibilityState === 'visible'
     isVisible.value = visible
 
@@ -556,7 +624,9 @@ function setupVisibilityTracking(): void {
       type: 'SET_VISIBILITY',
       payload: { visible },
     })
-  })
+  }
+
+  document.addEventListener('visibilitychange', visibilityHandler)
 }
 
 // ============================================================================
@@ -564,6 +634,7 @@ function setupVisibilityTracking(): void {
 // ============================================================================
 
 let activityThrottleTimer: ReturnType<typeof setTimeout> | null = null
+const activityEvents = ['click', 'keydown', 'scroll', 'mousemove', 'touchstart']
 
 function notifyUserActivity(): void {
   // Throttle activity notifications to every 30 seconds max
@@ -582,9 +653,11 @@ function notifyUserActivity(): void {
 }
 
 function setupActivityTracking(): void {
-  // Track user interactions that indicate active usage
-  const activityEvents = ['click', 'keydown', 'scroll', 'mousemove', 'touchstart']
+  // Only setup once to prevent duplicate listeners
+  if (listenersSetup) return
+  listenersSetup = true
 
+  // Track user interactions that indicate active usage
   for (const event of activityEvents) {
     document.addEventListener(event, notifyUserActivity, { passive: true })
   }

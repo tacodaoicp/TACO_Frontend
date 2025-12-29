@@ -190,6 +190,7 @@ let currentIdentity: Identity | null = null
 let isAdmin = false
 let isAuthenticated = false
 let isInitialized = false
+let currentNetwork: 'ic' | 'staging' | 'local' | null = null // Track current network to detect changes
 
 // ============================================================================
 // Helper Functions
@@ -612,15 +613,14 @@ function handleInvalidate(message: WorkerRequest): void {
 
 async function handleSetNetwork(message: WorkerRequest): Promise<void> {
   const { network } = message.payload
-  setWorkerNetworkOverride(network || null)
+  const newNetwork = network || 'ic' // Default to 'ic' if not specified
 
-  // Clear IndexedDB cache - data is from a different network
-  try {
-    const { clearAllCached } = await import('./shared/indexed-db')
-    await clearAllCached()
-  } catch (err) {
-    console.error('[AuthWorker-Dedicated] Error clearing cache:', err)
-  }
+  // Check if this is the first SET_NETWORK or if network actually changed
+  const networkChanged = currentNetwork !== null && currentNetwork !== newNetwork
+
+  // Update tracked network
+  currentNetwork = newNetwork
+  setWorkerNetworkOverride(network || null)
 
   // Recreate anonymous agent with new network settings
   anonymousAgent = await createAgent({
@@ -638,16 +638,26 @@ async function handleSetNetwork(message: WorkerRequest): Promise<void> {
     })
   }
 
-  // Clear in-memory state and queue for refetch
-  for (const key of HANDLED_KEYS) {
-    dataStates.set(key, createInitialState())
-    // Queue PUBLIC_ADMIN_KEYS since they can be fetched with anonymous agent
-    if (PUBLIC_ADMIN_KEYS.includes(key)) {
-      queue.enqueue(key, 'high')
+  // Only clear cache if network actually changed (not on first setup)
+  if (networkChanged) {
+    try {
+      const { clearAllCached } = await import('./shared/indexed-db')
+      await clearAllCached()
+    } catch (err) {
+      console.error('[AuthWorker-Dedicated] Error clearing cache:', err)
     }
-    // Queue USER_KEYS only if authenticated
-    if (USER_KEYS.includes(key) && isAuthenticated) {
-      queue.enqueue(key, 'high')
+
+    // Clear in-memory state and queue for refetch
+    for (const key of HANDLED_KEYS) {
+      dataStates.set(key, createInitialState())
+      // Queue PUBLIC_ADMIN_KEYS since they can be fetched with anonymous agent
+      if (PUBLIC_ADMIN_KEYS.includes(key)) {
+        queue.enqueue(key, 'high')
+      }
+      // Queue USER_KEYS only if authenticated
+      if (USER_KEYS.includes(key) && isAuthenticated) {
+        queue.enqueue(key, 'high')
+      }
     }
   }
 }

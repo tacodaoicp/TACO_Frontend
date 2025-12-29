@@ -217,6 +217,7 @@ let currentIdentity: Identity | null = null
 let isAdmin = false
 let isAuthenticated = false
 let isInitialized = false
+let currentNetwork: 'ic' | 'staging' | 'local' | null = null // Track current network to detect changes
 
 // Initial load state - track which keys are priority for current route
 let initialLoadKeys: Set<DataKey> = new Set()
@@ -225,6 +226,9 @@ let deferredLoadTriggered = false
 
 // Queue of ports waiting for cached data after init
 const pendingCacheDeliveries: Array<{ port: MessagePort; keys: DataKey[] }> = []
+
+// Pending INITIAL_LOAD message to process after init completes
+let pendingInitialLoad: { port: MessagePort; message: WorkerRequest } | null = null
 
 // ============================================================================
 // Initialization
@@ -239,7 +243,11 @@ async function init(): Promise<void> {
     subscriptions.set(key, new Set())
   }
 
-  // Load cached data from IndexedDB
+  // DON'T start agent creation here - wait for SET_NETWORK message
+  // The network override must be set before we know which host to connect to
+  // Agent creation will be triggered by handleSetNetwork
+
+  // Load cached data from IndexedDB (runs in parallel with agent creation)
   try {
     const cached = await getAllCached()
     for (const [key, state] of cached) {
@@ -255,14 +263,13 @@ async function init(): Promise<void> {
     console.error('[AuthWorker] Error loading cache:', error)
   }
 
-  // Create anonymous agent for public read-only queries
-  // This allows fetching admin-labeled data even before user logs in
-  await createAnonymousAgent()
-
-  // Mark as initialized
+  // Mark as initialized IMMEDIATELY after cache load (before agent is ready)
+  // This allows cached data to be delivered without waiting for agent
   isInitialized = true
+  console.log(`[AuthWorker] Initialization complete. dataStates has ${Array.from(dataStates.entries()).filter(([k, v]) => v.data).length} keys with data`)
 
   // Deliver cached data to any ports that connected during init
+  // Also queue fetches for stale/missing data
   console.log(`[AuthWorker] Delivering cached data to ${pendingCacheDeliveries.length} pending ports`)
   for (const { port, keys } of pendingCacheDeliveries) {
     for (const key of keys) {
@@ -280,22 +287,51 @@ async function init(): Promise<void> {
           },
         })
       }
+      // Queue fetch if data is missing or stale
+      const requiresAuth = USER_KEYS.includes(key) || AUTH_REQUIRED_KEYS.includes(key)
+      const canFetch = !requiresAuth || PUBLIC_ADMIN_KEYS.includes(key)
+      if (canFetch && (!state?.data || isStale(key, state.lastUpdated)) && !queue.has(key)) {
+        queue.enqueue(key, 'high')
+      }
     }
+    // Note: Don't send INITIAL_CACHE_READY here - it will be sent by handleInitialLoad
+    // which runs right after this when processing pendingInitialLoad
   }
   pendingCacheDeliveries.length = 0 // Clear the queue
 
-  // Start processing loop
+  // Process pending INITIAL_LOAD if one arrived before init completed
+  if (pendingInitialLoad) {
+    console.log('[AuthWorker] Processing pending INITIAL_LOAD')
+    handleInitialLoad(pendingInitialLoad.port, pendingInitialLoad.message)
+    pendingInitialLoad = null
+  }
+
+  debugLog('Cache initialized, agent will be created when SET_NETWORK is received')
+
+  // Don't wait for agent here - it will be created by handleSetNetwork
+  // Start processing loop - it will wait for agent to be available before fetching
+  console.log('[AuthWorker] Starting processQueue (agent creation pending)...')
   processQueue()
 
-  console.log('[AuthWorker] Initialized with anonymous agent (ready for public reads)')
+  debugLog(`Init complete: anonymousAgent=${!!anonymousAgent}, authenticatedAgent=${!!authenticatedAgent}, queueSize=${queue.size}`)
 }
 
 async function createAnonymousAgent(): Promise<void> {
-  anonymousAgent = await createAgent({
-    identity: new AnonymousIdentity(),
-    host: getHost(),
-    fetchRootKey: shouldFetchRootKey(),
-  })
+  // Capture network settings at creation time to avoid race with SET_NETWORK
+  const host = getHost()
+  const fetchRootKey = shouldFetchRootKey()
+  debugLog(`Creating anonymous agent... host=${host}, fetchRootKey=${fetchRootKey}`)
+  try {
+    anonymousAgent = await createAgent({
+      identity: new AnonymousIdentity(),
+      host,
+      fetchRootKey,
+    })
+    debugLog('Anonymous agent created successfully')
+  } catch (error) {
+    debugLog(`ERROR creating anonymous agent: ${error}`)
+    throw error
+  }
 }
 
 // ============================================================================
@@ -437,6 +473,7 @@ function disconnectPort(port: MessagePort): void {
 // ============================================================================
 
 function handleMessage(port: MessagePort, message: WorkerRequest): void {
+  console.log(`[AuthWorker] handleMessage: ${message.type}`)
   switch (message.type) {
     case 'SET_IDENTITY':
       if (message.payload.identity) {
@@ -542,7 +579,14 @@ function handleMessage(port: MessagePort, message: WorkerRequest): void {
  */
 function handleInitialLoad(port: MessagePort, message: WorkerRequest): void {
   const route = message.payload.route || '/'
-  console.log(`[AuthWorker] INITIAL_LOAD for route: ${route}`)
+  debugLog(`handleInitialLoad called for route: ${route}, isInitialized=${isInitialized}`)
+
+  // If not initialized yet, queue this for processing after init completes
+  if (!isInitialized) {
+    console.log(`[AuthWorker] Not initialized, queuing INITIAL_LOAD for route: ${route}`)
+    pendingInitialLoad = { port, message }
+    return
+  }
 
   // Reset state for fresh page load
   backoff.resetAll()
@@ -560,19 +604,24 @@ function handleInitialLoad(port: MessagePort, message: WorkerRequest): void {
     initialLoadKeys.add('userAllocation')
   }
 
-  console.log(`[AuthWorker] Priority keys for route: ${Array.from(initialLoadKeys).join(', ') || 'none'}`)
+  debugLog(`Priority keys for route: ${Array.from(initialLoadKeys).join(', ') || 'none'}`)
 
   // Send cached data ONLY for priority keys immediately
+  console.log(`[AuthWorker] Sending cached data for ${initialLoadKeys.size} priority keys`)
   for (const key of initialLoadKeys) {
     const requiresAuth = USER_KEYS.includes(key) || AUTH_REQUIRED_KEYS.includes(key)
     // Skip auth-required keys if not authenticated AND no cached data
     if (requiresAuth && !isAuthenticated) {
       const state = dataStates.get(key)
-      if (!state?.data) continue
+      if (!state?.data) {
+        console.log(`[AuthWorker] Skipping ${key} - requires auth, no cached data`)
+        continue
+      }
     }
 
     const state = dataStates.get(key)
     if (state?.data) {
+      console.log(`[AuthWorker] Sending CACHE_HIT for ${key} (hasData=true)`)
       sendResponse(port, {
         id: generateMessageId(),
         timestamp: Date.now(),
@@ -584,16 +633,23 @@ function handleInitialLoad(port: MessagePort, message: WorkerRequest): void {
           fromCache: true,
         },
       })
+    } else {
+      console.log(`[AuthWorker] No cached data for ${key}`)
     }
     // Queue fetch for stale priority data and track it
     if (!state?.data || isStale(key, state.lastUpdated)) {
       const canFetch = !requiresAuth || isAuthenticated || PUBLIC_ADMIN_KEYS.includes(key)
       if (canFetch) {
+        console.log(`[AuthWorker] Queuing fetch for ${key} (stale/missing, canFetch=true)`)
         pendingPriorityKeys.add(key)
         queue.enqueue(key, 'critical')
+      } else {
+        console.log(`[AuthWorker] Cannot fetch ${key} - requires auth, isAuth=${isAuthenticated}`)
       }
     }
   }
+
+  debugLog(`After handleInitialLoad: pendingPriorityKeys=${pendingPriorityKeys.size}, queueSize=${queue.size}`)
 
   // If no priority keys need fetching, trigger deferred load immediately
   if (pendingPriorityKeys.size === 0) {
@@ -757,6 +813,7 @@ function handleSubscribe(port: MessagePort, message: WorkerRequest): void {
   const { dataKey, dataKeys } = message.payload
   const keysToSubscribe = dataKeys || (dataKey ? [dataKey] : [])
   const validKeys = keysToSubscribe.filter((key: DataKey) => HANDLED_KEYS.includes(key))
+  debugLog(`handleSubscribe: keys=${keysToSubscribe.join(',')}, valid=${validKeys.join(',')}, isInit=${isInitialized}`)
 
   // Add to subscriptions immediately - ensure Set exists first
   for (const key of validKeys) {
@@ -773,9 +830,11 @@ function handleSubscribe(port: MessagePort, message: WorkerRequest): void {
     return
   }
 
-  // Already initialized - send cached data immediately
+  // Already initialized - send cached data and queue fetches for stale/missing data
   for (const key of validKeys) {
     const state = dataStates.get(key)
+
+    // Send cached data if available
     if (state?.data) {
       sendResponse(port, {
         id: generateMessageId(),
@@ -788,6 +847,15 @@ function handleSubscribe(port: MessagePort, message: WorkerRequest): void {
           fromCache: true,
         },
       })
+    }
+
+    // Queue fetch if data is missing or stale
+    // PUBLIC_ADMIN_KEYS can be fetched anonymously, others need auth
+    const requiresAuth = USER_KEYS.includes(key) || AUTH_REQUIRED_KEYS.includes(key)
+    const canFetch = !requiresAuth || isAuthenticated || PUBLIC_ADMIN_KEYS.includes(key)
+
+    if (canFetch && (!state?.data || isStale(key, state.lastUpdated)) && !queue.has(key)) {
+      queue.enqueue(key, 'high')
     }
   }
 }
@@ -821,20 +889,25 @@ function handleInvalidate(message: WorkerRequest): void {
 
 async function handleSetNetwork(message: WorkerRequest): Promise<void> {
   const { network } = message.payload
-  console.log(`[AuthWorker] Network override set to: ${network || 'auto'}`)
+  const newNetwork = network || 'ic' // Default to 'ic' if not specified
+
+  // Check if this is the first SET_NETWORK or if network actually changed
+  const isFirstSetup = currentNetwork === null
+  const networkChanged = currentNetwork !== null && currentNetwork !== newNetwork
+
+  debugLog(`SET_NETWORK: ${newNetwork} (current: ${currentNetwork}, isFirst: ${isFirstSetup}, changed: ${networkChanged})`)
+
+  // Update tracked network
+  currentNetwork = newNetwork
   setWorkerNetworkOverride(network || null)
 
-  // Clear IndexedDB cache - data is from a different network
+  // Create/recreate anonymous agent with correct network settings
   try {
-    const { clearAllCached } = await import('./shared/indexed-db')
-    await clearAllCached()
-    console.log('[AuthWorker] Cleared IndexedDB cache due to network change')
+    await createAnonymousAgent()
+    debugLog(`Agent ready after SET_NETWORK: anonymousAgent=${!!anonymousAgent}`)
   } catch (err) {
-    console.error('[AuthWorker] Error clearing cache:', err)
+    debugLog(`Failed to create agent after SET_NETWORK: ${err}`)
   }
-
-  // Always recreate anonymous agent with new network settings
-  await createAnonymousAgent()
 
   // If authenticated, recreate authenticated agent with new network settings
   if (isAuthenticated && currentIdentity) {
@@ -845,16 +918,27 @@ async function handleSetNetwork(message: WorkerRequest): Promise<void> {
     })
   }
 
-  // Clear in-memory state and queue for refetch
-  for (const key of HANDLED_KEYS) {
-    dataStates.set(key, createInitialState())
-    // Queue all ADMIN_KEYS since they can be fetched with anonymous agent
-    if (ADMIN_KEYS.includes(key)) {
-      queue.enqueue(key, 'high')
+  // Only clear cache if network actually changed (not on first setup)
+  if (networkChanged) {
+    try {
+      const { clearAllCached } = await import('./shared/indexed-db')
+      await clearAllCached()
+      debugLog('Cleared IndexedDB cache due to network change')
+    } catch (err) {
+      console.error('[AuthWorker] Error clearing cache:', err)
     }
-    // Queue USER_KEYS only if authenticated
-    if (USER_KEYS.includes(key) && isAuthenticated) {
-      queue.enqueue(key, 'high')
+
+    // Clear in-memory state and queue for refetch
+    for (const key of HANDLED_KEYS) {
+      dataStates.set(key, createInitialState())
+      // Queue all ADMIN_KEYS since they can be fetched with anonymous agent
+      if (ADMIN_KEYS.includes(key)) {
+        queue.enqueue(key, 'high')
+      }
+      // Queue USER_KEYS only if authenticated
+      if (USER_KEYS.includes(key) && isAuthenticated) {
+        queue.enqueue(key, 'high')
+      }
     }
   }
 }
@@ -871,20 +955,26 @@ let activeFetchCount = 0
 async function processQueue(): Promise<void> {
   if (isProcessing) return
   isProcessing = true
-  console.log('[AuthWorker] processQueue started')
+  debugLog('processQueue started')
 
   while (true) {
+    // If no agent available yet, wait before trying to process
+    // This prevents spinning the CPU waiting for SET_NETWORK
+    if (!anonymousAgent && !authenticatedAgent) {
+      await sleep(100)
+      continue
+    }
+
     // Start new fetches up to the limit (priority queue returns highest priority first)
     while (activeFetchCount < MAX_CONCURRENT_FETCHES) {
       // Get next highest-priority item (queue.dequeue handles deduplication internally)
       const item = queue.dequeue()
-      if (item) {
-        console.log(`[AuthWorker] Dequeued ${item.dataKey}, activeFetches=${activeFetchCount}`)
-      }
 
       if (!item) {
         break
       }
+
+      debugLog(`Dequeued ${item.dataKey}, activeFetches=${activeFetchCount}`)
 
       // USER_KEYS and AUTH_REQUIRED_KEYS require authentication
       // Skip for now - will be fetched when user authenticates
@@ -895,12 +985,10 @@ async function processQueue(): Promise<void> {
         continue
       }
 
-      // PUBLIC_ADMIN_KEYS can use anonymous agent - they're publicly readable
-      // If no agent available yet, re-queue and wait for init to complete
+      // Double-check agent is still available (shouldn't happen but safety check)
       if (!anonymousAgent && !authenticatedAgent) {
-        console.log(`[AuthWorker] Retrying ${item.dataKey} - no agent available yet`)
         queue.retry(item.dataKey)
-        continue
+        break // Exit inner loop to wait for agent
       }
 
       if (!backoff.canRetry(item.dataKey)) {
@@ -966,6 +1054,7 @@ async function processSingleFetch(item: { dataKey: DataKey; retryCount: number }
 }
 
 async function fetchData(dataKey: DataKey): Promise<void> {
+  debugLog(`fetchData called for ${dataKey}`)
   // Choose the appropriate agent:
   // - USER_KEYS and AUTH_REQUIRED_KEYS require authenticated agent
   // - PUBLIC_ADMIN_KEYS can use anonymous agent (publicly readable queries)
@@ -975,11 +1064,13 @@ async function fetchData(dataKey: DataKey): Promise<void> {
     : (authenticatedAgent || anonymousAgent)
 
   if (!agent) {
+    console.log(`[AuthWorker] No agent for ${dataKey}, requiresAuth=${requiresAuth}`)
     throw new Error(requiresAuth
       ? 'No authenticated agent'
       : 'No agent available')
   }
 
+  debugLog(`Starting network fetch for ${dataKey}`)
   updateState(dataKey, { loading: true, error: null })
 
   let data: unknown
@@ -1155,6 +1246,7 @@ async function fetchData(dataKey: DataKey): Promise<void> {
       throw new Error(`Unknown dataKey: ${dataKey}`)
   }
 
+  debugLog(`Fetch completed for ${dataKey}, updating state`)
   updateState(dataKey, {
     data,
     lastUpdated: Date.now(),
@@ -1164,6 +1256,7 @@ async function fetchData(dataKey: DataKey): Promise<void> {
   })
 
   await setCached(dataKey, data)
+  console.log(`[AuthWorker] Cached ${dataKey} to IndexedDB`)
 
   // Notify that this priority key has loaded (triggers deferred load when all done)
   onPriorityKeyLoaded(dataKey)
@@ -1196,7 +1289,11 @@ function updateState(dataKey: DataKey, partial: Partial<DataState>): void {
 
 function broadcastToSubscribers(dataKey: DataKey, response: WorkerResponse): void {
   const subscribers = subscriptions.get(dataKey)
-  if (!subscribers) return
+  debugLog(`broadcastToSubscribers for ${dataKey}, subscribers=${subscribers?.size || 0}, type=${response.type}`)
+  if (!subscribers || subscribers.size === 0) {
+    debugLog(`No subscribers for ${dataKey}!`)
+    return
+  }
 
   for (const port of subscribers) {
     sendResponse(port, response)
@@ -1208,6 +1305,30 @@ function sendResponse(port: MessagePort, response: WorkerResponse): void {
     port.postMessage(response)
   } catch {
     disconnectPort(port)
+  }
+}
+
+// Forward debug logs to all connected ports so they appear in main thread console
+function debugLog(message: string): void {
+  const fullMessage = `[AuthWorker] ${message}`
+  console.log(fullMessage) // Also log to worker console
+  console.log(`[AuthWorker] debugLog: connectedPorts.size=${connectedPorts.size}`)
+  for (const port of connectedPorts) {
+    try {
+      port.postMessage({
+        id: generateMessageId(),
+        timestamp: Date.now(),
+        type: 'DEBUG_LOG',
+        payload: {
+          dataKey: 'systemLogs' as DataKey,
+          state: createInitialState(),
+          fromCache: false,
+          debugMessage: message,
+        },
+      })
+    } catch (e) {
+      console.log(`[AuthWorker] debugLog: failed to post to port: ${e}`)
+    }
   }
 }
 
@@ -1255,22 +1376,33 @@ async function autoRefreshLoop(): Promise<void> {
     // Check if we should enter idle mode
     checkIdleStatus()
 
-    // Skip auto-refresh if idle or not authenticated
-    if (isIdle || !isAuthenticated) {
+    // Skip auto-refresh if idle
+    if (isIdle) {
       continue
     }
 
-    // Refresh user data
-    for (const dataKey of USER_KEYS) {
+    // Always refresh PUBLIC_ADMIN_KEYS - they can be fetched anonymously
+    // This ensures admin page data stays fresh even for non-logged-in users
+    for (const dataKey of PUBLIC_ADMIN_KEYS) {
       const state = dataStates.get(dataKey)
       if (state && isStale(dataKey, state.lastUpdated) && !queue.has(dataKey)) {
-        queue.enqueue(dataKey, 'medium')
+        queue.enqueue(dataKey, 'low')
       }
     }
 
-    // Refresh admin data if admin
-    if (isAdmin) {
-      for (const dataKey of ADMIN_KEYS) {
+    // Refresh user data only if authenticated
+    if (isAuthenticated) {
+      for (const dataKey of USER_KEYS) {
+        const state = dataStates.get(dataKey)
+        if (state && isStale(dataKey, state.lastUpdated) && !queue.has(dataKey)) {
+          queue.enqueue(dataKey, 'medium')
+        }
+      }
+    }
+
+    // Refresh auth-required admin data if admin
+    if (isAdmin && isAuthenticated) {
+      for (const dataKey of AUTH_REQUIRED_KEYS) {
         const state = dataStates.get(dataKey)
         if (state && isStale(dataKey, state.lastUpdated) && !queue.has(dataKey)) {
           queue.enqueue(dataKey, 'low')

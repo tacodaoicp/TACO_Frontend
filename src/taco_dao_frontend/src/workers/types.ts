@@ -299,6 +299,8 @@ export type WorkerResponseType =
   | 'CACHE_HIT'
   | 'CONNECTED'
   | 'PONG'
+  | 'INITIAL_CACHE_READY'
+  | 'DEBUG_LOG'
 
 export interface WorkerResponse extends BaseMessage {
   type: WorkerResponseType
@@ -309,6 +311,7 @@ export interface WorkerResponse extends BaseMessage {
     state: DataState
     fromCache: boolean
     tabCount?: number
+    debugMessage?: string  // For DEBUG_LOG type
   }
 }
 

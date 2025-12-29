@@ -230,7 +230,7 @@ export async function fetchCryptoPricesData(): Promise<CryptoPrices> {
 }
 
 /**
- * Fetch token details from DAO backend
+ * Fetch token details from DAO backend (without past prices for performance)
  */
 export async function fetchTokenDetailsData(agent: HttpAgent): Promise<any[]> {
   const actor = Actor.createActor(daoBackendIDL, {
@@ -238,7 +238,7 @@ export async function fetchTokenDetailsData(agent: HttpAgent): Promise<any[]> {
     canisterId: getDaoBackendCanisterId(),
   })
 
-  const tokenDetails = await actor.getTokenDetails()
+  const tokenDetails = await actor.getTokenDetailsWithoutPastPrices()
   return tokenDetails as any[]
 }
 
@@ -287,7 +287,7 @@ export async function fetchTimerStatusData(agent: HttpAgent): Promise<TimerStatu
   const [snapshotInfo, tradingStatus, tokenDetails] = await Promise.all([
     daoActor.getSnapshotInfo(),
     treasuryActor.getTradingStatus() as Promise<TradingStatusResult>,
-    daoActor.getTokenDetails(),
+    daoActor.getTokenDetailsWithoutPastPrices(),
   ])
 
   return {

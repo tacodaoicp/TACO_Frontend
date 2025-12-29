@@ -66,6 +66,7 @@ let isIdle = false
 let lastActivityTime = Date.now()
 let agent: HttpAgent | null = null
 let isInitialized = false
+let currentNetwork: 'ic' | 'staging' | 'local' | null = null // Track current network to detect changes
 
 // ============================================================================
 // Helper Functions
@@ -382,15 +383,14 @@ function handleInvalidate(message: WorkerRequest): void {
 
 async function handleSetNetwork(message: WorkerRequest): Promise<void> {
   const { network } = message.payload
-  setWorkerNetworkOverride(network || null)
+  const newNetwork = network || 'ic' // Default to 'ic' if not specified
 
-  // Clear IndexedDB cache - data is from a different network
-  try {
-    const { clearAllCached } = await import('./shared/indexed-db')
-    await clearAllCached()
-  } catch (err) {
-    console.error('[SecondaryWorker-Dedicated] Error clearing cache:', err)
-  }
+  // Check if this is the first SET_NETWORK or if network actually changed
+  const networkChanged = currentNetwork !== null && currentNetwork !== newNetwork
+
+  // Update tracked network
+  currentNetwork = newNetwork
+  setWorkerNetworkOverride(network || null)
 
   // Recreate anonymous agent with new network settings
   agent = await createAgent({
@@ -399,10 +399,20 @@ async function handleSetNetwork(message: WorkerRequest): Promise<void> {
     fetchRootKey: shouldFetchRootKey(),
   })
 
-  // Clear in-memory state and queue for refetch
-  for (const key of HANDLED_KEYS) {
-    dataStates.set(key, createInitialState())
-    queue.enqueue(key, 'high')
+  // Only clear cache if network actually changed (not on first setup)
+  if (networkChanged) {
+    try {
+      const { clearAllCached } = await import('./shared/indexed-db')
+      await clearAllCached()
+    } catch (err) {
+      console.error('[SecondaryWorker-Dedicated] Error clearing cache:', err)
+    }
+
+    // Clear in-memory state and queue for refetch
+    for (const key of HANDLED_KEYS) {
+      dataStates.set(key, createInitialState())
+      queue.enqueue(key, 'high')
+    }
   }
 }
 

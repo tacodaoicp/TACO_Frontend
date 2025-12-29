@@ -831,7 +831,7 @@ const fetchCyclesFor = async (key: CanKey) => {
           const [tsRes, cfgRaw, tokensResp, snapStatus, longSyncTimerRes] = await Promise.all([
             tActor.getTradingStatus(),
             tActor.getRebalanceConfig?.() ?? Promise.resolve(null),
-            dActor.getTokenDetails(),
+            dActor.getTokenDetailsWithoutPastPrices(),
             tActor.getPortfolioSnapshotStatus(),
             tActor.getLongSyncTimerStatus?.() ?? Promise.resolve(null),
             tacoStore.getRebalanceConfig().catch(() => null) // Ensure store config is loaded
@@ -980,7 +980,7 @@ const fetchCyclesFor = async (key: CanKey) => {
           const agent = new HttpAgent({ host: process.env.DFX_NETWORK === 'local' ? 'http://127.0.0.1:4943' : 'https://ic0.app' })
           if (process.env.DFX_NETWORK === 'local') { await agent.fetchRootKey() }
           const dActor: any = Actor.createActor(daoIDL, { agent, canisterId: resolvePrincipal('dao_backend') })
-          const tokenDetails = await dActor.getTokenDetails()
+          const tokenDetails = await dActor.getTokenDetailsWithoutPastPrices()
           const tokens = (tokenDetails || []).map((entry: any) => {
             const token = entry[1]
             const symbol = token?.tokenSymbol || 'UNKNOWN'
@@ -2618,7 +2618,7 @@ const testTradingBotRegular = async (test: any) => {
     try {
       [tsRes, tokensResp, , longSyncTimerRes] = await Promise.all([
         tActor.getTradingStatus(),
-        dActor.getTokenDetails(),
+        dActor.getTokenDetailsWithoutPastPrices(),
         tacoStore.getRebalanceConfig().catch(() => null), // Fetch config into store (no variable needed)
         tActor.getLongSyncTimerStatus?.() ?? Promise.resolve(null),
       ])

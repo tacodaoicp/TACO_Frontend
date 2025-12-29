@@ -13,6 +13,9 @@ import { deserializeFromTransfer } from '../workers/shared/fetch-functions'
 // Only import Principal synchronously - it's small and used everywhere
 import { Principal } from '@dfinity/principal'
 
+// Debug mode (set VITE_WORKER_DEBUG=true to enable debug logs)
+const WORKER_DEBUG = import.meta.env.VITE_WORKER_DEBUG === 'true'
+
 // Type-only imports (no runtime cost)
 import type { AuthClient as AuthClientType, IdbStorage as IdbStorageType } from "@dfinity/auth-client"
 import type { Actor as ActorType, AnonymousIdentity as AnonymousIdentityType, HttpAgent } from "@dfinity/agent"
@@ -1713,58 +1716,86 @@ export const useTacoStore = defineStore('taco', () => {
             })
         )
 
+        // Admin data subscriptions - always set up (they use same worker infrastructure)
+        setupAdminSubscriptions()
+    }
+
+    // Separate array for admin-only subscriptions (lazy-loaded)
+    const adminWorkerUnsubscribers: (() => void)[] = []
+    let adminSubscriptionsActive = false
+
+    /**
+     * Setup admin-only worker subscriptions - called when navigating to /admin/* routes
+     * This saves memory for non-admin users by not loading admin data until needed
+     */
+    const setupAdminSubscriptions = () => {
+        // Only setup if not already subscribed
+        if (adminSubscriptionsActive) return
+        adminSubscriptionsActive = true
+
+        if (WORKER_DEBUG) {
+            console.log('[TacoStore] Setting up admin subscriptions (lazy load)')
+        }
+
         // systemLogs (admin)
-        workerUnsubscribers.push(
+        adminWorkerUnsubscribers.push(
             workerBridge.subscribe('systemLogs', (data: unknown) => {
+                if (WORKER_DEBUG) {
+                    console.log('[TacoStore] systemLogs callback called, data:', data ? `array[${(data as any[]).length}]` : 'null/undefined')
+                }
                 if (data && Array.isArray(data)) {
-                    // Deserialize BigInt values from worker
                     systemLogs.value = deserializeFromTransfer(data) as SystemLog[]
+                    if (WORKER_DEBUG) {
+                        console.log('[TacoStore] systemLogs.value updated with', systemLogs.value.length, 'entries')
+                    }
                 }
             })
         )
 
         // voterDetails (admin)
-        workerUnsubscribers.push(
+        adminWorkerUnsubscribers.push(
             workerBridge.subscribe('voterDetails', (data: unknown) => {
+                if (WORKER_DEBUG) {
+                    console.log('[TacoStore] voterDetails callback called, data:', data ? `array[${(data as any[]).length}]` : 'null/undefined')
+                }
                 if (data && Array.isArray(data)) {
-                    // Deserialize BigInt values from worker
                     fetchedVoterDetails.value = deserializeFromTransfer(data) as VoterDetails[]
+                    if (WORKER_DEBUG) {
+                        console.log('[TacoStore] fetchedVoterDetails.value updated with', fetchedVoterDetails.value.length, 'entries')
+                    }
                 }
             })
         )
 
         // neuronAllocations (admin)
-        workerUnsubscribers.push(
+        adminWorkerUnsubscribers.push(
             workerBridge.subscribe('neuronAllocations', (data: unknown) => {
                 if (data && Array.isArray(data)) {
-                    // Deserialize BigInt values from worker
                     fetchedNeuronAllocations.value = deserializeFromTransfer(data) as ProcessedNeuronAllocation[]
                 }
             })
         )
 
         // rebalanceConfig (admin)
-        workerUnsubscribers.push(
+        adminWorkerUnsubscribers.push(
             workerBridge.subscribe('rebalanceConfig', (data: unknown) => {
                 if (data) {
-                    // Deserialize BigInt values from worker
                     rebalanceConfig.value = deserializeFromTransfer(data) as RebalanceConfig
                 }
             })
         )
 
         // systemParameters (admin)
-        workerUnsubscribers.push(
+        adminWorkerUnsubscribers.push(
             workerBridge.subscribe('systemParameters', (data: unknown) => {
                 if (data) {
-                    // Deserialize BigInt values from worker
                     systemParameters.value = deserializeFromTransfer(data) as GetSystemParameterResult
                 }
             })
         )
 
         // portfolioSnapshotStatus (admin) - from secondary-public worker
-        workerUnsubscribers.push(
+        adminWorkerUnsubscribers.push(
             workerBridge.subscribe('portfolioSnapshotStatus', (data: unknown) => {
                 if (data) {
                     cachedPortfolioSnapshotStatus.value = deserializeFromTransfer(data)
@@ -1773,177 +1804,192 @@ export const useTacoStore = defineStore('taco', () => {
         )
 
         // Treasury/Trading admin data subscriptions
-        workerUnsubscribers.push(
+        adminWorkerUnsubscribers.push(
             workerBridge.subscribe('priceAlerts', (data: unknown) => {
                 if (data) cachedPriceAlerts.value = deserializeFromTransfer(data)
             })
         )
-        workerUnsubscribers.push(
+        adminWorkerUnsubscribers.push(
             workerBridge.subscribe('tradingPauses', (data: unknown) => {
                 if (data) cachedTradingPauses.value = deserializeFromTransfer(data)
             })
         )
-        workerUnsubscribers.push(
+        adminWorkerUnsubscribers.push(
             workerBridge.subscribe('priceHistory', (data: unknown) => {
                 if (data) cachedPriceHistory.value = deserializeFromTransfer(data)
             })
         )
-        workerUnsubscribers.push(
+        adminWorkerUnsubscribers.push(
             workerBridge.subscribe('portfolioHistory', (data: unknown) => {
                 if (data) cachedPortfolioHistory.value = deserializeFromTransfer(data)
             })
         )
-        workerUnsubscribers.push(
+        adminWorkerUnsubscribers.push(
             workerBridge.subscribe('circuitBreakerLogs', (data: unknown) => {
                 if (data && Array.isArray(data)) cachedCircuitBreakerLogs.value = deserializeFromTransfer(data) as any[]
             })
         )
-        workerUnsubscribers.push(
+        adminWorkerUnsubscribers.push(
             workerBridge.subscribe('circuitBreakerConditions', (data: unknown) => {
                 if (data && Array.isArray(data)) cachedCircuitBreakerConditions.value = deserializeFromTransfer(data) as any[]
             })
         )
-        workerUnsubscribers.push(
+        adminWorkerUnsubscribers.push(
             workerBridge.subscribe('portfolioCircuitBreakerConditions', (data: unknown) => {
                 if (data && Array.isArray(data)) cachedPortfolioCircuitBreakerConditions.value = deserializeFromTransfer(data) as any[]
             })
         )
-        workerUnsubscribers.push(
+        adminWorkerUnsubscribers.push(
             workerBridge.subscribe('maxPriceHistoryEntries', (data: unknown) => {
                 if (data !== null && data !== undefined) cachedMaxPriceHistoryEntries.value = deserializeFromTransfer(data) as bigint
             })
         )
-        workerUnsubscribers.push(
+        adminWorkerUnsubscribers.push(
             workerBridge.subscribe('maxPortfolioSnapshots', (data: unknown) => {
                 if (data !== null && data !== undefined) cachedMaxPortfolioSnapshots.value = deserializeFromTransfer(data) as bigint
             })
         )
 
         // Neuron snapshot admin data subscriptions
-        workerUnsubscribers.push(
+        adminWorkerUnsubscribers.push(
             workerBridge.subscribe('neuronSnapshots', (data: unknown) => {
                 if (data && Array.isArray(data)) cachedNeuronSnapshots.value = deserializeFromTransfer(data) as any[]
             })
         )
-        workerUnsubscribers.push(
+        adminWorkerUnsubscribers.push(
             workerBridge.subscribe('maxNeuronSnapshots', (data: unknown) => {
                 if (data !== null && data !== undefined) cachedMaxNeuronSnapshots.value = deserializeFromTransfer(data) as bigint
             })
         )
 
         // Alarm system admin data subscriptions
-        workerUnsubscribers.push(
+        adminWorkerUnsubscribers.push(
             workerBridge.subscribe('alarmSystemStatus', (data: unknown) => {
                 if (data) cachedAlarmSystemStatus.value = deserializeFromTransfer(data)
             })
         )
-        workerUnsubscribers.push(
+        adminWorkerUnsubscribers.push(
             workerBridge.subscribe('alarmContacts', (data: unknown) => {
                 if (data && Array.isArray(data)) cachedAlarmContacts.value = deserializeFromTransfer(data) as any[]
             })
         )
-        workerUnsubscribers.push(
+        adminWorkerUnsubscribers.push(
             workerBridge.subscribe('monitoringStatus', (data: unknown) => {
                 if (data) cachedMonitoringStatus.value = deserializeFromTransfer(data)
             })
         )
-        workerUnsubscribers.push(
+        adminWorkerUnsubscribers.push(
             workerBridge.subscribe('pendingAlarms', (data: unknown) => {
                 if (data && Array.isArray(data)) cachedPendingAlarms.value = deserializeFromTransfer(data) as any[]
             })
         )
-        workerUnsubscribers.push(
+        adminWorkerUnsubscribers.push(
             workerBridge.subscribe('systemErrors', (data: unknown) => {
                 if (data && Array.isArray(data)) cachedSystemErrors.value = deserializeFromTransfer(data) as any[]
             })
         )
-        workerUnsubscribers.push(
+        adminWorkerUnsubscribers.push(
             workerBridge.subscribe('internalErrors', (data: unknown) => {
                 if (data && Array.isArray(data)) cachedInternalErrors.value = deserializeFromTransfer(data) as any[]
             })
         )
-        workerUnsubscribers.push(
+        adminWorkerUnsubscribers.push(
             workerBridge.subscribe('monitoredCanisters', (data: unknown) => {
                 if (data && Array.isArray(data)) cachedMonitoredCanisters.value = deserializeFromTransfer(data) as any[]
             })
         )
-        workerUnsubscribers.push(
+        adminWorkerUnsubscribers.push(
             workerBridge.subscribe('configurationIntervals', (data: unknown) => {
                 if (data) cachedConfigurationIntervals.value = deserializeFromTransfer(data)
             })
         )
-        workerUnsubscribers.push(
+        adminWorkerUnsubscribers.push(
             workerBridge.subscribe('queueStatus', (data: unknown) => {
                 if (data) cachedQueueStatus.value = deserializeFromTransfer(data)
             })
         )
-        workerUnsubscribers.push(
+        adminWorkerUnsubscribers.push(
             workerBridge.subscribe('sentSMSMessages', (data: unknown) => {
                 if (data && Array.isArray(data)) cachedSentSMSMessages.value = deserializeFromTransfer(data) as any[]
             })
         )
-        workerUnsubscribers.push(
+        adminWorkerUnsubscribers.push(
             workerBridge.subscribe('sentEmailMessages', (data: unknown) => {
                 if (data && Array.isArray(data)) cachedSentEmailMessages.value = deserializeFromTransfer(data) as any[]
             })
         )
-        workerUnsubscribers.push(
+        adminWorkerUnsubscribers.push(
             workerBridge.subscribe('sentMessages', (data: unknown) => {
                 if (data && Array.isArray(data)) cachedSentMessages.value = deserializeFromTransfer(data) as any[]
             })
         )
-        workerUnsubscribers.push(
+        adminWorkerUnsubscribers.push(
             workerBridge.subscribe('alarmAcknowledgments', (data: unknown) => {
                 if (data && Array.isArray(data)) cachedAlarmAcknowledgments.value = deserializeFromTransfer(data) as any[]
             })
         )
-        workerUnsubscribers.push(
+        adminWorkerUnsubscribers.push(
             workerBridge.subscribe('adminActionLogs', (data: unknown) => {
                 if (data && Array.isArray(data)) cachedAdminActionLogs.value = deserializeFromTransfer(data) as any[]
             })
         )
 
         // NNS Automation admin data subscriptions
-        workerUnsubscribers.push(
+        adminWorkerUnsubscribers.push(
             workerBridge.subscribe('votableProposals', (data: unknown) => {
                 if (data && Array.isArray(data)) cachedVotableProposals.value = deserializeFromTransfer(data) as any[]
             })
         )
-        workerUnsubscribers.push(
+        adminWorkerUnsubscribers.push(
             workerBridge.subscribe('periodicTimerStatus', (data: unknown) => {
                 if (data) cachedPeriodicTimerStatus.value = deserializeFromTransfer(data)
             })
         )
-        workerUnsubscribers.push(
+        adminWorkerUnsubscribers.push(
             workerBridge.subscribe('autoVotingThreshold', (data: unknown) => {
                 if (data !== null && data !== undefined) cachedAutoVotingThreshold.value = deserializeFromTransfer(data) as bigint
             })
         )
-        workerUnsubscribers.push(
+        adminWorkerUnsubscribers.push(
             workerBridge.subscribe('proposerSubaccount', (data: unknown) => {
                 if (data) cachedProposerSubaccount.value = deserializeFromTransfer(data)
             })
         )
-        workerUnsubscribers.push(
+        adminWorkerUnsubscribers.push(
             workerBridge.subscribe('tacoDAONeuronId', (data: unknown) => {
                 if (data) cachedTacoDAONeuronId.value = deserializeFromTransfer(data)
             })
         )
-        workerUnsubscribers.push(
+        adminWorkerUnsubscribers.push(
             workerBridge.subscribe('defaultVoteBehavior', (data: unknown) => {
                 if (data) cachedDefaultVoteBehavior.value = deserializeFromTransfer(data)
             })
         )
-        workerUnsubscribers.push(
+        adminWorkerUnsubscribers.push(
             workerBridge.subscribe('highestProcessedNNSProposalId', (data: unknown) => {
                 if (data !== null && data !== undefined) cachedHighestProcessedNNSProposalId.value = deserializeFromTransfer(data) as bigint
             })
         )
     }
 
+    /**
+     * Cleanup admin subscriptions
+     * Called as part of cleanupWorkerSubscriptions
+     */
+    const cleanupAdminSubscriptions = () => {
+        if (!adminSubscriptionsActive) return
+        adminSubscriptionsActive = false
+
+        // Unsubscribe from all admin data
+        adminWorkerUnsubscribers.forEach(unsub => unsub())
+        adminWorkerUnsubscribers.length = 0
+    }
+
     const cleanupWorkerSubscriptions = () => {
         workerUnsubscribers.forEach(unsub => unsub())
         workerUnsubscribers.length = 0
+        // Also cleanup admin subscriptions
+        cleanupAdminSubscriptions()
     }
 
     // Helper to process raw proposal data
@@ -3161,8 +3207,8 @@ export const useTacoStore = defineStore('taco', () => {
             //////////////////////
             // post actor logic //
 
-            // get token details
-            const tokenDetails = await actor.getTokenDetails()
+            // get token details (without past prices for performance)
+            const tokenDetails = await actor.getTokenDetailsWithoutPastPrices()
 
             // set fetched token details
             // @ts-ignore
@@ -3862,7 +3908,7 @@ export const useTacoStore = defineStore('taco', () => {
             const [tradingStatusResult, longSyncTimerResult, tokenDetailsResult] = await Promise.all([
                 treasuryActor.getTradingStatus() as Promise<TradingStatusResult>,
                 (treasuryActor as any).getLongSyncTimerStatus?.() as Promise<any> || Promise.resolve(null),
-                daoActor.getTokenDetails() as Promise<TrustedTokenEntry[]>
+                daoActor.getTokenDetailsWithoutPastPrices() as Promise<TrustedTokenEntry[]>
             ]);
             //console.log('refreshTimerStatus: Received trading status:', tradingStatusResult);
             //console.log('refreshTimerStatus: Received long sync timer:', longSyncTimerResult);
@@ -10579,6 +10625,8 @@ export const useTacoStore = defineStore('taco', () => {
         // Worker subscriptions
         setupWorkerSubscriptions,
         cleanupWorkerSubscriptions,
+        setupAdminSubscriptions,
+        cleanupAdminSubscriptions,
 
         // Cached admin data refs (populated by worker subscriptions)
         cachedPriceAlerts,
