@@ -92,10 +92,11 @@
     /////////////
 
     import { ref, onMounted } from 'vue'
+    import { getEffectiveNetwork } from '../../config/network-config'
 
     /////////////////////
     // local variables //
-    ///////////////////// 
+    /////////////////////
 
     // is ic
     const isIC = ref(false)
@@ -116,8 +117,11 @@
         // log
         // console.log('environment indicator mounted')
 
+        // Get current network at runtime
+        const network = getEffectiveNetwork()
+
         // if host is staging
-        if (process.env.DFX_NETWORK === "staging"){
+        if (network === "staging"){
 
             // log
             // console.log('host is staging')
@@ -131,7 +135,7 @@
         }
 
         // if host is local
-        if (process.env.DFX_NETWORK === "local"){
+        if (network === "local"){
 
             // log
             // console.log('host is local')

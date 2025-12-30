@@ -119,8 +119,19 @@ let workerSetNetwork: ((network: 'ic' | 'staging' | 'local' | null) => void) | n
 export function initNetworkConfig(setNetworkFn: (network: 'ic' | 'staging' | 'local' | null) => void): void {
   workerSetNetwork = setNetworkFn
 
-  // Apply any existing override to workers
-  const override = getNetworkOverride()
+  // Auto-use mainnet when on localhost/192.x addresses (local dev without dfx)
+  const hostname = window.location.hostname
+  const isLocalAddress = hostname === 'localhost' || hostname === '127.0.0.1' || hostname.startsWith('192.')
+  let override = getNetworkOverride()
+
+  if (isLocalAddress && !override) {
+    // Auto-set mainnet for local development
+    setNetworkOverride('ic')
+    override = 'ic'
+    console.log('[NetworkConfig] Local address detected - auto-connecting to mainnet')
+  }
+
+  // Apply network override to all workers
   if (override) {
     workerSetNetwork(override)
   }
@@ -184,17 +195,12 @@ Changes apply immediately - workers will refetch data from new network.
     },
   }
 
-
-
-  const envNetwork = import.meta.env?.DFX_NETWORK || import.meta.env?.VITE_DFX_NETWORK
-
-
-  const override = localStorage.getItem('taco_network_override')
-    if (override === 'ic' || override === 'staging' || override === 'local') {
-        console.log('[NetworkConfig] Type tacoConfig.help() for network commands')
-    }else if (envNetwork === 'local' || envNetwork === 'staging') {
-      console.log('[NetworkConfig] Type tacoConfig.help() for network commands')
-    }
+  // Show help only for local addresses
+  const hostname = window.location.hostname
+  const isLocalAddress = hostname === 'localhost' || hostname === '127.0.0.1' || hostname.startsWith('192.')
+  if (isLocalAddress) {
+    ;(window as any).tacoConfig.help()
+  }
 
 }
 

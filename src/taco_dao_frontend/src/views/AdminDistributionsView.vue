@@ -708,6 +708,17 @@ import { createActor as createRewardsActor } from '../../../declarations/rewards
 import { AnonymousIdentity } from '@dfinity/agent'
 import { workerBridge } from '../stores/worker-bridge'
 import { deserializeFromTransfer } from '../workers/shared/fetch-functions'
+import { getEffectiveNetwork } from '../config/network-config'
+
+// Helper function for runtime network detection
+function getNetworkHost() {
+  const network = getEffectiveNetwork()
+  if (network === 'local') {
+    const port = import.meta.env.VITE_LOCAL_PORT || '4943'
+    return `http://localhost:${port}`
+  }
+  return 'https://ic0.app'
+}
 
 const router = useRouter()
 const tacoStore = useTacoStore()
@@ -814,7 +825,7 @@ const getRewardsActor = async () => {
       const canisterId = tacoStore.rewardsCanisterId()
       if (!canisterId) throw new Error('Rewards canister ID not found')
 
-      const host = process.env.DFX_NETWORK === 'local' ? 'http://localhost:4943' : 'https://ic0.app'
+      const host = getNetworkHost()
       cachedRewardsActor = createRewardsActor(canisterId, {
         agentOptions: {
           identity: new AnonymousIdentity(),

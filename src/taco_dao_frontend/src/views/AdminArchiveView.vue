@@ -636,6 +636,17 @@ import { createActor as createDaoNeuronAllocationActor } from '../../../declarat
 import { createActor as createDaoGovernanceActor } from '../../../declarations/dao_governance_archive'
 import { createActor as createRewardDistributionActor } from '../../../declarations/reward_distribution_archive'
 import { createActor as createRewardWithdrawalActor } from '../../../declarations/reward_withdrawal_archive'
+import { getEffectiveNetwork } from '../config/network-config'
+
+// Helper function for runtime network detection
+function getNetworkHost() {
+  const network = getEffectiveNetwork()
+  if (network === 'local') {
+    const port = import.meta.env.VITE_LOCAL_PORT || '4943'
+    return `http://localhost:${port}`
+  }
+  return 'https://ic0.app'
+}
 
 // Archive canister IDs (mapped from archive type to principal)
 const ARCHIVE_CANISTER_IDS = {
@@ -869,7 +880,8 @@ export default {
     },
     // Canister ID functions using actual deployed canister IDs from canister_ids.json
     tradingArchiveCanisterId() {
-      switch (process.env.DFX_NETWORK) {
+      const network = getEffectiveNetwork()
+      switch (network) {
         case "ic":
           return process.env.CANISTER_ID_TRADING_ARCHIVE_IC || 'jmze3-hiaaa-aaaan-qz4xq-cai';
         case "staging":
@@ -879,17 +891,19 @@ export default {
     },
 
     portfolioArchiveCanisterId() {
-      switch (process.env.DFX_NETWORK) {
+      const network = getEffectiveNetwork()
+      switch (network) {
         case "ic":
           return process.env.CANISTER_ID_PORTFOLIO_ARCHIVE_IC || 'bl7x7-wiaaa-aaaan-qz5bq-cai'; // fallback to staging as no IC deployment yet
-        case "staging":  
+        case "staging":
           return process.env.CANISTER_ID_PORTFOLIO_ARCHIVE_STAGING || 'lrekt-uaaaa-aaaan-qz4ya-cai';
       }
       return 'lrekt-uaaaa-aaaan-qz4ya-cai'; // fallback to staging canisterId for local
     },
 
     priceArchiveCanisterId() {
-      switch (process.env.DFX_NETWORK) {
+      const network = getEffectiveNetwork()
+      switch (network) {
         case "ic":
           return process.env.CANISTER_ID_PRICE_ARCHIVE_IC || 'bm6rl-3qaaa-aaaan-qz5ba-cai'; // fallback to staging as no IC deployment yet
         case "staging":
@@ -899,7 +913,8 @@ export default {
     },
 
     daoAdminArchiveCanisterId() {
-      switch (process.env.DFX_NETWORK) {
+      const network = getEffectiveNetwork()
+      switch (network) {
         case "ic":
           return process.env.CANISTER_ID_DAO_ADMIN_ARCHIVE_IC || 'cspwf-4aaaa-aaaan-qz5ia-cai'; // fallback to staging
         case "staging":
@@ -909,7 +924,8 @@ export default {
     },
 
     daoAllocationArchiveCanisterId() {
-      switch (process.env.DFX_NETWORK) {
+      const network = getEffectiveNetwork()
+      switch (network) {
         case "ic":
           return process.env.CANISTER_ID_DAO_ALLOCATION_ARCHIVE_IC || 'cvoqr-ryaaa-aaaan-qz5iq-cai'; // fallback to staging
         case "staging":
@@ -919,7 +935,8 @@ export default {
     },
 
     daoNeuronAllocationArchiveCanisterId() {
-      switch (process.env.DFX_NETWORK) {
+      const network = getEffectiveNetwork()
+      switch (network) {
         case "ic":
           return process.env.CANISTER_ID_DAO_NEURON_ALLOCATION_ARCHIVE_IC || 'dnhfs-7yaaa-aaaan-qz5mq-cai';
         case "staging":
@@ -929,7 +946,8 @@ export default {
     },
 
     daoGovernanceArchiveCanisterId() {
-      switch (process.env.DFX_NETWORK) {
+      const network = getEffectiveNetwork()
+      switch (network) {
         case "ic":
           return process.env.CANISTER_ID_DAO_GOVERNANCE_ARCHIVE_IC || 'c4n3n-hqaaa-aaaan-qz5ja-cai'; // fallback to staging
         case "staging":
@@ -939,7 +957,8 @@ export default {
     },
 
     rewardDistributionArchiveCanisterId() {
-      switch (process.env.DFX_NETWORK) {
+      const network = getEffectiveNetwork()
+      switch (network) {
         case "ic":
           return process.env.CANISTER_ID_REWARD_DISTRIBUTION_ARCHIVE_IC || 'uqkap-jiaaa-aaaan-qz6tq-cai';
         case "staging":
@@ -949,7 +968,8 @@ export default {
     },
 
     rewardWithdrawalArchiveCanisterId() {
-      switch (process.env.DFX_NETWORK) {
+      const network = getEffectiveNetwork()
+      switch (network) {
         case "ic":
           return process.env.CANISTER_ID_REWARD_WITHDRAWAL_ARCHIVE_IC || 'v5eeb-gaaaa-aaaan-qz6ua-cai';
         case "staging":
@@ -975,13 +995,13 @@ export default {
         const identity = await authClient.getIdentity()
         
         // Determine host
-        const host = process.env.DFX_NETWORK === "local" ? "http://127.0.0.1:4943" : "https://icp0.io"
-        
+        const host = getNetworkHost()
+
         // Create agent with authenticated identity
         const agent = await createAgent({
           identity: identity,
           host: host,
-          fetchRootKey: process.env.DFX_NETWORK === "local"
+          fetchRootKey: getEffectiveNetwork() === "local"
         })
         
         // Create actors with proper canister IDs and authenticated agent

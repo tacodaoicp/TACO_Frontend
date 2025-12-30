@@ -223,6 +223,17 @@ import { AnonymousIdentity } from '@dfinity/agent'
 
 // Import rewards actor
 import { createActor as createRewardsActor } from '../../../declarations/rewards'
+import { getEffectiveNetwork } from '../config/network-config'
+
+// Helper function for runtime network detection
+function getNetworkHost() {
+  const network = getEffectiveNetwork()
+  if (network === 'local') {
+    const port = import.meta.env.VITE_LOCAL_PORT || '4943'
+    return `http://localhost:${port}`
+  }
+  return 'https://ic0.app'
+}
 
 export default {
   name: 'AdminRewardsView',
@@ -286,7 +297,7 @@ export default {
     try {
       // Create rewards actor with proper host configuration
       const canisterId = this.tacoStore.rewardsCanisterId()
-      const host = process.env.DFX_NETWORK === 'local' ? 'http://localhost:4943' : 'https://ic0.app'
+      const host = getNetworkHost()
       this.rewardsActor = createRewardsActor(canisterId, {
         agentOptions: {
           identity: new AnonymousIdentity(),

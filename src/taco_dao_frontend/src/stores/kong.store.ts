@@ -10,6 +10,20 @@ import { createAgent } from '@dfinity/utils'
 import { Principal } from '@dfinity/principal'
 import { AuthClient } from '@dfinity/auth-client'
 import { useTacoStore } from './taco.store'
+import { getEffectiveNetwork } from '../config/network-config'
+
+// Helper functions for runtime network detection
+function shouldFetchRootKey(): boolean {
+    return getEffectiveNetwork() === 'local'
+}
+function getNetworkHost(): string {
+    const network = getEffectiveNetwork()
+    if (network === 'local') {
+        const port = import.meta.env.VITE_LOCAL_PORT || '4943'
+        return `http://localhost:${port}`
+    }
+    return 'https://ic0.app'
+}
 import { idlFactory as kongIdlFactory } from '../../../declarations/kongswap/kongswap.did.js'
 
 // Kong canister ID
@@ -83,8 +97,8 @@ export const useKongStore = defineStore('kong', () => {
     
     const agent = await createAgent({
       identity,
-      host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-      fetchRootKey: process.env.DFX_NETWORK === "local",
+      host: getNetworkHost(),
+      fetchRootKey: shouldFetchRootKey(),
     })
 
 
@@ -102,8 +116,8 @@ export const useKongStore = defineStore('kong', () => {
     
     const agent = await createAgent({
       identity,
-      host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-      fetchRootKey: process.env.DFX_NETWORK === "local",
+      host: getNetworkHost(),
+      fetchRootKey: shouldFetchRootKey(),
     })
 
     const icrcIDL = ({ IDL }: any) => {

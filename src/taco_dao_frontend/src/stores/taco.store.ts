@@ -9,6 +9,7 @@ import { useRouter } from 'vue-router'
 import { useStorage } from "@vueuse/core"
 import { workerBridge, fetchAndWait } from './worker-bridge'
 import { deserializeFromTransfer } from '../workers/shared/fetch-functions'
+import { getEffectiveNetwork } from '../config/network-config'
 
 // Only import Principal synchronously - it's small and used everywhere
 import { Principal } from '@dfinity/principal'
@@ -55,6 +56,30 @@ let _appSneedDaoIDL: any = null
 let _snsGovernanceIDL: any = null
 let _alarmIDL: any = null
 let _rewardsIDL: any = null
+
+// ============================================================================
+// Runtime Network Helpers - Check localStorage override at runtime
+// ============================================================================
+
+/**
+ * Check if we should fetch root key (only for local development)
+ * Uses runtime network override instead of build-time DFX_NETWORK
+ */
+function shouldFetchRootKey(): boolean {
+    return getEffectiveNetwork() === 'local'
+}
+
+/**
+ * Get the IC host URL based on current network (runtime-aware)
+ */
+function getNetworkHost(): string {
+    const network = getEffectiveNetwork()
+    if (network === 'local') {
+        const port = import.meta.env.VITE_LOCAL_PORT || '4943'
+        return `http://localhost:${port}`
+    }
+    return 'https://ic0.app'
+}
 
 async function getAuthClientModule() {
     if (!_authClientModule) {
@@ -285,7 +310,7 @@ async function createAnonymousAgent(host: string) {
     return createAgent({
         identity: new AnonymousIdentity(),
         host,
-        fetchRootKey: process.env.DFX_NETWORK === "local",
+        fetchRootKey: shouldFetchRootKey(),
     })
 }
 
@@ -2532,7 +2557,7 @@ export const useTacoStore = defineStore('taco', () => {
                 authClient.login({
                     maxTimeToLive: BigInt(30 * 24 * 60 * 60 * 1000 * 1000 * 1000),
                     identityProvider:
-                        process.env.DFX_NETWORK === "ic" || process.env.DFX_NETWORK === "staging"
+                        getEffectiveNetwork() !== 'local'
                             ? 'https://identity.ic0.app'
                             : `http://${iiCanisterId}.localhost:4943/`,
                     onSuccess: resolve,
@@ -2664,79 +2689,73 @@ export const useTacoStore = defineStore('taco', () => {
     const daoBackendCanisterId = () => {
 
         // determine canisterId based on network
-        switch (process.env.DFX_NETWORK) {
+        const network = getEffectiveNetwork()
+        switch (network) {
             case "ic":
                 return process.env.CANISTER_ID_DAO_BACKEND_IC || 'vxqw7-iqaaa-aaaan-qzziq-cai';
-                break;
             case "staging":
                 return  process.env.CANISTER_ID_DAO_BACKEND_STAGING || 'tisou-7aaaa-aaaai-atiea-cai';
-                break;
-        }        
+        }
         return 'ywhqf-eyaaa-aaaad-qg6tq-cai'; // local canisterId
     }
     const treasuryCanisterId = () => {
-
-        switch (process.env.DFX_NETWORK) {
+        const network = getEffectiveNetwork()
+        switch (network) {
             case "ic":
                 return process.env.CANISTER_ID_TREASURY_IC || 'v6t5d-6yaaa-aaaan-qzzja-cai';
-                break;
             case "staging":
                 return  process.env.CANISTER_ID_TREASURY_STAGING || 'tptia-syaaa-aaaai-atieq-cai';
-                break;
-        }        
+        }
         return 'z4is7-giaaa-aaaad-qg6uq-cai'; // local canisterId
     }
     const nachosCanisterId = () => {
-
-        switch (process.env.DFX_NETWORK) {
+        const network = getEffectiveNetwork()
+        switch (network) {
             case "ic":
                 return process.env.CANISTER_ID_NACHOS_IC || 'rctxc-zqaaa-aaaan-qz6na-cai';
-                break;
             case "staging":
                 return  process.env.CANISTER_ID_NACHOS_STAGING || 'rctxc-zqaaa-aaaan-qz6na-caitptia-syaaa-aaaai-atieq-cai';
-                break;
-        }        
+        }
         return 'rctxc-zqaaa-aaaan-qz6na-cai'; // local canisterId
     }
     const neuronSnapshotCanisterId = () => {
-        switch (process.env.DFX_NETWORK) {
+        const network = getEffectiveNetwork()
+        switch (network) {
             case "ic":
                 return process.env.CANISTER_ID_NEURONSNAPSHOT_IC || 'vzs3x-taaaa-aaaan-qzzjq-cai';
-                break;
             case "staging":
                 return  process.env.CANISTER_ID_NEURONSNAPSHOT_STAGING || 'tgqd4-eqaaa-aaaai-atifa-cai';
-                break;
-        }        
+        }
         return 'tgqd4-eqaaa-aaaai-atifa-cai'; // local canisterId
     }
     const rewardsCanisterId = () => {
-
-        switch (process.env.DFX_NETWORK) {
+        const network = getEffectiveNetwork()
+        switch (network) {
             case "ic":
                 return process.env.CANISTER_ID_REWARDS_IC || 'dkgdg-saaaa-aaaan-qz5ma-cai';
-                break;
             case "staging":
                 return  process.env.CANISTER_ID_REWARDS_STAGING || 'cjkka-gyaaa-aaaan-qz5kq-cai';
-                break;
-        }        
+        }
         return 'cjkka-gyaaa-aaaan-qz5kq-cai'; // local canisterId
     }
     const portfolioArchiveCanisterId = () => {
-        switch (process.env.DFX_NETWORK) {
+        const network = getEffectiveNetwork()
+        switch (network) {
             case "ic":
                 return process.env.CANISTER_ID_PORTFOLIO_ARCHIVE_IC || 'bl7x7-wiaaa-aaaan-qz5bq-cai';
             case "staging":
                 return process.env.CANISTER_ID_PORTFOLIO_ARCHIVE_STAGING || 'lrekt-uaaaa-aaaan-qz4ya-cai';
-        }        
+        }
         return 'lrekt-uaaaa-aaaan-qz4ya-cai'; // local canisterId
     }
     const alarmCanisterId = () => {
-        switch (process.env.DFX_NETWORK) {
+        const network = getEffectiveNetwork()
+        switch (network) {
             case "ic":
                 return process.env.CANISTER_ID_ALARM_IC || 'b2cwp-6qaaa-aaaad-qhn6a-cai'
             case "staging":
                 return process.env.CANISTER_ID_ALARM_STAGING || 'b2cwp-6qaaa-aaaad-qhn6a-cai'
-        }        
+        }
         return 'b2cwp-6qaaa-aaaad-qhn6a-cai' // if not ic or staging, use local (all the same for now)
     }
 
@@ -2853,15 +2872,13 @@ export const useTacoStore = defineStore('taco', () => {
             await initializeShims()
 
             // get host
-            const host = process.env.DFX_NETWORK === "local"
-                ? getLocalHost()
-                : "https://ic0.app";
+            const host = getNetworkHost()
 
             // create agent
             const agent = await createAgent({
                 identity: new AnonymousIdentity(),
                 host,
-                fetchRootKey: process.env.DFX_NETWORK === "local",
+                fetchRootKey: shouldFetchRootKey(),
             })         
 
             // create actor
@@ -2905,15 +2922,13 @@ export const useTacoStore = defineStore('taco', () => {
             await initializeShims()
 
             // get host
-            const host = process.env.DFX_NETWORK === "local"
-                ? getLocalHost()
-                : "https://ic0.app";
+            const host = getNetworkHost()
 
             // create agent
             const agent = await createAgent({
                 identity: new AnonymousIdentity(),
                 host,
-                fetchRootKey: process.env.DFX_NETWORK === "local",
+                fetchRootKey: shouldFetchRootKey(),
             })         
 
             // create actor
@@ -3096,15 +3111,13 @@ export const useTacoStore = defineStore('taco', () => {
             await initializeShims()
 
             // get host
-            const host = process.env.DFX_NETWORK === "local"
-                ? getLocalHost()
-                : "https://ic0.app";
+            const host = getNetworkHost()
 
             // create agent
             const agent = await createAgent({
                 identity: new AnonymousIdentity(),
                 host,
-                fetchRootKey: process.env.DFX_NETWORK === "local",
+                fetchRootKey: shouldFetchRootKey(),
             })
 
             let canisterId = daoBackendCanisterId();
@@ -3185,15 +3198,13 @@ export const useTacoStore = defineStore('taco', () => {
             await initializeShims()
 
             // get host
-            const host = process.env.DFX_NETWORK === "local"
-                ? getLocalHost()
-                : "https://ic0.app";
+            const host = getNetworkHost()
 
             // create agent
             const agent = await createAgent({
                 identity: new AnonymousIdentity(),
                 host,
-                fetchRootKey: process.env.DFX_NETWORK === "local",
+                fetchRootKey: shouldFetchRootKey(),
             })
 
             let canisterId = daoBackendCanisterId();
@@ -3249,15 +3260,13 @@ export const useTacoStore = defineStore('taco', () => {
         try {
 
             // get host
-            const host = process.env.DFX_NETWORK === "local"
-                ? getLocalHost()
-                : "https://ic0.app";
+            const host = getNetworkHost()
 
             // create agent
             const agent = await createAgent({
                 identity: new AnonymousIdentity(),
                 host,
-                fetchRootKey: process.env.DFX_NETWORK === "local",
+                fetchRootKey: shouldFetchRootKey(),
             })
 
 
@@ -3314,15 +3323,13 @@ export const useTacoStore = defineStore('taco', () => {
         try {
 
             // get host
-            const host = process.env.DFX_NETWORK === "local"
-                ? getLocalHost()
-                : "https://ic0.app";
+            const host = getNetworkHost()
                 
             // create agent
             const agent = await createAgent({
                 identity: new AnonymousIdentity(),
                 host,
-                fetchRootKey: process.env.DFX_NETWORK === "local",
+                fetchRootKey: shouldFetchRootKey(),
             })
 
             // create actor
@@ -3382,9 +3389,7 @@ export const useTacoStore = defineStore('taco', () => {
             if (await authClient.isAuthenticated()) {
 
                 // get host
-                const host = process.env.DFX_NETWORK === "local"
-                    ? getLocalHost()
-                    : "https://ic0.app";                
+                const host = getNetworkHost()                
 
                 // get identity
                 const identity = await authClient.getIdentity()
@@ -3393,7 +3398,7 @@ export const useTacoStore = defineStore('taco', () => {
                 const agent = await createAgent({
                     identity,
                     host,
-                    fetchRootKey: process.env.DFX_NETWORK === "local",
+                    fetchRootKey: shouldFetchRootKey(),
                 })
 
                 // create actor
@@ -3453,9 +3458,7 @@ export const useTacoStore = defineStore('taco', () => {
             if (await authClient.isAuthenticated()) {
 
                 // get host
-                const host = process.env.DFX_NETWORK === "local"
-                    ? getLocalHost()
-                    : "https://ic0.app";
+                const host = getNetworkHost()
 
                 // get identity
                 const identity = await authClient.getIdentity()
@@ -3464,7 +3467,7 @@ export const useTacoStore = defineStore('taco', () => {
                 const agent = await createAgent({
                     identity,
                     host,
-                    fetchRootKey: process.env.DFX_NETWORK === "local",
+                    fetchRootKey: shouldFetchRootKey(),
                 })
 
                 // create actor
@@ -3563,9 +3566,7 @@ export const useTacoStore = defineStore('taco', () => {
             if (await authClient.isAuthenticated()) {
 
                 // get host
-                const host = process.env.DFX_NETWORK === "local"
-                    ? getLocalHost()
-                    : "https://ic0.app";                
+                const host = getNetworkHost()                
 
                 // get identity
                 const identity = await authClient.getIdentity()
@@ -3574,7 +3575,7 @@ export const useTacoStore = defineStore('taco', () => {
                 const agent = await createAgent({
                     identity,
                     host,
-                    fetchRootKey: process.env.DFX_NETWORK === "local",
+                    fetchRootKey: shouldFetchRootKey(),
                 })
 
                 // create actor
@@ -3641,9 +3642,7 @@ export const useTacoStore = defineStore('taco', () => {
             if (await authClient.isAuthenticated()) {
 
                 // get host
-                const host = process.env.DFX_NETWORK === "local"
-                    ? getLocalHost()
-                    : "https://ic0.app";                
+                const host = getNetworkHost()                
 
                 // get identity
                 const identity = await authClient.getIdentity()
@@ -3652,7 +3651,7 @@ export const useTacoStore = defineStore('taco', () => {
                 const agent = await createAgent({
                     identity,
                     host,
-                    fetchRootKey: process.env.DFX_NETWORK === "local",
+                    fetchRootKey: shouldFetchRootKey(),
                 })
 
                 // create actor
@@ -3719,9 +3718,7 @@ export const useTacoStore = defineStore('taco', () => {
             if (await authClient.isAuthenticated()) {
 
                 // get host
-                const host = process.env.DFX_NETWORK === "local"
-                    ? getLocalHost()
-                    : "https://ic0.app";                
+                const host = getNetworkHost()                
 
                 // get identity
                 const identity = await authClient.getIdentity()
@@ -3730,7 +3727,7 @@ export const useTacoStore = defineStore('taco', () => {
                 const agent = await createAgent({
                     identity,
                     host,
-                    fetchRootKey: process.env.DFX_NETWORK === "local",
+                    fetchRootKey: shouldFetchRootKey(),
                 })
 
                 // create actor
@@ -3790,15 +3787,13 @@ export const useTacoStore = defineStore('taco', () => {
         try {
 
             // get host
-            const host = process.env.DFX_NETWORK === "local"
-                ? getLocalHost()
-                : "https://ic0.app"
+            const host = getNetworkHost()
 
             // create agent
             const agent = await createAgent({
                 identity: new AnonymousIdentity(),
                 host,
-                fetchRootKey: process.env.DFX_NETWORK === "local",
+                fetchRootKey: shouldFetchRootKey(),
             })
 
             // create actor
@@ -3855,16 +3850,14 @@ export const useTacoStore = defineStore('taco', () => {
         // console.log('refreshTimerStatus: Starting refresh...');
         try {
             // get host
-            const host = process.env.DFX_NETWORK === "local"
-                ? getLocalHost()
-                : "https://ic0.app"
+            const host = getNetworkHost()
             //console.log('refreshTimerStatus: Using host:', host);
 
             // create agent
             const agent = await createAgent({
                 identity: new AnonymousIdentity(),
                 host,
-                fetchRootKey: process.env.DFX_NETWORK === "local",
+                fetchRootKey: shouldFetchRootKey(),
             })
             //console.log('refreshTimerStatus: Agent created');
 
@@ -4025,15 +4018,13 @@ export const useTacoStore = defineStore('taco', () => {
     const triggerManualSnapshot = async () => {
         try {
             // get host
-            const host = process.env.DFX_NETWORK === "local"
-                ? `http://localhost:54612`
-                : "https://ic0.app"
+            const host = getNetworkHost()
 
             // create agent
             const agent = await createAgent({
                 identity: new AnonymousIdentity(),
                 host,
-                fetchRootKey: process.env.DFX_NETWORK === "local",
+                fetchRootKey: shouldFetchRootKey(),
             })
 
             // determine canisterId based on network
@@ -4058,15 +4049,13 @@ export const useTacoStore = defineStore('taco', () => {
     const restartSnapshotTimer = async () => {
         try {
             // get host
-            const host = process.env.DFX_NETWORK === "local"
-                ? `http://localhost:54612`
-                : "https://ic0.app"
+            const host = getNetworkHost()
 
             // create agent
             const agent = await createAgent({
                 identity: new AnonymousIdentity(),
                 host,
-                fetchRootKey: process.env.DFX_NETWORK === "local",
+                fetchRootKey: shouldFetchRootKey(),
             })
 
             // determine canisterId based on network
@@ -4089,15 +4078,13 @@ export const useTacoStore = defineStore('taco', () => {
         // console.log('TacoStore: restartTreasurySyncs called');
         try {
             // get host
-            const host = process.env.DFX_NETWORK === "local"
-                ? `http://localhost:54612`
-                : "https://ic0.app"
+            const host = getNetworkHost()
 
             // create agent
             const agent = await createAgent({
                 identity: new AnonymousIdentity(),
                 host,
-                fetchRootKey: process.env.DFX_NETWORK === "local",
+                fetchRootKey: shouldFetchRootKey(),
             });
 
             // determine canisterId based on network
@@ -4133,8 +4120,8 @@ export const useTacoStore = defineStore('taco', () => {
             // Create agent with authenticated identity
             const agent = await createAgent({
                 identity,
-                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-                fetchRootKey: process.env.DFX_NETWORK === "local",
+                host: getNetworkHost(),
+                fetchRootKey: shouldFetchRootKey(),
             });
 
             const actor = Actor.createActor(treasuryIDL, {
@@ -4169,15 +4156,13 @@ export const useTacoStore = defineStore('taco', () => {
             const identity = await authClient.getIdentity();
 
             // get host
-            const host = process.env.DFX_NETWORK === "local"
-                ? `http://localhost:54612`
-                : "https://ic0.app"
+            const host = getNetworkHost()
 
             // create agent with authenticated identity
             const agent = await createAgent({
                 identity,
                 host,
-                fetchRootKey: process.env.DFX_NETWORK === "local",
+                fetchRootKey: shouldFetchRootKey(),
             })
 
             // create actor
@@ -4196,14 +4181,12 @@ export const useTacoStore = defineStore('taco', () => {
         // console.log('fetchSystemLogs: Starting to fetch logs...');
         try {
             // Use anonymous identity for public query (no authentication required)
-            const host = process.env.DFX_NETWORK === "local"
-                ? getLocalHost()
-                : "https://ic0.app"
+            const host = getNetworkHost()
 
             const agent = await createAgent({
                 identity: new AnonymousIdentity(),
                 host,
-                fetchRootKey: process.env.DFX_NETWORK === "local",
+                fetchRootKey: shouldFetchRootKey(),
             })
 
             // determine canisterId based on network
@@ -4236,15 +4219,13 @@ export const useTacoStore = defineStore('taco', () => {
             const identity = await authClient.getIdentity();
 
             // get host
-            const host = process.env.DFX_NETWORK === "local"
-                ? `http://localhost:54612`
-                : "https://ic0.app"
+            const host = getNetworkHost()
 
             // create agent with authenticated identity
             const agent = await createAgent({
                 identity,
                 host,
-                fetchRootKey: process.env.DFX_NETWORK === "local",
+                fetchRootKey: shouldFetchRootKey(),
             })
 
             // create actor
@@ -4279,15 +4260,13 @@ export const useTacoStore = defineStore('taco', () => {
             const identity = await authClient.getIdentity();
 
             // get host
-            const host = process.env.DFX_NETWORK === "local"
-                ? `http://localhost:54612`
-                : "https://ic0.app"
+            const host = getNetworkHost()
 
             // create agent with authenticated identity
             const agent = await createAgent({
                 identity,
                 host,
-                fetchRootKey: process.env.DFX_NETWORK === "local",
+                fetchRootKey: shouldFetchRootKey(),
             })
 
             // create actor
@@ -4396,15 +4375,13 @@ export const useTacoStore = defineStore('taco', () => {
             // JUST LEAVE THIS CODE HERE AS IS !!
 
             // Use anonymous identity for public query (no authentication required)
-            const host = process.env.DFX_NETWORK === "local"
-                ? getLocalHost()
-                : "https://ic0.app";
+            const host = getNetworkHost()
 
             // Create an agent with anonymous identity
             const agent = await createAgent({
                 identity: new AnonymousIdentity(),
                 host,
-                fetchRootKey: process.env.DFX_NETWORK === "local",
+                fetchRootKey: shouldFetchRootKey(),
             });
 
             // Create treasury actor
@@ -4439,15 +4416,13 @@ export const useTacoStore = defineStore('taco', () => {
             // JUST LEAVE THIS CODE HERE AS IS !!
 
             // Use anonymous identity for public query (no authentication required)
-            const host = process.env.DFX_NETWORK === "local"
-                ? getLocalHost()
-                : "https://ic0.app";
+            const host = getNetworkHost()
 
             // Create an agent with anonymous identity
             const agent = await createAgent({
                 identity: new AnonymousIdentity(),
                 host,
-                fetchRootKey: process.env.DFX_NETWORK === "local",
+                fetchRootKey: shouldFetchRootKey(),
             });
 
             let canisterId = daoBackendCanisterId();
@@ -4526,8 +4501,8 @@ export const useTacoStore = defineStore('taco', () => {
             // Create agent with authenticated identity
             const agent = await createAgent({
                 identity,
-                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-                fetchRootKey: process.env.DFX_NETWORK === "local",
+                host: getNetworkHost(),
+                fetchRootKey: shouldFetchRootKey(),
             });
 
             let canisterId = daoBackendCanisterId();
@@ -4568,8 +4543,8 @@ export const useTacoStore = defineStore('taco', () => {
             // Create agent with authenticated identity
             const agent = await createAgent({
                 identity,
-                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-                fetchRootKey: process.env.DFX_NETWORK === "local",
+                host: getNetworkHost(),
+                fetchRootKey: shouldFetchRootKey(),
             });
 
             let canisterId = daoBackendCanisterId();
@@ -4596,14 +4571,12 @@ export const useTacoStore = defineStore('taco', () => {
         // console.log('taco.store: fetchVoterDetails() - Starting fetch...');
         try {
             // Use anonymous identity for public query (no authentication required)
-            const host = process.env.DFX_NETWORK === "local"
-                ? getLocalHost()
-                : "https://ic0.app";
+            const host = getNetworkHost()
 
             const agent = await createAgent({
                 identity: new AnonymousIdentity(),
                 host,
-                fetchRootKey: process.env.DFX_NETWORK === "local",
+                fetchRootKey: shouldFetchRootKey(),
             })
 
             let canisterId = daoBackendCanisterId();
@@ -4633,14 +4606,12 @@ export const useTacoStore = defineStore('taco', () => {
     const fetchNeuronAllocations = async () => {
         try {
             // Use anonymous identity for public query (no authentication required)
-            const host = process.env.DFX_NETWORK === "local"
-                ? getLocalHost()
-                : "https://ic0.app";
+            const host = getNetworkHost()
 
             const agent = await createAgent({
                 identity: new AnonymousIdentity(),
                 host,
-                fetchRootKey: process.env.DFX_NETWORK === "local",
+                fetchRootKey: shouldFetchRootKey(),
             });
 
             let canisterId = daoBackendCanisterId();
@@ -4674,14 +4645,12 @@ export const useTacoStore = defineStore('taco', () => {
         // console.log('taco.store: adminGetUserAllocation() - Starting fetch for principal:', principal.toString());
         try {
             // Use anonymous identity for public query (no authentication required)
-            const host = process.env.DFX_NETWORK === "local"
-                ? getLocalHost()
-                : "https://ic0.app";
+            const host = getNetworkHost()
 
             const agent = await createAgent({
                 identity: new AnonymousIdentity(),
                 host,
-                fetchRootKey: process.env.DFX_NETWORK === "local",
+                fetchRootKey: shouldFetchRootKey(),
             });
 
             let canisterId = daoBackendCanisterId();
@@ -4719,8 +4688,8 @@ export const useTacoStore = defineStore('taco', () => {
             // Create an agent with the identity
             const agent = await createAgent({
                 identity,
-                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-                fetchRootKey: process.env.DFX_NETWORK === "local",
+                host: getNetworkHost(),
+                fetchRootKey: shouldFetchRootKey(),
             });
 
 
@@ -4792,8 +4761,8 @@ export const useTacoStore = defineStore('taco', () => {
             // Create an agent with the identity
             const agent = await createAgent({
                 identity,
-                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-                fetchRootKey: process.env.DFX_NETWORK === "local",
+                host: getNetworkHost(),
+                fetchRootKey: shouldFetchRootKey(),
             });
 
 
@@ -4854,14 +4823,12 @@ export const useTacoStore = defineStore('taco', () => {
     const getTreasuryLogs = async (count: number) => {
         try {
             // Use anonymous identity for public query (no authentication required)
-            const host = process.env.DFX_NETWORK === "local"
-                ? getLocalHost()
-                : "https://ic0.app";
+            const host = getNetworkHost()
 
             const agent = await createAgent({
                 identity: new AnonymousIdentity(),
                 host,
-                fetchRootKey: process.env.DFX_NETWORK === "local",
+                fetchRootKey: shouldFetchRootKey(),
             });
 
             const treasury = Actor.createActor<TreasuryService>(treasuryIDL, {
@@ -4878,14 +4845,12 @@ export const useTacoStore = defineStore('taco', () => {
     const getTreasuryLogsByContext = async (context: string, count: number) => {
         try {
             // Use anonymous identity for public query (no authentication required)
-            const host = process.env.DFX_NETWORK === "local"
-                ? getLocalHost()
-                : "https://ic0.app";
+            const host = getNetworkHost()
 
             const agent = await createAgent({
                 identity: new AnonymousIdentity(),
                 host,
-                fetchRootKey: process.env.DFX_NETWORK === "local",
+                fetchRootKey: shouldFetchRootKey(),
             });
 
             const treasury = Actor.createActor<TreasuryService>(treasuryIDL, {
@@ -4902,14 +4867,12 @@ export const useTacoStore = defineStore('taco', () => {
     const getTreasuryLogsByLevel = async (level: any, count: number) => {
         try {
             // Use anonymous identity for public query (no authentication required)
-            const host = process.env.DFX_NETWORK === "local"
-                ? getLocalHost()
-                : "https://ic0.app";
+            const host = getNetworkHost()
 
             const agent = await createAgent({
                 identity: new AnonymousIdentity(),
                 host,
-                fetchRootKey: process.env.DFX_NETWORK === "local",
+                fetchRootKey: shouldFetchRootKey(),
             });
 
             const treasury = Actor.createActor<TreasuryService>(treasuryIDL, {
@@ -4934,8 +4897,8 @@ export const useTacoStore = defineStore('taco', () => {
             const identity = await authClient.getIdentity();
             const agent = await createAgent({
                 identity,
-                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-                fetchRootKey: process.env.DFX_NETWORK === "local",
+                host: getNetworkHost(),
+                fetchRootKey: shouldFetchRootKey(),
             });
 
             const treasury = Actor.createActor<TreasuryService>(treasuryIDL, {
@@ -4954,14 +4917,12 @@ export const useTacoStore = defineStore('taco', () => {
     const listTriggerConditions = async () => {
         try {
             // Use anonymous identity for public query (no authentication required)
-            const host = process.env.DFX_NETWORK === "local"
-                ? getLocalHost()
-                : "https://ic0.app";
+            const host = getNetworkHost()
 
             const agent = await createAgent({
                 identity: new AnonymousIdentity(),
                 host,
-                fetchRootKey: process.env.DFX_NETWORK === "local",
+                fetchRootKey: shouldFetchRootKey(),
             });
 
             const treasury = Actor.createActor<TreasuryService>(treasuryIDL, {
@@ -4992,8 +4953,8 @@ export const useTacoStore = defineStore('taco', () => {
             const identity = await authClient.getIdentity();
             const agent = await createAgent({
                 identity,
-                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-                fetchRootKey: process.env.DFX_NETWORK === "local",
+                host: getNetworkHost(),
+                fetchRootKey: shouldFetchRootKey(),
             });
 
             const treasury = Actor.createActor<TreasuryService>(treasuryIDL, {
@@ -5024,8 +4985,8 @@ export const useTacoStore = defineStore('taco', () => {
             const identity = await authClient.getIdentity();
             const agent = await createAgent({
                 identity,
-                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-                fetchRootKey: process.env.DFX_NETWORK === "local",
+                host: getNetworkHost(),
+                fetchRootKey: shouldFetchRootKey(),
             });
 
             const treasury = Actor.createActor<TreasuryService>(treasuryIDL, {
@@ -5050,8 +5011,8 @@ export const useTacoStore = defineStore('taco', () => {
             const identity = await authClient.getIdentity();
             const agent = await createAgent({
                 identity,
-                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-                fetchRootKey: process.env.DFX_NETWORK === "local",
+                host: getNetworkHost(),
+                fetchRootKey: shouldFetchRootKey(),
             });
 
             const treasury = Actor.createActor<TreasuryService>(treasuryIDL, {
@@ -5068,14 +5029,12 @@ export const useTacoStore = defineStore('taco', () => {
     const getPriceAlerts = async (offset: number, limit: number) => {
         try {
             // Use anonymous identity for public query (no authentication required)
-            const host = process.env.DFX_NETWORK === "local"
-                ? getLocalHost()
-                : "https://ic0.app";
+            const host = getNetworkHost()
 
             const agent = await createAgent({
                 identity: new AnonymousIdentity(),
                 host,
-                fetchRootKey: process.env.DFX_NETWORK === "local",
+                fetchRootKey: shouldFetchRootKey(),
             });
 
             const treasury = Actor.createActor<TreasuryService>(treasuryIDL, {
@@ -5100,8 +5059,8 @@ export const useTacoStore = defineStore('taco', () => {
             const identity = await authClient.getIdentity();
             const agent = await createAgent({
                 identity,
-                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-                fetchRootKey: process.env.DFX_NETWORK === "local",
+                host: getNetworkHost(),
+                fetchRootKey: shouldFetchRootKey(),
             });
 
             const treasury = Actor.createActor<TreasuryService>(treasuryIDL, {
@@ -5120,14 +5079,12 @@ export const useTacoStore = defineStore('taco', () => {
     const listTradingPauses = async () => {
         try {
             // Use anonymous identity for public query (no authentication required)
-            const host = process.env.DFX_NETWORK === "local"
-                ? getLocalHost()
-                : "https://ic0.app";
+            const host = getNetworkHost()
 
             const agent = await createAgent({
                 identity: new AnonymousIdentity(),
                 host,
-                fetchRootKey: process.env.DFX_NETWORK === "local",
+                fetchRootKey: shouldFetchRootKey(),
             });
 
             const treasury = Actor.createActor<TreasuryService>(treasuryIDL, {
@@ -5152,8 +5109,8 @@ export const useTacoStore = defineStore('taco', () => {
             const identity = await authClient.getIdentity();
             const agent = await createAgent({
                 identity,
-                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-                fetchRootKey: process.env.DFX_NETWORK === "local",
+                host: getNetworkHost(),
+                fetchRootKey: shouldFetchRootKey(),
             });
 
             const treasury = Actor.createActor<TreasuryService>(treasuryIDL, {
@@ -5178,8 +5135,8 @@ export const useTacoStore = defineStore('taco', () => {
             const identity = await authClient.getIdentity();
             const agent = await createAgent({
                 identity,
-                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-                fetchRootKey: process.env.DFX_NETWORK === "local",
+                host: getNetworkHost(),
+                fetchRootKey: shouldFetchRootKey(),
             });
 
             const treasury = Actor.createActor<TreasuryService>(treasuryIDL, {
@@ -5204,8 +5161,8 @@ export const useTacoStore = defineStore('taco', () => {
             const identity = await authClient.getIdentity();
             const agent = await createAgent({
                 identity,
-                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-                fetchRootKey: process.env.DFX_NETWORK === "local",
+                host: getNetworkHost(),
+                fetchRootKey: shouldFetchRootKey(),
             });
 
             const treasury = Actor.createActor<TreasuryService>(treasuryIDL, {
@@ -5230,8 +5187,8 @@ export const useTacoStore = defineStore('taco', () => {
             const identity = await authClient.getIdentity();
             const agent = await createAgent({
                 identity,
-                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-                fetchRootKey: process.env.DFX_NETWORK === "local",
+                host: getNetworkHost(),
+                fetchRootKey: shouldFetchRootKey(),
             });
 
             const treasury = Actor.createActor<TreasuryService>(treasuryIDL, {
@@ -5248,14 +5205,12 @@ export const useTacoStore = defineStore('taco', () => {
     const getTokenPriceHistory = async (tokens: Principal[]) => {
         try {
             // Use anonymous identity for public query (no authentication required)
-            const host = process.env.DFX_NETWORK === "local"
-                ? getLocalHost()
-                : "https://ic0.app";
+            const host = getNetworkHost()
 
             const agent = await createAgent({
                 identity: new AnonymousIdentity(),
                 host,
-                fetchRootKey: process.env.DFX_NETWORK === "local",
+                fetchRootKey: shouldFetchRootKey(),
             });
 
             const treasury = Actor.createActor<TreasuryService>(treasuryIDL, {
@@ -5278,14 +5233,12 @@ export const useTacoStore = defineStore('taco', () => {
     const getPortfolioHistory = async (limit: number = 1000) => {
         try {
             // Use anonymous identity for public query (no authentication required)
-            const host = process.env.DFX_NETWORK === "local"
-                ? getLocalHost()
-                : "https://ic0.app";
+            const host = getNetworkHost()
 
             const agent = await createAgent({
                 identity: new AnonymousIdentity(),
                 host,
-                fetchRootKey: process.env.DFX_NETWORK === "local",
+                fetchRootKey: shouldFetchRootKey(),
             });
 
             const dao = Actor.createActor(daoBackendIDL, {
@@ -5303,14 +5256,12 @@ export const useTacoStore = defineStore('taco', () => {
     const getTreasuryPortfolioHistory = async (limit: number = 1000) => {
         try {
             // Use anonymous identity for public query (no authentication required)
-            const host = process.env.DFX_NETWORK === "local"
-                ? getLocalHost()
-                : "https://ic0.app";
+            const host = getNetworkHost()
 
             const agent = await createAgent({
                 identity: new AnonymousIdentity(),
                 host,
-                fetchRootKey: process.env.DFX_NETWORK === "local",
+                fetchRootKey: shouldFetchRootKey(),
             });
 
             const treasury = Actor.createActor<TreasuryService>(treasuryIDL, {
@@ -5341,8 +5292,8 @@ export const useTacoStore = defineStore('taco', () => {
             const identity = await authClient.getIdentity();
             const agent = await createAgent({
                 identity,
-                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-                fetchRootKey: process.env.DFX_NETWORK === "local",
+                host: getNetworkHost(),
+                fetchRootKey: shouldFetchRootKey(),
             });
 
             const treasury = Actor.createActor<TreasuryService>(treasuryIDL, {
@@ -5367,11 +5318,11 @@ export const useTacoStore = defineStore('taco', () => {
     // Portfolio snapshot status and management
     const getPortfolioSnapshotStatus = async () => {
         try {
-            const host = process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app";
+            const host = getNetworkHost()
             const agent = await createAgent({
                 identity: new AnonymousIdentity(),
                 host,
-                fetchRootKey: process.env.DFX_NETWORK === "local",
+                fetchRootKey: shouldFetchRootKey(),
             });
 
             const treasury = Actor.createActor<TreasuryService>(treasuryIDL, {
@@ -5406,8 +5357,8 @@ export const useTacoStore = defineStore('taco', () => {
             const identity = await authClient.getIdentity();
             const agent = await createAgent({
                 identity,
-                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-                fetchRootKey: process.env.DFX_NETWORK === "local",
+                host: getNetworkHost(),
+                fetchRootKey: shouldFetchRootKey(),
             });
 
             const treasury = Actor.createActor<TreasuryService>(treasuryIDL, {
@@ -5439,8 +5390,8 @@ export const useTacoStore = defineStore('taco', () => {
             const identity = await authClient.getIdentity();
             const agent = await createAgent({
                 identity,
-                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-                fetchRootKey: process.env.DFX_NETWORK === "local",
+                host: getNetworkHost(),
+                fetchRootKey: shouldFetchRootKey(),
             });
 
             const treasury = Actor.createActor<TreasuryService>(treasuryIDL, {
@@ -5472,8 +5423,8 @@ export const useTacoStore = defineStore('taco', () => {
             const identity = await authClient.getIdentity();
             const agent = await createAgent({
                 identity,
-                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-                fetchRootKey: process.env.DFX_NETWORK === "local",
+                host: getNetworkHost(),
+                fetchRootKey: shouldFetchRootKey(),
             });
 
             const treasury = Actor.createActor<TreasuryService>(treasuryIDL, {
@@ -5498,14 +5449,12 @@ export const useTacoStore = defineStore('taco', () => {
     const listPortfolioCircuitBreakerConditions = async () => {
         try {
             // Use anonymous identity for public query (no authentication required)
-            const host = process.env.DFX_NETWORK === "local"
-                ? getLocalHost()
-                : "https://ic0.app";
+            const host = getNetworkHost()
 
             const agent = await createAgent({
                 identity: new AnonymousIdentity(),
                 host,
-                fetchRootKey: process.env.DFX_NETWORK === "local",
+                fetchRootKey: shouldFetchRootKey(),
             });
 
             const treasury = Actor.createActor<TreasuryService>(treasuryIDL, {
@@ -5537,8 +5486,8 @@ export const useTacoStore = defineStore('taco', () => {
             const identity = await authClient.getIdentity();
             const agent = await createAgent({
                 identity,
-                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-                fetchRootKey: process.env.DFX_NETWORK === "local",
+                host: getNetworkHost(),
+                fetchRootKey: shouldFetchRootKey(),
             });
 
             const treasury = Actor.createActor<TreasuryService>(treasuryIDL, {
@@ -5580,8 +5529,8 @@ export const useTacoStore = defineStore('taco', () => {
             const identity = await authClient.getIdentity();
             const agent = await createAgent({
                 identity,
-                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-                fetchRootKey: process.env.DFX_NETWORK === "local",
+                host: getNetworkHost(),
+                fetchRootKey: shouldFetchRootKey(),
             });
 
             const treasury = Actor.createActor<TreasuryService>(treasuryIDL, {
@@ -5614,8 +5563,8 @@ export const useTacoStore = defineStore('taco', () => {
             const identity = await authClient.getIdentity();
             const agent = await createAgent({
                 identity,
-                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-                fetchRootKey: process.env.DFX_NETWORK === "local",
+                host: getNetworkHost(),
+                fetchRootKey: shouldFetchRootKey(),
             });
 
             const treasury = Actor.createActor<TreasuryService>(treasuryIDL, {
@@ -5640,14 +5589,12 @@ export const useTacoStore = defineStore('taco', () => {
     const getPortfolioCircuitBreakerLogs = async (offset: number, limit: number) => {
         try {
             // Use anonymous identity for public query (no authentication required)
-            const host = process.env.DFX_NETWORK === "local"
-                ? getLocalHost()
-                : "https://ic0.app";
+            const host = getNetworkHost()
 
             const agent = await createAgent({
                 identity: new AnonymousIdentity(),
                 host,
-                fetchRootKey: process.env.DFX_NETWORK === "local",
+                fetchRootKey: shouldFetchRootKey(),
             });
 
             const treasury = Actor.createActor<TreasuryService>(treasuryIDL, {
@@ -5673,8 +5620,8 @@ export const useTacoStore = defineStore('taco', () => {
             const identity = await authClient.getIdentity();
             const agent = await createAgent({
                 identity,
-                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-                fetchRootKey: process.env.DFX_NETWORK === "local",
+                host: getNetworkHost(),
+                fetchRootKey: shouldFetchRootKey(),
             });
 
             const treasury = Actor.createActor<TreasuryService>(treasuryIDL, {
@@ -5702,8 +5649,8 @@ export const useTacoStore = defineStore('taco', () => {
         try {
             const agent = await createAgent({
                 identity: new AnonymousIdentity(),
-                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-                fetchRootKey: process.env.DFX_NETWORK === "local",
+                host: getNetworkHost(),
+                fetchRootKey: shouldFetchRootKey(),
             });
 
             const neuronSnapshot = Actor.createActor<NeuronSnapshotService>(neuronSnapshotIDL, {
@@ -5721,8 +5668,8 @@ export const useTacoStore = defineStore('taco', () => {
         try {
             const agent = await createAgent({
                 identity: new AnonymousIdentity(),
-                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-                fetchRootKey: process.env.DFX_NETWORK === "local",
+                host: getNetworkHost(),
+                fetchRootKey: shouldFetchRootKey(),
             });
 
             const neuronSnapshot = Actor.createActor<NeuronSnapshotService>(neuronSnapshotIDL, {
@@ -5740,8 +5687,8 @@ export const useTacoStore = defineStore('taco', () => {
         try {
             const agent = await createAgent({
                 identity: new AnonymousIdentity(),
-                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-                fetchRootKey: process.env.DFX_NETWORK === "local",
+                host: getNetworkHost(),
+                fetchRootKey: shouldFetchRootKey(),
             });
 
             const neuronSnapshot = Actor.createActor<NeuronSnapshotService>(neuronSnapshotIDL, {
@@ -5759,8 +5706,8 @@ export const useTacoStore = defineStore('taco', () => {
         try {
             const agent = await createAgent({
                 identity: new AnonymousIdentity(),
-                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-                fetchRootKey: process.env.DFX_NETWORK === "local",
+                host: getNetworkHost(),
+                fetchRootKey: shouldFetchRootKey(),
             });
 
             const neuronSnapshot = Actor.createActor<NeuronSnapshotService>(neuronSnapshotIDL, {
@@ -5778,8 +5725,8 @@ export const useTacoStore = defineStore('taco', () => {
         try {
             const agent = await createAgent({
                 identity: new AnonymousIdentity(),
-                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-                fetchRootKey: process.env.DFX_NETWORK === "local",
+                host: getNetworkHost(),
+                fetchRootKey: shouldFetchRootKey(),
             });
 
             const neuronSnapshot = Actor.createActor<NeuronSnapshotService>(neuronSnapshotIDL, {
@@ -5804,8 +5751,8 @@ export const useTacoStore = defineStore('taco', () => {
             const identity = await authClient.getIdentity();
             const agent = await createAgent({
                 identity,
-                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-                fetchRootKey: process.env.DFX_NETWORK === "local",
+                host: getNetworkHost(),
+                fetchRootKey: shouldFetchRootKey(),
             });
 
             const neuronSnapshot = Actor.createActor<NeuronSnapshotService>(neuronSnapshotIDL, {
@@ -5823,8 +5770,8 @@ export const useTacoStore = defineStore('taco', () => {
         try {
             const agent = await createAgent({
                 identity: new AnonymousIdentity(),
-                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-                fetchRootKey: process.env.DFX_NETWORK === "local",
+                host: getNetworkHost(),
+                fetchRootKey: shouldFetchRootKey(),
             });
 
             const neuronSnapshot = Actor.createActor<NeuronSnapshotService>(neuronSnapshotIDL, {
@@ -5849,8 +5796,8 @@ export const useTacoStore = defineStore('taco', () => {
             const identity = await authClient.getIdentity();
             const agent = await createAgent({
                 identity,
-                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-                fetchRootKey: process.env.DFX_NETWORK === "local",
+                host: getNetworkHost(),
+                fetchRootKey: shouldFetchRootKey(),
             });
 
             const neuronSnapshot = Actor.createActor<NeuronSnapshotService>(neuronSnapshotIDL, {
@@ -5870,8 +5817,8 @@ export const useTacoStore = defineStore('taco', () => {
         try {
             const agent = await createAgent({
                 identity: new AnonymousIdentity(),
-                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-                fetchRootKey: process.env.DFX_NETWORK === "local",
+                host: getNetworkHost(),
+                fetchRootKey: shouldFetchRootKey(),
             });
 
             const treasury = Actor.createActor<TreasuryService>(treasuryIDL, {
@@ -5889,8 +5836,8 @@ export const useTacoStore = defineStore('taco', () => {
         try {
             const agent = await createAgent({
                 identity: new AnonymousIdentity(),
-                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-                fetchRootKey: process.env.DFX_NETWORK === "local",
+                host: getNetworkHost(),
+                fetchRootKey: shouldFetchRootKey(),
             });
 
             const treasury = Actor.createActor<TreasuryService>(treasuryIDL, {
@@ -5915,8 +5862,8 @@ export const useTacoStore = defineStore('taco', () => {
             const identity = await authClient.getIdentity();
             const agent = await createAgent({
                 identity,
-                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-                fetchRootKey: process.env.DFX_NETWORK === "local",
+                host: getNetworkHost(),
+                fetchRootKey: shouldFetchRootKey(),
             });
 
             const treasury = Actor.createActor<TreasuryService>(treasuryIDL, {
@@ -5940,15 +5887,14 @@ export const useTacoStore = defineStore('taco', () => {
 
     // forum system methods
     const sneedForumCanisterId = () => {
-        switch (process.env.DFX_NETWORK) {
+        const network = getEffectiveNetwork()
+        switch (network) {
             case "ic":
                 return process.env.CANISTER_ID_NEURONSNAPSHOT_IC || 'mcigm-4aaaa-aaaad-qhlkq-cai';
-                break;
             case "staging":
                 return  process.env.CANISTER_ID_NEURONSNAPSHOT_STAGING || 'mcigm-4aaaa-aaaad-qhlkq-cai'; // nrtf2-wiaaa-aaaad-aankq-cai << real staging
-                break;
-        }        
-        return 'mcigm-4aaaa-aaaad-qhlkq-cai'; 
+        }
+        return 'mcigm-4aaaa-aaaad-qhlkq-cai';
     }
     const tacoSnsRootCanisterId = () => {
         // TACO DAO SNS root canister ID
@@ -5958,8 +5904,8 @@ export const useTacoStore = defineStore('taco', () => {
         try {
             const agent = await createAgent({
                 identity: new AnonymousIdentity(),
-                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-                fetchRootKey: process.env.DFX_NETWORK === "local",
+                host: getNetworkHost(),
+                fetchRootKey: shouldFetchRootKey(),
             });
 
             const forumActor = Actor.createActor<SneedForumService>(sneedForumIDL, {
@@ -5980,8 +5926,8 @@ export const useTacoStore = defineStore('taco', () => {
         try {
             const agent = await createAgent({
                 identity: new AnonymousIdentity(),
-                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-                fetchRootKey: process.env.DFX_NETWORK === "local",
+                host: getNetworkHost(),
+                fetchRootKey: shouldFetchRootKey(),
             });
 
             const forumActor = Actor.createActor<SneedForumService>(sneedForumIDL, {
@@ -6011,8 +5957,8 @@ export const useTacoStore = defineStore('taco', () => {
         try {
             const agent = await createAgent({
                 identity: new AnonymousIdentity(),
-                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-                fetchRootKey: process.env.DFX_NETWORK === "local",
+                host: getNetworkHost(),
+                fetchRootKey: shouldFetchRootKey(),
             });
 
             const forumActor = Actor.createActor<SneedForumService>(sneedForumIDL, {
@@ -6040,8 +5986,8 @@ export const useTacoStore = defineStore('taco', () => {
         try {
             const agent = await createAgent({
                 identity: new AnonymousIdentity(),
-                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-                fetchRootKey: process.env.DFX_NETWORK === "local",
+                host: getNetworkHost(),
+                fetchRootKey: shouldFetchRootKey(),
             });
 
             const forumActor = Actor.createActor<SneedForumService>(sneedForumIDL, {
@@ -6071,8 +6017,8 @@ export const useTacoStore = defineStore('taco', () => {
         try {
             const agent = await createAgent({
                 identity: new AnonymousIdentity(),
-                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-                fetchRootKey: process.env.DFX_NETWORK === "local",
+                host: getNetworkHost(),
+                fetchRootKey: shouldFetchRootKey(),
             });
 
             const forumActor = Actor.createActor<SneedForumService>(sneedForumIDL, {
@@ -6093,8 +6039,8 @@ export const useTacoStore = defineStore('taco', () => {
         try {
             const agent = await createAgent({
                 identity: new AnonymousIdentity(),
-                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-                fetchRootKey: process.env.DFX_NETWORK === "local",
+                host: getNetworkHost(),
+                fetchRootKey: shouldFetchRootKey(),
             });
 
             const forumActor = Actor.createActor<SneedForumService>(sneedForumIDL, {
@@ -6138,8 +6084,8 @@ export const useTacoStore = defineStore('taco', () => {
         try {
             const agent = await createAgent({
                 identity: new AnonymousIdentity(),
-                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-                fetchRootKey: process.env.DFX_NETWORK === "local",
+                host: getNetworkHost(),
+                fetchRootKey: shouldFetchRootKey(),
             });
 
             const forumActor = Actor.createActor<SneedForumService>(sneedForumIDL, {
@@ -6161,8 +6107,8 @@ export const useTacoStore = defineStore('taco', () => {
             
             const agent = await createAgent({
                 identity: new AnonymousIdentity(),
-                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-                fetchRootKey: process.env.DFX_NETWORK === "local",
+                host: getNetworkHost(),
+                fetchRootKey: shouldFetchRootKey(),
             });
 
             const forumActor = Actor.createActor<SneedForumService>(sneedForumIDL, {
@@ -6213,8 +6159,8 @@ export const useTacoStore = defineStore('taco', () => {
             
             const agent = await createAgent({
                 identity,
-                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-                fetchRootKey: process.env.DFX_NETWORK === "local",
+                host: getNetworkHost(),
+                fetchRootKey: shouldFetchRootKey(),
             });
 
             const forumActor = Actor.createActor<SneedForumService>(sneedForumIDL, {
@@ -6256,8 +6202,8 @@ export const useTacoStore = defineStore('taco', () => {
             
             const agent = await createAgent({
                 identity,
-                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-                fetchRootKey: process.env.DFX_NETWORK === "local",
+                host: getNetworkHost(),
+                fetchRootKey: shouldFetchRootKey(),
             });
 
             const forumActor = Actor.createActor<SneedForumService>(sneedForumIDL, {
@@ -6300,8 +6246,8 @@ export const useTacoStore = defineStore('taco', () => {
             
             const agent = await createAgent({
                 identity,
-                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-                fetchRootKey: process.env.DFX_NETWORK === "local",
+                host: getNetworkHost(),
+                fetchRootKey: shouldFetchRootKey(),
             });
 
             const forumActor = Actor.createActor<SneedForumService>(sneedForumIDL, {
@@ -6339,8 +6285,8 @@ export const useTacoStore = defineStore('taco', () => {
             
             const agent = await createAgent({
                 identity,
-                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-                fetchRootKey: process.env.DFX_NETWORK === "local",
+                host: getNetworkHost(),
+                fetchRootKey: shouldFetchRootKey(),
             });
 
             const forumActor = Actor.createActor<SneedForumService>(sneedForumIDL, {
@@ -6370,8 +6316,8 @@ export const useTacoStore = defineStore('taco', () => {
             
             const agent = await createAgent({
                 identity: new AnonymousIdentity(),
-                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-                fetchRootKey: process.env.DFX_NETWORK === "local",
+                host: getNetworkHost(),
+                fetchRootKey: shouldFetchRootKey(),
             });
 
             const forumActor = Actor.createActor<SneedForumService>(sneedForumIDL, {
@@ -6408,8 +6354,8 @@ export const useTacoStore = defineStore('taco', () => {
         
         const agent = await createAgent({
             identity: new AnonymousIdentity(),
-            host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-            fetchRootKey: process.env.DFX_NETWORK === "local",
+            host: getNetworkHost(),
+            fetchRootKey: shouldFetchRootKey(),
         });
 
         const governanceActor = Actor.createActor(snsGovernanceIDL, {
@@ -6550,14 +6496,13 @@ export const useTacoStore = defineStore('taco', () => {
 
     // naming system methods
     const appSneedDaoCanisterId = () => {
-        switch (process.env.DFX_NETWORK) {
+        const network = getEffectiveNetwork()
+        switch (network) {
             case "ic":
                 return process.env.CANISTER_ID_APP_SNEEDDAO_BACKEND_IC || 'g7s5u-tqaaa-aaaad-qhktq-cai'; // Replace with actual IC canister ID
-                break;
             case "staging":
                 return process.env.CANISTER_ID_APP_SNEEDDAO_BACKEND_STAGING || 'g7s5u-tqaaa-aaaad-qhktq-cai'; // Replace with actual staging ID
-                break;
-        }        
+        }
         return 'g7s5u-tqaaa-aaaad-qhktq-cai'; // Replace with actual local/default ID
     }
 
@@ -6586,8 +6531,8 @@ export const useTacoStore = defineStore('taco', () => {
             
             const agent = await createAgent({
                 identity: new AnonymousIdentity(),
-                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-                fetchRootKey: process.env.DFX_NETWORK === "local",
+                host: getNetworkHost(),
+                fetchRootKey: shouldFetchRootKey(),
             });
 
             const canisterId = appSneedDaoCanisterId();
@@ -6675,8 +6620,8 @@ export const useTacoStore = defineStore('taco', () => {
             
             const agent = await createAgent({
                 identity,
-                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-                fetchRootKey: process.env.DFX_NETWORK === "local",
+                host: getNetworkHost(),
+                fetchRootKey: shouldFetchRootKey(),
             });
 
             const appSneedDaoActor = Actor.createActor<AppSneedDaoService>(appSneedDaoIDL, {
@@ -6715,8 +6660,8 @@ export const useTacoStore = defineStore('taco', () => {
             
             const agent = await createAgent({
                 identity,
-                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-                fetchRootKey: process.env.DFX_NETWORK === "local",
+                host: getNetworkHost(),
+                fetchRootKey: shouldFetchRootKey(),
             });
 
             const appSneedDaoActor = Actor.createActor<AppSneedDaoService>(appSneedDaoIDL, {
@@ -6758,8 +6703,8 @@ export const useTacoStore = defineStore('taco', () => {
             
             const agent = await createAgent({
                 identity,
-                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-                fetchRootKey: process.env.DFX_NETWORK === "local",
+                host: getNetworkHost(),
+                fetchRootKey: shouldFetchRootKey(),
             });
 
             const appSneedDaoActor = Actor.createActor<AppSneedDaoService>(appSneedDaoIDL, {
@@ -6797,8 +6742,8 @@ export const useTacoStore = defineStore('taco', () => {
 
             const agent = await createAgent({
                 identity,
-                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-                fetchRootKey: process.env.DFX_NETWORK === "local",
+                host: getNetworkHost(),
+                fetchRootKey: shouldFetchRootKey(),
             });
 
             // Create SNS Governance actor
@@ -7175,12 +7120,12 @@ export const useTacoStore = defineStore('taco', () => {
             idleOptions: { disableIdle: true }
         })
         const identity = await authClient.getIdentity()
-        const host = process.env.DFX_NETWORK === 'local' ? 'http://localhost:4943' : 'https://ic0.app'
+        const host = getNetworkHost()
 
         const agent = await createAgent({
             identity,
             host,
-            fetchRootKey: process.env.DFX_NETWORK === 'local',
+            fetchRootKey: shouldFetchRootKey(),
         })
 
         return Actor.createActor(rewardsIDL, {
@@ -7417,8 +7362,8 @@ export const useTacoStore = defineStore('taco', () => {
             
             const agent = await createAgent({
                 identity,
-                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-                fetchRootKey: process.env.DFX_NETWORK === "local",
+                host: getNetworkHost(),
+                fetchRootKey: shouldFetchRootKey(),
             });
 
             // Create SNS Governance actor
@@ -7476,8 +7421,8 @@ export const useTacoStore = defineStore('taco', () => {
             
             const agent = await createAgent({
                 identity,
-                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-                fetchRootKey: process.env.DFX_NETWORK === "local",
+                host: getNetworkHost(),
+                fetchRootKey: shouldFetchRootKey(),
             });
 
             // Create SNS Governance actor
@@ -7532,8 +7477,8 @@ export const useTacoStore = defineStore('taco', () => {
             
             const agent = await createAgent({
                 identity,
-                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-                fetchRootKey: process.env.DFX_NETWORK === "local",
+                host: getNetworkHost(),
+                fetchRootKey: shouldFetchRootKey(),
             });
 
             // Create SNS Governance actor
@@ -7596,8 +7541,8 @@ export const useTacoStore = defineStore('taco', () => {
             
             const agent = await createAgent({
                 identity,
-                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-                fetchRootKey: process.env.DFX_NETWORK === "local",
+                host: getNetworkHost(),
+                fetchRootKey: shouldFetchRootKey(),
             });
 
             // Create SNS Governance actor
@@ -7669,8 +7614,8 @@ export const useTacoStore = defineStore('taco', () => {
             
             const agent = await createAgent({
                 identity,
-                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-                fetchRootKey: process.env.DFX_NETWORK === "local",
+                host: getNetworkHost(),
+                fetchRootKey: shouldFetchRootKey(),
             });
 
             // Create SNS Governance actor
@@ -7731,8 +7676,8 @@ export const useTacoStore = defineStore('taco', () => {
             
             const agent = await createAgent({
                 identity,
-                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-                fetchRootKey: process.env.DFX_NETWORK === "local",
+                host: getNetworkHost(),
+                fetchRootKey: shouldFetchRootKey(),
             });
 
             // Create SNS Governance actor
@@ -7783,8 +7728,8 @@ export const useTacoStore = defineStore('taco', () => {
             
             const agent = await createAgent({
                 identity,
-                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-                fetchRootKey: process.env.DFX_NETWORK === "local",
+                host: getNetworkHost(),
+                fetchRootKey: shouldFetchRootKey(),
             });
 
             // Create SNS Governance actor
@@ -7851,8 +7796,8 @@ export const useTacoStore = defineStore('taco', () => {
             
             const agent = await createAgent({
                 identity,
-                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-                fetchRootKey: process.env.DFX_NETWORK === "local",
+                host: getNetworkHost(),
+                fetchRootKey: shouldFetchRootKey(),
             });
 
             // Create SNS Governance actor
@@ -7916,8 +7861,8 @@ export const useTacoStore = defineStore('taco', () => {
             
             const agent = await createAgent({
                 identity,
-                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-                fetchRootKey: process.env.DFX_NETWORK === "local",
+                host: getNetworkHost(),
+                fetchRootKey: shouldFetchRootKey(),
             });
 
             // Create SNS Governance actor
@@ -8012,8 +7957,8 @@ export const useTacoStore = defineStore('taco', () => {
             
             const agent = await createAgent({
                 identity,
-                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-                fetchRootKey: process.env.DFX_NETWORK === "local",
+                host: getNetworkHost(),
+                fetchRootKey: shouldFetchRootKey(),
             });
 
             // Create SNS Governance actor
@@ -8082,8 +8027,8 @@ export const useTacoStore = defineStore('taco', () => {
             
             const agent = await createAgent({
                 identity,
-                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-                fetchRootKey: process.env.DFX_NETWORK === "local",
+                host: getNetworkHost(),
+                fetchRootKey: shouldFetchRootKey(),
             });
 
             const snsGov = await createSnsGovernanceActor(agent, 'lhdfz-wqaaa-aaaaq-aae3q-cai');
@@ -8165,8 +8110,8 @@ export const useTacoStore = defineStore('taco', () => {
         
         const agent = await createAgent({
             identity,
-            host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-            fetchRootKey: process.env.DFX_NETWORK === "local",
+            host: getNetworkHost(),
+            fetchRootKey: shouldFetchRootKey(),
         });
 
         // Use the existing SNS governance IDL
@@ -8289,8 +8234,8 @@ export const useTacoStore = defineStore('taco', () => {
         
         const agent = await createAgent({
             identity,
-            host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-            fetchRootKey: process.env.DFX_NETWORK === "local",
+            host: getNetworkHost(),
+            fetchRootKey: shouldFetchRootKey(),
         });
 
         // Create ICRC1 actor for TACO token
@@ -8366,8 +8311,8 @@ export const useTacoStore = defineStore('taco', () => {
         
         const agent = await createAgent({
             identity,
-            host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-            fetchRootKey: process.env.DFX_NETWORK === "local",
+            host: getNetworkHost(),
+            fetchRootKey: shouldFetchRootKey(),
         });
 
         // Use the existing SNS governance IDL
@@ -8440,8 +8385,8 @@ export const useTacoStore = defineStore('taco', () => {
             
             const agent = await createAgent({
                 identity,
-                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-                fetchRootKey: process.env.DFX_NETWORK === "local",
+                host: getNetworkHost(),
+                fetchRootKey: shouldFetchRootKey(),
             });
 
             const daoActor = Actor.createActor(daoBackendIDL, {
@@ -8473,8 +8418,8 @@ export const useTacoStore = defineStore('taco', () => {
             
             const agent = await createAgent({
                 identity,
-                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-                fetchRootKey: process.env.DFX_NETWORK === "local",
+                host: getNetworkHost(),
+                fetchRootKey: shouldFetchRootKey(),
             });
 
             const daoActor = Actor.createActor(daoBackendIDL, {
@@ -8506,8 +8451,8 @@ export const useTacoStore = defineStore('taco', () => {
             
             const agent = await createAgent({
                 identity,
-                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-                fetchRootKey: process.env.DFX_NETWORK === "local",
+                host: getNetworkHost(),
+                fetchRootKey: shouldFetchRootKey(),
             });
 
             const daoActor = Actor.createActor(daoBackendIDL, {
@@ -8533,8 +8478,8 @@ export const useTacoStore = defineStore('taco', () => {
             
             const agent = await createAgent({
                 identity,
-                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-                fetchRootKey: process.env.DFX_NETWORK === "local",
+                host: getNetworkHost(),
+                fetchRootKey: shouldFetchRootKey(),
             });
 
             // Use ICRC1 interface for all tokens (including ICP)
@@ -8580,8 +8525,8 @@ export const useTacoStore = defineStore('taco', () => {
             
             const agent = await createAgent({
                 identity,
-                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-                fetchRootKey: process.env.DFX_NETWORK === "local",
+                host: getNetworkHost(),
+                fetchRootKey: shouldFetchRootKey(),
             });
 
             // Use ICRC1 interface for all tokens (including ICP)
@@ -8734,15 +8679,13 @@ export const useTacoStore = defineStore('taco', () => {
             };
 
             // Create agent
-            const host = process.env.DFX_NETWORK === "local"
-                ? getLocalHost()
-                : "https://ic0.app";
+            const host = getNetworkHost()
                 
             const authClientInst = await getAuthClient();
             const agent = await createAgent({
                 identity: new AnonymousIdentity(), // Use anonymous for metadata queries
                 host,
-                fetchRootKey: process.env.DFX_NETWORK === "local",
+                fetchRootKey: shouldFetchRootKey(),
             });
 
             const tokenActor = Actor.createActor(icrc1IDL, {
@@ -8857,8 +8800,8 @@ export const useTacoStore = defineStore('taco', () => {
 
             const agent = await createAgent({
                 identity,
-                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-                fetchRootKey: process.env.DFX_NETWORK === "local",
+                host: getNetworkHost(),
+                fetchRootKey: shouldFetchRootKey(),
             });
 
             return Actor.createActor<AlarmService>(alarmIDL, {
@@ -9555,10 +9498,10 @@ export const useTacoStore = defineStore('taco', () => {
         const identity = await authClient.getIdentity();
         const agent = new HttpAgent({
             identity,
-            host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+            host: getNetworkHost(),
         });
 
-        if (process.env.DFX_NETWORK === "local") {
+        if (shouldFetchRootKey()) {
             await agent.fetchRootKey();
         }
 
@@ -9600,10 +9543,10 @@ export const useTacoStore = defineStore('taco', () => {
             const identity = await authClient.getIdentity();
             const agent = new HttpAgent({
                 identity,
-                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+                host: getNetworkHost(),
             });
 
-            if (process.env.DFX_NETWORK === "local") {
+            if (shouldFetchRootKey()) {
                 await agent.fetchRootKey();
             }
 
@@ -9665,8 +9608,8 @@ export const useTacoStore = defineStore('taco', () => {
                     const identity = authClient.getIdentity();
                     const agent = await createAgent({
                         identity,
-                        host: process.env.DFX_NETWORK === 'local' ? 'http://localhost:4943' : 'https://ic0.app',
-                        fetchRootKey: process.env.DFX_NETWORK === 'local',
+                        host: getNetworkHost(),
+                        fetchRootKey: shouldFetchRootKey(),
                     });
                     const snsGov = await createSnsGovernanceActor(agent, 'lhdfz-wqaaa-aaaaq-aae3q-cai');
                     const resp = await (snsGov as any).get_proposal({ proposal_id: [{ id: snsProposalId }] });
@@ -9987,10 +9930,10 @@ export const useTacoStore = defineStore('taco', () => {
             const identity = await authClient.getIdentity();
             const agent = new HttpAgent({
                 identity,
-                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+                host: getNetworkHost(),
             });
 
-            if (process.env.DFX_NETWORK === "local") {
+            if (shouldFetchRootKey()) {
                 await agent.fetchRootKey();
             }
 
@@ -10074,10 +10017,10 @@ export const useTacoStore = defineStore('taco', () => {
             const identity = await authClient.getIdentity();
             const agent = new HttpAgent({
                 identity,
-                host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
+                host: getNetworkHost(),
             });
 
-            if (process.env.DFX_NETWORK === "local") {
+            if (shouldFetchRootKey()) {
                 await agent.fetchRootKey();
             }
 

@@ -1,6 +1,20 @@
 import { ref } from 'vue'
 import { useTacoStore } from '../stores/taco.store'
 import { setAdminStatus } from '../stores/worker-bridge'
+import { getEffectiveNetwork } from '../config/network-config'
+
+// Helper functions for runtime network detection
+function shouldFetchRootKey(): boolean {
+  return getEffectiveNetwork() === 'local'
+}
+function getNetworkHost(): string {
+  const network = getEffectiveNetwork()
+  if (network === 'local') {
+    const port = import.meta.env.VITE_LOCAL_PORT || '4943'
+    return `http://localhost:${port}`
+  }
+  return 'https://ic0.app'
+}
 
 // Lazy-load heavy @dfinity modules to reduce initial bundle size
 let _agentModule: typeof import('@dfinity/agent') | null = null
@@ -109,10 +123,10 @@ export function useAdminCheck() {
       // Fall back to backend verification (only once)
       const agent = new HttpAgent({
         identity,
-        host: process.env.DFX_NETWORK === "local" ? "http://localhost:4943" : "https://ic0.app"
+        host: getNetworkHost()
       })
 
-      if (process.env.DFX_NETWORK === 'local') {
+      if (shouldFetchRootKey()) {
         await agent.fetchRootKey()
       }
 

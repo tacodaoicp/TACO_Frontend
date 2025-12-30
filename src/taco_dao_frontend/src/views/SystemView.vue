@@ -325,6 +325,17 @@ import SystemStatusItem from "../components/system/SystemStatusItem.vue"
 import { useTacoStore } from "../stores/taco.store"
 import { Actor, HttpAgent } from '@dfinity/agent'
 import { CANISTER_IDS, type EnvKey } from '../constants/canisterIds'
+import { getEffectiveNetwork } from '../config/network-config'
+
+// Helper function for runtime network detection
+function getNetworkHost() {
+  const network = getEffectiveNetwork()
+  if (network === 'local') {
+    const port = import.meta.env.VITE_LOCAL_PORT || '4943'
+    return `http://localhost:${port}`
+  }
+  return 'https://ic0.app'
+}
 
 // Minimal IDL with only get_canister_cycles
 const minimalCyclesIdl = ({ IDL }: any) => IDL.Service({
@@ -578,10 +589,10 @@ const checklist = reactive([
 const isAdmin = ref(false)
 
 // Check if running on staging network
-const isRunningOnStaging = computed(() => process.env.DFX_NETWORK === 'staging')
+const isRunningOnStaging = computed(() => getEffectiveNetwork() === 'staging')
 
 // Environment selection - default to staging if running on staging
-const selectedEnv = ref<EnvKey>(process.env.DFX_NETWORK === 'staging' ? 'staging' : 'ic')
+const selectedEnv = ref<EnvKey>(getEffectiveNetwork() === 'staging' ? 'staging' : 'ic')
 
 // Auto-refresh interval (in minutes, 0 = off)
 const autoRunInterval = ref<number>(30) // Default: every 30 minutes
@@ -726,8 +737,8 @@ const expandedMap = reactive<Record<CanKey, boolean>>({
 
 const createGenericActor = async (canisterId: string) => {
   // Use anonymous identity for public queries to avoid CORS/II session issues
-  const agent = new HttpAgent({ host: "https://ic0.app" })
-  if (process.env.DFX_NETWORK === 'local') {
+  const agent = new HttpAgent({ host: getNetworkHost() })
+  if (getEffectiveNetwork() === 'local') {
     await agent.fetchRootKey()
   }
   return Actor.createActor(minimalCyclesIdl as any, {
@@ -750,8 +761,8 @@ const isArchiveKey = (key: CanKey) => (
 const createArchiveActor = async (key: CanKey, canisterId: string) => {
   try {
     // Use the generated declarations (like AdminArchiveView) so getTimerStatus exists
-    const agent = new HttpAgent({ host: process.env.DFX_NETWORK === 'local' ? 'http://127.0.0.1:4943' : 'https://ic0.app' })
-    if (process.env.DFX_NETWORK === 'local') {
+    const agent = new HttpAgent({ host: getNetworkHost() })
+    if (getEffectiveNetwork() === 'local') {
       await agent.fetchRootKey()
     }
     switch (key) {
@@ -823,8 +834,8 @@ const fetchCyclesFor = async (key: CanKey) => {
           const cid = resolvePrincipal('treasury')
           const { idlFactory: treasuryIDL } = await import('../../../declarations/treasury/treasury.did.js')
           const { idlFactory: daoIDL } = await import('../../../declarations/dao_backend/DAO_backend.did.js')
-          const agent = new HttpAgent({ host: process.env.DFX_NETWORK === 'local' ? 'http://127.0.0.1:4943' : 'https://ic0.app' })
-          if (process.env.DFX_NETWORK === 'local') { await agent.fetchRootKey() }
+          const agent = new HttpAgent({ host: getNetworkHost() })
+          if (getEffectiveNetwork() === 'local') { await agent.fetchRootKey() }
           const tActor: any = Actor.createActor(treasuryIDL, { agent, canisterId: cid })
           const dActor: any = Actor.createActor(daoIDL, { agent, canisterId: resolvePrincipal('dao_backend') })
 
@@ -977,8 +988,8 @@ const fetchCyclesFor = async (key: CanKey) => {
         // Load DAO token sync list and aggregate lamp from selected env
         try {
           const { idlFactory: daoIDL } = await import('../../../declarations/dao_backend/DAO_backend.did.js')
-          const agent = new HttpAgent({ host: process.env.DFX_NETWORK === 'local' ? 'http://127.0.0.1:4943' : 'https://ic0.app' })
-          if (process.env.DFX_NETWORK === 'local') { await agent.fetchRootKey() }
+          const agent = new HttpAgent({ host: getNetworkHost() })
+          if (getEffectiveNetwork() === 'local') { await agent.fetchRootKey() }
           const dActor: any = Actor.createActor(daoIDL, { agent, canisterId: resolvePrincipal('dao_backend') })
           const tokenDetails = await dActor.getTokenDetailsWithoutPastPrices()
           const tokens = (tokenDetails || []).map((entry: any) => {
@@ -1013,8 +1024,8 @@ const fetchCyclesFor = async (key: CanKey) => {
         // Load governance snapshot status and NNS periodic timer from selected env
         try {
           const { idlFactory: neuronIDL } = await import('../../../declarations/neuronSnapshot/neuronSnapshot.did.js')
-          const agent = new HttpAgent({ host: process.env.DFX_NETWORK === 'local' ? 'http://127.0.0.1:4943' : 'https://ic0.app' })
-          if (process.env.DFX_NETWORK === 'local') { await agent.fetchRootKey() }
+          const agent = new HttpAgent({ host: getNetworkHost() })
+          if (getEffectiveNetwork() === 'local') { await agent.fetchRootKey() }
           const nActor: any = Actor.createActor(neuronIDL, { agent, canisterId: resolvePrincipal('neuronSnapshot') })
           
           const [snapInfoArr, periodicStatus] = await Promise.all([
@@ -1101,8 +1112,8 @@ const fetchCyclesFor = async (key: CanKey) => {
         // Load rewards distribution status from selected env
         try {
           const { idlFactory: rewardsIDL } = await import('../../../declarations/rewards/rewards.did.js')
-          const agent = new HttpAgent({ host: process.env.DFX_NETWORK === 'local' ? 'http://127.0.0.1:4943' : 'https://ic0.app' })
-          if (process.env.DFX_NETWORK === 'local') { await agent.fetchRootKey() }
+          const agent = new HttpAgent({ host: getNetworkHost() })
+          if (getEffectiveNetwork() === 'local') { await agent.fetchRootKey() }
           const rActor: any = Actor.createActor(rewardsIDL, { agent, canisterId: resolvePrincipal('rewards') })
           
           // Fetch config and status
@@ -1725,8 +1736,8 @@ const testNeuronSnapshots = async (test: any) => {
     const cid = resolvePrincipal('neuronSnapshot')
     const { idlFactory: neuronIDL } = await import('../../../declarations/neuronSnapshot/neuronSnapshot.did.js')
     const { idlFactory: daoIDL } = await import('../../../declarations/dao_backend/DAO_backend.did.js')
-    const agent = new HttpAgent({ host: process.env.DFX_NETWORK === 'local' ? 'http://127.0.0.1:4943' : 'https://ic0.app' })
-    if (process.env.DFX_NETWORK === 'local') { await agent.fetchRootKey() }
+    const agent = new HttpAgent({ host: getNetworkHost() })
+    if (getEffectiveNetwork() === 'local') { await agent.fetchRootKey() }
     const nActor: any = Actor.createActor(neuronIDL, { agent, canisterId: cid })
     const dActor: any = Actor.createActor(daoIDL, { agent, canisterId: resolvePrincipal('dao_backend') })
 
@@ -1890,8 +1901,8 @@ const testPriceHistory = async (test: any) => {
   try {
     const cid = resolvePrincipal('dao_backend')
     const { idlFactory: daoIDL } = await import('../../../declarations/dao_backend/DAO_backend.did.js')
-    const agent = new HttpAgent({ host: process.env.DFX_NETWORK === 'local' ? 'http://127.0.0.1:4943' : 'https://ic0.app' })
-    if (process.env.DFX_NETWORK === 'local') { await agent.fetchRootKey() }
+    const agent = new HttpAgent({ host: getNetworkHost() })
+    if (getEffectiveNetwork() === 'local') { await agent.fetchRootKey() }
     const daoActor: any = Actor.createActor(daoIDL, { agent, canisterId: cid })
 
     // Fetch token details
@@ -2069,8 +2080,8 @@ const testAllocationVoting = async (test: any) => {
   try {
     const cid = resolvePrincipal('dao_backend')
     const { idlFactory: daoIDL } = await import('../../../declarations/dao_backend/DAO_backend.did.js')
-    const agent = new HttpAgent({ host: process.env.DFX_NETWORK === 'local' ? 'http://127.0.0.1:4943' : 'https://ic0.app' })
-    if (process.env.DFX_NETWORK === 'local') { await agent.fetchRootKey() }
+    const agent = new HttpAgent({ host: getNetworkHost() })
+    if (getEffectiveNetwork() === 'local') { await agent.fetchRootKey() }
     const daoActor: any = Actor.createActor(daoIDL, { agent, canisterId: cid })
 
     // Fetch allocation stats and aggregate allocation (both publicly accessible)
@@ -2247,8 +2258,8 @@ const testGrantSystem = async (test: any) => {
   try {
     const cid = resolvePrincipal('neuronSnapshot')
     const { idlFactory: neuronIDL } = await import('../../../declarations/neuronSnapshot/neuronSnapshot.did.js')
-    const agent = new HttpAgent({ host: process.env.DFX_NETWORK === 'local' ? 'http://127.0.0.1:4943' : 'https://ic0.app' })
-    if (process.env.DFX_NETWORK === 'local') { await agent.fetchRootKey() }
+    const agent = new HttpAgent({ host: getNetworkHost() })
+    if (getEffectiveNetwork() === 'local') { await agent.fetchRootKey() }
     const nActor: any = Actor.createActor(neuronIDL, { agent, canisterId: cid })
 
     // Fetch timer status and activity counts
@@ -2609,8 +2620,8 @@ const testTradingBotRegular = async (test: any) => {
     const cid = resolvePrincipal('treasury')
     const { idlFactory: treasuryIDL } = await import('../../../declarations/treasury/treasury.did.js')
     const { idlFactory: daoIDL } = await import('../../../declarations/dao_backend/DAO_backend.did.js')
-    const agent = new HttpAgent({ host: process.env.DFX_NETWORK === 'local' ? 'http://127.0.0.1:4943' : 'https://ic0.app' })
-    if (process.env.DFX_NETWORK === 'local') { await agent.fetchRootKey() }
+    const agent = new HttpAgent({ host: getNetworkHost() })
+    if (getEffectiveNetwork() === 'local') { await agent.fetchRootKey() }
     const tActor: any = Actor.createActor(treasuryIDL, { agent, canisterId: cid })
     const dActor: any = Actor.createActor(daoIDL, { agent, canisterId: resolvePrincipal('dao_backend') })
 
@@ -3076,8 +3087,8 @@ const testRewardsRegular = async (test: any) => {
   try {
     const cid = resolvePrincipal('rewards')
     const { idlFactory: rewardsIDL } = await import('../../../declarations/rewards/rewards.did.js')
-    const agent = new HttpAgent({ host: process.env.DFX_NETWORK === 'local' ? 'http://127.0.0.1:4943' : 'https://ic0.app' })
-    if (process.env.DFX_NETWORK === 'local') { await agent.fetchRootKey() }
+    const agent = new HttpAgent({ host: getNetworkHost() })
+    if (getEffectiveNetwork() === 'local') { await agent.fetchRootKey() }
     const rActor: any = Actor.createActor(rewardsIDL, { agent, canisterId: cid })
 
     // Fetch config and balances
@@ -3292,8 +3303,8 @@ const testPortfolioSnapshots = async (test: any) => {
   try {
     const cid = resolvePrincipal('treasury')
     const { idlFactory: treasuryIDL } = await import('../../../declarations/treasury/treasury.did.js')
-    const agent = new HttpAgent({ host: process.env.DFX_NETWORK === 'local' ? 'http://127.0.0.1:4943' : 'https://ic0.app' })
-    if (process.env.DFX_NETWORK === 'local') { await agent.fetchRootKey() }
+    const agent = new HttpAgent({ host: getNetworkHost() })
+    if (getEffectiveNetwork() === 'local') { await agent.fetchRootKey() }
     const tActor: any = Actor.createActor(treasuryIDL, { agent, canisterId: cid })
 
     // Fetch snapshot status
@@ -3483,7 +3494,7 @@ onMounted(() => {
     const authClient = await AuthClient.create()
     const identity = await authClient.getIdentity()
     const agent = new HttpAgent({ identity, host: "https://ic0.app" })
-    if (process.env.DFX_NETWORK === 'local') { await agent.fetchRootKey() }
+    if (getEffectiveNetwork() === 'local') { await agent.fetchRootKey() }
     const daoActor = Actor.createActor(daoIDL, { agent, canisterId: tacoStore.daoBackendCanisterId() }) as any
     // check permission for a read-safe function like getLogs
     isAdmin.value = await daoActor.hasAdminPermission(identity.getPrincipal(), { getLogs: null })
