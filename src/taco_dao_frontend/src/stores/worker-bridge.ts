@@ -29,10 +29,13 @@ import SecondaryDedicatedWorkerUrl from '../workers/secondary-public.dedicated.w
 import AuthDedicatedWorkerUrl from '../workers/authenticated.dedicated.worker.ts?worker&url'
 
 // ============================================================================
-// Debug Mode (set VITE_WORKER_DEBUG=true to enable worker logs in console)
+// Debug Mode (use tacoConfig.debug() in console to enable/disable)
 // ============================================================================
 
-const WORKER_DEBUG = import.meta.env.VITE_WORKER_DEBUG === 'true'
+import { isDebugEnabled } from '../config/network-config'
+
+// Runtime debug check - respects tacoConfig.debug() setting
+const WORKER_DEBUG = () => isDebugEnabled()
 
 // ============================================================================
 // Worker Instances (singletons)
@@ -196,12 +199,12 @@ function handleWorkerMessage(response: WorkerResponse, workerName: string): void
     case 'CACHE_HIT':
     case 'FETCH_COMPLETE':
       if (payload.dataKey && payload.state) {
-        if (WORKER_DEBUG) {
+        if (WORKER_DEBUG()) {
           const dataInfo = payload.state?.data ? (Array.isArray(payload.state.data) ? `array[${payload.state.data.length}]` : typeof payload.state.data) : 'null'
           console.log(`[WorkerBridge] ${type} received for ${payload.dataKey} from ${workerName}, data=${dataInfo}`)
         }
         updateDataStore(payload.dataKey, payload.state)
-      } else if (WORKER_DEBUG) {
+      } else if (WORKER_DEBUG()) {
         console.warn(`[WorkerBridge] ${type} received but missing dataKey or state`, payload)
       }
       break
@@ -244,7 +247,7 @@ function handleWorkerMessage(response: WorkerResponse, workerName: string): void
 
     case 'INITIAL_CACHE_READY':
       workersReportedCacheReady++
-      if (WORKER_DEBUG) {
+      if (WORKER_DEBUG()) {
         console.log(`[WorkerBridge] ${workerName} reported cache ready (${workersReportedCacheReady}/${EXPECTED_WORKERS_FOR_CACHE})`)
       }
       if (workersReportedCacheReady >= EXPECTED_WORKERS_FOR_CACHE && cacheDeliveryResolve) {
@@ -255,7 +258,7 @@ function handleWorkerMessage(response: WorkerResponse, workerName: string): void
 
     case 'DEBUG_LOG':
       // Forward worker logs to main thread console for debugging (only if debug mode enabled)
-      if (WORKER_DEBUG && payload.debugMessage) {
+      if (WORKER_DEBUG() && payload.debugMessage) {
         console.log(`[Worker:${workerName}] ${payload.debugMessage}`)
       }
       break
@@ -270,7 +273,7 @@ function updateDataStore(dataKey: DataKey, state: DataState): void {
 
   // Notify subscribers FIRST so they can process/deserialize the data
   const callbacks = subscriptions.get(dataKey)
-  if (WORKER_DEBUG) {
+  if (WORKER_DEBUG()) {
     console.log(`[WorkerBridge] updateDataStore for ${dataKey}, hasData=${!!state?.data}, subscriberCount=${callbacks?.size || 0}`)
   }
   if (callbacks) {
@@ -321,7 +324,7 @@ function broadcastToAllWorkers(message: WorkerRequest): void {
 export function initWorkerBridge(route?: string): void {
   if (initialized) return
 
-  if (WORKER_DEBUG) {
+  if (WORKER_DEBUG()) {
     console.log('[WorkerBridge] initWorkerBridge called with route:', route)
   }
 
@@ -356,13 +359,13 @@ export function initWorkerBridge(route?: string): void {
   // Reset cache ready counter for fresh initialization
   workersReportedCacheReady = 0
 
-  if (WORKER_DEBUG) {
+  if (WORKER_DEBUG()) {
     console.log('[WorkerBridge] Sending INITIAL_LOAD to workers...')
   }
   sendToWorker(getCoreWorker(), initialLoadMessage)
   sendToWorker(getSecondaryWorker(), initialLoadMessage)
   sendToWorker(getAuthWorker(), initialLoadMessage)
-  if (WORKER_DEBUG) {
+  if (WORKER_DEBUG()) {
     console.log('[WorkerBridge] INITIAL_LOAD sent to all workers')
   }
 
@@ -376,7 +379,7 @@ export function initWorkerBridge(route?: string): void {
   // Normally resolved earlier by INITIAL_CACHE_READY signals from workers
   setTimeout(() => {
     if (cacheDeliveryResolve) {
-      if (WORKER_DEBUG) {
+      if (WORKER_DEBUG()) {
         console.warn('[WorkerBridge] Cache delivery timeout - proceeding anyway')
       }
       cacheDeliveryResolve()
@@ -411,7 +414,7 @@ export function subscribe(
   }
 
   subscriptions.get(dataKey)!.add(callback)
-  if (WORKER_DEBUG) {
+  if (WORKER_DEBUG()) {
     console.log(`[WorkerBridge] subscribe called for ${dataKey}, total subscribers now: ${subscriptions.get(dataKey)!.size}`)
   }
 
@@ -419,7 +422,7 @@ export function subscribe(
   // This provides instant data on navigation without waiting for worker round-trip
   const cachedState = dataStore.get(dataKey)
   if (cachedState?.data) {
-    if (WORKER_DEBUG) {
+    if (WORKER_DEBUG()) {
       console.log(`[WorkerBridge] subscribe: found cached data for ${dataKey}, calling callback`)
     }
     // Use setTimeout to ensure callback runs after subscription is fully set up

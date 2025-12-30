@@ -14,8 +14,9 @@ import { getEffectiveNetwork } from '../config/network-config'
 // Only import Principal synchronously - it's small and used everywhere
 import { Principal } from '@dfinity/principal'
 
-// Debug mode (set VITE_WORKER_DEBUG=true to enable debug logs)
-const WORKER_DEBUG = import.meta.env.VITE_WORKER_DEBUG === 'true'
+// Debug mode (use tacoConfig.debug() in console to enable/disable)
+import { isDebugEnabled } from '../config/network-config'
+const WORKER_DEBUG = () => isDebugEnabled()
 
 // Type-only imports (no runtime cost)
 import type { AuthClient as AuthClientType, IdbStorage as IdbStorageType } from "@dfinity/auth-client"
@@ -1758,19 +1759,19 @@ export const useTacoStore = defineStore('taco', () => {
         if (adminSubscriptionsActive) return
         adminSubscriptionsActive = true
 
-        if (WORKER_DEBUG) {
+        if (WORKER_DEBUG()) {
             console.log('[TacoStore] Setting up admin subscriptions (lazy load)')
         }
 
         // systemLogs (admin)
         adminWorkerUnsubscribers.push(
             workerBridge.subscribe('systemLogs', (data: unknown) => {
-                if (WORKER_DEBUG) {
+                if (WORKER_DEBUG()) {
                     console.log('[TacoStore] systemLogs callback called, data:', data ? `array[${(data as any[]).length}]` : 'null/undefined')
                 }
                 if (data && Array.isArray(data)) {
                     systemLogs.value = deserializeFromTransfer(data) as SystemLog[]
-                    if (WORKER_DEBUG) {
+                    if (WORKER_DEBUG()) {
                         console.log('[TacoStore] systemLogs.value updated with', systemLogs.value.length, 'entries')
                     }
                 }
@@ -1780,12 +1781,12 @@ export const useTacoStore = defineStore('taco', () => {
         // voterDetails (admin)
         adminWorkerUnsubscribers.push(
             workerBridge.subscribe('voterDetails', (data: unknown) => {
-                if (WORKER_DEBUG) {
+                if (WORKER_DEBUG()) {
                     console.log('[TacoStore] voterDetails callback called, data:', data ? `array[${(data as any[]).length}]` : 'null/undefined')
                 }
                 if (data && Array.isArray(data)) {
                     fetchedVoterDetails.value = deserializeFromTransfer(data) as VoterDetails[]
-                    if (WORKER_DEBUG) {
+                    if (WORKER_DEBUG()) {
                         console.log('[TacoStore] fetchedVoterDetails.value updated with', fetchedVoterDetails.value.length, 'entries')
                     }
                 }

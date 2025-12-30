@@ -26,6 +26,12 @@
  */
 const NETWORK_OVERRIDE_DEFAULT: 'ic' | 'staging' | 'local' | null = null
 
+/**
+ * Debug mode - controls whether debug messages are logged
+ * Default is false (no debug messages)
+ */
+const DEBUG_MODE_DEFAULT = false
+
 // ============================================================================
 // Runtime Configuration
 // ============================================================================
@@ -45,6 +51,77 @@ export function getNetworkOverride(): 'ic' | 'staging' | 'local' | null {
     }
   }
   return NETWORK_OVERRIDE_DEFAULT
+}
+
+// ============================================================================
+// Debug Mode
+// ============================================================================
+
+// Store original console.log for critical messages
+const originalConsoleLog = console.log.bind(console)
+
+/**
+ * Check if debug mode is enabled
+ */
+export function isDebugEnabled(): boolean {
+  if (isBrowser()) {
+    const debug = localStorage.getItem('taco_debug_mode')
+    if (debug === 'true') return true
+    if (debug === 'false') return false
+  }
+  return DEBUG_MODE_DEFAULT
+}
+
+/**
+ * Set debug mode (persists to localStorage)
+ * When enabled: console.log works normally
+ * When disabled: console.log is suppressed (use originalLog for critical messages)
+ */
+export function setDebugMode(enabled: boolean): void {
+  if (isBrowser()) {
+    localStorage.setItem('taco_debug_mode', enabled ? 'true' : 'false')
+    applyDebugMode(enabled)
+    originalConsoleLog(`[TACO] Debug mode ${enabled ? 'ON' : 'OFF'}`)
+  }
+}
+
+/**
+ * Apply debug mode by overriding/restoring console.log
+ */
+function applyDebugMode(enabled: boolean): void {
+  if (enabled) {
+    // Restore original console.log
+    console.log = originalConsoleLog
+  } else {
+    // Suppress console.log (make it a no-op)
+    console.log = () => {}
+  }
+}
+
+/**
+ * Initialize debug mode on page load
+ */
+export function initDebugMode(): void {
+  if (isBrowser()) {
+    const enabled = isDebugEnabled()
+    applyDebugMode(enabled)
+  }
+}
+
+/**
+ * Force log - always logs regardless of debug mode (for critical messages)
+ */
+export function forceLog(...args: any[]): void {
+  originalConsoleLog(...args)
+}
+
+/**
+ * Debug log - only logs if debug mode is enabled (legacy helper)
+ */
+export function debugLog(category: string, ...args: any[]): void {
+  if (isDebugEnabled()) {
+    originalConsoleLog(`[${category}]`, ...args)
+  }
 }
 
 /**
@@ -175,8 +252,23 @@ if (isBrowser()) {
         console.log('Set to AUTO-DETECT from environment. Refresh the page to apply.')
       }
     },
+    debug: (enabled?: boolean) => {
+      if (enabled === undefined) {
+        // Toggle if no argument provided
+        const current = isDebugEnabled()
+        setDebugMode(!current)
+        console.log(`Debug mode ${!current ? 'ON' : 'OFF'}`)
+      } else {
+        setDebugMode(enabled)
+        console.log(`Debug mode ${enabled ? 'ON' : 'OFF'}`)
+      }
+      return isDebugEnabled()
+    },
     status: () => {
-      const status = getNetworkStatus()
+      const status = {
+        ...getNetworkStatus(),
+        debugMode: isDebugEnabled()
+      }
       console.table(status)
       return status
     },
@@ -188,7 +280,11 @@ tacoConfig.useMainnet()  - Connect to IC mainnet (ic0.app)
 tacoConfig.useStaging()  - Connect to staging network
 tacoConfig.useLocal()    - Connect to local dfx (localhost:4943)
 tacoConfig.useAuto()     - Auto-detect from environment
-tacoConfig.status()      - Show current network configuration
+tacoConfig.debug()       - Toggle debug messages (default: off)
+tacoConfig.debug(true)   - Enable debug messages
+tacoConfig.debug(false)  - Disable debug messages
+tacoConfig.status()      - Show current configuration
+tacoConfig.help()        - Show this help
 
 Changes apply immediately - workers will refetch data from new network.
       `)
@@ -204,10 +300,18 @@ Changes apply immediately - workers will refetch data from new network.
 
 }
 
+// Initialize debug mode immediately on module load
+initDebugMode()
+
 export default {
   getNetworkOverride,
   setNetworkOverride,
   initNetworkConfig,
   getEffectiveNetwork,
   getNetworkStatus,
+  isDebugEnabled,
+  setDebugMode,
+  initDebugMode,
+  debugLog,
+  forceLog,
 }
