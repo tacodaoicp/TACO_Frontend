@@ -1485,6 +1485,9 @@ const handleProposalSuccess = (proposalId: bigint) => {
 
 // Lifecycle hooks
 onMounted(() => {
+    // Mark that user has visited admin (for prefetching on next visit)
+    localStorage.setItem('hasVisitedAdmin', 'true')
+
     // Check admin status in background (don't block data loading)
     checkAdminStatus().catch(console.error);
 

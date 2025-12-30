@@ -2236,29 +2236,60 @@
   // Lifecycle Hooks //
   /////////////////////
 
-  // Prefetch routes based on user state - saves RAM by only loading what's needed
+  // Prefetch routes based on user state for faster navigation
   const prefetchRoutes = () => {
-    // Always prefetch public pages
+    // Public pages - prefetch for all users
     import('./VoteView.vue')
     import('./DaoView.vue')
+    import('./InfoView.vue')
+    import('./ChatView.vue')
+    import('./ReportsView.vue')
+    import('./SalesView.vue')
+    import('./ProposalsView.vue')
 
-    // If logged in, also prefetch wallet
+    // Logged in users - also prefetch authenticated pages
     if (userLoggedIn.value) {
       import('./WalletView.vue')
-    }
+      import('./RewardsView.vue')
 
-    // If admin (quick check against hardcoded list), also prefetch admin
-    const principalText = tacoStore.userPrincipal
-    const ADMIN_PRINCIPALS = [
-      'odoge-dr36c-i3lls-orjen-eapnp-now2f-dj63m-3bdcd-nztox-5gvzy-sqe',
-      'uuyso-zydjd-tsb4o-lgpgj-dfsvq-awald-j2zfp-e6h72-d2je3-whmjr-xae',
-      '6mxg4-njnu6-qzizq-2ekit-rnagc-4d42s-qyayx-jghoe-nd72w-elbsy-xqe',
-      'yjdlk-jqx52-ha6xa-w6iqe-b4jrr-s5ova-mirv4-crlfi-xgsaa-ib3cg-3ae',
-      'chxs6-z6h3t-hjrgk-i5x57-rm7fm-3tvlz-b352m-heq2g-hu23b-sxasf-kqe',
-      '6q3ra-pds56-nqzzc-itigw-tsw4r-vs235-yqx5u-dg34n-nnsus-kkpqf-aqe',
-    ]
-    if (principalText && ADMIN_PRINCIPALS.includes(principalText)) {
-      import('./AdminView.vue')
+      // Admin pages - only if admin or previously visited admin
+      const principalText = tacoStore.userPrincipal
+      const ADMIN_PRINCIPALS = [
+        'odoge-dr36c-i3lls-orjen-eapnp-now2f-dj63m-3bdcd-nztox-5gvzy-sqe',
+        'uuyso-zydjd-tsb4o-lgpgj-dfsvq-awald-j2zfp-e6h72-d2je3-whmjr-xae',
+        '6mxg4-njnu6-qzizq-2ekit-rnagc-4d42s-qyayx-jghoe-nd72w-elbsy-xqe',
+        'yjdlk-jqx52-ha6xa-w6iqe-b4jrr-s5ova-mirv4-crlfi-xgsaa-ib3cg-3ae',
+        'chxs6-z6h3t-hjrgk-i5x57-rm7fm-3tvlz-b352m-heq2g-hu23b-sxasf-kqe',
+        '6q3ra-pds56-nqzzc-itigw-tsw4r-vs235-yqx5u-dg34n-nnsus-kkpqf-aqe',
+        'd7zib-qo5mr-qzmpb-dtyof-l7yiu-pu52k-wk7ng-cbm3n-ffmys-crbkz-nae',
+        'as6jn-gaoo7-k4kji-tdkxg-jlsrk-avxkc-zu76j-vz7hj-di3su-2f74z-qqe',
+        'r27hb-ckxon-xohqv-afcvx-yhemm-xoggl-37dg6-sfyt3-n6jer-ditge-6qe',
+        '5uvsz-em754-ulbgb-vxihq-wqyzd-brdgs-snzlu-mhlqw-k74uu-4l5h3-2qe',
+        'k2xol-5avzc-lf3wt-vwoft-pjx6k-77fjh-7pera-6b7qt-fwt5e-a3ekl-vqe',
+        'hxjcv-hbraf-oathz-repfu-x7szv-j6p2f-2cu6n-fywhf-yxago-plyz5-5ae',
+        '4ggui-2celt-yxv2h-z6zyh-sq5ok-rycog-tjyfl-gzxsj-kiq3y-c4sm4-lqe',
+        'hzeez-ilt5k-pzrtz-hdcg3-pwjq5-564tv-uu46m-esqun-chj7o-uptsv-aae',
+        'nfzo4-i26mj-e2tuj-bt3ba-cuco4-vcqxx-ybjw7-gzyzh-kvyp7-wjeyp-hqe',
+      ]
+      const isAdmin = principalText && ADMIN_PRINCIPALS.includes(principalText)
+      const hasVisitedAdmin = localStorage.getItem('hasVisitedAdmin') === 'true'
+
+      if (isAdmin || hasVisitedAdmin) {
+        import('./AdminView.vue')
+        import('./AdminTradeView.vue')
+        import('./AdminPriceView.vue')
+        import('./AdminPriceHistoryView.vue')
+        import('./AdminArchiveView.vue')
+        import('./AdminNeuronView.vue')
+        import('./AdminVotesView.vue')
+        import('./AdminRewardsView.vue')
+        import('./AdminRewardsBalancesView.vue')
+        import('./AdminDistributionsView.vue')
+        import('./AdminAlarmView.vue')
+        import('./AdminClaimsView.vue')
+        import('./AdminNNSView.vue')
+        import('./SystemView.vue')
+      }
     }
   }
 

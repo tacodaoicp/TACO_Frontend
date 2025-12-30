@@ -18,7 +18,15 @@ import {
   generateMessageId,
   getRoutePriorities,
 } from '../workers/types'
-import { createWorkerAdapter, isSharedWorkerSupported, type WorkerAdapter } from '../workers/worker-adapter'
+import { createWorkerAdapterFromUrl, isSharedWorkerSupported, type WorkerAdapter } from '../workers/worker-adapter'
+
+// Import worker URLs using Vite's worker URL syntax - ensures proper bundling in production
+import CoreWorkerUrl from '../workers/core-public.worker.ts?worker&url'
+import SecondaryWorkerUrl from '../workers/secondary-public.worker.ts?worker&url'
+import AuthWorkerUrl from '../workers/authenticated.worker.ts?worker&url'
+import CoreDedicatedWorkerUrl from '../workers/core-public.dedicated.worker.ts?worker&url'
+import SecondaryDedicatedWorkerUrl from '../workers/secondary-public.dedicated.worker.ts?worker&url'
+import AuthDedicatedWorkerUrl from '../workers/authenticated.dedicated.worker.ts?worker&url'
 
 // ============================================================================
 // Debug Mode (set VITE_WORKER_DEBUG=true to enable worker logs in console)
@@ -77,8 +85,9 @@ const WORKER_VERSION = 'v2'
 
 function getCoreWorker(): WorkerAdapter {
   if (!coreWorker) {
-    coreWorker = createWorkerAdapter(
-      new URL('../workers/core-public.worker.ts', import.meta.url),
+    coreWorker = createWorkerAdapterFromUrl(
+      CoreWorkerUrl,
+      CoreDedicatedWorkerUrl,
       `taco-core-public-${WORKER_VERSION}`
     )
     setupWorkerAdapter(coreWorker, 'core')
@@ -88,8 +97,9 @@ function getCoreWorker(): WorkerAdapter {
 
 function getSecondaryWorker(): WorkerAdapter {
   if (!secondaryWorker) {
-    secondaryWorker = createWorkerAdapter(
-      new URL('../workers/secondary-public.worker.ts', import.meta.url),
+    secondaryWorker = createWorkerAdapterFromUrl(
+      SecondaryWorkerUrl,
+      SecondaryDedicatedWorkerUrl,
       `taco-secondary-public-${WORKER_VERSION}`
     )
     setupWorkerAdapter(secondaryWorker, 'secondary')
@@ -99,8 +109,9 @@ function getSecondaryWorker(): WorkerAdapter {
 
 function getAuthWorker(): WorkerAdapter {
   if (!authWorker) {
-    authWorker = createWorkerAdapter(
-      new URL('../workers/authenticated.worker.ts', import.meta.url),
+    authWorker = createWorkerAdapterFromUrl(
+      AuthWorkerUrl,
+      AuthDedicatedWorkerUrl,
       `taco-authenticated-${WORKER_VERSION}`
     )
     setupWorkerAdapter(authWorker, 'auth')

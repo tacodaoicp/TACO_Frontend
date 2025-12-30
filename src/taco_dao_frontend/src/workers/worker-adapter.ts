@@ -41,6 +41,64 @@ export function createWorkerAdapter(
 }
 
 /**
+ * Create a worker adapter from pre-resolved URLs (for Vite production builds)
+ */
+export function createWorkerAdapterFromUrl(
+  sharedWorkerUrl: string,
+  dedicatedWorkerUrl: string,
+  workerName: string
+): WorkerAdapter {
+  if (isSharedWorkerSupported()) {
+    return createSharedWorkerAdapter(new URL(sharedWorkerUrl, import.meta.url), workerName)
+  } else {
+    return createDedicatedWorkerAdapterFromUrl(dedicatedWorkerUrl, workerName)
+  }
+}
+
+/**
+ * Dedicated Worker adapter from URL string
+ */
+function createDedicatedWorkerAdapterFromUrl(workerUrl: string, workerName: string): WorkerAdapter {
+  const worker = new Worker(workerUrl, { type: 'module', name: workerName })
+
+  const adapter: WorkerAdapter = {
+    type: 'dedicated',
+
+    postMessage(message: WorkerRequest): void {
+      worker.postMessage(message)
+    },
+
+    onmessage: null,
+    onerror: null,
+    onmessageerror: null,
+
+    terminate(): void {
+      worker.terminate()
+    }
+  }
+
+  worker.onmessage = (event: MessageEvent<WorkerResponse>) => {
+    if (adapter.onmessage) {
+      adapter.onmessage(event)
+    }
+  }
+
+  worker.onmessageerror = (event: MessageEvent) => {
+    if (adapter.onmessageerror) {
+      adapter.onmessageerror(event)
+    }
+  }
+
+  worker.onerror = (event: ErrorEvent) => {
+    if (adapter.onerror) {
+      adapter.onerror(event)
+    }
+  }
+
+  return adapter
+}
+
+/**
  * SharedWorker adapter - wraps SharedWorker's port-based API
  */
 function createSharedWorkerAdapter(workerUrl: URL, workerName: string): WorkerAdapter {
