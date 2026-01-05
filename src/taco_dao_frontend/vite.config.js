@@ -39,6 +39,12 @@ export default defineConfig({
     environment('all', { prefix: 'CANISTER_' }),
     environment('all', { prefix: 'DFX_' }),
   ],
+  preview: {
+    host: true,
+    // SPA fallback - serve index.html for all routes
+    proxy: {},
+  },
+  appType: 'spa',
   resolve: {
     alias: [
       { find: 'declarations', replacement: fileURLToPath(new URL('../declarations', import.meta.url)) },

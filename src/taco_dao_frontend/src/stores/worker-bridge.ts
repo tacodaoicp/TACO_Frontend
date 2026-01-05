@@ -21,11 +21,9 @@ import {
 import { createWorkerAdapterFromUrl, isSharedWorkerSupported, type WorkerAdapter } from '../workers/worker-adapter'
 
 // Import worker URLs using Vite's worker URL syntax - ensures proper bundling in production
-import CoreWorkerUrl from '../workers/core-public.worker.ts?worker&url'
-import SecondaryWorkerUrl from '../workers/secondary-public.worker.ts?worker&url'
+import PublicWorkerUrl from '../workers/public.worker.ts?worker&url'
 import AuthWorkerUrl from '../workers/authenticated.worker.ts?worker&url'
-import CoreDedicatedWorkerUrl from '../workers/core-public.dedicated.worker.ts?worker&url'
-import SecondaryDedicatedWorkerUrl from '../workers/secondary-public.dedicated.worker.ts?worker&url'
+import PublicDedicatedWorkerUrl from '../workers/public.dedicated.worker.ts?worker&url'
 import AuthDedicatedWorkerUrl from '../workers/authenticated.dedicated.worker.ts?worker&url'
 
 // ============================================================================
@@ -41,8 +39,7 @@ const WORKER_DEBUG = () => isDebugEnabled()
 // Worker Instances (singletons)
 // ============================================================================
 
-let coreWorker: WorkerAdapter | null = null
-let secondaryWorker: WorkerAdapter | null = null
+let publicWorker: WorkerAdapter | null = null
 let authWorker: WorkerAdapter | null = null
 
 // Track worker type for logging
@@ -55,7 +52,7 @@ let initialized = false
 let cacheDeliveryPromise: Promise<void> | null = null
 let cacheDeliveryResolve: (() => void) | null = null
 let workersReportedCacheReady = 0
-const EXPECTED_WORKERS_FOR_CACHE = 2 // core + secondary (auth waits for identity)
+const EXPECTED_WORKERS_FOR_CACHE = 1 // public worker only (auth waits for identity)
 
 // ============================================================================
 // State
@@ -84,30 +81,18 @@ const workersConnected = ref(false)
 // ============================================================================
 
 // Increment to force browser to load fresh SharedWorker code
-const WORKER_VERSION = 'v2'
+const WORKER_VERSION = 'v3'
 
-function getCoreWorker(): WorkerAdapter {
-  if (!coreWorker) {
-    coreWorker = createWorkerAdapterFromUrl(
-      CoreWorkerUrl,
-      CoreDedicatedWorkerUrl,
-      `taco-core-public-${WORKER_VERSION}`
+function getPublicWorker(): WorkerAdapter {
+  if (!publicWorker) {
+    publicWorker = createWorkerAdapterFromUrl(
+      PublicWorkerUrl,
+      PublicDedicatedWorkerUrl,
+      `taco-public-${WORKER_VERSION}`
     )
-    setupWorkerAdapter(coreWorker, 'core')
+    setupWorkerAdapter(publicWorker, 'public')
   }
-  return coreWorker
-}
-
-function getSecondaryWorker(): WorkerAdapter {
-  if (!secondaryWorker) {
-    secondaryWorker = createWorkerAdapterFromUrl(
-      SecondaryWorkerUrl,
-      SecondaryDedicatedWorkerUrl,
-      `taco-secondary-public-${WORKER_VERSION}`
-    )
-    setupWorkerAdapter(secondaryWorker, 'secondary')
-  }
-  return secondaryWorker
+  return publicWorker
 }
 
 function getAuthWorker(): WorkerAdapter {
@@ -126,10 +111,8 @@ function getWorkerForKey(dataKey: DataKey): WorkerAdapter {
   const assignment = WORKER_ASSIGNMENT[dataKey]
 
   switch (assignment) {
-    case 'core':
-      return getCoreWorker()
-    case 'secondary':
-      return getSecondaryWorker()
+    case 'public':
+      return getPublicWorker()
     case 'auth':
       return getAuthWorker()
     default:
@@ -308,8 +291,7 @@ function sendToWorker(worker: WorkerAdapter, message: WorkerRequest): void {
 }
 
 function broadcastToAllWorkers(message: WorkerRequest): void {
-  if (coreWorker) sendToWorker(coreWorker, message)
-  if (secondaryWorker) sendToWorker(secondaryWorker, message)
+  if (publicWorker) sendToWorker(publicWorker, message)
   if (authWorker) sendToWorker(authWorker, message)
 }
 
@@ -338,8 +320,7 @@ export function initWorkerBridge(route?: string): void {
 
   // Create all workers
   try {
-    getCoreWorker()
-    getSecondaryWorker()
+    getPublicWorker()
     getAuthWorker()
   } catch (error) {
     console.error('[WorkerBridge] Failed to create workers:', error)
@@ -362,8 +343,7 @@ export function initWorkerBridge(route?: string): void {
   if (WORKER_DEBUG()) {
     console.log('[WorkerBridge] Sending INITIAL_LOAD to workers...')
   }
-  sendToWorker(getCoreWorker(), initialLoadMessage)
-  sendToWorker(getSecondaryWorker(), initialLoadMessage)
+  sendToWorker(getPublicWorker(), initialLoadMessage)
   sendToWorker(getAuthWorker(), initialLoadMessage)
   if (WORKER_DEBUG()) {
     console.log('[WorkerBridge] INITIAL_LOAD sent to all workers')
@@ -685,8 +665,7 @@ function updatePrioritiesForRoute(route: string): void {
   const priorities = getRoutePriorities(route, isAdmin.value, true)
 
   // Group by worker
-  const coreKeys: Array<{ dataKey: DataKey; priority: Priority }> = []
-  const secondaryKeys: Array<{ dataKey: DataKey; priority: Priority }> = []
+  const publicKeys: Array<{ dataKey: DataKey; priority: Priority }> = []
   const authKeys: Array<{ dataKey: DataKey; priority: Priority }> = []
 
   for (const [dataKey, priority] of priorities) {
@@ -694,11 +673,8 @@ function updatePrioritiesForRoute(route: string): void {
     const item = { dataKey, priority }
 
     switch (worker) {
-      case 'core':
-        coreKeys.push(item)
-        break
-      case 'secondary':
-        secondaryKeys.push(item)
+      case 'public':
+        publicKeys.push(item)
         break
       case 'auth':
         authKeys.push(item)
@@ -707,20 +683,9 @@ function updatePrioritiesForRoute(route: string): void {
   }
 
   // Send priority updates to each worker
-  if (coreWorker && coreKeys.length > 0) {
-    for (const { dataKey, priority } of coreKeys) {
-      sendToWorker(coreWorker, {
-        id: generateMessageId(),
-        timestamp: Date.now(),
-        type: 'SET_PRIORITY',
-        payload: { dataKey, priority },
-      })
-    }
-  }
-
-  if (secondaryWorker && secondaryKeys.length > 0) {
-    for (const { dataKey, priority } of secondaryKeys) {
-      sendToWorker(secondaryWorker, {
+  if (publicWorker && publicKeys.length > 0) {
+    for (const { dataKey, priority } of publicKeys) {
+      sendToWorker(publicWorker, {
         id: generateMessageId(),
         timestamp: Date.now(),
         type: 'SET_PRIORITY',

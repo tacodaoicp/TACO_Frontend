@@ -948,8 +948,8 @@ async function handleSetNetwork(message: WorkerRequest): Promise<void> {
 // ============================================================================
 
 // Maximum concurrent fetches - higher priority items are dequeued first
-// Bumped to 5 to handle 41 admin data keys more efficiently
-const MAX_CONCURRENT_FETCHES = 5
+// Bumped to 10 to handle 41 admin data keys more efficiently
+const MAX_CONCURRENT_FETCHES = 10
 let activeFetchCount = 0
 
 async function processQueue(): Promise<void> {

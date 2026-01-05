@@ -1,13 +1,11 @@
 /**
- * Secondary Public Data SharedWorker
+ * Public Data SharedWorker
  *
- * Handles medium-priority public data that requires no authentication:
- * - votingPowerMetrics (DAO backend)
- * - tacoProposals (SNS Governance)
- * - proposalsThreads (Sneed Forum)
- * - allNames (AppSneedDAO)
- * - neuronSnapshotStatus (NeuronSnapshot canister)
- * - portfolioSnapshotStatus (Treasury)
+ * Handles all public data that requires no authentication:
+ * - Core high-priority: cryptoPrices, tokenDetails, totalTreasuryValueInUsd, aggregateAllocation, tradingStatus, timerStatus
+ * - Secondary medium-priority: votingPowerMetrics, tacoProposals, proposalsThreads, allNames, neuronSnapshotStatus, portfolioSnapshotStatus
+ *
+ * Consolidated from core-public.worker.ts and secondary-public.worker.ts
  */
 
 /// <reference lib="webworker" />
@@ -19,6 +17,14 @@ import { BackoffTracker } from './shared/backoff'
 import { getCached, setCached, getAllCached } from './shared/indexed-db'
 import { getHost, shouldFetchRootKey, setWorkerNetworkOverride } from './shared/canister-ids'
 import {
+  // Core fetch functions
+  fetchCryptoPricesData,
+  fetchTokenDetailsData,
+  fetchAggregateAllocationData,
+  fetchTradingStatusData,
+  fetchTimerStatusData,
+  calculateTotalTreasuryValueInUsd,
+  // Secondary fetch functions
   fetchVotingPowerMetricsData,
   fetchTacoProposalsData,
   fetchProposalsThreadsData,
@@ -46,10 +52,18 @@ import {
 declare const self: SharedWorkerGlobalScope
 
 // ============================================================================
-// Data keys handled by this worker
+// Data keys handled by this worker (merged core + secondary = 12 keys)
 // ============================================================================
 
 const HANDLED_KEYS: DataKey[] = [
+  // Core (high priority)
+  'cryptoPrices',
+  'tokenDetails',
+  'totalTreasuryValueInUsd',
+  'aggregateAllocation',
+  'tradingStatus',
+  'timerStatus',
+  // Secondary (medium priority)
   'votingPowerMetrics',
   'tacoProposals',
   'proposalsThreads',
@@ -75,11 +89,11 @@ let lastActivityTime = Date.now()
 let agent: HttpAgent | null = null
 let initPromise: Promise<void> | null = null
 let isInitialized = false
-let currentNetwork: 'ic' | 'staging' | 'local' | null = null // Track current network to detect changes
+let currentNetwork: 'ic' | 'staging' | 'local' | null = null
 
-// Initial load state - track which keys are priority for current route
+// Initial load state
 let initialLoadKeys: Set<DataKey> = new Set()
-let pendingPriorityKeys: Set<DataKey> = new Set() // Keys still being fetched
+let pendingPriorityKeys: Set<DataKey> = new Set()
 let deferredLoadTriggered = false
 
 // Queue of ports waiting for cached data after init
@@ -96,7 +110,7 @@ const portsReceivedCacheReady = new WeakSet<MessagePort>()
 // ============================================================================
 
 async function init(): Promise<void> {
-  console.log('[SecondaryWorker] Initializing...')
+  console.log('[PublicWorker] Initializing...')
 
   // Initialize all data states
   for (const key of HANDLED_KEYS) {
@@ -104,11 +118,7 @@ async function init(): Promise<void> {
     subscriptions.set(key, new Set())
   }
 
-  // DON'T start agent creation here - wait for SET_NETWORK message
-  // The network override must be set before we know which host to connect to
-  // Agent creation will be triggered by handleSetNetwork
-
-  // Load cached data from IndexedDB (runs in parallel with agent creation)
+  // Load cached data from IndexedDB
   try {
     const cached = await getAllCached()
     for (const [key, state] of cached) {
@@ -117,20 +127,18 @@ async function init(): Promise<void> {
           ...state,
           stale: isStale(key, state.lastUpdated),
         })
-        console.log(`[SecondaryWorker] Loaded cached ${key}`)
+        console.log(`[PublicWorker] Loaded cached ${key}`)
       }
     }
   } catch (error) {
-    console.error('[SecondaryWorker] Error loading cache:', error)
+    console.error('[PublicWorker] Error loading cache:', error)
   }
 
-  // Mark as initialized IMMEDIATELY after cache load (before agent is ready)
-  // This allows cached data to be delivered without waiting for agent
+  // Mark as initialized after cache load
   isInitialized = true
 
   // Deliver cached data to any ports that connected during init
-  // Also queue fetches for stale/missing data
-  console.log(`[SecondaryWorker] Delivering cached data to ${pendingCacheDeliveries.length} pending ports`)
+  console.log(`[PublicWorker] Delivering cached data to ${pendingCacheDeliveries.length} pending ports`)
   for (const { port, keys } of pendingCacheDeliveries) {
     for (const key of keys) {
       const state = dataStates.get(key)
@@ -147,30 +155,26 @@ async function init(): Promise<void> {
           },
         })
       }
-      // Queue fetch if data is missing or stale
       if ((!state?.data || isStale(key, state.lastUpdated)) && !queue.has(key)) {
         queue.enqueue(key, 'high')
       }
     }
-    // Note: Don't send INITIAL_CACHE_READY here - it will be sent by handleInitialLoad
-    // which runs right after this when processing pendingInitialLoad
   }
-  pendingCacheDeliveries.length = 0 // Clear the queue
+  pendingCacheDeliveries.length = 0
 
   // Process pending INITIAL_LOAD if one arrived before init completed
   if (pendingInitialLoad) {
-    console.log('[SecondaryWorker] Processing pending INITIAL_LOAD')
+    console.log('[PublicWorker] Processing pending INITIAL_LOAD')
     handleInitialLoad(pendingInitialLoad.port, pendingInitialLoad.message)
     pendingInitialLoad = null
   }
 
-  console.log('[SecondaryWorker] Cache initialized, agent will be created when SET_NETWORK is received')
+  console.log('[PublicWorker] Cache initialized, agent will be created when SET_NETWORK is received')
 
-  // Don't wait for agent here - it will be created by handleSetNetwork
-  // Start processing loop - it will wait for agent to be available before fetching
+  // Start processing loop
   processQueue()
 
-  console.log('[SecondaryWorker] Init complete, waiting for SET_NETWORK')
+  console.log('[PublicWorker] Init complete, waiting for SET_NETWORK')
 }
 
 async function createAnonymousAgent(): Promise<void> {
@@ -189,9 +193,7 @@ self.onconnect = (event: MessageEvent) => {
   const port = event.ports[0]
   connectedPorts.add(port)
 
-  console.log(`[SecondaryWorker] Port connected. Total: ${connectedPorts.size}`)
-
-  // Don't reset state here - INITIAL_LOAD message will handle that with route context
+  console.log(`[PublicWorker] Port connected. Total: ${connectedPorts.size}`)
 
   port.onmessage = (e: MessageEvent<WorkerRequest>) => {
     handleMessage(port, e.data)
@@ -203,21 +205,21 @@ self.onconnect = (event: MessageEvent) => {
 
   port.start()
 
-  // Send connected message only - don't send all cached data automatically
+  // Send connected message
   sendResponse(port, {
     id: generateMessageId(),
     timestamp: Date.now(),
     type: 'CONNECTED',
     payload: {
-      dataKey: 'votingPowerMetrics',
-      state: dataStates.get('votingPowerMetrics') || createInitialState(),
+      dataKey: 'cryptoPrices',
+      state: dataStates.get('cryptoPrices') || createInitialState(),
       fromCache: false,
       tabCount: connectedPorts.size,
     },
   })
 
   if (!isInitialized) {
-    console.log(`[SecondaryWorker] Port connected before init - waiting for INITIAL_LOAD`)
+    console.log(`[PublicWorker] Port connected before init - waiting for INITIAL_LOAD`)
   }
 }
 
@@ -226,7 +228,7 @@ function disconnectPort(port: MessagePort): void {
   for (const subscribers of subscriptions.values()) {
     subscribers.delete(port)
   }
-  console.log(`[SecondaryWorker] Port disconnected. Total: ${connectedPorts.size}`)
+  console.log(`[PublicWorker] Port disconnected. Total: ${connectedPorts.size}`)
 }
 
 // ============================================================================
@@ -245,7 +247,7 @@ function handleMessage(port: MessagePort, message: WorkerRequest): void {
 
     case 'SET_VISIBILITY':
       isBackgroundTab = !message.payload.visible
-      console.log(`[SecondaryWorker] Visibility: ${message.payload.visible ? 'visible' : 'hidden'}`)
+      console.log(`[PublicWorker] Visibility: ${message.payload.visible ? 'visible' : 'hidden'}`)
       if (message.payload.visible) {
         recordActivity()
       }
@@ -281,7 +283,7 @@ function handleMessage(port: MessagePort, message: WorkerRequest): void {
         timestamp: Date.now(),
         type: 'PONG',
         payload: {
-          dataKey: 'votingPowerMetrics',
+          dataKey: 'cryptoPrices',
           state: createInitialState(),
           fromCache: false,
           tabCount: connectedPorts.size,
@@ -290,12 +292,10 @@ function handleMessage(port: MessagePort, message: WorkerRequest): void {
       break
 
     case 'RESET':
-      // Reset all state that could block fetches after fast page refresh
-      console.log('[SecondaryWorker] RESET received - clearing backoff, queue, fetch count, and re-sending cache')
+      console.log('[PublicWorker] RESET received - clearing backoff, queue, fetch count, and re-sending cache')
       backoff.resetAll()
       queue.clearProcessing()
       activeFetchCount = 0
-      // Re-send all cached data to this port (new page load needs it)
       for (const key of HANDLED_KEYS) {
         const state = dataStates.get(key)
         if (state?.data) {
@@ -320,17 +320,12 @@ function handleMessage(port: MessagePort, message: WorkerRequest): void {
   }
 }
 
-/**
- * Handle initial page load - only send/fetch critical+high priority data for the route
- * Deferred data loads after all priority keys have loaded
- */
 function handleInitialLoad(port: MessagePort, message: WorkerRequest): void {
   const route = message.payload.route || '/'
-  console.log(`[SecondaryWorker] INITIAL_LOAD for route: ${route}`)
+  console.log(`[PublicWorker] INITIAL_LOAD for route: ${route}`)
 
-  // If not initialized yet, queue this for processing after init completes
   if (!isInitialized) {
-    console.log(`[SecondaryWorker] Not initialized, queuing INITIAL_LOAD for route: ${route}`)
+    console.log(`[PublicWorker] Not initialized, queuing INITIAL_LOAD for route: ${route}`)
     pendingInitialLoad = { port, message }
     return
   }
@@ -346,7 +341,7 @@ function handleInitialLoad(port: MessagePort, message: WorkerRequest): void {
   const priorityKeys = getInitialLoadKeys(route)
   initialLoadKeys = new Set(priorityKeys.filter(key => HANDLED_KEYS.includes(key)))
 
-  console.log(`[SecondaryWorker] Priority keys for route: ${Array.from(initialLoadKeys).join(', ') || 'none'}`)
+  console.log(`[PublicWorker] Priority keys for route: ${Array.from(initialLoadKeys).join(', ') || 'none'}`)
 
   // Send cached data ONLY for priority keys immediately
   for (const key of initialLoadKeys) {
@@ -364,7 +359,6 @@ function handleInitialLoad(port: MessagePort, message: WorkerRequest): void {
         },
       })
     }
-    // Queue fetch for stale priority data and track it
     if (!state?.data || isStale(key, state.lastUpdated)) {
       pendingPriorityKeys.add(key)
       queue.enqueue(key, 'critical')
@@ -372,7 +366,6 @@ function handleInitialLoad(port: MessagePort, message: WorkerRequest): void {
   }
 
   // Signal that initial cache delivery is complete for this worker
-  // Only send once per port to prevent duplicate signals
   if (!portsReceivedCacheReady.has(port)) {
     portsReceivedCacheReady.add(port)
     sendResponse(port, {
@@ -380,49 +373,39 @@ function handleInitialLoad(port: MessagePort, message: WorkerRequest): void {
       timestamp: Date.now(),
       type: 'INITIAL_CACHE_READY',
       payload: {
-        dataKey: 'votingPowerMetrics', // placeholder key (required by type)
+        dataKey: 'cryptoPrices',
         state: createInitialState(),
         fromCache: true,
       },
     })
   }
 
-  // If no priority keys need fetching, trigger deferred load immediately
   if (pendingPriorityKeys.size === 0) {
     triggerDeferredLoad()
   }
 }
 
-/**
- * Called when a priority key finishes loading - triggers deferred load when all done
- */
 function onPriorityKeyLoaded(dataKey: DataKey): void {
   if (!pendingPriorityKeys.has(dataKey)) return
 
   pendingPriorityKeys.delete(dataKey)
-  console.log(`[SecondaryWorker] Priority key loaded: ${dataKey}, remaining: ${pendingPriorityKeys.size}`)
+  console.log(`[PublicWorker] Priority key loaded: ${dataKey}, remaining: ${pendingPriorityKeys.size}`)
 
-  // When all priority keys are loaded, trigger deferred loading immediately (non-blocking)
   if (pendingPriorityKeys.size === 0 && !deferredLoadTriggered) {
     triggerDeferredLoad()
   }
 }
 
-/**
- * Load non-priority keys after priority keys are done
- */
 function triggerDeferredLoad(): void {
   if (deferredLoadTriggered) return
   deferredLoadTriggered = true
 
-  console.log('[SecondaryWorker] All priority keys loaded - starting deferred load for non-priority keys')
+  console.log('[PublicWorker] All priority keys loaded - starting deferred load for non-priority keys')
 
-  // Send cached data and queue fetches for remaining keys
   for (const key of HANDLED_KEYS) {
-    if (initialLoadKeys.has(key)) continue // Already handled
+    if (initialLoadKeys.has(key)) continue
 
     const state = dataStates.get(key)
-    // Send cached data to all subscribers
     if (state?.data) {
       broadcastToSubscribers(key, {
         id: generateMessageId(),
@@ -436,7 +419,6 @@ function triggerDeferredLoad(): void {
         },
       })
     }
-    // Queue fetch if stale
     if (!state?.data || isStale(key, state.lastUpdated)) {
       queue.enqueue(key, 'low')
     }
@@ -449,7 +431,6 @@ function handleFetch(port: MessagePort, message: WorkerRequest): void {
 
   const currentState = dataStates.get(dataKey)
 
-  // Stale-while-revalidate
   if (currentState?.data && !force) {
     sendResponse(port, {
       id: message.id,
@@ -464,7 +445,6 @@ function handleFetch(port: MessagePort, message: WorkerRequest): void {
     })
   }
 
-  // Queue for refresh if needed
   if (force || !currentState?.data || isStale(dataKey, currentState.lastUpdated)) {
     queue.enqueue(dataKey, priority)
   }
@@ -501,23 +481,19 @@ function handleSubscribe(port: MessagePort, message: WorkerRequest): void {
   const keysToSubscribe = dataKeys || (dataKey ? [dataKey] : [])
   const validKeys = keysToSubscribe.filter((key: DataKey) => HANDLED_KEYS.includes(key))
 
-  // Add to subscriptions immediately
   for (const key of validKeys) {
     subscriptions.get(key)?.add(port)
   }
 
-  // If not yet initialized, queue this port for cache delivery when init completes
   if (!isInitialized) {
-    console.log(`[SecondaryWorker] Not yet initialized, queuing cache delivery for ${validKeys.length} keys`)
+    console.log(`[PublicWorker] Not yet initialized, queuing cache delivery for ${validKeys.length} keys`)
     pendingCacheDeliveries.push({ port, keys: validKeys })
     return
   }
 
-  // Already initialized - send cached data and queue fetches for stale/missing data
   for (const key of validKeys) {
     const state = dataStates.get(key)
 
-    // Send cached data if available
     if (state?.data) {
       sendResponse(port, {
         id: generateMessageId(),
@@ -532,7 +508,6 @@ function handleSubscribe(port: MessagePort, message: WorkerRequest): void {
       })
     }
 
-    // Queue fetch if data is missing or stale
     if ((!state?.data || isStale(key, state.lastUpdated)) && !queue.has(key)) {
       queue.enqueue(key, 'high')
     }
@@ -566,32 +541,27 @@ function handleInvalidate(message: WorkerRequest): void {
 
 async function handleSetNetwork(message: WorkerRequest): Promise<void> {
   const { network } = message.payload
-  const newNetwork = network || 'ic' // Default to 'ic' if not specified
+  const newNetwork = network || 'ic'
 
-  // Check if this is the first SET_NETWORK or if network actually changed
   const isFirstSetup = currentNetwork === null
   const networkChanged = currentNetwork !== null && currentNetwork !== newNetwork
 
-  console.log(`[SecondaryWorker] SET_NETWORK: ${newNetwork} (current: ${currentNetwork}, isFirst: ${isFirstSetup}, changed: ${networkChanged})`)
+  console.log(`[PublicWorker] SET_NETWORK: ${newNetwork} (current: ${currentNetwork}, isFirst: ${isFirstSetup}, changed: ${networkChanged})`)
 
-  // Update tracked network
   currentNetwork = newNetwork
   setWorkerNetworkOverride(network || null)
 
-  // Recreate agent with new network settings
   await createAnonymousAgent()
 
-  // Only clear cache if network actually changed (not on first setup)
   if (networkChanged) {
     try {
       const { clearAllCached } = await import('./shared/indexed-db')
       await clearAllCached()
-      console.log('[SecondaryWorker] Cleared IndexedDB cache due to network change')
+      console.log('[PublicWorker] Cleared IndexedDB cache due to network change')
     } catch (err) {
-      console.error('[SecondaryWorker] Error clearing cache:', err)
+      console.error('[PublicWorker] Error clearing cache:', err)
     }
 
-    // Clear in-memory state and queue for refetch
     for (const key of HANDLED_KEYS) {
       dataStates.set(key, createInitialState())
       queue.enqueue(key, 'high')
@@ -600,11 +570,10 @@ async function handleSetNetwork(message: WorkerRequest): Promise<void> {
 }
 
 // ============================================================================
-// Queue Processing (Parallel)
+// Queue Processing (Parallel) - 10 concurrent fetches
 // ============================================================================
 
-// Maximum concurrent fetches - higher priority items are dequeued first
-const MAX_CONCURRENT_FETCHES = 4
+const MAX_CONCURRENT_FETCHES = 10
 let activeFetchCount = 0
 
 async function processQueue(): Promise<void> {
@@ -612,23 +581,18 @@ async function processQueue(): Promise<void> {
   isProcessing = true
 
   while (true) {
-    // If no agent available yet, wait before trying to process
-    // This prevents spinning the CPU waiting for SET_NETWORK
     if (!agent) {
       await sleep(100)
       continue
     }
 
-    // Start new fetches up to the limit (priority queue returns highest priority first)
     while (activeFetchCount < MAX_CONCURRENT_FETCHES) {
-      // Get next highest-priority item (queue.dequeue handles deduplication internally)
       const item = queue.dequeue()
 
       if (!item) {
         break
       }
 
-      // Double-check agent is still available
       if (!agent) {
         queue.retry(item.dataKey)
         break
@@ -639,7 +603,6 @@ async function processQueue(): Promise<void> {
         continue
       }
 
-      // Start fetch in parallel (don't await) - critical/high priority items start first
       activeFetchCount++
       processSingleFetch(item).finally(() => {
         activeFetchCount--
@@ -657,7 +620,7 @@ async function processSingleFetch(item: { dataKey: DataKey; retryCount: number }
     backoff.recordSuccess(item.dataKey)
     queue.complete(item.dataKey)
   } catch (error) {
-    console.error(`[SecondaryWorker] Error fetching ${item.dataKey}:`, error)
+    console.error(`[PublicWorker] Error fetching ${item.dataKey}:`, error)
     backoff.recordFailure(item.dataKey)
 
     updateState(item.dataKey, {
@@ -683,6 +646,52 @@ async function fetchData(dataKey: DataKey): Promise<void> {
   let data: unknown
 
   switch (dataKey) {
+    // Core data keys
+    case 'cryptoPrices':
+      data = await fetchCryptoPricesData()
+      break
+
+    case 'tokenDetails':
+      const rawTokenData = await fetchTokenDetailsData(agent!)
+      data = serializeForTransfer(rawTokenData)
+      // Also update totalTreasuryValueInUsd when tokenDetails is fetched
+      const treasuryValue = calculateTotalTreasuryValueInUsd(rawTokenData as any[])
+      updateState('totalTreasuryValueInUsd', {
+        data: treasuryValue,
+        lastUpdated: Date.now(),
+        loading: false,
+        error: null,
+        stale: false,
+      })
+      await setCached('totalTreasuryValueInUsd', treasuryValue)
+      break
+
+    case 'totalTreasuryValueInUsd':
+      const tokenData = await fetchTokenDetailsData(agent!)
+      data = calculateTotalTreasuryValueInUsd(tokenData as any[])
+      updateState('tokenDetails', {
+        data: serializeForTransfer(tokenData),
+        lastUpdated: Date.now(),
+        loading: false,
+        error: null,
+        stale: false,
+      })
+      await setCached('tokenDetails', serializeForTransfer(tokenData))
+      break
+
+    case 'aggregateAllocation':
+      data = serializeForTransfer(await fetchAggregateAllocationData(agent!))
+      break
+
+    case 'tradingStatus':
+      data = serializeForTransfer(await fetchTradingStatusData(agent!))
+      break
+
+    case 'timerStatus':
+      data = serializeForTransfer(await fetchTimerStatusData(agent!))
+      break
+
+    // Secondary data keys
     case 'votingPowerMetrics':
       data = serializeForTransfer(await fetchVotingPowerMetricsData(agent!))
       break
@@ -697,7 +706,6 @@ async function fetchData(dataKey: DataKey): Promise<void> {
 
     case 'allNames':
       const namesData = await fetchAllNamesData(agent!)
-      // Convert Maps to serializable format for storage
       data = {
         principalNames: Object.fromEntries(namesData.principalNames),
         neuronNames: Object.fromEntries(namesData.neuronNames),
@@ -726,7 +734,6 @@ async function fetchData(dataKey: DataKey): Promise<void> {
 
   await setCached(dataKey, data)
 
-  // Notify that this priority key has loaded (triggers deferred load when all done)
   onPriorityKeyLoaded(dataKey)
 }
 
@@ -791,9 +798,9 @@ function checkIdleStatus(): void {
   const wasIdle = isIdle
   isIdle = Date.now() - lastActivityTime > IDLE_TIMEOUT_MS
   if (isIdle && !wasIdle) {
-    console.log('[SecondaryWorker] Entering idle mode - pausing refreshes')
+    console.log('[PublicWorker] Entering idle mode - pausing refreshes')
   } else if (!isIdle && wasIdle) {
-    console.log('[SecondaryWorker] Exiting idle mode - resuming refreshes')
+    console.log('[PublicWorker] Exiting idle mode - resuming refreshes')
   }
 }
 
@@ -801,22 +808,20 @@ function recordActivity(): void {
   lastActivityTime = Date.now()
   if (isIdle) {
     isIdle = false
-    console.log('[SecondaryWorker] Activity detected - resuming refreshes')
+    console.log('[PublicWorker] Activity detected - resuming refreshes')
   }
 }
 
 // ============================================================================
-// Auto-refresh Loop
+// Auto-refresh Loop (5 second interval for core data responsiveness)
 // ============================================================================
 
 async function autoRefreshLoop(): Promise<void> {
   while (true) {
-    await sleep(10000) // Check every 10 seconds (less frequent than core worker)
+    await sleep(5000) // Check every 5 seconds
 
-    // Check if we should enter idle mode
     checkIdleStatus()
 
-    // Skip auto-refresh if idle
     if (isIdle) {
       continue
     }

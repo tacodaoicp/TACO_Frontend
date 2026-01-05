@@ -14,8 +14,7 @@ import { WORKER_ASSIGNMENT, generateMessageId, getRoutePriorities } from '../wor
 // Worker Instances (singletons)
 // ============================================================================
 
-let coreWorker: SharedWorker | null = null
-let secondaryWorker: SharedWorker | null = null
+let publicWorker: SharedWorker | null = null
 let authWorker: SharedWorker | null = null
 
 // Track initialization state
@@ -26,24 +25,14 @@ const workerReadyPromises: Map<string, Promise<void>> = new Map()
 // Worker Getters
 // ============================================================================
 
-function getCoreWorker(): SharedWorker {
-  if (!coreWorker) {
-    coreWorker = new SharedWorker(
-      new URL('../workers/core-public.worker.ts', import.meta.url),
-      { type: 'module', name: 'taco-core-public' }
+function getPublicWorker(): SharedWorker {
+  if (!publicWorker) {
+    publicWorker = new SharedWorker(
+      new URL('../workers/public.worker.ts', import.meta.url),
+      { type: 'module', name: 'taco-public' }
     )
   }
-  return coreWorker
-}
-
-function getSecondaryWorker(): SharedWorker {
-  if (!secondaryWorker) {
-    secondaryWorker = new SharedWorker(
-      new URL('../workers/secondary-public.worker.ts', import.meta.url),
-      { type: 'module', name: 'taco-secondary-public' }
-    )
-  }
-  return secondaryWorker
+  return publicWorker
 }
 
 function getAuthWorker(): SharedWorker {
@@ -60,10 +49,8 @@ function getWorkerForKey(dataKey: DataKey): SharedWorker {
   const workerType = WORKER_ASSIGNMENT[dataKey]
 
   switch (workerType) {
-    case 'core':
-      return getCoreWorker()
-    case 'secondary':
-      return getSecondaryWorker()
+    case 'public':
+      return getPublicWorker()
     case 'auth':
       return getAuthWorker()
     default:
@@ -341,8 +328,7 @@ export function initializeWorkers(): void {
   if (workersInitialized) return
 
   // Create all workers
-  getCoreWorker()
-  getSecondaryWorker()
+  getPublicWorker()
   getAuthWorker()
 
   workersInitialized = true
@@ -361,8 +347,7 @@ export function setWorkersVisibility(visible: boolean): void {
     payload: { visible },
   }
 
-  if (coreWorker) sendToWorker(coreWorker, message)
-  if (secondaryWorker) sendToWorker(secondaryWorker, message)
+  if (publicWorker) sendToWorker(publicWorker, message)
   if (authWorker) sendToWorker(authWorker, message)
 }
 
@@ -422,8 +407,7 @@ export function invalidateWorkerCache(dataKeys?: DataKey[]): void {
     payload: { dataKeys },
   }
 
-  if (coreWorker) sendToWorker(coreWorker, message)
-  if (secondaryWorker) sendToWorker(secondaryWorker, message)
+  if (publicWorker) sendToWorker(publicWorker, message)
   if (authWorker) sendToWorker(authWorker, message)
 }
 
@@ -432,13 +416,11 @@ export function invalidateWorkerCache(dataKeys?: DataKey[]): void {
 // ============================================================================
 
 export function getWorkers(): {
-  core: SharedWorker | null
-  secondary: SharedWorker | null
+  public: SharedWorker | null
   auth: SharedWorker | null
 } {
   return {
-    core: coreWorker,
-    secondary: secondaryWorker,
+    public: publicWorker,
     auth: authWorker,
   }
 }

@@ -1,7 +1,12 @@
 /**
- * Secondary Public Data Dedicated Worker (Fallback for SharedWorker)
+ * Public Data Dedicated Worker (Fallback for SharedWorker)
  *
- * This is a dedicated worker version for browsers that don't support SharedWorker.
+ * This is a dedicated worker version for browsers that don't support SharedWorker (iOS Safari).
+ * Handles all public data that requires no authentication:
+ * - Core high-priority: cryptoPrices, tokenDetails, totalTreasuryValueInUsd, aggregateAllocation, tradingStatus, timerStatus
+ * - Secondary medium-priority: votingPowerMetrics, tacoProposals, proposalsThreads, allNames, neuronSnapshotStatus, portfolioSnapshotStatus
+ *
+ * Consolidated from core-public.dedicated.worker.ts and secondary-public.dedicated.worker.ts
  */
 
 /// <reference lib="webworker" />
@@ -13,6 +18,14 @@ import { BackoffTracker } from './shared/backoff'
 import { getCached, setCached, getAllCached } from './shared/indexed-db'
 import { getHost, shouldFetchRootKey, setWorkerNetworkOverride } from './shared/canister-ids'
 import {
+  // Core fetch functions
+  fetchCryptoPricesData,
+  fetchTokenDetailsData,
+  fetchAggregateAllocationData,
+  fetchTradingStatusData,
+  fetchTimerStatusData,
+  calculateTotalTreasuryValueInUsd,
+  // Secondary fetch functions
   fetchVotingPowerMetricsData,
   fetchTacoProposalsData,
   fetchProposalsThreadsData,
@@ -34,15 +47,24 @@ import {
   IDLE_TIMEOUT_MS,
   generateMessageId,
   createInitialState,
+  getInitialLoadKeys,
 } from './types'
 
 declare const self: DedicatedWorkerGlobalScope
 
 // ============================================================================
-// Data keys handled by this worker
+// Data keys handled by this worker (merged core + secondary = 12 keys)
 // ============================================================================
 
 const HANDLED_KEYS: DataKey[] = [
+  // Core (high priority)
+  'cryptoPrices',
+  'tokenDetails',
+  'totalTreasuryValueInUsd',
+  'aggregateAllocation',
+  'tradingStatus',
+  'timerStatus',
+  // Secondary (medium priority)
   'votingPowerMetrics',
   'tacoProposals',
   'proposalsThreads',
@@ -66,7 +88,12 @@ let isIdle = false
 let lastActivityTime = Date.now()
 let agent: HttpAgent | null = null
 let isInitialized = false
-let currentNetwork: 'ic' | 'staging' | 'local' | null = null // Track current network to detect changes
+let currentNetwork: 'ic' | 'staging' | 'local' | null = null
+
+// Initial load state
+let initialLoadKeys: Set<DataKey> = new Set()
+let pendingPriorityKeys: Set<DataKey> = new Set()
+let deferredLoadTriggered = false
 
 // ============================================================================
 // Helper Functions
@@ -80,9 +107,9 @@ function checkIdleStatus(): void {
   const wasIdle = isIdle
   isIdle = Date.now() - lastActivityTime > IDLE_TIMEOUT_MS
   if (isIdle && !wasIdle) {
-    console.log('[SecondaryWorker-Dedicated] Entering idle mode - pausing refreshes')
+    console.log('[PublicWorker-Dedicated] Entering idle mode - pausing refreshes')
   } else if (!isIdle && wasIdle) {
-    console.log('[SecondaryWorker-Dedicated] Exiting idle mode - resuming refreshes')
+    console.log('[PublicWorker-Dedicated] Exiting idle mode - resuming refreshes')
   }
 }
 
@@ -90,7 +117,7 @@ function recordActivity(): void {
   lastActivityTime = Date.now()
   if (isIdle) {
     isIdle = false
-    console.log('[SecondaryWorker-Dedicated] Activity detected - resuming refreshes')
+    console.log('[PublicWorker-Dedicated] Activity detected - resuming refreshes')
   }
 }
 
@@ -109,6 +136,22 @@ function updateState(dataKey: DataKey, updates: Partial<DataState>): void {
   const current = dataStates.get(dataKey) || createInitialState()
   const newState = { ...current, ...updates }
   dataStates.set(dataKey, newState)
+
+  // Broadcast if subscribed
+  if (subscriptions.has(dataKey) && (updates.data !== undefined || updates.error)) {
+    sendResponse({
+      id: generateMessageId(),
+      timestamp: Date.now(),
+      type: updates.error ? 'FETCH_ERROR' : 'DATA_UPDATE',
+      payload: {
+        dataKey,
+        data: newState.data,
+        error: updates.error || undefined,
+        state: newState,
+        fromCache: false,
+      },
+    })
+  }
 }
 
 function broadcastUpdate(dataKey: DataKey, data: unknown, fromCache: boolean = false): void {
@@ -135,12 +178,14 @@ function broadcastUpdate(dataKey: DataKey, data: unknown, fromCache: boolean = f
 // ============================================================================
 
 async function init(): Promise<void> {
-  console.log('[SecondaryWorker-Dedicated] Initializing...')
+  console.log('[PublicWorker-Dedicated] Initializing...')
 
+  // Initialize all data states
   for (const key of HANDLED_KEYS) {
     dataStates.set(key, createInitialState())
   }
 
+  // Load cached data from IndexedDB
   try {
     const cached = await getAllCached()
     for (const [key, state] of cached) {
@@ -149,34 +194,33 @@ async function init(): Promise<void> {
           ...state,
           stale: isStale(key, state.lastUpdated),
         })
-        console.log(`[SecondaryWorker-Dedicated] Loaded cached ${key}`)
+        console.log(`[PublicWorker-Dedicated] Loaded cached ${key}`)
       }
     }
   } catch (error) {
-    console.error('[SecondaryWorker-Dedicated] Error loading cache:', error)
+    console.error('[PublicWorker-Dedicated] Error loading cache:', error)
   }
 
-  agent = await createAgent({
-    identity: new AnonymousIdentity(),
-    host: getHost(),
-    fetchRootKey: shouldFetchRootKey(),
-  })
-
+  // Mark as initialized
   isInitialized = true
+
+  // Start processing loop
   processQueue()
 
+  // Send connected message
   sendResponse({
     id: generateMessageId(),
     timestamp: Date.now(),
     type: 'CONNECTED',
     payload: {
-      dataKey: 'votingPowerMetrics',
-      state: dataStates.get('votingPowerMetrics') || createInitialState(),
+      dataKey: 'cryptoPrices',
+      state: dataStates.get('cryptoPrices') || createInitialState(),
       fromCache: false,
       tabCount: 1,
     },
   })
 
+  // Send all cached data
   for (const key of HANDLED_KEYS) {
     const state = dataStates.get(key)
     if (state?.data) {
@@ -194,7 +238,15 @@ async function init(): Promise<void> {
     }
   }
 
-  console.log('[SecondaryWorker-Dedicated] Initialized')
+  console.log('[PublicWorker-Dedicated] Init complete, waiting for SET_NETWORK')
+}
+
+async function createAnonymousAgent(): Promise<void> {
+  agent = await createAgent({
+    identity: new AnonymousIdentity(),
+    host: getHost(),
+    fetchRootKey: shouldFetchRootKey(),
+  })
 }
 
 // ============================================================================
@@ -248,7 +300,7 @@ function handleMessage(message: WorkerRequest): void {
         timestamp: Date.now(),
         type: 'PONG',
         payload: {
-          dataKey: 'votingPowerMetrics',
+          dataKey: 'cryptoPrices',
           state: createInitialState(),
           fromCache: false,
           tabCount: 1,
@@ -257,12 +309,10 @@ function handleMessage(message: WorkerRequest): void {
       break
 
     case 'RESET':
-      // Reset all state that could block fetches after fast page refresh
-      console.log('[SecondaryWorker-Dedicated] RESET received - clearing backoff, queue, fetch count, and re-sending cache')
+      console.log('[PublicWorker-Dedicated] RESET received - clearing backoff, queue, fetch count, and re-sending cache')
       backoff.resetAll()
       queue.clearProcessing()
       activeFetchCount = 0
-      // Re-send all cached data (new page load needs it)
       for (const key of HANDLED_KEYS) {
         const state = dataStates.get(key)
         if (state?.data) {
@@ -280,15 +330,119 @@ function handleMessage(message: WorkerRequest): void {
         }
       }
       break
+
+    case 'INITIAL_LOAD':
+      handleInitialLoad(message)
+      break
+  }
+}
+
+function handleInitialLoad(message: WorkerRequest): void {
+  const route = message.payload.route || '/'
+  console.log(`[PublicWorker-Dedicated] INITIAL_LOAD for route: ${route}`)
+
+  // Reset state for fresh page load
+  backoff.resetAll()
+  queue.clearProcessing()
+  activeFetchCount = 0
+  deferredLoadTriggered = false
+  pendingPriorityKeys.clear()
+
+  // Get priority keys for this route
+  const priorityKeys = getInitialLoadKeys(route)
+  initialLoadKeys = new Set(priorityKeys.filter(key => HANDLED_KEYS.includes(key)))
+
+  console.log(`[PublicWorker-Dedicated] Priority keys for route: ${Array.from(initialLoadKeys).join(', ') || 'none'}`)
+
+  // Send cached data ONLY for priority keys immediately
+  for (const key of initialLoadKeys) {
+    const state = dataStates.get(key)
+    if (state?.data) {
+      sendResponse({
+        id: generateMessageId(),
+        timestamp: Date.now(),
+        type: 'CACHE_HIT',
+        payload: {
+          dataKey: key,
+          data: state.data,
+          state,
+          fromCache: true,
+        },
+      })
+    }
+    if (!state?.data || isStale(key, state.lastUpdated)) {
+      pendingPriorityKeys.add(key)
+      queue.enqueue(key, 'critical')
+    }
+  }
+
+  // Signal that initial cache delivery is complete
+  sendResponse({
+    id: generateMessageId(),
+    timestamp: Date.now(),
+    type: 'INITIAL_CACHE_READY',
+    payload: {
+      dataKey: 'cryptoPrices',
+      state: createInitialState(),
+      fromCache: true,
+    },
+  })
+
+  if (pendingPriorityKeys.size === 0) {
+    triggerDeferredLoad()
+  }
+}
+
+function onPriorityKeyLoaded(dataKey: DataKey): void {
+  if (!pendingPriorityKeys.has(dataKey)) return
+
+  pendingPriorityKeys.delete(dataKey)
+  console.log(`[PublicWorker-Dedicated] Priority key loaded: ${dataKey}, remaining: ${pendingPriorityKeys.size}`)
+
+  if (pendingPriorityKeys.size === 0 && !deferredLoadTriggered) {
+    triggerDeferredLoad()
+  }
+}
+
+function triggerDeferredLoad(): void {
+  if (deferredLoadTriggered) return
+  deferredLoadTriggered = true
+
+  console.log('[PublicWorker-Dedicated] All priority keys loaded - starting deferred load for non-priority keys')
+
+  for (const key of HANDLED_KEYS) {
+    if (initialLoadKeys.has(key)) continue
+
+    const state = dataStates.get(key)
+    if (state?.data && subscriptions.has(key)) {
+      sendResponse({
+        id: generateMessageId(),
+        timestamp: Date.now(),
+        type: 'CACHE_HIT',
+        payload: {
+          dataKey: key,
+          data: state.data,
+          state,
+          fromCache: true,
+        },
+      })
+    }
+    if (!state?.data || isStale(key, state.lastUpdated)) {
+      queue.enqueue(key, 'low')
+    }
   }
 }
 
 function handleFetch(message: WorkerRequest): void {
   const { dataKey, priority = 'medium', force = false } = message.payload
-  if (!dataKey || !HANDLED_KEYS.includes(dataKey)) return
+
+  if (!dataKey || !HANDLED_KEYS.includes(dataKey)) {
+    return
+  }
 
   const currentState = dataStates.get(dataKey)
 
+  // Stale-while-revalidate - return cached data if available
   if (currentState?.data && !force) {
     sendResponse({
       id: message.id,
@@ -303,6 +457,7 @@ function handleFetch(message: WorkerRequest): void {
     })
   }
 
+  // Queue for refresh if needed
   if (force || !currentState?.data || isStale(dataKey, currentState.lastUpdated)) {
     queue.enqueue(dataKey, priority)
   }
@@ -323,6 +478,7 @@ function handleSubscribe(message: WorkerRequest): void {
     subscriptions.add(key)
   }
 
+  // Send cached data immediately
   for (const key of validKeys) {
     const state = dataStates.get(key)
     if (state?.data) {
@@ -338,13 +494,20 @@ function handleSubscribe(message: WorkerRequest): void {
         },
       })
     }
+    if ((!state?.data || isStale(key, state.lastUpdated)) && !queue.has(key)) {
+      queue.enqueue(key, 'high')
+    }
   }
 }
 
 function handleUnsubscribe(message: WorkerRequest): void {
-  const { dataKey } = message.payload
-  if (dataKey && HANDLED_KEYS.includes(dataKey)) {
-    subscriptions.delete(dataKey)
+  const { dataKey, dataKeys } = message.payload
+  const keysToUnsubscribe = dataKeys || (dataKey ? [dataKey] : [])
+
+  for (const key of keysToUnsubscribe) {
+    if (HANDLED_KEYS.includes(key)) {
+      subscriptions.delete(key)
+    }
   }
 }
 
@@ -375,7 +538,7 @@ function handleInvalidate(message: WorkerRequest): void {
       const state = dataStates.get(key)
       if (state) {
         dataStates.set(key, { ...state, stale: true })
-        queue.enqueue(key, 'high')
+        queue.enqueue(key, 'critical')
       }
     }
   }
@@ -383,29 +546,26 @@ function handleInvalidate(message: WorkerRequest): void {
 
 async function handleSetNetwork(message: WorkerRequest): Promise<void> {
   const { network } = message.payload
-  const newNetwork = network || 'ic' // Default to 'ic' if not specified
+  const newNetwork = network || 'ic'
 
-  // Check if this is the first SET_NETWORK or if network actually changed
+  const isFirstSetup = currentNetwork === null
   const networkChanged = currentNetwork !== null && currentNetwork !== newNetwork
 
-  // Update tracked network
+  console.log(`[PublicWorker-Dedicated] SET_NETWORK: ${newNetwork} (current: ${currentNetwork}, isFirst: ${isFirstSetup}, changed: ${networkChanged})`)
+
   currentNetwork = newNetwork
   setWorkerNetworkOverride(network || null)
 
-  // Recreate anonymous agent with new network settings
-  agent = await createAgent({
-    identity: new AnonymousIdentity(),
-    host: getHost(),
-    fetchRootKey: shouldFetchRootKey(),
-  })
+  await createAnonymousAgent()
 
   // Only clear cache if network actually changed (not on first setup)
   if (networkChanged) {
     try {
       const { clearAllCached } = await import('./shared/indexed-db')
       await clearAllCached()
+      console.log('[PublicWorker-Dedicated] Cleared IndexedDB cache due to network change')
     } catch (err) {
-      console.error('[SecondaryWorker-Dedicated] Error clearing cache:', err)
+      console.error('[PublicWorker-Dedicated] Error clearing cache:', err)
     }
 
     // Clear in-memory state and queue for refetch
@@ -417,10 +577,10 @@ async function handleSetNetwork(message: WorkerRequest): Promise<void> {
 }
 
 // ============================================================================
-// Queue Processing
+// Queue Processing (Parallel) - 10 concurrent fetches
 // ============================================================================
 
-const MAX_CONCURRENT_FETCHES = 3
+const MAX_CONCURRENT_FETCHES = 10
 let activeFetchCount = 0
 
 async function processQueue(): Promise<void> {
@@ -428,14 +588,21 @@ async function processQueue(): Promise<void> {
   isProcessing = true
 
   while (true) {
+    if (!agent) {
+      await sleep(100)
+      continue
+    }
+
     while (activeFetchCount < MAX_CONCURRENT_FETCHES) {
       const item = queue.dequeue()
 
-      if (!item) break
+      if (!item) {
+        break
+      }
 
       if (!agent) {
         queue.retry(item.dataKey)
-        continue
+        break
       }
 
       if (!backoff.canRetry(item.dataKey)) {
@@ -460,7 +627,7 @@ async function processSingleFetch(item: { dataKey: DataKey; retryCount: number }
     backoff.recordSuccess(item.dataKey)
     queue.complete(item.dataKey)
   } catch (error) {
-    console.error(`[SecondaryWorker-Dedicated] Error fetching ${item.dataKey}:`, error)
+    console.error(`[PublicWorker-Dedicated] Error fetching ${item.dataKey}:`, error)
     backoff.recordFailure(item.dataKey)
 
     const errorMsg = error instanceof Error ? error.message : String(error)
@@ -469,7 +636,7 @@ async function processSingleFetch(item: { dataKey: DataKey; retryCount: number }
       error: errorMsg,
     })
 
-    if (item.retryCount < 3) {
+    if (item.retryCount < 5) {
       queue.retry(item.dataKey)
     } else {
       queue.complete(item.dataKey)
@@ -478,27 +645,78 @@ async function processSingleFetch(item: { dataKey: DataKey; retryCount: number }
 }
 
 async function fetchData(dataKey: DataKey): Promise<void> {
-  if (!agent) throw new Error('No agent available')
+  if (!agent) {
+    await createAnonymousAgent()
+  }
 
   updateState(dataKey, { loading: true, error: null })
 
   let data: unknown
 
   switch (dataKey) {
+    // Core data keys
+    case 'cryptoPrices':
+      data = await fetchCryptoPricesData()
+      break
+
+    case 'tokenDetails':
+      const rawTokenData = await fetchTokenDetailsData(agent!)
+      data = serializeForTransfer(rawTokenData)
+      // Also calculate treasury value
+      const totalValue = calculateTotalTreasuryValueInUsd(rawTokenData as any[])
+      updateState('totalTreasuryValueInUsd', {
+        data: totalValue,
+        loading: false,
+        error: null,
+        lastUpdated: Date.now(),
+        stale: false,
+      })
+      broadcastUpdate('totalTreasuryValueInUsd', totalValue)
+      await setCached('totalTreasuryValueInUsd', totalValue)
+      break
+
+    case 'totalTreasuryValueInUsd':
+      // This is calculated from tokenDetails, so fetch that instead
+      const tokenData = await fetchTokenDetailsData(agent!)
+      data = calculateTotalTreasuryValueInUsd(tokenData as any[])
+      // Also update tokenDetails
+      updateState('tokenDetails', {
+        data: serializeForTransfer(tokenData),
+        lastUpdated: Date.now(),
+        loading: false,
+        error: null,
+        stale: false,
+      })
+      await setCached('tokenDetails', serializeForTransfer(tokenData))
+      break
+
+    case 'aggregateAllocation':
+      data = serializeForTransfer(await fetchAggregateAllocationData(agent!))
+      break
+
+    case 'tradingStatus':
+      data = serializeForTransfer(await fetchTradingStatusData(agent!))
+      break
+
+    case 'timerStatus':
+      data = serializeForTransfer(await fetchTimerStatusData(agent!))
+      break
+
+    // Secondary data keys
     case 'votingPowerMetrics':
-      data = serializeForTransfer(await fetchVotingPowerMetricsData(agent))
+      data = serializeForTransfer(await fetchVotingPowerMetricsData(agent!))
       break
 
     case 'tacoProposals':
-      data = serializeForTransfer(await fetchTacoProposalsData(agent))
+      data = serializeForTransfer(await fetchTacoProposalsData(agent!))
       break
 
     case 'proposalsThreads':
-      data = serializeForTransfer(await fetchProposalsThreadsData(agent))
+      data = serializeForTransfer(await fetchProposalsThreadsData(agent!))
       break
 
     case 'allNames':
-      const namesData = await fetchAllNamesData(agent)
+      const namesData = await fetchAllNamesData(agent!)
       data = {
         principalNames: Object.fromEntries(namesData.principalNames),
         neuronNames: Object.fromEntries(namesData.neuronNames),
@@ -506,17 +724,18 @@ async function fetchData(dataKey: DataKey): Promise<void> {
       break
 
     case 'neuronSnapshotStatus':
-      data = serializeForTransfer(await fetchNeuronSnapshotStatusData(agent))
+      data = serializeForTransfer(await fetchNeuronSnapshotStatusData(agent!))
       break
 
     case 'portfolioSnapshotStatus':
-      data = serializeForTransfer(await fetchPortfolioSnapshotStatusData(agent))
+      data = serializeForTransfer(await fetchPortfolioSnapshotStatusData(agent!))
       break
 
     default:
       throw new Error(`Unknown data key: ${dataKey}`)
   }
 
+  // Update state
   updateState(dataKey, {
     data,
     loading: false,
@@ -525,17 +744,23 @@ async function fetchData(dataKey: DataKey): Promise<void> {
     stale: false,
   })
 
+  // Broadcast to main thread
   broadcastUpdate(dataKey, data)
-  await setCached(dataKey, dataStates.get(dataKey)!)
+
+  // Persist to cache
+  await setCached(dataKey, data)
+
+  // Track priority key completion
+  onPriorityKeyLoaded(dataKey)
 }
 
 // ============================================================================
-// Auto-refresh Loop
+// Auto-refresh Loop (5 second interval for responsiveness)
 // ============================================================================
 
 async function autoRefreshLoop(): Promise<void> {
   while (true) {
-    await sleep(15000)
+    await sleep(5000) // Check every 5 seconds
 
     // Check if we should enter idle mode
     checkIdleStatus()
@@ -548,7 +773,10 @@ async function autoRefreshLoop(): Promise<void> {
     for (const dataKey of HANDLED_KEYS) {
       const state = dataStates.get(dataKey)
       if (state && isStale(dataKey, state.lastUpdated) && !queue.has(dataKey)) {
-        queue.enqueue(dataKey, 'low')
+        const threshold = STALENESS_THRESHOLDS[dataKey]
+        const age = state.lastUpdated ? Date.now() - state.lastUpdated : Infinity
+        const priority: Priority = age > threshold * 2 ? 'high' : 'medium'
+        queue.enqueue(dataKey, priority)
       }
     }
   }

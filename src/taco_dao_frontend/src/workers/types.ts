@@ -7,21 +7,20 @@
 // ============================================================================
 
 export type DataKey =
-  // Worker 1: Core Public (high priority)
+  // Worker 1: Public (core + secondary merged, high/medium priority)
   | 'cryptoPrices'
   | 'tokenDetails'
   | 'totalTreasuryValueInUsd'
   | 'aggregateAllocation'
   | 'tradingStatus'
   | 'timerStatus'
-  // Worker 2: Secondary Public (medium priority)
   | 'votingPowerMetrics'
   | 'tacoProposals'
   | 'proposalsThreads'
   | 'allNames'
   | 'neuronSnapshotStatus'
   | 'portfolioSnapshotStatus'
-  // Worker 3: Authenticated (user/admin)
+  // Worker 2: Authenticated (user/admin)
   | 'userAllocation'
   | 'systemLogs'
   | 'voterDetails'
@@ -74,21 +73,20 @@ export type DataKey =
 // Worker Assignment - Which worker handles which data
 // ============================================================================
 
-export const WORKER_ASSIGNMENT: Record<DataKey, 'core' | 'secondary' | 'auth'> = {
-  // Core public worker
-  cryptoPrices: 'core',
-  tokenDetails: 'core',
-  totalTreasuryValueInUsd: 'core',
-  aggregateAllocation: 'core',
-  tradingStatus: 'core',
-  timerStatus: 'core',
-  // Secondary public worker
-  votingPowerMetrics: 'secondary',
-  tacoProposals: 'secondary',
-  proposalsThreads: 'secondary',
-  allNames: 'secondary',
-  neuronSnapshotStatus: 'secondary',
-  portfolioSnapshotStatus: 'secondary',
+export const WORKER_ASSIGNMENT: Record<DataKey, 'public' | 'auth'> = {
+  // Public worker (merged core + secondary)
+  cryptoPrices: 'public',
+  tokenDetails: 'public',
+  totalTreasuryValueInUsd: 'public',
+  aggregateAllocation: 'public',
+  tradingStatus: 'public',
+  timerStatus: 'public',
+  votingPowerMetrics: 'public',
+  tacoProposals: 'public',
+  proposalsThreads: 'public',
+  allNames: 'public',
+  neuronSnapshotStatus: 'public',
+  portfolioSnapshotStatus: 'public',
   // Authenticated worker (user data)
   userAllocation: 'auth',
   // Authenticated worker (admin data - treasury/trading)
