@@ -573,7 +573,7 @@ async function handleSetNetwork(message: WorkerRequest): Promise<void> {
 // Queue Processing (Parallel) - 10 concurrent fetches
 // ============================================================================
 
-const MAX_CONCURRENT_FETCHES = 10
+const MAX_CONCURRENT_FETCHES = 5
 let activeFetchCount = 0
 
 async function processQueue(): Promise<void> {
