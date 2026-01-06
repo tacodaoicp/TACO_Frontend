@@ -21,6 +21,9 @@ node_modules/
 dist/
 .svelte-kit/
 
+*.log
+*.json
+
 # environment variables
 .env
 *.env
