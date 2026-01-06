@@ -700,7 +700,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useTacoStore } from '../stores/taco.store'
 import { useAdminStore } from '../stores/admin.store'
@@ -767,9 +767,6 @@ const newSkipNeuronId = ref('')
 // Sorting state
 const sortColumns = ref<Record<number, string | null>>({})
 const sortDirections = ref<Record<number, 'asc' | 'desc'>>({})
-
-// Refresh interval
-let refreshInterval: any = null
 
 // Computed properties
 const distributionInProgress = computed(() => distributionStatus.value?.inProgress || false)
@@ -1727,20 +1724,9 @@ onMounted(async () => {
       loadAvailableBalance(),
       loadRewardSkipList()
     ])
-    
-    // Auto-refresh every 30 seconds
-    refreshInterval = setInterval(() => {
-      loadData()
-    }, 30000)
   } catch (error) {
     console.error('Error loading initial data:', error)
     errorMessage.value = 'Failed to load distribution data'
-  }
-})
-
-onBeforeUnmount(() => {
-  if (refreshInterval) {
-    clearInterval(refreshInterval)
   }
 })
 </script>
