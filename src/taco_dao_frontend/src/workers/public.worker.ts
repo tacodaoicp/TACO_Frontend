@@ -609,7 +609,10 @@ async function processQueue(): Promise<void> {
       })
     }
 
-    await sleep(50)
+    // Adaptive sleep: longer when idle (no active fetches and empty queue), shorter when processing
+    // This dramatically reduces CPU overhead when the worker is waiting
+    const isIdle = activeFetchCount === 0 && queue.isEmpty()
+    await sleep(isIdle ? 500 : 50)
   }
 }
 

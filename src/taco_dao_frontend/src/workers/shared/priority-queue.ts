@@ -125,6 +125,13 @@ export class PriorityQueue {
   }
 
   /**
+   * Check if queue is empty (no items waiting)
+   */
+  isEmpty(): boolean {
+    return this.items.length === 0
+  }
+
+  /**
    * Get number of items currently processing
    */
   get processingCount(): number {
