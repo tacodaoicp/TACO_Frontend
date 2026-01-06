@@ -1,0 +1,1853 @@
+{
+  "timestamp": "2026-01-06T01:16:28.552100",
+  "base_url": "http://localhost:4173",
+  "pages": [
+    {
+      "path": "/",
+      "url": "http://localhost:4173/",
+      "load_time_seconds": 8.86,
+      "timestamp": "2026-01-06T01:16:40.504691",
+      "tab_memory": {
+        "renderer_mb": 0,
+        "shared_worker_mb": 908.96,
+        "service_worker_mb": 0,
+        "utility_worker_mb": 0,
+        "gpu_mb": 153.07,
+        "utility_mb": 157.8,
+        "tab_total_mb": 908.96,
+        "processes": [
+          {
+            "pid": 23220,
+            "type": "shared_worker",
+            "memory_mb": 415.4
+          },
+          {
+            "pid": 23231,
+            "type": "shared_worker",
+            "memory_mb": 263.24
+          },
+          {
+            "pid": 23121,
+            "type": "unknown",
+            "memory_mb": 192.12
+          },
+          {
+            "pid": 23251,
+            "type": "shared_worker",
+            "memory_mb": 170.0
+          },
+          {
+            "pid": 23159,
+            "type": "gpu",
+            "memory_mb": 153.07
+          },
+          {
+            "pid": 23161,
+            "type": "utility",
+            "memory_mb": 113.89
+          },
+          {
+            "pid": 23136,
+            "type": "unknown",
+            "memory_mb": 62.73
+          },
+          {
+            "pid": 23135,
+            "type": "unknown",
+            "memory_mb": 62.28
+          },
+          {
+            "pid": 23252,
+            "type": "shared_worker",
+            "memory_mb": 60.32
+          },
+          {
+            "pid": 23162,
+            "type": "utility",
+            "memory_mb": 43.91
+          }
+        ]
+      },
+      "js_heap": {
+        "js_heap_used_mb": 17.6,
+        "js_heap_total_mb": 51.93,
+        "js_heap_limit_mb": 4095.75
+      },
+      "cdp_metrics": {
+        "dom_counters": {
+          "documents": 5,
+          "nodes": 653,
+          "jsEventListeners": 95
+        },
+        "performance_metrics": {
+          "js_heap_used_mb": 13.44,
+          "js_heap_total_mb": 47.75,
+          "dom_nodes": 653,
+          "documents": 5,
+          "frames": 8,
+          "js_event_listeners": 95,
+          "layout_objects": 467,
+          "resources": 59,
+          "script_duration_ms": 0,
+          "layout_duration_ms": 0,
+          "task_duration_ms": 1.06
+        },
+        "raw_metrics": {
+          "Timestamp": 28564.659228,
+          "AudioHandlers": 0,
+          "AudioWorkletProcessors": 0,
+          "Documents": 5,
+          "Frames": 8,
+          "JSEventListeners": 95,
+          "LayoutObjects": 467,
+          "MediaKeySessions": 0,
+          "MediaKeys": 0,
+          "Nodes": 653,
+          "Resources": 59,
+          "ContextLifecycleStateObservers": 13,
+          "V8PerContextDatas": 1,
+          "WorkerGlobalScopes": 2,
+          "UACSSResources": 0,
+          "RTCPeerConnections": 0,
+          "ResourceFetchers": 7,
+          "AdSubframes": 0,
+          "DetachedScriptStates": 0,
+          "ArrayBufferContents": 9139,
+          "LayoutCount": 0,
+          "RecalcStyleCount": 0,
+          "LayoutDuration": 0,
+          "RecalcStyleDuration": 0,
+          "DevToolsCommandDuration": 0.000927,
+          "ScriptDuration": 0,
+          "V8CompileDuration": 0,
+          "TaskDuration": 0.001063,
+          "TaskOtherDuration": 0.000136,
+          "ThreadTime": 0.000869,
+          "ProcessTime": 12.41,
+          "JSHeapUsedSize": 14087732,
+          "JSHeapTotalSize": 50069504,
+          "FirstMeaningfulPaint": 28556.0788,
+          "DomContentLoaded": 28555.903454,
+          "NavigationStart": 28555.762214
+        }
+      },
+      "detailed_breakdown": {
+        "categories": [
+          {
+            "count": 8,
+            "largest": [
+              {
+                "dimensions": "774x670",
+                "sizeMB": 1.98,
+                "src": "chef-read-4d89f81f.webp"
+              },
+              {
+                "dimensions": "774x668",
+                "sizeMB": 1.97,
+                "src": "chef-taco-b14e9110.webp"
+              },
+              {
+                "dimensions": "775x656",
+                "sizeMB": 1.94,
+                "src": "chef-wave-64398bba.webp"
+              },
+              {
+                "dimensions": "775x653",
+                "sizeMB": 1.93,
+                "src": "chef-friends-955c5082.webp"
+              }
+            ],
+            "name": "Decoded Images",
+            "sizeMB": 8.18
+          },
+          {
+            "count": 10,
+            "name": "Stylesheets",
+            "sizeMB": 1
+          },
+          {
+            "name": "DOM Tree",
+            "nodeCount": 441,
+            "sizeMB": 0.32
+          },
+          {
+            "name": "WebAssembly Memory",
+            "note": "WASM modules (dfinity/agent uses WASM)",
+            "sizeMB": 0
+          },
+          {
+            "details": [],
+            "name": "ArrayBuffers/TypedArrays",
+            "sizeMB": 0
+          },
+          {
+            "count": 0,
+            "name": "Canvas Memory",
+            "sizeMB": 0
+          },
+          {
+            "count": 0,
+            "name": "Video Memory",
+            "sizeMB": 0
+          },
+          {
+            "name": "Compiled JavaScript",
+            "note": "V8 compiles JS to machine code (~3-10x source size)",
+            "scriptCount": 1,
+            "sizeMB": "varies"
+          },
+          {
+            "name": "Web Workers",
+            "note": "SharedWorkers detected - memory shared across tabs",
+            "sizeMB": "see worker analysis"
+          }
+        ],
+        "details": {
+          "largeGlobals": []
+        }
+      },
+      "heap_objects": {
+        "object_types": [
+          {
+            "count": 1,
+            "estimatedKB": 4,
+            "type": "Window"
+          }
+        ]
+      },
+      "breakdown": {
+        "categories": [
+          {
+            "count": 8,
+            "name": "Decoded Images",
+            "sizeKB": 8377
+          },
+          {
+            "count": 441,
+            "name": "DOM Nodes",
+            "sizeKB": 44
+          },
+          {
+            "count": 0,
+            "name": "Pinia Stores",
+            "sizeKB": 0
+          },
+          {
+            "count": 0,
+            "name": "Global Objects",
+            "sizeKB": 0
+          },
+          {
+            "count": 0,
+            "name": "Worker Bridge Data",
+            "sizeKB": 0
+          },
+          {
+            "count": 0,
+            "name": "Event Listeners",
+            "sizeKB": 0
+          }
+        ],
+        "details": {
+          "dom": {
+            "estimatedKB": 44,
+            "nodeCount": 441
+          },
+          "globals": [],
+          "images": {
+            "count": 8,
+            "largest": [
+              {
+                "dimensions": "774x670",
+                "sizeKB": 2026,
+                "src": "chef-read-4d89f81f.webp"
+              },
+              {
+                "dimensions": "774x668",
+                "sizeKB": 2020,
+                "src": "chef-taco-b14e9110.webp"
+              },
+              {
+                "dimensions": "775x656",
+                "sizeKB": 1986,
+                "src": "chef-wave-64398bba.webp"
+              },
+              {
+                "dimensions": "775x653",
+                "sizeKB": 1977,
+                "src": "chef-friends-955c5082.webp"
+              },
+              {
+                "dimensions": "300x150",
+                "sizeKB": 176,
+                "src": "tacoDaoTaco-9e29b28d.svg"
+              }
+            ],
+            "totalKB": 8377
+          },
+          "listeners": {
+            "estimated": 0,
+            "estimatedKB": 0
+          },
+          "piniaStores": [],
+          "workerBridge": []
+        }
+      },
+      "indexeddb": {
+        "databases": [
+          {
+            "name": "auth-client-db",
+            "storeCount": 1,
+            "stores": [
+              "ic-keyval"
+            ],
+            "version": 1
+          },
+          {
+            "name": "taco-dao-cache",
+            "version": 1
+          },
+          {
+            "name": "ic-delegation",
+            "storeCount": 0,
+            "stores": [],
+            "version": 1
+          },
+          {
+            "name": "keyval-store",
+            "storeCount": 0,
+            "stores": [],
+            "version": 1
+          }
+        ],
+        "error": null,
+        "storageEstimate": {
+          "percent": 0,
+          "quota_mb": 57290.15,
+          "usage_mb": 0.85
+        },
+        "supported": true
+      },
+      "workers": {
+        "broadcastChannelSupported": true,
+        "dedicatedWorkerSupported": true,
+        "hasActiveSharedWorker": false,
+        "messageChannelSupported": true,
+        "serviceWorker": {
+          "controlled": false,
+          "scriptURL": null,
+          "state": "none",
+          "supported": true
+        },
+        "sharedWorkerSupported": true,
+        "workerDetails": []
+      },
+      "shared_worker_cdp": {
+        "worker_targets": [
+          {
+            "type": "shared_worker",
+            "title": "taco-public-v3",
+            "url": "http://localhost:4173/assets/public.worker-33c08f7f.js",
+            "targetId": "FEF09681D7FF859634E15C61BD4D80CA",
+            "attached": false
+          },
+          {
+            "type": "shared_worker",
+            "title": "taco-authenticated-v3",
+            "url": "http://localhost:4173/assets/authenticated.worker-0f47af7b.js",
+            "targetId": "D25D05BBA7ACFADBE0AFDF419D9CDEF8",
+            "attached": false
+          },
+          {
+            "type": "service_worker",
+            "title": "Service Worker https://dexscreener.com/service-worker.js",
+            "url": "https://dexscreener.com/service-worker.js",
+            "targetId": "4A28A604B0EAD475F2930CA0718FC7CF",
+            "attached": true
+          }
+        ],
+        "worker_count": 3,
+        "shared_worker_count": 2,
+        "service_worker_count": 1,
+        "dedicated_worker_count": 0,
+        "process_info": []
+      },
+      "chrome_processes": {
+        "total_chrome_memory_mb": 1536.87,
+        "renderer_memory_mb": 896.2,
+        "shared_worker_memory_mb": 0,
+        "gpu_memory_mb": 151.7,
+        "utility_memory_mb": 157.87,
+        "other_memory_mb": 331.11,
+        "process_count": 12,
+        "processes": [
+          {
+            "pid": 23220,
+            "type": "renderer",
+            "memory_mb": 406.55,
+            "cmdline_preview": "/opt/google/chrome/chrome --type=renderer --crashpad-handler-pid=23128 --enable-crash-reporter=, --n..."
+          },
+          {
+            "pid": 23231,
+            "type": "renderer",
+            "memory_mb": 259.02,
+            "cmdline_preview": "/opt/google/chrome/chrome --type=renderer --crashpad-handler-pid=23128 --enable-crash-reporter=, --n..."
+          },
+          {
+            "pid": 23121,
+            "type": "other",
+            "memory_mb": 204.35,
+            "cmdline_preview": "/opt/google/chrome/chrome --allow-pre-commit-input --disable-application-cache --disable-background-..."
+          },
+          {
+            "pid": 23251,
+            "type": "renderer",
+            "memory_mb": 169.48,
+            "cmdline_preview": "/opt/google/chrome/chrome --type=renderer --crashpad-handler-pid=23128 --enable-crash-reporter=, --n..."
+          },
+          {
+            "pid": 23159,
+            "type": "gpu",
+            "memory_mb": 151.7,
+            "cmdline_preview": "/opt/google/chrome/chrome --type=gpu-process --no-sandbox --disable-dev-shm-usage --headless=new --o..."
+          },
+          {
+            "pid": 23161,
+            "type": "utility",
+            "memory_mb": 113.96,
+            "cmdline_preview": "/opt/google/chrome/chrome --type=utility --utility-sub-type=network.mojom.NetworkService --lang=en-U..."
+          },
+          {
+            "pid": 23136,
+            "type": "other",
+            "memory_mb": 62.79,
+            "cmdline_preview": "/opt/google/chrome/chrome --type=zygote --no-sandbox --enable-logging=stderr --headless=new --log-le..."
+          },
+          {
+            "pid": 23135,
+            "type": "other",
+            "memory_mb": 62.28,
+            "cmdline_preview": "/opt/google/chrome/chrome --type=zygote --no-zygote-sandbox --no-sandbox --enable-logging=stderr --h..."
+          },
+          {
+            "pid": 23252,
+            "type": "renderer",
+            "memory_mb": 61.14,
+            "cmdline_preview": "/opt/google/chrome/chrome --type=renderer --crashpad-handler-pid=23128 --enable-crash-reporter=, --n..."
+          },
+          {
+            "pid": 23162,
+            "type": "utility",
+            "memory_mb": 43.91,
+            "cmdline_preview": "/opt/google/chrome/chrome --type=utility --utility-sub-type=storage.mojom.StorageService --lang=en-U..."
+          },
+          {
+            "pid": 23126,
+            "type": "other",
+            "memory_mb": 0.86,
+            "cmdline_preview": "cat"
+          },
+          {
+            "pid": 23125,
+            "type": "other",
+            "memory_mb": 0.83,
+            "cmdline_preview": "cat"
+          }
+        ]
+      }
+    },
+    {
+      "path": "/dao",
+      "url": "http://localhost:4173/dao",
+      "load_time_seconds": 9.11,
+      "timestamp": "2026-01-06T01:16:52.559692",
+      "tab_memory": {
+        "renderer_mb": 0,
+        "shared_worker_mb": 685.25,
+        "service_worker_mb": 0,
+        "utility_worker_mb": 0,
+        "gpu_mb": 139.59,
+        "utility_mb": 161.13,
+        "tab_total_mb": 685.25,
+        "processes": [
+          {
+            "pid": 23220,
+            "type": "shared_worker",
+            "memory_mb": 417.54
+          },
+          {
+            "pid": 23231,
+            "type": "shared_worker",
+            "memory_mb": 206.57
+          },
+          {
+            "pid": 23121,
+            "type": "unknown",
+            "memory_mb": 205.44
+          },
+          {
+            "pid": 23159,
+            "type": "gpu",
+            "memory_mb": 139.59
+          },
+          {
+            "pid": 23161,
+            "type": "utility",
+            "memory_mb": 113.64
+          },
+          {
+            "pid": 23136,
+            "type": "unknown",
+            "memory_mb": 62.79
+          },
+          {
+            "pid": 23135,
+            "type": "unknown",
+            "memory_mb": 62.28
+          },
+          {
+            "pid": 23252,
+            "type": "shared_worker",
+            "memory_mb": 61.14
+          },
+          {
+            "pid": 23162,
+            "type": "utility",
+            "memory_mb": 47.5
+          },
+          {
+            "pid": 23115,
+            "type": "unknown",
+            "memory_mb": 47.31
+          }
+        ]
+      },
+      "js_heap": {
+        "js_heap_used_mb": 18.9,
+        "js_heap_total_mb": 50.95,
+        "js_heap_limit_mb": 4095.75
+      },
+      "cdp_metrics": {
+        "dom_counters": {
+          "documents": 5,
+          "nodes": 2025,
+          "jsEventListeners": 457
+        },
+        "performance_metrics": {
+          "js_heap_used_mb": 14.71,
+          "js_heap_total_mb": 46.75,
+          "dom_nodes": 2025,
+          "documents": 5,
+          "frames": 4,
+          "js_event_listeners": 457,
+          "layout_objects": 655,
+          "resources": 66,
+          "script_duration_ms": 568.18,
+          "layout_duration_ms": 55.42,
+          "task_duration_ms": 4212.64
+        },
+        "raw_metrics": {
+          "Timestamp": 28576.629665,
+          "AudioHandlers": 0,
+          "AudioWorkletProcessors": 0,
+          "Documents": 5,
+          "Frames": 4,
+          "JSEventListeners": 457,
+          "LayoutObjects": 655,
+          "MediaKeySessions": 0,
+          "MediaKeys": 0,
+          "Nodes": 2025,
+          "Resources": 66,
+          "ContextLifecycleStateObservers": 12,
+          "V8PerContextDatas": 1,
+          "WorkerGlobalScopes": 2,
+          "UACSSResources": 0,
+          "RTCPeerConnections": 0,
+          "ResourceFetchers": 7,
+          "AdSubframes": 0,
+          "DetachedScriptStates": 0,
+          "ArrayBufferContents": 276,
+          "LayoutCount": 180,
+          "RecalcStyleCount": 185,
+          "LayoutDuration": 0.055416,
+          "RecalcStyleDuration": 0.099331,
+          "DevToolsCommandDuration": 0.073529,
+          "ScriptDuration": 0.568183,
+          "V8CompileDuration": 0,
+          "TaskDuration": 4.212641,
+          "TaskOtherDuration": 3.416182,
+          "ThreadTime": 2.916209,
+          "ProcessTime": 31.14,
+          "JSHeapUsedSize": 15429340,
+          "JSHeapTotalSize": 49020928,
+          "FirstMeaningfulPaint": 28567.921679,
+          "DomContentLoaded": 28567.73676,
+          "NavigationStart": 28567.488223
+        }
+      },
+      "detailed_breakdown": {
+        "categories": [
+          {
+            "count": 22,
+            "largest": [
+              {
+                "dimensions": "774x670",
+                "sizeMB": 1.98,
+                "src": "chef-read-4d89f81f.webp"
+              },
+              {
+                "dimensions": "774x668",
+                "sizeMB": 1.97,
+                "src": "chef-taco-b14e9110.webp"
+              },
+              {
+                "dimensions": "775x656",
+                "sizeMB": 1.94,
+                "src": "chef-wave-64398bba.webp"
+              },
+              {
+                "dimensions": "775x653",
+                "sizeMB": 1.93,
+                "src": "chef-friends-955c5082.webp"
+              }
+            ],
+            "name": "Decoded Images",
+            "sizeMB": 9.01
+          },
+          {
+            "count": 12,
+            "name": "Stylesheets",
+            "sizeMB": 1.2
+          },
+          {
+            "name": "DOM Tree",
+            "nodeCount": 1165,
+            "sizeMB": 0.83
+          },
+          {
+            "name": "WebAssembly Memory",
+            "note": "WASM modules (dfinity/agent uses WASM)",
+            "sizeMB": 0
+          },
+          {
+            "details": [],
+            "name": "ArrayBuffers/TypedArrays",
+            "sizeMB": 0
+          },
+          {
+            "count": 0,
+            "name": "Canvas Memory",
+            "sizeMB": 0
+          },
+          {
+            "count": 0,
+            "name": "Video Memory",
+            "sizeMB": 0
+          },
+          {
+            "name": "Compiled JavaScript",
+            "note": "V8 compiles JS to machine code (~3-10x source size)",
+            "scriptCount": 1,
+            "sizeMB": "varies"
+          },
+          {
+            "name": "Web Workers",
+            "note": "SharedWorkers detected - memory shared across tabs",
+            "sizeMB": "see worker analysis"
+          }
+        ],
+        "details": {
+          "largeGlobals": []
+        }
+      },
+      "heap_objects": {
+        "object_types": [
+          {
+            "count": 3,
+            "estimatedKB": 12,
+            "type": "Window"
+          },
+          {
+            "count": 37,
+            "estimatedKB": 7,
+            "type": "Object"
+          },
+          {
+            "count": 38,
+            "estimatedKB": 4,
+            "type": "e"
+          }
+        ]
+      },
+      "breakdown": {
+        "categories": [
+          {
+            "count": 22,
+            "name": "Decoded Images",
+            "sizeKB": 9225
+          },
+          {
+            "count": 1165,
+            "name": "DOM Nodes",
+            "sizeKB": 117
+          },
+          {
+            "count": 0,
+            "name": "Pinia Stores",
+            "sizeKB": 0
+          },
+          {
+            "count": 0,
+            "name": "Global Objects",
+            "sizeKB": 0
+          },
+          {
+            "count": 0,
+            "name": "Worker Bridge Data",
+            "sizeKB": 0
+          },
+          {
+            "count": 0,
+            "name": "Event Listeners",
+            "sizeKB": 0
+          }
+        ],
+        "details": {
+          "dom": {
+            "estimatedKB": 117,
+            "nodeCount": 1165
+          },
+          "globals": [],
+          "images": {
+            "count": 22,
+            "largest": [
+              {
+                "dimensions": "774x670",
+                "sizeKB": 2026,
+                "src": "chef-read-4d89f81f.webp"
+              },
+              {
+                "dimensions": "774x668",
+                "sizeKB": 2020,
+                "src": "chef-taco-b14e9110.webp"
+              },
+              {
+                "dimensions": "775x656",
+                "sizeKB": 1986,
+                "src": "chef-wave-64398bba.webp"
+              },
+              {
+                "dimensions": "775x653",
+                "sizeKB": 1977,
+                "src": "chef-friends-955c5082.webp"
+              },
+              {
+                "dimensions": "300x150",
+                "sizeKB": 176,
+                "src": "tacoDaoTaco-9e29b28d.svg"
+              }
+            ],
+            "totalKB": 9225
+          },
+          "listeners": {
+            "estimated": 0,
+            "estimatedKB": 0
+          },
+          "piniaStores": [],
+          "workerBridge": []
+        }
+      },
+      "indexeddb": {
+        "databases": [
+          {
+            "name": "auth-client-db",
+            "storeCount": 1,
+            "stores": [
+              "ic-keyval"
+            ],
+            "version": 1
+          },
+          {
+            "name": "ic-delegation",
+            "storeCount": 0,
+            "stores": [],
+            "version": 1
+          },
+          {
+            "name": "keyval-store",
+            "storeCount": 0,
+            "stores": [],
+            "version": 1
+          },
+          {
+            "name": "taco-dao-cache",
+            "version": 1
+          }
+        ],
+        "error": null,
+        "storageEstimate": {
+          "percent": 0,
+          "quota_mb": 57290.15,
+          "usage_mb": 0.85
+        },
+        "supported": true
+      },
+      "workers": {
+        "broadcastChannelSupported": true,
+        "dedicatedWorkerSupported": true,
+        "hasActiveSharedWorker": false,
+        "messageChannelSupported": true,
+        "serviceWorker": {
+          "controlled": false,
+          "scriptURL": null,
+          "state": "none",
+          "supported": true
+        },
+        "sharedWorkerSupported": true,
+        "workerDetails": []
+      },
+      "shared_worker_cdp": {
+        "worker_targets": [
+          {
+            "type": "shared_worker",
+            "title": "taco-public-v3",
+            "url": "http://localhost:4173/assets/public.worker-33c08f7f.js",
+            "targetId": "0E2CB2B666ADE57AFDD99F1BB0EBFCEC",
+            "attached": false
+          },
+          {
+            "type": "shared_worker",
+            "title": "taco-authenticated-v3",
+            "url": "http://localhost:4173/assets/authenticated.worker-0f47af7b.js",
+            "targetId": "135543B2C012A391B4569764F77DC15F",
+            "attached": false
+          },
+          {
+            "type": "service_worker",
+            "title": "Service Worker https://dexscreener.com/service-worker.js",
+            "url": "https://dexscreener.com/service-worker.js",
+            "targetId": "4A28A604B0EAD475F2930CA0718FC7CF",
+            "attached": false
+          }
+        ],
+        "worker_count": 3,
+        "shared_worker_count": 2,
+        "service_worker_count": 1,
+        "dedicated_worker_count": 0,
+        "process_info": []
+      },
+      "chrome_processes": {
+        "total_chrome_memory_mb": 1220.5,
+        "renderer_memory_mb": 587.95,
+        "shared_worker_memory_mb": 0,
+        "gpu_memory_mb": 139.59,
+        "utility_memory_mb": 161.13,
+        "other_memory_mb": 331.83,
+        "process_count": 11,
+        "processes": [
+          {
+            "pid": 23220,
+            "type": "renderer",
+            "memory_mb": 323.72,
+            "cmdline_preview": "/opt/google/chrome/chrome --type=renderer --crashpad-handler-pid=23128 --enable-crash-reporter=, --n..."
+          },
+          {
+            "pid": 23121,
+            "type": "other",
+            "memory_mb": 205.07,
+            "cmdline_preview": "/opt/google/chrome/chrome --allow-pre-commit-input --disable-application-cache --disable-background-..."
+          },
+          {
+            "pid": 23231,
+            "type": "renderer",
+            "memory_mb": 203.09,
+            "cmdline_preview": "/opt/google/chrome/chrome --type=renderer --crashpad-handler-pid=23128 --enable-crash-reporter=, --n..."
+          },
+          {
+            "pid": 23159,
+            "type": "gpu",
+            "memory_mb": 139.59,
+            "cmdline_preview": "/opt/google/chrome/chrome --type=gpu-process --no-sandbox --disable-dev-shm-usage --headless=new --o..."
+          },
+          {
+            "pid": 23161,
+            "type": "utility",
+            "memory_mb": 113.64,
+            "cmdline_preview": "/opt/google/chrome/chrome --type=utility --utility-sub-type=network.mojom.NetworkService --lang=en-U..."
+          },
+          {
+            "pid": 23136,
+            "type": "other",
+            "memory_mb": 62.79,
+            "cmdline_preview": "/opt/google/chrome/chrome --type=zygote --no-sandbox --enable-logging=stderr --headless=new --log-le..."
+          },
+          {
+            "pid": 23135,
+            "type": "other",
+            "memory_mb": 62.28,
+            "cmdline_preview": "/opt/google/chrome/chrome --type=zygote --no-zygote-sandbox --no-sandbox --enable-logging=stderr --h..."
+          },
+          {
+            "pid": 23252,
+            "type": "renderer",
+            "memory_mb": 61.14,
+            "cmdline_preview": "/opt/google/chrome/chrome --type=renderer --crashpad-handler-pid=23128 --enable-crash-reporter=, --n..."
+          },
+          {
+            "pid": 23162,
+            "type": "utility",
+            "memory_mb": 47.5,
+            "cmdline_preview": "/opt/google/chrome/chrome --type=utility --utility-sub-type=storage.mojom.StorageService --lang=en-U..."
+          },
+          {
+            "pid": 23126,
+            "type": "other",
+            "memory_mb": 0.86,
+            "cmdline_preview": "cat"
+          },
+          {
+            "pid": 23125,
+            "type": "other",
+            "memory_mb": 0.83,
+            "cmdline_preview": "cat"
+          }
+        ]
+      }
+    },
+    {
+      "path": "/vote",
+      "url": "http://localhost:4173/vote",
+      "load_time_seconds": 9.05,
+      "timestamp": "2026-01-06T01:17:04.766193",
+      "tab_memory": {
+        "renderer_mb": 0,
+        "shared_worker_mb": 531.52,
+        "service_worker_mb": 0,
+        "utility_worker_mb": 0,
+        "gpu_mb": 144.12,
+        "utility_mb": 161.32,
+        "tab_total_mb": 531.52,
+        "processes": [
+          {
+            "pid": 23220,
+            "type": "shared_worker",
+            "memory_mb": 470.38
+          },
+          {
+            "pid": 23121,
+            "type": "unknown",
+            "memory_mb": 206.66
+          },
+          {
+            "pid": 23159,
+            "type": "gpu",
+            "memory_mb": 144.12
+          },
+          {
+            "pid": 23161,
+            "type": "utility",
+            "memory_mb": 113.8
+          },
+          {
+            "pid": 23115,
+            "type": "unknown",
+            "memory_mb": 78.11
+          },
+          {
+            "pid": 23136,
+            "type": "unknown",
+            "memory_mb": 62.79
+          },
+          {
+            "pid": 23135,
+            "type": "unknown",
+            "memory_mb": 62.28
+          },
+          {
+            "pid": 23252,
+            "type": "shared_worker",
+            "memory_mb": 61.14
+          },
+          {
+            "pid": 23162,
+            "type": "utility",
+            "memory_mb": 47.52
+          }
+        ]
+      },
+      "js_heap": {
+        "js_heap_used_mb": 18.68,
+        "js_heap_total_mb": 56.04,
+        "js_heap_limit_mb": 4095.75
+      },
+      "cdp_metrics": {
+        "dom_counters": {
+          "documents": 5,
+          "nodes": 1414,
+          "jsEventListeners": 336
+        },
+        "performance_metrics": {
+          "js_heap_used_mb": 14.4,
+          "js_heap_total_mb": 51.75,
+          "dom_nodes": 1414,
+          "documents": 5,
+          "frames": 4,
+          "js_event_listeners": 336,
+          "layout_objects": 623,
+          "resources": 61,
+          "script_duration_ms": 519.31,
+          "layout_duration_ms": 54.7,
+          "task_duration_ms": 1061.08
+        },
+        "raw_metrics": {
+          "Timestamp": 28588.621063,
+          "AudioHandlers": 0,
+          "AudioWorkletProcessors": 0,
+          "Documents": 5,
+          "Frames": 4,
+          "JSEventListeners": 336,
+          "LayoutObjects": 623,
+          "MediaKeySessions": 0,
+          "MediaKeys": 0,
+          "Nodes": 1414,
+          "Resources": 61,
+          "ContextLifecycleStateObservers": 12,
+          "V8PerContextDatas": 1,
+          "WorkerGlobalScopes": 2,
+          "UACSSResources": 0,
+          "RTCPeerConnections": 0,
+          "ResourceFetchers": 7,
+          "AdSubframes": 0,
+          "DetachedScriptStates": 0,
+          "ArrayBufferContents": 2817,
+          "LayoutCount": 118,
+          "RecalcStyleCount": 117,
+          "LayoutDuration": 0.0547,
+          "RecalcStyleDuration": 0.059247,
+          "DevToolsCommandDuration": 0.056443,
+          "ScriptDuration": 0.51931,
+          "V8CompileDuration": 0,
+          "TaskDuration": 1.061077,
+          "TaskOtherDuration": 0.371377,
+          "ThreadTime": 0.770613,
+          "ProcessTime": 49.27,
+          "JSHeapUsedSize": 15096484,
+          "JSHeapTotalSize": 54263808,
+          "FirstMeaningfulPaint": 28580.231959,
+          "DomContentLoaded": 28579.802275,
+          "NavigationStart": 28579.54104
+        }
+      },
+      "detailed_breakdown": {
+        "categories": [
+          {
+            "count": 10,
+            "largest": [
+              {
+                "dimensions": "774x670",
+                "sizeMB": 1.98,
+                "src": "chef-read-4d89f81f.webp"
+              },
+              {
+                "dimensions": "774x668",
+                "sizeMB": 1.97,
+                "src": "chef-taco-b14e9110.webp"
+              },
+              {
+                "dimensions": "775x656",
+                "sizeMB": 1.94,
+                "src": "chef-wave-64398bba.webp"
+              },
+              {
+                "dimensions": "775x653",
+                "sizeMB": 1.93,
+                "src": "chef-friends-955c5082.webp"
+              }
+            ],
+            "name": "Decoded Images",
+            "sizeMB": 8.3
+          },
+          {
+            "count": 12,
+            "name": "Stylesheets",
+            "sizeMB": 1.2
+          },
+          {
+            "name": "DOM Tree",
+            "nodeCount": 922,
+            "sizeMB": 0.66
+          },
+          {
+            "name": "WebAssembly Memory",
+            "note": "WASM modules (dfinity/agent uses WASM)",
+            "sizeMB": 0
+          },
+          {
+            "details": [],
+            "name": "ArrayBuffers/TypedArrays",
+            "sizeMB": 0
+          },
+          {
+            "count": 0,
+            "name": "Canvas Memory",
+            "sizeMB": 0
+          },
+          {
+            "count": 0,
+            "name": "Video Memory",
+            "sizeMB": 0
+          },
+          {
+            "name": "Compiled JavaScript",
+            "note": "V8 compiles JS to machine code (~3-10x source size)",
+            "scriptCount": 1,
+            "sizeMB": "varies"
+          },
+          {
+            "name": "Web Workers",
+            "note": "SharedWorkers detected - memory shared across tabs",
+            "sizeMB": "see worker analysis"
+          }
+        ],
+        "details": {
+          "largeGlobals": []
+        }
+      },
+      "heap_objects": {
+        "object_types": [
+          {
+            "count": 3,
+            "estimatedKB": 12,
+            "type": "Window"
+          },
+          {
+            "count": 37,
+            "estimatedKB": 7,
+            "type": "Object"
+          },
+          {
+            "count": 38,
+            "estimatedKB": 4,
+            "type": "e"
+          }
+        ]
+      },
+      "breakdown": {
+        "categories": [
+          {
+            "count": 10,
+            "name": "Decoded Images",
+            "sizeKB": 8505
+          },
+          {
+            "count": 922,
+            "name": "DOM Nodes",
+            "sizeKB": 92
+          },
+          {
+            "count": 0,
+            "name": "Pinia Stores",
+            "sizeKB": 0
+          },
+          {
+            "count": 0,
+            "name": "Global Objects",
+            "sizeKB": 0
+          },
+          {
+            "count": 0,
+            "name": "Worker Bridge Data",
+            "sizeKB": 0
+          },
+          {
+            "count": 0,
+            "name": "Event Listeners",
+            "sizeKB": 0
+          }
+        ],
+        "details": {
+          "dom": {
+            "estimatedKB": 92,
+            "nodeCount": 922
+          },
+          "globals": [],
+          "images": {
+            "count": 10,
+            "largest": [
+              {
+                "dimensions": "774x670",
+                "sizeKB": 2026,
+                "src": "chef-read-4d89f81f.webp"
+              },
+              {
+                "dimensions": "774x668",
+                "sizeKB": 2020,
+                "src": "chef-taco-b14e9110.webp"
+              },
+              {
+                "dimensions": "775x656",
+                "sizeKB": 1986,
+                "src": "chef-wave-64398bba.webp"
+              },
+              {
+                "dimensions": "775x653",
+                "sizeKB": 1977,
+                "src": "chef-friends-955c5082.webp"
+              },
+              {
+                "dimensions": "300x150",
+                "sizeKB": 176,
+                "src": "tacoDaoTaco-9e29b28d.svg"
+              }
+            ],
+            "totalKB": 8505
+          },
+          "listeners": {
+            "estimated": 0,
+            "estimatedKB": 0
+          },
+          "piniaStores": [],
+          "workerBridge": []
+        }
+      },
+      "indexeddb": {
+        "databases": [
+          {
+            "name": "auth-client-db",
+            "storeCount": 1,
+            "stores": [
+              "ic-keyval"
+            ],
+            "version": 1
+          },
+          {
+            "name": "ic-delegation",
+            "storeCount": 0,
+            "stores": [],
+            "version": 1
+          },
+          {
+            "name": "keyval-store",
+            "storeCount": 0,
+            "stores": [],
+            "version": 1
+          },
+          {
+            "name": "taco-dao-cache",
+            "version": 1
+          }
+        ],
+        "error": null,
+        "storageEstimate": {
+          "percent": 0,
+          "quota_mb": 57290.15,
+          "usage_mb": 0.97
+        },
+        "supported": true
+      },
+      "workers": {
+        "broadcastChannelSupported": true,
+        "dedicatedWorkerSupported": true,
+        "hasActiveSharedWorker": false,
+        "messageChannelSupported": true,
+        "serviceWorker": {
+          "controlled": false,
+          "scriptURL": null,
+          "state": "none",
+          "supported": true
+        },
+        "sharedWorkerSupported": true,
+        "workerDetails": []
+      },
+      "shared_worker_cdp": {
+        "worker_targets": [
+          {
+            "type": "shared_worker",
+            "title": "taco-public-v3",
+            "url": "http://localhost:4173/assets/public.worker-33c08f7f.js",
+            "targetId": "FF3AC2E648908954B7EF3BA7CFFD7FFF",
+            "attached": false
+          },
+          {
+            "type": "shared_worker",
+            "title": "taco-authenticated-v3",
+            "url": "http://localhost:4173/assets/authenticated.worker-0f47af7b.js",
+            "targetId": "9D0A8059774EE126ABD3E5C7D9120294",
+            "attached": false
+          }
+        ],
+        "worker_count": 2,
+        "shared_worker_count": 2,
+        "service_worker_count": 0,
+        "dedicated_worker_count": 0,
+        "process_info": []
+      },
+      "chrome_processes": {
+        "total_chrome_memory_mb": 1102.96,
+        "renderer_memory_mb": 463.79,
+        "shared_worker_memory_mb": 0,
+        "gpu_memory_mb": 144.12,
+        "utility_memory_mb": 161.25,
+        "other_memory_mb": 333.8,
+        "process_count": 10,
+        "processes": [
+          {
+            "pid": 23220,
+            "type": "renderer",
+            "memory_mb": 402.65,
+            "cmdline_preview": "/opt/google/chrome/chrome --type=renderer --crashpad-handler-pid=23128 --enable-crash-reporter=, --n..."
+          },
+          {
+            "pid": 23121,
+            "type": "other",
+            "memory_mb": 207.05,
+            "cmdline_preview": "/opt/google/chrome/chrome --allow-pre-commit-input --disable-application-cache --disable-background-..."
+          },
+          {
+            "pid": 23159,
+            "type": "gpu",
+            "memory_mb": 144.12,
+            "cmdline_preview": "/opt/google/chrome/chrome --type=gpu-process --no-sandbox --disable-dev-shm-usage --headless=new --o..."
+          },
+          {
+            "pid": 23161,
+            "type": "utility",
+            "memory_mb": 113.73,
+            "cmdline_preview": "/opt/google/chrome/chrome --type=utility --utility-sub-type=network.mojom.NetworkService --lang=en-U..."
+          },
+          {
+            "pid": 23136,
+            "type": "other",
+            "memory_mb": 62.79,
+            "cmdline_preview": "/opt/google/chrome/chrome --type=zygote --no-sandbox --enable-logging=stderr --headless=new --log-le..."
+          },
+          {
+            "pid": 23135,
+            "type": "other",
+            "memory_mb": 62.28,
+            "cmdline_preview": "/opt/google/chrome/chrome --type=zygote --no-zygote-sandbox --no-sandbox --enable-logging=stderr --h..."
+          },
+          {
+            "pid": 23252,
+            "type": "renderer",
+            "memory_mb": 61.14,
+            "cmdline_preview": "/opt/google/chrome/chrome --type=renderer --crashpad-handler-pid=23128 --enable-crash-reporter=, --n..."
+          },
+          {
+            "pid": 23162,
+            "type": "utility",
+            "memory_mb": 47.52,
+            "cmdline_preview": "/opt/google/chrome/chrome --type=utility --utility-sub-type=storage.mojom.StorageService --lang=en-U..."
+          },
+          {
+            "pid": 23126,
+            "type": "other",
+            "memory_mb": 0.86,
+            "cmdline_preview": "cat"
+          },
+          {
+            "pid": 23125,
+            "type": "other",
+            "memory_mb": 0.83,
+            "cmdline_preview": "cat"
+          }
+        ]
+      }
+    },
+    {
+      "path": "/wallet",
+      "url": "http://localhost:4173/wallet",
+      "load_time_seconds": 8.97,
+      "timestamp": "2026-01-06T01:17:15.090750",
+      "tab_memory": {
+        "renderer_mb": 0,
+        "shared_worker_mb": 412.65,
+        "service_worker_mb": 0,
+        "utility_worker_mb": 0,
+        "gpu_mb": 132.8,
+        "utility_mb": 161.2,
+        "tab_total_mb": 412.65,
+        "processes": [
+          {
+            "pid": 23220,
+            "type": "shared_worker",
+            "memory_mb": 351.51
+          },
+          {
+            "pid": 23121,
+            "type": "unknown",
+            "memory_mb": 207.56
+          },
+          {
+            "pid": 23159,
+            "type": "gpu",
+            "memory_mb": 132.8
+          },
+          {
+            "pid": 23161,
+            "type": "utility",
+            "memory_mb": 113.68
+          },
+          {
+            "pid": 23115,
+            "type": "unknown",
+            "memory_mb": 107.99
+          },
+          {
+            "pid": 23136,
+            "type": "unknown",
+            "memory_mb": 62.79
+          },
+          {
+            "pid": 23135,
+            "type": "unknown",
+            "memory_mb": 62.28
+          },
+          {
+            "pid": 23252,
+            "type": "shared_worker",
+            "memory_mb": 61.14
+          },
+          {
+            "pid": 23162,
+            "type": "utility",
+            "memory_mb": 47.52
+          }
+        ]
+      },
+      "js_heap": {
+        "js_heap_used_mb": 17.94,
+        "js_heap_total_mb": 19.91,
+        "js_heap_limit_mb": 4095.75
+      },
+      "cdp_metrics": {
+        "dom_counters": {
+          "documents": 5,
+          "nodes": 787,
+          "jsEventListeners": 128
+        },
+        "performance_metrics": {
+          "js_heap_used_mb": 13.54,
+          "js_heap_total_mb": 15.5,
+          "dom_nodes": 787,
+          "documents": 5,
+          "frames": 4,
+          "js_event_listeners": 128,
+          "layout_objects": 149,
+          "resources": 54,
+          "script_duration_ms": 508.29,
+          "layout_duration_ms": 18.52,
+          "task_duration_ms": 827.81
+        },
+        "raw_metrics": {
+          "Timestamp": 28600.756407,
+          "AudioHandlers": 0,
+          "AudioWorkletProcessors": 0,
+          "Documents": 5,
+          "Frames": 4,
+          "JSEventListeners": 128,
+          "LayoutObjects": 149,
+          "MediaKeySessions": 0,
+          "MediaKeys": 0,
+          "Nodes": 787,
+          "Resources": 54,
+          "ContextLifecycleStateObservers": 12,
+          "V8PerContextDatas": 1,
+          "WorkerGlobalScopes": 2,
+          "UACSSResources": 0,
+          "RTCPeerConnections": 0,
+          "ResourceFetchers": 7,
+          "AdSubframes": 0,
+          "DetachedScriptStates": 0,
+          "ArrayBufferContents": 1073,
+          "LayoutCount": 11,
+          "RecalcStyleCount": 11,
+          "LayoutDuration": 0.018525,
+          "RecalcStyleDuration": 0.024561,
+          "DevToolsCommandDuration": 0.020791,
+          "ScriptDuration": 0.508293,
+          "V8CompileDuration": 0,
+          "TaskDuration": 0.82781,
+          "TaskOtherDuration": 0.25564,
+          "ThreadTime": 0.571788,
+          "ProcessTime": 59.95,
+          "JSHeapUsedSize": 14192516,
+          "JSHeapTotalSize": 16252928,
+          "FirstMeaningfulPaint": 28592.06267,
+          "DomContentLoaded": 28592.037319,
+          "NavigationStart": 28591.747531
+        }
+      },
+      "detailed_breakdown": {
+        "categories": [
+          {
+            "count": 8,
+            "largest": [
+              {
+                "dimensions": "774x670",
+                "sizeMB": 1.98,
+                "src": "chef-read-4d89f81f.webp"
+              },
+              {
+                "dimensions": "774x668",
+                "sizeMB": 1.97,
+                "src": "chef-taco-b14e9110.webp"
+              },
+              {
+                "dimensions": "775x656",
+                "sizeMB": 1.94,
+                "src": "chef-wave-64398bba.webp"
+              },
+              {
+                "dimensions": "775x653",
+                "sizeMB": 1.93,
+                "src": "chef-friends-955c5082.webp"
+              }
+            ],
+            "name": "Decoded Images",
+            "sizeMB": 8.18
+          },
+          {
+            "count": 12,
+            "name": "Stylesheets",
+            "sizeMB": 1.2
+          },
+          {
+            "name": "DOM Tree",
+            "nodeCount": 556,
+            "sizeMB": 0.4
+          },
+          {
+            "name": "WebAssembly Memory",
+            "note": "WASM modules (dfinity/agent uses WASM)",
+            "sizeMB": 0
+          },
+          {
+            "details": [],
+            "name": "ArrayBuffers/TypedArrays",
+            "sizeMB": 0
+          },
+          {
+            "count": 0,
+            "name": "Canvas Memory",
+            "sizeMB": 0
+          },
+          {
+            "count": 0,
+            "name": "Video Memory",
+            "sizeMB": 0
+          },
+          {
+            "name": "Compiled JavaScript",
+            "note": "V8 compiles JS to machine code (~3-10x source size)",
+            "scriptCount": 1,
+            "sizeMB": "varies"
+          },
+          {
+            "name": "Web Workers",
+            "note": "SharedWorkers detected - memory shared across tabs",
+            "sizeMB": "see worker analysis"
+          }
+        ],
+        "details": {
+          "largeGlobals": []
+        }
+      },
+      "heap_objects": {
+        "object_types": [
+          {
+            "count": 3,
+            "estimatedKB": 12,
+            "type": "Window"
+          }
+        ]
+      },
+      "breakdown": {
+        "categories": [
+          {
+            "count": 8,
+            "name": "Decoded Images",
+            "sizeKB": 8377
+          },
+          {
+            "count": 556,
+            "name": "DOM Nodes",
+            "sizeKB": 56
+          },
+          {
+            "count": 0,
+            "name": "Pinia Stores",
+            "sizeKB": 0
+          },
+          {
+            "count": 0,
+            "name": "Global Objects",
+            "sizeKB": 0
+          },
+          {
+            "count": 0,
+            "name": "Worker Bridge Data",
+            "sizeKB": 0
+          },
+          {
+            "count": 0,
+            "name": "Event Listeners",
+            "sizeKB": 0
+          }
+        ],
+        "details": {
+          "dom": {
+            "estimatedKB": 56,
+            "nodeCount": 556
+          },
+          "globals": [],
+          "images": {
+            "count": 8,
+            "largest": [
+              {
+                "dimensions": "774x670",
+                "sizeKB": 2026,
+                "src": "chef-read-4d89f81f.webp"
+              },
+              {
+                "dimensions": "774x668",
+                "sizeKB": 2020,
+                "src": "chef-taco-b14e9110.webp"
+              },
+              {
+                "dimensions": "775x656",
+                "sizeKB": 1986,
+                "src": "chef-wave-64398bba.webp"
+              },
+              {
+                "dimensions": "775x653",
+                "sizeKB": 1977,
+                "src": "chef-friends-955c5082.webp"
+              },
+              {
+                "dimensions": "300x150",
+                "sizeKB": 176,
+                "src": "tacoDaoTaco-9e29b28d.svg"
+              }
+            ],
+            "totalKB": 8377
+          },
+          "listeners": {
+            "estimated": 0,
+            "estimatedKB": 0
+          },
+          "piniaStores": [],
+          "workerBridge": []
+        }
+      },
+      "indexeddb": {
+        "databases": [
+          {
+            "name": "auth-client-db",
+            "storeCount": 1,
+            "stores": [
+              "ic-keyval"
+            ],
+            "version": 1
+          },
+          {
+            "name": "ic-delegation",
+            "storeCount": 0,
+            "stores": [],
+            "version": 1
+          },
+          {
+            "name": "keyval-store",
+            "storeCount": 0,
+            "stores": [],
+            "version": 1
+          },
+          {
+            "name": "taco-dao-cache",
+            "version": 1
+          }
+        ],
+        "error": null,
+        "storageEstimate": {
+          "percent": 0,
+          "quota_mb": 57290.15,
+          "usage_mb": 1.01
+        },
+        "supported": true
+      },
+      "workers": {
+        "broadcastChannelSupported": true,
+        "dedicatedWorkerSupported": true,
+        "hasActiveSharedWorker": false,
+        "messageChannelSupported": true,
+        "serviceWorker": {
+          "controlled": false,
+          "scriptURL": null,
+          "state": "none",
+          "supported": true
+        },
+        "sharedWorkerSupported": true,
+        "workerDetails": []
+      },
+      "shared_worker_cdp": {
+        "worker_targets": [
+          {
+            "type": "shared_worker",
+            "title": "taco-public-v3",
+            "url": "http://localhost:4173/assets/public.worker-33c08f7f.js",
+            "targetId": "4CFF8F17F864784DFAA715CD42C6B4E6",
+            "attached": false
+          },
+          {
+            "type": "shared_worker",
+            "title": "taco-authenticated-v3",
+            "url": "http://localhost:4173/assets/authenticated.worker-0f47af7b.js",
+            "targetId": "9DFA2CAD133407E6396DD692EF455EA4",
+            "attached": false
+          }
+        ],
+        "worker_count": 2,
+        "shared_worker_count": 2,
+        "service_worker_count": 0,
+        "dedicated_worker_count": 0,
+        "process_info": []
+      },
+      "chrome_processes": {
+        "total_chrome_memory_mb": 981.08,
+        "renderer_memory_mb": 353.15,
+        "shared_worker_memory_mb": 0,
+        "gpu_memory_mb": 132.8,
+        "utility_memory_mb": 161.2,
+        "other_memory_mb": 333.94,
+        "process_count": 10,
+        "processes": [
+          {
+            "pid": 23220,
+            "type": "renderer",
+            "memory_mb": 292.01,
+            "cmdline_preview": "/opt/google/chrome/chrome --type=renderer --crashpad-handler-pid=23128 --enable-crash-reporter=, --n..."
+          },
+          {
+            "pid": 23121,
+            "type": "other",
+            "memory_mb": 207.18,
+            "cmdline_preview": "/opt/google/chrome/chrome --allow-pre-commit-input --disable-application-cache --disable-background-..."
+          },
+          {
+            "pid": 23159,
+            "type": "gpu",
+            "memory_mb": 132.8,
+            "cmdline_preview": "/opt/google/chrome/chrome --type=gpu-process --no-sandbox --disable-dev-shm-usage --headless=new --o..."
+          },
+          {
+            "pid": 23161,
+            "type": "utility",
+            "memory_mb": 113.68,
+            "cmdline_preview": "/opt/google/chrome/chrome --type=utility --utility-sub-type=network.mojom.NetworkService --lang=en-U..."
+          },
+          {
+            "pid": 23136,
+            "type": "other",
+            "memory_mb": 62.79,
+            "cmdline_preview": "/opt/google/chrome/chrome --type=zygote --no-sandbox --enable-logging=stderr --headless=new --log-le..."
+          },
+          {
+            "pid": 23135,
+            "type": "other",
+            "memory_mb": 62.28,
+            "cmdline_preview": "/opt/google/chrome/chrome --type=zygote --no-zygote-sandbox --no-sandbox --enable-logging=stderr --h..."
+          },
+          {
+            "pid": 23252,
+            "type": "renderer",
+            "memory_mb": 61.14,
+            "cmdline_preview": "/opt/google/chrome/chrome --type=renderer --crashpad-handler-pid=23128 --enable-crash-reporter=, --n..."
+          },
+          {
+            "pid": 23162,
+            "type": "utility",
+            "memory_mb": 47.52,
+            "cmdline_preview": "/opt/google/chrome/chrome --type=utility --utility-sub-type=storage.mojom.StorageService --lang=en-U..."
+          },
+          {
+            "pid": 23126,
+            "type": "other",
+            "memory_mb": 0.86,
+            "cmdline_preview": "cat"
+          },
+          {
+            "pid": 23125,
+            "type": "other",
+            "memory_mb": 0.83,
+            "cmdline_preview": "cat"
+          }
+        ]
+      }
+    }
+  ],
+  "memory_timeline": [
+    {
+      "timestamp": "2026-01-06T01:16:40.504799",
+      "path": "/",
+      "tab_memory_mb": 908.96,
+      "js_heap_mb": 17.6
+    },
+    {
+      "timestamp": "2026-01-06T01:16:52.559748",
+      "path": "/dao",
+      "tab_memory_mb": 685.25,
+      "js_heap_mb": 18.9
+    },
+    {
+      "timestamp": "2026-01-06T01:17:04.766307",
+      "path": "/vote",
+      "tab_memory_mb": 531.52,
+      "js_heap_mb": 18.68
+    },
+    {
+      "timestamp": "2026-01-06T01:17:15.090838",
+      "path": "/wallet",
+      "tab_memory_mb": 412.65,
+      "js_heap_mb": 17.94
+    }
+  ],
+  "recommendations": [
+    {
+      "priority": "MEDIUM",
+      "page": "/",
+      "category": "Large Images",
+      "issue": "Decoded images total 8377 KB",
+      "suggestion": "Consider lazy loading images or using smaller dimensions"
+    },
+    {
+      "priority": "MEDIUM",
+      "page": "/dao",
+      "category": "Large Images",
+      "issue": "Decoded images total 9225 KB",
+      "suggestion": "Consider lazy loading images or using smaller dimensions"
+    },
+    {
+      "priority": "MEDIUM",
+      "page": "/vote",
+      "category": "Large Images",
+      "issue": "Decoded images total 8505 KB",
+      "suggestion": "Consider lazy loading images or using smaller dimensions"
+    },
+    {
+      "priority": "MEDIUM",
+      "page": "/wallet",
+      "category": "Large Images",
+      "issue": "Decoded images total 8377 KB",
+      "suggestion": "Consider lazy loading images or using smaller dimensions"
+    }
+  ],
+  "summary": {
+    "total_duration_seconds": 46.54,
+    "pages_tested": 4,
+    "js_heap_peak_mb": 18.9,
+    "js_heap_min_mb": 17.6,
+    "js_heap_growth_mb": 0.34,
+    "tab_memory_peak_mb": 908.96,
+    "recommendations_count": 4
+  }
+}

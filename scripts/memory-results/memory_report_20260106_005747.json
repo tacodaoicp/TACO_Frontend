@@ -1,0 +1,647 @@
+{
+  "timestamp": "2026-01-06T00:57:47.449316",
+  "base_url": "http://localhost:4173",
+  "pages": [
+    {
+      "path": "/",
+      "url": "http://localhost:4173/",
+      "load_time_seconds": 8.88,
+      "timestamp": "2026-01-06T00:57:56.616622",
+      "tab_memory": {
+        "renderer_mb": 932.14,
+        "worker_mb": 0,
+        "gpu_mb": 153.09,
+        "tab_total_mb": 932.14
+      },
+      "js_heap": {
+        "js_heap_used_mb": 17.61,
+        "js_heap_total_mb": 51.67,
+        "js_heap_limit_mb": 4095.75
+      },
+      "breakdown": {
+        "categories": [
+          {
+            "count": 8,
+            "name": "Decoded Images",
+            "sizeKB": 8377
+          },
+          {
+            "count": 441,
+            "name": "DOM Nodes",
+            "sizeKB": 44
+          },
+          {
+            "count": 0,
+            "name": "Pinia Stores",
+            "sizeKB": 0
+          },
+          {
+            "count": 0,
+            "name": "Global Objects",
+            "sizeKB": 0
+          },
+          {
+            "count": 0,
+            "name": "Worker Bridge Data",
+            "sizeKB": 0
+          },
+          {
+            "count": 0,
+            "name": "Event Listeners",
+            "sizeKB": 0
+          }
+        ],
+        "details": {
+          "dom": {
+            "estimatedKB": 44,
+            "nodeCount": 441
+          },
+          "globals": [],
+          "images": {
+            "count": 8,
+            "largest": [
+              {
+                "dimensions": "774x670",
+                "sizeKB": 2026,
+                "src": "chef-read-3705b738.png"
+              },
+              {
+                "dimensions": "774x668",
+                "sizeKB": 2020,
+                "src": "chef-taco-26f1d8b9.png"
+              },
+              {
+                "dimensions": "775x656",
+                "sizeKB": 1986,
+                "src": "chef-wave-3413f733.png"
+              },
+              {
+                "dimensions": "775x653",
+                "sizeKB": 1977,
+                "src": "chef-friends-d1d2ec1f.png"
+              },
+              {
+                "dimensions": "300x150",
+                "sizeKB": 176,
+                "src": "tacoDaoTaco-9e29b28d.svg"
+              }
+            ],
+            "totalKB": 8377
+          },
+          "listeners": {
+            "estimated": 0,
+            "estimatedKB": 0
+          },
+          "piniaStores": [],
+          "workerBridge": []
+        }
+      },
+      "indexeddb": {
+        "databases": [
+          {
+            "name": "auth-client-db",
+            "storeCount": 1,
+            "stores": [
+              "ic-keyval"
+            ],
+            "version": 1
+          },
+          {
+            "name": "taco-dao-cache",
+            "version": 1
+          },
+          {
+            "name": "ic-delegation",
+            "storeCount": 0,
+            "stores": [],
+            "version": 1
+          },
+          {
+            "name": "keyval-store",
+            "storeCount": 0,
+            "stores": [],
+            "version": 1
+          }
+        ],
+        "error": null,
+        "storageEstimate": {
+          "percent": 0,
+          "quota_mb": 57290.15,
+          "usage_mb": 0.83
+        },
+        "supported": true
+      },
+      "workers": {
+        "broadcastChannelSupported": true,
+        "dedicatedWorkerSupported": true,
+        "hasActiveSharedWorker": false,
+        "messageChannelSupported": true,
+        "serviceWorker": {
+          "controlled": false,
+          "scriptURL": null,
+          "state": "none",
+          "supported": true
+        },
+        "sharedWorkerSupported": true,
+        "workerDetails": []
+      }
+    },
+    {
+      "path": "/dao",
+      "url": "http://localhost:4173/dao",
+      "load_time_seconds": 8.91,
+      "timestamp": "2026-01-06T00:58:05.581204",
+      "tab_memory": {
+        "renderer_mb": 777.09,
+        "worker_mb": 0,
+        "gpu_mb": 139.94,
+        "tab_total_mb": 777.09
+      },
+      "js_heap": {
+        "js_heap_used_mb": 23.08,
+        "js_heap_total_mb": 89.19,
+        "js_heap_limit_mb": 4095.75
+      },
+      "breakdown": {
+        "categories": [
+          {
+            "count": 22,
+            "name": "Decoded Images",
+            "sizeKB": 9225
+          },
+          {
+            "count": 1165,
+            "name": "DOM Nodes",
+            "sizeKB": 117
+          },
+          {
+            "count": 0,
+            "name": "Pinia Stores",
+            "sizeKB": 0
+          },
+          {
+            "count": 0,
+            "name": "Global Objects",
+            "sizeKB": 0
+          },
+          {
+            "count": 0,
+            "name": "Worker Bridge Data",
+            "sizeKB": 0
+          },
+          {
+            "count": 0,
+            "name": "Event Listeners",
+            "sizeKB": 0
+          }
+        ],
+        "details": {
+          "dom": {
+            "estimatedKB": 117,
+            "nodeCount": 1165
+          },
+          "globals": [],
+          "images": {
+            "count": 22,
+            "largest": [
+              {
+                "dimensions": "774x670",
+                "sizeKB": 2026,
+                "src": "chef-read-3705b738.png"
+              },
+              {
+                "dimensions": "774x668",
+                "sizeKB": 2020,
+                "src": "chef-taco-26f1d8b9.png"
+              },
+              {
+                "dimensions": "775x656",
+                "sizeKB": 1986,
+                "src": "chef-wave-3413f733.png"
+              },
+              {
+                "dimensions": "775x653",
+                "sizeKB": 1977,
+                "src": "chef-friends-d1d2ec1f.png"
+              },
+              {
+                "dimensions": "300x150",
+                "sizeKB": 176,
+                "src": "tacoDaoTaco-9e29b28d.svg"
+              }
+            ],
+            "totalKB": 9225
+          },
+          "listeners": {
+            "estimated": 0,
+            "estimatedKB": 0
+          },
+          "piniaStores": [],
+          "workerBridge": []
+        }
+      },
+      "indexeddb": {
+        "databases": [
+          {
+            "name": "auth-client-db",
+            "storeCount": 1,
+            "stores": [
+              "ic-keyval"
+            ],
+            "version": 1
+          },
+          {
+            "name": "ic-delegation",
+            "storeCount": 0,
+            "stores": [],
+            "version": 1
+          },
+          {
+            "name": "keyval-store",
+            "storeCount": 0,
+            "stores": [],
+            "version": 1
+          },
+          {
+            "name": "taco-dao-cache",
+            "version": 1
+          }
+        ],
+        "error": null,
+        "storageEstimate": {
+          "percent": 0,
+          "quota_mb": 57290.15,
+          "usage_mb": 0.85
+        },
+        "supported": true
+      },
+      "workers": {
+        "broadcastChannelSupported": true,
+        "dedicatedWorkerSupported": true,
+        "hasActiveSharedWorker": false,
+        "messageChannelSupported": true,
+        "serviceWorker": {
+          "controlled": false,
+          "scriptURL": null,
+          "state": "none",
+          "supported": true
+        },
+        "sharedWorkerSupported": true,
+        "workerDetails": []
+      }
+    },
+    {
+      "path": "/vote",
+      "url": "http://localhost:4173/vote",
+      "load_time_seconds": 8.86,
+      "timestamp": "2026-01-06T00:58:14.488147",
+      "tab_memory": {
+        "renderer_mb": 765.0,
+        "worker_mb": 0,
+        "gpu_mb": 144.27,
+        "tab_total_mb": 765.0
+      },
+      "js_heap": {
+        "js_heap_used_mb": 19.0,
+        "js_heap_total_mb": 83.71,
+        "js_heap_limit_mb": 4095.75
+      },
+      "breakdown": {
+        "categories": [
+          {
+            "count": 10,
+            "name": "Decoded Images",
+            "sizeKB": 8505
+          },
+          {
+            "count": 922,
+            "name": "DOM Nodes",
+            "sizeKB": 92
+          },
+          {
+            "count": 0,
+            "name": "Pinia Stores",
+            "sizeKB": 0
+          },
+          {
+            "count": 0,
+            "name": "Global Objects",
+            "sizeKB": 0
+          },
+          {
+            "count": 0,
+            "name": "Worker Bridge Data",
+            "sizeKB": 0
+          },
+          {
+            "count": 0,
+            "name": "Event Listeners",
+            "sizeKB": 0
+          }
+        ],
+        "details": {
+          "dom": {
+            "estimatedKB": 92,
+            "nodeCount": 922
+          },
+          "globals": [],
+          "images": {
+            "count": 10,
+            "largest": [
+              {
+                "dimensions": "774x670",
+                "sizeKB": 2026,
+                "src": "chef-read-3705b738.png"
+              },
+              {
+                "dimensions": "774x668",
+                "sizeKB": 2020,
+                "src": "chef-taco-26f1d8b9.png"
+              },
+              {
+                "dimensions": "775x656",
+                "sizeKB": 1986,
+                "src": "chef-wave-3413f733.png"
+              },
+              {
+                "dimensions": "775x653",
+                "sizeKB": 1977,
+                "src": "chef-friends-d1d2ec1f.png"
+              },
+              {
+                "dimensions": "300x150",
+                "sizeKB": 176,
+                "src": "tacoDaoTaco-9e29b28d.svg"
+              }
+            ],
+            "totalKB": 8505
+          },
+          "listeners": {
+            "estimated": 0,
+            "estimatedKB": 0
+          },
+          "piniaStores": [],
+          "workerBridge": []
+        }
+      },
+      "indexeddb": {
+        "databases": [
+          {
+            "name": "auth-client-db",
+            "storeCount": 1,
+            "stores": [
+              "ic-keyval"
+            ],
+            "version": 1
+          },
+          {
+            "name": "ic-delegation",
+            "storeCount": 0,
+            "stores": [],
+            "version": 1
+          },
+          {
+            "name": "keyval-store",
+            "storeCount": 0,
+            "stores": [],
+            "version": 1
+          },
+          {
+            "name": "taco-dao-cache",
+            "version": 1
+          }
+        ],
+        "error": null,
+        "storageEstimate": {
+          "percent": 0,
+          "quota_mb": 57290.15,
+          "usage_mb": 0.98
+        },
+        "supported": true
+      },
+      "workers": {
+        "broadcastChannelSupported": true,
+        "dedicatedWorkerSupported": true,
+        "hasActiveSharedWorker": false,
+        "messageChannelSupported": true,
+        "serviceWorker": {
+          "controlled": false,
+          "scriptURL": null,
+          "state": "none",
+          "supported": true
+        },
+        "sharedWorkerSupported": true,
+        "workerDetails": []
+      }
+    },
+    {
+      "path": "/wallet",
+      "url": "http://localhost:4173/wallet",
+      "load_time_seconds": 8.78,
+      "timestamp": "2026-01-06T00:58:23.316263",
+      "tab_memory": {
+        "renderer_mb": 465.36,
+        "worker_mb": 0,
+        "gpu_mb": 134.86,
+        "tab_total_mb": 465.36
+      },
+      "js_heap": {
+        "js_heap_used_mb": 18.99,
+        "js_heap_total_mb": 22.43,
+        "js_heap_limit_mb": 4095.75
+      },
+      "breakdown": {
+        "categories": [
+          {
+            "count": 8,
+            "name": "Decoded Images",
+            "sizeKB": 8377
+          },
+          {
+            "count": 556,
+            "name": "DOM Nodes",
+            "sizeKB": 56
+          },
+          {
+            "count": 0,
+            "name": "Pinia Stores",
+            "sizeKB": 0
+          },
+          {
+            "count": 0,
+            "name": "Global Objects",
+            "sizeKB": 0
+          },
+          {
+            "count": 0,
+            "name": "Worker Bridge Data",
+            "sizeKB": 0
+          },
+          {
+            "count": 0,
+            "name": "Event Listeners",
+            "sizeKB": 0
+          }
+        ],
+        "details": {
+          "dom": {
+            "estimatedKB": 56,
+            "nodeCount": 556
+          },
+          "globals": [],
+          "images": {
+            "count": 8,
+            "largest": [
+              {
+                "dimensions": "774x670",
+                "sizeKB": 2026,
+                "src": "chef-read-3705b738.png"
+              },
+              {
+                "dimensions": "774x668",
+                "sizeKB": 2020,
+                "src": "chef-taco-26f1d8b9.png"
+              },
+              {
+                "dimensions": "775x656",
+                "sizeKB": 1986,
+                "src": "chef-wave-3413f733.png"
+              },
+              {
+                "dimensions": "775x653",
+                "sizeKB": 1977,
+                "src": "chef-friends-d1d2ec1f.png"
+              },
+              {
+                "dimensions": "300x150",
+                "sizeKB": 176,
+                "src": "tacoDaoTaco-9e29b28d.svg"
+              }
+            ],
+            "totalKB": 8377
+          },
+          "listeners": {
+            "estimated": 0,
+            "estimatedKB": 0
+          },
+          "piniaStores": [],
+          "workerBridge": []
+        }
+      },
+      "indexeddb": {
+        "databases": [
+          {
+            "name": "auth-client-db",
+            "storeCount": 1,
+            "stores": [
+              "ic-keyval"
+            ],
+            "version": 1
+          },
+          {
+            "name": "ic-delegation",
+            "storeCount": 0,
+            "stores": [],
+            "version": 1
+          },
+          {
+            "name": "keyval-store",
+            "storeCount": 0,
+            "stores": [],
+            "version": 1
+          },
+          {
+            "name": "taco-dao-cache",
+            "version": 1
+          }
+        ],
+        "error": null,
+        "storageEstimate": {
+          "percent": 0,
+          "quota_mb": 57290.15,
+          "usage_mb": 1
+        },
+        "supported": true
+      },
+      "workers": {
+        "broadcastChannelSupported": true,
+        "dedicatedWorkerSupported": true,
+        "hasActiveSharedWorker": false,
+        "messageChannelSupported": true,
+        "serviceWorker": {
+          "controlled": false,
+          "scriptURL": null,
+          "state": "none",
+          "supported": true
+        },
+        "sharedWorkerSupported": true,
+        "workerDetails": []
+      }
+    }
+  ],
+  "memory_timeline": [
+    {
+      "timestamp": "2026-01-06T00:57:56.616721",
+      "path": "/",
+      "tab_memory_mb": 932.14,
+      "js_heap_mb": 17.61
+    },
+    {
+      "timestamp": "2026-01-06T00:58:05.581258",
+      "path": "/dao",
+      "tab_memory_mb": 777.09,
+      "js_heap_mb": 23.08
+    },
+    {
+      "timestamp": "2026-01-06T00:58:14.488190",
+      "path": "/vote",
+      "tab_memory_mb": 765.0,
+      "js_heap_mb": 19.0
+    },
+    {
+      "timestamp": "2026-01-06T00:58:23.316314",
+      "path": "/wallet",
+      "tab_memory_mb": 465.36,
+      "js_heap_mb": 18.99
+    }
+  ],
+  "recommendations": [
+    {
+      "priority": "MEDIUM",
+      "page": "/",
+      "category": "Large Images",
+      "issue": "Decoded images total 8377 KB",
+      "suggestion": "Consider lazy loading images or using smaller dimensions"
+    },
+    {
+      "priority": "MEDIUM",
+      "page": "/dao",
+      "category": "Large Images",
+      "issue": "Decoded images total 9225 KB",
+      "suggestion": "Consider lazy loading images or using smaller dimensions"
+    },
+    {
+      "priority": "MEDIUM",
+      "page": "/vote",
+      "category": "Large Images",
+      "issue": "Decoded images total 8505 KB",
+      "suggestion": "Consider lazy loading images or using smaller dimensions"
+    },
+    {
+      "priority": "MEDIUM",
+      "page": "/wallet",
+      "category": "Large Images",
+      "issue": "Decoded images total 8377 KB",
+      "suggestion": "Consider lazy loading images or using smaller dimensions"
+    }
+  ],
+  "summary": {
+    "total_duration_seconds": 35.87,
+    "pages_tested": 4,
+    "js_heap_peak_mb": 23.08,
+    "js_heap_min_mb": 17.61,
+    "js_heap_growth_mb": 1.38,
+    "tab_memory_peak_mb": 932.14,
+    "recommendations_count": 4
+  }
+}

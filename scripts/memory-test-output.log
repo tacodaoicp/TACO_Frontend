@@ -1,0 +1,819 @@
+[0;34m[INFO][0m Building production bundle...
+npm WARN ignoring workspace config at /home/d/Documents/staging/TACO_Frontend/src/taco_dao_frontend/.npmrc 
+
+> taco_dao_frontend@0.0.0 prebuild
+> dfx generate
+
+Generated type declarations for canister 'taco_dao_frontend' to '/home/d/Documents/staging/TACO_Frontend/src/declarations/taco_dao_frontend'
+
+> taco_dao_frontend@0.0.0 build
+> tsc && vite build
+
+vite v4.5.14 building for production...
+transforming...
+DEPRECATION WARNING [legacy-js-api]: The legacy JS API is deprecated and will be removed in Dart Sass 2.0.0.
+
+More info: https://sass-lang.com/d/legacy-js-api
+
+DEPRECATION WARNING [legacy-js-api]: The legacy JS API is deprecated and will be removed in Dart Sass 2.0.0.
+
+More info: https://sass-lang.com/d/legacy-js-api
+
+DEPRECATION WARNING [legacy-js-api]: The legacy JS API is deprecated and will be removed in Dart Sass 2.0.0.
+
+More info: https://sass-lang.com/d/legacy-js-api
+
+DEPRECATION WARNING [legacy-js-api]: The legacy JS API is deprecated and will be removed in Dart Sass 2.0.0.
+
+More info: https://sass-lang.com/d/legacy-js-api
+
+DEPRECATION WARNING [legacy-js-api]: The legacy JS API is deprecated and will be removed in Dart Sass 2.0.0.
+
+More info: https://sass-lang.com/d/legacy-js-api
+
+DEPRECATION WARNING [legacy-js-api]: The legacy JS API is deprecated and will be removed in Dart Sass 2.0.0.
+
+More info: https://sass-lang.com/d/legacy-js-api
+
+DEPRECATION WARNING [legacy-js-api]: The legacy JS API is deprecated and will be removed in Dart Sass 2.0.0.
+
+More info: https://sass-lang.com/d/legacy-js-api
+
+DEPRECATION WARNING [legacy-js-api]: The legacy JS API is deprecated and will be removed in Dart Sass 2.0.0.
+
+More info: https://sass-lang.com/d/legacy-js-api
+
+DEPRECATION WARNING [legacy-js-api]: The legacy JS API is deprecated and will be removed in Dart Sass 2.0.0.
+
+More info: https://sass-lang.com/d/legacy-js-api
+
+DEPRECATION WARNING [legacy-js-api]: The legacy JS API is deprecated and will be removed in Dart Sass 2.0.0.
+
+More info: https://sass-lang.com/d/legacy-js-api
+
+DEPRECATION WARNING [legacy-js-api]: The legacy JS API is deprecated and will be removed in Dart Sass 2.0.0.
+
+More info: https://sass-lang.com/d/legacy-js-api
+
+DEPRECATION WARNING [legacy-js-api]: The legacy JS API is deprecated and will be removed in Dart Sass 2.0.0.
+
+More info: https://sass-lang.com/d/legacy-js-api
+
+DEPRECATION WARNING [legacy-js-api]: The legacy JS API is deprecated and will be removed in Dart Sass 2.0.0.
+
+More info: https://sass-lang.com/d/legacy-js-api
+
+DEPRECATION WARNING [legacy-js-api]: The legacy JS API is deprecated and will be removed in Dart Sass 2.0.0.
+
+More info: https://sass-lang.com/d/legacy-js-api
+
+DEPRECATION WARNING [legacy-js-api]: The legacy JS API is deprecated and will be removed in Dart Sass 2.0.0.
+
+More info: https://sass-lang.com/d/legacy-js-api
+
+DEPRECATION WARNING [legacy-js-api]: The legacy JS API is deprecated and will be removed in Dart Sass 2.0.0.
+
+More info: https://sass-lang.com/d/legacy-js-api
+
+DEPRECATION WARNING [legacy-js-api]: The legacy JS API is deprecated and will be removed in Dart Sass 2.0.0.
+
+More info: https://sass-lang.com/d/legacy-js-api
+
+DEPRECATION WARNING [legacy-js-api]: The legacy JS API is deprecated and will be removed in Dart Sass 2.0.0.
+
+More info: https://sass-lang.com/d/legacy-js-api
+
+DEPRECATION WARNING [legacy-js-api]: The legacy JS API is deprecated and will be removed in Dart Sass 2.0.0.
+
+More info: https://sass-lang.com/d/legacy-js-api
+
+DEPRECATION WARNING [legacy-js-api]: The legacy JS API is deprecated and will be removed in Dart Sass 2.0.0.
+
+More info: https://sass-lang.com/d/legacy-js-api
+
+DEPRECATION WARNING [legacy-js-api]: The legacy JS API is deprecated and will be removed in Dart Sass 2.0.0.
+
+More info: https://sass-lang.com/d/legacy-js-api
+
+DEPRECATION WARNING [legacy-js-api]: The legacy JS API is deprecated and will be removed in Dart Sass 2.0.0.
+
+More info: https://sass-lang.com/d/legacy-js-api
+
+DEPRECATION WARNING [legacy-js-api]: The legacy JS API is deprecated and will be removed in Dart Sass 2.0.0.
+
+More info: https://sass-lang.com/d/legacy-js-api
+
+DEPRECATION WARNING [legacy-js-api]: The legacy JS API is deprecated and will be removed in Dart Sass 2.0.0.
+
+More info: https://sass-lang.com/d/legacy-js-api
+
+DEPRECATION WARNING [legacy-js-api]: The legacy JS API is deprecated and will be removed in Dart Sass 2.0.0.
+
+More info: https://sass-lang.com/d/legacy-js-api
+
+DEPRECATION WARNING [legacy-js-api]: The legacy JS API is deprecated and will be removed in Dart Sass 2.0.0.
+
+More info: https://sass-lang.com/d/legacy-js-api
+
+DEPRECATION WARNING [legacy-js-api]: The legacy JS API is deprecated and will be removed in Dart Sass 2.0.0.
+
+More info: https://sass-lang.com/d/legacy-js-api
+
+DEPRECATION WARNING [legacy-js-api]: The legacy JS API is deprecated and will be removed in Dart Sass 2.0.0.
+
+More info: https://sass-lang.com/d/legacy-js-api
+
+DEPRECATION WARNING [legacy-js-api]: The legacy JS API is deprecated and will be removed in Dart Sass 2.0.0.
+
+More info: https://sass-lang.com/d/legacy-js-api
+
+DEPRECATION WARNING [legacy-js-api]: The legacy JS API is deprecated and will be removed in Dart Sass 2.0.0.
+
+More info: https://sass-lang.com/d/legacy-js-api
+
+DEPRECATION WARNING [legacy-js-api]: The legacy JS API is deprecated and will be removed in Dart Sass 2.0.0.
+
+More info: https://sass-lang.com/d/legacy-js-api
+
+DEPRECATION WARNING [legacy-js-api]: The legacy JS API is deprecated and will be removed in Dart Sass 2.0.0.
+
+More info: https://sass-lang.com/d/legacy-js-api
+
+DEPRECATION WARNING [legacy-js-api]: The legacy JS API is deprecated and will be removed in Dart Sass 2.0.0.
+
+More info: https://sass-lang.com/d/legacy-js-api
+
+DEPRECATION WARNING [legacy-js-api]: The legacy JS API is deprecated and will be removed in Dart Sass 2.0.0.
+
+More info: https://sass-lang.com/d/legacy-js-api
+
+DEPRECATION WARNING [legacy-js-api]: The legacy JS API is deprecated and will be removed in Dart Sass 2.0.0.
+
+More info: https://sass-lang.com/d/legacy-js-api
+
+DEPRECATION WARNING [legacy-js-api]: The legacy JS API is deprecated and will be removed in Dart Sass 2.0.0.
+
+More info: https://sass-lang.com/d/legacy-js-api
+
+DEPRECATION WARNING [legacy-js-api]: The legacy JS API is deprecated and will be removed in Dart Sass 2.0.0.
+
+More info: https://sass-lang.com/d/legacy-js-api
+
+DEPRECATION WARNING [legacy-js-api]: The legacy JS API is deprecated and will be removed in Dart Sass 2.0.0.
+
+More info: https://sass-lang.com/d/legacy-js-api
+
+DEPRECATION WARNING [legacy-js-api]: The legacy JS API is deprecated and will be removed in Dart Sass 2.0.0.
+
+More info: https://sass-lang.com/d/legacy-js-api
+
+DEPRECATION WARNING [legacy-js-api]: The legacy JS API is deprecated and will be removed in Dart Sass 2.0.0.
+
+More info: https://sass-lang.com/d/legacy-js-api
+
+DEPRECATION WARNING [legacy-js-api]: The legacy JS API is deprecated and will be removed in Dart Sass 2.0.0.
+
+More info: https://sass-lang.com/d/legacy-js-api
+
+✓ 631 modules transformed.
+warnings when minifying css:
+▲ [WARNING] A nested style rule cannot start with "label" because it looks like the start of a declaration [css-syntax-error]
+
+    <stdin>:8:0:
+      8 │ label[data-v-0a7b0d7d] {
+        │ ~~~~~
+        ╵ :is(label)
+
+  To start a nested style rule with an identifier, you need to wrap the identifier in ":is(...)" to prevent the rule from being parsed as a declaration.
+
+
+warnings when minifying css:
+▲ [WARNING] A nested style rule cannot start with "span" because it looks like the start of a declaration [css-syntax-error]
+
+    <stdin>:210:0:
+      210 │ span[data-v-ad7cedd0] {
+          │ ~~~~
+          ╵ :is(span)
+
+  To start a nested style rule with an identifier, you need to wrap the identifier in ":is(...)" to prevent the rule from being parsed as a declaration.
+
+
+▲ [WARNING] A nested style rule cannot start with "i" because it looks like the start of a declaration [css-syntax-error]
+
+    <stdin>:247:0:
+      247 │ i[data-v-ad7cedd0] {
+          │ ^
+          ╵ :is(i)
+
+  To start a nested style rule with an identifier, you need to wrap the identifier in ":is(...)" to prevent the rule from being parsed as a declaration.
+
+
+▲ [WARNING] A nested style rule cannot start with "span" because it looks like the start of a declaration [css-syntax-error]
+
+    <stdin>:307:0:
+      307 │ span[data-v-684399df] {
+          │ ~~~~
+          ╵ :is(span)
+
+  To start a nested style rule with an identifier, you need to wrap the identifier in ":is(...)" to prevent the rule from being parsed as a declaration.
+
+
+▲ [WARNING] A nested style rule cannot start with "i" because it looks like the start of a declaration [css-syntax-error]
+
+    <stdin>:354:0:
+      354 │ i[data-v-684399df] {
+          │ ^
+          ╵ :is(i)
+
+  To start a nested style rule with an identifier, you need to wrap the identifier in ":is(...)" to prevent the rule from being parsed as a declaration.
+
+
+▲ [WARNING] A nested style rule cannot start with "i" because it looks like the start of a declaration [css-syntax-error]
+
+    <stdin>:524:0:
+      524 │ i[data-v-684399df] {
+          │ ^
+          ╵ :is(i)
+
+  To start a nested style rule with an identifier, you need to wrap the identifier in ":is(...)" to prevent the rule from being parsed as a declaration.
+
+
+▲ [WARNING] A nested style rule cannot start with "span" because it looks like the start of a declaration [css-syntax-error]
+
+    <stdin>:783:0:
+      783 │ span[data-v-be74a568] {
+          │ ~~~~
+          ╵ :is(span)
+
+  To start a nested style rule with an identifier, you need to wrap the identifier in ":is(...)" to prevent the rule from being parsed as a declaration.
+
+
+▲ [WARNING] A nested style rule cannot start with "i" because it looks like the start of a declaration [css-syntax-error]
+
+    <stdin>:827:0:
+      827 │ i[data-v-be74a568] {
+          │ ^
+          ╵ :is(i)
+
+  To start a nested style rule with an identifier, you need to wrap the identifier in ":is(...)" to prevent the rule from being parsed as a declaration.
+
+
+▲ [WARNING] A nested style rule cannot start with "span" because it looks like the start of a declaration [css-syntax-error]
+
+    <stdin>:1367:0:
+      1367 │ span[data-v-498844dd] {
+           │ ~~~~
+           ╵ :is(span)
+
+  To start a nested style rule with an identifier, you need to wrap the identifier in ":is(...)" to prevent the rule from being parsed as a declaration.
+
+
+▲ [WARNING] A nested style rule cannot start with "i" because it looks like the start of a declaration [css-syntax-error]
+
+    <stdin>:1414:0:
+      1414 │ i[data-v-498844dd] {
+           │ ^
+           ╵ :is(i)
+
+  To start a nested style rule with an identifier, you need to wrap the identifier in ":is(...)" to prevent the rule from being parsed as a declaration.
+
+
+rendering chunks...
+[plugin:vite:reporter] 
+(!) /home/d/Documents/staging/TACO_Frontend/node_modules/@dfinity/utils/dist/esm/index.js is dynamically imported by /home/d/Documents/staging/TACO_Frontend/src/taco_dao_frontend/src/components/forum/ForumThreadView.vue?vue&type=script&setup=true&lang.ts, /home/d/Documents/staging/TACO_Frontend/src/taco_dao_frontend/src/shared/auth-cache.ts, /home/d/Documents/staging/TACO_Frontend/src/taco_dao_frontend/src/stores/taco.store.ts, /home/d/Documents/staging/TACO_Frontend/src/taco_dao_frontend/src/views/AdminArchiveView.vue but also statically imported by /home/d/Documents/staging/TACO_Frontend/node_modules/@dfinity/ledger-icp/dist/esm/chunk-CB3M6OHV.js, /home/d/Documents/staging/TACO_Frontend/node_modules/@dfinity/ledger-icp/dist/esm/chunk-OSGIFLNH.js, /home/d/Documents/staging/TACO_Frontend/node_modules/@dfinity/ledger-icp/dist/esm/chunk-UB2XX3PN.js, /home/d/Documents/staging/TACO_Frontend/node_modules/@dfinity/ledger-icp/dist/esm/index.js, /home/d/Documents/staging/TACO_Frontend/node_modules/@dfinity/ledger-icrc/dist/esm/chunk-62KIKAXV.js, /home/d/Documents/staging/TACO_Frontend/node_modules/@dfinity/ledger-icrc/dist/esm/chunk-F74MWPN7.js, /home/d/Documents/staging/TACO_Frontend/node_modules/@dfinity/ledger-icrc/dist/esm/chunk-IHNDUXP4.js, /home/d/Documents/staging/TACO_Frontend/node_modules/@dfinity/ledger-icrc/dist/esm/chunk-OJD6CVD7.js, /home/d/Documents/staging/TACO_Frontend/node_modules/@dfinity/ledger-icrc/dist/esm/chunk-PEPO333H.js, /home/d/Documents/staging/TACO_Frontend/node_modules/@dfinity/ledger-icrc/dist/esm/index.js, /home/d/Documents/staging/TACO_Frontend/node_modules/@dfinity/sns/dist/esm/chunk-4E6G4JED.js, /home/d/Documents/staging/TACO_Frontend/node_modules/@dfinity/sns/dist/esm/chunk-4OISOQSJ.js, /home/d/Documents/staging/TACO_Frontend/node_modules/@dfinity/sns/dist/esm/chunk-BJBCLIED.js, /home/d/Documents/staging/TACO_Frontend/node_modules/@dfinity/sns/dist/esm/chunk-EYIWJ4DL.js, /home/d/Documents/staging/TACO_Frontend/node_modules/@dfinity/sns/dist/esm/chunk-Y6XGADSI.js, /home/d/Documents/staging/TACO_Frontend/node_modules/@dfinity/sns/dist/esm/index.js, /home/d/Documents/staging/TACO_Frontend/src/taco_dao_frontend/src/stores/icpswap.store.ts, /home/d/Documents/staging/TACO_Frontend/src/taco_dao_frontend/src/views/AdminClaimsView.vue, /home/d/Documents/staging/TACO_Frontend/src/taco_dao_frontend/src/views/RewardsView.vue, dynamic import will not move module into another chunk.
+
+computing gzip size...
+dist/index.html                                             2.52 kB │ gzip:   0.84 kB
+dist/assets/cketh-caf02535.png                              4.15 kB
+dist/assets/ckbtc-9538f047.png                              4.17 kB
+dist/assets/kongswap-431fc1f4.png                           4.38 kB
+dist/assets/catalyze-7a257f64.png                           4.72 kB
+dist/assets/ckusdc-096e76ae.png                             4.78 kB
+dist/assets/tacoDaoTacoSimple-043eee0f.svg                  4.79 kB │ gzip:   2.35 kB
+dist/assets/swampies-05aadae2.png                           5.20 kB
+dist/assets/neutrinite-531a8ed3.png                         5.57 kB
+dist/assets/tacoDaoTaco-9e29b28d.svg                        5.63 kB │ gzip:   2.59 kB
+dist/assets/tacoDaoTacoTranslucent2-58e4fbd4.svg            5.65 kB │ gzip:   2.62 kB
+dist/assets/tacoDaoTacoTranslucent-b2b096a1.svg             5.65 kB │ gzip:   2.62 kB
+dist/assets/cicp-81083cc5.png                               5.95 kB
+dist/assets/icto-39bfb72f.png                               6.27 kB
+dist/assets/alice-533cc6e5.png                              7.97 kB
+dist/assets/boom-dao-760b52fa.png                           8.06 kB
+dist/assets/waterneuron-79e8a78a.png                        8.58 kB
+dist/assets/dogmi-d8c195fe.png                              8.66 kB
+dist/assets/dkp-13b889b8.png                                8.89 kB
+dist/assets/clown-198e7f5e.png                             11.46 kB
+dist/assets/cecil-the-lion-dao-5962a86e.png                13.49 kB
+dist/assets/chef-wave-64398bba.webp                        29.92 kB
+dist/assets/smallchartplaceholder-15727d7d.png             29.95 kB
+dist/assets/chef-read-4d89f81f.webp                        30.41 kB
+dist/assets/chef-taco-b14e9110.webp                        33.74 kB
+dist/assets/chef-friends-955c5082.webp                     41.16 kB
+dist/assets/fontawesome-webfont-2adefcbc.woff2             77.16 kB
+dist/assets/SpaceMono-Bold-d9cb77aa.ttf                    86.64 kB
+dist/assets/SpaceMono-Regular-74ea8049.ttf                 90.90 kB
+dist/assets/chef-wizard-d9413c06.webp                      93.21 kB
+dist/assets/SpaceMono-BoldItalic-94ee7b8b.ttf              95.29 kB
+dist/assets/fontawesome-webfont-ba0c59de.woff              98.02 kB
+dist/assets/SpaceMono-Italic-d966f87a.ttf                 103.52 kB
+dist/assets/RubikMonoOne-Regular-09711b5e.ttf             117.13 kB
+dist/assets/Merchant-Copy-2671b433.ttf                    120.30 kB
+dist/assets/fontawesome-webfont-aa58f33f.ttf              165.55 kB
+dist/assets/fontawesome-webfont-7bfcab6d.eot              165.74 kB
+dist/assets/Roboto-Light-c576c506.ttf                     167.00 kB
+dist/assets/Roboto-Bold-ec685a46.ttf                      167.34 kB
+dist/assets/Roboto-Black-5ace0d08.ttf                     168.06 kB
+dist/assets/Roboto-Regular-4e147ab6.ttf                   168.26 kB
+dist/assets/Roboto-Thin-67248f7e.ttf                      168.49 kB
+dist/assets/Roboto-Medium-9d0d55a3.ttf                    168.64 kB
+dist/assets/Roboto-Italic-99e4a850.ttf                    170.50 kB
+dist/assets/Roboto-BoldItalic-61df597f.ttf                171.51 kB
+dist/assets/Roboto-ThinItalic-28ce251a.ttf                172.86 kB
+dist/assets/Roboto-LightItalic-a4840622.ttf               173.17 kB
+dist/assets/Roboto-MediumItalic-d3f317c9.ttf              173.42 kB
+dist/assets/Merchant-Copy-Wide-d6065de7.ttf               173.76 kB
+dist/assets/Roboto-BlackItalic-8b2f87fb.ttf               174.11 kB
+dist/assets/Merchant-Copy-Doublesize-fb6c8ad8.ttf         182.60 kB
+dist/assets/Rubik-LightItalic-ae86b4c5.ttf                205.68 kB
+dist/assets/Rubik-Italic-8f44d792.ttf                     206.34 kB
+dist/assets/Rubik-Light-c234fd2e.ttf                      206.70 kB
+dist/assets/Rubik-BlackItalic-eb096dc7.ttf                206.96 kB
+dist/assets/Rubik-MediumItalic-103157cf.ttf               207.05 kB
+dist/assets/Rubik-SemiBoldItalic-c7d7762e.ttf             207.19 kB
+dist/assets/Rubik-BoldItalic-13e067fc.ttf                 207.20 kB
+dist/assets/Rubik-ExtraBoldItalic-1abbded9.ttf            207.34 kB
+dist/assets/Rubik-Regular-7839aacd.ttf                    207.63 kB
+dist/assets/Rubik-Black-bc9b7194.ttf                      207.84 kB
+dist/assets/Rubik-Medium-99699974.ttf                     208.20 kB
+dist/assets/Rubik-SemiBold-3f76a099.ttf                   208.21 kB
+dist/assets/Rubik-ExtraBold-43c7ff54.ttf                  208.22 kB
+dist/assets/Rubik-Bold-e1bc0a0f.ttf                       208.32 kB
+dist/assets/authenticated.dedicated.worker-558adf88.js    254.32 kB
+dist/assets/public.dedicated.worker-9c3fe353.js           262.07 kB
+dist/assets/public.worker-99606dcf.js                     265.42 kB
+dist/assets/authenticated.worker-b2a6ac7b.js              265.65 kB
+dist/assets/fa-solid-900-c022e7c2.woff2                   354.30 kB
+dist/assets/fa-regular-400-309b1ca5.woff2                 425.68 kB
+dist/assets/fontawesome-webfont-ad615792.svg              444.38 kB │ gzip: 136.06 kB
+dist/assets/fa-light-300-10359e6c.woff2                   465.35 kB
+dist/assets/fa-duotone-900-1ea56da9.woff2                 468.18 kB
+dist/assets/astonautLoader-68b574c6.webp                  538.21 kB
+dist/assets/fa-solid-900-f960c6b8.ttf                   1,003.81 kB
+dist/assets/fa-regular-400-55d4e978.ttf                 1,151.85 kB
+dist/assets/fa-light-300-aae6d975.ttf                   1,288.91 kB
+dist/assets/fa-duotone-900-36643158.ttf                 1,411.76 kB
+dist/assets/AdminAlarmView-e3b0c442.css                     0.00 kB │ gzip:   0.02 kB
+dist/assets/NNSPropView-c3c2ad0b.css                        0.14 kB │ gzip:   0.11 kB
+dist/assets/NNSPropViewDemo-10a95cb4.css                    0.14 kB │ gzip:   0.11 kB
+dist/assets/AdminConfirmationModal-88859ec7.css             0.22 kB │ gzip:   0.17 kB
+dist/assets/TacoTitle-11c6e794.css                          0.25 kB │ gzip:   0.18 kB
+dist/assets/AdminNeuronView-e0b08984.css                    0.40 kB │ gzip:   0.23 kB
+dist/assets/AdminRewardsView-ae82de55.css                   0.42 kB │ gzip:   0.25 kB
+dist/assets/NNSVoteViewDemo-10a8efb1.css                    0.73 kB │ gzip:   0.38 kB
+dist/assets/AdminVotesView-4a35abdd.css                     0.75 kB │ gzip:   0.37 kB
+dist/assets/PortfolioHistoryView-3ddada2d.css               0.85 kB │ gzip:   0.38 kB
+dist/assets/RewardsView-4682b4f3.css                        0.88 kB │ gzip:   0.39 kB
+dist/assets/AdminClaimsView-d66359e7.css                    0.92 kB │ gzip:   0.41 kB
+dist/assets/AdminPriceView-d63314e3.css                     0.99 kB │ gzip:   0.32 kB
+dist/assets/AdminNNSView-3766090b.css                       1.07 kB │ gzip:   0.38 kB
+dist/assets/InfoView-b998e28f.css                           1.28 kB │ gzip:   0.30 kB
+dist/assets/useAdminCheck-7b57de21.css                      1.49 kB │ gzip:   0.57 kB
+dist/assets/ProposalsView-e7abcbc3.css                      1.88 kB │ gzip:   0.69 kB
+dist/assets/AdminRewardsBalancesView-3971452b.css           1.89 kB │ gzip:   0.55 kB
+dist/assets/TestPropView-f1cc7577.css                       2.10 kB │ gzip:   0.52 kB
+dist/assets/SaleDKPSwap-e020cc58.css                        2.30 kB │ gzip:   0.66 kB
+dist/assets/AdminArchiveView-be0ca5ca.css                   2.32 kB │ gzip:   0.75 kB
+dist/assets/NNSVoteView-82b2ddb1.css                        2.33 kB │ gzip:   0.68 kB
+dist/assets/SystemView-0626a443.css                         2.54 kB │ gzip:   0.58 kB
+dist/assets/AdminDistributionsView-4ee945bd.css             2.62 kB │ gzip:   0.82 kB
+dist/assets/SalesView-c2b6515f.css                          2.93 kB │ gzip:   0.66 kB
+dist/assets/AdminPriceHistoryView-c4f75911.css              2.95 kB │ gzip:   0.83 kB
+dist/assets/ForumView-f481a6f0.css                          3.05 kB │ gzip:   0.84 kB
+dist/assets/ThreadView-f14e6347.css                         4.20 kB │ gzip:   1.01 kB
+dist/assets/ManagePermissionsDialog-2bfefde4.css            5.57 kB │ gzip:   1.18 kB
+dist/assets/NamesViewDemo-b97ef22c.css                      5.77 kB │ gzip:   1.20 kB
+dist/assets/AdminView-2ffd32a4.css                          6.21 kB │ gzip:   1.49 kB
+dist/assets/ReportsView-cd64f132.css                        7.13 kB │ gzip:   1.36 kB
+dist/assets/DaoView-e0dc5ceb.css                           12.99 kB │ gzip:   1.96 kB
+dist/assets/VoteView-de005113.css                          16.75 kB │ gzip:   3.20 kB
+dist/assets/AdminTradeView-448300fe.css                    20.37 kB │ gzip:   3.16 kB
+dist/assets/HomeView-0d259ccd.css                          23.43 kB │ gzip:   3.36 kB
+dist/assets/WalletView-c476d1b2.css                        28.69 kB │ gzip:   4.50 kB
+dist/assets/ChatView-1e5470e8.css                          29.82 kB │ gzip:   4.02 kB
+dist/assets/WalletViewDemo-032cdbc8.css                    46.25 kB │ gzip:   6.95 kB
+dist/assets/index-8102e3f8.css                            541.03 kB │ gzip: 106.77 kB
+dist/assets/dkp-403efc27.js                                 0.05 kB │ gzip:   0.07 kB
+dist/assets/index-dd351f9a.js                               0.58 kB │ gzip:   0.39 kB
+dist/assets/index-5b3e0169.js                               0.63 kB │ gzip:   0.41 kB
+dist/assets/TacoTitle-56b8d088.js                           0.64 kB │ gzip:   0.40 kB
+dist/assets/admin.store-f183b4ab.js                         1.45 kB │ gzip:   0.60 kB
+dist/assets/AdminConfirmationModal-d679b07b.js              2.01 kB │ gzip:   1.04 kB
+dist/assets/NNSPropView-38dd3e32.js                         2.36 kB │ gzip:   1.19 kB
+dist/assets/NNSPropViewDemo-c0df0fd3.js                     2.37 kB │ gzip:   1.19 kB
+dist/assets/ForumView-4b4a463e.js                           3.02 kB │ gzip:   1.31 kB
+dist/assets/index-e1371727.js                               3.04 kB │ gzip:   1.32 kB
+dist/assets/index-9af4bcca.js                               3.61 kB │ gzip:   1.38 kB
+dist/assets/index-b6656f40.js                               4.14 kB │ gzip:   1.52 kB
+dist/assets/index-51de9cc2.js                               4.16 kB │ gzip:   1.52 kB
+dist/assets/index-642ec58d.js                               4.19 kB │ gzip:   1.58 kB
+dist/assets/ThreadView-824166f4.js                          4.29 kB │ gzip:   1.62 kB
+dist/assets/index-5ef98ace.js                               4.60 kB │ gzip:   2.07 kB
+dist/assets/index-e83bcef7.js                               4.82 kB │ gzip:   1.76 kB
+dist/assets/index-b170ae56.js                               4.90 kB │ gzip:   1.80 kB
+dist/assets/index-5f90b395.js                               5.18 kB │ gzip:   1.92 kB
+dist/assets/sneed_sns_forum.did-e9b44a40.js                 5.22 kB │ gzip:   1.09 kB
+dist/assets/app_sneeddao_backend.did-60a2ccb4.js            5.25 kB │ gzip:   1.30 kB
+dist/assets/rewards.did-8e789478.js                         5.39 kB │ gzip:   1.60 kB
+dist/assets/useGNSFProposal-4cb1ef97.js                     5.44 kB │ gzip:   1.96 kB
+dist/assets/ProposalsView-5d49cc44.js                       5.75 kB │ gzip:   2.21 kB
+dist/assets/alarm.did-9d13da86.js                           5.81 kB │ gzip:   1.61 kB
+dist/assets/SalesView-6463d4fb.js                           5.83 kB │ gzip:   1.51 kB
+dist/assets/index-70a77a97.js                               5.83 kB │ gzip:   1.97 kB
+dist/assets/ledger_canister.did-f27895df.js                 6.05 kB │ gzip:   1.54 kB
+dist/assets/index-32513ccc.js                               7.49 kB │ gzip:   2.42 kB
+dist/assets/NamesViewDemo-e05e5d0d.js                       8.12 kB │ gzip:   2.64 kB
+dist/assets/delegation-de46d17a.js                          8.20 kB │ gzip:   3.00 kB
+dist/assets/AdminClaimsView-47810899.js                     9.63 kB │ gzip:   3.10 kB
+dist/assets/InfoView-eb9c7281.js                            9.64 kB │ gzip:   1.70 kB
+dist/assets/neuronSnapshot.did-774eca51.js                  9.96 kB │ gzip:   2.61 kB
+dist/assets/AdminVotesView-55f5f7cc.js                     10.17 kB │ gzip:   3.36 kB
+dist/assets/DAO_backend.did-4301e939.js                    10.30 kB │ gzip:   2.60 kB
+dist/assets/TestPropView-44d4e098.js                       10.64 kB │ gzip:   3.55 kB
+dist/assets/PortfolioHistoryView-b6be2a45.js               10.99 kB │ gzip:   3.86 kB
+dist/assets/treasury.did-caf191f8.js                       11.70 kB │ gzip:   2.77 kB
+dist/assets/index-7046ed14.js                              11.90 kB │ gzip:   4.31 kB
+dist/assets/useAdminCheck-b601f1e9.js                      12.28 kB │ gzip:   4.67 kB
+dist/assets/AdminNeuronView-ba54d3b3.js                    12.31 kB │ gzip:   4.22 kB
+dist/assets/AdminRewardsBalancesView-64d4ac70.js           13.16 kB │ gzip:   4.49 kB
+dist/assets/AdminRewardsView-4b579571.js                   13.67 kB │ gzip:   4.52 kB
+dist/assets/NNSVoteViewDemo-d40c6686.js                    15.15 kB │ gzip:   4.73 kB
+dist/assets/RewardsView-23732fb5.js                        18.05 kB │ gzip:   5.94 kB
+dist/assets/sgldt-e34f64f5.js                              18.61 kB │ gzip:  13.69 kB
+dist/assets/NNSVoteView-06c6fd28.js                        19.07 kB │ gzip:   5.12 kB
+dist/assets/AdminPriceHistoryView-d1b224e2.js              21.74 kB │ gzip:   6.67 kB
+dist/assets/index-5bb52284.js                              23.52 kB │ gzip:   5.60 kB
+dist/assets/sns_governance.did-05bbf8c3.js                 27.62 kB │ gzip:   4.45 kB
+dist/assets/AdminPriceView-b505748b.js                     28.70 kB │ gzip:   7.04 kB
+dist/assets/ManagePermissionsDialog-fb0e7e43.js            30.17 kB │ gzip:   9.52 kB
+dist/assets/AdminAlarmView-bc41a6ca.js                     32.75 kB │ gzip:   7.74 kB
+dist/assets/DaoView-747bfac2.js                            35.03 kB │ gzip:  10.48 kB
+dist/assets/AdminNNSView-baca1c34.js                       36.46 kB │ gzip:   9.00 kB
+dist/assets/SaleDKPSwap-1a032b2c.js                        37.95 kB │ gzip:   3.58 kB
+dist/assets/VoteView-b213f319.js                           37.95 kB │ gzip:  11.30 kB
+dist/assets/AdminDistributionsView-4003ccbd.js             38.07 kB │ gzip:  10.29 kB
+dist/assets/AdminTradeView-21955ec0.js                     56.06 kB │ gzip:  14.18 kB
+dist/assets/index-354ee83f.js                              57.17 kB │ gzip:  15.55 kB
+dist/assets/AdminView-d40742fd.js                          61.80 kB │ gzip:  14.49 kB
+dist/assets/HomeView-75ea45fa.js                           71.59 kB │ gzip:  26.87 kB
+dist/assets/WalletViewDemo-b5983058.js                     87.82 kB │ gzip:  21.96 kB
+dist/assets/TokenData-ba1a5778.js                          91.86 kB │ gzip:  58.99 kB
+dist/assets/ChatView-30b9a349.js                           93.98 kB │ gzip:  34.53 kB
+dist/assets/SystemView-7a12afa8.js                         96.27 kB │ gzip:  22.13 kB
+dist/assets/WalletView-20ba0d45.js                        101.62 kB │ gzip:  27.66 kB
+dist/assets/AdminArchiveView-4c9550c4.js                  121.95 kB │ gzip:  26.97 kB
+dist/assets/index-db0a8eef.js                             150.17 kB │ gzip:  23.33 kB
+dist/assets/ReportsView-6466a0ad.js                       361.24 kB │ gzip:  99.66 kB
+dist/assets/index-2f350410.js                           1,250.12 kB │ gzip: 364.19 kB
+
+(!) Some chunks are larger than 500 kBs after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 19.92s
+[0;32m[SUCCESS][0m Production build complete
+[0;34m[INFO][0m Checking for existing servers on port 4173...
+[0;34m[INFO][0m Starting preview server on port 4173...
+[0;34m[INFO][0m Waiting for server to be ready...
+npm WARN ignoring workspace config at /home/d/Documents/staging/TACO_Frontend/src/taco_dao_frontend/.npmrc 
+  ➜  Local:   http://localhost:4173/
+  ➜  Network: http://192.168.8.167:4173/
+[0;32m[SUCCESS][0m Server is ready!
+[0;34m[INFO][0m Setting up Python virtual environment...
+[0;32m[SUCCESS][0m Python environment ready
+[0;34m[INFO][0m Running memory profiling tests...
+============================================================
+TACO Frontend Memory Profiler v2
+Focus: TAB + WORKER memory, sorted breakdown
+============================================================
+Chrome started with PID: 23963
+
+============================================================
+Profiling: http://localhost:4173/
+============================================================
+  Waiting 5s for data loading...
+  Getting JS heap memory...
+  Getting renderer process memory...
+  Getting CDP performance metrics...
+  Getting detailed renderer breakdown...
+  Getting heap object statistics...
+  Getting memory breakdown (sorted high→low)...
+  Getting IndexedDB usage...
+  Getting worker info...
+  Getting SharedWorker targets via CDP...
+  Getting all Chrome process memory breakdown...
+
+  Summary for /:
+  ┌─────────────────────────────────────────────────────────────
+  │ CHROME PROCESS BREAKDOWN:
+  │   Total Chrome Memory:      1541.1 MB
+  │   ├─ Renderer (tab):         899.1 MB
+  │   ├─ SharedWorker:             0.0 MB
+  │   ├─ GPU Process:            153.3 MB
+  │   ├─ Utility:                157.2 MB
+  │   └─ Other:                  331.5 MB
+  │
+  │ WORKER TARGETS (CDP):
+  │   SharedWorkers: 2
+  │   ServiceWorkers: 1
+  │   DedicatedWorkers: 0
+  │     - [shared_worker] public.worker-99606dcf.js
+  │     - [shared_worker] authenticated.worker-b2a6ac7b.js
+  │     - [service_worker] service-worker.js
+  │
+  │ TAB + WORKER MEMORY: 891.82 MB
+  │   (Renderer + SharedWorker processes)
+  │
+  │ JS HEAP: 13.56 MB used / 16.67 MB allocated
+  │
+  │ CDP METRICS:
+  │   DOM Nodes: 653
+  │   Event Listeners: 95
+  │   Layout Objects: 467
+  │   Resources: 63
+  │
+  │ MEMORY BREAKDOWN (high → low):
+  │   Decoded Images             8.18 MB  ████░░░░░░░░░░░░░░░░░░░░░
+  │     └─ chef-read-4d89f81f.webp: 1.98 MB
+  │     └─ chef-taco-b14e9110.webp: 1.97 MB
+  │   Stylesheets                1.00 MB  ░░░░░░░░░░░░░░░░░░░░░░░░░
+  │   DOM Tree                   0.32 MB  ░░░░░░░░░░░░░░░░░░░░░░░░░
+  │   WebAssembly Memory     WASM modules (dfinity/agent uses WASM)
+  │   Compiled JavaScript    V8 compiles JS to machine code (~3-10x source size)
+  │   Web Workers            SharedWorkers detected - memory shared across tabs
+  │
+  │ TOP HEAP OBJECT TYPES:
+  │   Window                   1 objects  ~4 KB
+  │
+  │ STORAGE: 0.51 MB (0% of quota)
+  └─────────────────────────────────────────────────────────────
+
+============================================================
+Profiling: http://localhost:4173/dao
+============================================================
+  Waiting 5s for data loading...
+  Getting JS heap memory...
+  Getting renderer process memory...
+  Getting CDP performance metrics...
+  Getting detailed renderer breakdown...
+  Getting heap object statistics...
+  Getting memory breakdown (sorted high→low)...
+  Getting IndexedDB usage...
+  Getting worker info...
+  Getting SharedWorker targets via CDP...
+  Getting all Chrome process memory breakdown...
+
+  Summary for /dao:
+  ┌─────────────────────────────────────────────────────────────
+  │ CHROME PROCESS BREAKDOWN:
+  │   Total Chrome Memory:      1172.9 MB
+  │   ├─ Renderer (tab):         542.1 MB
+  │   ├─ SharedWorker:             0.0 MB
+  │   ├─ GPU Process:            138.4 MB
+  │   ├─ Utility:                160.0 MB
+  │   └─ Other:                  332.5 MB
+  │
+  │ WORKER TARGETS (CDP):
+  │   SharedWorkers: 2
+  │   ServiceWorkers: 1
+  │   DedicatedWorkers: 0
+  │     - [shared_worker] public.worker-99606dcf.js
+  │     - [shared_worker] authenticated.worker-b2a6ac7b.js
+  │     - [service_worker] service-worker.js
+  │
+  │ TAB + WORKER MEMORY: 678.6 MB
+  │   (Renderer + SharedWorker processes)
+  │
+  │ JS HEAP: 15.0 MB used / 18.95 MB allocated
+  │
+  │ CDP METRICS:
+  │   DOM Nodes: 2089
+  │   Event Listeners: 613
+  │   Layout Objects: 655
+  │   Resources: 65
+  │
+  │ MEMORY BREAKDOWN (high → low):
+  │   Decoded Images             9.01 MB  ████░░░░░░░░░░░░░░░░░░░░░
+  │     └─ chef-read-4d89f81f.webp: 1.98 MB
+  │     └─ chef-taco-b14e9110.webp: 1.97 MB
+  │   Stylesheets                1.20 MB  ░░░░░░░░░░░░░░░░░░░░░░░░░
+  │   DOM Tree                   0.83 MB  ░░░░░░░░░░░░░░░░░░░░░░░░░
+  │   WebAssembly Memory     WASM modules (dfinity/agent uses WASM)
+  │   Compiled JavaScript    V8 compiles JS to machine code (~3-10x source size)
+  │   Web Workers            SharedWorkers detected - memory shared across tabs
+  │
+  │ TOP HEAP OBJECT TYPES:
+  │   Window                   3 objects  ~12 KB
+  │   Object                  37 objects  ~7 KB
+  │   e                       38 objects  ~4 KB
+  │
+  │ STORAGE: 0.51 MB (0% of quota)
+  └─────────────────────────────────────────────────────────────
+
+============================================================
+Profiling: http://localhost:4173/vote
+============================================================
+  Waiting 5s for data loading...
+  Getting JS heap memory...
+  Getting renderer process memory...
+  Getting CDP performance metrics...
+  Getting detailed renderer breakdown...
+  Getting heap object statistics...
+  Getting memory breakdown (sorted high→low)...
+  Getting IndexedDB usage...
+  Getting worker info...
+  Getting SharedWorker targets via CDP...
+  Getting all Chrome process memory breakdown...
+
+  Summary for /vote:
+  ┌─────────────────────────────────────────────────────────────
+  │ CHROME PROCESS BREAKDOWN:
+  │   Total Chrome Memory:      1017.1 MB
+  │   ├─ Renderer (tab):         379.9 MB
+  │   ├─ SharedWorker:             0.0 MB
+  │   ├─ GPU Process:            141.7 MB
+  │   ├─ Utility:                160.5 MB
+  │   └─ Other:                  335.0 MB
+  │
+  │ WORKER TARGETS (CDP):
+  │   SharedWorkers: 2
+  │   ServiceWorkers: 0
+  │   DedicatedWorkers: 0
+  │     - [shared_worker] public.worker-99606dcf.js
+  │     - [shared_worker] authenticated.worker-b2a6ac7b.js
+  │
+  │ TAB + WORKER MEMORY: 643.19 MB
+  │   (Renderer + SharedWorker processes)
+  │
+  │ JS HEAP: 14.52 MB used / 33.46 MB allocated
+  │
+  │ CDP METRICS:
+  │   DOM Nodes: 1414
+  │   Event Listeners: 336
+  │   Layout Objects: 623
+  │   Resources: 61
+  │
+  │ MEMORY BREAKDOWN (high → low):
+  │   Decoded Images             8.30 MB  ████░░░░░░░░░░░░░░░░░░░░░
+  │     └─ chef-read-4d89f81f.webp: 1.98 MB
+  │     └─ chef-taco-b14e9110.webp: 1.97 MB
+  │   Stylesheets                1.20 MB  ░░░░░░░░░░░░░░░░░░░░░░░░░
+  │   DOM Tree                   0.66 MB  ░░░░░░░░░░░░░░░░░░░░░░░░░
+  │   WebAssembly Memory     WASM modules (dfinity/agent uses WASM)
+  │   Compiled JavaScript    V8 compiles JS to machine code (~3-10x source size)
+  │   Web Workers            SharedWorkers detected - memory shared across tabs
+  │
+  │ TOP HEAP OBJECT TYPES:
+  │   Window                   3 objects  ~12 KB
+  │   Object                  37 objects  ~7 KB
+  │   e                       38 objects  ~4 KB
+  │
+  │ STORAGE: 0.64 MB (0% of quota)
+  └─────────────────────────────────────────────────────────────
+
+============================================================
+Profiling: http://localhost:4173/wallet
+============================================================
+  Waiting 5s for data loading...
+  Getting JS heap memory...
+  Getting renderer process memory...
+  Getting CDP performance metrics...
+  Getting detailed renderer breakdown...
+  Getting heap object statistics...
+  Getting memory breakdown (sorted high→low)...
+  Getting IndexedDB usage...
+  Getting worker info...
+  Getting SharedWorker targets via CDP...
+  Getting all Chrome process memory breakdown...
+
+  Summary for /wallet:
+  ┌─────────────────────────────────────────────────────────────
+  │ CHROME PROCESS BREAKDOWN:
+  │   Total Chrome Memory:      1044.5 MB
+  │   ├─ Renderer (tab):         415.7 MB
+  │   ├─ SharedWorker:             0.0 MB
+  │   ├─ GPU Process:            132.9 MB
+  │   ├─ Utility:                160.4 MB
+  │   └─ Other:                  335.4 MB
+  │
+  │ WORKER TARGETS (CDP):
+  │   SharedWorkers: 2
+  │   ServiceWorkers: 0
+  │   DedicatedWorkers: 0
+  │     - [shared_worker] public.worker-99606dcf.js
+  │     - [shared_worker] authenticated.worker-b2a6ac7b.js
+  │
+  │ TAB + WORKER MEMORY: 464.06 MB
+  │   (Renderer + SharedWorker processes)
+  │
+  │ JS HEAP: 13.84 MB used / 17.16 MB allocated
+  │
+  │ CDP METRICS:
+  │   DOM Nodes: 787
+  │   Event Listeners: 128
+  │   Layout Objects: 149
+  │   Resources: 54
+  │
+  │ MEMORY BREAKDOWN (high → low):
+  │   Decoded Images             8.18 MB  ████░░░░░░░░░░░░░░░░░░░░░
+  │     └─ chef-read-4d89f81f.webp: 1.98 MB
+  │     └─ chef-taco-b14e9110.webp: 1.97 MB
+  │   Stylesheets                1.20 MB  ░░░░░░░░░░░░░░░░░░░░░░░░░
+  │   DOM Tree                   0.40 MB  ░░░░░░░░░░░░░░░░░░░░░░░░░
+  │   WebAssembly Memory     WASM modules (dfinity/agent uses WASM)
+  │   Compiled JavaScript    V8 compiles JS to machine code (~3-10x source size)
+  │   Web Workers            SharedWorkers detected - memory shared across tabs
+  │
+  │ TOP HEAP OBJECT TYPES:
+  │   Window                   3 objects  ~12 KB
+  │
+  │ STORAGE: 0.68 MB (0% of quota)
+  └─────────────────────────────────────────────────────────────
+
+Results saved to: /home/d/Documents/staging/TACO_Frontend/scripts/memory-results/memory_report_20260106_012459.json
+
+============================================================
+FINAL SUMMARY
+============================================================
+
+Test Duration: 43.3s
+Pages Tested: 4
+
+┌──────────────────────────────────────────────────────────
+│ MEMORY BREAKDOWN
+├──────────────────────────────────────────────────────────
+│ Renderer Process Memory: 892 MB
+│   ├─ Chrome Baseline (headless):    ~500-700 MB
+│   ├─ V8 Compiled Code:              ~20-50 MB
+│   ├─ Blink Rendering Engine:        ~50-100 MB
+│   ├─ GPU Process Share:             ~50-100 MB
+│   └─ Your App's Actual Usage:       ~15-30 MB
+│
+│ JS Heap (controllable by code):
+│   Peak: 15.00 MB
+│   Min:  13.56 MB
+│   Growth: +0.28 MB
+└──────────────────────────────────────────────────────────
+
+📊 KEY INSIGHT:
+   The 892 MB renderer memory is MOSTLY Chrome overhead.
+   Your app's controllable memory is the JS Heap: ~15 MB
+   This is NORMAL for a headless Chrome instance.
+
+------------------------------------------------------------
+RECOMMENDATIONS
+------------------------------------------------------------
+
+[MEDIUM] Large Images (/)
+  Issue: Decoded images total 8377 KB
+  Fix: Consider lazy loading images or using smaller dimensions
+
+[MEDIUM] Large Images (/dao)
+  Issue: Decoded images total 9225 KB
+  Fix: Consider lazy loading images or using smaller dimensions
+
+[MEDIUM] Large Images (/vote)
+  Issue: Decoded images total 8505 KB
+  Fix: Consider lazy loading images or using smaller dimensions
+
+[MEDIUM] Large Images (/wallet)
+  Issue: Decoded images total 8377 KB
+  Fix: Consider lazy loading images or using smaller dimensions
+
+============================================================
+[0;32m[SUCCESS][0m Memory profiling complete!
+[0;34m[INFO][0m Report saved to: /home/d/Documents/staging/TACO_Frontend/scripts/memory-results/memory_report_20260106_012459.json
+
+==========================================
+           MEMORY PROFILE SUMMARY        
+==========================================
+Test Duration: 43.3s
+Peak JS Heap: 15.00 MB
+Peak Tab Memory: 891.82 MB
+JS Heap Growth: +0.28 MB
+
+Per-Page Breakdown:
+------------------------------------------------------------
+  /               | JS Heap:  13.56 MB | Tab: 891.82 MB
+  /dao            | JS Heap:  15.00 MB | Tab: 678.60 MB
+  /vote           | JS Heap:  14.52 MB | Tab: 643.19 MB
+  /wallet         | JS Heap:  13.84 MB | Tab: 464.06 MB
+
+Recommendations:
+------------------------------------------------------------
+  [MEDIUM] Decoded images total 8377 KB
+  [MEDIUM] Decoded images total 9225 KB
+  [MEDIUM] Decoded images total 8505 KB
+  [MEDIUM] Decoded images total 8377 KB
+==========================================
+[0;32m[SUCCESS][0m All tests complete!
+[0;34m[INFO][0m Cleaning up...
