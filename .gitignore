@@ -22,7 +22,7 @@ dist/
 .svelte-kit/
 
 *.log
-*.json
+
 
 # environment variables
 .env
