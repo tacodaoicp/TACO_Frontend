@@ -2969,10 +2969,10 @@ export const useTacoStore = defineStore('taco', () => {
     }
 
     // sns provided canisters
-    const fetchTotalTreasuryValueInUsd = async () => {
+    const fetchTotalTreasuryValueInUsd = async (forceRefetch = false) => {
 
-        // if total treasury value in usd is already set, return
-        if (totalTreasuryValueInUsd.value > 0) {
+        // if total treasury value in usd is already set, return (unless forced)
+        if (totalTreasuryValueInUsd.value > 0 && !forceRefetch) {
             return true
         }
 

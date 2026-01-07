@@ -196,12 +196,17 @@ let workerSetNetwork: ((network: 'ic' | 'staging' | 'local' | null) => void) | n
 export function initNetworkConfig(setNetworkFn: (network: 'ic' | 'staging' | 'local' | null) => void): void {
   workerSetNetwork = setNetworkFn
 
-  // Auto-use mainnet when on localhost/192.x addresses (local dev without dfx)
   const hostname = window.location.hostname
   const isLocalAddress = hostname === 'localhost' || hostname === '127.0.0.1' || hostname.startsWith('192.')
+  const isStagingCanister = hostname.includes('wxunf-maaaa-aaaab-qbzga-cai')
   let override = getNetworkOverride()
 
-  if (isLocalAddress && !override) {
+  if (isStagingCanister && !override) {
+    // Auto-set staging when on staging canister
+    setNetworkOverride('staging')
+    override = 'staging'
+    console.log('[NetworkConfig] Staging canister detected - auto-connecting to staging')
+  } else if (isLocalAddress && !override) {
     // Auto-set mainnet for local development
     setNetworkOverride('ic')
     override = 'ic'
@@ -291,10 +296,11 @@ Changes apply immediately - workers will refetch data from new network.
     },
   }
 
-  // Show help only for local addresses
+  // Show help for local addresses and staging canister
   const hostname = window.location.hostname
   const isLocalAddress = hostname === 'localhost' || hostname === '127.0.0.1' || hostname.startsWith('192.')
-  if (isLocalAddress) {
+  const isStagingCanister = hostname.includes('wxunf-maaaa-aaaab-qbzga-cai')
+  if (isLocalAddress || isStagingCanister) {
     ;(window as any).tacoConfig.help()
   }
 

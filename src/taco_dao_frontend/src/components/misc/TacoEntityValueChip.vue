@@ -267,7 +267,7 @@
 
     import TacoDaoLogo from "../../assets/images/tacoDaoLogo.vue"
     import TacoDaoTacoT from "../../assets/images/tacoDaoTacoT.vue"
-    import { ref, onMounted, onUnmounted, computed } from 'vue'
+    import { ref, onMounted, computed, watch } from 'vue'
     import { useTacoStore } from "../../stores/taco.store"
     import { storeToRefs } from "pinia"
     import icpLogo from "../../assets/tokens/snspng/icp.png"
@@ -289,6 +289,9 @@
 
     // dao
     const { totalPortfolioValueInUsd, totalTreasuryValueInUsd, snsTreasuryTacoValueInUsd, snsTreasuryIcpValueInUsd, snsTreasuryDkpValueInUsd } = storeToRefs(tacoStore)
+
+    // prices (for watching)
+    const { icpPriceUsd, tacoPriceUsd, dkpPriceUsd } = storeToRefs(tacoStore)
 
     /////////////////////
     // local variables //
@@ -352,5 +355,21 @@
         await fetchTotalTreasuryValueInUsd()
 
     })
+
+    //////////////
+    // watchers //
+    //////////////
+
+    // Watch for prices to load - refetch treasury values when prices become available
+    // This handles the case where treasury balances are fetched before prices arrive
+    watch(
+        () => icpPriceUsd.value + tacoPriceUsd.value + dkpPriceUsd.value,
+        (newTotal, oldTotal) => {
+            // If prices just became available (were 0, now have value) and treasury shows 0, refetch
+            if (oldTotal === 0 && newTotal > 0 && totalTreasuryValueInUsd.value === 0) {
+                fetchTotalTreasuryValueInUsd(true) // force refetch since prices are now available
+            }
+        }
+    )
 
 </script>

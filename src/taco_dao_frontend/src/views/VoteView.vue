@@ -622,10 +622,10 @@
                               :class="{'ready-to-vote': userLockedVote}" placeholder="0" min="0" max="100"
                               style="width: 6rem;" :step="step" :value="control.currentPercentage.toFixed(2)"
                               :disabled="control.isLocked || userLockedVote || unlockedCount === currentSliders.length - 1"
-                              @input="onAllocationChange(index, ($event.target as HTMLInputElement).valueAsNumber)">
+                              @input="onAllocationChange(index as number, ($event.target as HTMLInputElement).valueAsNumber)">
 
                             <!-- lock icon -->
-                            <button v-if="!userLockedVote" class="btn" @click="toggleLock(index)">
+                            <button v-if="!userLockedVote" class="btn" @click="toggleLock(index as number)">
 
                               <!-- unlock icon -->
                               <i v-if="!control.isLocked" class="fa-solid fa-unlock fa-lg"
@@ -656,7 +656,7 @@
                             :id="'slider' + (control.symbol)" :value="control.currentPercentage" min="0" max="100"
                             :step="step"
                             :disabled="control.isLocked || userLockedVote || unlockedCount === currentSliders.length - 1"
-                            @input="onAllocationChange(index, ($event.target as HTMLInputElement).valueAsNumber)">
+                            @input="onAllocationChange(index as number, ($event.target as HTMLInputElement).valueAsNumber)">
 
                         </div>
 
