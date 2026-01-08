@@ -260,40 +260,66 @@ export interface TimerStatusData {
 /**
  * Fetch crypto prices from external APIs (CoinGecko + GeckoTerminal)
  * No IC agent needed - direct HTTP calls
+ * Gracefully handles partial failures - returns 0 for failed fetches
  */
 export async function fetchCryptoPricesData(): Promise<CryptoPrices> {
-  // Fetch ICP and BTC from CoinGecko
-  const coingeckoResponse = await fetch(
-    'https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=internet-computer,bitcoin'
-  )
-
-  if (!coingeckoResponse.ok) {
-    throw new Error(`CoinGecko API error: ${coingeckoResponse.status}`)
-  }
-
-  const marketData = await coingeckoResponse.json()
-
-  // Find ICP and BTC in response
-  const icpData = marketData.find((c: any) => c.id === 'internet-computer')
-  const btcData = marketData.find((c: any) => c.id === 'bitcoin')
-
-  // Fetch TACO price from GeckoTerminal
-  const tacoResponse = await fetch(
-    'https://api.geckoterminal.com/api/v2/networks/icp/pools/vhoia-myaaa-aaaar-qbmja-cai'
-  )
-
+  let icpPrice = 0
+  let btcPrice = 0
   let tacoUsd = 0
   let tacoIcp = 0
 
-  if (tacoResponse.ok) {
-    const tacoData = await tacoResponse.json()
-    tacoUsd = Number(tacoData.data?.attributes?.base_token_price_usd || 0)
-    tacoIcp = Number(tacoData.data?.attributes?.base_token_price_quote_token || 0)
+  // Fetch ICP and BTC from CoinGecko (with timeout)
+  try {
+    const coingeckoController = new AbortController()
+    const coingeckoTimeout = setTimeout(() => coingeckoController.abort(), 10000)
+
+    const coingeckoResponse = await fetch(
+      'https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=internet-computer,bitcoin',
+      { signal: coingeckoController.signal }
+    )
+    clearTimeout(coingeckoTimeout)
+
+    if (coingeckoResponse.ok) {
+      const marketData = await coingeckoResponse.json()
+      const icpData = marketData.find((c: any) => c.id === 'internet-computer')
+      const btcData = marketData.find((c: any) => c.id === 'bitcoin')
+      icpPrice = icpData?.current_price || 0
+      btcPrice = btcData?.current_price || 0
+    }
+  } catch (err) {
+    // CoinGecko fetch failed - continue with zeros, will retry via backoff
+    console.warn('[fetchCryptoPricesData] CoinGecko fetch failed:', err)
+  }
+
+  // Fetch TACO price from GeckoTerminal (with timeout)
+  try {
+    const tacoController = new AbortController()
+    const tacoTimeout = setTimeout(() => tacoController.abort(), 10000)
+
+    const tacoResponse = await fetch(
+      'https://api.geckoterminal.com/api/v2/networks/icp/pools/vhoia-myaaa-aaaar-qbmja-cai',
+      { signal: tacoController.signal }
+    )
+    clearTimeout(tacoTimeout)
+
+    if (tacoResponse.ok) {
+      const tacoData = await tacoResponse.json()
+      tacoUsd = Number(tacoData.data?.attributes?.base_token_price_usd || 0)
+      tacoIcp = Number(tacoData.data?.attributes?.base_token_price_quote_token || 0)
+    }
+  } catch (err) {
+    // GeckoTerminal fetch failed - continue with zeros
+    console.warn('[fetchCryptoPricesData] GeckoTerminal fetch failed:', err)
+  }
+
+  // Only throw if ALL prices are zero (complete failure)
+  if (icpPrice === 0 && btcPrice === 0 && tacoUsd === 0) {
+    throw new Error('Failed to fetch any crypto prices - network may be unavailable')
   }
 
   return {
-    icp: icpData?.current_price || 0,
-    btc: btcData?.current_price || 0,
+    icp: icpPrice,
+    btc: btcPrice,
     taco: tacoUsd,
     tacoIcp: tacoIcp,
   }

@@ -616,8 +616,9 @@ const handleProposalSuccess = async () => {
 
 // Watchers to sync cached data to local refs
 watch(cachedNeuronSnapshots, (newVal) => {
-  if (newVal?.length > 0) {
-    snapshots.value = newVal
+  // Always update loading state when data arrives (even if empty)
+  if (newVal !== undefined) {
+    snapshots.value = newVal || []
     loadingSnapshots.value = false
   }
 }, { immediate: true })
