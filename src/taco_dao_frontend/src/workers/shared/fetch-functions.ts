@@ -5,9 +5,9 @@
  * and returns the data. Agent is passed in to allow anonymous or authenticated calls.
  */
 
-import { Actor, type HttpAgent } from '@dfinity/agent'
+import { Actor, type HttpAgent, type ActorSubclass } from '@dfinity/agent'
 import { Principal } from '@dfinity/principal'
-import { idlFactory as daoBackendIDL } from '../../../../declarations/dao_backend/DAO_backend.did.js'
+import { idlFactory as daoBackendIDL, type _SERVICE as DaoBackendService } from '../../../../declarations/dao_backend/DAO_backend.did.js'
 import { idlFactory as treasuryIDL, type _SERVICE as TreasuryService } from '../../../../declarations/treasury/treasury.did.js'
 import { idlFactory as neuronSnapshotIDL, type _SERVICE as NeuronSnapshotService } from '../../../../declarations/neuronSnapshot/neuronSnapshot.did.js'
 import { idlFactory as sneedForumIDL, type _SERVICE as SneedForumService } from '../../../../declarations/sneed_sns_forum/sneed_sns_forum.did.js'
@@ -27,6 +27,76 @@ import {
 } from './canister-ids'
 import { idlFactory as alarmIDL, type _SERVICE as AlarmService } from '../../../../declarations/alarm/alarm.did.js'
 import { idlFactory as rewardsIDL, type _SERVICE as RewardsService } from '../../../../declarations/rewards/rewards.did.js'
+
+// ============================================================================
+// Actor Caching - Reuse actors for same agent/canister combinations
+// ============================================================================
+
+// WeakMap keyed by agent to allow GC when agent changes
+const actorCache = new WeakMap<HttpAgent, Map<string, ActorSubclass<any>>>()
+
+/**
+ * Get or create a cached actor for the given agent and canister
+ */
+function getCachedActor<T>(
+  agent: HttpAgent,
+  canisterId: string,
+  idlFactory: any
+): ActorSubclass<T> {
+  let agentActors = actorCache.get(agent)
+  if (!agentActors) {
+    agentActors = new Map()
+    actorCache.set(agent, agentActors)
+  }
+
+  let actor = agentActors.get(canisterId)
+  if (!actor) {
+    actor = Actor.createActor<T>(idlFactory, { agent, canisterId })
+    agentActors.set(canisterId, actor)
+  }
+
+  return actor as ActorSubclass<T>
+}
+
+// Convenience getters for each canister type
+function getDaoBackendActor(agent: HttpAgent): ActorSubclass<DaoBackendService> {
+  return getCachedActor<DaoBackendService>(agent, getDaoBackendCanisterId(), daoBackendIDL)
+}
+
+function getTreasuryActor(agent: HttpAgent): ActorSubclass<TreasuryService> {
+  return getCachedActor<TreasuryService>(agent, getTreasuryCanisterId(), treasuryIDL)
+}
+
+function getNeuronSnapshotActor(agent: HttpAgent): ActorSubclass<NeuronSnapshotService> {
+  return getCachedActor<NeuronSnapshotService>(agent, getNeuronSnapshotCanisterId(), neuronSnapshotIDL)
+}
+
+function getSneedForumActor(agent: HttpAgent): ActorSubclass<SneedForumService> {
+  return getCachedActor<SneedForumService>(agent, getSneedForumCanisterId(), sneedForumIDL)
+}
+
+function getAppSneedDaoActor(agent: HttpAgent): ActorSubclass<AppSneedDaoService> {
+  return getCachedActor<AppSneedDaoService>(agent, getAppSneedDaoCanisterId(), appSneedDaoIDL)
+}
+
+function getSnsGovernanceActor(agent: HttpAgent): ActorSubclass<any> {
+  return getCachedActor<any>(agent, getTacoSnsGovernanceCanisterId(), snsGovernanceIDL)
+}
+
+function getAlarmActor(agent: HttpAgent): ActorSubclass<AlarmService> {
+  return getCachedActor<AlarmService>(agent, getAlarmCanisterId(), alarmIDL)
+}
+
+function getRewardsActor(agent: HttpAgent): ActorSubclass<RewardsService> {
+  return getCachedActor<RewardsService>(agent, getRewardsCanisterId(), rewardsIDL)
+}
+
+/**
+ * Clear actor cache for a specific agent (call when agent identity changes)
+ */
+export function clearActorCache(agent: HttpAgent): void {
+  actorCache.delete(agent)
+}
 
 // ============================================================================
 // Principal Caching (for serialization performance)
@@ -233,11 +303,7 @@ export async function fetchCryptoPricesData(): Promise<CryptoPrices> {
  * Fetch token details from DAO backend (without past prices for performance)
  */
 export async function fetchTokenDetailsData(agent: HttpAgent): Promise<any[]> {
-  const actor = Actor.createActor(daoBackendIDL, {
-    agent,
-    canisterId: getDaoBackendCanisterId(),
-  })
-
+  const actor = getDaoBackendActor(agent)
   const tokenDetails = await actor.getTokenDetailsWithoutPastPrices()
   return tokenDetails as any[]
 }
@@ -246,11 +312,7 @@ export async function fetchTokenDetailsData(agent: HttpAgent): Promise<any[]> {
  * Fetch aggregate allocation from DAO backend
  */
 export async function fetchAggregateAllocationData(agent: HttpAgent): Promise<any> {
-  const actor = Actor.createActor(daoBackendIDL, {
-    agent,
-    canisterId: getDaoBackendCanisterId(),
-  })
-
+  const actor = getDaoBackendActor(agent)
   const allocation = await actor.getAggregateAllocation()
   return allocation
 }
@@ -259,11 +321,7 @@ export async function fetchAggregateAllocationData(agent: HttpAgent): Promise<an
  * Fetch trading status from Treasury
  */
 export async function fetchTradingStatusData(agent: HttpAgent): Promise<TradingStatusResult> {
-  const actor = Actor.createActor<TreasuryService>(treasuryIDL, {
-    agent,
-    canisterId: getTreasuryCanisterId(),
-  })
-
+  const actor = getTreasuryActor(agent)
   const status = (await actor.getTradingStatus()) as TradingStatusResult
   return status
 }
@@ -273,15 +331,8 @@ export async function fetchTradingStatusData(agent: HttpAgent): Promise<TradingS
  * This combines data from DAO backend and Treasury
  */
 export async function fetchTimerStatusData(agent: HttpAgent): Promise<TimerStatusData> {
-  const daoActor = Actor.createActor(daoBackendIDL, {
-    agent,
-    canisterId: getDaoBackendCanisterId(),
-  })
-
-  const treasuryActor = Actor.createActor<TreasuryService>(treasuryIDL, {
-    agent,
-    canisterId: getTreasuryCanisterId(),
-  })
+  const daoActor = getDaoBackendActor(agent)
+  const treasuryActor = getTreasuryActor(agent)
 
   // Fetch in parallel
   const [snapshotInfo, tradingStatus, tokenDetails] = await Promise.all([
@@ -324,11 +375,7 @@ export function calculateTotalTreasuryValueInUsd(tokenDetails: any[]): number {
  * Fetch voting power metrics from DAO backend
  */
 export async function fetchVotingPowerMetricsData(agent: HttpAgent): Promise<any> {
-  const actor = Actor.createActor(daoBackendIDL, {
-    agent,
-    canisterId: getDaoBackendCanisterId(),
-  })
-
+  const actor = getDaoBackendActor(agent)
   const metrics = await actor.votingPowerMetrics()
   return metrics
 }
@@ -341,10 +388,7 @@ export async function fetchTacoProposalsData(
   beforeProposal: bigint | null = null,
   limit: number = 20
 ): Promise<any> {
-  const actor = Actor.createActor(snsGovernanceIDL, {
-    agent,
-    canisterId: getTacoSnsGovernanceCanisterId(),
-  })
+  const actor = getSnsGovernanceActor(agent)
 
   const request = {
     include_reward_status: [],
@@ -376,10 +420,7 @@ export async function fetchTacoProposalsData(
  * Fetch proposals threads from Sneed Forum
  */
 export async function fetchProposalsThreadsData(agent: HttpAgent): Promise<any[]> {
-  const forumActor = Actor.createActor<SneedForumService>(sneedForumIDL, {
-    agent,
-    canisterId: getSneedForumCanisterId(),
-  })
+  const forumActor = getSneedForumActor(agent)
 
   // Direct lookup using SNS root canister ID
   const tacoSnsRoot = Principal.fromText(getTacoSnsRootCanisterId())
@@ -402,10 +443,7 @@ export async function fetchAllNamesData(agent: HttpAgent): Promise<{
   principalNames: Map<string, { name: string; verified: boolean }>
   neuronNames: Map<string, { name: string; verified: boolean }>
 }> {
-  const actor = Actor.createActor<AppSneedDaoService>(appSneedDaoIDL, {
-    agent,
-    canisterId: getAppSneedDaoCanisterId(),
-  })
+  const actor = getAppSneedDaoActor(agent)
 
   const [principalNamesRaw, neuronNamesRaw] = await Promise.all([
     actor.get_all_principal_names(),
@@ -432,11 +470,7 @@ export async function fetchAllNamesData(agent: HttpAgent): Promise<{
  * Fetch neuron snapshot status
  */
 export async function fetchNeuronSnapshotStatusData(agent: HttpAgent): Promise<any> {
-  const actor = Actor.createActor<NeuronSnapshotService>(neuronSnapshotIDL, {
-    agent,
-    canisterId: getNeuronSnapshotCanisterId(),
-  })
-
+  const actor = getNeuronSnapshotActor(agent)
   return await actor.get_neuron_snapshot_status()
 }
 
@@ -444,11 +478,7 @@ export async function fetchNeuronSnapshotStatusData(agent: HttpAgent): Promise<a
  * Fetch portfolio snapshot status from Treasury
  */
 export async function fetchPortfolioSnapshotStatusData(agent: HttpAgent): Promise<any> {
-  const actor = Actor.createActor<TreasuryService>(treasuryIDL, {
-    agent,
-    canisterId: getTreasuryCanisterId(),
-  })
-
+  const actor = getTreasuryActor(agent)
   const status = await actor.getPortfolioSnapshotStatus()
   return {
     status: status.status,
@@ -465,11 +495,7 @@ export async function fetchPortfolioSnapshotStatusData(agent: HttpAgent): Promis
  * Fetch user allocation (requires authenticated agent)
  */
 export async function fetchUserAllocationData(agent: HttpAgent): Promise<any> {
-  const actor = Actor.createActor(daoBackendIDL, {
-    agent,
-    canisterId: getDaoBackendCanisterId(),
-  })
-
+  const actor = getDaoBackendActor(agent)
   return await actor.getUserAllocation()
 }
 
@@ -477,23 +503,15 @@ export async function fetchUserAllocationData(agent: HttpAgent): Promise<any> {
  * Fetch system logs (admin only)
  */
 export async function fetchSystemLogsData(agent: HttpAgent, count: number = 68): Promise<any[]> {
-  const actor = Actor.createActor(daoBackendIDL, {
-    agent,
-    canisterId: getDaoBackendCanisterId(),
-  })
-
-  return (await actor.getLogs(count)) as any[]
+  const actor = getDaoBackendActor(agent)
+  return (await actor.getLogs(BigInt(count))) as any[]
 }
 
 /**
  * Fetch voter details (admin only)
  */
 export async function fetchVoterDetailsData(agent: HttpAgent): Promise<any[]> {
-  const actor = Actor.createActor(daoBackendIDL, {
-    agent,
-    canisterId: getDaoBackendCanisterId(),
-  })
-
+  const actor = getDaoBackendActor(agent)
   const voterDetails = await actor.admin_getUserAllocations()
 
   if (!voterDetails || !Array.isArray(voterDetails)) {
@@ -510,11 +528,7 @@ export async function fetchVoterDetailsData(agent: HttpAgent): Promise<any[]> {
  * Fetch neuron allocations (admin only)
  */
 export async function fetchNeuronAllocationsData(agent: HttpAgent): Promise<any[]> {
-  const actor = Actor.createActor(daoBackendIDL, {
-    agent,
-    canisterId: getDaoBackendCanisterId(),
-  })
-
+  const actor = getDaoBackendActor(agent)
   const result = await actor.admin_getNeuronAllocations()
 
   if (!Array.isArray(result)) {
@@ -538,11 +552,7 @@ export async function fetchNeuronAllocationsData(agent: HttpAgent): Promise<any[
  * Returns neurons with their penalty multipliers
  */
 export async function fetchPenalizedNeuronsData(agent: HttpAgent): Promise<any[]> {
-  const actor = Actor.createActor(daoBackendIDL, {
-    agent,
-    canisterId: getDaoBackendCanisterId(),
-  })
-
+  const actor = getDaoBackendActor(agent)
   const result = await actor.getPenalizedNeurons()
 
   if (!Array.isArray(result)) {
@@ -559,11 +569,7 @@ export async function fetchPenalizedNeuronsData(agent: HttpAgent): Promise<any[]
  * Fetch rebalance config from Treasury (admin only)
  */
 export async function fetchRebalanceConfigData(agent: HttpAgent): Promise<any> {
-  const actor = Actor.createActor<TreasuryService>(treasuryIDL, {
-    agent,
-    canisterId: getTreasuryCanisterId(),
-  })
-
+  const actor = getTreasuryActor(agent)
   return await actor.getSystemParameters()
 }
 
@@ -571,11 +577,7 @@ export async function fetchRebalanceConfigData(agent: HttpAgent): Promise<any> {
  * Fetch system parameters from DAO backend (admin only)
  */
 export async function fetchSystemParametersData(agent: HttpAgent): Promise<any> {
-  const actor = Actor.createActor(daoBackendIDL, {
-    agent,
-    canisterId: getDaoBackendCanisterId(),
-  })
-
+  const actor = getDaoBackendActor(agent)
   return await actor.getSystemParameters()
 }
 
@@ -587,11 +589,7 @@ export async function fetchSystemParametersData(agent: HttpAgent): Promise<any> 
  * Fetch price alerts from Treasury (admin only)
  */
 export async function fetchPriceAlertsData(agent: HttpAgent, offset: number = 0, limit: number = 68): Promise<any> {
-  const actor = Actor.createActor<TreasuryService>(treasuryIDL, {
-    agent,
-    canisterId: getTreasuryCanisterId(),
-  })
-
+  const actor = getTreasuryActor(agent)
   // Returns { alerts: PriceAlertLog[], totalCount: bigint }
   return await actor.getPriceAlerts(BigInt(offset), BigInt(limit))
 }
@@ -600,11 +598,7 @@ export async function fetchPriceAlertsData(agent: HttpAgent, offset: number = 0,
  * Fetch trading pauses from Treasury (admin only)
  */
 export async function fetchTradingPausesData(agent: HttpAgent): Promise<any> {
-  const actor = Actor.createActor<TreasuryService>(treasuryIDL, {
-    agent,
-    canisterId: getTreasuryCanisterId(),
-  })
-
+  const actor = getTreasuryActor(agent)
   // Returns TradingPausesResponse
   return await actor.listTradingPauses()
 }
@@ -614,11 +608,7 @@ export async function fetchTradingPausesData(agent: HttpAgent): Promise<any> {
  * Uses getTokenPriceHistory for all tokens
  */
 export async function fetchPriceHistoryData(agent: HttpAgent, tokens: Principal[] = []): Promise<any> {
-  const actor = Actor.createActor<TreasuryService>(treasuryIDL, {
-    agent,
-    canisterId: getTreasuryCanisterId(),
-  })
-
+  const actor = getTreasuryActor(agent)
   const result = await actor.getTokenPriceHistory(tokens)
   if ('ok' in result) {
     return result.ok
@@ -630,11 +620,7 @@ export async function fetchPriceHistoryData(agent: HttpAgent, tokens: Principal[
  * Fetch portfolio history from Treasury (admin only)
  */
 export async function fetchPortfolioHistoryData(agent: HttpAgent, limit: number = 270): Promise<any> {
-  const actor = Actor.createActor<TreasuryService>(treasuryIDL, {
-    agent,
-    canisterId: getTreasuryCanisterId(),
-  })
-
+  const actor = getTreasuryActor(agent)
   const result = await actor.getPortfolioHistory(BigInt(limit))
   if ('ok' in result) {
     return result.ok
@@ -646,11 +632,7 @@ export async function fetchPortfolioHistoryData(agent: HttpAgent, limit: number 
  * Fetch circuit breaker logs from Treasury (admin only)
  */
 export async function fetchCircuitBreakerLogsData(agent: HttpAgent, offset: number = 0, limit: number = 68): Promise<any> {
-  const actor = Actor.createActor<TreasuryService>(treasuryIDL, {
-    agent,
-    canisterId: getTreasuryCanisterId(),
-  })
-
+  const actor = getTreasuryActor(agent)
   return await actor.getPortfolioCircuitBreakerLogs(BigInt(offset), BigInt(limit))
 }
 
@@ -658,11 +640,7 @@ export async function fetchCircuitBreakerLogsData(agent: HttpAgent, offset: numb
  * Fetch circuit breaker conditions from Treasury (admin only)
  */
 export async function fetchCircuitBreakerConditionsData(agent: HttpAgent): Promise<any> {
-  const actor = Actor.createActor<TreasuryService>(treasuryIDL, {
-    agent,
-    canisterId: getTreasuryCanisterId(),
-  })
-
+  const actor = getTreasuryActor(agent)
   return await actor.listPortfolioCircuitBreakerConditions()
 }
 
@@ -670,11 +648,7 @@ export async function fetchCircuitBreakerConditionsData(agent: HttpAgent): Promi
  * Fetch portfolio circuit breaker conditions from Treasury (admin only)
  */
 export async function fetchPortfolioCircuitBreakerConditionsData(agent: HttpAgent): Promise<any> {
-  const actor = Actor.createActor<TreasuryService>(treasuryIDL, {
-    agent,
-    canisterId: getTreasuryCanisterId(),
-  })
-
+  const actor = getTreasuryActor(agent)
   return await actor.listPortfolioCircuitBreakerConditions()
 }
 
@@ -682,11 +656,7 @@ export async function fetchPortfolioCircuitBreakerConditionsData(agent: HttpAgen
  * Fetch max price history entries from Treasury (admin only)
  */
 export async function fetchMaxPriceHistoryEntriesData(agent: HttpAgent): Promise<bigint> {
-  const actor = Actor.createActor<TreasuryService>(treasuryIDL, {
-    agent,
-    canisterId: getTreasuryCanisterId(),
-  })
-
+  const actor = getTreasuryActor(agent)
   return await actor.getMaxPriceHistoryEntries() as bigint
 }
 
@@ -694,11 +664,7 @@ export async function fetchMaxPriceHistoryEntriesData(agent: HttpAgent): Promise
  * Fetch max portfolio snapshots from Treasury (admin only)
  */
 export async function fetchMaxPortfolioSnapshotsData(agent: HttpAgent): Promise<bigint> {
-  const actor = Actor.createActor<TreasuryService>(treasuryIDL, {
-    agent,
-    canisterId: getTreasuryCanisterId(),
-  })
-
+  const actor = getTreasuryActor(agent)
   return await actor.getMaxPortfolioSnapshots() as bigint
 }
 
@@ -710,11 +676,7 @@ export async function fetchMaxPortfolioSnapshotsData(agent: HttpAgent): Promise<
  * Fetch neuron snapshots from NeuronSnapshot canister (admin only)
  */
 export async function fetchNeuronSnapshotsData(agent: HttpAgent, start: number = 0, length: number = 68): Promise<any[]> {
-  const actor = Actor.createActor<NeuronSnapshotService>(neuronSnapshotIDL, {
-    agent,
-    canisterId: getNeuronSnapshotCanisterId(),
-  })
-
+  const actor = getNeuronSnapshotActor(agent)
   return await actor.get_neuron_snapshots_info(BigInt(start), BigInt(length)) as any[]
 }
 
@@ -722,11 +684,7 @@ export async function fetchNeuronSnapshotsData(agent: HttpAgent, start: number =
  * Fetch max neuron snapshots from NeuronSnapshot canister (admin only)
  */
 export async function fetchMaxNeuronSnapshotsData(agent: HttpAgent): Promise<bigint> {
-  const actor = Actor.createActor<NeuronSnapshotService>(neuronSnapshotIDL, {
-    agent,
-    canisterId: getNeuronSnapshotCanisterId(),
-  })
-
+  const actor = getNeuronSnapshotActor(agent)
   return await actor.getMaxNeuronSnapshots() as bigint
 }
 
@@ -738,11 +696,7 @@ export async function fetchMaxNeuronSnapshotsData(agent: HttpAgent): Promise<big
  * Fetch alarm system status (admin only)
  */
 export async function fetchAlarmSystemStatusData(agent: HttpAgent): Promise<any> {
-  const actor = Actor.createActor<AlarmService>(alarmIDL, {
-    agent,
-    canisterId: getAlarmCanisterId(),
-  })
-
+  const actor = getAlarmActor(agent)
   const result = await actor.getMonitoringStatus()
   if ('ok' in result) {
     return result.ok
@@ -754,11 +708,7 @@ export async function fetchAlarmSystemStatusData(agent: HttpAgent): Promise<any>
  * Fetch alarm contacts (admin only)
  */
 export async function fetchAlarmContactsData(agent: HttpAgent): Promise<any[]> {
-  const actor = Actor.createActor<AlarmService>(alarmIDL, {
-    agent,
-    canisterId: getAlarmCanisterId(),
-  })
-
+  const actor = getAlarmActor(agent)
   const result = await actor.getContacts()
   if ('ok' in result) {
     return result.ok as any[]
@@ -770,11 +720,7 @@ export async function fetchAlarmContactsData(agent: HttpAgent): Promise<any[]> {
  * Fetch monitoring status (admin only)
  */
 export async function fetchMonitoringStatusData(agent: HttpAgent): Promise<any> {
-  const actor = Actor.createActor<AlarmService>(alarmIDL, {
-    agent,
-    canisterId: getAlarmCanisterId(),
-  })
-
+  const actor = getAlarmActor(agent)
   const result = await actor.getMonitoringStatus()
   if ('ok' in result) {
     return result.ok
@@ -786,11 +732,7 @@ export async function fetchMonitoringStatusData(agent: HttpAgent): Promise<any> 
  * Fetch pending alarms (admin only)
  */
 export async function fetchPendingAlarmsData(agent: HttpAgent): Promise<any[]> {
-  const actor = Actor.createActor<AlarmService>(alarmIDL, {
-    agent,
-    canisterId: getAlarmCanisterId(),
-  })
-
+  const actor = getAlarmActor(agent)
   const result = await actor.getPendingAlarms()
   if ('ok' in result) {
     return result.ok as any[]
@@ -802,11 +744,7 @@ export async function fetchPendingAlarmsData(agent: HttpAgent): Promise<any[]> {
  * Fetch system errors (admin only)
  */
 export async function fetchSystemErrorsData(agent: HttpAgent, limit: number = 68): Promise<any[]> {
-  const actor = Actor.createActor<AlarmService>(alarmIDL, {
-    agent,
-    canisterId: getAlarmCanisterId(),
-  })
-
+  const actor = getAlarmActor(agent)
   const result = await actor.getSystemErrors([BigInt(limit)])
   if ('ok' in result) {
     return result.ok as any[]
@@ -818,11 +756,7 @@ export async function fetchSystemErrorsData(agent: HttpAgent, limit: number = 68
  * Fetch internal errors (admin only)
  */
 export async function fetchInternalErrorsData(agent: HttpAgent, limit: number = 68): Promise<any[]> {
-  const actor = Actor.createActor<AlarmService>(alarmIDL, {
-    agent,
-    canisterId: getAlarmCanisterId(),
-  })
-
+  const actor = getAlarmActor(agent)
   const result = await actor.getInternalErrors([BigInt(limit)])
   if ('ok' in result) {
     return result.ok as any[]
@@ -834,11 +768,7 @@ export async function fetchInternalErrorsData(agent: HttpAgent, limit: number = 
  * Fetch monitored canisters (admin only)
  */
 export async function fetchMonitoredCanistersData(agent: HttpAgent): Promise<any[]> {
-  const actor = Actor.createActor<AlarmService>(alarmIDL, {
-    agent,
-    canisterId: getAlarmCanisterId(),
-  })
-
+  const actor = getAlarmActor(agent)
   const result = await actor.getMonitoredCanisters()
   if ('ok' in result) {
     return result.ok as any[]
@@ -850,11 +780,7 @@ export async function fetchMonitoredCanistersData(agent: HttpAgent): Promise<any
  * Fetch configuration intervals (admin only)
  */
 export async function fetchConfigurationIntervalsData(agent: HttpAgent): Promise<any> {
-  const actor = Actor.createActor<AlarmService>(alarmIDL, {
-    agent,
-    canisterId: getAlarmCanisterId(),
-  })
-
+  const actor = getAlarmActor(agent)
   const result = await actor.getConfigurationIntervals()
   if ('ok' in result) {
     return result.ok
@@ -866,11 +792,7 @@ export async function fetchConfigurationIntervalsData(agent: HttpAgent): Promise
  * Fetch queue status (admin only)
  */
 export async function fetchQueueStatusData(agent: HttpAgent): Promise<any> {
-  const actor = Actor.createActor<AlarmService>(alarmIDL, {
-    agent,
-    canisterId: getAlarmCanisterId(),
-  })
-
+  const actor = getAlarmActor(agent)
   const result = await actor.getQueueStatus()
   if ('ok' in result) {
     return result.ok
@@ -882,11 +804,7 @@ export async function fetchQueueStatusData(agent: HttpAgent): Promise<any> {
  * Fetch sent SMS messages (admin only)
  */
 export async function fetchSentSMSMessagesData(agent: HttpAgent, limit: number = 68): Promise<any[]> {
-  const actor = Actor.createActor<AlarmService>(alarmIDL, {
-    agent,
-    canisterId: getAlarmCanisterId(),
-  })
-
+  const actor = getAlarmActor(agent)
   const result = await actor.getSentSMSMessages([BigInt(limit)])
   if ('ok' in result) {
     return result.ok as any[]
@@ -898,10 +816,7 @@ export async function fetchSentSMSMessagesData(agent: HttpAgent, limit: number =
  * Fetch sent email messages (admin only)
  */
 export async function fetchSentEmailMessagesData(agent: HttpAgent, limit: number = 68): Promise<any[]> {
-  const actor = Actor.createActor<AlarmService>(alarmIDL, {
-    agent,
-    canisterId: getAlarmCanisterId(),
-  })
+  const actor = getAlarmActor(agent)
 
   const result = await actor.getSentEmailMessages([BigInt(limit)])
   if ('ok' in result) {
@@ -914,10 +829,7 @@ export async function fetchSentEmailMessagesData(agent: HttpAgent, limit: number
  * Fetch sent messages (admin only)
  */
 export async function fetchSentMessagesData(agent: HttpAgent, limit: number = 68): Promise<any[]> {
-  const actor = Actor.createActor<AlarmService>(alarmIDL, {
-    agent,
-    canisterId: getAlarmCanisterId(),
-  })
+  const actor = getAlarmActor(agent)
 
   const result = await actor.getSentMessages([BigInt(limit)])
   if ('ok' in result) {
@@ -930,10 +842,7 @@ export async function fetchSentMessagesData(agent: HttpAgent, limit: number = 68
  * Fetch alarm acknowledgments (admin only)
  */
 export async function fetchAlarmAcknowledgmentsData(agent: HttpAgent, limit: number = 68): Promise<any[]> {
-  const actor = Actor.createActor<AlarmService>(alarmIDL, {
-    agent,
-    canisterId: getAlarmCanisterId(),
-  })
+  const actor = getAlarmActor(agent)
 
   const result = await actor.getAlarmAcknowledgments([BigInt(limit)])
   if ('ok' in result) {
@@ -946,10 +855,7 @@ export async function fetchAlarmAcknowledgmentsData(agent: HttpAgent, limit: num
  * Fetch admin action logs (admin only)
  */
 export async function fetchAdminActionLogsData(agent: HttpAgent, limit: number = 68): Promise<any[]> {
-  const actor = Actor.createActor<AlarmService>(alarmIDL, {
-    agent,
-    canisterId: getAlarmCanisterId(),
-  })
+  const actor = getAlarmActor(agent)
 
   const result = await actor.getAdminActionLogs([BigInt(limit)])
   if ('ok' in result) {
@@ -966,10 +872,7 @@ export async function fetchAdminActionLogsData(agent: HttpAgent, limit: number =
  * Fetch votable proposals (admin only)
  */
 export async function fetchVotableProposalsData(agent: HttpAgent): Promise<any[]> {
-  const actor = Actor.createActor<NeuronSnapshotService>(neuronSnapshotIDL, {
-    agent,
-    canisterId: getNeuronSnapshotCanisterId(),
-  })
+  const actor = getNeuronSnapshotActor(agent)
 
   return await (actor as any).getVotableProposals() as any[]
 }
@@ -978,10 +881,7 @@ export async function fetchVotableProposalsData(agent: HttpAgent): Promise<any[]
  * Fetch periodic timer status (admin only)
  */
 export async function fetchPeriodicTimerStatusData(agent: HttpAgent): Promise<any> {
-  const actor = Actor.createActor<NeuronSnapshotService>(neuronSnapshotIDL, {
-    agent,
-    canisterId: getNeuronSnapshotCanisterId(),
-  })
+  const actor = getNeuronSnapshotActor(agent)
 
   return await (actor as any).getPeriodicTimerStatus()
 }
@@ -990,10 +890,7 @@ export async function fetchPeriodicTimerStatusData(agent: HttpAgent): Promise<an
  * Fetch auto voting threshold (admin only)
  */
 export async function fetchAutoVotingThresholdData(agent: HttpAgent): Promise<bigint> {
-  const actor = Actor.createActor<NeuronSnapshotService>(neuronSnapshotIDL, {
-    agent,
-    canisterId: getNeuronSnapshotCanisterId(),
-  })
+  const actor = getNeuronSnapshotActor(agent)
 
   return await (actor as any).getAutoVotingThresholdSeconds() as bigint
 }
@@ -1002,10 +899,7 @@ export async function fetchAutoVotingThresholdData(agent: HttpAgent): Promise<bi
  * Fetch proposer subaccount (admin only)
  */
 export async function fetchProposerSubaccountData(agent: HttpAgent): Promise<any> {
-  const actor = Actor.createActor<NeuronSnapshotService>(neuronSnapshotIDL, {
-    agent,
-    canisterId: getNeuronSnapshotCanisterId(),
-  })
+  const actor = getNeuronSnapshotActor(agent)
 
   return await (actor as any).getProposerSubaccount()
 }
@@ -1014,10 +908,7 @@ export async function fetchProposerSubaccountData(agent: HttpAgent): Promise<any
  * Fetch TACO DAO neuron ID (admin only)
  */
 export async function fetchTacoDAONeuronIdData(agent: HttpAgent): Promise<any> {
-  const actor = Actor.createActor<NeuronSnapshotService>(neuronSnapshotIDL, {
-    agent,
-    canisterId: getNeuronSnapshotCanisterId(),
-  })
+  const actor = getNeuronSnapshotActor(agent)
 
   return await (actor as any).getTacoDAONeuronId()
 }
@@ -1026,10 +917,7 @@ export async function fetchTacoDAONeuronIdData(agent: HttpAgent): Promise<any> {
  * Fetch default vote behavior (admin only)
  */
 export async function fetchDefaultVoteBehaviorData(agent: HttpAgent): Promise<any> {
-  const actor = Actor.createActor<NeuronSnapshotService>(neuronSnapshotIDL, {
-    agent,
-    canisterId: getNeuronSnapshotCanisterId(),
-  })
+  const actor = getNeuronSnapshotActor(agent)
 
   return await (actor as any).getDefaultVoteBehavior()
 }
@@ -1038,10 +926,7 @@ export async function fetchDefaultVoteBehaviorData(agent: HttpAgent): Promise<an
  * Fetch highest processed NNS proposal ID (admin only)
  */
 export async function fetchHighestProcessedNNSProposalIdData(agent: HttpAgent): Promise<bigint> {
-  const actor = Actor.createActor<NeuronSnapshotService>(neuronSnapshotIDL, {
-    agent,
-    canisterId: getNeuronSnapshotCanisterId(),
-  })
+  const actor = getNeuronSnapshotActor(agent)
 
   return await (actor as any).getHighestProcessedNNSProposalId() as bigint
 }
@@ -1055,10 +940,7 @@ export async function fetchHighestProcessedNNSProposalIdData(agent: HttpAgent): 
  * Returns configuration including distribution settings
  */
 export async function fetchRewardsConfigurationData(agent: HttpAgent): Promise<any> {
-  const actor = Actor.createActor<RewardsService>(rewardsIDL, {
-    agent,
-    canisterId: getRewardsCanisterId(),
-  })
+  const actor = getRewardsActor(agent)
 
   const config = await actor.getConfiguration()
 
@@ -1084,10 +966,7 @@ export async function fetchRewardsConfigurationData(agent: HttpAgent): Promise<a
  * Returns paginated distribution records
  */
 export async function fetchDistributionHistoryData(agent: HttpAgent, offset: number = 0, limit: number = 5): Promise<any> {
-  const actor = Actor.createActor<RewardsService>(rewardsIDL, {
-    agent,
-    canisterId: getRewardsCanisterId(),
-  })
+  const actor = getRewardsActor(agent)
 
   return await actor.getDistributionHistory(BigInt(offset), BigInt(limit))
 }
