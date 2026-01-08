@@ -185,6 +185,20 @@ import { useTacoStore } from '../stores/taco.store'
 import { Actor, AnonymousIdentity } from '@dfinity/agent'
 import { createAgent } from '@dfinity/utils'
 import { idlFactory as rewardsIDL } from '../../../declarations/rewards/rewards.did.js'
+import { getEffectiveNetwork } from '../config/network-config'
+
+// Helper functions for runtime network detection
+function shouldFetchRootKey() {
+  return getEffectiveNetwork() === 'local'
+}
+function getNetworkHost() {
+  const network = getEffectiveNetwork()
+  if (network === 'local') {
+    const port = import.meta.env.VITE_LOCAL_PORT || '4943'
+    return `http://localhost:${port}`
+  }
+  return 'https://ic0.app'
+}
 
 export default {
   name: 'AdminClaimsView',
@@ -246,7 +260,7 @@ export default {
         // Use anonymous identity for public query (no authentication required)
         const agent = await createAgent({
           identity: new AnonymousIdentity(),
-          host: process.env.DFX_NETWORK === 'local' ? 'http://localhost:4943' : 'https://ic0.app'
+          host: getNetworkHost()
         })
 
         return Actor.createActor(rewardsIDL, {

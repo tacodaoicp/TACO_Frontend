@@ -668,7 +668,7 @@
   // Imports //
   /////////////
 
-  import { ref, onMounted, onBeforeUnmount } from 'vue'
+  import { ref, onMounted, onBeforeUnmount, watch } from 'vue'
   import { useTacoStore } from "../stores/taco.store"
   import { storeToRefs } from "pinia"
   import TacoDaoLogo from "../assets/images/tacoDaoLogo.vue"
@@ -760,27 +760,29 @@
   /////////////////////
 
   // on mounted
-  onMounted(async () => {
-
-    // check if user is logged in
-    await checkIfLoggedIn()
-
-    // if user is logged in, get neurons count
-    if (userLoggedIn.value) {
-
-      const rawNeurons = await tacoStore.getTacoNeurons()
-      const neuronsCount = rawNeurons.length
-
-      // set neurons count
-      localNeuronsCount.value = neuronsCount
-
-    }
-
-    // init bootstrap tooltips
+  onMounted(() => {
+    // init bootstrap tooltips (non-blocking)
     new Tooltip(document.body, {
       selector: "[data-bs-toggle='tooltip']",
     })
 
+    // Fetch neurons count in background if user is already logged in
+    if (userLoggedIn.value) {
+      tacoStore.getTacoNeurons().then(rawNeurons => {
+        localNeuronsCount.value = rawNeurons.length
+      })
+    }
+  })
+
+  // Watch for login state changes to fetch neurons
+  watch(userLoggedIn, (loggedIn) => {
+    if (loggedIn) {
+      tacoStore.getTacoNeurons().then(rawNeurons => {
+        localNeuronsCount.value = rawNeurons.length
+      })
+    } else {
+      localNeuronsCount.value = 0
+    }
   })
 
   onBeforeUnmount(() => {

@@ -1,6 +1,6 @@
 <template>
 
-  <div v-if="show" class="modal-overlay">
+  <div v-if="show && swapData" class="modal-overlay">
 
     <!-- modal dialog -->
     <div class="modal-dialog">

@@ -3,32 +3,32 @@
     <div class="trading-logs">
         <h3>Trading Logs</h3>
         <div class="log-container">
-            <div v-for="log in sortedLogs" :key="log.timestamp" class="log-entry">
+            <div v-for="log in sortedLogs" :key="String(log.timestamp)" class="log-entry">
                 <div class="log-timestamp">{{ formatTimestamp(log.timestamp) }}</div>
                 <div class="log-message">
-                    <template v-if="log.tokens">
+                    <template v-if="'tokens' in log && log.tokens">
                         <div class="token-trade">
                             <div class="token-info">
-                                <img v-if="getTokenInfo(log.tokens.sold.symbol)?.tokenIcon" 
-                                     :src="getTokenInfo(log.tokens.sold.symbol)?.tokenIcon" 
-                                     class="token-icon" 
+                                <img v-if="getTokenInfo(log.tokens.sold.symbol)?.icon"
+                                     :src="getTokenInfo(log.tokens.sold.symbol)?.icon"
+                                     class="token-icon"
                                      :alt="log.tokens.sold.symbol">
                                 <span>{{ formatAmount(log.tokens.sold.amount, log.tokens.sold.decimals) }}</span>
-                                <a :href="getTokenInfo(log.tokens.sold.symbol)?.tokenLink" 
-                                   target="_blank" 
+                                <a :href="getTokenInfo(log.tokens.sold.symbol)?.link"
+                                   target="_blank"
                                    class="token-symbol">{{ log.tokens.sold.symbol }}</a>
                             </div>
                             <div class="trade-arrow">→</div>
                             <div class="token-info">
-                                <img v-if="getTokenInfo(log.tokens.bought.symbol)?.tokenIcon" 
-                                     :src="getTokenInfo(log.tokens.bought.symbol)?.tokenIcon" 
-                                     class="token-icon" 
+                                <img v-if="getTokenInfo(log.tokens.bought.symbol)?.icon"
+                                     :src="getTokenInfo(log.tokens.bought.symbol)?.icon"
+                                     class="token-icon"
                                      :alt="log.tokens.bought.symbol">
                                 <span>{{ formatAmount(log.tokens.bought.amount, log.tokens.bought.decimals) }}</span>
-                                <a :href="getTokenInfo(log.tokens.bought.symbol)?.tokenLink" 
-                                   target="_blank" 
+                                <a :href="getTokenInfo(log.tokens.bought.symbol)?.link"
+                                   target="_blank"
                                    class="token-symbol">{{ log.tokens.bought.symbol }}</a>
-                                <div class="exchange-info" v-if="log.exchange">
+                                <div class="exchange-info" v-if="'exchange' in log && log.exchange">
                                     on {{ log.exchange }}
                                 </div>
                             </div>
@@ -158,7 +158,7 @@ const sortedLogs = computed(() => {
         const soldMatch = log.message.match(/Sold ([\d.]+) (\w+) for ([\d.]+) (\w+) on (\w+)/)
         
         if (arrowMatch || soldMatch) {
-            const match = arrowMatch || soldMatch
+            const match = (arrowMatch || soldMatch)!
             const [_, soldAmount, soldSymbol, boughtAmount, boughtSymbol, exchange] = match
             
             // Find token details from fetchedTokenDetails

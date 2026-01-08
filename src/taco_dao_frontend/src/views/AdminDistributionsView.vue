@@ -1,13 +1,10 @@
 <template>
   <div class="standard-view">
-    <!-- header bar -->
-    <HeaderBar />
-    
     <div class="scroll-y-container h-100">
       <div class="container">
         <div class="row">
           <TacoTitle level="h2" emoji="🎯" title="Rewards Distribution Management" class="mt-4" style="padding-left: 1rem !important;"/>
-          
+
           <!-- Navigation Bar -->
           <div class="mb-4">
             <div class="d-flex gap-3 flex-wrap">
@@ -22,7 +19,7 @@
               </router-link>
             </div>
           </div>
-          
+
           <!-- Distribution Controls -->
           <div class="card bg-dark text-white mb-4">
             <div class="card-header">
@@ -687,7 +684,7 @@
       </div>
     </div>
   </div>
-  
+
   <!-- GNSF Proposal Dialog for Non-Admin Users -->
   <GNSFProposalDialog
     :show="showProposalDialog"
@@ -700,16 +697,28 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useTacoStore } from '../stores/taco.store'
 import { useAdminStore } from '../stores/admin.store'
 import { useAdminCheck } from '../composables/useAdminCheck'
-import HeaderBar from '../components/HeaderBar.vue'
 import TacoTitle from '../components/misc/TacoTitle.vue'
 import GNSFProposalDialog from '../components/proposals/GNSFProposalDialog.vue'
 import { createActor as createRewardsActor } from '../../../declarations/rewards'
 import { AnonymousIdentity } from '@dfinity/agent'
+import { workerBridge } from '../stores/worker-bridge'
+import { deserializeFromTransfer } from '../workers/shared/fetch-functions'
+import { getEffectiveNetwork } from '../config/network-config'
+
+// Helper function for runtime network detection
+function getNetworkHost() {
+  const network = getEffectiveNetwork()
+  if (network === 'local') {
+    const port = import.meta.env.VITE_LOCAL_PORT || '4943'
+    return `http://localhost:${port}`
+  }
+  return 'https://ic0.app'
+}
 
 const router = useRouter()
 const tacoStore = useTacoStore()
@@ -717,6 +726,9 @@ const adminStore = useAdminStore()
 
 // Admin check
 const { isAdmin, checking, checkAdminStatus } = useAdminCheck()
+
+// Worker unsubscribers
+const workerUnsubscribers: Array<() => void> = []
 
 // GNSF Proposal Dialog state
 const showProposalDialog = ref(false)
@@ -768,6 +780,14 @@ const newSkipNeuronId = ref('')
 const sortColumns = ref<Record<number, string | null>>({})
 const sortDirections = ref<Record<number, 'asc' | 'desc'>>({})
 
+
+// Refresh interval
+let refreshInterval: any = null
+
+// Cached rewards actor (created once)
+let cachedRewardsActor: any = null
+let actorCreationPromise: Promise<any> | null = null
+
 // Computed properties
 const distributionInProgress = computed(() => distributionStatus.value?.inProgress || false)
 
@@ -790,22 +810,38 @@ const isValidCustomInput = computed(() => {
 
 // Helper functions
 const getRewardsActor = async () => {
-  try {
-    const canisterId = tacoStore.rewardsCanisterId()
-    if (!canisterId) throw new Error('Rewards canister ID not found')
-
-    const host = process.env.DFX_NETWORK === 'local' ? 'http://localhost:4943' : 'https://ic0.app'
-    const actor = createRewardsActor(canisterId, {
-      agentOptions: {
-        identity: new AnonymousIdentity(),
-        host
-      }
-    })
-    return actor
-  } catch (error) {
-    console.error('Error creating rewards actor:', error)
-    throw error
+  // Return cached actor if already created
+  if (cachedRewardsActor) {
+    return cachedRewardsActor
   }
+
+  // If another call is already creating the actor, wait for it
+  if (actorCreationPromise) {
+    return actorCreationPromise
+  }
+
+  // Create the actor with a lock to prevent race conditions
+  actorCreationPromise = (async () => {
+    try {
+      const canisterId = tacoStore.rewardsCanisterId()
+      if (!canisterId) throw new Error('Rewards canister ID not found')
+
+      const host = getNetworkHost()
+      cachedRewardsActor = createRewardsActor(canisterId, {
+        agentOptions: {
+          identity: new AnonymousIdentity(),
+          host
+        }
+      })
+      return cachedRewardsActor
+    } catch (error) {
+      console.error('Error creating rewards actor:', error)
+      actorCreationPromise = null // Reset on error so we can retry
+      throw error
+    }
+  })()
+
+  return actorCreationPromise
 }
 
 const clearMessages = () => {
@@ -979,10 +1015,19 @@ const neuronIdToFullHex = (neuronId: any) => {
 }
 
 // Data loading functions
-const loadDistributionStatus = async () => {
+const loadConfigurationAndStatus = async () => {
   try {
     const actor = await getRewardsActor()
     const config = await actor.getConfiguration()
+
+    // Update configuration
+    configuration.value = config
+    newRewardPot.value = config.periodicRewardPot
+    newDistributionPeriod.value = Math.round(Number(config.distributionPeriodNS) / (24 * 60 * 60 * 1_000_000_000))
+    newPerformanceScorePower.value = config.performanceScorePower
+    newVotingPowerPower.value = config.votingPowerPower
+
+    // Update distribution status from same config
     distributionStatus.value = {
       lastDistributionTime: config.lastDistributionTime,
       totalDistributions: config.totalDistributions,
@@ -990,20 +1035,6 @@ const loadDistributionStatus = async () => {
       currentDistributionId: null,
       inProgress: false
     }
-  } catch (error) {
-    console.error('Error loading distribution status:', error)
-    throw error
-  }
-}
-
-const loadConfiguration = async () => {
-  try {
-    const actor = await getRewardsActor()
-    configuration.value = await actor.getConfiguration()
-    newRewardPot.value = configuration.value.periodicRewardPot
-    newDistributionPeriod.value = Math.round(Number(configuration.value.distributionPeriodNS) / (24 * 60 * 60 * 1_000_000_000))
-    newPerformanceScorePower.value = configuration.value.performanceScorePower
-    newVotingPowerPower.value = configuration.value.votingPowerPower
   } catch (error) {
     console.error('Error loading configuration:', error)
     throw error
@@ -1101,16 +1132,26 @@ const loadRewardSkipList = async () => {
   }
 }
 
+// Track if initial load is in progress to prevent double-loading
+let isInitialLoading = false
+
 const loadData = async () => {
+  // Prevent concurrent data loads
+  if (isInitialLoading) {
+    return
+  }
+  isInitialLoading = true
+
   try {
     await Promise.all([
-      loadDistributionStatus(),
-      loadConfiguration(),
+      loadConfigurationAndStatus(),
       loadDistributionHistory(true) // Reset pagination when loading data
     ])
   } catch (error) {
     console.error('Error loading data:', error)
     errorMessage.value = 'Failed to load distribution data'
+  } finally {
+    isInitialLoading = false
   }
 }
 
@@ -1169,7 +1210,7 @@ const startDistributionTimer = async () => {
       
       if ('ok' in result) {
         successMessage.value = result.ok
-        await loadConfiguration()
+        await loadConfigurationAndStatus()
       } else {
         errorMessage.value = formatError(result.err)
       }
@@ -1202,7 +1243,7 @@ const stopDistributionTimer = async () => {
       
       if ('ok' in result) {
         successMessage.value = result.ok
-        await loadConfiguration()
+        await loadConfigurationAndStatus()
       } else {
         errorMessage.value = formatError(result.err)
       }
@@ -1279,7 +1320,7 @@ const updateRewardPot = async () => {
       
       if ('ok' in result) {
         successMessage.value = result.ok
-        await loadConfiguration()
+        await loadConfigurationAndStatus()
       } else {
         errorMessage.value = formatError(result.err)
       }
@@ -1315,7 +1356,7 @@ const updateDistributionPeriod = async () => {
       
       if ('ok' in result) {
         successMessage.value = result.ok
-        await loadConfiguration()
+        await loadConfigurationAndStatus()
       } else {
         errorMessage.value = formatError(result.err)
       }
@@ -1350,7 +1391,7 @@ const updatePerformanceScorePower = async () => {
       
       if ('ok' in result) {
         successMessage.value = result.ok
-        await loadConfiguration()
+        await loadConfigurationAndStatus()
       } else {
         errorMessage.value = formatError(result.err)
       }
@@ -1385,7 +1426,7 @@ const updateVotingPowerPower = async () => {
       
       if ('ok' in result) {
         successMessage.value = result.ok
-        await loadConfiguration()
+        await loadConfigurationAndStatus()
       } else {
         errorMessage.value = formatError(result.err)
       }
@@ -1529,15 +1570,12 @@ const refreshHistory = async () => {
   clearMessages()
   isLoading.value = true
   currentAction.value = 'refresh'
-  
+
   try {
+    // Force refresh from worker (bypasses cache)
     await Promise.all([
-      loadDistributionStatus(),
-      loadDistributionHistory(true), // Reset pagination when refreshing
-      loadTotalDistributed(),
-      loadTacoBalance(),
-      loadCurrentNeuronBalances(),
-      loadAvailableBalance()
+      workerBridge.fetch('rewardsConfiguration', true),
+      workerBridge.fetch('distributionHistory', true)
     ])
   } catch (error) {
     console.error('Error refreshing data:', error)
@@ -1711,24 +1749,74 @@ const handleProposalSuccess = async () => {
 // Lifecycle hooks
 onMounted(async () => {
   setDefaultCustomTimes()
-  await checkAdminStatus()
-  
-  try {
-    await Promise.all([
-      loadDistributionStatus(),
-      loadConfiguration(),
-      loadDistributionHistory(true), // Reset pagination on mount
-      loadTotalDistributed(),
-      loadTacoBalance(),
-      loadCurrentNeuronBalances(),
-      loadAvailableBalance(),
-      loadRewardSkipList()
-    ])
-  } catch (error) {
-    console.error('Error loading initial data:', error)
-    errorMessage.value = 'Failed to load distribution data'
-  }
+
+
+  // Check admin status
+  checkAdminStatus()
+
+  // Subscribe to worker data for configuration
+  workerUnsubscribers.push(
+    workerBridge.subscribe('rewardsConfiguration', (data: unknown) => {
+      if (data && typeof data === 'object') {
+        const configData = deserializeFromTransfer(data) as any
+
+        // Update configuration
+        configuration.value = configData
+        newRewardPot.value = configData.periodicRewardPot
+        newDistributionPeriod.value = Math.round(Number(configData.distributionPeriodNS) / (24 * 60 * 60 * 1_000_000_000))
+        newPerformanceScorePower.value = configData.performanceScorePower
+        newVotingPowerPower.value = configData.votingPowerPower
+
+        // Update distribution status
+        distributionStatus.value = {
+          lastDistributionTime: configData.lastDistributionTime,
+          totalDistributions: configData.totalDistributions,
+          distributionEnabled: configData.distributionEnabled,
+          currentDistributionId: null,
+          inProgress: false
+        }
+
+        // Update balances from combined config
+        totalDistributed.value = configData.totalDistributed
+        tacoBalance.value = configData.tacoBalance
+        currentNeuronBalances.value = configData.currentNeuronBalances
+        availableBalance.value = configData.availableBalance
+      }
+    })
+  )
+
+  // Subscribe to worker data for distribution history
+  workerUnsubscribers.push(
+    workerBridge.subscribe('distributionHistory', (data: unknown) => {
+      if (data && typeof data === 'object') {
+        const historyData = deserializeFromTransfer(data) as any
+        distributionHistory.value = historyData.records || []
+        historyTotal.value = Number(historyData.total || 0)
+        historyHasMore.value = historyData.hasMore || false
+        historyOffset.value = historyData.records?.length || 0
+      }
+    })
+  )
+
+  // Fetch data from worker (will use cache if available)
+  workerBridge.fetch('rewardsConfiguration')
+  workerBridge.fetch('distributionHistory')
+
+  // Load skip list directly (not in worker system yet)
+  loadRewardSkipList().catch(err => console.error('Error loading skip list:', err))
 })
+
+onBeforeUnmount(() => {
+  if (refreshInterval) {
+    clearInterval(refreshInterval)
+  }
+  // Clear cached actor and promise
+  cachedRewardsActor = null
+  actorCreationPromise = null
+  // Clean up worker subscriptions
+  workerUnsubscribers.forEach(unsub => unsub())
+})
+
 </script>
 
 <style scoped>

@@ -213,6 +213,7 @@ type NeuronAllocationChangeBlockData =
    neuronId: blob;
    newAllocations: vec Allocation;
    oldAllocations: vec Allocation;
+   penaltyMultiplier: opt nat;
    reason: opt text;
    timestamp: int;
    votingPower: nat;

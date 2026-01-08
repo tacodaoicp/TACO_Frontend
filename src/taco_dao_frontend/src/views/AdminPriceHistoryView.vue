@@ -1,13 +1,13 @@
 <template>
   <div class="admin-price-history-view">
-    <HeaderBar />
-    
     <div class="container-fluid mt-4">
       <div class="row">
         <div class="col-12">
-          <TacoTitle 
-            title="Price History" 
-            subtitle="View historical price data for treasury tokens" 
+          <TacoTitle
+            level="h2"
+            emoji="📊"
+            title="Price History"
+            subtitle="View historical price data for treasury tokens"
           />
           
           <!-- Quick Navigation -->
@@ -347,7 +347,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch, nextTick } from 'vue'
 import { useTacoStore } from '../stores/taco.store'
-import HeaderBar from '../components/HeaderBar.vue'
 import TacoTitle from '../components/misc/TacoTitle.vue'
 import { Principal } from '@dfinity/principal'
 import { default as apexchart } from 'vue3-apexcharts'
@@ -406,7 +405,7 @@ const sliderPercent = computed(() => {
 // Holdings chart configuration
 const holdingsChartOptions = computed(() => ({
   chart: {
-    type: 'pie',
+    type: 'pie' as const,
     fontFamily: 'Space Mono',
     animations: { enabled: true, easing: 'easeout', speed: 350 }
   },
@@ -441,7 +440,7 @@ const holdingsChartOptions = computed(() => ({
 
 const allocationsChartOptions = computed(() => ({
   chart: {
-    type: 'pie',
+    type: 'pie' as const,
     fontFamily: 'Space Mono',
     animations: { enabled: true, easing: 'easeout', speed: 350 }
   },

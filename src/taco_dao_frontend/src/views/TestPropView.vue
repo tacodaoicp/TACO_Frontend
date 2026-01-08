@@ -1,8 +1,5 @@
 <template>
   <div class="standard-view">
-    <!-- header bar -->
-    <HeaderBar />
-
     <!-- scroll container -->
     <div class="scroll-y-container h-100">
       <!-- bootstrap container -->
@@ -33,8 +30,8 @@
           <div class="taco-container taco-container--l1 mt-3 p-4">
             <h5 class="mb-3">Check Your Eligibility</h5>
             
-            <button 
-              @click="checkEligibility" 
+            <button
+              @click="() => checkEligibility()"
               class="btn btn-primary btn-lg"
               :disabled="checking"
             >
@@ -286,17 +283,12 @@
         </div>
       </div>
     </div>
-
-    <!-- footer bar -->
-    <FooterBar />
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { Principal } from '@dfinity/principal'
-import HeaderBar from '../components/HeaderBar.vue'
-import FooterBar from '../components/FooterBar.vue'
 import TacoTitle from '../components/misc/TacoTitle.vue'
 import { useProposalEligibility } from '../composables/useProposalEligibility'
 import { useGNSFProposal } from '../composables/useGNSFProposal'

@@ -1,8 +1,5 @@
 <template>
   <div class="standard-view">
-    <!-- header bar -->
-    <HeaderBar />
-    
     <div class="scroll-y-container h-100">
       <div class="container">
         <div class="row">
@@ -218,19 +215,29 @@
 </template>
 
 <script>
-import HeaderBar from '../components/HeaderBar.vue'
 import TacoTitle from '../components/misc/TacoTitle.vue'
 import { useTacoStore } from '../stores/taco.store'
 import { mapStores } from 'pinia'
 import { Principal } from '@dfinity/principal'
+import { AnonymousIdentity } from '@dfinity/agent'
 
 // Import rewards actor
 import { createActor as createRewardsActor } from '../../../declarations/rewards'
+import { getEffectiveNetwork } from '../config/network-config'
+
+// Helper function for runtime network detection
+function getNetworkHost() {
+  const network = getEffectiveNetwork()
+  if (network === 'local') {
+    const port = import.meta.env.VITE_LOCAL_PORT || '4943'
+    return `http://localhost:${port}`
+  }
+  return 'https://ic0.app'
+}
 
 export default {
   name: 'AdminRewardsView',
   components: {
-    HeaderBar,
     TacoTitle
   },
   computed: {
@@ -288,8 +295,15 @@ export default {
   },
   async mounted() {
     try {
-      // Create rewards actor with the proper canister ID from store
-      this.rewardsActor = createRewardsActor(this.tacoStore.rewardsCanisterId())
+      // Create rewards actor with proper host configuration
+      const canisterId = this.tacoStore.rewardsCanisterId()
+      const host = getNetworkHost()
+      this.rewardsActor = createRewardsActor(canisterId, {
+        agentOptions: {
+          identity: new AnonymousIdentity(),
+          host
+        }
+      })
       // Load token metadata
       await this.tacoStore.loadAllNames()
       
@@ -523,19 +537,22 @@ export default {
     // Format rewards-specific errors
     formatRewardsError(error) {
       if (typeof error === 'string') return error
-      
+
       // Handle different error types from the rewards backend
+      // Use 'in' operator to check for keys with null values (Candid variant encoding)
       if (error.SystemError) return `System Error: ${error.SystemError}`
-      if (error.NotAuthorized) return 'Not authorized to perform this action'
-      if (error.InvalidTimeRange) return 'Invalid time range: start time must be before end time'
-      if (error.NeuronNotFound) return 'Neuron not found or has no allocation data'
-      if (error.AllocationDataMissing) return 'Allocation data missing for this neuron in the specified time period'
+      if ('NotAuthorized' in error) return 'Not authorized to perform this action'
+      if ('InvalidTimeRange' in error) return 'Invalid time range: start time must be before end time'
+      if ('NeuronNotFound' in error) return 'Neuron not found - no allocation history exists for this neuron ID'
+      if ('AllocationDataMissing' in error) return 'Allocation data missing for this neuron in the specified time period'
       if (error.PriceDataMissing) {
         return `Price data missing for token ${error.PriceDataMissing.token} at timestamp ${error.PriceDataMissing.timestamp}`
       }
-      if (error.DistributionInProgress) return 'Distribution currently in progress'
-      if (error.InsufficientRewardPot) return 'Insufficient reward pot'
-      
+      if ('DistributionInProgress' in error) return 'Distribution currently in progress'
+      if ('InsufficientRewardPot' in error) return 'Insufficient reward pot'
+      if ('InvalidNeuronId' in error) return 'Invalid neuron ID format'
+      if ('Unauthorized' in error) return 'Unauthorized - you do not have permission for this action'
+
       // Log the unknown error for debugging
       console.error('Unknown rewards error format:', error)
       return JSON.stringify(error)

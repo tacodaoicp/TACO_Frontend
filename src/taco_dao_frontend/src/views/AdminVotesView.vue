@@ -1,8 +1,5 @@
 <template>
   <div class="standard-view">
-    <!-- header bar -->
-    <HeaderBar />
-    
     <div class="scroll-y-container h-100">
       <div class="container">
         <div class="row">
@@ -273,6 +270,117 @@
           <div v-if="searchAttempted && !userVoteHistory && !errorMessage" class="alert alert-info" role="alert">
             No vote history found for the provided principal.
           </div>
+
+          <!-- Penalized Neurons Section -->
+          <div class="card bg-dark text-white mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+              <h3 class="mb-0">Penalized Neurons ({{ penalizedNeurons.length }})</h3>
+              <button
+                class="btn btn-sm btn-outline-warning"
+                @click="refreshPenalizedNeurons"
+                :disabled="isLoadingPenalized"
+              >
+                {{ isLoadingPenalized ? 'Loading...' : '🔄 Refresh' }}
+              </button>
+            </div>
+            <div class="card-body">
+
+              <!-- Add Penalty Form -->
+              <div class="mb-4 p-3" style="background: rgba(255, 255, 255, 0.05); border-radius: 0.5rem;">
+                <h5>Add Neuron Penalty</h5>
+                <div class="row">
+                  <div class="col-md-6">
+                    <div class="form-group mb-2">
+                      <label for="penaltyNeuronId">Neuron ID (hex)</label>
+                      <input
+                        type="text"
+                        id="penaltyNeuronId"
+                        v-model="newPenaltyNeuronId"
+                        class="form-control"
+                        placeholder="Enter neuron ID in hex format..."
+                      >
+                    </div>
+                  </div>
+                  <div class="col-md-3">
+                    <div class="form-group mb-2">
+                      <label for="penaltyMultiplier">VP % (1-100)</label>
+                      <input
+                        type="number"
+                        id="penaltyMultiplier"
+                        v-model.number="newPenaltyMultiplier"
+                        class="form-control"
+                        placeholder="e.g. 50"
+                        min="1"
+                        max="100"
+                      >
+                    </div>
+                  </div>
+                  <div class="col-md-3 d-flex align-items-end">
+                    <button
+                      class="btn btn-warning mb-2"
+                      @click="addPenalty"
+                      :disabled="isAddingPenalty || !newPenaltyNeuronId.trim() || !newPenaltyMultiplier"
+                    >
+                      {{ isAddingPenalty ? 'Adding...' : '➕ Add Penalty' }}
+                    </button>
+                  </div>
+                </div>
+                <small class="text-muted">
+                  VP % determines how much of the neuron's voting power is used. E.g., 1 = 1% VP, 50 = 50% VP, 100 = full VP (no penalty).
+                </small>
+              </div>
+
+              <!-- Penalized Neurons Table -->
+              <div v-if="penalizedNeurons.length > 0">
+                <div class="table-responsive">
+                  <table class="table table-dark table-striped">
+                    <thead>
+                      <tr>
+                        <th>Neuron ID</th>
+                        <th>VP %</th>
+                        <th>Effect</th>
+                        <th>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr v-for="neuron in penalizedNeurons" :key="uint8ArrayToHex(neuron.neuronId)">
+                        <td>
+                          <div>{{ formatNeuronWithName(neuron.neuronId) }}</div>
+                          <small class="text-muted">{{ uint8ArrayToHex(neuron.neuronId) }}</small>
+                        </td>
+                        <td>{{ neuron.multiplier }}%</td>
+                        <td>Uses {{ neuron.multiplier }}% of VP</td>
+                        <td>
+                          <button
+                            class="btn btn-sm btn-danger"
+                            @click="removePenalty(uint8ArrayToHex(neuron.neuronId))"
+                            :disabled="removingNeuronId === uint8ArrayToHex(neuron.neuronId)"
+                          >
+                            {{ removingNeuronId === uint8ArrayToHex(neuron.neuronId) ? 'Removing...' : '🗑️ Remove' }}
+                          </button>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+              <div v-else class="text-muted">
+                No penalized neurons configured.
+              </div>
+
+              <!-- Penalty Error Message -->
+              <div v-if="penaltyErrorMessage" class="alert alert-danger mt-3" role="alert">
+                {{ penaltyErrorMessage }}
+              </div>
+
+              <!-- Penalty Success Message -->
+              <div v-if="penaltySuccessMessage" class="alert alert-success mt-3" role="alert">
+                {{ penaltySuccessMessage }}
+              </div>
+
+            </div>
+          </div>
+
         </div>
       </div>
     </div>
@@ -329,7 +437,6 @@ import { useRoute, useRouter } from 'vue-router';
 import { Principal } from '@dfinity/principal';
 import { useTacoStore } from '../stores/taco.store';
 import { storeToRefs } from "pinia";
-import HeaderBar from "../components/HeaderBar.vue";
 import TacoTitle from '../components/misc/TacoTitle.vue';
 
 // Get route and router
@@ -338,10 +445,10 @@ const router = useRouter();
 
 // Get store
 const tacoStore = useTacoStore();
-const { fetchedTokenDetails } = storeToRefs(tacoStore);
+const { fetchedTokenDetails, fetchedPenalizedNeurons } = storeToRefs(tacoStore);
 
 // Destructure utility methods
-const { getPrincipalDisplayName, getNeuronDisplayName } = tacoStore;
+const { getPrincipalDisplayName, getNeuronDisplayName, fetchPenalizedNeurons, adminAddPenalizedNeuron, adminRemovePenalizedNeuron } = tacoStore;
 
 // Component state
 const principalInput = ref('');
@@ -350,6 +457,18 @@ const isLoading = ref(false);
 const errorMessage = ref('');
 const searchAttempted = ref(false);
 const userVoteHistory = ref<any>(null);
+
+// Penalized neurons state
+const isLoadingPenalized = ref(false);
+const isAddingPenalty = ref(false);
+const removingNeuronId = ref<string | null>(null);
+const newPenaltyNeuronId = ref('');
+const newPenaltyMultiplier = ref<number>(50);
+const penaltyErrorMessage = ref('');
+const penaltySuccessMessage = ref('');
+
+// Computed for penalized neurons
+const penalizedNeurons = computed(() => fetchedPenalizedNeurons.value || []);
 
 // Search for user votes
 const searchUserVotes = async () => {
@@ -382,6 +501,64 @@ const searchUserVotes = async () => {
     errorMessage.value = 'Error fetching vote history. Please check the principal format and try again.';
   } finally {
     isLoading.value = false;
+  }
+};
+
+// Penalized neurons functions
+const refreshPenalizedNeurons = async () => {
+  isLoadingPenalized.value = true;
+  penaltyErrorMessage.value = '';
+  try {
+    await fetchPenalizedNeurons();
+  } catch (error: any) {
+    penaltyErrorMessage.value = 'Failed to load penalized neurons: ' + (error.message || error);
+  } finally {
+    isLoadingPenalized.value = false;
+  }
+};
+
+const addPenalty = async () => {
+  if (!newPenaltyNeuronId.value.trim() || !newPenaltyMultiplier.value) return;
+
+  isAddingPenalty.value = true;
+  penaltyErrorMessage.value = '';
+  penaltySuccessMessage.value = '';
+
+  try {
+    // Clean the hex input (remove spaces, 0x prefix if any)
+    const cleanHex = newPenaltyNeuronId.value.trim().replace(/^0x/, '').replace(/\s/g, '');
+
+    await adminAddPenalizedNeuron(cleanHex, newPenaltyMultiplier.value);
+    penaltySuccessMessage.value = `Successfully added penalty (${newPenaltyMultiplier.value}% VP) for neuron`;
+
+    // Clear form
+    newPenaltyNeuronId.value = '';
+    newPenaltyMultiplier.value = 50;
+
+    // Auto-hide success message after 5 seconds
+    setTimeout(() => { penaltySuccessMessage.value = ''; }, 5000);
+  } catch (error: any) {
+    penaltyErrorMessage.value = 'Failed to add penalty: ' + (error.message || error);
+  } finally {
+    isAddingPenalty.value = false;
+  }
+};
+
+const removePenalty = async (neuronIdHex: string) => {
+  removingNeuronId.value = neuronIdHex;
+  penaltyErrorMessage.value = '';
+  penaltySuccessMessage.value = '';
+
+  try {
+    await adminRemovePenalizedNeuron(neuronIdHex);
+    penaltySuccessMessage.value = 'Successfully removed penalty from neuron';
+
+    // Auto-hide success message after 5 seconds
+    setTimeout(() => { penaltySuccessMessage.value = ''; }, 5000);
+  } catch (error: any) {
+    penaltyErrorMessage.value = 'Failed to remove penalty: ' + (error.message || error);
+  } finally {
+    removingNeuronId.value = null;
   }
 };
 
@@ -519,5 +696,7 @@ onMounted(async () => {
   await tacoStore.fetchTokenDetails();
   // Handle URL parameter after token details are loaded
   handleUrlPrincipal();
+  // Load penalized neurons
+  refreshPenalizedNeurons();
 });
 </script> 

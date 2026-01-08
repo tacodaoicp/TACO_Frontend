@@ -21,10 +21,19 @@ node_modules/
 dist/
 .svelte-kit/
 
+
+
+
 # environment variables
 .env
 *.env
 toadd/
 .mops/
 
-notes.txt
+.venv
+.claude
+*.log
+
+scripts/memory-results
+
+notes.txtscripts/.venv

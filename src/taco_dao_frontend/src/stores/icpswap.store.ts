@@ -10,6 +10,20 @@ import { createAgent, principalToSubAccount } from '@dfinity/utils'
 import { Principal } from '@dfinity/principal'
 import { AuthClient } from '@dfinity/auth-client'
 import { useTacoStore } from './taco.store'
+import { getEffectiveNetwork } from '../config/network-config'
+
+// Helper functions for runtime network detection
+function shouldFetchRootKey(): boolean {
+    return getEffectiveNetwork() === 'local'
+}
+function getNetworkHost(): string {
+    const network = getEffectiveNetwork()
+    if (network === 'local') {
+        const port = import.meta.env.VITE_LOCAL_PORT || '4943'
+        return `http://localhost:${port}`
+    }
+    return 'https://ic0.app'
+}
 
 // ICPSwap Factory canister ID
 const ICPSWAP_FACTORY_ID = '4mmnk-kiaaa-aaaag-qbllq-cai'
@@ -82,8 +96,8 @@ export const useICPSwapStore = defineStore('icpswap', () => {
     
     const agent = await createAgent({
       identity,
-      host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-      fetchRootKey: process.env.DFX_NETWORK === "local",
+      host: getNetworkHost(),
+      fetchRootKey: shouldFetchRootKey(),
     })
 
     const factoryIDL = ({ IDL }: any) => {
@@ -130,8 +144,8 @@ export const useICPSwapStore = defineStore('icpswap', () => {
     
     const agent = await createAgent({
       identity,
-      host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-      fetchRootKey: process.env.DFX_NETWORK === "local",
+      host: getNetworkHost(),
+      fetchRootKey: shouldFetchRootKey(),
     })
 
     const poolIDL = ({ IDL }: any) => {
@@ -239,8 +253,8 @@ export const useICPSwapStore = defineStore('icpswap', () => {
     
     const agent = await createAgent({
       identity,
-      host: process.env.DFX_NETWORK === "local" ? `http://localhost:4943` : "https://ic0.app",
-      fetchRootKey: process.env.DFX_NETWORK === "local",
+      host: getNetworkHost(),
+      fetchRootKey: shouldFetchRootKey(),
     })
 
     const icrcIDL = ({ IDL }: any) => {

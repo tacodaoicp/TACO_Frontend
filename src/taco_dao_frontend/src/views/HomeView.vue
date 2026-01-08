@@ -8,9 +8,6 @@
       <!-- above the fold -->
       <div class="home-view__above-the-fold">
 
-        <!-- header bar -->
-        <HeaderBar />
-
         <!-- upper -->
         <div class="container home-view__above-the-fold__upper">
 
@@ -110,31 +107,22 @@
                       <i class="fa-solid fa-expand"></i>
                     </button>
 
-                    <!-- if desktop, chart iframe -->
-                    <iframe v-if="!isMobile && shouldLoadDex" 
+                    <!-- chart iframe - lazy loaded for performance -->
+                    <iframe v-if="!isMobile && shouldLoadDex"
+                            ref="dexIframeRef"
                             loading="lazy"
-                            style="border-radius: 0.5rem; 
-                                   z-index: 2;" 
+                            style="border-radius: 0.5rem; border: none;"
                             src="https://dexscreener.com/icp/vhoia-myaaa-aaaar-qbmja-cai?embed=1&loadChartSettings=0&trades=0&tabs=0&info=0&chartLeftToolbar=0&chartTheme=dark&theme=dark&chartStyle=1&chartType=usd&interval=15"></iframe>
 
                     <!-- if mobile, tap to view -->
-                    <div v-else @click="viewingChartModal = true" 
+                    <div v-else @click="viewingChartModal = true"
                           class="home-view__taco-token-chart__mobile"
                           style="z-index: 2;">
-                      
+
                       <!-- text -->
                       <span>Tap to View</span>
-                      
+
                     </div>
-
-                    <!-- loader container -->
-                    <div class="position-absolute top-0 start-0 w-100 h-100"
-                          style="z-index: 1;">
-
-                      <!-- astronaut -->
-                      <img :src="astronautLoaderUrl" :style="{ zoom: !isMobile ? 2 : 1 }" class="loading-img">
-
-                    </div>                    
 
                   </div>
 
@@ -159,19 +147,16 @@
                 <!-- tile container inner -->
                 <div class="home-view__tile__inner taco-container taco-container--l2 p-0">
 
-                  <!-- video iframe (lazy) -->
+                  <!-- video iframe - lazy loaded, using nocookie for faster load -->
                   <iframe v-if="shouldLoadYouTube"
+                    ref="youtubeIframeRef"
                     loading="lazy"
-                    src="https://www.youtube.com/embed/ikNBuHYMkNs"
-                    title="YouTube video player" 
-                    frameborder="0" 
-                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+                    src="https://www.youtube-nocookie.com/embed/ikNBuHYMkNs?enablejsapi=1"
+                    title="YouTube video player"
+                    frameborder="0"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                     allowfullscreen
-                    style="z-index: 2;"
                     ></iframe>
-
-                  <!-- astronaut -->
-                  <img :src="astronautLoaderUrl" class="loading-img">
 
                 </div>
                 
@@ -595,9 +580,6 @@
 
         </a>
 
-        <!-- footer bar -->
-        <FooterBar style="width: 100%;" />
-
         <!-- upper taco dao background taco -->
         <img :src="TacoDaoTaco" 
               alt="placeholder" 
@@ -658,7 +640,7 @@
         <!-- message middle -->
         <div class="home-view__chart-modal__dialog__middle" style="width: 100%; height: 100%;">
 
-            <iframe style="width: 100%; height: 100%;" src="https://dexscreener.com/icp/vhoia-myaaa-aaaar-qbmja-cai?embed=1&loadChartSettings=0&trades=0&tabs=0&info=0&chartLeftToolbar=0&chartTheme=dark&theme=dark&chartStyle=1&chartType=usd&interval=15"></iframe>
+            <iframe style="width: 100%; height: 100%; border: none;" src="https://dexscreener.com/icp/vhoia-myaaa-aaaar-qbmja-cai?embed=1&loadChartSettings=0&trades=0&tabs=0&info=0&chartLeftToolbar=0&chartBottomToolbar=0&chartTheme=dark&theme=dark&chartStyle=1&chartType=usd&interval=15"></iframe>
 
         </div>
 
@@ -1153,8 +1135,21 @@
   }
 
   &__taco-token-chart {
-    zoom: 0.5;
     border-radius: 1rem;
+    // Chrome/Safari: use zoom for better chart visibility
+    zoom: 0.5;
+
+    // Firefox: doesn't support zoom, just show at normal size
+    @supports (-moz-appearance: none) {
+      zoom: unset;
+    }
+
+    iframe {
+      width: 100%;
+      aspect-ratio: 16 / 9;
+      border-radius: 0.5rem;
+      border: none;
+    }
 
     &__icon {
       width: 1rem;
@@ -1169,7 +1164,13 @@
       color: var(--);
       background-color: var(--yellow-to-dark-orange);
       border: 1px solid var(--dark-orange);
+      // Counteract the container's zoom: 0.5
       zoom: 2;
+
+      // Firefox: no zoom to counteract
+      @supports (-moz-appearance: none) {
+        zoom: unset;
+      }
     }
 
     &__mobile {
@@ -1251,6 +1252,8 @@
         flex-direction: row;
         align-items: start;
         gap: 2rem;
+        flex: 1;
+        min-height: 0; // Allow shrinking in flexbox
       }
 
     }
@@ -1757,21 +1760,18 @@
   .home-view__powered-by {
     margin: 3rem 0 2rem;
   }  
-  .taco-token-chart {
-    zoom: 0.4 !important;
-  }  
   .home-view__taco-assets span {
     font-size: 0.75rem;
-  }  
+  }
   .home-view__taco-assets__fa-icon {
     font-size: 1rem;
   }
   .home-view__taco-assets__svg {
     width: 1rem;
-  }  
+  }
   .home-view__chart-modal {
     padding: 1rem;
-  }  
+  }
 }
 
 // tablet
@@ -1874,18 +1874,15 @@
   .home-view__powered-by {
     margin: 3rem 0 2rem;
   }
-  .taco-token-chart {
-    zoom: 0.4 !important;
-  }
   .home-view__taco-assets span {
     font-size: 0.75rem;
-  }  
+  }
   .home-view__taco-assets__fa-icon {
     font-size: 1rem;
   }
   .home-view__taco-assets__svg {
     width: 1rem;
-  }  
+  }
   .home-view__chart-modal {
     padding: 1rem;
   }
@@ -1991,13 +1988,17 @@
 
 <script setup lang="ts">
 
+  // Component name for keep-alive matching
+  defineOptions({
+    name: 'HomeView'
+  })
+
   /////////////
   // Imports //
   /////////////
 
-  import { ref, onMounted, computed, onUnmounted } from "vue";
-  import HeaderBar from "../components/HeaderBar.vue";
-  import FooterBar from "../components/FooterBar.vue";
+  import { ref, onMounted, computed, onUnmounted, watch } from "vue";
+  import { useRoute } from 'vue-router'
   import { useTacoStore } from "../stores/taco.store"
   import { storeToRefs } from "pinia"  
   import TacoCoinIcon from "../assets/tokens/tacoCoinIcon.vue"
@@ -2009,7 +2010,6 @@
   import TacoDaoTaco from '../assets/images/tacoDaoTaco.svg'
   import icpLogo from "../assets/tokens/snspng/icp.png"
   import dkpLogo from "../assets/tokens/snspng/dragginz.png"
-  import astronautLoader from '../assets/images/astonautLoader.webp'
   import TaggrSocialImg from '../assets/images/social/taggr.vue'
   import CatalyzeSocialImg from '../assets/images/social/catalyze.vue'
   import GithubSocialImg from '../assets/images/social/github.vue'
@@ -2060,10 +2060,27 @@
   // viewing chart modal
   const viewingChartModal = ref(false)
 
-  // images
-  const astronautLoaderUrl =  astronautLoader 
+  // lazy loading flags for iframes
   const shouldLoadDex = ref(false)
   const shouldLoadYouTube = ref(false)
+  const youtubeIframeRef = ref<HTMLIFrameElement | null>(null)
+  const dexIframeRef = ref<HTMLIFrameElement | null>(null)
+
+  // Route for watching navigation
+  const route = useRoute()
+
+  // Pause YouTube when navigating away from home (HomeView stays in DOM via KeepAlive + v-show)
+  watch(() => route.path, (newPath) => {
+    if (newPath !== '/') {
+      // Navigating away from home - pause YouTube video
+      if (youtubeIframeRef.value) {
+        // Send postMessage to pause the YouTube video
+        youtubeIframeRef.value.contentWindow?.postMessage('{"event":"command","func":"pauseVideo","args":""}', '*')
+      }
+      // Close chart modal if open
+      viewingChartModal.value = false
+    }
+  })
 
   // social links
   const xSocialImg = XSocialImg
@@ -2232,26 +2249,79 @@
   // Lifecycle Hooks //
   /////////////////////
 
+  // Prefetch routes based on user state for faster navigation
+  const prefetchRoutes = () => {
+    // Public pages - prefetch for all users
+    import('./VoteView.vue')
+    import('./DaoView.vue')
+    import('./InfoView.vue')
+    import('./ChatView.vue')
+    import('./ReportsView.vue')
+    import('./SalesView.vue')
+    import('./ProposalsView.vue')
+
+    // Logged in users - also prefetch authenticated pages
+    if (userLoggedIn.value) {
+      import('./WalletView.vue')
+      import('./RewardsView.vue')
+
+      // Admin pages - only if admin or previously visited admin
+      const principalText = tacoStore.userPrincipal
+      const ADMIN_PRINCIPALS = [
+        'odoge-dr36c-i3lls-orjen-eapnp-now2f-dj63m-3bdcd-nztox-5gvzy-sqe',
+        'uuyso-zydjd-tsb4o-lgpgj-dfsvq-awald-j2zfp-e6h72-d2je3-whmjr-xae',
+        '6mxg4-njnu6-qzizq-2ekit-rnagc-4d42s-qyayx-jghoe-nd72w-elbsy-xqe',
+        'yjdlk-jqx52-ha6xa-w6iqe-b4jrr-s5ova-mirv4-crlfi-xgsaa-ib3cg-3ae',
+        'chxs6-z6h3t-hjrgk-i5x57-rm7fm-3tvlz-b352m-heq2g-hu23b-sxasf-kqe',
+        '6q3ra-pds56-nqzzc-itigw-tsw4r-vs235-yqx5u-dg34n-nnsus-kkpqf-aqe',
+        'd7zib-qo5mr-qzmpb-dtyof-l7yiu-pu52k-wk7ng-cbm3n-ffmys-crbkz-nae',
+        'as6jn-gaoo7-k4kji-tdkxg-jlsrk-avxkc-zu76j-vz7hj-di3su-2f74z-qqe',
+        'r27hb-ckxon-xohqv-afcvx-yhemm-xoggl-37dg6-sfyt3-n6jer-ditge-6qe',
+        '5uvsz-em754-ulbgb-vxihq-wqyzd-brdgs-snzlu-mhlqw-k74uu-4l5h3-2qe',
+        'k2xol-5avzc-lf3wt-vwoft-pjx6k-77fjh-7pera-6b7qt-fwt5e-a3ekl-vqe',
+        'hxjcv-hbraf-oathz-repfu-x7szv-j6p2f-2cu6n-fywhf-yxago-plyz5-5ae',
+        '4ggui-2celt-yxv2h-z6zyh-sq5ok-rycog-tjyfl-gzxsj-kiq3y-c4sm4-lqe',
+        'hzeez-ilt5k-pzrtz-hdcg3-pwjq5-564tv-uu46m-esqun-chj7o-uptsv-aae',
+        'nfzo4-i26mj-e2tuj-bt3ba-cuco4-vcqxx-ybjw7-gzyzh-kvyp7-wjeyp-hqe',
+      ]
+      const isAdmin = principalText && ADMIN_PRINCIPALS.includes(principalText)
+      const hasVisitedAdmin = localStorage.getItem('hasVisitedAdmin') === 'true'
+
+      if (isAdmin || hasVisitedAdmin) {
+        import('./AdminView.vue')
+        import('./AdminTradeView.vue')
+        import('./AdminPriceView.vue')
+        import('./AdminPriceHistoryView.vue')
+        import('./AdminArchiveView.vue')
+        import('./AdminNeuronView.vue')
+        import('./AdminVotesView.vue')
+        import('./AdminRewardsView.vue')
+        import('./AdminRewardsBalancesView.vue')
+        import('./AdminDistributionsView.vue')
+        import('./AdminAlarmView.vue')
+        import('./AdminClaimsView.vue')
+        import('./AdminNNSView.vue')
+        import('./SystemView.vue')
+      }
+    }
+  }
+
   // on mounted
-  onMounted(async () => {
-    
+  onMounted(() => {
+
     // log
     // console.log('homepage mounted')
 
+    // Prefetch common routes in background (non-blocking)
+    prefetchRoutes()
 
-    // check if user is logged in
-    await checkIfLoggedIn()    
-
-    // if user is logged in, get neurons count
+    // Fetch neurons count in background if user is already logged in
+    // Note: checkIfLoggedIn is already called in App.vue
     if (userLoggedIn.value) {
-
-      const rawNeurons = await tacoStore.getTacoNeurons()
-      const neuronsCount = rawNeurons.length
-
-      // set neurons count
-      localNeuronsCount.value = neuronsCount
-
-    }      
+      tacoStore.getTacoNeurons().then(rawNeurons => {
+        localNeuronsCount.value = rawNeurons.length
+      })
+    }
 
     // get the below the fold element
     const belowTheFold = document.querySelector('.home-view__below-the-fold')
@@ -2298,7 +2368,18 @@
         shouldLoadYouTube.value = true
       }, 1000)
     }  
-    
+
+  })
+
+  // Watch for login state changes to update neurons count
+  watch(userLoggedIn, (loggedIn) => {
+    if (loggedIn) {
+      tacoStore.getTacoNeurons().then(rawNeurons => {
+        localNeuronsCount.value = rawNeurons.length
+      })
+    } else {
+      localNeuronsCount.value = 0
+    }
   })
 
   // clean up observer

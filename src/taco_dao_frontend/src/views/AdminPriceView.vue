@@ -1,8 +1,5 @@
 <template>
   <div class="standard-view">
-    <!-- header bar -->
-    <HeaderBar />
-    
     <div class="scroll-y-container h-100">
       <div class="container">
         <div class="row">
@@ -61,8 +58,8 @@
                         <div><strong>Direction:</strong> {{ condition.direction.Up !== undefined ? '📈 Up' : '📉 Down' }}</div>
                         <div><strong>Threshold:</strong> {{ condition.percentage.toFixed(1) }}%</div>
                         <div><strong>Time Window:</strong> {{ formatTimeWindow(condition.timeWindowNS) }}</div>
-                        <div><strong>Applies to:</strong> 
-                          <span v-if="condition.applicableTokens.length === 0">All tokens</span>
+                        <div><strong>Applies to:</strong>
+                          <span v-if="!condition.applicableTokens || condition.applicableTokens.length === 0">All tokens</span>
                           <span v-else>{{ condition.applicableTokens.length }} specific token(s)</span>
                         </div>
                         <div class="text-muted small">
@@ -582,14 +579,15 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
+import { storeToRefs } from 'pinia'
 import { useTacoStore } from '../stores/taco.store'
-import HeaderBar from '../components/HeaderBar.vue'
 import TacoTitle from '../components/misc/TacoTitle.vue'
 import AdminConfirmationModal from '../components/admin/AdminConfirmationModal.vue'
 import GNSFProposalDialog from '../components/proposals/GNSFProposalDialog.vue'
 import { useAdminCheck } from '../composables/useAdminCheck'
 import { Principal } from '@dfinity/principal'
+import * as workerBridge from '../stores/worker-bridge'
 
 interface PriceDirection {
   Up?: null;
@@ -628,6 +626,15 @@ interface PriceAlertLog {
 
 const store = useTacoStore()
 
+// Extract cached refs from store for reactive binding
+const {
+  cachedPriceAlerts,
+  cachedTradingPauses,
+  cachedCircuitBreakerConditions,
+  cachedPortfolioCircuitBreakerConditions,
+  cachedCircuitBreakerLogs
+} = storeToRefs(store)
+
 // Admin check
 const { isAdmin, checking, checkAdminStatus } = useAdminCheck()
 
@@ -637,17 +644,18 @@ const proposalFunctionName = ref('')
 const proposalReasonPlaceholder = ref('')
 const proposalContextParams = ref<any>({})
 
-// State
-const conditions = ref<TriggerCondition[]>([])
-const alerts = ref<PriceAlertLog[]>([])
-const tradingPauses = ref<any[]>([])
-const portfolioConditions = ref<any[]>([])
-const portfolioLogs = ref<any[]>([])
-const loadingConditions = ref(false)
-const loadingAlerts = ref(false)
-const loadingTradingPauses = ref(false)
-const loadingPortfolioConditions = ref(false)
-const loadingPortfolioLogs = ref(false)
+// State - initialize from cache if available for instant display on navigation
+const conditions = ref<TriggerCondition[]>(cachedCircuitBreakerConditions.value || [])
+const alerts = ref<PriceAlertLog[]>(cachedPriceAlerts.value?.alerts || [])
+const tradingPauses = ref<any[]>(cachedTradingPauses.value?.pausedTokens || [])
+const portfolioConditions = ref<any[]>(cachedPortfolioCircuitBreakerConditions.value || [])
+const portfolioLogs = ref<any[]>(cachedCircuitBreakerLogs.value || [])
+// Only show loading if no cached data
+const loadingConditions = ref(!cachedCircuitBreakerConditions.value)
+const loadingAlerts = ref(!cachedPriceAlerts.value)
+const loadingTradingPauses = ref(!cachedTradingPauses.value)
+const loadingPortfolioConditions = ref(!cachedPortfolioCircuitBreakerConditions.value)
+const loadingPortfolioLogs = ref(!cachedCircuitBreakerLogs.value)
 const submitting = ref(false)
 const submittingPause = ref(false)
 const submittingPortfolio = ref(false)
@@ -658,7 +666,18 @@ const showManualPauseModal = ref(false)
 const showAddPortfolioModal = ref(false)
 
 // Confirmation modal state
-const confirmationModal = ref({
+const confirmationModal = ref<{
+  show: boolean
+  title: string
+  message: string
+  extraData: string
+  confirmButtonText: string
+  confirmButtonClass: string
+  reasonPlaceholder: string
+  submitting: boolean
+  action: (() => Promise<void>) | null
+  actionData: { type: string; token?: any; tokenSymbol?: string } | null
+}>({
   show: false,
   title: '',
   message: '',
@@ -710,26 +729,17 @@ const getTokenSymbol = (principal: any) => {
   return principal.toString().slice(0, 8) + '...'
 }
 
-const refreshConditions = async () => {
+// Refresh functions - use workers for non-blocking fetches
+const refreshConditions = () => {
+  console.log('AdminPriceView: Triggering worker refresh for conditions')
   loadingConditions.value = true
-  try {
-    const result = await store.listTriggerConditions()
-    conditions.value = result
-  } catch (error) {
-    console.error('Failed to fetch conditions:', error)
-  }
-  loadingConditions.value = false
+  workerBridge.fetch('circuitBreakerConditions', true)
 }
 
-const refreshAlerts = async () => {
+const refreshAlerts = () => {
+  console.log('AdminPriceView: Triggering worker refresh for alerts')
   loadingAlerts.value = true
-  try {
-    const result = await store.getPriceAlerts(0, 50)
-    alerts.value = result.alerts
-  } catch (error) {
-    console.error('Failed to fetch alerts:', error)
-  }
-  loadingAlerts.value = false
+  workerBridge.fetch('priceAlerts', true)
 }
 
 const toggleActive = async (id: number, isActive: boolean) => {
@@ -867,16 +877,11 @@ const closeModal = () => {
   }
 }
 
-// Trading pause functions
-const refreshTradingPauses = async () => {
+// Trading pause functions - use worker for non-blocking fetch
+const refreshTradingPauses = () => {
+  console.log('AdminPriceView: Triggering worker refresh for trading pauses')
   loadingTradingPauses.value = true
-  try {
-    const result = await store.listTradingPauses()
-    tradingPauses.value = result.pausedTokens
-  } catch (error) {
-    console.error('Failed to fetch trading pauses:', error)
-  }
-  loadingTradingPauses.value = false
+  workerBridge.fetch('tradingPauses', true)
 }
 
 const unpauseToken = async (token: any) => {
@@ -985,27 +990,17 @@ const closeManualPauseModal = () => {
   }
 }
 
-// Portfolio circuit breaker functions
-const refreshPortfolioConditions = async () => {
+// Portfolio circuit breaker functions - use workers for non-blocking fetches
+const refreshPortfolioConditions = () => {
+  console.log('AdminPriceView: Triggering worker refresh for portfolio conditions')
   loadingPortfolioConditions.value = true
-  try {
-    const result = await store.listPortfolioCircuitBreakerConditions()
-    portfolioConditions.value = result
-  } catch (error) {
-    console.error('Failed to fetch portfolio conditions:', error)
-  }
-  loadingPortfolioConditions.value = false
+  workerBridge.fetch('portfolioCircuitBreakerConditions', true)
 }
 
-const refreshPortfolioLogs = async () => {
+const refreshPortfolioLogs = () => {
+  console.log('AdminPriceView: Triggering worker refresh for portfolio logs')
   loadingPortfolioLogs.value = true
-  try {
-    const result = await store.getPortfolioCircuitBreakerLogs(0, 50)
-    portfolioLogs.value = result.logs
-  } catch (error) {
-    console.error('Failed to fetch portfolio logs:', error)
-  }
-  loadingPortfolioLogs.value = false
+  workerBridge.fetch('circuitBreakerLogs', true)
 }
 
 const togglePortfolioActive = async (id: number, isActive: boolean) => {
@@ -1227,14 +1222,70 @@ const handleProposalSuccess = async () => {
   console.log('AdminPriceView: Proposal submitted successfully')
 }
 
+// Watch cached data and sync to local refs
+watch(cachedCircuitBreakerConditions, (newVal) => {
+  if (newVal !== undefined && newVal !== null) {
+    conditions.value = newVal || []
+    loadingConditions.value = false
+  }
+}, { immediate: true })
+
+watch(cachedPriceAlerts, (newVal) => {
+  if (newVal !== undefined && newVal !== null) {
+    alerts.value = newVal?.alerts || []
+    loadingAlerts.value = false
+  }
+}, { immediate: true })
+
+watch(cachedTradingPauses, (newVal) => {
+  if (newVal !== undefined && newVal !== null) {
+    tradingPauses.value = newVal?.pausedTokens || []
+    loadingTradingPauses.value = false
+  }
+}, { immediate: true })
+
+watch(cachedPortfolioCircuitBreakerConditions, (newVal) => {
+  if (newVal !== undefined && newVal !== null) {
+    portfolioConditions.value = newVal || []
+    loadingPortfolioConditions.value = false
+  }
+}, { immediate: true })
+
+watch(cachedCircuitBreakerLogs, (newVal) => {
+  if (newVal !== undefined && newVal !== null) {
+    portfolioLogs.value = newVal || []
+    loadingPortfolioLogs.value = false
+  }
+}, { immediate: true })
+
 // Lifecycle
-onMounted(async () => {
-  await checkAdminStatus()
-  await refreshConditions()
-  await refreshAlerts()
-  await refreshTradingPauses()
-  await refreshPortfolioConditions()
-  await refreshPortfolioLogs()
+onMounted(() => {
+  // Only set loading if data isn't already available from cache
+  if (!cachedCircuitBreakerConditions.value) loadingConditions.value = true
+  if (!cachedPriceAlerts.value) loadingAlerts.value = true
+  if (!cachedTradingPauses.value) loadingTradingPauses.value = true
+  if (!cachedPortfolioCircuitBreakerConditions.value) loadingPortfolioConditions.value = true
+  if (!cachedCircuitBreakerLogs.value) loadingPortfolioLogs.value = true
+
+  // Check admin status in background (don't block data loading or navigation)
+  checkAdminStatus().catch(console.error)
+
+  // Trigger worker fetches for data needed by this view
+  // Workers will update cached refs, which watchers will sync to local refs
+  workerBridge.fetch('circuitBreakerConditions', false)
+  workerBridge.fetch('priceAlerts', false)
+  workerBridge.fetch('tradingPauses', false)
+  workerBridge.fetch('portfolioCircuitBreakerConditions', false)
+  workerBridge.fetch('circuitBreakerLogs', false)
+
+  // Fallback: clear loading states after 10 seconds if data never arrives
+  setTimeout(() => {
+    loadingConditions.value = false
+    loadingAlerts.value = false
+    loadingTradingPauses.value = false
+    loadingPortfolioConditions.value = false
+    loadingPortfolioLogs.value = false
+  }, 10000)
 })
 </script>
 

@@ -33,6 +33,7 @@ export const idlFactory = ({ IDL }) => {
     'newAllocations' : IDL.Vec(Allocation),
     'timestamp' : IDL.Int,
     'neuronId' : IDL.Vec(IDL.Nat8),
+    'penaltyMultiplier' : IDL.Opt(IDL.Nat),
     'reason' : IDL.Opt(IDL.Text),
   });
   const PriceInfo = IDL.Record({

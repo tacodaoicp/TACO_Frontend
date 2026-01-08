@@ -266,7 +266,7 @@ const handleCreate = async () => {
       successMessage.value = `Successfully created new neuron with ${formatBalance(stakeAmountBigInt.value, 8)} TACO and ${dissolveDays.value} day dissolve period!`
       
       // Also show toast notification
-      tacoStore.addToast('success', 'Neuron Created', `Successfully created new neuron with ${formatBalance(stakeAmountBigInt.value, 8)} TACO and ${dissolveDays.value} day dissolve period`)
+      tacoStore.addToast({ id: Date.now(), code: 'success', title: 'Neuron Created', icon: 'check', message: `Successfully created new neuron with ${formatBalance(stakeAmountBigInt.value, 8)} TACO and ${dissolveDays.value} day dissolve period` })
       
       emit('created')
       

@@ -407,10 +407,19 @@
         return Number(tokenDetail?.tokenDecimals ?? 8)
     }
 
-    // get token info
-    const getTokenInfo = (principal: string) => {
+    // get token info - accepts Principal object or string
+    const getTokenInfo = (principal: any) => {
         if (!principal) return null
-        const tokenDetail = fetchedTokenDetails.value?.find((entry) => entry[0].toString() === principal.toString())?.[1]
+
+        // Convert principal to string for comparison
+        const principalStr = typeof principal === 'string' ? principal : principal.toString?.() || String(principal)
+
+        // Find matching token in fetchedTokenDetails
+        const tokenDetail = fetchedTokenDetails.value?.find((entry) => {
+            const entryPrincipalStr = typeof entry[0] === 'string' ? entry[0] : entry[0]?.toString?.() || String(entry[0])
+            return entryPrincipalStr === principalStr
+        })?.[1]
+
         if (!tokenDetail) return null
         return tokenData.find(t => t.symbol.toLowerCase() === tokenDetail.tokenSymbol.toLowerCase())
     }    

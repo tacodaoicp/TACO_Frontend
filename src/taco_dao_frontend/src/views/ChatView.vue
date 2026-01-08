@@ -2,9 +2,6 @@
 
   <div class="standard-view">
 
-    <!-- header bar -->
-    <HeaderBar />
-
     <!-- scroll container - app util class -->
     <div class="scroll-y-container h-100">
 
@@ -89,9 +86,6 @@
       </div>
 
     </div>
-
-    <!-- footer bar -->
-    <FooterBar />
 
     <!-- gated access tutorial modal -->
     <div v-if="userShownAccessTutorial" class="access__message">
@@ -398,8 +392,6 @@
   // Imports //
   /////////////
 
-  import HeaderBar from "../components/HeaderBar.vue"
-  import FooterBar from "../components/FooterBar.vue"
   import ForumView from "../components/forum/ForumView.vue"
   import { ref, onMounted, watch } from "vue"
   import { initialise } from '@open-ic/openchat-xframe'

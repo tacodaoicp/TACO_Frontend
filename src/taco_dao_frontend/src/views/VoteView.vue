@@ -2,9 +2,6 @@
 
   <div class="standard-view">
 
-    <!-- header bar -->
-    <HeaderBar />
-
     <!-- scroll container -->
     <div class="scroll-y-container h-100">
 
@@ -625,10 +622,10 @@
                               :class="{'ready-to-vote': userLockedVote}" placeholder="0" min="0" max="100"
                               style="width: 6rem;" :step="step" :value="control.currentPercentage.toFixed(2)"
                               :disabled="control.isLocked || userLockedVote || unlockedCount === currentSliders.length - 1"
-                              @input="onAllocationChange(index, $event.target.valueAsNumber)">
+                              @input="onAllocationChange(index as number, ($event.target as HTMLInputElement).valueAsNumber)">
 
                             <!-- lock icon -->
-                            <button v-if="!userLockedVote" class="btn" @click="toggleLock(index)">
+                            <button v-if="!userLockedVote" class="btn" @click="toggleLock(index as number)">
 
                               <!-- unlock icon -->
                               <i v-if="!control.isLocked" class="fa-solid fa-unlock fa-lg"
@@ -659,7 +656,7 @@
                             :id="'slider' + (control.symbol)" :value="control.currentPercentage" min="0" max="100"
                             :step="step"
                             :disabled="control.isLocked || userLockedVote || unlockedCount === currentSliders.length - 1"
-                            @input="onAllocationChange(index, $event.target.valueAsNumber)">
+                            @input="onAllocationChange(index as number, ($event.target as HTMLInputElement).valueAsNumber)">
 
                         </div>
 
@@ -800,7 +797,7 @@
                                   <tbody>
                                     <tr v-if="formattedUserAllocation" v-for="currentAllocation in formattedUserAllocation?.allocations">
                                       <td>
-                                        <span>{{ fetchedTokenDetails?.find(([p]) => p.toString() === currentAllocation.token.toString())?.[1]?.tokenSymbol || currentAllocation.token }}</span>
+                                        <span>{{ fetchedTokenDetails?.find((entry) => entry[0].toString() === currentAllocation.token.toString())?.[1]?.tokenSymbol || currentAllocation.token }}</span>
                                       </td>
                                       <td>
                                         <span>{{ Number(currentAllocation.basisPoints) / 100 }}%</span>
@@ -874,7 +871,7 @@
                                   <tbody>
                                     <tr v-for="actualAllocation in pastAllocation.allocation">
                                       <td>
-                                        <span>{{ fetchedTokenDetails?.find(([p]) => p.toString() === actualAllocation.token.toString())?.[1]?.tokenSymbol || actualAllocation.token }}</span>
+                                        <span>{{ fetchedTokenDetails?.find((entry) => entry[0].toString() === actualAllocation.token.toString())?.[1]?.tokenSymbol || actualAllocation.token }}</span>
                                       </td>
                                       <td>
                                         <span>{{ Number(actualAllocation.basisPoints) / 100 }}%</span>
@@ -1007,9 +1004,6 @@
       </div>
 
     </div>
-
-    <!-- footer bar -->
-    <FooterBar />
 
     <!-- message modal -->
     <div v-if="!userAcceptedHotkeyTutorial || userReshownHotkeyTutorial" class="vote__message">
@@ -2167,11 +2161,9 @@
   // imports //
   /////////////
 
-  import HeaderBar from "../components/HeaderBar.vue"
-  import FooterBar from "../components/FooterBar.vue"
   import { ref, onMounted, onBeforeUnmount, computed, watch, nextTick } from "vue"
   import { useTacoStore } from "../stores/taco.store"
-  import { storeToRefs } from "pinia"  
+  import { storeToRefs } from "pinia"
   import { tokenData } from "../components/data/TokenData"
   import DfinityLogo from "../assets/images/dfinityLogo.vue"
   import { Principal } from "@dfinity/principal"
@@ -2317,7 +2309,8 @@
   let updatedArray: any[] = []  
 
   // handle fetched token details
-  const handleFetchedTokenDetails = async (tokenDetails: any) => {
+  // Optional: pass initialPercentages to avoid equal-segment animation when we already have allocation data
+  const handleFetchedTokenDetails = async (tokenDetails: any, initialPercentages?: number[]) => {
 
     // log
     // console.log('VoteView.vue: fetchedTokenDetails:', tokenDetails)
@@ -2341,8 +2334,8 @@
     // console.log('VoteView.vue: allTokens:', allTokens)
     // console.log('VoteView.vue: extractedTokens (filtered):', extractedTokens)
 
-    // evenly distribute percentages at first
-    const percentages = extractedTokens.map((token: any) => 100 / extractedTokens.length)
+    // Use initialPercentages if provided, otherwise evenly distribute
+    const percentages = initialPercentages || extractedTokens.map((token: any) => 100 / extractedTokens.length)
 
     // create array for symbols
     let symbols: string[] = extractedTokens.map((token: [any, { tokenSymbol: string }]) => token[1].tokenSymbol)
@@ -2450,35 +2443,40 @@
       // log
       // console.log('canisterIds:', canisterIds)
 
-      // create symbols array
+      // create symbols array - use tokenDetails for fast lookup instead of icrc1Metadata
       let symbols: string[] = []
 
-      // get metadata for each canister id
-      for (const canisterId of canisterIds) {
+      // Build a map from principal -> symbol using fetchedTokenDetails (fast path)
+      const tokenDetailsMap = new Map<string, string>()
+      if (fetchedTokenDetails.value && fetchedTokenDetails.value.length > 0) {
+        for (const entry of fetchedTokenDetails.value) {
+          const principal = entry[0]
+          const details = entry[1]
+          const principalStr = typeof principal === 'string' ? principal : principal?.toString?.() || ''
+          if (principalStr && details?.tokenSymbol) {
+            tokenDetailsMap.set(principalStr, details.tokenSymbol)
+          }
+        }
+      }
 
-        // fetch metadata
+      // Map canister IDs to symbols
+      for (const canisterId of canisterIds) {
+        // Check tokenDetails map first (fast path)
+        if (tokenDetailsMap.has(canisterId)) {
+          symbols.push(tokenDetailsMap.get(canisterId)!)
+          continue
+        }
+
+        // Fall back to icrc1Metadata call (slow path) - only if not in tokenDetails
         const fetchedMetadata = await icrc1Metadata(canisterId)
-        
-        // find the symbol entry and extract its value
         // @ts-ignore
         const symbolEntry = fetchedMetadata.find((entry: any) => entry[0] === "icrc1:symbol")
-        
-        // if symbol entry and text, push symbol to symbols array
+
         if (symbolEntry && symbolEntry[1]?.Text) {
-
-          // push symbol to symbols array
           symbols.push(symbolEntry[1].Text)
-
-        }
-
-        // else there is a problem
-        else {
-
-          // log error
+        } else {
           console.error('VoteView.vue: error fetching metadata for canister id:', canisterId)
-
         }
-
       }
 
       // log
@@ -2696,19 +2694,10 @@
     // confirm allocations sum to 10000 basis points
     const sum = allocations.reduce((acc: number, curr: any) => acc + curr.basisPoints, 0)
 
-    // if allocations do not sum to 10000, log values and total and do not continue
+    // if allocations do not sum to 10000, return to allocation sliders and do not continue
     if (Math.abs(sum - 10000) > 1) {
-
-      // log
-      console.log('VoteView.vue: allocations do not sum to 10000 basis points!')
-      console.log('VoteView.vue: sum is:', sum)
-
-      // return to allocation sliders
       userLockedVote.value = false
-
-      // do not continue
       return
-
     }
 
     // log
@@ -2720,10 +2709,8 @@
       // cast vote with backend
       await updateAllocation(allocations)
 
-      // log
-      console.log('... Vote Cast!')
-
-      // refresh everything
+      // refresh everything (must await handlers in order)
+      await ensureTokenDetails()
       await handleFetchedTokenDetails(fetchedTokenDetails.value)
       await fetchAggregateAllocation()
       await handleFetchedAggregateAllocation(fetchedAggregateAllocation.value)
@@ -2779,7 +2766,25 @@
     }
 
   }
-  
+
+  // handle add follow
+  const handleAddFollow = async (principalStr: string) => {
+    try {
+      await followAllocation(Principal.fromText(principalStr))
+    } catch (error) {
+      console.error('VoteView.vue: error following allocation:', error)
+    }
+  }
+
+  // handle remove follow
+  const handleRemoveFollow = async (principalStr: string) => {
+    try {
+      await unfollowAllocation(Principal.fromText(principalStr))
+    } catch (error) {
+      console.error('VoteView.vue: error unfollowing allocation:', error)
+    }
+  }
+
   // match dao
   const matchDao = () => {
 
@@ -3023,11 +3028,11 @@
     if (!formattedUserAllocation.value?.allocations) return false
 
     // return true if all sliders match their corresponding last allocation
-    return currentSliders.value.every(slider => {
+    return currentSliders.value.every((slider: any) => {
 
       // find matching allocation by canister id
       const matchingAllocation = formattedUserAllocation.value.allocations.find(
-        allocation => allocation.token.toString() === slider.canisterId
+        (allocation: any) => allocation.token.toString() === slider.canisterId
       )
 
       // compare current percentage with last allocation (converting basis points to percentage)
@@ -3060,15 +3065,8 @@
       // log
       // console.log('VoteView.vue: user is logged in')
 
-      // turn on right loading
-      rightLoading.value = true
-
-      // refresh voting power
+      // refresh voting power (button shows "Refreshing" state, no astronaut loader needed)
       await refreshVotingPower()
-
-      // turn off right loading
-      rightLoading.value = false
-
 
     } else {
 
@@ -3086,81 +3084,187 @@
   // on mounted
   onMounted(async () => {
 
-    // turn on left loading
-    leftLoading.value = true
-
-    // turn on right loading
-    rightLoading.value = true
-
-    await ensureTokenDetails()
-
-    // log
-    // console.log('vote page mounted')
-
     // chart stuff
     setTacoChartMaxHeight()
     window.addEventListener('resize', setTacoChartMaxHeight)
 
-    try {
+    // Check for existing cached data FIRST before any await calls or loading flags
+    const hasCachedTokenDetails = fetchedTokenDetails.value && fetchedTokenDetails.value.length > 0
+    const hasCachedAggregateAllocation = fetchedAggregateAllocation.value && fetchedAggregateAllocation.value.length > 0
+    const hasCachedVotingPowerMetrics = fetchedVotingPowerMetrics.value !== null
 
-      await handleFetchedTokenDetails(fetchedTokenDetails.value)
-      // console.log('fetchedTokenDetails', fetchedTokenDetails.value)
-      await fetchAggregateAllocation()
+    // If we have all cached data, use it immediately without showing loading
+    if (hasCachedTokenDetails && hasCachedAggregateAllocation) {
+
+      // Extract initial percentages from aggregate allocation to avoid equal-segment animation
+      // This builds a map of principal -> percentage, then maps it to token order
+      const allocationMap = new Map<string, number>()
+      for (const allocation of fetchedAggregateAllocation.value as any[]) {
+        const principal = String(allocation[0]?.toString?.() || allocation[0])
+        const percentage = Number(allocation[1]) / 100 // basis points to percentage
+        allocationMap.set(principal, percentage)
+      }
+
+      // Get active tokens and their initial percentages in the correct order
+      const activeTokens = (fetchedTokenDetails.value as any[]).filter((token: any) => token[1]?.Active === true)
+      const initialPercentages = activeTokens.map((token: any) => {
+        const principal = String(token[0]?.toString?.() || token[0])
+        return allocationMap.get(principal) || 0
+      })
+
+      // Ensure percentages sum to 100 (adjust largest if needed due to rounding)
+      const sum = initialPercentages.reduce((a: number, b: number) => a + b, 0)
+      if (Math.abs(sum - 100) >= 0.01 && initialPercentages.length > 0) {
+        const diff = 100 - sum
+        const largestIndex = initialPercentages.indexOf(Math.max(...initialPercentages))
+        initialPercentages[largestIndex] = Number((initialPercentages[largestIndex] + diff).toFixed(2))
+      }
+
+      // Pass initial percentages to avoid equal-segment animation
+      await handleFetchedTokenDetails(fetchedTokenDetails.value, initialPercentages)
       await handleFetchedAggregateAllocation(fetchedAggregateAllocation.value)
-      // console.log('fetchedAggregateAllocation', fetchedAggregateAllocation.value)
-      await fetchVotingPowerMetrics()
+      if (hasCachedVotingPowerMetrics) {
+        await handleFetchedVotingPowerMetrics(fetchedVotingPowerMetrics.value)
+      }
+
+      // Check login and user allocation in background (don't block)
+      checkIfLoggedIn().then(async () => {
+        if (userLoggedIn.value) {
+          // Check if we already have cached userAllocation
+          const hasCachedUserAllocation = fetchedUserAllocation.value && fetchedUserAllocation.value.length > 0
+          if (hasCachedUserAllocation) {
+            handleFetchedUserAllocation(fetchedUserAllocation.value)
+            // Background refresh (fire-and-forget)
+            fetchUserAllocation().catch(console.error)
+          } else {
+            await fetchUserAllocation()
+            handleFetchedUserAllocation(fetchedUserAllocation.value)
+          }
+        }
+      })
+
+      // Trigger background refresh (fire-and-forget, don't await)
+      ensureTokenDetails().catch(console.error)
+      fetchAggregateAllocation().catch(console.error)
+      fetchVotingPowerMetrics().catch(console.error)
+
+      return // Early return - we're done with immediate rendering
+    }
+
+    // No cached data - turn on component-level loading spinners only
+    // (no full-page appLoadingOn - let component spinners handle it)
+    leftLoading.value = true
+    rightLoading.value = true
+
+    try {
+      // Fetch all data in parallel for faster loading
+      await Promise.all([
+        ensureTokenDetails(),
+        fetchAggregateAllocation(),
+        fetchVotingPowerMetrics(),
+      ])
+
+      // Extract initial percentages to avoid equal-segment animation
+      const allocationMap = new Map<string, number>()
+      for (const allocation of fetchedAggregateAllocation.value as any[]) {
+        const principal = String(allocation[0]?.toString?.() || allocation[0])
+        const percentage = Number(allocation[1]) / 100
+        allocationMap.set(principal, percentage)
+      }
+      const activeTokens = (fetchedTokenDetails.value as any[]).filter((token: any) => token[1]?.Active === true)
+      const initialPercentages = activeTokens.map((token: any) => {
+        const principal = String(token[0]?.toString?.() || token[0])
+        return allocationMap.get(principal) || 0
+      })
+      // Adjust for rounding
+      const sum = initialPercentages.reduce((a: number, b: number) => a + b, 0)
+      if (Math.abs(sum - 100) >= 0.01 && initialPercentages.length > 0) {
+        const diff = 100 - sum
+        const largestIndex = initialPercentages.indexOf(Math.max(...initialPercentages))
+        initialPercentages[largestIndex] = Number((initialPercentages[largestIndex] + diff).toFixed(2))
+      }
+
+      // Handle the fetched data with initial percentages (avoid equal-segment animation)
+      await handleFetchedTokenDetails(fetchedTokenDetails.value, initialPercentages)
+      await handleFetchedAggregateAllocation(fetchedAggregateAllocation.value)
       await handleFetchedVotingPowerMetrics(fetchedVotingPowerMetrics.value)
-      // console.log('fetchedVotingPowerMetrics', fetchedVotingPowerMetrics.value)
 
       // check if user is logged in
       await checkIfLoggedIn()
 
       // if user is logged in, fetch user state
       if (userLoggedIn.value) {
-
-        // log
-        // console.log('VoteView.vue: user is logged in')
-
-        // fetch and handle user allocation
-        await fetchUserAllocation()
-
-        // log
-        // console.log('fetchedUserAllocation', fetchedUserAllocation.value)
-
-        // handle fetched user allocation
-        await handleFetchedUserAllocation(fetchedUserAllocation.value)
-
-        // refresh voting power
-        await refreshVotingPower()
-
-      } else {
-
-        // log
-        // console.log('VoteView.vue: user is not logged in')
-
+        // Check if we already have cached userAllocation
+        const hasCachedUserAllocation = fetchedUserAllocation.value && fetchedUserAllocation.value.length > 0
+        if (hasCachedUserAllocation) {
+          handleFetchedUserAllocation(fetchedUserAllocation.value)
+          // Background refresh (fire-and-forget)
+          fetchUserAllocation().catch(console.error)
+        } else {
+          await fetchUserAllocation()
+          handleFetchedUserAllocation(fetchedUserAllocation.value)
+        }
       }
 
     } catch (error) {
-
-      // log
       console.error('VoteView.vue: error on mounted:', error)
-
     } finally {
-
-      // turn off left loading
       leftLoading.value = false
-
-      // turn off right loading
       rightLoading.value = false
-
     }
 
-  })    
+  })
+
+  // Watch for data arriving from worker (update display when cached data arrives)
+  let hasProcessedInitialData = false
+
+  watch([fetchedTokenDetails, fetchedAggregateAllocation], async ([tokenDetails, aggregateAllocation]) => {
+    // Only process if we have both sets of data and haven't loaded yet
+    if (tokenDetails && tokenDetails.length > 0 &&
+        aggregateAllocation && aggregateAllocation.length > 0 &&
+        !hasProcessedInitialData) {
+      hasProcessedInitialData = true
+
+      // Extract initial percentages to avoid equal-segment animation
+      const allocationMap = new Map<string, number>()
+      for (const allocation of aggregateAllocation as any[]) {
+        const principal = String(allocation[0]?.toString?.() || allocation[0])
+        const percentage = Number(allocation[1]) / 100
+        allocationMap.set(principal, percentage)
+      }
+      const activeTokens = (tokenDetails as any[]).filter((token: any) => token[1]?.Active === true)
+      const initialPercentages = activeTokens.map((token: any) => {
+        const principal = String(token[0]?.toString?.() || token[0])
+        return allocationMap.get(principal) || 0
+      })
+      // Adjust for rounding
+      const sum = initialPercentages.reduce((a: number, b: number) => a + b, 0)
+      if (Math.abs(sum - 100) >= 0.01 && initialPercentages.length > 0) {
+        const diff = 100 - sum
+        const largestIndex = initialPercentages.indexOf(Math.max(...initialPercentages))
+        initialPercentages[largestIndex] = Number((initialPercentages[largestIndex] + diff).toFixed(2))
+      }
+
+      await handleFetchedTokenDetails(tokenDetails, initialPercentages)
+      await handleFetchedAggregateAllocation(aggregateAllocation)
+
+      if (fetchedVotingPowerMetrics.value) {
+        await handleFetchedVotingPowerMetrics(fetchedVotingPowerMetrics.value)
+      }
+    }
+  })
+
+  // Watch for userAllocation data arriving from worker (for logged-in users)
+  watch(fetchedUserAllocation, (newData) => {
+    if (newData && newData.length > 0 && userLoggedIn.value) {
+      handleFetchedUserAllocation(newData)
+    }
+  })
 
   // on before unmounted
   onBeforeUnmount(() => {
 
-      // 
+      //
       window.removeEventListener('resize', setTacoChartMaxHeight)
 
   })
@@ -3176,14 +3280,14 @@
         animations: {
             enabled: true,
             easing: 'easeout',
-            speed: 350,
+            speed: 300,
             animateGradually: {
-                enabled: true,
-                delay: 1000
+                enabled: false,  // disable "popping up" animation on initial load
+                delay: 0
             },
             dynamicAnimation: {
-                enabled: true,
-                speed: 500
+                enabled: true,   // keep smooth transitions when data changes
+                speed: 300
             }
         },
         fontFamily: 'Space Mono',
@@ -3512,7 +3616,7 @@
 
   // how many history allocations to show
   const initialDisplayCount = 3
-  const displayedPastAllocations = ref([])
+  const displayedPastAllocations = ref<any[]>([])
 
   // watch for changes in pastAllocations
   watch(() => formattedUserAllocation.value?.pastAllocations, (newVal) => {

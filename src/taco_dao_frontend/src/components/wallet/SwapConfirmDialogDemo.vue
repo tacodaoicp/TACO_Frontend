@@ -1,5 +1,5 @@
 <template>
-  <div v-if="show" class="modal-overlay">
+  <div v-if="show && swapData" class="modal-overlay">
     <div class="modal-dialog">
       <div class="modal-header">
         <h5 class="modal-title">

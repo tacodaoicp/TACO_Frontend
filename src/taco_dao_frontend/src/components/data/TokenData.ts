@@ -44,6 +44,9 @@ import yralToken from "../../assets/tokens/snspng/yral.png"
 import yukuDaoToken from "../../assets/tokens/snspng/yuku-dao.png"
 import ckusdcToken from "../../assets/tokens/ckusdc.png"
 import ckbtcToken from "../../assets/tokens/ckbtc.png"
+import ckethToken from "../../assets/tokens/cketh.png"
+import cicpToken from "../../assets/tokens/cicp.png"
+import clownToken from "../../assets/tokens/clown.png"
 import icfcToken from "../../assets/tokens/snspng/icfc.png"
 import icpExToken from "../../assets/tokens/snspng/icpex.png"
 import nfidWalletToken from "../../assets/tokens/snspng/nfidw.png"
@@ -53,9 +56,6 @@ import personalDaoToken from "../../assets/tokens/snspng/personal-dao.png"
 import dolrToken from "../../assets/tokens/snspng/dolr.png"
 import fuelEvToken from "../../assets/tokens/snspng/fuelev.png"
 import sgldtToken from "../../assets/tokens/sgldt.png"
-import cicpToken from "../../assets/tokens/cicp.png"
-import clownToken from "../../assets/tokens/clown.png"
-import ckethToken from "../../assets/tokens/cketh.png"
 
 //////////////
 // mappings //
@@ -114,6 +114,45 @@ export const tokenImages: { [key: string]: string } = {
 "cICP": cicpToken,
 "Clown": clownToken,
 "Chainkey ETH": ckethToken,
+"Compound ICP": cicpToken,
+"CLOWN": clownToken,
+// Additional name variations for wallet compatibility
+"CHAT": openchatToken,
+"Chat": openchatToken,
+"GoldDAO": goldDaoToken,
+"GOLDDAO": goldDaoToken,
+"GoldAO": goldDaoToken,
+"GOLDAO": goldDaoToken,
+"Goldao": goldDaoToken,
+"GLDGov": goldDaoToken,
+"GLDGOV": goldDaoToken,
+"Gold Dao": goldDaoToken,
+"Gold": goldDaoToken,
+"GOLD": goldDaoToken,
+"GLD": goldDaoToken,
+"ckBTC": ckbtcToken,
+"CKBTC": ckbtcToken,
+"ckETH": ckethToken,
+"CKETH": ckethToken,
+"ckUSDC": ckusdcToken,
+"CKUSDC": ckusdcToken,
+"ICP": icpToken,
+"NTN": neutriniteToken,
+"Ntn": neutriniteToken,
+"SNEED": sneedToken,
+"Sneed DAO": sneedToken,
+"KONG": kongSwapToken,
+"Kong": kongSwapToken,
+"DKP": dragginzToken,
+"MOT": motokoToken,
+"MOTOKO": motokoToken,
+"OGY": origynToken,
+"BOOM": boomDaoToken,
+"ICL": icLightHouseToken,
+"KINIC": kinicToken,
+"ELNA": elnaAiToken,
+"WTN": waterneuronToken,
+"PANDA": icpandaDaoToken,
 }  
 
 //////////
@@ -602,13 +641,26 @@ export const tokenData = [
         color: '#c6ad52'
     },
     {
+        title: 'Chainkey ETH',
+        symbol: 'cketh',
+        link: 'https://dashboard.internetcomputer.org/ethereum',
+        icpCoinsLink: 'https://neutrinite.io/currencies/ckETH',
+        icon: ckethToken,
+        description: `Chain-key Ethereum (ckETH) is a multi-chain ETH twin on the Internet Computer, backed 1:1 by ETH.`,
+        color: '#627eea',
+        isSNS: false,
+        decimals: 18
+    },
+    {
         title: 'cICP',
         symbol: 'cicp',
         link: 'https://forum.dfinity.org/t/cicp-compounding-stream-icp-liquid-staking-token/49663',
         icpCoinsLink: 'https://neutrinite.io/currencies/cICP',
         icon: cicpToken,
         description: `cICP is a liquid staking token (compounding stream ICP) designed to align long-term incentives on the Internet Computer (IC). When you mint cICP, 95-98% of the ICP provided as mint_input is staked into an 8-year neuron. The voting rewards from this neuron are disbursed daily into the buyback stream, where ICP is used to purchase cICP via a vector, and the purchased cICP is burned. cICP doesn't unlock.`,
-        color: '#0c0f23'
+        color: '#0c0f23',
+        isSNS: false,
+        decimals: 8
     },
     {
         title: 'Clown',
@@ -617,6 +669,8 @@ export const tokenData = [
         icpCoinsLink: 'https://neutrinite.io/currencies/CLOWN',
         icon: clownToken,
         description: `Clown is a unique social mining platform that allows users to earn rewards for engagement and content creation within its social ecosystem.`,
-        color: '#4da2d6'
+        color: '#4da2d6',
+        isSNS: false,
+        decimals: 8
     }
 ]

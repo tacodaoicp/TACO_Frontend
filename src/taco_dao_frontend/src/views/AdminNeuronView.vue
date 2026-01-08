@@ -1,8 +1,5 @@
 <template>
   <div class="standard-view">
-    <!-- header bar -->
-    <HeaderBar />
-    
     <div class="scroll-y-container h-100">
       <div class="container">
         <div class="row">
@@ -299,15 +296,22 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, watch } from 'vue'
+import { storeToRefs } from 'pinia'
 import { useTacoStore } from '../stores/taco.store'
-import HeaderBar from '../components/HeaderBar.vue'
 import TacoTitle from '../components/misc/TacoTitle.vue'
 import GNSFProposalDialog from '../components/proposals/GNSFProposalDialog.vue'
 import { useAdminCheck } from '../composables/useAdminCheck'
 import { Principal } from '@dfinity/principal'
+import * as workerBridge from '../stores/worker-bridge'
 
 const store = useTacoStore()
+
+// Extract cached refs from store for reactive binding
+const {
+  cachedNeuronSnapshots,
+  cachedMaxNeuronSnapshots
+} = storeToRefs(store)
 
 // Admin check
 const { isAdmin, checking, checkAdminStatus } = useAdminCheck()
@@ -497,20 +501,13 @@ const takeSnapshot = async () => {
   }
 }
 
-const refreshSnapshots = async () => {
+// Refresh snapshots via worker (non-blocking)
+const refreshSnapshots = () => {
+  console.log('AdminNeuronView: Triggering worker refresh for neuron snapshots')
   loadingSnapshots.value = true
-  try {
-    // Reset pagination
-    snapshotStartIndex.value = 0
-    
-    const snapshotInfos = await store.getNeuronSnapshotsInfo(0, selectedSnapshotPageSize.value)
-    snapshots.value = snapshotInfos
-    
-  } catch (error) {
-    console.error('Error refreshing snapshots:', error)
-  } finally {
-    loadingSnapshots.value = false
-  }
+  // Reset pagination
+  snapshotStartIndex.value = 0
+  workerBridge.fetch('neuronSnapshots', true)
 }
 
 const loadMoreSnapshots = async () => {
@@ -569,7 +566,7 @@ const loadNeuronData = async () => {
       neuronDataPageSize.value
     )
     
-    if (result && result.length > 0) {
+    if (result && result.length > 0 && result[0]) {
       neuronData.value = result[0].entries
       neuronDataInfo.value = result[0]
     } else {
@@ -596,7 +593,7 @@ const loadMoreNeuronData = async () => {
       neuronDataPageSize.value
     )
     
-    if (result && result.length > 0) {
+    if (result && result.length > 0 && result[0]) {
       neuronData.value.push(...result[0].entries)
       neuronDataInfo.value = result[0]
     }
@@ -617,11 +614,32 @@ const handleProposalSuccess = async () => {
   console.log('AdminNeuronView: Proposal submitted successfully')
 }
 
+// Watchers to sync cached data to local refs
+watch(cachedNeuronSnapshots, (newVal) => {
+  if (newVal?.length > 0) {
+    snapshots.value = newVal
+    loadingSnapshots.value = false
+  }
+}, { immediate: true })
+
+watch(cachedMaxNeuronSnapshots, (newVal) => {
+  if (newVal) {
+    currentMaxSnapshots.value = Number(newVal)
+  }
+}, { immediate: true })
+
 // Initialize component
-onMounted(async () => {
-  await checkAdminStatus()
-  await loadCurrentConfig()
-  await refreshSnapshots()
+onMounted(() => {
+  // Set loading state before fetching
+  loadingSnapshots.value = true
+
+  // Check admin status in background (don't block data loading or navigation)
+  checkAdminStatus().catch(console.error)
+
+  // Trigger worker fetches for neuron snapshot data
+  workerBridge.fetch('neuronSnapshots', false)
+  workerBridge.fetch('maxNeuronSnapshots', false)
+  workerBridge.fetch('neuronSnapshotStatus', false)
 })
 </script>
 

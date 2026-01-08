@@ -242,7 +242,7 @@
             </a>
               
               <!-- refresh neurons button -->
-              <button @click="loadNeurons"
+              <button @click="loadNeurons(true)"
                       class="btn btn-sm taco-btn taco-btn--green px-2 py-1"
                       :disabled="loadingNeurons">
 
@@ -1052,8 +1052,8 @@ const startDissolving = async (neuronId: Uint8Array) => {
     message: 'Started dissolving neuron'
   })
 
-  // load neurons
-  loadNeurons()
+  // load neurons (force refresh after action)
+  loadNeurons(true)
 
   // turn app loading off
   tacoStore.appLoadingOff()
@@ -1081,8 +1081,8 @@ const stopDissolving = async (neuronId: Uint8Array) => {
     message: 'Stopped dissolving neuron'
   })
 
-  // load neurons
-  loadNeurons()
+  // load neurons (force refresh after action)
+  loadNeurons(true)
 
   // turn app loading off
   tacoStore.appLoadingOff()
@@ -1100,8 +1100,8 @@ const localDisburseNeuron = async (neuronId: Uint8Array) => {
   // await disburse neuron
   const result = await tacoStore.disburseNeuron(neuronId)
 
-  // load neurons
-  loadNeurons()
+  // load neurons (force refresh after action)
+  loadNeurons(true)
 
   // refresh wallet balances via parent
   emit('refresh-balances')
@@ -1177,25 +1177,64 @@ const qrModalAddress = ref('')
 const qrModalTitle = ref('')
 
 // Load neurons for TACO token
-const loadNeurons = async () => {
+const loadNeurons = async (forceRefresh = false) => {
   if (!tacoStore.userLoggedIn || props.token.symbol !== 'TACO') {
     return
   }
-  
-  loadingNeurons.value = true
+
+  // Check if we have cached neurons - use them immediately without spinner
+  const cachedNeurons = tacoStore.cachedTacoNeurons
+  const hasCachedData = cachedNeurons && cachedNeurons.length > 0
+
+  if (hasCachedData && !forceRefresh) {
+    // Use cached data immediately - no spinner
+    categorizedNeurons.value = tacoStore.categorizeNeurons(cachedNeurons)
+    neurons.value = categorizedNeurons.value.all
+
+    // Load cached rewards if available
+    const cachedRewards = tacoStore.cachedNeuronRewardBalances
+    if (cachedRewards && cachedRewards.size > 0) {
+      neuronBalances.value = new Map(cachedRewards)
+    }
+
+    // Background refresh (fire-and-forget)
+    refreshNeuronsInBackground()
+    return
+  }
+
+  // Only show loading spinner when user explicitly forces refresh
+  // For initial load without cache, just fetch in background and let watcher update UI
+  if (forceRefresh) {
+    loadingNeurons.value = true
+  }
+
   try {
-    const rawNeurons = await tacoStore.getTacoNeurons()
+    const rawNeurons = await tacoStore.getTacoNeurons(forceRefresh)
     categorizedNeurons.value = tacoStore.categorizeNeurons(rawNeurons)
     neurons.value = categorizedNeurons.value.all // Keep for backward compatibility
-    
-    // Load rewards after neurons are loaded
-    await loadRewards()
+
+    // Load rewards after neurons are loaded (no spinner for initial load)
+    await loadRewards(false, forceRefresh)
   } catch (error) {
     console.error('Error loading neurons:', error)
     neurons.value = []
     categorizedNeurons.value = {owned: [], hotkeyed: [], all: []}
   } finally {
     loadingNeurons.value = false
+  }
+}
+
+// Background refresh for neurons (non-blocking, no loading spinners)
+const refreshNeuronsInBackground = async () => {
+  try {
+    const rawNeurons = await tacoStore.getTacoNeurons(true) // Force refresh
+    categorizedNeurons.value = tacoStore.categorizeNeurons(rawNeurons)
+    neurons.value = categorizedNeurons.value.all
+
+    // Also refresh rewards in background (force refresh, no loading spinner)
+    await loadRewards(true, false)
+  } catch (error) {
+    // Silent error - background refresh
   }
 }
 
@@ -1311,21 +1350,31 @@ const claimAllRewards = async () => {
   }
 }
 
-const loadRewards = async () => {
+const loadRewards = async (forceRefresh = false, showLoading = true) => {
   if (!tacoStore.userLoggedIn || props.token.symbol !== 'TACO') {
     return
   }
-  
-  loadingRewards.value = true
+
+  // Check if we have cached rewards - use them immediately
+  const cachedRewards = tacoStore.cachedNeuronRewardBalances
+  if (!forceRefresh && cachedRewards && cachedRewards.size > 0) {
+    neuronBalances.value = new Map(cachedRewards)
+    return
+  }
+
+  // Only show loading if requested (not during background refresh)
+  if (showLoading) {
+    loadingRewards.value = true
+  }
   try {
     // Use the same approach as RewardsView - work with raw neurons directly
     const rawNeurons = await tacoStore.getTacoNeurons()
     // console.log('Raw neurons for rewards:', rawNeurons)
-    
+
     // Load real rewards data from taco store using raw neurons
     const rewardsMap = await tacoStore.loadNeuronRewardBalances(rawNeurons)
     // console.log('Rewards map from store:', rewardsMap)
-    
+
     // Convert the rewards map to use neuron hex IDs as keys for the categorized neurons
     const neuronRewards = new Map<string, number>()
     for (const neuron of categorizedNeurons.value.all) {
@@ -1335,7 +1384,7 @@ const loadRewards = async () => {
         // console.log(`Neuron ${neuron.idHex}: ${balance} rewards`)
       }
     }
-    
+
     neuronBalances.value = neuronRewards
     // console.log('Final neuron balances:', neuronBalances.value)
   } catch (error) {

@@ -81,23 +81,21 @@
                 Mine
             </button>
 
-            <!-- chart -->
-            <apexchart 
-                v-if="showCurrentAllocations && currentAllocationsHaveValue || showCurrentHoldings && currentHoldingsHaveValue"
-                type="pie" 
-                :options="chartOptions" 
-                :series="series" 
+            <!-- single chart - data updates with animation -->
+            <apexchart
+                v-if="chartHasData"
+                ref="chartRef"
+                type="pie"
+                :options="chartOptions"
+                :series="series"
                 class="dao-allocations__taco-chart"
                 @dataPointSelection="handleChartSegmentClick"></apexchart>
 
-            <!-- if no holdings -->
-            <div v-if="showCurrentHoldings && !currentHoldingsHaveValue" class="dao-allocations__no-holdings py-5 text-center">
-                <span class="taco-text-black-to-white">No holdings yet</span>
-            </div>
-
-            <!-- if no allocations -->
-            <div v-if="showCurrentAllocations && !currentAllocationsHaveValue" class="dao-allocations__no-allocations py-5 text-center">
-                <span class="taco-text-black-to-white">No allocations yet</span>
+            <!-- no data message -->
+            <div v-else class="dao-allocations__no-data py-5 text-center">
+                <span class="taco-text-black-to-white">
+                    {{ showCurrentAllocations ? 'No allocations yet' : 'No holdings yet' }}
+                </span>
             </div>
         
         </div>
@@ -346,16 +344,12 @@
 
     // taco chart container
     &__taco-chart-container {
-        
         // placeholder
-        
     }
 
     // taco chart
     &__taco-chart {
-
         // placeholder
-
     }
 
     // token title
@@ -479,7 +473,7 @@
 // overrides //
 ///////////////
 
-// 
+//
 
 
 ///////////////////
@@ -643,7 +637,7 @@ LOCAL METHODS
     const { icrc1Metadata } = tacoStore
 
     // dao backend
-    const { ensureTokenDetails } = tacoStore
+    const { ensureTokenDetails, fetchTokenDetails } = tacoStore
 
     /////////////////////
     // local variables //
@@ -662,10 +656,123 @@ LOCAL METHODS
     const tacoChartContainer = ref<HTMLElement | null>(null)
     const maxWidthThreshold = 576
 
-    // chart
+    // chart ref for programmatic updates
+    const chartRef = ref<any>(null)
+
+    // Track if chart has been populated with real data (for initial placeholder animation)
+    const chartHasBeenPopulated = ref(false)
+
+    // chart - start with placeholder that will be updated to equal segments once we know token count
     const series = ref([100])
     const seriesNames = ref(['loading'])
     const colors = ref(['#ccc'])
+
+    // chart options (must be defined before handleApplyDataToChart)
+    const chartOptions = ref({
+        chart: {
+            type: 'pie',
+            animations: {
+                enabled: true,
+                easing: 'easeout',
+                speed: 300,
+                animateGradually: {
+                    enabled: false,  // disable "popping up" animation on initial load
+                    delay: 0
+                },
+                dynamicAnimation: {
+                    enabled: true,   // keep smooth transitions when data changes
+                    speed: 300
+                }
+            },
+            fontFamily: 'Space Mono',
+            id: 'currentAllocations',
+        },
+        states: {
+            hover: {
+                filter: {
+                    type: 'darken',
+                    value: 0.85
+                }
+            },
+            active: {
+                filter: {
+                    type: 'darken',
+                    value: 0.50
+                }
+            }
+        },
+        plotOptions: {
+            pie: {
+                startAngle: -90,
+                endAngle: 90,
+                customScale: 1,
+                expandOnClick: true,
+            },
+        },
+        colors: colors,
+        dataLabels: {
+            enabled: true,
+            formatter: function (val: any, opts: any) {
+                return seriesNames.value[opts.seriesIndex].toUpperCase() + " " + val.toFixed(2) +'%'
+            },
+            textAnchor: 'middle',
+            distributed: false,
+            offsetX: 0,
+            offsetY: 0,
+            style: {
+                fontSize: '16px',
+                fontFamily: 'Space Mono',
+                fontWeight: 'bold',
+                colors: undefined
+            },
+            background: {
+                enabled: true,
+                foreColor: '#fff',
+                padding: 4,
+                borderRadius: 2,
+                borderWidth: 1,
+                borderColor: '#fff',
+                opacity: 1,
+                dropShadow: {
+                    enabled: false,
+                    top: 1,
+                    left: 1,
+                    blur: 1,
+                    color: '#000',
+                    opacity: 0.25,
+                }
+            },
+            dropShadow: {
+                enabled: false,
+                top: 1,
+                left: 1,
+                blur: 1,
+                color: '#000',
+                opacity: 0.45
+            },
+        },
+        legend: {show: false},
+        stroke: {show: false},
+        tooltip: {
+            enabled: true,
+            fillSeriesColor: true,
+            style: {
+                fontSize: '16px',
+                fontFamily: 'Space Mono',
+                fontWeight: 'bold',
+            },
+            custom: function({ series, seriesIndex, dataPointIndex, w }: any) {
+                const val = series[seriesIndex]
+                const symbol = seriesNames.value[seriesIndex].toUpperCase()
+                return `<div class="custom-tooltip">
+                    <span>${symbol} ${val.toFixed(2)}%</span>
+                </div>`
+            }
+        },
+        markers: {
+            size: 1,
+        }
+    })
 
     // navigation
     const showCurrentHoldings = ref(false) // user is viewing current holdings
@@ -690,6 +797,23 @@ LOCAL METHODS
     // no holdings
     const currentHoldingsHaveValue = ref<boolean>(true)
 
+    // computed: chart has data to display (or should show placeholder)
+    const chartHasData = computed(() => {
+        // Always show chart if it hasn't been populated yet (show placeholder)
+        // This allows the initial equal-sized placeholder to display
+        if (!chartHasBeenPopulated.value) {
+            return true
+        }
+        // Once populated, check if there's actual data
+        if (showCurrentAllocations.value) {
+            return currentAllocationsHaveValue.value
+        }
+        if (showCurrentHoldings.value) {
+            return currentHoldingsHaveValue.value
+        }
+        return false
+    })
+
     ///////////////////
     // local methods //
     //////////////////
@@ -711,20 +835,22 @@ LOCAL METHODS
 
     // handle apply allocation data to chart
     const handleApplyDataToChart = async (seriesParams: number[], seriesNamesParams: string[], colorsParams: string[]) => {
-        
-        // update all values at once using nextTick
-        nextTick(() => {
-            series.value = seriesParams
-            seriesNames.value = seriesNamesParams
-            colors.value = colorsParams
-        })
 
-        // force chart update by updating options
+        // Update all values at once using nextTick (matches VoteView pattern)
+        // Wait for nextTick to complete before returning so subsequent code can use the updated values
+        await nextTick()
+        series.value = seriesParams
+        seriesNames.value = seriesNamesParams
+        colors.value = colorsParams
+
+        // Force chart update by updating options
         chartOptions.value = {
             ...chartOptions.value,
             colors: colorsParams
         }
 
+        // Mark chart as populated
+        chartHasBeenPopulated.value = true
     }
 
     // handle clicking on a chart segment
@@ -770,12 +896,13 @@ LOCAL METHODS
         ////////////////////////////////
         
         // find matching token
-        const selectedToken2 = fetchedTokenDetails.value.find(([_, token]) => {
+        const selectedToken2 = fetchedTokenDetails.value.find((entry) => {
+            const token = entry[1]
             const tokenSymbol = token.tokenSymbol?.toLowerCase()
             const searchSymbol = selectedSymbol.toLowerCase()
-            
+
             // match exact symbols or special case for ICP/LICP
-            return tokenSymbol === searchSymbol || 
+            return tokenSymbol === searchSymbol ||
                    (tokenSymbol === 'icp' && searchSymbol === 'licp') ||
                    (tokenSymbol === 'licp' && searchSymbol === 'icp')
         })?.[1]
@@ -794,7 +921,7 @@ LOCAL METHODS
         // update current token trusted date with fetchedTokenDetails
         if (selectedToken2) {
             const timestamp = selectedToken2.epochAdded
-            currentTokenTrusted.value = formatTimestampDateOnly(timestamp)
+            currentTokenTrusted.value = formatTimestampDateOnly(String(timestamp))
         }
 
         // update current token icp coins link with tokenData
@@ -839,16 +966,21 @@ LOCAL METHODS
     // watchers //
     //////////////
     
-    // watch for current allocations, run this watcher immediately  
+    // Cache for token symbols (avoid repeated icrc1Metadata calls)
+    const tokenSymbolCache = new Map<string, string>()
+
+    // watch for current allocations, run this watcher immediately
     watch(showCurrentAllocations, async (newVal) => {
 
         if (newVal) {
 
-            // log
-            // console.log('DaoAllocations.vue: showCurrentAllocations selected')
+            // Check if we already have allocation data
+            const hasExistingData = fetchedAggregateAllocation.value && fetchedAggregateAllocation.value.length > 0
 
-            // turn on component loading
-            componentLoading.value = true
+            // Only show loading if we don't have data yet
+            if (!hasExistingData) {
+                componentLoading.value = true
+            }
 
             // run allocations logic
             try {
@@ -856,10 +988,11 @@ LOCAL METHODS
                 // ensure token details are loaded
                 await ensureTokenDetails()
 
-                // fetch aggregate allocation from dao backend
-
-                // if fetched aggregate allocation is not set, fetch it
-                await fetchAggregateAllocation()
+                // Only fetch if we don't have data yet
+                // (The worker will handle staleness and background refresh)
+                if (!hasExistingData) {
+                    await fetchAggregateAllocation()
+                }
 
                 // log
                 // console.log('fetchedAggregateAllocation', fetchedAggregateAllocation.value)
@@ -903,37 +1036,52 @@ LOCAL METHODS
                 // console.log('percentages:', percentages)
 
                 // create array of canister ids from allocations
-                const canisterIds = allocations.map((allocation: any) => 
+                const canisterIds = allocations.map((allocation: any) =>
                     allocation.principal
                 ).filter(Boolean) // remove any empty strings
 
                 // log
                 // console.log('canisterIds:', canisterIds)
 
-                // create array for symbols
+                // Get symbols from tokenDetails if available (much faster than icrc1Metadata calls)
+                // If tokenDetails not available, fall back to icrc1Metadata
                 let symbols: string[] = []
 
-                // get metadata for each canister id
+                // First try to get symbols from fetchedTokenDetails (fast path)
+                const tokenDetailsMap = new Map<string, string>()
+                if (fetchedTokenDetails.value && fetchedTokenDetails.value.length > 0) {
+                    for (const entry of fetchedTokenDetails.value) {
+                        const principal = entry[0]
+                        const details = entry[1]
+                        const principalStr = typeof principal === 'string' ? principal : principal?.toString?.() || ''
+                        if (principalStr && details?.tokenSymbol) {
+                            tokenDetailsMap.set(principalStr, details.tokenSymbol)
+                        }
+                    }
+                }
+
+                // Map canister IDs to symbols
                 for (const canisterId of canisterIds) {
+                    // Check cache first
+                    if (tokenSymbolCache.has(canisterId)) {
+                        symbols.push(tokenSymbolCache.get(canisterId)!)
+                        continue
+                    }
 
-                    // log
-                    // console.log('fetching metadata for canisterId:', canisterId)
+                    // Check tokenDetails map
+                    if (tokenDetailsMap.has(canisterId)) {
+                        const symbol = tokenDetailsMap.get(canisterId)!
+                        symbols.push(symbol)
+                        tokenSymbolCache.set(canisterId, symbol)
+                        continue
+                    }
 
-                    // fetch metadata
-                    const fetchedMetadata = await icrc1Metadata(canisterId)
-
-                    // log
-                    // console.log('fetchedMetadata:', fetchedMetadata)
-                    
-                    // find the symbol entry and extract its value
-                    const symbolEntry = fetchedMetadata.find((entry: any) => entry[0] === "icrc1:symbol")
-                    
-                    // log
-                    // console.log('symbolEntry:', symbolEntry)
-                    
-                    // push symbol to symbols array
+                    // Fall back to icrc1Metadata call (slow path)
+                    const fetchedMetadata = await icrc1Metadata(canisterId) as Array<[string, { Text?: string }]>
+                    const symbolEntry = fetchedMetadata.find((entry) => entry[0] === "icrc1:symbol")
                     if (symbolEntry && symbolEntry[1]?.Text) {
                         symbols.push(symbolEntry[1].Text)
+                        tokenSymbolCache.set(canisterId, symbolEntry[1].Text)
                     }
                 }
 
@@ -1008,26 +1156,28 @@ LOCAL METHODS
     // watch for current holdings
     watch(showCurrentHoldings, async (newVal) => {
 
-        // log
-        // console.log('DaoAllocations.vue: showCurrentHoldings:', newVal)
-
         // if showCurrentHoldings is true
         if (newVal) {
 
-            // log
-            // console.log('DaoAllocations.vue: showCurrentHoldings selected')
+            // Check if we already have token details data
+            const hasExistingData = fetchedTokenDetails.value && fetchedTokenDetails.value.length > 0
 
-            // turn on component loading
-            componentLoading.value = true
+            // Only show loading if we don't have data yet
+            if (!hasExistingData) {
+                componentLoading.value = true
+            }
 
             // run holdings logic
             try {
 
+                // Only fetch if we don't have data yet
+                // (The worker will handle staleness and background refresh)
+                if (!hasExistingData) {
+                    await fetchTokenDetails()
+                }
+
                 // safely extract holdings data
                 const holdings = fetchedTokenDetails.value || []
-
-                // log
-                // console.log('holdings', holdings)
 
                 // calculate total value across all tokens
                 // use bigint scaling to normalize by token decimals without precision loss
@@ -1039,26 +1189,21 @@ LOCAL METHODS
                     const priceScaled = BigInt(Math.round(Number(t.priceInICP) * Number(ICP_SCALE)))
                     return (balance * priceScaled) / denom
                 }
-                const totalValueScaled = holdings.reduce((sum: bigint, [_, token]: any) => {
-                    return sum + toScaledValueIcp(token)
+                const totalValueScaled = holdings.reduce((sum: bigint, entry) => {
+                    return sum + toScaledValueIcp(entry[1])
                 }, 0n)
-
-                // log
-                // console.log('totalValue', Number(totalValueScaled) / Number(ICP_SCALE))
+                const totalValue = Number(totalValueScaled) / Number(ICP_SCALE)
 
                 // create percentages array
-                const percentages = holdings.map(([_, token]) => {
+                const percentages = holdings.map((entry) => {
                     if (totalValueScaled === 0n) return 0
-                    const tokenScaled = toScaledValueIcp(token)
+                    const tokenScaled = toScaledValueIcp(entry[1])
                     const percentage = (Number(tokenScaled) / Number(totalValueScaled)) * 100
                     return Number(percentage.toFixed(2))
                 })
 
-                // log
-                // console.log('percentages', percentages)
-
                 // create symbols array
-                const symbols = holdings.map(([_, token]) => token.tokenSymbol.toLowerCase())
+                const symbols = holdings.map((entry) => entry[1].tokenSymbol.toLowerCase())
 
                 // log
                 // console.log('symbols:', symbols)
@@ -1093,7 +1238,7 @@ LOCAL METHODS
 
                 // click the first non-zero chart segment
                 handleChartSegmentClick(null, null, {
-                    dataPointIndex: firstNonZeroIndex >= 0 ? firstNonZeroIndex : 0 
+                    dataPointIndex: firstNonZeroIndex >= 0 ? firstNonZeroIndex : 0
                 })
 
             } catch (error) {
@@ -1115,6 +1260,27 @@ LOCAL METHODS
 
     })
 
+    // Watch for data arriving from worker (re-trigger display when cached data arrives)
+    watch(fetchedAggregateAllocation, (newData) => {
+        if (newData && newData.length > 0 && showCurrentAllocations.value) {
+            // Re-trigger the allocations watcher by toggling
+            showCurrentAllocations.value = false
+            nextTick(() => {
+                showCurrentAllocations.value = true
+            })
+        }
+    })
+
+    watch(fetchedTokenDetails, (newData) => {
+        if (newData && newData.length > 0 && showCurrentHoldings.value) {
+            // Re-trigger the holdings watcher by toggling
+            showCurrentHoldings.value = false
+            nextTick(() => {
+                showCurrentHoldings.value = true
+            })
+        }
+    })
+
     /////////////////////
     // lifecycle hooks //
     /////////////////////
@@ -1122,10 +1288,22 @@ LOCAL METHODS
     // on mounted
     onMounted(async () => {
 
-        await ensureTokenDetails()
+        // Check for cached data FIRST before any await calls
+        const hasAllocationsData = fetchedAggregateAllocation.value && fetchedAggregateAllocation.value.length > 0
+        const hasTokenDetailsData = fetchedTokenDetails.value && fetchedTokenDetails.value.length > 0
 
-        // turn on component loading
-        componentLoading.value = true
+        // Only show loading if we don't have cached data
+        if (!hasAllocationsData && !hasTokenDetailsData) {
+            componentLoading.value = true
+        }
+
+        // Ensure token details are loaded (background if cached, blocking if not)
+        if (hasTokenDetailsData) {
+            // Trigger background refresh (fire-and-forget)
+            ensureTokenDetails().catch(console.error)
+        } else {
+            await ensureTokenDetails()
+        }
 
         // handle taco chart max height
         handleSetTacoChartMaxHeight()
@@ -1137,6 +1315,28 @@ LOCAL METHODS
         new Tooltip(document.body, {
             selector: "[data-bs-toggle='tooltip']",
         })
+
+        // refresh every minute - NO loading spinner, just silent update
+        refreshTimer.value = window.setInterval(async () => {
+
+            // try - no loading spinner for background refresh
+            try {
+
+                // trigger the appropriate watcher based on current view
+                if (showCurrentAllocations.value) {
+                    await fetchAggregateAllocation()
+                } else if (showCurrentHoldings.value) {
+                    await fetchTokenDetails()
+                }
+
+            } catch (error) {
+
+                // log
+                console.error('error refreshing data:', error)
+
+            }
+
+        }, 60000) // 60000ms = 1 minute
 
     })
 
@@ -1162,118 +1362,6 @@ LOCAL METHODS
             }
         })        
 
-    }) 
-
-    /////////////////
-    // apex charts //
-    /////////////////
-
-    // initialize chart options
-    const chartOptions = ref({
-        chart: {
-            type: 'pie',
-            animations: {
-                enabled: true,
-                easing: 'easeout',
-                speed: 350,
-                animateGradually: {
-                    enabled: true,
-                    delay: 1000
-                },
-                dynamicAnimation: {
-                    enabled: true,
-                    speed: 500
-                }
-            },
-            fontFamily: 'Space Mono',
-            id: 'currentAllocations',
-        },
-        states: {
-            hover: {
-                filter: {
-                    type: 'darken',
-                    value: 0.85
-                }
-            },
-            active: {
-                filter: {
-                    type: 'darken',
-                    value: 0.50
-                }
-            }
-        },
-        plotOptions: {
-            pie: {
-                startAngle: -90,
-                endAngle: 90,
-                customScale: 1,
-                expandOnClick: true,
-            },
-        },
-        // colors: ['#3b00b9', '#777', '#888', '#f8a01b', '#047b3e'],
-        colors: colors,
-        dataLabels: {
-            enabled: true,
-            formatter: function (val: any, opts: any) {
-                return seriesNames.value[opts.seriesIndex].toUpperCase() + " " + val.toFixed(2) +'%'
-            },
-            textAnchor: 'middle',
-            distributed: false,
-            offsetX: 0,
-            offsetY: 0,
-            style: {
-                fontSize: '16px',
-                fontFamily: 'Space Mono',
-                fontWeight: 'bold',
-                colors: undefined
-            },
-            background: {
-                enabled: true,
-                foreColor: '#fff',
-                padding: 4,
-                borderRadius: 2,
-                borderWidth: 1,
-                borderColor: '#fff',
-                opacity: 1,
-                dropShadow: {
-                    enabled: false,
-                    top: 1,
-                    left: 1,
-                    blur: 1,
-                    color: '#000',
-                    opacity: 0.25,
-                }
-            },
-            dropShadow: {
-                enabled: false,
-                top: 1,
-                left: 1,
-                blur: 1,
-                color: '#000',
-                opacity: 0.45
-            },
-        },
-        legend: {show: false},
-        stroke: {show: false},
-        tooltip: {
-            enabled: true,
-            fillSeriesColor: true,
-            style: {
-                fontSize: '16px',
-                fontFamily: 'Space Mono',
-                fontWeight: 'bold',
-            },
-            custom: function({ series, seriesIndex, dataPointIndex, w }: any) {
-                const val = series[seriesIndex]
-                const symbol = seriesNames.value[seriesIndex].toUpperCase()
-                return `<div class="custom-tooltip">
-                    <span>${symbol} ${val.toFixed(2)}%</span>
-                </div>`
-            }
-        },
-        markers: {
-            size: 1,
-        }
     })
 
 </script>

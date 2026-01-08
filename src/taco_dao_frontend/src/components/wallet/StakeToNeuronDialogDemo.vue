@@ -197,7 +197,7 @@ const handleStake = async () => {
     successMessage.value = `Successfully staked ${formatBalance(stakeAmountBigInt.value, 8)} TACO to ${props.neuron.displayName}!`
     
     // Also show toast notification
-    tacoStore.addToast('success', 'Staking Successful', `Successfully staked ${formatBalance(stakeAmountBigInt.value, 8)} TACO to ${props.neuron.displayName}`)
+    tacoStore.addToast({ id: Date.now(), code: 'success', title: 'Staking Successful', icon: 'check', message: `Successfully staked ${formatBalance(stakeAmountBigInt.value, 8)} TACO to ${props.neuron.displayName}` })
     
     emit('staked', props.neuron)
     

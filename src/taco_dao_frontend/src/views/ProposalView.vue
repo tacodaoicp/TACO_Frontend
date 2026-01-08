@@ -1,8 +1,5 @@
 <template>
   <div class="standard-view">
-    <!-- header bar -->
-    <HeaderBar />
-
     <!-- scroll container -->
     <div class="scroll-y-container h-100">
       <!-- bootstrap container -->
@@ -412,9 +409,6 @@
         </div>
       </div>
     </div>
-
-    <!-- footer bar -->
-    <FooterBar />
   </div>
 </template>
 
@@ -422,8 +416,6 @@
 import { ref, onMounted, computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { useTacoStore } from '../stores/taco.store'
-import HeaderBar from '../components/HeaderBar.vue'
-import FooterBar from '../components/FooterBar.vue'
 import TacoTitle from '../components/misc/TacoTitle.vue'
 
 const route = useRoute()

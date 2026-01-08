@@ -1,8 +1,5 @@
 <template>
   <div class="standard-view">
-    <!-- header bar -->
-    <HeaderBar />
-    
     <div class="scroll-y-container h-100">
       <div class="container">
         <div class="row">
@@ -801,7 +798,6 @@
 </template>
 
 <script>
-import HeaderBar from '../components/HeaderBar.vue'
 import TacoTitle from '../components/misc/TacoTitle.vue'
 import { useTacoStore } from '../stores/taco.store'
 import { mapStores } from 'pinia'
@@ -809,7 +805,6 @@ import { mapStores } from 'pinia'
 export default {
   name: 'AdminTradeView',
   components: {
-    HeaderBar,
     TacoTitle
   },
   data() {

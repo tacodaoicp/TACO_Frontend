@@ -56,9 +56,9 @@
                 <!-- thread item -->
                 <router-link
                   v-for="proposal in filteredProposals"
-                  :key="proposal.id.toString()"
-                  :to="`/chat/forum/${proposal.id.toString()}`"
-                  :class="['forum-threads-list__list-item', { 'forum-threads-list__thread--active': activeThreadId === proposal.id.toString() }]"
+                  :key="proposal.id?.toString() || 'unknown'"
+                  :to="`/chat/forum/${proposal.id?.toString() || ''}`"
+                  :class="['forum-threads-list__list-item', { 'forum-threads-list__thread--active': activeThreadId === proposal.id?.toString() }]"
                   @click="toggleThreadMenu">
 
                   <!-- thread -->
@@ -68,7 +68,7 @@
                       <div class="forum-threads-list__thread__left">
 
                           <!-- thread icon -->              
-                          <div class="forum-threads-list__thread__icon shadow">#{{ proposal.id.toString() }}</div>
+                          <div class="forum-threads-list__thread__icon shadow">#{{ proposal.id?.toString() || '?' }}</div>
 
                           <!-- thread status -->
                           <span class="forum-threads-list__thread__status"
@@ -672,8 +672,9 @@
     
     // filtered proposals
     const filteredProposals = computed(() => {
-      let filtered = proposals.value
-      
+      // First filter out any proposals without a valid id
+      let filtered = proposals.value.filter(proposal => proposal.id !== undefined && proposal.id !== null)
+
       // apply topic filter
       if (selectedTopic.value !== 'all') {
         filtered = filtered.filter(proposal => {
@@ -681,37 +682,37 @@
           return topicKey === selectedTopic.value
         })
       }
-      
+
       // apply search filter
       if (searchQuery.value.trim()) {
         const query = searchQuery.value.toLowerCase().trim()
-        
+
         filtered = filtered.filter(proposal => {
           // search in title
           if (proposal.title && proposal.title.toLowerCase().includes(query)) {
             return true
           }
-          
+
           // search in topic
           const topicKey = getTopicKey(proposal.topic)
           if (topicKey.toLowerCase().includes(query)) {
             return true
           }
-          
+
           // search in proposer address
           if (proposal.proposer && proposal.proposer.toLowerCase().includes(query)) {
             return true
           }
-          
+
           // search in status
           if (proposal.status && proposal.status.toLowerCase().includes(query)) {
             return true
           }
-          
+
           return false
         })
       }
-      
+
       return filtered
     })
 

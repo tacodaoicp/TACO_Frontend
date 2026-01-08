@@ -1,8 +1,5 @@
 <template>
   <div class="standard-view">
-    <!-- header bar -->
-    <HeaderBar />
-    
     <div class="scroll-y-container h-100">
       <div class="container">
         <div class="row">
@@ -237,15 +234,27 @@
 <script>
 import { useTacoStore } from '../stores/taco.store'
 import { useAdminStore } from '../stores/admin.store'
-import HeaderBar from '../components/HeaderBar.vue'
 import TacoTitle from '../components/misc/TacoTitle.vue'
 import { createActor as createRewardsActor } from '../../../declarations/rewards'
 import { AnonymousIdentity } from '@dfinity/agent'
+import { getEffectiveNetwork } from '../config/network-config'
+
+// Helper function for runtime network detection
+function getNetworkHost() {
+  const network = getEffectiveNetwork()
+  if (network === 'local') {
+    const port = import.meta.env.VITE_LOCAL_PORT || '4943'
+    return `http://localhost:${port}`
+  }
+  return 'https://ic0.app'
+}
+
+// Cached rewards actor instance
+let cachedRewardsActor = null
 
 export default {
   name: 'AdminRewardsBalancesView',
   components: {
-    HeaderBar,
     TacoTitle
   },
 
@@ -333,6 +342,11 @@ export default {
     await this.refreshBalances()
   },
 
+  beforeUnmount() {
+    // Clear cached actor when component is destroyed
+    cachedRewardsActor = null
+  },
+
   methods: {
     async refreshBalances() {
       this.clearMessages()
@@ -393,27 +407,29 @@ export default {
     },
 
     async getRewardsActor() {
+      // Return cached actor if available
+      if (cachedRewardsActor) {
+        return cachedRewardsActor
+      }
+
       try {
-        console.log('Getting rewards canister ID...')
         const canisterId = this.tacoStore.rewardsCanisterId()
-        console.log('Canister ID:', canisterId)
-        
+
         if (!canisterId) {
           throw new Error('Rewards canister ID not found')
         }
 
         // Use anonymous identity for public query (no authentication required)
-        const host = process.env.DFX_NETWORK === 'local' ? 'http://localhost:4943' : 'https://ic0.app'
+        const host = getNetworkHost()
 
-        const actor = createRewardsActor(canisterId, {
+        cachedRewardsActor = createRewardsActor(canisterId, {
           agentOptions: {
             identity: new AnonymousIdentity(),
             host
           }
         })
-        
-        console.log('Created actor:', actor)
-        return actor
+
+        return cachedRewardsActor
       } catch (error) {
         console.error('Error creating rewards actor:', error)
         throw error

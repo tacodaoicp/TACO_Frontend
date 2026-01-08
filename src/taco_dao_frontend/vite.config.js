@@ -4,7 +4,12 @@ import environment from 'vite-plugin-environment';
 import vue from '@vitejs/plugin-vue';
 import dotenv from 'dotenv';
 
+// Load base .env first, then environment-specific overrides
 dotenv.config({ path: '../../.env' });
+// Load .env.production for production builds (overrides base .env)
+if (process.env.NODE_ENV === 'production') {
+  dotenv.config({ path: '../../.env.production', override: true });
+}
 
 export default defineConfig({
   build: {
@@ -18,6 +23,8 @@ export default defineConfig({
     },
   },
   server: {
+    host: true,
+    allowedHosts: true,
     proxy: {
       '/api': {
         target: 'http://127.0.0.1:8080',
@@ -25,11 +32,24 @@ export default defineConfig({
       },
     },
   },
+  worker: {
+    format: 'es',
+    plugins: [
+      environment('all', { prefix: 'CANISTER_' }),
+      environment('all', { prefix: 'DFX_' }),
+    ],
+  },
   plugins: [
     vue(),
     environment('all', { prefix: 'CANISTER_' }),
     environment('all', { prefix: 'DFX_' }),
   ],
+  preview: {
+    host: true,
+    // SPA fallback - serve index.html for all routes
+    proxy: {},
+  },
+  appType: 'spa',
   resolve: {
     alias: [
       { find: 'declarations', replacement: fileURLToPath(new URL('../declarations', import.meta.url)) },

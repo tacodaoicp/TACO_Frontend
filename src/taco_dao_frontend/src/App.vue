@@ -12,8 +12,24 @@
 
     </div>
 
-    <!-- router view -->
-    <router-view></router-view>
+    <!-- Persistent HeaderBar - renders once and stays across all routes -->
+    <HeaderBar />
+
+    <!-- Main content area with persistent footer -->
+    <div class="app__content">
+      <!-- HomeView with KeepAlive - use v-show to keep in DOM and preserve iframe state -->
+      <KeepAlive>
+        <HomeView v-if="routerReady" v-show="route.path === '/'" />
+      </KeepAlive>
+
+      <!-- Router view for all other pages - only render after router is ready -->
+      <router-view v-slot="{ Component }">
+        <component v-if="routerReady && route.path !== '/'" :is="Component" />
+      </router-view>
+
+      <!-- Persistent FooterBar - renders once and stays across all routes -->
+      <FooterBar />
+    </div>
 
     <!-- toast container -->
     <TransitionGroup name="fade" tag="div" class="toast-container position-fixed bottom-0 end-0 m-3">
@@ -90,6 +106,20 @@
 
     // default text color black
     color: var(--black);
+
+    // app content area - flex container for views and footer
+    &__content {
+      display: flex;
+      flex-direction: column;
+      height: calc(100dvh - 56px); // subtract header height
+      overflow: hidden;
+
+      // Make views expand to fill available space
+      > :first-child {
+        flex: 1;
+        overflow: auto;
+      }
+    }
 
   }
 
@@ -896,10 +926,18 @@
   // Imports //
   /////////////
 
-  import { onMounted, watch, computed } from 'vue';
+  import { onMounted, onUnmounted, watch, computed, defineAsyncComponent, ref } from 'vue';
   import { useTacoStore } from "./stores/taco.store";
   import { storeToRefs } from "pinia";
-  import { useRoute } from 'vue-router'
+  import { useRoute, useRouter } from 'vue-router'
+
+  // Lazy load HomeView to reduce initial bundle
+  const HomeView = defineAsyncComponent(() => import('./views/HomeView.vue'))
+
+  // HeaderBar and FooterBar are rendered once in App.vue and persist across all routes
+  import HeaderBar from './components/HeaderBar.vue'
+  import FooterBar from './components/FooterBar.vue'
+
   import 'bootstrap/dist/css/bootstrap.css';
   import '@fortawesome/fontawesome-pro/css/fontawesome.css';
   import '@fortawesome/fontawesome-pro/css/light.css';
@@ -907,6 +945,8 @@
   import '@fortawesome/fontawesome-pro/css/solid.css';
   import '@fortawesome/fontawesome-pro/css/duotone.css';
   import astronautLoader from './assets/images/astonautLoader.webp'
+  import { initWorkerBridge, setCurrentRoute, setNetwork } from './stores/worker-bridge'
+  import { initNetworkConfig } from './config/network-config'
 
   ////////////
   // Stores //
@@ -935,6 +975,9 @@
 
   // misc
   const { fetchCryptoPrices } = tacoStore
+
+  // worker subscriptions
+  const { setupWorkerSubscriptions, cleanupWorkerSubscriptions } = tacoStore
   
   /////////////////////
   // Local Variables //
@@ -942,6 +985,13 @@
 
   // route
   const route = useRoute()
+  const router = useRouter()
+
+  // Track if router is ready (prevents flash when navigating directly to non-home routes)
+  const routerReady = ref(false)
+  router.isReady().then(() => {
+    routerReady.value = true
+  })
 
   // images
   const astronautLoaderUrl = astronautLoader
@@ -1012,11 +1062,29 @@
     // log
     // // console.log('running app mounted logic')
 
-    // check if user is logged in (this will trigger name loading if logged in)
-    //console.log('🚀 Running app initialization - checking login status...');
-    await checkIfLoggedIn()
+    // Wait for router to resolve the URL before initializing workers
+    // This ensures /admin gets admin data prioritized, not homepage data
+    await router.isReady()
 
-    // fetch crypto prices
+    // Initialize SharedWorkers with the current route for correct priority loading
+    initWorkerBridge(route.path)
+
+    // Initialize network config with worker bridge (allows runtime network switching)
+    initNetworkConfig(setNetwork)
+
+    // Setup store subscriptions to worker updates
+    setupWorkerSubscriptions()
+
+    // Start loading @dfinity shims in background (don't block UI)
+    // Functions that need shims will await initializeShims() themselves
+    tacoStore.initializeShims()
+
+    // check if user is logged in (this will trigger name loading if logged in)
+    // Note: checkIfLoggedIn internally calls initializeShims if needed
+    // Non-blocking: UI will reactively update when userLoggedIn.value changes
+    checkIfLoggedIn().catch(console.error)
+
+    // fetch crypto prices (now triggers worker fetch)
     fetchCryptoPrices()
 
   }
@@ -1043,6 +1111,14 @@
       updateRobotsMeta(robots || 'index')
     },
     { immediate: true }
+  )
+
+  // watch for route changes to update worker priorities
+  watch(
+    () => route.path,
+    (newPath) => {
+      setCurrentRoute(newPath)
+    }
   )  
 
   /////////////////////
@@ -1065,6 +1141,11 @@
     // run mounted logic
     mountedLogic()
 
+  })
+
+  // onUnmounted - cleanup worker subscriptions
+  onUnmounted(() => {
+    cleanupWorkerSubscriptions()
   })
 
 </script>

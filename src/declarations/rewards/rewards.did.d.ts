@@ -56,6 +56,7 @@ export interface NeuronAllocationChangeBlockData {
   'newAllocations' : Array<Allocation>,
   'timestamp' : bigint,
   'neuronId' : Uint8Array | number[],
+  'penaltyMultiplier' : [] | [bigint],
   'reason' : [] | [string],
 }
 export interface NeuronReward {

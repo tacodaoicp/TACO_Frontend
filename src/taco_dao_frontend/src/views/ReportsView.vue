@@ -2,9 +2,6 @@
 
   <div class="standard-view">
 
-    <!-- header bar -->
-    <HeaderBar />
-
     <!-- scroll container - app util class -->
     <div class="scroll-y-container h-100">
 
@@ -12322,9 +12319,6 @@ away from being playable.
 
     </div>
 
-    <!-- footer bar -->
-    <FooterBar />
-
     <!-- message modal -->
     <div v-if="!userAcceptedReportsDisclaimer || userReshownReportsDisclaimer" class="reports__message">
       
@@ -12828,8 +12822,6 @@ away from being playable.
   // Imports //
   /////////////
 
-  import HeaderBar from "../components/HeaderBar.vue"
-  import FooterBar from "../components/FooterBar.vue"
   import { ref, onMounted, watch, computed } from "vue"
   import { useTacoStore } from "../stores/taco.store"
   import { storeToRefs } from "pinia"  

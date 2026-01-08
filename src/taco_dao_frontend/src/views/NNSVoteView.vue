@@ -2,9 +2,6 @@
 
     <div class="standard-view">
 
-        <!-- header bar -->
-        <HeaderBar />
-
         <!-- scroll container -->
         <div class="scroll-y-container h-100">
 
@@ -590,9 +587,6 @@
 
         </div>
 
-        <!-- footer bar -->
-        <FooterBar />
-
     </div>
 
 </template>
@@ -748,8 +742,6 @@
   // imports //
   /////////////
 
-    import HeaderBar from '../components/HeaderBar.vue'
-    import FooterBar from '../components/FooterBar.vue'
     import { ref, computed, onMounted, watch } from "vue"
     import { useRoute, useRouter } from "vue-router"
     import { storeToRefs } from 'pinia'
