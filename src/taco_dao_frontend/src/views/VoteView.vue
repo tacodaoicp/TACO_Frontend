@@ -3065,15 +3065,8 @@
       // log
       // console.log('VoteView.vue: user is logged in')
 
-      // turn on right loading
-      rightLoading.value = true
-
-      // refresh voting power
+      // refresh voting power (button shows "Refreshing" state, no astronaut loader needed)
       await refreshVotingPower()
-
-      // turn off right loading
-      rightLoading.value = false
-
 
     } else {
 

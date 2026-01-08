@@ -4,7 +4,12 @@ import environment from 'vite-plugin-environment';
 import vue from '@vitejs/plugin-vue';
 import dotenv from 'dotenv';
 
+// Load base .env first, then environment-specific overrides
 dotenv.config({ path: '../../.env' });
+// Load .env.production for production builds (overrides base .env)
+if (process.env.NODE_ENV === 'production') {
+  dotenv.config({ path: '../../.env.production', override: true });
+}
 
 export default defineConfig({
   build: {

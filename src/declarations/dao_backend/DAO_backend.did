@@ -192,6 +192,21 @@ type Result_2 =
    err: UpdateError;
    ok: text;
  };
+type Result_16 = 
+ variant {
+   err: AuthorizationError;
+   ok;
+ };
+type Result_15 = 
+ variant {
+   err: AuthorizationError;
+   ok: bool;
+ };
+type Result_14 = 
+ variant {
+   err: AuthorizationError;
+   ok: nat;
+ };
 type Result_13 = 
  variant {
    err: AuthorizationError;
@@ -300,6 +315,7 @@ type NeuronAllocationChangeRecord =
    neuronId: blob;
    newAllocations: vec Allocation;
    oldAllocations: vec Allocation;
+   penaltyMultiplier: opt nat;
    reason: opt text;
    timestamp: int;
    votingPower: nat;
@@ -372,6 +388,8 @@ type ContinuousDAO =
    addToken: (token: principal, tokenType: TokenType) -> (Result_1);
    addTokenWithReason: (token: principal, tokenType: TokenType, reason:
     text) -> (Result_1);
+   admin_addPenalizedNeuron: (neuronId: blob, multiplier: nat) -> (Result_16);
+   admin_clearAllPastPrices: () -> (Result_1);
    admin_getNeuronAllocations: () ->
     (vec record {
            blob;
@@ -383,6 +401,11 @@ type ContinuousDAO =
                                           UserState;
                                         }) query;
    admin_recalculateAllVotingPower: (id: nat) -> ();
+   admin_removePenalizedNeuron: (neuronId: blob) -> (Result_15);
+   admin_setPenalizedNeurons: (neurons: vec record {
+                                              blob;
+                                              nat;
+                                            }) -> (Result_14);
    clearLogs: () -> ();
    deleteToken: (token: principal, reason: text) -> (Result_1);
    followAllocation: (followee: principal) -> (Result_6);
@@ -419,6 +442,11 @@ type ContinuousDAO =
     (Result_10) query;
    getNeuronUpdatesSince: (sinceTimestamp: int, limit: nat) ->
     (Result_9) query;
+   getPenalizedNeurons: () -> (vec record {
+                                     blob;
+                                     nat;
+                                   }) query;
+   getPenalizedNeuronsCount: () -> (nat) query;
    getSnapshotInfo: () ->
     (opt
       record {

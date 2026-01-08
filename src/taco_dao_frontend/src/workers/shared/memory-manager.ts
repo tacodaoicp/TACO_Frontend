@@ -39,6 +39,7 @@ export const MAX_DATA_SIZE_BYTES: Partial<Record<DataKey, number>> = {
   // Voter details can grow - limit to 500KB
   voterDetails: 500_000,
   neuronAllocations: 300_000,
+  penalizedNeurons: 100_000,
 }
 
 // Default max size for unspecified keys (1MB)

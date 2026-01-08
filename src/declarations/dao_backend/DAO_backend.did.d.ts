@@ -105,6 +105,11 @@ export interface ContinuousDAO {
   'addAdmin' : ActorMethod<[Principal, [] | [string]], Result_1>,
   'addToken' : ActorMethod<[Principal, TokenType], Result_1>,
   'addTokenWithReason' : ActorMethod<[Principal, TokenType, string], Result_1>,
+  'admin_addPenalizedNeuron' : ActorMethod<
+    [Uint8Array | number[], bigint],
+    Result_16
+  >,
+  'admin_clearAllPastPrices' : ActorMethod<[], Result_1>,
   'admin_getNeuronAllocations' : ActorMethod<
     [],
     Array<[Uint8Array | number[], NeuronAllocation]>
@@ -112,6 +117,14 @@ export interface ContinuousDAO {
   'admin_getUserAllocation' : ActorMethod<[Principal], [] | [UserState]>,
   'admin_getUserAllocations' : ActorMethod<[], Array<[Principal, UserState]>>,
   'admin_recalculateAllVotingPower' : ActorMethod<[bigint], undefined>,
+  'admin_removePenalizedNeuron' : ActorMethod<
+    [Uint8Array | number[]],
+    Result_15
+  >,
+  'admin_setPenalizedNeurons' : ActorMethod<
+    [Array<[Uint8Array | number[], bigint]>],
+    Result_14
+  >,
   'clearLogs' : ActorMethod<[], undefined>,
   'deleteToken' : ActorMethod<[Principal, string], Result_1>,
   'followAllocation' : ActorMethod<[Principal], Result_6>,
@@ -138,6 +151,11 @@ export interface ContinuousDAO {
   >,
   'getNeuronAllocationChangesSince' : ActorMethod<[bigint, bigint], Result_10>,
   'getNeuronUpdatesSince' : ActorMethod<[bigint, bigint], Result_9>,
+  'getPenalizedNeurons' : ActorMethod<
+    [],
+    Array<[Uint8Array | number[], bigint]>
+  >,
+  'getPenalizedNeuronsCount' : ActorMethod<[], bigint>,
   'getSnapshotInfo' : ActorMethod<
     [],
     [] | [
@@ -254,6 +272,7 @@ export interface NeuronAllocationChangeRecord {
   'newAllocations' : Array<Allocation>,
   'timestamp' : bigint,
   'neuronId' : Uint8Array | number[],
+  'penaltyMultiplier' : [] | [bigint],
   'reason' : [] | [string],
 }
 export interface NeuronAllocationChangesSinceResponse {
@@ -325,6 +344,12 @@ export type Result_11 = { 'ok' : FollowActionsSinceResponse } |
 export type Result_12 = { 'ok' : AllocationChangesSinceResponse } |
   { 'err' : AuthorizationError };
 export type Result_13 = { 'ok' : AdminActionsSinceResponse } |
+  { 'err' : AuthorizationError };
+export type Result_14 = { 'ok' : bigint } |
+  { 'err' : AuthorizationError };
+export type Result_15 = { 'ok' : boolean } |
+  { 'err' : AuthorizationError };
+export type Result_16 = { 'ok' : null } |
   { 'err' : AuthorizationError };
 export type Result_2 = { 'ok' : string } |
   { 'err' : UpdateError };

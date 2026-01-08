@@ -4670,6 +4670,114 @@ export const useTacoStore = defineStore('taco', () => {
             throw error;
         }
     }
+
+    // Penalized neurons state
+    const fetchedPenalizedNeurons = ref<Array<{ neuronId: Uint8Array; multiplier: number }>>([]);
+
+    const fetchPenalizedNeurons = async () => {
+        try {
+            const host = getNetworkHost();
+            const agent = await createAgent({
+                identity: new AnonymousIdentity(),
+                host,
+                fetchRootKey: shouldFetchRootKey(),
+            });
+
+            const actor = Actor.createActor(daoBackendIDL, {
+                agent,
+                canisterId: daoBackendCanisterId(),
+            });
+
+            const result = await actor.getPenalizedNeurons() as Array<[Uint8Array, bigint]>;
+            fetchedPenalizedNeurons.value = result.map(([neuronId, multiplier]) => ({
+                neuronId,
+                multiplier: Number(multiplier),
+            }));
+            return fetchedPenalizedNeurons.value;
+        } catch (error: any) {
+            console.error('taco.store: fetchPenalizedNeurons() - Error:', error);
+            throw error;
+        }
+    }
+
+    const adminAddPenalizedNeuron = async (neuronIdHex: string, multiplier: number): Promise<boolean> => {
+        try {
+            appLoadingOn();
+
+            const authClient = await getAuthClient();
+            if (!await authClient.isAuthenticated()) {
+                throw new Error('User not authenticated');
+            }
+
+            const identity = await authClient.getIdentity();
+            const host = getNetworkHost();
+            const agent = await createAgent({
+                identity,
+                host,
+                fetchRootKey: shouldFetchRootKey(),
+            });
+
+            const actor = Actor.createActor(daoBackendIDL, {
+                agent,
+                canisterId: daoBackendCanisterId(),
+            });
+
+            // Convert hex string to Uint8Array
+            const neuronId = new Uint8Array(neuronIdHex.match(/.{1,2}/g)!.map(byte => parseInt(byte, 16)));
+
+            const result = await actor.admin_addPenalizedNeuron(neuronId, BigInt(multiplier));
+            console.log('taco.store: adminAddPenalizedNeuron() - Result:', result);
+
+            // Refresh the list
+            await fetchPenalizedNeurons();
+            return true;
+        } catch (error: any) {
+            console.error('taco.store: adminAddPenalizedNeuron() - Error:', error);
+            throw error;
+        } finally {
+            appLoadingOff();
+        }
+    }
+
+    const adminRemovePenalizedNeuron = async (neuronIdHex: string): Promise<boolean> => {
+        try {
+            appLoadingOn();
+
+            const authClient = await getAuthClient();
+            if (!await authClient.isAuthenticated()) {
+                throw new Error('User not authenticated');
+            }
+
+            const identity = await authClient.getIdentity();
+            const host = getNetworkHost();
+            const agent = await createAgent({
+                identity,
+                host,
+                fetchRootKey: shouldFetchRootKey(),
+            });
+
+            const actor = Actor.createActor(daoBackendIDL, {
+                agent,
+                canisterId: daoBackendCanisterId(),
+            });
+
+            // Convert hex string to Uint8Array
+            const neuronId = new Uint8Array(neuronIdHex.match(/.{1,2}/g)!.map(byte => parseInt(byte, 16)));
+
+            const result = await actor.admin_removePenalizedNeuron(neuronId);
+            console.log('taco.store: adminRemovePenalizedNeuron() - Result:', result);
+
+            // Refresh the list
+            await fetchPenalizedNeurons();
+            return true;
+        } catch (error: any) {
+            console.error('taco.store: adminRemovePenalizedNeuron() - Error:', error);
+            throw error;
+        } finally {
+            appLoadingOff();
+        }
+    }
+
     const updateSystemParameter = async (param: any, reason?: string): Promise<boolean> => {
         // console.log('TacoStore: updateSystemParameter called with', param, reason);
         try {
@@ -10269,6 +10377,7 @@ export const useTacoStore = defineStore('taco', () => {
         icpPriceUsd,
         btcPriceUsd,
         tacoPriceUsd,
+        dkpPriceUsd,
         tacoPriceIcp,
         portfolioTokenPricesInUsd,
         portfolioTokenPricesInIcp,
@@ -10356,6 +10465,10 @@ export const useTacoStore = defineStore('taco', () => {
         fetchVoterDetails,
         fetchNeuronAllocations,
         adminGetUserAllocation,
+        fetchedPenalizedNeurons,
+        fetchPenalizedNeurons,
+        adminAddPenalizedNeuron,
+        adminRemovePenalizedNeuron,
         updateSystemParameter,
         updateSnapshotInterval,
         getTradingStatus,

@@ -10,6 +10,10 @@ export const idlFactory = ({ IDL }) => {
     'ICRC3' : IDL.Null,
     'ICRC12' : IDL.Null,
   });
+  const Result_16 = IDL.Variant({
+    'ok' : IDL.Null,
+    'err' : AuthorizationError,
+  });
   const Allocation = IDL.Record({
     'token' : IDL.Principal,
     'basisPoints' : IDL.Nat,
@@ -47,6 +51,11 @@ export const idlFactory = ({ IDL }) => {
     'lastAllocationUpdate' : IDL.Int,
     'neurons' : IDL.Vec(NeuronVP),
   });
+  const Result_15 = IDL.Variant({
+    'ok' : IDL.Bool,
+    'err' : AuthorizationError,
+  });
+  const Result_14 = IDL.Variant({ 'ok' : IDL.Nat, 'err' : AuthorizationError });
   const FollowError = IDL.Variant({
     'FollowLimitReached' : IDL.Null,
     'FollowerNoAllocationYetMade' : IDL.Null,
@@ -234,6 +243,7 @@ export const idlFactory = ({ IDL }) => {
     'newAllocations' : IDL.Vec(Allocation),
     'timestamp' : IDL.Int,
     'neuronId' : IDL.Vec(IDL.Nat8),
+    'penaltyMultiplier' : IDL.Opt(IDL.Nat),
     'reason' : IDL.Opt(IDL.Text),
   });
   const NeuronAllocationChangesSinceResponse = IDL.Record({
@@ -405,6 +415,12 @@ export const idlFactory = ({ IDL }) => {
         [Result_1],
         [],
       ),
+    'admin_addPenalizedNeuron' : IDL.Func(
+        [IDL.Vec(IDL.Nat8), IDL.Nat],
+        [Result_16],
+        [],
+      ),
+    'admin_clearAllPastPrices' : IDL.Func([], [Result_1], []),
     'admin_getNeuronAllocations' : IDL.Func(
         [],
         [IDL.Vec(IDL.Tuple(IDL.Vec(IDL.Nat8), NeuronAllocation))],
@@ -421,6 +437,16 @@ export const idlFactory = ({ IDL }) => {
         ['query'],
       ),
     'admin_recalculateAllVotingPower' : IDL.Func([IDL.Nat], [], []),
+    'admin_removePenalizedNeuron' : IDL.Func(
+        [IDL.Vec(IDL.Nat8)],
+        [Result_15],
+        [],
+      ),
+    'admin_setPenalizedNeurons' : IDL.Func(
+        [IDL.Vec(IDL.Tuple(IDL.Vec(IDL.Nat8), IDL.Nat))],
+        [Result_14],
+        [],
+      ),
     'clearLogs' : IDL.Func([], [], []),
     'deleteToken' : IDL.Func([IDL.Principal, IDL.Text], [Result_1], []),
     'followAllocation' : IDL.Func([IDL.Principal], [Result_6], []),
@@ -486,6 +512,12 @@ export const idlFactory = ({ IDL }) => {
         [Result_9],
         ['query'],
       ),
+    'getPenalizedNeurons' : IDL.Func(
+        [],
+        [IDL.Vec(IDL.Tuple(IDL.Vec(IDL.Nat8), IDL.Nat))],
+        ['query'],
+      ),
+    'getPenalizedNeuronsCount' : IDL.Func([], [IDL.Nat], ['query']),
     'getSnapshotInfo' : IDL.Func(
         [],
         [

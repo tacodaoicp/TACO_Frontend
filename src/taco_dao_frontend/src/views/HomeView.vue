@@ -111,17 +111,17 @@
                     <iframe v-if="!isMobile && shouldLoadDex"
                             ref="dexIframeRef"
                             loading="lazy"
-                            style="border-radius: 0.5rem; z-index: 2;"
+                            style="border-radius: 0.5rem; border: none;"
                             src="https://dexscreener.com/icp/vhoia-myaaa-aaaar-qbmja-cai?embed=1&loadChartSettings=0&trades=0&tabs=0&info=0&chartLeftToolbar=0&chartTheme=dark&theme=dark&chartStyle=1&chartType=usd&interval=15"></iframe>
 
                     <!-- if mobile, tap to view -->
-                    <div v-else @click="viewingChartModal = true" 
+                    <div v-else @click="viewingChartModal = true"
                           class="home-view__taco-token-chart__mobile"
                           style="z-index: 2;">
-                      
+
                       <!-- text -->
                       <span>Tap to View</span>
-                      
+
                     </div>
 
                   </div>
@@ -640,7 +640,7 @@
         <!-- message middle -->
         <div class="home-view__chart-modal__dialog__middle" style="width: 100%; height: 100%;">
 
-            <iframe style="width: 100%; height: 100%;" src="https://dexscreener.com/icp/vhoia-myaaa-aaaar-qbmja-cai?embed=1&loadChartSettings=0&trades=0&tabs=0&info=0&chartLeftToolbar=0&chartTheme=dark&theme=dark&chartStyle=1&chartType=usd&interval=15"></iframe>
+            <iframe style="width: 100%; height: 100%; border: none;" src="https://dexscreener.com/icp/vhoia-myaaa-aaaar-qbmja-cai?embed=1&loadChartSettings=0&trades=0&tabs=0&info=0&chartLeftToolbar=0&chartBottomToolbar=0&chartTheme=dark&theme=dark&chartStyle=1&chartType=usd&interval=15"></iframe>
 
         </div>
 
@@ -1135,8 +1135,21 @@
   }
 
   &__taco-token-chart {
-    zoom: 0.5;
     border-radius: 1rem;
+    // Chrome/Safari: use zoom for better chart visibility
+    zoom: 0.5;
+
+    // Firefox: doesn't support zoom, just show at normal size
+    @supports (-moz-appearance: none) {
+      zoom: unset;
+    }
+
+    iframe {
+      width: 100%;
+      aspect-ratio: 16 / 9;
+      border-radius: 0.5rem;
+      border: none;
+    }
 
     &__icon {
       width: 1rem;
@@ -1151,7 +1164,13 @@
       color: var(--);
       background-color: var(--yellow-to-dark-orange);
       border: 1px solid var(--dark-orange);
+      // Counteract the container's zoom: 0.5
       zoom: 2;
+
+      // Firefox: no zoom to counteract
+      @supports (-moz-appearance: none) {
+        zoom: unset;
+      }
     }
 
     &__mobile {
@@ -1741,21 +1760,18 @@
   .home-view__powered-by {
     margin: 3rem 0 2rem;
   }  
-  .taco-token-chart {
-    zoom: 0.4 !important;
-  }  
   .home-view__taco-assets span {
     font-size: 0.75rem;
-  }  
+  }
   .home-view__taco-assets__fa-icon {
     font-size: 1rem;
   }
   .home-view__taco-assets__svg {
     width: 1rem;
-  }  
+  }
   .home-view__chart-modal {
     padding: 1rem;
-  }  
+  }
 }
 
 // tablet
@@ -1858,18 +1874,15 @@
   .home-view__powered-by {
     margin: 3rem 0 2rem;
   }
-  .taco-token-chart {
-    zoom: 0.4 !important;
-  }
   .home-view__taco-assets span {
     font-size: 0.75rem;
-  }  
+  }
   .home-view__taco-assets__fa-icon {
     font-size: 1rem;
   }
   .home-view__taco-assets__svg {
     width: 1rem;
-  }  
+  }
   .home-view__chart-modal {
     padding: 1rem;
   }

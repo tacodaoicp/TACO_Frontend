@@ -25,6 +25,7 @@ export type DataKey =
   | 'systemLogs'
   | 'voterDetails'
   | 'neuronAllocations'
+  | 'penalizedNeurons'
   | 'rebalanceConfig'
   | 'systemParameters'
   // Admin-only data keys (treasury/trading)
@@ -93,6 +94,7 @@ export const WORKER_ASSIGNMENT: Record<DataKey, 'public' | 'auth'> = {
   systemLogs: 'auth',
   voterDetails: 'auth',
   neuronAllocations: 'auth',
+  penalizedNeurons: 'auth',
   rebalanceConfig: 'auth',
   systemParameters: 'auth',
   treasuryLogs: 'auth',
@@ -170,6 +172,7 @@ export const STALENESS_THRESHOLDS: Record<DataKey, number> = {
   votingPowerMetrics: 120_000,
   voterDetails: 120_000,
   neuronAllocations: 120_000,
+  penalizedNeurons: 120_000,
   rebalanceConfig: 120_000,
   treasuryLogs: 120_000,
   tradingPauses: 120_000,
@@ -431,6 +434,7 @@ export const ADMIN_PRELOAD_KEYS: DataKey[] = [
   'systemLogs',
   'voterDetails',
   'neuronAllocations',
+  'penalizedNeurons',
   'rebalanceConfig',
   'systemParameters',
   // Treasury/Trading admin data

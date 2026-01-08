@@ -534,6 +534,28 @@ export async function fetchNeuronAllocationsData(agent: HttpAgent): Promise<any[
 }
 
 /**
+ * Fetch penalized neurons (admin only)
+ * Returns neurons with their penalty multipliers
+ */
+export async function fetchPenalizedNeuronsData(agent: HttpAgent): Promise<any[]> {
+  const actor = Actor.createActor(daoBackendIDL, {
+    agent,
+    canisterId: getDaoBackendCanisterId(),
+  })
+
+  const result = await actor.getPenalizedNeurons()
+
+  if (!Array.isArray(result)) {
+    return []
+  }
+
+  return (result as any[]).map(([neuronId, multiplier]) => ({
+    neuronId,
+    multiplier: Number(multiplier),
+  }))
+}
+
+/**
  * Fetch rebalance config from Treasury (admin only)
  */
 export async function fetchRebalanceConfigData(agent: HttpAgent): Promise<any> {

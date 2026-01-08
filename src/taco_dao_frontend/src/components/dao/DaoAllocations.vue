@@ -837,11 +837,11 @@ LOCAL METHODS
     const handleApplyDataToChart = async (seriesParams: number[], seriesNamesParams: string[], colorsParams: string[]) => {
 
         // Update all values at once using nextTick (matches VoteView pattern)
-        nextTick(() => {
-            series.value = seriesParams
-            seriesNames.value = seriesNamesParams
-            colors.value = colorsParams
-        })
+        // Wait for nextTick to complete before returning so subsequent code can use the updated values
+        await nextTick()
+        series.value = seriesParams
+        seriesNames.value = seriesNamesParams
+        colors.value = colorsParams
 
         // Force chart update by updating options
         chartOptions.value = {

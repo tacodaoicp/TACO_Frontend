@@ -54,6 +54,19 @@ function getNetwork(): 'ic' | 'staging' | 'local' {
     return envNetwork
   }
 
+  // Auto-detect from worker location (critical for production where env vars may not be set)
+  if (isWorker() && typeof self !== 'undefined' && self.location) {
+    const hostname = self.location.hostname
+    // Production domains
+    if (hostname === 'tacodao.com' || hostname.endsWith('.tacodao.com') || hostname.endsWith('.icp0.io') || hostname.endsWith('.ic0.app')) {
+      return 'ic'
+    }
+    // Staging canister
+    if (hostname.includes('wxunf-maaaa-aaaab-qbzga-cai')) {
+      return 'staging'
+    }
+  }
+
   return 'local'
 }
 

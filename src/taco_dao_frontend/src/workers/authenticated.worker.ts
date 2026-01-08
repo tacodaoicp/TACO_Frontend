@@ -26,6 +26,7 @@ import {
   fetchSystemLogsData,
   fetchVoterDetailsData,
   fetchNeuronAllocationsData,
+  fetchPenalizedNeuronsData,
   fetchRebalanceConfigData,
   fetchSystemParametersData,
   // Treasury/Trading admin data
@@ -1094,6 +1095,10 @@ async function fetchData(dataKey: DataKey): Promise<void> {
 
     case 'neuronAllocations':
       data = serializeForTransfer(await fetchNeuronAllocationsData(agent))
+      break
+
+    case 'penalizedNeurons':
+      data = serializeForTransfer(await fetchPenalizedNeuronsData(agent))
       break
 
     case 'rebalanceConfig':

@@ -40,17 +40,16 @@ function isBrowser(): boolean {
   return typeof window !== 'undefined' && typeof localStorage !== 'undefined'
 }
 
+// Session-only storage for network override (not persisted to localStorage)
+// Only used in dev mode - resets on every page refresh
+let sessionNetworkOverride: 'ic' | 'staging' | 'local' | null = null
+
 /**
- * Get network override (for testing mainnet from local)
+ * Get network override (for testing from local dev server)
+ * Uses session-only storage (resets on refresh)
  */
 export function getNetworkOverride(): 'ic' | 'staging' | 'local' | null {
-  if (isBrowser()) {
-    const override = localStorage.getItem('taco_network_override')
-    if (override === 'ic' || override === 'staging' || override === 'local') {
-      return override
-    }
-  }
-  return NETWORK_OVERRIDE_DEFAULT
+  return sessionNetworkOverride ?? NETWORK_OVERRIDE_DEFAULT
 }
 
 // ============================================================================
@@ -125,17 +124,15 @@ export function debugLog(category: string, ...args: any[]): void {
 }
 
 /**
- * Set network override (persists to localStorage)
+ * Set network override (session-only, not persisted)
+ * Only works in dev mode via tacoConfig
  */
 export function setNetworkOverride(network: 'ic' | 'staging' | 'local' | null): void {
-  if (isBrowser()) {
-    if (network === null) {
-      localStorage.removeItem('taco_network_override')
-      console.log('[NetworkConfig] Network override cleared. Refresh to apply.')
-    } else {
-      localStorage.setItem('taco_network_override', network)
-      console.log(`[NetworkConfig] Network set to "${network}". Refresh to apply.`)
-    }
+  sessionNetworkOverride = network
+  if (network === null) {
+    console.log('[NetworkConfig] Network override cleared.')
+  } else {
+    console.log(`[NetworkConfig] Network set to "${network}".`)
   }
 }
 
@@ -154,6 +151,19 @@ export function getEffectiveNetwork(): 'ic' | 'staging' | 'local' {
     const envNetwork = import.meta.env?.DFX_NETWORK || import.meta.env?.VITE_DFX_NETWORK
     if (envNetwork === 'ic' || envNetwork === 'staging') {
       return envNetwork
+    }
+  }
+
+  // Auto-detect from hostname (critical for production where env vars may not be set)
+  if (isBrowser()) {
+    const hostname = window.location.hostname
+    // Production domains
+    if (hostname === 'tacodao.com' || hostname.endsWith('.tacodao.com') || hostname.endsWith('.icp0.io') || hostname.endsWith('.ic0.app')) {
+      return 'ic'
+    }
+    // Staging canister
+    if (hostname.includes('wxunf-maaaa-aaaab-qbzga-cai')) {
+      return 'staging'
     }
   }
 
@@ -219,7 +229,9 @@ export function initNetworkConfig(setNetworkFn: (network: 'ic' | 'staging' | 'lo
   }
 }
 
-if (isBrowser()) {
+// DEV ONLY: tacoConfig is completely excluded from production builds
+// @ts-ignore - import.meta.env is injected by Vite
+if (import.meta.env?.DEV && isBrowser()) {
   (window as any).tacoConfig = {
     useMainnet: () => {
       setNetworkOverride('ic')
@@ -259,7 +271,6 @@ if (isBrowser()) {
     },
     debug: (enabled?: boolean) => {
       if (enabled === undefined) {
-        // Toggle if no argument provided
         const current = isDebugEnabled()
         setDebugMode(!current)
         console.log(`Debug mode ${!current ? 'ON' : 'OFF'}`)
@@ -279,8 +290,8 @@ if (isBrowser()) {
     },
     help: () => {
       console.log(`
-TACO DAO Network Configuration:
-===============================
+TACO DAO Network Configuration (DEV ONLY):
+==========================================
 tacoConfig.useMainnet()  - Connect to IC mainnet (ic0.app)
 tacoConfig.useStaging()  - Connect to staging network
 tacoConfig.useLocal()    - Connect to local dfx (localhost:4943)
@@ -291,19 +302,13 @@ tacoConfig.debug(false)  - Disable debug messages
 tacoConfig.status()      - Show current configuration
 tacoConfig.help()        - Show this help
 
-Changes apply immediately - workers will refetch data from new network.
+Note: Settings are session-only (reset on page refresh).
       `)
     },
   }
 
-  // Show help for local addresses and staging canister
-  const hostname = window.location.hostname
-  const isLocalAddress = hostname === 'localhost' || hostname === '127.0.0.1' || hostname.startsWith('192.')
-  const isStagingCanister = hostname.includes('wxunf-maaaa-aaaab-qbzga-cai')
-  if (isLocalAddress || isStagingCanister) {
-    ;(window as any).tacoConfig.help()
-  }
-
+  // Show help on startup in dev mode
+  ;(window as any).tacoConfig.help()
 }
 
 // Initialize debug mode immediately on module load
