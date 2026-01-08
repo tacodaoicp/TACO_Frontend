@@ -780,6 +780,7 @@ const newSkipNeuronId = ref('')
 const sortColumns = ref<Record<number, string | null>>({})
 const sortDirections = ref<Record<number, 'asc' | 'desc'>>({})
 
+
 // Refresh interval
 let refreshInterval: any = null
 
@@ -1749,6 +1750,7 @@ const handleProposalSuccess = async () => {
 onMounted(async () => {
   setDefaultCustomTimes()
 
+
   // Check admin status
   checkAdminStatus()
 
@@ -1814,6 +1816,7 @@ onBeforeUnmount(() => {
   // Clean up worker subscriptions
   workerUnsubscribers.forEach(unsub => unsub())
 })
+
 </script>
 
 <style scoped>
