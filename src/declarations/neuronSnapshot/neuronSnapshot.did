@@ -1,6 +1,24 @@
 type neuronSnapshot = 
  service {
    addCopiedNNSProposal: (nnsProposalId: nat64, snsProposalId: nat64) -> ();
+   archiveProxy_getKnownArchives: () -> (vec record {
+                                               text;
+                                               principal;
+                                             }) query;
+   archiveProxy_isValidArchive: (archivePrincipal: principal) -> (bool) query;
+   archiveProxy_resetImportTimestamps: (archivePrincipal: principal) ->
+    (Result_5);
+   archiveProxy_runManualBatchImport: (archivePrincipal: principal) ->
+    (Result_5);
+   archiveProxy_setMaxInnerLoopIterations: (archivePrincipal: principal,
+    iterations: nat) -> (Result_5);
+   archiveProxy_startBatchImportSystem: (archivePrincipal: principal) ->
+    (Result_5);
+   archiveProxy_stopAllTimers: (archivePrincipal: principal) -> (Result_5);
+   archiveProxy_stopBatchImportSystem: (archivePrincipal: principal) ->
+    (Result_5);
+   archiveProxy_updateConfig: (archivePrincipal: principal, newConfig:
+    ArchiveConfig) -> (Result_5);
    autoVoteOnProposalsExpiringWithinOneHour: () -> (Result_3);
    autoVoteOnUrgentProposals: (timeThresholdSeconds: nat64,
     maxProposalsToVote: nat) -> (Result_3);
@@ -231,6 +249,11 @@ type SNSProposalData =
    wait_for_quiet_deadline_increase_seconds: nat64;
    wait_for_quiet_state: opt WaitForQuietState;
  };
+type Result_5 = 
+ variant {
+   err: text;
+   ok: text;
+ };
 type Result_3 = 
  variant {
    err: text;
@@ -456,6 +479,8 @@ type CumulativeVP =
  record {
    total_staked_vp: nat;
    total_staked_vp_by_hotkey_setters: nat;
+   total_staked_vp_by_hotkey_setters_raw: opt nat;
+   total_staked_vp_raw: opt nat;
  };
 type CopyNNSProposalResult = 
  variant {
@@ -476,6 +501,13 @@ type CancelNeuronSnapshotResult =
    Ok: SnapshotId;
  };
 type CancelNeuronSnapshotError = variant {NotTakingSnapshot;};
+type ArchiveConfig = 
+ record {
+   autoArchiveEnabled: bool;
+   blockRetentionPeriodNS: int;
+   enableCompression: bool;
+   maxBlocksPerCanister: nat;
+ };
 type Action = variant {Motion: Motion;};
 type Account = 
  record {

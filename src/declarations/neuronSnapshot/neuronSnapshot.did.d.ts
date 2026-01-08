@@ -7,6 +7,12 @@ export interface Account {
   'subaccount' : [] | [Subaccount],
 }
 export type Action = { 'Motion' : Motion };
+export interface ArchiveConfig {
+  'maxBlocksPerCanister' : bigint,
+  'blockRetentionPeriodNS' : bigint,
+  'autoArchiveEnabled' : boolean,
+  'enableCompression' : boolean,
+}
 export type CancelNeuronSnapshotError = { 'NotTakingSnapshot' : null };
 export type CancelNeuronSnapshotResult = { 'Ok' : SnapshotId } |
   { 'Err' : CancelNeuronSnapshotError };
@@ -18,6 +24,8 @@ export type CopyNNSProposalError = { 'NetworkError' : string } |
 export type CopyNNSProposalResult = { 'ok' : bigint } |
   { 'err' : CopyNNSProposalError };
 export interface CumulativeVP {
+  'total_staked_vp_raw' : [] | [bigint],
+  'total_staked_vp_by_hotkey_setters_raw' : [] | [bigint],
   'total_staked_vp_by_hotkey_setters' : bigint,
   'total_staked_vp' : bigint,
 }
@@ -187,6 +195,8 @@ export type Result_3 = {
     }
   } |
   { 'err' : string };
+export type Result_5 = { 'ok' : string } |
+  { 'err' : string };
 export interface SNSProposalData {
   'id' : [] | [SNSProposalId],
   'payload_text_rendering' : [] | [string],
@@ -260,6 +270,21 @@ export interface WaitForQuietState {
 }
 export interface neuronSnapshot {
   'addCopiedNNSProposal' : ActorMethod<[bigint, bigint], undefined>,
+  'archiveProxy_getKnownArchives' : ActorMethod<[], Array<[string, Principal]>>,
+  'archiveProxy_isValidArchive' : ActorMethod<[Principal], boolean>,
+  'archiveProxy_resetImportTimestamps' : ActorMethod<[Principal], Result_5>,
+  'archiveProxy_runManualBatchImport' : ActorMethod<[Principal], Result_5>,
+  'archiveProxy_setMaxInnerLoopIterations' : ActorMethod<
+    [Principal, bigint],
+    Result_5
+  >,
+  'archiveProxy_startBatchImportSystem' : ActorMethod<[Principal], Result_5>,
+  'archiveProxy_stopAllTimers' : ActorMethod<[Principal], Result_5>,
+  'archiveProxy_stopBatchImportSystem' : ActorMethod<[Principal], Result_5>,
+  'archiveProxy_updateConfig' : ActorMethod<
+    [Principal, ArchiveConfig],
+    Result_5
+  >,
   'autoVoteOnProposalsExpiringWithinOneHour' : ActorMethod<[], Result_3>,
   'autoVoteOnUrgentProposals' : ActorMethod<[bigint, bigint], Result_3>,
   'cancel_neuron_snapshot' : ActorMethod<[], CancelNeuronSnapshotResult>,

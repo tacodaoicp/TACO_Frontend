@@ -1,4 +1,11 @@
 export const idlFactory = ({ IDL }) => {
+  const Result_5 = IDL.Variant({ 'ok' : IDL.Text, 'err' : IDL.Text });
+  const ArchiveConfig = IDL.Record({
+    'maxBlocksPerCanister' : IDL.Nat,
+    'blockRetentionPeriodNS' : IDL.Int,
+    'autoArchiveEnabled' : IDL.Bool,
+    'enableCompression' : IDL.Bool,
+  });
   const Result_3 = IDL.Variant({
     'ok' : IDL.Record({
       'votes_successful' : IDL.Nat,
@@ -54,6 +61,8 @@ export const idlFactory = ({ IDL }) => {
     'err' : CopyNNSProposalError,
   });
   const CumulativeVP = IDL.Record({
+    'total_staked_vp_raw' : IDL.Opt(IDL.Nat),
+    'total_staked_vp_by_hotkey_setters_raw' : IDL.Opt(IDL.Nat),
     'total_staked_vp_by_hotkey_setters' : IDL.Nat,
     'total_staked_vp' : IDL.Nat,
   });
@@ -293,6 +302,47 @@ export const idlFactory = ({ IDL }) => {
   });
   const neuronSnapshot = IDL.Service({
     'addCopiedNNSProposal' : IDL.Func([IDL.Nat64, IDL.Nat64], [], []),
+    'archiveProxy_getKnownArchives' : IDL.Func(
+        [],
+        [IDL.Vec(IDL.Tuple(IDL.Text, IDL.Principal))],
+        ['query'],
+      ),
+    'archiveProxy_isValidArchive' : IDL.Func(
+        [IDL.Principal],
+        [IDL.Bool],
+        ['query'],
+      ),
+    'archiveProxy_resetImportTimestamps' : IDL.Func(
+        [IDL.Principal],
+        [Result_5],
+        [],
+      ),
+    'archiveProxy_runManualBatchImport' : IDL.Func(
+        [IDL.Principal],
+        [Result_5],
+        [],
+      ),
+    'archiveProxy_setMaxInnerLoopIterations' : IDL.Func(
+        [IDL.Principal, IDL.Nat],
+        [Result_5],
+        [],
+      ),
+    'archiveProxy_startBatchImportSystem' : IDL.Func(
+        [IDL.Principal],
+        [Result_5],
+        [],
+      ),
+    'archiveProxy_stopAllTimers' : IDL.Func([IDL.Principal], [Result_5], []),
+    'archiveProxy_stopBatchImportSystem' : IDL.Func(
+        [IDL.Principal],
+        [Result_5],
+        [],
+      ),
+    'archiveProxy_updateConfig' : IDL.Func(
+        [IDL.Principal, ArchiveConfig],
+        [Result_5],
+        [],
+      ),
     'autoVoteOnProposalsExpiringWithinOneHour' : IDL.Func([], [Result_3], []),
     'autoVoteOnUrgentProposals' : IDL.Func(
         [IDL.Nat64, IDL.Nat],
