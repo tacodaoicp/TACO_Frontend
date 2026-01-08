@@ -33,6 +33,7 @@ import {
   fetchNeuronSnapshotStatusData,
   fetchPortfolioSnapshotStatusData,
   serializeForTransfer,
+  clearActorCache,
 } from './shared/fetch-functions'
 import type {
   DataKey,
@@ -243,6 +244,11 @@ async function init(): Promise<void> {
 }
 
 async function createAnonymousAgent(): Promise<void> {
+  // Clear actor cache for old agent before creating new one
+  if (agent) {
+    clearActorCache(agent)
+  }
+
   agent = await createAgent({
     identity: new AnonymousIdentity(),
     host: getHost(),

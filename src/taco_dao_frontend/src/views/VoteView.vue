@@ -3450,9 +3450,30 @@
       } else {
 
         // distribute the delta among the free tokens
+        let remainingDelta = 0
         for (const t of freeTokens) {
-          const newAlloc = currentSliders.value[t.index].currentPercentage - equalShare
-          currentSliders.value[t.index].currentPercentage = round(newAlloc)
+          const currentAlloc = currentSliders.value[t.index].currentPercentage
+          const newAlloc = round(currentAlloc - equalShare)
+          if (newAlloc < 0) {
+            // Can't go negative - take what we can and track remainder
+            remainingDelta += round(-newAlloc)
+            currentSliders.value[t.index].currentPercentage = 0
+          } else {
+            currentSliders.value[t.index].currentPercentage = newAlloc
+          }
+        }
+
+        // If there's remaining delta due to clamping, redistribute to tokens that still have room
+        if (remainingDelta > 0.001) {
+          for (const t of freeTokens) {
+            if (remainingDelta < 0.001) break
+            const currentAlloc = currentSliders.value[t.index].currentPercentage
+            if (currentAlloc > 0) {
+              const canTake = Math.min(remainingDelta, currentAlloc)
+              currentSliders.value[t.index].currentPercentage = round(currentAlloc - canTake)
+              remainingDelta = round(remainingDelta - canTake)
+            }
+          }
         }
 
         // set delta to 0
@@ -3588,11 +3609,29 @@
 
     // fix any rounding error so that the total is exactly 100.
     const total = round(currentSliders.value.reduce((sum: number, t: any) => sum + t.currentPercentage, 0))
-    const diff = round(100 - total)
+    let diff = round(100 - total)
     if (Math.abs(diff) > 0.001 && freeIndices.length > 0) {
-      currentSliders.value[freeIndices[0]].currentPercentage = round(
-        currentSliders.value[freeIndices[0]].currentPercentage + diff
-      )
+      // Try to apply correction to free tokens, ensuring we don't go below 0 or above 100
+      for (const freeIdx of freeIndices) {
+        if (Math.abs(diff) < 0.001) break
+        const currentVal = currentSliders.value[freeIdx].currentPercentage
+        const correctedValue = round(currentVal + diff)
+        if (correctedValue >= 0 && correctedValue <= 100) {
+          currentSliders.value[freeIdx].currentPercentage = correctedValue
+          diff = 0
+          break
+        } else if (diff < 0 && currentVal > 0) {
+          // Can only reduce by currentVal amount
+          const reduction = Math.min(Math.abs(diff), currentVal)
+          currentSliders.value[freeIdx].currentPercentage = round(currentVal - reduction)
+          diff = round(diff + reduction)
+        } else if (diff > 0 && currentVal < 100) {
+          // Can only increase by (100 - currentVal) amount
+          const increase = Math.min(diff, 100 - currentVal)
+          currentSliders.value[freeIdx].currentPercentage = round(currentVal + increase)
+          diff = round(diff - increase)
+        }
+      }
     }
   }
 

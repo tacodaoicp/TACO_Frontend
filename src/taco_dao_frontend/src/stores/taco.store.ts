@@ -3260,6 +3260,9 @@ export const useTacoStore = defineStore('taco', () => {
 
         try {
 
+            // Ensure shims are initialized before using Actor
+            await initializeShims()
+
             // get host
             const host = getNetworkHost()
 
@@ -3323,9 +3326,12 @@ export const useTacoStore = defineStore('taco', () => {
 
         try {
 
+            // Ensure shims are initialized before using Actor
+            await initializeShims()
+
             // get host
             const host = getNetworkHost()
-                
+
             // create agent
             const agent = await createAgent({
                 identity: new AnonymousIdentity(),
@@ -6460,7 +6466,10 @@ export const useTacoStore = defineStore('taco', () => {
     const fetchTacoProposalsInternal = async (beforeProposal: bigint | null = null, limit: number = 20) => {
         // console.log('🔍 Fetching TACO DAO proposals...', beforeProposal ? `before ID ${beforeProposal}` : 'from latest');
         // console.log('🔗 Using SNS governance canister:', tacoSnsGovernanceCanisterId());
-        
+
+        // Ensure shims are initialized before using Actor
+        await initializeShims()
+
         const agent = await createAgent({
             identity: new AnonymousIdentity(),
             host: getNetworkHost(),

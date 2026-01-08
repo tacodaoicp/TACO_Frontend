@@ -57,6 +57,7 @@ import {
   fetchRewardsConfigurationData,
   fetchDistributionHistoryData,
   serializeForTransfer,
+  clearActorCache,
 } from './shared/fetch-functions'
 import type {
   DataKey,
@@ -268,6 +269,11 @@ function deserializeIdentity(serialized: SerializedIdentity): DelegationIdentity
 
 async function setIdentity(serialized: SerializedIdentity): Promise<void> {
   try {
+    // Clear actor cache for old agent before creating new one
+    if (authenticatedAgent) {
+      clearActorCache(authenticatedAgent)
+    }
+
     currentIdentity = deserializeIdentity(serialized)
     isAuthenticated = true
 
@@ -313,6 +319,11 @@ async function setIdentity(serialized: SerializedIdentity): Promise<void> {
 }
 
 function clearIdentity(): void {
+  // Clear actor cache before nulling the agent
+  if (authenticatedAgent) {
+    clearActorCache(authenticatedAgent)
+  }
+
   currentIdentity = null
   authenticatedAgent = null
   isAuthenticated = false
