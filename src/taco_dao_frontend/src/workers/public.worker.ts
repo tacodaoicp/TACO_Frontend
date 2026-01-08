@@ -90,6 +90,7 @@ let agent: HttpAgent | null = null
 let initPromise: Promise<void> | null = null
 let isInitialized = false
 let currentNetwork: 'ic' | 'staging' | 'local' | null = null
+let debugEnabled = false // Debug mode - disabled by default in production
 
 // Initial load state
 let initialLoadKeys: Set<DataKey> = new Set()
@@ -110,7 +111,7 @@ const portsReceivedCacheReady = new WeakSet<MessagePort>()
 // ============================================================================
 
 async function init(): Promise<void> {
-  console.log('[PublicWorker] Initializing...')
+  if (debugEnabled) console.log('[PublicWorker] Initializing...')
 
   // Initialize all data states
   for (const key of HANDLED_KEYS) {
@@ -127,7 +128,7 @@ async function init(): Promise<void> {
           ...state,
           stale: isStale(key, state.lastUpdated),
         })
-        console.log(`[PublicWorker] Loaded cached ${key}`)
+        if (debugEnabled) console.log(`[PublicWorker] Loaded cached ${key}`)
       }
     }
   } catch (error) {
@@ -138,7 +139,7 @@ async function init(): Promise<void> {
   isInitialized = true
 
   // Deliver cached data to any ports that connected during init
-  console.log(`[PublicWorker] Delivering cached data to ${pendingCacheDeliveries.length} pending ports`)
+  if (debugEnabled) console.log(`[PublicWorker] Delivering cached data to ${pendingCacheDeliveries.length} pending ports`)
   for (const { port, keys } of pendingCacheDeliveries) {
     for (const key of keys) {
       const state = dataStates.get(key)
@@ -164,17 +165,17 @@ async function init(): Promise<void> {
 
   // Process pending INITIAL_LOAD if one arrived before init completed
   if (pendingInitialLoad) {
-    console.log('[PublicWorker] Processing pending INITIAL_LOAD')
+    if (debugEnabled) console.log('[PublicWorker] Processing pending INITIAL_LOAD')
     handleInitialLoad(pendingInitialLoad.port, pendingInitialLoad.message)
     pendingInitialLoad = null
   }
 
-  console.log('[PublicWorker] Cache initialized, agent will be created when SET_NETWORK is received')
+  if (debugEnabled) console.log('[PublicWorker] Cache initialized, agent will be created when SET_NETWORK is received')
 
   // Start processing loop
   processQueue()
 
-  console.log('[PublicWorker] Init complete, waiting for SET_NETWORK')
+  if (debugEnabled) console.log('[PublicWorker] Init complete, waiting for SET_NETWORK')
 }
 
 async function createAnonymousAgent(): Promise<void> {
@@ -193,7 +194,7 @@ self.onconnect = (event: MessageEvent) => {
   const port = event.ports[0]
   connectedPorts.add(port)
 
-  console.log(`[PublicWorker] Port connected. Total: ${connectedPorts.size}`)
+  if (debugEnabled) console.log(`[PublicWorker] Port connected. Total: ${connectedPorts.size}`)
 
   port.onmessage = (e: MessageEvent<WorkerRequest>) => {
     handleMessage(port, e.data)
@@ -219,7 +220,7 @@ self.onconnect = (event: MessageEvent) => {
   })
 
   if (!isInitialized) {
-    console.log(`[PublicWorker] Port connected before init - waiting for INITIAL_LOAD`)
+    if (debugEnabled) console.log(`[PublicWorker] Port connected before init - waiting for INITIAL_LOAD`)
   }
 }
 
@@ -228,7 +229,7 @@ function disconnectPort(port: MessagePort): void {
   for (const subscribers of subscriptions.values()) {
     subscribers.delete(port)
   }
-  console.log(`[PublicWorker] Port disconnected. Total: ${connectedPorts.size}`)
+  if (debugEnabled) console.log(`[PublicWorker] Port disconnected. Total: ${connectedPorts.size}`)
 }
 
 // ============================================================================
@@ -247,7 +248,7 @@ function handleMessage(port: MessagePort, message: WorkerRequest): void {
 
     case 'SET_VISIBILITY':
       isBackgroundTab = !message.payload.visible
-      console.log(`[PublicWorker] Visibility: ${message.payload.visible ? 'visible' : 'hidden'}`)
+      if (debugEnabled) console.log(`[PublicWorker] Visibility: ${message.payload.visible ? 'visible' : 'hidden'}`)
       if (message.payload.visible) {
         recordActivity()
       }
@@ -292,7 +293,7 @@ function handleMessage(port: MessagePort, message: WorkerRequest): void {
       break
 
     case 'RESET':
-      console.log('[PublicWorker] RESET received - clearing backoff, queue, fetch count, and re-sending cache')
+      if (debugEnabled) console.log('[PublicWorker] RESET received - clearing backoff, queue, fetch count, and re-sending cache')
       backoff.resetAll()
       queue.clearProcessing()
       activeFetchCount = 0
@@ -322,10 +323,10 @@ function handleMessage(port: MessagePort, message: WorkerRequest): void {
 
 function handleInitialLoad(port: MessagePort, message: WorkerRequest): void {
   const route = message.payload.route || '/'
-  console.log(`[PublicWorker] INITIAL_LOAD for route: ${route}`)
+  if (debugEnabled) console.log(`[PublicWorker] INITIAL_LOAD for route: ${route}`)
 
   if (!isInitialized) {
-    console.log(`[PublicWorker] Not initialized, queuing INITIAL_LOAD for route: ${route}`)
+    if (debugEnabled) console.log(`[PublicWorker] Not initialized, queuing INITIAL_LOAD for route: ${route}`)
     pendingInitialLoad = { port, message }
     return
   }
@@ -341,7 +342,7 @@ function handleInitialLoad(port: MessagePort, message: WorkerRequest): void {
   const priorityKeys = getInitialLoadKeys(route)
   initialLoadKeys = new Set(priorityKeys.filter(key => HANDLED_KEYS.includes(key)))
 
-  console.log(`[PublicWorker] Priority keys for route: ${Array.from(initialLoadKeys).join(', ') || 'none'}`)
+  if (debugEnabled) console.log(`[PublicWorker] Priority keys for route: ${Array.from(initialLoadKeys).join(', ') || 'none'}`)
 
   // Send cached data ONLY for priority keys immediately
   for (const key of initialLoadKeys) {
@@ -389,7 +390,7 @@ function onPriorityKeyLoaded(dataKey: DataKey): void {
   if (!pendingPriorityKeys.has(dataKey)) return
 
   pendingPriorityKeys.delete(dataKey)
-  console.log(`[PublicWorker] Priority key loaded: ${dataKey}, remaining: ${pendingPriorityKeys.size}`)
+  if (debugEnabled) console.log(`[PublicWorker] Priority key loaded: ${dataKey}, remaining: ${pendingPriorityKeys.size}`)
 
   if (pendingPriorityKeys.size === 0 && !deferredLoadTriggered) {
     triggerDeferredLoad()
@@ -400,7 +401,7 @@ function triggerDeferredLoad(): void {
   if (deferredLoadTriggered) return
   deferredLoadTriggered = true
 
-  console.log('[PublicWorker] All priority keys loaded - starting deferred load for non-priority keys')
+  if (debugEnabled) console.log('[PublicWorker] All priority keys loaded - starting deferred load for non-priority keys')
 
   for (const key of HANDLED_KEYS) {
     if (initialLoadKeys.has(key)) continue
@@ -486,7 +487,7 @@ function handleSubscribe(port: MessagePort, message: WorkerRequest): void {
   }
 
   if (!isInitialized) {
-    console.log(`[PublicWorker] Not yet initialized, queuing cache delivery for ${validKeys.length} keys`)
+    if (debugEnabled) console.log(`[PublicWorker] Not yet initialized, queuing cache delivery for ${validKeys.length} keys`)
     pendingCacheDeliveries.push({ port, keys: validKeys })
     return
   }
@@ -546,7 +547,7 @@ async function handleSetNetwork(message: WorkerRequest): Promise<void> {
   const isFirstSetup = currentNetwork === null
   const networkChanged = currentNetwork !== null && currentNetwork !== newNetwork
 
-  console.log(`[PublicWorker] SET_NETWORK: ${newNetwork} (current: ${currentNetwork}, isFirst: ${isFirstSetup}, changed: ${networkChanged})`)
+  if (debugEnabled) console.log(`[PublicWorker] SET_NETWORK: ${newNetwork} (current: ${currentNetwork}, isFirst: ${isFirstSetup}, changed: ${networkChanged})`)
 
   currentNetwork = newNetwork
   setWorkerNetworkOverride(network || null)
@@ -557,7 +558,7 @@ async function handleSetNetwork(message: WorkerRequest): Promise<void> {
     try {
       const { clearAllCached } = await import('./shared/indexed-db')
       await clearAllCached()
-      console.log('[PublicWorker] Cleared IndexedDB cache due to network change')
+      if (debugEnabled) console.log('[PublicWorker] Cleared IndexedDB cache due to network change')
     } catch (err) {
       console.error('[PublicWorker] Error clearing cache:', err)
     }
@@ -801,9 +802,9 @@ function checkIdleStatus(): void {
   const wasIdle = isIdle
   isIdle = Date.now() - lastActivityTime > IDLE_TIMEOUT_MS
   if (isIdle && !wasIdle) {
-    console.log('[PublicWorker] Entering idle mode - pausing refreshes')
+    if (debugEnabled) console.log('[PublicWorker] Entering idle mode - pausing refreshes')
   } else if (!isIdle && wasIdle) {
-    console.log('[PublicWorker] Exiting idle mode - resuming refreshes')
+    if (debugEnabled) console.log('[PublicWorker] Exiting idle mode - resuming refreshes')
   }
 }
 
@@ -811,7 +812,7 @@ function recordActivity(): void {
   lastActivityTime = Date.now()
   if (isIdle) {
     isIdle = false
-    console.log('[PublicWorker] Activity detected - resuming refreshes')
+    if (debugEnabled) console.log('[PublicWorker] Activity detected - resuming refreshes')
   }
 }
 

@@ -219,6 +219,7 @@ let isAdmin = false
 let isAuthenticated = false
 let isInitialized = false
 let currentNetwork: 'ic' | 'staging' | 'local' | null = null // Track current network to detect changes
+let debugEnabled = false // Debug mode - disabled by default in production
 
 // Initial load state - track which keys are priority for current route
 let initialLoadKeys: Set<DataKey> = new Set()
@@ -236,7 +237,8 @@ let pendingInitialLoad: { port: MessagePort; message: WorkerRequest } | null = n
 // ============================================================================
 
 async function init(): Promise<void> {
-  console.log('[AuthWorker] Initializing...')
+  // Initialization - debug log only if enabled
+  if (debugEnabled) if (debugEnabled) console.log('[AuthWorker] Initializing...')
 
   // Initialize all data states
   for (const key of HANDLED_KEYS) {
@@ -257,7 +259,7 @@ async function init(): Promise<void> {
           ...state,
           stale: isStale(key, state.lastUpdated),
         })
-        console.log(`[AuthWorker] Loaded cached ${key}`)
+        if (debugEnabled) if (debugEnabled) console.log(`[AuthWorker] Loaded cached ${key}`)
       }
     }
   } catch (error) {
@@ -267,11 +269,11 @@ async function init(): Promise<void> {
   // Mark as initialized IMMEDIATELY after cache load (before agent is ready)
   // This allows cached data to be delivered without waiting for agent
   isInitialized = true
-  console.log(`[AuthWorker] Initialization complete. dataStates has ${Array.from(dataStates.entries()).filter(([k, v]) => v.data).length} keys with data`)
+  if (debugEnabled) console.log(`[AuthWorker] Initialization complete. dataStates has ${Array.from(dataStates.entries()).filter(([k, v]) => v.data).length} keys with data`)
 
   // Deliver cached data to any ports that connected during init
   // Also queue fetches for stale/missing data
-  console.log(`[AuthWorker] Delivering cached data to ${pendingCacheDeliveries.length} pending ports`)
+  if (debugEnabled) console.log(`[AuthWorker] Delivering cached data to ${pendingCacheDeliveries.length} pending ports`)
   for (const { port, keys } of pendingCacheDeliveries) {
     for (const key of keys) {
       const state = dataStates.get(key)
@@ -302,7 +304,7 @@ async function init(): Promise<void> {
 
   // Process pending INITIAL_LOAD if one arrived before init completed
   if (pendingInitialLoad) {
-    console.log('[AuthWorker] Processing pending INITIAL_LOAD')
+    if (debugEnabled) console.log('[AuthWorker] Processing pending INITIAL_LOAD')
     handleInitialLoad(pendingInitialLoad.port, pendingInitialLoad.message)
     pendingInitialLoad = null
   }
@@ -311,7 +313,7 @@ async function init(): Promise<void> {
 
   // Don't wait for agent here - it will be created by handleSetNetwork
   // Start processing loop - it will wait for agent to be available before fetching
-  console.log('[AuthWorker] Starting processQueue (agent creation pending)...')
+  if (debugEnabled) console.log('[AuthWorker] Starting processQueue (agent creation pending)...')
   processQueue()
 
   debugLog(`Init complete: anonymousAgent=${!!anonymousAgent}, authenticatedAgent=${!!authenticatedAgent}, queueSize=${queue.size}`)
@@ -361,14 +363,14 @@ async function setIdentity(serialized: SerializedIdentity): Promise<void> {
       fetchRootKey: shouldFetchRootKey(),
     })
 
-    console.log('[AuthWorker] Identity set, agent created')
+    if (debugEnabled) console.log('[AuthWorker] Identity set, agent created')
 
     // Immediately deliver any cached user data to all subscribed ports
     // This ensures components get cached data without waiting for a new fetch
     for (const key of USER_KEYS) {
       const state = dataStates.get(key)
       if (state?.data) {
-        console.log(`[AuthWorker] Delivering cached ${key} after authentication`)
+        if (debugEnabled) console.log(`[AuthWorker] Delivering cached ${key} after authentication`)
         broadcastToSubscribers(key, {
           id: generateMessageId(),
           timestamp: Date.now(),
@@ -417,7 +419,7 @@ function clearIdentity(): void {
   // Clear queue
   queue.clear()
 
-  console.log('[AuthWorker] Identity cleared')
+  if (debugEnabled) console.log('[AuthWorker] Identity cleared')
 }
 
 // ============================================================================
@@ -428,12 +430,12 @@ self.onconnect = (event: MessageEvent) => {
   const port = event.ports[0]
   connectedPorts.add(port)
 
-  console.log(`[AuthWorker] Port connected. Total: ${connectedPorts.size}`)
+  if (debugEnabled) console.log(`[AuthWorker] Port connected. Total: ${connectedPorts.size}`)
 
   // Don't reset state here - INITIAL_LOAD message will handle that with route context
 
   port.onmessage = (e: MessageEvent<WorkerRequest>) => {
-    console.log(`[AuthWorker] Message received: ${e.data?.type}, dataKey=${e.data?.payload?.dataKey}`)
+    if (debugEnabled) console.log(`[AuthWorker] Message received: ${e.data?.type}, dataKey=${e.data?.payload?.dataKey}`)
     handleMessage(port, e.data)
   }
 
@@ -457,7 +459,7 @@ self.onconnect = (event: MessageEvent) => {
   })
 
   if (!isInitialized) {
-    console.log(`[AuthWorker] Port connected before init - waiting for INITIAL_LOAD`)
+    if (debugEnabled) console.log(`[AuthWorker] Port connected before init - waiting for INITIAL_LOAD`)
   }
 }
 
@@ -466,7 +468,7 @@ function disconnectPort(port: MessagePort): void {
   for (const subscribers of subscriptions.values()) {
     subscribers.delete(port)
   }
-  console.log(`[AuthWorker] Port disconnected. Total: ${connectedPorts.size}`)
+  if (debugEnabled) console.log(`[AuthWorker] Port disconnected. Total: ${connectedPorts.size}`)
 }
 
 // ============================================================================
@@ -474,7 +476,7 @@ function disconnectPort(port: MessagePort): void {
 // ============================================================================
 
 function handleMessage(port: MessagePort, message: WorkerRequest): void {
-  console.log(`[AuthWorker] handleMessage: ${message.type}`)
+  if (debugEnabled) console.log(`[AuthWorker] handleMessage: ${message.type}`)
   switch (message.type) {
     case 'SET_IDENTITY':
       if (message.payload.identity) {
@@ -545,7 +547,7 @@ function handleMessage(port: MessagePort, message: WorkerRequest): void {
 
     case 'RESET':
       // Reset all state that could block fetches after fast page refresh
-      console.log('[AuthWorker] RESET received - clearing backoff, queue, fetch count, and re-sending cache')
+      if (debugEnabled) console.log('[AuthWorker] RESET received - clearing backoff, queue, fetch count, and re-sending cache')
       backoff.resetAll()
       queue.clearProcessing()
       activeFetchCount = 0
@@ -584,7 +586,7 @@ function handleInitialLoad(port: MessagePort, message: WorkerRequest): void {
 
   // If not initialized yet, queue this for processing after init completes
   if (!isInitialized) {
-    console.log(`[AuthWorker] Not initialized, queuing INITIAL_LOAD for route: ${route}`)
+    if (debugEnabled) console.log(`[AuthWorker] Not initialized, queuing INITIAL_LOAD for route: ${route}`)
     pendingInitialLoad = { port, message }
     return
   }
@@ -608,21 +610,21 @@ function handleInitialLoad(port: MessagePort, message: WorkerRequest): void {
   debugLog(`Priority keys for route: ${Array.from(initialLoadKeys).join(', ') || 'none'}`)
 
   // Send cached data ONLY for priority keys immediately
-  console.log(`[AuthWorker] Sending cached data for ${initialLoadKeys.size} priority keys`)
+  if (debugEnabled) console.log(`[AuthWorker] Sending cached data for ${initialLoadKeys.size} priority keys`)
   for (const key of initialLoadKeys) {
     const requiresAuth = USER_KEYS.includes(key) || AUTH_REQUIRED_KEYS.includes(key)
     // Skip auth-required keys if not authenticated AND no cached data
     if (requiresAuth && !isAuthenticated) {
       const state = dataStates.get(key)
       if (!state?.data) {
-        console.log(`[AuthWorker] Skipping ${key} - requires auth, no cached data`)
+        if (debugEnabled) console.log(`[AuthWorker] Skipping ${key} - requires auth, no cached data`)
         continue
       }
     }
 
     const state = dataStates.get(key)
     if (state?.data) {
-      console.log(`[AuthWorker] Sending CACHE_HIT for ${key} (hasData=true)`)
+      if (debugEnabled) console.log(`[AuthWorker] Sending CACHE_HIT for ${key} (hasData=true)`)
       sendResponse(port, {
         id: generateMessageId(),
         timestamp: Date.now(),
@@ -635,17 +637,17 @@ function handleInitialLoad(port: MessagePort, message: WorkerRequest): void {
         },
       })
     } else {
-      console.log(`[AuthWorker] No cached data for ${key}`)
+      if (debugEnabled) console.log(`[AuthWorker] No cached data for ${key}`)
     }
     // Queue fetch for stale priority data and track it
     if (!state?.data || isStale(key, state.lastUpdated)) {
       const canFetch = !requiresAuth || isAuthenticated || PUBLIC_ADMIN_KEYS.includes(key)
       if (canFetch) {
-        console.log(`[AuthWorker] Queuing fetch for ${key} (stale/missing, canFetch=true)`)
+        if (debugEnabled) console.log(`[AuthWorker] Queuing fetch for ${key} (stale/missing, canFetch=true)`)
         pendingPriorityKeys.add(key)
         queue.enqueue(key, 'critical')
       } else {
-        console.log(`[AuthWorker] Cannot fetch ${key} - requires auth, isAuth=${isAuthenticated}`)
+        if (debugEnabled) console.log(`[AuthWorker] Cannot fetch ${key} - requires auth, isAuth=${isAuthenticated}`)
       }
     }
   }
@@ -665,7 +667,7 @@ function onPriorityKeyLoaded(dataKey: DataKey): void {
   if (!pendingPriorityKeys.has(dataKey)) return
 
   pendingPriorityKeys.delete(dataKey)
-  console.log(`[AuthWorker] Priority key loaded: ${dataKey}, remaining: ${pendingPriorityKeys.size}`)
+  if (debugEnabled) console.log(`[AuthWorker] Priority key loaded: ${dataKey}, remaining: ${pendingPriorityKeys.size}`)
 
   // When all priority keys are loaded, trigger deferred loading immediately (non-blocking)
   if (pendingPriorityKeys.size === 0 && !deferredLoadTriggered) {
@@ -680,7 +682,7 @@ function triggerDeferredLoad(): void {
   if (deferredLoadTriggered) return
   deferredLoadTriggered = true
 
-  console.log('[AuthWorker] All priority keys loaded - starting deferred load for non-priority keys')
+  if (debugEnabled) console.log('[AuthWorker] All priority keys loaded - starting deferred load for non-priority keys')
 
   // Send cached data and queue fetches for remaining keys
   for (const key of HANDLED_KEYS) {
@@ -718,7 +720,7 @@ function handleSetAdmin(message: WorkerRequest): void {
   const wasAdmin = isAdmin
   isAdmin = message.payload.isAdmin || false
 
-  console.log(`[AuthWorker] Admin status: ${isAdmin}`)
+  if (debugEnabled) console.log(`[AuthWorker] Admin status: ${isAdmin}`)
 
   // If newly admin and authenticated, queue admin data
   if (isAdmin && !wasAdmin && isAuthenticated) {
@@ -731,10 +733,10 @@ function handleSetAdmin(message: WorkerRequest): void {
 function handleFetch(port: MessagePort, message: WorkerRequest): void {
   const { dataKey, priority = 'medium', force = false } = message.payload
   if (!dataKey || !HANDLED_KEYS.includes(dataKey)) {
-    console.log(`[AuthWorker] FETCH ignored - dataKey=${dataKey} not in HANDLED_KEYS`)
+    if (debugEnabled) console.log(`[AuthWorker] FETCH ignored - dataKey=${dataKey} not in HANDLED_KEYS`)
     return
   }
-  console.log(`[AuthWorker] FETCH request: ${dataKey}, force=${force}, isAuth=${isAuthenticated}, hasAnon=${!!anonymousAgent}`)
+  if (debugEnabled) console.log(`[AuthWorker] FETCH request: ${dataKey}, force=${force}, isAuth=${isAuthenticated}, hasAnon=${!!anonymousAgent}`)
 
   // USER_KEYS and AUTH_REQUIRED_KEYS require authentication
   // The canister will reject anonymous calls for these
@@ -779,7 +781,7 @@ function handleFetch(port: MessagePort, message: WorkerRequest): void {
   // Queue for refresh if needed
   // The queue processor will wait for agent initialization before processing
   if (force || !currentState?.data || isStale(dataKey, currentState.lastUpdated)) {
-    console.log(`[AuthWorker] Queuing ${dataKey} for fetch (force=${force}, hasData=${!!currentState?.data}, queueSize=${queue.size})`)
+    if (debugEnabled) console.log(`[AuthWorker] Queuing ${dataKey} for fetch (force=${force}, hasData=${!!currentState?.data}, queueSize=${queue.size})`)
     queue.enqueue(dataKey, priority)
   }
 }
@@ -826,7 +828,7 @@ function handleSubscribe(port: MessagePort, message: WorkerRequest): void {
 
   // If not yet initialized, queue this port for cache delivery when init completes
   if (!isInitialized) {
-    console.log(`[AuthWorker] Not yet initialized, queuing cache delivery for ${validKeys.length} keys`)
+    if (debugEnabled) console.log(`[AuthWorker] Not yet initialized, queuing cache delivery for ${validKeys.length} keys`)
     pendingCacheDeliveries.push({ port, keys: validKeys })
     return
   }
@@ -981,7 +983,7 @@ async function processQueue(): Promise<void> {
       // Skip for now - will be fetched when user authenticates
       const requiresAuth = USER_KEYS.includes(item.dataKey) || AUTH_REQUIRED_KEYS.includes(item.dataKey)
       if (requiresAuth && (!isAuthenticated || !authenticatedAgent)) {
-        console.log(`[AuthWorker] Skipping ${item.dataKey} - requires auth but not authenticated`)
+        if (debugEnabled) console.log(`[AuthWorker] Skipping ${item.dataKey} - requires auth but not authenticated`)
         queue.complete(item.dataKey)
         continue
       }
@@ -1021,7 +1023,7 @@ async function processSingleFetch(item: { dataKey: DataKey; retryCount: number }
     // If first successful admin call, we're confirmed admin
     if (ADMIN_KEYS.includes(item.dataKey) && !isAdmin) {
       isAdmin = true
-      console.log('[AuthWorker] Admin confirmed by successful call')
+      if (debugEnabled) console.log('[AuthWorker] Admin confirmed by successful call')
     }
   } catch (error) {
     backoff.recordFailure(item.dataKey)
@@ -1035,7 +1037,7 @@ async function processSingleFetch(item: { dataKey: DataKey; retryCount: number }
 
     if (isAccessDenied && ADMIN_KEYS.includes(item.dataKey)) {
       // Not admin or not authorized for this canister - don't retry, don't spam logs
-      console.log(`[AuthWorker] Access denied for ${item.dataKey} - skipping`)
+      if (debugEnabled) console.log(`[AuthWorker] Access denied for ${item.dataKey} - skipping`)
       isAdmin = false
       queue.complete(item.dataKey)
       return
@@ -1068,7 +1070,7 @@ async function fetchData(dataKey: DataKey): Promise<void> {
     : (authenticatedAgent || anonymousAgent)
 
   if (!agent) {
-    console.log(`[AuthWorker] No agent for ${dataKey}, requiresAuth=${requiresAuth}`)
+    if (debugEnabled) console.log(`[AuthWorker] No agent for ${dataKey}, requiresAuth=${requiresAuth}`)
     throw new Error(requiresAuth
       ? 'No authenticated agent'
       : 'No agent available')
@@ -1264,7 +1266,7 @@ async function fetchData(dataKey: DataKey): Promise<void> {
   })
 
   await setCached(dataKey, data)
-  console.log(`[AuthWorker] Cached ${dataKey} to IndexedDB`)
+  if (debugEnabled) console.log(`[AuthWorker] Cached ${dataKey} to IndexedDB`)
 
   // Notify that this priority key has loaded (triggers deferred load when all done)
   onPriorityKeyLoaded(dataKey)
@@ -1318,9 +1320,10 @@ function sendResponse(port: MessagePort, response: WorkerResponse): void {
 
 // Forward debug logs to all connected ports so they appear in main thread console
 function debugLog(message: string): void {
+  if (!debugEnabled) return // Skip if debug mode is disabled
+
   const fullMessage = `[AuthWorker] ${message}`
   console.log(fullMessage) // Also log to worker console
-  console.log(`[AuthWorker] debugLog: connectedPorts.size=${connectedPorts.size}`)
   for (const port of connectedPorts) {
     try {
       port.postMessage({
@@ -1335,7 +1338,7 @@ function debugLog(message: string): void {
         },
       })
     } catch (e) {
-      console.log(`[AuthWorker] debugLog: failed to post to port: ${e}`)
+      // Silently fail - port may be disconnected
     }
   }
 }
@@ -1359,9 +1362,9 @@ function checkIdleStatus(): void {
   const wasIdle = isIdle
   isIdle = Date.now() - lastActivityTime > IDLE_TIMEOUT_MS
   if (isIdle && !wasIdle) {
-    console.log('[AuthWorker] Entering idle mode - pausing refreshes')
+    if (debugEnabled) console.log('[AuthWorker] Entering idle mode - pausing refreshes')
   } else if (!isIdle && wasIdle) {
-    console.log('[AuthWorker] Exiting idle mode - resuming refreshes')
+    if (debugEnabled) console.log('[AuthWorker] Exiting idle mode - resuming refreshes')
   }
 }
 
@@ -1369,7 +1372,7 @@ function recordActivity(): void {
   lastActivityTime = Date.now()
   if (isIdle) {
     isIdle = false
-    console.log('[AuthWorker] Activity detected - resuming refreshes')
+    if (debugEnabled) console.log('[AuthWorker] Activity detected - resuming refreshes')
   }
 }
 

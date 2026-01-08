@@ -192,6 +192,7 @@ let isAdmin = false
 let isAuthenticated = false
 let isInitialized = false
 let currentNetwork: 'ic' | 'staging' | 'local' | null = null // Track current network to detect changes
+let debugEnabled = false // Debug mode - disabled by default in production
 
 // ============================================================================
 // Helper Functions
@@ -205,9 +206,9 @@ function checkIdleStatus(): void {
   const wasIdle = isIdle
   isIdle = Date.now() - lastActivityTime > IDLE_TIMEOUT_MS
   if (isIdle && !wasIdle) {
-    console.log('[AuthWorker-Dedicated] Entering idle mode - pausing refreshes')
+    if (debugEnabled) console.log('[AuthWorker-Dedicated] Entering idle mode - pausing refreshes')
   } else if (!isIdle && wasIdle) {
-    console.log('[AuthWorker-Dedicated] Exiting idle mode - resuming refreshes')
+    if (debugEnabled) console.log('[AuthWorker-Dedicated] Exiting idle mode - resuming refreshes')
   }
 }
 
@@ -215,7 +216,7 @@ function recordActivity(): void {
   lastActivityTime = Date.now()
   if (isIdle) {
     isIdle = false
-    console.log('[AuthWorker-Dedicated] Activity detected - resuming refreshes')
+    if (debugEnabled) console.log('[AuthWorker-Dedicated] Activity detected - resuming refreshes')
   }
 }
 
@@ -276,7 +277,7 @@ async function setIdentity(serialized: SerializedIdentity): Promise<void> {
       fetchRootKey: shouldFetchRootKey(),
     })
 
-    console.log('[AuthWorker-Dedicated] Identity set, agent created')
+    if (debugEnabled) console.log('[AuthWorker-Dedicated] Identity set, agent created')
 
     // Deliver cached user data
     for (const key of USER_KEYS) {
@@ -325,7 +326,7 @@ function clearIdentity(): void {
   }
 
   queue.clear()
-  console.log('[AuthWorker-Dedicated] Identity cleared')
+  if (debugEnabled) console.log('[AuthWorker-Dedicated] Identity cleared')
 }
 
 // ============================================================================
@@ -333,7 +334,7 @@ function clearIdentity(): void {
 // ============================================================================
 
 async function init(): Promise<void> {
-  console.log('[AuthWorker-Dedicated] Initializing...')
+  if (debugEnabled) console.log('[AuthWorker-Dedicated] Initializing...')
 
   for (const key of HANDLED_KEYS) {
     dataStates.set(key, createInitialState())
@@ -347,7 +348,7 @@ async function init(): Promise<void> {
           ...state,
           stale: isStale(key, state.lastUpdated),
         })
-        console.log(`[AuthWorker-Dedicated] Loaded cached ${key}`)
+        if (debugEnabled) console.log(`[AuthWorker-Dedicated] Loaded cached ${key}`)
       }
     }
   } catch (error) {
@@ -376,7 +377,7 @@ async function init(): Promise<void> {
     },
   })
 
-  console.log('[AuthWorker-Dedicated] Initialized with anonymous agent')
+  if (debugEnabled) console.log('[AuthWorker-Dedicated] Initialized with anonymous agent')
 }
 
 // ============================================================================
@@ -454,7 +455,7 @@ function handleMessage(message: WorkerRequest): void {
 
     case 'RESET':
       // Reset all state that could block fetches after fast page refresh
-      console.log('[AuthWorker-Dedicated] RESET received - clearing backoff, queue, fetch count, and re-sending cache')
+      if (debugEnabled) console.log('[AuthWorker-Dedicated] RESET received - clearing backoff, queue, fetch count, and re-sending cache')
       backoff.resetAll()
       queue.clearProcessing()
       activeFetchCount = 0
@@ -483,7 +484,7 @@ function handleSetAdmin(message: WorkerRequest): void {
   const wasAdmin = isAdmin
   isAdmin = message.payload.isAdmin || false
 
-  console.log(`[AuthWorker-Dedicated] Admin status: ${isAdmin}`)
+  if (debugEnabled) console.log(`[AuthWorker-Dedicated] Admin status: ${isAdmin}`)
 
   if (isAdmin && !wasAdmin && isAuthenticated) {
     for (const key of ADMIN_KEYS) {
@@ -715,7 +716,7 @@ async function processSingleFetch(item: { dataKey: DataKey; retryCount: number }
 
     if (ADMIN_KEYS.includes(item.dataKey) && !isAdmin) {
       isAdmin = true
-      console.log('[AuthWorker-Dedicated] Admin confirmed by successful call')
+      if (debugEnabled) console.log('[AuthWorker-Dedicated] Admin confirmed by successful call')
     }
   } catch (error) {
     backoff.recordFailure(item.dataKey)
@@ -727,7 +728,7 @@ async function processSingleFetch(item: { dataKey: DataKey; retryCount: number }
       errorMsg.includes('refused message')
 
     if (isAccessDenied && ADMIN_KEYS.includes(item.dataKey)) {
-      console.log(`[AuthWorker-Dedicated] Access denied for ${item.dataKey} - skipping`)
+      if (debugEnabled) console.log(`[AuthWorker-Dedicated] Access denied for ${item.dataKey} - skipping`)
       isAdmin = false
       queue.complete(item.dataKey)
       return
