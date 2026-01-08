@@ -1188,11 +1188,10 @@ onMounted(async () => {
 <style scoped>
 .admin-price-history-view {
   padding-bottom: 2rem;
-}
-
-/* Override the global .app overflow:clip for this page only */
-:global(.app) {
-  overflow: auto !important;
+  /* Ensure the view itself can scroll on mobile */
+  min-height: 100%;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .chart-container {
