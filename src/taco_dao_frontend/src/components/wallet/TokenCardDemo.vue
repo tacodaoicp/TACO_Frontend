@@ -605,7 +605,7 @@ const tacoStore = useTacoStore()
 const { getPermissionIcon, getPermissionColor, getPermissionDescription } = usePermissionMapping()
 
 // Clipboard functionality
-const { copy } = useClipboard()
+const { copy } = useClipboard({ legacy: true })
 
 // ICP Account ID computation
 const icpAccountId = computed(() => {

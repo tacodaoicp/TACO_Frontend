@@ -739,20 +739,55 @@
   }  
 
   // on click, copy user principal to clipboard
-  const copyUserPrincipalToClipboard = () => {
-    navigator.clipboard.writeText(userPrincipal.value)
-    // alert('Copied user principal to clipboard: ' + userPrincipal.value)
-    addToast({
-      id: Date.now(),
-      code: 'code',
-      tradeAmount: '',
-      tokenSellIdentifier: '',
-      tradeLimit: '',
-      tokenInitIdentifier: '',
-      title: '👨‍🍳 Principal Copied!',
-      icon: '',
-      message: `Account principal was copied to your clipboard`
-    })
+  const copyUserPrincipalToClipboard = async () => {
+    try {
+      // Try modern clipboard API first
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(userPrincipal.value)
+      } else {
+        // Fallback for non-secure contexts
+        const textarea = document.createElement('textarea')
+        textarea.value = userPrincipal.value
+        textarea.style.position = 'fixed'
+        textarea.style.opacity = '0'
+        document.body.appendChild(textarea)
+        textarea.select()
+        document.execCommand('copy')
+        document.body.removeChild(textarea)
+      }
+      addToast({
+        id: Date.now(),
+        code: 'code',
+        tradeAmount: '',
+        tokenSellIdentifier: '',
+        tradeLimit: '',
+        tokenInitIdentifier: '',
+        title: '👨‍🍳 Principal Copied!',
+        icon: '',
+        message: `Account principal was copied to your clipboard`
+      })
+    } catch (err) {
+      // Fallback for older browsers
+      const textarea = document.createElement('textarea')
+      textarea.value = userPrincipal.value
+      textarea.style.position = 'fixed'
+      textarea.style.opacity = '0'
+      document.body.appendChild(textarea)
+      textarea.select()
+      document.execCommand('copy')
+      document.body.removeChild(textarea)
+      addToast({
+        id: Date.now(),
+        code: 'code',
+        tradeAmount: '',
+        tokenSellIdentifier: '',
+        tradeLimit: '',
+        tokenInitIdentifier: '',
+        title: '👨‍🍳 Principal Copied!',
+        icon: '',
+        message: `Account principal was copied to your clipboard`
+      })
+    }
   }
 
   /////////////////////

@@ -165,6 +165,11 @@ export function getEffectiveNetwork(): 'ic' | 'staging' | 'local' {
     if (hostname.includes('wxunf-maaaa-aaaab-qbzga-cai')) {
       return 'staging'
     }
+    // Local development (localhost, 127.0.0.1, or LAN addresses like 192.x.x.x)
+    // Default to mainnet for local dev so you can test against real data without running dfx
+    if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname.startsWith('192.')) {
+      return 'ic'
+    }
   }
 
   return 'local'
@@ -206,27 +211,20 @@ let workerSetNetwork: ((network: 'ic' | 'staging' | 'local' | null) => void) | n
 export function initNetworkConfig(setNetworkFn: (network: 'ic' | 'staging' | 'local' | null) => void): void {
   workerSetNetwork = setNetworkFn
 
-  const hostname = window.location.hostname
-  const isLocalAddress = hostname === 'localhost' || hostname === '127.0.0.1' || hostname.startsWith('192.')
-  const isStagingCanister = hostname.includes('wxunf-maaaa-aaaab-qbzga-cai')
-  let override = getNetworkOverride()
+  // Get the effective network (already auto-detects based on hostname)
+  const effectiveNetwork = getEffectiveNetwork()
 
-  if (isStagingCanister && !override) {
-    // Auto-set staging when on staging canister
-    setNetworkOverride('staging')
-    override = 'staging'
-    console.log('[NetworkConfig] Staging canister detected - auto-connecting to staging')
-  } else if (isLocalAddress && !override) {
-    // Auto-set mainnet for local development
-    setNetworkOverride('ic')
-    override = 'ic'
-    console.log('[NetworkConfig] Local address detected - auto-connecting to mainnet')
+  // Log what network we're using
+  if (isBrowser()) {
+    const hostname = window.location.hostname
+    const isLocalAddress = hostname === 'localhost' || hostname === '127.0.0.1' || hostname.startsWith('192.')
+    if (isLocalAddress && effectiveNetwork === 'ic') {
+      console.log('[NetworkConfig] Local dev detected - using mainnet (ic0.app)')
+    }
   }
 
-  // Apply network override to all workers
-  if (override) {
-    workerSetNetwork(override)
-  }
+  // Apply the effective network to all workers
+  workerSetNetwork(effectiveNetwork)
 }
 
 // DEV ONLY: tacoConfig is completely excluded from production builds

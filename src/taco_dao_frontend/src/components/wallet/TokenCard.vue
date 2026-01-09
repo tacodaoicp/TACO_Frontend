@@ -390,6 +390,20 @@
 
                   </button>
 
+                  <!-- refresh stake button - for stuck stakes where transfer succeeded but claim failed -->
+                  <button @click.stop="dismissTooltips(); refreshNeuronStake(neuron.id, neuron.idHex)"
+                          class="btn btn-sm taco-btn taco-btn--green p-1"
+                          :disabled="refreshingNeurons.has(neuron.idHex)"
+                          data-bs-toggle="tooltip"
+                          data-bs-placement="bottom"
+                          data-bs-custom-class="taco-tooltip"
+                          title="Refresh stake (finalize pending transfers)">
+
+                    <!-- icon -->
+                    <i class="fa fa-fw fa-refresh" :class="{ 'fa-spin': refreshingNeurons.has(neuron.idHex) }"></i>
+
+                  </button>
+
                   <!-- disburse neuron button -->
                   <button v-if="neuron.dissolveState.type === 'dissolved' || (neuron.dissolveState.type === 'delay' && neuron.dissolveState.seconds === 0)"
                           @click.stop="localDisburseNeuron(neuron.id); dismissTooltips()"
@@ -559,6 +573,24 @@
 
           </div>
 
+          <!-- recover stuck stakes -->
+          <div class="token-card__neurons__add-neuron-card
+                      d-flex flex-column align-items-center justify-content-center"
+              :class="{ 'opacity-50': isRecoveringStakes }"
+              @click="recoverStuckStakes">
+
+            <!-- icon -->
+            <span style="font-size: 2rem;">
+              <i class="fa fa-search" :class="{ 'fa-spin': isRecoveringStakes }"></i>
+            </span>
+
+            <!-- text -->
+            <span class="text-center">
+              {{ isRecoveringStakes ? 'Scanning...' : 'Recover Stuck Stakes' }}
+            </span>
+
+          </div>
+
         </div>
 
       </div>
@@ -638,6 +670,20 @@
 
                     <!-- icon -->
                     <i class="fa fa-fw fa-plus"></i>
+
+                  </button>
+
+                  <!-- refresh stake button - for stuck stakes where transfer succeeded but claim failed -->
+                  <button @click.stop="dismissTooltips(); refreshNeuronStake(neuron.id, neuron.idHex)"
+                          class="btn btn-sm taco-btn taco-btn--green p-1"
+                          :disabled="refreshingNeurons.has(neuron.idHex)"
+                          data-bs-toggle="tooltip"
+                          data-bs-placement="bottom"
+                          data-bs-custom-class="taco-tooltip"
+                          title="Refresh stake (finalize pending transfers)">
+
+                    <!-- icon -->
+                    <i class="fa fa-fw fa-refresh" :class="{ 'fa-spin': refreshingNeurons.has(neuron.idHex) }"></i>
 
                   </button>
 
@@ -1090,7 +1136,7 @@ const stopDissolving = async (neuronId: Uint8Array) => {
 }
 
 // Clipboard functionality
-const { copy } = useClipboard()
+const { copy } = useClipboard({ legacy: true })
 
 const { addToast } = tacoStore // not reactive
 
@@ -1124,6 +1170,105 @@ const localDisburseNeuron = async (neuronId: Uint8Array) => {
       icon: 'fa-solid fa-exclamation-triangle',
       message: 'Neuron disburse failed, please try again'
     })
+  }
+}
+
+// Refresh neuron stake - used to finalize stuck stakes where transfer succeeded but ClaimOrRefresh failed
+const refreshingNeurons = ref<Set<string>>(new Set())
+
+const refreshNeuronStake = async (neuronId: Uint8Array, neuronIdHex: string) => {
+  if (refreshingNeurons.value.has(neuronIdHex)) return
+
+  refreshingNeurons.value.add(neuronIdHex)
+  tacoStore.appLoadingOn()
+
+  try {
+    await tacoStore.refreshNeuronStake(neuronId)
+
+    tacoStore.addToast({
+      id: Date.now(),
+      code: 'refresh-stake-success',
+      title: 'Stake Refreshed',
+      icon: 'fa-solid fa-check',
+      message: 'Neuron stake refreshed successfully. Any pending transfers have been finalized.'
+    })
+
+    // Reload neurons to show updated stake
+    loadNeurons(true)
+  } catch (error: any) {
+    console.error('Failed to refresh neuron stake:', error)
+    tacoStore.addToast({
+      id: Date.now(),
+      code: 'refresh-stake-error',
+      title: 'Refresh Failed',
+      icon: 'fa-solid fa-exclamation-triangle',
+      message: error.message || 'Failed to refresh neuron stake. Please try again.'
+    })
+  } finally {
+    refreshingNeurons.value.delete(neuronIdHex)
+    tacoStore.appLoadingOff()
+  }
+}
+
+// Recover stuck stakes - for new neuron creation that failed
+const isRecoveringStakes = ref(false)
+
+const recoverStuckStakes = async () => {
+  if (isRecoveringStakes.value) return
+
+  isRecoveringStakes.value = true
+
+  try {
+    tacoStore.addToast({
+      id: Date.now(),
+      code: 'recover-start',
+      title: 'Scanning for Stuck Stakes',
+      icon: 'fa-solid fa-search',
+      message: 'Scanning your subaccounts for orphaned stakes...'
+    })
+
+    const result = await tacoStore.recoverStuckStakes(50) // Check first 50 nonces (covers users with up to 50 neurons)
+
+    if (result.found.length === 0) {
+      tacoStore.addToast({
+        id: Date.now(),
+        code: 'recover-none',
+        title: 'No Stuck Stakes Found',
+        icon: 'fa-solid fa-check',
+        message: 'No orphaned stakes were found. Your stakes are all accounted for!'
+      })
+    } else if (result.totalRecovered > 0) {
+      tacoStore.addToast({
+        id: Date.now(),
+        code: 'recover-success',
+        title: 'Stakes Recovered!',
+        icon: 'fa-solid fa-check',
+        message: `Successfully recovered ${result.totalRecovered} stuck stake(s)! Refreshing neurons...`
+      })
+      // Reload neurons to show the recovered ones
+      loadNeurons(true)
+    } else {
+      // Found stakes but couldn't recover them
+      const totalFound = result.found.reduce((sum, f) => sum + f.balance, 0n)
+      tacoStore.addToast({
+        id: Date.now(),
+        code: 'recover-partial',
+        title: 'Stuck Stakes Found',
+        icon: 'fa-solid fa-exclamation-triangle',
+        message: `Found ${result.found.length} stuck stake(s) totaling ${Number(totalFound) / 1e8} TACO, but recovery failed. Check console for details.`
+      })
+    }
+  } catch (error: any) {
+    console.error('Failed to recover stuck stakes:', error)
+    tacoStore.addToast({
+      id: Date.now(),
+      code: 'recover-error',
+      title: 'Recovery Failed',
+      icon: 'fa-solid fa-exclamation-triangle',
+      message: error.message || 'Failed to scan for stuck stakes. Please try again.'
+    })
+  } finally {
+    isRecoveringStakes.value = false
   }
 }
 
@@ -1394,16 +1539,23 @@ const loadRewards = async (forceRefresh = false, showLoading = true) => {
   }
 }
 
-// dismiss tooltips
+// dismiss tooltips safely
 const dismissTooltips = () => {
-  const tooltipElements = document.querySelectorAll('.token-card [data-bs-toggle="tooltip"]')
-  tooltipElements.forEach(element => {
-    const tooltip = Tooltip.getInstance(element)
-    if (tooltip) {
-      tooltip.hide() // explicitly hide before disposal
-      tooltip.dispose()
-    }
-  })
+  try {
+    const tooltipElements = document.querySelectorAll('.token-card [data-bs-toggle="tooltip"]')
+    tooltipElements.forEach(element => {
+      try {
+        const tooltip = Tooltip.getInstance(element)
+        if (tooltip) {
+          tooltip.hide()
+        }
+      } catch (e) {
+        // Ignore tooltip errors - element may have been removed
+      }
+    })
+  } catch (e) {
+    // Ignore errors during tooltip dismissal
+  }
 }
 
 // QR Modal methods

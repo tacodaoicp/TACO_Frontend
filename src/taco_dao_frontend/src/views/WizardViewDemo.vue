@@ -642,7 +642,7 @@ const router = useRouter()
 const tacoStore = useTacoStore()
 const kongStore = useKongStore()
 const icpswapStore = useICPSwapStore()
-const { copy } = useClipboard()
+const { copy } = useClipboard({ legacy: true })
 
 // State
 const loading = ref(true)

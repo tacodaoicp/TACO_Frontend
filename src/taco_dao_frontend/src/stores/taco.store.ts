@@ -13,6 +13,7 @@ import { getEffectiveNetwork } from '../config/network-config'
 
 // Only import Principal synchronously - it's small and used everywhere
 import { Principal } from '@dfinity/principal'
+import { sha256 } from 'js-sha256'
 
 // Debug mode (use tacoConfig.debug() in console to enable/disable)
 import { isDebugEnabled } from '../config/network-config'
@@ -8187,7 +8188,7 @@ export const useTacoStore = defineStore('taco', () => {
 
     // Generate neuron subaccount using the correct SNS formula
     // SHA256(0x0c, "neuron-stake", principal-bytes, nonce-u64-be)
-    const generateNeuronSubaccount = async (controller: Principal, nonce: bigint): Promise<Uint8Array> => {
+    const generateNeuronSubaccount = (controller: Principal, nonce: bigint): Uint8Array => {
         // u64 → big-endian 8 bytes using DataView (more reliable)
         const u64be = (value: bigint): Uint8Array => {
             const buffer = new ArrayBuffer(8);
@@ -8202,7 +8203,7 @@ export const useTacoStore = defineStore('taco', () => {
             controller.toUint8Array(),                                  // controller principal bytes
             u64be(nonce),                                               // nonce as u64 big-endian
         ];
-        
+
         // Concatenate all chunks
         const totalLength = chunks.reduce((sum, chunk) => sum + chunk.length, 0);
         const data = new Uint8Array(totalLength);
@@ -8211,10 +8212,12 @@ export const useTacoStore = defineStore('taco', () => {
             data.set(chunk, offset);
             offset += chunk.length;
         }
-        
-        // Hash with SHA-256
-        const digest = await crypto.subtle.digest("SHA-256", data);
-        return new Uint8Array(digest);
+
+        // Hash with SHA-256 using js-sha256 (works in all contexts, not just HTTPS)
+        const hashHex = sha256(data);
+        // Convert hex string to Uint8Array
+        const hashBytes = new Uint8Array(hashHex.match(/.{1,2}/g)!.map(byte => parseInt(byte, 16)));
+        return hashBytes;
     }
 
     // Find next available subaccount for neuron creation
@@ -8243,7 +8246,7 @@ export const useTacoStore = defineStore('taco', () => {
         // Try nonces starting from 0
         for (let nonce = 0n; nonce < 1000n; nonce++) {  // Reasonable upper limit
             const controllerPrincipal = Principal.fromText(userPrincipal.value);
-            const subaccount = await generateNeuronSubaccount(controllerPrincipal, nonce);
+            const subaccount = generateNeuronSubaccount(controllerPrincipal, nonce);
             
             try {
                 // Try to get neuron with this subaccount
@@ -8337,6 +8340,150 @@ export const useTacoStore = defineStore('taco', () => {
             console.error('Error staking to neuron:', error);
             throw error;
         }
+    }
+
+    // Refresh neuron stake - use this to finalize stuck stakes where tokens were transferred but ClaimOrRefresh failed
+    const refreshNeuronStake = async (neuronId: Uint8Array) => {
+        try {
+            if (!userLoggedIn.value) {
+                throw new Error('User must be logged in');
+            }
+
+            console.log('Refreshing neuron stake to finalize any pending transfers...');
+            console.log(`Neuron ID (hex): ${Array.from(neuronId).map(b => b.toString(16).padStart(2, '0')).join('')}`);
+
+            // Call claimOrRefreshNeuron with NeuronId variant (no memo) to update stake from any pending transfers
+            await claimOrRefreshNeuron(neuronId);
+
+            console.log('Neuron stake refreshed successfully!');
+            return true;
+        } catch (error: any) {
+            console.error('Error refreshing neuron stake:', error);
+            throw error;
+        }
+    }
+
+    // Recover stuck stakes - finds subaccounts with tokens where neuron creation failed
+    // This scans through nonces and attempts to claim any orphaned stakes
+    const recoverStuckStakes = async (maxNoncesToCheck: number = 20): Promise<{
+        found: Array<{ nonce: number; balance: bigint; recovered: boolean; error?: string }>;
+        totalRecovered: number;
+    }> => {
+        if (!userLoggedIn.value) {
+            throw new Error('User must be logged in');
+        }
+
+        console.log(`Scanning for stuck stakes (checking nonces 0-${maxNoncesToCheck - 1})...`);
+
+        const authClient = await getAuthClient();
+        const identity = authClient.getIdentity();
+
+        const agent = await createAgent({
+            identity,
+            host: getNetworkHost(),
+            fetchRootKey: shouldFetchRootKey(),
+        });
+
+        const tacoTokenPrincipal = 'kknbx-zyaaa-aaaaq-aae4a-cai';
+        const snsGovernancePrincipal = 'lhdfz-wqaaa-aaaaq-aae3q-cai';
+
+        // Create ICRC1 actor for balance checking
+        const icrc1IDL = ({ IDL }: any) => {
+            return IDL.Service({
+                'icrc1_balance_of': IDL.Func(
+                    [IDL.Record({
+                        'owner': IDL.Principal,
+                        'subaccount': IDL.Opt(IDL.Vec(IDL.Nat8))
+                    })],
+                    [IDL.Nat],
+                    ['query']
+                )
+            });
+        };
+
+        const tokenActor = Actor.createActor(icrc1IDL, {
+            agent,
+            canisterId: tacoTokenPrincipal
+        });
+
+        const found: Array<{ nonce: number; balance: bigint; recovered: boolean; error?: string }> = [];
+        let totalRecovered = 0;
+
+        const controllerPrincipal = Principal.fromText(userPrincipal.value);
+
+        // Create SNS Governance actor for checking if neurons already exist
+        const governanceActor = await createSnsGovernanceActor(agent, snsGovernancePrincipal);
+
+        for (let nonce = 0; nonce < maxNoncesToCheck; nonce++) {
+            try {
+                // Generate subaccount for this nonce
+                const subaccount = generateNeuronSubaccount(controllerPrincipal, BigInt(nonce));
+
+                // FIRST: Check if a neuron already exists at this nonce
+                // If it does, this is NOT a stuck stake - it's a working neuron
+                let neuronExists = false;
+                try {
+                    const getNeuronRequest = {
+                        neuron_id: [{ id: Array.from(subaccount) }]
+                    };
+                    const neuronResult = await governanceActor.get_neuron(getNeuronRequest) as any;
+
+                    // Check if we got a valid neuron back
+                    if (neuronResult.result && neuronResult.result.length > 0) {
+                        const inner = neuronResult.result[0];
+                        if (inner?.Neuron || (inner && !inner.Error && !inner.Err)) {
+                            neuronExists = true;
+                            console.log(`Nonce ${nonce}: neuron already exists, skipping`);
+                        }
+                    }
+                } catch (getNeuronError) {
+                    // Error calling get_neuron means no neuron exists, which is fine
+                    console.log(`Nonce ${nonce}: no existing neuron found (this is expected for potential stuck stakes)`);
+                }
+
+                // If neuron already exists, skip this nonce entirely
+                if (neuronExists) {
+                    continue;
+                }
+
+                // Check balance in this subaccount on the governance canister
+                const balance = await tokenActor.icrc1_balance_of({
+                    owner: Principal.fromText(snsGovernancePrincipal),
+                    subaccount: [Array.from(subaccount)]
+                }) as bigint;
+
+                // Minimum 1 TACO (100_000_000 e8s) to avoid false positives on dust
+                const MIN_STAKE_THRESHOLD = 100_000_000n;
+
+                if (balance >= MIN_STAKE_THRESHOLD) {
+                    console.log(`Found TRULY stuck stake at nonce ${nonce}: ${balance} e8s (${Number(balance) / 1e8} TACO)`);
+
+                    // Try to claim the neuron
+                    try {
+                        await claimOrRefreshNeuron(subaccount, BigInt(nonce));
+                        console.log(`Successfully recovered stake at nonce ${nonce}!`);
+                        found.push({ nonce, balance, recovered: true });
+                        totalRecovered++;
+                    } catch (claimError: any) {
+                        console.error(`Failed to recover stake at nonce ${nonce}:`, claimError);
+                        found.push({
+                            nonce,
+                            balance,
+                            recovered: false,
+                            error: claimError.message || 'Unknown error'
+                        });
+                    }
+                } else if (balance > 0n) {
+                    console.log(`Nonce ${nonce}: found dust amount (${Number(balance) / 1e8} TACO), skipping`);
+                }
+            } catch (error: any) {
+                // Skip errors for individual nonces (likely just means no stake there)
+                console.log(`Nonce ${nonce}: no stake or error checking`);
+            }
+        }
+
+        console.log(`Scan complete. Found ${found.length} stuck stakes, recovered ${totalRecovered}.`);
+        return { found, totalRecovered };
     }
 
     // Transfer tokens to neuron subaccount
@@ -8445,11 +8592,11 @@ export const useTacoStore = defineStore('taco', () => {
         const subaccount = new Uint8Array(32);
         subaccount.set(neuronId, 0);
 
-        // Debug logging
-        // console.log(`ClaimOrRefresh request details:`);
-        // console.log(`- Subaccount: ${Array.from(subaccount).map(b => b.toString(16).padStart(2, '0')).join('')}`);
-        // console.log(`- Memo: ${memo}`);
-        // console.log(`- Controller: ${userPrincipal.value}`);
+        // Debug logging for staking issues
+        console.log(`ClaimOrRefresh request details:`);
+        console.log(`- Subaccount: ${Array.from(subaccount).map(b => b.toString(16).padStart(2, '0')).join('')}`);
+        console.log(`- Memo: ${memo}`);
+        console.log(`- Controller: ${userPrincipal.value}`);
 
         // For neuron creation, we need to use MemoAndController variant
         const manageNeuronRequest = memo !== undefined ? {
@@ -8476,17 +8623,25 @@ export const useTacoStore = defineStore('taco', () => {
             }]
         };
 
-        // Convert BigInt to string for logging
-        const requestForLogging = JSON.parse(JSON.stringify(manageNeuronRequest, (key, value) =>
+        // Log request for debugging
+        const requestForLogging = JSON.parse(JSON.stringify(manageNeuronRequest, (_key, value) =>
             typeof value === 'bigint' ? value.toString() : value
         ));
-        // console.log('ManageNeuron request:', JSON.stringify(requestForLogging, null, 2));
+        console.log('ManageNeuron request:', JSON.stringify(requestForLogging, null, 2));
 
         const result = await governanceActor.manage_neuron(manageNeuronRequest) as any;
-        
+        console.log('ManageNeuron result:', JSON.stringify(result, (_key, value) =>
+            typeof value === 'bigint' ? value.toString() : value
+        , 2));
+
         if (result.command && result.command.length > 0 && 'ClaimOrRefresh' in result.command[0]) {
             return result.command[0].ClaimOrRefresh;
+        } else if (result.command && result.command.length > 0 && 'Error' in result.command[0]) {
+            const error = result.command[0].Error;
+            console.error('ClaimOrRefresh governance error:', error);
+            throw new Error(`ClaimOrRefresh failed: ${error.error_message || JSON.stringify(error)}`);
         } else {
+            console.error('ClaimOrRefresh unexpected result:', result);
             throw new Error(`ClaimOrRefresh failed: ${JSON.stringify(result)}`);
         }
     }
@@ -10556,6 +10711,8 @@ export const useTacoStore = defineStore('taco', () => {
         formatNeuronIdForMap,
         stakeToNeuron,
         createNeuron,
+        refreshNeuronStake,
+        recoverStuckStakes,
         setNeuronDissolveDelay,
         startDissolving,
         stopDissolving,

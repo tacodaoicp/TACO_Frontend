@@ -581,11 +581,38 @@ export default {
     async copyNeuronId(neuronId) {
       try {
         const formattedId = this.formatNeuronId(neuronId)
-        await navigator.clipboard.writeText(formattedId)
+        // Try modern clipboard API first
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          await navigator.clipboard.writeText(formattedId)
+        } else {
+          // Fallback for non-secure contexts
+          const textarea = document.createElement('textarea')
+          textarea.value = formattedId
+          textarea.style.position = 'fixed'
+          textarea.style.opacity = '0'
+          document.body.appendChild(textarea)
+          textarea.select()
+          document.execCommand('copy')
+          document.body.removeChild(textarea)
+        }
         this.successMessage = 'Neuron ID copied to clipboard!'
       } catch (error) {
-        console.error('Failed to copy:', error)
-        this.errorMessage = 'Failed to copy neuron ID'
+        // Fallback for older browsers
+        try {
+          const formattedId = this.formatNeuronId(neuronId)
+          const textarea = document.createElement('textarea')
+          textarea.value = formattedId
+          textarea.style.position = 'fixed'
+          textarea.style.opacity = '0'
+          document.body.appendChild(textarea)
+          textarea.select()
+          document.execCommand('copy')
+          document.body.removeChild(textarea)
+          this.successMessage = 'Neuron ID copied to clipboard!'
+        } catch (fallbackError) {
+          console.error('Failed to copy:', fallbackError)
+          this.errorMessage = 'Failed to copy neuron ID'
+        }
       }
     },
 

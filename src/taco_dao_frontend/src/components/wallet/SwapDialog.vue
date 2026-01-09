@@ -1110,25 +1110,28 @@ const selectInputToken = (token: Token) => {
 
 const setMaxAmount = () => {
   if (!selectedInputToken.value) return
-  
-  const maxAmount = selectedInputToken.value.balance - selectedInputToken.value.fee
+
+  // Subtract 2 fees to account for:
+  // 1. ICRC2 approval fee
+  // 2. Transfer/deposit fee when the swap pulls tokens
+  const maxAmount = selectedInputToken.value.balance - (selectedInputToken.value.fee * 2n)
   if (maxAmount <= 0n) {
     inputAmount.value = '0'
     return
   }
-  
+
   const decimals = selectedInputToken.value.decimals
   const divisor = BigInt(Math.pow(10, decimals))
   const wholePart = maxAmount / divisor
   const fractionalPart = maxAmount % divisor
-  
+
   if (fractionalPart === 0n) {
     inputAmount.value = wholePart.toString()
   } else {
     const fractionalStr = fractionalPart.toString().padStart(decimals, '0').replace(/0+$/, '')
     inputAmount.value = `${wholePart}.${fractionalStr}`
   }
-  
+
   fetchQuotes()
 }
 

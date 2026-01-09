@@ -88,17 +88,43 @@
 
                 <p class="mb-4">You can buy ICP on exchanges like <a class="wizard__step__link" href="https://www.coinbase.com" target="_blank">Coinbase</a>, <a class="wizard__step__link" href="https://www.binance.com" target="_blank">Binance</a>, or <a class="wizard__step__link" href="https://www.kraken.com" target="_blank">Kraken</a></p>   
 
-                <p class="mb-0">Send some to this address:</p>
+                <p class="mb-1">Send some to this address:</p>
 
+                <!-- Legacy ICP Account ID (for CEX withdrawals) -->
+                <p class="mb-0 small text-muted">Account ID (for exchanges):</p>
+                <p class="mb-2">
+
+                  <span class="wizard__step__link"
+                        style="cursor: pointer;"
+                        @click="copyToClipboard(userLedgerAccountId)">
+                    <span style="word-break: break-all; font-size: 0.85em;">
+                      {{ userLedgerAccountId }}
+                    </span>
+                  </span>
+
+                  <button @click="copyToClipboard(userLedgerAccountId)"
+                          style="color: var(--brown-to-white);"
+                          class="btn m-0 p-0 px-2">
+
+                    <i class="fa-regular fa-copy"></i>
+
+                  </button>
+
+                </p>
+
+                <!-- Principal (for ICRC-1 transfers) -->
+                <p class="mb-0 small text-muted">Principal (for ICP wallets):</p>
                 <p class="mb-3">
 
-                  <span class="wizard__step__link">
-                    <span style="word-break: break-all;">
+                  <span class="wizard__step__link"
+                        style="cursor: pointer;"
+                        @click="copyToClipboard(userPrincipal)">
+                    <span style="word-break: break-all; font-size: 0.85em;">
                       {{ userPrincipal }}
                     </span>
                   </span>
-                  
-                  <button @click="copy(userPrincipal); tacoStore.addToast({ id: Date.now(), code: 'copy-success', title: 'Copied!', icon: 'fa-solid fa-check', message: 'Address copied to clipboard' })"
+
+                  <button @click="copyToClipboard(userPrincipal)"
                           style="color: var(--brown-to-white);"
                           class="btn m-0 p-0 px-2">
 
@@ -667,7 +693,38 @@ import DfinityLogo from '../assets/images/dfinityLogo.vue'
 ///////////
 
 const router = useRouter()
-const { copy } = useClipboard()
+const { copy } = useClipboard({ legacy: true })
+
+// Copy to clipboard with fallback
+const copyToClipboard = async (text: string) => {
+  try {
+    await copy(text)
+    tacoStore.addToast({
+      id: Date.now(),
+      code: 'copy-success',
+      title: 'Copied!',
+      icon: 'fa-solid fa-check',
+      message: 'Address copied to clipboard'
+    })
+  } catch (err) {
+    // Fallback for older browsers
+    const textarea = document.createElement('textarea')
+    textarea.value = text
+    textarea.style.position = 'fixed'
+    textarea.style.opacity = '0'
+    document.body.appendChild(textarea)
+    textarea.select()
+    document.execCommand('copy')
+    document.body.removeChild(textarea)
+    tacoStore.addToast({
+      id: Date.now(),
+      code: 'copy-success',
+      title: 'Copied!',
+      icon: 'fa-solid fa-check',
+      message: 'Address copied to clipboard'
+    })
+  }
+}
 
 ////////////
 // Stores //
@@ -680,7 +737,7 @@ const icpswapStore = useICPSwapStore()
 
 // # STATE #
 const { userLoggedIn } = storeToRefs(tacoStore)
-const { userPrincipal } = storeToRefs(tacoStore)
+const { userPrincipal, userLedgerAccountId } = storeToRefs(tacoStore)
 
 // # ACTIONS #
 const { toggleTacoWizard } = tacoStore
@@ -1205,12 +1262,21 @@ const performStake = async () => {
     // log error
     console.error('staking failed:', error)
 
+    // Show error toast to user with details
+    tacoStore.addToast({
+      id: Date.now(),
+      code: 'staking-error',
+      title: 'Staking Failed',
+      icon: 'fa-solid fa-exclamation-triangle',
+      message: error.message || 'Failed to complete staking. If tokens were transferred, use the Refresh Stake button on your neuron to finalize.'
+    })
+
     // refresh balances
     await refreshBalances()
-    
+
     // refresh user neurons
     await loadUserNeurons()
-    
+
   } 
   
   // finally

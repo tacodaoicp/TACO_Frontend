@@ -218,7 +218,7 @@ const emit = defineEmits<{
 }>()
 
 const qrCanvas = ref<HTMLCanvasElement | null>(null)
-const { copy } = useClipboard()
+const { copy } = useClipboard({ legacy: true })
 const tacoStore = useTacoStore()
 
 const closeModal = () => {
