@@ -758,6 +758,11 @@
         // log
         // console.log('forum thread list mounted')
 
+        // Skip fetch if we already have proposals (prevents flash when returning to forum)
+        if (proposals.value.length > 0) {
+            return
+        }
+
         // show loading curtain
         componentLoading.value = true
 
