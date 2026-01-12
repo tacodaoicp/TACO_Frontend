@@ -16,7 +16,7 @@ import { Principal } from '@dfinity/principal'
 import { sha256 } from 'js-sha256'
 
 // Debug mode (use tacoConfig.debug() in console to enable/disable)
-import { isDebugEnabled } from '../config/network-config'
+import { isDebugEnabled, isSimulateStuckStakeEnabled, setSimulateStuckStake } from '../config/network-config'
 const WORKER_DEBUG = () => isDebugEnabled()
 
 // Type-only imports (no runtime cost)
@@ -8186,15 +8186,21 @@ export const useTacoStore = defineStore('taco', () => {
         }
     }
 
+    // Cross-browser BigInt to big-endian 8 bytes conversion
+    // Safari < 14 doesn't support DataView.setBigUint64()
+    const bigintToU64BE = (value: bigint): Uint8Array => {
+        const buffer = new Uint8Array(8);
+        for (let i = 7; i >= 0; i--) {
+            buffer[i] = Number(value & 0xffn);
+            value = value >> 8n;
+        }
+        return buffer;
+    };
+
     // Generate neuron subaccount using the correct SNS formula
     // SHA256(0x0c, "neuron-stake", principal-bytes, nonce-u64-be)
     const generateNeuronSubaccount = (controller: Principal, nonce: bigint): Uint8Array => {
-        // u64 → big-endian 8 bytes using DataView (more reliable)
-        const u64be = (value: bigint): Uint8Array => {
-            const buffer = new ArrayBuffer(8);
-            new DataView(buffer).setBigUint64(0, value);
-            return new Uint8Array(buffer);
-        };
+        const u64be = bigintToU64BE;
 
         // Build the data to hash
         const chunks = [
@@ -8299,6 +8305,16 @@ export const useTacoStore = defineStore('taco', () => {
             
             const transferResult = await transferToNeuronSubaccount(tacoTokenPrincipal, snsGovernancePrincipal, subaccount, amount, nonce);
             // console.log(`Transfer completed with block index: ${transferResult}`);
+
+            // DEV ONLY: Simulate stuck stake by skipping ClaimOrRefresh
+            if (isSimulateStuckStakeEnabled()) {
+                console.warn('⚠️ SIMULATING STUCK STAKE: Skipping ClaimOrRefresh step!');
+                console.log(`Tokens transferred to subaccount at nonce ${nonce}, but neuron NOT created.`);
+                console.log(`Use "Recover Stuck Stakes" button to recover these tokens.`);
+                // Reset the flag after use (one-shot simulation)
+                setSimulateStuckStake(false);
+                throw new Error('Simulated stuck stake: ClaimOrRefresh skipped (tokens transferred but neuron not created)');
+            }
 
             // Step 2: Wait a moment for the transfer to be processed
             // console.log('Waiting for transfer to be processed...');
@@ -8462,6 +8478,17 @@ export const useTacoStore = defineStore('taco', () => {
                     try {
                         await claimOrRefreshNeuron(subaccount, BigInt(nonce));
                         console.log(`Successfully recovered stake at nonce ${nonce}!`);
+
+                        // Set 1 month dissolve delay (same as wizard default)
+                        try {
+                            console.log(`Setting 1 month dissolve delay for recovered neuron at nonce ${nonce}...`);
+                            await setNeuronDissolveDelay(subaccount, 1);
+                            console.log(`Dissolve delay set successfully for nonce ${nonce}`);
+                        } catch (dissolveError: any) {
+                            console.warn(`Failed to set dissolve delay for nonce ${nonce}:`, dissolveError);
+                            // Don't fail the recovery if dissolve delay fails - neuron is still recovered
+                        }
+
                         found.push({ nonce, balance, recovered: true });
                         totalRecovered++;
                     } catch (claimError: any) {
@@ -8541,12 +8568,8 @@ export const useTacoStore = defineStore('taco', () => {
         const subaccount = new Uint8Array(32);
         subaccount.set(neuronId, 0);
 
-        // Convert memo to bytes if provided
-        const memoBytes = memo ? (() => {
-            const buffer = new ArrayBuffer(8);
-            new DataView(buffer).setBigUint64(0, memo);
-            return Array.from(new Uint8Array(buffer));
-        })() : [];
+        // Convert memo to bytes if provided (using Safari-compatible bigintToU64BE)
+        const memoBytes = memo ? Array.from(bigintToU64BE(memo)) : [];
 
         const transferArgs = {
             to: {

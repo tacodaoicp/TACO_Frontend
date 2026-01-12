@@ -44,6 +44,23 @@ function isBrowser(): boolean {
 // Only used in dev mode - resets on every page refresh
 let sessionNetworkOverride: 'ic' | 'staging' | 'local' | null = null
 
+// DEV ONLY: Simulate stuck stake (skip ClaimOrRefresh step)
+let simulateStuckStakeEnabled = false
+
+/**
+ * Check if stuck stake simulation is enabled (DEV ONLY)
+ */
+export function isSimulateStuckStakeEnabled(): boolean {
+  return simulateStuckStakeEnabled
+}
+
+/**
+ * Enable/disable stuck stake simulation (DEV ONLY)
+ */
+export function setSimulateStuckStake(enabled: boolean): void {
+  simulateStuckStakeEnabled = enabled
+}
+
 /**
  * Get network override (for testing from local dev server)
  * Uses session-only storage (resets on refresh)
@@ -281,10 +298,22 @@ if (import.meta.env?.DEV && isBrowser()) {
     status: () => {
       const status = {
         ...getNetworkStatus(),
-        debugMode: isDebugEnabled()
+        debugMode: isDebugEnabled(),
+        simulateStuckStake: isSimulateStuckStakeEnabled()
       }
       console.table(status)
       return status
+    },
+    simulateStuckStake: (enabled?: boolean) => {
+      if (enabled === undefined) {
+        const current = isSimulateStuckStakeEnabled()
+        setSimulateStuckStake(!current)
+        console.log(`Simulate stuck stake: ${!current ? 'ON - next neuron creation will skip ClaimOrRefresh!' : 'OFF'}`)
+      } else {
+        setSimulateStuckStake(enabled)
+        console.log(`Simulate stuck stake: ${enabled ? 'ON - next neuron creation will skip ClaimOrRefresh!' : 'OFF'}`)
+      }
+      return isSimulateStuckStakeEnabled()
     },
     help: () => {
       console.log(`
@@ -297,6 +326,9 @@ tacoConfig.useAuto()     - Auto-detect from environment
 tacoConfig.debug()       - Toggle debug messages (default: off)
 tacoConfig.debug(true)   - Enable debug messages
 tacoConfig.debug(false)  - Disable debug messages
+tacoConfig.simulateStuckStake()       - Toggle stuck stake simulation
+tacoConfig.simulateStuckStake(true)   - Enable: skip ClaimOrRefresh on next neuron creation
+tacoConfig.simulateStuckStake(false)  - Disable stuck stake simulation
 tacoConfig.status()      - Show current configuration
 tacoConfig.help()        - Show this help
 
@@ -323,4 +355,6 @@ export default {
   initDebugMode,
   debugLog,
   forceLog,
+  isSimulateStuckStakeEnabled,
+  setSimulateStuckStake,
 }
