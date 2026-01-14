@@ -174,13 +174,13 @@ export function getEffectiveNetwork(): 'ic' | 'staging' | 'local' {
   // Auto-detect from hostname (critical for production where env vars may not be set)
   if (isBrowser()) {
     const hostname = window.location.hostname
+    // Staging canister (check BEFORE generic .icp0.io to avoid false positive)
+    if (hostname.includes('wxunf-maaaa-aaaab-qbzga-cai')) {
+      return 'staging'
+    }
     // Production domains
     if (hostname === 'tacodao.com' || hostname.endsWith('.tacodao.com') || hostname.endsWith('.icp0.io') || hostname.endsWith('.ic0.app')) {
       return 'ic'
-    }
-    // Staging canister
-    if (hostname.includes('wxunf-maaaa-aaaab-qbzga-cai')) {
-      return 'staging'
     }
     // Local development (localhost, 127.0.0.1, or LAN addresses like 192.x.x.x)
     // Default to mainnet for local dev so you can test against real data without running dfx

@@ -6,24 +6,9 @@
 import { ref, computed } from 'vue'
 import { defineStore } from 'pinia'
 import { Actor } from '@dfinity/agent'
-import { createAgent, principalToSubAccount } from '@dfinity/utils'
+import { principalToSubAccount } from '@dfinity/utils'
 import { Principal } from '@dfinity/principal'
-import { AuthClient } from '@dfinity/auth-client'
 import { useTacoStore } from './taco.store'
-import { getEffectiveNetwork } from '../config/network-config'
-
-// Helper functions for runtime network detection
-function shouldFetchRootKey(): boolean {
-    return getEffectiveNetwork() === 'local'
-}
-function getNetworkHost(): string {
-    const network = getEffectiveNetwork()
-    if (network === 'local') {
-        const port = import.meta.env.VITE_LOCAL_PORT || '4943'
-        return `http://localhost:${port}`
-    }
-    return 'https://ic0.app'
-}
 
 // ICPSwap Factory canister ID
 const ICPSWAP_FACTORY_ID = '4mmnk-kiaaa-aaaag-qbllq-cai'
@@ -91,14 +76,8 @@ export const useICPSwapStore = defineStore('icpswap', () => {
 
   // # FACTORY ACTOR #
   const createFactoryActor = async () => {
-    const authClient = await AuthClient.create()
-    const identity = await authClient.getIdentity()
-    
-    const agent = await createAgent({
-      identity,
-      host: getNetworkHost(),
-      fetchRootKey: shouldFetchRootKey(),
-    })
+    // Use taco store's centralized authenticated agent
+    const agent = await tacoStore.getAuthenticatedAgent()
 
     const factoryIDL = ({ IDL }: any) => {
       const Token = IDL.Record({
@@ -139,14 +118,8 @@ export const useICPSwapStore = defineStore('icpswap', () => {
 
   // # POOL ACTOR #
   const createPoolActor = async (poolId: string) => {
-    const authClient = await AuthClient.create()
-    const identity = await authClient.getIdentity()
-    
-    const agent = await createAgent({
-      identity,
-      host: getNetworkHost(),
-      fetchRootKey: shouldFetchRootKey(),
-    })
+    // Use taco store's centralized authenticated agent
+    const agent = await tacoStore.getAuthenticatedAgent()
 
     const poolIDL = ({ IDL }: any) => {
       const Account = IDL.Record({
@@ -248,14 +221,8 @@ export const useICPSwapStore = defineStore('icpswap', () => {
 
   // # ICRC TOKEN ACTOR #
   const createTokenActor = async (tokenPrincipal: string) => {
-    const authClient = await AuthClient.create()
-    const identity = await authClient.getIdentity()
-    
-    const agent = await createAgent({
-      identity,
-      host: getNetworkHost(),
-      fetchRootKey: shouldFetchRootKey(),
-    })
+    // Use taco store's centralized authenticated agent
+    const agent = await tacoStore.getAuthenticatedAgent()
 
     const icrcIDL = ({ IDL }: any) => {
       const Account = IDL.Record({

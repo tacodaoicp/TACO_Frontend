@@ -303,9 +303,146 @@ async function initializeShims() {
     _shimsInitialized = true
 }
 
+// ============================================================================
+// Agent & Actor Caching - Reduces compute/RAM by reusing instances
+// ============================================================================
+
+// Cached anonymous agent (shared across all anonymous queries)
+let _cachedAnonymousAgent: any = null
+let _cachedAnonymousAgentHost: string | null = null
+
+// Cached authenticated agent (shared across all authenticated queries)
+let _cachedAuthenticatedAgent: any = null
+let _cachedAuthenticatedAgentHost: string | null = null
+let _cachedAuthenticatedAgentPrincipal: string | null = null
+
+// Actor cache: Map<canisterId, actor> for each agent type
+const _anonymousActorCache = new Map<string, any>()
+const _authenticatedActorCache = new Map<string, any>()
+
+// Track last authenticated identity to invalidate cache on identity change
+let _lastAuthIdentityPrincipal: string | null = null
+
+/**
+ * Get or create a cached anonymous agent
+ */
+async function getAnonymousAgent() {
+    await initializeShims()
+    const host = getNetworkHost()
+
+    // Return cached agent if host matches
+    if (_cachedAnonymousAgent && _cachedAnonymousAgentHost === host) {
+        return _cachedAnonymousAgent
+    }
+
+    // Create new agent and cache it
+    _cachedAnonymousAgent = await createAgent({
+        identity: new AnonymousIdentity(),
+        host,
+        fetchRootKey: shouldFetchRootKey(),
+    })
+    _cachedAnonymousAgentHost = host
+
+    // Clear actor cache when agent changes
+    _anonymousActorCache.clear()
+
+    return _cachedAnonymousAgent
+}
+
+/**
+ * Get or create a cached actor for anonymous queries
+ * NOTE: idlFactory must be one of the global IDL variables (e.g., daoBackendIDL)
+ * which are populated by initializeShims(). This function ensures shims are
+ * initialized before using the idlFactory.
+ */
+async function getAnonymousActor(canisterId: string, getIdlFactory: () => any) {
+    // Ensure shims are initialized first (this populates the global IDL variables)
+    await initializeShims()
+
+    const cacheKey = canisterId
+
+    // Return cached actor if available
+    if (_anonymousActorCache.has(cacheKey)) {
+        return _anonymousActorCache.get(cacheKey)
+    }
+
+    // Get the IDL factory AFTER shims are initialized
+    const idlFactory = getIdlFactory()
+
+    // Create new actor
+    const agent = await getAnonymousAgent()
+    const actor = Actor.createActor(idlFactory, { agent, canisterId })
+
+    // Cache and return
+    _anonymousActorCache.set(cacheKey, actor)
+    return actor
+}
+
+/**
+ * Get or create a cached actor for authenticated calls
+ * Cache is invalidated when identity changes
+ * @param authClient - The auth client instance (from store's getAuthClient)
+ * @param canisterId - The canister ID
+ * @param getIdlFactory - Getter function for the IDL factory (called after shims init)
+ */
+async function getAuthenticatedActor(authClient: any, canisterId: string, getIdlFactory: () => any) {
+    await initializeShims()
+
+    if (!await authClient.isAuthenticated()) {
+        throw new Error('User not authenticated')
+    }
+
+    const identity = await authClient.getIdentity()
+    const currentPrincipal = identity.getPrincipal().toText()
+
+    // Invalidate cache if identity changed
+    if (_lastAuthIdentityPrincipal !== currentPrincipal) {
+        _authenticatedActorCache.clear()
+        _lastAuthIdentityPrincipal = currentPrincipal
+    }
+
+    const cacheKey = canisterId
+
+    // Return cached actor if available
+    if (_authenticatedActorCache.has(cacheKey)) {
+        return _authenticatedActorCache.get(cacheKey)
+    }
+
+    // Get the IDL factory AFTER shims are initialized
+    const idlFactory = getIdlFactory()
+
+    // Create new agent and actor
+    const agent = await createAgent({
+        identity,
+        host: getNetworkHost(),
+        fetchRootKey: shouldFetchRootKey(),
+    })
+
+    const actor = Actor.createActor(idlFactory, { agent, canisterId })
+
+    // Cache and return
+    _authenticatedActorCache.set(cacheKey, actor)
+    return actor
+}
+
+/**
+ * Clear all actor caches (call on logout or network change)
+ */
+function clearActorCaches() {
+    _cachedAnonymousAgent = null
+    _cachedAnonymousAgentHost = null
+    _cachedAuthenticatedAgent = null
+    _cachedAuthenticatedAgentHost = null
+    _cachedAuthenticatedAgentPrincipal = null
+    _anonymousActorCache.clear()
+    _authenticatedActorCache.clear()
+    _lastAuthIdentityPrincipal = null
+}
+
 /**
  * Helper to create an anonymous agent with proper initialization
  * This ensures shims are loaded before using AnonymousIdentity
+ * @deprecated Use getAnonymousAgent() for caching benefits
  */
 async function createAnonymousAgent(host: string) {
     await initializeShims()
@@ -1702,7 +1839,10 @@ export const useTacoStore = defineStore('taco', () => {
                     // Deserialize BigInt values from worker, then process
                     const deserialized = deserializeFromTransfer(data) as ProposalData[]
                     const processed = deserialized.map(processProposalData).filter(Boolean) as TacoProposal[]
-                    fetchedTacoProposals.value = processed
+                    // Only update if we got data, don't overwrite existing data with empty array
+                    if (processed.length > 0 || fetchedTacoProposals.value.length === 0) {
+                        fetchedTacoProposals.value = processed
+                    }
                 }
             })
         )
@@ -2166,7 +2306,51 @@ export const useTacoStore = defineStore('taco', () => {
             })
         }
         return authClientInstance
-    }      
+    }
+
+    /**
+     * Get an authenticated agent for use with external actor factories (e.g., archive canisters)
+     * This ensures proper identity management and shim initialization
+     */
+    const getAuthenticatedAgent = async () => {
+        await initializeShims()
+
+        const authClient = await getAuthClient()
+
+        if (!await authClient.isAuthenticated()) {
+            throw new Error('User not authenticated')
+        }
+
+        const identity = await authClient.getIdentity()
+        const currentPrincipal = identity.getPrincipal().toText()
+        const host = getNetworkHost()
+
+        // Return cached agent if identity and host match
+        if (_cachedAuthenticatedAgent &&
+            _cachedAuthenticatedAgentPrincipal === currentPrincipal &&
+            _cachedAuthenticatedAgentHost === host) {
+            return _cachedAuthenticatedAgent
+        }
+
+        // Create new agent and cache it
+        _cachedAuthenticatedAgent = await createAgent({
+            identity,
+            host,
+            fetchRootKey: shouldFetchRootKey(),
+        })
+        _cachedAuthenticatedAgentPrincipal = currentPrincipal
+        _cachedAuthenticatedAgentHost = host
+
+        return _cachedAuthenticatedAgent
+    }
+
+    /**
+     * Get an anonymous agent for public queries
+     * Uses cached anonymous agent for efficiency
+     */
+    const getAnonymousAgentPublic = async () => {
+        return await getAnonymousAgent()
+    }
 
     // app
     const changeRoute = (destination: string) => {
@@ -2521,7 +2705,7 @@ export const useTacoStore = defineStore('taco', () => {
             console.error('[TacoStore] Error sending identity to worker:', error)
         }
     }
-    const iidLogIn = async () => {
+    const iidLogIn = async (version: 'v1' | 'v2' = 'v1') => {
 
         // turn app loading on
         appLoadingOn()
@@ -2554,14 +2738,20 @@ export const useTacoStore = defineStore('taco', () => {
 
             }
 
+            // Get identity provider based on network and version
+            const getIdentityProvider = () => {
+                if (getEffectiveNetwork() === 'local') {
+                    return `http://${iiCanisterId}.localhost:4943/`
+                }
+                // II 2.0 uses id.ai, II 1.0 uses identity.ic0.app
+                return version === 'v2' ? 'https://id.ai' : 'https://identity.ic0.app'
+            }
+
             // login
             await new Promise((resolve, reject) => {
                 authClient.login({
                     maxTimeToLive: BigInt(30 * 24 * 60 * 60 * 1000 * 1000 * 1000),
-                    identityProvider:
-                        getEffectiveNetwork() !== 'local'
-                            ? 'https://identity.ic0.app'
-                            : `http://${iiCanisterId}.localhost:4943/`,
+                    identityProvider: getIdentityProvider(),
                     onSuccess: resolve,
                     onError: reject,
                 })
@@ -2641,6 +2831,9 @@ export const useTacoStore = defineStore('taco', () => {
 
             // Clear neuron cache on logout
             clearNeuronCache()
+
+            // Clear actor caches on logout
+            clearActorCaches()
 
             // set user principal to empty string
             setUserPrincipal('')
@@ -2777,20 +2970,27 @@ export const useTacoStore = defineStore('taco', () => {
         if (now - lastPriceUpdate.value > timeToUpdate) {
 
             // try coingecko standard endpoint for icp, btc, and dkp
+            let coingeckoSuccess = false
             try {
 
                 // log
                 // console.log('taco.store: fetching new crypto prices - coingecko standard endpoint')
 
-                // fetch
-                const response = await fetch('https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=internet-computer,bitcoin,draggin-karma-points')
-                
+                // fetch with timeout
+                const controller = new AbortController()
+                const timeout = setTimeout(() => controller.abort(), 5000)
+
+                const response = await fetch('https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=internet-computer,bitcoin,draggin-karma-points', {
+                    signal: controller.signal
+                })
+                clearTimeout(timeout)
+
                 // if not ok, throw error
                 if (!response.ok) throw new Error(`HTTP ${response.status}`)
 
                 // parse response
                 const data = await response.json()
-                
+
                 // log
                 // console.log('taco.store: fetchCryptoPrices() - coingecko standard endpoint data:', data)
 
@@ -2806,12 +3006,75 @@ export const useTacoStore = defineStore('taco', () => {
 
                 // // set last price update
                 lastPriceUpdate.value = now
+                coingeckoSuccess = true
 
             } catch (error) {
 
                 // log error
                 console.error('error fetching crypto prices from coingecko standard endpoint:', error)
 
+            }
+
+            // Fallback 1: CoinCap API (free, CORS-friendly)
+            if (!coingeckoSuccess) {
+                try {
+                    console.log('taco.store: trying CoinCap fallback for ICP/BTC prices')
+
+                    const controller = new AbortController()
+                    const timeout = setTimeout(() => controller.abort(), 5000)
+
+                    const [icpResp, btcResp] = await Promise.all([
+                        fetch('https://api.coincap.io/v2/assets/internet-computer', { signal: controller.signal }),
+                        fetch('https://api.coincap.io/v2/assets/bitcoin', { signal: controller.signal })
+                    ])
+                    clearTimeout(timeout)
+
+                    if (icpResp.ok) {
+                        const icpData = await icpResp.json()
+                        icpPriceUsd.value = parseFloat(icpData.data?.priceUsd) || 0
+                    }
+
+                    if (btcResp.ok) {
+                        const btcData = await btcResp.json()
+                        btcPriceUsd.value = parseFloat(btcData.data?.priceUsd) || 0
+                    }
+
+                    lastPriceUpdate.value = now
+                    console.log('taco.store: CoinCap fallback successful - ICP:', icpPriceUsd.value, 'BTC:', btcPriceUsd.value)
+
+                } catch (fallbackError) {
+                    console.error('error fetching from CoinCap fallback:', fallbackError)
+
+                    // Fallback 2: Binance API
+                    try {
+                        console.log('taco.store: trying Binance fallback for ICP/BTC prices')
+
+                        const controller = new AbortController()
+                        const timeout = setTimeout(() => controller.abort(), 5000)
+
+                        const [icpResp, btcResp] = await Promise.all([
+                            fetch('https://api.binance.com/api/v3/ticker/price?symbol=ICPUSDT', { signal: controller.signal }),
+                            fetch('https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT', { signal: controller.signal })
+                        ])
+                        clearTimeout(timeout)
+
+                        if (icpResp.ok) {
+                            const icpData = await icpResp.json()
+                            icpPriceUsd.value = parseFloat(icpData.price) || 0
+                        }
+
+                        if (btcResp.ok) {
+                            const btcData = await btcResp.json()
+                            btcPriceUsd.value = parseFloat(btcData.price) || 0
+                        }
+
+                        lastPriceUpdate.value = now
+                        console.log('taco.store: Binance fallback successful - ICP:', icpPriceUsd.value, 'BTC:', btcPriceUsd.value)
+
+                    } catch (binanceError) {
+                        console.error('error fetching from Binance fallback:', binanceError)
+                    }
+                }
             }
 
             // try gecko terminal pool endpoint for taco
@@ -2870,24 +3133,8 @@ export const useTacoStore = defineStore('taco', () => {
         // console.log('taco.store: icrc1Metadata() - calling for metadata...')
 
         try {
-            // Ensure shims are initialized before using them
-            await initializeShims()
-
-            // get host
-            const host = getNetworkHost()
-
-            // create agent
-            const agent = await createAgent({
-                identity: new AnonymousIdentity(),
-                host,
-                fetchRootKey: shouldFetchRootKey(),
-            })         
-
-            // create actor
-            const actor = Actor.createActor(idlFactory, {
-                agent,
-                canisterId: passedCanisterId,
-            })
+            // create actor using cached anonymous agent
+            const actor = await getAnonymousActor(passedCanisterId, () => idlFactory)
 
             //////////////////////
             // post actor logic //
@@ -2920,24 +3167,8 @@ export const useTacoStore = defineStore('taco', () => {
         // console.log('taco.store: icrc1BalanceOf() - owner:', owner.toText())
 
         try {
-            // Ensure shims are initialized before using them
-            await initializeShims()
-
-            // get host
-            const host = getNetworkHost()
-
-            // create agent
-            const agent = await createAgent({
-                identity: new AnonymousIdentity(),
-                host,
-                fetchRootKey: shouldFetchRootKey(),
-            })         
-
-            // create actor
-            const actor = Actor.createActor(idlFactory, {
-                agent,
-                canisterId: canisterId,
-            })
+            // create actor using cached anonymous agent
+            const actor = await getAnonymousActor(canisterId, () => idlFactory)
 
             //////////////////////
             // post actor logic //
@@ -3109,26 +3340,8 @@ export const useTacoStore = defineStore('taco', () => {
         // This prevents the full-page spinner when cached data exists
 
         try {
-            // Ensure shims are initialized before using them
-            await initializeShims()
-
-            // get host
-            const host = getNetworkHost()
-
-            // create agent
-            const agent = await createAgent({
-                identity: new AnonymousIdentity(),
-                host,
-                fetchRootKey: shouldFetchRootKey(),
-            })
-
-            let canisterId = daoBackendCanisterId();
-
-            // create actor
-            const actor = Actor.createActor(daoBackendIDL, {
-                agent,
-                canisterId: daoBackendCanisterId(),
-            })
+            // create actor using cached anonymous agent
+            const actor = await getAnonymousActor(daoBackendCanisterId(), () => daoBackendIDL)
             
             //////////////////////
             // post actor logic //
@@ -3196,26 +3409,8 @@ export const useTacoStore = defineStore('taco', () => {
         // Note: No appLoadingOn here - let components control their own loading states
 
         try {
-            // Ensure shims are initialized before using them
-            await initializeShims()
-
-            // get host
-            const host = getNetworkHost()
-
-            // create agent
-            const agent = await createAgent({
-                identity: new AnonymousIdentity(),
-                host,
-                fetchRootKey: shouldFetchRootKey(),
-            })
-
-            let canisterId = daoBackendCanisterId();
-
-            // create actor
-            const actor = Actor.createActor(daoBackendIDL, {
-                agent,
-                canisterId: daoBackendCanisterId(),
-            })
+            // create actor using cached anonymous agent
+            const actor = await getAnonymousActor(daoBackendCanisterId(), () => daoBackendIDL)
             
             //////////////////////
             // post actor logic //
@@ -3260,25 +3455,8 @@ export const useTacoStore = defineStore('taco', () => {
         // console.log('taco.store: fetchAggregateAllocation() - Starting fetch...')
 
         try {
-
-            // Ensure shims are initialized before using Actor
-            await initializeShims()
-
-            // get host
-            const host = getNetworkHost()
-
-            // create agent
-            const agent = await createAgent({
-                identity: new AnonymousIdentity(),
-                host,
-                fetchRootKey: shouldFetchRootKey(),
-            })
-
-
-            const actor = Actor.createActor(daoBackendIDL, {
-                agent,
-                canisterId: daoBackendCanisterId(),
-            })
+            // create actor using cached anonymous agent
+            const actor = await getAnonymousActor(daoBackendCanisterId(), () => daoBackendIDL)
 
             //////////////////////
             // post actor logic //            
@@ -3326,25 +3504,8 @@ export const useTacoStore = defineStore('taco', () => {
         // console.log('taco.store: fetchVotingPowerMetrics() - Starting fetch...')
 
         try {
-
-            // Ensure shims are initialized before using Actor
-            await initializeShims()
-
-            // get host
-            const host = getNetworkHost()
-
-            // create agent
-            const agent = await createAgent({
-                identity: new AnonymousIdentity(),
-                host,
-                fetchRootKey: shouldFetchRootKey(),
-            })
-
-            // create actor
-            const actor = Actor.createActor(daoBackendIDL, {
-                agent,
-                canisterId: daoBackendCanisterId(),
-            })
+            // create actor using cached anonymous agent
+            const actor = await getAnonymousActor(daoBackendCanisterId(), () => daoBackendIDL)
 
             //////////////////////
             // post actor logic //            
@@ -3386,37 +3547,19 @@ export const useTacoStore = defineStore('taco', () => {
     const fetchUserAllocation = async () => {
 
         // log
-        // console.log('taco.store: fetchUserAllocation()')      
+        // console.log('taco.store: fetchUserAllocation()')
 
         try {
-
             // create auth client
             const authClient = await getAuthClient()
 
             // if user is logged in
             if (await authClient.isAuthenticated()) {
-
-                // get host
-                const host = getNetworkHost()                
-
-                // get identity
-                const identity = await authClient.getIdentity()
-
-                // create an agent with the user's identity
-                const agent = await createAgent({
-                    identity,
-                    host,
-                    fetchRootKey: shouldFetchRootKey(),
-                })
-
-                // create actor
-                const actor = Actor.createActor(daoBackendIDL, {
-                    agent,
-                    canisterId: daoBackendCanisterId(),
-                })
+                // create actor using cached authenticated agent
+                const actor = await getAuthenticatedActor(authClient, daoBackendCanisterId(), () => daoBackendIDL)
 
                 //////////////////////
-                // post actor logic //            
+                // post actor logic //
 
                 // call the userState function
                 const userState = await actor.getUserAllocation()
@@ -3426,7 +3569,7 @@ export const useTacoStore = defineStore('taco', () => {
                 fetchedUserAllocation.value = userState
 
                 // log
-                // console.log('taco.store: DAO backend - actor.getUserAllocation() - fetchedUserAllocation.value:', fetchedUserAllocation.value)  
+                // console.log('taco.store: DAO backend - actor.getUserAllocation() - fetchedUserAllocation.value:', fetchedUserAllocation.value)
 
                 // return
                 return true
@@ -3455,37 +3598,19 @@ export const useTacoStore = defineStore('taco', () => {
     const refreshUserVotingPower = async () => {
 
         // log
-        // console.log('taco.store: refreshUserVotingPower()')      
+        // console.log('taco.store: refreshUserVotingPower()')
 
         try {
-
             // create auth client
             const authClient = await getAuthClient()
 
             // if user is logged in
             if (await authClient.isAuthenticated()) {
-
-                // get host
-                const host = getNetworkHost()
-
-                // get identity
-                const identity = await authClient.getIdentity()
-
-                // create an agent with the user's identity
-                const agent = await createAgent({
-                    identity,
-                    host,
-                    fetchRootKey: shouldFetchRootKey(),
-                })
-
-                // create actor
-                const actor = Actor.createActor(daoBackendIDL, {
-                    agent,
-                    canisterId: daoBackendCanisterId(),
-                })
+                // create actor using cached authenticated agent
+                const actor = await getAuthenticatedActor(authClient, daoBackendCanisterId(), () => daoBackendIDL)
 
                 //////////////////////
-                // post actor logic //            
+                // post actor logic //
 
                 // call the refreshUserVotingPower function
                 // @ts-ignore
@@ -3563,37 +3688,19 @@ export const useTacoStore = defineStore('taco', () => {
         // console.log('taco.store: updateAllocation()')
 
         // turn on loading
-        appLoadingOn()        
+        appLoadingOn()
 
         try {
-
             // create auth client
             const authClient = await getAuthClient()
 
             // if user is logged in
             if (await authClient.isAuthenticated()) {
-
-                // get host
-                const host = getNetworkHost()                
-
-                // get identity
-                const identity = await authClient.getIdentity()
-
-                // create an agent with the user's identity
-                const agent = await createAgent({
-                    identity,
-                    host,
-                    fetchRootKey: shouldFetchRootKey(),
-                })
-
-                // create actor
-                const actor = Actor.createActor(daoBackendIDL, {
-                    agent,
-                    canisterId: daoBackendCanisterId(),
-                })
+                // create actor using cached authenticated agent
+                const actor = await getAuthenticatedActor(authClient, daoBackendCanisterId(), () => daoBackendIDL)
 
                 //////////////////////
-                // post actor logic //            
+                // post actor logic //
 
                 // call the updateAllocation function
                 await actor.updateAllocation(allocations)
@@ -3639,37 +3746,19 @@ export const useTacoStore = defineStore('taco', () => {
         // console.log('taco.store: followAllocation()')
 
         // turn on loading
-        appLoadingOn()        
+        appLoadingOn()
 
         try {
-
             // create auth client
             const authClient = await getAuthClient()
 
             // if user is logged in
             if (await authClient.isAuthenticated()) {
-
-                // get host
-                const host = getNetworkHost()                
-
-                // get identity
-                const identity = await authClient.getIdentity()
-
-                // create an agent with the user's identity
-                const agent = await createAgent({
-                    identity,
-                    host,
-                    fetchRootKey: shouldFetchRootKey(),
-                })
-
-                // create actor
-                const actor = Actor.createActor(daoBackendIDL, {
-                    agent,
-                    canisterId: daoBackendCanisterId(),
-                })
+                // create actor using cached authenticated agent
+                const actor = await getAuthenticatedActor(authClient, daoBackendCanisterId(), () => daoBackendIDL)
 
                 //////////////////////
-                // post actor logic //            
+                // post actor logic //
 
                 // call the followAllocation function
                 await actor.followAllocation(principal)
@@ -3715,37 +3804,19 @@ export const useTacoStore = defineStore('taco', () => {
         // console.log('taco.store: unfollowAllocation()')
 
         // turn on loading
-        appLoadingOn()        
+        appLoadingOn()
 
         try {
-
             // create auth client
             const authClient = await getAuthClient()
 
             // if user is logged in
             if (await authClient.isAuthenticated()) {
-
-                // get host
-                const host = getNetworkHost()                
-
-                // get identity
-                const identity = await authClient.getIdentity()
-
-                // create an agent with the user's identity
-                const agent = await createAgent({
-                    identity,
-                    host,
-                    fetchRootKey: shouldFetchRootKey(),
-                })
-
-                // create actor
-                const actor = Actor.createActor(daoBackendIDL, {
-                    agent,
-                    canisterId: daoBackendCanisterId(),
-                })
+                // create actor using cached authenticated agent
+                const actor = await getAuthenticatedActor(authClient, daoBackendCanisterId(), () => daoBackendIDL)
 
                 // log
-                // console.log('taco.store: DAO backend - actor.unfollowAllocation() - unfollowing allocation:', principal)                  
+                // console.log('taco.store: DAO backend - actor.unfollowAllocation() - unfollowing allocation:', principal)
 
                 // call the unfollowAllocation function
                 await actor.unfollowAllocation(principal)
@@ -3790,25 +3861,11 @@ export const useTacoStore = defineStore('taco', () => {
     const getTradingStatus = async () => {
 
         // log
-        // console.log('taco.store: unfollowAllocation()')   
+        // console.log('taco.store: getTradingStatus()')
 
         try {
-
-            // get host
-            const host = getNetworkHost()
-
-            // create agent
-            const agent = await createAgent({
-                identity: new AnonymousIdentity(),
-                host,
-                fetchRootKey: shouldFetchRootKey(),
-            })
-
-            // create actor
-            const actor = Actor.createActor(treasuryIDL, {
-                agent,
-                canisterId: treasuryCanisterId(),
-            })
+            // create actor using cached anonymous agent
+            const actor = await getAnonymousActor(treasuryCanisterId(), () => treasuryIDL)
             
             //////////////////////
             // post actor logic //
@@ -3857,25 +3914,8 @@ export const useTacoStore = defineStore('taco', () => {
     const refreshTimerStatus = async () => {
         // console.log('refreshTimerStatus: Starting refresh...');
         try {
-            // get host
-            const host = getNetworkHost()
-            //console.log('refreshTimerStatus: Using host:', host);
-
-            // create agent
-            const agent = await createAgent({
-                identity: new AnonymousIdentity(),
-                host,
-                fetchRootKey: shouldFetchRootKey(),
-            })
-            //console.log('refreshTimerStatus: Agent created');
-
-            // Create DAO actor for snapshot info
-            //console.log('refreshTimerStatus: Using DAO canisterId:', daoCanisterId);
-
-            const daoActor = Actor.createActor(daoBackendIDL, {
-                agent,
-                canisterId: daoBackendCanisterId(),
-            })
+            // Create DAO actor for snapshot info using cached anonymous agent
+            const daoActor = await getAnonymousActor(daoBackendCanisterId(), () => daoBackendIDL)
             //console.log('refreshTimerStatus: DAO Actor created');
 
             // Get snapshot info
@@ -3896,13 +3936,8 @@ export const useTacoStore = defineStore('taco', () => {
                 //console.log('refreshTimerStatus: Updated snapshotStatus:', snapshotStatus.value);
             }
 
-            // Create Treasury actor for sync info
-            //console.log('refreshTimerStatus: Using Treasury canisterId:', treasuryCanisterId);
-
-            const treasuryActor = Actor.createActor(treasuryIDL, {
-                agent,
-                canisterId: treasuryCanisterId()
-            })
+            // Create Treasury actor for sync info using cached anonymous agent
+            const treasuryActor = await getAnonymousActor(treasuryCanisterId(), () => treasuryIDL)
             //console.log('refreshTimerStatus: Treasury Actor created');
 
             // Get treasury status, long sync timer, and token details in parallel
@@ -4025,25 +4060,11 @@ export const useTacoStore = defineStore('taco', () => {
     }
     const triggerManualSnapshot = async () => {
         try {
-            // get host
-            const host = getNetworkHost()
+            // Create auth client
+            const authClient = await getAuthClient();
 
-            // create agent
-            const agent = await createAgent({
-                identity: new AnonymousIdentity(),
-                host,
-                fetchRootKey: shouldFetchRootKey(),
-            })
-
-            // determine canisterId based on network
-            let canisterId = daoBackendCanisterId();
-
-
-            // create actor
-            const actor = Actor.createActor(daoBackendIDL, {
-                agent,
-                canisterId,
-            })
+            // create actor using cached authenticated agent
+            const actor = await getAuthenticatedActor(authClient, daoBackendCanisterId(), () => daoBackendIDL)
 
             timerHealth.value.snapshot.inProgress = true;
             await actor.triggerSnapshot();
@@ -4056,25 +4077,11 @@ export const useTacoStore = defineStore('taco', () => {
     }
     const restartSnapshotTimer = async () => {
         try {
-            // get host
-            const host = getNetworkHost()
+            // Create auth client
+            const authClient = await getAuthClient();
 
-            // create agent
-            const agent = await createAgent({
-                identity: new AnonymousIdentity(),
-                host,
-                fetchRootKey: shouldFetchRootKey(),
-            })
-
-            // determine canisterId based on network
-            let canisterId = daoBackendCanisterId();
-
-
-            // create actor
-            const actor = Actor.createActor(daoBackendIDL, {
-                agent,
-                canisterId,
-            })
+            // create actor using cached authenticated agent
+            const actor = await getAuthenticatedActor(authClient, daoBackendCanisterId(), () => daoBackendIDL)
 
             await actor.startSnapshotTimer();
             await refreshTimerStatus();
@@ -4085,22 +4092,11 @@ export const useTacoStore = defineStore('taco', () => {
     const restartTreasurySyncs = async () => {
         // console.log('TacoStore: restartTreasurySyncs called');
         try {
-            // get host
-            const host = getNetworkHost()
+            // Create auth client
+            const authClient = await getAuthClient();
 
-            // create agent
-            const agent = await createAgent({
-                identity: new AnonymousIdentity(),
-                host,
-                fetchRootKey: shouldFetchRootKey(),
-            });
-
-            // determine canisterId based on network
-
-            const actor = Actor.createActor(treasuryIDL, {
-                agent,
-                canisterId: treasuryCanisterId(),
-            });
+            // create actor using cached authenticated agent
+            const actor = await getAuthenticatedActor(authClient, treasuryCanisterId(), () => treasuryIDL)
 
             await actor.admin_restartSyncs();
             await refreshTimerStatus();
@@ -4115,27 +4111,9 @@ export const useTacoStore = defineStore('taco', () => {
         try {
             // Create auth client
             const authClient = await getAuthClient();
-            
-            // Check if user is authenticated
-            if (!await authClient.isAuthenticated()) {
-                console.error('User not authenticated');
-                throw new Error('User not authenticated');
-            }
 
-            // Get authenticated identity
-            const identity = await authClient.getIdentity();
-
-            // Create agent with authenticated identity
-            const agent = await createAgent({
-                identity,
-                host: getNetworkHost(),
-                fetchRootKey: shouldFetchRootKey(),
-            });
-
-            const actor = Actor.createActor(treasuryIDL, {
-                agent,
-                canisterId: treasuryCanisterId(),
-            });
+            // create actor using cached authenticated agent
+            const actor = await getAuthenticatedActor(authClient, treasuryCanisterId(), () => treasuryIDL)
 
             const result = await actor.admin_recoverPoolBalances() as any;
             if ('err' in result) {
@@ -4150,34 +4128,11 @@ export const useTacoStore = defineStore('taco', () => {
     }  
     const triggerManualSync = async () => {
         try {
-            // get host
             // create auth client
             const authClient = await getAuthClient();
-            
-            // Check if user is authenticated
-            if (!await authClient.isAuthenticated()) {
-                console.error('User not authenticated');
-                return false;
-            }
 
-            // get identity
-            const identity = await authClient.getIdentity();
-
-            // get host
-            const host = getNetworkHost()
-
-            // create agent with authenticated identity
-            const agent = await createAgent({
-                identity,
-                host,
-                fetchRootKey: shouldFetchRootKey(),
-            })
-
-            // create actor
-            const actor = Actor.createActor(treasuryIDL, {
-                agent,
-                canisterId: treasuryCanisterId(),
-            })
+            // create actor using cached authenticated agent
+            const actor = await getAuthenticatedActor(authClient, treasuryCanisterId(), () => treasuryIDL)
 
             await actor.admin_syncWithDao();
             await refreshTimerStatus();
@@ -4188,23 +4143,8 @@ export const useTacoStore = defineStore('taco', () => {
     const fetchSystemLogs = async () => {
         // console.log('fetchSystemLogs: Starting to fetch logs...');
         try {
-            // Use anonymous identity for public query (no authentication required)
-            const host = getNetworkHost()
-
-            const agent = await createAgent({
-                identity: new AnonymousIdentity(),
-                host,
-                fetchRootKey: shouldFetchRootKey(),
-            })
-
-            // determine canisterId based on network
-            let canisterId = daoBackendCanisterId();
-
-            // create actor
-            const actor = Actor.createActor(daoBackendIDL, {
-                agent,
-                canisterId,
-            })
+            // create actor using cached anonymous agent
+            const actor = await getAnonymousActor(daoBackendCanisterId(), () => daoBackendIDL)
 
             const logs = await actor.getLogs(100) as SystemLog[];
             systemLogs.value = logs;
@@ -4216,31 +4156,9 @@ export const useTacoStore = defineStore('taco', () => {
         try {
             // create auth client
             const authClient = await getAuthClient();
-            
-            // Check if user is authenticated
-            if (!await authClient.isAuthenticated()) {
-                console.error('User not authenticated');
-                return false;
-            }
 
-            // get identity
-            const identity = await authClient.getIdentity();
-
-            // get host
-            const host = getNetworkHost()
-
-            // create agent with authenticated identity
-            const agent = await createAgent({
-                identity,
-                host,
-                fetchRootKey: shouldFetchRootKey(),
-            })
-
-            // create actor
-            const actor = Actor.createActor(treasuryIDL, {
-                agent,
-                canisterId: treasuryCanisterId(),
-            })
+            // create actor using cached authenticated agent
+            const actor = await getAuthenticatedActor(authClient, treasuryCanisterId(), () => treasuryIDL)
 
             const result = await actor.startRebalancing(reason ? [reason] : []) as RebalanceResult;
             if ('err' in result) {
@@ -4257,31 +4175,9 @@ export const useTacoStore = defineStore('taco', () => {
         try {
             // create auth client
             const authClient = await getAuthClient();
-            
-            // Check if user is authenticated
-            if (!await authClient.isAuthenticated()) {
-                console.error('User not authenticated');
-                return false;
-            }
 
-            // get identity
-            const identity = await authClient.getIdentity();
-
-            // get host
-            const host = getNetworkHost()
-
-            // create agent with authenticated identity
-            const agent = await createAgent({
-                identity,
-                host,
-                fetchRootKey: shouldFetchRootKey(),
-            })
-
-            // create actor
-            const actor = Actor.createActor(treasuryIDL, {
-                agent,
-                canisterId: treasuryCanisterId(),
-            })
+            // create actor using cached authenticated agent
+            const actor = await getAuthenticatedActor(authClient, treasuryCanisterId(), () => treasuryIDL)
 
             const result = await actor.stopRebalancing(reason ? [reason] : []) as RebalanceResult;
             if ('err' in result) {
@@ -4299,32 +4195,11 @@ export const useTacoStore = defineStore('taco', () => {
         try {
             appLoadingOn();
 
-            // NOTE TO AI: DO NOT CHANGE THIS PATTERN FOR OTHER FUNCTIONS
-            // DO NOT INTRODUCE A getTreasuryActor method !!
-            // JUST LEAVE THIS CODE HERE AS IS !!
             // create auth client
             const authClient = await getAuthClient();
-            
-            // Check if user is authenticated
-            if (!await authClient.isAuthenticated()) {
-                throw new Error('User not authenticated');
-            }
 
-            // Get the identity
-            const identity = await authClient.getIdentity();
-            
-            // Create an agent with the identity
-            const agent = await createAgent({
-                identity,
-                host: import.meta.env.VITE_IC_HOST
-            });
-
-            // Create treasury actor with authenticated identity
-            const treasury = Actor.createActor<TreasuryService>(treasuryIDL, {
-                agent,
-                canisterId: treasuryCanisterId()
-            });
-            // END OF NOTE TO AI!
+            // create actor using cached authenticated agent
+            const treasury = await getAuthenticatedActor(authClient, treasuryCanisterId(), () => treasuryIDL)
 
             const result = await treasury.updateRebalanceConfig(updates, [], reason ? [reason] : []);
             // console.log('TacoStore: updateRebalanceConfig result:', result);
@@ -4378,27 +4253,8 @@ export const useTacoStore = defineStore('taco', () => {
         try {
             appLoadingOn();
 
-            // NOTE TO AI: DO NOT CHANGE THIS PATTERN FOR OTHER FUNCTIONS
-            // DO NOT INTRODUCE A getTreasuryActor method !!
-            // JUST LEAVE THIS CODE HERE AS IS !!
-
-            // Use anonymous identity for public query (no authentication required)
-            const host = getNetworkHost()
-
-            // Create an agent with anonymous identity
-            const agent = await createAgent({
-                identity: new AnonymousIdentity(),
-                host,
-                fetchRootKey: shouldFetchRootKey(),
-            });
-
-            // Create treasury actor
-            const treasury = Actor.createActor<TreasuryService>(treasuryIDL, {
-                agent,
-                canisterId: treasuryCanisterId()
-            });
-
-            // END OF NOTE TO AI!
+            // create actor using cached anonymous agent
+            const treasury = await getAnonymousActor(treasuryCanisterId(), () => treasuryIDL)
 
             // Get the current config using getSystemParameters
             const config = await treasury.getSystemParameters();
@@ -4419,28 +4275,8 @@ export const useTacoStore = defineStore('taco', () => {
         try {
             appLoadingOn();
 
-            // NOTE TO AI: DO NOT CHANGE THIS PATTERN FOR OTHER FUNCTIONS
-            // DO NOT INTRODUCE A getTreasuryActor method !!
-            // JUST LEAVE THIS CODE HERE AS IS !!
-
-            // Use anonymous identity for public query (no authentication required)
-            const host = getNetworkHost()
-
-            // Create an agent with anonymous identity
-            const agent = await createAgent({
-                identity: new AnonymousIdentity(),
-                host,
-                fetchRootKey: shouldFetchRootKey(),
-            });
-
-            let canisterId = daoBackendCanisterId();
-
-            const actor = Actor.createActor(daoBackendIDL, {
-                agent,
-                canisterId,
-            });
-
-            // END OF NOTE TO AI!
+            // create actor using cached anonymous agent
+            const actor = await getAnonymousActor(daoBackendCanisterId(), () => daoBackendIDL)
 
             // Get the current config using getSystemParameters
             const config = await actor.getSystemParameters();
@@ -4462,26 +4298,9 @@ export const useTacoStore = defineStore('taco', () => {
         try {
             // create auth client
             const authClient = await getAuthClient();
-            
-            // Check if user is authenticated
-            if (!await authClient.isAuthenticated()) {
-                throw new Error('User not authenticated');
-            }
 
-            // Get the identity
-            const identity = await authClient.getIdentity();
-            
-            // Create an agent with the identity
-            const agent = await createAgent({
-                identity,
-                host: import.meta.env.VITE_IC_HOST
-            });
-
-            // Create treasury actor with authenticated identity
-            const treasury = Actor.createActor<TreasuryService>(treasuryIDL, {
-                agent,
-                canisterId: treasuryCanisterId()
-            });
+            // create actor using cached authenticated agent
+            const treasury = await getAuthenticatedActor(authClient, treasuryCanisterId(), () => treasuryIDL)
 
             await treasury.admin_executeTradingCycle(reason ? [reason] : []);
         } catch (error) {
@@ -4496,30 +4315,9 @@ export const useTacoStore = defineStore('taco', () => {
         try {
             // Create auth client
             const authClient = await getAuthClient();
-            
-            // Check if user is authenticated
-            if (!await authClient.isAuthenticated()) {
-                console.error('User not authenticated');
-                return false;
-            }
 
-            // Get authenticated identity
-            const identity = await authClient.getIdentity();
-
-            // Create agent with authenticated identity
-            const agent = await createAgent({
-                identity,
-                host: getNetworkHost(),
-                fetchRootKey: shouldFetchRootKey(),
-            });
-
-            let canisterId = daoBackendCanisterId();
-
-
-            const actor = Actor.createActor(daoBackendIDL, {
-                agent,
-                canisterId,
-            });
+            // create actor using cached authenticated agent
+            const actor = await getAuthenticatedActor(authClient, daoBackendCanisterId(), () => daoBackendIDL)
 
             const result = await actor.pauseToken(principal, reason) as Result_1;
             if ('err' in result) {
@@ -4538,30 +4336,9 @@ export const useTacoStore = defineStore('taco', () => {
         try {
             // Create auth client
             const authClient = await getAuthClient();
-            
-            // Check if user is authenticated
-            if (!await authClient.isAuthenticated()) {
-                console.error('User not authenticated');
-                return false;
-            }
 
-            // Get authenticated identity
-            const identity = await authClient.getIdentity();
-
-            // Create agent with authenticated identity
-            const agent = await createAgent({
-                identity,
-                host: getNetworkHost(),
-                fetchRootKey: shouldFetchRootKey(),
-            });
-
-            let canisterId = daoBackendCanisterId();
-
-
-            const actor = Actor.createActor(daoBackendIDL, {
-                agent,
-                canisterId,
-            });
+            // create actor using cached authenticated agent
+            const actor = await getAuthenticatedActor(authClient, daoBackendCanisterId(), () => daoBackendIDL)
 
             const result = await actor.unpauseToken(principal, reason) as Result_1;
             if ('err' in result) {
@@ -4578,21 +4355,11 @@ export const useTacoStore = defineStore('taco', () => {
     const fetchVoterDetails = async () => {
         // console.log('taco.store: fetchVoterDetails() - Starting fetch...');
         try {
-            // Use anonymous identity for public query (no authentication required)
-            const host = getNetworkHost()
+            // Create auth client
+            const authClient = await getAuthClient();
 
-            const agent = await createAgent({
-                identity: new AnonymousIdentity(),
-                host,
-                fetchRootKey: shouldFetchRootKey(),
-            })
-
-            let canisterId = daoBackendCanisterId();
-
-            const actor = Actor.createActor(daoBackendIDL, {
-                agent,
-                canisterId,
-            })
+            // create actor using cached authenticated agent
+            const actor = await getAuthenticatedActor(authClient, daoBackendCanisterId(), () => daoBackendIDL)
 
             const voterDetails = await actor.admin_getUserAllocations();
 
@@ -4613,21 +4380,11 @@ export const useTacoStore = defineStore('taco', () => {
     }
     const fetchNeuronAllocations = async () => {
         try {
-            // Use anonymous identity for public query (no authentication required)
-            const host = getNetworkHost()
+            // Create auth client
+            const authClient = await getAuthClient();
 
-            const agent = await createAgent({
-                identity: new AnonymousIdentity(),
-                host,
-                fetchRootKey: shouldFetchRootKey(),
-            });
-
-            let canisterId = daoBackendCanisterId();
-
-            const actor = Actor.createActor(daoBackendIDL, {
-                agent,
-                canisterId,
-            });
+            // create actor using cached authenticated agent
+            const actor = await getAuthenticatedActor(authClient, daoBackendCanisterId(), () => daoBackendIDL)
 
             const result = await actor.admin_getNeuronAllocations();
 
@@ -4652,21 +4409,11 @@ export const useTacoStore = defineStore('taco', () => {
     const adminGetUserAllocation = async (principal: Principal) => {
         // console.log('taco.store: adminGetUserAllocation() - Starting fetch for principal:', principal.toString());
         try {
-            // Use anonymous identity for public query (no authentication required)
-            const host = getNetworkHost()
+            // Create auth client
+            const authClient = await getAuthClient();
 
-            const agent = await createAgent({
-                identity: new AnonymousIdentity(),
-                host,
-                fetchRootKey: shouldFetchRootKey(),
-            });
-
-            let canisterId = daoBackendCanisterId();
-
-            const actor = Actor.createActor(daoBackendIDL, {
-                agent,
-                canisterId,
-            });
+            // create actor using cached authenticated agent
+            const actor = await getAuthenticatedActor(authClient, daoBackendCanisterId(), () => daoBackendIDL)
 
             const result = await actor.admin_getUserAllocation(principal);
             // console.log('taco.store: adminGetUserAllocation() - Raw response:', result);
@@ -4683,17 +4430,8 @@ export const useTacoStore = defineStore('taco', () => {
 
     const fetchPenalizedNeurons = async () => {
         try {
-            const host = getNetworkHost();
-            const agent = await createAgent({
-                identity: new AnonymousIdentity(),
-                host,
-                fetchRootKey: shouldFetchRootKey(),
-            });
-
-            const actor = Actor.createActor(daoBackendIDL, {
-                agent,
-                canisterId: daoBackendCanisterId(),
-            });
+            // create actor using cached anonymous agent
+            const actor = await getAnonymousActor(daoBackendCanisterId(), () => daoBackendIDL)
 
             const result = await actor.getPenalizedNeurons() as Array<[Uint8Array, bigint]>;
             fetchedPenalizedNeurons.value = result.map(([neuronId, multiplier]) => ({
@@ -4712,22 +4450,9 @@ export const useTacoStore = defineStore('taco', () => {
             appLoadingOn();
 
             const authClient = await getAuthClient();
-            if (!await authClient.isAuthenticated()) {
-                throw new Error('User not authenticated');
-            }
 
-            const identity = await authClient.getIdentity();
-            const host = getNetworkHost();
-            const agent = await createAgent({
-                identity,
-                host,
-                fetchRootKey: shouldFetchRootKey(),
-            });
-
-            const actor = Actor.createActor(daoBackendIDL, {
-                agent,
-                canisterId: daoBackendCanisterId(),
-            });
+            // create actor using cached authenticated agent
+            const actor = await getAuthenticatedActor(authClient, daoBackendCanisterId(), () => daoBackendIDL)
 
             // Convert hex string to Uint8Array
             const neuronId = new Uint8Array(neuronIdHex.match(/.{1,2}/g)!.map(byte => parseInt(byte, 16)));
@@ -4751,22 +4476,9 @@ export const useTacoStore = defineStore('taco', () => {
             appLoadingOn();
 
             const authClient = await getAuthClient();
-            if (!await authClient.isAuthenticated()) {
-                throw new Error('User not authenticated');
-            }
 
-            const identity = await authClient.getIdentity();
-            const host = getNetworkHost();
-            const agent = await createAgent({
-                identity,
-                host,
-                fetchRootKey: shouldFetchRootKey(),
-            });
-
-            const actor = Actor.createActor(daoBackendIDL, {
-                agent,
-                canisterId: daoBackendCanisterId(),
-            });
+            // create actor using cached authenticated agent
+            const actor = await getAuthenticatedActor(authClient, daoBackendCanisterId(), () => daoBackendIDL)
 
             // Convert hex string to Uint8Array
             const neuronId = new Uint8Array(neuronIdHex.match(/.{1,2}/g)!.map(byte => parseInt(byte, 16)));
@@ -4792,31 +4504,9 @@ export const useTacoStore = defineStore('taco', () => {
 
             // create auth client
             const authClient = await getAuthClient();
-            
-            // Check if user is authenticated
-            if (!await authClient.isAuthenticated()) {
-                throw new Error('User not authenticated');
-            }
 
-            // Get the identity
-            const identity = await authClient.getIdentity();
-            
-            // Create an agent with the identity
-            const agent = await createAgent({
-                identity,
-                host: getNetworkHost(),
-                fetchRootKey: shouldFetchRootKey(),
-            });
-
-
-            let canisterId = daoBackendCanisterId();
-
-
-            // Create DAO backend actor with authenticated identity
-            const backend = Actor.createActor(daoBackendIDL, {
-                agent,
-                canisterId
-            });
+            // create actor using cached authenticated agent
+            const backend = await getAuthenticatedActor(authClient, daoBackendCanisterId(), () => daoBackendIDL)
 
             const result = await backend.updateSystemParameter(param, reason ? [reason] : []) as SystemParameterResult;
             
@@ -4863,38 +4553,9 @@ export const useTacoStore = defineStore('taco', () => {
 
             // create auth client
             const authClient = await getAuthClient();
-            
-            // Check if user is authenticated
-            if (!await authClient.isAuthenticated()) {
-                throw new Error('User not authenticated');
-            }
 
-            // Get the identity
-            const identity = await authClient.getIdentity();
-            
-            // Create an agent with the identity
-            
-            // Create an agent with the identity
-            const agent = await createAgent({
-                identity,
-                host: getNetworkHost(),
-                fetchRootKey: shouldFetchRootKey(),
-            });
-
-
-            let canisterId = daoBackendCanisterId();
-
-
-            // Create treasury actor with authenticated identity
-            const backend = Actor.createActor(daoBackendIDL, {
-                agent,
-                canisterId
-            });
-
-            // Create update config with just the snapshot interval
-            //const updateConfig: UpdateConfig = {
-            //    snapshotIntervalNS: [intervalNS]
-            //};
+            // create actor using cached authenticated agent
+            const backend = await getAuthenticatedActor(authClient, daoBackendCanisterId(), () => daoBackendIDL)
 
             const result = await backend.updateSystemParameter({ SnapshotInterval: intervalNS }, reason ? [reason] : []) as SystemParameterResult;
             
@@ -4938,20 +4599,8 @@ export const useTacoStore = defineStore('taco', () => {
     // Treasury Log Methods
     const getTreasuryLogs = async (count: number) => {
         try {
-            // Use anonymous identity for public query (no authentication required)
-            const host = getNetworkHost()
-
-            const agent = await createAgent({
-                identity: new AnonymousIdentity(),
-                host,
-                fetchRootKey: shouldFetchRootKey(),
-            });
-
-            const treasury = Actor.createActor<TreasuryService>(treasuryIDL, {
-                agent,
-                canisterId: treasuryCanisterId()
-            });
-
+            // create actor using cached anonymous agent
+            const treasury = await getAnonymousActor(treasuryCanisterId(), () => treasuryIDL)
             return await treasury.getLogs(BigInt(count));
         } catch (error: any) {
             console.error('Error fetching treasury logs:', error);
@@ -4960,20 +4609,8 @@ export const useTacoStore = defineStore('taco', () => {
     }
     const getTreasuryLogsByContext = async (context: string, count: number) => {
         try {
-            // Use anonymous identity for public query (no authentication required)
-            const host = getNetworkHost()
-
-            const agent = await createAgent({
-                identity: new AnonymousIdentity(),
-                host,
-                fetchRootKey: shouldFetchRootKey(),
-            });
-
-            const treasury = Actor.createActor<TreasuryService>(treasuryIDL, {
-                agent,
-                canisterId: treasuryCanisterId()
-            });
-
+            // create actor using cached anonymous agent
+            const treasury = await getAnonymousActor(treasuryCanisterId(), () => treasuryIDL)
             return await treasury.getLogsByContext(context, BigInt(count));
         } catch (error: any) {
             console.error('Error fetching treasury logs by context:', error);
@@ -4982,20 +4619,8 @@ export const useTacoStore = defineStore('taco', () => {
     }
     const getTreasuryLogsByLevel = async (level: any, count: number) => {
         try {
-            // Use anonymous identity for public query (no authentication required)
-            const host = getNetworkHost()
-
-            const agent = await createAgent({
-                identity: new AnonymousIdentity(),
-                host,
-                fetchRootKey: shouldFetchRootKey(),
-            });
-
-            const treasury = Actor.createActor<TreasuryService>(treasuryIDL, {
-                agent,
-                canisterId: treasuryCanisterId()
-            });
-
+            // create actor using cached anonymous agent
+            const treasury = await getAnonymousActor(treasuryCanisterId(), () => treasuryIDL)
             return await treasury.getLogsByLevel(level, BigInt(count));
         } catch (error: any) {
             console.error('Error fetching treasury logs by level:', error);
@@ -5005,23 +4630,8 @@ export const useTacoStore = defineStore('taco', () => {
     const clearTreasuryLogs = async () => {
         try {
             const authClient = await getAuthClient();
-            
-            if (!await authClient.isAuthenticated()) {
-                throw new Error('User not authenticated');
-            }
-
-            const identity = await authClient.getIdentity();
-            const agent = await createAgent({
-                identity,
-                host: getNetworkHost(),
-                fetchRootKey: shouldFetchRootKey(),
-            });
-
-            const treasury = Actor.createActor<TreasuryService>(treasuryIDL, {
-                agent,
-                canisterId: treasuryCanisterId()
-            });
-
+            // create actor using cached authenticated agent
+            const treasury = await getAuthenticatedActor(authClient, treasuryCanisterId(), () => treasuryIDL)
             return await treasury.clearLogs();
         } catch (error: any) {
             console.error('Error clearing treasury logs:', error);
@@ -5032,20 +4642,8 @@ export const useTacoStore = defineStore('taco', () => {
     // price failsafe system methods
     const listTriggerConditions = async () => {
         try {
-            // Use anonymous identity for public query (no authentication required)
-            const host = getNetworkHost()
-
-            const agent = await createAgent({
-                identity: new AnonymousIdentity(),
-                host,
-                fetchRootKey: shouldFetchRootKey(),
-            });
-
-            const treasury = Actor.createActor<TreasuryService>(treasuryIDL, {
-                agent,
-                canisterId: treasuryCanisterId()
-            });
-
+            // create actor using cached anonymous agent
+            const treasury = await getAnonymousActor(treasuryCanisterId(), () => treasuryIDL)
             return await treasury.listTriggerConditions();
         } catch (error: any) {
             console.error('Error listing trigger conditions:', error);
@@ -5061,23 +4659,8 @@ export const useTacoStore = defineStore('taco', () => {
     ) => {
         try {
             const authClient = await getAuthClient();
-            
-            if (!await authClient.isAuthenticated()) {
-                throw new Error('User not authenticated');
-            }
-
-            const identity = await authClient.getIdentity();
-            const agent = await createAgent({
-                identity,
-                host: getNetworkHost(),
-                fetchRootKey: shouldFetchRootKey(),
-            });
-
-            const treasury = Actor.createActor<TreasuryService>(treasuryIDL, {
-                agent,
-                canisterId: treasuryCanisterId()
-            });
-
+            // create actor using cached authenticated agent
+            const treasury = await getAuthenticatedActor(authClient, treasuryCanisterId(), () => treasuryIDL)
             return await treasury.addTriggerCondition(
                 name,
                 direction === 'Up' ? { Up: null } : { Down: null },
@@ -5093,23 +4676,8 @@ export const useTacoStore = defineStore('taco', () => {
     const setTriggerConditionActive = async (conditionId: number, isActive: boolean) => {
         try {
             const authClient = await getAuthClient();
-            
-            if (!await authClient.isAuthenticated()) {
-                throw new Error('User not authenticated');
-            }
-
-            const identity = await authClient.getIdentity();
-            const agent = await createAgent({
-                identity,
-                host: getNetworkHost(),
-                fetchRootKey: shouldFetchRootKey(),
-            });
-
-            const treasury = Actor.createActor<TreasuryService>(treasuryIDL, {
-                agent,
-                canisterId: treasuryCanisterId()
-            });
-
+            // create actor using cached authenticated agent
+            const treasury = await getAuthenticatedActor(authClient, treasuryCanisterId(), () => treasuryIDL)
             return await treasury.setTriggerConditionActive(BigInt(conditionId), isActive);
         } catch (error: any) {
             console.error('Error setting trigger condition active:', error);
@@ -5119,23 +4687,8 @@ export const useTacoStore = defineStore('taco', () => {
     const removeTriggerCondition = async (conditionId: number) => {
         try {
             const authClient = await getAuthClient();
-            
-            if (!await authClient.isAuthenticated()) {
-                throw new Error('User not authenticated');
-            }
-
-            const identity = await authClient.getIdentity();
-            const agent = await createAgent({
-                identity,
-                host: getNetworkHost(),
-                fetchRootKey: shouldFetchRootKey(),
-            });
-
-            const treasury = Actor.createActor<TreasuryService>(treasuryIDL, {
-                agent,
-                canisterId: treasuryCanisterId()
-            });
-
+            // create actor using cached authenticated agent
+            const treasury = await getAuthenticatedActor(authClient, treasuryCanisterId(), () => treasuryIDL)
             return await treasury.removeTriggerCondition(BigInt(conditionId));
         } catch (error: any) {
             console.error('Error removing trigger condition:', error);
@@ -5144,20 +4697,8 @@ export const useTacoStore = defineStore('taco', () => {
     }
     const getPriceAlerts = async (offset: number, limit: number) => {
         try {
-            // Use anonymous identity for public query (no authentication required)
-            const host = getNetworkHost()
-
-            const agent = await createAgent({
-                identity: new AnonymousIdentity(),
-                host,
-                fetchRootKey: shouldFetchRootKey(),
-            });
-
-            const treasury = Actor.createActor<TreasuryService>(treasuryIDL, {
-                agent,
-                canisterId: treasuryCanisterId()
-            });
-
+            // create actor using cached anonymous agent
+            const treasury = await getAnonymousActor(treasuryCanisterId(), () => treasuryIDL)
             return await treasury.getPriceAlerts(BigInt(offset), BigInt(limit));
         } catch (error: any) {
             console.error('Error getting price alerts:', error);
@@ -5167,23 +4708,8 @@ export const useTacoStore = defineStore('taco', () => {
     const clearPriceAlerts = async () => {
         try {
             const authClient = await getAuthClient();
-            
-            if (!await authClient.isAuthenticated()) {
-                throw new Error('User not authenticated');
-            }
-
-            const identity = await authClient.getIdentity();
-            const agent = await createAgent({
-                identity,
-                host: getNetworkHost(),
-                fetchRootKey: shouldFetchRootKey(),
-            });
-
-            const treasury = Actor.createActor<TreasuryService>(treasuryIDL, {
-                agent,
-                canisterId: treasuryCanisterId()
-            });
-
+            // create actor using cached authenticated agent
+            const treasury = await getAuthenticatedActor(authClient, treasuryCanisterId(), () => treasuryIDL)
             return await treasury.clearPriceAlerts();
         } catch (error: any) {
             console.error('Error clearing price alerts:', error);
@@ -5194,20 +4720,8 @@ export const useTacoStore = defineStore('taco', () => {
     // trading pause management functions
     const listTradingPauses = async () => {
         try {
-            // Use anonymous identity for public query (no authentication required)
-            const host = getNetworkHost()
-
-            const agent = await createAgent({
-                identity: new AnonymousIdentity(),
-                host,
-                fetchRootKey: shouldFetchRootKey(),
-            });
-
-            const treasury = Actor.createActor<TreasuryService>(treasuryIDL, {
-                agent,
-                canisterId: treasuryCanisterId()
-            });
-
+            // create actor using cached anonymous agent
+            const treasury = await getAnonymousActor(treasuryCanisterId(), () => treasuryIDL)
             return await treasury.listTradingPauses();
         } catch (error: any) {
             console.error('Error listing trading pauses:', error);
@@ -5216,24 +4730,8 @@ export const useTacoStore = defineStore('taco', () => {
     }
     const getTradingPauseInfo = async (token: Principal) => {
         try {
-            const authClient = await getAuthClient();
-            
-            if (!await authClient.isAuthenticated()) {
-                throw new Error('User not authenticated');
-            }
-
-            const identity = await authClient.getIdentity();
-            const agent = await createAgent({
-                identity,
-                host: getNetworkHost(),
-                fetchRootKey: shouldFetchRootKey(),
-            });
-
-            const treasury = Actor.createActor<TreasuryService>(treasuryIDL, {
-                agent,
-                canisterId: treasuryCanisterId()
-            });
-
+            // create actor using cached anonymous agent (query doesn't require auth)
+            const treasury = await getAnonymousActor(treasuryCanisterId(), () => treasuryIDL)
             return await treasury.getTradingPauseInfo(token);
         } catch (error: any) {
             console.error('Error getting trading pause info:', error);
@@ -5243,23 +4741,8 @@ export const useTacoStore = defineStore('taco', () => {
     const unpauseTokenFromTrading = async (token: Principal, reason?: string) => {
         try {
             const authClient = await getAuthClient();
-            
-            if (!await authClient.isAuthenticated()) {
-                throw new Error('User not authenticated');
-            }
-
-            const identity = await authClient.getIdentity();
-            const agent = await createAgent({
-                identity,
-                host: getNetworkHost(),
-                fetchRootKey: shouldFetchRootKey(),
-            });
-
-            const treasury = Actor.createActor<TreasuryService>(treasuryIDL, {
-                agent,
-                canisterId: treasuryCanisterId()
-            });
-
+            // create actor using cached authenticated agent
+            const treasury = await getAuthenticatedActor(authClient, treasuryCanisterId(), () => treasuryIDL)
             return await treasury.unpauseTokenFromTrading(token, reason ? [reason] : []);
         } catch (error: any) {
             console.error('Error unpausing token from trading:', error);
@@ -5269,23 +4752,8 @@ export const useTacoStore = defineStore('taco', () => {
     const pauseTokenFromTradingManual = async (token: Principal, reason: string) => {
         try {
             const authClient = await getAuthClient();
-            
-            if (!await authClient.isAuthenticated()) {
-                throw new Error('User not authenticated');
-            }
-
-            const identity = await authClient.getIdentity();
-            const agent = await createAgent({
-                identity,
-                host: getNetworkHost(),
-                fetchRootKey: shouldFetchRootKey(),
-            });
-
-            const treasury = Actor.createActor<TreasuryService>(treasuryIDL, {
-                agent,
-                canisterId: treasuryCanisterId()
-            });
-
+            // create actor using cached authenticated agent
+            const treasury = await getAuthenticatedActor(authClient, treasuryCanisterId(), () => treasuryIDL)
             return await treasury.pauseTokenFromTradingManual(token, reason);
         } catch (error: any) {
             console.error('Error pausing token from trading:', error);
@@ -5295,23 +4763,8 @@ export const useTacoStore = defineStore('taco', () => {
     const clearAllTradingPauses = async (reason?: string) => {
         try {
             const authClient = await getAuthClient();
-            
-            if (!await authClient.isAuthenticated()) {
-                throw new Error('User not authenticated');
-            }
-
-            const identity = await authClient.getIdentity();
-            const agent = await createAgent({
-                identity,
-                host: getNetworkHost(),
-                fetchRootKey: shouldFetchRootKey(),
-            });
-
-            const treasury = Actor.createActor<TreasuryService>(treasuryIDL, {
-                agent,
-                canisterId: treasuryCanisterId()
-            });
-
+            // create actor using cached authenticated agent
+            const treasury = await getAuthenticatedActor(authClient, treasuryCanisterId(), () => treasuryIDL)
             return await treasury.clearAllTradingPauses(reason ? [reason] : []);
         } catch (error: any) {
             console.error('Error clearing all trading pauses:', error);
@@ -5320,20 +4773,8 @@ export const useTacoStore = defineStore('taco', () => {
     }
     const getTokenPriceHistory = async (tokens: Principal[]) => {
         try {
-            // Use anonymous identity for public query (no authentication required)
-            const host = getNetworkHost()
-
-            const agent = await createAgent({
-                identity: new AnonymousIdentity(),
-                host,
-                fetchRootKey: shouldFetchRootKey(),
-            });
-
-            const treasury = Actor.createActor<TreasuryService>(treasuryIDL, {
-                agent,
-                canisterId: treasuryCanisterId()
-            });
-
+            // create actor using cached anonymous agent
+            const treasury = await getAnonymousActor(treasuryCanisterId(), () => treasuryIDL)
             const result = await treasury.getTokenPriceHistory(tokens);
             if ('ok' in result) {
                 return result.ok;
@@ -5348,20 +4789,8 @@ export const useTacoStore = defineStore('taco', () => {
     }
     const getPortfolioHistory = async (limit: number = 1000) => {
         try {
-            // Use anonymous identity for public query (no authentication required)
-            const host = getNetworkHost()
-
-            const agent = await createAgent({
-                identity: new AnonymousIdentity(),
-                host,
-                fetchRootKey: shouldFetchRootKey(),
-            });
-
-            const dao = Actor.createActor(daoBackendIDL, {
-                agent,
-                canisterId: daoBackendCanisterId()
-            });
-
+            // create actor using cached anonymous agent
+            const dao = await getAnonymousActor(daoBackendCanisterId(), () => daoBackendIDL)
             const result = await dao.getHistoricBalanceAndAllocation(BigInt(limit));
             return result;
         } catch (error: any) {
@@ -5371,20 +4800,8 @@ export const useTacoStore = defineStore('taco', () => {
     }
     const getTreasuryPortfolioHistory = async (limit: number = 1000) => {
         try {
-            // Use anonymous identity for public query (no authentication required)
-            const host = getNetworkHost()
-
-            const agent = await createAgent({
-                identity: new AnonymousIdentity(),
-                host,
-                fetchRootKey: shouldFetchRootKey(),
-            });
-
-            const treasury = Actor.createActor<TreasuryService>(treasuryIDL, {
-                agent,
-                canisterId: treasuryCanisterId()
-            });
-
+            // create actor using cached anonymous agent
+            const treasury = await getAnonymousActor(treasuryCanisterId(), () => treasuryIDL)
             const result = await treasury.getPortfolioHistory(BigInt(limit));
             if ('ok' in result) {
                 return result.ok;
@@ -5400,23 +4817,8 @@ export const useTacoStore = defineStore('taco', () => {
     const takeManualPortfolioSnapshot = async (reason?: string) => {
         try {
             const authClient = await getAuthClient();
-            
-            if (!await authClient.isAuthenticated()) {
-                throw new Error('User not authenticated');
-            }
-
-            const identity = await authClient.getIdentity();
-            const agent = await createAgent({
-                identity,
-                host: getNetworkHost(),
-                fetchRootKey: shouldFetchRootKey(),
-            });
-
-            const treasury = Actor.createActor<TreasuryService>(treasuryIDL, {
-                agent,
-                canisterId: treasuryCanisterId()
-            });
-
+            // create actor using cached authenticated agent
+            const treasury = await getAuthenticatedActor(authClient, treasuryCanisterId(), () => treasuryIDL)
             const result = await treasury.takeManualPortfolioSnapshot(reason ? [reason] : []);
             if ('ok' in result) {
                 // console.log('Manual portfolio snapshot taken:', result.ok);
@@ -5434,17 +4836,8 @@ export const useTacoStore = defineStore('taco', () => {
     // Portfolio snapshot status and management
     const getPortfolioSnapshotStatus = async () => {
         try {
-            const host = getNetworkHost()
-            const agent = await createAgent({
-                identity: new AnonymousIdentity(),
-                host,
-                fetchRootKey: shouldFetchRootKey(),
-            });
-
-            const treasury = Actor.createActor<TreasuryService>(treasuryIDL, {
-                agent,
-                canisterId: treasuryCanisterId()
-            });
+            // create actor using cached anonymous agent
+            const treasury = await getAnonymousActor(treasuryCanisterId(), () => treasuryIDL)
 
             const status = await treasury.getPortfolioSnapshotStatus();
             return {
@@ -5465,22 +4858,7 @@ export const useTacoStore = defineStore('taco', () => {
     const startPortfolioSnapshots = async (reason?: string) => {
         try {
             const authClient = await getAuthClient();
-            
-            if (!await authClient.isAuthenticated()) {
-                throw new Error('User not authenticated');
-            }
-
-            const identity = await authClient.getIdentity();
-            const agent = await createAgent({
-                identity,
-                host: getNetworkHost(),
-                fetchRootKey: shouldFetchRootKey(),
-            });
-
-            const treasury = Actor.createActor<TreasuryService>(treasuryIDL, {
-                agent,
-                canisterId: treasuryCanisterId()
-            });
+            const treasury = await getAuthenticatedActor(authClient, treasuryCanisterId(), () => treasuryIDL) as TreasuryService
 
             const result = await treasury.startPortfolioSnapshots(reason ? [reason] : []);
             if ('ok' in result) {
@@ -5498,22 +4876,7 @@ export const useTacoStore = defineStore('taco', () => {
     const stopPortfolioSnapshots = async (reason?: string) => {
         try {
             const authClient = await getAuthClient();
-            
-            if (!await authClient.isAuthenticated()) {
-                throw new Error('User not authenticated');
-            }
-
-            const identity = await authClient.getIdentity();
-            const agent = await createAgent({
-                identity,
-                host: getNetworkHost(),
-                fetchRootKey: shouldFetchRootKey(),
-            });
-
-            const treasury = Actor.createActor<TreasuryService>(treasuryIDL, {
-                agent,
-                canisterId: treasuryCanisterId()
-            });
+            const treasury = await getAuthenticatedActor(authClient, treasuryCanisterId(), () => treasuryIDL) as TreasuryService
 
             const result = await treasury.stopPortfolioSnapshots(reason ? [reason] : []);
             if ('ok' in result) {
@@ -5531,22 +4894,7 @@ export const useTacoStore = defineStore('taco', () => {
     const updatePortfolioSnapshotInterval = async (intervalMinutes: number, reason?: string) => {
         try {
             const authClient = await getAuthClient();
-            
-            if (!await authClient.isAuthenticated()) {
-                throw new Error('User not authenticated');
-            }
-
-            const identity = await authClient.getIdentity();
-            const agent = await createAgent({
-                identity,
-                host: getNetworkHost(),
-                fetchRootKey: shouldFetchRootKey(),
-            });
-
-            const treasury = Actor.createActor<TreasuryService>(treasuryIDL, {
-                agent,
-                canisterId: treasuryCanisterId()
-            });
+            const treasury = await getAuthenticatedActor(authClient, treasuryCanisterId(), () => treasuryIDL) as TreasuryService
 
             const result = await treasury.updatePortfolioSnapshotInterval(BigInt(intervalMinutes), reason ? [reason] : []);
             if ('ok' in result) {
@@ -5564,19 +4912,7 @@ export const useTacoStore = defineStore('taco', () => {
     // portfolio circuit breaker
     const listPortfolioCircuitBreakerConditions = async () => {
         try {
-            // Use anonymous identity for public query (no authentication required)
-            const host = getNetworkHost()
-
-            const agent = await createAgent({
-                identity: new AnonymousIdentity(),
-                host,
-                fetchRootKey: shouldFetchRootKey(),
-            });
-
-            const treasury = Actor.createActor<TreasuryService>(treasuryIDL, {
-                agent,
-                canisterId: treasuryCanisterId()
-            });
+            const treasury = await getAnonymousActor(treasuryCanisterId(), () => treasuryIDL) as TreasuryService
 
             const result = await treasury.listPortfolioCircuitBreakerConditions();
             return result;
@@ -5594,22 +4930,7 @@ export const useTacoStore = defineStore('taco', () => {
     ) => {
         try {
             const authClient = await getAuthClient();
-            
-            if (!await authClient.isAuthenticated()) {
-                throw new Error('User not authenticated');
-            }
-
-            const identity = await authClient.getIdentity();
-            const agent = await createAgent({
-                identity,
-                host: getNetworkHost(),
-                fetchRootKey: shouldFetchRootKey(),
-            });
-
-            const treasury = Actor.createActor<TreasuryService>(treasuryIDL, {
-                agent,
-                canisterId: treasuryCanisterId()
-            });
+            const treasury = await getAuthenticatedActor(authClient, treasuryCanisterId(), () => treasuryIDL) as TreasuryService
 
             const directionVariant = direction === 'Up' ? { Up: null } : { Down: null };
             const valueTypeVariant = valueType === 'ICP' ? { ICP: null } : { USD: null };
@@ -5637,22 +4958,7 @@ export const useTacoStore = defineStore('taco', () => {
     const setPortfolioCircuitBreakerConditionActive = async (conditionId: number, isActive: boolean) => {
         try {
             const authClient = await getAuthClient();
-            
-            if (!await authClient.isAuthenticated()) {
-                throw new Error('User not authenticated');
-            }
-
-            const identity = await authClient.getIdentity();
-            const agent = await createAgent({
-                identity,
-                host: getNetworkHost(),
-                fetchRootKey: shouldFetchRootKey(),
-            });
-
-            const treasury = Actor.createActor<TreasuryService>(treasuryIDL, {
-                agent,
-                canisterId: treasuryCanisterId()
-            });
+            const treasury = await getAuthenticatedActor(authClient, treasuryCanisterId(), () => treasuryIDL) as TreasuryService
 
             const result = await treasury.setPortfolioCircuitBreakerConditionActive(BigInt(conditionId), isActive);
             
@@ -5671,22 +4977,7 @@ export const useTacoStore = defineStore('taco', () => {
     const removePortfolioCircuitBreakerCondition = async (conditionId: number) => {
         try {
             const authClient = await getAuthClient();
-            
-            if (!await authClient.isAuthenticated()) {
-                throw new Error('User not authenticated');
-            }
-
-            const identity = await authClient.getIdentity();
-            const agent = await createAgent({
-                identity,
-                host: getNetworkHost(),
-                fetchRootKey: shouldFetchRootKey(),
-            });
-
-            const treasury = Actor.createActor<TreasuryService>(treasuryIDL, {
-                agent,
-                canisterId: treasuryCanisterId()
-            });
+            const treasury = await getAuthenticatedActor(authClient, treasuryCanisterId(), () => treasuryIDL) as TreasuryService
 
             const result = await treasury.removePortfolioCircuitBreakerCondition(BigInt(conditionId));
             
@@ -5704,19 +4995,7 @@ export const useTacoStore = defineStore('taco', () => {
     }
     const getPortfolioCircuitBreakerLogs = async (offset: number, limit: number) => {
         try {
-            // Use anonymous identity for public query (no authentication required)
-            const host = getNetworkHost()
-
-            const agent = await createAgent({
-                identity: new AnonymousIdentity(),
-                host,
-                fetchRootKey: shouldFetchRootKey(),
-            });
-
-            const treasury = Actor.createActor<TreasuryService>(treasuryIDL, {
-                agent,
-                canisterId: treasuryCanisterId()
-            });
+            const treasury = await getAnonymousActor(treasuryCanisterId(), () => treasuryIDL) as TreasuryService
 
             const result = await treasury.getPortfolioCircuitBreakerLogs(BigInt(offset), BigInt(limit));
             return result;
@@ -5728,22 +5007,7 @@ export const useTacoStore = defineStore('taco', () => {
     const clearPortfolioCircuitBreakerLogs = async () => {
         try {
             const authClient = await getAuthClient();
-            
-            if (!await authClient.isAuthenticated()) {
-                throw new Error('User not authenticated');
-            }
-
-            const identity = await authClient.getIdentity();
-            const agent = await createAgent({
-                identity,
-                host: getNetworkHost(),
-                fetchRootKey: shouldFetchRootKey(),
-            });
-
-            const treasury = Actor.createActor<TreasuryService>(treasuryIDL, {
-                agent,
-                canisterId: treasuryCanisterId()
-            });
+            const treasury = await getAuthenticatedActor(authClient, treasuryCanisterId(), () => treasuryIDL) as TreasuryService
 
             const result = await treasury.clearPortfolioCircuitBreakerLogs();
             
@@ -5763,16 +5027,7 @@ export const useTacoStore = defineStore('taco', () => {
     // neuron snapshots
     const getNeuronSnapshotStatus = async () => {
         try {
-            const agent = await createAgent({
-                identity: new AnonymousIdentity(),
-                host: getNetworkHost(),
-                fetchRootKey: shouldFetchRootKey(),
-            });
-
-            const neuronSnapshot = Actor.createActor<NeuronSnapshotService>(neuronSnapshotIDL, {
-                agent,
-                canisterId: neuronSnapshotCanisterId()
-            });
+            const neuronSnapshot = await getAnonymousActor(neuronSnapshotCanisterId(), () => neuronSnapshotIDL) as NeuronSnapshotService
 
             return await neuronSnapshot.get_neuron_snapshot_status();
         } catch (error: any) {
@@ -5782,16 +5037,7 @@ export const useTacoStore = defineStore('taco', () => {
     }
     const getNeuronSnapshotsInfo = async (start: number, length: number) => {
         try {
-            const agent = await createAgent({
-                identity: new AnonymousIdentity(),
-                host: getNetworkHost(),
-                fetchRootKey: shouldFetchRootKey(),
-            });
-
-            const neuronSnapshot = Actor.createActor<NeuronSnapshotService>(neuronSnapshotIDL, {
-                agent,
-                canisterId: neuronSnapshotCanisterId()
-            });
+            const neuronSnapshot = await getAnonymousActor(neuronSnapshotCanisterId(), () => neuronSnapshotIDL) as NeuronSnapshotService
 
             return await neuronSnapshot.get_neuron_snapshots_info(BigInt(start), BigInt(length));
         } catch (error: any) {
@@ -5801,16 +5047,7 @@ export const useTacoStore = defineStore('taco', () => {
     }
     const getNeuronSnapshotInfo = async (snapshotId: bigint) => {
         try {
-            const agent = await createAgent({
-                identity: new AnonymousIdentity(),
-                host: getNetworkHost(),
-                fetchRootKey: shouldFetchRootKey(),
-            });
-
-            const neuronSnapshot = Actor.createActor<NeuronSnapshotService>(neuronSnapshotIDL, {
-                agent,
-                canisterId: neuronSnapshotCanisterId()
-            });
+            const neuronSnapshot = await getAnonymousActor(neuronSnapshotCanisterId(), () => neuronSnapshotIDL) as NeuronSnapshotService
 
             return await neuronSnapshot.get_neuron_snapshot_info(snapshotId);
         } catch (error: any) {
@@ -5820,16 +5057,7 @@ export const useTacoStore = defineStore('taco', () => {
     }
     const getCumulativeValuesAtSnapshot = async (snapshotId: bigint | null) => {
         try {
-            const agent = await createAgent({
-                identity: new AnonymousIdentity(),
-                host: getNetworkHost(),
-                fetchRootKey: shouldFetchRootKey(),
-            });
-
-            const neuronSnapshot = Actor.createActor<NeuronSnapshotService>(neuronSnapshotIDL, {
-                agent,
-                canisterId: neuronSnapshotCanisterId()
-            });
+            const neuronSnapshot = await getAnonymousActor(neuronSnapshotCanisterId(), () => neuronSnapshotIDL) as NeuronSnapshotService
 
             return await neuronSnapshot.getCumulativeValuesAtSnapshot(snapshotId ? [snapshotId] : []);
         } catch (error: any) {
@@ -5839,16 +5067,7 @@ export const useTacoStore = defineStore('taco', () => {
     }
     const getNeuronDataForDAO = async (snapshotId: bigint, start: number, limit: number) => {
         try {
-            const agent = await createAgent({
-                identity: new AnonymousIdentity(),
-                host: getNetworkHost(),
-                fetchRootKey: shouldFetchRootKey(),
-            });
-
-            const neuronSnapshot = Actor.createActor<NeuronSnapshotService>(neuronSnapshotIDL, {
-                agent,
-                canisterId: neuronSnapshotCanisterId()
-            });
+            const neuronSnapshot = await getAnonymousActor(neuronSnapshotCanisterId(), () => neuronSnapshotIDL) as NeuronSnapshotService
 
             return await neuronSnapshot.getNeuronDataForDAO(snapshotId, BigInt(start), BigInt(limit));
         } catch (error: any) {
@@ -5859,22 +5078,7 @@ export const useTacoStore = defineStore('taco', () => {
     const takeNeuronSnapshot = async () => {
         try {
             const authClient = await getAuthClient();
-            
-            if (!await authClient.isAuthenticated()) {
-                throw new Error('User not authenticated');
-            }
-
-            const identity = await authClient.getIdentity();
-            const agent = await createAgent({
-                identity,
-                host: getNetworkHost(),
-                fetchRootKey: shouldFetchRootKey(),
-            });
-
-            const neuronSnapshot = Actor.createActor<NeuronSnapshotService>(neuronSnapshotIDL, {
-                agent,
-                canisterId: neuronSnapshotCanisterId()
-            });
+            const neuronSnapshot = await getAuthenticatedActor(authClient, neuronSnapshotCanisterId(), () => neuronSnapshotIDL) as NeuronSnapshotService
 
             return await neuronSnapshot.take_neuron_snapshot();
         } catch (error: any) {
@@ -5884,16 +5088,7 @@ export const useTacoStore = defineStore('taco', () => {
     }
     const getMaxNeuronSnapshots = async () => {
         try {
-            const agent = await createAgent({
-                identity: new AnonymousIdentity(),
-                host: getNetworkHost(),
-                fetchRootKey: shouldFetchRootKey(),
-            });
-
-            const neuronSnapshot = Actor.createActor<NeuronSnapshotService>(neuronSnapshotIDL, {
-                agent,
-                canisterId: neuronSnapshotCanisterId()
-            });
+            const neuronSnapshot = await getAnonymousActor(neuronSnapshotCanisterId(), () => neuronSnapshotIDL) as NeuronSnapshotService
 
             return await neuronSnapshot.getMaxNeuronSnapshots();
         } catch (error: any) {
@@ -5904,22 +5099,7 @@ export const useTacoStore = defineStore('taco', () => {
     const setMaxNeuronSnapshots = async (maxSnapshots: number) => {
         try {
             const authClient = await getAuthClient();
-            
-            if (!await authClient.isAuthenticated()) {
-                throw new Error('User not authenticated');
-            }
-
-            const identity = await authClient.getIdentity();
-            const agent = await createAgent({
-                identity,
-                host: getNetworkHost(),
-                fetchRootKey: shouldFetchRootKey(),
-            });
-
-            const neuronSnapshot = Actor.createActor<NeuronSnapshotService>(neuronSnapshotIDL, {
-                agent,
-                canisterId: neuronSnapshotCanisterId()
-            });
+            const neuronSnapshot = await getAuthenticatedActor(authClient, neuronSnapshotCanisterId(), () => neuronSnapshotIDL) as NeuronSnapshotService
 
             await neuronSnapshot.setMaxNeuronSnapshots(BigInt(maxSnapshots));
             // console.log('Successfully set max neuron snapshots to:', maxSnapshots);
@@ -5931,16 +5111,7 @@ export const useTacoStore = defineStore('taco', () => {
     }
     const getMaxPriceHistoryEntries = async () => {
         try {
-            const agent = await createAgent({
-                identity: new AnonymousIdentity(),
-                host: getNetworkHost(),
-                fetchRootKey: shouldFetchRootKey(),
-            });
-
-            const treasury = Actor.createActor<TreasuryService>(treasuryIDL, {
-                agent,
-                canisterId: treasuryCanisterId()
-            });
+            const treasury = await getAnonymousActor(treasuryCanisterId(), () => treasuryIDL) as TreasuryService
 
             return await treasury.getMaxPriceHistoryEntries();
         } catch (error: any) {
@@ -5950,16 +5121,7 @@ export const useTacoStore = defineStore('taco', () => {
     }
     const getMaxPortfolioSnapshots = async () => {
         try {
-            const agent = await createAgent({
-                identity: new AnonymousIdentity(),
-                host: getNetworkHost(),
-                fetchRootKey: shouldFetchRootKey(),
-            });
-
-            const treasury = Actor.createActor<TreasuryService>(treasuryIDL, {
-                agent,
-                canisterId: treasuryCanisterId()
-            });
+            const treasury = await getAnonymousActor(treasuryCanisterId(), () => treasuryIDL) as TreasuryService
 
             return await (treasury as any).getMaxPortfolioSnapshots();
         } catch (error: any) {
@@ -5970,22 +5132,7 @@ export const useTacoStore = defineStore('taco', () => {
     const updateMaxPortfolioSnapshots = async (newLimit: number, reason?: string) => {
         try {
             const authClient = await getAuthClient();
-            
-            if (!await authClient.isAuthenticated()) {
-                throw new Error('User not authenticated');
-            }
-
-            const identity = await authClient.getIdentity();
-            const agent = await createAgent({
-                identity,
-                host: getNetworkHost(),
-                fetchRootKey: shouldFetchRootKey(),
-            });
-
-            const treasury = Actor.createActor<TreasuryService>(treasuryIDL, {
-                agent,
-                canisterId: treasuryCanisterId()
-            });
+            const treasury = await getAuthenticatedActor(authClient, treasuryCanisterId(), () => treasuryIDL) as TreasuryService
 
             const result = await (treasury as any).updateMaxPortfolioSnapshots(BigInt(newLimit), reason ? [reason] : []);
             if ('ok' in result) {
@@ -6018,16 +5165,7 @@ export const useTacoStore = defineStore('taco', () => {
     }
     const getAllForums = async () => {
         try {
-            const agent = await createAgent({
-                identity: new AnonymousIdentity(),
-                host: getNetworkHost(),
-                fetchRootKey: shouldFetchRootKey(),
-            });
-
-            const forumActor = Actor.createActor<SneedForumService>(sneedForumIDL, {
-                agent,
-                canisterId: sneedForumCanisterId()
-            });
+            const forumActor = await getAnonymousActor(sneedForumCanisterId(), () => sneedForumIDL) as SneedForumService
 
             const forums = await forumActor.get_forums();
             fetchedForums.value = forums;
@@ -6040,16 +5178,7 @@ export const useTacoStore = defineStore('taco', () => {
     }
     const findTacoForum = async () => {
         try {
-            const agent = await createAgent({
-                identity: new AnonymousIdentity(),
-                host: getNetworkHost(),
-                fetchRootKey: shouldFetchRootKey(),
-            });
-
-            const forumActor = Actor.createActor<SneedForumService>(sneedForumIDL, {
-                agent,
-                canisterId: sneedForumCanisterId()
-            });
+            const forumActor = await getAnonymousActor(sneedForumCanisterId(), () => sneedForumIDL) as SneedForumService
 
             // Direct lookup using SNS root canister ID (much more efficient!)
             const tacoSnsRoot = Principal.fromText(tacoSnsRootCanisterId());
@@ -6071,16 +5200,7 @@ export const useTacoStore = defineStore('taco', () => {
     }
     const getProposalsTopic = async (forumId: bigint) => {
         try {
-            const agent = await createAgent({
-                identity: new AnonymousIdentity(),
-                host: getNetworkHost(),
-                fetchRootKey: shouldFetchRootKey(),
-            });
-
-            const forumActor = Actor.createActor<SneedForumService>(sneedForumIDL, {
-                agent,
-                canisterId: sneedForumCanisterId()
-            });
+            const forumActor = await getAnonymousActor(sneedForumCanisterId(), () => sneedForumIDL) as SneedForumService
 
             const proposalsTopicMapping = await forumActor.get_proposals_topic(forumId);
             
@@ -6100,16 +5220,7 @@ export const useTacoStore = defineStore('taco', () => {
     }
     const getProposalsTopicDirect = async () => {
         try {
-            const agent = await createAgent({
-                identity: new AnonymousIdentity(),
-                host: getNetworkHost(),
-                fetchRootKey: shouldFetchRootKey(),
-            });
-
-            const forumActor = Actor.createActor<SneedForumService>(sneedForumIDL, {
-                agent,
-                canisterId: sneedForumCanisterId()
-            });
+            const forumActor = await getAnonymousActor(sneedForumCanisterId(), () => sneedForumIDL) as SneedForumService
 
             // Direct lookup using SNS root canister ID - super efficient!
             const tacoSnsRoot = Principal.fromText(tacoSnsRootCanisterId());
@@ -6131,16 +5242,7 @@ export const useTacoStore = defineStore('taco', () => {
     }
     const getThreadsByTopic = async (topicId: bigint) => {
         try {
-            const agent = await createAgent({
-                identity: new AnonymousIdentity(),
-                host: getNetworkHost(),
-                fetchRootKey: shouldFetchRootKey(),
-            });
-
-            const forumActor = Actor.createActor<SneedForumService>(sneedForumIDL, {
-                agent,
-                canisterId: sneedForumCanisterId()
-            });
+            const forumActor = await getAnonymousActor(sneedForumCanisterId(), () => sneedForumIDL) as SneedForumService
 
             const threads = await forumActor.get_threads_by_topic(topicId);
             fetchedProposalsThreads.value = threads;
@@ -6153,16 +5255,7 @@ export const useTacoStore = defineStore('taco', () => {
     }
     const getPostsByThread = async (threadId: bigint) => {
         try {
-            const agent = await createAgent({
-                identity: new AnonymousIdentity(),
-                host: getNetworkHost(),
-                fetchRootKey: shouldFetchRootKey(),
-            });
-
-            const forumActor = Actor.createActor<SneedForumService>(sneedForumIDL, {
-                agent,
-                canisterId: sneedForumCanisterId()
-            });
+            const forumActor = await getAnonymousActor(sneedForumCanisterId(), () => sneedForumIDL) as SneedForumService
 
             const posts = await forumActor.get_posts_by_thread(threadId);
             fetchedThreadPosts.value = posts;
@@ -6198,16 +5291,7 @@ export const useTacoStore = defineStore('taco', () => {
     }
     const getThread = async (threadId: bigint) => {
         try {
-            const agent = await createAgent({
-                identity: new AnonymousIdentity(),
-                host: getNetworkHost(),
-                fetchRootKey: shouldFetchRootKey(),
-            });
-
-            const forumActor = Actor.createActor<SneedForumService>(sneedForumIDL, {
-                agent,
-                canisterId: sneedForumCanisterId()
-            });
+            const forumActor = await getAnonymousActor(sneedForumCanisterId(), () => sneedForumIDL) as SneedForumService
 
             const thread = await forumActor.get_thread(threadId);
             // console.log('Fetched thread:', threadId, thread);
@@ -6220,17 +5304,8 @@ export const useTacoStore = defineStore('taco', () => {
     const getProposalThread = async (proposalId: bigint) => {
         try {
             // console.log('🔍 Looking up thread for proposal ID:', proposalId.toString());
-            
-            const agent = await createAgent({
-                identity: new AnonymousIdentity(),
-                host: getNetworkHost(),
-                fetchRootKey: shouldFetchRootKey(),
-            });
 
-            const forumActor = Actor.createActor<SneedForumService>(sneedForumIDL, {
-                agent,
-                canisterId: sneedForumCanisterId()
-            });
+            const forumActor = await getAnonymousActor(sneedForumCanisterId(), () => sneedForumIDL) as SneedForumService
 
             const tacoSnsRoot = Principal.fromText(tacoSnsRootCanisterId());
             const proposalThreadMapping = await forumActor.get_proposal_thread(tacoSnsRoot, proposalId);
@@ -6265,24 +5340,13 @@ export const useTacoStore = defineStore('taco', () => {
     const createProposalThread = async (proposalId: bigint) => {
         try {
             // console.log('🔧 Creating thread for proposal ID:', proposalId.toString());
-            
+
             if (!userLoggedIn.value) {
                 throw new Error('Must be logged in to create proposal threads');
             }
 
             const authClient = await getAuthClient();
-            const identity = authClient.getIdentity();
-            
-            const agent = await createAgent({
-                identity,
-                host: getNetworkHost(),
-                fetchRootKey: shouldFetchRootKey(),
-            });
-
-            const forumActor = Actor.createActor<SneedForumService>(sneedForumIDL, {
-                agent,
-                canisterId: sneedForumCanisterId()
-            });
+            const forumActor = await getAuthenticatedActor(authClient, sneedForumCanisterId(), () => sneedForumIDL) as SneedForumService
 
             const tacoSnsRoot = Principal.fromText(tacoSnsRootCanisterId());
             const result = await forumActor.create_proposal_thread_with_auto_setup({
@@ -6308,24 +5372,13 @@ export const useTacoStore = defineStore('taco', () => {
     const createPost = async (threadId: bigint, body: string, replyToPostId?: bigint, title?: string) => {
         try {
             // console.log('🔧 Creating post for thread ID:', threadId.toString());
-            
+
             if (!userLoggedIn.value) {
                 throw new Error('Must be logged in to create posts');
             }
 
             const authClient = await getAuthClient();
-            const identity = authClient.getIdentity();
-            
-            const agent = await createAgent({
-                identity,
-                host: getNetworkHost(),
-                fetchRootKey: shouldFetchRootKey(),
-            });
-
-            const forumActor = Actor.createActor<SneedForumService>(sneedForumIDL, {
-                agent,
-                canisterId: sneedForumCanisterId()
-            });
+            const forumActor = await getAuthenticatedActor(authClient, sneedForumCanisterId(), () => sneedForumIDL) as SneedForumService
 
             const result = await forumActor.create_post(
                 threadId,
@@ -6352,24 +5405,13 @@ export const useTacoStore = defineStore('taco', () => {
     const voteOnPost = async (postId: bigint, voteType: 'upvote' | 'downvote') => {
         try {
             // console.log('🗳️ Voting on post ID:', postId.toString(), 'vote type:', voteType);
-            
+
             if (!userLoggedIn.value) {
                 throw new Error('Must be logged in to vote');
             }
 
             const authClient = await getAuthClient();
-            const identity = authClient.getIdentity();
-            
-            const agent = await createAgent({
-                identity,
-                host: getNetworkHost(),
-                fetchRootKey: shouldFetchRootKey(),
-            });
-
-            const forumActor = Actor.createActor<SneedForumService>(sneedForumIDL, {
-                agent,
-                canisterId: sneedForumCanisterId()
-            });
+            const forumActor = await getAuthenticatedActor(authClient, sneedForumCanisterId(), () => sneedForumIDL) as SneedForumService
 
             const voteTypeVariant = voteType === 'upvote' ? { upvote: null } : { downvote: null };
             const result = await forumActor.vote_on_post(postId, voteTypeVariant);
@@ -6391,24 +5433,13 @@ export const useTacoStore = defineStore('taco', () => {
     const retractVote = async (postId: bigint) => {
         try {
             // console.log('🔄 Retracting vote on post ID:', postId.toString());
-            
+
             if (!userLoggedIn.value) {
                 throw new Error('Must be logged in to retract vote');
             }
 
             const authClient = await getAuthClient();
-            const identity = authClient.getIdentity();
-            
-            const agent = await createAgent({
-                identity,
-                host: getNetworkHost(),
-                fetchRootKey: shouldFetchRootKey(),
-            });
-
-            const forumActor = Actor.createActor<SneedForumService>(sneedForumIDL, {
-                agent,
-                canisterId: sneedForumCanisterId()
-            });
+            const forumActor = await getAuthenticatedActor(authClient, sneedForumCanisterId(), () => sneedForumIDL) as SneedForumService
 
             const result = await forumActor.retract_vote(postId);
             
@@ -6429,17 +5460,8 @@ export const useTacoStore = defineStore('taco', () => {
     const getPostVotes = async (postId: bigint) => {
         try {
             // console.log('📊 Getting votes for post ID:', postId.toString());
-            
-            const agent = await createAgent({
-                identity: new AnonymousIdentity(),
-                host: getNetworkHost(),
-                fetchRootKey: shouldFetchRootKey(),
-            });
 
-            const forumActor = Actor.createActor<SneedForumService>(sneedForumIDL, {
-                agent,
-                canisterId: sneedForumCanisterId()
-            });
+            const forumActor = await getAnonymousActor(sneedForumCanisterId(), () => sneedForumIDL) as SneedForumService
 
             const votes = await forumActor.get_post_votes(postId);
             // console.log('✅ Retrieved votes for post:', votes);
@@ -6471,16 +5493,7 @@ export const useTacoStore = defineStore('taco', () => {
         // Ensure shims are initialized before using Actor
         await initializeShims()
 
-        const agent = await createAgent({
-            identity: new AnonymousIdentity(),
-            host: getNetworkHost(),
-            fetchRootKey: shouldFetchRootKey(),
-        });
-
-        const governanceActor = Actor.createActor(snsGovernanceIDL, {
-            agent,
-            canisterId: tacoSnsGovernanceCanisterId()
-        });
+        const governanceActor = await getAnonymousActor(tacoSnsGovernanceCanisterId(), () => snsGovernanceIDL)
 
         // Create request for list_proposals
         const request = {
@@ -6647,21 +5660,12 @@ export const useTacoStore = defineStore('taco', () => {
         try {
             // console.log('🚀 Starting to load all names...');
             namesLoading.value = true;
-            
-            const agent = await createAgent({
-                identity: new AnonymousIdentity(),
-                host: getNetworkHost(),
-                fetchRootKey: shouldFetchRootKey(),
-            });
 
             const canisterId = appSneedDaoCanisterId();
             // console.log('🔗 Connecting to app_sneeddao_backend canister:', canisterId);
             // console.log('🌐 DFX_NETWORK:', process.env.DFX_NETWORK);
-            
-            const appSneedDaoActor = Actor.createActor<AppSneedDaoService>(appSneedDaoIDL, {
-                agent,
-                canisterId: canisterId
-            });
+
+            const appSneedDaoActor = await getAnonymousActor(canisterId, () => appSneedDaoIDL) as AppSneedDaoService
 
             // Load all principal names and neuron names in parallel
             // console.log('📞 Making API calls to get_all_principal_names() and get_all_neuron_names()...');
@@ -6735,18 +5739,7 @@ export const useTacoStore = defineStore('taco', () => {
             }
 
             const authClient = await getAuthClient();
-            const identity = authClient.getIdentity();
-            
-            const agent = await createAgent({
-                identity,
-                host: getNetworkHost(),
-                fetchRootKey: shouldFetchRootKey(),
-            });
-
-            const appSneedDaoActor = Actor.createActor<AppSneedDaoService>(appSneedDaoIDL, {
-                agent,
-                canisterId: appSneedDaoCanisterId()
-            });
+            const appSneedDaoActor = await getAuthenticatedActor(authClient, appSneedDaoCanisterId(), () => appSneedDaoIDL) as AppSneedDaoService
 
             const result = await appSneedDaoActor.set_principal_name(name);
             
@@ -6775,18 +5768,7 @@ export const useTacoStore = defineStore('taco', () => {
             }
 
             const authClient = await getAuthClient();
-            const identity = authClient.getIdentity();
-            
-            const agent = await createAgent({
-                identity,
-                host: getNetworkHost(),
-                fetchRootKey: shouldFetchRootKey(),
-            });
-
-            const appSneedDaoActor = Actor.createActor<AppSneedDaoService>(appSneedDaoIDL, {
-                agent,
-                canisterId: appSneedDaoCanisterId()
-            });
+            const appSneedDaoActor = await getAuthenticatedActor(authClient, appSneedDaoCanisterId(), () => appSneedDaoIDL) as AppSneedDaoService
 
             // Convert number[] to Uint8Array if needed
             const neuronIdUint8 = neuronId instanceof Uint8Array ? neuronId : new Uint8Array(neuronId);
@@ -6818,18 +5800,7 @@ export const useTacoStore = defineStore('taco', () => {
             }
 
             const authClient = await getAuthClient();
-            const identity = authClient.getIdentity();
-            
-            const agent = await createAgent({
-                identity,
-                host: getNetworkHost(),
-                fetchRootKey: shouldFetchRootKey(),
-            });
-
-            const appSneedDaoActor = Actor.createActor<AppSneedDaoService>(appSneedDaoIDL, {
-                agent,
-                canisterId: appSneedDaoCanisterId()
-            });
+            const appSneedDaoActor = await getAuthenticatedActor(authClient, appSneedDaoCanisterId(), () => appSneedDaoIDL) as AppSneedDaoService
 
             const result = await appSneedDaoActor.get_user_neurons();
             
@@ -6857,16 +5828,9 @@ export const useTacoStore = defineStore('taco', () => {
             }
 
             const authClient = await getAuthClient();
-            const identity = authClient.getIdentity();
-
-            const agent = await createAgent({
-                identity,
-                host: getNetworkHost(),
-                fetchRootKey: shouldFetchRootKey(),
-            });
 
             // Create SNS Governance actor
-            const snsGov = await createSnsGovernanceActor(agent, 'lhdfz-wqaaa-aaaaq-aae3q-cai');
+            const snsGov = await createSnsGovernanceActor(authClient, 'lhdfz-wqaaa-aaaaq-aae3q-cai');
 
             const neuronsResult = await snsGov.list_neurons({
                 of_principal: [Principal.fromText(userPrincipal.value)],
@@ -6906,14 +5870,23 @@ export const useTacoStore = defineStore('taco', () => {
         cachedNeuronRewardBalances.value = new Map();
     }
 
-    const createSnsGovernanceActor = async (agent: any, canisterId: string) => {
+    const createSnsGovernanceActor = async (authClient: any, canisterId: string) => {
         // Import the full SNS governance IDL that includes permissions
         const { idlFactory } = await import('../../../declarations/sns_governance');
-        
-        return Actor.createActor(idlFactory, {
-            agent,
-            canisterId
-        });
+
+        return await getAuthenticatedActor(authClient, canisterId, () => idlFactory);
+    }
+
+    // Public version that gets authClient internally
+    const createSnsGovernanceActorPublic = async (canisterId: string) => {
+        const authClient = await getAuthClient();
+        return await createSnsGovernanceActor(authClient, canisterId);
+    }
+
+    // Anonymous version for public queries (no auth required)
+    const createSnsGovernanceActorAnonymous = async (canisterId: string) => {
+        const { idlFactory } = await import('../../../declarations/sns_governance');
+        return await getAnonymousActor(canisterId, () => idlFactory);
     }
 
     // Determine neuron relationship to user
@@ -7228,29 +6201,25 @@ export const useTacoStore = defineStore('taco', () => {
         };
     }
 
-    // Create rewards actor
+    // Create rewards actor (authenticated)
     const createRewardsActor = async () => {
         const canisterId = rewardsCanisterId()
         if (!canisterId) {
             throw new Error('Rewards canister ID not found')
         }
 
-        const authClient = await AuthClient.create({
-            idleOptions: { disableIdle: true }
-        })
-        const identity = await authClient.getIdentity()
-        const host = getNetworkHost()
+        const authClient = await getAuthClient()
+        return await getAuthenticatedActor(authClient, canisterId, () => rewardsIDL)
+    }
 
-        const agent = await createAgent({
-            identity,
-            host,
-            fetchRootKey: shouldFetchRootKey(),
-        })
+    // Create rewards actor (anonymous - for public queries)
+    const createRewardsActorAnonymous = async () => {
+        const canisterId = rewardsCanisterId()
+        if (!canisterId) {
+            throw new Error('Rewards canister ID not found')
+        }
 
-        return Actor.createActor(rewardsIDL, {
-            agent,
-            canisterId
-        })
+        return await getAnonymousActor(canisterId, () => rewardsIDL)
     }
 
     // Format neuron ID for map key
@@ -7477,17 +6446,10 @@ export const useTacoStore = defineStore('taco', () => {
             // });
 
             const authClient = await getAuthClient();
-            const identity = authClient.getIdentity();
-            
-            const agent = await createAgent({
-                identity,
-                host: getNetworkHost(),
-                fetchRootKey: shouldFetchRootKey(),
-            });
 
             // Create SNS Governance actor
-            const snsGov = await createSnsGovernanceActor(agent, 'lhdfz-wqaaa-aaaaq-aae3q-cai');
-            
+            const snsGov = await createSnsGovernanceActor(authClient, 'lhdfz-wqaaa-aaaaq-aae3q-cai');
+
             // Prepare the manage neuron request for SetDissolveTimestamp
             const manageNeuronRequest = {
                 subaccount: Array.from(neuronId),
@@ -7536,17 +6498,10 @@ export const useTacoStore = defineStore('taco', () => {
             // console.log('Starting dissolving for neuron:', Array.from(neuronId).map(b => b.toString(16).padStart(2, '0')).join(''));
 
             const authClient = await getAuthClient();
-            const identity = authClient.getIdentity();
-            
-            const agent = await createAgent({
-                identity,
-                host: getNetworkHost(),
-                fetchRootKey: shouldFetchRootKey(),
-            });
 
             // Create SNS Governance actor
-            const snsGov = await createSnsGovernanceActor(agent, 'lhdfz-wqaaa-aaaaq-aae3q-cai');
-            
+            const snsGov = await createSnsGovernanceActor(authClient, 'lhdfz-wqaaa-aaaaq-aae3q-cai');
+
             // Prepare the manage neuron request for StartDissolving
             const manageNeuronRequest = {
                 subaccount: Array.from(neuronId),
@@ -7592,16 +6547,9 @@ export const useTacoStore = defineStore('taco', () => {
             // console.log('Stopping dissolving for neuron:', Array.from(neuronId).map(b => b.toString(16).padStart(2, '0')).join(''));
 
             const authClient = await getAuthClient();
-            const identity = authClient.getIdentity();
-            
-            const agent = await createAgent({
-                identity,
-                host: getNetworkHost(),
-                fetchRootKey: shouldFetchRootKey(),
-            });
 
             // Create SNS Governance actor
-            const snsGov = await createSnsGovernanceActor(agent, 'lhdfz-wqaaa-aaaaq-aae3q-cai');
+            const snsGov = await createSnsGovernanceActor(authClient, 'lhdfz-wqaaa-aaaaq-aae3q-cai');
             
             // Prepare the manage neuron request for StopDissolving
             const manageNeuronRequest = {
@@ -7656,16 +6604,9 @@ export const useTacoStore = defineStore('taco', () => {
             // console.log('Disbursing neuron:', Array.from(neuronId).map(b => b.toString(16).padStart(2, '0')).join(''));
 
             const authClient = await getAuthClient();
-            const identity = authClient.getIdentity();
-            
-            const agent = await createAgent({
-                identity,
-                host: getNetworkHost(),
-                fetchRootKey: shouldFetchRootKey(),
-            });
 
             // Create SNS Governance actor
-            const snsGov = await createSnsGovernanceActor(agent, 'lhdfz-wqaaa-aaaaq-aae3q-cai');
+            const snsGov = await createSnsGovernanceActor(authClient, 'lhdfz-wqaaa-aaaaq-aae3q-cai');
             
             // Prepare the disburse command
             const disburseCommand: any = {};
@@ -7729,16 +6670,9 @@ export const useTacoStore = defineStore('taco', () => {
             // });
 
             const authClient = await getAuthClient();
-            const identity = authClient.getIdentity();
-            
-            const agent = await createAgent({
-                identity,
-                host: getNetworkHost(),
-                fetchRootKey: shouldFetchRootKey(),
-            });
 
             // Create SNS Governance actor
-            const snsGov = await createSnsGovernanceActor(agent, 'lhdfz-wqaaa-aaaaq-aae3q-cai');
+            const snsGov = await createSnsGovernanceActor(authClient, 'lhdfz-wqaaa-aaaaq-aae3q-cai');
             
             // Prepare the manage neuron request for AddNeuronPermissions
             const manageNeuronRequest = {
@@ -7791,16 +6725,9 @@ export const useTacoStore = defineStore('taco', () => {
             // });
 
             const authClient = await getAuthClient();
-            const identity = authClient.getIdentity();
-            
-            const agent = await createAgent({
-                identity,
-                host: getNetworkHost(),
-                fetchRootKey: shouldFetchRootKey(),
-            });
 
             // Create SNS Governance actor
-            const snsGov = await createSnsGovernanceActor(agent, 'lhdfz-wqaaa-aaaaq-aae3q-cai');
+            const snsGov = await createSnsGovernanceActor(authClient, 'lhdfz-wqaaa-aaaaq-aae3q-cai');
             
             // Prepare the manage neuron request for RemoveNeuronPermissions
             const manageNeuronRequest = {
@@ -7843,16 +6770,9 @@ export const useTacoStore = defineStore('taco', () => {
     const getGrantablePermissions = async (): Promise<number[]> => {
         try {
             const authClient = await getAuthClient();
-            const identity = authClient.getIdentity();
-            
-            const agent = await createAgent({
-                identity,
-                host: getNetworkHost(),
-                fetchRootKey: shouldFetchRootKey(),
-            });
 
             // Create SNS Governance actor
-            const snsGov = await createSnsGovernanceActor(agent, 'lhdfz-wqaaa-aaaaq-aae3q-cai');
+            const snsGov = await createSnsGovernanceActor(authClient, 'lhdfz-wqaaa-aaaaq-aae3q-cai');
             
             // Get nervous system parameters
             const params = await snsGov.get_nervous_system_parameters(null) as any;
@@ -7911,16 +6831,9 @@ export const useTacoStore = defineStore('taco', () => {
             // });
 
             const authClient = await getAuthClient();
-            const identity = authClient.getIdentity();
-            
-            const agent = await createAgent({
-                identity,
-                host: getNetworkHost(),
-                fetchRootKey: shouldFetchRootKey(),
-            });
 
             // Create SNS Governance actor
-            const snsGov = await createSnsGovernanceActor(agent, 'lhdfz-wqaaa-aaaaq-aae3q-cai');
+            const snsGov = await createSnsGovernanceActor(authClient, 'lhdfz-wqaaa-aaaaq-aae3q-cai');
             
             // Prepare the manage neuron request for SetFollowing
             const manageNeuronRequest = {
@@ -7976,16 +6889,9 @@ export const useTacoStore = defineStore('taco', () => {
             // });
 
             const authClient = await getAuthClient();
-            const identity = authClient.getIdentity();
-            
-            const agent = await createAgent({
-                identity,
-                host: getNetworkHost(),
-                fetchRootKey: shouldFetchRootKey(),
-            });
 
             // Create SNS Governance actor
-            const snsGov = await createSnsGovernanceActor(agent, 'lhdfz-wqaaa-aaaaq-aae3q-cai');
+            const snsGov = await createSnsGovernanceActor(authClient, 'lhdfz-wqaaa-aaaaq-aae3q-cai');
             
             // Get current neuron data to find existing followees for this topic
             const currentNeuronData = await getSingleNeuron(neuronId);
@@ -8072,16 +6978,9 @@ export const useTacoStore = defineStore('taco', () => {
             }
 
             const authClient = await getAuthClient();
-            const identity = authClient.getIdentity();
-            
-            const agent = await createAgent({
-                identity,
-                host: getNetworkHost(),
-                fetchRootKey: shouldFetchRootKey(),
-            });
 
             // Create SNS Governance actor
-            const snsGov = await createSnsGovernanceActor(agent, 'lhdfz-wqaaa-aaaaq-aae3q-cai');
+            const snsGov = await createSnsGovernanceActor(authClient, 'lhdfz-wqaaa-aaaaq-aae3q-cai');
             
             const result = await snsGov.get_neuron({ 
                 neuron_id: [{ id: Array.from(neuronId) }] 
@@ -8142,15 +7041,8 @@ export const useTacoStore = defineStore('taco', () => {
         try {
             // 1) Read DAO parameters to respect the minimum dissolve delay
             const authClient = await getAuthClient();
-            const identity = authClient.getIdentity();
-            
-            const agent = await createAgent({
-                identity,
-                host: getNetworkHost(),
-                fetchRootKey: shouldFetchRootKey(),
-            });
 
-            const snsGov = await createSnsGovernanceActor(agent, 'lhdfz-wqaaa-aaaaq-aae3q-cai');
+            const snsGov = await createSnsGovernanceActor(authClient, 'lhdfz-wqaaa-aaaaq-aae3q-cai');
             
             // Get nervous system parameters
             const params = await snsGov.get_nervous_system_parameters(null) as any;
@@ -8233,21 +7125,11 @@ export const useTacoStore = defineStore('taco', () => {
         }
 
         const authClient = await getAuthClient();
-        const identity = authClient.getIdentity();
-        
-        const agent = await createAgent({
-            identity,
-            host: getNetworkHost(),
-            fetchRootKey: shouldFetchRootKey(),
-        });
 
         // Use the existing SNS governance IDL
         const { idlFactory } = await import('../../../declarations/sns_governance');
-        
-        const governanceActor = Actor.createActor(idlFactory, {
-            agent,
-            canisterId: 'lhdfz-wqaaa-aaaaq-aae3q-cai'
-        });
+
+        const governanceActor = await getAuthenticatedActor(authClient, 'lhdfz-wqaaa-aaaaq-aae3q-cai', () => idlFactory);
 
         // Try nonces starting from 0
         for (let nonce = 0n; nonce < 1000n; nonce++) {  // Reasonable upper limit
@@ -8392,13 +7274,6 @@ export const useTacoStore = defineStore('taco', () => {
         console.log(`Scanning for stuck stakes (checking nonces 0-${maxNoncesToCheck - 1})...`);
 
         const authClient = await getAuthClient();
-        const identity = authClient.getIdentity();
-
-        const agent = await createAgent({
-            identity,
-            host: getNetworkHost(),
-            fetchRootKey: shouldFetchRootKey(),
-        });
 
         const tacoTokenPrincipal = 'kknbx-zyaaa-aaaaq-aae4a-cai';
         const snsGovernancePrincipal = 'lhdfz-wqaaa-aaaaq-aae3q-cai';
@@ -8417,10 +7292,7 @@ export const useTacoStore = defineStore('taco', () => {
             });
         };
 
-        const tokenActor = Actor.createActor(icrc1IDL, {
-            agent,
-            canisterId: tacoTokenPrincipal
-        });
+        const tokenActor = await getAuthenticatedActor(authClient, tacoTokenPrincipal, () => icrc1IDL);
 
         const found: Array<{ nonce: number; balance: bigint; recovered: boolean; error?: string }> = [];
         let totalRecovered = 0;
@@ -8428,7 +7300,8 @@ export const useTacoStore = defineStore('taco', () => {
         const controllerPrincipal = Principal.fromText(userPrincipal.value);
 
         // Create SNS Governance actor for checking if neurons already exist
-        const governanceActor = await createSnsGovernanceActor(agent, snsGovernancePrincipal);
+        const { idlFactory: snsGovIdl } = await import('../../../declarations/sns_governance');
+        const governanceActor = await getAuthenticatedActor(authClient, snsGovernancePrincipal, () => snsGovIdl);
 
         for (let nonce = 0; nonce < maxNoncesToCheck; nonce++) {
             try {
@@ -8522,13 +7395,6 @@ export const useTacoStore = defineStore('taco', () => {
         memo?: bigint  // Optional memo for neuron creation traceability
     ) => {
         const authClient = await getAuthClient();
-        const identity = authClient.getIdentity();
-        
-        const agent = await createAgent({
-            identity,
-            host: getNetworkHost(),
-            fetchRootKey: shouldFetchRootKey(),
-        });
 
         // Create ICRC1 actor for TACO token
         const icrc1IDL = ({ IDL }: any) => {
@@ -8559,10 +7425,7 @@ export const useTacoStore = defineStore('taco', () => {
             });
         };
 
-        const tokenActor = Actor.createActor(icrc1IDL, {
-            agent,
-            canisterId: tokenPrincipal
-        });
+        const tokenActor = await getAuthenticatedActor(authClient, tokenPrincipal, () => icrc1IDL);
 
         // Convert neuronId to proper subaccount (32 bytes)
         const subaccount = new Uint8Array(32);
@@ -8595,21 +7458,11 @@ export const useTacoStore = defineStore('taco', () => {
     // Claim or refresh neuron after staking
     const claimOrRefreshNeuron = async (neuronId: Uint8Array, memo?: bigint) => {
         const authClient = await getAuthClient();
-        const identity = authClient.getIdentity();
-        
-        const agent = await createAgent({
-            identity,
-            host: getNetworkHost(),
-            fetchRootKey: shouldFetchRootKey(),
-        });
 
         // Use the existing SNS governance IDL
         const { idlFactory } = await import('../../../declarations/sns_governance');
-        
-        const governanceActor = Actor.createActor(idlFactory, {
-            agent,
-            canisterId: 'lhdfz-wqaaa-aaaaq-aae3q-cai'
-        });
+
+        const governanceActor = await getAuthenticatedActor(authClient, 'lhdfz-wqaaa-aaaaq-aae3q-cai', () => idlFactory);
 
         // Convert neuronId to proper subaccount (32 bytes)
         const subaccount = new Uint8Array(32);
@@ -8677,18 +7530,7 @@ export const useTacoStore = defineStore('taco', () => {
             }
 
             const authClient = await getAuthClient();
-            const identity = authClient.getIdentity();
-            
-            const agent = await createAgent({
-                identity,
-                host: getNetworkHost(),
-                fetchRootKey: shouldFetchRootKey(),
-            });
-
-            const daoActor = Actor.createActor(daoBackendIDL, {
-                agent,
-                canisterId: daoBackendCanisterId()
-            });
+            const daoActor = await getAuthenticatedActor(authClient, daoBackendCanisterId(), () => daoBackendIDL)
 
             const result = await daoActor.registerUserToken(Principal.fromText(tokenPrincipal)) as { ok?: string; err?: any };
             
@@ -8710,18 +7552,7 @@ export const useTacoStore = defineStore('taco', () => {
             }
 
             const authClient = await getAuthClient();
-            const identity = authClient.getIdentity();
-            
-            const agent = await createAgent({
-                identity,
-                host: getNetworkHost(),
-                fetchRootKey: shouldFetchRootKey(),
-            });
-
-            const daoActor = Actor.createActor(daoBackendIDL, {
-                agent,
-                canisterId: daoBackendCanisterId()
-            });
+            const daoActor = await getAuthenticatedActor(authClient, daoBackendCanisterId(), () => daoBackendIDL)
 
             const result = await daoActor.unregisterUserToken(Principal.fromText(tokenPrincipal)) as { ok?: string; err?: any };
             
@@ -8743,18 +7574,7 @@ export const useTacoStore = defineStore('taco', () => {
             }
 
             const authClient = await getAuthClient();
-            const identity = authClient.getIdentity();
-            
-            const agent = await createAgent({
-                identity,
-                host: getNetworkHost(),
-                fetchRootKey: shouldFetchRootKey(),
-            });
-
-            const daoActor = Actor.createActor(daoBackendIDL, {
-                agent,
-                canisterId: daoBackendCanisterId()
-            });
+            const daoActor = await getAuthenticatedActor(authClient, daoBackendCanisterId(), () => daoBackendIDL)
 
             return await daoActor.getUserRegisteredTokens() as Principal[];
         } catch (error: any) {
@@ -8770,13 +7590,6 @@ export const useTacoStore = defineStore('taco', () => {
             }
 
             const authClient = await getAuthClient();
-            const identity = authClient.getIdentity();
-            
-            const agent = await createAgent({
-                identity,
-                host: getNetworkHost(),
-                fetchRootKey: shouldFetchRootKey(),
-            });
 
             // Use ICRC1 interface for all tokens (including ICP)
             const icrc1IDL = ({ IDL }: any) => {
@@ -8789,11 +7602,8 @@ export const useTacoStore = defineStore('taco', () => {
                 });
             };
 
-            const tokenActor = Actor.createActor(icrc1IDL, {
-                agent,
-                canisterId: tokenPrincipal
-            });
-            
+            const tokenActor = await getAuthenticatedActor(authClient, tokenPrincipal, () => icrc1IDL);
+
             return await tokenActor.icrc1_balance_of({
                 owner: Principal.fromText(userPrincipal.value),
                 subaccount: []
@@ -8817,13 +7627,6 @@ export const useTacoStore = defineStore('taco', () => {
             }
 
             const authClient = await getAuthClient();
-            const identity = authClient.getIdentity();
-            
-            const agent = await createAgent({
-                identity,
-                host: getNetworkHost(),
-                fetchRootKey: shouldFetchRootKey(),
-            });
 
             // Use ICRC1 interface for all tokens (including ICP)
             const icrc1IDL = ({ IDL }: any) => {
@@ -8843,10 +7646,7 @@ export const useTacoStore = defineStore('taco', () => {
                 });
             };
 
-            const tokenActor = Actor.createActor(icrc1IDL, {
-                agent,
-                canisterId: tokenPrincipal
-            });
+            const tokenActor = await getAuthenticatedActor(authClient, tokenPrincipal, () => icrc1IDL);
 
             const result = await tokenActor.icrc1_transfer({
                 to: {
@@ -8974,20 +7774,8 @@ export const useTacoStore = defineStore('taco', () => {
                 });
             };
 
-            // Create agent
-            const host = getNetworkHost()
-                
-            const authClientInst = await getAuthClient();
-            const agent = await createAgent({
-                identity: new AnonymousIdentity(), // Use anonymous for metadata queries
-                host,
-                fetchRootKey: shouldFetchRootKey(),
-            });
-
-            const tokenActor = Actor.createActor(icrc1IDL, {
-                agent,
-                canisterId: tokenPrincipal,
-            });
+            // Use anonymous actor for metadata queries (public data)
+            const tokenActor = await getAnonymousActor(tokenPrincipal, () => icrc1IDL);
 
             // Try to fetch individual ICRC1 properties (more reliable than metadata)
             const [name, symbol, decimals, fee, metadataResult, supportedStandardsResult] = await Promise.allSettled([
@@ -9073,37 +7861,10 @@ export const useTacoStore = defineStore('taco', () => {
         // # ALARM MANAGEMENT FUNCTIONS #
 
     // Helper function to create alarm actor
-    const createAlarmActor = async (useAuth: boolean = true) => {
+    const createAlarmActor = async () => {
         try {
-
-
-            let identity;
             const authClient = await getAuthClient();
-            
-            if (await authClient.isAuthenticated()) {
-                identity = authClient.getIdentity();
-                if (identity.getPrincipal().isAnonymous()) {
-                    userLoggedIn.value = false;
-                } else{
-                userLoggedIn.value = true;};
-            } else {
-                identity = new AnonymousIdentity();
-                userLoggedIn.value = false;
-            }
-        if (!userLoggedIn.value) {
-                throw new Error('User must be logged in');
-            }
-
-            const agent = await createAgent({
-                identity,
-                host: getNetworkHost(),
-                fetchRootKey: shouldFetchRootKey(),
-            });
-
-            return Actor.createActor<AlarmService>(alarmIDL, {
-                agent,
-                canisterId: alarmCanisterId()
-            });
+            return await getAuthenticatedActor(authClient, alarmCanisterId(), () => alarmIDL) as AlarmService;
         } catch (error) {
             console.error('Error creating alarm actor:', error);
             throw error;
@@ -9789,22 +8550,8 @@ export const useTacoStore = defineStore('taco', () => {
 
     // Create neuron snapshot actor
     const createNeuronSnapshotActor = async () => {
-        const { HttpAgent } = await import('@dfinity/agent');
         const authClient = await getAuthClient();
-        const identity = await authClient.getIdentity();
-        const agent = new HttpAgent({
-            identity,
-            host: getNetworkHost(),
-        });
-
-        if (shouldFetchRootKey()) {
-            await agent.fetchRootKey();
-        }
-
-        return Actor.createActor(neuronSnapshotIDL, {
-            agent,
-            canisterId: neuronSnapshotCanisterId()
-        });
+        return await getAuthenticatedActor(authClient, neuronSnapshotCanisterId(), () => neuronSnapshotIDL);
     }
 
     // Get votable NNS/SNS proposal pairs
@@ -9834,25 +8581,12 @@ export const useTacoStore = defineStore('taco', () => {
     // Get NNS proposal details from NNS governance
     const getNNSProposal = async (nnsProposalId: bigint) => {
         try {
-            const { Actor, HttpAgent } = await import('@dfinity/agent');
             const authClient = await getAuthClient();
-            const identity = await authClient.getIdentity();
-            const agent = new HttpAgent({
-                identity,
-                host: getNetworkHost(),
-            });
-
-            if (shouldFetchRootKey()) {
-                await agent.fetchRootKey();
-            }
 
             // Import NNS governance IDL
             const { idlFactory } = await import('../../../declarations/nns_governance');
-            
-            const nnsGov = Actor.createActor(idlFactory, {
-                agent,
-                canisterId: 'rrkah-fqaaa-aaaaa-aaaaq-cai' // NNS Governance canister
-            });
+
+            const nnsGov = await getAuthenticatedActor(authClient, 'rrkah-fqaaa-aaaaa-aaaaq-cai', () => idlFactory);
 
             const result = await (nnsGov as any).get_proposal_info(nnsProposalId);
             
@@ -9901,13 +8635,7 @@ export const useTacoStore = defineStore('taco', () => {
                 // Fallback: fetch directly from SNS Governance if snapshot returns an error
                 try {
                     const authClient = await getAuthClient();
-                    const identity = authClient.getIdentity();
-                    const agent = await createAgent({
-                        identity,
-                        host: getNetworkHost(),
-                        fetchRootKey: shouldFetchRootKey(),
-                    });
-                    const snsGov = await createSnsGovernanceActor(agent, 'lhdfz-wqaaa-aaaaq-aae3q-cai');
+                    const snsGov = await createSnsGovernanceActor(authClient, 'lhdfz-wqaaa-aaaaq-aae3q-cai');
                     const resp = await (snsGov as any).get_proposal({ proposal_id: [{ id: snsProposalId }] });
                     // Normalize GetProposalResponse -> ProposalData
                     if (resp?.result && Array.isArray(resp.result) && resp.result.length > 0) {
@@ -10221,25 +8949,12 @@ export const useTacoStore = defineStore('taco', () => {
     // Get NNS proposal info directly from NNS governance
     const getNNSProposalInfo = async (proposalId: bigint) => {
         try {
-            const { HttpAgent } = await import('@dfinity/agent');
             const authClient = await getAuthClient();
-            const identity = await authClient.getIdentity();
-            const agent = new HttpAgent({
-                identity,
-                host: getNetworkHost(),
-            });
-
-            if (shouldFetchRootKey()) {
-                await agent.fetchRootKey();
-            }
 
             // Import NNS governance IDL
             const { idlFactory } = await import('../../../declarations/nns_governance');
-            
-            const nnsGov = Actor.createActor(idlFactory, {
-                agent,
-                canisterId: 'rrkah-fqaaa-aaaaa-aaaaq-cai' // NNS Governance canister
-            });
+
+            const nnsGov = await getAuthenticatedActor(authClient, 'rrkah-fqaaa-aaaaa-aaaaq-cai', () => idlFactory);
 
             const result = await (nnsGov as any).get_proposal_info(proposalId);
             
@@ -10308,25 +9023,12 @@ export const useTacoStore = defineStore('taco', () => {
     // Check if TACO DAO neuron has voted on NNS proposal
     const hasNeuronVotedOnNNSProposal = async (proposalId: bigint, neuronId: bigint): Promise<boolean> => {
         try {
-            const { HttpAgent } = await import('@dfinity/agent');
             const authClient = await getAuthClient();
-            const identity = await authClient.getIdentity();
-            const agent = new HttpAgent({
-                identity,
-                host: getNetworkHost(),
-            });
-
-            if (shouldFetchRootKey()) {
-                await agent.fetchRootKey();
-            }
 
             // Import NNS governance IDL
             const { idlFactory } = await import('../../../declarations/nns_governance');
-            
-            const nnsGov = Actor.createActor(idlFactory, {
-                agent,
-                canisterId: 'rrkah-fqaaa-aaaaa-aaaaq-cai' // NNS Governance canister
-            });
+
+            const nnsGov = await getAuthenticatedActor(authClient, 'rrkah-fqaaa-aaaaa-aaaaq-cai', () => idlFactory);
 
             // Get the proposal info which includes ballots
             const result = await (nnsGov as any).get_proposal_info(proposalId);
@@ -10729,6 +9431,10 @@ export const useTacoStore = defineStore('taco', () => {
         formatNeuronForDisplay,
         categorizeNeurons,
         loadNeuronRewardBalances,
+        createRewardsActor,
+        createRewardsActorAnonymous,
+        createSnsGovernanceActorPublic,
+        createSnsGovernanceActorAnonymous,
         claimNeuronRewards,
         claimAllNeuronRewards,
         formatNeuronIdForMap,
@@ -10779,6 +9485,8 @@ export const useTacoStore = defineStore('taco', () => {
 
         // Alarm management functions
         createAlarmActor,
+        getAuthenticatedAgent,
+        getAnonymousAgentPublic,
         performSystemHealthCheck,
         getEnhancedAlarmSystemStatus,
         getMonitoringStatus,

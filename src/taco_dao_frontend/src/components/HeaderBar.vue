@@ -167,9 +167,9 @@
         </div>
 
         <!-- login button -->
-        <button v-if="!userLoggedIn" 
+        <button v-if="!userLoggedIn"
                 class="btn iid-login"
-                @click="iidLogIn()">
+                @click="showLoginModal = true">
 
           <!-- dfinity logo -->
           <DfinityLogo />
@@ -336,6 +336,31 @@
 
   <!-- wizard modal -->
   <WizardModal v-if="tacoWizardOpen"/>
+
+  <!-- login provider modal -->
+  <Teleport to="body">
+    <div v-if="showLoginModal" class="login-modal-backdrop" @click.self="showLoginModal = false">
+      <div class="login-modal">
+        <div class="login-modal__header">
+          <h3>Select Login Provider</h3>
+          <button class="login-modal__close" @click="showLoginModal = false">
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+        </div>
+        <div class="login-modal__options">
+          <button class="login-option" @click="loginWithII('v1')">
+            <img :src="iiV1Logo" alt="Internet Identity 1.0" />
+            <span class="login-option__text">Internet Identity 1.0</span>
+          </button>
+          <button class="login-option" @click="loginWithII('v2')">
+            <img :src="iiV2Logo" alt="Internet Identity 2.0" />
+            <span class="login-option__text">Internet Identity 2.0</span>
+            <span class="login-option__beta">Beta</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </Teleport>
 
 </template>
 
@@ -514,6 +539,8 @@
     // pages menu
     .pages-menu {
       left: 1rem;
+      max-height: calc(100vh - 4rem); // Prevent menu from extending past screen
+      overflow-y: auto; // Allow scrolling if menu is tall
 
       &__btn {
         display: none;
@@ -662,6 +689,122 @@
 
 </style>
 
+<!-- Non-scoped styles for teleported modal -->
+<style lang="scss">
+  // Login modal backdrop
+  .login-modal-backdrop {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 99999;
+    padding: 1rem;
+    box-sizing: border-box;
+  }
+
+  // Login modal - uses taco-container CSS variables for dark/light mode
+  .login-modal {
+    background-color: var(--yellow-to-brown);
+    border: 1px solid var(--dark-orange-to-brown);
+    border-radius: 0.5rem;
+    padding: 1.25rem;
+    width: 100%;
+    max-width: 380px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+
+    &__header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1rem;
+
+      h3 {
+        margin: 0;
+        font-size: 1.1rem;
+        font-weight: 600;
+        color: var(--black-to-white);
+        font-family: 'Space Mono', monospace;
+      }
+    }
+
+    &__close {
+      background: transparent;
+      border: none;
+      color: var(--black-to-white);
+      cursor: pointer;
+      padding: 0.5rem;
+      font-size: 1.1rem;
+      opacity: 0.7;
+      transition: opacity 0.2s;
+
+      &:hover {
+        opacity: 1;
+      }
+    }
+
+    &__options {
+      display: flex;
+      flex-direction: column;
+      gap: 0.6rem;
+    }
+  }
+
+  // Login option button - uses l2 container style
+  .login-option {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.875rem 1rem;
+    background-color: var(--dark-orange-to-light-brown);
+    border: none;
+    border-radius: 0.5rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    overflow: hidden;
+
+    &:hover {
+      filter: brightness(1.1);
+      transform: translateY(-1px);
+    }
+
+    img {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background-color: #fff;
+      padding: 2px;
+      flex-shrink: 0;
+    }
+
+    &__text {
+      flex: 1;
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: var(--black-to-white);
+      text-align: left;
+      font-family: 'Space Mono', monospace;
+      white-space: nowrap;
+    }
+
+    &__beta {
+      font-size: 0.55rem;
+      padding: 0.125rem 0.35rem;
+      background-color: var(--dark-orange-to-brown);
+      color: var(--white-to-black);
+      border-radius: 0.2rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      flex-shrink: 0;
+      margin-left: -0.25rem;
+    }
+  }
+</style>
+
 <script setup lang="ts">
 
   /////////////
@@ -680,6 +823,8 @@
   import { Tooltip } from 'bootstrap'
   // import EnvironmentIndicator from './misc/EnvironmentIndicator.vue'
   import WizardModal from "../views/WizardView.vue"
+  import iiV1Logo from "../assets/tokens/InternetIdentity.svg"
+  import iiV2Logo from "../assets/tokens/internetIdentityv2.svg"
 
   ////////////
   // Stores //
@@ -711,8 +856,17 @@
   // pages menu visiblility
   const pagesMenuIsVisible = ref(false)
 
+  // login modal visibility
+  const showLoginModal = ref(false)
+
   // neurons count
   const localNeuronsCount = ref(0)
+
+  // login with specific II version
+  const loginWithII = async (version: 'v1' | 'v2') => {
+    showLoginModal.value = false
+    await iidLogIn(version)
+  }
 
   ///////////////////
   // Local Methods //

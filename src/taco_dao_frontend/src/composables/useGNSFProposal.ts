@@ -1,24 +1,7 @@
 import { ref } from 'vue'
 import { IDL } from '@dfinity/candid'
 import { Principal } from '@dfinity/principal'
-import { Actor } from '@dfinity/agent'
-import { createAgent } from '@dfinity/utils'
-import { AuthClient } from '@dfinity/auth-client'
 import { useTacoStore } from '../stores/taco.store'
-import { getEffectiveNetwork } from '../config/network-config'
-
-// Helper functions for runtime network detection
-function shouldFetchRootKey(): boolean {
-  return getEffectiveNetwork() === 'local'
-}
-function getNetworkHost(): string {
-  const network = getEffectiveNetwork()
-  if (network === 'local') {
-    const port = import.meta.env.VITE_LOCAL_PORT || '4943'
-    return `http://localhost:${port}`
-  }
-  return 'https://ic0.app'
-}
 
 export interface GNSFProposalParams {
   neuronId: Uint8Array  // The ID of the neuron to use for submitting the proposal
@@ -73,29 +56,15 @@ export function useGNSFProposal() {
   }
   
   /**
-   * Create an SNS Governance actor
+   * Create an SNS Governance actor using store's cached authenticated actor
    */
   const createSnsGovernanceActor = async () => {
     try {
-      const authClient = await AuthClient.create()
-      const identity = authClient.getIdentity()
-      
-      const agent = await createAgent({
-        identity,
-        host: getNetworkHost(),
-        fetchRootKey: shouldFetchRootKey(),
-      })
-      
-      // Import the SNS governance IDL
-      const { idlFactory } = await import('../../../declarations/sns_governance')
-      
       // TACO SNS Governance canister ID
       const governanceCanisterId = 'lhdfz-wqaaa-aaaaq-aae3q-cai'
-      
-      return Actor.createActor(idlFactory, {
-        agent,
-        canisterId: governanceCanisterId
-      })
+
+      // Use store's cached actor for proper identity management
+      return await tacoStore.createSnsGovernanceActorPublic(governanceCanisterId)
     } catch (err: any) {
       console.error('Error creating SNS Governance actor:', err)
       throw new Error(`Failed to create governance actor: ${err.message}`)

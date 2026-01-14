@@ -182,23 +182,6 @@
 <script>
 import { useAdminStore } from '../stores/admin.store'
 import { useTacoStore } from '../stores/taco.store'
-import { Actor, AnonymousIdentity } from '@dfinity/agent'
-import { createAgent } from '@dfinity/utils'
-import { idlFactory as rewardsIDL } from '../../../declarations/rewards/rewards.did.js'
-import { getEffectiveNetwork } from '../config/network-config'
-
-// Helper functions for runtime network detection
-function shouldFetchRootKey() {
-  return getEffectiveNetwork() === 'local'
-}
-function getNetworkHost() {
-  const network = getEffectiveNetwork()
-  if (network === 'local') {
-    const port = import.meta.env.VITE_LOCAL_PORT || '4943'
-    return `http://localhost:${port}`
-  }
-  return 'https://ic0.app'
-}
 
 export default {
   name: 'AdminClaimsView',
@@ -251,26 +234,8 @@ export default {
     },
 
     async getRewardsActor() {
-      try {
-        const canisterId = this.tacoStore.rewardsCanisterId()
-        if (!canisterId) {
-          throw new Error('Rewards canister ID not found')
-        }
-
-        // Use anonymous identity for public query (no authentication required)
-        const agent = await createAgent({
-          identity: new AnonymousIdentity(),
-          host: getNetworkHost()
-        })
-
-        return Actor.createActor(rewardsIDL, {
-          agent,
-          canisterId
-        })
-      } catch (error) {
-        console.error('Error creating rewards actor:', error)
-        throw error
-      }
+      // Use store's cached anonymous actor for proper caching
+      return await this.tacoStore.createRewardsActorAnonymous()
     },
 
     async loadWithdrawalStats() {

@@ -3322,23 +3322,10 @@
     // fetch proposal deadline from SNS governance
     const fetchProposalDeadline = async (propId: bigint) => {
         try {
-            const { createAgent } = await import('@dfinity/utils')
-            const { AnonymousIdentity } = await import('@dfinity/agent')
-            const { Actor } = await import('@dfinity/agent')
-
-            const agent = await createAgent({
-                identity: new AnonymousIdentity(),
-                host: getNetworkHost(),
-                fetchRootKey: shouldFetchRootKey(),
-            })
-
-            const { idlFactory } = await import('../../../../declarations/sns_governance')
             const governanceCanisterId = 'lhdfz-wqaaa-aaaaq-aae3q-cai'
 
-            const governanceActor = Actor.createActor(idlFactory, {
-                agent,
-                canisterId: governanceCanisterId
-            })
+            // Use store's cached anonymous actor for proper caching
+            const governanceActor = await tacoStore.createSnsGovernanceActorAnonymous(governanceCanisterId)
 
             const proposalResponse = await (governanceActor as any).get_proposal({
                 proposal_id: [{ id: propId }]

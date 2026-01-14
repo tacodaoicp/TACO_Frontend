@@ -90,6 +90,7 @@
                         @stake-to-neuron="handleStakeToNeuron"
                         @create-neuron="handleCreateNeuron"
                         @set-dissolve="handleSetDissolve"
+                        @transfer-neuron="handleTransferNeuron"
                         @refresh-balances="() => loadAllBalances(true)" />
 
                     </div>
@@ -261,6 +262,14 @@
       @permissions-updated="handlePermissionsUpdated"
     />
 
+    <!-- Transfer Neuron Dialog -->
+    <TransferNeuronDialog
+      :show="showTransferDialog"
+      :neuron="neuronToTransfer"
+      @close="closeTransferDialog"
+      @transferred="handleTransferCompleted"
+    />
+
     <!-- Swap Dialog -->
     <SwapDialog
       ref="swapDialogRef"
@@ -400,6 +409,7 @@ import StakeToNeuronDialog from '../components/wallet/StakeToNeuronDialog.vue'
 import CreateNeuronDialog from '../components/wallet/CreateNeuronDialog.vue'
 import SetDissolveDialog from '../components/wallet/SetDissolveDialog.vue'
 import ManagePermissionsDialog from '../components/wallet/ManagePermissionsDialog.vue'
+import TransferNeuronDialog from '../components/wallet/TransferNeuronDialog.vue'
 import { tokenImages } from '../components/data/TokenData'
 import DfinityLogo from '../assets/images/dfinityLogo.vue'
 
@@ -436,6 +446,8 @@ const selectedNeuron = ref<any | null>(null)
 const showCreateDialog = ref(false)
 const showDissolveDialog = ref(false)
 const showPermissionsDialog = ref(false)
+const showTransferDialog = ref(false)
+const neuronToTransfer = ref<any | null>(null)
 const showSwapDialog = ref(false)
 const showSwapConfirmDialog = ref(false)
 const selectedTokenForSwap = ref<WalletToken | null>(null)
@@ -980,6 +992,35 @@ const handlePermissionsUpdated = async () => {
     }
   } catch (e) {
     console.error('error refreshing neurons after permissions update', e)
+  }
+}
+
+// handle transfer neuron
+const handleTransferNeuron = (neuron: any) => {
+  neuronToTransfer.value = neuron
+  showTransferDialog.value = true
+}
+
+// close transfer dialog
+const closeTransferDialog = () => {
+  showTransferDialog.value = false
+  neuronToTransfer.value = null
+}
+
+// handle transfer completed
+const handleTransferCompleted = async () => {
+  // refresh the wallet data to show updated balances etc
+  await loadWalletData()
+  // then refresh neurons in the taco token card specifically
+  try {
+    const refVal = tacoTokenCardRef.value as any
+    // handle both single and v-for array refs
+    const instances = Array.isArray(refVal) ? refVal : [refVal]
+    for (const inst of instances) {
+      if (inst && typeof inst.loadNeurons === 'function') await inst.loadNeurons()
+    }
+  } catch (e) {
+    console.error('error refreshing neurons after transfer', e)
   }
 }
 

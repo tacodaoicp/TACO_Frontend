@@ -644,12 +644,12 @@ const proposalFunctionName = ref('')
 const proposalReasonPlaceholder = ref('')
 const proposalContextParams = ref<any>({})
 
-// State - initialize from cache if available for instant display on navigation
-const conditions = ref<TriggerCondition[]>(cachedCircuitBreakerConditions.value || [])
-const alerts = ref<PriceAlertLog[]>(cachedPriceAlerts.value?.alerts || [])
-const tradingPauses = ref<any[]>(cachedTradingPauses.value?.pausedTokens || [])
-const portfolioConditions = ref<any[]>(cachedPortfolioCircuitBreakerConditions.value || [])
-const portfolioLogs = ref<any[]>(cachedCircuitBreakerLogs.value || [])
+// State - computed from cache to avoid duplication (saves ~100-250KB RAM)
+const conditions = computed<TriggerCondition[]>(() => cachedCircuitBreakerConditions.value || [])
+const alerts = computed<PriceAlertLog[]>(() => cachedPriceAlerts.value?.alerts || [])
+const tradingPauses = computed<any[]>(() => cachedTradingPauses.value?.pausedTokens || [])
+const portfolioConditions = computed<any[]>(() => cachedPortfolioCircuitBreakerConditions.value || [])
+const portfolioLogs = computed<any[]>(() => cachedCircuitBreakerLogs.value || [])
 // Only show loading if no cached data
 const loadingConditions = ref(!cachedCircuitBreakerConditions.value)
 const loadingAlerts = ref(!cachedPriceAlerts.value)
@@ -801,10 +801,10 @@ const deleteCondition = async (id: number) => {
 
 const clearAlerts = async () => {
   if (!confirm('Are you sure you want to clear all alerts?')) return
-  
+
   try {
     await store.clearPriceAlerts()
-    alerts.value = []
+    // Cache will be updated automatically by worker subscription
   } catch (error) {
     console.error('Failed to clear alerts:', error)
   }
@@ -1062,10 +1062,10 @@ const deletePortfolioCondition = async (id: number) => {
 
 const clearPortfolioLogs = async () => {
   if (!confirm('Are you sure you want to clear all portfolio circuit breaker logs?')) return
-  
+
   try {
     await store.clearPortfolioCircuitBreakerLogs()
-    portfolioLogs.value = []
+    // Cache will be updated automatically by worker subscription
   } catch (error) {
     console.error('Failed to clear portfolio logs:', error)
   }
@@ -1195,7 +1195,7 @@ const handleConfirmAction = async (reason: string) => {
     } else if (actionData.type === 'clearAllTradingPauses') {
       // Handle clear all trading pauses
       await store.clearAllTradingPauses(reason)
-      tradingPauses.value = []
+      // Cache will be updated automatically by worker subscription
       console.log('All trading pauses cleared successfully')
       success = true
     }
@@ -1222,40 +1222,25 @@ const handleProposalSuccess = async () => {
   console.log('AdminPriceView: Proposal submitted successfully')
 }
 
-// Watch cached data and sync to local refs
+// Watch cached data to update loading state (data is now computed, not copied)
 watch(cachedCircuitBreakerConditions, (newVal) => {
-  if (newVal !== undefined && newVal !== null) {
-    conditions.value = newVal || []
-    loadingConditions.value = false
-  }
+  if (newVal !== undefined && newVal !== null) loadingConditions.value = false
 }, { immediate: true })
 
 watch(cachedPriceAlerts, (newVal) => {
-  if (newVal !== undefined && newVal !== null) {
-    alerts.value = newVal?.alerts || []
-    loadingAlerts.value = false
-  }
+  if (newVal !== undefined && newVal !== null) loadingAlerts.value = false
 }, { immediate: true })
 
 watch(cachedTradingPauses, (newVal) => {
-  if (newVal !== undefined && newVal !== null) {
-    tradingPauses.value = newVal?.pausedTokens || []
-    loadingTradingPauses.value = false
-  }
+  if (newVal !== undefined && newVal !== null) loadingTradingPauses.value = false
 }, { immediate: true })
 
 watch(cachedPortfolioCircuitBreakerConditions, (newVal) => {
-  if (newVal !== undefined && newVal !== null) {
-    portfolioConditions.value = newVal || []
-    loadingPortfolioConditions.value = false
-  }
+  if (newVal !== undefined && newVal !== null) loadingPortfolioConditions.value = false
 }, { immediate: true })
 
 watch(cachedCircuitBreakerLogs, (newVal) => {
-  if (newVal !== undefined && newVal !== null) {
-    portfolioLogs.value = newVal || []
-    loadingPortfolioLogs.value = false
-  }
+  if (newVal !== undefined && newVal !== null) loadingPortfolioLogs.value = false
 }, { immediate: true })
 
 // Lifecycle

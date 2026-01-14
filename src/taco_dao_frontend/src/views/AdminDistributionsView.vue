@@ -704,21 +704,9 @@ import { useAdminStore } from '../stores/admin.store'
 import { useAdminCheck } from '../composables/useAdminCheck'
 import TacoTitle from '../components/misc/TacoTitle.vue'
 import GNSFProposalDialog from '../components/proposals/GNSFProposalDialog.vue'
-import { createActor as createRewardsActor } from '../../../declarations/rewards'
-import { AnonymousIdentity } from '@dfinity/agent'
+import type { Rewards } from '../../../declarations/rewards/rewards.did'
 import { workerBridge } from '../stores/worker-bridge'
 import { deserializeFromTransfer } from '../workers/shared/fetch-functions'
-import { getEffectiveNetwork } from '../config/network-config'
-
-// Helper function for runtime network detection
-function getNetworkHost() {
-  const network = getEffectiveNetwork()
-  if (network === 'local') {
-    const port = import.meta.env.VITE_LOCAL_PORT || '4943'
-    return `http://localhost:${port}`
-  }
-  return 'https://ic0.app'
-}
 
 const router = useRouter()
 const tacoStore = useTacoStore()
@@ -784,10 +772,6 @@ const sortDirections = ref<Record<number, 'asc' | 'desc'>>({})
 // Refresh interval
 let refreshInterval: any = null
 
-// Cached rewards actor (created once)
-let cachedRewardsActor: any = null
-let actorCreationPromise: Promise<any> | null = null
-
 // Computed properties
 const distributionInProgress = computed(() => distributionStatus.value?.inProgress || false)
 
@@ -809,39 +793,9 @@ const isValidCustomInput = computed(() => {
 })
 
 // Helper functions
-const getRewardsActor = async () => {
-  // Return cached actor if already created
-  if (cachedRewardsActor) {
-    return cachedRewardsActor
-  }
-
-  // If another call is already creating the actor, wait for it
-  if (actorCreationPromise) {
-    return actorCreationPromise
-  }
-
-  // Create the actor with a lock to prevent race conditions
-  actorCreationPromise = (async () => {
-    try {
-      const canisterId = tacoStore.rewardsCanisterId()
-      if (!canisterId) throw new Error('Rewards canister ID not found')
-
-      const host = getNetworkHost()
-      cachedRewardsActor = createRewardsActor(canisterId, {
-        agentOptions: {
-          identity: new AnonymousIdentity(),
-          host
-        }
-      })
-      return cachedRewardsActor
-    } catch (error) {
-      console.error('Error creating rewards actor:', error)
-      actorCreationPromise = null // Reset on error so we can retry
-      throw error
-    }
-  })()
-
-  return actorCreationPromise
+const getRewardsActor = async (): Promise<Rewards> => {
+  // Use store's cached actor for proper identity management
+  return await tacoStore.createRewardsActor() as Rewards
 }
 
 const clearMessages = () => {
@@ -1022,7 +976,7 @@ const loadConfigurationAndStatus = async () => {
 
     // Update configuration
     configuration.value = config
-    newRewardPot.value = config.periodicRewardPot
+    newRewardPot.value = Number(config.periodicRewardPot)
     newDistributionPeriod.value = Math.round(Number(config.distributionPeriodNS) / (24 * 60 * 60 * 1_000_000_000))
     newPerformanceScorePower.value = config.performanceScorePower
     newVotingPowerPower.value = config.votingPowerPower
@@ -1085,7 +1039,7 @@ const loadMoreHistory = async () => {
 const loadTotalDistributed = async () => {
   try {
     const actor = await getRewardsActor()
-    totalDistributed.value = await actor.getTotalDistributed()
+    totalDistributed.value = Number(await actor.getTotalDistributed())
   } catch (error) {
     console.error('Error loading total distributed:', error)
   }
@@ -1094,7 +1048,7 @@ const loadTotalDistributed = async () => {
 const loadTacoBalance = async () => {
   try {
     const actor = await getRewardsActor()
-    tacoBalance.value = await actor.getTacoBalance()
+    tacoBalance.value = Number(await actor.getTacoBalance())
   } catch (error) {
     console.error('Error loading TACO balance:', error)
   }
@@ -1103,7 +1057,7 @@ const loadTacoBalance = async () => {
 const loadCurrentNeuronBalances = async () => {
   try {
     const actor = await getRewardsActor()
-    currentNeuronBalances.value = await actor.getCurrentTotalNeuronBalances()
+    currentNeuronBalances.value = Number(await actor.getCurrentTotalNeuronBalances())
   } catch (error) {
     console.error('Error loading current neuron balances:', error)
   }
@@ -1112,7 +1066,7 @@ const loadCurrentNeuronBalances = async () => {
 const loadAvailableBalance = async () => {
   try {
     const actor = await getRewardsActor()
-    availableBalance.value = await actor.getAvailableBalance()
+    availableBalance.value = Number(await actor.getAvailableBalance())
   } catch (error) {
     console.error('Error loading available balance:', error)
   }
@@ -1122,7 +1076,7 @@ const loadRewardSkipList = async () => {
   try {
     const actor = await getRewardsActor()
     const result = await actor.getRewardSkipList()
-    if (result.ok) {
+    if ('ok' in result) {
       rewardSkipList.value = result.ok
     } else {
       throw new Error('Failed to load skip list')
@@ -1316,7 +1270,7 @@ const updateRewardPot = async () => {
     
     try {
       const actor = await getRewardsActor()
-      const result = await actor.setPeriodicRewardPot(newValue)
+      const result = await actor.setPeriodicRewardPot(BigInt(newValue))
       
       if ('ok' in result) {
         successMessage.value = result.ok
@@ -1470,12 +1424,14 @@ const addToSkipList = async () => {
       const actor = await getRewardsActor()
       const result = await actor.addToRewardSkipList(neuronIdBytes)
       
-      if (result.ok) {
+      if ('ok' in result) {
         successMessage.value = result.ok
         newSkipNeuronId.value = ''
         await loadRewardSkipList()
       } else {
-        throw new Error(result.err?.SystemError || 'Unknown error')
+        const err = result.err
+        const errMsg = 'SystemError' in err ? err.SystemError : JSON.stringify(err)
+        throw new Error(errMsg)
       }
     } catch (error: any) {
       console.error('Error adding neuron to skip list:', error)
@@ -1506,11 +1462,13 @@ const removeFromSkipList = async (neuronId: any) => {
       const actor = await getRewardsActor()
       const result = await actor.removeFromRewardSkipList(neuronId)
       
-      if (result.ok) {
+      if ('ok' in result) {
         successMessage.value = result.ok
         await loadRewardSkipList()
       } else {
-        throw new Error(result.err?.SystemError || 'Unknown error')
+        const err = result.err
+        const errMsg = 'SystemError' in err ? err.SystemError : JSON.stringify(err)
+        throw new Error(errMsg)
       }
     } catch (error: any) {
       console.error('Error removing neuron from skip list:', error)
@@ -1545,11 +1503,13 @@ const clearSkipList = async () => {
       const actor = await getRewardsActor()
       const result = await actor.setRewardSkipList([])
       
-      if (result.ok) {
+      if ('ok' in result) {
         successMessage.value = 'Skip list cleared successfully'
         await loadRewardSkipList()
       } else {
-        throw new Error(result.err?.SystemError || 'Unknown error')
+        const err = result.err
+        const errMsg = 'SystemError' in err ? err.SystemError : JSON.stringify(err)
+        throw new Error(errMsg)
       }
     } catch (error: any) {
       console.error('Error clearing skip list:', error)
@@ -1810,9 +1770,6 @@ onBeforeUnmount(() => {
   if (refreshInterval) {
     clearInterval(refreshInterval)
   }
-  // Clear cached actor and promise
-  cachedRewardsActor = null
-  actorCreationPromise = null
   // Clean up worker subscriptions
   workerUnsubscribers.forEach(unsub => unsub())
 })

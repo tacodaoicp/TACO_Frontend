@@ -57,13 +57,13 @@ function getNetwork(): 'ic' | 'staging' | 'local' {
   // Auto-detect from worker location (critical for production where env vars may not be set)
   if (isWorker() && typeof self !== 'undefined' && self.location) {
     const hostname = self.location.hostname
+    // Staging canister (check BEFORE generic .icp0.io to avoid false positive)
+    if (hostname.includes('wxunf-maaaa-aaaab-qbzga-cai')) {
+      return 'staging'
+    }
     // Production domains
     if (hostname === 'tacodao.com' || hostname.endsWith('.tacodao.com') || hostname.endsWith('.icp0.io') || hostname.endsWith('.ic0.app')) {
       return 'ic'
-    }
-    // Staging canister
-    if (hostname.includes('wxunf-maaaa-aaaab-qbzga-cai')) {
-      return 'staging'
     }
   }
 

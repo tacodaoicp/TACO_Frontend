@@ -603,14 +603,27 @@
                 </div>
                 <div class="config-item">
                   <label>Max Kongswap Attempts</label>
-                  <input 
-                    type="number" 
-                    v-model="configInputs.maxKongswapAttempts" 
-                    step="1" 
+                  <input
+                    type="number"
+                    v-model="configInputs.maxKongswapAttempts"
+                    step="1"
                     min="1"
                     @input="validateInput('maxKongswapAttempts')"
                     class="form-control"
                   />
+                </div>
+                <div class="config-item">
+                  <label>Min Allocation Diff (%)</label>
+                  <input
+                    type="number"
+                    v-model="configInputs.minAllocationDiffBasisPoints"
+                    step="0.01"
+                    min="0.01"
+                    max="10"
+                    @input="validateInput('minAllocationDiffBasisPoints')"
+                    class="form-control"
+                  />
+                  <div class="help-text text-muted">Minimum allocation difference to trigger a trade</div>
                 </div>
                 <div class="config-item">
                   <label>Rebalance Interval (minutes)</label>
@@ -1632,6 +1645,7 @@ const configInputs = ref({
   maxTradesStored: 0,
   maxTradeAttemptsPerInterval: 0,
   maxKongswapAttempts: 0,
+  minAllocationDiffBasisPoints: 0,
   rebalanceIntervalMinutes: 0,
   portfolioRebalancePeriodMinutes: 0,
   shortSyncIntervalSeconds: 0,
@@ -1695,6 +1709,7 @@ watch(rebalanceConfig, async (newConfig) => {
         maxTradesStored: Number(newConfig.maxTradesStored),
         maxTradeAttemptsPerInterval: Number(newConfig.maxTradeAttemptsPerInterval),
         maxKongswapAttempts: Number(newConfig.maxKongswapAttempts),
+        minAllocationDiffBasisPoints: Number(newConfig.minAllocationDiffBasisPoints) / 100,
         rebalanceIntervalMinutes: nsToMinutes(newConfig.rebalanceIntervalNS),
         portfolioRebalancePeriodMinutes: nsToMinutes(newConfig.portfolioRebalancePeriodNS),
         shortSyncIntervalSeconds: nsToSeconds(newConfig.shortSyncIntervalNS),
@@ -1714,6 +1729,7 @@ watch(rebalanceConfig, async (newConfig) => {
         maxTradesStored: 0,
         maxTradeAttemptsPerInterval: 0,
         maxKongswapAttempts: 0,
+        minAllocationDiffBasisPoints: 0,
         rebalanceIntervalMinutes: 0,
         portfolioRebalancePeriodMinutes: 0,
         shortSyncIntervalSeconds: 0,
@@ -1731,15 +1747,16 @@ watch(configInputs, () => {
   if (rebalanceConfig.value) {
     const current = configInputs.value;
     const original = rebalanceConfig.value;
-    
+
     // Convert all values to strings for comparison to avoid BigInt mixing
-    hasConfigChanges.value = 
+    hasConfigChanges.value =
       current.maxSlippageBasisPoints * 100 !== Number(original.maxSlippageBasisPoints) ||
       current.minTradeValueICP !== Number(original.minTradeValueICP) ||
       current.maxTradeValueICP !== Number(original.maxTradeValueICP) ||
       current.maxTradesStored !== Number(original.maxTradesStored) ||
       current.maxTradeAttemptsPerInterval !== Number(original.maxTradeAttemptsPerInterval) ||
       current.maxKongswapAttempts !== Number(original.maxKongswapAttempts) ||
+      current.minAllocationDiffBasisPoints * 100 !== Number(original.minAllocationDiffBasisPoints) ||
       String(minutesToNs(current.rebalanceIntervalMinutes)) !== String(original.rebalanceIntervalNS) ||
       String(minutesToNs(current.portfolioRebalancePeriodMinutes)) !== String(original.portfolioRebalancePeriodNS) ||
       String(secondsToNs(current.shortSyncIntervalSeconds)) !== String(original.shortSyncIntervalNS) ||
@@ -1757,7 +1774,7 @@ const validateInput = (field: string) => {
 
 const updateConfigWithReason = async (reason: string) => {
   if (!isConfigValid.value || !rebalanceConfig.value) return;
-  
+
   // Update rebalance config
   const updates = {
     maxSlippageBasisPoints: [BigInt(Math.round(configInputs.value.maxSlippageBasisPoints * 100))] as [bigint],
@@ -1766,6 +1783,7 @@ const updateConfigWithReason = async (reason: string) => {
     maxTradesStored: [BigInt(Math.round(configInputs.value.maxTradesStored))] as [bigint],
     maxTradeAttemptsPerInterval: [BigInt(Math.round(configInputs.value.maxTradeAttemptsPerInterval))] as [bigint],
     maxKongswapAttempts: [BigInt(Math.round(configInputs.value.maxKongswapAttempts))] as [bigint],
+    minAllocationDiffBasisPoints: [BigInt(Math.round(configInputs.value.minAllocationDiffBasisPoints * 100))] as [bigint],
     rebalanceIntervalNS: [minutesToNs(configInputs.value.rebalanceIntervalMinutes)] as [bigint],
     portfolioRebalancePeriodNS: [minutesToNs(configInputs.value.portfolioRebalancePeriodMinutes)] as [bigint],
     shortSyncIntervalNS: [secondsToNs(configInputs.value.shortSyncIntervalSeconds)] as [bigint],
@@ -1774,7 +1792,7 @@ const updateConfigWithReason = async (reason: string) => {
     maxPriceHistoryEntries: configInputs.value.maxPriceHistoryEntries > 0 ? [BigInt(Math.round(configInputs.value.maxPriceHistoryEntries))] as [bigint] : [] as [],
     priceUpdateIntervalNS: [] as []
   };
-  
+
   await tacoStore.updateRebalanceConfig(updates, reason);
   
   // Update max portfolio snapshots separately if it changed
@@ -1799,6 +1817,7 @@ const resetConfig = () => {
       maxTradesStored: Number(rebalanceConfig.value.maxTradesStored),
       maxTradeAttemptsPerInterval: Number(rebalanceConfig.value.maxTradeAttemptsPerInterval),
       maxKongswapAttempts: Number(rebalanceConfig.value.maxKongswapAttempts),
+      minAllocationDiffBasisPoints: Number(rebalanceConfig.value.minAllocationDiffBasisPoints) / 100,
       rebalanceIntervalMinutes: nsToMinutes(rebalanceConfig.value.rebalanceIntervalNS),
       portfolioRebalancePeriodMinutes: nsToMinutes(rebalanceConfig.value.portfolioRebalancePeriodNS),
       shortSyncIntervalSeconds: nsToSeconds(rebalanceConfig.value.shortSyncIntervalNS),
@@ -2024,7 +2043,7 @@ const hasRebalanceConfigChanges = () => {
   if (!rebalanceConfig.value) return false;
   const current = configInputs.value;
   const original = rebalanceConfig.value;
-  
+
   return (
     current.maxSlippageBasisPoints * 100 !== Number(original.maxSlippageBasisPoints) ||
     current.minTradeValueICP !== Number(original.minTradeValueICP) ||
@@ -2032,6 +2051,7 @@ const hasRebalanceConfigChanges = () => {
     current.maxTradesStored !== Number(original.maxTradesStored) ||
     current.maxTradeAttemptsPerInterval !== Number(original.maxTradeAttemptsPerInterval) ||
     current.maxKongswapAttempts !== Number(original.maxKongswapAttempts) ||
+    current.minAllocationDiffBasisPoints * 100 !== Number(original.minAllocationDiffBasisPoints) ||
     String(minutesToNs(current.rebalanceIntervalMinutes)) !== String(original.rebalanceIntervalNS) ||
     String(minutesToNs(current.portfolioRebalancePeriodMinutes)) !== String(original.portfolioRebalancePeriodNS) ||
     String(secondsToNs(current.shortSyncIntervalSeconds)) !== String(original.shortSyncIntervalNS) ||
@@ -2054,6 +2074,7 @@ const buildConfigProposalParams = () => {
     maxTradesStored: [BigInt(Math.round(configInputs.value.maxTradesStored))],
     maxTradeAttemptsPerInterval: [BigInt(Math.round(configInputs.value.maxTradeAttemptsPerInterval))],
     maxKongswapAttempts: [BigInt(Math.round(configInputs.value.maxKongswapAttempts))],
+    minAllocationDiffBasisPoints: [BigInt(Math.round(configInputs.value.minAllocationDiffBasisPoints * 100))],
     rebalanceIntervalNS: [minutesToNs(configInputs.value.rebalanceIntervalMinutes)],
     portfolioRebalancePeriodNS: [minutesToNs(configInputs.value.portfolioRebalancePeriodMinutes)],
     shortSyncIntervalNS: [secondsToNs(configInputs.value.shortSyncIntervalSeconds)],

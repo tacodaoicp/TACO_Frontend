@@ -554,7 +554,31 @@
 
                 </button>
 
-              </div>                    
+              </div>
+
+              <!-- transfer neuron -->
+              <div>
+
+                <!-- transfer label -->
+                <span class="small">
+                  <span class="fw-bold">Transfer: </span>
+                  <span>Transfer ownership</span>
+                </span>
+
+                <!-- transfer neuron button -->
+                <button @click.stop="dismissTooltips(); $emit('transfer-neuron', neuron)"
+                        class="btn btn-sm taco-btn taco-btn--green p-1"
+                        data-bs-toggle="tooltip"
+                        data-bs-placement="bottom"
+                        data-bs-custom-class="taco-tooltip"
+                        title="Transfer neuron to another principal">
+
+                  <!-- icon -->
+                  <i class="fa fa-fw fa-share"></i>
+
+                </button>
+
+              </div>
 
             </div>
 
@@ -1065,6 +1089,7 @@ interface TokenCardEmits {
   (e: 'create-neuron'): void
   (e: 'set-dissolve', neuron: any): void
   (e: 'refresh-balances'): void
+  (e: 'transfer-neuron', neuron: any): void
 }
 
 const props = withDefaults(defineProps<TokenCardProps>(), {

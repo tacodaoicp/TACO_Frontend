@@ -638,16 +638,6 @@ import { createActor as createRewardDistributionActor } from '../../../declarati
 import { createActor as createRewardWithdrawalActor } from '../../../declarations/reward_withdrawal_archive'
 import { getEffectiveNetwork } from '../config/network-config'
 
-// Helper function for runtime network detection
-function getNetworkHost() {
-  const network = getEffectiveNetwork()
-  if (network === 'local') {
-    const port = import.meta.env.VITE_LOCAL_PORT || '4943'
-    return `http://localhost:${port}`
-  }
-  return 'https://ic0.app'
-}
-
 // Archive canister IDs (mapped from archive type to principal)
 const ARCHIVE_CANISTER_IDS = {
   trading_archive: 'jlycp-kqaaa-aaaan-qz4xa-cai',
@@ -980,30 +970,15 @@ export default {
 
     async createArchiveActors() {
       try {
-        // Create authenticated agent (same pattern as store functions)
-        const { createAgent } = await import('@dfinity/utils')
-        const { AuthClient } = await import('@dfinity/auth-client')
-        
-        // Get authenticated identity using the same pattern as taco store
-        const authClient = await AuthClient.create({
-          idleOptions: {
-            disableIdle: true,
-            disableDefaultIdleCallback: true
-          }
-        })
-        
-        const identity = await authClient.getIdentity()
-        
-        // Determine host
-        const host = getNetworkHost()
+        // Check if user is logged in first
+        if (!this.tacoStore.userLoggedIn) {
+          console.log('User not logged in, skipping archive actors creation')
+          return
+        }
 
-        // Create agent with authenticated identity
-        const agent = await createAgent({
-          identity: identity,
-          host: host,
-          fetchRootKey: getEffectiveNetwork() === "local"
-        })
-        
+        // Use store's getAuthenticatedAgent for proper identity management
+        const agent = await this.tacoStore.getAuthenticatedAgent()
+
         // Create actors with proper canister IDs and authenticated agent
         this.tradingActor = createTradingActor(this.tradingArchiveCanisterId(), { agent })
         this.portfolioActor = createPortfolioActor(this.portfolioArchiveCanisterId(), { agent })
@@ -1014,8 +989,6 @@ export default {
         this.daoGovernanceActor = createDaoGovernanceActor(this.daoGovernanceArchiveCanisterId(), { agent })
         this.rewardDistributionActor = createRewardDistributionActor(this.rewardDistributionArchiveCanisterId(), { agent })
         this.rewardWithdrawalActor = createRewardWithdrawalActor(this.rewardWithdrawalArchiveCanisterId(), { agent })
-        
-        //console.log('Archive actors created with identity:', identity.getPrincipal().toString())
       } catch (error) {
         console.error('Failed to create archive actors:', error)
         this.errorMessage = 'Failed to initialize archive actors'

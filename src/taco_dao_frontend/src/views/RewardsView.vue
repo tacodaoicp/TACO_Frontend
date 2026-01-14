@@ -359,25 +359,7 @@ import { ref, onMounted, computed, watch } from "vue"
 import { useTacoStore } from "../stores/taco.store"
 import { storeToRefs } from "pinia"
 import DfinityLogo from "../assets/images/dfinityLogo.vue"
-import { AuthClient } from '@dfinity/auth-client'
-import { Actor } from '@dfinity/agent'
-import { createAgent } from '@dfinity/utils'
 import { Principal } from '@dfinity/principal'
-import { idlFactory as rewardsIDL } from '../../../declarations/rewards/rewards.did.js'
-import { getEffectiveNetwork } from '../config/network-config'
-
-// Helper functions for runtime network detection
-function shouldFetchRootKey() {
-  return getEffectiveNetwork() === 'local'
-}
-function getNetworkHost() {
-  const network = getEffectiveNetwork()
-  if (network === 'local') {
-    const port = import.meta.env.VITE_LOCAL_PORT || '4943'
-    return `http://localhost:${port}`
-  }
-  return 'https://ic0.app'
-}
 
 export default {
   name: 'RewardsView',
@@ -610,73 +592,13 @@ export default {
       }
     }
 
+    // Use store's cached actor functions for proper identity management
     const createSnsGovernanceActor = async (canisterId) => {
-      const authClient = await AuthClient.create({
-        idleOptions: { disableIdle: true }
-      })
-      const identity = await authClient.getIdentity()
-      const host = getNetworkHost()
-      
-      const agent = await createAgent({
-        identity,
-        host,
-        fetchRootKey: shouldFetchRootKey(),
-      })
-
-      // Create a simplified IDL for list_neurons
-      const snsGovernanceIDL = ({ IDL }) => {
-        const NeuronId = IDL.Record({ 'id': IDL.Vec(IDL.Nat8) })
-        const ListNeurons = IDL.Record({
-          'of_principal': IDL.Opt(IDL.Principal),
-          'limit': IDL.Nat32,
-          'start_page_at': IDL.Opt(NeuronId)
-        })
-        
-        // Simplified neuron type for our needs
-        const Neuron = IDL.Record({
-          'id': IDL.Opt(NeuronId),
-          'cached_neuron_stake_e8s': IDL.Nat64,
-          'maturity_e8s_equivalent': IDL.Nat64,
-          'voting_power_percentage_multiplier': IDL.Nat64
-        })
-        
-        const ListNeuronsResponse = IDL.Record({
-          'neurons': IDL.Vec(Neuron)
-        })
-
-        return IDL.Service({
-          'list_neurons': IDL.Func([ListNeurons], [ListNeuronsResponse], ['query'])
-        })
-      }
-
-      return Actor.createActor(snsGovernanceIDL, {
-        agent,
-        canisterId
-      })
+      return await tacoStore.createSnsGovernanceActorPublic(canisterId)
     }
 
     const getRewardsActor = async () => {
-      const canisterId = tacoStore.rewardsCanisterId()
-      if (!canisterId) {
-        throw new Error('Rewards canister ID not found')
-      }
-
-      const authClient = await AuthClient.create({
-        idleOptions: { disableIdle: true }
-      })
-      const identity = await authClient.getIdentity()
-      const host = getNetworkHost()
-
-      const agent = await createAgent({
-        identity,
-        host,
-        fetchRootKey: shouldFetchRootKey(),
-      })
-
-      return Actor.createActor(rewardsIDL, {
-        agent,
-        canisterId
-      })
+      return await tacoStore.createRewardsActor()
     }
 
     const refreshData = async () => {

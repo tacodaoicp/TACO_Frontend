@@ -6,24 +6,8 @@
 import { ref, computed } from 'vue'
 import { defineStore } from 'pinia'
 import { Actor } from '@dfinity/agent'
-import { createAgent } from '@dfinity/utils'
 import { Principal } from '@dfinity/principal'
-import { AuthClient } from '@dfinity/auth-client'
 import { useTacoStore } from './taco.store'
-import { getEffectiveNetwork } from '../config/network-config'
-
-// Helper functions for runtime network detection
-function shouldFetchRootKey(): boolean {
-    return getEffectiveNetwork() === 'local'
-}
-function getNetworkHost(): string {
-    const network = getEffectiveNetwork()
-    if (network === 'local') {
-        const port = import.meta.env.VITE_LOCAL_PORT || '4943'
-        return `http://localhost:${port}`
-    }
-    return 'https://ic0.app'
-}
 import { idlFactory as kongIdlFactory } from '../../../declarations/kongswap/kongswap.did.js'
 
 // Kong canister ID
@@ -92,16 +76,8 @@ export const useKongStore = defineStore('kong', () => {
 
   // # KONG ACTOR #
   const createKongActor = async () => {
-    const authClient = await AuthClient.create()
-    const identity = await authClient.getIdentity()
-    
-    const agent = await createAgent({
-      identity,
-      host: getNetworkHost(),
-      fetchRootKey: shouldFetchRootKey(),
-    })
-
-
+    // Use taco store's centralized authenticated agent
+    const agent = await tacoStore.getAuthenticatedAgent()
 
     return Actor.createActor(kongIdlFactory, {
       agent,
@@ -111,14 +87,8 @@ export const useKongStore = defineStore('kong', () => {
 
   // # ICRC TOKEN ACTOR #
   const createTokenActor = async (tokenPrincipal: string) => {
-    const authClient = await AuthClient.create()
-    const identity = await authClient.getIdentity()
-    
-    const agent = await createAgent({
-      identity,
-      host: getNetworkHost(),
-      fetchRootKey: shouldFetchRootKey(),
-    })
+    // Use taco store's centralized authenticated agent
+    const agent = await tacoStore.getAuthenticatedAgent()
 
     const icrcIDL = ({ IDL }: any) => {
       const Account = IDL.Record({

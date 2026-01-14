@@ -20,7 +20,16 @@ type treasury =
     (Result_12);
    admin_executeTradingCycle: (reason: opt text) -> (Result_1);
    admin_recoverPoolBalances: () -> (Result_2);
+   /// * Timer for data synchronization
+   ///    *
+   ///    * Schedules periodic updates of token info from:
+   ///    * - DAO (allocation targets and token status)
+   ///    * - NTN service (token prices)
+   ///    * - Ledgers (token balances)
+   admin_startShortSyncTimer: () -> (bool);
+   admin_syncToDao: () -> (Result_2);
    admin_syncWithDao: () -> (Result_2);
+   admin_syncWithDaoNoPull: () -> (Result_2);
    /// * Clear all trading pauses (emergency function)
    ///    *
    ///    * Removes all tokens from the trading pause registry.
@@ -92,10 +101,11 @@ type treasury =
    /// * Get portfolio history
    ///    * 
    ///    * Returns recent portfolio snapshots for analysis and charting.
-   ///    * Accessible by authenticated users.
+   ///    * Public query - allows anyone to view portfolio history (read-only transparency).
    getPortfolioHistory: (limit: nat) -> (Result_11) query;
    /// * Get portfolio history filtered by timestamp (for archive efficiency)
    ///    * Returns only snapshots newer than the specified timestamp
+   ///    * Public query - allows anyone to view portfolio history (read-only transparency).
    getPortfolioHistorySince: (sinceTimestamp: int, limit: nat) ->
     (Result_11) query;
    /// * Get portfolio snapshot status
@@ -323,6 +333,7 @@ type UpdateConfig =
    maxTradeAttemptsPerInterval: opt nat;
    maxTradeValueICP: opt nat;
    maxTradesStored: opt nat;
+   minAllocationDiffBasisPoints: opt nat;
    minTradeValueICP: opt nat;
    portfolioRebalancePeriodNS: opt nat;
    priceUpdateIntervalNS: opt nat;
@@ -716,6 +727,7 @@ type RebalanceConfig =
    maxTradeAttemptsPerInterval: nat;
    maxTradeValueICP: nat;
    maxTradesStored: nat;
+   minAllocationDiffBasisPoints: nat;
    minTradeValueICP: nat;
    portfolioRebalancePeriodNS: nat;
    rebalanceIntervalNS: nat;

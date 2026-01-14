@@ -764,8 +764,16 @@ const currentDefaultVoteBehavior = ref('Loading...')
 const newHighestProcessedNNSProposalId = ref('')
 const currentHighestProcessedNNSProposalId = ref('')
 
-// Proposals
-const votableProposals = ref<any[]>([])
+// Proposals - votableProposals computed from cached store data to avoid duplication
+const votableProposals = computed(() => {
+    if (!cachedVotableProposals.value?.length) return []
+    return cachedVotableProposals.value.map((proposal: any) => ({
+        ...proposal,
+        nns_proposal_id: Number(proposal.nns_proposal_id),
+        sns_proposal_id: Number(proposal.sns_proposal_id),
+        time_remaining_seconds: Number(proposal.time_remaining_seconds)
+    }))
+})
 const discoveredProposals = ref<any[]>([])
 
 // Computed
@@ -1447,14 +1455,9 @@ const loadConfiguration = () => {
 }
 
 // Watchers to sync cached data to local refs
+// Note: votableProposals is now a computed property, so we just update loading when data arrives
 watch(cachedVotableProposals, (newVal) => {
     if (newVal?.length > 0) {
-        votableProposals.value = newVal.map((proposal: any) => ({
-            ...proposal,
-            nns_proposal_id: Number(proposal.nns_proposal_id),
-            sns_proposal_id: Number(proposal.sns_proposal_id),
-            time_remaining_seconds: Number(proposal.time_remaining_seconds)
-        }))
         loading.value = false
     }
 }, { immediate: true })

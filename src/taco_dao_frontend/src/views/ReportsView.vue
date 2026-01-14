@@ -12822,7 +12822,7 @@ away from being playable.
   // Imports //
   /////////////
 
-  import { ref, onMounted, watch, computed } from "vue"
+  import { ref, onMounted, onBeforeUnmount, watch, computed } from "vue"
   import { useTacoStore } from "../stores/taco.store"
   import { storeToRefs } from "pinia"  
   import { useRoute, useRouter } from 'vue-router'
@@ -12989,14 +12989,20 @@ away from being playable.
   // lifecycle hooks //
   /////////////////////
 
+  // Resize handler (stored for cleanup)
+  const handleResize = () => {
+    isMobile.value = window.innerWidth < 768
+  }
+
   // on mounted
   onMounted(async () => {
-
     // watch for window resize
-    window.addEventListener('resize', () => {
-      isMobile.value = window.innerWidth < 768
-    })
+    window.addEventListener('resize', handleResize)
+  })
 
+  // Cleanup on unmount to prevent memory leak
+  onBeforeUnmount(() => {
+    window.removeEventListener('resize', handleResize)
   })
 
 </script>

@@ -1,38 +1,6 @@
 import { ref } from 'vue'
 import { useTacoStore } from '../stores/taco.store'
 import { setAdminStatus } from '../stores/worker-bridge'
-import { getEffectiveNetwork } from '../config/network-config'
-
-// Helper functions for runtime network detection
-function shouldFetchRootKey(): boolean {
-  return getEffectiveNetwork() === 'local'
-}
-function getNetworkHost(): string {
-  const network = getEffectiveNetwork()
-  if (network === 'local') {
-    const port = import.meta.env.VITE_LOCAL_PORT || '4943'
-    return `http://localhost:${port}`
-  }
-  return 'https://ic0.app'
-}
-
-// Lazy-load heavy @dfinity modules to reduce initial bundle size
-let _agentModule: typeof import('@dfinity/agent') | null = null
-let _authClientModule: typeof import('@dfinity/auth-client') | null = null
-
-async function getAgentModule() {
-  if (!_agentModule) {
-    _agentModule = await import('@dfinity/agent')
-  }
-  return _agentModule
-}
-
-async function getAuthClientModule() {
-  if (!_authClientModule) {
-    _authClientModule = await import('@dfinity/auth-client')
-  }
-  return _authClientModule
-}
 
 /**
  * Hardcoded list of admin principals
@@ -97,16 +65,18 @@ export function useAdminCheck() {
     checking.value = true
 
     try {
-      // Lazy-load auth client module
-      const { AuthClient } = await getAuthClientModule()
+      // Check if user is logged in first
+      if (!tacoStore.userLoggedIn) {
+        isAdmin.value = false
+        setAdminStatus(false)
+        return false
+      }
 
-      // Get auth client and identity
-      const authClient = await AuthClient.create()
-      const identity = authClient.getIdentity()
-      const principalText = identity.getPrincipal().toText()
+      // Get user principal from store
+      const principalText = tacoStore.userPrincipal
 
       // Check hardcoded admin list first (faster)
-      if (ADMIN_PRINCIPALS.includes(principalText)) {
+      if (principalText && ADMIN_PRINCIPALS.includes(principalText)) {
         isAdmin.value = true
         setAdminStatus(true)
         return true
@@ -117,18 +87,9 @@ export function useAdminCheck() {
         return isAdmin.value
       }
 
-      // Lazy-load agent module
-      const { Actor, HttpAgent } = await getAgentModule()
-
-      // Fall back to backend verification (only once)
-      const agent = new HttpAgent({
-        identity,
-        host: getNetworkHost()
-      })
-
-      if (shouldFetchRootKey()) {
-        await agent.fetchRootKey()
-      }
+      // Use store's getAuthenticatedAgent for proper identity management
+      const { Actor } = await import('@dfinity/agent')
+      const agent = await tacoStore.getAuthenticatedAgent()
 
       // Import DAO IDL and create actor
       const { idlFactory: daoIDL } = await import('../../../declarations/dao_backend/DAO_backend.did.js')
@@ -137,8 +98,9 @@ export function useAdminCheck() {
         canisterId: tacoStore.daoBackendCanisterId()
       }) as any
 
-      // Check permission for a read-safe function like getLogs
-      isAdmin.value = await daoActor.hasAdminPermission(identity.getPrincipal(), { getLogs: null })
+      // Get principal from agent and check permission
+      const principal = await agent.getPrincipal()
+      isAdmin.value = await daoActor.hasAdminPermission(principal, { getLogs: null })
       setAdminStatus(isAdmin.value)
       backendCheckDone = true // Mark that we've done the backend check
 
