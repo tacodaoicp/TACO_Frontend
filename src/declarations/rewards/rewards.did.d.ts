@@ -106,17 +106,21 @@ export type Result__1_3 = { 'ok' : Array<WithdrawalRecord> } |
   { 'err' : RewardsError };
 export type Result__1_4 = { 'ok' : Array<Uint8Array | number[]> } |
   { 'err' : RewardsError };
-export type Result__1_5 = {
+export type Result__1_5 = { 'ok' : [] | [bigint] } |
+  { 'err' : RewardsError };
+export type Result__1_6 = { 'ok' : Array<[Uint8Array | number[], bigint]> } |
+  { 'err' : RewardsError };
+export type Result__1_7 = {
     'ok' : { 'distributions' : Array<DistributionRecord> }
   } |
   { 'err' : RewardsError };
-export type Result__1_6 = { 'ok' : PerformanceResult } |
+export type Result__1_8 = { 'ok' : PerformanceResult } |
   { 'err' : RewardsError };
 export interface Rewards {
   'addToRewardSkipList' : ActorMethod<[Uint8Array | number[]], Result__1>,
   'calculateNeuronPerformance' : ActorMethod<
     [Uint8Array | number[], bigint, bigint, PriceType],
-    Result__1_6
+    Result__1_8
   >,
   'getAllNeuronRewardBalances' : ActorMethod<
     [],
@@ -148,6 +152,7 @@ export interface Rewards {
       'rewardSkipListSize' : bigint,
       'maxDistributionHistory' : bigint,
       'periodicRewardPot' : bigint,
+      'rewardPenaltiesCount' : bigint,
       'performanceScorePower' : number,
       'totalDistributions' : bigint,
       'nextScheduledDistribution' : [] | [bigint],
@@ -175,12 +180,14 @@ export interface Rewards {
       'records' : Array<DistributionRecord>,
     }
   >,
-  'getDistributionsSince' : ActorMethod<[bigint, bigint], Result__1_5>,
+  'getDistributionsSince' : ActorMethod<[bigint, bigint], Result__1_7>,
   'getNeuronRewardBalance' : ActorMethod<[Uint8Array | number[]], bigint>,
   'getNeuronRewardBalances' : ActorMethod<
     [Array<Uint8Array | number[]>],
     Array<[Uint8Array | number[], bigint]>
   >,
+  'getRewardPenalties' : ActorMethod<[], Result__1_6>,
+  'getRewardPenalty' : ActorMethod<[Uint8Array | number[]], Result__1_5>,
   'getRewardSkipList' : ActorMethod<[], Result__1_4>,
   'getTacoBalance' : ActorMethod<[], bigint>,
   'getTotalDistributed' : ActorMethod<[], bigint>,
@@ -189,10 +196,16 @@ export interface Rewards {
   'getWithdrawalsSince' : ActorMethod<[bigint, bigint], Result__1_1>,
   'get_canister_cycles' : ActorMethod<[], { 'cycles' : bigint }>,
   'removeFromRewardSkipList' : ActorMethod<[Uint8Array | number[]], Result__1>,
+  'removeRewardPenalty' : ActorMethod<[Uint8Array | number[]], Result__1>,
   'setDistributionEnabled' : ActorMethod<[boolean], Result__1>,
   'setDistributionPeriod' : ActorMethod<[bigint], Result__1>,
   'setPerformanceScorePower' : ActorMethod<[number], Result__1>,
   'setPeriodicRewardPot' : ActorMethod<[bigint], Result__1>,
+  'setRewardPenalties' : ActorMethod<
+    [Array<[Uint8Array | number[], bigint]>],
+    Result__1
+  >,
+  'setRewardPenalty' : ActorMethod<[Uint8Array | number[], bigint], Result__1>,
   'setRewardSkipList' : ActorMethod<[Array<Uint8Array | number[]>], Result__1>,
   'setVotingPowerPower' : ActorMethod<[number], Result__1>,
   'startDistributionTimer' : ActorMethod<[], Result__1>,

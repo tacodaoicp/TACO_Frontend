@@ -207,103 +207,114 @@
             </div>
           </div>
 
-          <!-- Skip List Management -->
+          <!-- Reward Penalties Section -->
           <div class="card bg-dark text-white mb-4">
-            <div class="card-header">
-              <h3 class="mb-0">
-                🚫 Reward Skip List Management
-                <span v-if="rewardSkipList.length > 0" class="badge bg-warning ms-2">{{ rewardSkipList.length }} neurons skipped</span>
-              </h3>
+            <div class="card-header d-flex justify-content-between align-items-center">
+              <h3 class="mb-0">⚖️ Reward Penalties ({{ rewardPenalties.length }})</h3>
+              <button
+                class="btn btn-sm btn-outline-warning"
+                @click="refreshRewardPenalties"
+                :disabled="isLoadingPenalties"
+              >
+                {{ isLoadingPenalties ? 'Loading...' : '🔄 Refresh' }}
+              </button>
             </div>
             <div class="card-body">
               <p class="text-muted mb-3">
-                Manage the list of neurons that should be excluded from reward distributions. 
-                Neurons in this list will not receive rewards during distribution runs.
+                Manage reward penalties for neurons. Penalized neurons receive a reduced percentage of their calculated rewards.
               </p>
-              
-              <!-- Add Neuron to Skip List -->
-              <div class="row mb-4">
-                <div class="col-md-8">
-                  <label for="newSkipNeuronId" class="form-label">Add Neuron ID to Skip List:</label>
-                  <input 
-                    id="newSkipNeuronId" 
-                    type="text" 
-                    class="form-control bg-dark text-white font-monospace" 
-                    v-model="newSkipNeuronId"
-                    placeholder="Enter neuron ID (hex format)..."
-                  />
-                  <small class="text-muted">
-                    Enter the full neuron ID in hexadecimal format
-                  </small>
+
+              <!-- Add Penalty Form -->
+              <div class="mb-4 p-3" style="background: rgba(255, 255, 255, 0.05); border-radius: 0.5rem;">
+                <h5>Add Reward Penalty</h5>
+                <div class="row">
+                  <div class="col-md-6">
+                    <div class="form-group mb-2">
+                      <label for="rewardPenaltyNeuronId">Neuron ID (hex)</label>
+                      <input
+                        type="text"
+                        id="rewardPenaltyNeuronId"
+                        v-model="newPenaltyNeuronId"
+                        class="form-control bg-dark text-white font-monospace"
+                        placeholder="Enter neuron ID in hex format..."
+                      >
+                    </div>
+                  </div>
+                  <div class="col-md-3">
+                    <div class="form-group mb-2">
+                      <label for="rewardPenaltyMultiplier">Reward % (1-100)</label>
+                      <input
+                        type="number"
+                        id="rewardPenaltyMultiplier"
+                        v-model.number="newPenaltyMultiplier"
+                        class="form-control bg-dark text-white"
+                        placeholder="e.g. 50"
+                        min="1"
+                        max="100"
+                      >
+                    </div>
+                  </div>
+                  <div class="col-md-3 d-flex align-items-end">
+                    <button
+                      class="btn btn-warning mb-2"
+                      @click="addPenalty"
+                      :disabled="isAddingPenalty || !newPenaltyNeuronId.trim() || !newPenaltyMultiplier"
+                    >
+                      {{ isAddingPenalty ? 'Adding...' : '➕ Add Penalty' }}
+                    </button>
+                  </div>
                 </div>
-                <div class="col-md-4 d-flex align-items-end">
-                  <button 
-                    class="btn btn-warning w-100" 
-                    @click="addToSkipList"
-                    :disabled="isLoading || !newSkipNeuronId.trim()"
-                  >
-                    <span v-if="isLoading && currentAction === 'addSkip'" class="spinner-border spinner-border-sm me-2" role="status"></span>
-                    ➕ Add to Skip List
-                  </button>
-                </div>
+                <small class="text-muted">
+                  Reward % determines how much of the neuron's calculated rewards they receive. E.g., 1 = 1% rewards, 50 = 50% rewards, 100 = full rewards (no penalty).
+                </small>
               </div>
 
-              <!-- Current Skip List -->
-              <div v-if="rewardSkipList.length > 0">
-                <h5 class="mb-3">Current Skip List ({{ rewardSkipList.length }} neurons):</h5>
+              <!-- Penalized Neurons Table -->
+              <div v-if="rewardPenalties.length > 0">
                 <div class="table-responsive" style="max-height: 300px; overflow-y: auto;">
                   <table class="table table-dark table-striped table-sm">
                     <thead class="sticky-top">
                       <tr>
-                        <th style="width: 60px;">#</th>
                         <th>Neuron ID</th>
-                        <th style="width: 120px;">Actions</th>
+                        <th>Reward %</th>
+                        <th>Effect</th>
+                        <th>Actions</th>
                       </tr>
                     </thead>
                     <tbody>
-                      <tr v-for="(neuronId, index) in rewardSkipList" :key="index">
-                        <td>{{ index + 1 }}</td>
-                        <td class="font-monospace">{{ formatNeuronId(neuronId) }}</td>
+                      <tr v-for="neuron in rewardPenalties" :key="uint8ArrayToHex(neuron.neuronId)">
                         <td>
-                          <button 
-                            class="btn btn-sm btn-outline-danger" 
-                            @click="removeFromSkipList(neuronId)"
-                            :disabled="isLoading"
-                            title="Remove from skip list"
+                          <div class="font-monospace">{{ formatNeuronId(neuron.neuronId) }}</div>
+                        </td>
+                        <td>{{ neuron.multiplier }}%</td>
+                        <td>Receives {{ neuron.multiplier }}% of rewards</td>
+                        <td>
+                          <button
+                            class="btn btn-sm btn-danger"
+                            @click="removePenalty(uint8ArrayToHex(neuron.neuronId))"
+                            :disabled="removingNeuronId === uint8ArrayToHex(neuron.neuronId)"
                           >
-                            <span v-if="isLoading && currentAction === 'removeSkip'" class="spinner-border spinner-border-sm" role="status"></span>
-                            <span v-else>🗑️</span>
+                            {{ removingNeuronId === uint8ArrayToHex(neuron.neuronId) ? 'Removing...' : '🗑️ Remove' }}
                           </button>
                         </td>
                       </tr>
                     </tbody>
                   </table>
                 </div>
-                
-                <!-- Bulk Actions -->
-                <div class="mt-3">
-                  <button 
-                    class="btn btn-outline-danger" 
-                    @click="clearSkipList"
-                    :disabled="isLoading"
-                  >
-                    <span v-if="isLoading && currentAction === 'clearSkip'" class="spinner-border spinner-border-sm me-2" role="status"></span>
-                    🗑️ Clear All
-                  </button>
-                  <button 
-                    class="btn btn-outline-info ms-2" 
-                    @click="refreshSkipList"
-                    :disabled="isLoading"
-                  >
-                    <span v-if="isLoading && currentAction === 'refreshSkip'" class="spinner-border spinner-border-sm me-2" role="status"></span>
-                    🔄 Refresh
-                  </button>
-                </div>
               </div>
-              
               <div v-else class="text-center text-muted py-4">
-                <p class="mb-0">No neurons in skip list</p>
-                <small>All neurons will be included in reward distributions</small>
+                <p class="mb-0">No reward penalties configured</p>
+                <small>All neurons will receive full rewards</small>
+              </div>
+
+              <!-- Penalty Error Message -->
+              <div v-if="penaltyErrorMessage" class="alert alert-danger mt-3" role="alert">
+                {{ penaltyErrorMessage }}
+              </div>
+
+              <!-- Penalty Success Message -->
+              <div v-if="penaltySuccessMessage" class="alert alert-success mt-3" role="alert">
+                {{ penaltySuccessMessage }}
               </div>
             </div>
           </div>
@@ -699,6 +710,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useRouter } from 'vue-router'
+import { storeToRefs } from 'pinia'
 import { useTacoStore } from '../stores/taco.store'
 import { useAdminStore } from '../stores/admin.store'
 import { useAdminCheck } from '../composables/useAdminCheck'
@@ -711,6 +723,13 @@ import { deserializeFromTransfer } from '../workers/shared/fetch-functions'
 const router = useRouter()
 const tacoStore = useTacoStore()
 const adminStore = useAdminStore()
+
+// Destructure store refs and methods for reward penalties
+const { fetchedRewardPenalties } = storeToRefs(tacoStore)
+const { fetchRewardPenalties, adminAddRewardPenalty, adminRemoveRewardPenalty } = tacoStore
+
+// Computed for reward penalties
+const rewardPenalties = computed(() => fetchedRewardPenalties.value || [])
 
 // Admin check
 const { isAdmin, checking, checkAdminStatus } = useAdminCheck()
@@ -760,9 +779,14 @@ const customStartTime = ref('')
 const customEndTime = ref('')
 const selectedPriceType = ref('USD')
 
-// Skip list state
-const rewardSkipList = ref<any[]>([])
-const newSkipNeuronId = ref('')
+// Reward penalties state
+const isLoadingPenalties = ref(false)
+const isAddingPenalty = ref(false)
+const removingNeuronId = ref<string | null>(null)
+const newPenaltyNeuronId = ref('')
+const newPenaltyMultiplier = ref<number>(50)
+const penaltyErrorMessage = ref('')
+const penaltySuccessMessage = ref('')
 
 // Sorting state
 const sortColumns = ref<Record<number, string | null>>({})
@@ -1072,18 +1096,10 @@ const loadAvailableBalance = async () => {
   }
 }
 
-const loadRewardSkipList = async () => {
-  try {
-    const actor = await getRewardsActor()
-    const result = await actor.getRewardSkipList()
-    if ('ok' in result) {
-      rewardSkipList.value = result.ok
-    } else {
-      throw new Error('Failed to load skip list')
-    }
-  } catch (error) {
-    console.error('Error loading reward skip list:', error)
-  }
+// Helper function to convert Uint8Array to hex string
+const uint8ArrayToHex = (arr: Uint8Array | number[]): string => {
+  const bytes = arr instanceof Uint8Array ? arr : new Uint8Array(arr)
+  return Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('')
 }
 
 // Track if initial load is in progress to prevent double-loading
@@ -1400,128 +1416,61 @@ const updateVotingPowerPower = async () => {
   }
 }
 
-const addToSkipList = async () => {
-  if (!newSkipNeuronId.value.trim()) return
-  
-  await checkAdminStatus()
-  
-  const neuronIdHex = newSkipNeuronId.value.trim().replace(/^0x/, '')
-  if (neuronIdHex.length % 2 !== 0) {
-    errorMessage.value = 'Invalid hex string length'
-    return
-  }
-  
-  const neuronIdBytes = new Uint8Array(
-    neuronIdHex.match(/.{2}/g)!.map(byte => parseInt(byte, 16))
-  )
-  
-  if (isAdmin.value) {
-    clearMessages()
-    isLoading.value = true
-    currentAction.value = 'addSkip'
-    
-    try {
-      const actor = await getRewardsActor()
-      const result = await actor.addToRewardSkipList(neuronIdBytes)
-      
-      if ('ok' in result) {
-        successMessage.value = result.ok
-        newSkipNeuronId.value = ''
-        await loadRewardSkipList()
-      } else {
-        const err = result.err
-        const errMsg = 'SystemError' in err ? err.SystemError : JSON.stringify(err)
-        throw new Error(errMsg)
-      }
-    } catch (error: any) {
-      console.error('Error adding neuron to skip list:', error)
-      errorMessage.value = 'Failed to add neuron to skip list: ' + error.message
-    } finally {
-      isLoading.value = false
-      currentAction.value = ''
-    }
-  } else {
-    proposalFunctionName.value = 'addToRewardSkipList'
-    proposalReasonPlaceholder.value = `Please explain why neuron ${neuronIdHex.substring(0, 16)}... should be added to the skip list...`
-    proposalContextParams.value = {
-      neuronId: neuronIdBytes
-    }
-    showProposalDialog.value = true
+// Reward penalty functions
+const refreshRewardPenalties = async () => {
+  isLoadingPenalties.value = true
+  penaltyErrorMessage.value = ''
+  try {
+    await fetchRewardPenalties()
+  } catch (error: any) {
+    penaltyErrorMessage.value = 'Failed to load reward penalties: ' + (error.message || error)
+  } finally {
+    isLoadingPenalties.value = false
   }
 }
 
-const removeFromSkipList = async (neuronId: any) => {
-  await checkAdminStatus()
-  
-  if (isAdmin.value) {
-    clearMessages()
-    isLoading.value = true
-    currentAction.value = 'removeSkip'
-    
-    try {
-      const actor = await getRewardsActor()
-      const result = await actor.removeFromRewardSkipList(neuronId)
-      
-      if ('ok' in result) {
-        successMessage.value = result.ok
-        await loadRewardSkipList()
-      } else {
-        const err = result.err
-        const errMsg = 'SystemError' in err ? err.SystemError : JSON.stringify(err)
-        throw new Error(errMsg)
-      }
-    } catch (error: any) {
-      console.error('Error removing neuron from skip list:', error)
-      errorMessage.value = 'Failed to remove neuron from skip list: ' + error.message
-    } finally {
-      isLoading.value = false
-      currentAction.value = ''
-    }
-  } else {
-    proposalFunctionName.value = 'removeFromRewardSkipList'
-    proposalReasonPlaceholder.value = `Please explain why this neuron should be removed from the skip list...`
-    proposalContextParams.value = {
-      neuronId: neuronId
-    }
-    showProposalDialog.value = true
+const addPenalty = async () => {
+  if (!newPenaltyNeuronId.value.trim() || !newPenaltyMultiplier.value) return
+
+  isAddingPenalty.value = true
+  penaltyErrorMessage.value = ''
+  penaltySuccessMessage.value = ''
+
+  try {
+    // Clean the hex input (remove spaces, 0x prefix if any)
+    const cleanHex = newPenaltyNeuronId.value.trim().replace(/^0x/, '').replace(/\s/g, '')
+
+    await adminAddRewardPenalty(cleanHex, newPenaltyMultiplier.value)
+    penaltySuccessMessage.value = `Successfully added penalty (${newPenaltyMultiplier.value}% rewards) for neuron`
+
+    // Clear form
+    newPenaltyNeuronId.value = ''
+    newPenaltyMultiplier.value = 50
+
+    // Auto-hide success message after 5 seconds
+    setTimeout(() => { penaltySuccessMessage.value = '' }, 5000)
+  } catch (error: any) {
+    penaltyErrorMessage.value = 'Failed to add penalty: ' + (error.message || error)
+  } finally {
+    isAddingPenalty.value = false
   }
 }
 
-const clearSkipList = async () => {
-  await checkAdminStatus()
-  
-  if (isAdmin.value) {
-    if (!confirm('Are you sure you want to clear the entire skip list? This will allow all neurons to receive rewards again.')) {
-      return
-    }
-    
-    clearMessages()
-    isLoading.value = true
-    currentAction.value = 'clearSkip'
-    
-    try {
-      const actor = await getRewardsActor()
-      const result = await actor.setRewardSkipList([])
-      
-      if ('ok' in result) {
-        successMessage.value = 'Skip list cleared successfully'
-        await loadRewardSkipList()
-      } else {
-        const err = result.err
-        const errMsg = 'SystemError' in err ? err.SystemError : JSON.stringify(err)
-        throw new Error(errMsg)
-      }
-    } catch (error: any) {
-      console.error('Error clearing skip list:', error)
-      errorMessage.value = 'Failed to clear skip list: ' + error.message
-    } finally {
-      isLoading.value = false
-      currentAction.value = ''
-    }
-  } else {
-    // Show dialog saying Admin Only  
-    errorMessage.value = 'This action is only available to administrators'  
-    showProposalDialog.value = false
+const removePenalty = async (neuronIdHex: string) => {
+  removingNeuronId.value = neuronIdHex
+  penaltyErrorMessage.value = ''
+  penaltySuccessMessage.value = ''
+
+  try {
+    await adminRemoveRewardPenalty(neuronIdHex)
+    penaltySuccessMessage.value = 'Successfully removed penalty from neuron'
+
+    // Auto-hide success message after 5 seconds
+    setTimeout(() => { penaltySuccessMessage.value = '' }, 5000)
+  } catch (error: any) {
+    penaltyErrorMessage.value = 'Failed to remove penalty: ' + (error.message || error)
+  } finally {
+    removingNeuronId.value = null
   }
 }
 
@@ -1540,23 +1489,6 @@ const refreshHistory = async () => {
   } catch (error) {
     console.error('Error refreshing data:', error)
     errorMessage.value = 'Failed to refresh distribution data'
-  } finally {
-    isLoading.value = false
-    currentAction.value = ''
-  }
-}
-
-const refreshSkipList = async () => {
-  clearMessages()
-  isLoading.value = true
-  currentAction.value = 'refreshSkip'
-  
-  try {
-    await loadRewardSkipList()
-    successMessage.value = 'Skip list refreshed'
-  } catch (error) {
-    console.error('Error refreshing skip list:', error)
-    errorMessage.value = 'Failed to refresh skip list'
   } finally {
     isLoading.value = false
     currentAction.value = ''
@@ -1762,8 +1694,8 @@ onMounted(async () => {
   workerBridge.fetch('rewardsConfiguration')
   workerBridge.fetch('distributionHistory')
 
-  // Load skip list directly (not in worker system yet)
-  loadRewardSkipList().catch(err => console.error('Error loading skip list:', err))
+  // Load reward penalties
+  refreshRewardPenalties()
 })
 
 onBeforeUnmount(() => {

@@ -1,0 +1,207 @@
+type Account = record { owner : principal; subaccount : opt blob };
+type Allocation = record { token : principal; basisPoints : nat };
+type AllocationChangeType = variant {
+  FollowAction : record { followedUser : principal };
+  UserUpdate : record { userInitiated : bool };
+  SystemRebalance;
+  VotingPowerChange;
+};
+type CheckpointData = record {
+  maker : opt principal;
+  totalPortfolioValue : float64;
+  pricesUsed : vec record { principal; PriceInfo };
+  timestamp : int;
+  allocations : vec Allocation;
+  tokenValues : vec record { principal; float64 };
+};
+type DistributionRecord = record {
+  id : nat;
+  startTime : int;
+  status : DistributionStatus;
+  distributionTime : int;
+  neuronsProcessed : nat;
+  endTime : int;
+  actualDistributed : nat;
+  totalRewardPot : nat;
+  totalRewardScore : float64;
+  neuronRewards : vec NeuronReward;
+  failedNeurons : vec FailedNeuron;
+};
+type DistributionStatus = variant {
+  Failed : text;
+  PartiallyCompleted : record { successfulNeurons : nat; failedNeurons : nat };
+  InProgress : record { currentNeuron : nat; totalNeurons : nat };
+  Completed;
+};
+type FailedNeuron = record { errorMessage : text; neuronId : blob };
+type NeuronAllocationChangeBlockData = record {
+  id : nat;
+  maker : principal;
+  oldAllocations : vec Allocation;
+  changeType : AllocationChangeType;
+  votingPower : nat;
+  newAllocations : vec Allocation;
+  timestamp : int;
+  neuronId : blob;
+  penaltyMultiplier : opt nat;
+  reason : opt text;
+};
+type NeuronReward = record {
+  rewardAmount : nat;
+  performanceScore : float64;
+  votingPower : nat;
+  rewardScore : float64;
+  checkpoints : vec CheckpointData;
+  neuronId : blob;
+};
+type PerformanceResult = record {
+  startTime : int;
+  endTime : int;
+  performanceScore : float64;
+  finalValue : float64;
+  preTimespanAllocation : opt NeuronAllocationChangeBlockData;
+  checkpoints : vec CheckpointData;
+  neuronId : blob;
+  allocationChanges : nat;
+  inTimespanChanges : vec NeuronAllocationChangeBlockData;
+  initialValue : float64;
+};
+type PriceInfo = record { usdPrice : float64; timestamp : int; icpPrice : nat };
+type PriceType = variant { ICP; USD };
+type Result = variant { Ok : nat; Err : TransferError };
+type Result__1 = variant { ok : text; err : RewardsError };
+type Result__1_1 = variant {
+  ok : record { withdrawals : vec WithdrawalRecord };
+  err : RewardsError;
+};
+type Result__1_2 = variant {
+  ok : record {
+    totalRecordsInHistory : nat;
+    totalWithdrawn : nat;
+    totalWithdrawals : nat;
+  };
+  err : RewardsError;
+};
+type Result__1_3 = variant { ok : vec WithdrawalRecord; err : RewardsError };
+type Result__1_4 = variant { ok : vec blob; err : RewardsError };
+type Result__1_5 = variant { ok : opt nat; err : RewardsError };
+type Result__1_6 = variant {
+  ok : vec record { blob; nat };
+  err : RewardsError;
+};
+type Result__1_7 = variant {
+  ok : record { distributions : vec DistributionRecord };
+  err : RewardsError;
+};
+type Result__1_8 = variant { ok : PerformanceResult; err : RewardsError };
+type Rewards = service {
+  addToRewardSkipList : (blob) -> (Result__1);
+  calculateNeuronPerformance : (blob, int, int, PriceType) -> (Result__1_8);
+  getAllNeuronRewardBalances : () -> (vec record { blob; nat }) query;
+  getAllWithdrawalHistory : (opt nat) -> (Result__1_3);
+  getAvailableBalance : () -> (nat);
+  getCanisterStatus : () -> (
+      record {
+        priceArchiveId : principal;
+        environment : text;
+        distributionStatus : record {
+          lastDistribution : int;
+          totalRewardsDistributed : nat;
+          totalDistributions : nat;
+          inProgress : bool;
+          nextDistribution : int;
+        };
+        daoId : principal;
+        neuronAllocationArchiveId : principal;
+      },
+    );
+  getConfiguration : () -> (
+      record {
+        distributionEnabled : bool;
+        distributionPeriodNS : nat;
+        rewardSkipListSize : nat;
+        maxDistributionHistory : nat;
+        periodicRewardPot : nat;
+        rewardPenaltiesCount : nat;
+        performanceScorePower : float64;
+        totalDistributions : nat;
+        nextScheduledDistribution : opt int;
+        votingPowerPower : float64;
+        lastDistributionTime : int;
+        timerRunning : bool;
+      },
+    ) query;
+  getCurrentDistributionStatus : () -> (
+      record {
+        nextDistributionTime : int;
+        distributionEnabled : bool;
+        currentDistributionId : opt nat;
+        lastDistributionTime : int;
+        inProgress : bool;
+      },
+    ) query;
+  getCurrentTotalNeuronBalances : () -> (nat) query;
+  getDistributionHistory : (nat, nat) -> (
+      record { total : nat; hasMore : bool; records : vec DistributionRecord },
+    ) query;
+  getDistributionsSince : (int, nat) -> (Result__1_7) query;
+  getNeuronRewardBalance : (blob) -> (nat) query;
+  getNeuronRewardBalances : (vec blob) -> (vec record { blob; nat }) query;
+  getRewardPenalties : () -> (Result__1_6) query;
+  getRewardPenalty : (blob) -> (Result__1_5) query;
+  getRewardSkipList : () -> (Result__1_4) query;
+  getTacoBalance : () -> (nat);
+  getTotalDistributed : () -> (nat) query;
+  getUserWithdrawalHistory : (opt nat) -> (Result__1_3);
+  getWithdrawalStats : () -> (Result__1_2);
+  getWithdrawalsSince : (int, nat) -> (Result__1_1) query;
+  get_canister_cycles : () -> (record { cycles : nat }) query;
+  removeFromRewardSkipList : (blob) -> (Result__1);
+  removeRewardPenalty : (blob) -> (Result__1);
+  setDistributionEnabled : (bool) -> (Result__1);
+  setDistributionPeriod : (nat) -> (Result__1);
+  setPerformanceScorePower : (float64) -> (Result__1);
+  setPeriodicRewardPot : (nat) -> (Result__1);
+  setRewardPenalties : (vec record { blob; nat }) -> (Result__1);
+  setRewardPenalty : (blob, nat) -> (Result__1);
+  setRewardSkipList : (vec blob) -> (Result__1);
+  setVotingPowerPower : (float64) -> (Result__1);
+  startDistributionTimer : () -> (Result__1);
+  startDistributionTimerAt : (int) -> (Result__1);
+  stopDistributionTimer : () -> (Result__1);
+  triggerDistribution : () -> (Result__1);
+  triggerDistributionCustom : (int, int, PriceType) -> (Result__1);
+  withdraw : (Account, vec blob) -> (Result);
+};
+type RewardsError = variant {
+  AllocationDataMissing;
+  SystemError : text;
+  NotAuthorized;
+  DistributionInProgress;
+  PriceDataMissing : record { token : principal; timestamp : int };
+  NeuronNotFound;
+  InvalidTimeRange;
+  InsufficientRewardPot;
+};
+type TransferError = variant {
+  GenericError : record { message : text; error_code : nat };
+  TemporarilyUnavailable;
+  BadBurn : record { min_burn_amount : nat };
+  Duplicate : record { duplicate_of : nat };
+  BadFee : record { expected_fee : nat };
+  CreatedInFuture : record { ledger_time : nat64 };
+  TooOld;
+  InsufficientFunds : record { balance : nat };
+};
+type WithdrawalRecord = record {
+  id : nat;
+  fee : nat;
+  amountSent : nat;
+  neuronWithdrawals : vec record { blob; nat };
+  totalAmount : nat;
+  timestamp : int;
+  caller : principal;
+  targetAccount : Account;
+  transactionId : opt nat;
+};
+service : Rewards

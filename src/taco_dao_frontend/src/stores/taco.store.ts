@@ -4497,6 +4497,83 @@ export const useTacoStore = defineStore('taco', () => {
         }
     }
 
+    // Reward penalties state (for rewards canister)
+    const fetchedRewardPenalties = ref<Array<{ neuronId: Uint8Array; multiplier: number }>>([]);
+
+    const fetchRewardPenalties = async () => {
+        try {
+            const actor = await createRewardsActor();
+            const result = await actor.getRewardPenalties();
+            if ('ok' in result) {
+                fetchedRewardPenalties.value = result.ok.map(([neuronId, multiplier]: [Uint8Array | number[], bigint]) => ({
+                    neuronId: neuronId instanceof Uint8Array ? neuronId : new Uint8Array(neuronId),
+                    multiplier: Number(multiplier),
+                }));
+            } else {
+                console.error('taco.store: fetchRewardPenalties() - Error:', result.err);
+                throw new Error('Failed to fetch reward penalties');
+            }
+            return fetchedRewardPenalties.value;
+        } catch (error: any) {
+            console.error('taco.store: fetchRewardPenalties() - Error:', error);
+            throw error;
+        }
+    }
+
+    const adminAddRewardPenalty = async (neuronIdHex: string, multiplier: number): Promise<boolean> => {
+        try {
+            appLoadingOn();
+
+            const actor = await createRewardsActor();
+
+            // Convert hex string to Uint8Array
+            const neuronId = new Uint8Array(neuronIdHex.match(/.{1,2}/g)!.map(byte => parseInt(byte, 16)));
+
+            const result = await actor.setRewardPenalty(neuronId, BigInt(multiplier));
+            console.log('taco.store: adminAddRewardPenalty() - Result:', result);
+
+            if ('err' in result) {
+                throw new Error(JSON.stringify(result.err));
+            }
+
+            // Refresh the list
+            await fetchRewardPenalties();
+            return true;
+        } catch (error: any) {
+            console.error('taco.store: adminAddRewardPenalty() - Error:', error);
+            throw error;
+        } finally {
+            appLoadingOff();
+        }
+    }
+
+    const adminRemoveRewardPenalty = async (neuronIdHex: string): Promise<boolean> => {
+        try {
+            appLoadingOn();
+
+            const actor = await createRewardsActor();
+
+            // Convert hex string to Uint8Array
+            const neuronId = new Uint8Array(neuronIdHex.match(/.{1,2}/g)!.map(byte => parseInt(byte, 16)));
+
+            const result = await actor.removeRewardPenalty(neuronId);
+            console.log('taco.store: adminRemoveRewardPenalty() - Result:', result);
+
+            if ('err' in result) {
+                throw new Error(JSON.stringify(result.err));
+            }
+
+            // Refresh the list
+            await fetchRewardPenalties();
+            return true;
+        } catch (error: any) {
+            console.error('taco.store: adminRemoveRewardPenalty() - Error:', error);
+            throw error;
+        } finally {
+            appLoadingOff();
+        }
+    }
+
     const updateSystemParameter = async (param: any, reason?: string): Promise<boolean> => {
         // console.log('TacoStore: updateSystemParameter called with', param, reason);
         try {
@@ -9358,6 +9435,10 @@ export const useTacoStore = defineStore('taco', () => {
         fetchPenalizedNeurons,
         adminAddPenalizedNeuron,
         adminRemovePenalizedNeuron,
+        fetchedRewardPenalties,
+        fetchRewardPenalties,
+        adminAddRewardPenalty,
+        adminRemoveRewardPenalty,
         updateSystemParameter,
         updateSnapshotInterval,
         getTradingStatus,
