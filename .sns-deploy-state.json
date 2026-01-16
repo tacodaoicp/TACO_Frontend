@@ -1,0 +1,20 @@
+{
+  "canister_id": "lx7ws-diaaa-aaaag-aubda-cai",
+  "canister_created": true,
+  "permissions_cleaned": "true",
+  "root_controller_added": "true",
+  "governance_controller_added": "true",
+  "prepare_granted_to_deployer": "true",
+  "commit_granted_to_root": "true",
+  "commit_granted_to_governance": "true",
+  "manage_granted_to_root": "true",
+  "manage_granted_to_governance": "true",
+  "deployer_manage_revoked": true,
+  "registration_proposal_id": "322",
+  "registration_proposal_status": "executed",
+  "function_id": "3103",
+  "function_proposal_id": "323",
+  "function_proposal_status": "executed",
+  "setup_complete": true,
+  "last_updated": "2026-01-16T18:19:48Z"
+}
