@@ -1703,18 +1703,18 @@ watch(rebalanceConfig, async (newConfig) => {
       }
 
       configInputs.value = {
-        maxSlippageBasisPoints: Number(newConfig.maxSlippageBasisPoints) / 100,
-        minTradeValueICP: Number(newConfig.minTradeValueICP),
-        maxTradeValueICP: Number(newConfig.maxTradeValueICP),
-        maxTradesStored: Number(newConfig.maxTradesStored),
-        maxTradeAttemptsPerInterval: Number(newConfig.maxTradeAttemptsPerInterval),
-        maxKongswapAttempts: Number(newConfig.maxKongswapAttempts),
-        minAllocationDiffBasisPoints: Number(newConfig.minAllocationDiffBasisPoints) / 100,
-        rebalanceIntervalMinutes: nsToMinutes(newConfig.rebalanceIntervalNS),
-        portfolioRebalancePeriodMinutes: nsToMinutes(newConfig.portfolioRebalancePeriodNS),
-        shortSyncIntervalSeconds: nsToSeconds(newConfig.shortSyncIntervalNS),
-        longSyncIntervalMinutes: nsToMinutes(newConfig.longSyncIntervalNS),
-        tokenSyncTimeoutSeconds: nsToSeconds(newConfig.tokenSyncTimeoutNS),
+        maxSlippageBasisPoints: Number(newConfig.maxSlippageBasisPoints ?? 100) / 100,
+        minTradeValueICP: Number(newConfig.minTradeValueICP ?? 0),
+        maxTradeValueICP: Number(newConfig.maxTradeValueICP ?? 0),
+        maxTradesStored: Number(newConfig.maxTradesStored ?? 0),
+        maxTradeAttemptsPerInterval: Number(newConfig.maxTradeAttemptsPerInterval ?? 0),
+        maxKongswapAttempts: Number(newConfig.maxKongswapAttempts ?? 0),
+        minAllocationDiffBasisPoints: Number(newConfig.minAllocationDiffBasisPoints ?? 100) / 100,
+        rebalanceIntervalMinutes: nsToMinutes(newConfig.rebalanceIntervalNS ?? BigInt(0)),
+        portfolioRebalancePeriodMinutes: nsToMinutes(newConfig.portfolioRebalancePeriodNS ?? BigInt(0)),
+        shortSyncIntervalSeconds: nsToSeconds(newConfig.shortSyncIntervalNS ?? BigInt(0)),
+        longSyncIntervalMinutes: nsToMinutes(newConfig.longSyncIntervalNS ?? BigInt(0)),
+        tokenSyncTimeoutSeconds: nsToSeconds(newConfig.tokenSyncTimeoutNS ?? BigInt(0)),
         maxPriceHistoryEntries: currentMaxPriceHistory,
         maxPortfolioSnapshots: currentMaxPortfolioSnapshots
       };

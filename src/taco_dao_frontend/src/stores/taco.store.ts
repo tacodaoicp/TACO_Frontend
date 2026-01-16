@@ -7350,7 +7350,9 @@ export const useTacoStore = defineStore('taco', () => {
 
         console.log(`Scanning for stuck stakes (checking nonces 0-${maxNoncesToCheck - 1})...`);
 
+        await initializeShims();
         const authClient = await getAuthClient();
+        const identity = await authClient.getIdentity();
 
         const tacoTokenPrincipal = 'kknbx-zyaaa-aaaaq-aae4a-cai';
         const snsGovernancePrincipal = 'lhdfz-wqaaa-aaaaq-aae3q-cai';
@@ -7369,7 +7371,13 @@ export const useTacoStore = defineStore('taco', () => {
             });
         };
 
-        const tokenActor = await getAuthenticatedActor(authClient, tacoTokenPrincipal, () => icrc1IDL);
+        // Create actor directly without caching to ensure correct IDL is used
+        const agent = await createAgent({
+            identity,
+            host: getNetworkHost(),
+            fetchRootKey: shouldFetchRootKey(),
+        });
+        const tokenActor = Actor.createActor(icrc1IDL, { agent, canisterId: tacoTokenPrincipal });
 
         const found: Array<{ nonce: number; balance: bigint; recovered: boolean; error?: string }> = [];
         let totalRecovered = 0;
@@ -7471,7 +7479,9 @@ export const useTacoStore = defineStore('taco', () => {
         amount: bigint,
         memo?: bigint  // Optional memo for neuron creation traceability
     ) => {
+        await initializeShims();
         const authClient = await getAuthClient();
+        const identity = await authClient.getIdentity();
 
         // Create ICRC1 actor for TACO token
         const icrc1IDL = ({ IDL }: any) => {
@@ -7502,7 +7512,13 @@ export const useTacoStore = defineStore('taco', () => {
             });
         };
 
-        const tokenActor = await getAuthenticatedActor(authClient, tokenPrincipal, () => icrc1IDL);
+        // Create actor directly without caching to ensure correct IDL is used
+        const agent = await createAgent({
+            identity,
+            host: getNetworkHost(),
+            fetchRootKey: shouldFetchRootKey(),
+        });
+        const tokenActor = Actor.createActor(icrc1IDL, { agent, canisterId: tokenPrincipal });
 
         // Convert neuronId to proper subaccount (32 bytes)
         const subaccount = new Uint8Array(32);
@@ -7666,7 +7682,9 @@ export const useTacoStore = defineStore('taco', () => {
                 return 0n;
             }
 
+            await initializeShims();
             const authClient = await getAuthClient();
+            const identity = await authClient.getIdentity();
 
             // Use ICRC1 interface for all tokens (including ICP)
             const icrc1IDL = ({ IDL }: any) => {
@@ -7679,7 +7697,13 @@ export const useTacoStore = defineStore('taco', () => {
                 });
             };
 
-            const tokenActor = await getAuthenticatedActor(authClient, tokenPrincipal, () => icrc1IDL);
+            // Create actor directly without caching to ensure correct IDL is used
+            const agent = await createAgent({
+                identity,
+                host: getNetworkHost(),
+                fetchRootKey: shouldFetchRootKey(),
+            });
+            const tokenActor = Actor.createActor(icrc1IDL, { agent, canisterId: tokenPrincipal });
 
             return await tokenActor.icrc1_balance_of({
                 owner: Principal.fromText(userPrincipal.value),
@@ -7703,7 +7727,9 @@ export const useTacoStore = defineStore('taco', () => {
                 throw new Error('User must be logged in to send tokens');
             }
 
+            await initializeShims();
             const authClient = await getAuthClient();
+            const identity = await authClient.getIdentity();
 
             // Use ICRC1 interface for all tokens (including ICP)
             const icrc1IDL = ({ IDL }: any) => {
@@ -7723,7 +7749,13 @@ export const useTacoStore = defineStore('taco', () => {
                 });
             };
 
-            const tokenActor = await getAuthenticatedActor(authClient, tokenPrincipal, () => icrc1IDL);
+            // Create actor directly without caching to ensure correct IDL is used
+            const agent = await createAgent({
+                identity,
+                host: getNetworkHost(),
+                fetchRootKey: shouldFetchRootKey(),
+            });
+            const tokenActor = Actor.createActor(icrc1IDL, { agent, canisterId: tokenPrincipal });
 
             const result = await tokenActor.icrc1_transfer({
                 to: {
@@ -7829,6 +7861,8 @@ export const useTacoStore = defineStore('taco', () => {
         }
 
         try {
+            await initializeShims();
+
             // Create a basic ICRC1 token actor using existing patterns
             const icrc1IDL = ({ IDL }: any) => {
                 const MetadataValue = IDL.Variant({
@@ -7851,8 +7885,9 @@ export const useTacoStore = defineStore('taco', () => {
                 });
             };
 
-            // Use anonymous actor for metadata queries (public data)
-            const tokenActor = await getAnonymousActor(tokenPrincipal, () => icrc1IDL);
+            // Create actor directly without caching to ensure correct IDL is used
+            const agent = await getAnonymousAgent();
+            const tokenActor = Actor.createActor(icrc1IDL, { agent, canisterId: tokenPrincipal });
 
             // Try to fetch individual ICRC1 properties (more reliable than metadata)
             const [name, symbol, decimals, fee, metadataResult, supportedStandardsResult] = await Promise.allSettled([

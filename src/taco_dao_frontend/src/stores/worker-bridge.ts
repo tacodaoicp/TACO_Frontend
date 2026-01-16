@@ -212,14 +212,16 @@ function handleWorkerMessage(response: WorkerResponse, workerName: string): void
           })
         }
       }
-      // Only log unexpected errors (not access denied)
-      const isAccessDenied = payload.error && (
+      // Only log unexpected errors (not access denied or backend version mismatch)
+      const isSuppressedError = payload.error && (
         payload.error.includes('canister_inspect_message') ||
         payload.error.includes('refused message') ||
         payload.error.includes('not authorized') ||
-        payload.error.includes('is not a function')
+        payload.error.includes('is not a function') ||
+        // Suppress backend version mismatch errors (frontend has newer IDL than deployed backend)
+        payload.error.includes('Cannot find required field')
       )
-      if (!isAccessDenied) {
+      if (!isSuppressedError) {
         console.error(`[WorkerBridge] Fetch error for ${payload.dataKey}:`, payload.error)
       }
       break
