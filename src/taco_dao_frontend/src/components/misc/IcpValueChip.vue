@@ -19,7 +19,10 @@
                   title="Value of ICP in USD"
                   data-bs-toggle="tooltip"
                   data-bs-placement="right"
-                  data-bs-custom-class="taco-tooltip">${{ icpPriceUsd.toFixed(2) }}</span>
+                  data-bs-custom-class="taco-tooltip">
+                <template v-if="icpPriceUsd > 0">${{ icpPriceUsd.toFixed(2) }}</template>
+                <template v-else><span class="opacity-50">--</span></template>
+            </span>
 
         </span>
 

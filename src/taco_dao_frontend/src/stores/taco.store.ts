@@ -1665,11 +1665,12 @@ export const useTacoStore = defineStore('taco', () => {
         workerUnsubscribers.push(
             workerBridge.subscribe('cryptoPrices', (data: unknown) => {
                 if (data && typeof data === 'object') {
-                    const prices = data as { icp: number; btc: number; taco: number; tacoIcp: number }
+                    const prices = data as { icp: number; btc: number; taco: number; tacoIcp: number; dkp: number }
                     icpPriceUsd.value = prices.icp
                     btcPriceUsd.value = prices.btc
                     tacoPriceUsd.value = prices.taco
                     tacoPriceIcp.value = prices.tacoIcp
+                    dkpPriceUsd.value = prices.dkp
                     lastPriceUpdate.value = Date.now()
                 }
             })
@@ -3202,6 +3203,11 @@ export const useTacoStore = defineStore('taco', () => {
 
     // sns provided canisters
     const fetchTotalTreasuryValueInUsd = async (forceRefetch = false) => {
+
+        // Early return if prices aren't loaded yet - will be called again by watcher
+        if (icpPriceUsd.value === 0 && tacoPriceUsd.value === 0) {
+            return false
+        }
 
         // if total treasury value in usd is already set, return (unless forced)
         if (totalTreasuryValueInUsd.value > 0 && !forceRefetch) {

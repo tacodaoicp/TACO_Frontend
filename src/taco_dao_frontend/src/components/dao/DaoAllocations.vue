@@ -999,20 +999,28 @@ LOCAL METHODS
 
                 // safely extract allocation data (has canisters for each allocation, need to get symbols from tokenData)
                 const allocations = (fetchedAggregateAllocation.value || []).map(([principal, basisPoints]) => ({
-                    principal: principal.toString(), // convert principal object to string
+                    // Principal objects have toText() method for proper string conversion
+                    principal: typeof principal === 'string'
+                        ? principal
+                        : (principal as any)?.toText?.() || (principal as any)?.toString?.() || '',
                     basisPoints: basisPoints.toString().padStart(4, '0') // convert BigInt to string with zero padding
                 }))
 
+                // Filter to only non-zero allocations FIRST to ensure array alignment
+                // (percentages, canisterIds, and symbols must all have matching indices)
+                const nonZeroAllocations = allocations.filter(a => Number(a.basisPoints) > 0)
+
                 // log transformed allocations
                 // console.log('transformed allocations:', allocations)
+                // console.log('nonZeroAllocations:', nonZeroAllocations)
 
                 // create array of percentages from basis points and ensure exactly 100%
-                const calculateExactPercentages = (allocations: any[]) => {
+                const calculateExactPercentages = (allocs: any[]) => {
 
-                    // convert to rounded percentages
-                    let percentages = allocations.map((allocation: any) => 
+                    // convert to rounded percentages (no filtering - input already filtered)
+                    let percentages = allocs.map((allocation: any) =>
                         Number((Number(allocation.basisPoints || 0) / 100).toFixed(2)) // convert basis points to percentage with 2 decimal places
-                    ).filter(Boolean) // remove any 0 or null values
+                    )
                     
                     // get the exact sum
                     const sum = percentages.reduce((a, b) => a + b, 0)
@@ -1030,15 +1038,15 @@ LOCAL METHODS
                 }
                 
                 // calculate percentages once to use in both places
-                const percentages = calculateExactPercentages(allocations)
+                const percentages = calculateExactPercentages(nonZeroAllocations)
 
                 // log
                 // console.log('percentages:', percentages)
 
-                // create array of canister ids from allocations
-                const canisterIds = allocations.map((allocation: any) =>
+                // create array of canister ids from non-zero allocations (ensures array alignment)
+                const canisterIds = nonZeroAllocations.map((allocation: any) =>
                     allocation.principal
-                ).filter(Boolean) // remove any empty strings
+                ).filter(Boolean) // remove any empty strings for safety
 
                 // log
                 // console.log('canisterIds:', canisterIds)
@@ -1053,7 +1061,10 @@ LOCAL METHODS
                     for (const entry of fetchedTokenDetails.value) {
                         const principal = entry[0]
                         const details = entry[1]
-                        const principalStr = typeof principal === 'string' ? principal : principal?.toString?.() || ''
+                        // Principal objects have toText() method, not toString()
+                        const principalStr = typeof principal === 'string'
+                            ? principal
+                            : (principal as any)?.toText?.() || (principal as any)?.toString?.() || ''
                         if (principalStr && details?.tokenSymbol) {
                             tokenDetailsMap.set(principalStr, details.tokenSymbol)
                         }
@@ -1062,13 +1073,7 @@ LOCAL METHODS
 
                 // Map canister IDs to symbols
                 for (const canisterId of canisterIds) {
-                    // Check cache first
-                    if (tokenSymbolCache.has(canisterId)) {
-                        symbols.push(tokenSymbolCache.get(canisterId)!)
-                        continue
-                    }
-
-                    // Check tokenDetails map
+                    // Check tokenDetails map first (fresh authoritative data)
                     if (tokenDetailsMap.has(canisterId)) {
                         const symbol = tokenDetailsMap.get(canisterId)!
                         symbols.push(symbol)
@@ -1076,7 +1081,13 @@ LOCAL METHODS
                         continue
                     }
 
-                    // Fall back to icrc1Metadata call (slow path)
+                    // Fall back to cache (for tokens not in tokenDetails)
+                    if (tokenSymbolCache.has(canisterId)) {
+                        symbols.push(tokenSymbolCache.get(canisterId)!)
+                        continue
+                    }
+
+                    // Last resort: icrc1Metadata call (slow path)
                     const fetchedMetadata = await icrc1Metadata(canisterId) as Array<[string, { Text?: string }]>
                     const symbolEntry = fetchedMetadata.find((entry) => entry[0] === "icrc1:symbol")
                     if (symbolEntry && symbolEntry[1]?.Text) {
@@ -1263,6 +1274,8 @@ LOCAL METHODS
     // Watch for data arriving from worker (re-trigger display when cached data arrives)
     watch(fetchedAggregateAllocation, (newData) => {
         if (newData && newData.length > 0 && showCurrentAllocations.value) {
+            // Clear stale symbol cache when allocation data changes
+            tokenSymbolCache.clear()
             // Re-trigger the allocations watcher by toggling
             showCurrentAllocations.value = false
             nextTick(() => {

@@ -229,6 +229,7 @@ export interface CryptoPrices {
   btc: number
   taco: number
   tacoIcp: number
+  dkp: number
 }
 
 export interface TradingStatusResult {
@@ -261,20 +262,22 @@ export interface TimerStatusData {
  * Fetch crypto prices from external APIs (CoinGecko + GeckoTerminal)
  * No IC agent needed - direct HTTP calls
  * Gracefully handles partial failures - returns 0 for failed fetches
+ * Includes fallback APIs (CoinCap, Binance) for ICP/BTC if CoinGecko fails
  */
 export async function fetchCryptoPricesData(): Promise<CryptoPrices> {
   let icpPrice = 0
   let btcPrice = 0
+  let dkpPrice = 0
   let tacoUsd = 0
   let tacoIcp = 0
 
-  // Fetch ICP and BTC from CoinGecko (with timeout)
+  // PRIMARY: Fetch ICP, BTC, and DKP from CoinGecko (with timeout)
   try {
     const coingeckoController = new AbortController()
     const coingeckoTimeout = setTimeout(() => coingeckoController.abort(), 10000)
 
     const coingeckoResponse = await fetch(
-      'https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=internet-computer,bitcoin',
+      'https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=internet-computer,bitcoin,draggin-karma-points',
       { signal: coingeckoController.signal }
     )
     clearTimeout(coingeckoTimeout)
@@ -283,12 +286,60 @@ export async function fetchCryptoPricesData(): Promise<CryptoPrices> {
       const marketData = await coingeckoResponse.json()
       const icpData = marketData.find((c: any) => c.id === 'internet-computer')
       const btcData = marketData.find((c: any) => c.id === 'bitcoin')
+      const dkpData = marketData.find((c: any) => c.id === 'draggin-karma-points')
       icpPrice = icpData?.current_price || 0
       btcPrice = btcData?.current_price || 0
+      dkpPrice = dkpData?.current_price || 0
     }
   } catch (err) {
-    // CoinGecko fetch failed - continue with zeros, will retry via backoff
+    // CoinGecko fetch failed - continue with zeros, will try fallbacks
     console.warn('[fetchCryptoPricesData] CoinGecko fetch failed:', err)
+  }
+
+  // FALLBACK 1: CoinCap (if ICP price still 0)
+  if (icpPrice === 0) {
+    try {
+      const coincapController = new AbortController()
+      const coincapTimeout = setTimeout(() => coincapController.abort(), 5000)
+
+      const [icpResp, btcResp] = await Promise.all([
+        fetch('https://api.coincap.io/v2/assets/internet-computer', { signal: coincapController.signal }),
+        fetch('https://api.coincap.io/v2/assets/bitcoin', { signal: coincapController.signal })
+      ])
+      clearTimeout(coincapTimeout)
+
+      if (icpResp.ok) {
+        const icpData = await icpResp.json()
+        icpPrice = parseFloat(icpData.data?.priceUsd) || 0
+      }
+      if (btcResp.ok && btcPrice === 0) {
+        const btcData = await btcResp.json()
+        btcPrice = parseFloat(btcData.data?.priceUsd) || 0
+      }
+    } catch (err) {
+      console.warn('[fetchCryptoPricesData] CoinCap fallback failed:', err)
+    }
+  }
+
+  // FALLBACK 2: Binance (if ICP price still 0)
+  if (icpPrice === 0) {
+    try {
+      const binanceController = new AbortController()
+      const binanceTimeout = setTimeout(() => binanceController.abort(), 5000)
+
+      const response = await fetch(
+        'https://api.binance.com/api/v3/ticker/price?symbol=ICPUSDT',
+        { signal: binanceController.signal }
+      )
+      clearTimeout(binanceTimeout)
+
+      if (response.ok) {
+        const data = await response.json()
+        icpPrice = parseFloat(data.price) || 0
+      }
+    } catch (err) {
+      console.warn('[fetchCryptoPricesData] Binance fallback failed:', err)
+    }
   }
 
   // Fetch TACO price from GeckoTerminal (with timeout)
@@ -322,6 +373,7 @@ export async function fetchCryptoPricesData(): Promise<CryptoPrices> {
     btc: btcPrice,
     taco: tacoUsd,
     tacoIcp: tacoIcp,
+    dkp: dkpPrice,
   }
 }
 

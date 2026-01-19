@@ -1684,6 +1684,11 @@ const secondsToNs = (seconds: number) => {
 
 // Initialize config inputs when rebalanceConfig changes
 watch(rebalanceConfig, async (newConfig) => {
+  // Don't overwrite user's pending changes
+  if (hasConfigChanges.value) {
+    return;
+  }
+
   if (newConfig) {
     try {
       // Load current max price history entries and max portfolio snapshots
