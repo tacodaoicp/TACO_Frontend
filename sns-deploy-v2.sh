@@ -1290,8 +1290,59 @@ PYEOF
     # Create proposal
     print_step "Submitting commit proposal..."
 
-    local title="Update Frontend Canister"
-    local summary="Update frontend canister $canister with batch $batch_id. Evidence: $evidence"
+    # Prompt for commit code (for title)
+    echo ""
+    print_info "Enter commit code (e.g., FE-042):"
+    read -r commit_code
+
+    # Prompt for commit title (single line)
+    print_info "Enter commit title (short description):"
+    read -r commit_title
+    if [ -z "$commit_title" ]; then
+        commit_title="Frontend update"
+    fi
+
+    # Prompt for commit description (multiline - end with empty line)
+    echo ""
+    print_info "Enter commit description (press Enter twice to finish):"
+    commit_description=""
+    while IFS= read -r line; do
+        # Empty line ends input
+        [ -z "$line" ] && break
+        if [ -n "$commit_description" ]; then
+            commit_description="$commit_description
+$line"
+        else
+            commit_description="$line"
+        fi
+    done
+
+    # Build title with optional commit code
+    local title="Update Frontend: $commit_title"
+    if [ -n "$commit_code" ]; then
+        title="$title [$commit_code]"
+    fi
+
+    # Build summary
+    local summary="Update frontend canister $canister with batch $batch_id.
+
+**Changes:** $commit_title"
+
+    if [ -n "$commit_description" ]; then
+        summary="$summary
+
+$commit_description"
+    fi
+
+    summary="$summary
+
+Evidence: $evidence"
+
+    if [ -n "$commit_code" ]; then
+        summary="$summary
+
+Commit: $commit_code"
+    fi
 
     local neuron_subaccount=$(echo "$PROPOSER_NEURON_ID" | sed 's/../\\&/g')
 
