@@ -13,6 +13,25 @@ type WithdrawalRecord =
    totalAmount: nat;
    transactionId: opt nat;
  };
+type UserPerformanceResult = 
+ record {
+   aggregatedPerformance:
+    record {
+      allTimeICP: opt float64;
+      allTimeUSD: opt float64;
+      oneMonthICP: opt float64;
+      oneMonthUSD: opt float64;
+      oneWeekICP: opt float64;
+      oneWeekUSD: opt float64;
+      oneYearICP: opt float64;
+      oneYearUSD: opt float64;
+    };
+   distributionsParticipated: nat;
+   lastActivity: int;
+   neurons: vec NeuronPerformanceDetail;
+   "principal": principal;
+   totalVotingPower: nat;
+ };
 type TransferError = 
  variant {
    BadBurn: record {min_burn_amount: nat;};
@@ -45,12 +64,14 @@ type Rewards =
  service {
    addToRewardSkipList: (neuronId: blob) -> (Result__1);
    calculateNeuronPerformance: (neuronId: blob, startTime: int, endTime: 
-    int, priceType: PriceType) -> (Result__1_8);
+    int, priceType: PriceType) -> (Result__1_9);
+   calculateNeuronPerformanceQuery: (neuronId: blob, startTime: int, endTime:
+    int, priceType: PriceType) -> (Result__1_9) composite_query;
    getAllNeuronRewardBalances: () -> (vec record {
                                             blob;
                                             nat;
                                           }) query;
-   getAllWithdrawalHistory: (limit: opt nat) -> (Result__1_3);
+   getAllWithdrawalHistory: (limit: opt nat) -> (Result__1_2);
    getAvailableBalance: () -> (nat);
    getCanisterStatus: () ->
     (record {
@@ -98,7 +119,29 @@ type Rewards =
        total: nat;
      }) query;
    getDistributionsSince: (sinceTimestamp: int, limit: nat) ->
-    (Result__1_7) query;
+    (Result__1_8) query;
+   getLeaderboard: (timeframe: LeaderboardTimeframe, priceType:
+    LeaderboardPriceType, limit: opt nat, offset: opt nat) ->
+    (vec LeaderboardEntry) query;
+   getLeaderboardInfo: () ->
+    (record {
+       lastUpdate: int;
+       leaderboardCounts:
+        record {
+          allTimeICP: nat;
+          allTimeUSD: nat;
+          oneMonthICP: nat;
+          oneMonthUSD: nat;
+          oneWeekICP: nat;
+          oneWeekUSD: nat;
+          oneYearICP: nat;
+          oneYearUSD: nat;
+        };
+       maxSize: nat;
+       totalDistributions: nat;
+       updateEnabled: bool;
+     }) query;
+   getNeuronPerformance: (neuronId: blob) -> (Result__1_7) query;
    getNeuronRewardBalance: (neuronId: blob) -> (nat) query;
    getNeuronRewardBalances: (neuronIds: vec blob) ->
     (vec record {
@@ -110,11 +153,19 @@ type Rewards =
    getRewardSkipList: () -> (Result__1_4) query;
    getTacoBalance: () -> (nat);
    getTotalDistributed: () -> (nat) query;
-   getUserWithdrawalHistory: (limit: opt nat) -> (Result__1_3);
-   getWithdrawalStats: () -> (Result__1_2);
+   getUserPerformance: (userPrincipal: principal) ->
+    (Result__1_3) composite_query;
+   getUserWithdrawalHistory: (limit: opt nat) -> (Result__1_2);
+   getWithdrawalStats: () ->
+    (record {
+       totalRecordsInHistory: nat;
+       totalWithdrawals: nat;
+       totalWithdrawn: nat;
+     }) query;
    getWithdrawalsSince: (sinceTimestamp: int, limit: nat) ->
     (Result__1_1) query;
    get_canister_cycles: () -> (record {cycles: nat;}) query;
+   refreshLeaderboards: () -> (Result__1);
    removeFromRewardSkipList: (neuronId: blob) -> (Result__1);
    removeRewardPenalty: (neuronId: blob) -> (Result__1);
    setDistributionEnabled: (enabled: bool) -> (Result__1);
@@ -134,17 +185,23 @@ type Rewards =
    triggerDistribution: () -> (Result__1);
    triggerDistributionCustom: (startTime: int, endTime: int, priceType:
     PriceType) -> (Result__1);
+   updateLeaderboardConfig: (size: opt nat, enabled: opt bool) -> (Result__1);
    withdraw: (account: Account, neuronIds: vec blob) -> (Result);
  };
-type Result__1_8 = 
+type Result__1_9 = 
  variant {
    err: RewardsError;
    ok: PerformanceResult;
  };
-type Result__1_7 = 
+type Result__1_8 = 
  variant {
    err: RewardsError;
    ok: record {distributions: vec DistributionRecord;};
+ };
+type Result__1_7 = 
+ variant {
+   err: RewardsError;
+   ok: NeuronPerformanceDetail;
  };
 type Result__1_6 = 
  variant {
@@ -167,17 +224,12 @@ type Result__1_4 =
 type Result__1_3 = 
  variant {
    err: RewardsError;
-   ok: vec WithdrawalRecord;
+   ok: UserPerformanceResult;
  };
 type Result__1_2 = 
  variant {
    err: RewardsError;
-   ok:
-    record {
-      totalRecordsInHistory: nat;
-      totalWithdrawals: nat;
-      totalWithdrawn: nat;
-    };
+   ok: vec WithdrawalRecord;
  };
 type Result__1_1 = 
  variant {
@@ -223,8 +275,27 @@ type NeuronReward =
    checkpoints: vec CheckpointData;
    neuronId: blob;
    performanceScore: float64;
+   performanceScoreICP: opt float64;
    rewardAmount: nat;
    rewardScore: float64;
+   votingPower: nat;
+ };
+type NeuronPerformanceDetail = 
+ record {
+   distributionsParticipated: nat;
+   lastAllocationChange: int;
+   neuronId: blob;
+   performance:
+    record {
+      allTimeICP: opt float64;
+      allTimeUSD: opt float64;
+      oneMonthICP: opt float64;
+      oneMonthUSD: opt float64;
+      oneWeekICP: opt float64;
+      oneWeekUSD: opt float64;
+      oneYearICP: opt float64;
+      oneYearUSD: opt float64;
+    };
    votingPower: nat;
  };
 type NeuronAllocationChangeBlockData = 
@@ -239,6 +310,27 @@ type NeuronAllocationChangeBlockData =
    reason: opt text;
    timestamp: int;
    votingPower: nat;
+ };
+type LeaderboardTimeframe = 
+ variant {
+   AllTime;
+   OneMonth;
+   OneWeek;
+   OneYear;
+ };
+type LeaderboardPriceType = 
+ variant {
+   ICP;
+   USD;
+ };
+type LeaderboardEntry = 
+ record {
+   distributionsCount: nat;
+   lastActivity: int;
+   neuronId: blob;
+   performanceScore: float64;
+   "principal": principal;
+   rank: nat;
  };
 type FailedNeuron = 
  record {

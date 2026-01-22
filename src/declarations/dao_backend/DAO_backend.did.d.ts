@@ -134,6 +134,10 @@ export interface ContinuousDAO {
     Array<[Principal, Array<AdminPermission>]>
   >,
   'getAggregateAllocation' : ActorMethod<[], Array<[Principal, bigint]>>,
+  'getAllNeuronOwners' : ActorMethod<
+    [],
+    Array<[Uint8Array | number[], Array<Principal>]>
+  >,
   'getAllocationChangesSince' : ActorMethod<[bigint, bigint], Result_12>,
   'getAllocationStats' : ActorMethod<[], AllocationStats>,
   'getFollowActionsSince' : ActorMethod<[bigint, bigint], Result_11>,
@@ -173,7 +177,9 @@ export interface ContinuousDAO {
     Array<PublicTokenDetailsEntry>
   >,
   'getUserAllocation' : ActorMethod<[], [] | [UserState]>,
+  'getUserNeurons' : ActorMethod<[Principal], Array<NeuronVP>>,
   'getUserRegisteredTokens' : ActorMethod<[], Array<Principal>>,
+  'getUsersFollowerInfo' : ActorMethod<[Array<Principal>], Array<FollowerInfo>>,
   'getVotingPowerChangesSince' : ActorMethod<[bigint, bigint], Result_8>,
   'get_canister_cycles' : ActorMethod<[], { 'cycles' : bigint }>,
   'grantAdminPermission' : ActorMethod<
@@ -241,6 +247,10 @@ export interface FollowRecord {
   'followed' : Principal,
   'follower' : Principal,
   'since' : bigint,
+}
+export interface FollowerInfo {
+  'canBeFollowed' : boolean,
+  'followerCount' : bigint,
 }
 export interface HistoricBalanceAllocation {
   'allocations' : Array<[Principal, bigint]>,
@@ -439,6 +449,7 @@ export interface UpdateConfig {
   'maxTradesStored' : [] | [bigint],
   'maxTradeValueICP' : [] | [bigint],
   'minTradeValueICP' : [] | [bigint],
+  'minAllocationDiffBasisPoints' : [] | [bigint],
   'portfolioRebalancePeriodNS' : [] | [bigint],
   'longSyncIntervalNS' : [] | [bigint],
   'maxTradeAttemptsPerInterval' : [] | [bigint],

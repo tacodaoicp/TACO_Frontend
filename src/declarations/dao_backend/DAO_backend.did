@@ -64,6 +64,7 @@ type UpdateConfig =
    maxTradeAttemptsPerInterval: opt nat;
    maxTradeValueICP: opt nat;
    maxTradesStored: opt nat;
+   minAllocationDiffBasisPoints: opt nat;
    minTradeValueICP: opt nat;
    portfolioRebalancePeriodNS: opt nat;
    priceUpdateIntervalNS: opt nat;
@@ -354,6 +355,11 @@ type HistoricBalanceAllocation =
    totalWorthInICP: nat;
    totalWorthInUSD: float64;
  };
+type FollowerInfo = 
+ record {
+   canBeFollowed: bool;
+   followerCount: nat;
+ };
 type FollowRecord = 
  record {
    followed: principal;
@@ -420,6 +426,10 @@ type ContinuousDAO =
                                         principal;
                                         nat;
                                       }) query;
+   getAllNeuronOwners: () -> (vec record {
+                                    blob;
+                                    vec principal;
+                                  }) query;
    getAllocationChangesSince: (sinceTimestamp: int, limit: nat) ->
     (Result_12) query;
    getAllocationStats: () -> (AllocationStats) query;
@@ -462,7 +472,10 @@ type ContinuousDAO =
    getTokenDetailsWithoutPastPrices: () ->
     (vec PublicTokenDetailsEntry) query;
    getUserAllocation: () -> (opt UserState) query;
+   getUserNeurons: ("principal": principal) -> (vec NeuronVP) query;
    getUserRegisteredTokens: () -> (vec principal) query;
+   getUsersFollowerInfo: (principals: vec principal) ->
+    (vec FollowerInfo) query;
    getVotingPowerChangesSince: (sinceTimestamp: int, limit: nat) ->
     (Result_8) query;
    get_canister_cycles: () -> (record {cycles: nat;}) query;

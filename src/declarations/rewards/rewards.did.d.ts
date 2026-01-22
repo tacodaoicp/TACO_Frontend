@@ -47,6 +47,20 @@ export interface FailedNeuron {
   'errorMessage' : string,
   'neuronId' : Uint8Array | number[],
 }
+export interface LeaderboardEntry {
+  'principal' : Principal,
+  'performanceScore' : number,
+  'lastActivity' : bigint,
+  'rank' : bigint,
+  'distributionsCount' : bigint,
+  'neuronId' : Uint8Array | number[],
+}
+export type LeaderboardPriceType = { 'ICP' : null } |
+  { 'USD' : null };
+export type LeaderboardTimeframe = { 'AllTime' : null } |
+  { 'OneWeek' : null } |
+  { 'OneYear' : null } |
+  { 'OneMonth' : null };
 export interface NeuronAllocationChangeBlockData {
   'id' : bigint,
   'maker' : Principal,
@@ -59,6 +73,22 @@ export interface NeuronAllocationChangeBlockData {
   'penaltyMultiplier' : [] | [bigint],
   'reason' : [] | [string],
 }
+export interface NeuronPerformanceDetail {
+  'lastAllocationChange' : bigint,
+  'votingPower' : bigint,
+  'performance' : {
+    'oneMonthICP' : [] | [number],
+    'oneMonthUSD' : [] | [number],
+    'oneWeekICP' : [] | [number],
+    'oneWeekUSD' : [] | [number],
+    'oneYearICP' : [] | [number],
+    'oneYearUSD' : [] | [number],
+    'allTimeICP' : [] | [number],
+    'allTimeUSD' : [] | [number],
+  },
+  'distributionsParticipated' : bigint,
+  'neuronId' : Uint8Array | number[],
+}
 export interface NeuronReward {
   'rewardAmount' : bigint,
   'performanceScore' : number,
@@ -66,6 +96,7 @@ export interface NeuronReward {
   'rewardScore' : number,
   'checkpoints' : Array<CheckpointData>,
   'neuronId' : Uint8Array | number[],
+  'performanceScoreICP' : [] | [number],
 }
 export interface PerformanceResult {
   'startTime' : bigint,
@@ -94,15 +125,9 @@ export type Result__1_1 = {
     'ok' : { 'withdrawals' : Array<WithdrawalRecord> }
   } |
   { 'err' : RewardsError };
-export type Result__1_2 = {
-    'ok' : {
-      'totalRecordsInHistory' : bigint,
-      'totalWithdrawn' : bigint,
-      'totalWithdrawals' : bigint,
-    }
-  } |
+export type Result__1_2 = { 'ok' : Array<WithdrawalRecord> } |
   { 'err' : RewardsError };
-export type Result__1_3 = { 'ok' : Array<WithdrawalRecord> } |
+export type Result__1_3 = { 'ok' : UserPerformanceResult } |
   { 'err' : RewardsError };
 export type Result__1_4 = { 'ok' : Array<Uint8Array | number[]> } |
   { 'err' : RewardsError };
@@ -110,23 +135,29 @@ export type Result__1_5 = { 'ok' : [] | [bigint] } |
   { 'err' : RewardsError };
 export type Result__1_6 = { 'ok' : Array<[Uint8Array | number[], bigint]> } |
   { 'err' : RewardsError };
-export type Result__1_7 = {
+export type Result__1_7 = { 'ok' : NeuronPerformanceDetail } |
+  { 'err' : RewardsError };
+export type Result__1_8 = {
     'ok' : { 'distributions' : Array<DistributionRecord> }
   } |
   { 'err' : RewardsError };
-export type Result__1_8 = { 'ok' : PerformanceResult } |
+export type Result__1_9 = { 'ok' : PerformanceResult } |
   { 'err' : RewardsError };
 export interface Rewards {
   'addToRewardSkipList' : ActorMethod<[Uint8Array | number[]], Result__1>,
   'calculateNeuronPerformance' : ActorMethod<
     [Uint8Array | number[], bigint, bigint, PriceType],
-    Result__1_8
+    Result__1_9
+  >,
+  'calculateNeuronPerformanceQuery' : ActorMethod<
+    [Uint8Array | number[], bigint, bigint, PriceType],
+    Result__1_9
   >,
   'getAllNeuronRewardBalances' : ActorMethod<
     [],
     Array<[Uint8Array | number[], bigint]>
   >,
-  'getAllWithdrawalHistory' : ActorMethod<[[] | [bigint]], Result__1_3>,
+  'getAllWithdrawalHistory' : ActorMethod<[[] | [bigint]], Result__1_2>,
   'getAvailableBalance' : ActorMethod<[], bigint>,
   'getCanisterStatus' : ActorMethod<
     [],
@@ -180,7 +211,31 @@ export interface Rewards {
       'records' : Array<DistributionRecord>,
     }
   >,
-  'getDistributionsSince' : ActorMethod<[bigint, bigint], Result__1_7>,
+  'getDistributionsSince' : ActorMethod<[bigint, bigint], Result__1_8>,
+  'getLeaderboard' : ActorMethod<
+    [LeaderboardTimeframe, LeaderboardPriceType, [] | [bigint], [] | [bigint]],
+    Array<LeaderboardEntry>
+  >,
+  'getLeaderboardInfo' : ActorMethod<
+    [],
+    {
+      'updateEnabled' : boolean,
+      'lastUpdate' : bigint,
+      'leaderboardCounts' : {
+        'oneMonthICP' : bigint,
+        'oneMonthUSD' : bigint,
+        'oneWeekICP' : bigint,
+        'oneWeekUSD' : bigint,
+        'oneYearICP' : bigint,
+        'oneYearUSD' : bigint,
+        'allTimeICP' : bigint,
+        'allTimeUSD' : bigint,
+      },
+      'totalDistributions' : bigint,
+      'maxSize' : bigint,
+    }
+  >,
+  'getNeuronPerformance' : ActorMethod<[Uint8Array | number[]], Result__1_7>,
   'getNeuronRewardBalance' : ActorMethod<[Uint8Array | number[]], bigint>,
   'getNeuronRewardBalances' : ActorMethod<
     [Array<Uint8Array | number[]>],
@@ -191,10 +246,19 @@ export interface Rewards {
   'getRewardSkipList' : ActorMethod<[], Result__1_4>,
   'getTacoBalance' : ActorMethod<[], bigint>,
   'getTotalDistributed' : ActorMethod<[], bigint>,
-  'getUserWithdrawalHistory' : ActorMethod<[[] | [bigint]], Result__1_3>,
-  'getWithdrawalStats' : ActorMethod<[], Result__1_2>,
+  'getUserPerformance' : ActorMethod<[Principal], Result__1_3>,
+  'getUserWithdrawalHistory' : ActorMethod<[[] | [bigint]], Result__1_2>,
+  'getWithdrawalStats' : ActorMethod<
+    [],
+    {
+      'totalRecordsInHistory' : bigint,
+      'totalWithdrawn' : bigint,
+      'totalWithdrawals' : bigint,
+    }
+  >,
   'getWithdrawalsSince' : ActorMethod<[bigint, bigint], Result__1_1>,
   'get_canister_cycles' : ActorMethod<[], { 'cycles' : bigint }>,
+  'refreshLeaderboards' : ActorMethod<[], Result__1>,
   'removeFromRewardSkipList' : ActorMethod<[Uint8Array | number[]], Result__1>,
   'removeRewardPenalty' : ActorMethod<[Uint8Array | number[]], Result__1>,
   'setDistributionEnabled' : ActorMethod<[boolean], Result__1>,
@@ -214,6 +278,10 @@ export interface Rewards {
   'triggerDistribution' : ActorMethod<[], Result__1>,
   'triggerDistributionCustom' : ActorMethod<
     [bigint, bigint, PriceType],
+    Result__1
+  >,
+  'updateLeaderboardConfig' : ActorMethod<
+    [[] | [bigint], [] | [boolean]],
     Result__1
   >,
   'withdraw' : ActorMethod<[Account, Array<Uint8Array | number[]>], Result>,
@@ -236,6 +304,23 @@ export type TransferError = {
   { 'CreatedInFuture' : { 'ledger_time' : bigint } } |
   { 'TooOld' : null } |
   { 'InsufficientFunds' : { 'balance' : bigint } };
+export interface UserPerformanceResult {
+  'principal' : Principal,
+  'lastActivity' : bigint,
+  'totalVotingPower' : bigint,
+  'aggregatedPerformance' : {
+    'oneMonthICP' : [] | [number],
+    'oneMonthUSD' : [] | [number],
+    'oneWeekICP' : [] | [number],
+    'oneWeekUSD' : [] | [number],
+    'oneYearICP' : [] | [number],
+    'oneYearUSD' : [] | [number],
+    'allTimeICP' : [] | [number],
+    'allTimeUSD' : [] | [number],
+  },
+  'distributionsParticipated' : bigint,
+  'neurons' : Array<NeuronPerformanceDetail>,
+}
 export interface WithdrawalRecord {
   'id' : bigint,
   'fee' : bigint,

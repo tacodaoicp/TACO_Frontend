@@ -304,6 +304,10 @@ export const idlFactory = ({ IDL }) => {
     'tokenType' : TokenType,
   });
   const PublicTokenDetailsEntry = IDL.Tuple(IDL.Principal, PublicTokenDetails);
+  const FollowerInfo = IDL.Record({
+    'canBeFollowed' : IDL.Bool,
+    'followerCount' : IDL.Nat,
+  });
   const UserVotingPowerRecord = IDL.Record({
     'lastVotingPowerUpdate' : IDL.Int,
     'votingPower' : IDL.Nat,
@@ -392,6 +396,7 @@ export const idlFactory = ({ IDL }) => {
     'maxTradesStored' : IDL.Opt(IDL.Nat),
     'maxTradeValueICP' : IDL.Opt(IDL.Nat),
     'minTradeValueICP' : IDL.Opt(IDL.Nat),
+    'minAllocationDiffBasisPoints' : IDL.Opt(IDL.Nat),
     'portfolioRebalancePeriodNS' : IDL.Opt(IDL.Nat),
     'longSyncIntervalNS' : IDL.Opt(IDL.Nat),
     'maxTradeAttemptsPerInterval' : IDL.Opt(IDL.Nat),
@@ -463,6 +468,11 @@ export const idlFactory = ({ IDL }) => {
     'getAggregateAllocation' : IDL.Func(
         [],
         [IDL.Vec(IDL.Tuple(IDL.Principal, IDL.Nat))],
+        ['query'],
+      ),
+    'getAllNeuronOwners' : IDL.Func(
+        [],
+        [IDL.Vec(IDL.Tuple(IDL.Vec(IDL.Nat8), IDL.Vec(IDL.Principal)))],
         ['query'],
       ),
     'getAllocationChangesSince' : IDL.Func(
@@ -543,9 +553,19 @@ export const idlFactory = ({ IDL }) => {
         ['query'],
       ),
     'getUserAllocation' : IDL.Func([], [IDL.Opt(UserState)], ['query']),
+    'getUserNeurons' : IDL.Func(
+        [IDL.Principal],
+        [IDL.Vec(NeuronVP)],
+        ['query'],
+      ),
     'getUserRegisteredTokens' : IDL.Func(
         [],
         [IDL.Vec(IDL.Principal)],
+        ['query'],
+      ),
+    'getUsersFollowerInfo' : IDL.Func(
+        [IDL.Vec(IDL.Principal)],
+        [IDL.Vec(FollowerInfo)],
         ['query'],
       ),
     'getVotingPowerChangesSince' : IDL.Func(
