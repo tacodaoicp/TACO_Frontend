@@ -30,6 +30,7 @@ const AdminAlarmView = () => import("./views/AdminAlarmView.vue")
 const AdminClaimsView = () => import("./views/AdminClaimsView.vue")
 const AdminNNSView = () => import("./views/AdminNNSView.vue")
 const RewardsView = () => import("./views/RewardsView.vue")
+const PerformanceView = () => import("./views/PerformanceView.vue")
 const ChatView = () => import("./views/ChatView.vue")
 const ReportsView = () => import("./views/ReportsView.vue")
 const ForumView = () => import("./views/ForumView.vue")
@@ -58,6 +59,7 @@ const routes = [
     { path: "/walletdemo", name: "WalletDemo", component: WalletViewDemo, meta: { robots: 'noindex' } },
     // { path: "/wizarddemo", name: "WizardDemo", component: WizardViewDemo, meta: { robots: 'noindex' } },
     { path: "/rewards", name: "Rewards", component: RewardsView, meta: { robots: 'noindex' } },
+    { path: "/performance", name: "Performance", component: PerformanceView, meta: { robots: 'index' } },
     { path: "/chat/oc", name: "ChatOC", component: ChatView, meta: { robots: 'index' } },
     { path: "/chat/sneed", redirect: "/chat/forum", meta: { robots: 'noindex' } }, // keep for historical linking
     { path: "/chat/forum", name: "ChatForum", component: ChatView, meta: { robots: 'index' } },

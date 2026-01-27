@@ -6305,6 +6305,27 @@ export const useTacoStore = defineStore('taco', () => {
         return await getAnonymousActor(canisterId, () => rewardsIDL)
     }
 
+    // Create DAO actor (authenticated)
+    const createDAOActor = async () => {
+        const canisterId = daoBackendCanisterId()
+        if (!canisterId) {
+            throw new Error('DAO backend canister ID not found')
+        }
+
+        const authClient = await getAuthClient()
+        return await getAuthenticatedActor(authClient, canisterId, () => daoBackendIDL)
+    }
+
+    // Create DAO actor (anonymous - for public queries)
+    const createDAOActorAnonymous = async () => {
+        const canisterId = daoBackendCanisterId()
+        if (!canisterId) {
+            throw new Error('DAO backend canister ID not found')
+        }
+
+        return await getAnonymousActor(canisterId, () => daoBackendIDL)
+    }
+
     // Format neuron ID for map key
     const formatNeuronIdForMap = (neuronId: Uint8Array): string => {
         try {
@@ -9555,6 +9576,8 @@ export const useTacoStore = defineStore('taco', () => {
         loadNeuronRewardBalances,
         createRewardsActor,
         createRewardsActorAnonymous,
+        createDAOActor,
+        createDAOActorAnonymous,
         createSnsGovernanceActorPublic,
         createSnsGovernanceActorAnonymous,
         claimNeuronRewards,

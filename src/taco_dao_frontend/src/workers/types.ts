@@ -69,6 +69,10 @@ export type DataKey =
   // Admin-only data keys (Rewards/Distributions)
   | 'rewardsConfiguration'
   | 'distributionHistory'
+  // Performance/Leaderboard data keys
+  | 'leaderboard'
+  | 'leaderboardInfo'
+  | 'userPerformance'
 
 // ============================================================================
 // Worker Assignment - Which worker handles which data
@@ -137,6 +141,10 @@ export const WORKER_ASSIGNMENT: Record<DataKey, 'public' | 'auth'> = {
   // Authenticated worker (admin data - Rewards/Distributions)
   rewardsConfiguration: 'auth',
   distributionHistory: 'auth',
+  // Performance/Leaderboard
+  leaderboard: 'public',
+  leaderboardInfo: 'public',
+  userPerformance: 'auth',
 }
 
 // ============================================================================
@@ -219,6 +227,10 @@ export const STALENESS_THRESHOLDS: Record<DataKey, number> = {
   // Rewards/Distributions - 120 seconds (reasonable refresh rate)
   rewardsConfiguration: 120_000,
   distributionHistory: 120_000,
+  // Performance/Leaderboard - 300 seconds (updated weekly, not frequently changing)
+  leaderboard: 300_000,
+  leaderboardInfo: 300_000,
+  userPerformance: 300_000,
 }
 
 // Background tab multiplier (3x slower)
@@ -425,6 +437,11 @@ export const ROUTE_PRIORITIES: Record<string, RouteDataConfig> = {
     critical: ['tokenDetails'],
     high: ['cryptoPrices'],
     preloadRoutes: [],
+  },
+  '/performance': {
+    critical: ['leaderboard', 'leaderboardInfo'],
+    high: ['userPerformance'],
+    preloadRoutes: ['/dao', '/rewards'],
   },
 }
 

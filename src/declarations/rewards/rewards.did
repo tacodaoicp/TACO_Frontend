@@ -32,6 +32,23 @@ type UserPerformanceResult =
    "principal": principal;
    totalVotingPower: nat;
  };
+type UserPerformanceGraphData = 
+ record {
+   aggregatedPerformanceICP: opt float64;
+   aggregatedPerformanceUSD: float64;
+   neuronData:
+    vec
+     record {
+       checkpoints: vec CheckpointData;
+       neuronId: blob;
+       performanceScoreICP: opt float64;
+       performanceScoreUSD: float64;
+     };
+   timeframe: record {
+                endTime: int;
+                startTime: int;
+              };
+ };
 type TransferError = 
  variant {
    BadBurn: record {min_burn_amount: nat;};
@@ -63,16 +80,37 @@ type RewardsError =
 type Rewards = 
  service {
    addToRewardSkipList: (neuronId: blob) -> (Result__1);
+   admin_backfillDistributionHistory: (config: BackfillConfig) ->
+    (Result__1_11);
+   admin_recalculateAllIcpPerformance: () -> (Result__1);
+   admin_recalculateIcpPerformanceForDistribution: (distributionId: nat) ->
+    (Result__1);
    calculateNeuronPerformance: (neuronId: blob, startTime: int, endTime: 
-    int, priceType: PriceType) -> (Result__1_9);
+    int, priceType: PriceType) -> (Result__1_10);
    calculateNeuronPerformanceQuery: (neuronId: blob, startTime: int, endTime:
-    int, priceType: PriceType) -> (Result__1_9) composite_query;
+    int, priceType: PriceType) -> (Result__1_10) composite_query;
+   /// * Clear all logs
+   clearLogs: () -> ();
    getAllNeuronRewardBalances: () -> (vec record {
                                             blob;
                                             nat;
                                           }) query;
    getAllWithdrawalHistory: (limit: opt nat) -> (Result__1_2);
    getAvailableBalance: () -> (nat);
+   getBackfillStatus: () ->
+    (record {
+       currentPeriodEnd: int;
+       currentPeriodStart: int;
+       dataEndTime: int;
+       dataStartTime: int;
+       elapsedNS: int;
+       inProgress: bool;
+       lastErrors: vec text;
+       periodsCompleted: nat;
+       progressPercent: nat;
+       startedAt: int;
+       totalPeriods: nat;
+     }) query;
    getCanisterStatus: () ->
     (record {
        daoId: principal;
@@ -119,7 +157,7 @@ type Rewards =
        total: nat;
      }) query;
    getDistributionsSince: (sinceTimestamp: int, limit: nat) ->
-    (Result__1_8) query;
+    (Result__1_9) query;
    getLeaderboard: (timeframe: LeaderboardTimeframe, priceType:
     LeaderboardPriceType, limit: opt nat, offset: opt nat) ->
     (vec LeaderboardEntry) query;
@@ -141,20 +179,28 @@ type Rewards =
        totalDistributions: nat;
        updateEnabled: bool;
      }) query;
-   getNeuronPerformance: (neuronId: blob) -> (Result__1_7) query;
+   /// * Get the last N log entries
+   getLogs: (count: nat) -> (vec LogEntry) query;
+   /// * Get the last N log entries for a specific context
+   getLogsByContext: (context: text, count: nat) -> (vec LogEntry) query;
+   /// * Get the last N log entries for a specific level
+   getLogsByLevel: (level: LogLevel, count: nat) -> (vec LogEntry) query;
+   getNeuronPerformance: (neuronId: blob) -> (Result__1_8) query;
    getNeuronRewardBalance: (neuronId: blob) -> (nat) query;
    getNeuronRewardBalances: (neuronIds: vec blob) ->
     (vec record {
            blob;
            nat;
          }) query;
-   getRewardPenalties: () -> (Result__1_6) query;
-   getRewardPenalty: (neuronId: blob) -> (Result__1_5) query;
-   getRewardSkipList: () -> (Result__1_4) query;
+   getRewardPenalties: () -> (Result__1_7) query;
+   getRewardPenalty: (neuronId: blob) -> (Result__1_6) query;
+   getRewardSkipList: () -> (Result__1_5) query;
    getTacoBalance: () -> (nat);
    getTotalDistributed: () -> (nat) query;
    getUserPerformance: (userPrincipal: principal) ->
-    (Result__1_3) composite_query;
+    (Result__1_4) composite_query;
+   getUserPerformanceGraphData: (userPrincipal: principal, startTime: 
+    int, endTime: int) -> (Result__1_3) composite_query;
    getUserWithdrawalHistory: (limit: opt nat) -> (Result__1_2);
    getWithdrawalStats: () ->
     (record {
@@ -170,6 +216,7 @@ type Rewards =
    removeRewardPenalty: (neuronId: blob) -> (Result__1);
    setDistributionEnabled: (enabled: bool) -> (Result__1);
    setDistributionPeriod: (periodNS: nat) -> (Result__1);
+   setMaxDistributionHistory: (max: nat) -> (Result__1);
    setPerformanceScorePower: (power: float64) -> (Result__1);
    setPeriodicRewardPot: (amount: nat) -> (Result__1);
    setRewardPenalties: (penalties: vec record {
@@ -191,19 +238,14 @@ type Rewards =
 type Result__1_9 = 
  variant {
    err: RewardsError;
-   ok: PerformanceResult;
+   ok: record {distributions: vec DistributionRecord;};
  };
 type Result__1_8 = 
  variant {
    err: RewardsError;
-   ok: record {distributions: vec DistributionRecord;};
- };
-type Result__1_7 = 
- variant {
-   err: RewardsError;
    ok: NeuronPerformanceDetail;
  };
-type Result__1_6 = 
+type Result__1_7 = 
  variant {
    err: RewardsError;
    ok: vec record {
@@ -211,25 +253,40 @@ type Result__1_6 =
              nat;
            };
  };
-type Result__1_5 = 
+type Result__1_6 = 
  variant {
    err: RewardsError;
    ok: opt nat;
  };
-type Result__1_4 = 
+type Result__1_5 = 
  variant {
    err: RewardsError;
    ok: vec blob;
  };
-type Result__1_3 = 
+type Result__1_4 = 
  variant {
    err: RewardsError;
    ok: UserPerformanceResult;
+ };
+type Result__1_3 = 
+ variant {
+   err: RewardsError;
+   ok: UserPerformanceGraphData;
  };
 type Result__1_2 = 
  variant {
    err: RewardsError;
    ok: vec WithdrawalRecord;
+ };
+type Result__1_11 = 
+ variant {
+   err: RewardsError;
+   ok: BackfillResult;
+ };
+type Result__1_10 = 
+ variant {
+   err: RewardsError;
+   ok: PerformanceResult;
  };
 type Result__1_1 = 
  variant {
@@ -311,6 +368,20 @@ type NeuronAllocationChangeBlockData =
    timestamp: int;
    votingPower: nat;
  };
+type LogLevel = 
+ variant {
+   ERROR;
+   INFO;
+   WARN;
+ };
+type LogEntry = 
+ record {
+   component: text;
+   context: text;
+   level: LogLevel;
+   message: text;
+   timestamp: int;
+ };
 type LeaderboardTimeframe = 
  variant {
    AllTime;
@@ -378,6 +449,23 @@ type CheckpointData =
                       float64;
                     };
    totalPortfolioValue: float64;
+ };
+type BackfillResult = 
+ record {
+   endTime: int;
+   errors: vec text;
+   neuronsProcessed: nat;
+   periodsCreated: nat;
+   startTime: int;
+   totalNeuronRewards: nat;
+ };
+type BackfillConfig = 
+ record {
+   clearExisting: bool;
+   maxPeriods: nat;
+   periodDays: nat;
+   skipExistingPeriods: bool;
+   startTime: int;
  };
 type AllocationChangeType = 
  variant {

@@ -31,6 +31,9 @@ import {
   fetchAllNamesData,
   fetchNeuronSnapshotStatusData,
   fetchPortfolioSnapshotStatusData,
+  // Performance/Leaderboard fetch functions
+  fetchLeaderboardData,
+  fetchLeaderboardInfoData,
   serializeForTransfer,
 } from './shared/fetch-functions'
 import type {
@@ -70,6 +73,9 @@ const HANDLED_KEYS: DataKey[] = [
   'allNames',
   'neuronSnapshotStatus',
   'portfolioSnapshotStatus',
+  // Performance/Leaderboard (low priority - public)
+  'leaderboard',
+  'leaderboardInfo',
 ]
 
 // ============================================================================
@@ -722,6 +728,16 @@ async function fetchData(dataKey: DataKey): Promise<void> {
 
     case 'portfolioSnapshotStatus':
       data = serializeForTransfer(await fetchPortfolioSnapshotStatusData(agent!))
+      break
+
+    // Performance/Leaderboard data keys
+    case 'leaderboard':
+      // Fetch default leaderboard (AllTime, USD)
+      data = serializeForTransfer(await fetchLeaderboardData(agent!, 'AllTime', 'USD', 100, 0))
+      break
+
+    case 'leaderboardInfo':
+      data = serializeForTransfer(await fetchLeaderboardInfoData(agent!))
       break
 
     default:

@@ -1043,10 +1043,186 @@ export async function fetchRewardsConfigurationData(agent: HttpAgent): Promise<a
  * Fetch distribution history (admin only - but public read)
  * Returns paginated distribution records
  */
-export async function fetchDistributionHistoryData(agent: HttpAgent, offset: number = 0, limit: number = 5): Promise<any> {
+export async function fetchDistributionHistoryData(agent: HttpAgent, offset: number = 0, limit: number = 2): Promise<any> {
   const actor = getRewardsActor(agent)
 
   return await actor.getDistributionHistory(BigInt(offset), BigInt(limit))
+}
+
+// ============================================================================
+// Performance/Leaderboard Functions
+// ============================================================================
+
+/**
+ * Fetch leaderboard data (public)
+ * Returns top 100 performers for the given timeframe and price type
+ */
+export async function fetchLeaderboardData(
+  agent: HttpAgent,
+  timeframe: 'OneWeek' | 'OneMonth' | 'OneYear' | 'AllTime' = 'AllTime',
+  priceType: 'USD' | 'ICP' = 'USD',
+  limit: number = 100,
+  offset: number = 0
+): Promise<any[]> {
+  const actor = getRewardsActor(agent)
+
+  // Convert to candid variants
+  const timeframeVariant = { [timeframe]: null }
+  const priceTypeVariant = { [priceType]: null }
+
+  return await actor.getLeaderboard(
+    timeframeVariant as any,
+    priceTypeVariant as any,
+    [BigInt(limit)],
+    [BigInt(offset)]
+  )
+}
+
+/**
+ * Fetch leaderboard info (public)
+ * Returns metadata about leaderboards (counts, last update, etc.)
+ */
+export async function fetchLeaderboardInfoData(agent: HttpAgent): Promise<any> {
+  const actor = getRewardsActor(agent)
+
+  return await actor.getLeaderboardInfo()
+}
+
+/**
+ * Fetch user performance data (requires principal)
+ * Uses getUserPerformanceGraphData API which works across subnets
+ * Returns aggregated performance for a user across all their neurons
+ */
+export async function fetchUserPerformanceData(agent: HttpAgent, principal: Principal): Promise<any> {
+  const actor = getRewardsActor(agent)
+
+  // Use getUserPerformanceGraphData which is designed for graph data and works across subnets
+  const nowMs = BigInt(Date.now())
+  const endTime = nowMs * BigInt(1_000_000) // nanoseconds
+  const startTime = BigInt(0) // AllTime
+
+  const result = await actor.getUserPerformanceGraphData(principal, startTime, endTime)
+
+  // Handle Result type - return data or throw error
+  if ('ok' in result) {
+    const graphData = result.ok
+
+    // Flatten all checkpoints to calculate timeframe-specific performance
+    const allCheckpoints = graphData.neuronData.flatMap((nd: any) => nd.checkpoints)
+    allCheckpoints.sort((a: any, b: any) => Number(a.timestamp) - Number(b.timestamp))
+
+    // Calculate performance for different timeframes from checkpoint data
+    const calculatePerformanceForTimeframe = (checkpoints: any[], daysAgo: number | null) => {
+      if (checkpoints.length < 2) return null
+
+      const nowNs = BigInt(Date.now()) * BigInt(1_000_000)
+      const cutoffNs = daysAgo === null
+        ? BigInt(0) // AllTime
+        : nowNs - (BigInt(daysAgo) * BigInt(24) * BigInt(60) * BigInt(60) * BigInt(1000) * BigInt(1_000_000))
+
+      // Find first checkpoint at or after cutoff
+      const relevantCheckpoints = checkpoints.filter((cp: any) => BigInt(cp.timestamp) >= cutoffNs)
+      if (relevantCheckpoints.length < 1) return null
+
+      // Get earliest checkpoint in range (or closest before cutoff)
+      let startCheckpoint = relevantCheckpoints[0]
+      // If we have checkpoints before the cutoff, use the last one before as baseline
+      const checkpointsBeforeCutoff = checkpoints.filter((cp: any) => BigInt(cp.timestamp) < cutoffNs)
+      if (checkpointsBeforeCutoff.length > 0) {
+        startCheckpoint = checkpointsBeforeCutoff[checkpointsBeforeCutoff.length - 1]
+      }
+
+      const endCheckpoint = checkpoints[checkpoints.length - 1]
+
+      if (!startCheckpoint || !endCheckpoint) return null
+      if (startCheckpoint.totalPortfolioValue === 0) return null
+
+      // Performance score = final / initial (1.0 = break even, 1.15 = +15%)
+      return endCheckpoint.totalPortfolioValue / startCheckpoint.totalPortfolioValue
+    }
+
+    // Calculate all timeframe performances from USD checkpoints
+    const oneWeekPerf = calculatePerformanceForTimeframe(allCheckpoints, 7)
+    const oneMonthPerf = calculatePerformanceForTimeframe(allCheckpoints, 30)
+    const oneYearPerf = calculatePerformanceForTimeframe(allCheckpoints, 365)
+    const allTimePerf = graphData.aggregatedPerformanceUSD || calculatePerformanceForTimeframe(allCheckpoints, null)
+
+    // Build aggregated performance
+    const aggregatedPerformance = {
+      allTimeUSD: allTimePerf ? [allTimePerf] : [],
+      allTimeICP: graphData.aggregatedPerformanceICP ? [graphData.aggregatedPerformanceICP[0]] : [],
+      oneWeekUSD: oneWeekPerf ? [oneWeekPerf] : [],
+      oneWeekICP: [], // ICP calculation would need ICP-priced checkpoints
+      oneMonthUSD: oneMonthPerf ? [oneMonthPerf] : [],
+      oneMonthICP: [],
+      oneYearUSD: oneYearPerf ? [oneYearPerf] : [],
+      oneYearICP: []
+    }
+
+    // Build neurons array from neuronData with derived performance
+    const neurons = graphData.neuronData.map((nd: any) => {
+      const neuronCheckpoints = [...nd.checkpoints].sort((a: any, b: any) => Number(a.timestamp) - Number(b.timestamp))
+
+      return {
+        neuronId: nd.neuronId,
+        votingPower: BigInt(0), // Not provided in graph data
+        distributionsParticipated: nd.checkpoints.length,
+        lastAllocationChange: nd.checkpoints.length > 0
+          ? nd.checkpoints[nd.checkpoints.length - 1].timestamp
+          : BigInt(0),
+        performance: {
+          allTimeUSD: nd.performanceScoreUSD ? [nd.performanceScoreUSD] : [],
+          allTimeICP: nd.performanceScoreICP ? [nd.performanceScoreICP[0]] : [],
+          oneWeekUSD: calculatePerformanceForTimeframe(neuronCheckpoints, 7) ? [calculatePerformanceForTimeframe(neuronCheckpoints, 7)] : [],
+          oneWeekICP: [],
+          oneMonthUSD: calculatePerformanceForTimeframe(neuronCheckpoints, 30) ? [calculatePerformanceForTimeframe(neuronCheckpoints, 30)] : [],
+          oneMonthICP: [],
+          oneYearUSD: calculatePerformanceForTimeframe(neuronCheckpoints, 365) ? [calculatePerformanceForTimeframe(neuronCheckpoints, 365)] : [],
+          oneYearICP: []
+        }
+      }
+    })
+
+    // Calculate total distributions from checkpoints
+    const totalCheckpoints = graphData.neuronData.reduce(
+      (sum: number, nd: any) => sum + nd.checkpoints.length, 0
+    )
+
+    // Return in the same format as getUserPerformance would have
+    return {
+      principal,
+      totalVotingPower: BigInt(0), // Not available in graph data
+      distributionsParticipated: totalCheckpoints > 0 ? totalCheckpoints : 0,
+      lastActivity: graphData.timeframe.endTime,
+      aggregatedPerformance,
+      neurons
+    }
+  } else {
+    throw new Error(formatRewardsError(result.err))
+  }
+}
+
+/**
+ * Fetch follower info for multiple principals (public)
+ * Returns follower count and canBeFollowed status for each principal
+ */
+export async function fetchUsersFollowerInfoData(agent: HttpAgent, principals: Principal[]): Promise<any[]> {
+  const actor = getDaoBackendActor(agent)
+
+  return await actor.getUsersFollowerInfo(principals)
+}
+
+/**
+ * Format rewards error for display
+ */
+function formatRewardsError(err: any): string {
+  if ('NeuronNotFound' in err) return 'No performance data found'
+  if ('NotAuthorized' in err) return 'Not authorized'
+  if ('SystemError' in err) return err.SystemError
+  if ('AllocationDataMissing' in err) return 'Allocation data missing'
+  if ('PriceDataMissing' in err) return 'Price data missing'
+  if ('InvalidTimeRange' in err) return 'Invalid time range'
+  return 'An error occurred'
 }
 
 // ============================================================================

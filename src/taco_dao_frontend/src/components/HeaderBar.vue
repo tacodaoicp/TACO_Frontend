@@ -85,10 +85,17 @@
         
         <!-- wallet - router link -->
         <router-link to="/wallet" class="header-bar__rl">
-          
+
           <span class="header-bar__rl-span">Wallet</span>
-        
-        </router-link>  
+
+        </router-link>
+
+        <!-- performance - router link -->
+        <router-link to="/performance" class="header-bar__rl">
+
+          <span class="header-bar__rl-span">Performance</span>
+
+        </router-link>
 
         <!-- wizard - router link -->
         <a v-if="localNeuronsCount < 1" href="#" @click="toggleTacoWizard()" class="header-bar__rl">
@@ -289,7 +296,15 @@
           <!-- item text -->
           <span>Wallet</span>
 
-        </router-link>                   
+        </router-link>
+
+        <!-- performance - router link -->
+        <router-link @click="togglePagesMenu()" to="/performance" class="list-group-item">
+
+          <!-- item text -->
+          <span>Performance</span>
+
+        </router-link>
 
       </div>
 

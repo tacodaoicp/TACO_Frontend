@@ -15,6 +15,7 @@
 /// <reference lib="webworker" />
 
 import { HttpAgent, Identity, AnonymousIdentity } from '@dfinity/agent'
+import { Principal } from '@dfinity/principal'
 import { DelegationChain, DelegationIdentity, Ed25519KeyIdentity } from '@dfinity/identity'
 import { createAgent } from '@dfinity/utils'
 import { PriorityQueue } from './shared/priority-queue'
@@ -67,6 +68,7 @@ import {
   fetchHighestProcessedNNSProposalIdData,
   fetchRewardsConfigurationData,
   fetchDistributionHistoryData,
+  fetchUserPerformanceData,
   serializeForTransfer,
 } from './shared/fetch-functions'
 import type {
@@ -139,9 +141,11 @@ const HANDLED_KEYS: DataKey[] = [
   // Rewards/Distributions admin data
   'rewardsConfiguration',
   'distributionHistory',
+  // Performance data (user-specific)
+  'userPerformance',
 ]
 
-const USER_KEYS: DataKey[] = ['userAllocation']
+const USER_KEYS: DataKey[] = ['userAllocation', 'userPerformance']
 
 // Keys that REQUIRE authentication - canister enforces caller identity check
 const AUTH_REQUIRED_KEYS: DataKey[] = [
@@ -1250,6 +1254,15 @@ async function fetchData(dataKey: DataKey): Promise<void> {
 
     case 'distributionHistory':
       data = serializeForTransfer(await fetchDistributionHistoryData(agent))
+      break
+
+    case 'userPerformance':
+      // userPerformance requires the authenticated user's principal
+      if (!currentIdentity) {
+        throw new Error('No identity available for userPerformance')
+      }
+      const userPrincipal = currentIdentity.getPrincipal()
+      data = serializeForTransfer(await fetchUserPerformanceData(authenticatedAgent!, userPrincipal))
       break
 
     default:

@@ -759,7 +759,7 @@ const currentNeuronBalances = ref(0)
 const availableBalance = ref(0)
 
 // Pagination state for distribution history
-const historyPageSize = 5
+const historyPageSize = 2
 const historyOffset = ref(0)
 const historyTotal = ref(0)
 const historyHasMore = ref(false)
