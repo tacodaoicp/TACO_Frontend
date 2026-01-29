@@ -73,8 +73,15 @@ const HANDLED_KEYS: DataKey[] = [
   'allNames',
   'neuronSnapshotStatus',
   'portfolioSnapshotStatus',
-  // Performance/Leaderboard (low priority - public)
-  'leaderboard',
+  // Performance/Leaderboard (8 combinations: 2 price types × 4 timeframes)
+  'leaderboardAllTimeUSD',
+  'leaderboardAllTimeICP',
+  'leaderboardOneYearUSD',
+  'leaderboardOneYearICP',
+  'leaderboardOneMonthUSD',
+  'leaderboardOneMonthICP',
+  'leaderboardOneWeekUSD',
+  'leaderboardOneWeekICP',
   'leaderboardInfo',
 ]
 
@@ -730,10 +737,30 @@ async function fetchData(dataKey: DataKey): Promise<void> {
       data = serializeForTransfer(await fetchPortfolioSnapshotStatusData(agent!))
       break
 
-    // Performance/Leaderboard data keys
-    case 'leaderboard':
-      // Fetch default leaderboard (AllTime, USD)
+    // Performance/Leaderboard data keys (8 combinations)
+    case 'leaderboardAllTimeUSD':
       data = serializeForTransfer(await fetchLeaderboardData(agent!, 'AllTime', 'USD', 100, 0))
+      break
+    case 'leaderboardAllTimeICP':
+      data = serializeForTransfer(await fetchLeaderboardData(agent!, 'AllTime', 'ICP', 100, 0))
+      break
+    case 'leaderboardOneYearUSD':
+      data = serializeForTransfer(await fetchLeaderboardData(agent!, 'OneYear', 'USD', 100, 0))
+      break
+    case 'leaderboardOneYearICP':
+      data = serializeForTransfer(await fetchLeaderboardData(agent!, 'OneYear', 'ICP', 100, 0))
+      break
+    case 'leaderboardOneMonthUSD':
+      data = serializeForTransfer(await fetchLeaderboardData(agent!, 'OneMonth', 'USD', 100, 0))
+      break
+    case 'leaderboardOneMonthICP':
+      data = serializeForTransfer(await fetchLeaderboardData(agent!, 'OneMonth', 'ICP', 100, 0))
+      break
+    case 'leaderboardOneWeekUSD':
+      data = serializeForTransfer(await fetchLeaderboardData(agent!, 'OneWeek', 'USD', 100, 0))
+      break
+    case 'leaderboardOneWeekICP':
+      data = serializeForTransfer(await fetchLeaderboardData(agent!, 'OneWeek', 'ICP', 100, 0))
       break
 
     case 'leaderboardInfo':

@@ -318,7 +318,7 @@ export interface Rewards {
   'getTotalDistributed' : ActorMethod<[], bigint>,
   'getUserPerformance' : ActorMethod<[Principal], Result__1_4>,
   'getUserPerformanceGraphData' : ActorMethod<
-    [Principal, bigint, bigint],
+    [Principal, bigint, bigint, LeaderboardTimeframe, PriceType],
     Result__1_3
   >,
   'getUserWithdrawalHistory' : ActorMethod<[[] | [bigint]], Result__1_2>,
@@ -380,6 +380,8 @@ export type TransferError = {
   { 'TooOld' : null } |
   { 'InsufficientFunds' : { 'balance' : bigint } };
 export interface UserPerformanceGraphData {
+  'oneMonthICP' : [] | [number],
+  'oneMonthUSD' : [] | [number],
   'timeframe' : { 'startTime' : bigint, 'endTime' : bigint },
   'neuronData' : Array<
     {
@@ -389,6 +391,10 @@ export interface UserPerformanceGraphData {
       'performanceScoreUSD' : number,
     }
   >,
+  'oneWeekICP' : [] | [number],
+  'oneWeekUSD' : [] | [number],
+  'oneYearICP' : [] | [number],
+  'oneYearUSD' : [] | [number],
   'aggregatedPerformanceICP' : [] | [number],
   'aggregatedPerformanceUSD' : number,
 }

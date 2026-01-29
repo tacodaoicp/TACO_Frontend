@@ -1652,6 +1652,18 @@ export const useTacoStore = defineStore('taco', () => {
     const cachedHighestProcessedNNSProposalId = ref<bigint | null>(null)
     const cachedPortfolioSnapshotStatus = ref<any>(null)
 
+    // Performance/Leaderboard data refs (8 combinations: 2 price types × 4 timeframes)
+    const leaderboardAllTimeUSD = ref<any[]>([])
+    const leaderboardAllTimeICP = ref<any[]>([])
+    const leaderboardOneYearUSD = ref<any[]>([])
+    const leaderboardOneYearICP = ref<any[]>([])
+    const leaderboardOneMonthUSD = ref<any[]>([])
+    const leaderboardOneMonthICP = ref<any[]>([])
+    const leaderboardOneWeekUSD = ref<any[]>([])
+    const leaderboardOneWeekICP = ref<any[]>([])
+    const leaderboardInfo = ref<any>(null)
+    const leaderboardLoading = ref(false)
+
     // # WORKER SUBSCRIPTIONS #
     // Subscribe to worker updates to populate state from SharedWorkers
 
@@ -1880,6 +1892,71 @@ export const useTacoStore = defineStore('taco', () => {
                 if (data) {
                     // Deserialize BigInt values from worker
                     fetchedUserAllocation.value = deserializeFromTransfer(data) as any
+                }
+            })
+        )
+
+        // Performance/Leaderboard subscriptions (8 combinations: 2 price types × 4 timeframes)
+        workerUnsubscribers.push(
+            workerBridge.subscribe('leaderboardAllTimeUSD', (data: unknown) => {
+                if (data && Array.isArray(data)) {
+                    leaderboardAllTimeUSD.value = deserializeFromTransfer(data) as any[]
+                }
+            })
+        )
+        workerUnsubscribers.push(
+            workerBridge.subscribe('leaderboardAllTimeICP', (data: unknown) => {
+                if (data && Array.isArray(data)) {
+                    leaderboardAllTimeICP.value = deserializeFromTransfer(data) as any[]
+                }
+            })
+        )
+        workerUnsubscribers.push(
+            workerBridge.subscribe('leaderboardOneYearUSD', (data: unknown) => {
+                if (data && Array.isArray(data)) {
+                    leaderboardOneYearUSD.value = deserializeFromTransfer(data) as any[]
+                }
+            })
+        )
+        workerUnsubscribers.push(
+            workerBridge.subscribe('leaderboardOneYearICP', (data: unknown) => {
+                if (data && Array.isArray(data)) {
+                    leaderboardOneYearICP.value = deserializeFromTransfer(data) as any[]
+                }
+            })
+        )
+        workerUnsubscribers.push(
+            workerBridge.subscribe('leaderboardOneMonthUSD', (data: unknown) => {
+                if (data && Array.isArray(data)) {
+                    leaderboardOneMonthUSD.value = deserializeFromTransfer(data) as any[]
+                }
+            })
+        )
+        workerUnsubscribers.push(
+            workerBridge.subscribe('leaderboardOneMonthICP', (data: unknown) => {
+                if (data && Array.isArray(data)) {
+                    leaderboardOneMonthICP.value = deserializeFromTransfer(data) as any[]
+                }
+            })
+        )
+        workerUnsubscribers.push(
+            workerBridge.subscribe('leaderboardOneWeekUSD', (data: unknown) => {
+                if (data && Array.isArray(data)) {
+                    leaderboardOneWeekUSD.value = deserializeFromTransfer(data) as any[]
+                }
+            })
+        )
+        workerUnsubscribers.push(
+            workerBridge.subscribe('leaderboardOneWeekICP', (data: unknown) => {
+                if (data && Array.isArray(data)) {
+                    leaderboardOneWeekICP.value = deserializeFromTransfer(data) as any[]
+                }
+            })
+        )
+        workerUnsubscribers.push(
+            workerBridge.subscribe('leaderboardInfo', (data: unknown) => {
+                if (data) {
+                    leaderboardInfo.value = deserializeFromTransfer(data)
                 }
             })
         )
@@ -9761,6 +9838,18 @@ export const useTacoStore = defineStore('taco', () => {
         cachedDefaultVoteBehavior,
         cachedHighestProcessedNNSProposalId,
         cachedPortfolioSnapshotStatus,
+
+        // Performance/Leaderboard data refs (cached by workers)
+        leaderboardAllTimeUSD,
+        leaderboardAllTimeICP,
+        leaderboardOneYearUSD,
+        leaderboardOneYearICP,
+        leaderboardOneMonthUSD,
+        leaderboardOneMonthICP,
+        leaderboardOneWeekUSD,
+        leaderboardOneWeekICP,
+        leaderboardInfo,
+        leaderboardLoading,
 
         // Initialization helpers
         initializeShims,

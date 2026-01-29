@@ -39,11 +39,17 @@ type UserPerformanceGraphData =
    neuronData:
     vec
      record {
-       checkpoints: vec CheckpointData;
+       checkpoints: vec GraphCheckpointData;
        neuronId: blob;
        performanceScoreICP: opt float64;
        performanceScoreUSD: float64;
      };
+   oneMonthICP: opt float64;
+   oneMonthUSD: opt float64;
+   oneWeekICP: opt float64;
+   oneWeekUSD: opt float64;
+   oneYearICP: opt float64;
+   oneYearUSD: opt float64;
    timeframe: record {
                 endTime: int;
                 startTime: int;
@@ -200,7 +206,8 @@ type Rewards =
    getUserPerformance: (userPrincipal: principal) ->
     (Result__1_4) composite_query;
    getUserPerformanceGraphData: (userPrincipal: principal, startTime: 
-    int, endTime: int) -> (Result__1_3) composite_query;
+    int, endTime: int, timeframe: LeaderboardTimeframe, priceType:
+    PriceType) -> (Result__1_3) composite_query;
    getUserWithdrawalHistory: (limit: opt nat) -> (Result__1_2);
    getWithdrawalStats: () ->
     (record {
@@ -402,6 +409,22 @@ type LeaderboardEntry =
    performanceScore: float64;
    "principal": principal;
    rank: nat;
+ };
+type GraphCheckpointData = 
+ record {
+   allocations: vec Allocation;
+   maker: opt principal;
+   pricesUsed: vec record {
+                     principal;
+                     PriceInfo;
+                   };
+   timestamp: int;
+   tokenValues: vec record {
+                      principal;
+                      float64;
+                    };
+   totalPortfolioValue: float64;
+   totalPortfolioValueICP: float64;
  };
 type FailedNeuron = 
  record {

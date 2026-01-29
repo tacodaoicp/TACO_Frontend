@@ -5,7 +5,7 @@
         <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
           <h5 class="mb-0">
             <i class="fas fa-trophy me-2 text-warning"></i>
-            Top 100 Performers
+            Best Performers
           </h5>
 
           <!-- Last Updated -->
@@ -171,8 +171,6 @@
                     <div class="expanded-chart-container">
                       <PerformanceChart
                         :principal="entry.principal.toString()"
-                        :priceType="selectedPriceType"
-                        :timeframe="selectedTimeframe"
                         :height="220"
                       />
                     </div>

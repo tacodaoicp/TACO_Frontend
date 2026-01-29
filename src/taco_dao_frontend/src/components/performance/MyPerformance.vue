@@ -56,8 +56,6 @@
             <div class="chart-container bg-dark-subtle rounded p-3">
               <PerformanceChart
                 :principal="principal"
-                :priceType="selectedPriceType"
-                :timeframe="selectedTimeframe"
                 :height="280"
               />
             </div>

@@ -229,6 +229,8 @@ export const idlFactory = ({ IDL }) => {
     'err' : RewardsError,
   });
   const UserPerformanceGraphData = IDL.Record({
+    'oneMonthICP' : IDL.Opt(IDL.Float64),
+    'oneMonthUSD' : IDL.Opt(IDL.Float64),
     'timeframe' : IDL.Record({ 'startTime' : IDL.Int, 'endTime' : IDL.Int }),
     'neuronData' : IDL.Vec(
       IDL.Record({
@@ -238,6 +240,10 @@ export const idlFactory = ({ IDL }) => {
         'performanceScoreUSD' : IDL.Float64,
       })
     ),
+    'oneWeekICP' : IDL.Opt(IDL.Float64),
+    'oneWeekUSD' : IDL.Opt(IDL.Float64),
+    'oneYearICP' : IDL.Opt(IDL.Float64),
+    'oneYearUSD' : IDL.Opt(IDL.Float64),
     'aggregatedPerformanceICP' : IDL.Opt(IDL.Float64),
     'aggregatedPerformanceUSD' : IDL.Float64,
   });
@@ -455,7 +461,7 @@ export const idlFactory = ({ IDL }) => {
         ['composite_query'],
       ),
     'getUserPerformanceGraphData' : IDL.Func(
-        [IDL.Principal, IDL.Int, IDL.Int],
+        [IDL.Principal, IDL.Int, IDL.Int, LeaderboardTimeframe, PriceType],
         [Result__1_3],
         ['composite_query'],
       ),

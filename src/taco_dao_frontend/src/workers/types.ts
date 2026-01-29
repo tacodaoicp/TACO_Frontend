@@ -69,8 +69,15 @@ export type DataKey =
   // Admin-only data keys (Rewards/Distributions)
   | 'rewardsConfiguration'
   | 'distributionHistory'
-  // Performance/Leaderboard data keys
-  | 'leaderboard'
+  // Performance/Leaderboard data keys (8 combinations: 2 price types × 4 timeframes)
+  | 'leaderboardAllTimeUSD'
+  | 'leaderboardAllTimeICP'
+  | 'leaderboardOneYearUSD'
+  | 'leaderboardOneYearICP'
+  | 'leaderboardOneMonthUSD'
+  | 'leaderboardOneMonthICP'
+  | 'leaderboardOneWeekUSD'
+  | 'leaderboardOneWeekICP'
   | 'leaderboardInfo'
   | 'userPerformance'
 
@@ -141,8 +148,15 @@ export const WORKER_ASSIGNMENT: Record<DataKey, 'public' | 'auth'> = {
   // Authenticated worker (admin data - Rewards/Distributions)
   rewardsConfiguration: 'auth',
   distributionHistory: 'auth',
-  // Performance/Leaderboard
-  leaderboard: 'public',
+  // Performance/Leaderboard (all 8 combinations are public)
+  leaderboardAllTimeUSD: 'public',
+  leaderboardAllTimeICP: 'public',
+  leaderboardOneYearUSD: 'public',
+  leaderboardOneYearICP: 'public',
+  leaderboardOneMonthUSD: 'public',
+  leaderboardOneMonthICP: 'public',
+  leaderboardOneWeekUSD: 'public',
+  leaderboardOneWeekICP: 'public',
   leaderboardInfo: 'public',
   userPerformance: 'auth',
 }
@@ -228,7 +242,14 @@ export const STALENESS_THRESHOLDS: Record<DataKey, number> = {
   rewardsConfiguration: 120_000,
   distributionHistory: 120_000,
   // Performance/Leaderboard - 300 seconds (updated weekly, not frequently changing)
-  leaderboard: 300_000,
+  leaderboardAllTimeUSD: 300_000,
+  leaderboardAllTimeICP: 300_000,
+  leaderboardOneYearUSD: 300_000,
+  leaderboardOneYearICP: 300_000,
+  leaderboardOneMonthUSD: 300_000,
+  leaderboardOneMonthICP: 300_000,
+  leaderboardOneWeekUSD: 300_000,
+  leaderboardOneWeekICP: 300_000,
   leaderboardInfo: 300_000,
   userPerformance: 300_000,
 }
@@ -350,8 +371,8 @@ export interface RouteDataConfig {
 export const ROUTE_PRIORITIES: Record<string, RouteDataConfig> = {
   '/': {
     critical: ['cryptoPrices', 'tokenDetails', 'totalTreasuryValueInUsd'],
-    high: ['aggregateAllocation', 'tradingStatus'],
-    preloadRoutes: ['/dao', '/vote'],
+    high: ['aggregateAllocation', 'tradingStatus', 'leaderboardAllTimeUSD'],
+    preloadRoutes: ['/dao', '/vote', '/performance'],
   },
   '/dao': {
     critical: ['tokenDetails', 'aggregateAllocation', 'tradingStatus'],
@@ -439,8 +460,17 @@ export const ROUTE_PRIORITIES: Record<string, RouteDataConfig> = {
     preloadRoutes: [],
   },
   '/performance': {
-    critical: ['leaderboard', 'leaderboardInfo'],
-    high: ['userPerformance'],
+    critical: ['leaderboardAllTimeUSD', 'leaderboardInfo'],
+    high: [
+      'leaderboardAllTimeICP',
+      'leaderboardOneYearUSD',
+      'leaderboardOneYearICP',
+      'leaderboardOneMonthUSD',
+      'leaderboardOneMonthICP',
+      'leaderboardOneWeekUSD',
+      'leaderboardOneWeekICP',
+      'userPerformance',
+    ],
     preloadRoutes: ['/dao', '/rewards'],
   },
 }

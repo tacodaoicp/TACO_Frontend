@@ -1055,7 +1055,7 @@ export async function fetchDistributionHistoryData(agent: HttpAgent, offset: num
 
 /**
  * Fetch leaderboard data (public)
- * Returns top 100 performers for the given timeframe and price type
+ * Returns Leaderboard of  performers for the given timeframe and price type
  */
 export async function fetchLeaderboardData(
   agent: HttpAgent,
@@ -1091,107 +1091,73 @@ export async function fetchLeaderboardInfoData(agent: HttpAgent): Promise<any> {
 /**
  * Fetch user performance data (requires principal)
  * Uses getUserPerformanceGraphData API which works across subnets
- * Returns aggregated performance for a user across all their neurons
+ * Backend returns pre-calculated timeframe performance values and the best neuron
  */
-export async function fetchUserPerformanceData(agent: HttpAgent, principal: Principal): Promise<any> {
+export async function fetchUserPerformanceData(
+  agent: HttpAgent,
+  principal: Principal,
+  timeframe: 'OneWeek' | 'OneMonth' | 'OneYear' | 'AllTime' = 'AllTime',
+  priceType: 'USD' | 'ICP' = 'USD'
+): Promise<any> {
   const actor = getRewardsActor(agent)
 
-  // Use getUserPerformanceGraphData which is designed for graph data and works across subnets
   const nowMs = BigInt(Date.now())
   const endTime = nowMs * BigInt(1_000_000) // nanoseconds
-  const startTime = BigInt(0) // AllTime
+  const startTime = BigInt(0) // AllTime - backend returns all checkpoints
 
-  const result = await actor.getUserPerformanceGraphData(principal, startTime, endTime)
+  const timeframeVariant = { [timeframe]: null }
+  const priceTypeVariant = { [priceType]: null }
 
-  // Handle Result type - return data or throw error
+  const result = await actor.getUserPerformanceGraphData(
+    principal,
+    startTime,
+    endTime,
+    timeframeVariant as any,
+    priceTypeVariant as any
+  )
+
   if ('ok' in result) {
     const graphData = result.ok
 
-    // Flatten all checkpoints to calculate timeframe-specific performance
-    const allCheckpoints = graphData.neuronData.flatMap((nd: any) => nd.checkpoints)
-    allCheckpoints.sort((a: any, b: any) => Number(a.timestamp) - Number(b.timestamp))
-
-    // Calculate performance for different timeframes from checkpoint data
-    const calculatePerformanceForTimeframe = (checkpoints: any[], daysAgo: number | null) => {
-      if (checkpoints.length < 2) return null
-
-      const nowNs = BigInt(Date.now()) * BigInt(1_000_000)
-      const cutoffNs = daysAgo === null
-        ? BigInt(0) // AllTime
-        : nowNs - (BigInt(daysAgo) * BigInt(24) * BigInt(60) * BigInt(60) * BigInt(1000) * BigInt(1_000_000))
-
-      // Find first checkpoint at or after cutoff
-      const relevantCheckpoints = checkpoints.filter((cp: any) => BigInt(cp.timestamp) >= cutoffNs)
-      if (relevantCheckpoints.length < 1) return null
-
-      // Get earliest checkpoint in range (or closest before cutoff)
-      let startCheckpoint = relevantCheckpoints[0]
-      // If we have checkpoints before the cutoff, use the last one before as baseline
-      const checkpointsBeforeCutoff = checkpoints.filter((cp: any) => BigInt(cp.timestamp) < cutoffNs)
-      if (checkpointsBeforeCutoff.length > 0) {
-        startCheckpoint = checkpointsBeforeCutoff[checkpointsBeforeCutoff.length - 1]
-      }
-
-      const endCheckpoint = checkpoints[checkpoints.length - 1]
-
-      if (!startCheckpoint || !endCheckpoint) return null
-      if (startCheckpoint.totalPortfolioValue === 0) return null
-
-      // Performance score = final / initial (1.0 = break even, 1.15 = +15%)
-      return endCheckpoint.totalPortfolioValue / startCheckpoint.totalPortfolioValue
-    }
-
-    // Calculate all timeframe performances from USD checkpoints
-    const oneWeekPerf = calculatePerformanceForTimeframe(allCheckpoints, 7)
-    const oneMonthPerf = calculatePerformanceForTimeframe(allCheckpoints, 30)
-    const oneYearPerf = calculatePerformanceForTimeframe(allCheckpoints, 365)
-    const allTimePerf = graphData.aggregatedPerformanceUSD || calculatePerformanceForTimeframe(allCheckpoints, null)
-
-    // Build aggregated performance
+    // Use backend-provided timeframe performance values (exact match with leaderboard)
     const aggregatedPerformance = {
-      allTimeUSD: allTimePerf ? [allTimePerf] : [],
-      allTimeICP: graphData.aggregatedPerformanceICP ? [graphData.aggregatedPerformanceICP[0]] : [],
-      oneWeekUSD: oneWeekPerf ? [oneWeekPerf] : [],
-      oneWeekICP: [], // ICP calculation would need ICP-priced checkpoints
-      oneMonthUSD: oneMonthPerf ? [oneMonthPerf] : [],
-      oneMonthICP: [],
-      oneYearUSD: oneYearPerf ? [oneYearPerf] : [],
-      oneYearICP: []
+      allTimeUSD: graphData.aggregatedPerformanceUSD ? [graphData.aggregatedPerformanceUSD] : [],
+      allTimeICP: graphData.aggregatedPerformanceICP?.length > 0 ? [graphData.aggregatedPerformanceICP[0]] : [],
+      oneWeekUSD: graphData.oneWeekUSD?.length > 0 ? [graphData.oneWeekUSD[0]] : [],
+      oneWeekICP: graphData.oneWeekICP?.length > 0 ? [graphData.oneWeekICP[0]] : [],
+      oneMonthUSD: graphData.oneMonthUSD?.length > 0 ? [graphData.oneMonthUSD[0]] : [],
+      oneMonthICP: graphData.oneMonthICP?.length > 0 ? [graphData.oneMonthICP[0]] : [],
+      oneYearUSD: graphData.oneYearUSD?.length > 0 ? [graphData.oneYearUSD[0]] : [],
+      oneYearICP: graphData.oneYearICP?.length > 0 ? [graphData.oneYearICP[0]] : []
     }
 
-    // Build neurons array from neuronData with derived performance
-    const neurons = graphData.neuronData.map((nd: any) => {
-      const neuronCheckpoints = [...nd.checkpoints].sort((a: any, b: any) => Number(a.timestamp) - Number(b.timestamp))
-
-      return {
-        neuronId: nd.neuronId,
-        votingPower: BigInt(0), // Not provided in graph data
-        distributionsParticipated: nd.checkpoints.length,
-        lastAllocationChange: nd.checkpoints.length > 0
-          ? nd.checkpoints[nd.checkpoints.length - 1].timestamp
-          : BigInt(0),
-        performance: {
-          allTimeUSD: nd.performanceScoreUSD ? [nd.performanceScoreUSD] : [],
-          allTimeICP: nd.performanceScoreICP ? [nd.performanceScoreICP[0]] : [],
-          oneWeekUSD: calculatePerformanceForTimeframe(neuronCheckpoints, 7) ? [calculatePerformanceForTimeframe(neuronCheckpoints, 7)] : [],
-          oneWeekICP: [],
-          oneMonthUSD: calculatePerformanceForTimeframe(neuronCheckpoints, 30) ? [calculatePerformanceForTimeframe(neuronCheckpoints, 30)] : [],
-          oneMonthICP: [],
-          oneYearUSD: calculatePerformanceForTimeframe(neuronCheckpoints, 365) ? [calculatePerformanceForTimeframe(neuronCheckpoints, 365)] : [],
-          oneYearICP: []
-        }
+    // neuronData now has at most 1 neuron (the best for the selected timeframe/priceType)
+    const neurons = graphData.neuronData.map((nd: any) => ({
+      neuronId: nd.neuronId,
+      votingPower: BigInt(0),
+      distributionsParticipated: nd.checkpoints.length,
+      lastAllocationChange: nd.checkpoints.length > 0
+        ? nd.checkpoints[nd.checkpoints.length - 1].timestamp
+        : BigInt(0),
+      performance: {
+        allTimeUSD: nd.performanceScoreUSD ? [nd.performanceScoreUSD] : [],
+        allTimeICP: nd.performanceScoreICP?.length > 0 ? [nd.performanceScoreICP[0]] : [],
+        oneWeekUSD: graphData.oneWeekUSD?.length > 0 ? [graphData.oneWeekUSD[0]] : [],
+        oneWeekICP: graphData.oneWeekICP?.length > 0 ? [graphData.oneWeekICP[0]] : [],
+        oneMonthUSD: graphData.oneMonthUSD?.length > 0 ? [graphData.oneMonthUSD[0]] : [],
+        oneMonthICP: graphData.oneMonthICP?.length > 0 ? [graphData.oneMonthICP[0]] : [],
+        oneYearUSD: graphData.oneYearUSD?.length > 0 ? [graphData.oneYearUSD[0]] : [],
+        oneYearICP: graphData.oneYearICP?.length > 0 ? [graphData.oneYearICP[0]] : []
       }
-    })
+    }))
 
-    // Calculate total distributions from checkpoints
     const totalCheckpoints = graphData.neuronData.reduce(
       (sum: number, nd: any) => sum + nd.checkpoints.length, 0
     )
 
-    // Return in the same format as getUserPerformance would have
     return {
       principal,
-      totalVotingPower: BigInt(0), // Not available in graph data
+      totalVotingPower: BigInt(0),
       distributionsParticipated: totalCheckpoints > 0 ? totalCheckpoints : 0,
       lastActivity: graphData.timeframe.endTime,
       aggregatedPerformance,

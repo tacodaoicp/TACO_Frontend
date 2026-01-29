@@ -118,21 +118,60 @@ export default {
     const tacoStore = useTacoStore()
 
     // User authentication state from store
-    const { userLoggedIn, userPrincipal } = storeToRefs(tacoStore)
+    const {
+      userLoggedIn,
+      userPrincipal,
+      // Leaderboard data from workers (8 combinations cached)
+      leaderboardAllTimeUSD,
+      leaderboardAllTimeICP,
+      leaderboardOneYearUSD,
+      leaderboardOneYearICP,
+      leaderboardOneMonthUSD,
+      leaderboardOneMonthICP,
+      leaderboardOneWeekUSD,
+      leaderboardOneWeekICP,
+      leaderboardInfo: storeLeaderboardInfo,
+      leaderboardLoading
+    } = storeToRefs(tacoStore)
 
     // Loading states
     const isLoading = ref(false)
-    const isLoadingLeaderboard = ref(false)
     const isLoadingUserPerformance = ref(false)
+    const isLoadingFollowerInfo = ref(false)
 
     // Error states
     const errorMessage = ref('')
     const userPerformanceError = ref('')
 
-    // Leaderboard data
-    const leaderboardEntries = ref([])
+    // Leaderboard data - computed from store based on filters
     const followerInfos = ref([])
-    const leaderboardInfo = ref(null)
+
+    // Computed: select the right leaderboard data based on current filters
+    const leaderboardEntries = computed(() => {
+      const key = `${selectedTimeframe.value}${selectedPriceType.value}`
+      switch (key) {
+        case 'AllTimeUSD': return leaderboardAllTimeUSD.value || []
+        case 'AllTimeICP': return leaderboardAllTimeICP.value || []
+        case 'OneYearUSD': return leaderboardOneYearUSD.value || []
+        case 'OneYearICP': return leaderboardOneYearICP.value || []
+        case 'OneMonthUSD': return leaderboardOneMonthUSD.value || []
+        case 'OneMonthICP': return leaderboardOneMonthICP.value || []
+        case 'OneWeekUSD': return leaderboardOneWeekUSD.value || []
+        case 'OneWeekICP': return leaderboardOneWeekICP.value || []
+        default: return leaderboardAllTimeUSD.value || []
+      }
+    })
+
+    // Computed: use leaderboardInfo from store
+    const leaderboardInfo = computed(() => storeLeaderboardInfo.value)
+
+    // Computed: loading state - only show spinner on initial load, not background refreshes
+    const isLoadingLeaderboard = computed(() => {
+      // If we already have leaderboard data, don't show loading state
+      // (background worker updates and follower info refreshes should be silent)
+      if (leaderboardEntries.value && leaderboardEntries.value.length > 0) return false
+      return leaderboardLoading.value || isLoadingFollowerInfo.value
+    })
 
     // User performance data
     const userPerformance = ref(null)
@@ -168,55 +207,46 @@ export default {
       return priceType === 'ICP' ? { ICP: null } : { USD: null }
     }
 
-    // Load leaderboard data
-    const loadLeaderboard = async () => {
-      isLoadingLeaderboard.value = true
-      errorMessage.value = ''
+    // Load follower info for leaderboard entries (leaderboard data comes from workers)
+    const loadFollowerInfo = async () => {
+      const entries = leaderboardEntries.value
+      if (!entries || entries.length === 0) {
+        followerInfos.value = []
+        return
+      }
+
+      // Only show loading spinner if we have no follower data yet (initial load)
+      const isInitialLoad = followerInfos.value.length === 0
+      if (isInitialLoad) {
+        isLoadingFollowerInfo.value = true
+      }
 
       try {
-        const rewardsActor = await tacoStore.createRewardsActorAnonymous()
-
-        // Get leaderboard entries
-        const entries = await rewardsActor.getLeaderboard(
-          getTimeframeVariant(selectedTimeframe.value),
-          getPriceTypeVariant(selectedPriceType.value),
-          [100], // limit
-          [0]    // offset
-        )
-
-        leaderboardEntries.value = entries
-
-        // Get leaderboard info
-        const info = await rewardsActor.getLeaderboardInfo()
-        leaderboardInfo.value = info
-
-        // Get follower info for all principals in leaderboard
-        // This is optional - if it fails, we still show the leaderboard without follower data
-        if (entries.length > 0) {
-          try {
-            const principals = entries.map(e => e.principal)
-            const daoActor = await tacoStore.createDAOActorAnonymous()
-            const followerData = await daoActor.getUsersFollowerInfo(principals)
-            followerInfos.value = followerData
-          } catch (followerError) {
-            console.warn('Failed to load follower info (non-critical):', followerError)
-            followerInfos.value = []
-          }
-        } else {
+        const principals = entries.map(e => e.principal)
+        const daoActor = await tacoStore.createDAOActorAnonymous()
+        const followerData = await daoActor.getUsersFollowerInfo(principals)
+        followerInfos.value = followerData
+      } catch (followerError) {
+        console.warn('Failed to load follower info (non-critical):', followerError)
+        // Only clear on initial load failure; keep existing data on background refresh
+        if (isInitialLoad) {
           followerInfos.value = []
         }
-
-      } catch (error) {
-        console.error('Error loading leaderboard:', error)
-        errorMessage.value = formatNetworkError(error)
       } finally {
-        isLoadingLeaderboard.value = false
+        isLoadingFollowerInfo.value = false
       }
     }
 
+    // Watch leaderboard entries to load follower info when data changes
+    watch(leaderboardEntries, (newEntries) => {
+      if (newEntries && newEntries.length > 0) {
+        loadFollowerInfo()
+      }
+    }, { immediate: true })
+
     // Load user's performance data
     // Uses getUserPerformanceGraphData which returns checkpoint data for graphs
-    // and provides aggregated performance scores
+    // and provides pre-calculated timeframe performance scores from the backend
     const loadUserPerformance = async () => {
       if (!userLoggedIn.value || !userPrincipal.value) return
 
@@ -227,108 +257,61 @@ export default {
         const rewardsActor = await tacoStore.createRewardsActorAnonymous()
         const { Principal } = await import('@dfinity/principal')
 
-        // Use getUserPerformanceGraphData which is designed for graph data and works across subnets
-        // We need to call it multiple times for different timeframes to get all aggregated scores
-        // Or we can call getUserPerformance first and fall back to graph data
-
-        // Try the graph data API with AllTime to get the most complete picture
         const nowMs = BigInt(Date.now())
         const endTime = nowMs * BigInt(1_000_000) // nanoseconds
-        const startTime = BigInt(0) // AllTime
+        const startTime = BigInt(0) // AllTime - backend returns all checkpoints
 
+        // Pass current timeframe and priceType so backend selects the best neuron
         const graphResult = await rewardsActor.getUserPerformanceGraphData(
           Principal.fromText(userPrincipal.value),
           startTime,
-          endTime
+          endTime,
+          getTimeframeVariant(selectedTimeframe.value),
+          getPriceTypeVariant(selectedPriceType.value)
         )
 
         if ('ok' in graphResult) {
           const graphData = graphResult.ok
 
-          // Flatten all checkpoints to calculate timeframe-specific performance
-          const allCheckpoints = graphData.neuronData.flatMap(nd => nd.checkpoints)
-          allCheckpoints.sort((a, b) => Number(a.timestamp) - Number(b.timestamp))
-
-          // Calculate performance for different timeframes from checkpoint data
-          const calculatePerformanceForTimeframe = (checkpoints, daysAgo) => {
-            if (checkpoints.length < 2) return null
-
-            const nowNs = BigInt(Date.now()) * BigInt(1_000_000)
-            const cutoffNs = daysAgo === null
-              ? BigInt(0) // AllTime
-              : nowNs - (BigInt(daysAgo) * BigInt(24) * BigInt(60) * BigInt(60) * BigInt(1000) * BigInt(1_000_000))
-
-            // Find first checkpoint at or after cutoff
-            const relevantCheckpoints = checkpoints.filter(cp => BigInt(cp.timestamp) >= cutoffNs)
-            if (relevantCheckpoints.length < 1) return null
-
-            // Get earliest checkpoint in range (or closest before cutoff)
-            let startCheckpoint = relevantCheckpoints[0]
-            // If we have checkpoints before the cutoff, use the last one before as baseline
-            const checkpointsBeforeCutoff = checkpoints.filter(cp => BigInt(cp.timestamp) < cutoffNs)
-            if (checkpointsBeforeCutoff.length > 0) {
-              startCheckpoint = checkpointsBeforeCutoff[checkpointsBeforeCutoff.length - 1]
-            }
-
-            const endCheckpoint = checkpoints[checkpoints.length - 1]
-
-            if (!startCheckpoint || !endCheckpoint) return null
-            if (startCheckpoint.totalPortfolioValue === 0) return null
-
-            // Performance score = final / initial (1.0 = break even, 1.15 = +15%)
-            return endCheckpoint.totalPortfolioValue / startCheckpoint.totalPortfolioValue
-          }
-
-          // Calculate all timeframe performances from USD checkpoints
-          const oneWeekPerf = calculatePerformanceForTimeframe(allCheckpoints, 7)
-          const oneMonthPerf = calculatePerformanceForTimeframe(allCheckpoints, 30)
-          const oneYearPerf = calculatePerformanceForTimeframe(allCheckpoints, 365)
-          const allTimePerf = graphData.aggregatedPerformanceUSD || calculatePerformanceForTimeframe(allCheckpoints, null)
-
-          // Build aggregated performance
+          // Use backend-provided timeframe performance values (exact match with leaderboard)
           const aggregatedPerformance = {
-            allTimeUSD: allTimePerf ? [allTimePerf] : [],
-            allTimeICP: graphData.aggregatedPerformanceICP ? [graphData.aggregatedPerformanceICP[0]] : [],
-            oneWeekUSD: oneWeekPerf ? [oneWeekPerf] : [],
-            oneWeekICP: [], // ICP calculation would need ICP-priced checkpoints
-            oneMonthUSD: oneMonthPerf ? [oneMonthPerf] : [],
-            oneMonthICP: [],
-            oneYearUSD: oneYearPerf ? [oneYearPerf] : [],
-            oneYearICP: []
+            allTimeUSD: graphData.aggregatedPerformanceUSD ? [graphData.aggregatedPerformanceUSD] : [],
+            allTimeICP: graphData.aggregatedPerformanceICP?.length > 0 ? [graphData.aggregatedPerformanceICP[0]] : [],
+            oneWeekUSD: graphData.oneWeekUSD?.length > 0 ? [graphData.oneWeekUSD[0]] : [],
+            oneWeekICP: graphData.oneWeekICP?.length > 0 ? [graphData.oneWeekICP[0]] : [],
+            oneMonthUSD: graphData.oneMonthUSD?.length > 0 ? [graphData.oneMonthUSD[0]] : [],
+            oneMonthICP: graphData.oneMonthICP?.length > 0 ? [graphData.oneMonthICP[0]] : [],
+            oneYearUSD: graphData.oneYearUSD?.length > 0 ? [graphData.oneYearUSD[0]] : [],
+            oneYearICP: graphData.oneYearICP?.length > 0 ? [graphData.oneYearICP[0]] : []
           }
 
-          // Build neurons array from neuronData with derived performance
-          const neurons = graphData.neuronData.map(nd => {
-            const neuronCheckpoints = [...nd.checkpoints].sort((a, b) => Number(a.timestamp) - Number(b.timestamp))
-
-            return {
-              neuronId: nd.neuronId,
-              votingPower: BigInt(0), // Not provided in graph data
-              distributionsParticipated: nd.checkpoints.length,
-              lastAllocationChange: nd.checkpoints.length > 0
-                ? nd.checkpoints[nd.checkpoints.length - 1].timestamp
-                : BigInt(0),
-              performance: {
-                allTimeUSD: nd.performanceScoreUSD ? [nd.performanceScoreUSD] : [],
-                allTimeICP: nd.performanceScoreICP ? [nd.performanceScoreICP[0]] : [],
-                oneWeekUSD: calculatePerformanceForTimeframe(neuronCheckpoints, 7) ? [calculatePerformanceForTimeframe(neuronCheckpoints, 7)] : [],
-                oneWeekICP: [],
-                oneMonthUSD: calculatePerformanceForTimeframe(neuronCheckpoints, 30) ? [calculatePerformanceForTimeframe(neuronCheckpoints, 30)] : [],
-                oneMonthICP: [],
-                oneYearUSD: calculatePerformanceForTimeframe(neuronCheckpoints, 365) ? [calculatePerformanceForTimeframe(neuronCheckpoints, 365)] : [],
-                oneYearICP: []
-              }
+          // neuronData now has at most 1 neuron (the best for the selected timeframe/priceType)
+          const neurons = graphData.neuronData.map(nd => ({
+            neuronId: nd.neuronId,
+            votingPower: BigInt(0),
+            distributionsParticipated: nd.checkpoints.length,
+            lastAllocationChange: nd.checkpoints.length > 0
+              ? nd.checkpoints[nd.checkpoints.length - 1].timestamp
+              : BigInt(0),
+            performance: {
+              allTimeUSD: nd.performanceScoreUSD ? [nd.performanceScoreUSD] : [],
+              allTimeICP: nd.performanceScoreICP?.length > 0 ? [nd.performanceScoreICP[0]] : [],
+              oneWeekUSD: graphData.oneWeekUSD?.length > 0 ? [graphData.oneWeekUSD[0]] : [],
+              oneWeekICP: graphData.oneWeekICP?.length > 0 ? [graphData.oneWeekICP[0]] : [],
+              oneMonthUSD: graphData.oneMonthUSD?.length > 0 ? [graphData.oneMonthUSD[0]] : [],
+              oneMonthICP: graphData.oneMonthICP?.length > 0 ? [graphData.oneMonthICP[0]] : [],
+              oneYearUSD: graphData.oneYearUSD?.length > 0 ? [graphData.oneYearUSD[0]] : [],
+              oneYearICP: graphData.oneYearICP?.length > 0 ? [graphData.oneYearICP[0]] : []
             }
-          })
+          }))
 
-          // Calculate total distributions from checkpoints
           const totalCheckpoints = graphData.neuronData.reduce(
             (sum, nd) => sum + nd.checkpoints.length, 0
           )
 
           userPerformance.value = {
             principal: Principal.fromText(userPrincipal.value),
-            totalVotingPower: BigInt(0), // Not available in graph data
+            totalVotingPower: BigInt(0),
             distributionsParticipated: totalCheckpoints > 0 ? totalCheckpoints : 0,
             lastActivity: graphData.timeframe.endTime,
             aggregatedPerformance,
@@ -408,22 +391,26 @@ export default {
     const refreshAllData = async () => {
       isLoading.value = true
       await Promise.all([
-        loadLeaderboard(),
+        loadFollowerInfo(),
         userLoggedIn.value ? loadUserPerformance() : Promise.resolve()
       ])
       isLoading.value = false
     }
 
     // Handle timeframe filter change
+    // Leaderboard data is already cached by workers - just update the filter
+    // No need to reload user performance: chart shows AllTime with both USD+ICP,
+    // and all 8 timeframe performance scores are already loaded
     const onTimeframeChange = (timeframe) => {
       selectedTimeframe.value = timeframe
-      loadLeaderboard()
+      // Follower info will be loaded via the watch on leaderboardEntries
     }
 
     // Handle price type filter change
+    // Leaderboard data is already cached by workers - just update the filter
     const onPriceTypeChange = (priceType) => {
       selectedPriceType.value = priceType
-      loadLeaderboard()
+      // Follower info will be loaded via the watch on leaderboardEntries
     }
 
     // Handle follow action
@@ -438,7 +425,7 @@ export default {
         if ('ok' in result) {
           tacoStore.showSuccess('Successfully followed user')
           await loadUserFollows()
-          await loadLeaderboard()
+          await loadFollowerInfo() // Refresh follower counts
         } else {
           tacoStore.showError(formatFollowError(result.err))
         }
@@ -460,7 +447,7 @@ export default {
         if ('ok' in result) {
           tacoStore.showSuccess('Successfully unfollowed user')
           await loadUserFollows()
-          await loadLeaderboard()
+          await loadFollowerInfo() // Refresh follower counts
         } else {
           tacoStore.showError(formatUnfollowError(result.err))
         }

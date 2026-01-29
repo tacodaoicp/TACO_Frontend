@@ -20,14 +20,28 @@
       <span class="text-muted">No performance history available</span>
     </div>
 
-    <!-- Chart -->
-    <apexchart
-      v-else
-      type="area"
-      :options="chartOptions"
-      :series="chartSeries"
-      :height="height"
-    />
+    <!-- Chart with baseline selector -->
+    <div v-else>
+      <div class="d-flex align-items-center gap-2 mb-2">
+        <label class="baseline-label text-muted">Start from:</label>
+        <select
+          v-model="baselineIndex"
+          class="form-select form-select-sm baseline-select"
+        >
+          <option
+            v-for="(opt, idx) in baselineOptions"
+            :key="idx"
+            :value="opt.index"
+          >{{ opt.label }}</option>
+        </select>
+      </div>
+      <apexchart
+        type="area"
+        :options="chartOptions"
+        :series="chartSeries"
+        :height="height"
+      />
+    </div>
   </div>
 </template>
 
@@ -44,18 +58,6 @@ export default {
       type: String,
       required: true
     },
-    // Price type: 'USD' or 'ICP'
-    priceType: {
-      type: String,
-      default: 'USD',
-      validator: (val) => ['USD', 'ICP'].includes(val)
-    },
-    // Timeframe: 'OneWeek', 'OneMonth', 'OneYear', 'AllTime'
-    timeframe: {
-      type: String,
-      default: 'AllTime',
-      validator: (val) => ['OneWeek', 'OneMonth', 'OneYear', 'AllTime'].includes(val)
-    },
     // Chart height
     height: {
       type: [Number, String],
@@ -70,7 +72,7 @@ export default {
     const loading = ref(false)
     const error = ref('')
     const checkpoints = ref([])
-    const initialValue = ref(1)
+    const baselineIndex = ref(0)
 
     // Build a map of token principal -> symbol for quick lookup
     const tokenSymbolMap = computed(() => {
@@ -112,6 +114,17 @@ export default {
       return checkpoints.value.length > 0
     })
 
+    // Baseline options for the dropdown - each checkpoint as a selectable start point
+    const baselineOptions = computed(() => {
+      return checkpoints.value.map((cp, idx) => {
+        const date = new Date(Number(cp.timestamp) / 1_000_000)
+        const label = idx === 0
+          ? `${date.toLocaleDateString()} (First)`
+          : date.toLocaleDateString()
+        return { index: idx, label }
+      })
+    })
+
     // Helper to check if two allocations are identical
     const allocationsEqual = (alloc1, alloc2) => {
       if (!alloc1 && !alloc2) return true
@@ -140,58 +153,80 @@ export default {
     }
 
     // Process checkpoints into chart series data, skipping consecutive identical allocations
+    // Returns two series: USD and ICP, starting from the selected baseline checkpoint
     const chartSeries = computed(() => {
       if (!checkpoints.value.length) return []
 
-      // First, filter checkpoints to skip consecutive ones with identical allocations
+      const bIdx = baselineIndex.value
+      const baselineCp = checkpoints.value[bIdx]
+      if (!baselineCp) return []
+
+      const baseUSD = baselineCp.totalPortfolioValueUSD || 1
+      const baseICP = baselineCp.totalPortfolioValueICP || 1
+
+      // Only include checkpoints from the baseline onward
+      const relevantCheckpoints = checkpoints.value.slice(bIdx)
+
+      // Filter to skip consecutive ones with identical allocations
       const filteredCheckpoints = []
       let lastIncludedAllocation = null
 
-      for (let i = 0; i < checkpoints.value.length; i++) {
-        const cp = checkpoints.value[i]
+      for (let i = 0; i < relevantCheckpoints.length; i++) {
+        const cp = relevantCheckpoints[i]
+        const originalIndex = bIdx + i
         const isFirst = i === 0
-        const isLast = i === checkpoints.value.length - 1
+        const isLast = i === relevantCheckpoints.length - 1
 
-        // Always include first and last checkpoint
         if (isFirst || isLast) {
-          filteredCheckpoints.push({ checkpoint: cp, originalIndex: i })
+          filteredCheckpoints.push({ checkpoint: cp, originalIndex })
           lastIncludedAllocation = cp.allocations
         } else {
-          // Include if allocation changed from last included
           if (!allocationsEqual(cp.allocations, lastIncludedAllocation)) {
-            filteredCheckpoints.push({ checkpoint: cp, originalIndex: i })
+            filteredCheckpoints.push({ checkpoint: cp, originalIndex })
             lastIncludedAllocation = cp.allocations
           }
         }
       }
 
-      const data = filteredCheckpoints.map(({ checkpoint: cp, originalIndex }) => {
-        // Convert timestamp from nanoseconds to milliseconds
+      const usdData = []
+      const icpData = []
+
+      for (const { checkpoint: cp, originalIndex } of filteredCheckpoints) {
         const timestampMs = Number(cp.timestamp) / 1_000_000
-        // Calculate % return from initial value
-        const percentReturn = ((cp.totalPortfolioValue / initialValue.value) - 1) * 100
+        const usdReturn = ((cp.totalPortfolioValueUSD / baseUSD) - 1) * 100
+        const icpReturn = cp.totalPortfolioValueICP > 0
+          ? ((cp.totalPortfolioValueICP / baseICP) - 1) * 100
+          : null
 
-        return {
+        usdData.push({
           x: timestampMs,
-          y: parseFloat(percentReturn.toFixed(2)),
-          checkpointIndex: originalIndex // Store original index to look up allocation data
+          y: parseFloat(usdReturn.toFixed(2)),
+          checkpointIndex: originalIndex
+        })
+
+        if (icpReturn !== null) {
+          icpData.push({
+            x: timestampMs,
+            y: parseFloat(icpReturn.toFixed(2)),
+            checkpointIndex: originalIndex
+          })
         }
-      })
+      }
 
-      // Sort by timestamp
-      data.sort((a, b) => a.x - b.x)
+      usdData.sort((a, b) => a.x - b.x)
+      icpData.sort((a, b) => a.x - b.x)
 
-      return [{
-        name: `Return (${props.priceType})`,
-        data
-      }]
+      const series = [{ name: 'Return (USD)', data: usdData }]
+      if (icpData.length > 0) {
+        series.push({ name: 'Return (ICP)', data: icpData })
+      }
+      return series
     })
 
-    // Chart options
+    // Chart options - dual series: USD (green/red) and ICP (blue)
     const chartOptions = computed(() => {
-      const isPositive = chartSeries.value[0]?.data?.length > 0
-        ? chartSeries.value[0].data[chartSeries.value[0].data.length - 1]?.y >= 0
-        : true
+      const usdColor = '#68d391' // Green for USD
+      const icpColor = '#63b3ed' // Blue for ICP
 
       return {
         chart: {
@@ -217,7 +252,7 @@ export default {
           }
         },
         theme: { mode: 'dark' },
-        colors: [isPositive ? '#68d391' : '#fc8181'], // Green for positive, red for negative
+        colors: [usdColor, icpColor],
         stroke: {
           curve: 'smooth',
           width: 2
@@ -226,21 +261,27 @@ export default {
           type: 'gradient',
           gradient: {
             shadeIntensity: 1,
-            opacityFrom: 0.4,
-            opacityTo: 0.1,
+            opacityFrom: 0.3,
+            opacityTo: 0.05,
             stops: [0, 90, 100]
           }
         },
         dataLabels: {
           enabled: false
         },
+        legend: {
+          show: chartSeries.value.length > 1,
+          position: 'top',
+          horizontalAlign: 'left',
+          labels: { colors: '#aaa' },
+          markers: { width: 10, height: 10, radius: 2 }
+        },
         markers: {
-          size: 5,
-          colors: [isPositive ? '#68d391' : '#fc8181'],
+          size: 4,
           strokeColors: '#1a1a2e',
           strokeWidth: 2,
           hover: {
-            size: 7
+            size: 6
           }
         },
         xaxis: {
@@ -268,9 +309,12 @@ export default {
         },
         tooltip: {
           theme: 'dark',
-          custom: function({ series, seriesIndex, dataPointIndex, w }) {
-            const dataPoint = w.config.series[seriesIndex].data[dataPointIndex]
-            const value = series[seriesIndex][dataPointIndex]
+          shared: true,
+          intersect: false,
+          custom: function({ series, dataPointIndex, w }) {
+            // Get timestamp from the first series' data point
+            const dataPoint = w.config.series[0].data[dataPointIndex]
+            if (!dataPoint) return ''
             const timestamp = dataPoint.x
             const date = new Date(timestamp)
             const dateStr = date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
@@ -278,6 +322,20 @@ export default {
             // Get the checkpoint data for allocations
             const checkpointIndex = dataPoint.checkpointIndex
             const checkpoint = checkpoints.value[checkpointIndex]
+
+            // Build returns HTML for both series
+            let returnsHtml = ''
+            for (let i = 0; i < w.config.series.length; i++) {
+              const val = series[i]?.[dataPointIndex]
+              if (val === undefined || val === null) continue
+              const name = w.config.series[i].name
+              const color = w.config.colors[i]
+              const sign = val >= 0 ? '+' : ''
+              returnsHtml += `<div style="display:flex;justify-content:space-between;gap:12px;align-items:center;">
+                <span style="color:${color};font-size:12px;">${name}</span>
+                <span style="font-weight:600;color:${color};">${sign}${val.toFixed(2)}%</span>
+              </div>`
+            }
 
             // Build allocation HTML
             let allocationHtml = ''
@@ -300,13 +358,10 @@ export default {
               }
             }
 
-            const returnColor = value >= 0 ? '#68d391' : '#fc8181'
-            const returnSign = value >= 0 ? '+' : ''
-
             return `
-              <div style="background:#1a1a2e;border:1px solid #333;border-radius:6px;padding:10px;min-width:140px;">
+              <div style="background:#1a1a2e;border:1px solid #333;border-radius:6px;padding:10px;min-width:160px;">
                 <div style="color:#888;font-size:11px;margin-bottom:6px;">${dateStr}</div>
-                <div style="font-size:16px;font-weight:600;color:${returnColor};">${returnSign}${value.toFixed(2)}%</div>
+                ${returnsHtml}
                 ${allocationHtml}
               </div>
             `
@@ -339,40 +394,23 @@ export default {
       }
     })
 
-    // Calculate time range based on timeframe
-    const getTimeRange = () => {
-      // Use BigInt throughout to avoid Number overflow (nanosecond timestamps exceed MAX_SAFE_INTEGER)
-      const nowMs = BigInt(Date.now())
-      const now = nowMs * BigInt(1_000_000) // Convert to nanoseconds as BigInt
-      let startTime
-
-      // One day in nanoseconds as BigInt
-      const DAY_NS = BigInt(24) * BigInt(60) * BigInt(60) * BigInt(1000) * BigInt(1_000_000)
-
-      switch (props.timeframe) {
-        case 'OneWeek':
-          startTime = now - (BigInt(7) * DAY_NS)
-          break
-        case 'OneMonth':
-          startTime = now - (BigInt(30) * DAY_NS)
-          break
-        case 'OneYear':
-          startTime = now - (BigInt(365) * DAY_NS)
-          break
-        case 'AllTime':
-        default:
-          // Use null to indicate "all time" - the canister will return all data
-          // We'll use the first checkpoint's timestamp as the actual start
-          startTime = null
+    // Helper to get ICP/USD price from checkpoint's pricesUsed
+    const getIcpUsdPrice = (cp) => {
+      if (!cp.pricesUsed || cp.pricesUsed.length === 0) return null
+      for (const [, priceInfo] of cp.pricesUsed) {
+        if (priceInfo && priceInfo.usdPrice && priceInfo.icpPrice) {
+          const icpPriceNum = Number(priceInfo.icpPrice)
+          if (icpPriceNum > 0) {
+            return priceInfo.usdPrice / (icpPriceNum / 1e8)
+          }
+        }
       }
-
-      return {
-        startTime,
-        endTime: now
-      }
+      return null
     }
 
-    // Load performance data using the new getUserPerformanceGraphData API
+    // Load performance data using getUserPerformanceGraphData API
+    // Always requests AllTime so the graph shows the full history
+    // Passes priceType so backend selects the best neuron for that currency
     const loadPerformanceData = async () => {
       if (!props.principal) return
 
@@ -384,15 +422,17 @@ export default {
         const rewardsActor = await tacoStore.createRewardsActorAnonymous()
         const { Principal } = await import('@dfinity/principal')
 
-        const { startTime, endTime } = getTimeRange()
-        // For canister call, use BigInt(0) when startTime is null (AllTime)
-        const queryStartTime = startTime === null ? BigInt(0) : startTime
+        const nowMs = BigInt(Date.now())
+        const endTime = nowMs * BigInt(1_000_000) // nanoseconds
+        const startTime = BigInt(0) // Always AllTime for the graph
 
-        // Use the new getUserPerformanceGraphData API which returns checkpoint data directly
+        // Always use AllTime timeframe for graph, USD for best neuron selection
         const graphResult = await rewardsActor.getUserPerformanceGraphData(
           Principal.fromText(props.principal),
-          queryStartTime,
-          endTime
+          startTime,
+          endTime,
+          { AllTime: null },
+          { USD: null }
         )
 
         if ('err' in graphResult) {
@@ -402,19 +442,34 @@ export default {
 
         const graphData = graphResult.ok
 
-        // Flatten checkpoints from all neurons into a single timeline
-        const allCheckpoints = graphData.neuronData.flatMap(n => n.checkpoints)
-
-        // Sort by timestamp (chronological order)
-        allCheckpoints.sort((a, b) => Number(a.timestamp) - Number(b.timestamp))
-
-        if (allCheckpoints.length === 0) {
+        // Backend returns at most 1 neuron - get its checkpoints directly
+        const neuron = graphData.neuronData[0]
+        if (!neuron || neuron.checkpoints.length === 0) {
           error.value = 'No checkpoint data available'
           return
         }
 
-        checkpoints.value = allCheckpoints
-        initialValue.value = allCheckpoints[0]?.totalPortfolioValue || 1
+        // Process checkpoints - add ICP portfolio value
+        const processedCheckpoints = neuron.checkpoints.map(cp => {
+          const icpUsdPrice = getIcpUsdPrice(cp)
+          return {
+            ...cp,
+            totalPortfolioValueUSD: cp.totalPortfolioValue,
+            totalPortfolioValueICP: icpUsdPrice ? cp.totalPortfolioValue / icpUsdPrice : 0
+          }
+        })
+
+        // Sort by timestamp and show all checkpoints (AllTime)
+        processedCheckpoints.sort((a, b) => Number(a.timestamp) - Number(b.timestamp))
+
+        if (processedCheckpoints.length === 0) {
+          error.value = 'No checkpoint data available'
+          return
+        }
+
+        checkpoints.value = processedCheckpoints
+        // Reset baseline to first checkpoint when new data loads
+        baselineIndex.value = 0
 
       } catch (err) {
         console.error('Error loading performance chart data:', err)
@@ -440,9 +495,9 @@ export default {
       return 'Failed to load data'
     }
 
-    // Watch for prop changes and reload
+    // Watch for principal change and reload data
     watch(
-      () => [props.principal, props.priceType, props.timeframe],
+      () => props.principal,
       () => {
         loadPerformanceData()
       },
@@ -458,6 +513,8 @@ export default {
       loading,
       error,
       hasData,
+      baselineIndex,
+      baselineOptions,
       chartSeries,
       chartOptions
     }
@@ -469,6 +526,27 @@ export default {
 .performance-chart {
   width: 100%;
   min-height: 100px;
+}
+
+.baseline-label {
+  font-size: 0.8rem;
+  white-space: nowrap;
+}
+
+.baseline-select {
+  max-width: 200px;
+  background-color: #1a1a2e;
+  color: #ccc;
+  border-color: #444;
+  font-size: 0.8rem;
+  padding: 0.2rem 0.5rem;
+}
+
+.baseline-select:focus {
+  background-color: #1a1a2e;
+  color: #ccc;
+  border-color: #63b3ed;
+  box-shadow: 0 0 0 0.15rem rgba(99, 179, 237, 0.25);
 }
 
 .text-muted {

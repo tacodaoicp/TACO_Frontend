@@ -95,8 +95,6 @@
             <div v-if="isExpanded(follow.principal)" class="follow-chart">
               <PerformanceChart
                 :principal="follow.principal"
-                :priceType="selectedPriceType"
-                :timeframe="selectedTimeframe"
                 :height="200"
               />
             </div>
