@@ -680,17 +680,30 @@
                         <span v-if="currentSlidersSumTo100 && matchesLast">Must Be A New Vote</span>
                       </button>
 
-                      <!-- cancel and vote buttons -->
-                      <div v-if="userLockedVote" class="d-flex gap-2">
+                      <!-- cancel, note, and vote buttons -->
+                      <div v-if="userLockedVote" class="vote-confirm-area">
 
-                        <!-- cancel button -->
-                        <button @click="userLockedVote = false"
-                          class="btn taco-btn taco-btn--danger taco-btn--big">Cancel</button>
+                        <!-- optional note -->
+                        <div class="vote-note-field">
+                          <textarea
+                            v-model="allocationNote"
+                            class="form-control taco-input vote-note-textarea"
+                            rows="2"
+                            maxlength="150"
+                            placeholder="Optional: describe your allocation reasoning..."
+                          ></textarea>
+                          <small class="vote-note-char-count">{{ allocationNote.length }}/150</small>
+                        </div>
 
-                        <!-- vote button -->
-                        <button @click="castVote()" 
-                          class="btn taco-btn taco-btn--success taco-btn--big w-100">Vote with
-                          {{ votePower }} VP</button>
+                        <!-- action buttons -->
+                        <div class="d-flex gap-2">
+                          <button @click="userLockedVote = false; allocationNote = ''"
+                            class="btn taco-btn taco-btn--danger taco-btn--big">Cancel</button>
+
+                          <button @click="castVote()"
+                            class="btn taco-btn taco-btn--success taco-btn--big w-100">Vote with
+                            {{ votePower }} VP</button>
+                        </div>
 
                       </div>
 
@@ -1115,6 +1128,7 @@
     </div>    
 
   </div>
+
 
 </template>
 
@@ -2150,8 +2164,58 @@
 
   // medium desktop
   @media (min-width: 1200px) and (max-width: 1399.98px) {
-    
-  }  
+
+  }
+
+  // Inline vote note field
+  .vote-confirm-area {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .vote-note-field {
+    position: relative;
+  }
+
+  .vote-note-textarea {
+    resize: none;
+    font-family: 'Space Mono', monospace;
+    font-size: 0.8rem;
+    min-height: 52px;
+    animation: noteTextareaGlow 2s ease-out;
+  }
+
+  @keyframes noteTextareaGlow {
+    0% {
+      box-shadow: 0 0 28px 10px rgba(254, 200, 0, 0.75), inset 0 0 12px rgba(254, 200, 0, 0.25);
+      outline: 2px solid rgba(254, 200, 0, 1);
+      outline-offset: -1px;
+    }
+    30% {
+      box-shadow: 0 0 20px 6px rgba(254, 200, 0, 0.5), inset 0 0 8px rgba(254, 200, 0, 0.12);
+      outline: 2px solid rgba(254, 200, 0, 0.6);
+      outline-offset: -1px;
+    }
+    65% {
+      box-shadow: 0 0 10px 3px rgba(254, 200, 0, 0.2);
+      outline: 1px solid rgba(254, 200, 0, 0.2);
+      outline-offset: -1px;
+    }
+    100% {
+      box-shadow: none;
+      outline: 0px solid transparent;
+    }
+  }
+
+  .vote-note-char-count {
+    display: block;
+    text-align: right;
+    color: var(--dark-brown-to-white);
+    font-size: 0.7rem;
+    margin-top: 0.2rem;
+    font-family: 'Space Mono', monospace;
+  }
 
 </style>
 
@@ -2268,6 +2332,9 @@
   // user
   const userLockedVote = ref(false)
   const refreshingVP = ref(false)
+
+  // allocation note modal
+  const allocationNote = ref('')
 
   // chart
   const series = ref([100])
@@ -2706,8 +2773,9 @@
     // cast vote with backend
     try { 
 
-      // cast vote with backend
-      await updateAllocation(allocations)
+      // cast vote with backend (pass optional note)
+      const noteText = allocationNote.value.trim() || undefined
+      await updateAllocation(allocations, noteText)
 
       // refresh everything (must await handlers in order)
       await ensureTokenDetails()
@@ -2766,6 +2834,7 @@
     }
 
   }
+
 
   // handle add follow
   const handleAddFollow = async (principalStr: string) => {
@@ -3266,6 +3335,7 @@
 
       //
       window.removeEventListener('resize', setTacoChartMaxHeight)
+
 
   })
 

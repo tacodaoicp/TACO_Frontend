@@ -910,12 +910,12 @@ const handleStakeCompleted = async (neuron: any) => {
   // console.log('Staking completed for neuron:', neuron)
   // Refresh wallet data to show updated balances
   await loadWalletData()
-  // then refresh neurons in the taco token card specifically
+  // then refresh neurons in the taco token card specifically (force refresh to bypass cache)
   try {
     const refVal = tacoTokenCardRef.value as any
     const instances = Array.isArray(refVal) ? refVal : [refVal]
     for (const inst of instances) {
-      if (inst && typeof inst.loadNeurons === 'function') await inst.loadNeurons()
+      if (inst && typeof inst.loadNeurons === 'function') await inst.loadNeurons(true)
     }
   } catch (e) {
     console.error('error refreshing neurons after stake', e)

@@ -1,70 +1,68 @@
 <template>
   <div class="performance-leaderboard mx-3 mb-4">
-    <div class="card bg-dark text-white">
-      <div class="card-header">
-        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
-          <h5 class="mb-0">
-            <i class="fas fa-trophy me-2 text-warning"></i>
-            Best Performers
-          </h5>
+    <div class="taco-container taco-container--l1">
+      <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+        <h5 class="mb-0 taco-text-brown-to-white">
+          <i class="fas fa-trophy me-2" style="color: var(--dark-orange);"></i>
+          Best Performers
+        </h5>
 
-          <!-- Last Updated -->
-          <small v-if="leaderboardInfo" class="text-muted">
-            Updated: {{ formatTimestamp(leaderboardInfo.lastUpdate) }}
-          </small>
+        <!-- Last Updated -->
+        <small v-if="leaderboardInfo" class="lb-muted">
+          Updated: {{ formatTimestamp(leaderboardInfo.lastUpdate) }}
+        </small>
+      </div>
+
+      <!-- Filters -->
+      <div class="filters mb-3 d-flex flex-wrap gap-2">
+        <!-- Timeframe Filters -->
+        <div class="btn-group" role="group">
+          <button
+            v-for="tf in timeframes"
+            :key="tf.value"
+            type="button"
+            class="btn taco-nav-btn"
+            :class="selectedTimeframe === tf.value ? 'taco-nav-btn--active' : ''"
+            @click="$emit('timeframe-change', tf.value)"
+          >
+            {{ tf.label }}
+          </button>
         </div>
 
-        <!-- Filters -->
-        <div class="filters mt-3 d-flex flex-wrap gap-2">
-          <!-- Timeframe Filters -->
-          <div class="btn-group" role="group">
-            <button
-              v-for="tf in timeframes"
-              :key="tf.value"
-              type="button"
-              class="btn btn-sm"
-              :class="selectedTimeframe === tf.value ? 'btn-primary' : 'btn-outline-secondary'"
-              @click="$emit('timeframe-change', tf.value)"
-            >
-              {{ tf.label }}
-            </button>
-          </div>
-
-          <!-- Price Type Filters -->
-          <div class="btn-group" role="group">
-            <button
-              v-for="pt in priceTypes"
-              :key="pt.value"
-              type="button"
-              class="btn btn-sm"
-              :class="selectedPriceType === pt.value ? 'btn-warning' : 'btn-outline-secondary'"
-              @click="$emit('price-type-change', pt.value)"
-            >
-              {{ pt.label }}
-            </button>
-          </div>
+        <!-- Price Type Filters -->
+        <div class="btn-group" role="group">
+          <button
+            v-for="pt in priceTypes"
+            :key="pt.value"
+            type="button"
+            class="btn taco-nav-btn"
+            :class="selectedPriceType === pt.value ? 'taco-nav-btn--active' : ''"
+            @click="$emit('price-type-change', pt.value)"
+          >
+            {{ pt.label }}
+          </button>
         </div>
       </div>
 
-      <div class="card-body p-0">
+      <div>
         <!-- Loading State -->
         <div v-if="isLoading" class="text-center py-5">
-          <div class="spinner-border text-primary" role="status">
+          <div class="spinner-border" role="status" style="color: var(--brown);">
             <span class="visually-hidden">Loading...</span>
           </div>
-          <p class="mt-2 text-muted">Loading leaderboard...</p>
+          <p class="mt-2 lb-muted">Loading leaderboard...</p>
         </div>
 
         <!-- Empty State -->
         <div v-else-if="!leaderboardEntries || leaderboardEntries.length === 0" class="text-center py-5">
-          <i class="fas fa-trophy text-muted fa-3x mb-3"></i>
-          <h5 class="text-muted">No Leaderboard Data Yet</h5>
-          <p class="text-muted">Performance data will appear after reward distributions.</p>
+          <i class="fas fa-trophy fa-3x mb-3" style="color: var(--dark-orange);"></i>
+          <h5 class="lb-muted">No Leaderboard Data Yet</h5>
+          <p class="lb-muted">Performance data will appear after reward distributions.</p>
         </div>
 
         <!-- Leaderboard Table -->
         <div v-else class="table-responsive">
-          <table class="table table-dark table-hover mb-0">
+          <table class="lb-table">
             <thead>
               <tr>
                 <th class="text-center" style="width: 60px;">Rank</th>
@@ -88,35 +86,44 @@
                 >
                   <!-- Rank -->
                   <td class="text-center">
-                    <span class="badge" :class="getRankBadgeClass(Number(entry.rank))">
+                    <span class="rank-badge" :class="getRankBadgeClass(Number(entry.rank))">
                       {{ Number(entry.rank) }}
                     </span>
                   </td>
 
-                  <!-- User Principal -->
+                  <!-- User -->
                   <td>
                     <div class="d-flex align-items-center gap-2">
                       <i
                         class="fas fa-chevron-right expand-icon"
                         :class="{ 'rotated': isExpanded(entry.principal) }"
                       ></i>
-                      <code class="principal-id" :title="entry.principal.toString()">
-                        {{ formatPrincipal(entry.principal) }}
-                      </code>
-                      <span v-if="isCurrentUser(entry.principal)" class="badge bg-info">You</span>
+                      <div class="d-flex flex-column">
+                        <span v-if="entry.displayName && entry.displayName.length > 0" class="display-name" :title="entry.principal.toString()">
+                          {{ entry.displayName[0] }}
+                        </span>
+                        <code
+                          class="principal-id"
+                          :class="{ 'principal-id--small': entry.displayName && entry.displayName.length > 0 }"
+                          :title="entry.principal.toString()"
+                        >
+                          {{ entry.principal.toString() }}
+                        </code>
+                      </div>
+                      <span v-if="isCurrentUser(entry.principal)" class="you-badge">You</span>
                     </div>
                   </td>
 
                   <!-- Performance Return -->
                   <td class="text-end">
-                    <span :class="getPerformanceClass(entry.performanceScore)" class="fw-bold">
+                    <span :class="getPerformanceClass(entry.performanceScore)" class="fw-bold perf-value">
                       {{ formatPerformance(entry.performanceScore) }}
                     </span>
                   </td>
 
                   <!-- Distributions Count -->
                   <td class="text-center">
-                    <span class="text-muted">{{ Number(entry.distributionsCount) }}</span>
+                    <span class="lb-muted">{{ Number(entry.distributionsCount) }}</span>
                   </td>
 
                   <!-- Followers -->
@@ -124,7 +131,7 @@
                     <span v-if="followerInfos[index]" class="follower-count">
                       {{ Number(followerInfos[index].followerCount) }}/500
                     </span>
-                    <span v-else class="text-muted">-</span>
+                    <span v-else class="lb-muted">-</span>
                   </td>
 
                   <!-- Follow Action -->
@@ -133,7 +140,7 @@
                       <!-- Already following -->
                       <button
                         v-if="isFollowing(entry.principal)"
-                        class="btn btn-sm btn-outline-danger"
+                        class="btn taco-btn taco-btn--danger btn-sm"
                         @click="$emit('unfollow', entry.principal.toString())"
                         title="Unfollow this user"
                       >
@@ -143,7 +150,7 @@
                       <!-- Can follow -->
                       <button
                         v-else-if="canFollow(index)"
-                        class="btn btn-sm btn-outline-success"
+                        class="btn taco-btn taco-btn--success btn-sm"
                         @click="$emit('follow', entry.principal.toString())"
                         title="Follow this user's allocations"
                       >
@@ -153,7 +160,7 @@
                       <!-- Cannot follow (at capacity) -->
                       <span
                         v-else
-                        class="badge bg-secondary"
+                        class="full-badge"
                         title="This user has reached maximum followers"
                       >
                         FULL
@@ -161,7 +168,7 @@
                     </template>
 
                     <!-- Not logged in or self -->
-                    <span v-else class="text-muted">-</span>
+                    <span v-else class="lb-muted">-</span>
                   </td>
                 </tr>
 
@@ -182,8 +189,8 @@
         </div>
 
         <!-- Leaderboard Stats Footer -->
-        <div v-if="leaderboardInfo && leaderboardEntries.length > 0" class="card-footer bg-transparent border-top">
-          <small class="text-muted">
+        <div v-if="leaderboardInfo && leaderboardEntries.length > 0" class="lb-footer">
+          <small class="lb-muted">
             Showing {{ leaderboardEntries.length }} of {{ getLeaderboardCount() }} entries
             <span class="mx-2">|</span>
             Total Distributions: {{ Number(leaderboardInfo.totalDistributions) }}
@@ -297,7 +304,7 @@ export default {
     const formatPrincipal = (principal) => {
       const str = principal.toString()
       if (str.length > 20) {
-        return str.substring(0, 8) + '...' + str.substring(str.length - 4)
+        return str.substring(0, 10) + '...' + str.substring(str.length - 6)
       }
       return str
     }
@@ -319,11 +326,11 @@ export default {
 
     // Get badge class for rank
     const getRankBadgeClass = (rank) => {
-      if (rank === 1) return 'bg-warning text-dark'
-      if (rank === 2) return 'bg-secondary'
-      if (rank === 3) return 'bg-warning-subtle text-dark'
-      if (rank <= 10) return 'bg-info'
-      return 'bg-dark border'
+      if (rank === 1) return 'rank-gold'
+      if (rank === 2) return 'rank-silver'
+      if (rank === 3) return 'rank-bronze'
+      if (rank <= 10) return 'rank-top10'
+      return 'rank-default'
     }
 
     // Format timestamp from nanoseconds
@@ -384,44 +391,45 @@ export default {
 </script>
 
 <style scoped>
-.performance-leaderboard .card {
-  border: 1px solid #333;
-}
-
 .filters .btn-group {
   flex-wrap: nowrap;
 }
 
-.filters .btn {
-  padding: 0.25rem 0.75rem;
-}
-
 /* Table styling */
-.table {
-  margin-bottom: 0;
+.lb-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: 'Space Mono', monospace;
+  color: var(--black-to-white);
 }
 
-.table th {
+.lb-table th {
   border-top: none;
-  border-bottom: 2px solid #444;
+  border-bottom: 2px solid var(--dark-orange);
   font-weight: 600;
   font-size: 0.85rem;
-  color: #aaa;
+  color: var(--brown-to-white);
   padding: 0.75rem;
+  font-family: 'Rubik', sans-serif;
 }
 
-.table td {
+.lb-table td {
   vertical-align: middle;
   padding: 0.75rem;
-  border-color: #333;
+  border-bottom: 1px solid var(--dark-orange);
+  color: var(--black-to-white);
 }
 
-.table-hover tbody tr:hover {
-  background-color: rgba(255, 255, 255, 0.05);
+.lb-table tbody tr:hover {
+  background-color: rgba(0, 0, 0, 0.05);
+}
+
+.lb-muted {
+  color: var(--dark-brown-to-white);
 }
 
 .highlight-row {
-  background-color: rgba(99, 179, 237, 0.1) !important;
+  background-color: rgba(218, 141, 40, 0.15) !important;
 }
 
 /* Expandable rows */
@@ -431,12 +439,11 @@ export default {
 }
 
 .clickable-row:hover {
-  background-color: rgba(255, 255, 255, 0.08) !important;
+  background-color: rgba(0, 0, 0, 0.08) !important;
 }
 
 .expanded-row {
-  background-color: rgba(255, 255, 255, 0.05) !important;
-  border-bottom: none !important;
+  background-color: rgba(0, 0, 0, 0.05) !important;
 }
 
 .expanded-row td {
@@ -445,7 +452,7 @@ export default {
 
 .expand-icon {
   font-size: 0.7rem;
-  color: #666;
+  color: var(--dark-brown-to-white);
   transition: transform 0.2s ease;
   width: 12px;
 }
@@ -455,38 +462,107 @@ export default {
 }
 
 .expanded-content-row {
-  background-color: rgba(0, 0, 0, 0.3) !important;
+  background-color: color-mix(in srgb, var(--yellow-to-brown) 85%, #000) !important;
 }
 
 .expanded-content-row:hover {
-  background-color: rgba(0, 0, 0, 0.3) !important;
+  background-color: color-mix(in srgb, var(--yellow-to-brown) 85%, #000) !important;
 }
 
 .expanded-chart-container {
   padding: 1rem;
-  border-top: 1px solid #222;
-  background: linear-gradient(180deg, rgba(0,0,0,0.2) 0%, rgba(0,0,0,0) 100%);
+  border-top: 1px solid var(--dark-orange);
+  background: color-mix(in srgb, var(--yellow-to-brown) 85%, #000);
+}
+
+/* Display name styling */
+.display-name {
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: var(--black-to-white);
 }
 
 /* Principal styling */
 .principal-id {
   font-size: 0.85rem;
-  color: #63b3ed;
+  color: var(--brown-to-white);
+  font-family: 'Space Mono', monospace;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 300px;
+  display: inline-block;
+  vertical-align: middle;
+}
+
+.principal-id--small {
+  font-size: 0.7rem;
+  opacity: 0.7;
 }
 
 /* Rank badges */
-.badge {
+.rank-badge {
+  display: inline-block;
   font-size: 0.8rem;
   min-width: 32px;
+  text-align: center;
+  padding: 0.2rem 0.5rem;
+  border-radius: 0.375rem;
+  font-weight: 700;
+  font-family: 'Space Mono', monospace;
 }
 
-.bg-warning-subtle {
-  background-color: #cd7f32 !important;
+.rank-gold {
+  background: var(--yellow);
+  color: var(--black);
+  border: 1px solid var(--dark-orange);
+}
+
+.rank-silver {
+  background: #c0c0c0;
+  color: var(--black);
+  border: 1px solid #999;
+}
+
+.rank-bronze {
+  background: #cd7f32;
+  color: #fff;
+  border: 1px solid #a0622a;
+}
+
+.rank-top10 {
+  background: var(--dark-orange);
+  color: #fff;
+}
+
+.rank-default {
+  background: var(--orange-to-light-brown);
+  color: var(--brown-to-white);
+  border: 1px solid var(--dark-orange);
+}
+
+.you-badge {
+  background: var(--green);
+  color: var(--black);
+  border-radius: 0.375rem;
+  padding: 0.1rem 0.4rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+}
+
+.full-badge {
+  background: var(--dark-gray);
+  color: #fff;
+  border-radius: 0.375rem;
+  padding: 0.15rem 0.5rem;
+  font-size: 0.75rem;
 }
 
 /* Follower count */
 .follower-count {
   font-size: 0.85rem;
+  font-family: 'Space Mono', monospace;
+  color: var(--black-to-white);
 }
 
 /* Action buttons */
@@ -495,18 +571,31 @@ export default {
   padding: 0.2rem 0.5rem;
 }
 
+.perf-value {
+  background: rgba(0, 0, 0, 0.45);
+  padding: 0.15rem 0.5rem;
+  border-radius: 0.375rem;
+  font-family: 'Space Mono', monospace;
+}
+
 /* Performance colors */
 .text-success {
-  color: #68d391 !important;
+  color: var(--green) !important;
 }
 
 .text-danger {
-  color: #fc8181 !important;
+  color: #FF4444 !important;
 }
 
-/* Card footer */
-.card-footer {
-  padding: 0.75rem 1rem;
+.text-muted {
+  color: var(--dark-brown-to-white) !important;
+}
+
+/* Footer */
+.lb-footer {
+  padding: 0.75rem 0;
+  margin-top: 0.75rem;
+  border-top: 1px solid var(--dark-orange);
   font-size: 0.85rem;
 }
 
@@ -524,14 +613,15 @@ export default {
     flex: 1;
   }
 
-  .table th,
-  .table td {
+  .lb-table th,
+  .lb-table td {
     padding: 0.5rem;
     font-size: 0.8rem;
   }
 
   .principal-id {
     font-size: 0.75rem;
+    max-width: 140px;
   }
 }
 </style>

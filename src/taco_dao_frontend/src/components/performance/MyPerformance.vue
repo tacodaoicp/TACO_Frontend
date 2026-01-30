@@ -1,8 +1,8 @@
 <template>
   <div class="my-performance mx-3 mb-4">
-    <div class="card bg-dark text-white">
-      <div class="card-header d-flex justify-content-between align-items-center">
-        <h5 class="mb-0">
+    <div class="taco-container taco-container--l1">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h5 class="mb-0 taco-text-brown-to-white">
           <i class="fas fa-user me-2"></i>
           My Performance
         </h5>
@@ -10,8 +10,8 @@
           <!-- Chart Toggle -->
           <button
             v-if="userPerformance && !isLoading"
-            class="btn btn-sm"
-            :class="showChart ? 'btn-info' : 'btn-outline-info'"
+            class="btn taco-nav-btn"
+            :class="showChart ? 'taco-nav-btn--active' : ''"
             @click="showChart = !showChart"
             title="Toggle performance chart"
           >
@@ -19,7 +19,7 @@
           </button>
           <button
             v-if="!isLoading"
-            class="btn btn-outline-primary btn-sm"
+            class="btn taco-nav-btn"
             @click="$emit('refresh')"
           >
             <i class="fas fa-sync-alt me-1"></i> Refresh
@@ -27,33 +27,33 @@
         </div>
       </div>
 
-      <div class="card-body">
+      <div>
         <!-- Loading State -->
         <div v-if="isLoading" class="text-center py-4">
-          <div class="spinner-border text-primary" role="status">
+          <div class="spinner-border" role="status" style="color: var(--brown);">
             <span class="visually-hidden">Loading...</span>
           </div>
-          <p class="mt-2 text-muted">Loading your performance data...</p>
+          <p class="mt-2 perf-muted">Loading your performance data...</p>
         </div>
 
         <!-- Error State -->
         <div v-else-if="errorMessage" class="text-center py-4">
-          <i class="fas fa-exclamation-circle text-warning fa-2x mb-3"></i>
-          <p class="text-muted">{{ errorMessage }}</p>
+          <i class="fas fa-exclamation-circle fa-2x mb-3" style="color: var(--dark-orange);"></i>
+          <p class="perf-muted">{{ errorMessage }}</p>
         </div>
 
         <!-- No Data State -->
         <div v-else-if="!userPerformance" class="text-center py-4">
-          <i class="fas fa-chart-line text-muted fa-2x mb-3"></i>
-          <p class="text-muted">No performance data available yet.</p>
-          <p class="text-muted small">Performance is calculated after participating in reward distributions.</p>
+          <i class="fas fa-chart-line fa-2x mb-3 perf-muted"></i>
+          <p class="perf-muted">No performance data available yet.</p>
+          <p class="perf-muted small">Performance is calculated after participating in reward distributions.</p>
         </div>
 
         <!-- Performance Data -->
         <div v-else>
           <!-- Performance Chart (collapsible) -->
           <div v-if="showChart && principal" class="mb-4">
-            <div class="chart-container bg-dark-subtle rounded p-3">
+            <div class="chart-container">
               <PerformanceChart
                 :principal="principal"
                 :height="280"
@@ -65,24 +65,24 @@
           <div class="row mb-4">
             <div class="col-md-4">
               <div class="stat-card">
-                <small class="text-muted">Total Voting Power</small>
-                <div class="h5 mb-0 text-info">
+                <small class="perf-muted">Total Voting Power</small>
+                <div class="h5 mb-0 perf-positive">
                   {{ formatVotingPower(userPerformance.totalVotingPower) }}
                 </div>
               </div>
             </div>
             <div class="col-md-4">
               <div class="stat-card">
-                <small class="text-muted">Distributions Participated</small>
-                <div class="h5 mb-0 text-success">
+                <small class="perf-muted">Distributions Participated</small>
+                <div class="h5 mb-0 perf-positive">
                   {{ Number(userPerformance.distributionsParticipated) }}
                 </div>
               </div>
             </div>
             <div class="col-md-4">
               <div class="stat-card">
-                <small class="text-muted">Neurons</small>
-                <div class="h5 mb-0 text-warning">
+                <small class="perf-muted">Neurons</small>
+                <div class="h5 mb-0 perf-positive">
                   {{ userPerformance.neurons?.length || 0 }}
                 </div>
               </div>
@@ -90,7 +90,7 @@
           </div>
 
           <!-- Performance Grid -->
-          <h6 class="text-muted mb-3">Performance by Timeframe</h6>
+          <h6 class="perf-muted mb-3">Performance by Timeframe</h6>
           <div class="performance-grid mb-4">
             <!-- USD Performance -->
             <div class="perf-section">
@@ -157,7 +157,7 @@
 
           <!-- Neurons Section -->
           <div v-if="userPerformance.neurons && userPerformance.neurons.length > 0">
-            <h6 class="text-muted mb-3">
+            <h6 class="perf-muted mb-3">
               <i class="fas fa-brain me-1"></i>
               Your Neurons ({{ userPerformance.neurons.length }})
             </h6>
@@ -168,8 +168,8 @@
                 class="neuron-card"
               >
                 <div class="neuron-header">
-                  <code class="text-primary">{{ formatNeuronId(neuron.neuronId) }}</code>
-                  <span class="badge bg-info ms-2">
+                  <code class="neuron-id">{{ formatNeuronId(neuron.neuronId) }}</code>
+                  <span class="neuron-badge ms-2">
                     VP: {{ formatVotingPower(neuron.votingPower) }}
                   </span>
                 </div>
@@ -194,7 +194,7 @@
                   </div>
                 </div>
                 <div class="neuron-meta">
-                  <small class="text-muted">
+                  <small class="perf-muted">
                     {{ Number(neuron.distributionsParticipated) }} distributions
                   </small>
                 </div>
@@ -313,22 +313,17 @@ export default {
 </script>
 
 <style scoped>
-.my-performance .card {
-  border: 1px solid #333;
-}
-
 .chart-container {
-  background: rgba(0, 0, 0, 0.2);
-  border: 1px solid #333;
-}
-
-.bg-dark-subtle {
-  background-color: rgba(255, 255, 255, 0.03) !important;
+  background: color-mix(in srgb, var(--yellow-to-brown) 85%, #000);
+  border: 1px solid var(--dark-orange);
+  border-radius: 0.5rem;
+  padding: 0.75rem;
 }
 
 .stat-card {
-  background: rgba(255, 255, 255, 0.05);
-  border-radius: 8px;
+  background: var(--orange-to-light-brown);
+  border: 1px solid var(--dark-orange);
+  border-radius: 0.5rem;
   padding: 1rem;
   text-align: center;
 }
@@ -340,17 +335,19 @@ export default {
 }
 
 .perf-section {
-  background: rgba(255, 255, 255, 0.03);
-  border-radius: 8px;
+  background: var(--orange-to-light-brown);
+  border: 1px solid var(--dark-orange);
+  border-radius: 0.5rem;
   padding: 0.75rem 1rem;
 }
 
 .perf-label {
   display: block;
   font-weight: 600;
-  color: #888;
+  color: var(--brown-to-white);
   margin-bottom: 0.5rem;
   font-size: 0.85rem;
+  font-family: 'Space Mono', monospace;
 }
 
 .perf-row {
@@ -367,12 +364,25 @@ export default {
 
 .perf-timeframe {
   font-size: 0.75rem;
-  color: #666;
+  color: var(--dark-brown-to-white);
+  font-family: 'Space Mono', monospace;
 }
 
 .perf-item span:last-child {
   font-weight: 600;
   font-size: 1.1rem;
+  font-family: 'Space Mono', monospace;
+  background: rgba(0, 0, 0, 0.45);
+  padding: 0.15rem 0.5rem;
+  border-radius: 0.375rem;
+}
+
+.perf-muted {
+  color: var(--dark-brown-to-white);
+}
+
+.perf-positive {
+  color: var(--green);
 }
 
 .neurons-list {
@@ -382,9 +392,9 @@ export default {
 }
 
 .neuron-card {
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid #333;
-  border-radius: 8px;
+  background: var(--orange-to-light-brown);
+  border: 1px solid var(--dark-orange);
+  border-radius: 0.5rem;
   padding: 1rem;
 }
 
@@ -394,8 +404,20 @@ export default {
   margin-bottom: 0.75rem;
 }
 
-.neuron-header code {
+.neuron-id {
   font-size: 0.85rem;
+  color: var(--brown-to-white);
+}
+
+.neuron-badge {
+  background: var(--yellow);
+  color: var(--black);
+  border: 1px solid var(--dark-orange);
+  border-radius: 0.375rem;
+  padding: 0.15rem 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  font-family: 'Space Mono', monospace;
 }
 
 .neuron-performance {
@@ -411,38 +433,35 @@ export default {
 
 .perf-mini .label {
   font-size: 0.7rem;
-  color: #666;
+  color: var(--dark-brown-to-white);
+  font-family: 'Space Mono', monospace;
 }
 
 .perf-mini span:last-child {
   font-weight: 600;
+  font-family: 'Space Mono', monospace;
+  background: rgba(0, 0, 0, 0.45);
+  padding: 0.1rem 0.4rem;
+  border-radius: 0.375rem;
 }
 
 .neuron-meta {
-  border-top: 1px solid #333;
+  border-top: 1px solid var(--dark-orange);
   padding-top: 0.5rem;
   margin-top: 0.5rem;
 }
 
-/* Text colors */
+/* Performance text colors - theme aware */
 .text-success {
-  color: #68d391 !important;
+  color: var(--green) !important;
 }
 
 .text-danger {
-  color: #fc8181 !important;
+  color: #FF4444 !important;
 }
 
 .text-muted {
-  color: #718096 !important;
-}
-
-.text-info {
-  color: #63b3ed !important;
-}
-
-.text-warning {
-  color: #f6e05e !important;
+  color: var(--dark-brown-to-white) !important;
 }
 
 /* Responsive */

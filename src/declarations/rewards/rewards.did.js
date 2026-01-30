@@ -1,6 +1,7 @@
 export const idlFactory = ({ IDL }) => {
   const RewardsError = IDL.Variant({
     'AllocationDataMissing' : IDL.Null,
+    'InvalidDisplayName' : IDL.Text,
     'SystemError' : IDL.Text,
     'NotAuthorized' : IDL.Null,
     'DistributionInProgress' : IDL.Null,
@@ -28,7 +29,7 @@ export const idlFactory = ({ IDL }) => {
     'endTime' : IDL.Int,
     'errors' : IDL.Vec(IDL.Text),
   });
-  const Result__1_11 = IDL.Variant({
+  const Result__1_12 = IDL.Variant({
     'ok' : BackfillResult,
     'err' : RewardsError,
   });
@@ -67,6 +68,7 @@ export const idlFactory = ({ IDL }) => {
     'timestamp' : IDL.Int,
     'allocations' : IDL.Vec(Allocation),
     'tokenValues' : IDL.Vec(IDL.Tuple(IDL.Principal, IDL.Float64)),
+    'reason' : IDL.Opt(IDL.Text),
   });
   const PerformanceResult = IDL.Record({
     'startTime' : IDL.Int,
@@ -80,7 +82,7 @@ export const idlFactory = ({ IDL }) => {
     'inTimespanChanges' : IDL.Vec(NeuronAllocationChangeBlockData),
     'initialValue' : IDL.Float64,
   });
-  const Result__1_10 = IDL.Variant({
+  const Result__1_11 = IDL.Variant({
     'ok' : PerformanceResult,
     'err' : RewardsError,
   });
@@ -101,6 +103,10 @@ export const idlFactory = ({ IDL }) => {
   });
   const Result__1_2 = IDL.Variant({
     'ok' : IDL.Vec(WithdrawalRecord),
+    'err' : RewardsError,
+  });
+  const Result__1_10 = IDL.Variant({
+    'ok' : IDL.Vec(IDL.Text),
     'err' : RewardsError,
   });
   const DistributionStatus = IDL.Variant({
@@ -157,6 +163,7 @@ export const idlFactory = ({ IDL }) => {
   });
   const LeaderboardEntry = IDL.Record({
     'principal' : IDL.Principal,
+    'displayName' : IDL.Opt(IDL.Text),
     'performanceScore' : IDL.Float64,
     'lastActivity' : IDL.Int,
     'rank' : IDL.Nat,
@@ -228,24 +235,35 @@ export const idlFactory = ({ IDL }) => {
     'ok' : UserPerformanceResult,
     'err' : RewardsError,
   });
+  const GraphCheckpointData = IDL.Record({
+    'maker' : IDL.Opt(IDL.Principal),
+    'totalPortfolioValue' : IDL.Float64,
+    'totalPortfolioValueICP' : IDL.Float64,
+    'pricesUsed' : IDL.Vec(IDL.Tuple(IDL.Principal, PriceInfo)),
+    'timestamp' : IDL.Int,
+    'allocations' : IDL.Vec(Allocation),
+    'tokenValues' : IDL.Vec(IDL.Tuple(IDL.Principal, IDL.Float64)),
+    'reason' : IDL.Opt(IDL.Text),
+  });
+  const NeuronGraphData = IDL.Record({
+    'checkpoints' : IDL.Vec(GraphCheckpointData),
+    'neuronId' : IDL.Vec(IDL.Nat8),
+    'performanceScoreICP' : IDL.Opt(IDL.Float64),
+    'performanceScoreUSD' : IDL.Float64,
+  });
   const UserPerformanceGraphData = IDL.Record({
     'oneMonthICP' : IDL.Opt(IDL.Float64),
     'oneMonthUSD' : IDL.Opt(IDL.Float64),
     'timeframe' : IDL.Record({ 'startTime' : IDL.Int, 'endTime' : IDL.Int }),
-    'neuronData' : IDL.Vec(
-      IDL.Record({
-        'checkpoints' : IDL.Vec(CheckpointData),
-        'neuronId' : IDL.Vec(IDL.Nat8),
-        'performanceScoreICP' : IDL.Opt(IDL.Float64),
-        'performanceScoreUSD' : IDL.Float64,
-      })
-    ),
+    'bestUsdNeuron' : IDL.Opt(NeuronGraphData),
     'oneWeekICP' : IDL.Opt(IDL.Float64),
     'oneWeekUSD' : IDL.Opt(IDL.Float64),
     'oneYearICP' : IDL.Opt(IDL.Float64),
     'oneYearUSD' : IDL.Opt(IDL.Float64),
     'aggregatedPerformanceICP' : IDL.Opt(IDL.Float64),
     'aggregatedPerformanceUSD' : IDL.Float64,
+    'allocationNeuronId' : IDL.Opt(IDL.Vec(IDL.Nat8)),
+    'bestIcpNeuron' : IDL.Opt(NeuronGraphData),
   });
   const Result__1_3 = IDL.Variant({
     'ok' : UserPerformanceGraphData,
@@ -270,10 +288,12 @@ export const idlFactory = ({ IDL }) => {
   });
   const Result = IDL.Variant({ 'Ok' : IDL.Nat, 'Err' : TransferError });
   const Rewards = IDL.Service({
+    'addBannedWords' : IDL.Func([IDL.Vec(IDL.Text)], [Result__1], []),
     'addToRewardSkipList' : IDL.Func([IDL.Vec(IDL.Nat8)], [Result__1], []),
+    'adminDeleteDisplayName' : IDL.Func([IDL.Principal], [Result__1], []),
     'admin_backfillDistributionHistory' : IDL.Func(
         [BackfillConfig],
-        [Result__1_11],
+        [Result__1_12],
         [],
       ),
     'admin_recalculateAllIcpPerformance' : IDL.Func([], [Result__1], []),
@@ -284,15 +304,16 @@ export const idlFactory = ({ IDL }) => {
       ),
     'calculateNeuronPerformance' : IDL.Func(
         [IDL.Vec(IDL.Nat8), IDL.Int, IDL.Int, PriceType],
-        [Result__1_10],
+        [Result__1_11],
         [],
       ),
     'calculateNeuronPerformanceQuery' : IDL.Func(
         [IDL.Vec(IDL.Nat8), IDL.Int, IDL.Int, PriceType],
-        [Result__1_10],
+        [Result__1_11],
         ['composite_query'],
       ),
     'clearLogs' : IDL.Func([], [], []),
+    'deleteMyDisplayName' : IDL.Func([], [Result__1], []),
     'getAllNeuronRewardBalances' : IDL.Func(
         [],
         [IDL.Vec(IDL.Tuple(IDL.Vec(IDL.Nat8), IDL.Nat))],
@@ -319,6 +340,7 @@ export const idlFactory = ({ IDL }) => {
         ],
         ['query'],
       ),
+    'getBannedWords' : IDL.Func([], [Result__1_10], []),
     'getCanisterStatus' : IDL.Func(
         [],
         [
@@ -372,6 +394,16 @@ export const idlFactory = ({ IDL }) => {
         ['query'],
       ),
     'getCurrentTotalNeuronBalances' : IDL.Func([], [IDL.Nat], ['query']),
+    'getDisplayName' : IDL.Func(
+        [IDL.Principal],
+        [IDL.Opt(IDL.Text)],
+        ['query'],
+      ),
+    'getDisplayNames' : IDL.Func(
+        [IDL.Vec(IDL.Principal)],
+        [IDL.Vec(IDL.Tuple(IDL.Principal, IDL.Opt(IDL.Text)))],
+        ['query'],
+      ),
     'getDistributionHistory' : IDL.Func(
         [IDL.Nat, IDL.Nat],
         [
@@ -461,7 +493,7 @@ export const idlFactory = ({ IDL }) => {
         ['composite_query'],
       ),
     'getUserPerformanceGraphData' : IDL.Func(
-        [IDL.Principal, IDL.Int, IDL.Int, LeaderboardTimeframe, PriceType],
+        [IDL.Principal, IDL.Int, IDL.Int, LeaderboardTimeframe],
         [Result__1_3],
         ['composite_query'],
       ),
@@ -492,8 +524,10 @@ export const idlFactory = ({ IDL }) => {
         ['query'],
       ),
     'refreshLeaderboards' : IDL.Func([], [Result__1], []),
+    'removeBannedWords' : IDL.Func([IDL.Vec(IDL.Text)], [Result__1], []),
     'removeFromRewardSkipList' : IDL.Func([IDL.Vec(IDL.Nat8)], [Result__1], []),
     'removeRewardPenalty' : IDL.Func([IDL.Vec(IDL.Nat8)], [Result__1], []),
+    'setDisplayName' : IDL.Func([IDL.Text], [Result__1], []),
     'setDistributionEnabled' : IDL.Func([IDL.Bool], [Result__1], []),
     'setDistributionPeriod' : IDL.Func([IDL.Nat], [Result__1], []),
     'setMaxDistributionHistory' : IDL.Func([IDL.Nat], [Result__1], []),

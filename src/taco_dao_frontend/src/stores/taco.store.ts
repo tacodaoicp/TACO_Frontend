@@ -3765,7 +3765,7 @@ export const useTacoStore = defineStore('taco', () => {
         }
 
     }
-    const updateAllocation = async (allocations: any) => {
+    const updateAllocation = async (allocations: any, note?: string) => {
 
         // log
         // console.log('taco.store: updateAllocation()')
@@ -3785,8 +3785,8 @@ export const useTacoStore = defineStore('taco', () => {
                 //////////////////////
                 // post actor logic //
 
-                // call the updateAllocation function
-                await actor.updateAllocation(allocations)
+                // call the updateAllocation function (with optional note)
+                await actor.updateAllocation(allocations, note ? [note] : [])
 
                 // log
                 // console.log('taco.store: DAO backend - actor.updateAllocation() - updated allocation')                  

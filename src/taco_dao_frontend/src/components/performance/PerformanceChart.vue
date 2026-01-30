@@ -2,28 +2,28 @@
   <div class="performance-chart">
     <!-- Loading State -->
     <div v-if="loading" class="text-center py-4">
-      <div class="spinner-border spinner-border-sm text-primary" role="status">
+      <div class="spinner-border spinner-border-sm" role="status" style="color: var(--brown);">
         <span class="visually-hidden">Loading...</span>
       </div>
-      <span class="ms-2 text-muted">Loading chart data...</span>
+      <span class="ms-2 chart-muted">Loading chart data...</span>
     </div>
 
     <!-- Error State -->
     <div v-else-if="error" class="text-center py-4">
-      <i class="fas fa-exclamation-triangle text-warning me-2"></i>
-      <span class="text-muted">{{ error }}</span>
+      <i class="fas fa-exclamation-triangle me-2" style="color: var(--dark-orange);"></i>
+      <span class="chart-muted">{{ error }}</span>
     </div>
 
     <!-- No Data State -->
     <div v-else-if="!hasData" class="text-center py-4">
-      <i class="fas fa-chart-area text-muted me-2"></i>
-      <span class="text-muted">No performance history available</span>
+      <i class="fas fa-chart-area chart-muted me-2"></i>
+      <span class="chart-muted">No performance history available</span>
     </div>
 
     <!-- Chart with baseline selector -->
     <div v-else>
       <div class="d-flex align-items-center gap-2 mb-2">
-        <label class="baseline-label text-muted">Start from:</label>
+        <label class="baseline-label chart-muted">Start from:</label>
         <select
           v-model="baselineIndex"
           class="form-select form-select-sm baseline-select"
@@ -62,7 +62,7 @@ export default {
     height: {
       type: [Number, String],
       default: 250
-    }
+    },
   },
 
   setup(props) {
@@ -71,7 +71,8 @@ export default {
 
     const loading = ref(false)
     const error = ref('')
-    const checkpoints = ref([])
+    const usdCheckpoints = ref([])
+    const icpCheckpoints = ref([])
     const baselineIndex = ref(0)
 
     // Build a map of token principal -> symbol for quick lookup
@@ -111,12 +112,13 @@ export default {
 
     // Check if we have data to display
     const hasData = computed(() => {
-      return checkpoints.value.length > 0
+      return usdCheckpoints.value.length > 0 || icpCheckpoints.value.length > 0
     })
 
-    // Baseline options for the dropdown - each checkpoint as a selectable start point
+    // Baseline options for the dropdown - use USD checkpoints (primary series)
     const baselineOptions = computed(() => {
-      return checkpoints.value.map((cp, idx) => {
+      const cps = usdCheckpoints.value.length > 0 ? usdCheckpoints.value : icpCheckpoints.value
+      return cps.map((cp, idx) => {
         const date = new Date(Number(cp.timestamp) / 1_000_000)
         const label = idx === 0
           ? `${date.toLocaleDateString()} (First)`
@@ -152,71 +154,62 @@ export default {
       return true
     }
 
-    // Process checkpoints into chart series data, skipping consecutive identical allocations
-    // Returns two series: USD and ICP, starting from the selected baseline checkpoint
-    const chartSeries = computed(() => {
-      if (!checkpoints.value.length) return []
+    // Helper: filter checkpoints, skip consecutive identical allocations, compute returns from baseline
+    const buildSeriesData = (checkpointsArr, baselineIdx, valueKey) => {
+      if (!checkpointsArr.length) return []
 
-      const bIdx = baselineIndex.value
-      const baselineCp = checkpoints.value[bIdx]
+      const bIdx = Math.min(baselineIdx, checkpointsArr.length - 1)
+      const baselineCp = checkpointsArr[bIdx]
       if (!baselineCp) return []
 
-      const baseUSD = baselineCp.totalPortfolioValueUSD || 1
-      const baseICP = baselineCp.totalPortfolioValueICP || 1
+      const baseVal = baselineCp[valueKey] || 1
+      const relevant = checkpointsArr.slice(bIdx)
 
-      // Only include checkpoints from the baseline onward
-      const relevantCheckpoints = checkpoints.value.slice(bIdx)
+      const filtered = []
+      let lastAlloc = null
 
-      // Filter to skip consecutive ones with identical allocations
-      const filteredCheckpoints = []
-      let lastIncludedAllocation = null
-
-      for (let i = 0; i < relevantCheckpoints.length; i++) {
-        const cp = relevantCheckpoints[i]
-        const originalIndex = bIdx + i
+      for (let i = 0; i < relevant.length; i++) {
+        const cp = relevant[i]
+        const origIdx = bIdx + i
         const isFirst = i === 0
-        const isLast = i === relevantCheckpoints.length - 1
+        const isLast = i === relevant.length - 1
 
         if (isFirst || isLast) {
-          filteredCheckpoints.push({ checkpoint: cp, originalIndex })
-          lastIncludedAllocation = cp.allocations
-        } else {
-          if (!allocationsEqual(cp.allocations, lastIncludedAllocation)) {
-            filteredCheckpoints.push({ checkpoint: cp, originalIndex })
-            lastIncludedAllocation = cp.allocations
-          }
+          filtered.push({ cp, origIdx })
+          lastAlloc = cp.allocations
+        } else if (!allocationsEqual(cp.allocations, lastAlloc)) {
+          filtered.push({ cp, origIdx })
+          lastAlloc = cp.allocations
         }
       }
 
-      const usdData = []
-      const icpData = []
-
-      for (const { checkpoint: cp, originalIndex } of filteredCheckpoints) {
-        const timestampMs = Number(cp.timestamp) / 1_000_000
-        const usdReturn = ((cp.totalPortfolioValueUSD / baseUSD) - 1) * 100
-        const icpReturn = cp.totalPortfolioValueICP > 0
-          ? ((cp.totalPortfolioValueICP / baseICP) - 1) * 100
-          : null
-
-        usdData.push({
-          x: timestampMs,
-          y: parseFloat(usdReturn.toFixed(2)),
-          checkpointIndex: originalIndex
+      const data = []
+      for (const { cp, origIdx } of filtered) {
+        const val = cp[valueKey]
+        if (val == null || val <= 0) continue
+        const ret = ((val / baseVal) - 1) * 100
+        data.push({
+          x: Number(cp.timestamp) / 1_000_000,
+          y: parseFloat(ret.toFixed(2)),
+          checkpointIndex: origIdx
         })
-
-        if (icpReturn !== null) {
-          icpData.push({
-            x: timestampMs,
-            y: parseFloat(icpReturn.toFixed(2)),
-            checkpointIndex: originalIndex
-          })
-        }
       }
+      data.sort((a, b) => a.x - b.x)
+      return data
+    }
 
-      usdData.sort((a, b) => a.x - b.x)
-      icpData.sort((a, b) => a.x - b.x)
+    // Process checkpoints into chart series data
+    // USD line uses best-USD neuron checkpoints, ICP line uses best-ICP neuron checkpoints
+    const chartSeries = computed(() => {
+      const bIdx = baselineIndex.value
 
-      const series = [{ name: 'Return (USD)', data: usdData }]
+      const usdData = buildSeriesData(usdCheckpoints.value, bIdx, 'totalPortfolioValueUSD')
+      const icpData = buildSeriesData(icpCheckpoints.value, bIdx, 'totalPortfolioValueICP')
+
+      const series = []
+      if (usdData.length > 0) {
+        series.push({ name: 'Return (USD)', data: usdData })
+      }
       if (icpData.length > 0) {
         series.push({ name: 'Return (ICP)', data: icpData })
       }
@@ -225,8 +218,8 @@ export default {
 
     // Chart options - dual series: USD (green/red) and ICP (blue)
     const chartOptions = computed(() => {
-      const usdColor = '#68d391' // Green for USD
-      const icpColor = '#63b3ed' // Blue for ICP
+      const usdColor = '#FEC800' // Yellow/Gold for USD
+      const icpColor = '#7CDC86' // Light green for ICP
 
       return {
         chart: {
@@ -273,12 +266,12 @@ export default {
           show: chartSeries.value.length > 1,
           position: 'top',
           horizontalAlign: 'left',
-          labels: { colors: '#aaa' },
+          labels: { colors: '#fff' },
           markers: { width: 10, height: 10, radius: 2 }
         },
         markers: {
           size: 4,
-          strokeColors: '#1a1a2e',
+          strokeColors: '#934A17',
           strokeWidth: 2,
           hover: {
             size: 6
@@ -289,21 +282,21 @@ export default {
           labels: {
             datetimeUTC: false,
             style: {
-              colors: '#888'
+              colors: '#FEEAC1'
             }
           },
           axisBorder: {
-            color: '#333'
+            color: '#DA8D28'
           },
           axisTicks: {
-            color: '#333'
+            color: '#DA8D28'
           }
         },
         yaxis: {
           labels: {
             formatter: (val) => `${val >= 0 ? '+' : ''}${val.toFixed(1)}%`,
             style: {
-              colors: '#888'
+              colors: '#FEEAC1'
             }
           }
         },
@@ -311,22 +304,53 @@ export default {
           theme: 'dark',
           shared: true,
           intersect: false,
-          custom: function({ series, dataPointIndex, w }) {
-            // Get timestamp from the first series' data point
-            const dataPoint = w.config.series[0].data[dataPointIndex]
-            if (!dataPoint) return ''
-            const timestamp = dataPoint.x
+          custom: function({ seriesIndex, dataPointIndex, w }) {
+            // Determine if data point is in the left or right half of the chart
+            const totalPoints = Math.max(...w.config.series.map(s => s.data?.length || 0), 1)
+            const isLeftHalf = dataPointIndex < totalPoints / 2
+            // Get the hovered timestamp from whichever series the user is hovering
+            // seriesIndex may be -1 when shared tooltip triggers, so try each series
+            let timestamp = null
+            if (seriesIndex >= 0 && w.config.series[seriesIndex]?.data?.[dataPointIndex]) {
+              timestamp = w.config.series[seriesIndex].data[dataPointIndex].x
+            } else {
+              // Fallback: try series 0, then series 1
+              for (let s = 0; s < w.config.series.length; s++) {
+                const dp = w.config.series[s]?.data?.[dataPointIndex]
+                if (dp) {
+                  timestamp = dp.x
+                  break
+                }
+              }
+            }
+            if (timestamp === null) return ''
             const date = new Date(timestamp)
             const dateStr = date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
 
-            // Get the checkpoint data for allocations
-            const checkpointIndex = dataPoint.checkpointIndex
-            const checkpoint = checkpoints.value[checkpointIndex]
+            // For each series, find the closest data point by timestamp
+            // (series may have different data points from different neurons)
+            const findClosestPoint = (seriesData, ts) => {
+              if (!seriesData || seriesData.length === 0) return null
+              let closest = seriesData[0]
+              let closestDiff = Math.abs(closest.x - ts)
+              for (const pt of seriesData) {
+                const diff = Math.abs(pt.x - ts)
+                if (diff < closestDiff) {
+                  closest = pt
+                  closestDiff = diff
+                }
+              }
+              return closest
+            }
 
-            // Build returns HTML for both series
+            // Build returns HTML for both series and track which has the best return
             let returnsHtml = ''
+            let bestReturnVal = -Infinity
+            let bestSeriesIdx = -1
             for (let i = 0; i < w.config.series.length; i++) {
-              const val = series[i]?.[dataPointIndex]
+              const pt = findClosestPoint(w.config.series[i].data, timestamp)
+              if (!pt) continue
+              const val = pt.y
               if (val === undefined || val === null) continue
               const name = w.config.series[i].name
               const color = w.config.colors[i]
@@ -335,6 +359,34 @@ export default {
                 <span style="color:${color};font-size:12px;">${name}</span>
                 <span style="font-weight:600;color:${color};">${sign}${val.toFixed(2)}%</span>
               </div>`
+              if (val > bestReturnVal) {
+                bestReturnVal = val
+                bestSeriesIdx = i
+              }
+            }
+
+            // Show allocation from whichever neuron (USD or ICP) has the better return
+            const findClosestCheckpoint = (cps, ts) => {
+              if (!cps || cps.length === 0) return null
+              let closest = cps[0]
+              let closestDiff = Math.abs(Number(closest.timestamp) / 1_000_000 - ts)
+              for (const cp of cps) {
+                const diff = Math.abs(Number(cp.timestamp) / 1_000_000 - ts)
+                if (diff < closestDiff) {
+                  closest = cp
+                  closestDiff = diff
+                }
+              }
+              return closest
+            }
+
+            // Pick allocation from the neuron with the better return at this point
+            let checkpoint = null
+            const usdIsFirst = w.config.series[0]?.name?.includes('USD')
+            if (bestSeriesIdx === 0) {
+              checkpoint = findClosestCheckpoint(usdIsFirst ? usdCheckpoints.value : icpCheckpoints.value, timestamp)
+            } else if (bestSeriesIdx === 1) {
+              checkpoint = findClosestCheckpoint(usdIsFirst ? icpCheckpoints.value : usdCheckpoints.value, timestamp)
             }
 
             // Build allocation HTML
@@ -345,30 +397,60 @@ export default {
                 .map(alloc => {
                   const symbol = getTokenSymbol(alloc.token)
                   const percent = (Number(alloc.basisPoints) / 100).toFixed(1)
-                  return `<div style="display:flex;justify-content:space-between;gap:12px;"><span style="color:#aaa;">${symbol}</span><span>${percent}%</span></div>`
+                  return `<div style="display:flex;justify-content:space-between;gap:12px;"><span style="color:#FEEAC1;">${symbol}</span><span style="color:#fff;">${percent}%</span></div>`
                 })
 
               if (nonZeroAllocations.length > 0) {
                 allocationHtml = `
-                  <div style="border-top:1px solid #444;margin-top:8px;padding-top:8px;">
-                    <div style="color:#888;font-size:11px;margin-bottom:4px;">Allocation:</div>
+                  <div style="border-top:1px solid #DA8D28;margin-top:8px;padding-top:8px;">
+                    <div style="color:#FEEAC1;font-size:11px;margin-bottom:4px;">Allocation:</div>
                     ${nonZeroAllocations.join('')}
                   </div>
                 `
               }
             }
 
+            // Build note HTML
+            let noteHtml = ''
+            if (checkpoint?.reason && checkpoint.reason.length > 0 && checkpoint.reason[0]) {
+              noteHtml = `
+                <div style="border-top:1px solid #DA8D28;margin-top:8px;padding-top:8px;">
+                  <div style="color:#FEEAC1;font-size:11px;margin-bottom:4px;">Note:</div>
+                  <div style="color:#fff;font-size:11px;word-break:break-word;">${checkpoint.reason[0]}</div>
+                </div>
+              `
+            }
+
+            // Reposition tooltip to opposite side of cursor after render
+            setTimeout(() => {
+              const chartEl = w.globals.dom.baseEl
+              if (!chartEl) return
+              const tooltipEl = chartEl.querySelector('.apexcharts-tooltip')
+              if (!tooltipEl) return
+              const chartRect = chartEl.getBoundingClientRect()
+              const tooltipWidth = tooltipEl.offsetWidth
+              if (isLeftHalf) {
+                // Point is on left, show tooltip on right
+                tooltipEl.style.left = (chartRect.width - tooltipWidth - 10) + 'px'
+              } else {
+                // Point is on right, show tooltip on left
+                tooltipEl.style.left = '10px'
+              }
+              tooltipEl.style.top = '0px'
+            }, 0)
+
             return `
-              <div style="background:#1a1a2e;border:1px solid #333;border-radius:6px;padding:10px;min-width:160px;">
-                <div style="color:#888;font-size:11px;margin-bottom:6px;">${dateStr}</div>
+              <div style="background:#512100;border:1px solid #DA8D28;border-radius:6px;padding:10px;min-width:210px;color:#fff;">
+                <div style="color:#FEEAC1;font-size:11px;margin-bottom:6px;">${dateStr}</div>
                 ${returnsHtml}
                 ${allocationHtml}
+                ${noteHtml}
               </div>
             `
           }
         },
         grid: {
-          borderColor: '#333',
+          borderColor: '#DA8D28',
           strokeDashArray: 4,
           xaxis: {
             lines: {
@@ -380,12 +462,12 @@ export default {
           yaxis: [{
             y: 0,
             strokeDashArray: 5,
-            borderColor: '#666',
+            borderColor: '#934A17',
             label: {
-              borderColor: '#666',
+              borderColor: '#934A17',
               style: {
-                color: '#aaa',
-                background: '#333'
+                color: '#fff',
+                background: '#512100'
               },
               text: 'Break-even'
             }
@@ -394,29 +476,16 @@ export default {
       }
     })
 
-    // Helper to get ICP/USD price from checkpoint's pricesUsed
-    const getIcpUsdPrice = (cp) => {
-      if (!cp.pricesUsed || cp.pricesUsed.length === 0) return null
-      for (const [, priceInfo] of cp.pricesUsed) {
-        if (priceInfo && priceInfo.usdPrice && priceInfo.icpPrice) {
-          const icpPriceNum = Number(priceInfo.icpPrice)
-          if (icpPriceNum > 0) {
-            return priceInfo.usdPrice / (icpPriceNum / 1e8)
-          }
-        }
-      }
-      return null
-    }
-
     // Load performance data using getUserPerformanceGraphData API
     // Always requests AllTime so the graph shows the full history
-    // Passes priceType so backend selects the best neuron for that currency
+    // Backend returns best USD neuron, best ICP neuron, and allocation neuron ID
     const loadPerformanceData = async () => {
       if (!props.principal) return
 
       loading.value = true
       error.value = ''
-      checkpoints.value = []
+      usdCheckpoints.value = []
+      icpCheckpoints.value = []
 
       try {
         const rewardsActor = await tacoStore.createRewardsActorAnonymous()
@@ -426,13 +495,11 @@ export default {
         const endTime = nowMs * BigInt(1_000_000) // nanoseconds
         const startTime = BigInt(0) // Always AllTime for the graph
 
-        // Always use AllTime timeframe for graph, USD for best neuron selection
         const graphResult = await rewardsActor.getUserPerformanceGraphData(
           Principal.fromText(props.principal),
           startTime,
           endTime,
-          { AllTime: null },
-          { USD: null }
+          { AllTime: null }
         )
 
         if ('err' in graphResult) {
@@ -442,32 +509,33 @@ export default {
 
         const graphData = graphResult.ok
 
-        // Backend returns at most 1 neuron - get its checkpoints directly
-        const neuron = graphData.neuronData[0]
-        if (!neuron || neuron.checkpoints.length === 0) {
-          error.value = 'No checkpoint data available'
-          return
-        }
-
-        // Process checkpoints - add ICP portfolio value
-        const processedCheckpoints = neuron.checkpoints.map(cp => {
-          const icpUsdPrice = getIcpUsdPrice(cp)
-          return {
+        // Process helper: map checkpoints to include both USD and ICP values
+        const processCheckpoints = (neuron) => {
+          if (!neuron || !neuron.checkpoints || neuron.checkpoints.length === 0) return []
+          const cps = neuron.checkpoints.map(cp => ({
             ...cp,
             totalPortfolioValueUSD: cp.totalPortfolioValue,
-            totalPortfolioValueICP: icpUsdPrice ? cp.totalPortfolioValue / icpUsdPrice : 0
-          }
-        })
+            totalPortfolioValueICP: cp.totalPortfolioValueICP || cp.totalPortfolioValue
+          }))
+          cps.sort((a, b) => Number(a.timestamp) - Number(b.timestamp))
+          return cps
+        }
 
-        // Sort by timestamp and show all checkpoints (AllTime)
-        processedCheckpoints.sort((a, b) => Number(a.timestamp) - Number(b.timestamp))
+        // Extract best USD neuron checkpoints
+        const bestUsd = graphData.bestUsdNeuron?.[0] || null
+        const bestIcp = graphData.bestIcpNeuron?.[0] || null
 
-        if (processedCheckpoints.length === 0) {
+        const usdCps = processCheckpoints(bestUsd)
+        const icpCps = processCheckpoints(bestIcp)
+
+        if (usdCps.length === 0 && icpCps.length === 0) {
           error.value = 'No checkpoint data available'
           return
         }
 
-        checkpoints.value = processedCheckpoints
+        usdCheckpoints.value = usdCps
+        icpCheckpoints.value = icpCps
+
         // Reset baseline to first checkpoint when new data loads
         baselineIndex.value = 0
 
@@ -526,6 +594,18 @@ export default {
 .performance-chart {
   width: 100%;
   min-height: 100px;
+  position: relative;
+}
+
+/* Allow tooltip to overflow the chart container */
+.performance-chart :deep(.apexcharts-tooltip) {
+  overflow: visible !important;
+}
+
+.performance-chart :deep(.apexcharts-canvas),
+.performance-chart :deep(.apexcharts-svg),
+.performance-chart :deep(.apexcharts-inner) {
+  overflow: visible !important;
 }
 
 .baseline-label {
@@ -535,25 +615,22 @@ export default {
 
 .baseline-select {
   max-width: 200px;
-  background-color: #1a1a2e;
-  color: #ccc;
-  border-color: #444;
+  background-color: var(--dark-brown);
+  color: #fff;
+  border-color: var(--dark-orange);
   font-size: 0.8rem;
   padding: 0.2rem 0.5rem;
+  font-family: 'Space Mono', monospace;
 }
 
 .baseline-select:focus {
-  background-color: #1a1a2e;
-  color: #ccc;
-  border-color: #63b3ed;
-  box-shadow: 0 0 0 0.15rem rgba(99, 179, 237, 0.25);
+  background-color: var(--dark-brown);
+  color: #fff;
+  border-color: var(--brown);
+  box-shadow: 0 0 0 0.15rem rgba(147, 74, 23, 0.35);
 }
 
-.text-muted {
-  color: #718096 !important;
-}
-
-.text-warning {
-  color: #f6ad55 !important;
+.chart-muted {
+  color: var(--dark-brown-to-white);
 }
 </style>

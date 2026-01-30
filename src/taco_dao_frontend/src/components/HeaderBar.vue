@@ -32,9 +32,17 @@
 
         <!-- vote - router link -->
         <router-link to="/vote" class="header-bar__rl">
-                      
+
           <span class="header-bar__rl-span">Vote</span>
-        
+
+        </router-link>
+
+        <!-- performance - router link -->
+        <router-link to="/performance" class="header-bar__rl header-bar__rl--with-badge">
+
+          <span class="header-bar__rl-span">Performance</span>
+          <span class="header-bar__rl-beta">BETA</span>
+
         </router-link>
 
         <!-- chat - router link -->
@@ -87,13 +95,6 @@
         <router-link to="/wallet" class="header-bar__rl">
 
           <span class="header-bar__rl-span">Wallet</span>
-
-        </router-link>
-
-        <!-- performance - router link -->
-        <router-link to="/performance" class="header-bar__rl">
-
-          <span class="header-bar__rl-span">Performance</span>
 
         </router-link>
 
@@ -236,6 +237,14 @@
 
         </router-link>
 
+        <!-- performance - router link -->
+        <router-link @click="togglePagesMenu()" to="/performance" class="list-group-item">
+
+          <!-- item text -->
+          <span>Performance <span class="header-bar__rl-beta">BETA</span></span>
+
+        </router-link>
+
         <!-- chat - router link -->
         <router-link @click="togglePagesMenu()" to="/chat/oc" 
                     class="list-group-item">
@@ -295,14 +304,6 @@
 
           <!-- item text -->
           <span>Wallet</span>
-
-        </router-link>
-
-        <!-- performance - router link -->
-        <router-link @click="togglePagesMenu()" to="/performance" class="list-group-item">
-
-          <!-- item text -->
-          <span>Performance</span>
 
         </router-link>
 
@@ -466,6 +467,25 @@
     // router link span
     .header-bar__rl-span {
       color: var(--brown-to-white);
+    }
+
+    // router link with badge
+    .header-bar__rl--with-badge {
+      align-items: center;
+      gap: 0.3rem;
+    }
+
+    // beta badge for nav links
+    .header-bar__rl-beta {
+      font-size: 0.5rem;
+      padding: 0.1rem 0.3rem;
+      background-color: var(--dark-orange-to-brown);
+      color: var(--white-to-black);
+      border-radius: 0.2rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      line-height: 1;
+      vertical-align: super;
     }
 
     // login

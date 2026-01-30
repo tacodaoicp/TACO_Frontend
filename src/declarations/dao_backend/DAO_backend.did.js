@@ -10,10 +10,43 @@ export const idlFactory = ({ IDL }) => {
     'ICRC3' : IDL.Null,
     'ICRC12' : IDL.Null,
   });
-  const Result_16 = IDL.Variant({
+  const Result_20 = IDL.Variant({
     'ok' : IDL.Null,
     'err' : AuthorizationError,
   });
+  const Result_19 = IDL.Variant({
+    'ok' : IDL.Record({
+      'skipped' : IDL.Nat,
+      'errors' : IDL.Nat,
+      'archived' : IDL.Nat,
+    }),
+    'err' : AuthorizationError,
+  });
+  const BackfillResult = IDL.Record({
+    'startTime' : IDL.Int,
+    'neuronsProcessed' : IDL.Nat,
+    'periodsCreated' : IDL.Nat,
+    'totalNeuronRewards' : IDL.Nat,
+    'endTime' : IDL.Int,
+    'errors' : IDL.Vec(IDL.Text),
+  });
+  const Result_18 = IDL.Variant({
+    'ok' : BackfillResult,
+    'err' : AuthorizationError,
+  });
+  const TestDataConfig = IDL.Record({
+    'allocationFrequencyDays' : IDL.Nat,
+    'priceFrequencyDays' : IDL.Nat,
+    'daysBack' : IDL.Nat,
+  });
+  const TestDataResult = IDL.Record({
+    'neuronsProcessed' : IDL.Nat,
+    'tokensProcessed' : IDL.Nat,
+    'errors' : IDL.Vec(IDL.Text),
+    'allocationsCreated' : IDL.Nat,
+    'pricesCreated' : IDL.Nat,
+  });
+  const Result_17 = IDL.Variant({ 'ok' : TestDataResult, 'err' : IDL.Text });
   const Allocation = IDL.Record({
     'token' : IDL.Principal,
     'basisPoints' : IDL.Nat,
@@ -43,6 +76,7 @@ export const idlFactory = ({ IDL }) => {
       IDL.Record({
         'to' : IDL.Int,
         'from' : IDL.Int,
+        'note' : IDL.Opt(IDL.Text),
         'allocation' : IDL.Vec(Allocation),
         'allocationMaker' : IDL.Principal,
       })
@@ -51,11 +85,11 @@ export const idlFactory = ({ IDL }) => {
     'lastAllocationUpdate' : IDL.Int,
     'neurons' : IDL.Vec(NeuronVP),
   });
-  const Result_15 = IDL.Variant({
+  const Result_16 = IDL.Variant({
     'ok' : IDL.Bool,
     'err' : AuthorizationError,
   });
-  const Result_14 = IDL.Variant({ 'ok' : IDL.Nat, 'err' : AuthorizationError });
+  const Result_15 = IDL.Variant({ 'ok' : IDL.Nat, 'err' : AuthorizationError });
   const FollowError = IDL.Variant({
     'FollowLimitReached' : IDL.Null,
     'FollowerNoAllocationYetMade' : IDL.Null,
@@ -131,17 +165,19 @@ export const idlFactory = ({ IDL }) => {
     'totalCount' : IDL.Nat,
     'actions' : IDL.Vec(AdminActionRecord),
   });
-  const Result_13 = IDL.Variant({
+  const Result_14 = IDL.Variant({
     'ok' : AdminActionsSinceResponse,
     'err' : AuthorizationError,
   });
   const AdminFunction = IDL.Variant({
     'removeToken' : IDL.Null,
     'setTest' : IDL.Null,
+    'manageBannedWords' : IDL.Null,
     'startRebalancing' : IDL.Null,
     'getLogs' : IDL.Null,
     'removeAdmin' : IDL.Null,
     'stopToken' : IDL.Null,
+    'backfillPerformanceData' : IDL.Null,
     'getNeuronUpdates' : IDL.Null,
     'unpauseToken' : IDL.Null,
     'updateSystemParameter' : IDL.Null,
@@ -180,7 +216,7 @@ export const idlFactory = ({ IDL }) => {
     'totalCount' : IDL.Nat,
     'changes' : IDL.Vec(PastAllocationRecord),
   });
-  const Result_12 = IDL.Variant({
+  const Result_13 = IDL.Variant({
     'ok' : AllocationChangesSinceResponse,
     'err' : AuthorizationError,
   });
@@ -191,6 +227,10 @@ export const idlFactory = ({ IDL }) => {
     'mostRecentUpdateTime' : IDL.Int,
     'totalNeuronVotingPower' : IDL.Nat,
     'usersWithAllocations' : IDL.Nat,
+  });
+  const Result_12 = IDL.Variant({
+    'ok' : IDL.Vec(IDL.Text),
+    'err' : AuthorizationError,
   });
   const UnfollowRecord = IDL.Record({
     'followed' : IDL.Principal,
@@ -414,6 +454,7 @@ export const idlFactory = ({ IDL }) => {
   });
   const ContinuousDAO = IDL.Service({
     'addAdmin' : IDL.Func([IDL.Principal, IDL.Opt(IDL.Text)], [Result_1], []),
+    'addBannedWords' : IDL.Func([IDL.Vec(IDL.Text)], [Result_1], []),
     'addToken' : IDL.Func([IDL.Principal, TokenType], [Result_1], []),
     'addTokenWithReason' : IDL.Func(
         [IDL.Principal, TokenType, IDL.Text],
@@ -422,10 +463,31 @@ export const idlFactory = ({ IDL }) => {
       ),
     'admin_addPenalizedNeuron' : IDL.Func(
         [IDL.Vec(IDL.Nat8), IDL.Nat],
-        [Result_16],
+        [Result_20],
+        [],
+      ),
+    'admin_backfillNeuronAllocationRecords' : IDL.Func([], [Result_19], []),
+    'admin_backfillPerformanceData' : IDL.Func(
+        [
+          IDL.Opt(IDL.Int),
+          IDL.Opt(IDL.Nat),
+          IDL.Opt(IDL.Nat),
+          IDL.Opt(IDL.Bool),
+        ],
+        [Result_18],
         [],
       ),
     'admin_clearAllPastPrices' : IDL.Func([], [Result_1], []),
+    'admin_generateTestData' : IDL.Func(
+        [IDL.Opt(TestDataConfig)],
+        [Result_17],
+        [],
+      ),
+    'admin_getAllActiveNeuronIds' : IDL.Func(
+        [],
+        [IDL.Vec(IDL.Vec(IDL.Nat8))],
+        ['query'],
+      ),
     'admin_getNeuronAllocations' : IDL.Func(
         [],
         [IDL.Vec(IDL.Tuple(IDL.Vec(IDL.Nat8), NeuronAllocation))],
@@ -444,20 +506,25 @@ export const idlFactory = ({ IDL }) => {
     'admin_recalculateAllVotingPower' : IDL.Func([IDL.Nat], [], []),
     'admin_removePenalizedNeuron' : IDL.Func(
         [IDL.Vec(IDL.Nat8)],
-        [Result_15],
+        [Result_16],
         [],
       ),
     'admin_setPenalizedNeurons' : IDL.Func(
         [IDL.Vec(IDL.Tuple(IDL.Vec(IDL.Nat8), IDL.Nat))],
-        [Result_14],
+        [Result_15],
         [],
       ),
     'clearLogs' : IDL.Func([], [], []),
     'deleteToken' : IDL.Func([IDL.Principal, IDL.Text], [Result_1], []),
     'followAllocation' : IDL.Func([IDL.Principal], [Result_6], []),
+    'getActiveDecisionMakers' : IDL.Func(
+        [],
+        [IDL.Vec(IDL.Tuple(IDL.Vec(IDL.Nat8), IDL.Vec(IDL.Principal)))],
+        ['query'],
+      ),
     'getAdminActionsSince' : IDL.Func(
         [IDL.Int, IDL.Nat],
-        [Result_13],
+        [Result_14],
         ['query'],
       ),
     'getAdminPermissions' : IDL.Func(
@@ -477,10 +544,31 @@ export const idlFactory = ({ IDL }) => {
       ),
     'getAllocationChangesSince' : IDL.Func(
         [IDL.Int, IDL.Nat],
-        [Result_12],
+        [Result_13],
         ['query'],
       ),
     'getAllocationStats' : IDL.Func([], [AllocationStats], ['query']),
+    'getBackfillStatus' : IDL.Func(
+        [],
+        [
+          IDL.Record({
+            'neuronsChecked' : IDL.Nat,
+            'totalNeuronsWithAllocations' : IDL.Nat,
+            'neuronsToBackfill' : IDL.Nat,
+            'lastRunTime' : IDL.Int,
+            'lastResult' : IDL.Opt(
+              IDL.Record({
+                'skipped' : IDL.Nat,
+                'errors' : IDL.Nat,
+                'archived' : IDL.Nat,
+              })
+            ),
+            'isRunning' : IDL.Bool,
+          }),
+        ],
+        ['query'],
+      ),
+    'getBannedWords' : IDL.Func([], [Result_12], []),
     'getFollowActionsSince' : IDL.Func(
         [IDL.Int, IDL.Nat],
         [Result_11],
@@ -515,6 +603,17 @@ export const idlFactory = ({ IDL }) => {
     'getNeuronAllocationChangesSince' : IDL.Func(
         [IDL.Int, IDL.Nat],
         [Result_10],
+        ['query'],
+      ),
+    'getNeuronAllocations' : IDL.Func(
+        [IDL.Nat, IDL.Nat],
+        [
+          IDL.Record({
+            'total' : IDL.Nat,
+            'hasMore' : IDL.Bool,
+            'neurons' : IDL.Vec(IDL.Tuple(IDL.Vec(IDL.Nat8), NeuronAllocation)),
+          }),
+        ],
         ['query'],
       ),
     'getNeuronUpdatesSince' : IDL.Func(
@@ -596,6 +695,7 @@ export const idlFactory = ({ IDL }) => {
         [Result_1],
         [],
       ),
+    'removeBannedWords' : IDL.Func([IDL.Vec(IDL.Text)], [Result_1], []),
     'removeFollower' : IDL.Func([IDL.Principal], [Result_6], []),
     'removeToken' : IDL.Func([IDL.Principal, IDL.Text], [Result_1], []),
     'setTacoAddress' : IDL.Func([IDL.Principal], [], []),
@@ -608,7 +708,11 @@ export const idlFactory = ({ IDL }) => {
     'unfollowAllocation' : IDL.Func([IDL.Principal], [Result_4], []),
     'unpauseToken' : IDL.Func([IDL.Principal, IDL.Text], [Result_1], []),
     'unregisterUserToken' : IDL.Func([IDL.Principal], [Result_3], []),
-    'updateAllocation' : IDL.Func([IDL.Vec(Allocation)], [Result_2], []),
+    'updateAllocation' : IDL.Func(
+        [IDL.Vec(Allocation), IDL.Opt(IDL.Text)],
+        [Result_2],
+        [],
+      ),
     'updateMintingVaultConfig' : IDL.Func([UpdateConfig__1], [Result_1], []),
     'updateSpamParameters' : IDL.Func(
         [

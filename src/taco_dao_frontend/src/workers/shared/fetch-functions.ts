@@ -1096,8 +1096,7 @@ export async function fetchLeaderboardInfoData(agent: HttpAgent): Promise<any> {
 export async function fetchUserPerformanceData(
   agent: HttpAgent,
   principal: Principal,
-  timeframe: 'OneWeek' | 'OneMonth' | 'OneYear' | 'AllTime' = 'AllTime',
-  priceType: 'USD' | 'ICP' = 'USD'
+  timeframe: 'OneWeek' | 'OneMonth' | 'OneYear' | 'AllTime' = 'AllTime'
 ): Promise<any> {
   const actor = getRewardsActor(agent)
 
@@ -1106,14 +1105,12 @@ export async function fetchUserPerformanceData(
   const startTime = BigInt(0) // AllTime - backend returns all checkpoints
 
   const timeframeVariant = { [timeframe]: null }
-  const priceTypeVariant = { [priceType]: null }
 
   const result = await actor.getUserPerformanceGraphData(
     principal,
     startTime,
     endTime,
-    timeframeVariant as any,
-    priceTypeVariant as any
+    timeframeVariant as any
   )
 
   if ('ok' in result) {
@@ -1131,28 +1128,41 @@ export async function fetchUserPerformanceData(
       oneYearICP: graphData.oneYearICP?.length > 0 ? [graphData.oneYearICP[0]] : []
     }
 
-    // neuronData now has at most 1 neuron (the best for the selected timeframe/priceType)
-    const neurons = graphData.neuronData.map((nd: any) => ({
-      neuronId: nd.neuronId,
-      votingPower: BigInt(0),
-      distributionsParticipated: nd.checkpoints.length,
-      lastAllocationChange: nd.checkpoints.length > 0
-        ? nd.checkpoints[nd.checkpoints.length - 1].timestamp
-        : BigInt(0),
-      performance: {
-        allTimeUSD: nd.performanceScoreUSD ? [nd.performanceScoreUSD] : [],
-        allTimeICP: nd.performanceScoreICP?.length > 0 ? [nd.performanceScoreICP[0]] : [],
-        oneWeekUSD: graphData.oneWeekUSD?.length > 0 ? [graphData.oneWeekUSD[0]] : [],
-        oneWeekICP: graphData.oneWeekICP?.length > 0 ? [graphData.oneWeekICP[0]] : [],
-        oneMonthUSD: graphData.oneMonthUSD?.length > 0 ? [graphData.oneMonthUSD[0]] : [],
-        oneMonthICP: graphData.oneMonthICP?.length > 0 ? [graphData.oneMonthICP[0]] : [],
-        oneYearUSD: graphData.oneYearUSD?.length > 0 ? [graphData.oneYearUSD[0]] : [],
-        oneYearICP: graphData.oneYearICP?.length > 0 ? [graphData.oneYearICP[0]] : []
-      }
-    }))
+    // Build neurons from bestUsdNeuron and bestIcpNeuron (dedup if same neuron)
+    const neurons: any[] = []
+    const seenNeuronIds = new Set<string>()
+    const bestUsd = graphData.bestUsdNeuron?.[0] || null
+    const bestIcp = graphData.bestIcpNeuron?.[0] || null
 
-    const totalCheckpoints = graphData.neuronData.reduce(
-      (sum: number, nd: any) => sum + nd.checkpoints.length, 0
+    const addNeuron = (nd: any) => {
+      if (!nd) return
+      const idStr = Array.from(nd.neuronId).join(',')
+      if (seenNeuronIds.has(idStr)) return
+      seenNeuronIds.add(idStr)
+      neurons.push({
+        neuronId: nd.neuronId,
+        votingPower: BigInt(0),
+        distributionsParticipated: nd.checkpoints.length,
+        lastAllocationChange: nd.checkpoints.length > 0
+          ? nd.checkpoints[nd.checkpoints.length - 1].timestamp
+          : BigInt(0),
+        performance: {
+          allTimeUSD: nd.performanceScoreUSD ? [nd.performanceScoreUSD] : [],
+          allTimeICP: nd.performanceScoreICP?.length > 0 ? [nd.performanceScoreICP[0]] : [],
+          oneWeekUSD: graphData.oneWeekUSD?.length > 0 ? [graphData.oneWeekUSD[0]] : [],
+          oneWeekICP: graphData.oneWeekICP?.length > 0 ? [graphData.oneWeekICP[0]] : [],
+          oneMonthUSD: graphData.oneMonthUSD?.length > 0 ? [graphData.oneMonthUSD[0]] : [],
+          oneMonthICP: graphData.oneMonthICP?.length > 0 ? [graphData.oneMonthICP[0]] : [],
+          oneYearUSD: graphData.oneYearUSD?.length > 0 ? [graphData.oneYearUSD[0]] : [],
+          oneYearICP: graphData.oneYearICP?.length > 0 ? [graphData.oneYearICP[0]] : []
+        }
+      })
+    }
+    addNeuron(bestUsd)
+    addNeuron(bestIcp)
+
+    const totalCheckpoints = neurons.reduce(
+      (sum: number, nd: any) => sum + nd.distributionsParticipated, 0
     )
 
     return {

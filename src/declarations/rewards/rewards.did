@@ -36,14 +36,9 @@ type UserPerformanceGraphData =
  record {
    aggregatedPerformanceICP: opt float64;
    aggregatedPerformanceUSD: float64;
-   neuronData:
-    vec
-     record {
-       checkpoints: vec GraphCheckpointData;
-       neuronId: blob;
-       performanceScoreICP: opt float64;
-       performanceScoreUSD: float64;
-     };
+   allocationNeuronId: opt blob;
+   bestIcpNeuron: opt NeuronGraphData;
+   bestUsdNeuron: opt NeuronGraphData;
    oneMonthICP: opt float64;
    oneMonthUSD: opt float64;
    oneWeekICP: opt float64;
@@ -74,6 +69,7 @@ type RewardsError =
    AllocationDataMissing;
    DistributionInProgress;
    InsufficientRewardPot;
+   InvalidDisplayName: text;
    InvalidTimeRange;
    NeuronNotFound;
    NotAuthorized;
@@ -85,18 +81,21 @@ type RewardsError =
  };
 type Rewards = 
  service {
+   addBannedWords: (words: vec text) -> (Result__1);
    addToRewardSkipList: (neuronId: blob) -> (Result__1);
+   adminDeleteDisplayName: (target: principal) -> (Result__1);
    admin_backfillDistributionHistory: (config: BackfillConfig) ->
-    (Result__1_11);
+    (Result__1_12);
    admin_recalculateAllIcpPerformance: () -> (Result__1);
    admin_recalculateIcpPerformanceForDistribution: (distributionId: nat) ->
     (Result__1);
    calculateNeuronPerformance: (neuronId: blob, startTime: int, endTime: 
-    int, priceType: PriceType) -> (Result__1_10);
+    int, priceType: PriceType) -> (Result__1_11);
    calculateNeuronPerformanceQuery: (neuronId: blob, startTime: int, endTime:
-    int, priceType: PriceType) -> (Result__1_10) composite_query;
+    int, priceType: PriceType) -> (Result__1_11) composite_query;
    /// * Clear all logs
    clearLogs: () -> ();
+   deleteMyDisplayName: () -> (Result__1);
    getAllNeuronRewardBalances: () -> (vec record {
                                             blob;
                                             nat;
@@ -117,6 +116,7 @@ type Rewards =
        startedAt: int;
        totalPeriods: nat;
      }) query;
+   getBannedWords: () -> (Result__1_10);
    getCanisterStatus: () ->
     (record {
        daoId: principal;
@@ -156,6 +156,12 @@ type Rewards =
        nextDistributionTime: int;
      }) query;
    getCurrentTotalNeuronBalances: () -> (nat) query;
+   getDisplayName: (user: principal) -> (opt text) query;
+   getDisplayNames: (users: vec principal) ->
+    (vec record {
+           principal;
+           opt text;
+         }) query;
    getDistributionHistory: (offset: nat, limit: nat) ->
     (record {
        hasMore: bool;
@@ -206,8 +212,8 @@ type Rewards =
    getUserPerformance: (userPrincipal: principal) ->
     (Result__1_4) composite_query;
    getUserPerformanceGraphData: (userPrincipal: principal, startTime: 
-    int, endTime: int, timeframe: LeaderboardTimeframe, priceType:
-    PriceType) -> (Result__1_3) composite_query;
+    int, endTime: int, timeframe: LeaderboardTimeframe) ->
+    (Result__1_3) composite_query;
    getUserWithdrawalHistory: (limit: opt nat) -> (Result__1_2);
    getWithdrawalStats: () ->
     (record {
@@ -219,8 +225,10 @@ type Rewards =
     (Result__1_1) query;
    get_canister_cycles: () -> (record {cycles: nat;}) query;
    refreshLeaderboards: () -> (Result__1);
+   removeBannedWords: (words: vec text) -> (Result__1);
    removeFromRewardSkipList: (neuronId: blob) -> (Result__1);
    removeRewardPenalty: (neuronId: blob) -> (Result__1);
+   setDisplayName: (name: text) -> (Result__1);
    setDistributionEnabled: (enabled: bool) -> (Result__1);
    setDistributionPeriod: (periodNS: nat) -> (Result__1);
    setMaxDistributionHistory: (max: nat) -> (Result__1);
@@ -285,15 +293,20 @@ type Result__1_2 =
    err: RewardsError;
    ok: vec WithdrawalRecord;
  };
-type Result__1_11 = 
+type Result__1_12 = 
  variant {
    err: RewardsError;
    ok: BackfillResult;
  };
-type Result__1_10 = 
+type Result__1_11 = 
  variant {
    err: RewardsError;
    ok: PerformanceResult;
+ };
+type Result__1_10 = 
+ variant {
+   err: RewardsError;
+   ok: vec text;
  };
 type Result__1_1 = 
  variant {
@@ -362,6 +375,13 @@ type NeuronPerformanceDetail =
     };
    votingPower: nat;
  };
+type NeuronGraphData = 
+ record {
+   checkpoints: vec GraphCheckpointData;
+   neuronId: blob;
+   performanceScoreICP: opt float64;
+   performanceScoreUSD: float64;
+ };
 type NeuronAllocationChangeBlockData = 
  record {
    changeType: AllocationChangeType;
@@ -403,6 +423,7 @@ type LeaderboardPriceType =
  };
 type LeaderboardEntry = 
  record {
+   displayName: opt text;
    distributionsCount: nat;
    lastActivity: int;
    neuronId: blob;
@@ -418,6 +439,7 @@ type GraphCheckpointData =
                      principal;
                      PriceInfo;
                    };
+   reason: opt text;
    timestamp: int;
    tokenValues: vec record {
                       principal;
@@ -466,6 +488,7 @@ type CheckpointData =
                      principal;
                      PriceInfo;
                    };
+   reason: opt text;
    timestamp: int;
    tokenValues: vec record {
                       principal;

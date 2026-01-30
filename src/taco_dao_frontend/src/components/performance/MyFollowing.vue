@@ -1,34 +1,35 @@
 <template>
-  <div class="my-following mx-3 mb-4">
-    <div class="card bg-dark text-white">
-      <div class="card-header d-flex justify-content-between align-items-center">
-        <h5 class="mb-0">
+  <!-- Full standalone mode (with wrapper + header) -->
+  <div v-if="!inline" class="my-following mx-3 mb-4">
+    <div class="taco-container taco-container--l1">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h5 class="mb-0 taco-text-brown-to-white">
           <i class="fas fa-users me-2"></i>
           Following ({{ follows.length }}/3)
         </h5>
-        <small class="text-muted">Your allocation copies</small>
+        <small class="fol-muted">Your allocation copies</small>
       </div>
 
-      <div class="card-body">
+      <div>
         <!-- Not logged in -->
         <div v-if="!userLoggedIn" class="text-center py-4">
-          <i class="fas fa-lock text-muted fa-2x mb-3"></i>
-          <p class="text-muted">Log in to see who you're following</p>
+          <i class="fas fa-lock fa-2x mb-3 fol-muted"></i>
+          <p class="fol-muted">Log in to see who you're following</p>
         </div>
 
         <!-- Loading State -->
         <div v-else-if="isLoading" class="text-center py-4">
-          <div class="spinner-border spinner-border-sm text-primary" role="status">
+          <div class="spinner-border spinner-border-sm" role="status" style="color: var(--brown);">
             <span class="visually-hidden">Loading...</span>
           </div>
-          <span class="ms-2 text-muted">Loading follows...</span>
+          <span class="ms-2 fol-muted">Loading follows...</span>
         </div>
 
         <!-- No follows -->
         <div v-else-if="follows.length === 0" class="text-center py-4">
-          <i class="fas fa-user-plus text-muted fa-2x mb-3"></i>
-          <p class="text-muted mb-2">Not following anyone yet</p>
-          <p class="text-muted small">
+          <i class="fas fa-user-plus fa-2x mb-3 fol-muted"></i>
+          <p class="fol-muted mb-2">Not following anyone yet</p>
+          <p class="fol-muted small">
             Follow top performers from the leaderboard above to copy their allocations.
           </p>
         </div>
@@ -49,10 +50,10 @@
                   @click="toggleExpanded(follow.principal)"
                 ></i>
                 <code class="principal-id" :title="follow.principal">
-                  {{ formatPrincipal(follow.principal) }}
+                  {{ follow.principal }}
                 </code>
                 <!-- Rank badge if on leaderboard -->
-                <span v-if="getLeaderboardRank(follow.principal)" class="badge bg-warning text-dark">
+                <span v-if="getLeaderboardRank(follow.principal)" class="rank-badge">
                   #{{ getLeaderboardRank(follow.principal) }}
                 </span>
               </div>
@@ -62,15 +63,15 @@
                 <span
                   v-if="getLeaderboardEntry(follow.principal)"
                   :class="getPerformanceClass(getLeaderboardEntry(follow.principal).performanceScore)"
-                  class="fw-bold"
+                  class="fw-bold perf-value"
                 >
                   {{ formatPerformance(getLeaderboardEntry(follow.principal).performanceScore) }}
                 </span>
-                <span v-else class="text-muted">-</span>
+                <span v-else class="fol-muted">-</span>
 
                 <!-- Unfollow button -->
                 <button
-                  class="btn btn-sm btn-outline-danger"
+                  class="btn taco-btn taco-btn--danger btn-sm"
                   @click="$emit('unfollow', follow.principal)"
                   title="Unfollow this user"
                 >
@@ -81,11 +82,11 @@
 
             <!-- Meta row -->
             <div class="follow-meta">
-              <small class="text-muted">
+              <small class="fol-muted">
                 <i class="fas fa-calendar-alt me-1"></i>
                 Following since {{ formatDate(follow.since) }}
               </small>
-              <small v-if="getLeaderboardEntry(follow.principal)" class="text-muted">
+              <small v-if="getLeaderboardEntry(follow.principal)" class="fol-muted">
                 <i class="fas fa-chart-bar me-1"></i>
                 {{ Number(getLeaderboardEntry(follow.principal).distributionsCount) }} distributions
               </small>
@@ -99,6 +100,88 @@
               />
             </div>
           </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Inline mode (no wrapper, parent provides container + header) -->
+  <div v-else class="my-following-inline">
+    <!-- Loading State -->
+    <div v-if="isLoading" class="text-center py-3">
+      <div class="spinner-border spinner-border-sm" role="status" style="color: var(--brown);">
+        <span class="visually-hidden">Loading...</span>
+      </div>
+      <span class="ms-2 fol-muted">Loading follows...</span>
+    </div>
+
+    <!-- No follows -->
+    <div v-else-if="follows.length === 0" class="text-center py-3">
+      <i class="fas fa-user-plus fa-2x mb-3 fol-muted"></i>
+      <p class="fol-muted mb-2">Not following anyone yet</p>
+      <p class="fol-muted small">
+        Follow top performers from the leaderboard to copy their allocations.
+      </p>
+    </div>
+
+    <!-- Follows List -->
+    <div v-else class="follows-list">
+      <div
+        v-for="(follow, index) in follows"
+        :key="follow.principal"
+        class="follow-card"
+      >
+        <div class="follow-header">
+          <div class="d-flex align-items-center gap-2">
+            <i
+              class="fas fa-chevron-right expand-icon"
+              :class="{ 'rotated': isExpanded(follow.principal) }"
+              @click="toggleExpanded(follow.principal)"
+            ></i>
+            <code class="principal-id" :title="follow.principal">
+              {{ follow.principal }}
+            </code>
+            <span v-if="getLeaderboardRank(follow.principal)" class="rank-badge">
+              #{{ getLeaderboardRank(follow.principal) }}
+            </span>
+          </div>
+
+          <div class="d-flex align-items-center gap-3">
+            <span
+              v-if="getLeaderboardEntry(follow.principal)"
+              :class="getPerformanceClass(getLeaderboardEntry(follow.principal).performanceScore)"
+              class="fw-bold perf-value"
+            >
+              {{ formatPerformance(getLeaderboardEntry(follow.principal).performanceScore) }}
+            </span>
+            <span v-else class="fol-muted">-</span>
+
+            <button
+              class="btn taco-btn taco-btn--danger btn-sm"
+              @click="$emit('unfollow', follow.principal)"
+              title="Unfollow this user"
+            >
+              <i class="fas fa-user-minus"></i>
+            </button>
+          </div>
+        </div>
+
+        <div class="follow-meta">
+          <small class="fol-muted">
+            <i class="fas fa-calendar-alt me-1"></i>
+            Following since {{ formatDate(follow.since) }}
+          </small>
+          <small v-if="getLeaderboardEntry(follow.principal)" class="fol-muted">
+            <i class="fas fa-chart-bar me-1"></i>
+            {{ Number(getLeaderboardEntry(follow.principal).distributionsCount) }} distributions
+          </small>
+        </div>
+
+        <div v-if="isExpanded(follow.principal)" class="follow-chart">
+          <PerformanceChart
+            :principal="follow.principal"
+            :height="200"
+          />
         </div>
       </div>
     </div>
@@ -130,6 +213,10 @@ export default {
       default: false
     },
     isLoading: {
+      type: Boolean,
+      default: false
+    },
+    inline: {
       type: Boolean,
       default: false
     },
@@ -174,7 +261,7 @@ export default {
     // Format principal for display
     const formatPrincipal = (principal) => {
       if (principal.length > 20) {
-        return principal.substring(0, 8) + '...' + principal.substring(principal.length - 4)
+        return principal.substring(0, 10) + '...' + principal.substring(principal.length - 6)
       }
       return principal
     }
@@ -222,10 +309,6 @@ export default {
 </script>
 
 <style scoped>
-.my-following .card {
-  border: 1px solid #333;
-}
-
 .follows-list {
   display: flex;
   flex-direction: column;
@@ -233,9 +316,9 @@ export default {
 }
 
 .follow-card {
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid #333;
-  border-radius: 8px;
+  background: var(--orange-to-light-brown);
+  border: 1px solid var(--dark-orange);
+  border-radius: 0.5rem;
   padding: 1rem;
 }
 
@@ -248,14 +331,14 @@ export default {
 
 .expand-icon {
   font-size: 0.7rem;
-  color: #666;
+  color: var(--dark-brown-to-white);
   cursor: pointer;
   transition: transform 0.2s ease;
   width: 12px;
 }
 
 .expand-icon:hover {
-  color: #888;
+  color: var(--brown-to-white);
 }
 
 .expand-icon.rotated {
@@ -264,37 +347,66 @@ export default {
 
 .principal-id {
   font-size: 0.85rem;
-  color: #63b3ed;
+  color: var(--brown-to-white);
+  font-family: 'Space Mono', monospace;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 300px;
+  display: inline-block;
+  vertical-align: middle;
+}
+
+.rank-badge {
+  background: var(--yellow);
+  color: var(--black);
+  border: 1px solid var(--dark-orange);
+  border-radius: 0.375rem;
+  padding: 0.1rem 0.4rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  font-family: 'Space Mono', monospace;
 }
 
 .follow-meta {
   display: flex;
   gap: 1.5rem;
   padding-top: 0.5rem;
-  border-top: 1px solid #333;
+  border-top: 1px solid var(--dark-orange);
   margin-top: 0.5rem;
 }
 
 .follow-chart {
   margin-top: 1rem;
   padding-top: 1rem;
-  border-top: 1px solid #333;
-  background: rgba(0, 0, 0, 0.2);
-  border-radius: 4px;
+  border-top: 1px solid var(--dark-orange);
+  background: color-mix(in srgb, var(--yellow-to-brown) 85%, #000);
+  border-radius: 0.375rem;
   padding: 0.75rem;
+}
+
+.fol-muted {
+  color: var(--dark-brown-to-white);
+}
+
+.perf-value {
+  background: rgba(0, 0, 0, 0.45);
+  padding: 0.15rem 0.5rem;
+  border-radius: 0.375rem;
+  font-family: 'Space Mono', monospace;
 }
 
 /* Text colors */
 .text-success {
-  color: #68d391 !important;
+  color: var(--green) !important;
 }
 
 .text-danger {
-  color: #fc8181 !important;
+  color: #FF4444 !important;
 }
 
 .text-muted {
-  color: #718096 !important;
+  color: var(--dark-brown-to-white) !important;
 }
 
 /* Responsive */

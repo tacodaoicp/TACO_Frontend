@@ -1,7 +1,33 @@
 <template>
   <div class="standard-view">
+    <!-- Floating Section Nav -->
+    <div class="section-nav-floating" :class="{ 'section-nav-open': sectionNavOpen }">
+      <button class="section-nav-toggle" @click="sectionNavOpen = !sectionNavOpen" title="Navigate sections">
+        <i class="fas" :class="sectionNavOpen ? 'fa-times' : 'fa-bars'"></i>
+      </button>
+      <transition name="nav-fade">
+        <div v-if="sectionNavOpen" class="section-nav-menu">
+          <button class="section-nav-item" @click="scrollToSection('my-performance'); sectionNavOpen = false">
+            <i class="fas fa-user me-2"></i>My Performance
+          </button>
+          <button class="section-nav-item" @click="scrollToSection('leaderboard'); sectionNavOpen = false">
+            <i class="fas fa-trophy me-2"></i>Leaderboard
+          </button>
+          <button class="section-nav-item" @click="scrollToSection('follow-principal'); sectionNavOpen = false">
+            <i class="fas fa-user-plus me-2"></i>Follow Principal
+          </button>
+          <button class="section-nav-item" @click="scrollToSection('my-following'); sectionNavOpen = false">
+            <i class="fas fa-users me-2"></i>My Following
+          </button>
+          <button class="section-nav-item" @click="scrollToSection('display-name'); sectionNavOpen = false">
+            <i class="fas fa-id-badge me-2"></i>Display Name
+          </button>
+        </div>
+      </transition>
+    </div>
+
     <!-- scroll container -->
-    <div class="scroll-y-container h-100">
+    <div class="scroll-y-container h-100" ref="scrollContainer">
       <!-- bootstrap container -->
       <div class="container p-0">
         <!-- bootstrap row -->
@@ -11,16 +37,17 @@
           <div class="performance-view">
 
             <!-- title container -->
-            <div class="d-flex align-items-center justify-content-between">
+            <div class="perf-title-bar d-flex align-items-center justify-content-between mx-3 mt-3 mb-4">
               <!-- performance title -->
-              <h1 class="taco-title mb-4 mt-4 px-3">
+              <h1 class="taco-title mb-0">
                 <span class="taco-title__icon">🏆</span>
                 <span class="taco-title__title">Performance</span>
+                <span class="perf-beta-badge">BETA</span>
               </h1>
 
               <!-- refresh button -->
               <button
-                class="btn taco-nav-btn taco-nav-btn--active me-3"
+                class="btn taco-nav-btn taco-nav-btn--active"
                 @click="refreshAllData"
                 :disabled="isLoading">
                 <span class="taco-text-black">
@@ -36,33 +63,35 @@
             </div>
 
             <!-- MY PERFORMANCE SECTION (logged in users only) -->
-            <MyPerformance
-              v-if="userLoggedIn"
-              :userPerformance="userPerformance"
-              :isLoading="isLoadingUserPerformance"
-              :errorMessage="userPerformanceError"
-              :principal="userPrincipal"
-              :selectedPriceType="selectedPriceType"
-              :selectedTimeframe="selectedTimeframe"
-              @refresh="loadUserPerformance"
-            />
+            <div id="my-performance">
+              <MyPerformance
+                v-if="userLoggedIn"
+                :userPerformance="userPerformance"
+                :isLoading="isLoadingUserPerformance"
+                :errorMessage="userPerformanceError"
+                :principal="userPrincipal"
+                :selectedPriceType="selectedPriceType"
+                :selectedTimeframe="selectedTimeframe"
+                @refresh="loadUserPerformance"
+              />
 
-            <!-- Login prompt for non-logged in users -->
-            <div v-else class="mx-3 mb-4">
-              <div class="card bg-dark text-white">
-                <div class="card-body text-center py-4">
-                  <h5 class="mb-3">View Your Performance</h5>
-                  <p class="text-muted mb-3">Log in to see your personal performance metrics and neuron details.</p>
-                  <button class="btn iid-login" @click="iidLogIn">
-                    <DfinityLogo />
-                    <span class="taco-text-white ms-2">Login</span>
-                  </button>
+              <!-- Login prompt for non-logged in users -->
+              <div v-else class="mx-3 mb-4">
+                <div class="taco-container taco-container--l1">
+                  <div class="text-center py-4">
+                    <h5 class="mb-3 taco-text-brown-to-white">View Your Performance</h5>
+                    <p class="perf-muted mb-3">Log in to see your personal performance metrics and neuron details.</p>
+                    <button class="btn iid-login" @click="iidLogIn">
+                      <DfinityLogo />
+                      <span class="taco-text-white ms-2">Login</span>
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
 
             <!-- LEADERBOARD SECTION -->
-            <PerformanceLeaderboard
+            <PerformanceLeaderboard id="leaderboard"
               :leaderboardEntries="leaderboardEntries"
               :followerInfos="followerInfos"
               :leaderboardInfo="leaderboardInfo"
@@ -77,17 +106,117 @@
               @unfollow="onUnfollowUser"
             />
 
-            <!-- MY FOLLOWING SECTION (logged in users only) -->
-            <MyFollowing
-              v-if="userLoggedIn"
-              :follows="userFollowsData"
-              :leaderboardEntries="leaderboardEntries"
-              :userLoggedIn="userLoggedIn"
-              :isLoading="isLoadingUserPerformance"
-              :selectedPriceType="selectedPriceType"
-              :selectedTimeframe="selectedTimeframe"
-              @unfollow="onUnfollowUser"
-            />
+            <!-- FOLLOW BY PRINCIPAL SECTION -->
+            <div id="follow-principal" class="mx-3 mb-4" v-if="userLoggedIn">
+              <div class="taco-container taco-container--l1">
+                <div class="d-flex align-items-center gap-2 mb-3">
+                  <i class="fas fa-user-plus taco-text-brown-to-white"></i>
+                  <h5 class="mb-0 taco-text-brown-to-white">Follow Principal</h5>
+                </div>
+                <p class="perf-muted small mb-3">Enter a principal ID to follow their allocation strategy.</p>
+                <div class="d-flex gap-2">
+                  <input
+                    v-model="followPrincipalInput"
+                    type="text"
+                    class="taco-input flex-grow-1"
+                    placeholder="Enter principal ID (e.g. abc12-xyz...)"
+                    @keyup.enter="followByPrincipal"
+                  />
+                  <button
+                    class="btn taco-btn taco-btn--success flex-shrink-0"
+                    @click="followByPrincipal"
+                    :disabled="isFollowingByPrincipal || !followPrincipalInput.trim()"
+                  >
+                    <i v-if="isFollowingByPrincipal" class="fas fa-spinner fa-spin me-1"></i>
+                    <i v-else class="fas fa-user-plus me-1"></i>
+                    Follow
+                  </button>
+                </div>
+
+                <!-- Follow Error -->
+                <div v-if="followByPrincipalError" class="perf-alert perf-alert--warning mt-3">
+                  <small>{{ followByPrincipalError }}</small>
+                </div>
+
+                <!-- Follow Success -->
+                <div v-if="followByPrincipalSuccess" class="perf-alert perf-alert--success mt-3">
+                  <small>{{ followByPrincipalSuccess }}</small>
+                </div>
+              </div>
+            </div>
+
+            <!-- FOLLOWING + DISPLAY NAME (side by side) -->
+            <div v-if="userLoggedIn" class="d-flex gap-3 mx-3 mb-4 bottom-row">
+              <!-- MY FOLLOWING -->
+              <div id="my-following" class="flex-fill bottom-col">
+                <div class="taco-container taco-container--l1 h-100">
+                  <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5 class="mb-0 taco-text-brown-to-white">
+                      <i class="fas fa-users me-2"></i>
+                      Following ({{ userFollowsData.length }}/3)
+                    </h5>
+                    <small class="perf-muted">Your allocation copies</small>
+                  </div>
+                  <MyFollowing
+                    :follows="userFollowsData"
+                    :leaderboardEntries="leaderboardEntries"
+                    :userLoggedIn="userLoggedIn"
+                    :isLoading="isLoadingUserPerformance"
+                    :selectedPriceType="selectedPriceType"
+                    :selectedTimeframe="selectedTimeframe"
+                    @unfollow="onUnfollowUser"
+                    :inline="true"
+                  />
+                </div>
+              </div>
+
+              <!-- DISPLAY NAME -->
+              <div id="display-name" class="flex-fill bottom-col">
+                <div class="taco-container taco-container--l1 h-100">
+                  <h5 class="mb-3 taco-text-brown-to-white">
+                    <i class="fas fa-id-badge me-2"></i>Display Name
+                  </h5>
+                  <p class="perf-muted small mb-3">Set a name to show on the leaderboard instead of your principal ID.<br><br></p>
+                  <div v-if="currentDisplayName" class="mb-3">  
+                    <small class="perf-muted">Current: </small>
+                    <strong class="taco-text-brown-to-white">{{ currentDisplayName }}</strong>
+                  </div>
+                  <div class="d-flex gap-2 align-items-center flex-wrap">
+                    <input
+                      v-model="displayNameInput"
+                      type="text"
+                      maxlength="24"
+                      placeholder="Enter display name (2-24 chars)"
+                      class="form-control form-control-sm taco-input"
+                      style="max-width: 100%; flex: 1;"
+                      @keyup.enter="onSetDisplayName"
+                    />
+                    <button
+                      class="btn taco-btn taco-btn--success btn-sm"
+                      @click="onSetDisplayName"
+                      :disabled="displayNameLoading"
+                    >
+                      <i class="fas fa-save me-1"></i>
+                      {{ displayNameLoading ? 'Saving...' : 'Set Name' }}
+                    </button>
+                    <button
+                      v-if="currentDisplayName"
+                      class="btn taco-btn taco-btn--danger btn-sm"
+                      @click="onDeleteDisplayName"
+                      :disabled="displayNameLoading"
+                    >
+                      <i class="fas fa-trash me-1"></i> Remove
+                    </button>
+                  </div>
+                  <div v-if="displayNameError" class="perf-alert perf-alert--warning mt-2">
+                    <small>{{ displayNameError }}</small>
+                  </div>
+                  <div v-if="displayNameSuccess" class="perf-alert perf-alert--success mt-2">
+                    <small>{{ displayNameSuccess }}</small>
+                  </div>
+                </div>
+              </div>
+            </div>
 
           </div>
         </div>
@@ -97,7 +226,7 @@
 </template>
 
 <script>
-import { ref, onMounted, computed, watch } from "vue"
+import { ref, onMounted, computed, watch, nextTick } from "vue"
 import { useTacoStore } from "../stores/taco.store"
 import { storeToRefs } from "pinia"
 import DfinityLogo from "../assets/images/dfinityLogo.vue"
@@ -133,6 +262,23 @@ export default {
       leaderboardInfo: storeLeaderboardInfo,
       leaderboardLoading
     } = storeToRefs(tacoStore)
+
+    // Section nav
+    const sectionNavOpen = ref(false)
+    const scrollContainer = ref(null)
+
+    // Follow by principal
+    const followPrincipalInput = ref('')
+    const isFollowingByPrincipal = ref(false)
+    const followByPrincipalError = ref('')
+    const followByPrincipalSuccess = ref('')
+
+    // Display name
+    const displayNameInput = ref('')
+    const currentDisplayName = ref(null)
+    const displayNameLoading = ref(false)
+    const displayNameError = ref('')
+    const displayNameSuccess = ref('')
 
     // Loading states
     const isLoading = ref(false)
@@ -184,7 +330,7 @@ export default {
 
     // Filters
     const selectedTimeframe = ref('AllTime') // OneWeek, OneMonth, OneYear, AllTime
-    const selectedPriceType = ref('USD') // USD, ICP
+    const selectedPriceType = ref('ICP') // USD, ICP
 
     // Login function
     const iidLogIn = () => {
@@ -200,11 +346,6 @@ export default {
         case 'AllTime':
         default: return { AllTime: null }
       }
-    }
-
-    // Convert price type string to candid variant
-    const getPriceTypeVariant = (priceType) => {
-      return priceType === 'ICP' ? { ICP: null } : { USD: null }
     }
 
     // Load follower info for leaderboard entries (leaderboard data comes from workers)
@@ -261,13 +402,12 @@ export default {
         const endTime = nowMs * BigInt(1_000_000) // nanoseconds
         const startTime = BigInt(0) // AllTime - backend returns all checkpoints
 
-        // Pass current timeframe and priceType so backend selects the best neuron
+        // Backend now returns best USD neuron and best ICP neuron separately
         const graphResult = await rewardsActor.getUserPerformanceGraphData(
           Principal.fromText(userPrincipal.value),
           startTime,
           endTime,
-          getTimeframeVariant(selectedTimeframe.value),
-          getPriceTypeVariant(selectedPriceType.value)
+          getTimeframeVariant(selectedTimeframe.value)
         )
 
         if ('ok' in graphResult) {
@@ -285,28 +425,41 @@ export default {
             oneYearICP: graphData.oneYearICP?.length > 0 ? [graphData.oneYearICP[0]] : []
           }
 
-          // neuronData now has at most 1 neuron (the best for the selected timeframe/priceType)
-          const neurons = graphData.neuronData.map(nd => ({
-            neuronId: nd.neuronId,
-            votingPower: BigInt(0),
-            distributionsParticipated: nd.checkpoints.length,
-            lastAllocationChange: nd.checkpoints.length > 0
-              ? nd.checkpoints[nd.checkpoints.length - 1].timestamp
-              : BigInt(0),
-            performance: {
-              allTimeUSD: nd.performanceScoreUSD ? [nd.performanceScoreUSD] : [],
-              allTimeICP: nd.performanceScoreICP?.length > 0 ? [nd.performanceScoreICP[0]] : [],
-              oneWeekUSD: graphData.oneWeekUSD?.length > 0 ? [graphData.oneWeekUSD[0]] : [],
-              oneWeekICP: graphData.oneWeekICP?.length > 0 ? [graphData.oneWeekICP[0]] : [],
-              oneMonthUSD: graphData.oneMonthUSD?.length > 0 ? [graphData.oneMonthUSD[0]] : [],
-              oneMonthICP: graphData.oneMonthICP?.length > 0 ? [graphData.oneMonthICP[0]] : [],
-              oneYearUSD: graphData.oneYearUSD?.length > 0 ? [graphData.oneYearUSD[0]] : [],
-              oneYearICP: graphData.oneYearICP?.length > 0 ? [graphData.oneYearICP[0]] : []
-            }
-          }))
+          // Build neurons array from bestUsdNeuron and bestIcpNeuron
+          const neurons = []
+          const seenNeuronIds = new Set()
+          const bestUsd = graphData.bestUsdNeuron?.[0] || null
+          const bestIcp = graphData.bestIcpNeuron?.[0] || null
 
-          const totalCheckpoints = graphData.neuronData.reduce(
-            (sum, nd) => sum + nd.checkpoints.length, 0
+          const addNeuron = (nd) => {
+            if (!nd) return
+            const idStr = Array.from(nd.neuronId).join(',')
+            if (seenNeuronIds.has(idStr)) return
+            seenNeuronIds.add(idStr)
+            neurons.push({
+              neuronId: nd.neuronId,
+              votingPower: BigInt(0),
+              distributionsParticipated: nd.checkpoints.length,
+              lastAllocationChange: nd.checkpoints.length > 0
+                ? nd.checkpoints[nd.checkpoints.length - 1].timestamp
+                : BigInt(0),
+              performance: {
+                allTimeUSD: nd.performanceScoreUSD ? [nd.performanceScoreUSD] : [],
+                allTimeICP: nd.performanceScoreICP?.length > 0 ? [nd.performanceScoreICP[0]] : [],
+                oneWeekUSD: graphData.oneWeekUSD?.length > 0 ? [graphData.oneWeekUSD[0]] : [],
+                oneWeekICP: graphData.oneWeekICP?.length > 0 ? [graphData.oneWeekICP[0]] : [],
+                oneMonthUSD: graphData.oneMonthUSD?.length > 0 ? [graphData.oneMonthUSD[0]] : [],
+                oneMonthICP: graphData.oneMonthICP?.length > 0 ? [graphData.oneMonthICP[0]] : [],
+                oneYearUSD: graphData.oneYearUSD?.length > 0 ? [graphData.oneYearUSD[0]] : [],
+                oneYearICP: graphData.oneYearICP?.length > 0 ? [graphData.oneYearICP[0]] : []
+              }
+            })
+          }
+          addNeuron(bestUsd)
+          addNeuron(bestIcp)
+
+          const totalCheckpoints = neurons.reduce(
+            (sum, nd) => sum + nd.distributionsParticipated, 0
           )
 
           userPerformance.value = {
@@ -385,6 +538,58 @@ export default {
         return 'Request was rejected by the network'
       }
       return 'Failed to load performance data'
+    }
+
+    // Scroll to a section by id
+    const scrollToSection = (sectionId) => {
+      nextTick(() => {
+        const el = document.getElementById(sectionId)
+        if (el && scrollContainer.value) {
+          const containerRect = scrollContainer.value.getBoundingClientRect()
+          const elRect = el.getBoundingClientRect()
+          const offset = elRect.top - containerRect.top + scrollContainer.value.scrollTop - 16
+          scrollContainer.value.scrollTo({ top: offset, behavior: 'smooth' })
+        }
+      })
+    }
+
+    // Follow a user by entering their principal ID
+    const followByPrincipal = async () => {
+      const input = followPrincipalInput.value.trim()
+      if (!input || !userLoggedIn.value) return
+
+      isFollowingByPrincipal.value = true
+      followByPrincipalError.value = ''
+      followByPrincipalSuccess.value = ''
+
+      try {
+        const { Principal } = await import('@dfinity/principal')
+        let principalObj
+        try {
+          principalObj = Principal.fromText(input)
+        } catch {
+          followByPrincipalError.value = 'Invalid principal ID format.'
+          isFollowingByPrincipal.value = false
+          return
+        }
+
+        const daoActor = await tacoStore.createDAOActor()
+        const result = await daoActor.followAllocation(principalObj)
+
+        if ('ok' in result) {
+          followByPrincipalSuccess.value = `Successfully followed ${input.substring(0, 12)}...`
+          followPrincipalInput.value = ''
+          await loadUserFollows()
+          await loadFollowerInfo()
+        } else {
+          followByPrincipalError.value = formatFollowError(result.err)
+        }
+      } catch (error) {
+        console.error('Error following principal:', error)
+        followByPrincipalError.value = 'Failed to follow. Please check the principal ID and try again.'
+      } finally {
+        isFollowingByPrincipal.value = false
+      }
     }
 
     // Refresh all data
@@ -487,13 +692,87 @@ export default {
       return 'Unfollow action failed'
     }
 
+    // Display name functions
+    const loadDisplayName = async () => {
+      if (!userLoggedIn.value || !userPrincipal.value) return
+      try {
+        const rewardsActor = await tacoStore.createRewardsActorAnonymous()
+        const { Principal } = await import('@dfinity/principal')
+        const result = await rewardsActor.getDisplayName(Principal.fromText(userPrincipal.value))
+        if (result && result.length > 0) {
+          currentDisplayName.value = result[0]
+          displayNameInput.value = result[0]
+        } else {
+          currentDisplayName.value = null
+        }
+      } catch (error) {
+        console.error('Error loading display name:', error)
+      }
+    }
+
+    const onSetDisplayName = async () => {
+      if (!displayNameInput.value.trim()) return
+      displayNameLoading.value = true
+      displayNameError.value = ''
+      displayNameSuccess.value = ''
+      try {
+        const rewardsActor = await tacoStore.createRewardsActor()
+        const result = await rewardsActor.setDisplayName(displayNameInput.value.trim())
+        if ('ok' in result) {
+          currentDisplayName.value = displayNameInput.value.trim()
+          displayNameSuccess.value = 'Display name set successfully'
+          setTimeout(() => { displayNameSuccess.value = '' }, 3000)
+        } else {
+          const err = result.err
+          if ('InvalidDisplayName' in err) {
+            displayNameError.value = err.InvalidDisplayName
+          } else if ('NotAuthorized' in err) {
+            displayNameError.value = 'Not authorized'
+          } else {
+            displayNameError.value = 'Failed to set display name'
+          }
+        }
+      } catch (error) {
+        console.error('Error setting display name:', error)
+        displayNameError.value = 'Failed to set display name'
+      } finally {
+        displayNameLoading.value = false
+      }
+    }
+
+    const onDeleteDisplayName = async () => {
+      displayNameLoading.value = true
+      displayNameError.value = ''
+      displayNameSuccess.value = ''
+      try {
+        const rewardsActor = await tacoStore.createRewardsActor()
+        const result = await rewardsActor.deleteMyDisplayName()
+        if ('ok' in result) {
+          currentDisplayName.value = null
+          displayNameInput.value = ''
+          displayNameSuccess.value = 'Display name removed'
+          setTimeout(() => { displayNameSuccess.value = '' }, 3000)
+        } else {
+          displayNameError.value = 'Failed to remove display name'
+        }
+      } catch (error) {
+        console.error('Error deleting display name:', error)
+        displayNameError.value = 'Failed to remove display name'
+      } finally {
+        displayNameLoading.value = false
+      }
+    }
+
     // Watch for login state changes
     watch(userLoggedIn, (newState) => {
       if (newState) {
         loadUserPerformance()
+        loadDisplayName()
       } else {
         userPerformance.value = null
         userFollowsData.value = []
+        currentDisplayName.value = null
+        displayNameInput.value = ''
       }
     })
 
@@ -501,6 +780,7 @@ export default {
     onMounted(async () => {
       await tacoStore.checkIfLoggedIn()
       await refreshAllData()
+      loadDisplayName()
     })
 
     return {
@@ -521,6 +801,23 @@ export default {
       selectedTimeframe,
       selectedPriceType,
 
+      // Section nav
+      sectionNavOpen,
+      scrollContainer,
+
+      // Follow by principal
+      followPrincipalInput,
+      isFollowingByPrincipal,
+      followByPrincipalError,
+      followByPrincipalSuccess,
+
+      // Display name
+      displayNameInput,
+      currentDisplayName,
+      displayNameLoading,
+      displayNameError,
+      displayNameSuccess,
+
       // Methods
       iidLogIn,
       refreshAllData,
@@ -528,7 +825,11 @@ export default {
       onTimeframeChange,
       onPriceTypeChange,
       onFollowUser,
-      onUnfollowUser
+      onUnfollowUser,
+      scrollToSection,
+      followByPrincipal,
+      onSetDisplayName,
+      onDeleteDisplayName
     }
   }
 }
@@ -538,17 +839,69 @@ export default {
 .performance-view {
   display: flex;
   flex-direction: column;
-  height: 100%;
+  padding-bottom: 2rem;
 }
 
-.standard-view {
-  height: 100vh;
-  display: flex;
-  flex-direction: column;
+/* Bottom row: Following + Display Name side by side */
+.bottom-row {
+  align-items: stretch;
 }
 
-.scroll-y-container {
-  overflow-y: auto;
+.bottom-col {
+  min-width: 0;
+  flex-basis: 50%;
+}
+
+@media (max-width: 768px) {
+  .bottom-row {
+    flex-direction: column;
+  }
+
+  .bottom-col {
+    flex-basis: auto;
+  }
+}
+
+.perf-title-bar {
+  background: var(--yellow-to-brown);
+  border: 1px solid var(--dark-orange);
+  border-radius: 0.5rem;
+  padding: 0.75rem 1.25rem;
+}
+
+.perf-beta-badge {
+  font-size: 0.6rem;
+  padding: 0.15rem 0.4rem;
+  background-color: var(--dark-orange);
+  color: #fff;
+  border-radius: 0.25rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  vertical-align: super;
+  margin-left: 0.25rem;
+  letter-spacing: 0.05em;
+}
+
+/* Theme text helpers */
+.perf-muted {
+  color: var(--dark-brown-to-white);
+}
+
+/* Theme alert boxes */
+.perf-alert {
+  border-radius: 0.5rem;
+  padding: 0.5rem 1rem;
+  border: 1px solid var(--dark-orange);
+}
+
+.perf-alert--warning {
+  background: var(--dark-orange-to-light-brown);
+  color: var(--brown-to-white);
+}
+
+.perf-alert--success {
+  background: var(--green);
+  color: var(--black);
 }
 
 /* Button styling */
@@ -569,5 +922,113 @@ export default {
 .iid-login:hover {
   transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(82, 39, 133, 0.4);
+}
+
+/* Floating Section Nav */
+.section-nav-floating {
+  position: fixed;
+  top: 80px;
+  left: 120px;
+  z-index: 1050;
+}
+
+.section-nav-toggle {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 1px solid var(--dark-orange);
+  background: var(--yellow-to-brown);
+  color: var(--brown-to-white);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 1rem;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.section-nav-toggle:hover {
+  background: var(--orange-to-light-brown);
+  color: var(--brown-to-white);
+  border-color: var(--brown);
+}
+
+.section-nav-open .section-nav-toggle {
+  background: var(--brown);
+  border-color: var(--dark-brown);
+  color: #fff;
+}
+
+.section-nav-menu {
+  position: absolute;
+  top: 48px;
+  left: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  background: var(--yellow-to-brown);
+  border: 1px solid var(--dark-orange);
+  border-radius: 0.5rem;
+  padding: 6px;
+  min-width: 200px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+}
+
+.section-nav-item {
+  display: flex;
+  align-items: center;
+  padding: 10px 14px;
+  border: none;
+  background: transparent;
+  color: var(--brown-to-white);
+  font-family: 'Space Mono', monospace;
+  font-size: 0.8rem;
+  border-radius: 0.375rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.section-nav-item:hover {
+  background: var(--orange-to-light-brown);
+  color: var(--brown-to-white);
+}
+
+/* Nav transition */
+.nav-fade-enter-active,
+.nav-fade-leave-active {
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+.nav-fade-enter-from,
+.nav-fade-leave-to {
+  opacity: 0;
+  transform: translateY(-8px);
+}
+
+/* Responsive */
+@media (max-width: 576px) {
+  .section-nav-floating {
+    top: 70px;
+    left: 80px;
+  }
+
+  .section-nav-toggle {
+    width: 36px;
+    height: 36px;
+    font-size: 0.9rem;
+  }
+
+  .section-nav-menu {
+    top: 44px;
+    min-width: 180px;
+  }
+
+  .section-nav-item {
+    padding: 8px 12px;
+    font-size: 0.75rem;
+  }
 }
 </style>

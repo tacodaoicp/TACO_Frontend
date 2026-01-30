@@ -35,6 +35,7 @@ export interface CheckpointData {
   'timestamp' : bigint,
   'allocations' : Array<Allocation>,
   'tokenValues' : Array<[Principal, number]>,
+  'reason' : [] | [string],
 }
 export interface DistributionRecord {
   'id' : bigint,
@@ -62,8 +63,19 @@ export interface FailedNeuron {
   'errorMessage' : string,
   'neuronId' : Uint8Array | number[],
 }
+export interface GraphCheckpointData {
+  'maker' : [] | [Principal],
+  'totalPortfolioValue' : number,
+  'totalPortfolioValueICP' : number,
+  'pricesUsed' : Array<[Principal, PriceInfo]>,
+  'timestamp' : bigint,
+  'allocations' : Array<Allocation>,
+  'tokenValues' : Array<[Principal, number]>,
+  'reason' : [] | [string],
+}
 export interface LeaderboardEntry {
   'principal' : Principal,
+  'displayName' : [] | [string],
   'performanceScore' : number,
   'lastActivity' : bigint,
   'rank' : bigint,
@@ -97,6 +109,12 @@ export interface NeuronAllocationChangeBlockData {
   'neuronId' : Uint8Array | number[],
   'penaltyMultiplier' : [] | [bigint],
   'reason' : [] | [string],
+}
+export interface NeuronGraphData {
+  'checkpoints' : Array<GraphCheckpointData>,
+  'neuronId' : Uint8Array | number[],
+  'performanceScoreICP' : [] | [number],
+  'performanceScoreUSD' : number,
 }
 export interface NeuronPerformanceDetail {
   'lastAllocationChange' : bigint,
@@ -150,9 +168,11 @@ export type Result__1_1 = {
     'ok' : { 'withdrawals' : Array<WithdrawalRecord> }
   } |
   { 'err' : RewardsError };
-export type Result__1_10 = { 'ok' : PerformanceResult } |
+export type Result__1_10 = { 'ok' : Array<string> } |
   { 'err' : RewardsError };
-export type Result__1_11 = { 'ok' : BackfillResult } |
+export type Result__1_11 = { 'ok' : PerformanceResult } |
+  { 'err' : RewardsError };
+export type Result__1_12 = { 'ok' : BackfillResult } |
   { 'err' : RewardsError };
 export type Result__1_2 = { 'ok' : Array<WithdrawalRecord> } |
   { 'err' : RewardsError };
@@ -173,10 +193,12 @@ export type Result__1_9 = {
   } |
   { 'err' : RewardsError };
 export interface Rewards {
+  'addBannedWords' : ActorMethod<[Array<string>], Result__1>,
   'addToRewardSkipList' : ActorMethod<[Uint8Array | number[]], Result__1>,
+  'adminDeleteDisplayName' : ActorMethod<[Principal], Result__1>,
   'admin_backfillDistributionHistory' : ActorMethod<
     [BackfillConfig],
-    Result__1_11
+    Result__1_12
   >,
   'admin_recalculateAllIcpPerformance' : ActorMethod<[], Result__1>,
   'admin_recalculateIcpPerformanceForDistribution' : ActorMethod<
@@ -185,16 +207,17 @@ export interface Rewards {
   >,
   'calculateNeuronPerformance' : ActorMethod<
     [Uint8Array | number[], bigint, bigint, PriceType],
-    Result__1_10
+    Result__1_11
   >,
   'calculateNeuronPerformanceQuery' : ActorMethod<
     [Uint8Array | number[], bigint, bigint, PriceType],
-    Result__1_10
+    Result__1_11
   >,
   /**
    * / * Clear all logs
    */
   'clearLogs' : ActorMethod<[], undefined>,
+  'deleteMyDisplayName' : ActorMethod<[], Result__1>,
   'getAllNeuronRewardBalances' : ActorMethod<
     [],
     Array<[Uint8Array | number[], bigint]>
@@ -217,6 +240,7 @@ export interface Rewards {
       'inProgress' : boolean,
     }
   >,
+  'getBannedWords' : ActorMethod<[], Result__1_10>,
   'getCanisterStatus' : ActorMethod<
     [],
     {
@@ -261,6 +285,11 @@ export interface Rewards {
     }
   >,
   'getCurrentTotalNeuronBalances' : ActorMethod<[], bigint>,
+  'getDisplayName' : ActorMethod<[Principal], [] | [string]>,
+  'getDisplayNames' : ActorMethod<
+    [Array<Principal>],
+    Array<[Principal, [] | [string]]>
+  >,
   'getDistributionHistory' : ActorMethod<
     [bigint, bigint],
     {
@@ -318,7 +347,7 @@ export interface Rewards {
   'getTotalDistributed' : ActorMethod<[], bigint>,
   'getUserPerformance' : ActorMethod<[Principal], Result__1_4>,
   'getUserPerformanceGraphData' : ActorMethod<
-    [Principal, bigint, bigint, LeaderboardTimeframe, PriceType],
+    [Principal, bigint, bigint, LeaderboardTimeframe],
     Result__1_3
   >,
   'getUserWithdrawalHistory' : ActorMethod<[[] | [bigint]], Result__1_2>,
@@ -333,8 +362,10 @@ export interface Rewards {
   'getWithdrawalsSince' : ActorMethod<[bigint, bigint], Result__1_1>,
   'get_canister_cycles' : ActorMethod<[], { 'cycles' : bigint }>,
   'refreshLeaderboards' : ActorMethod<[], Result__1>,
+  'removeBannedWords' : ActorMethod<[Array<string>], Result__1>,
   'removeFromRewardSkipList' : ActorMethod<[Uint8Array | number[]], Result__1>,
   'removeRewardPenalty' : ActorMethod<[Uint8Array | number[]], Result__1>,
+  'setDisplayName' : ActorMethod<[string], Result__1>,
   'setDistributionEnabled' : ActorMethod<[boolean], Result__1>,
   'setDistributionPeriod' : ActorMethod<[bigint], Result__1>,
   'setMaxDistributionHistory' : ActorMethod<[bigint], Result__1>,
@@ -362,6 +393,7 @@ export interface Rewards {
   'withdraw' : ActorMethod<[Account, Array<Uint8Array | number[]>], Result>,
 }
 export type RewardsError = { 'AllocationDataMissing' : null } |
+  { 'InvalidDisplayName' : string } |
   { 'SystemError' : string } |
   { 'NotAuthorized' : null } |
   { 'DistributionInProgress' : null } |
@@ -383,20 +415,15 @@ export interface UserPerformanceGraphData {
   'oneMonthICP' : [] | [number],
   'oneMonthUSD' : [] | [number],
   'timeframe' : { 'startTime' : bigint, 'endTime' : bigint },
-  'neuronData' : Array<
-    {
-      'checkpoints' : Array<CheckpointData>,
-      'neuronId' : Uint8Array | number[],
-      'performanceScoreICP' : [] | [number],
-      'performanceScoreUSD' : number,
-    }
-  >,
+  'bestUsdNeuron' : [] | [NeuronGraphData],
   'oneWeekICP' : [] | [number],
   'oneWeekUSD' : [] | [number],
   'oneYearICP' : [] | [number],
   'oneYearUSD' : [] | [number],
   'aggregatedPerformanceICP' : [] | [number],
   'aggregatedPerformanceUSD' : number,
+  'allocationNeuronId' : [] | [Uint8Array | number[]],
+  'bestIcpNeuron' : [] | [NeuronGraphData],
 }
 export interface UserPerformanceResult {
   'principal' : Principal,
