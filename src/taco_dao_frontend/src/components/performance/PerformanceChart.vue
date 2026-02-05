@@ -389,7 +389,24 @@ export default {
               checkpoint = findClosestCheckpoint(usdIsFirst ? icpCheckpoints.value : usdCheckpoints.value, timestamp)
             }
 
-            // Build allocation HTML
+            // Find next checkpoint for price change calculation
+            const currentIndex = usdCheckpoints.value.findIndex(cp =>
+              Math.abs(Number(cp.timestamp) / 1_000_000 - timestamp) < 1000
+            )
+            const nextCheckpoint = currentIndex >= 0 && currentIndex < usdCheckpoints.value.length - 1
+              ? usdCheckpoints.value[currentIndex + 1]
+              : null
+
+            // Helper to get USD price from pricesUsed array
+            const getPriceUsd = (cp, tokenPrincipal) => {
+              if (!cp?.pricesUsed) return null
+              const priceEntry = cp.pricesUsed.find(([p, _]) =>
+                p.toString() === tokenPrincipal.toString()
+              )
+              return priceEntry ? priceEntry[1].usdPrice : null
+            }
+
+            // Build allocation HTML with price changes
             let allocationHtml = ''
             if (checkpoint?.allocations && checkpoint.allocations.length > 0) {
               const nonZeroAllocations = checkpoint.allocations
@@ -397,7 +414,28 @@ export default {
                 .map(alloc => {
                   const symbol = getTokenSymbol(alloc.token)
                   const percent = (Number(alloc.basisPoints) / 100).toFixed(1)
-                  return `<div style="display:flex;justify-content:space-between;gap:12px;"><span style="color:#FEEAC1;">${symbol}</span><span style="color:#fff;">${percent}%</span></div>`
+
+                  // Calculate price change to next checkpoint
+                  let priceChangeHtml = ''
+                  if (nextCheckpoint) {
+                    const currentPrice = getPriceUsd(checkpoint, alloc.token)
+                    const nextPrice = getPriceUsd(nextCheckpoint, alloc.token)
+                    if (currentPrice && nextPrice && currentPrice > 0) {
+                      const change = ((nextPrice - currentPrice) / currentPrice) * 100
+                      const sign = change >= 0 ? '+' : ''
+                      const color = change >= 0 ? '#4CAF50' : '#FF5252'
+                      const emoji = change >= 0 ? '📈' : '📉'
+                      priceChangeHtml = `<span style="color:${color};font-size:10px;margin-left:4px;">${emoji}${sign}${change.toFixed(1)}%</span>`
+                    }
+                  }
+
+                  return `<div style="display:flex;justify-content:space-between;gap:8px;align-items:center;">
+                    <span style="color:#FEEAC1;">${symbol}</span>
+                    <span style="display:flex;align-items:center;gap:4px;">
+                      <span style="color:#fff;">${percent}%</span>
+                      ${priceChangeHtml}
+                    </span>
+                  </div>`
                 })
 
               if (nonZeroAllocations.length > 0) {
@@ -521,20 +559,34 @@ export default {
           return cps
         }
 
-        // Extract best USD neuron checkpoints
-        const bestUsd = graphData.bestUsdNeuron?.[0] || null
-        const bestIcp = graphData.bestIcpNeuron?.[0] || null
+        // Select the longest neuron (most checkpoints), tiebreaker: best ICP performance
+        const allNeurons = graphData.neurons || []
+        let selectedNeuron = null
+        if (allNeurons.length > 0) {
+          selectedNeuron = allNeurons.reduce((best, curr) => {
+            const bestLen = best.checkpoints?.length ?? 0
+            const currLen = curr.checkpoints?.length ?? 0
+            if (currLen > bestLen) return curr
+            if (currLen === bestLen) {
+              // Tiebreaker: better ICP performance
+              const bestIcp = best.performanceScoreICP?.[0] ?? -Infinity
+              const currIcp = curr.performanceScoreICP?.[0] ?? -Infinity
+              return currIcp > bestIcp ? curr : best
+            }
+            return best
+          })
+        }
 
-        const usdCps = processCheckpoints(bestUsd)
-        const icpCps = processCheckpoints(bestIcp)
-
-        if (usdCps.length === 0 && icpCps.length === 0) {
+        // Use same neuron for both USD and ICP chart lines
+        const cps = processCheckpoints(selectedNeuron)
+        if (cps.length === 0) {
           error.value = 'No checkpoint data available'
           return
         }
 
-        usdCheckpoints.value = usdCps
-        icpCheckpoints.value = icpCps
+        // Both chart lines use same checkpoints (different Y values: USD vs ICP)
+        usdCheckpoints.value = cps
+        icpCheckpoints.value = cps
 
         // Reset baseline to first checkpoint when new data loads
         baselineIndex.value = 0

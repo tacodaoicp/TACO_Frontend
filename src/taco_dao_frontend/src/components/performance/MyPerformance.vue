@@ -157,10 +157,13 @@
 
           <!-- Neurons Section -->
           <div v-if="userPerformance.neurons && userPerformance.neurons.length > 0">
-            <h6 class="perf-muted mb-3">
-              <i class="fas fa-brain me-1"></i>
-              Your Neurons ({{ userPerformance.neurons.length }})
-            </h6>
+            <div class="d-flex justify-content-between align-items-center mb-3">
+              <h6 class="perf-muted mb-0">
+                <i class="fas fa-brain me-1"></i>
+                Your Neurons ({{ userPerformance.neurons.length }})
+              </h6>
+              <small class="perf-legend">Performance: USD / ICP</small>
+            </div>
             <div class="neurons-list">
               <div
                 v-for="neuron in userPerformance.neurons"
@@ -175,21 +178,51 @@
                 </div>
                 <div class="neuron-performance">
                   <div class="perf-mini">
-                    <span class="label">1W USD</span>
-                    <span :class="getPerformanceClass(neuron.performance?.oneWeekUSD)">
-                      {{ formatPerformance(neuron.performance?.oneWeekUSD) }}
-                    </span>
-                  </div>
-                  <div class="perf-mini">
-                    <span class="label">1M USD</span>
-                    <span :class="getPerformanceClass(neuron.performance?.oneMonthUSD)">
-                      {{ formatPerformance(neuron.performance?.oneMonthUSD) }}
-                    </span>
-                  </div>
-                  <div class="perf-mini">
                     <span class="label">All-Time</span>
-                    <span :class="getPerformanceClass(neuron.performance?.allTimeUSD)">
-                      {{ formatPerformance(neuron.performance?.allTimeUSD) }}
+                    <span class="perf-values">
+                      <span :class="getPerformanceClass(neuron.performance?.allTimeUSD)">
+                        {{ formatPerformance(neuron.performance?.allTimeUSD) }}
+                      </span>
+                      <span class="perf-separator">/</span>
+                      <span :class="getPerformanceClass(neuron.performance?.allTimeICP)">
+                        {{ formatPerformance(neuron.performance?.allTimeICP) }}
+                      </span>
+                    </span>
+                  </div>
+                  <div class="perf-mini">
+                    <span class="label">1Y</span>
+                    <span class="perf-values">
+                      <span :class="getPerformanceClass(neuron.performance?.oneYearUSD)">
+                        {{ formatPerformance(neuron.performance?.oneYearUSD) }}
+                      </span>
+                      <span class="perf-separator">/</span>
+                      <span :class="getPerformanceClass(neuron.performance?.oneYearICP)">
+                        {{ formatPerformance(neuron.performance?.oneYearICP) }}
+                      </span>
+                    </span>
+                  </div>
+                  <div class="perf-mini">
+                    <span class="label">1M</span>
+                    <span class="perf-values">
+                      <span :class="getPerformanceClass(neuron.performance?.oneMonthUSD)">
+                        {{ formatPerformance(neuron.performance?.oneMonthUSD) }}
+                      </span>
+                      <span class="perf-separator">/</span>
+                      <span :class="getPerformanceClass(neuron.performance?.oneMonthICP)">
+                        {{ formatPerformance(neuron.performance?.oneMonthICP) }}
+                      </span>
+                    </span>
+                  </div>
+                  <div class="perf-mini">
+                    <span class="label">1W</span>
+                    <span class="perf-values">
+                      <span :class="getPerformanceClass(neuron.performance?.oneWeekUSD)">
+                        {{ formatPerformance(neuron.performance?.oneWeekUSD) }}
+                      </span>
+                      <span class="perf-separator">/</span>
+                      <span :class="getPerformanceClass(neuron.performance?.oneWeekICP)">
+                        {{ formatPerformance(neuron.performance?.oneWeekICP) }}
+                      </span>
                     </span>
                   </div>
                 </div>
@@ -424,6 +457,7 @@ export default {
   display: flex;
   gap: 1rem;
   margin-bottom: 0.5rem;
+  flex-wrap: wrap;
 }
 
 .perf-mini {
@@ -437,12 +471,27 @@ export default {
   font-family: 'Space Mono', monospace;
 }
 
-.perf-mini span:last-child {
+.perf-values {
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
   font-weight: 600;
   font-family: 'Space Mono', monospace;
   background: rgba(0, 0, 0, 0.45);
   padding: 0.1rem 0.4rem;
   border-radius: 0.375rem;
+  font-size: 0.85rem;
+}
+
+.perf-separator {
+  color: var(--brown-to-white);
+  opacity: 0.5;
+  font-weight: 400;
+}
+
+.perf-legend {
+  color: var(--dark-brown-to-white);
+  font-family: 'Space Mono', monospace;
 }
 
 .neuron-meta {

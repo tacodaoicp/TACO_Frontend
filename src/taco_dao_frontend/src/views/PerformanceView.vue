@@ -413,58 +413,59 @@ export default {
         if ('ok' in graphResult) {
           const graphData = graphResult.ok
 
-          // Use backend-provided timeframe performance values (exact match with leaderboard)
+          // Aggregated performance (all-time only now, per-timeframe scores are on each neuron)
           const aggregatedPerformance = {
             allTimeUSD: graphData.aggregatedPerformanceUSD ? [graphData.aggregatedPerformanceUSD] : [],
             allTimeICP: graphData.aggregatedPerformanceICP?.length > 0 ? [graphData.aggregatedPerformanceICP[0]] : [],
-            oneWeekUSD: graphData.oneWeekUSD?.length > 0 ? [graphData.oneWeekUSD[0]] : [],
-            oneWeekICP: graphData.oneWeekICP?.length > 0 ? [graphData.oneWeekICP[0]] : [],
-            oneMonthUSD: graphData.oneMonthUSD?.length > 0 ? [graphData.oneMonthUSD[0]] : [],
-            oneMonthICP: graphData.oneMonthICP?.length > 0 ? [graphData.oneMonthICP[0]] : [],
-            oneYearUSD: graphData.oneYearUSD?.length > 0 ? [graphData.oneYearUSD[0]] : [],
-            oneYearICP: graphData.oneYearICP?.length > 0 ? [graphData.oneYearICP[0]] : []
+            oneWeekUSD: [],
+            oneWeekICP: [],
+            oneMonthUSD: [],
+            oneMonthICP: [],
+            oneYearUSD: [],
+            oneYearICP: []
           }
 
-          // Build neurons array from bestUsdNeuron and bestIcpNeuron
-          const neurons = []
-          const seenNeuronIds = new Set()
-          const bestUsd = graphData.bestUsdNeuron?.[0] || null
-          const bestIcp = graphData.bestIcpNeuron?.[0] || null
+          // All neurons now come in graphData.neurons array
+          // Sort by best all-time ICP performance (descending)
+          const sortedNeurons = [...(graphData.neurons || [])].sort((a, b) => {
+            const aIcp = a.performanceScoreICP?.[0] ?? -Infinity
+            const bIcp = b.performanceScoreICP?.[0] ?? -Infinity
+            return bIcp - aIcp
+          })
 
-          const addNeuron = (nd) => {
-            if (!nd) return
-            const idStr = Array.from(nd.neuronId).join(',')
-            if (seenNeuronIds.has(idStr)) return
-            seenNeuronIds.add(idStr)
-            neurons.push({
-              neuronId: nd.neuronId,
-              votingPower: BigInt(0),
-              distributionsParticipated: nd.checkpoints.length,
-              lastAllocationChange: nd.checkpoints.length > 0
-                ? nd.checkpoints[nd.checkpoints.length - 1].timestamp
-                : BigInt(0),
-              performance: {
-                allTimeUSD: nd.performanceScoreUSD ? [nd.performanceScoreUSD] : [],
-                allTimeICP: nd.performanceScoreICP?.length > 0 ? [nd.performanceScoreICP[0]] : [],
-                oneWeekUSD: graphData.oneWeekUSD?.length > 0 ? [graphData.oneWeekUSD[0]] : [],
-                oneWeekICP: graphData.oneWeekICP?.length > 0 ? [graphData.oneWeekICP[0]] : [],
-                oneMonthUSD: graphData.oneMonthUSD?.length > 0 ? [graphData.oneMonthUSD[0]] : [],
-                oneMonthICP: graphData.oneMonthICP?.length > 0 ? [graphData.oneMonthICP[0]] : [],
-                oneYearUSD: graphData.oneYearUSD?.length > 0 ? [graphData.oneYearUSD[0]] : [],
-                oneYearICP: graphData.oneYearICP?.length > 0 ? [graphData.oneYearICP[0]] : []
-              }
-            })
-          }
-          addNeuron(bestUsd)
-          addNeuron(bestIcp)
+          // Map to internal structure with per-neuron timeframe scores
+          const neurons = sortedNeurons.map(nd => ({
+            neuronId: nd.neuronId,
+            votingPower: nd.votingPower ?? BigInt(0),
+            distributionsParticipated: nd.checkpoints?.length ?? 0,
+            allocationChangeCount: Number(nd.allocationChangeCount ?? 0),
+            lastAllocationChange: nd.checkpoints?.length > 0
+              ? nd.checkpoints[nd.checkpoints.length - 1].timestamp
+              : BigInt(0),
+            performance: {
+              allTimeUSD: nd.performanceScoreUSD ? [nd.performanceScoreUSD] : [],
+              allTimeICP: nd.performanceScoreICP?.length > 0 ? [nd.performanceScoreICP[0]] : [],
+              oneWeekUSD: nd.oneWeekUSD?.length > 0 ? [nd.oneWeekUSD[0]] : [],
+              oneWeekICP: nd.oneWeekICP?.length > 0 ? [nd.oneWeekICP[0]] : [],
+              oneMonthUSD: nd.oneMonthUSD?.length > 0 ? [nd.oneMonthUSD[0]] : [],
+              oneMonthICP: nd.oneMonthICP?.length > 0 ? [nd.oneMonthICP[0]] : [],
+              oneYearUSD: nd.oneYearUSD?.length > 0 ? [nd.oneYearUSD[0]] : [],
+              oneYearICP: nd.oneYearICP?.length > 0 ? [nd.oneYearICP[0]] : []
+            }
+          }))
 
           const totalCheckpoints = neurons.reduce(
             (sum, nd) => sum + nd.distributionsParticipated, 0
           )
 
+          // Calculate total voting power from all neurons
+          const totalVotingPower = neurons.reduce(
+            (sum, n) => sum + (n.votingPower || BigInt(0)), BigInt(0)
+          )
+
           userPerformance.value = {
             principal: Principal.fromText(userPrincipal.value),
-            totalVotingPower: BigInt(0),
+            totalVotingPower,
             distributionsParticipated: totalCheckpoints > 0 ? totalCheckpoints : 0,
             lastActivity: graphData.timeframe.endTime,
             aggregatedPerformance,

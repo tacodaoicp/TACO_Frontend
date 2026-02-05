@@ -56,6 +56,7 @@ import {
   fetchHighestProcessedNNSProposalIdData,
   fetchRewardsConfigurationData,
   fetchDistributionHistoryData,
+  fetchUserPerformanceData,
   serializeForTransfer,
   clearActorCache,
 } from './shared/fetch-functions'
@@ -122,9 +123,11 @@ const HANDLED_KEYS: DataKey[] = [
   'highestProcessedNNSProposalId',
   'rewardsConfiguration',
   'distributionHistory',
+  // Performance data (user-specific)
+  'userPerformance',
 ]
 
-const USER_KEYS: DataKey[] = ['userAllocation']
+const USER_KEYS: DataKey[] = ['userAllocation', 'userPerformance']
 
 const AUTH_REQUIRED_KEYS: DataKey[] = [
   'queueStatus',
@@ -777,6 +780,14 @@ async function fetchData(dataKey: DataKey): Promise<void> {
   switch (dataKey) {
     case 'userAllocation':
       data = serializeForTransfer(await fetchUserAllocationData(authenticatedAgent!))
+      break
+    case 'userPerformance':
+      // userPerformance requires the authenticated user's principal
+      if (!currentIdentity) {
+        throw new Error('No identity available for userPerformance')
+      }
+      const userPrincipal = currentIdentity.getPrincipal()
+      data = serializeForTransfer(await fetchUserPerformanceData(authenticatedAgent!, userPrincipal))
       break
     case 'systemLogs':
       data = serializeForTransfer(await fetchSystemLogsData(agent))

@@ -110,7 +110,15 @@ export interface NeuronAllocationChangeBlockData {
   'penaltyMultiplier' : [] | [bigint],
   'reason' : [] | [string],
 }
-export interface NeuronGraphData {
+export interface NeuronGraphDataExtended {
+  'oneMonthICP' : [] | [number],
+  'oneMonthUSD' : [] | [number],
+  'votingPower' : bigint,
+  'allocationChangeCount' : bigint,
+  'oneWeekICP' : [] | [number],
+  'oneWeekUSD' : [] | [number],
+  'oneYearICP' : [] | [number],
+  'oneYearUSD' : [] | [number],
   'checkpoints' : Array<GraphCheckpointData>,
   'neuronId' : Uint8Array | number[],
   'performanceScoreICP' : [] | [number],
@@ -303,6 +311,7 @@ export interface Rewards {
     [LeaderboardTimeframe, LeaderboardPriceType, [] | [bigint], [] | [bigint]],
     Array<LeaderboardEntry>
   >,
+  'getLeaderboardCutoffDate' : ActorMethod<[], bigint>,
   'getLeaderboardInfo' : ActorMethod<
     [],
     {
@@ -321,6 +330,10 @@ export interface Rewards {
       'totalDistributions' : bigint,
       'maxSize' : bigint,
     }
+  >,
+  'getLeaderboardTimerStatus' : ActorMethod<
+    [],
+    { 'active' : boolean, 'intervalHours' : bigint }
   >,
   /**
    * / * Get the last N log entries
@@ -347,7 +360,7 @@ export interface Rewards {
   'getTotalDistributed' : ActorMethod<[], bigint>,
   'getUserPerformance' : ActorMethod<[Principal], Result__1_4>,
   'getUserPerformanceGraphData' : ActorMethod<
-    [Principal, bigint, bigint, LeaderboardTimeframe],
+    [Principal, bigint, bigint],
     Result__1_3
   >,
   'getUserWithdrawalHistory' : ActorMethod<[[] | [bigint]], Result__1_2>,
@@ -368,6 +381,7 @@ export interface Rewards {
   'setDisplayName' : ActorMethod<[string], Result__1>,
   'setDistributionEnabled' : ActorMethod<[boolean], Result__1>,
   'setDistributionPeriod' : ActorMethod<[bigint], Result__1>,
+  'setLeaderboardCutoffDate' : ActorMethod<[bigint], Result__1>,
   'setMaxDistributionHistory' : ActorMethod<[bigint], Result__1>,
   'setPerformanceScorePower' : ActorMethod<[number], Result__1>,
   'setPeriodicRewardPot' : ActorMethod<[bigint], Result__1>,
@@ -381,6 +395,7 @@ export interface Rewards {
   'startDistributionTimer' : ActorMethod<[], Result__1>,
   'startDistributionTimerAt' : ActorMethod<[bigint], Result__1>,
   'stopDistributionTimer' : ActorMethod<[], Result__1>,
+  'stopLeaderboardTimer' : ActorMethod<[], Result__1>,
   'triggerDistribution' : ActorMethod<[], Result__1>,
   'triggerDistributionCustom' : ActorMethod<
     [bigint, bigint, PriceType],
@@ -412,18 +427,11 @@ export type TransferError = {
   { 'TooOld' : null } |
   { 'InsufficientFunds' : { 'balance' : bigint } };
 export interface UserPerformanceGraphData {
-  'oneMonthICP' : [] | [number],
-  'oneMonthUSD' : [] | [number],
   'timeframe' : { 'startTime' : bigint, 'endTime' : bigint },
-  'bestUsdNeuron' : [] | [NeuronGraphData],
-  'oneWeekICP' : [] | [number],
-  'oneWeekUSD' : [] | [number],
-  'oneYearICP' : [] | [number],
-  'oneYearUSD' : [] | [number],
   'aggregatedPerformanceICP' : [] | [number],
   'aggregatedPerformanceUSD' : number,
   'allocationNeuronId' : [] | [Uint8Array | number[]],
-  'bestIcpNeuron' : [] | [NeuronGraphData],
+  'neurons' : Array<NeuronGraphDataExtended>,
 }
 export interface UserPerformanceResult {
   'principal' : Principal,

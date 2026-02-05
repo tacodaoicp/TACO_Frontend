@@ -245,25 +245,26 @@ export const idlFactory = ({ IDL }) => {
     'tokenValues' : IDL.Vec(IDL.Tuple(IDL.Principal, IDL.Float64)),
     'reason' : IDL.Opt(IDL.Text),
   });
-  const NeuronGraphData = IDL.Record({
+  const NeuronGraphDataExtended = IDL.Record({
+    'oneMonthICP' : IDL.Opt(IDL.Float64),
+    'oneMonthUSD' : IDL.Opt(IDL.Float64),
+    'votingPower' : IDL.Nat,
+    'allocationChangeCount' : IDL.Nat,
+    'oneWeekICP' : IDL.Opt(IDL.Float64),
+    'oneWeekUSD' : IDL.Opt(IDL.Float64),
+    'oneYearICP' : IDL.Opt(IDL.Float64),
+    'oneYearUSD' : IDL.Opt(IDL.Float64),
     'checkpoints' : IDL.Vec(GraphCheckpointData),
     'neuronId' : IDL.Vec(IDL.Nat8),
     'performanceScoreICP' : IDL.Opt(IDL.Float64),
     'performanceScoreUSD' : IDL.Float64,
   });
   const UserPerformanceGraphData = IDL.Record({
-    'oneMonthICP' : IDL.Opt(IDL.Float64),
-    'oneMonthUSD' : IDL.Opt(IDL.Float64),
     'timeframe' : IDL.Record({ 'startTime' : IDL.Int, 'endTime' : IDL.Int }),
-    'bestUsdNeuron' : IDL.Opt(NeuronGraphData),
-    'oneWeekICP' : IDL.Opt(IDL.Float64),
-    'oneWeekUSD' : IDL.Opt(IDL.Float64),
-    'oneYearICP' : IDL.Opt(IDL.Float64),
-    'oneYearUSD' : IDL.Opt(IDL.Float64),
     'aggregatedPerformanceICP' : IDL.Opt(IDL.Float64),
     'aggregatedPerformanceUSD' : IDL.Float64,
     'allocationNeuronId' : IDL.Opt(IDL.Vec(IDL.Nat8)),
-    'bestIcpNeuron' : IDL.Opt(NeuronGraphData),
+    'neurons' : IDL.Vec(NeuronGraphDataExtended),
   });
   const Result__1_3 = IDL.Variant({
     'ok' : UserPerformanceGraphData,
@@ -430,6 +431,7 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Vec(LeaderboardEntry)],
         ['query'],
       ),
+    'getLeaderboardCutoffDate' : IDL.Func([], [IDL.Int], ['query']),
     'getLeaderboardInfo' : IDL.Func(
         [],
         [
@@ -450,6 +452,11 @@ export const idlFactory = ({ IDL }) => {
             'maxSize' : IDL.Nat,
           }),
         ],
+        ['query'],
+      ),
+    'getLeaderboardTimerStatus' : IDL.Func(
+        [],
+        [IDL.Record({ 'active' : IDL.Bool, 'intervalHours' : IDL.Nat })],
         ['query'],
       ),
     'getLogs' : IDL.Func([IDL.Nat], [IDL.Vec(LogEntry)], ['query']),
@@ -493,7 +500,7 @@ export const idlFactory = ({ IDL }) => {
         ['composite_query'],
       ),
     'getUserPerformanceGraphData' : IDL.Func(
-        [IDL.Principal, IDL.Int, IDL.Int, LeaderboardTimeframe],
+        [IDL.Principal, IDL.Int, IDL.Int],
         [Result__1_3],
         ['composite_query'],
       ),
@@ -530,6 +537,7 @@ export const idlFactory = ({ IDL }) => {
     'setDisplayName' : IDL.Func([IDL.Text], [Result__1], []),
     'setDistributionEnabled' : IDL.Func([IDL.Bool], [Result__1], []),
     'setDistributionPeriod' : IDL.Func([IDL.Nat], [Result__1], []),
+    'setLeaderboardCutoffDate' : IDL.Func([IDL.Int], [Result__1], []),
     'setMaxDistributionHistory' : IDL.Func([IDL.Nat], [Result__1], []),
     'setPerformanceScorePower' : IDL.Func([IDL.Float64], [Result__1], []),
     'setPeriodicRewardPot' : IDL.Func([IDL.Nat], [Result__1], []),
@@ -552,6 +560,7 @@ export const idlFactory = ({ IDL }) => {
     'startDistributionTimer' : IDL.Func([], [Result__1], []),
     'startDistributionTimerAt' : IDL.Func([IDL.Int], [Result__1], []),
     'stopDistributionTimer' : IDL.Func([], [Result__1], []),
+    'stopLeaderboardTimer' : IDL.Func([], [Result__1], []),
     'triggerDistribution' : IDL.Func([], [Result__1], []),
     'triggerDistributionCustom' : IDL.Func(
         [IDL.Int, IDL.Int, PriceType],
