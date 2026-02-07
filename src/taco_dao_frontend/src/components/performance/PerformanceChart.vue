@@ -536,8 +536,7 @@ export default {
         const graphResult = await rewardsActor.getUserPerformanceGraphData(
           Principal.fromText(props.principal),
           startTime,
-          endTime,
-          { AllTime: null }
+          endTime
         )
 
         if ('err' in graphResult) {

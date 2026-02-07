@@ -306,10 +306,10 @@ export default {
       return 'text-danger'
     }
 
-    // Format voting power
+    // Format voting power (divide by 10^8 to get actual VP)
     const formatVotingPower = (vp) => {
       if (!vp) return '0'
-      const value = Number(vp)
+      const value = Number(vp) / 1e8
       if (value >= 1_000_000_000) {
         return (value / 1_000_000_000).toFixed(2) + 'B'
       }
@@ -319,7 +319,7 @@ export default {
       if (value >= 1_000) {
         return (value / 1_000).toFixed(1) + 'K'
       }
-      return value.toString()
+      return value.toFixed(2)
     }
 
     // Format neuron ID

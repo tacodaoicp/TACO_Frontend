@@ -1095,8 +1095,7 @@ export async function fetchLeaderboardInfoData(agent: HttpAgent): Promise<any> {
  */
 export async function fetchUserPerformanceData(
   agent: HttpAgent,
-  principal: Principal,
-  timeframe: 'OneWeek' | 'OneMonth' | 'OneYear' | 'AllTime' = 'AllTime'
+  principal: Principal
 ): Promise<any> {
   const actor = getRewardsActor(agent)
 
@@ -1104,29 +1103,14 @@ export async function fetchUserPerformanceData(
   const endTime = nowMs * BigInt(1_000_000) // nanoseconds
   const startTime = BigInt(0) // AllTime - backend returns all checkpoints
 
-  const timeframeVariant = { [timeframe]: null }
-
   const result = await actor.getUserPerformanceGraphData(
     principal,
     startTime,
-    endTime,
-    timeframeVariant as any
+    endTime
   )
 
   if ('ok' in result) {
     const graphData = result.ok
-
-    // Aggregated performance (all-time only now, per-timeframe scores are on each neuron)
-    const aggregatedPerformance = {
-      allTimeUSD: graphData.aggregatedPerformanceUSD ? [graphData.aggregatedPerformanceUSD] : [],
-      allTimeICP: graphData.aggregatedPerformanceICP?.length > 0 ? [graphData.aggregatedPerformanceICP[0]] : [],
-      oneWeekUSD: [],
-      oneWeekICP: [],
-      oneMonthUSD: [],
-      oneMonthICP: [],
-      oneYearUSD: [],
-      oneYearICP: []
-    }
 
     // All neurons now come in graphData.neurons array
     // Sort by best all-time ICP performance (descending)
@@ -1135,6 +1119,32 @@ export async function fetchUserPerformanceData(
       const bIcp = b.performanceScoreICP?.[0] ?? -Infinity
       return bIcp - aIcp
     })
+
+    // Calculate weighted average by voting power for timeframe scores
+    const calcWeightedAvg = (neurons: any[], getValue: (n: any) => number | undefined) => {
+      let totalWeight = BigInt(0)
+      let weightedSum = 0
+      for (const n of neurons) {
+        const val = getValue(n)
+        const vp = n.votingPower ?? BigInt(0)
+        if (val !== null && val !== undefined && vp > 0) {
+          weightedSum += val * Number(vp)
+          totalWeight += vp
+        }
+      }
+      return totalWeight > 0 ? [weightedSum / Number(totalWeight)] : []
+    }
+
+    const aggregatedPerformance = {
+      allTimeUSD: calcWeightedAvg(sortedNeurons, n => n.performanceScoreUSD),
+      allTimeICP: calcWeightedAvg(sortedNeurons, n => n.performanceScoreICP?.[0]),
+      oneWeekUSD: calcWeightedAvg(sortedNeurons, n => n.oneWeekUSD?.[0]),
+      oneWeekICP: calcWeightedAvg(sortedNeurons, n => n.oneWeekICP?.[0]),
+      oneMonthUSD: calcWeightedAvg(sortedNeurons, n => n.oneMonthUSD?.[0]),
+      oneMonthICP: calcWeightedAvg(sortedNeurons, n => n.oneMonthICP?.[0]),
+      oneYearUSD: calcWeightedAvg(sortedNeurons, n => n.oneYearUSD?.[0]),
+      oneYearICP: calcWeightedAvg(sortedNeurons, n => n.oneYearICP?.[0])
+    }
 
     // Map to internal structure with per-neuron timeframe scores
     const neurons = sortedNeurons.map((nd: any) => ({

@@ -337,17 +337,6 @@ export default {
       tacoStore.iidLogIn()
     }
 
-    // Convert timeframe string to candid variant
-    const getTimeframeVariant = (timeframe) => {
-      switch (timeframe) {
-        case 'OneWeek': return { OneWeek: null }
-        case 'OneMonth': return { OneMonth: null }
-        case 'OneYear': return { OneYear: null }
-        case 'AllTime':
-        default: return { AllTime: null }
-      }
-    }
-
     // Load follower info for leaderboard entries (leaderboard data comes from workers)
     const loadFollowerInfo = async () => {
       const entries = leaderboardEntries.value
@@ -402,28 +391,15 @@ export default {
         const endTime = nowMs * BigInt(1_000_000) // nanoseconds
         const startTime = BigInt(0) // AllTime - backend returns all checkpoints
 
-        // Backend now returns best USD neuron and best ICP neuron separately
+        // Backend now returns all neurons with per-neuron timeframe scores
         const graphResult = await rewardsActor.getUserPerformanceGraphData(
           Principal.fromText(userPrincipal.value),
           startTime,
-          endTime,
-          getTimeframeVariant(selectedTimeframe.value)
+          endTime
         )
 
         if ('ok' in graphResult) {
           const graphData = graphResult.ok
-
-          // Aggregated performance (all-time only now, per-timeframe scores are on each neuron)
-          const aggregatedPerformance = {
-            allTimeUSD: graphData.aggregatedPerformanceUSD ? [graphData.aggregatedPerformanceUSD] : [],
-            allTimeICP: graphData.aggregatedPerformanceICP?.length > 0 ? [graphData.aggregatedPerformanceICP[0]] : [],
-            oneWeekUSD: [],
-            oneWeekICP: [],
-            oneMonthUSD: [],
-            oneMonthICP: [],
-            oneYearUSD: [],
-            oneYearICP: []
-          }
 
           // All neurons now come in graphData.neurons array
           // Sort by best all-time ICP performance (descending)
@@ -432,6 +408,32 @@ export default {
             const bIcp = b.performanceScoreICP?.[0] ?? -Infinity
             return bIcp - aIcp
           })
+
+          // Calculate weighted average by voting power for timeframe scores
+          const calcWeightedAvg = (neurons, getValue) => {
+            let totalWeight = BigInt(0)
+            let weightedSum = 0
+            for (const n of neurons) {
+              const val = getValue(n)
+              const vp = n.votingPower ?? BigInt(0)
+              if (val !== null && val !== undefined && vp > 0) {
+                weightedSum += val * Number(vp)
+                totalWeight += vp
+              }
+            }
+            return totalWeight > 0 ? [weightedSum / Number(totalWeight)] : []
+          }
+
+          const aggregatedPerformance = {
+            allTimeUSD: calcWeightedAvg(sortedNeurons, n => n.performanceScoreUSD),
+            allTimeICP: calcWeightedAvg(sortedNeurons, n => n.performanceScoreICP?.[0]),
+            oneWeekUSD: calcWeightedAvg(sortedNeurons, n => n.oneWeekUSD?.[0]),
+            oneWeekICP: calcWeightedAvg(sortedNeurons, n => n.oneWeekICP?.[0]),
+            oneMonthUSD: calcWeightedAvg(sortedNeurons, n => n.oneMonthUSD?.[0]),
+            oneMonthICP: calcWeightedAvg(sortedNeurons, n => n.oneMonthICP?.[0]),
+            oneYearUSD: calcWeightedAvg(sortedNeurons, n => n.oneYearUSD?.[0]),
+            oneYearICP: calcWeightedAvg(sortedNeurons, n => n.oneYearICP?.[0])
+          }
 
           // Map to internal structure with per-neuron timeframe scores
           const neurons = sortedNeurons.map(nd => ({
