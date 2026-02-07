@@ -931,7 +931,8 @@ export default {
 .section-nav-floating {
   position: fixed;
   top: 80px;
-  left: 120px;
+  /* Position in the left margin, before the content area */
+  left: calc((100vw - min(100vw - 24px, 1140px)) / 2 - 60px);
   z-index: 1050;
 }
 
@@ -1011,11 +1012,18 @@ export default {
   transform: translateY(-8px);
 }
 
-/* Responsive */
+/* Responsive - hide nav when there's no margin space */
+@media (max-width: 1300px) {
+  .section-nav-floating {
+    /* Fall back to fixed position when not enough margin */
+    left: 12px;
+  }
+}
+
 @media (max-width: 576px) {
   .section-nav-floating {
     top: 70px;
-    left: 80px;
+    left: 8px;
   }
 
   .section-nav-toggle {

@@ -422,10 +422,13 @@ export default {
                     const nextPrice = getPriceUsd(nextCheckpoint, alloc.token)
                     if (currentPrice && nextPrice && currentPrice > 0) {
                       const change = ((nextPrice - currentPrice) / currentPrice) * 100
-                      const sign = change >= 0 ? '+' : ''
-                      const color = change >= 0 ? '#4CAF50' : '#FF5252'
-                      const emoji = change >= 0 ? '📈' : '📉'
-                      priceChangeHtml = `<span style="color:${color};font-size:10px;margin-left:4px;">${emoji}${sign}${change.toFixed(1)}%</span>`
+                      // Only show if change is not ~0%
+                      if (Math.abs(change) >= 0.05) {
+                        const sign = change >= 0 ? '+' : ''
+                        const color = change >= 0 ? '#4CAF50' : '#FF5252'
+                        const emoji = change >= 0 ? '📈' : '📉'
+                        priceChangeHtml = `<span style="color:${color};font-size:10px;margin-left:4px;">${emoji}${sign}${change.toFixed(1)}%</span>`
+                      }
                     }
                   }
 
