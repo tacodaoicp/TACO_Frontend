@@ -1087,6 +1087,10 @@
     // fetch crypto prices (now triggers worker fetch)
     fetchCryptoPrices()
 
+    // Preload chart compute worker during idle time (warm before Performance tab)
+    const idle = window.requestIdleCallback || ((cb) => setTimeout(cb, 2000))
+    idle(() => import('./workers/chart-worker-port').then(m => m.getChartPort()))
+
   }
 
   // update robots meta

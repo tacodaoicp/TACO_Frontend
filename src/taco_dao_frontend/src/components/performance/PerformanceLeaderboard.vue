@@ -68,7 +68,7 @@
                 <th class="text-center" style="width: 60px;">Rank</th>
                 <th>User</th>
                 <th class="text-end">Return</th>
-                <th class="text-center">Distributions</th>
+                <th class="text-center d-none d-md-table-cell">Distributions</th>
                 <th class="text-center">Followers</th>
                 <th class="text-center" style="width: 100px;">Action</th>
               </tr>
@@ -122,16 +122,16 @@
                   </td>
 
                   <!-- Distributions Count -->
-                  <td class="text-center">
+                  <td class="text-center d-none d-md-table-cell">
                     <span class="lb-muted">{{ Number(entry.distributionsCount) }}</span>
                   </td>
 
                   <!-- Followers -->
                   <td class="text-center">
                     <span v-if="followerInfos[index]" class="follower-count">
-                      {{ Number(followerInfos[index].followerCount) }}/500
+                      {{ Number(followerInfos[index].followerCount) }}/20
                     </span>
-                    <span v-else class="lb-muted">-</span>
+                    <span v-else class="lb-muted">0/20</span>
                   </td>
 
                   <!-- Follow Action -->

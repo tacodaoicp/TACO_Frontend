@@ -927,12 +927,11 @@ export default {
   box-shadow: 0 4px 12px rgba(82, 39, 133, 0.4);
 }
 
-/* Floating Section Nav */
+/* Floating Section Nav — centered in the left margin outside the content container */
 .section-nav-floating {
   position: fixed;
   top: 80px;
-  /* Position in the left margin, before the content area */
-  left: calc((100vw - min(100vw - 24px, 1140px)) / 2 - 60px);
+  left: max(8px, calc((100vw - 1140px) / 4 - 20px));
   z-index: 1050;
 }
 
@@ -1010,14 +1009,6 @@ export default {
 .nav-fade-leave-to {
   opacity: 0;
   transform: translateY(-8px);
-}
-
-/* Responsive - hide nav when there's no margin space */
-@media (max-width: 1300px) {
-  .section-nav-floating {
-    /* Fall back to fixed position when not enough margin */
-    left: 12px;
-  }
 }
 
 @media (max-width: 576px) {

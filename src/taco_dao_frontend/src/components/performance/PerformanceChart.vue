@@ -21,7 +21,7 @@
     </div>
 
     <!-- Chart with baseline selector -->
-    <div v-else>
+    <div v-else style="position: relative;">
       <div class="d-flex align-items-center gap-2 mb-2">
         <label class="baseline-label chart-muted">Start from:</label>
         <select
@@ -34,6 +34,9 @@
             :value="opt.index"
           >{{ opt.label }}</option>
         </select>
+        <div v-if="computing" class="spinner-border spinner-border-sm ms-auto" role="status" style="color: var(--brown); width: 1rem; height: 1rem;">
+          <span class="visually-hidden">Computing...</span>
+        </div>
       </div>
       <apexchart
         type="area"
@@ -46,9 +49,10 @@
 </template>
 
 <script>
-import { ref, computed, watch, onMounted } from 'vue'
+import { ref, shallowRef, computed, watch, onMounted } from 'vue'
 import { useTacoStore } from '../../stores/taco.store'
 import { storeToRefs } from 'pinia'
+import { getChartPort } from '../../workers/chart-worker-port'
 
 export default {
   name: 'PerformanceChart',
@@ -70,10 +74,28 @@ export default {
     const { fetchedTokenDetails } = storeToRefs(tacoStore)
 
     const loading = ref(false)
+    const computing = ref(false)
     const error = ref('')
     const usdCheckpoints = ref([])
     const icpCheckpoints = ref([])
     const baselineIndex = ref(0)
+    const serializedCheckpoints = shallowRef([])
+    const chartSeries = shallowRef([])
+    const tooltipDataMap = shallowRef({})
+
+    // Chart compute worker — singleton, preloaded at app startup
+    const chartPort = getChartPort()
+    chartPort.onmessage = (e) => {
+      computing.value = false
+      const { usdSeries, icpSeries, tooltipData } = e.data
+      const series = []
+      if (usdSeries.length > 0) series.push({ name: 'Return (USD)', data: usdSeries })
+      if (icpSeries.length > 0) series.push({ name: 'Return (ICP)', data: icpSeries })
+      chartSeries.value = series
+      tooltipDataMap.value = tooltipData
+    }
+
+    const isLocal = window.location.hostname === 'localhost' || window.location.hostname.startsWith('192.168.')
 
     // Build a map of token principal -> symbol for quick lookup
     const tokenSymbolMap = computed(() => {
@@ -90,25 +112,6 @@ export default {
       }
       return map
     })
-
-    // Get token symbol from principal
-    const getTokenSymbol = (principal) => {
-      if (!principal) return 'Unknown'
-      try {
-        const principalStr = principal.toText ? principal.toText() : principal.toString()
-        return tokenSymbolMap.value.get(principalStr) || shortenPrincipal(principalStr)
-      } catch (e) {
-        return 'Unknown'
-      }
-    }
-
-    // Shorten principal for display if no symbol found
-    const shortenPrincipal = (principal) => {
-      if (principal.length > 10) {
-        return principal.substring(0, 5) + '...'
-      }
-      return principal
-    }
 
     // Check if we have data to display
     const hasData = computed(() => {
@@ -127,93 +130,38 @@ export default {
       })
     })
 
-    // Helper to check if two allocations are identical
-    const allocationsEqual = (alloc1, alloc2) => {
-      if (!alloc1 && !alloc2) return true
-      if (!alloc1 || !alloc2) return false
-      if (alloc1.length !== alloc2.length) return false
+    // Serialize checkpoints for worker (convert Principals to strings, BigInts to numbers)
+    const serializeCheckpoints = (cps) => cps.map(cp => ({
+      timestamp: Number(cp.timestamp),
+      allocations: (cp.allocations || []).map(a => ({
+        token: a.token?.toText ? a.token.toText() : a.token?.toString() || '',
+        basisPoints: Number(a.basisPoints)
+      })),
+      pricesUsed: (cp.pricesUsed || []).map(([p, info]) => [
+        p?.toText ? p.toText() : p?.toString() || '',
+        { usdPrice: info.usdPrice, icpPrice: Number(info.icpPrice) }
+      ]),
+      totalPortfolioValueUSD: Number(cp.totalPortfolioValueUSD),
+      totalPortfolioValueICP: Number(cp.totalPortfolioValueICP),
+      reason: (cp.reason || []).map(r => r || '')
+    }))
 
-      // Create maps of token -> basisPoints for comparison
-      const map1 = new Map()
-      const map2 = new Map()
-
-      for (const a of alloc1) {
-        const tokenStr = a.token?.toText ? a.token.toText() : a.token?.toString() || ''
-        map1.set(tokenStr, Number(a.basisPoints))
-      }
-      for (const a of alloc2) {
-        const tokenStr = a.token?.toText ? a.token.toText() : a.token?.toString() || ''
-        map2.set(tokenStr, Number(a.basisPoints))
-      }
-
-      if (map1.size !== map2.size) return false
-
-      for (const [token, bp] of map1) {
-        if (map2.get(token) !== bp) return false
-      }
-      return true
+    // Dispatch computation to worker when data or baseline changes
+    const dispatchToWorker = () => {
+      if (!serializedCheckpoints.value.length) return
+      computing.value = true
+      chartPort.postMessage({
+        checkpoints: serializedCheckpoints.value,
+        baselineIndex: baselineIndex.value,
+        tokenSymbolMap: Object.fromEntries(tokenSymbolMap.value),
+        isLocal
+      })
     }
 
-    // Helper: filter checkpoints, skip consecutive identical allocations, compute returns from baseline
-    const buildSeriesData = (checkpointsArr, baselineIdx, valueKey) => {
-      if (!checkpointsArr.length) return []
-
-      const bIdx = Math.min(baselineIdx, checkpointsArr.length - 1)
-      const baselineCp = checkpointsArr[bIdx]
-      if (!baselineCp) return []
-
-      const baseVal = baselineCp[valueKey] || 1
-      const relevant = checkpointsArr.slice(bIdx)
-
-      const filtered = []
-      let lastAlloc = null
-
-      for (let i = 0; i < relevant.length; i++) {
-        const cp = relevant[i]
-        const origIdx = bIdx + i
-        const isFirst = i === 0
-        const isLast = i === relevant.length - 1
-
-        if (isFirst || isLast) {
-          filtered.push({ cp, origIdx })
-          lastAlloc = cp.allocations
-        } else if (!allocationsEqual(cp.allocations, lastAlloc)) {
-          filtered.push({ cp, origIdx })
-          lastAlloc = cp.allocations
-        }
-      }
-
-      const data = []
-      for (const { cp, origIdx } of filtered) {
-        const val = cp[valueKey]
-        if (val == null || val <= 0) continue
-        const ret = ((val / baseVal) - 1) * 100
-        data.push({
-          x: Number(cp.timestamp) / 1_000_000,
-          y: parseFloat(ret.toFixed(2)),
-          checkpointIndex: origIdx
-        })
-      }
-      data.sort((a, b) => a.x - b.x)
-      return data
-    }
-
-    // Process checkpoints into chart series data
-    // USD line uses best-USD neuron checkpoints, ICP line uses best-ICP neuron checkpoints
-    const chartSeries = computed(() => {
-      const bIdx = baselineIndex.value
-
-      const usdData = buildSeriesData(usdCheckpoints.value, bIdx, 'totalPortfolioValueUSD')
-      const icpData = buildSeriesData(icpCheckpoints.value, bIdx, 'totalPortfolioValueICP')
-
-      const series = []
-      if (usdData.length > 0) {
-        series.push({ name: 'Return (USD)', data: usdData })
-      }
-      if (icpData.length > 0) {
-        series.push({ name: 'Return (ICP)', data: icpData })
-      }
-      return series
+    watch([serializedCheckpoints, baselineIndex], dispatchToWorker)
+    // Also re-dispatch when token symbols load (they may arrive after checkpoints)
+    watch(tokenSymbolMap, () => {
+      if (serializedCheckpoints.value.length) dispatchToWorker()
     })
 
     // Chart options - dual series: USD (green/red) and ICP (blue)
@@ -232,7 +180,7 @@ export default {
               zoom: true,
               zoomin: true,
               zoomout: true,
-              pan: true,
+              pan: false,
               reset: true
             }
           },
@@ -343,10 +291,8 @@ export default {
               return closest
             }
 
-            // Build returns HTML for both series and track which has the best return
+            // Build returns HTML for both series
             let returnsHtml = ''
-            let bestReturnVal = -Infinity
-            let bestSeriesIdx = -1
             for (let i = 0; i < w.config.series.length; i++) {
               const pt = findClosestPoint(w.config.series[i].data, timestamp)
               if (!pt) continue
@@ -359,99 +305,66 @@ export default {
                 <span style="color:${color};font-size:12px;">${name}</span>
                 <span style="font-weight:600;color:${color};">${sign}${val.toFixed(2)}%</span>
               </div>`
-              if (val > bestReturnVal) {
-                bestReturnVal = val
-                bestSeriesIdx = i
+            }
+
+            // Get checkpoint index from the chart data point
+            let checkpointIdx = null
+            for (let s = 0; s < w.config.series.length; s++) {
+              const pt = w.config.series[s]?.data?.[dataPointIndex]
+              if (pt?.checkpointIndex != null) {
+                checkpointIdx = pt.checkpointIndex
+                break
               }
             }
 
-            // Show allocation from whichever neuron (USD or ICP) has the better return
-            const findClosestCheckpoint = (cps, ts) => {
-              if (!cps || cps.length === 0) return null
-              let closest = cps[0]
-              let closestDiff = Math.abs(Number(closest.timestamp) / 1_000_000 - ts)
-              for (const cp of cps) {
-                const diff = Math.abs(Number(cp.timestamp) / 1_000_000 - ts)
-                if (diff < closestDiff) {
-                  closest = cp
-                  closestDiff = diff
-                }
-              }
-              return closest
-            }
-
-            // Pick allocation from the neuron with the better return at this point
-            let checkpoint = null
-            const usdIsFirst = w.config.series[0]?.name?.includes('USD')
-            if (bestSeriesIdx === 0) {
-              checkpoint = findClosestCheckpoint(usdIsFirst ? usdCheckpoints.value : icpCheckpoints.value, timestamp)
-            } else if (bestSeriesIdx === 1) {
-              checkpoint = findClosestCheckpoint(usdIsFirst ? icpCheckpoints.value : usdCheckpoints.value, timestamp)
-            }
-
-            // Find next checkpoint for price change calculation
-            const currentIndex = usdCheckpoints.value.findIndex(cp =>
-              Math.abs(Number(cp.timestamp) / 1_000_000 - timestamp) < 1000
-            )
-            const nextCheckpoint = currentIndex >= 0 && currentIndex < usdCheckpoints.value.length - 1
-              ? usdCheckpoints.value[currentIndex + 1]
-              : null
-
-            // Helper to get USD price from pricesUsed array
-            const getPriceUsd = (cp, tokenPrincipal) => {
-              if (!cp?.pricesUsed) return null
-              const priceEntry = cp.pricesUsed.find(([p, _]) =>
-                p.toString() === tokenPrincipal.toString()
-              )
-              return priceEntry ? priceEntry[1].usdPrice : null
-            }
-
-            // Build allocation HTML with price changes
+            // Build allocation HTML from pre-computed tooltip data (computed in worker)
             let allocationHtml = ''
-            if (checkpoint?.allocations && checkpoint.allocations.length > 0) {
-              const nonZeroAllocations = checkpoint.allocations
-                .filter(alloc => Number(alloc.basisPoints) > 0)
-                .map(alloc => {
-                  const symbol = getTokenSymbol(alloc.token)
-                  const percent = (Number(alloc.basisPoints) / 100).toFixed(1)
-
-                  // Calculate price change to next checkpoint
-                  let priceChangeHtml = ''
-                  if (nextCheckpoint) {
-                    const currentPrice = getPriceUsd(checkpoint, alloc.token)
-                    const nextPrice = getPriceUsd(nextCheckpoint, alloc.token)
-                    if (currentPrice && nextPrice && currentPrice > 0) {
-                      const change = ((nextPrice - currentPrice) / currentPrice) * 100
-                      // Only show if change is not ~0%
-                      if (Math.abs(change) >= 0.05) {
-                        const sign = change >= 0 ? '+' : ''
-                        const color = change >= 0 ? '#4CAF50' : '#FF5252'
-                        const emoji = change >= 0 ? '📈' : '📉'
-                        priceChangeHtml = `<span style="color:${color};font-size:10px;margin-left:4px;">${emoji}${sign}${change.toFixed(1)}%</span>`
-                      }
-                    }
-                  }
-
-                  return `<div style="display:flex;justify-content:space-between;gap:8px;align-items:center;">
-                    <span style="color:#FEEAC1;">${symbol}</span>
-                    <span style="display:flex;align-items:center;gap:4px;">
-                      <span style="color:#fff;">${percent}%</span>
-                      ${priceChangeHtml}
-                    </span>
-                  </div>`
-                })
-
-              if (nonZeroAllocations.length > 0) {
-                allocationHtml = `
-                  <div style="border-top:1px solid #DA8D28;margin-top:8px;padding-top:8px;">
-                    <div style="color:#FEEAC1;font-size:11px;margin-bottom:4px;">Allocation:</div>
-                    ${nonZeroAllocations.join('')}
-                  </div>
-                `
+            const cpTooltip = checkpointIdx != null ? tooltipDataMap.value[checkpointIdx] : null
+            if (cpTooltip && cpTooltip.tokens.length > 0) {
+              const fmtChange = (change, opacity) => {
+                if (change == null) return ''
+                const sign = change >= 0 ? '+' : ''
+                const color = change >= 0 ? '#4CAF50' : '#FF5252'
+                const opStyle = opacity ? 'opacity:0.75;' : ''
+                return `<span style="color:${color};font-size:13px;white-space:nowrap;${opStyle}">${sign}${change.toFixed(2)}%</span>`
               }
+
+              const tokenRows = cpTooltip.tokens.map(t => ({
+                ...t,
+                usdChangeHtml: fmtChange(t.usdChange, false),
+                icpChangeHtml: fmtChange(t.icpChange, true)
+              }))
+
+              const hasAnyPrice = tokenRows.some(a => a.usdChangeHtml || a.icpChangeHtml)
+              const hasIcp = tokenRows.some(a => a.icpChangeHtml)
+              const rows = tokenRows.map(a => {
+                let priceCols = ''
+                if (hasAnyPrice) {
+                  priceCols = `<span style="text-align:right;justify-self:end;">${a.usdChangeHtml || ''}</span>`
+                  if (hasIcp) priceCols += `<span style="text-align:right;justify-self:end;">${a.icpChangeHtml || ''}</span>`
+                }
+                return `<span style="color:#FEEAC1;font-size:15px;">${a.symbol}</span>` +
+                  `<span style="color:#fff;text-align:right;font-size:15px;justify-self:end;">${a.percent}%</span>` +
+                  priceCols
+              }).join('')
+              const cols = hasAnyPrice
+                ? (hasIcp ? 'auto auto minmax(52px,auto) minmax(52px,auto)' : 'auto auto minmax(52px,auto)')
+                : 'auto 1fr'
+              allocationHtml = `
+                <div style="border-top:1px solid #DA8D28;margin-top:8px;padding-top:8px;">
+                  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+                    <span style="color:#FEEAC1;font-size:11px;">Allocation:</span>
+                    ${hasIcp ? '<span style="color:#FEEAC1;font-size:9px;opacity:0.5;">USD / ICP</span>' : ''}
+                  </div>
+                  <div style="display:grid;grid-template-columns:${cols};gap:2px 10px;align-items:center;">
+                    ${rows}
+                  </div>
+                </div>
+              `
             }
 
-            // Build note HTML
+            // Build note HTML from raw checkpoint data
+            const checkpoint = checkpointIdx != null ? usdCheckpoints.value[checkpointIdx] : null
             let noteHtml = ''
             if (checkpoint?.reason && checkpoint.reason.length > 0 && checkpoint.reason[0]) {
               noteHtml = `
@@ -555,7 +468,7 @@ export default {
           const cps = neuron.checkpoints.map(cp => ({
             ...cp,
             totalPortfolioValueUSD: cp.totalPortfolioValue,
-            totalPortfolioValueICP: cp.totalPortfolioValueICP || cp.totalPortfolioValue
+            totalPortfolioValueICP: cp.totalPortfolioValueICP ?? 0
           }))
           cps.sort((a, b) => Number(a.timestamp) - Number(b.timestamp))
           return cps
@@ -589,6 +502,9 @@ export default {
         // Both chart lines use same checkpoints (different Y values: USD vs ICP)
         usdCheckpoints.value = cps
         icpCheckpoints.value = cps
+
+        // Serialize for worker (converts Principals to strings, BigInts to numbers)
+        serializedCheckpoints.value = serializeCheckpoints(cps)
 
         // Reset baseline to first checkpoint when new data loads
         baselineIndex.value = 0
@@ -626,13 +542,13 @@ export default {
       { immediate: false }
     )
 
-    // Load on mount
     onMounted(() => {
       loadPerformanceData()
     })
 
     return {
       loading,
+      computing,
       error,
       hasData,
       baselineIndex,
@@ -649,6 +565,7 @@ export default {
   width: 100%;
   min-height: 100px;
   position: relative;
+  touch-action: pan-y;
 }
 
 /* Allow tooltip to overflow the chart container */
