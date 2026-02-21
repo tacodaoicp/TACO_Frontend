@@ -112,7 +112,7 @@
                             ref="dexIframeRef"
                             loading="lazy"
                             style="border-radius: 0.5rem; border: none;"
-                            src="https://dexscreener.com/icp/vhoia-myaaa-aaaar-qbmja-cai?embed=1&loadChartSettings=0&trades=0&tabs=0&info=0&chartLeftToolbar=0&chartTheme=dark&theme=dark&chartStyle=1&chartType=usd&interval=15"></iframe>
+                            src="https://www.dextools.io/widget-chart/en/icp/pe-light/vhoia-myaaa-aaaar-qbmja-cai?theme=dark&chartType=1&chartResolution=240&drawingToolbars=false&chartInUsd=true&headerColor=1F2937&tvPlatformColor=1F2937&tvPaneColor=1F2937"></iframe>
 
                     <!-- if mobile, tap to view -->
                     <div v-else @click="viewingChartModal = true"
@@ -640,7 +640,7 @@
         <!-- message middle -->
         <div class="home-view__chart-modal__dialog__middle" style="width: 100%; height: 100%;">
 
-            <iframe style="width: 100%; height: 100%; border: none;" src="https://dexscreener.com/icp/vhoia-myaaa-aaaar-qbmja-cai?embed=1&loadChartSettings=0&trades=0&tabs=0&info=0&chartLeftToolbar=0&chartBottomToolbar=0&chartTheme=dark&theme=dark&chartStyle=1&chartType=usd&interval=15"></iframe>
+            <iframe style="width: 100%; height: 100%; border: none;" src="https://www.dextools.io/widget-chart/en/icp/pe-light/vhoia-myaaa-aaaar-qbmja-cai?theme=dark&chartType=1&chartResolution=240&drawingToolbars=false&chartInUsd=true&headerColor=1F2937&tvPlatformColor=1F2937&tvPaneColor=1F2937"></iframe>
 
         </div>
 

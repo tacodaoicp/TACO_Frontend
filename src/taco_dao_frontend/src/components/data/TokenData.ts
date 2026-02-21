@@ -56,6 +56,7 @@ import personalDaoToken from "../../assets/tokens/snspng/personal-dao.png"
 import dolrToken from "../../assets/tokens/snspng/dolr.png"
 import fuelEvToken from "../../assets/tokens/snspng/fuelev.png"
 import sgldtToken from "../../assets/tokens/sgldt.png"
+import windoge98Token from "../../assets/tokens/snspng/windoge98.png"
 
 //////////////
 // mappings //
@@ -153,6 +154,9 @@ export const tokenImages: { [key: string]: string } = {
 "ELNA": elnaAiToken,
 "WTN": waterneuronToken,
 "PANDA": icpandaDaoToken,
+"Windoge98": windoge98Token,
+"EXE": windoge98Token,
+"Windoge 98": windoge98Token,
 }  
 
 //////////
@@ -558,6 +562,15 @@ export const tokenData = [
         icon: waterneuronToken,
         description: `WaterNeuron is a liquid staking protocol designed for the Internet Computer network. Staking ICP becomes straightforward and efficient. Learn more: https://docs.waterneuron.fi | https://x.com/waterneuron | https://t.me/waterneuron`,
         color: '#BA2A41'
+    },
+    {
+        title: 'Windoge98',
+        symbol: 'exe',
+        link: 'https://windoge98.com/',
+        icpCoinsLink: 'https://neutrinite.io/currencies/EXE',
+        icon: windoge98Token,
+        description: `The retro fusion operating system empowering users on the Internet Computer. Fully on chain, fully awesome.`,
+        color: '#87CEEB'
     },
     {
         title: 'YRAL',
