@@ -1060,6 +1060,44 @@ export async function fetchDistributionHistoryData(agent: HttpAgent, offset: num
 }
 
 // ============================================================================
+// Composite Query Functions (reduce ~15 calls to ~3)
+// ============================================================================
+
+/**
+ * Fetch dashboard data from DAO backend composite endpoint
+ * Replaces: getTokenDetailsWithoutPastPrices + getAggregateAllocation + votingPowerMetrics + getSnapshotInfo
+ */
+export async function fetchDashboardData(agent: HttpAgent): Promise<any | null> {
+  const actor = getDaoBackendActor(agent)
+  const result = await actor.getDashboardData()
+  // Returns opt record — [] means null, [data] means some
+  if (!result || result.length === 0) return null
+  return result[0]
+}
+
+/**
+ * Fetch all leaderboards from rewards composite endpoint
+ * Replaces: 8 separate getLeaderboard() calls
+ */
+export async function fetchAllLeaderboardsData(
+  agent: HttpAgent,
+  limit: number = 50,
+  offset: number = 0
+): Promise<any> {
+  const actor = getRewardsActor(agent)
+  return await actor.getAllLeaderboards([BigInt(limit)], [BigInt(offset)])
+}
+
+/**
+ * Fetch treasury dashboard from treasury composite endpoint
+ * Replaces: getTradingStatus (and eliminates duplicate calls)
+ */
+export async function fetchTreasuryDashboardData(agent: HttpAgent): Promise<any> {
+  const actor = getTreasuryActor(agent)
+  return await actor.getTreasuryDashboard()
+}
+
+// ============================================================================
 // Performance/Leaderboard Functions
 // ============================================================================
 

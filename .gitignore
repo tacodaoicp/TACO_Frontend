@@ -33,7 +33,7 @@ toadd/
 .venv
 .claude
 *.log
-
+*.md
 scripts/memory-results
 
 notes.txtscripts/.venv

@@ -35,6 +35,10 @@ import {
   // Performance/Leaderboard fetch functions
   fetchLeaderboardData,
   fetchLeaderboardInfoData,
+  // Composite query fetch functions
+  fetchDashboardData,
+  fetchAllLeaderboardsData,
+  fetchTreasuryDashboardData,
   serializeForTransfer,
   clearActorCache,
 } from './shared/fetch-functions'
@@ -664,6 +668,95 @@ async function processSingleFetch(item: { dataKey: DataKey; retryCount: number }
   }
 }
 
+// ============================================================================
+// Composite Query Coalescing Cache
+// Prevents redundant composite calls when multiple data keys that share
+// a composite endpoint are processed within a short window.
+// ============================================================================
+
+let lastDashboardResult: { data: any; timestamp: number } | null = null
+let lastLeaderboardResult: { data: any; timestamp: number } | null = null
+const COALESCE_MS = 5_000
+
+async function getDashboardCoalesced(agentRef: HttpAgent): Promise<any | null> {
+  if (lastDashboardResult && (Date.now() - lastDashboardResult.timestamp) < COALESCE_MS) {
+    return lastDashboardResult.data
+  }
+  try {
+    const data = await fetchDashboardData(agentRef)
+    lastDashboardResult = { data, timestamp: Date.now() }
+    return data
+  } catch (err) {
+    console.warn('[PublicWorker-Dedicated] getDashboardData composite failed, falling back to individual calls:', err)
+    lastDashboardResult = { data: null, timestamp: Date.now() }
+    return null
+  }
+}
+
+async function getAllLeaderboardsCoalesced(agentRef: HttpAgent): Promise<any | null> {
+  if (lastLeaderboardResult && (Date.now() - lastLeaderboardResult.timestamp) < COALESCE_MS) {
+    return lastLeaderboardResult.data
+  }
+  try {
+    const data = await fetchAllLeaderboardsData(agentRef)
+    lastLeaderboardResult = { data, timestamp: Date.now() }
+    return data
+  } catch (err) {
+    console.warn('[PublicWorker-Dedicated] getAllLeaderboards composite failed, falling back to individual calls:', err)
+    lastLeaderboardResult = { data: null, timestamp: Date.now() }
+    return null
+  }
+}
+
+/**
+ * Populate sibling data keys from a composite dashboard response.
+ * DedicatedWorker version — includes broadcastUpdate() for each sibling.
+ */
+async function populateDashboardSiblings(dashboard: any, excludeKey: DataKey): Promise<void> {
+  const now = Date.now()
+  const freshState: Partial<DataState> = { lastUpdated: now, loading: false, error: null, stale: false }
+
+  if (excludeKey !== 'tokenDetails') {
+    const td = serializeForTransfer(dashboard.tokenDetails)
+    updateState('tokenDetails', { data: td, ...freshState })
+    broadcastUpdate('tokenDetails', td)
+    await setCached('tokenDetails', td)
+  }
+
+  if (excludeKey !== 'totalTreasuryValueInUsd') {
+    const tv = calculateTotalTreasuryValueInUsd(dashboard.tokenDetails as any[])
+    updateState('totalTreasuryValueInUsd', { data: tv, ...freshState })
+    broadcastUpdate('totalTreasuryValueInUsd', tv)
+    await setCached('totalTreasuryValueInUsd', tv)
+  }
+
+  if (excludeKey !== 'aggregateAllocation') {
+    const aa = serializeForTransfer(dashboard.aggregateAllocation)
+    updateState('aggregateAllocation', { data: aa, ...freshState })
+    broadcastUpdate('aggregateAllocation', aa)
+    await setCached('aggregateAllocation', aa)
+  }
+
+  if (excludeKey !== 'votingPowerMetrics') {
+    const vp = serializeForTransfer({ ok: dashboard.votingPowerMetrics })
+    updateState('votingPowerMetrics', { data: vp, ...freshState })
+    broadcastUpdate('votingPowerMetrics', vp)
+    await setCached('votingPowerMetrics', vp)
+  }
+
+  if (excludeKey !== 'timerStatus') {
+    const cachedTS = dataStates.get('tradingStatus')?.data
+    const ts = serializeForTransfer({
+      snapshotInfo: dashboard.snapshotInfo,
+      tradingStatus: cachedTS ?? null,
+      tokenDetails: dashboard.tokenDetails,
+    })
+    updateState('timerStatus', { data: ts, ...freshState })
+    broadcastUpdate('timerStatus', ts)
+    await setCached('timerStatus', ts)
+  }
+}
+
 async function fetchData(dataKey: DataKey): Promise<void> {
   if (!agent) {
     await createAnonymousAgent()
@@ -679,62 +772,92 @@ async function fetchData(dataKey: DataKey): Promise<void> {
       data = await fetchCryptoPricesData()
       break
 
-    case 'tokenDetails':
-      const rawTokenData = await fetchTokenDetailsData(agent!)
-      data = serializeForTransfer(rawTokenData)
-      // Also calculate treasury value
-      const totalValue = calculateTotalTreasuryValueInUsd(rawTokenData as any[])
-      updateState('totalTreasuryValueInUsd', {
-        data: totalValue,
-        loading: false,
-        error: null,
-        lastUpdated: Date.now(),
-        stale: false,
-      })
-      broadcastUpdate('totalTreasuryValueInUsd', totalValue)
-      await setCached('totalTreasuryValueInUsd', totalValue)
+    case 'tokenDetails': {
+      const dashboard = await getDashboardCoalesced(agent!)
+      if (!dashboard) {
+        const rawTokenData = await fetchTokenDetailsData(agent!)
+        data = serializeForTransfer(rawTokenData)
+        const totalValue = calculateTotalTreasuryValueInUsd(rawTokenData as any[])
+        updateState('totalTreasuryValueInUsd', { data: totalValue, loading: false, error: null, lastUpdated: Date.now(), stale: false })
+        broadcastUpdate('totalTreasuryValueInUsd', totalValue)
+        await setCached('totalTreasuryValueInUsd', totalValue)
+        break
+      }
+      data = serializeForTransfer(dashboard.tokenDetails)
+      await populateDashboardSiblings(dashboard, 'tokenDetails')
       break
+    }
 
-    case 'totalTreasuryValueInUsd':
-      // This is calculated from tokenDetails, so fetch that instead
-      const tokenData = await fetchTokenDetailsData(agent!)
-      data = calculateTotalTreasuryValueInUsd(tokenData as any[])
-      // Also update tokenDetails
-      updateState('tokenDetails', {
-        data: serializeForTransfer(tokenData),
-        lastUpdated: Date.now(),
-        loading: false,
-        error: null,
-        stale: false,
-      })
-      await setCached('tokenDetails', serializeForTransfer(tokenData))
+    case 'totalTreasuryValueInUsd': {
+      const dashboard = await getDashboardCoalesced(agent!)
+      if (!dashboard) {
+        const tokenData = await fetchTokenDetailsData(agent!)
+        data = calculateTotalTreasuryValueInUsd(tokenData as any[])
+        updateState('tokenDetails', { data: serializeForTransfer(tokenData), lastUpdated: Date.now(), loading: false, error: null, stale: false })
+        await setCached('tokenDetails', serializeForTransfer(tokenData))
+        break
+      }
+      data = calculateTotalTreasuryValueInUsd(dashboard.tokenDetails as any[])
+      await populateDashboardSiblings(dashboard, 'totalTreasuryValueInUsd')
       break
+    }
 
-    case 'aggregateAllocation':
-      data = serializeForTransfer(await fetchAggregateAllocationData(agent!))
+    case 'aggregateAllocation': {
+      const dashboard = await getDashboardCoalesced(agent!)
+      if (!dashboard) {
+        data = serializeForTransfer(await fetchAggregateAllocationData(agent!))
+        break
+      }
+      data = serializeForTransfer(dashboard.aggregateAllocation)
+      await populateDashboardSiblings(dashboard, 'aggregateAllocation')
       break
+    }
 
-    case 'tradingStatus':
-      data = serializeForTransfer(await fetchTradingStatusData(agent!))
+    case 'tradingStatus': {
+      try {
+        const treasuryResult = await fetchTreasuryDashboardData(agent!)
+        if ('ok' in treasuryResult) {
+          data = serializeForTransfer({ ok: treasuryResult.ok.tradingStatus })
+        } else {
+          data = serializeForTransfer(await fetchTradingStatusData(agent!))
+        }
+      } catch {
+        // Composite endpoint not available, fall back to individual call
+        data = serializeForTransfer(await fetchTradingStatusData(agent!))
+      }
       break
+    }
 
-    case 'timerStatus':
-      // Only fetch snapshotInfo — reuse cached tradingStatus and tokenDetails
-      // to avoid duplicate canister calls (they have their own data keys)
-      const snapshotInfo = await fetchSnapshotInfoData(agent!)
+    case 'timerStatus': {
+      const dashboard = await getDashboardCoalesced(agent!)
+      if (!dashboard) {
+        const snapshotInfo = await fetchSnapshotInfoData(agent!)
+        const cachedTS = dataStates.get('tradingStatus')?.data
+        const cachedTD = dataStates.get('tokenDetails')?.data
+        data = serializeForTransfer({ snapshotInfo, tradingStatus: cachedTS ?? null, tokenDetails: cachedTD ?? [] })
+        break
+      }
       const cachedTradingStatus = dataStates.get('tradingStatus')?.data
-      const cachedTokenDetails = dataStates.get('tokenDetails')?.data
       data = serializeForTransfer({
-        snapshotInfo,
-        tradingStatus: cachedTradingStatus ? cachedTradingStatus : null,
-        tokenDetails: cachedTokenDetails ? cachedTokenDetails : [],
+        snapshotInfo: dashboard.snapshotInfo,
+        tradingStatus: cachedTradingStatus ?? null,
+        tokenDetails: dashboard.tokenDetails,
       })
+      await populateDashboardSiblings(dashboard, 'timerStatus')
       break
+    }
 
     // Secondary data keys
-    case 'votingPowerMetrics':
-      data = serializeForTransfer(await fetchVotingPowerMetricsData(agent!))
+    case 'votingPowerMetrics': {
+      const dashboard = await getDashboardCoalesced(agent!)
+      if (!dashboard) {
+        data = serializeForTransfer(await fetchVotingPowerMetricsData(agent!))
+        break
+      }
+      data = serializeForTransfer({ ok: dashboard.votingPowerMetrics })
+      await populateDashboardSiblings(dashboard, 'votingPowerMetrics')
       break
+    }
 
     case 'tacoProposals':
       data = serializeForTransfer(await fetchTacoProposalsData(agent!))
@@ -760,31 +883,59 @@ async function fetchData(dataKey: DataKey): Promise<void> {
       data = serializeForTransfer(await fetchPortfolioSnapshotStatusData(agent!))
       break
 
-    // Performance/Leaderboard data keys (8 combinations)
+    // Performance/Leaderboard data keys (8 combinations) — single composite call
     case 'leaderboardAllTimeUSD':
-      data = serializeForTransfer(await fetchLeaderboardData(agent!, 'AllTime', 'USD', 50, 0))
-      break
     case 'leaderboardAllTimeICP':
-      data = serializeForTransfer(await fetchLeaderboardData(agent!, 'AllTime', 'ICP', 50, 0))
-      break
     case 'leaderboardOneYearUSD':
-      data = serializeForTransfer(await fetchLeaderboardData(agent!, 'OneYear', 'USD', 50, 0))
-      break
     case 'leaderboardOneYearICP':
-      data = serializeForTransfer(await fetchLeaderboardData(agent!, 'OneYear', 'ICP', 50, 0))
-      break
     case 'leaderboardOneMonthUSD':
-      data = serializeForTransfer(await fetchLeaderboardData(agent!, 'OneMonth', 'USD', 50, 0))
-      break
     case 'leaderboardOneMonthICP':
-      data = serializeForTransfer(await fetchLeaderboardData(agent!, 'OneMonth', 'ICP', 50, 0))
-      break
     case 'leaderboardOneWeekUSD':
-      data = serializeForTransfer(await fetchLeaderboardData(agent!, 'OneWeek', 'USD', 50, 0))
+    case 'leaderboardOneWeekICP': {
+      const allLB = await getAllLeaderboardsCoalesced(agent!)
+      if (!allLB) {
+        // Composite not available, fall back to individual call
+        const lbFallbackMap: Record<string, { timeframe: 'AllTime' | 'OneYear' | 'OneMonth' | 'OneWeek'; priceType: 'USD' | 'ICP' }> = {
+          leaderboardAllTimeUSD: { timeframe: 'AllTime', priceType: 'USD' },
+          leaderboardAllTimeICP: { timeframe: 'AllTime', priceType: 'ICP' },
+          leaderboardOneYearUSD: { timeframe: 'OneYear', priceType: 'USD' },
+          leaderboardOneYearICP: { timeframe: 'OneYear', priceType: 'ICP' },
+          leaderboardOneMonthUSD: { timeframe: 'OneMonth', priceType: 'USD' },
+          leaderboardOneMonthICP: { timeframe: 'OneMonth', priceType: 'ICP' },
+          leaderboardOneWeekUSD: { timeframe: 'OneWeek', priceType: 'USD' },
+          leaderboardOneWeekICP: { timeframe: 'OneWeek', priceType: 'ICP' },
+        }
+        const { timeframe, priceType } = lbFallbackMap[dataKey]
+        data = serializeForTransfer(await fetchLeaderboardData(agent!, timeframe, priceType, 50, 0))
+        break
+      }
+
+      const lbKeyMap: Record<string, string> = {
+        leaderboardAllTimeUSD: 'allTimeUSD',
+        leaderboardAllTimeICP: 'allTimeICP',
+        leaderboardOneYearUSD: 'oneYearUSD',
+        leaderboardOneYearICP: 'oneYearICP',
+        leaderboardOneMonthUSD: 'oneMonthUSD',
+        leaderboardOneMonthICP: 'oneMonthICP',
+        leaderboardOneWeekUSD: 'oneWeekUSD',
+        leaderboardOneWeekICP: 'oneWeekICP',
+      }
+
+      // Set current key's data
+      data = serializeForTransfer(allLB[lbKeyMap[dataKey]])
+
+      // Populate all 7 sibling leaderboard states from same response
+      const now = Date.now()
+      const freshState: Partial<DataState> = { lastUpdated: now, loading: false, error: null, stale: false }
+      for (const [dk, field] of Object.entries(lbKeyMap)) {
+        if (dk === dataKey) continue
+        const lbData = serializeForTransfer(allLB[field])
+        updateState(dk as DataKey, { data: lbData, ...freshState })
+        broadcastUpdate(dk as DataKey, lbData)
+        await setCached(dk as DataKey, lbData)
+      }
       break
-    case 'leaderboardOneWeekICP':
-      data = serializeForTransfer(await fetchLeaderboardData(agent!, 'OneWeek', 'ICP', 50, 0))
-      break
+    }
 
     case 'leaderboardInfo':
       data = serializeForTransfer(await fetchLeaderboardInfoData(agent!))

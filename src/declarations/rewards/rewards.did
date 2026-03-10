@@ -79,7 +79,11 @@ type Rewards =
    adminDeleteDisplayName: (target: principal) -> (Result__1);
    admin_backfillDistributionHistory: (config: BackfillConfig) ->
     (Result__1_12);
+   admin_backfillMissingNeurons: (neuronIds: vec blob, afterTimestamp:
+    int) -> (Result__1);
    admin_recalculateAllIcpPerformance: () -> (Result__1);
+   admin_recalculateDistributionPerformance: (afterTimestamp: int) ->
+    (Result__1);
    admin_recalculateIcpPerformanceForDistribution: (distributionId: nat) ->
     (Result__1);
    calculateNeuronPerformance: (neuronId: blob, startTime: int, endTime: 
@@ -89,6 +93,17 @@ type Rewards =
    /// * Clear all logs
    clearLogs: () -> ();
    deleteMyDisplayName: () -> (Result__1);
+   getAllLeaderboards: (limit: opt nat, offset: opt nat) ->
+    (record {
+       allTimeICP: vec LeaderboardEntry;
+       allTimeUSD: vec LeaderboardEntry;
+       oneMonthICP: vec LeaderboardEntry;
+       oneMonthUSD: vec LeaderboardEntry;
+       oneWeekICP: vec LeaderboardEntry;
+       oneWeekUSD: vec LeaderboardEntry;
+       oneYearICP: vec LeaderboardEntry;
+       oneYearUSD: vec LeaderboardEntry;
+     }) query;
    getAllNeuronRewardBalances: () -> (vec record {
                                             blob;
                                             nat;
@@ -515,7 +530,6 @@ type BackfillResult =
  };
 type BackfillConfig = 
  record {
-   clearExisting: bool;
    maxPeriods: nat;
    periodDays: nat;
    skipExistingPeriods: bool;

@@ -27,7 +27,7 @@ import type { AccountIdentifier as AccountIdentifierType } from '@dfinity/ledger
 import type { SnsGovernanceCanister as SnsGovernanceCanisterType } from '@dfinity/sns'
 import type { IDL as IDLType } from '@dfinity/candid'
 import type { Result_1, UserState } from "../../../declarations/dao_backend/DAO_backend.did.d"
-import type { Result_4, UpdateConfig, RebalanceConfig, _SERVICE as TreasuryService } from "../../../declarations/treasury/treasury.did.js"
+import type { Result_4, UpdateConfig, RebalanceConfigResponse, _SERVICE as TreasuryService } from "../../../declarations/treasury/treasury.did.js"
 import type { _SERVICE as NeuronSnapshotService } from "../../../declarations/neuronSnapshot/neuronSnapshot.did.js"
 import type { _SERVICE as SneedForumService } from "../../../declarations/sneed_sns_forum/sneed_sns_forum.did.js"
 import type { _SERVICE as AppSneedDaoService } from "../../../declarations/app_sneeddao_backend/app_sneeddao_backend.did.js"
@@ -1606,7 +1606,7 @@ export const useTacoStore = defineStore('taco', () => {
 
     // other
     const tokenMetadataCache = new Map<string, TokenMetadata>();
-    const rebalanceConfig = ref<RebalanceConfig | null>(null)
+    const rebalanceConfig = ref<RebalanceConfigResponse | null>(null)
     const systemParameters = ref<GetSystemParameterResult | null>(null)
     const fetchedVoterDetails = ref<VoterDetails[]>([])
     const fetchedNeuronAllocations = ref<ProcessedNeuronAllocation[]>([])
@@ -2025,7 +2025,7 @@ export const useTacoStore = defineStore('taco', () => {
         adminWorkerUnsubscribers.push(
             workerBridge.subscribe('rebalanceConfig', (data: unknown) => {
                 if (data) {
-                    rebalanceConfig.value = deserializeFromTransfer(data) as RebalanceConfig
+                    rebalanceConfig.value = deserializeFromTransfer(data) as RebalanceConfigResponse
                 }
             })
         )

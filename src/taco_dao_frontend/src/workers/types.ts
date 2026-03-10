@@ -460,15 +460,9 @@ export const ROUTE_PRIORITIES: Record<string, RouteDataConfig> = {
     preloadRoutes: [],
   },
   '/performance': {
-    critical: ['leaderboardAllTimeUSD', 'leaderboardInfo'],
+    critical: ['leaderboardAllTimeICP', 'leaderboardInfo'],
     high: [
-      'leaderboardAllTimeICP',
-      'leaderboardOneYearUSD',
-      'leaderboardOneYearICP',
-      'leaderboardOneMonthUSD',
-      'leaderboardOneMonthICP',
-      'leaderboardOneWeekUSD',
-      'leaderboardOneWeekICP',
+      'leaderboardAllTimeUSD',
       'userPerformance',
     ],
     preloadRoutes: ['/dao', '/rewards'],

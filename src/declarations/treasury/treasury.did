@@ -8,7 +8,7 @@ type treasury =
    ///    * Only callable by admins with appropriate permissions.
    addPortfolioCircuitBreakerCondition: (name: text, direction:
     PortfolioDirection, percentage: float64, timeWindowNS: nat, valueType:
-    PortfolioValueType) -> (Result_13);
+    PortfolioValueType) -> (Result_17);
    /// * Add a new price trigger condition
    ///    *
    ///    * Creates a failsafe rule that will pause tokens when price movements
@@ -17,9 +17,17 @@ type treasury =
    ///    * Only callable by admins with appropriate permissions.
    addTriggerCondition: (name: text, direction: PriceDirection, percentage:
     float64, timeWindowNS: nat, applicableTokens: vec principal) ->
-    (Result_12);
-   admin_executeTradingCycle: (reason: opt text) -> (Result_1);
-   admin_recoverPoolBalances: () -> (Result_2);
+    (Result_16);
+   /// * Execute all pending KongSwap claims to recover tokens
+   admin_executeKongClaims: () -> (Result);
+   admin_executeTradingCycle: (reason: opt text) -> (Result_2);
+   /// * Query pending KongSwap claims for this treasury
+   ///    * Returns list of claims that can be recovered
+   admin_getKongClaims: () -> (Result_15);
+   admin_recoverPoolBalances: () -> (Result);
+   /// * Manually refresh ICPSwap pools from factory
+   ///    * Use this to pick up newly created pools
+   admin_refreshICPSwapPools: () -> (Result);
    /// * Timer for data synchronization
    ///    *
    ///    * Schedules periodic updates of token info from:
@@ -27,9 +35,9 @@ type treasury =
    ///    * - NTN service (token prices)
    ///    * - Ledgers (token balances)
    admin_startShortSyncTimer: () -> (bool);
-   admin_syncToDao: () -> (Result_2);
-   admin_syncWithDao: () -> (Result_2);
-   admin_syncWithDaoNoPull: () -> (Result_2);
+   admin_syncToDao: () -> (Result);
+   admin_syncWithDao: () -> (Result);
+   admin_syncWithDaoNoPull: () -> (Result);
    /// * Clear all trading pauses (emergency function)
    ///    *
    ///    * Removes all tokens from the trading pause registry.
@@ -44,12 +52,23 @@ type treasury =
    ///    *
    ///    * Removes all price alert history.
    ///    * Only callable by admins with appropriate permissions.
-   clearPriceAlerts: () -> (Result);
+   clearPriceAlerts: () -> (Result_1);
    /// * Get current token allocations in basis points
    getCurrentAllocations: () -> (vec record {
                                        principal;
                                        nat;
                                      }) query;
+   /// * Get ICPSwap pool info for a specific token pair
+   ///    *
+   ///    * Returns the pool data if a pool exists for the given token pair,
+   ///    * or null if no pool is mapped.
+   getICPSwapPoolInfo: (tokenA: principal, tokenB: principal) ->
+    (opt record {
+           canisterId: principal;
+           fee: nat;
+           token0: text;
+           token1: text;
+         }) query;
    /// * Get the last N log entries
    ///    * Only accessible by master admin, controller, or DAO
    getLogs: (count: nat) -> (vec LogEntry) query;
@@ -102,12 +121,12 @@ type treasury =
    ///    * 
    ///    * Returns recent portfolio snapshots for analysis and charting.
    ///    * Public query - allows anyone to view portfolio history (read-only transparency).
-   getPortfolioHistory: (limit: nat) -> (Result_11) query;
+   getPortfolioHistory: (limit: nat) -> (Result_14) query;
    /// * Get portfolio history filtered by timestamp (for archive efficiency)
    ///    * Returns only snapshots newer than the specified timestamp
    ///    * Public query - allows anyone to view portfolio history (read-only transparency).
    getPortfolioHistorySince: (sinceTimestamp: int, limit: nat) ->
-    (Result_11) query;
+    (Result_14) query;
    /// * Get portfolio snapshot status
    getPortfolioSnapshotStatus: () ->
     (record {
@@ -158,7 +177,7 @@ type treasury =
    ///  * of the Treasury including trading intervals, size limits, slippage tolerance, etc.
    ///  *
    ///  * Accessible by any user with query access.
-   getSystemParameters: () -> (RebalanceConfig) query;
+   getSystemParameters: () -> (RebalanceConfigResponse) query;
    /// * Get all token details including balances and prices
    getTokenDetails: () -> (vec record {
                                  principal;
@@ -171,7 +190,7 @@ type treasury =
            principal;
            TokenDetails;
          }) query;
-   getTokenPriceHistory: (tokens: vec principal) -> (Result_10) query;
+   getTokenPriceHistory: (tokens: vec principal) -> (Result_13) query;
    /// * Get trading pause record for a specific token
    ///    *
    ///    * Returns the pause record if the token is paused from trading, null otherwise.
@@ -185,18 +204,30 @@ type treasury =
    ///    * - Portfolio valuation
    ///    * - Current vs target allocations
    ///    * - Performance metrics
-   getTradingStatus: () -> (Result_9) query;
+   getTradingStatus: () -> (Result_12) query;
    /// * Get trading status with trades filtered by timestamp (for archive efficiency)
    ///    * Returns only trades newer than the specified timestamp
-   getTradingStatusSince: (sinceTimestamp: int) -> (Result_8) query;
+   getTradingStatusSince: (sinceTimestamp: int) -> (Result_11) query;
    getTreasuryAdminActionsSince: (sinceTimestamp: int, limit: nat) ->
-    (Result_7) query;
+    (Result_10) query;
+   getTreasuryDashboard: () -> (Result_9) query;
    /// * Get a specific trigger condition by ID
    ///    *
    ///    * Returns details of a single failsafe rule.
    ///    * Accessible by any user with query access.
    getTriggerCondition: (conditionId: nat) -> (opt TriggerCondition) query;
    get_canister_cycles: () -> (record {cycles: nat;}) query;
+   /// * List all discovered ICPSwap pools
+   ///    *
+   ///    * Returns a unique list of all ICPSwap pools that have been discovered.
+   ///    * Since pools are stored bidirectionally, this filters out duplicates.
+   listICPSwapPools: () ->
+    (vec record {
+           canisterId: principal;
+           fee: nat;
+           token0: text;
+           token1: text;
+         }) query;
    /// * List all portfolio circuit breaker conditions
    listPortfolioCircuitBreakerConditions: () ->
     (vec PortfolioCircuitBreakerCondition) query;
@@ -234,18 +265,23 @@ type treasury =
                                                 principal;
                                                 nat64;
                                               });
+   /// * Public price refresh function for nachos_vault and authorized callers.
+   ///    * Rate-limited to MIN_PRICE_REFRESH_INTERVAL_NS between calls.
+   ///    * Wraps the private syncPriceWithDEX() function.
+   refreshAllPrices: () -> (Result_8);
+   refreshPricesAndGetDetails: () -> (Result_7);
    /// * Remove a portfolio circuit breaker condition
    removePortfolioCircuitBreakerCondition: (conditionId: nat) -> (Result_3);
    /// * Remove a trigger condition
    ///    *
    ///    * Deletes a failsafe rule permanently.
    ///    * Only callable by admins with appropriate permissions.
-   removeTriggerCondition: (conditionId: nat) -> (Result);
+   removeTriggerCondition: (conditionId: nat) -> (Result_1);
    /// * Reset the rebalancing state to initial values
    ///    *
    ///    * Completely resets all metrics, trade history, and timers
    ///    * Only callable by DAO or controller.
-   resetRebalanceState: (reason: opt text) -> (Result_1);
+   resetRebalanceState: (reason: opt text) -> (Result_2);
    sendToken: (token: principal, amount_e8s: nat, to_principal: principal,
     to_subaccount: opt Subaccount) -> ();
    /// * Set portfolio circuit breaker condition active/inactive
@@ -255,9 +291,10 @@ type treasury =
    ///    *
    ///    * Enables or disables a failsafe rule without deleting it.
    ///    * Only callable by admins with appropriate permissions.
-   setTriggerConditionActive: (conditionId: nat, isActive: bool) -> (Result);
+   setTriggerConditionActive: (conditionId: nat, isActive: bool) ->
+    (Result_1);
    /// * Start portfolio snapshots (Admin method)
-   startPortfolioSnapshots: (reason: opt text) -> (Result_2);
+   startPortfolioSnapshots: (reason: opt text) -> (Result);
    /// * Start the automatic rebalancing process
    ///    *
    ///    * Initializes the rebalancing engine, which will periodically:
@@ -266,14 +303,14 @@ type treasury =
    ///    * 3. Execute trades on the best exchange
    ///    *
    ///    * Only callable by DAO or controller.
-   startRebalancing: (reason: opt text) -> (Result_1);
+   startRebalancing: (reason: opt text) -> (Result_2);
    /// * Stop portfolio snapshots (Admin method)
-   stopPortfolioSnapshots: (reason: opt text) -> (Result_2);
+   stopPortfolioSnapshots: (reason: opt text) -> (Result);
    /// * Stop the automatic rebalancing process
    ///    *
    ///    * Cancels all timers and sets the system to idle state
    ///    * Only callable by DAO or controller.
-   stopRebalancing: (reason: opt text) -> (Result_1);
+   stopRebalancing: (reason: opt text) -> (Result_2);
    /// * Synchronize token details with DAO
    ///    *
    ///    * Updates token status from the DAO including:
@@ -310,19 +347,20 @@ type treasury =
     PortfolioCircuitBreakerUpdate) -> (Result_3);
    /// * Update portfolio snapshot interval (Admin method)
    updatePortfolioSnapshotInterval: (intervalMinutes: nat, reason:
-    opt text) -> (Result_2);
+    opt text) -> (Result);
    /// * Update the rebalancing configuration parameters
    ///    *
    ///    * Allows adjustment of trading intervals, sizes, and safety limits
    ///    * Only callable by DAO or controller.
    updateRebalanceConfig: (updates: UpdateConfig, rebalanceStateNew:
-    opt bool, reason: opt text) -> (Result_1);
+    opt bool, reason: opt text) -> (Result_2);
    /// * Update an existing trigger condition
    ///    *
    ///    * Modifies parameters of an existing failsafe rule.
    ///    * Only callable by admins with appropriate permissions.
    updateTriggerCondition: (conditionId: nat, updates:
-    TriggerConditionUpdate) -> (Result);
+    TriggerConditionUpdate) -> (Result_1);
+   withdrawAllCyclesToSelf: () -> (Result);
  };
 type UpdateConfig = 
  record {
@@ -566,6 +604,125 @@ type Result_9 =
    err: text;
    ok:
     record {
+      tradingStatus:
+       record {
+         executedTrades: vec TradeRecord;
+         metrics:
+          record {
+            avgSlippage: float64;
+            lastRebalanceAttempt: int;
+            lastUpdate: int;
+            skipBreakdown:
+             record {
+               insufficientCandidates: nat;
+               noExecutionPath: nat;
+               noPairsFound: nat;
+               pausedTokens: nat;
+               tokensFiltered: nat;
+             };
+            skipRate: float64;
+            successRate: float64;
+            totalTradesExecuted: nat;
+            totalTradesFailed: nat;
+            totalTradesSkipped: nat;
+          };
+         portfolioState:
+          record {
+            currentAllocations: vec record {
+                                      principal;
+                                      nat;
+                                    };
+            targetAllocations: vec record {
+                                     principal;
+                                     nat;
+                                   };
+            totalValueICP: nat;
+            totalValueUSD: float64;
+          };
+         rebalanceStatus: RebalanceStatus;
+       };};
+ };
+type Result_8 = 
+ variant {
+   err: text;
+   ok: record {
+         icpPriceUSD: float64;
+         timestamp: int;
+         tokensRefreshed: nat;
+       };
+ };
+type Result_7 = 
+ variant {
+   err: text;
+   ok:
+    record {
+      icpPriceUSD: float64;
+      timestamp: int;
+      tokenDetails: vec record {
+                          principal;
+                          TokenDetails;
+                        };
+      tokensRefreshed: nat;
+    };
+ };
+type Result_6 = 
+ variant {
+   err: SyncErrorTreasury;
+   ok: text;
+ };
+type Result_5 = 
+ variant {
+   err: TradingPauseError;
+   ok: text;
+ };
+type Result_4 = 
+ variant {
+   err: PortfolioSnapshotError;
+   ok: text;
+ };
+type Result_3 = 
+ variant {
+   err: PortfolioCircuitBreakerError;
+   ok: text;
+ };
+type Result_2 = 
+ variant {
+   err: RebalanceError;
+   ok: text;
+ };
+type Result_17 = 
+ variant {
+   err: PortfolioCircuitBreakerError;
+   ok: nat;
+ };
+type Result_16 = 
+ variant {
+   err: PriceFailsafeError;
+   ok: nat;
+ };
+type Result_15 = 
+ variant {
+   err: text;
+   ok: vec ClaimsReply;
+ };
+type Result_14 = 
+ variant {
+   err: PortfolioSnapshotError;
+   ok: PortfolioHistoryResponse;
+ };
+type Result_13 = 
+ variant {
+   err: text;
+   ok: vec record {
+             principal;
+             vec PricePoint;
+           };
+ };
+type Result_12 = 
+ variant {
+   err: text;
+   ok:
+    record {
       executedTrades: vec TradeRecord;
       metrics:
        record {
@@ -602,7 +759,7 @@ type Result_9 =
       rebalanceStatus: RebalanceStatus;
     };
  };
-type Result_8 = 
+type Result_11 = 
  variant {
    err: text;
    ok:
@@ -642,67 +799,19 @@ type Result_8 =
       rebalanceStatus: RebalanceStatus;
     };
  };
-type Result_7 = 
+type Result_10 = 
  variant {
    err: TradingPauseError;
    ok: TreasuryAdminActionsSinceResponse;
  };
-type Result_6 = 
- variant {
-   err: SyncErrorTreasury;
-   ok: text;
- };
-type Result_5 = 
- variant {
-   err: TradingPauseError;
-   ok: text;
- };
-type Result_4 = 
- variant {
-   err: PortfolioSnapshotError;
-   ok: text;
- };
-type Result_3 = 
- variant {
-   err: PortfolioCircuitBreakerError;
-   ok: text;
- };
-type Result_2 = 
- variant {
-   err: text;
-   ok: text;
- };
-type Result_13 = 
- variant {
-   err: PortfolioCircuitBreakerError;
-   ok: nat;
- };
-type Result_12 = 
- variant {
-   err: PriceFailsafeError;
-   ok: nat;
- };
-type Result_11 = 
- variant {
-   err: PortfolioSnapshotError;
-   ok: PortfolioHistoryResponse;
- };
-type Result_10 = 
- variant {
-   err: text;
-   ok: vec record {
-             principal;
-             vec PricePoint;
-           };
- };
 type Result_1 = 
  variant {
-   err: RebalanceError;
+   err: PriceFailsafeError;
    ok: text;
  };
 type Result = 
  variant {
-   err: PriceFailsafeError;
+   err: text;
    ok: text;
  };
 type RebalanceStatus = 
@@ -719,7 +828,7 @@ type RebalanceError =
    SystemError: text;
    TradeError: text;
  };
-type RebalanceConfig = 
+type RebalanceConfigResponse = 
  record {
    longSyncIntervalNS: nat;
    maxKongswapAttempts: nat;
@@ -859,6 +968,19 @@ type ExchangeType =
  variant {
    ICPSwap;
    KongSwap;
+ };
+type ClaimsReply = 
+ record {
+   amount: nat;
+   canister_id: opt text;
+   chain: text;
+   claim_id: nat64;
+   desc: text;
+   fee: nat;
+   status: text;
+   symbol: text;
+   to_address: text;
+   ts: nat64;
  };
 type ChangeType = 
  variant {

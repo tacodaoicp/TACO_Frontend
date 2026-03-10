@@ -122,7 +122,7 @@ export interface ContinuousDAO {
   >,
   'admin_backfillNeuronAllocationRecords' : ActorMethod<[], Result_19>,
   'admin_backfillPerformanceData' : ActorMethod<
-    [[] | [bigint], [] | [bigint], [] | [bigint], [] | [boolean]],
+    [[] | [bigint], [] | [bigint], [] | [bigint]],
     Result_18
   >,
   'admin_clearAllPastPrices' : ActorMethod<[], Result_1>,
@@ -176,6 +176,27 @@ export interface ContinuousDAO {
     }
   >,
   'getBannedWords' : ActorMethod<[], Result_12>,
+  'getDashboardData' : ActorMethod<
+    [],
+    [] | [
+      {
+        'snapshotInfo' : {
+          'totalVotingPower' : bigint,
+          'lastSnapshotTime' : bigint,
+          'lastSnapshotId' : bigint,
+        },
+        'tokenDetails' : Array<PublicTokenDetailsEntry>,
+        'aggregateAllocation' : Array<[Principal, bigint]>,
+        'votingPowerMetrics' : {
+          'principalCount' : bigint,
+          'totalVotingPower' : bigint,
+          'allocatedVotingPower' : bigint,
+          'totalVotingPowerByHotkeySetters' : bigint,
+          'neuronCount' : bigint,
+        },
+      }
+    ]
+  >,
   'getFollowActionsSince' : ActorMethod<[bigint, bigint], Result_11>,
   'getFollowersWithNeuronCounts' : ActorMethod<[], Array<[Principal, bigint]>>,
   'getHistoricBalanceAndAllocation' : ActorMethod<
@@ -251,13 +272,6 @@ export interface ContinuousDAO {
     [Array<Allocation>, [] | [string]],
     Result_2
   >,
-  /**
-   * / * Update Minting Vault configuration
-   * /  *
-   * /  * Allows configuration of premium rates, update intervals, and enabling/disabling swapping
-   * /  * Only callable by admins with the updateMintingVaultConfig permission.
-   */
-  'updateMintingVaultConfig' : ActorMethod<[UpdateConfig__1], Result_1>,
   'updateSpamParameters' : ActorMethod<
     [
       {
@@ -536,16 +550,6 @@ export interface UpdateConfig {
   'longSyncIntervalNS' : [] | [bigint],
   'maxTradeAttemptsPerInterval' : [] | [bigint],
   'maxKongswapAttempts' : [] | [bigint],
-}
-export interface UpdateConfig__1 {
-  'balanceUpdateInterval' : [] | [bigint],
-  'maxSlippageBasisPoints' : [] | [bigint],
-  'blockCleanupInterval' : [] | [bigint],
-  'minSwapValueUSD' : [] | [number],
-  'PRICE_HISTORY_WINDOW' : [] | [bigint],
-  'maxPremium' : [] | [number],
-  'swappingEnabled' : [] | [boolean],
-  'minPremium' : [] | [number],
 }
 export type UpdateError = { 'NotAllowed' : null } |
   { 'UnexpectedError' : string } |

@@ -54,6 +54,11 @@ import { useTacoStore } from '../../stores/taco.store'
 import { storeToRefs } from 'pinia'
 import { getChartPort } from '../../workers/chart-worker-port'
 
+// Module-level cache for getUserPerformanceGraphData results by principal
+// Avoids redundant canister calls when expanding/collapsing the same leaderboard row
+const performanceDataCache = new Map()
+const CACHE_TTL_MS = 60_000 // 60 seconds
+
 export default {
   name: 'PerformanceChart',
   props: {
@@ -442,25 +447,34 @@ export default {
       icpCheckpoints.value = []
 
       try {
-        const rewardsActor = await tacoStore.createRewardsActorAnonymous()
-        const { Principal } = await import('@dfinity/principal')
+        let graphData
 
-        const nowMs = BigInt(Date.now())
-        const endTime = nowMs * BigInt(1_000_000) // nanoseconds
-        const startTime = BigInt(0) // Always AllTime for the graph
+        // Check module-level cache first
+        const cached = performanceDataCache.get(props.principal)
+        if (cached && (Date.now() - cached.timestamp) < CACHE_TTL_MS) {
+          graphData = cached.data
+        } else {
+          const rewardsActor = await tacoStore.createRewardsActorAnonymous()
+          const { Principal } = await import('@dfinity/principal')
 
-        const graphResult = await rewardsActor.getUserPerformanceGraphData(
-          Principal.fromText(props.principal),
-          startTime,
-          endTime
-        )
+          const nowMs = BigInt(Date.now())
+          const endTime = nowMs * BigInt(1_000_000) // nanoseconds
+          const startTime = BigInt(0) // Always AllTime for the graph
 
-        if ('err' in graphResult) {
-          error.value = formatError(graphResult.err)
-          return
+          const graphResult = await rewardsActor.getUserPerformanceGraphData(
+            Principal.fromText(props.principal),
+            startTime,
+            endTime
+          )
+
+          if ('err' in graphResult) {
+            error.value = formatError(graphResult.err)
+            return
+          }
+
+          graphData = graphResult.ok
+          performanceDataCache.set(props.principal, { data: graphData, timestamp: Date.now() })
         }
-
-        const graphData = graphResult.ok
 
         // Process helper: map checkpoints to include both USD and ICP values
         const processCheckpoints = (neuron) => {

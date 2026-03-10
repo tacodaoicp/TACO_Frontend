@@ -17,7 +17,6 @@ export interface BackfillConfig {
   'periodDays' : bigint,
   'startTime' : bigint,
   'skipExistingPeriods' : boolean,
-  'clearExisting' : boolean,
   'maxPeriods' : bigint,
 }
 export interface BackfillResult {
@@ -208,7 +207,12 @@ export interface Rewards {
     [BackfillConfig],
     Result__1_12
   >,
+  'admin_backfillMissingNeurons' : ActorMethod<
+    [Array<Uint8Array | number[]>, bigint],
+    Result__1
+  >,
   'admin_recalculateAllIcpPerformance' : ActorMethod<[], Result__1>,
+  'admin_recalculateDistributionPerformance' : ActorMethod<[bigint], Result__1>,
   'admin_recalculateIcpPerformanceForDistribution' : ActorMethod<
     [bigint],
     Result__1
@@ -226,6 +230,19 @@ export interface Rewards {
    */
   'clearLogs' : ActorMethod<[], undefined>,
   'deleteMyDisplayName' : ActorMethod<[], Result__1>,
+  'getAllLeaderboards' : ActorMethod<
+    [[] | [bigint], [] | [bigint]],
+    {
+      'oneMonthICP' : Array<LeaderboardEntry>,
+      'oneMonthUSD' : Array<LeaderboardEntry>,
+      'oneWeekICP' : Array<LeaderboardEntry>,
+      'oneWeekUSD' : Array<LeaderboardEntry>,
+      'oneYearICP' : Array<LeaderboardEntry>,
+      'oneYearUSD' : Array<LeaderboardEntry>,
+      'allTimeICP' : Array<LeaderboardEntry>,
+      'allTimeUSD' : Array<LeaderboardEntry>,
+    }
+  >,
   'getAllNeuronRewardBalances' : ActorMethod<
     [],
     Array<[Uint8Array | number[], bigint]>

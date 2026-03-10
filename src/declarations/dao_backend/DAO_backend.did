@@ -45,17 +45,6 @@ type UpdateError =
    SystemInactive;
    UnexpectedError: text;
  };
-type UpdateConfig__1 = 
- record {
-   PRICE_HISTORY_WINDOW: opt int;
-   balanceUpdateInterval: opt int;
-   blockCleanupInterval: opt int;
-   maxPremium: opt float64;
-   maxSlippageBasisPoints: opt nat;
-   minPremium: opt float64;
-   minSwapValueUSD: opt float64;
-   swappingEnabled: opt bool;
- };
 type UpdateConfig = 
  record {
    longSyncIntervalNS: opt nat;
@@ -437,7 +426,7 @@ type ContinuousDAO =
    admin_addPenalizedNeuron: (neuronId: blob, multiplier: nat) -> (Result_20);
    admin_backfillNeuronAllocationRecords: () -> (Result_19);
    admin_backfillPerformanceData: (startTimestamp: opt int, periodDays:
-    opt nat, maxPeriods: opt nat, clearExisting: opt bool) -> (Result_18);
+    opt nat, maxPeriods: opt nat) -> (Result_18);
    admin_clearAllPastPrices: () -> (Result_1);
    admin_generateTestData: (config: opt TestDataConfig) -> (Result_17);
    admin_getAllActiveNeuronIds: () -> (vec blob) query;
@@ -496,6 +485,29 @@ type ContinuousDAO =
        totalNeuronsWithAllocations: nat;
      }) query;
    getBannedWords: () -> (Result_12);
+   getDashboardData: () ->
+    (opt
+      record {
+        aggregateAllocation: vec record {
+                                   principal;
+                                   nat;
+                                 };
+        snapshotInfo:
+         record {
+           lastSnapshotId: nat;
+           lastSnapshotTime: int;
+           totalVotingPower: nat;
+         };
+        tokenDetails: vec PublicTokenDetailsEntry;
+        votingPowerMetrics:
+         record {
+           allocatedVotingPower: nat;
+           neuronCount: nat;
+           principalCount: nat;
+           totalVotingPower: nat;
+           totalVotingPowerByHotkeySetters: nat;
+         };
+      }) query;
    getFollowActionsSince: (sinceTimestamp: int, limit: nat) ->
     (Result_11) query;
    getFollowersWithNeuronCounts: () -> (vec record {
@@ -574,11 +586,6 @@ type ContinuousDAO =
    unregisterUserToken: (tokenPrincipal: principal) -> (Result_3);
    updateAllocation: (newAllocations: vec Allocation, note: opt text) ->
     (Result_2);
-   /// * Update Minting Vault configuration
-   ///  *
-   ///  * Allows configuration of premium rates, update intervals, and enabling/disabling swapping
-   ///  * Only callable by admins with the updateMintingVaultConfig permission.
-   updateMintingVaultConfig: (config: UpdateConfig__1) -> (Result_1);
    updateSpamParameters: (params:
     record {
       allowedCalls: opt nat;

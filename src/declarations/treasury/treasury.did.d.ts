@@ -5,6 +5,18 @@ import type { IDL } from '@dfinity/candid';
 export type ChangeType = { 'CurrentToMax' : null } |
   { 'CurrentToMin' : null } |
   { 'MinToMax' : null };
+export interface ClaimsReply {
+  'ts' : bigint,
+  'fee' : bigint,
+  'status' : string,
+  'claim_id' : bigint,
+  'desc' : string,
+  'chain' : string,
+  'canister_id' : [] | [string],
+  'to_address' : string,
+  'amount' : bigint,
+  'symbol' : string,
+}
 export type ExchangeType = { 'KongSwap' : null } |
   { 'ICPSwap' : null };
 export interface LogEntry {
@@ -98,7 +110,7 @@ export interface PricePoint {
   'time' : bigint,
   'icpPrice' : bigint,
 }
-export interface RebalanceConfig {
+export interface RebalanceConfigResponse {
   'tokenSyncTimeoutNS' : bigint,
   'maxSlippageBasisPoints' : bigint,
   'shortSyncIntervalNS' : bigint,
@@ -121,30 +133,12 @@ export type RebalanceStatus = { 'Failed' : string } |
   { 'Idle' : null } |
   { 'Trading' : null };
 export type Result = { 'ok' : string } |
-  { 'err' : PriceFailsafeError };
+  { 'err' : string };
 export type Result_1 = { 'ok' : string } |
-  { 'err' : RebalanceError };
-export type Result_10 = { 'ok' : Array<[Principal, Array<PricePoint>]> } |
-  { 'err' : string };
-export type Result_11 = { 'ok' : PortfolioHistoryResponse } |
-  { 'err' : PortfolioSnapshotError };
-export type Result_12 = { 'ok' : bigint } |
   { 'err' : PriceFailsafeError };
-export type Result_13 = { 'ok' : bigint } |
-  { 'err' : PortfolioCircuitBreakerError };
-export type Result_2 = { 'ok' : string } |
-  { 'err' : string };
-export type Result_3 = { 'ok' : string } |
-  { 'err' : PortfolioCircuitBreakerError };
-export type Result_4 = { 'ok' : string } |
-  { 'err' : PortfolioSnapshotError };
-export type Result_5 = { 'ok' : string } |
+export type Result_10 = { 'ok' : TreasuryAdminActionsSinceResponse } |
   { 'err' : TradingPauseError };
-export type Result_6 = { 'ok' : string } |
-  { 'err' : SyncErrorTreasury };
-export type Result_7 = { 'ok' : TreasuryAdminActionsSinceResponse } |
-  { 'err' : TradingPauseError };
-export type Result_8 = {
+export type Result_11 = {
     'ok' : {
       'executedTrades' : Array<TradeRecord>,
       'metrics' : {
@@ -173,7 +167,7 @@ export type Result_8 = {
     }
   } |
   { 'err' : string };
-export type Result_9 = {
+export type Result_12 = {
     'ok' : {
       'executedTrades' : Array<TradeRecord>,
       'metrics' : {
@@ -199,6 +193,75 @@ export type Result_9 = {
         'totalValueICP' : bigint,
         'totalValueUSD' : number,
         'targetAllocations' : Array<[Principal, bigint]>,
+      },
+    }
+  } |
+  { 'err' : string };
+export type Result_13 = { 'ok' : Array<[Principal, Array<PricePoint>]> } |
+  { 'err' : string };
+export type Result_14 = { 'ok' : PortfolioHistoryResponse } |
+  { 'err' : PortfolioSnapshotError };
+export type Result_15 = { 'ok' : Array<ClaimsReply> } |
+  { 'err' : string };
+export type Result_16 = { 'ok' : bigint } |
+  { 'err' : PriceFailsafeError };
+export type Result_17 = { 'ok' : bigint } |
+  { 'err' : PortfolioCircuitBreakerError };
+export type Result_2 = { 'ok' : string } |
+  { 'err' : RebalanceError };
+export type Result_3 = { 'ok' : string } |
+  { 'err' : PortfolioCircuitBreakerError };
+export type Result_4 = { 'ok' : string } |
+  { 'err' : PortfolioSnapshotError };
+export type Result_5 = { 'ok' : string } |
+  { 'err' : TradingPauseError };
+export type Result_6 = { 'ok' : string } |
+  { 'err' : SyncErrorTreasury };
+export type Result_7 = {
+    'ok' : {
+      'icpPriceUSD' : number,
+      'tokenDetails' : Array<[Principal, TokenDetails]>,
+      'tokensRefreshed' : bigint,
+      'timestamp' : bigint,
+    }
+  } |
+  { 'err' : string };
+export type Result_8 = {
+    'ok' : {
+      'icpPriceUSD' : number,
+      'tokensRefreshed' : bigint,
+      'timestamp' : bigint,
+    }
+  } |
+  { 'err' : string };
+export type Result_9 = {
+    'ok' : {
+      'tradingStatus' : {
+        'executedTrades' : Array<TradeRecord>,
+        'metrics' : {
+          'avgSlippage' : number,
+          'successRate' : number,
+          'lastUpdate' : bigint,
+          'totalTradesExecuted' : bigint,
+          'lastRebalanceAttempt' : bigint,
+          'skipBreakdown' : {
+            'tokensFiltered' : bigint,
+            'insufficientCandidates' : bigint,
+            'noExecutionPath' : bigint,
+            'noPairsFound' : bigint,
+            'pausedTokens' : bigint,
+          },
+          'skipRate' : number,
+          'totalTradesFailed' : bigint,
+          'totalTradesSkipped' : bigint,
+        },
+        'rebalanceStatus' : RebalanceStatus,
+        'portfolioState' : {
+          'currentAllocations' : Array<[Principal, bigint]>,
+          'totalValueICP' : bigint,
+          'totalValueUSD' : number,
+          'targetAllocations' : Array<[Principal, bigint]>,
+        },
       },
     }
   } |
@@ -413,28 +476,129 @@ export interface UpdateConfig {
   'maxKongswapAttempts' : [] | [bigint],
 }
 export interface treasury {
+  /**
+   * / * Add a portfolio circuit breaker condition
+   * /    *
+   * /    * Creates a circuit breaker rule that will pause all trading when portfolio value
+   * /    * changes exceed the specified threshold within the time window.
+   * /    *
+   * /    * Only callable by admins with appropriate permissions.
+   */
   'addPortfolioCircuitBreakerCondition' : ActorMethod<
     [string, PortfolioDirection, number, bigint, PortfolioValueType],
-    Result_13
+    Result_17
   >,
+  /**
+   * / * Add a new price trigger condition
+   * /    *
+   * /    * Creates a failsafe rule that will pause tokens when price movements
+   * /    * exceed the specified threshold within the time window.
+   * /    *
+   * /    * Only callable by admins with appropriate permissions.
+   */
   'addTriggerCondition' : ActorMethod<
     [string, PriceDirection, number, bigint, Array<Principal>],
-    Result_12
+    Result_16
   >,
-  'admin_executeTradingCycle' : ActorMethod<[[] | [string]], Result_1>,
-  'admin_recoverPoolBalances' : ActorMethod<[], Result_2>,
+  /**
+   * / * Execute all pending KongSwap claims to recover tokens
+   */
+  'admin_executeKongClaims' : ActorMethod<[], Result>,
+  'admin_executeTradingCycle' : ActorMethod<[[] | [string]], Result_2>,
+  /**
+   * / * Query pending KongSwap claims for this treasury
+   * /    * Returns list of claims that can be recovered
+   */
+  'admin_getKongClaims' : ActorMethod<[], Result_15>,
+  'admin_recoverPoolBalances' : ActorMethod<[], Result>,
+  /**
+   * / * Manually refresh ICPSwap pools from factory
+   * /    * Use this to pick up newly created pools
+   */
+  'admin_refreshICPSwapPools' : ActorMethod<[], Result>,
+  /**
+   * / * Timer for data synchronization
+   * /    *
+   * /    * Schedules periodic updates of token info from:
+   * /    * - DAO (allocation targets and token status)
+   * /    * - NTN service (token prices)
+   * /    * - Ledgers (token balances)
+   */
   'admin_startShortSyncTimer' : ActorMethod<[], boolean>,
-  'admin_syncToDao' : ActorMethod<[], Result_2>,
-  'admin_syncWithDao' : ActorMethod<[], Result_2>,
-  'admin_syncWithDaoNoPull' : ActorMethod<[], Result_2>,
+  'admin_syncToDao' : ActorMethod<[], Result>,
+  'admin_syncWithDao' : ActorMethod<[], Result>,
+  'admin_syncWithDaoNoPull' : ActorMethod<[], Result>,
+  /**
+   * / * Clear all trading pauses (emergency function)
+   * /    *
+   * /    * Removes all tokens from the trading pause registry.
+   * /    * Only callable by master admins.
+   */
   'clearAllTradingPauses' : ActorMethod<[[] | [string]], Result_5>,
+  /**
+   * / * Clear all logs
+   * /    * Only accessible by master admin or controller
+   */
   'clearLogs' : ActorMethod<[], undefined>,
+  /**
+   * / * Clear portfolio circuit breaker logs
+   */
   'clearPortfolioCircuitBreakerLogs' : ActorMethod<[], Result_3>,
-  'clearPriceAlerts' : ActorMethod<[], Result>,
+  /**
+   * / * Clear price alerts log
+   * /    *
+   * /    * Removes all price alert history.
+   * /    * Only callable by admins with appropriate permissions.
+   */
+  'clearPriceAlerts' : ActorMethod<[], Result_1>,
+  /**
+   * / * Get current token allocations in basis points
+   */
   'getCurrentAllocations' : ActorMethod<[], Array<[Principal, bigint]>>,
+  /**
+   * / * Get ICPSwap pool info for a specific token pair
+   * /    *
+   * /    * Returns the pool data if a pool exists for the given token pair,
+   * /    * or null if no pool is mapped.
+   */
+  'getICPSwapPoolInfo' : ActorMethod<
+    [Principal, Principal],
+    [] | [
+      {
+        'fee' : bigint,
+        'token0' : string,
+        'token1' : string,
+        'canisterId' : Principal,
+      }
+    ]
+  >,
+  /**
+   * / * Get the last N log entries
+   * /    * Only accessible by master admin, controller, or DAO
+   */
   'getLogs' : ActorMethod<[bigint], Array<LogEntry>>,
+  /**
+   * / * Get the last N log entries for a specific context
+   * /    * Only accessible by master admin, controller, or DAO
+   */
   'getLogsByContext' : ActorMethod<[string, bigint], Array<LogEntry>>,
+  /**
+   * / * Get the last N log entries for a specific level
+   * /    * Only accessible by master admin, controller, or DAO
+   */
   'getLogsByLevel' : ActorMethod<[LogLevel, bigint], Array<LogEntry>>,
+  /**
+   * / * Get Long Sync Timer status
+   * /    *
+   * /    * Returns information about the Long Sync Timer including:
+   * /    * - lastRunTime: The last time the timer executed (0 if never run)
+   * /    * - nextScheduledTime: The next scheduled execution time (0 if not scheduled)
+   * /    * - isRunning: Whether the timer is currently active
+   * /    * - timerId: The timer ID (0 if not running)
+   * /    * - intervalNS: The configured interval in nanoseconds
+   * /    *
+   * /    * Accessible by any user with query access.
+   */
   'getLongSyncTimerStatus' : ActorMethod<
     [],
     {
@@ -445,19 +609,54 @@ export interface treasury {
       'isRunning' : boolean,
     }
   >,
+  /**
+   * / * Get the current maximum portfolio snapshots limit
+   * /    *
+   * /    * Returns the current limit for portfolio snapshots storage.
+   * /    * Accessible by any user with query access.
+   */
   'getMaxPortfolioSnapshots' : ActorMethod<[], bigint>,
+  /**
+   * / * Get current maximum price history entries configuration
+   * /    *
+   * /    * Returns the current limit for price history entries per token.
+   * /    * Accessible by any user with query access.
+   */
   'getMaxPriceHistoryEntries' : ActorMethod<[], bigint>,
+  /**
+   * / * Get the current paused token threshold for circuit breaker
+   */
   'getPausedTokenThresholdForCircuitBreaker' : ActorMethod<[], bigint>,
+  /**
+   * / * Get a specific portfolio circuit breaker condition
+   */
   'getPortfolioCircuitBreakerCondition' : ActorMethod<
     [bigint],
     [] | [PortfolioCircuitBreakerCondition]
   >,
+  /**
+   * / * Get portfolio circuit breaker logs
+   */
   'getPortfolioCircuitBreakerLogs' : ActorMethod<
     [bigint, bigint],
     { 'logs' : Array<PortfolioCircuitBreakerLog>, 'totalCount' : bigint }
   >,
-  'getPortfolioHistory' : ActorMethod<[bigint], Result_11>,
-  'getPortfolioHistorySince' : ActorMethod<[bigint, bigint], Result_11>,
+  /**
+   * / * Get portfolio history
+   * /    *
+   * /    * Returns recent portfolio snapshots for analysis and charting.
+   * /    * Public query - allows anyone to view portfolio history (read-only transparency).
+   */
+  'getPortfolioHistory' : ActorMethod<[bigint], Result_14>,
+  /**
+   * / * Get portfolio history filtered by timestamp (for archive efficiency)
+   * /    * Returns only snapshots newer than the specified timestamp
+   * /    * Public query - allows anyone to view portfolio history (read-only transparency).
+   */
+  'getPortfolioHistorySince' : ActorMethod<[bigint, bigint], Result_14>,
+  /**
+   * / * Get portfolio snapshot status
+   */
   'getPortfolioSnapshotStatus' : ActorMethod<
     [],
     {
@@ -467,14 +666,34 @@ export interface treasury {
       'intervalMinutes' : bigint,
     }
   >,
+  /**
+   * / * Get price alerts (paginated)
+   * /    *
+   * /    * Returns recent price alert events that triggered token pausing.
+   * /    * Accessible by any user with query access.
+   */
   'getPriceAlerts' : ActorMethod<
     [bigint, bigint],
     { 'alerts' : Array<PriceAlertLog>, 'totalCount' : bigint }
   >,
+  /**
+   * / * Get price alerts for a specific token
+   * /    *
+   * /    * Returns price alert events for a particular token.
+   * /    * Accessible by any user with query access.
+   */
   'getPriceAlertsForToken' : ActorMethod<
     [Principal, bigint],
     Array<PriceAlertLog>
   >,
+  /**
+   * / * Get skip metrics and breakdown
+   * /    *
+   * /    * Returns detailed information about skipped trades including:
+   * /    * - Total skipped trades
+   * /    * - Breakdown by skip reason
+   * /    * - Skip rate as percentage of all attempts
+   */
   'getSkipMetrics' : ActorMethod<
     [],
     {
@@ -489,76 +708,267 @@ export interface treasury {
       'totalTradesSkipped' : bigint,
     }
   >,
-  'getSystemParameters' : ActorMethod<[], RebalanceConfig>,
+  /**
+   * / * Get system rebalance parameters
+   * /  *
+   * /  * Returns all rebalancing configuration parameters that control the behavior
+   * /  * of the Treasury including trading intervals, size limits, slippage tolerance, etc.
+   * /  *
+   * /  * Accessible by any user with query access.
+   */
+  'getSystemParameters' : ActorMethod<[], RebalanceConfigResponse>,
+  /**
+   * / * Get all token details including balances and prices
+   */
   'getTokenDetails' : ActorMethod<[], Array<[Principal, TokenDetails]>>,
+  /**
+   * / * Get token details with price history filtered by timestamp (for archive efficiency)
+   * /    * Returns only price points newer than the specified timestamp per token
+   */
   'getTokenDetailsSince' : ActorMethod<
     [bigint],
     Array<[Principal, TokenDetails]>
   >,
-  'getTokenPriceHistory' : ActorMethod<[Array<Principal>], Result_10>,
+  'getTokenPriceHistory' : ActorMethod<[Array<Principal>], Result_13>,
+  /**
+   * / * Get trading pause record for a specific token
+   * /    *
+   * /    * Returns the pause record if the token is paused from trading, null otherwise.
+   * /    * Accessible by any user with query access.
+   */
   'getTradingPauseInfo' : ActorMethod<[Principal], [] | [TradingPauseRecord]>,
-  'getTradingStatus' : ActorMethod<[], Result_9>,
-  'getTradingStatusSince' : ActorMethod<[bigint], Result_8>,
-  'getTreasuryAdminActionsSince' : ActorMethod<[bigint, bigint], Result_7>,
+  /**
+   * / * Get detailed rebalancing status information
+   * /    *
+   * /    * Returns:
+   * /    * - Current system status
+   * /    * - Recent trade history
+   * /    * - Portfolio valuation
+   * /    * - Current vs target allocations
+   * /    * - Performance metrics
+   */
+  'getTradingStatus' : ActorMethod<[], Result_12>,
+  /**
+   * / * Get trading status with trades filtered by timestamp (for archive efficiency)
+   * /    * Returns only trades newer than the specified timestamp
+   */
+  'getTradingStatusSince' : ActorMethod<[bigint], Result_11>,
+  'getTreasuryAdminActionsSince' : ActorMethod<[bigint, bigint], Result_10>,
+  'getTreasuryDashboard' : ActorMethod<[], Result_9>,
+  /**
+   * / * Get a specific trigger condition by ID
+   * /    *
+   * /    * Returns details of a single failsafe rule.
+   * /    * Accessible by any user with query access.
+   */
   'getTriggerCondition' : ActorMethod<[bigint], [] | [TriggerCondition]>,
   'get_canister_cycles' : ActorMethod<[], { 'cycles' : bigint }>,
+  /**
+   * / * List all discovered ICPSwap pools
+   * /    *
+   * /    * Returns a unique list of all ICPSwap pools that have been discovered.
+   * /    * Since pools are stored bidirectionally, this filters out duplicates.
+   */
+  'listICPSwapPools' : ActorMethod<
+    [],
+    Array<
+      {
+        'fee' : bigint,
+        'token0' : string,
+        'token1' : string,
+        'canisterId' : Principal,
+      }
+    >
+  >,
+  /**
+   * / * List all portfolio circuit breaker conditions
+   */
   'listPortfolioCircuitBreakerConditions' : ActorMethod<
     [],
     Array<PortfolioCircuitBreakerCondition>
   >,
+  /**
+   * / * List all tokens currently paused from trading
+   * /    *
+   * /    * Returns all tokens in the trading pause registry with their pause reasons.
+   * /    * Accessible by any user with query access.
+   */
   'listTradingPauses' : ActorMethod<[], TradingPausesResponse>,
+  /**
+   * / * List all trigger conditions
+   * /    *
+   * /    * Returns all configured failsafe rules.
+   * /    * Accessible by any user with query access.
+   */
   'listTriggerConditions' : ActorMethod<[], Array<TriggerCondition>>,
+  /**
+   * / * Manually pause a token from trading (for admin use)
+   * /    *
+   * /    * Allows admins to pause tokens from trading with a circuit breaker reason.
+   * /    * Only callable by admins with appropriate permissions.
+   */
   'pauseTokenFromTradingManual' : ActorMethod<[Principal, string], Result_5>,
+  /**
+   * / * Process batch transfers from the DAO
+   * /    *
+   * /    * Handles both immediate and queued transfers of various token types.
+   * /    * Only callable by DAO.
+   * /    *
+   * /    * tempTransferQueue - Array of transfer instructions
+   * /    * Immediate - If true, process immediately and return block IDs
+   * /    *
+   */
   'receiveTransferTasks' : ActorMethod<
     [Array<[TransferRecipient, bigint, Principal, number]>, boolean],
     [boolean, [] | [Array<[Principal, bigint]>]]
   >,
+  /**
+   * / * Public price refresh function for nachos_vault and authorized callers.
+   * /    * Rate-limited to MIN_PRICE_REFRESH_INTERVAL_NS between calls.
+   * /    * Wraps the private syncPriceWithDEX() function.
+   */
+  'refreshAllPrices' : ActorMethod<[], Result_8>,
+  'refreshPricesAndGetDetails' : ActorMethod<[], Result_7>,
+  /**
+   * / * Remove a portfolio circuit breaker condition
+   */
   'removePortfolioCircuitBreakerCondition' : ActorMethod<[bigint], Result_3>,
-  'removeTriggerCondition' : ActorMethod<[bigint], Result>,
-  'resetRebalanceState' : ActorMethod<[[] | [string]], Result_1>,
+  /**
+   * / * Remove a trigger condition
+   * /    *
+   * /    * Deletes a failsafe rule permanently.
+   * /    * Only callable by admins with appropriate permissions.
+   */
+  'removeTriggerCondition' : ActorMethod<[bigint], Result_1>,
+  /**
+   * / * Reset the rebalancing state to initial values
+   * /    *
+   * /    * Completely resets all metrics, trade history, and timers
+   * /    * Only callable by DAO or controller.
+   */
+  'resetRebalanceState' : ActorMethod<[[] | [string]], Result_2>,
   'sendToken' : ActorMethod<
     [Principal, bigint, Principal, [] | [Subaccount]],
     undefined
   >,
+  /**
+   * / * Set portfolio circuit breaker condition active/inactive
+   */
   'setPortfolioCircuitBreakerConditionActive' : ActorMethod<
     [bigint, boolean],
     Result_3
   >,
-  'setTriggerConditionActive' : ActorMethod<[bigint, boolean], Result>,
-  'startPortfolioSnapshots' : ActorMethod<[[] | [string]], Result_2>,
-  'startRebalancing' : ActorMethod<[[] | [string]], Result_1>,
-  'stopPortfolioSnapshots' : ActorMethod<[[] | [string]], Result_2>,
-  'stopRebalancing' : ActorMethod<[[] | [string]], Result_1>,
+  /**
+   * / * Activate or deactivate a trigger condition
+   * /    *
+   * /    * Enables or disables a failsafe rule without deleting it.
+   * /    * Only callable by admins with appropriate permissions.
+   */
+  'setTriggerConditionActive' : ActorMethod<[bigint, boolean], Result_1>,
+  /**
+   * / * Start portfolio snapshots (Admin method)
+   */
+  'startPortfolioSnapshots' : ActorMethod<[[] | [string]], Result>,
+  /**
+   * / * Start the automatic rebalancing process
+   * /    *
+   * /    * Initializes the rebalancing engine, which will periodically:
+   * /    * 1. Check current vs target allocations
+   * /    * 2. Select tokens to trade
+   * /    * 3. Execute trades on the best exchange
+   * /    *
+   * /    * Only callable by DAO or controller.
+   */
+  'startRebalancing' : ActorMethod<[[] | [string]], Result_2>,
+  /**
+   * / * Stop portfolio snapshots (Admin method)
+   */
+  'stopPortfolioSnapshots' : ActorMethod<[[] | [string]], Result>,
+  /**
+   * / * Stop the automatic rebalancing process
+   * /    *
+   * /    * Cancels all timers and sets the system to idle state
+   * /    * Only callable by DAO or controller.
+   */
+  'stopRebalancing' : ActorMethod<[[] | [string]], Result_2>,
+  /**
+   * / * Synchronize token details with DAO
+   * /    *
+   * /    * Updates token status from the DAO including:
+   * /    * - Active/Inactive status
+   * /    * - Paused/Unpaused state
+   */
   'syncTokenDetailsFromDAO' : ActorMethod<
     [Array<[Principal, TokenDetails]>],
     Result_6
   >,
+  /**
+   * / * Manually trigger a portfolio snapshot (admin function)
+   */
   'takeManualPortfolioSnapshot' : ActorMethod<[[] | [string]], Result_4>,
+  /**
+   * / * Manually unpause a token from trading
+   * /    *
+   * /    * Removes a token from the trading pause registry, allowing it to trade again.
+   * /    * Only callable by admins with appropriate permissions.
+   */
   'unpauseTokenFromTrading' : ActorMethod<[Principal, [] | [string]], Result_5>,
+  /**
+   * / * Update the maximum portfolio snapshots limit
+   * /    *
+   * /    * Sets the maximum number of portfolio snapshots to store.
+   * /    * Older snapshots will be automatically removed when the limit is exceeded.
+   * /    * Only callable by admins with appropriate permissions.
+   */
   'updateMaxPortfolioSnapshots' : ActorMethod<
     [bigint, [] | [string]],
     Result_4
   >,
+  /**
+   * / * Update the paused token threshold for circuit breaker
+   * /    *
+   * /    * Sets the number of paused tokens that will trigger the circuit breaker.
+   * /    * Only callable by admins with appropriate permissions.
+   */
   'updatePausedTokenThresholdForCircuitBreaker' : ActorMethod<
     [bigint],
     Result_3
   >,
+  /**
+   * / * Update an existing portfolio circuit breaker condition
+   */
   'updatePortfolioCircuitBreakerCondition' : ActorMethod<
     [bigint, PortfolioCircuitBreakerUpdate],
     Result_3
   >,
+  /**
+   * / * Update portfolio snapshot interval (Admin method)
+   */
   'updatePortfolioSnapshotInterval' : ActorMethod<
     [bigint, [] | [string]],
-    Result_2
-  >,
-  'updateRebalanceConfig' : ActorMethod<
-    [UpdateConfig, [] | [boolean], [] | [string]],
-    Result_1
-  >,
-  'updateTriggerCondition' : ActorMethod<
-    [bigint, TriggerConditionUpdate],
     Result
   >,
+  /**
+   * / * Update the rebalancing configuration parameters
+   * /    *
+   * /    * Allows adjustment of trading intervals, sizes, and safety limits
+   * /    * Only callable by DAO or controller.
+   */
+  'updateRebalanceConfig' : ActorMethod<
+    [UpdateConfig, [] | [boolean], [] | [string]],
+    Result_2
+  >,
+  /**
+   * / * Update an existing trigger condition
+   * /    *
+   * /    * Modifies parameters of an existing failsafe rule.
+   * /    * Only callable by admins with appropriate permissions.
+   */
+  'updateTriggerCondition' : ActorMethod<
+    [bigint, TriggerConditionUpdate],
+    Result_1
+  >,
+  'withdrawAllCyclesToSelf' : ActorMethod<[], Result>,
 }
 export interface _SERVICE extends treasury {}
 export declare const idlFactory: IDL.InterfaceFactory;
