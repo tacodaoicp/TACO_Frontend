@@ -23,7 +23,7 @@ import {
   fetchTokenDetailsData,
   fetchAggregateAllocationData,
   fetchTradingStatusData,
-  fetchTimerStatusData,
+  fetchSnapshotInfoData,
   calculateTotalTreasuryValueInUsd,
   // Secondary fetch functions
   fetchVotingPowerMetricsData,
@@ -719,7 +719,16 @@ async function fetchData(dataKey: DataKey): Promise<void> {
       break
 
     case 'timerStatus':
-      data = serializeForTransfer(await fetchTimerStatusData(agent!))
+      // Only fetch snapshotInfo — reuse cached tradingStatus and tokenDetails
+      // to avoid duplicate canister calls (they have their own data keys)
+      const snapshotInfo = await fetchSnapshotInfoData(agent!)
+      const cachedTradingStatus = dataStates.get('tradingStatus')?.data
+      const cachedTokenDetails = dataStates.get('tokenDetails')?.data
+      data = serializeForTransfer({
+        snapshotInfo,
+        tradingStatus: cachedTradingStatus ? cachedTradingStatus : null,
+        tokenDetails: cachedTokenDetails ? cachedTokenDetails : [],
+      })
       break
 
     // Secondary data keys

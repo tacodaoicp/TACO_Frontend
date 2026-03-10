@@ -427,6 +427,16 @@ export async function fetchTimerStatusData(agent: HttpAgent): Promise<TimerStatu
 }
 
 /**
+ * Fetch only snapshot info for timerStatus — lightweight version
+ * that avoids re-fetching tradingStatus and tokenDetails which are
+ * already fetched by their own dedicated data keys.
+ */
+export async function fetchSnapshotInfoData(agent: HttpAgent): Promise<any> {
+  const daoActor = getDaoBackendActor(agent)
+  return await daoActor.getSnapshotInfo()
+}
+
+/**
  * Calculate total treasury value in USD
  * Requires token details with balances and prices
  */

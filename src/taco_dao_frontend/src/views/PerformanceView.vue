@@ -338,10 +338,19 @@ export default {
     }
 
     // Load follower info for leaderboard entries (leaderboard data comes from workers)
-    const loadFollowerInfo = async () => {
+    let lastFollowerPrincipalKey = ''
+    const loadFollowerInfo = async (force = false) => {
       const entries = leaderboardEntries.value
       if (!entries || entries.length === 0) {
         followerInfos.value = []
+        lastFollowerPrincipalKey = ''
+        return
+      }
+
+      const principals = entries.map(e => e.principal)
+      // Skip fetch if the same set of principals was already queried
+      const principalKey = principals.map(p => p.toString()).join(',')
+      if (!force && principalKey === lastFollowerPrincipalKey && followerInfos.value.length > 0) {
         return
       }
 
@@ -352,10 +361,10 @@ export default {
       }
 
       try {
-        const principals = entries.map(e => e.principal)
         const daoActor = await tacoStore.createDAOActorAnonymous()
         const followerData = await daoActor.getUsersFollowerInfo(principals)
         followerInfos.value = followerData
+        lastFollowerPrincipalKey = principalKey
       } catch (followerError) {
         console.warn('Failed to load follower info (non-critical):', followerError)
         // Only clear on initial load failure; keep existing data on background refresh
@@ -583,7 +592,7 @@ export default {
           followByPrincipalSuccess.value = `Successfully followed ${input.substring(0, 12)}...`
           followPrincipalInput.value = ''
           await loadUserFollows()
-          await loadFollowerInfo()
+          await loadFollowerInfo(true)
         } else {
           followByPrincipalError.value = formatFollowError(result.err)
         }
@@ -599,7 +608,7 @@ export default {
     const refreshAllData = async () => {
       isLoading.value = true
       await Promise.all([
-        loadFollowerInfo(),
+        loadFollowerInfo(true),
         userLoggedIn.value ? loadUserPerformance() : Promise.resolve()
       ])
       isLoading.value = false
@@ -633,7 +642,7 @@ export default {
         if ('ok' in result) {
           tacoStore.showSuccess('Successfully followed user')
           await loadUserFollows()
-          await loadFollowerInfo() // Refresh follower counts
+          await loadFollowerInfo(true) // Refresh follower counts
         } else {
           tacoStore.showError(formatFollowError(result.err))
         }
@@ -655,7 +664,7 @@ export default {
         if ('ok' in result) {
           tacoStore.showSuccess('Successfully unfollowed user')
           await loadUserFollows()
-          await loadFollowerInfo() // Refresh follower counts
+          await loadFollowerInfo(true) // Refresh follower counts
         } else {
           tacoStore.showError(formatUnfollowError(result.err))
         }

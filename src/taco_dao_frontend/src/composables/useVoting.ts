@@ -403,22 +403,25 @@ export function useVoting() {
       let totalVP = BigInt(0)
       const errors: string[] = []
       
-      // Vote with each neuron (skip refresh on individual votes)
-      for (const neuron of eligibleNeurons) {
-        try {
-          await castVote({
-            proposalId,
-            neuronId: neuron.id,
-            vote
-          }, true) // Skip refresh for individual votes
+      // Vote with all neurons concurrently (skip refresh on individual votes)
+      const results = await Promise.allSettled(
+        eligibleNeurons.map(neuron =>
+          castVote({ proposalId, neuronId: neuron.id, vote }, true)
+        )
+      )
+
+      for (let i = 0; i < results.length; i++) {
+        const result = results[i]
+        const neuron = eligibleNeurons[i]
+        if (result.status === 'fulfilled') {
           successful++
           totalVP += neuron.votingPower
           console.log(`✓ Voted with neuron ${neuron.displayId.substring(0, 8)}...`)
-        } catch (err: any) {
+        } else {
           failed++
-          const errorMsg = err.message || 'Unknown error'
+          const errorMsg = result.reason?.message || 'Unknown error'
           errors.push(`Neuron ${neuron.displayId.substring(0, 8)}...: ${errorMsg}`)
-          console.error(`✗ Failed to vote with neuron ${neuron.displayId.substring(0, 8)}...`, err)
+          console.error(`✗ Failed to vote with neuron ${neuron.displayId.substring(0, 8)}...`, result.reason)
         }
       }
       
