@@ -375,7 +375,7 @@ export default {
               noteHtml = `
                 <div style="border-top:1px solid #DA8D28;margin-top:8px;padding-top:8px;">
                   <div style="color:#FEEAC1;font-size:11px;margin-bottom:4px;">Note:</div>
-                  <div style="color:#fff;font-size:11px;word-break:break-word;">${checkpoint.reason[0]}</div>
+                  <div style="color:#fff;font-size:11px;word-break:break-word;white-space:pre-wrap;">${checkpoint.reason[0].replace(/</g, '&lt;').replace(/>/g, '&gt;')}</div>
                 </div>
               `
             }
