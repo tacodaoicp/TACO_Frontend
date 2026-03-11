@@ -79,6 +79,7 @@ export interface LeaderboardEntry {
   'lastActivity' : bigint,
   'rank' : bigint,
   'distributionsCount' : bigint,
+  'totalRewardsEarned' : bigint,
   'neuronId' : Uint8Array | number[],
 }
 export type LeaderboardPriceType = { 'ICP' : null } |

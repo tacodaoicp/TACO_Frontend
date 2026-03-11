@@ -70,6 +70,7 @@
                 <th class="text-end">Return</th>
                 <th class="text-center d-none d-md-table-cell">Distributions</th>
                 <th class="text-center">Followers</th>
+                <th class="text-center d-none d-md-table-cell">Rewards</th>
                 <th class="text-center" style="width: 100px;">Action</th>
               </tr>
             </thead>
@@ -134,6 +135,11 @@
                     <span v-else class="lb-muted">0/20</span>
                   </td>
 
+                  <!-- Total Rewards Earned -->
+                  <td class="text-center d-none d-md-table-cell">
+                    <span class="lb-muted">{{ formatRewards(entry.totalRewardsEarned) }}</span>
+                  </td>
+
                   <!-- Follow Action -->
                   <td class="text-center" @click.stop>
                     <template v-if="userLoggedIn && !isCurrentUser(entry.principal)">
@@ -174,7 +180,7 @@
 
                 <!-- Expanded Chart Row -->
                 <tr v-if="isExpanded(entry.principal)" class="expanded-content-row">
-                  <td colspan="6" class="p-0">
+                  <td colspan="7" class="p-0">
                     <div class="expanded-chart-container">
                       <PerformanceChart
                         :principal="entry.principal.toString()"
@@ -317,6 +323,14 @@ export default {
       return `${sign}${pct.toFixed(1)}%`
     }
 
+    // Format rewards from e8s bigint to human-readable TACO amount
+    const formatRewards = (rawE8s) => {
+      if (rawE8s === null || rawE8s === undefined) return '0.00'
+      const val = Number(rawE8s) / 1e8
+      if (val >= 1000) return (val / 1000).toFixed(2) + 'K'
+      return val.toFixed(2)
+    }
+
     // Get CSS class based on performance
     const getPerformanceClass = (score) => {
       if (score === null || score === undefined) return 'text-muted'
@@ -381,6 +395,7 @@ export default {
       canFollow,
       formatPrincipal,
       formatPerformance,
+      formatRewards,
       getPerformanceClass,
       getRankBadgeClass,
       formatTimestamp,

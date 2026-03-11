@@ -92,6 +92,7 @@ export const idlFactory = ({ IDL }) => {
     'lastActivity' : IDL.Int,
     'rank' : IDL.Nat,
     'distributionsCount' : IDL.Nat,
+    'totalRewardsEarned' : IDL.Nat,
     'neuronId' : IDL.Vec(IDL.Nat8),
   });
   const Account = IDL.Record({

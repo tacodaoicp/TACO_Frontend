@@ -453,6 +453,7 @@ type LeaderboardEntry =
    performanceScore: float64;
    "principal": principal;
    rank: nat;
+   totalRewardsEarned: nat;
  };
 type GraphCheckpointData = 
  record {
