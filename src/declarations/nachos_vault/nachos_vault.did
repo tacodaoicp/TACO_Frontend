@@ -1,0 +1,736 @@
+type VaultTransferTask = 
+ record {
+   actualAmountSent: opt nat;
+   amount: nat;
+   blockIndex: opt nat64;
+   caller: principal;
+   createdAt: int;
+   fromSubaccount: nat8;
+   id: nat;
+   operationId: nat;
+   operationType: TransferOperationType;
+   recipient: TransferRecipient;
+   retryCount: nat;
+   status: TransferStatus;
+   tokenPrincipal: principal;
+   updatedAt: int;
+ };
+type TransferStatus = 
+ variant {
+   Confirmed: nat64;
+   Failed: text;
+   Pending;
+   Sent;
+ };
+type TransferRecipient = 
+ variant {
+   accountId: record {
+                owner: principal;
+                subaccount: opt blob;
+              };
+   "principal": principal;
+ };
+type TransferOperationType = 
+ variant {
+   BurnPayout;
+   CancelReturn;
+   ExcessReturn;
+   MintReturn;
+   Recovery;
+ };
+type TokenTransferResult = 
+ record {
+   amount: nat;
+   token: principal;
+   txId: opt nat;
+ };
+type TokenDeposit = 
+ record {
+   amount: nat;
+   priceUsed: nat;
+   token: principal;
+   valueICP: nat;
+ };
+type Result_5 = 
+ variant {
+   err: NachosError;
+   ok: record {refundTaskId: nat;};
+ };
+type Result_4 = 
+ variant {
+   err: NachosError;
+   ok:
+    record {
+      allocation:
+       record {
+         afterDepositBasisPoints: nat;
+         currentBasisPoints: nat;
+         maxAcceptableAmount: nat;
+         targetBasisPoints: nat;
+         wouldExceed: bool;
+       };
+      depositValueICP: nat;
+      excessAmount: nat;
+      excessValueICP: nat;
+      feeEstimate: nat;
+      nachosEstimate: nat;
+      navUsed: nat;
+      tokenPriceICP: nat;
+      usedAmount: nat;
+      usedValueICP: nat;
+    };
+ };
+type Result_3 = 
+ variant {
+   err: NachosError;
+   ok: MintResult;
+ };
+type Result_2 = 
+ variant {
+   err: NachosError;
+   ok: BurnResult;
+ };
+type Result_1 = 
+ variant {
+   err: text;
+   ok: nat;
+ };
+type Result = 
+ variant {
+   err: text;
+   ok: text;
+ };
+type NavSnapshotReason = 
+ variant {
+   Burn;
+   Manual;
+   Mint;
+   Scheduled;
+ };
+type NavSnapshot = 
+ record {
+   nachosSupply: nat;
+   navPerTokenE8s: nat;
+   portfolioValueICP: nat;
+   reason: NavSnapshotReason;
+   timestamp: int;
+ };
+type NachosVaultDAO = 
+ service {
+   addAcceptedMintToken: (token: principal) -> (Result);
+   addFeeExemptPrincipal: ("principal": principal, reason: text) -> (Result);
+   addRateLimitExemptPrincipal: ("principal": principal, reason: text) ->
+    (Result);
+   cancelDeposit: (tokenPrincipal: principal, blockNumber: nat) -> (Result_5);
+   claimCancellationFees: (recipient: principal, tokenPrincipal: principal,
+    amount: nat) -> (Result);
+   claimMintFees: (recipient: principal, amount: nat) -> (Result);
+   emergencyPause: () -> (Result);
+   emergencyUnpause: () -> (Result);
+   estimateBurnTokens: (estNachosAmount: nat) ->
+    (record {
+       feeEstimate: nat;
+       nachosAmount: nat;
+       navUsed: nat;
+       netValueICP: nat;
+       portfolioValueICP: nat;
+       redemptionValueICP: nat;
+       tokens:
+        vec
+         record {
+           amount: nat;
+           decimals: nat;
+           isDust: bool;
+           priceICP: nat;
+           symbol: text;
+           token: principal;
+           tokenFee: nat;
+           valueICP: nat;
+         };
+     }) query;
+   estimateMintICP: (icpAmount: nat) ->
+    (record {
+       feeEstimate: nat;
+       nachosEstimate: nat;
+       navUsed: nat;
+     }) query;
+   estimateMintWithToken: (tokenPrincipal: principal, tokenAmount: nat) ->
+    (Result_4) query;
+   estimateRedeem: (nachosAmount: nat) ->
+    (record {
+       feeEstimate: nat;
+       netValueICP: nat;
+       redemptionValueICP: nat;
+     }) query;
+   genesisMint: (blockNumber: nat) -> (Result_3);
+   getAcceptedMintTokens: () ->
+    (vec record {
+           principal;
+           AcceptedTokenConfig;
+         }) query;
+   getActiveDepositsCount: () -> (nat) query;
+   getBurnHistory: (limit: nat, offset: nat) -> (vec BurnRecord) query;
+   getClaimableCancellationFees: () ->
+    (vec
+      record {
+        accumulated: nat;
+        claimable: nat;
+        claimed: nat;
+        token: principal;
+      }) query;
+   getClaimableMintFees: () ->
+    (record {
+       accumulated: nat;
+       claimable: nat;
+       claimed: nat;
+     }) query;
+   getConfig: () ->
+    (record {
+       burnFeeBasisPoints: nat;
+       cancellationFeeMultiplier: nat;
+       maxBurnAmountNachos: nat;
+       maxBurnNachosPerUser4Hours: nat;
+       maxBurnOpsPerUser4Hours: nat;
+       maxMintAmountICP: nat;
+       maxMintICPPerUser4Hours: nat;
+       maxMintICPWorthPer4Hours: nat;
+       maxMintOpsPerUser4Hours: nat;
+       maxNachosBurnPer4Hours: nat;
+       maxSlippageBasisPoints: nat;
+       minBurnValueICP: nat;
+       minMintValueICP: nat;
+       mintFeeBasisPoints: nat;
+       navDropThresholdPercent: float64;
+       portfolioShareMaxDeviationBP: nat;
+     }) query;
+   getDeposit: (tokenPrincipal: principal, blockNumber: nat) ->
+    (opt ActiveDeposit) query;
+   getFeeExemptPrincipals: () ->
+    (vec record {
+           principal;
+           FeeExemptConfig;
+         }) query;
+   getFeeHistory: (limit: nat) -> (vec FeeRecord) query;
+   getGlobalRateLimitStatus: () ->
+    (record {
+       totalBurnAmountIn4h: nat;
+       totalMintValueIn4h: nat;
+     }) query;
+   getLogs: (count: nat) -> (vec LogEntry) query;
+   getMintHistory: (limit: nat, offset: nat) -> (vec MintRecord) query;
+   getNAV: () -> (opt CachedNAV) query;
+   getNAVHistory: (limit: nat) -> (vec NavSnapshot) query;
+   getNAVHistoryAdaptive: () ->
+    (vec
+      record {
+        navPerTokenE8s: nat;
+        reason: NavSnapshotReason;
+        timestamp: int;
+      }) query;
+   getPortfolioBreakdown: () ->
+    (vec
+      record {
+        balance: nat;
+        basisPoints: nat;
+        priceICP: nat;
+        symbol: text;
+        token: principal;
+        valueICP: nat;
+      }) query;
+   getRateLimitExemptPrincipals: () ->
+    (vec record {
+           principal;
+           FeeExemptConfig;
+         }) query;
+   getRequiredPortfolioShares: (totalValueICP: nat) ->
+    (record {
+       feeEstimate: nat;
+       nachosEstimate: nat;
+       navUsed: nat;
+       portfolioValueICP: nat;
+       tokens:
+        vec
+         record {
+           basisPoints: nat;
+           decimals: nat;
+           priceICP: nat;
+           requiredAmount: nat;
+           symbol: text;
+           token: principal;
+           tokenFee: nat;
+           valueICP: nat;
+         };
+     }) query;
+   getSystemStatus: () ->
+    (record {
+       activeDepositCount: nat;
+       burningEnabled: bool;
+       cachedNAV: opt CachedNAV;
+       circuitBreakerActive: bool;
+       genesisComplete: bool;
+       hasPausedTokens: bool;
+       mintingEnabled: bool;
+       nachosLedger: opt principal;
+       pausedTokens: vec record {
+                           symbol: text;
+                           token: principal;
+                         };
+       pendingTransferCount: nat;
+       systemPaused: bool;
+       totalBurns: nat;
+       totalMints: nat;
+     }) query;
+   getTransferQueueStatus: () ->
+    (record {
+       completed: nat;
+       exhausted: nat;
+       pending: nat;
+       tasks: vec VaultTransferTask;
+     }) query;
+   getUserActivity: (user: principal, mintLimit: nat, mintOffset: nat,
+    burnLimit: nat, burnOffset: nat) ->
+    (record {
+       activeDeposits: vec ActiveDeposit;
+       burns: vec BurnRecord;
+       mints: vec MintRecord;
+       rateLimits:
+        record {
+          burnOpsIn4h: nat;
+          burnValueIn4h: nat;
+          maxBurnNachosPerUser4Hours: nat;
+          maxBurnOps: nat;
+          maxMintICPPerUser4Hours: nat;
+          maxMintOps: nat;
+          mintOpsIn4h: nat;
+          mintValueIn4h: nat;
+        };
+       recentTransactions:
+        vec
+         record {
+           feeICP: nat;
+           id: nat;
+           mintMode: opt MintMode;
+           nachosAmount: nat;
+           timestamp: int;
+           txType: variant {
+                     Burn;
+                     Mint;
+                   };
+           valueICP: nat;
+         };
+       totalBurns: nat;
+       totalMints: nat;
+       transfers:
+        vec
+         record {
+           amount: nat;
+           blockIndex: opt nat64;
+           createdAt: int;
+           id: nat;
+           operationId: nat;
+           operationType: TransferOperationType;
+           status: TransferStatus;
+           tokenPrincipal: principal;
+           updatedAt: int;
+         };
+       userTotalBurnVolumeICP: nat;
+       userTotalFeesICP: nat;
+       userTotalMintVolumeICP: nat;
+     }) query;
+   getUserBurnHistory: (user: principal) -> (vec BurnRecord) query;
+   getUserDeposits: (user: principal) -> (vec ActiveDeposit) query;
+   getUserMintHistory: (user: principal) -> (vec MintRecord) query;
+   getUserRateLimitStatus: (user: principal) ->
+    (record {
+       burnOpsIn4h: nat;
+       burnValueIn4h: nat;
+       mintOpsIn4h: nat;
+       mintValueIn4h: nat;
+     }) query;
+   getUserTransferTasks: (user: principal) ->
+    (vec
+      record {
+        amount: nat;
+        blockIndex: opt nat64;
+        createdAt: int;
+        id: nat;
+        operationId: nat;
+        operationType: TransferOperationType;
+        status: TransferStatus;
+        tokenPrincipal: principal;
+        updatedAt: int;
+      }) query;
+   getVaultAnalytics: () ->
+    (record {
+       burnFeesICP: nat;
+       currentNAV: opt CachedNAV;
+       feeCount: nat;
+       globalBurnIn4h: nat;
+       globalMintIn4h: nat;
+       initialNAVPerToken: nat;
+       maxBurnPer4h: nat;
+       maxMintPer4h: nat;
+       mintFeesICP: nat;
+       mintsByMode: record {
+                      icp: nat;
+                      portfolioShare: nat;
+                      singleToken: nat;
+                    };
+       nachosSupply: nat;
+       navChangePercent: opt float64;
+       portfolioValueICP: nat;
+       totalBurnCount: nat;
+       totalBurnVolumeICP: nat;
+       totalBurnVolumeNACHOS: nat;
+       totalFeesCollectedICP: nat;
+       totalMintCount: nat;
+       totalMintVolumeICP: nat;
+     }) query;
+   getVaultDashboard: (icpMintEstimateAmount: opt nat, burnEstimateAmount:
+    opt nat) ->
+    (record {
+       acceptedTokens: vec record {
+                             principal;
+                             AcceptedTokenConfig;
+                           };
+       burnEstimate:
+        opt
+         record {
+           feeEstimate: nat;
+           netValueICP: nat;
+           redemptionValueICP: nat;
+         };
+       burnFeeBasisPoints: nat;
+       burnFeesICP: nat;
+       burningEnabled: bool;
+       circuitBreakerActive: bool;
+       dataSource: text;
+       dataTimestamp: int;
+       feeCount: nat;
+       genesisComplete: bool;
+       globalBurnIn4h: nat;
+       globalMintIn4h: nat;
+       hasPausedTokens: bool;
+       maxBurnPer4h: nat;
+       maxMintPer4h: nat;
+       minBurnValueICP: nat;
+       minMintValueICP: nat;
+       mintEstimate:
+        opt record {
+              feeEstimate: nat;
+              nachosEstimate: nat;
+              navUsed: nat;
+            };
+       mintFeeBasisPoints: nat;
+       mintFeesICP: nat;
+       mintingEnabled: bool;
+       mintsByMode: record {
+                      icp: nat;
+                      portfolioShare: nat;
+                      singleToken: nat;
+                    };
+       nachosSupply: nat;
+       nav: opt CachedNAV;
+       navChangePercent: opt float64;
+       pausedTokens: vec record {
+                           symbol: text;
+                           token: principal;
+                         };
+       portfolio:
+        vec
+         record {
+           balance: nat;
+           currentBasisPoints: nat;
+           decimals: nat;
+           priceICP: nat;
+           priceUSD: float64;
+           symbol: text;
+           targetBasisPoints: nat;
+           token: principal;
+           valueICP: nat;
+         };
+       portfolioValueICP: nat;
+       systemPaused: bool;
+       totalBurnCount: nat;
+       totalBurnVolumeICP: nat;
+       totalBurnVolumeNACHOS: nat;
+       totalFeesCollectedICP: nat;
+       totalMintCount: nat;
+       totalMintVolumeICP: nat;
+     }) composite_query;
+   get_canister_cycles: () -> (nat) query;
+   mintNachos: (blockNumber: nat, minimumNachosReceive: nat) -> (Result_3);
+   mintNachosWithPortfolioShare: (depositInfos:
+    vec record {
+          blockNumber: nat;
+          token: principal;
+        }, minimumNachosReceive: nat) -> (Result_3);
+   mintNachosWithToken: (tokenPrincipal: principal, blockNumber: nat,
+    minimumNachosReceive: nat) -> (Result_3);
+   pauseBurning: () -> (Result);
+   pauseMinting: () -> (Result);
+   recoverWronglySentTokens: (tokenPrincipal: principal, blockNumber: 
+    nat, senderPrincipal: principal) -> (Result);
+   redeemNachos: (nachosBlockNumber: nat, minimumValues:
+    opt vec record {
+              minAmount: nat;
+              token: principal;
+            }) -> (Result_2);
+   refreshICPSwapPools: () -> (Result);
+   removeAcceptedMintToken: (token: principal) -> (Result);
+   removeFeeExemptPrincipal: ("principal": principal) -> (Result);
+   removeRateLimitExemptPrincipal: ("principal": principal) -> (Result);
+   resetCircuitBreaker: () -> (Result);
+   retryFailedTransfers: () -> (Result_1);
+   setAcceptedMintTokenEnabled: (token: principal, enabled: bool) -> (Result);
+   setNachosLedgerPrincipal: (ledgerPrincipal: principal) -> (Result);
+   testRefreshPrices: () -> (Result);
+   unpauseBurning: () -> (Result);
+   unpauseMinting: () -> (Result);
+   updateCancellationFeeMultiplier: (multiplier: nat) -> (Result);
+   updateFees: (mintBP: nat, burnBP: nat) -> (Result);
+   updateNachosConfig: (config: NachosUpdateConfig) -> (Result);
+ };
+type NachosUpdateConfig = 
+ record {
+   MAX_PRICE_STALENESS_NS: opt int;
+   PRICE_HISTORY_WINDOW: opt int;
+   burnFeeBasisPoints: opt nat;
+   burningEnabled: opt bool;
+   cancellationFeeMultiplier: opt nat;
+   maxBurnAmountNachos: opt nat;
+   maxBurnNachosPerUser4Hours: opt nat;
+   maxBurnOpsPerUser4Hours: opt nat;
+   maxMintAmountICP: opt nat;
+   maxMintICPPerUser4Hours: opt nat;
+   maxMintICPWorthPer4Hours: opt nat;
+   maxMintOpsPerUser4Hours: opt nat;
+   maxNachosBurnPer4Hours: opt nat;
+   maxSlippageBasisPoints: opt nat;
+   minBurnValueICP: opt nat;
+   minMintValueICP: opt nat;
+   mintFeeBasisPoints: opt nat;
+   mintingEnabled: opt bool;
+   navDropThresholdPercent: opt float64;
+   navDropTimeWindowNS: opt nat;
+   portfolioShareMaxDeviationBP: opt nat;
+ };
+type NachosError = 
+ variant {
+   AboveMaximumValue: record {
+                        max: nat;
+                        requested: nat;
+                      };
+   AllocationExceeded;
+   BelowMinimumValue;
+   BlockAlreadyProcessed;
+   BlockVerificationFailed: text;
+   BurnLimitExceeded:
+    record {
+      maxPer4Hours: nat;
+      recentBurns: nat;
+      requested: nat;
+    };
+   BurningDisabled;
+   CircuitBreakerActive;
+   DepositAlreadyCancelled;
+   DepositAlreadyConsumed;
+   DepositExpired;
+   DepositNotFound;
+   GenesisAlreadyDone;
+   GenesisNotComplete;
+   InsufficientBalance;
+   InsufficientLiquidity:
+    record {
+      available: nat;
+      requested: nat;
+      token: principal;
+    };
+   InvalidAllocation;
+   InvalidPrice;
+   MintLimitExceeded:
+    record {
+      maxPer4Hours: nat;
+      recentMints: nat;
+      requested: nat;
+    };
+   MintingDisabled;
+   NotAuthorized;
+   NotDepositor;
+   OperationInProgress;
+   PortfolioShareMismatch:
+    record {
+      expected: vec record {
+                      basisPoints: nat;
+                      token: principal;
+                    };
+      received: vec record {
+                      basisPoints: nat;
+                      token: principal;
+                    };
+    };
+   PortfolioTokenPaused:
+    record {pausedTokens: vec record {
+                                symbol: text;
+                                token: principal;
+                              };};
+   PriceStale;
+   RateLimitExceeded;
+   RollbackFailed: text;
+   SlippageExceeded;
+   SystemPaused;
+   TokenNotAccepted;
+   TokenNotActive;
+   TokenPaused;
+   TransferError: text;
+   UnexpectedError: text;
+   UserBurnLimitExceeded:
+    record {
+      maxPer4Hours: nat;
+      recentBurns: nat;
+      requested: nat;
+    };
+   UserMintLimitExceeded:
+    record {
+      maxPer4Hours: nat;
+      recentMints: nat;
+      requested: nat;
+    };
+ };
+type MintResult = 
+ record {
+   deposits: vec TokenDeposit;
+   excessReturned: vec TokenDeposit;
+   feeValueICP: nat;
+   mintId: nat;
+   mintMode: MintMode;
+   nachosLedgerTxId: opt nat;
+   nachosReceived: nat;
+   navUsed: nat;
+   netValueICP: nat;
+   success: bool;
+   totalDepositValueICP: nat;
+ };
+type MintRecord = 
+ record {
+   caller: principal;
+   deposits: vec TokenDeposit;
+   excessReturned: vec TokenDeposit;
+   feeValueICP: nat;
+   id: nat;
+   mintMode: MintMode;
+   nachosLedgerTxId: opt nat;
+   nachosReceived: nat;
+   navUsed: nat;
+   netValueICP: nat;
+   timestamp: int;
+   totalDepositValueICP: nat;
+ };
+type MintMode = 
+ variant {
+   ICP;
+   PortfolioShare;
+   SingleToken;
+ };
+type LogLevel = 
+ variant {
+   ERROR;
+   INFO;
+   WARN;
+ };
+type LogEntry = 
+ record {
+   component: text;
+   context: text;
+   level: LogLevel;
+   message: text;
+   timestamp: int;
+ };
+type FeeRecord = 
+ record {
+   feeAmountICP: nat;
+   feeType: variant {
+              Burn;
+              Mint;
+            };
+   operationId: nat;
+   timestamp: int;
+   userPrincipal: principal;
+ };
+type FeeExemptConfig = 
+ record {
+   addedAt: int;
+   addedBy: principal;
+   enabled: bool;
+   reason: text;
+ };
+type FailedTokenTransfer = 
+ record {
+   error: text;
+   requestedAmount: nat;
+   token: principal;
+ };
+type DepositStatus = 
+ variant {
+   Cancelled;
+   Consumed;
+   Expired;
+   Processing;
+   Verified;
+ };
+type CachedNAV = 
+ record {
+   nachosSupply: nat;
+   navPerTokenE8s: nat;
+   portfolioValueICP: nat;
+   timestamp: int;
+ };
+type BurnResult = 
+ record {
+   burnId: nat;
+   failedTokens: vec FailedTokenTransfer;
+   feeValueICP: nat;
+   nachosBurned: nat;
+   nachosLedgerTxId: opt nat;
+   navUsed: nat;
+   netValueICP: nat;
+   partialFailure: bool;
+   redemptionValueICP: nat;
+   skippedDustTokens: vec principal;
+   success: bool;
+   tokensReceived: vec TokenTransferResult;
+ };
+type BurnRecord = 
+ record {
+   caller: principal;
+   feeValueICP: nat;
+   id: nat;
+   nachosBurned: nat;
+   nachosLedgerTxId: opt nat;
+   navUsed: nat;
+   netValueICP: nat;
+   partialFailure: bool;
+   redemptionValueICP: nat;
+   skippedDustTokens: vec principal;
+   timestamp: int;
+   tokensReceived: vec TokenTransferResult;
+ };
+type ActiveDeposit = 
+ record {
+   amount: nat;
+   blockKey: text;
+   blockNumber: nat;
+   caller: principal;
+   cancellationTxId: opt nat64;
+   mintBurnId: opt nat;
+   status: DepositStatus;
+   timestamp: int;
+   tokenPrincipal: principal;
+ };
+type AcceptedTokenConfig = 
+ record {
+   addedAt: int;
+   addedBy: principal;
+   enabled: bool;
+ };
+service : () -> NachosVaultDAO

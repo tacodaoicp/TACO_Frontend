@@ -412,6 +412,7 @@ import ManagePermissionsDialog from '../components/wallet/ManagePermissionsDialo
 import TransferNeuronDialog from '../components/wallet/TransferNeuronDialog.vue'
 import { tokenImages } from '../components/data/TokenData'
 import DfinityLogo from '../assets/images/dfinityLogo.vue'
+import { getEffectiveNetwork } from '../config/network-config'
 
 ////////////////
 // interfaces //
@@ -503,6 +504,21 @@ const coreTokens = computed<WalletToken[]>(() => {
     priceUSD: tacoStore.tacoPriceUsd || 0,
     isRegistered: false
   })
+
+  // NACHOS token — staging only
+  if (getEffectiveNetwork() !== 'ic') {
+    const nachosPrincipal = 'pabnq-2qaaa-aaaam-qhryq-cai'
+    tokens.push({
+      principal: nachosPrincipal,
+      name: 'NACHOS',
+      symbol: 'NACHOS',
+      logo: tokenImages['Default'],
+      balance: allTokenBalances.value.get(nachosPrincipal) || 0n,
+      decimals: 8,
+      fee: 10000n,
+      isRegistered: false
+    })
+  }
 
   // return tokens array
   return tokens

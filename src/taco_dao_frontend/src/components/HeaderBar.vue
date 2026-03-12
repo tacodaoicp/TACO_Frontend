@@ -98,6 +98,12 @@
 
         </router-link>
 
+        <!-- vault - router link (staging only) -->
+        <router-link v-if="isNonProduction" to="/vault" class="header-bar__rl header-bar__rl--with-badge">
+          <span class="header-bar__rl-span">Vault</span>
+          <span class="header-bar__rl-beta">STAGING</span>
+        </router-link>
+
         <!-- wizard - router link -->
         <a v-if="localNeuronsCount < 1" href="#" @click="toggleTacoWizard()" class="header-bar__rl">
           
@@ -305,6 +311,11 @@
           <!-- item text -->
           <span>Wallet</span>
 
+        </router-link>
+
+        <!-- vault - router link (staging only) -->
+        <router-link v-if="isNonProduction" @click="togglePagesMenu()" to="/vault" class="list-group-item">
+          <span>Vault <span class="header-bar__rl-beta">STAGING</span></span>
         </router-link>
 
       </div>
@@ -716,6 +727,7 @@
   import DarkModeToggle from "./theme/DarkModeToggle.vue"
   import { Tooltip } from 'bootstrap'
   // import EnvironmentIndicator from './misc/EnvironmentIndicator.vue'
+  import { getEffectiveNetwork } from '../config/network-config'
   import WizardModal from "../views/WizardView.vue"
 
   ////////////
@@ -750,6 +762,9 @@
 
   // neurons count
   const localNeuronsCount = ref(0)
+
+  // staging-only features
+  const isNonProduction = ref(getEffectiveNetwork() !== 'ic')
 
   ///////////////////
   // Local Methods //

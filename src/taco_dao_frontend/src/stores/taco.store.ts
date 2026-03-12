@@ -2987,7 +2987,7 @@ export const useTacoStore = defineStore('taco', () => {
             case "ic":
                 return process.env.CANISTER_ID_NACHOS_IC || 'rctxc-zqaaa-aaaan-qz6na-cai';
             case "staging":
-                return  process.env.CANISTER_ID_NACHOS_STAGING || 'rctxc-zqaaa-aaaan-qz6na-caitptia-syaaa-aaaai-atieq-cai';
+                return  process.env.CANISTER_ID_NACHOS_STAGING || 'p4nog-baaaa-aaaad-qkwpa-cai';
         }
         return 'rctxc-zqaaa-aaaan-qz6na-cai'; // local canisterId
     }
