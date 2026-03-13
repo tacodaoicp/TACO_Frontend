@@ -52,6 +52,49 @@ export interface CachedNAV {
   'timestamp' : bigint,
   'portfolioValueICP' : bigint,
 }
+export type CircuitBreakerAction = { 'RejectOperation' : null } |
+  { 'PauseBoth' : null } |
+  { 'PauseBurn' : null } |
+  { 'PauseMint' : null };
+export interface CircuitBreakerAlert {
+  'id' : bigint,
+  'token' : [] | [Principal],
+  'conditionId' : bigint,
+  'conditionType' : CircuitBreakerConditionType,
+  'tokenSymbol' : string,
+  'timestamp' : bigint,
+  'details' : string,
+  'actionTaken' : CircuitBreakerAction,
+}
+export interface CircuitBreakerCondition {
+  'id' : bigint,
+  'direction' : { 'Up' : null } |
+    { 'Both' : null } |
+    { 'Down' : null },
+  'action' : CircuitBreakerAction,
+  'timeWindowNS' : bigint,
+  'createdAt' : bigint,
+  'createdBy' : Principal,
+  'conditionType' : CircuitBreakerConditionType,
+  'enabled' : boolean,
+  'thresholdPercent' : number,
+  'applicableTokens' : Array<Principal>,
+}
+export interface CircuitBreakerConditionInput {
+  'direction' : { 'Up' : null } |
+    { 'Both' : null } |
+    { 'Down' : null },
+  'action' : CircuitBreakerAction,
+  'timeWindowNS' : bigint,
+  'conditionType' : CircuitBreakerConditionType,
+  'enabled' : boolean,
+  'thresholdPercent' : number,
+  'applicableTokens' : Array<Principal>,
+}
+export type CircuitBreakerConditionType = { 'DecimalChange' : null } |
+  { 'BalanceChange' : null } |
+  { 'NavDrop' : null } |
+  { 'PriceChange' : null };
 export type DepositStatus = { 'Consumed' : null } |
   { 'Cancelled' : null } |
   { 'Processing' : null } |
@@ -217,6 +260,10 @@ export interface NachosUpdateConfig {
 }
 export interface NachosVaultDAO {
   'addAcceptedMintToken' : ActorMethod<[Principal], Result>,
+  'addCircuitBreakerCondition' : ActorMethod<
+    [CircuitBreakerConditionInput],
+    Result_1
+  >,
   'addFeeExemptPrincipal' : ActorMethod<[Principal, string], Result>,
   'addRateLimitExemptPrincipal' : ActorMethod<[Principal, string], Result>,
   'cancelDeposit' : ActorMethod<[Principal, bigint], Result_5>,
@@ -224,6 +271,7 @@ export interface NachosVaultDAO {
   'claimMintFees' : ActorMethod<[Principal, bigint], Result>,
   'emergencyPause' : ActorMethod<[], Result>,
   'emergencyUnpause' : ActorMethod<[], Result>,
+  'enableCircuitBreakerCondition' : ActorMethod<[bigint, boolean], Result>,
   'estimateBurnTokens' : ActorMethod<
     [bigint],
     {
@@ -266,7 +314,112 @@ export interface NachosVaultDAO {
     Array<[Principal, AcceptedTokenConfig]>
   >,
   'getActiveDepositsCount' : ActorMethod<[], bigint>,
+  'getAdminDashboard' : ActorMethod<
+    [],
+    {
+      'nav' : [] | [CachedNAV],
+      'totalBurnVolumeICP' : bigint,
+      'portfolio' : Array<
+        {
+          'decimals' : bigint,
+          'token' : Principal,
+          'balance' : bigint,
+          'currentBasisPoints' : bigint,
+          'priceICP' : bigint,
+          'priceUSD' : number,
+          'valueICP' : bigint,
+          'symbol' : string,
+          'targetBasisPoints' : bigint,
+        }
+      >,
+      'totalBurnCount' : bigint,
+      'dataSource' : string,
+      'activeDepositCount' : bigint,
+      'mintPausedByCircuitBreaker' : boolean,
+      'minBurnValueICP' : bigint,
+      'circuitBreakerConditions' : Array<CircuitBreakerCondition>,
+      'totalMintCount' : bigint,
+      'hasPausedTokens' : boolean,
+      'mintsByMode' : {
+        'icp' : bigint,
+        'portfolioShare' : bigint,
+        'singleToken' : bigint,
+      },
+      'acceptedTokens' : Array<[Principal, AcceptedTokenConfig]>,
+      'globalBurnIn4h' : bigint,
+      'maxBurnPer4h' : bigint,
+      'circuitBreakerActive' : boolean,
+      'totalMintVolumeICP' : bigint,
+      'nachosLedger' : [] | [Principal],
+      'totalFeesCollectedICP' : bigint,
+      'maxMintPer4h' : bigint,
+      'feeCount' : bigint,
+      'burnFeeBasisPoints' : bigint,
+      'nachosSupply' : bigint,
+      'claimableMintFees' : {
+        'claimed' : bigint,
+        'claimable' : bigint,
+        'accumulated' : bigint,
+      },
+      'mintFeeBasisPoints' : bigint,
+      'claimableCancellationFees' : Array<
+        {
+          'token' : Principal,
+          'claimed' : bigint,
+          'claimable' : bigint,
+          'accumulated' : bigint,
+        }
+      >,
+      'mintFeesICP' : bigint,
+      'genesisComplete' : boolean,
+      'totalBurnVolumeNACHOS' : bigint,
+      'recentAlerts' : Array<CircuitBreakerAlert>,
+      'canisterCycles' : bigint,
+      'globalMintIn4h' : bigint,
+      'fullConfig' : {
+        'maxMintICPWorthPer4Hours' : bigint,
+        'portfolioShareMaxDeviationBP' : bigint,
+        'maxBurnNachosPerUser4Hours' : bigint,
+        'cancellationFeeMultiplier' : bigint,
+        'maxSlippageBasisPoints' : bigint,
+        'maxMintOpsPerUser4Hours' : bigint,
+        'maxMintAmountICP' : bigint,
+        'maxBurnOpsPerUser4Hours' : bigint,
+        'navDropThresholdPercent' : number,
+        'maxNachosBurnPer4Hours' : bigint,
+        'maxBurnAmountNachos' : bigint,
+        'maxMintICPPerUser4Hours' : bigint,
+      },
+      'dataTimestamp' : bigint,
+      'burnPausedByCircuitBreaker' : boolean,
+      'feeExemptPrincipals' : Array<[Principal, FeeExemptConfig]>,
+      'transferQueue' : {
+        'tasks' : Array<VaultTransferTask>,
+        'pending' : bigint,
+        'completed' : bigint,
+        'exhausted' : bigint,
+      },
+      'pausedTokens' : Array<{ 'token' : Principal, 'symbol' : string }>,
+      'systemPaused' : boolean,
+      'burningEnabled' : boolean,
+      'minMintValueICP' : bigint,
+      'navChangePercent' : [] | [number],
+      'pendingTransferCount' : bigint,
+      'burnFeesICP' : bigint,
+      'mintingEnabled' : boolean,
+      'rateLimitExemptPrincipals' : Array<[Principal, FeeExemptConfig]>,
+      'portfolioValueICP' : bigint,
+    }
+  >,
   'getBurnHistory' : ActorMethod<[bigint, bigint], Array<BurnRecord>>,
+  'getCircuitBreakerAlerts' : ActorMethod<
+    [bigint, bigint],
+    Array<CircuitBreakerAlert>
+  >,
+  'getCircuitBreakerConditions' : ActorMethod<
+    [],
+    Array<CircuitBreakerCondition>
+  >,
   'getClaimableCancellationFees' : ActorMethod<
     [],
     Array<
@@ -370,11 +523,13 @@ export interface NachosVaultDAO {
     {
       'totalMints' : bigint,
       'activeDepositCount' : bigint,
+      'mintPausedByCircuitBreaker' : boolean,
       'hasPausedTokens' : boolean,
       'cachedNAV' : [] | [CachedNAV],
       'circuitBreakerActive' : boolean,
       'nachosLedger' : [] | [Principal],
       'genesisComplete' : boolean,
+      'burnPausedByCircuitBreaker' : boolean,
       'totalBurns' : bigint,
       'pausedTokens' : Array<{ 'token' : Principal, 'symbol' : string }>,
       'systemPaused' : boolean,
@@ -516,6 +671,7 @@ export interface NachosVaultDAO {
       >,
       'totalBurnCount' : bigint,
       'dataSource' : string,
+      'mintPausedByCircuitBreaker' : boolean,
       'minBurnValueICP' : bigint,
       'totalMintCount' : bigint,
       'hasPausedTokens' : boolean,
@@ -554,6 +710,7 @@ export interface NachosVaultDAO {
       'totalBurnVolumeNACHOS' : bigint,
       'globalMintIn4h' : bigint,
       'dataTimestamp' : bigint,
+      'burnPausedByCircuitBreaker' : boolean,
       'pausedTokens' : Array<{ 'token' : Principal, 'symbol' : string }>,
       'systemPaused' : boolean,
       'burningEnabled' : boolean,
@@ -583,6 +740,7 @@ export interface NachosVaultDAO {
   >,
   'refreshICPSwapPools' : ActorMethod<[], Result>,
   'removeAcceptedMintToken' : ActorMethod<[Principal], Result>,
+  'removeCircuitBreakerCondition' : ActorMethod<[bigint], Result>,
   'removeFeeExemptPrincipal' : ActorMethod<[Principal], Result>,
   'removeRateLimitExemptPrincipal' : ActorMethod<[Principal], Result>,
   'resetCircuitBreaker' : ActorMethod<[], Result>,
@@ -593,6 +751,17 @@ export interface NachosVaultDAO {
   'unpauseBurning' : ActorMethod<[], Result>,
   'unpauseMinting' : ActorMethod<[], Result>,
   'updateCancellationFeeMultiplier' : ActorMethod<[bigint], Result>,
+  'updateCircuitBreakerCondition' : ActorMethod<
+    [
+      bigint,
+      [] | [number],
+      [] | [bigint],
+      [] | [{ 'Up' : null } | { 'Both' : null } | { 'Down' : null }],
+      [] | [CircuitBreakerAction],
+      [] | [Array<Principal>],
+    ],
+    Result
+  >,
   'updateFees' : ActorMethod<[bigint, bigint], Result>,
   'updateNachosConfig' : ActorMethod<[NachosUpdateConfig], Result>,
 }
@@ -653,6 +822,7 @@ export type TransferOperationType = { 'MintReturn' : null } |
   { 'ExcessReturn' : null } |
   { 'BurnPayout' : null } |
   { 'Recovery' : null } |
+  { 'ForwardToPortfolio' : null } |
   { 'CancelReturn' : null };
 export type TransferRecipient = { 'principal' : Principal } |
   {

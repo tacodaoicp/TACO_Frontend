@@ -11,7 +11,7 @@
     </div>
 
     <!-- mint content -->
-    <div v-else class="vault-mint__content taco-container taco-container--l2">
+    <div v-else class="vault-mint__content taco-container taco-container--l1">
 
       <!-- mode tabs -->
       <div class="vault-mint__tabs">
@@ -28,18 +28,23 @@
         <span class="vault-mint__slippage-label">Slippage:</span>
         <button v-for="bp in slippagePresets" :key="bp"
                 class="btn btn-sm"
-                :class="nachosStore.slippageBP === bp && !customSlippage ? 'taco-btn taco-btn--green' : 'taco-btn'"
-                @click="nachosStore.slippageBP = bp; customSlippage = ''">
+                :class="nachosStore.slippageBP === bp ? 'taco-btn taco-btn--green' : 'taco-btn'"
+                @click="nachosStore.slippageBP = bp; customSlippage = (bp / 100).toFixed(1)">
           {{ (bp / 100).toFixed(1) }}%
         </button>
-        <input type="number"
-               v-model="customSlippage"
-               class="form-control taco-input vault-mint__slippage-custom"
-               placeholder="Custom %"
-               step="0.1"
-               min="0.01"
-               max="50"
-               @input="applyCustomSlippage" />
+        <div class="vault-mint__slippage-stepper">
+          <button class="vault-mint__slippage-step" @click="adjustSlippage(-0.1)">−</button>
+          <div class="vault-mint__slippage-input-wrap">
+            <input type="text"
+                   inputmode="decimal"
+                   v-model="customSlippage"
+                   class="form-control taco-input vault-mint__slippage-custom"
+                   placeholder="Custom"
+                   @input="applyCustomSlippage" />
+            <span class="vault-mint__slippage-pct">%</span>
+          </div>
+          <button class="vault-mint__slippage-step" @click="adjustSlippage(0.1)">+</button>
+        </div>
       </div>
 
       <!-- rate limit info -->
@@ -69,20 +74,29 @@
               <button class="btn btn-link vault-mint__max-btn" @click="setMaxICP">MAX</button>
             </span>
           </div>
-          <input type="number"
-                 v-model="icpAmount"
-                 class="form-control taco-input"
-                 placeholder="0.00"
-                 step="0.01"
-                 min="0.01"
-                 @input="debouncedEstimateICP" />
-          <input v-if="maxMintableICP > 0"
-                 type="range"
-                 class="vault-mint__slider"
-                 :min="0"
-                 :max="maxMintableICP"
-                 :value="Number(icpAmountE8s)"
-                 @input="onICPSlider" />
+          <div class="vault-mint__input-wrap">
+            <input type="text"
+                   inputmode="decimal"
+                   v-model="icpAmount"
+                   class="form-control taco-input"
+                   placeholder="0.00"
+                   @input="debouncedEstimateICP" />
+            <span class="vault-mint__input-suffix">ICP</span>
+          </div>
+          <div v-if="maxMintableICP > 0" class="vault-mint__slider-row">
+            <input type="range"
+                   class="vault-mint__slider"
+                   :min="0"
+                   :max="maxMintableICP"
+                   :value="Number(icpAmountE8s)"
+                   @input="onICPSlider" />
+            <div class="vault-mint__slider-pcts">
+              <button class="vault-mint__slider-pct" @click="setICPPercent(25)">25%</button>
+              <button class="vault-mint__slider-pct" @click="setICPPercent(50)">50%</button>
+              <button class="vault-mint__slider-pct" @click="setICPPercent(75)">75%</button>
+              <button class="vault-mint__slider-pct" @click="setICPPercent(100)">MAX</button>
+            </div>
+          </div>
           <span class="vault-mint__hint">
             Min: {{ nachosStore.formatE8s(nachosStore.minMintValueICP) }} ICP
             <template v-if="nachosStore.remainingMintICP !== null">
@@ -133,13 +147,15 @@
         <!-- amount input -->
         <div class="vault-mint__input-group">
           <label class="vault-mint__label">Amount</label>
-          <input type="number"
-                 v-model="tokenAmount"
-                 class="form-control taco-input"
-                 placeholder="0.00"
-                 step="0.000001"
-                 min="0"
-                 @input="debouncedEstimateToken" />
+          <div class="vault-mint__input-wrap">
+            <input type="text"
+                   inputmode="decimal"
+                   v-model="tokenAmount"
+                   class="form-control taco-input"
+                   placeholder="0.00"
+                   @input="debouncedEstimateToken" />
+            <span v-if="selectedTokenSymbol" class="vault-mint__input-suffix">{{ selectedTokenSymbol }}</span>
+          </div>
         </div>
 
         <!-- estimate with allocation info -->
@@ -189,13 +205,15 @@
         <!-- total value input -->
         <div class="vault-mint__input-group">
           <label class="vault-mint__label">Total ICP Value to Deposit</label>
-          <input type="number"
-                 v-model="portfolioValue"
-                 class="form-control taco-input"
-                 placeholder="10.00"
-                 step="0.1"
-                 min="0.01"
-                 @input="debouncedGetShares" />
+          <div class="vault-mint__input-wrap">
+            <input type="text"
+                   inputmode="decimal"
+                   v-model="portfolioValue"
+                   class="form-control taco-input"
+                   placeholder="10.00"
+                   @input="debouncedGetShares" />
+            <span class="vault-mint__input-suffix">ICP</span>
+          </div>
         </div>
 
         <!-- required deposits table -->
@@ -281,6 +299,12 @@ const loadICPBalance = async () => {
 }
 loadICPBalance()
 
+// Refresh ICP balance when dashboard data updates (after operations)
+watch(() => nachosStore.dashboardData, loadICPBalance)
+
+// Poll ICP balance every 15s
+const balanceInterval = setInterval(loadICPBalance, 15_000)
+
 // mode state — only show 'Single Token' if there are non-ICP tokens in portfolio
 const ICP_PRINCIPAL = 'ryjl3-tyaaa-aaaaa-aaaba-cai'
 const hasNonICPTokens = computed(() =>
@@ -298,9 +322,21 @@ const customSlippage = ref('')
 
 const applyCustomSlippage = () => {
   const val = parseFloat(customSlippage.value)
-  if (!isNaN(val) && val > 0 && val <= 50) {
-    nachosStore.slippageBP = Math.round(val * 100)
+  if (isNaN(val) || val <= 0) return
+  if (val > 50) {
+    customSlippage.value = '50'
+    nachosStore.slippageBP = 5000
+    return
   }
+  nachosStore.slippageBP = Math.round(val * 100)
+}
+
+const adjustSlippage = (delta: number) => {
+  const current = parseFloat(customSlippage.value) || 0
+  const next = Math.round((current + delta) * 10) / 10 // avoid float drift
+  const clamped = Math.min(50, Math.max(0.1, next))
+  customSlippage.value = clamped.toFixed(1)
+  nachosStore.slippageBP = Math.round(clamped * 100)
 }
 
 // ============ ICP MODE ============
@@ -325,6 +361,13 @@ const maxMintableICP = computed(() => {
 const setMaxICP = () => {
   if (maxMintableICP.value <= 0) return
   icpAmount.value = (maxMintableICP.value / 1e8).toFixed(4)
+  debouncedEstimateICP()
+}
+
+const setICPPercent = (pct: number) => {
+  if (maxMintableICP.value <= 0) return
+  const e8s = Math.floor(maxMintableICP.value * pct / 100)
+  icpAmount.value = (e8s / 1e8).toFixed(4)
   debouncedEstimateICP()
 }
 
@@ -397,6 +440,12 @@ const getTokenSymbol = (principal: any): string => {
   return entry?.symbol ?? principal.toText().substring(0, 8)
 }
 
+const selectedTokenSymbol = computed(() => {
+  if (!selectedTokenPrincipal.value) return ''
+  const entry = nachosStore.portfolio.find((p: any) => p.token.toText() === selectedTokenPrincipal.value)
+  return entry?.symbol ?? ''
+})
+
 const tokenAmountRaw = computed(() => {
   const val = parseFloat(tokenAmount.value)
   if (isNaN(val) || val <= 0) return 0n
@@ -448,6 +497,7 @@ const handleMintToken = async () => {
     tokenAmount.value = ''
     tokenEstimate.value = null
     emit('operation-complete')
+    loadICPBalance()
   } catch (e: any) {
     tacoStore.addToast({
       id: Date.now(),
@@ -506,6 +556,7 @@ const handleMintPortfolio = async () => {
     portfolioValue.value = ''
     portfolioShares.value = null
     emit('operation-complete')
+    loadICPBalance()
   } catch (e: any) {
     tacoStore.addToast({
       id: Date.now(),
@@ -629,6 +680,7 @@ watch(hasActiveInput, (active) => {
 
 onBeforeUnmount(() => {
   if (refreshInterval) clearInterval(refreshInterval)
+  clearInterval(balanceInterval)
 })
 </script>
 
@@ -639,8 +691,10 @@ onBeforeUnmount(() => {
   gap: 0.75rem;
 
   &__title {
-    font-size: 1.25rem;
+    font-size: 1rem;
     font-family: 'Space Mono', monospace;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
     margin-bottom: 0;
   }
 
@@ -661,6 +715,14 @@ onBeforeUnmount(() => {
     display: flex;
     gap: 0.5rem;
     flex-wrap: wrap;
+
+    .taco-btn:not(.taco-btn--green) {
+      background: var(--orange-to-dark-brown);
+      border: 1px solid var(--dark-orange-to-dark-brown);
+      color: var(--black-to-white);
+
+      &:hover { opacity: 0.85; }
+    }
   }
 
   &__slippage {
@@ -671,22 +733,77 @@ onBeforeUnmount(() => {
     font-family: 'Space Mono', monospace;
 
     &-label { opacity: 0.85; }
-    .btn { font-size: 0.75rem; padding: 0.125rem 0.5rem; }
+    .btn {
+      font-size: 0.75rem;
+      padding: 0.125rem 0.5rem;
+    }
+    .taco-btn:not(.taco-btn--green) {
+      background: var(--orange-to-dark-brown);
+      border: 1px solid var(--dark-orange-to-dark-brown);
+      color: var(--black-to-white);
+
+      &:hover { opacity: 0.85; }
+    }
+
+    &-input-wrap {
+      position: relative;
+      display: flex;
+      align-items: center;
+    }
 
     &-custom {
-      width: 80px;
+      width: 4.5rem;
       font-size: 0.75rem;
-      padding: 0.125rem 0.375rem;
+      padding: 0.125rem 1rem 0.125rem 0.375rem;
       height: auto;
+      border-radius: 0;
+      text-align: center;
+    }
+
+    &-pct {
+      position: absolute;
+      right: 0.3rem;
+      font-size: 0.65rem;
+      font-family: 'Space Mono', monospace;
+      opacity: 0.5;
+      pointer-events: none;
+      user-select: none;
+    }
+
+    &-stepper {
+      display: flex;
+      align-items: center;
+    }
+
+    &-step {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 1.5rem;
+      height: 100%;
+      background: var(--dark-orange);
+      border: 1px solid var(--dark-orange);
+      color: var(--white);
+      font-family: 'Space Mono', monospace;
+      font-size: 0.8rem;
+      font-weight: 700;
+      cursor: pointer;
+      padding: 0.125rem 0;
+      transition: opacity 0.15s;
+
+      &:first-child { border-radius: 0.25rem 0 0 0.25rem; }
+      &:last-child { border-radius: 0 0.25rem 0.25rem 0; }
+      &:hover { opacity: 0.8; }
+      &:active { opacity: 0.6; }
     }
   }
 
   &__limits {
     display: flex;
     gap: 1rem;
-    font-size: 0.75rem;
+    font-size: 0.7rem;
     font-family: 'Space Mono', monospace;
-    opacity: 0.75;
+    opacity: 0.55;
     flex-wrap: wrap;
   }
 
@@ -694,6 +811,9 @@ onBeforeUnmount(() => {
     display: flex;
     flex-direction: column;
     gap: 0.75rem;
+    background: rgba(0, 0, 0, 0.08);
+    border-radius: 0.375rem;
+    padding: 0.75rem;
   }
 
   &__input-group {
@@ -709,15 +829,17 @@ onBeforeUnmount(() => {
   }
 
   &__label {
-    font-size: 0.8rem;
+    font-size: 0.75rem;
     font-family: 'Space Mono', monospace;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
     opacity: 0.85;
   }
 
   &__balance {
     font-size: 0.75rem;
     font-family: 'Space Mono', monospace;
-    opacity: 0.8;
+    opacity: 0.85;
   }
 
   &__max-btn {
@@ -728,9 +850,35 @@ onBeforeUnmount(() => {
     font-family: 'Space Mono', monospace;
   }
 
+  // input wrapper for currency suffix
+  &__input-wrap {
+    position: relative;
+    display: flex;
+    align-items: center;
+
+    .taco-input { padding-right: 3.5rem; width: 100%; }
+  }
+
+  &__input-suffix {
+    position: absolute;
+    right: 0.75rem;
+    font-size: 0.75rem;
+    font-family: 'Space Mono', monospace;
+    opacity: 0.5;
+    pointer-events: none;
+    user-select: none;
+  }
+
+  // slider + percentage quick-select
+  &__slider-row {
+    display: flex;
+    flex-direction: column;
+    gap: 0.375rem;
+  }
+
   &__slider {
     width: 100%;
-    height: 0.5rem;
+    height: 0.375rem;
     -webkit-appearance: none;
     appearance: none;
     background: rgba(128, 128, 128, 0.2);
@@ -740,16 +888,16 @@ onBeforeUnmount(() => {
     &::-webkit-slider-thumb {
       -webkit-appearance: none;
       appearance: none;
-      width: 1.25rem;
-      height: 1.25rem;
+      width: 1rem;
+      height: 1rem;
       border-radius: 50%;
       background: var(--dark-orange);
       cursor: pointer;
     }
 
     &::-moz-range-thumb {
-      width: 1.25rem;
-      height: 1.25rem;
+      width: 1rem;
+      height: 1rem;
       border-radius: 50%;
       background: var(--dark-orange);
       cursor: pointer;
@@ -757,9 +905,56 @@ onBeforeUnmount(() => {
     }
   }
 
+  &__slider-pcts {
+    display: flex;
+    justify-content: space-between;
+  }
+
+  &__slider-pct {
+    background: none;
+    border: 1px solid var(--dark-orange-to-dark-brown);
+    color: var(--black-to-white);
+    font-family: 'Space Mono', monospace;
+    font-size: 0.65rem;
+    padding: 0.125rem 0.5rem;
+    border-radius: 0.25rem;
+    cursor: pointer;
+    opacity: 0.7;
+    transition: opacity 0.15s, background 0.15s;
+
+    &:hover {
+      opacity: 1;
+      background: var(--orange-to-dark-brown);
+    }
+  }
+
   &__hint {
-    font-size: 0.75rem;
-    opacity: 0.65;
+    font-size: 0.7rem;
+    opacity: 0.5;
+  }
+
+  // select dropdown house styling
+  select.taco-input {
+    background-color: var(--orange-to-dark-brown);
+    padding-right: 2.25rem;
+
+    option {
+      background-color: var(--orange-to-dark-brown);
+      color: var(--black-to-white);
+      font-family: 'Space Mono', monospace;
+    }
+
+    option:disabled {
+      opacity: 0.5;
+    }
+  }
+
+  // confirm button
+  &__confirm {
+    padding: 0.625rem 1rem;
+    font-size: 0.95rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
   }
 
   &__allocation {
@@ -849,6 +1044,13 @@ onBeforeUnmount(() => {
   font-family: 'Space Mono', monospace;
   padding: 0.5rem 0.75rem;
   border-radius: 0.375rem;
+  -moz-appearance: textfield;
+
+  &::-webkit-outer-spin-button,
+  &::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
 
   &:focus {
     border-color: var(--dark-orange);

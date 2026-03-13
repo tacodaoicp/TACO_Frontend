@@ -43,7 +43,7 @@ defineProps<{
   flex-direction: column;
   gap: 0.375rem;
   font-family: 'Space Mono', monospace;
-  font-size: 0.875rem;
+  font-size: 0.8rem;
 
   &__row {
     display: flex;
@@ -53,11 +53,14 @@ defineProps<{
 
   &__label {
     opacity: 0.7;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
   }
 
   &__pct {
     opacity: 0.6;
-    font-size: 0.8rem;
+    font-size: 0.75rem;
   }
 }
 </style>

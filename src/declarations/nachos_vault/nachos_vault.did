@@ -35,6 +35,7 @@ type TransferOperationType =
    BurnPayout;
    CancelReturn;
    ExcessReturn;
+   ForwardToPortfolio;
    MintReturn;
    Recovery;
  };
@@ -118,6 +119,8 @@ type NavSnapshot =
 type NachosVaultDAO = 
  service {
    addAcceptedMintToken: (token: principal) -> (Result);
+   addCircuitBreakerCondition: (input: CircuitBreakerConditionInput) ->
+    (Result_1);
    addFeeExemptPrincipal: ("principal": principal, reason: text) -> (Result);
    addRateLimitExemptPrincipal: ("principal": principal, reason: text) ->
     (Result);
@@ -127,6 +130,8 @@ type NachosVaultDAO =
    claimMintFees: (recipient: principal, amount: nat) -> (Result);
    emergencyPause: () -> (Result);
    emergencyUnpause: () -> (Result);
+   enableCircuitBreakerCondition: (conditionId: nat, enabled: bool) ->
+    (Result);
    estimateBurnTokens: (estNachosAmount: nat) ->
     (record {
        feeEstimate: nat;
@@ -169,7 +174,120 @@ type NachosVaultDAO =
            AcceptedTokenConfig;
          }) query;
    getActiveDepositsCount: () -> (nat) query;
+   getAdminDashboard: () ->
+    (record {
+       acceptedTokens: vec record {
+                             principal;
+                             AcceptedTokenConfig;
+                           };
+       activeDepositCount: nat;
+       burnFeeBasisPoints: nat;
+       burnFeesICP: nat;
+       burnPausedByCircuitBreaker: bool;
+       burningEnabled: bool;
+       canisterCycles: nat;
+       circuitBreakerActive: bool;
+       circuitBreakerConditions: vec CircuitBreakerCondition;
+       claimableCancellationFees:
+        vec
+         record {
+           accumulated: nat;
+           claimable: nat;
+           claimed: nat;
+           token: principal;
+         };
+       claimableMintFees:
+        record {
+          accumulated: nat;
+          claimable: nat;
+          claimed: nat;
+        };
+       dataSource: text;
+       dataTimestamp: int;
+       feeCount: nat;
+       feeExemptPrincipals: vec record {
+                                  principal;
+                                  FeeExemptConfig;
+                                };
+       fullConfig:
+        record {
+          cancellationFeeMultiplier: nat;
+          maxBurnAmountNachos: nat;
+          maxBurnNachosPerUser4Hours: nat;
+          maxBurnOpsPerUser4Hours: nat;
+          maxMintAmountICP: nat;
+          maxMintICPPerUser4Hours: nat;
+          maxMintICPWorthPer4Hours: nat;
+          maxMintOpsPerUser4Hours: nat;
+          maxNachosBurnPer4Hours: nat;
+          maxSlippageBasisPoints: nat;
+          navDropThresholdPercent: float64;
+          portfolioShareMaxDeviationBP: nat;
+        };
+       genesisComplete: bool;
+       globalBurnIn4h: nat;
+       globalMintIn4h: nat;
+       hasPausedTokens: bool;
+       maxBurnPer4h: nat;
+       maxMintPer4h: nat;
+       minBurnValueICP: nat;
+       minMintValueICP: nat;
+       mintFeeBasisPoints: nat;
+       mintFeesICP: nat;
+       mintPausedByCircuitBreaker: bool;
+       mintingEnabled: bool;
+       mintsByMode: record {
+                      icp: nat;
+                      portfolioShare: nat;
+                      singleToken: nat;
+                    };
+       nachosLedger: opt principal;
+       nachosSupply: nat;
+       nav: opt CachedNAV;
+       navChangePercent: opt float64;
+       pausedTokens: vec record {
+                           symbol: text;
+                           token: principal;
+                         };
+       pendingTransferCount: nat;
+       portfolio:
+        vec
+         record {
+           balance: nat;
+           currentBasisPoints: nat;
+           decimals: nat;
+           priceICP: nat;
+           priceUSD: float64;
+           symbol: text;
+           targetBasisPoints: nat;
+           token: principal;
+           valueICP: nat;
+         };
+       portfolioValueICP: nat;
+       rateLimitExemptPrincipals: vec record {
+                                        principal;
+                                        FeeExemptConfig;
+                                      };
+       recentAlerts: vec CircuitBreakerAlert;
+       systemPaused: bool;
+       totalBurnCount: nat;
+       totalBurnVolumeICP: nat;
+       totalBurnVolumeNACHOS: nat;
+       totalFeesCollectedICP: nat;
+       totalMintCount: nat;
+       totalMintVolumeICP: nat;
+       transferQueue:
+        record {
+          completed: nat;
+          exhausted: nat;
+          pending: nat;
+          tasks: vec VaultTransferTask;
+        };
+     }) composite_query;
    getBurnHistory: (limit: nat, offset: nat) -> (vec BurnRecord) query;
+   getCircuitBreakerAlerts: (limit: nat, offset: nat) ->
+    (vec CircuitBreakerAlert) query;
+   getCircuitBreakerConditions: () -> (vec CircuitBreakerCondition) query;
    getClaimableCancellationFees: () ->
     (vec
       record {
@@ -264,11 +382,13 @@ type NachosVaultDAO =
    getSystemStatus: () ->
     (record {
        activeDepositCount: nat;
+       burnPausedByCircuitBreaker: bool;
        burningEnabled: bool;
        cachedNAV: opt CachedNAV;
        circuitBreakerActive: bool;
        genesisComplete: bool;
        hasPausedTokens: bool;
+       mintPausedByCircuitBreaker: bool;
        mintingEnabled: bool;
        nachosLedger: opt principal;
        pausedTokens: vec record {
@@ -402,6 +522,7 @@ type NachosVaultDAO =
          };
        burnFeeBasisPoints: nat;
        burnFeesICP: nat;
+       burnPausedByCircuitBreaker: bool;
        burningEnabled: bool;
        circuitBreakerActive: bool;
        dataSource: text;
@@ -423,6 +544,7 @@ type NachosVaultDAO =
             };
        mintFeeBasisPoints: nat;
        mintFeesICP: nat;
+       mintPausedByCircuitBreaker: bool;
        mintingEnabled: bool;
        mintsByMode: record {
                       icp: nat;
@@ -478,6 +600,7 @@ type NachosVaultDAO =
             }) -> (Result_2);
    refreshICPSwapPools: () -> (Result);
    removeAcceptedMintToken: (token: principal) -> (Result);
+   removeCircuitBreakerCondition: (conditionId: nat) -> (Result);
    removeFeeExemptPrincipal: ("principal": principal) -> (Result);
    removeRateLimitExemptPrincipal: ("principal": principal) -> (Result);
    resetCircuitBreaker: () -> (Result);
@@ -488,6 +611,14 @@ type NachosVaultDAO =
    unpauseBurning: () -> (Result);
    unpauseMinting: () -> (Result);
    updateCancellationFeeMultiplier: (multiplier: nat) -> (Result);
+   updateCircuitBreakerCondition: (conditionId: nat, thresholdPercent:
+    opt float64, timeWindowNS: opt nat, direction:
+    opt variant {
+          Both;
+          Down;
+          Up;
+        }, action: opt CircuitBreakerAction, applicableTokens:
+    opt vec principal) -> (Result);
    updateFees: (mintBP: nat, burnBP: nat) -> (Result);
    updateNachosConfig: (config: NachosUpdateConfig) -> (Result);
  };
@@ -677,6 +808,62 @@ type DepositStatus =
    Expired;
    Processing;
    Verified;
+ };
+type CircuitBreakerConditionType = 
+ variant {
+   BalanceChange;
+   DecimalChange;
+   NavDrop;
+   PriceChange;
+ };
+type CircuitBreakerConditionInput = 
+ record {
+   action: CircuitBreakerAction;
+   applicableTokens: vec principal;
+   conditionType: CircuitBreakerConditionType;
+   direction: variant {
+                Both;
+                Down;
+                Up;
+              };
+   enabled: bool;
+   thresholdPercent: float64;
+   timeWindowNS: nat;
+ };
+type CircuitBreakerCondition = 
+ record {
+   action: CircuitBreakerAction;
+   applicableTokens: vec principal;
+   conditionType: CircuitBreakerConditionType;
+   createdAt: int;
+   createdBy: principal;
+   direction: variant {
+                Both;
+                Down;
+                Up;
+              };
+   enabled: bool;
+   id: nat;
+   thresholdPercent: float64;
+   timeWindowNS: nat;
+ };
+type CircuitBreakerAlert = 
+ record {
+   actionTaken: CircuitBreakerAction;
+   conditionId: nat;
+   conditionType: CircuitBreakerConditionType;
+   details: text;
+   id: nat;
+   timestamp: int;
+   token: opt principal;
+   tokenSymbol: text;
+ };
+type CircuitBreakerAction = 
+ variant {
+   PauseBoth;
+   PauseBurn;
+   PauseMint;
+   RejectOperation;
  };
 type CachedNAV = 
  record {

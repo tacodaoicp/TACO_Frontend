@@ -753,6 +753,43 @@
 
   }
 
+  // hide native number input spinners globally
+  input[type="number"] {
+    -moz-appearance: textfield;
+
+    &::-webkit-outer-spin-button,
+    &::-webkit-inner-spin-button {
+      -webkit-appearance: none;
+      margin: 0;
+    }
+  }
+
+  // house-style select dropdowns
+  select.taco-input,
+  select.form-select,
+  select.form-control {
+    appearance: none;
+    -webkit-appearance: none;
+    font-family: 'Space Mono';
+    cursor: pointer;
+    // custom chevron arrow (dark-orange #DA8D28)
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5L6 6.5L11 1.5' stroke='%23DA8D28' stroke-width='2' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.75rem center;
+    background-size: 0.75rem;
+    padding-right: 2.25rem;
+
+    &:focus {
+      outline: none;
+      box-shadow: none;
+    }
+
+    &:focus-visible {
+      outline: 3px solid var(--light-brown-to-orange);
+      outline-offset: 2px;
+    }
+  }
+
   // taco text copy area
   .taco-text-copy-area {
     padding: 1.375rem 1.825rem;

@@ -15,6 +15,7 @@ export type CanisterKey =
   | 'dao_neuron_allocation_archive'
   | 'reward_distribution_archive'
   | 'reward_withdrawal_archive'
+  | 'nachos_vault'
   | 'frontend'
 
 export const CANISTER_IDS: Record<CanisterKey, Record<EnvKey, string>> = {
@@ -76,6 +77,12 @@ export const CANISTER_IDS: Record<CanisterKey, Record<EnvKey, string>> = {
   reward_withdrawal_archive: {
     ic: 'v5eeb-gaaaa-aaaan-qz6ua-cai',
     staging: 'dwczx-faaaa-aaaan-qz5oa-cai',
+  },
+
+  // NACHOS Vault
+  nachos_vault: {
+    ic: 'p4nog-baaaa-aaaad-qkwpa-cai',  // placeholder — update when production deployed
+    staging: 'p4nog-baaaa-aaaad-qkwpa-cai',
   },
 
   // Frontend

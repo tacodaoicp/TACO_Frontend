@@ -83,6 +83,25 @@
             <span class="ms-1">underfunded</span>
           </span>
         </div>
+
+        <!-- vault header indicators -->
+        <div v-if="vaultHeader" class="d-flex align-items-center gap-2 ms-3">
+          <span class="text-muted small d-inline-flex align-items-center" title="System Status">
+            <i class="fa-solid fa-vault"></i>
+          </span>
+          <span class="status-indicator" :class="!vaultHeader.systemPaused ? 'active' : 'status-red'" title="System"></span>
+          <span class="status-indicator" :class="vaultHeader.mintingEnabled ? 'active' : 'inactive'" title="Minting"></span>
+          <span class="status-indicator" :class="vaultHeader.burningEnabled ? 'active' : 'inactive'" title="Burning"></span>
+          <span v-if="vaultHeader.circuitBreakerActive" class="text-danger small d-inline-flex align-items-center ms-1" title="Circuit Breaker Active">
+            <i class="fa-solid fa-bolt"></i>
+          </span>
+          <span v-if="vaultHeader.hasPausedTokens" class="text-warning small d-inline-flex align-items-center ms-1" title="Paused Tokens">
+            <i class="fa-solid fa-triangle-exclamation"></i>
+          </span>
+          <span v-if="vaultHeader.pendingTransfers > 0" class="badge bg-warning text-dark" :title="'Pending transfers: ' + vaultHeader.pendingTransfers">
+            {{ vaultHeader.pendingTransfers }} pending
+          </span>
+        </div>
       </div>
       <div class="d-flex align-items-center gap-2" @click.stop>
         <button class="btn btn-sm btn-primary" @click="$emit('refresh')" :disabled="loading" title="Refresh">
@@ -416,6 +435,16 @@ const props = defineProps<{
     periodicTimerStale: 'green' | 'orange' | 'red'
   }
   governanceDetails?: any
+  vaultHeader?: {
+    systemPaused: boolean
+    mintingEnabled: boolean
+    burningEnabled: boolean
+    circuitBreakerActive: boolean
+    genesisComplete: boolean
+    pendingTransfers: number
+    activeDeposits: number
+    hasPausedTokens: boolean
+  }
 }>()
 
 const emits = defineEmits(['update:expanded','refresh'])

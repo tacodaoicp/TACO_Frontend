@@ -11,7 +11,7 @@
     </div>
 
     <!-- burn content -->
-    <div v-else class="vault-burn__content taco-container taco-container--l2">
+    <div v-else class="vault-burn__content taco-container taco-container--l1">
 
       <!-- amount input -->
       <div class="vault-burn__input-group">
@@ -22,20 +22,29 @@
             <button class="btn btn-link vault-burn__max-btn" @click="setMaxBurn">MAX</button>
           </span>
         </div>
-        <input type="number"
-               v-model="nachosAmount"
-               class="form-control taco-input"
-               placeholder="0.00"
-               step="0.01"
-               min="0.01"
-               @input="debouncedEstimate" />
-        <input v-if="maxBurnable > 0"
-               type="range"
-               class="vault-burn__slider"
-               :min="0"
-               :max="maxBurnable"
-               :value="Number(nachosAmountE8s)"
-               @input="onBurnSlider" />
+        <div class="vault-burn__input-wrap">
+          <input type="text"
+                 inputmode="decimal"
+                 v-model="nachosAmount"
+                 class="form-control taco-input"
+                 placeholder="0.00"
+                 @input="debouncedEstimate" />
+          <span class="vault-burn__input-suffix">NACHOS</span>
+        </div>
+        <div v-if="maxBurnable > 0" class="vault-burn__slider-row">
+          <input type="range"
+                 class="vault-burn__slider"
+                 :min="0"
+                 :max="maxBurnable"
+                 :value="Number(nachosAmountE8s)"
+                 @input="onBurnSlider" />
+          <div class="vault-burn__slider-pcts">
+            <button class="vault-burn__slider-pct" @click="setBurnPercent(25)">25%</button>
+            <button class="vault-burn__slider-pct" @click="setBurnPercent(50)">50%</button>
+            <button class="vault-burn__slider-pct" @click="setBurnPercent(75)">75%</button>
+            <button class="vault-burn__slider-pct" @click="setBurnPercent(100)">MAX</button>
+          </div>
+        </div>
         <span class="vault-burn__hint">
           Min: {{ nachosStore.formatE8s(nachosStore.minBurnValueICP) }} ICP equivalent
         </span>
@@ -121,12 +130,11 @@
             </p>
             <div v-for="t in nonDustTokens" :key="t.symbol" class="vault-burn__advanced-row">
               <span class="vault-burn__advanced-label">{{ t.symbol }}</span>
-              <input type="number"
+              <input type="text"
+                     inputmode="decimal"
                      v-model="perTokenMins[t.token.toText()]"
                      class="form-control taco-input vault-burn__advanced-input"
-                     :placeholder="nachosStore.formatE8s(defaultMinForToken(t), Number(t.decimals))"
-                     step="0.000001"
-                     min="0" />
+                     :placeholder="nachosStore.formatE8s(defaultMinForToken(t), Number(t.decimals))" />
             </div>
           </div>
         </div>
@@ -210,6 +218,12 @@ const loadNachosBalance = async () => {
 }
 loadNachosBalance()
 
+// Refresh NACHOS balance when dashboard data updates (after operations)
+watch(() => nachosStore.dashboardData, loadNachosBalance)
+
+// Poll NACHOS balance every 15s
+const balanceInterval = setInterval(loadNachosBalance, 15_000)
+
 const nachosAmount = ref('')
 const burnEstimate = ref<any>(null)
 const showAdvanced = ref(false)
@@ -233,6 +247,13 @@ const maxBurnable = computed(() => {
 const setMaxBurn = () => {
   if (maxBurnable.value <= 0) return
   nachosAmount.value = (maxBurnable.value / 1e8).toFixed(4)
+  debouncedEstimate()
+}
+
+const setBurnPercent = (pct: number) => {
+  if (maxBurnable.value <= 0) return
+  const e8s = Math.floor(maxBurnable.value * pct / 100)
+  nachosAmount.value = (e8s / 1e8).toFixed(4)
   debouncedEstimate()
 }
 
@@ -393,6 +414,7 @@ watch(() => nachosAmountE8s.value > 0n, (active) => {
 
 onBeforeUnmount(() => {
   if (refreshInterval) clearInterval(refreshInterval)
+  clearInterval(balanceInterval)
 })
 </script>
 
@@ -403,8 +425,10 @@ onBeforeUnmount(() => {
   gap: 0.75rem;
 
   &__title {
-    font-size: 1.25rem;
+    font-size: 1rem;
     font-family: 'Space Mono', monospace;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
     margin-bottom: 0;
   }
 
@@ -421,6 +445,14 @@ onBeforeUnmount(() => {
     gap: 1rem;
   }
 
+  // darker inner area for form content
+  &__input-group,
+  &__estimate {
+    background: rgba(0, 0, 0, 0.08);
+    border-radius: 0.375rem;
+    padding: 0.75rem;
+  }
+
   &__input-group {
     display: flex;
     flex-direction: column;
@@ -434,15 +466,17 @@ onBeforeUnmount(() => {
   }
 
   &__label {
-    font-size: 0.8rem;
+    font-size: 0.75rem;
     font-family: 'Space Mono', monospace;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
     opacity: 0.85;
   }
 
   &__balance {
     font-size: 0.75rem;
     font-family: 'Space Mono', monospace;
-    opacity: 0.8;
+    opacity: 0.85;
   }
 
   &__max-btn {
@@ -453,9 +487,35 @@ onBeforeUnmount(() => {
     font-family: 'Space Mono', monospace;
   }
 
+  // input wrapper for currency suffix
+  &__input-wrap {
+    position: relative;
+    display: flex;
+    align-items: center;
+
+    .taco-input { padding-right: 4.5rem; width: 100%; }
+  }
+
+  &__input-suffix {
+    position: absolute;
+    right: 0.75rem;
+    font-size: 0.75rem;
+    font-family: 'Space Mono', monospace;
+    opacity: 0.5;
+    pointer-events: none;
+    user-select: none;
+  }
+
+  // slider + percentage quick-select
+  &__slider-row {
+    display: flex;
+    flex-direction: column;
+    gap: 0.375rem;
+  }
+
   &__slider {
     width: 100%;
-    height: 0.5rem;
+    height: 0.375rem;
     -webkit-appearance: none;
     appearance: none;
     background: rgba(128, 128, 128, 0.2);
@@ -465,16 +525,16 @@ onBeforeUnmount(() => {
     &::-webkit-slider-thumb {
       -webkit-appearance: none;
       appearance: none;
-      width: 1.25rem;
-      height: 1.25rem;
+      width: 1rem;
+      height: 1rem;
       border-radius: 50%;
       background: var(--dark-orange);
       cursor: pointer;
     }
 
     &::-moz-range-thumb {
-      width: 1.25rem;
-      height: 1.25rem;
+      width: 1rem;
+      height: 1rem;
       border-radius: 50%;
       background: var(--dark-orange);
       cursor: pointer;
@@ -482,17 +542,40 @@ onBeforeUnmount(() => {
     }
   }
 
+  &__slider-pcts {
+    display: flex;
+    justify-content: space-between;
+  }
+
+  &__slider-pct {
+    background: none;
+    border: 1px solid var(--dark-orange-to-dark-brown);
+    color: var(--black-to-white);
+    font-family: 'Space Mono', monospace;
+    font-size: 0.65rem;
+    padding: 0.125rem 0.5rem;
+    border-radius: 0.25rem;
+    cursor: pointer;
+    opacity: 0.7;
+    transition: opacity 0.15s, background 0.15s;
+
+    &:hover {
+      opacity: 1;
+      background: var(--orange-to-dark-brown);
+    }
+  }
+
   &__hint {
-    font-size: 0.75rem;
-    opacity: 0.65;
+    font-size: 0.7rem;
+    opacity: 0.5;
   }
 
   &__limits {
     display: flex;
     gap: 1rem;
-    font-size: 0.75rem;
+    font-size: 0.7rem;
     font-family: 'Space Mono', monospace;
-    opacity: 0.75;
+    opacity: 0.55;
     flex-wrap: wrap;
   }
 
@@ -515,7 +598,7 @@ onBeforeUnmount(() => {
       align-items: center;
     }
 
-    &-label { opacity: 0.85; }
+    &-label { opacity: 0.85; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.03em; }
     &-pct { opacity: 0.75; font-size: 0.8rem; }
   }
 
@@ -661,6 +744,13 @@ onBeforeUnmount(() => {
   font-family: 'Space Mono', monospace;
   padding: 0.5rem 0.75rem;
   border-radius: 0.375rem;
+  -moz-appearance: textfield;
+
+  &::-webkit-outer-spin-button,
+  &::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
 
   &:focus {
     border-color: var(--dark-orange);

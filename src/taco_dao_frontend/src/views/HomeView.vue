@@ -14,28 +14,6 @@
           <!-- top -->
           <div class="home-view__above-the-fold__upper__top">
 
-            <!-- left -->
-            <div class="home-view__above-the-fold__upper__top__left">
-
-              <!-- current discussion container -->
-              <div class="home-view__canted__container
-                          home-view__canted__container--left">
-
-                <!-- current discussion -->
-                <span class="home-view__canted__title">Current Discussions</span>
-
-                <!-- current discussion link -->
-                <router-link to="/chat/forum" 
-                            class="home-view__canted__link">
-                  See the Forum
-                </router-link>
-
-                <!-- <span class="home-view__canted__link">TBD</span> -->
-                
-              </div>
-
-            </div>
-
             <!-- center -->
             <div class="home-view__above-the-fold__upper__top__center">
 
@@ -49,33 +27,13 @@
 
                 <!-- slogan -->
                 <h2 class="home-view__taco-dao-slogan">
-                  <span class="cs__h2__line1 taco-text-brown-to-white">The <span class="taco-text-brown-to-white" style="font-weight: 500;">Tastiest</span> Entry Point in Crypto</span>
+                  <span class="cs__h2__line1 taco-text-brown-to-white">Crowd-Sourced Crypto, <span class="taco-text-brown-to-white" style="font-weight: 500;">On-Chain</span></span>
                 </h2>
 
               </div>
 
             </div>
 
-            <!-- right -->
-            <div class="home-view__above-the-fold__upper__top__right">
-
-              <!-- latest report container -->
-              <div class="home-view__canted__container
-                          home-view__canted__container--right">
-
-               <!-- latest report -->
-                <span class="home-view__canted__title">Latest Report</span>
-
-                <!-- latest report link -->
-                <router-link to="/reports/dkp" 
-                            class="home-view__canted__link">
-                  <!-- Insane Clown Protocol -->
-                  Dragginz Karma Points
-                </router-link>
-
-              </div>
-
-            </div>
 
           </div>
 
@@ -718,20 +676,6 @@
         justify-content: center;
         align-items: center;
 
-        &__left {
-          position: relative;
-          width: 30%;
-        }
-
-        &__center {
-          width: 40%;
-        }
-
-        &__right {
-          position: relative;
-          width: 30%;
-        }
-
       }
 
       &__middle {
@@ -852,39 +796,6 @@
       width: 100%;
       aspect-ratio: 16 / 9;
       border-radius: 0.5rem;
-    }
-
-  }
-
-  &__canted {
-
-    &__container {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-
-      &--left {
-        transform: translateY(-1rem) rotate(-10deg);
-      }
-
-      &--right {
-        transform: translateY(-1rem) rotate(10deg);
-      }
-
-    }
-
-    &__title {
-      font-size: 1.5rem;
-      color: var(--brown-to-light-orange);
-      // white-space: nowrap;
-      text-align: center;
-    }
-
-    &__link {
-      font-size: 1.5rem;
-      color: var(--blue-to-light-blue);
-      text-align: center;
     }
 
   }
@@ -1527,17 +1438,6 @@
     max-width: 100%;
     padding: 0 0.5rem;
   }  
-  .home-view__canted__container {
-    gap: 0.25rem;
-  }
-  .home-view__canted__title {
-    font-size: 0.875rem;
-    line-height: 1.25;
-  }
-  .home-view__canted__link {
-    font-size: 0.875rem;
-    line-height: 1.25;
-  }  
   .home-view__title__text {
     font-size: 1rem;
   }  
@@ -1657,12 +1557,6 @@
     max-width: 100%;
     padding: 0 1rem;
   }
-  .home-view__canted__title {
-    font-size: 1rem;
-  }
-  .home-view__canted__link {
-    font-size: 1rem;
-  }  
   .home-view__title__text {
     font-size: 1rem;
   }
@@ -1783,12 +1677,6 @@
     max-width: 100%;
     padding: 0 1rem;
   }
-  .home-view__canted__title {
-    font-size: 1.125rem;
-  }
-  .home-view__canted__link {
-    font-size: 1.125rem;
-  }  
   .home-view__title__text {
     font-size: 1.125rem;
   }
@@ -1892,12 +1780,6 @@
 @media (min-width: 992px) and (max-width: 1199.98px) {
   .home-view__pitch-points {
     max-width: 960px;
-  }
-  .home-view__canted__title {
-    font-size: 1.25rem;
-  }
-  .home-view__canted__link {
-    font-size: 1.25rem;
   }
   .home-view__title__text {
     font-size: 1.25rem;

@@ -42,11 +42,6 @@
       </span>
     </div>
 
-    <!-- cached data indicator -->
-    <div v-if="nachosStore.dataSource === 'cached'" class="vault-status-banner__alert vault-status-banner__alert--info">
-      <i class="fa-solid fa-clock"></i>
-      <span>Data may be slightly delayed (using cached data).</span>
-    </div>
 
   </div>
 
@@ -64,8 +59,7 @@ const showBanner = computed(() =>
   !nachosStore.genesisComplete ||
   (nachosStore.genesisComplete && !nachosStore.mintingEnabled) ||
   (nachosStore.genesisComplete && !nachosStore.burningEnabled) ||
-  nachosStore.hasPausedTokens ||
-  nachosStore.dataSource === 'cached'
+  nachosStore.hasPausedTokens
 )
 </script>
 
@@ -101,11 +95,6 @@ const showBanner = computed(() =>
       color: var(--dark-orange-to-brown);
     }
 
-    &--info {
-      background-color: rgba(13, 110, 253, 0.15);
-      border: 1px solid rgba(13, 110, 253, 0.3);
-      color: var(--brown-to-white);
-    }
   }
 }
 </style>

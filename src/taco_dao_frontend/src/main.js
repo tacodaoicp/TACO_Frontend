@@ -46,6 +46,7 @@ const NNSVoteViewDemo = () => import("./views/NNSVoteViewDemo.vue")
 const NNSPropView = () => import("./views/NNSPropView.vue")
 const NNSPropViewDemo = () => import("./views/NNSPropViewDemo.vue")
 const SystemView = () => import("./views/SystemView.vue")
+const AdminNachosView = () => import("./views/AdminNachosView.vue")
 const TestPropView = () => import("./views/TestPropView.vue")
 
 const routes = [
@@ -100,6 +101,7 @@ const routes = [
     { path: "/admin/alarm", name: "AdminAlarm", component: AdminAlarmView, meta: { robots: 'noindex' } },
     { path: "/admin/claims", name: "AdminClaims", component: AdminClaimsView, meta: { robots: 'noindex' } },
     { path: "/admin/nns", name: "AdminNNS", component: AdminNNSView, meta: { robots: 'noindex' } },
+    { path: "/admin/vault", name: "AdminNachos", component: AdminNachosView, meta: { robots: 'noindex' } },
     { path: "/forum", name: "Forum", component: ForumView, meta: { robots: 'noindex' } },
     { path: "/forum/thread/:id", name: "Thread", component: ThreadView, meta: { robots: 'noindex' } },
     { path: "/namesdemo", name: "NamesDemo", component: NamesViewDemo, meta: { robots: 'noindex' } }, //remove once integrated

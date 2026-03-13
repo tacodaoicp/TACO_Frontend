@@ -41,6 +41,9 @@
               <router-link to="/admin/nns" class="btn btn-outline-info">
                 🤖 NNS Automation
               </router-link>
+              <router-link to="/admin/vault" class="btn btn-outline-warning">
+                💎 NACHOS Vault Admin
+              </router-link>
             </div>
           </div>
           

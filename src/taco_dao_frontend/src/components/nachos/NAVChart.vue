@@ -6,29 +6,28 @@
     <h3 class="nav-chart__title">NAV History</h3>
 
     <!-- chart -->
-    <div class="nav-chart__wrap taco-container taco-container--l2">
-      <apexchart
-        type="line"
-        :options="chartOptions"
-        :series="chartSeries"
-        height="300"
-      />
-    </div>
+    <div class="nav-chart__wrap taco-container taco-container--l1">
+      <div class="nav-chart__inner">
+        <apexchart
+          type="line"
+          :options="chartOptions"
+          :series="chartSeries"
+          height="100%"
+        />
+      </div>
 
-    <!-- legend -->
-    <div class="nav-chart__legend">
-      <span class="nav-chart__legend-item">
-        <span class="nav-chart__legend-dot" style="background:#4CAF50"></span> Mint
-      </span>
-      <span class="nav-chart__legend-item">
-        <span class="nav-chart__legend-dot" style="background:#F44336"></span> Burn
-      </span>
-      <span class="nav-chart__legend-item">
-        <span class="nav-chart__legend-dot" style="background:#FFD600"></span> Scheduled
-      </span>
-      <span class="nav-chart__legend-item">
-        <span class="nav-chart__legend-dot" style="background:#FF9800"></span> Manual
-      </span>
+      <!-- legend -->
+      <div class="nav-chart__legend">
+        <span class="nav-chart__legend-item">
+          <span class="nav-chart__legend-dot" style="background:#4CAF50"></span> Mint
+        </span>
+        <span class="nav-chart__legend-item">
+          <span class="nav-chart__legend-dot" style="background:#F44336"></span> Burn
+        </span>
+        <span class="nav-chart__legend-item">
+          <span class="nav-chart__legend-dot" style="background:#FF9800"></span> Manual
+        </span>
+      </div>
     </div>
 
   </div>
@@ -64,6 +63,7 @@ const chartOptions = computed(() => ({
   xaxis: {
     type: 'datetime' as const,
     labels: {
+      datetimeUTC: false,
       style: { colors: 'var(--black-to-white)', fontSize: '0.7rem' },
     },
   },
@@ -99,7 +99,7 @@ const chartOptions = computed(() => ({
         dataPointIndex: i,
         fillColor: color,
         strokeColor: color,
-        size: 4,
+        size: ('Scheduled' in snap.reason) ? 0 : 4,
       }
     }),
   },
@@ -111,6 +111,8 @@ const chartOptions = computed(() => ({
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
+  flex: 1;
+  min-height: 300px;
 
   &__title {
     font-size: 1.25rem;
@@ -119,6 +121,17 @@ const chartOptions = computed(() => ({
   }
 
   &__wrap {
+    overflow: hidden;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+  }
+
+  &__inner {
+    flex: 1;
+    min-height: 0;
+    background: rgba(0, 0, 0, 0.08);
+    border-radius: 0.375rem;
     overflow: hidden;
   }
 
@@ -130,6 +143,7 @@ const chartOptions = computed(() => ({
     font-family: 'Space Mono', monospace;
     opacity: 0.7;
     flex-wrap: wrap;
+    padding-top: 0.5rem;
   }
 
   &__legend-item {

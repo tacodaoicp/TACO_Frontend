@@ -8,7 +8,7 @@
       <i class="fa-solid fa-spinner fa-spin"></i> Loading analytics...
     </div>
 
-    <div v-else class="vault-analytics__content taco-container taco-container--l2">
+    <div v-else class="vault-analytics__content taco-container taco-container--l1">
 
       <!-- key metrics grid -->
       <div class="vault-analytics__metrics">
@@ -113,7 +113,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useNachosStore } from '../../stores/nachos.store'
 
 const nachosStore = useNachosStore()
@@ -133,14 +133,19 @@ const hasNonICPTokens = computed(() =>
   nachosStore.acceptedTokens.some(([p, c]: [any, any]) => c.enabled && p.toText() !== ICP_PRINCIPAL)
 )
 
-onMounted(async () => {
+const loadAnalytics = async () => {
   try {
     const actor = await createAnalyticsActor()
     analytics.value = await actor.getVaultAnalytics()
   } catch (e) {
     console.error('Failed to load vault analytics:', e)
   }
-})
+}
+
+onMounted(loadAnalytics)
+
+// Re-fetch when dashboard data updates (30s auto-refresh or after operations)
+watch(() => nachosStore.dashboardData, loadAnalytics)
 
 // Create anonymous actor for analytics query
 const createAnalyticsActor = async () => {
@@ -249,6 +254,9 @@ const rateLimitPct = (type: 'mint' | 'burn'): number => {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
     gap: 0.75rem;
+    background: rgba(0, 0, 0, 0.08);
+    border-radius: 0.375rem;
+    padding: 0.75rem;
   }
 
   &__metric {
@@ -279,6 +287,9 @@ const rateLimitPct = (type: 'mint' | 'burn'): number => {
     display: flex;
     flex-direction: column;
     gap: 0.5rem;
+    background: rgba(0, 0, 0, 0.08);
+    border-radius: 0.375rem;
+    padding: 0.75rem;
 
     &-title {
       font-size: 0.95rem;

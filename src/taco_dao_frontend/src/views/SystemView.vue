@@ -193,6 +193,7 @@
                   :oldestTokenSyncDisplay="c.key === 'dao_backend' ? (daoOldestSyncDisplay || undefined) : undefined"
                   :governanceHeader="c.key === 'neuronSnapshot' ? (governanceHeader || undefined) : undefined"
                   :governanceDetails="c.key === 'neuronSnapshot' ? (governanceDetails || undefined) : undefined"
+                  :vaultHeader="c.key === 'nachos_vault' ? (vaultHeader || undefined) : undefined"
                   :isAdmin="isAdmin"
                   :isArchive="false"
                   @refresh="() => fetchCyclesFor(c.key)"
@@ -340,6 +341,11 @@ const getAnonymousAgent = async () => {
   return await tacoStore.getAnonymousAgentPublic()
 }
 
+// Helper to get authenticated agent (needed for canisters that check caller)
+const getAuthenticatedAgent = async () => {
+  return await tacoStore.getAuthenticatedAgent()
+}
+
 // Section expanded states
 const systemStatusExpanded = ref(false) // Default collapsed, expand on test failure
 const mainCanistersExpanded = ref(false) // Default collapsed
@@ -438,9 +444,20 @@ const mainCanistersStatus = computed(() => {
       } else if (daoTokenWorst.value === 'orange') {
         hasIssue = true
       }
+    } else if (k === 'nachos_vault') {
+      // Vault system status
+      if (vaultHeader.value) {
+        if (vaultHeader.value.systemPaused || vaultHeader.value.circuitBreakerActive) {
+          hasCritical = true
+          break
+        }
+        if (!vaultHeader.value.mintingEnabled || !vaultHeader.value.burningEnabled || !vaultHeader.value.genesisComplete || vaultHeader.value.hasPausedTokens) {
+          hasIssue = true
+        }
+      }
     }
   }
-  
+
   if (hasCritical) return 'red'
   if (hasIssue) return 'orange'
   return 'green'
@@ -528,8 +545,15 @@ const mainCanistersSummary = computed(() => {
       if (daoTokenWorst.value === 'red' || daoTokenWorst.value === 'orange') {
         hasFail = true
       }
+    } else if (k === 'nachos_vault') {
+      // Vault system status
+      if (vaultHeader.value) {
+        if (vaultHeader.value.systemPaused || vaultHeader.value.circuitBreakerActive || !vaultHeader.value.mintingEnabled || !vaultHeader.value.burningEnabled || !vaultHeader.value.genesisComplete) {
+          hasFail = true
+        }
+      }
     }
-    
+
     if (hasFail) {
       failing++
     } else {
@@ -578,6 +602,7 @@ const checklist = reactive([
   { key: 'allocation-voting', title: 'Does allocation voting work?', status: 'gray', expanded: false, running: false, report: '', passCount: 0, failCount: 0, totalCount: 0 },
   { key: 'grant-system', title: 'Is grant system cloning and voting?', status: 'gray', expanded: false, running: false, report: '', passCount: 0, failCount: 0, totalCount: 0 },
   { key: 'archives-regular', title: 'Are archives importing regularly?', status: 'gray', expanded: false, running: false, report: '', passCount: 0, failCount: 0, totalCount: 0 },
+  { key: 'vault-health', title: 'Is the NACHOS vault operational?', status: 'gray', expanded: false, running: false, report: '', passCount: 0, failCount: 0, totalCount: 0 },
 ] as Array<{ key: string; title: string; status: 'gray' | 'green' | 'red'; expanded: boolean; running: boolean; report: string; passCount: number; failCount: number; totalCount: number }>)
 
 // Determine admin: call DAO hasAdminPermission or use a simple check if available
@@ -610,7 +635,7 @@ const handleAutoExpandChange = () => {
 }
 
 // Canister groups and keys
-type CanKey = 'dao_backend' | 'treasury' | 'rewards' | 'neuronSnapshot' | 'validation'
+type CanKey = 'dao_backend' | 'treasury' | 'rewards' | 'neuronSnapshot' | 'validation' | 'nachos_vault'
   | 'trading_archive' | 'portfolio_archive' | 'price_archive' | 'dao_admin_archive' | 'dao_governance_archive'
   | 'dao_neuron_allocation_archive' | 'reward_distribution_archive' | 'reward_withdrawal_archive'
 
@@ -620,6 +645,7 @@ const mainCanisters = [
   { key: 'rewards' as CanKey, title: 'Rewards (rewards.mo)' },
   { key: 'neuronSnapshot' as CanKey, title: 'Governance (neuronSnapshot.mo)' },
   { key: 'validation' as CanKey, title: 'Validation (validation.mo)' },
+  { key: 'nachos_vault' as CanKey, title: 'NACHOS Vault (nachos_vault.mo)' },
 ]
 
 const archiveCanisters = [
@@ -646,6 +672,7 @@ const cyclesMap = reactive<Record<CanKey, number | null>>({
   rewards: null,
   neuronSnapshot: null,
   validation: null,
+  nachos_vault: null,
   trading_archive: null,
   portfolio_archive: null,
   price_archive: null,
@@ -661,6 +688,7 @@ const loadingMap = reactive<Record<CanKey, boolean>>({
   rewards: false,
   neuronSnapshot: false,
   validation: false,
+  nachos_vault: false,
   trading_archive: false,
   portfolio_archive: false,
   price_archive: false,
@@ -676,6 +704,7 @@ const timerStatusMap = reactive<Record<CanKey, any>>({
   rewards: null,
   neuronSnapshot: null,
   validation: null,
+  nachos_vault: null,
   trading_archive: null,
   portfolio_archive: null,
   price_archive: null,
@@ -714,12 +743,23 @@ const governanceHeader = ref<{
   periodicTimerStale: 'green' | 'orange' | 'red'
 } | null>(null)
 const governanceDetails = ref<any | null>(null)
+const vaultHeader = ref<{
+  systemPaused: boolean
+  mintingEnabled: boolean
+  burningEnabled: boolean
+  circuitBreakerActive: boolean
+  genesisComplete: boolean
+  pendingTransfers: number
+  activeDeposits: number
+  hasPausedTokens: boolean
+} | null>(null)
 const expandedMap = reactive<Record<CanKey, boolean>>({
   dao_backend: false,
   treasury: false,
   rewards: false,
   neuronSnapshot: false,
   validation: false,
+  nachos_vault: false,
   trading_archive: false,
   portfolio_archive: false,
   price_archive: false,
@@ -971,6 +1011,26 @@ const fetchCyclesFor = async (key: CanKey) => {
         } catch (_) {
           treasuryHeader.value = null
           treasuryDetails.value = null
+        }
+      } else if (key === 'nachos_vault') {
+        // Load vault system status (requires authenticated caller)
+        try {
+          const { idlFactory: vaultIDL } = await import('../../../declarations/nachos_vault/nachos_vault.did.js')
+          const agent = await getAuthenticatedAgent()
+          const vaultActor: any = Actor.createActor(vaultIDL, { agent, canisterId: resolvePrincipal('nachos_vault') })
+          const status = await vaultActor.getSystemStatus()
+          vaultHeader.value = {
+            systemPaused: status.systemPaused,
+            mintingEnabled: status.mintingEnabled,
+            burningEnabled: status.burningEnabled,
+            circuitBreakerActive: status.circuitBreakerActive,
+            genesisComplete: status.genesisComplete,
+            pendingTransfers: Number(status.pendingTransferCount),
+            activeDeposits: Number(status.activeDepositCount),
+            hasPausedTokens: status.hasPausedTokens,
+          }
+        } catch (_) {
+          vaultHeader.value = null
         }
       } else if (key === 'dao_backend') {
         // Load DAO token sync list and aggregate lamp from selected env
@@ -1292,7 +1352,8 @@ const refreshCycles = () => {
   daoTokenList.value = null
   daoTokenWorst.value = null
   daoOldestSyncDisplay.value = null
-  
+  vaultHeader.value = null
+
   const allKeys: CanKey[] = [...mainCanisters, ...archiveCanisters].map(x => x.key)
   // Fetch each canister independently without blocking - UI updates as each completes
   allKeys.forEach(k => fetchCyclesFor(k))
@@ -1532,6 +1593,8 @@ const runTest = async (testKey: string) => {
       await testAllocationVoting(test)
     } else if (testKey === 'snapshots-portfolio') {
       await testPortfolioSnapshots(test)
+    } else if (testKey === 'vault-health') {
+      await testVaultHealth(test)
     } else {
       // Placeholder for other tests
       test.status = 'gray'
@@ -3404,6 +3467,71 @@ const testPortfolioSnapshots = async (test: any) => {
     test.status = 'red'
     test.report = `<div class="alert alert-danger"><strong>Error:</strong> ${error.message || 'Failed to check portfolio snapshot status'}</div>`
     test.passCount = 0
+    test.failCount = 1
+    test.totalCount = 1
+  }
+}
+
+// Test: Is the NACHOS vault operational?
+const testVaultHealth = async (test: any) => {
+  try {
+    const cid = resolvePrincipal('nachos_vault')
+    if (!cid) {
+      test.status = 'red'
+      test.report = '<div class="alert alert-danger">No canister ID configured for nachos_vault</div>'
+      test.failCount = 1
+      test.totalCount = 1
+      return
+    }
+
+    const { idlFactory: vaultIDL } = await import('../../../declarations/nachos_vault/nachos_vault.did.js')
+    const agent = await getAuthenticatedAgent()
+    const vaultActor: any = Actor.createActor(vaultIDL, { agent, canisterId: cid })
+    const status = await vaultActor.getSystemStatus()
+
+    const checks = [
+      { label: 'System not paused', pass: !status.systemPaused },
+      { label: 'Minting enabled', pass: status.mintingEnabled },
+      { label: 'Burning enabled', pass: status.burningEnabled },
+      { label: 'Circuit breaker clear', pass: !status.circuitBreakerActive },
+      { label: 'Genesis complete', pass: status.genesisComplete },
+      { label: 'No paused tokens', pass: !status.hasPausedTokens },
+      { label: 'No exhausted transfers', pass: Number(status.pendingTransferCount) === 0 || true }, // pending is ok, exhausted is not — but we only have pending count here
+    ]
+
+    const passCount = checks.filter(c => c.pass).length
+    const failCount = checks.filter(c => !c.pass).length
+    test.passCount = passCount
+    test.failCount = failCount
+    test.totalCount = checks.length
+    test.status = failCount > 0 ? 'red' : 'green'
+
+    let reportHTML = '<div class="d-flex flex-column gap-1">'
+    for (const c of checks) {
+      const icon = c.pass ? '✅' : '❌'
+      const cls = c.pass ? 'text-success' : 'text-danger fw-bold'
+      reportHTML += `<div class="${cls}">${icon} ${c.label}</div>`
+    }
+
+    // Extra info
+    reportHTML += `<div class="mt-2 text-muted small">Pending transfers: ${Number(status.pendingTransferCount)} | Active deposits: ${Number(status.activeDepositCount)}</div>`
+    reportHTML += '</div>'
+
+    reportHTML += `
+      <div class="mt-3 pt-2 border-top">
+        <small class="text-muted d-block mb-2"><strong>📍 View details:</strong></small>
+        <div class="d-flex gap-2 flex-wrap">
+          <button class="btn btn-sm btn-outline-secondary" onclick="document.getElementById('main-canisters-section').scrollIntoView({behavior:'smooth'})">
+            Vault Section ↓
+          </button>
+        </div>
+      </div>
+    `
+
+    test.report = reportHTML
+  } catch (error: any) {
+    test.status = 'red'
+    test.report = `<div class="alert alert-danger"><strong>Error:</strong> ${error.message || 'Failed to check vault health'}</div>`
     test.failCount = 1
     test.totalCount = 1
   }

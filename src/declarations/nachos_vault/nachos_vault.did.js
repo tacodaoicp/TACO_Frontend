@@ -1,5 +1,31 @@
 export const idlFactory = ({ IDL }) => {
   const Result = IDL.Variant({ 'ok' : IDL.Text, 'err' : IDL.Text });
+  const CircuitBreakerAction = IDL.Variant({
+    'RejectOperation' : IDL.Null,
+    'PauseBoth' : IDL.Null,
+    'PauseBurn' : IDL.Null,
+    'PauseMint' : IDL.Null,
+  });
+  const CircuitBreakerConditionType = IDL.Variant({
+    'DecimalChange' : IDL.Null,
+    'BalanceChange' : IDL.Null,
+    'NavDrop' : IDL.Null,
+    'PriceChange' : IDL.Null,
+  });
+  const CircuitBreakerConditionInput = IDL.Record({
+    'direction' : IDL.Variant({
+      'Up' : IDL.Null,
+      'Both' : IDL.Null,
+      'Down' : IDL.Null,
+    }),
+    'action' : CircuitBreakerAction,
+    'timeWindowNS' : IDL.Nat,
+    'conditionType' : CircuitBreakerConditionType,
+    'enabled' : IDL.Bool,
+    'thresholdPercent' : IDL.Float64,
+    'applicableTokens' : IDL.Vec(IDL.Principal),
+  });
+  const Result_1 = IDL.Variant({ 'ok' : IDL.Nat, 'err' : IDL.Text });
   const NachosError = IDL.Variant({
     'PriceStale' : IDL.Null,
     'DepositAlreadyConsumed' : IDL.Null,
@@ -128,6 +154,81 @@ export const idlFactory = ({ IDL }) => {
     'addedAt' : IDL.Int,
     'addedBy' : IDL.Principal,
   });
+  const CachedNAV = IDL.Record({
+    'nachosSupply' : IDL.Nat,
+    'navPerTokenE8s' : IDL.Nat,
+    'timestamp' : IDL.Int,
+    'portfolioValueICP' : IDL.Nat,
+  });
+  const CircuitBreakerCondition = IDL.Record({
+    'id' : IDL.Nat,
+    'direction' : IDL.Variant({
+      'Up' : IDL.Null,
+      'Both' : IDL.Null,
+      'Down' : IDL.Null,
+    }),
+    'action' : CircuitBreakerAction,
+    'timeWindowNS' : IDL.Nat,
+    'createdAt' : IDL.Int,
+    'createdBy' : IDL.Principal,
+    'conditionType' : CircuitBreakerConditionType,
+    'enabled' : IDL.Bool,
+    'thresholdPercent' : IDL.Float64,
+    'applicableTokens' : IDL.Vec(IDL.Principal),
+  });
+  const CircuitBreakerAlert = IDL.Record({
+    'id' : IDL.Nat,
+    'token' : IDL.Opt(IDL.Principal),
+    'conditionId' : IDL.Nat,
+    'conditionType' : CircuitBreakerConditionType,
+    'tokenSymbol' : IDL.Text,
+    'timestamp' : IDL.Int,
+    'details' : IDL.Text,
+    'actionTaken' : CircuitBreakerAction,
+  });
+  const FeeExemptConfig = IDL.Record({
+    'enabled' : IDL.Bool,
+    'addedAt' : IDL.Int,
+    'addedBy' : IDL.Principal,
+    'reason' : IDL.Text,
+  });
+  const TransferStatus = IDL.Variant({
+    'Failed' : IDL.Text,
+    'Sent' : IDL.Null,
+    'Confirmed' : IDL.Nat64,
+    'Pending' : IDL.Null,
+  });
+  const TransferOperationType = IDL.Variant({
+    'MintReturn' : IDL.Null,
+    'ExcessReturn' : IDL.Null,
+    'BurnPayout' : IDL.Null,
+    'Recovery' : IDL.Null,
+    'ForwardToPortfolio' : IDL.Null,
+    'CancelReturn' : IDL.Null,
+  });
+  const TransferRecipient = IDL.Variant({
+    'principal' : IDL.Principal,
+    'accountId' : IDL.Record({
+      'owner' : IDL.Principal,
+      'subaccount' : IDL.Opt(IDL.Vec(IDL.Nat8)),
+    }),
+  });
+  const VaultTransferTask = IDL.Record({
+    'id' : IDL.Nat,
+    'status' : TransferStatus,
+    'tokenPrincipal' : IDL.Principal,
+    'fromSubaccount' : IDL.Nat8,
+    'createdAt' : IDL.Int,
+    'operationType' : TransferOperationType,
+    'recipient' : TransferRecipient,
+    'updatedAt' : IDL.Int,
+    'retryCount' : IDL.Nat,
+    'operationId' : IDL.Nat,
+    'blockIndex' : IDL.Opt(IDL.Nat64),
+    'caller' : IDL.Principal,
+    'amount' : IDL.Nat,
+    'actualAmountSent' : IDL.Opt(IDL.Nat),
+  });
   const TokenTransferResult = IDL.Record({
     'token' : IDL.Principal,
     'txId' : IDL.Opt(IDL.Nat),
@@ -165,12 +266,6 @@ export const idlFactory = ({ IDL }) => {
     'amount' : IDL.Nat,
     'mintBurnId' : IDL.Opt(IDL.Nat),
   });
-  const FeeExemptConfig = IDL.Record({
-    'enabled' : IDL.Bool,
-    'addedAt' : IDL.Int,
-    'addedBy' : IDL.Principal,
-    'reason' : IDL.Text,
-  });
   const FeeRecord = IDL.Record({
     'feeAmountICP' : IDL.Nat,
     'feeType' : IDL.Variant({ 'Burn' : IDL.Null, 'Mint' : IDL.Null }),
@@ -204,12 +299,6 @@ export const idlFactory = ({ IDL }) => {
     'deposits' : IDL.Vec(TokenDeposit),
     'navUsed' : IDL.Nat,
   });
-  const CachedNAV = IDL.Record({
-    'nachosSupply' : IDL.Nat,
-    'navPerTokenE8s' : IDL.Nat,
-    'timestamp' : IDL.Int,
-    'portfolioValueICP' : IDL.Nat,
-  });
   const NavSnapshotReason = IDL.Variant({
     'Burn' : IDL.Null,
     'Mint' : IDL.Null,
@@ -222,42 +311,6 @@ export const idlFactory = ({ IDL }) => {
     'timestamp' : IDL.Int,
     'reason' : NavSnapshotReason,
     'portfolioValueICP' : IDL.Nat,
-  });
-  const TransferStatus = IDL.Variant({
-    'Failed' : IDL.Text,
-    'Sent' : IDL.Null,
-    'Confirmed' : IDL.Nat64,
-    'Pending' : IDL.Null,
-  });
-  const TransferOperationType = IDL.Variant({
-    'MintReturn' : IDL.Null,
-    'ExcessReturn' : IDL.Null,
-    'BurnPayout' : IDL.Null,
-    'Recovery' : IDL.Null,
-    'CancelReturn' : IDL.Null,
-  });
-  const TransferRecipient = IDL.Variant({
-    'principal' : IDL.Principal,
-    'accountId' : IDL.Record({
-      'owner' : IDL.Principal,
-      'subaccount' : IDL.Opt(IDL.Vec(IDL.Nat8)),
-    }),
-  });
-  const VaultTransferTask = IDL.Record({
-    'id' : IDL.Nat,
-    'status' : TransferStatus,
-    'tokenPrincipal' : IDL.Principal,
-    'fromSubaccount' : IDL.Nat8,
-    'createdAt' : IDL.Int,
-    'operationType' : TransferOperationType,
-    'recipient' : TransferRecipient,
-    'updatedAt' : IDL.Int,
-    'retryCount' : IDL.Nat,
-    'operationId' : IDL.Nat,
-    'blockIndex' : IDL.Opt(IDL.Nat64),
-    'caller' : IDL.Principal,
-    'amount' : IDL.Nat,
-    'actualAmountSent' : IDL.Opt(IDL.Nat),
   });
   const FailedTokenTransfer = IDL.Record({
     'token' : IDL.Principal,
@@ -279,7 +332,6 @@ export const idlFactory = ({ IDL }) => {
     'skippedDustTokens' : IDL.Vec(IDL.Principal),
   });
   const Result_2 = IDL.Variant({ 'ok' : BurnResult, 'err' : NachosError });
-  const Result_1 = IDL.Variant({ 'ok' : IDL.Nat, 'err' : IDL.Text });
   const NachosUpdateConfig = IDL.Record({
     'maxMintICPWorthPer4Hours' : IDL.Opt(IDL.Nat),
     'minBurnValueICP' : IDL.Opt(IDL.Nat),
@@ -305,6 +357,11 @@ export const idlFactory = ({ IDL }) => {
   });
   const NachosVaultDAO = IDL.Service({
     'addAcceptedMintToken' : IDL.Func([IDL.Principal], [Result], []),
+    'addCircuitBreakerCondition' : IDL.Func(
+        [CircuitBreakerConditionInput],
+        [Result_1],
+        [],
+      ),
     'addFeeExemptPrincipal' : IDL.Func([IDL.Principal, IDL.Text], [Result], []),
     'addRateLimitExemptPrincipal' : IDL.Func(
         [IDL.Principal, IDL.Text],
@@ -320,6 +377,11 @@ export const idlFactory = ({ IDL }) => {
     'claimMintFees' : IDL.Func([IDL.Principal, IDL.Nat], [Result], []),
     'emergencyPause' : IDL.Func([], [Result], []),
     'emergencyUnpause' : IDL.Func([], [Result], []),
+    'enableCircuitBreakerCondition' : IDL.Func(
+        [IDL.Nat, IDL.Bool],
+        [Result],
+        [],
+      ),
     'estimateBurnTokens' : IDL.Func(
         [IDL.Nat],
         [
@@ -380,9 +442,127 @@ export const idlFactory = ({ IDL }) => {
         ['query'],
       ),
     'getActiveDepositsCount' : IDL.Func([], [IDL.Nat], ['query']),
+    'getAdminDashboard' : IDL.Func(
+        [],
+        [
+          IDL.Record({
+            'nav' : IDL.Opt(CachedNAV),
+            'totalBurnVolumeICP' : IDL.Nat,
+            'portfolio' : IDL.Vec(
+              IDL.Record({
+                'decimals' : IDL.Nat,
+                'token' : IDL.Principal,
+                'balance' : IDL.Nat,
+                'currentBasisPoints' : IDL.Nat,
+                'priceICP' : IDL.Nat,
+                'priceUSD' : IDL.Float64,
+                'valueICP' : IDL.Nat,
+                'symbol' : IDL.Text,
+                'targetBasisPoints' : IDL.Nat,
+              })
+            ),
+            'totalBurnCount' : IDL.Nat,
+            'dataSource' : IDL.Text,
+            'activeDepositCount' : IDL.Nat,
+            'mintPausedByCircuitBreaker' : IDL.Bool,
+            'minBurnValueICP' : IDL.Nat,
+            'circuitBreakerConditions' : IDL.Vec(CircuitBreakerCondition),
+            'totalMintCount' : IDL.Nat,
+            'hasPausedTokens' : IDL.Bool,
+            'mintsByMode' : IDL.Record({
+              'icp' : IDL.Nat,
+              'portfolioShare' : IDL.Nat,
+              'singleToken' : IDL.Nat,
+            }),
+            'acceptedTokens' : IDL.Vec(
+              IDL.Tuple(IDL.Principal, AcceptedTokenConfig)
+            ),
+            'globalBurnIn4h' : IDL.Nat,
+            'maxBurnPer4h' : IDL.Nat,
+            'circuitBreakerActive' : IDL.Bool,
+            'totalMintVolumeICP' : IDL.Nat,
+            'nachosLedger' : IDL.Opt(IDL.Principal),
+            'totalFeesCollectedICP' : IDL.Nat,
+            'maxMintPer4h' : IDL.Nat,
+            'feeCount' : IDL.Nat,
+            'burnFeeBasisPoints' : IDL.Nat,
+            'nachosSupply' : IDL.Nat,
+            'claimableMintFees' : IDL.Record({
+              'claimed' : IDL.Nat,
+              'claimable' : IDL.Nat,
+              'accumulated' : IDL.Nat,
+            }),
+            'mintFeeBasisPoints' : IDL.Nat,
+            'claimableCancellationFees' : IDL.Vec(
+              IDL.Record({
+                'token' : IDL.Principal,
+                'claimed' : IDL.Nat,
+                'claimable' : IDL.Nat,
+                'accumulated' : IDL.Nat,
+              })
+            ),
+            'mintFeesICP' : IDL.Nat,
+            'genesisComplete' : IDL.Bool,
+            'totalBurnVolumeNACHOS' : IDL.Nat,
+            'recentAlerts' : IDL.Vec(CircuitBreakerAlert),
+            'canisterCycles' : IDL.Nat,
+            'globalMintIn4h' : IDL.Nat,
+            'fullConfig' : IDL.Record({
+              'maxMintICPWorthPer4Hours' : IDL.Nat,
+              'portfolioShareMaxDeviationBP' : IDL.Nat,
+              'maxBurnNachosPerUser4Hours' : IDL.Nat,
+              'cancellationFeeMultiplier' : IDL.Nat,
+              'maxSlippageBasisPoints' : IDL.Nat,
+              'maxMintOpsPerUser4Hours' : IDL.Nat,
+              'maxMintAmountICP' : IDL.Nat,
+              'maxBurnOpsPerUser4Hours' : IDL.Nat,
+              'navDropThresholdPercent' : IDL.Float64,
+              'maxNachosBurnPer4Hours' : IDL.Nat,
+              'maxBurnAmountNachos' : IDL.Nat,
+              'maxMintICPPerUser4Hours' : IDL.Nat,
+            }),
+            'dataTimestamp' : IDL.Int,
+            'burnPausedByCircuitBreaker' : IDL.Bool,
+            'feeExemptPrincipals' : IDL.Vec(
+              IDL.Tuple(IDL.Principal, FeeExemptConfig)
+            ),
+            'transferQueue' : IDL.Record({
+              'tasks' : IDL.Vec(VaultTransferTask),
+              'pending' : IDL.Nat,
+              'completed' : IDL.Nat,
+              'exhausted' : IDL.Nat,
+            }),
+            'pausedTokens' : IDL.Vec(
+              IDL.Record({ 'token' : IDL.Principal, 'symbol' : IDL.Text })
+            ),
+            'systemPaused' : IDL.Bool,
+            'burningEnabled' : IDL.Bool,
+            'minMintValueICP' : IDL.Nat,
+            'navChangePercent' : IDL.Opt(IDL.Float64),
+            'pendingTransferCount' : IDL.Nat,
+            'burnFeesICP' : IDL.Nat,
+            'mintingEnabled' : IDL.Bool,
+            'rateLimitExemptPrincipals' : IDL.Vec(
+              IDL.Tuple(IDL.Principal, FeeExemptConfig)
+            ),
+            'portfolioValueICP' : IDL.Nat,
+          }),
+        ],
+        ['composite_query'],
+      ),
     'getBurnHistory' : IDL.Func(
         [IDL.Nat, IDL.Nat],
         [IDL.Vec(BurnRecord)],
+        ['query'],
+      ),
+    'getCircuitBreakerAlerts' : IDL.Func(
+        [IDL.Nat, IDL.Nat],
+        [IDL.Vec(CircuitBreakerAlert)],
+        ['query'],
+      ),
+    'getCircuitBreakerConditions' : IDL.Func(
+        [],
+        [IDL.Vec(CircuitBreakerCondition)],
         ['query'],
       ),
     'getClaimableCancellationFees' : IDL.Func(
@@ -527,11 +707,13 @@ export const idlFactory = ({ IDL }) => {
           IDL.Record({
             'totalMints' : IDL.Nat,
             'activeDepositCount' : IDL.Nat,
+            'mintPausedByCircuitBreaker' : IDL.Bool,
             'hasPausedTokens' : IDL.Bool,
             'cachedNAV' : IDL.Opt(CachedNAV),
             'circuitBreakerActive' : IDL.Bool,
             'nachosLedger' : IDL.Opt(IDL.Principal),
             'genesisComplete' : IDL.Bool,
+            'burnPausedByCircuitBreaker' : IDL.Bool,
             'totalBurns' : IDL.Nat,
             'pausedTokens' : IDL.Vec(
               IDL.Record({ 'token' : IDL.Principal, 'symbol' : IDL.Text })
@@ -707,6 +889,7 @@ export const idlFactory = ({ IDL }) => {
             ),
             'totalBurnCount' : IDL.Nat,
             'dataSource' : IDL.Text,
+            'mintPausedByCircuitBreaker' : IDL.Bool,
             'minBurnValueICP' : IDL.Nat,
             'totalMintCount' : IDL.Nat,
             'hasPausedTokens' : IDL.Bool,
@@ -747,6 +930,7 @@ export const idlFactory = ({ IDL }) => {
             'totalBurnVolumeNACHOS' : IDL.Nat,
             'globalMintIn4h' : IDL.Nat,
             'dataTimestamp' : IDL.Int,
+            'burnPausedByCircuitBreaker' : IDL.Bool,
             'pausedTokens' : IDL.Vec(
               IDL.Record({ 'token' : IDL.Principal, 'symbol' : IDL.Text })
             ),
@@ -799,6 +983,7 @@ export const idlFactory = ({ IDL }) => {
       ),
     'refreshICPSwapPools' : IDL.Func([], [Result], []),
     'removeAcceptedMintToken' : IDL.Func([IDL.Principal], [Result], []),
+    'removeCircuitBreakerCondition' : IDL.Func([IDL.Nat], [Result], []),
     'removeFeeExemptPrincipal' : IDL.Func([IDL.Principal], [Result], []),
     'removeRateLimitExemptPrincipal' : IDL.Func([IDL.Principal], [Result], []),
     'resetCircuitBreaker' : IDL.Func([], [Result], []),
@@ -813,6 +998,24 @@ export const idlFactory = ({ IDL }) => {
     'unpauseBurning' : IDL.Func([], [Result], []),
     'unpauseMinting' : IDL.Func([], [Result], []),
     'updateCancellationFeeMultiplier' : IDL.Func([IDL.Nat], [Result], []),
+    'updateCircuitBreakerCondition' : IDL.Func(
+        [
+          IDL.Nat,
+          IDL.Opt(IDL.Float64),
+          IDL.Opt(IDL.Nat),
+          IDL.Opt(
+            IDL.Variant({
+              'Up' : IDL.Null,
+              'Both' : IDL.Null,
+              'Down' : IDL.Null,
+            })
+          ),
+          IDL.Opt(CircuitBreakerAction),
+          IDL.Opt(IDL.Vec(IDL.Principal)),
+        ],
+        [Result],
+        [],
+      ),
     'updateFees' : IDL.Func([IDL.Nat, IDL.Nat], [Result], []),
     'updateNachosConfig' : IDL.Func([NachosUpdateConfig], [Result], []),
   });
