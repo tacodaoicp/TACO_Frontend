@@ -135,7 +135,7 @@
           <label class="vault-mint__label">Select Token</label>
           <select v-model="selectedTokenPrincipal" class="form-control taco-input" @change="tokenEstimate = null">
             <option value="">Choose a token...</option>
-            <option v-for="[principal, config] in nachosStore.acceptedTokens"
+            <option v-for="[principal, config] in nonICPAcceptedTokens"
                     :key="principal.toText()"
                     :value="principal.toText()"
                     :disabled="!config.enabled">
@@ -180,8 +180,8 @@
                    :style="{ width: (Number(tokenEstimate.allocation.afterDepositBasisPoints) / 100 - Number(tokenEstimate.allocation.currentBasisPoints) / 100) + '%' }"></div>
             </div>
             <div v-if="tokenEstimate.allocation.wouldExceed" class="vault-mint__allocation-warning">
-              This token is near its target allocation. Only {{ nachosStore.formatE8s(tokenEstimate.usedAmount) }}
-              will be accepted. {{ nachosStore.formatE8s(tokenEstimate.excessAmount) }} will be returned.
+              This token is near its target allocation. Only {{ nachosStore.formatE8s(tokenEstimate.usedAmount, selectedTokenDecimals) }}
+              will be accepted. {{ nachosStore.formatE8s(tokenEstimate.excessAmount, selectedTokenDecimals) }} will be returned.
             </div>
           </div>
         </div>
@@ -318,7 +318,7 @@ const modes = computed(() => {
 })
 const activeMode = ref('icp')
 const slippagePresets = [50, 100, 200]
-const customSlippage = ref('')
+const customSlippage = ref((nachosStore.slippageBP / 100).toFixed(1))
 
 const applyCustomSlippage = () => {
   const val = parseFloat(customSlippage.value)
@@ -383,10 +383,8 @@ const icpFeePct = computed(() => {
 })
 
 const canConfirmICP = computed(() => {
-  if (icpAmountE8s.value < nachosStore.minMintValueICP) return false
+  if (icpAmountE8s.value <= 0n) return false
   if (!icpEstimate.value) return false
-  if (nachosStore.remainingMintICP !== null && Number(icpAmountE8s.value) > nachosStore.remainingMintICP) return false
-  if (nachosStore.remainingMintOps !== null && nachosStore.remainingMintOps <= 0) return false
   return true
 })
 
@@ -440,17 +438,26 @@ const getTokenSymbol = (principal: any): string => {
   return entry?.symbol ?? principal.toText().substring(0, 8)
 }
 
-const selectedTokenSymbol = computed(() => {
-  if (!selectedTokenPrincipal.value) return ''
-  const entry = nachosStore.portfolio.find((p: any) => p.token.toText() === selectedTokenPrincipal.value)
-  return entry?.symbol ?? ''
+const nonICPAcceptedTokens = computed(() =>
+  nachosStore.acceptedTokens.filter(([p]: [any, any]) => p.toText() !== ICP_PRINCIPAL)
+)
+
+const selectedTokenEntry = computed(() => {
+  if (!selectedTokenPrincipal.value) return null
+  return nachosStore.portfolio.find((p: any) => p.token.toText() === selectedTokenPrincipal.value) ?? null
 })
+
+const selectedTokenSymbol = computed(() => selectedTokenEntry.value?.symbol ?? '')
+
+const selectedTokenDecimals = computed(() =>
+  selectedTokenEntry.value ? Number(selectedTokenEntry.value.decimals) : 8
+)
 
 const tokenAmountRaw = computed(() => {
   const val = parseFloat(tokenAmount.value)
   if (isNaN(val) || val <= 0) return 0n
-  // Assume 8 decimals — will be corrected by estimate
-  return BigInt(Math.round(val * 1e8))
+  const decimals = selectedTokenDecimals.value
+  return BigInt(Math.round(val * 10 ** decimals))
 })
 
 const canConfirmToken = computed(() =>

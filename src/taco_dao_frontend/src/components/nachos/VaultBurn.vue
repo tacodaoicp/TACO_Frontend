@@ -275,8 +275,6 @@ const nonDustTokens = computed(() =>
 const canConfirm = computed(() => {
   if (nachosAmountE8s.value <= 0n) return false
   if (!burnEstimate.value) return false
-  if (nachosStore.remainingBurnNachos !== null && Number(nachosAmountE8s.value) > nachosStore.remainingBurnNachos) return false
-  if (nachosStore.remainingBurnOps !== null && nachosStore.remainingBurnOps <= 0) return false
   return true
 })
 

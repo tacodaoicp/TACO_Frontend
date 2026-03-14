@@ -43,6 +43,15 @@ type UserPerformanceGraphData =
                 startTime: int;
               };
  };
+type UserDistributionSummary = 
+ record {
+   distributionId: nat;
+   distributionTime: int;
+   endTime: int;
+   neuronRewards: vec NeuronRewardSummary;
+   startTime: int;
+   totalRewardPot: nat;
+ };
 type TransferError = 
  variant {
    BadBurn: record {min_burn_amount: nat;};
@@ -223,6 +232,13 @@ type Rewards =
    getRewardSkipList: () -> (Result__1_5) query;
    getTacoBalance: () -> (nat);
    getTotalDistributed: () -> (nat) query;
+   getUserDistributionRewards: (neuronIds: vec blob, offset: nat, limit:
+    nat) ->
+    (record {
+       hasMore: bool;
+       records: vec UserDistributionSummary;
+       total: nat;
+     }) query;
    getUserPerformance: (userPrincipal: principal) ->
     (Result__1_4) composite_query;
    getUserPerformanceGraphData: (userPrincipal: principal, startTime: 
@@ -361,6 +377,15 @@ type PerformanceResult =
    performanceScore: float64;
    preTimespanAllocation: opt NeuronAllocationChangeBlockData;
    startTime: int;
+ };
+type NeuronRewardSummary = 
+ record {
+   neuronId: blob;
+   performanceScore: float64;
+   performanceScoreICP: opt float64;
+   rewardAmount: nat;
+   rewardScore: float64;
+   votingPower: nat;
  };
 type NeuronReward = 
  record {

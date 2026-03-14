@@ -58,6 +58,15 @@ let _appSneedDaoIDL: any = null
 let _snsGovernanceIDL: any = null
 let _alarmIDL: any = null
 let _rewardsIDL: any = null
+let _nachosVaultIDL: any = null
+
+async function getNachosVaultIDL() {
+    if (!_nachosVaultIDL) {
+        const mod = await import("../../../declarations/nachos_vault/nachos_vault.did.js")
+        _nachosVaultIDL = mod.idlFactory
+    }
+    return _nachosVaultIDL
+}
 
 // ============================================================================
 // Runtime Network Helpers - Check localStorage override at runtime
@@ -3011,6 +3020,17 @@ export const useTacoStore = defineStore('taco', () => {
         }
         return 'cjkka-gyaaa-aaaan-qz5kq-cai'; // local canisterId
     }
+    const nachosVaultCanisterId = () => {
+        const network = getEffectiveNetwork()
+        switch (network) {
+            case "ic":
+                return 'p4nog-baaaa-aaaad-qkwpa-cai'; // placeholder — update when production deployed
+            case "staging":
+                return 'p4nog-baaaa-aaaad-qkwpa-cai';
+        }
+        return 'p4nog-baaaa-aaaad-qkwpa-cai';
+    }
+
     const portfolioArchiveCanisterId = () => {
         const network = getEffectiveNetwork()
         switch (network) {
@@ -6403,6 +6423,21 @@ export const useTacoStore = defineStore('taco', () => {
         return await getAnonymousActor(canisterId, () => daoBackendIDL)
     }
 
+    // Create NACHOS vault actor (authenticated)
+    const createNachosVaultActor = async () => {
+        const canisterId = nachosVaultCanisterId()
+        const authClient = await getAuthClient()
+        const idl = await getNachosVaultIDL()
+        return await getAuthenticatedActor(authClient, canisterId, () => idl)
+    }
+
+    // Create NACHOS vault actor (anonymous - for public queries)
+    const createNachosVaultActorAnonymous = async () => {
+        const canisterId = nachosVaultCanisterId()
+        const idl = await getNachosVaultIDL()
+        return await getAnonymousActor(canisterId, () => idl)
+    }
+
     // Format neuron ID for map key
     const formatNeuronIdForMap = (neuronId: Uint8Array): string => {
         try {
@@ -9655,6 +9690,8 @@ export const useTacoStore = defineStore('taco', () => {
         createRewardsActorAnonymous,
         createDAOActor,
         createDAOActorAnonymous,
+        createNachosVaultActor,
+        createNachosVaultActorAnonymous,
         createSnsGovernanceActorPublic,
         createSnsGovernanceActorAnonymous,
         claimNeuronRewards,

@@ -1015,9 +1015,7 @@ const fetchCyclesFor = async (key: CanKey) => {
       } else if (key === 'nachos_vault') {
         // Load vault system status (requires authenticated caller)
         try {
-          const { idlFactory: vaultIDL } = await import('../../../declarations/nachos_vault/nachos_vault.did.js')
-          const agent = await getAuthenticatedAgent()
-          const vaultActor: any = Actor.createActor(vaultIDL, { agent, canisterId: resolvePrincipal('nachos_vault') })
+          const vaultActor: any = await tacoStore.createNachosVaultActor()
           const status = await vaultActor.getSystemStatus()
           vaultHeader.value = {
             systemPaused: status.systemPaused,
@@ -3484,9 +3482,7 @@ const testVaultHealth = async (test: any) => {
       return
     }
 
-    const { idlFactory: vaultIDL } = await import('../../../declarations/nachos_vault/nachos_vault.did.js')
-    const agent = await getAuthenticatedAgent()
-    const vaultActor: any = Actor.createActor(vaultIDL, { agent, canisterId: cid })
+    const vaultActor: any = await tacoStore.createNachosVaultActor()
     const status = await vaultActor.getSystemStatus()
 
     const checks = [

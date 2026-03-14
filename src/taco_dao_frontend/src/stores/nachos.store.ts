@@ -10,7 +10,7 @@ import { Actor } from '@dfinity/agent'
 import { Principal } from '@dfinity/principal'
 import { useTacoStore } from './taco.store'
 import { getEffectiveNetwork } from '../config/network-config'
-import { idlFactory as nachosVaultIdlFactory } from '../../../declarations/nachos_vault/nachos_vault.did.js'
+// Vault IDL factory now managed by taco.store's lazy loader + actor cache
 import type {
   MintResult, BurnResult, NachosError, CachedNAV, ActiveDeposit,
   MintRecord, BurnRecord, NavSnapshot, MintMode, DepositStatus,
@@ -187,13 +187,9 @@ export const useNachosStore = defineStore('nachos', () => {
   // ============================================================================
 
   const createVaultActor = async (authenticated = false) => {
-    const agent = authenticated
-      ? await tacoStore.getAuthenticatedAgent()
-      : await tacoStore.getAnonymousAgentPublic()
-    return Actor.createActor(nachosVaultIdlFactory, {
-      agent,
-      canisterId: NACHOS_VAULT_ID(),
-    })
+    return authenticated
+      ? await tacoStore.createNachosVaultActor()
+      : await tacoStore.createNachosVaultActorAnonymous()
   }
 
   // ICRC1 token actor — inline IDL from kong.store.ts
@@ -471,53 +467,104 @@ export const useNachosStore = defineStore('nachos', () => {
 
   const depositICPForMint = async (amountE8s: bigint): Promise<bigint> => {
     const tokenActor = await createTokenActor(ICP_LEDGER_ID)
-    const result = await (tokenActor as any).icrc1_transfer({
-      to: {
-        owner: Principal.fromText(TREASURY_ID()),
-        subaccount: [DEPOSIT_SUBACCOUNT],
-      },
-      amount: amountE8s,
-      fee: [10_000n],
-      memo: [],
-      from_subaccount: [],
-      created_at_time: [],
-    })
-    if ('Ok' in result) return result.Ok
-    throw new Error(`ICP transfer failed: ${JSON.stringify(result.Err, (_, v) => typeof v === 'bigint' ? v.toString() : v)}`)
+    const createdAt = BigInt(Date.now()) * 1_000_000n // nanoseconds — fixed across retries for deduplication
+    let lastError: any
+
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        const result = await (tokenActor as any).icrc1_transfer({
+          to: {
+            owner: Principal.fromText(TREASURY_ID()),
+            subaccount: [DEPOSIT_SUBACCOUNT],
+          },
+          amount: amountE8s,
+          fee: [10_000n],
+          memo: [],
+          from_subaccount: [],
+          created_at_time: [createdAt],
+        })
+        if ('Ok' in result) return result.Ok
+        if ('Err' in result && 'Duplicate' in result.Err) return result.Err.Duplicate.duplicate_of
+        const errStr = JSON.stringify(result.Err, (_, v) => typeof v === 'bigint' ? v.toString() : v)
+        if ('Err' in result && ('InsufficientFunds' in result.Err || 'BadFee' in result.Err)) {
+          throw new Error(`ICP transfer failed: ${errStr}`)
+        }
+        lastError = new Error(`ICP transfer failed: ${errStr}`)
+      } catch (e: any) {
+        lastError = e
+        if (e.message?.includes('InsufficientFunds') || e.message?.includes('BadFee')) throw e
+      }
+      if (attempt < 3) await new Promise(r => setTimeout(r, 1000 * attempt))
+    }
+    throw lastError
   }
 
   const depositTokenForMint = async (tokenPrincipal: string, amount: bigint, fee: bigint): Promise<bigint> => {
     const tokenActor = await createTokenActor(tokenPrincipal)
-    const result = await (tokenActor as any).icrc1_transfer({
-      to: {
-        owner: Principal.fromText(TREASURY_ID()),
-        subaccount: [DEPOSIT_SUBACCOUNT],
-      },
-      amount,
-      fee: [fee],
-      memo: [],
-      from_subaccount: [],
-      created_at_time: [],
-    })
-    if ('Ok' in result) return result.Ok
-    throw new Error(`Token transfer failed: ${JSON.stringify(result.Err, (_, v) => typeof v === 'bigint' ? v.toString() : v)}`)
+    const createdAt = BigInt(Date.now()) * 1_000_000n
+    let lastError: any
+
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        const result = await (tokenActor as any).icrc1_transfer({
+          to: {
+            owner: Principal.fromText(TREASURY_ID()),
+            subaccount: [DEPOSIT_SUBACCOUNT],
+          },
+          amount,
+          fee: [fee],
+          memo: [],
+          from_subaccount: [],
+          created_at_time: [createdAt],
+        })
+        if ('Ok' in result) return result.Ok
+        if ('Err' in result && 'Duplicate' in result.Err) return result.Err.Duplicate.duplicate_of
+        const errStr = JSON.stringify(result.Err, (_, v) => typeof v === 'bigint' ? v.toString() : v)
+        if ('Err' in result && ('InsufficientFunds' in result.Err || 'BadFee' in result.Err)) {
+          throw new Error(`Token transfer failed: ${errStr}`)
+        }
+        lastError = new Error(`Token transfer failed: ${errStr}`)
+      } catch (e: any) {
+        lastError = e
+        if (e.message?.includes('InsufficientFunds') || e.message?.includes('BadFee')) throw e
+      }
+      if (attempt < 3) await new Promise(r => setTimeout(r, 1000 * attempt))
+    }
+    throw lastError
   }
 
   const depositNachosForBurn = async (nachosAmount: bigint): Promise<bigint> => {
     const tokenActor = await createTokenActor(NACHOS_LEDGER_ID)
-    const result = await (tokenActor as any).icrc1_transfer({
-      to: {
-        owner: Principal.fromText(NACHOS_VAULT_ID()),
-        subaccount: [BURN_SUBACCOUNT],
-      },
-      amount: nachosAmount,
-      fee: [10_000n],
-      memo: [],
-      from_subaccount: [],
-      created_at_time: [],
-    })
-    if ('Ok' in result) return result.Ok
-    throw new Error(`NACHOS transfer failed: ${JSON.stringify(result.Err, (_, v) => typeof v === 'bigint' ? v.toString() : v)}`)
+    const createdAt = BigInt(Date.now()) * 1_000_000n
+    let lastError: any
+
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        const result = await (tokenActor as any).icrc1_transfer({
+          to: {
+            owner: Principal.fromText(NACHOS_VAULT_ID()),
+            subaccount: [BURN_SUBACCOUNT],
+          },
+          amount: nachosAmount,
+          fee: [10_000n],
+          memo: [],
+          from_subaccount: [],
+          created_at_time: [createdAt],
+        })
+        if ('Ok' in result) return result.Ok
+        if ('Err' in result && 'Duplicate' in result.Err) return result.Err.Duplicate.duplicate_of
+        const errStr = JSON.stringify(result.Err, (_, v) => typeof v === 'bigint' ? v.toString() : v)
+        if ('Err' in result && ('InsufficientFunds' in result.Err || 'BadFee' in result.Err)) {
+          throw new Error(`NACHOS transfer failed: ${errStr}`)
+        }
+        lastError = new Error(`NACHOS transfer failed: ${errStr}`)
+      } catch (e: any) {
+        lastError = e
+        if (e.message?.includes('InsufficientFunds') || e.message?.includes('BadFee')) throw e
+      }
+      if (attempt < 3) await new Promise(r => setTimeout(r, 1000 * attempt))
+    }
+    throw lastError
   }
 
   const getTokenBalance = async (tokenPrincipal: string): Promise<bigint> => {
@@ -640,23 +687,57 @@ export const useNachosStore = defineStore('nachos', () => {
     totalEstimateNachos: bigint
   ): Promise<MintResult> => {
     activeOperationStatus.value = 'depositing'
-    const depositInfos: Array<{ token: Principal; blockNumber: bigint }> = []
 
     try {
-      for (const d of deposits) {
-        const blockNumber = await depositTokenForMint(d.token, d.amount, d.fee)
-        depositInfos.push({ token: Principal.fromText(d.token), blockNumber })
+      const depositInfos: Array<{ token: Principal; blockNumber: bigint }> = []
+      let remaining = [...deposits]
 
-        addCachedOp({
-          type: 'mint_portfolio',
-          userPrincipal: userPrincipal.value,
-          tokenPrincipal: d.token,
-          blockNumber: blockNumber.toString(),
-          amount: d.amount.toString(),
-          status: 'minting',
-          timestamp: Date.now(),
-          mintMode: 'PortfolioShare',
-        })
+      // Up to 3 batch passes — each pass retries only the failed deposits in parallel
+      for (let batch = 1; batch <= 3 && remaining.length > 0; batch++) {
+        const settled = await Promise.allSettled(
+          remaining.map(async (d) => {
+            const blockNumber = await depositTokenForMint(d.token, d.amount, d.fee)
+            addCachedOp({
+              type: 'mint_portfolio',
+              userPrincipal: userPrincipal.value,
+              tokenPrincipal: d.token,
+              blockNumber: blockNumber.toString(),
+              amount: d.amount.toString(),
+              status: 'minting',
+              timestamp: Date.now(),
+              mintMode: 'PortfolioShare',
+            })
+            return { token: Principal.fromText(d.token), blockNumber }
+          })
+        )
+
+        const stillFailed: Array<{ token: string; amount: bigint; fee: bigint }> = []
+        for (let i = 0; i < settled.length; i++) {
+          const s = settled[i]
+          if (s.status === 'fulfilled') {
+            depositInfos.push(s.value)
+          } else {
+            // Don't retry deterministic errors (InsufficientFunds, BadFee)
+            const msg = s.reason?.message || ''
+            if (msg.includes('InsufficientFunds') || msg.includes('BadFee')) {
+              throw s.reason
+            }
+            stillFailed.push(remaining[i])
+          }
+        }
+
+        remaining = stillFailed
+        if (remaining.length > 0 && batch < 3) {
+          await new Promise(r => setTimeout(r, 1000 * batch))
+        }
+      }
+
+      if (remaining.length > 0) {
+        throw new Error(
+          `${remaining.length} token deposit(s) failed after retries. ` +
+          `${depositInfos.length} deposited successfully (tracked in Operations). ` +
+          `Failed: ${remaining.map(d => d.token).join(', ')}`
+        )
       }
 
       activeOperationStatus.value = 'minting'
@@ -680,9 +761,6 @@ export const useNachosStore = defineStore('nachos', () => {
         throw new Error(errorMsg)
       }
     } catch (e: any) {
-      for (const d of depositInfos) {
-        updateCachedOp(d.blockNumber.toString(), d.token.toText(), { status: 'failed', error: e.message })
-      }
       throw e
     } finally {
       activeOperationStatus.value = null
@@ -881,6 +959,8 @@ export const useNachosStore = defineStore('nachos', () => {
     startPolling, stopPolling,
     // Lifecycle
     initialize, cleanup,
+    // Actor (for admin views)
+    createVaultActor,
     // Utilities
     formatE8s, formatICP, formatNachos, formatBasisPoints, mapNachosError,
     calculateMinimumReceive,

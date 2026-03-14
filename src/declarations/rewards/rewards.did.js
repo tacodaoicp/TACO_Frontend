@@ -214,6 +214,22 @@ export const idlFactory = ({ IDL }) => {
     'ok' : IDL.Vec(IDL.Vec(IDL.Nat8)),
     'err' : RewardsError,
   });
+  const NeuronRewardSummary = IDL.Record({
+    'rewardAmount' : IDL.Nat,
+    'performanceScore' : IDL.Float64,
+    'votingPower' : IDL.Nat,
+    'rewardScore' : IDL.Float64,
+    'neuronId' : IDL.Vec(IDL.Nat8),
+    'performanceScoreICP' : IDL.Opt(IDL.Float64),
+  });
+  const UserDistributionSummary = IDL.Record({
+    'startTime' : IDL.Int,
+    'distributionTime' : IDL.Int,
+    'endTime' : IDL.Int,
+    'totalRewardPot' : IDL.Nat,
+    'distributionId' : IDL.Nat,
+    'neuronRewards' : IDL.Vec(NeuronRewardSummary),
+  });
   const UserPerformanceResult = IDL.Record({
     'principal' : IDL.Principal,
     'lastActivity' : IDL.Int,
@@ -520,6 +536,17 @@ export const idlFactory = ({ IDL }) => {
     'getRewardSkipList' : IDL.Func([], [Result__1_5], ['query']),
     'getTacoBalance' : IDL.Func([], [IDL.Nat], []),
     'getTotalDistributed' : IDL.Func([], [IDL.Nat], ['query']),
+    'getUserDistributionRewards' : IDL.Func(
+        [IDL.Vec(IDL.Vec(IDL.Nat8)), IDL.Nat, IDL.Nat],
+        [
+          IDL.Record({
+            'total' : IDL.Nat,
+            'hasMore' : IDL.Bool,
+            'records' : IDL.Vec(UserDistributionSummary),
+          }),
+        ],
+        ['query'],
+      ),
     'getUserPerformance' : IDL.Func(
         [IDL.Principal],
         [Result__1_4],

@@ -13,6 +13,9 @@
           <button class="section-nav-item" @click="scrollToSection('leaderboard'); sectionNavOpen = false">
             <i class="fas fa-trophy me-2"></i>Leaderboard
           </button>
+          <button class="section-nav-item" @click="scrollToSection('my-distribution-rewards'); sectionNavOpen = false">
+            <i class="fas fa-coins me-2"></i>My Rewards
+          </button>
           <button class="section-nav-item" @click="scrollToSection('follow-principal'); sectionNavOpen = false">
             <i class="fas fa-user-plus me-2"></i>Follow Principal
           </button>
@@ -105,6 +108,14 @@
               @follow="onFollowUser"
               @unfollow="onUnfollowUser"
             />
+
+            <!-- MY DISTRIBUTION REWARDS (logged in users with neuron data) -->
+            <div id="my-distribution-rewards" v-if="userLoggedIn && userPerformance">
+              <MyDistributionRewards
+                :userNeuronIds="userNeuronIds"
+                :isLoadingUserPerformance="isLoadingUserPerformance"
+              />
+            </div>
 
             <!-- FOLLOW BY PRINCIPAL SECTION -->
             <div id="follow-principal" class="mx-3 mb-4" v-if="userLoggedIn">
@@ -233,6 +244,7 @@ import DfinityLogo from "../assets/images/dfinityLogo.vue"
 import MyPerformance from "../components/performance/MyPerformance.vue"
 import PerformanceLeaderboard from "../components/performance/PerformanceLeaderboard.vue"
 import MyFollowing from "../components/performance/MyFollowing.vue"
+import MyDistributionRewards from "../components/performance/MyDistributionRewards.vue"
 
 export default {
   name: 'PerformanceView',
@@ -240,7 +252,8 @@ export default {
     DfinityLogo,
     MyPerformance,
     PerformanceLeaderboard,
-    MyFollowing
+    MyFollowing,
+    MyDistributionRewards
   },
 
   setup() {
@@ -326,6 +339,12 @@ export default {
     // Computed: extract just principal strings for leaderboard component
     const userFollowPrincipals = computed(() => {
       return userFollowsData.value.map(f => f.principal)
+    })
+
+    // Computed: extract neuron IDs for distribution rewards component
+    const userNeuronIds = computed(() => {
+      if (!userPerformance.value?.neurons) return []
+      return userPerformance.value.neurons.map(n => n.neuronId)
     })
 
     // Filters
@@ -810,6 +829,7 @@ export default {
       userPerformance,
       userFollowsData,
       userFollowPrincipals,
+      userNeuronIds,
       selectedTimeframe,
       selectedPriceType,
 

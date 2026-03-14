@@ -149,6 +149,14 @@ export interface NeuronReward {
   'neuronId' : Uint8Array | number[],
   'performanceScoreICP' : [] | [number],
 }
+export interface NeuronRewardSummary {
+  'rewardAmount' : bigint,
+  'performanceScore' : number,
+  'votingPower' : bigint,
+  'rewardScore' : number,
+  'neuronId' : Uint8Array | number[],
+  'performanceScoreICP' : [] | [number],
+}
 export interface PerformanceResult {
   'startTime' : bigint,
   'endTime' : bigint,
@@ -376,6 +384,14 @@ export interface Rewards {
   'getRewardSkipList' : ActorMethod<[], Result__1_5>,
   'getTacoBalance' : ActorMethod<[], bigint>,
   'getTotalDistributed' : ActorMethod<[], bigint>,
+  'getUserDistributionRewards' : ActorMethod<
+    [Array<Uint8Array | number[]>, bigint, bigint],
+    {
+      'total' : bigint,
+      'hasMore' : boolean,
+      'records' : Array<UserDistributionSummary>,
+    }
+  >,
   'getUserPerformance' : ActorMethod<[Principal], Result__1_4>,
   'getUserPerformanceGraphData' : ActorMethod<
     [Principal, bigint, bigint],
@@ -444,6 +460,14 @@ export type TransferError = {
   { 'CreatedInFuture' : { 'ledger_time' : bigint } } |
   { 'TooOld' : null } |
   { 'InsufficientFunds' : { 'balance' : bigint } };
+export interface UserDistributionSummary {
+  'startTime' : bigint,
+  'distributionTime' : bigint,
+  'endTime' : bigint,
+  'totalRewardPot' : bigint,
+  'distributionId' : bigint,
+  'neuronRewards' : Array<NeuronRewardSummary>,
+}
 export interface UserPerformanceGraphData {
   'timeframe' : { 'startTime' : bigint, 'endTime' : bigint },
   'aggregatedPerformanceICP' : [] | [number],

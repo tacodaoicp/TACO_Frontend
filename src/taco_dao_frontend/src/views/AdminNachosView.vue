@@ -894,26 +894,18 @@
 
 <script setup lang="ts">
 import { ref, computed, reactive, onMounted, onBeforeUnmount } from 'vue'
-import { Actor } from '@dfinity/agent'
 import { Principal } from '@dfinity/principal'
 import { useTacoStore } from '../stores/taco.store'
-import { getEffectiveNetwork } from '../config/network-config'
-import { idlFactory as nachosVaultIdlFactory } from '../../../declarations/nachos_vault/nachos_vault.did.js'
+import { useNachosStore } from '../stores/nachos.store'
 import TacoTitle from '../components/misc/TacoTitle.vue'
 import AdminConfirmationModal from '../components/admin/AdminConfirmationModal.vue'
 
 const tacoStore = useTacoStore()
+const nachosStore = useNachosStore()
 
 // ============================================================================
 // Constants & Tabs
 // ============================================================================
-
-const VAULT_ID = () => {
-  switch (getEffectiveNetwork()) {
-    case 'staging': return 'p4nog-baaaa-aaaad-qkwpa-cai'
-    default: return 'p4nog-baaaa-aaaad-qkwpa-cai' // Update with production ID
-  }
-}
 
 const tabs = [
   { key: 'health', icon: '🟢', label: 'System Health' },
@@ -938,20 +930,6 @@ const historySubTabs = [
 const activeTab = ref('health')
 
 // ============================================================================
-// Actor Creation
-// ============================================================================
-
-const createVaultActor = async (authenticated = false) => {
-  const agent = authenticated
-    ? await tacoStore.getAuthenticatedAgent()
-    : await tacoStore.getAnonymousAgentPublic()
-  return Actor.createActor(nachosVaultIdlFactory, {
-    agent,
-    canisterId: VAULT_ID(),
-  })
-}
-
-// ============================================================================
 // Admin Dashboard Data
 // ============================================================================
 
@@ -964,7 +942,7 @@ const loadAdminDashboard = async () => {
     loading.value = true
     loadError.value = ''
     // Use authenticated actor — getAdminDashboard may require admin caller
-    const actor = await createVaultActor(true)
+    const actor = await nachosStore.createVaultActor(true)
     adminData.value = await (actor as any).getAdminDashboard()
   } catch (e: any) {
     console.error('Failed to load admin dashboard:', e)
@@ -1157,7 +1135,7 @@ const showConfirmation = (action: string, title: string, message: string) => {
 const handleConfirmAction = async (_reason: string) => {
   confirmModal.submitting = true
   try {
-    const actor = await createVaultActor(true) as any
+    const actor = await nachosStore.createVaultActor(true) as any
     let result: any
 
     if (confirmModal.action === 'emergencyPause') result = await actor.emergencyPause()
@@ -1195,7 +1173,7 @@ const handleConfirmAction = async (_reason: string) => {
 
 const adminCall = async (fn: (actor: any) => Promise<any>, successMsg: string) => {
   try {
-    const actor = await createVaultActor(true)
+    const actor = await nachosStore.createVaultActor(true)
     const result = await fn(actor)
     if (result && 'ok' in result) {
       addToast('Success', result.ok || successMsg, 'fa-solid fa-check')
@@ -1352,7 +1330,7 @@ const saveConfig = async () => {
     update.burningEnabled = []
     update.mintingEnabled = []
 
-    const actor = await createVaultActor(true)
+    const actor = await nachosStore.createVaultActor(true)
     const result = await (actor as any).updateNachosConfig(update)
     if ('ok' in result) {
       addToast('Config Updated', result.ok, 'fa-solid fa-check')
@@ -1419,7 +1397,7 @@ const addCondition = async () => {
       enabled: true,
       applicableTokens: newCondition.selectedTokens.map((s: string) => Principal.fromText(s)),
     }
-    const actor = await createVaultActor(true)
+    const actor = await nachosStore.createVaultActor(true)
     const result = await (actor as any).addCircuitBreakerCondition(input)
     if ('ok' in result) {
       addToast('Condition Added', `ID: ${Number(result.ok)}`, 'fa-solid fa-check')
@@ -1446,7 +1424,7 @@ const loadingAlerts = ref(false)
 const loadMoreAlerts = async () => {
   loadingAlerts.value = true
   try {
-    const actor = await createVaultActor()
+    const actor = await nachosStore.createVaultActor()
     fullAlerts.value = await (actor as any).getCircuitBreakerAlerts(BigInt(100), BigInt(0))
   } catch (e) {
     console.error('Failed to load alerts:', e)
@@ -1545,7 +1523,7 @@ const lookupUserRateLimit = async () => {
   lookingUpRateLimit.value = true
   try {
     const principal = Principal.fromText(rateLimitLookupPrincipal.value.trim())
-    const actor = await createVaultActor()
+    const actor = await nachosStore.createVaultActor()
     userRateLimitData.value = await (actor as any).getUserRateLimitStatus(principal)
   } catch (e: any) {
     addToast('Error', e.message || 'Lookup failed', 'fa-solid fa-exclamation-triangle')
@@ -1610,7 +1588,7 @@ const loadHistoryTab = async (tab: string) => {
 const loadMoreMints = async () => {
   loadingHistory.value = true
   try {
-    const actor = await createVaultActor()
+    const actor = await nachosStore.createVaultActor()
     const result = await (actor as any).getMintHistory(HISTORY_PAGE_SIZE, BigInt(mintHistoryOffset.value))
     mintHistory.value = [...mintHistory.value, ...result]
     mintHistoryOffset.value += result.length
@@ -1624,7 +1602,7 @@ const loadMoreMints = async () => {
 const loadMoreBurns = async () => {
   loadingHistory.value = true
   try {
-    const actor = await createVaultActor()
+    const actor = await nachosStore.createVaultActor()
     const result = await (actor as any).getBurnHistory(HISTORY_PAGE_SIZE, BigInt(burnHistoryOffset.value))
     burnHistory.value = [...burnHistory.value, ...result]
     burnHistoryOffset.value += result.length
@@ -1638,7 +1616,7 @@ const loadMoreBurns = async () => {
 const loadFeeHistory = async () => {
   loadingHistory.value = true
   try {
-    const actor = await createVaultActor()
+    const actor = await nachosStore.createVaultActor()
     feeHistory.value = await (actor as any).getFeeHistory(BigInt(200))
   } catch (e) {
     console.error('Failed to load fee history:', e)
@@ -1651,7 +1629,7 @@ const lookupUserActivity = async () => {
   lookingUpUser.value = true
   try {
     const principal = Principal.fromText(userLookupPrincipal.value.trim())
-    const actor = await createVaultActor()
+    const actor = await nachosStore.createVaultActor()
     userActivityData.value = await (actor as any).getUserActivity(principal, BigInt(20), BigInt(0), BigInt(20), BigInt(0))
   } catch (e: any) {
     addToast('Error', e.message || 'User lookup failed', 'fa-solid fa-exclamation-triangle')
@@ -1663,7 +1641,7 @@ const lookupUserActivity = async () => {
 const loadLogs = async () => {
   loadingLogs.value = true
   try {
-    const actor = await createVaultActor()
+    const actor = await nachosStore.createVaultActor()
     systemLogs.value = await (actor as any).getLogs(BigInt(logCount.value))
   } catch (e) {
     console.error('Failed to load logs:', e)
