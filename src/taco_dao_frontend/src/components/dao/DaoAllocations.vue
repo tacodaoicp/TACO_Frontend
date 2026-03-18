@@ -20,7 +20,8 @@
                 <div class="btn-group">
 
                     <!-- current button -->
-                    <button @click="showCurrentAllocations = true; showCurrentHoldings = false" 
+                    <button v-if="canShowAllocations"
+                            @click="showCurrentAllocations = true; showCurrentHoldings = false"
                             class="btn taco-nav-btn"
                             :class="{'taco-nav-btn--active': showCurrentAllocations}">Allocations</button>
 
@@ -32,9 +33,9 @@
                 </div>
 
                 <!-- hover tooltip info icon -->
-                <div class="ms-2 me-auto taco-text-white" 
-                    data-bs-toggle="tooltip" 
-                    data-bs-placement="top" 
+                <div v-if="canShowAllocations" class="ms-2 me-auto taco-text-white"
+                    data-bs-toggle="tooltip"
+                    data-bs-placement="top"
                     title="Allocations are the voted upon targets of the DAO. Holdings are the actual amounts held by the DAO portfolio">
                     <i class="fa-solid fa-circle-info"></i>
                 </div>
@@ -613,6 +614,8 @@ LOCAL METHODS
     import astronautLoader from '../../assets/images/astonautLoader.webp'
     import placeholder52x52 from '../../assets/images/placeholder-52x52.png'
     import { Tooltip } from 'bootstrap'
+    import { getEffectiveNetwork } from '../../config/network-config'
+    import { useAdminCheck } from '../../composables/useAdminCheck'
 
     ///////////
     // Store //
@@ -775,8 +778,15 @@ LOCAL METHODS
     })
 
     // navigation
-    const showCurrentHoldings = ref(false) // user is viewing current holdings
-    const showCurrentAllocations = ref(true) // user is viewing current allocations
+    // allocations visibility: only on staging/local or for admins
+    const { isAdmin } = useAdminCheck()
+    const network = getEffectiveNetwork()
+    const canShowAllocations = computed(() => {
+      return network === 'staging' || network === 'local' || isAdmin.value
+    })
+
+    const showCurrentHoldings = ref(!canShowAllocations.value) // user is viewing current holdings
+    const showCurrentAllocations = ref(canShowAllocations.value) // user is viewing current allocations
 
     // element references
     const currentTokenTitle = ref<string>('No Token Selected')

@@ -170,8 +170,13 @@
                             <span class="token-symbol">{{ entry[1].tokenSymbol }}</span>
                             <span class="token-status">{{ getTokenStatusText(entry[1], entry[0]) }}</span>
                             <span>Last Sync: {{ formatTime(entry[1].lastTimeSynced) }}</span>
+                            <span class="badge ms-2" :class="tokenMaxAllocationMap.get(entry[0].toString()) != null ? 'bg-info' : 'bg-dark text-muted'">
+                              {{ tokenMaxAllocationMap.get(entry[0].toString()) != null
+                                 ? `Cap: ${tokenMaxAllocationMap.get(entry[0].toString())}%`
+                                 : 'No Cap' }}
+                            </span>
                           </div>
-                          <div class="d-flex gap-2">
+                          <div class="d-flex gap-2 align-items-center">
                             <button
                               v-if="!entry[1].isPaused"
                               class="btn btn-warning btn-sm"
@@ -186,6 +191,28 @@
                             >
                               Unpause
                             </button>
+                            <!-- Max Allocation Controls -->
+                            <template v-if="editingMaxAllocation !== entry[0].toString()">
+                              <button class="btn btn-info btn-sm"
+                                @click="startEditMaxAllocation(entry[0].toString())">
+                                Set Cap
+                              </button>
+                            </template>
+                            <template v-else>
+                              <input type="number" class="form-control form-control-sm" style="width: 5rem;"
+                                v-model.number="maxAllocationInput" min="1" max="100" step="1" placeholder="%" />
+                              <button class="btn btn-success btn-sm"
+                                @click="showSetMaxAllocationConfirmation(entry[0].toString(), entry[1].tokenSymbol)"
+                                :disabled="!maxAllocationInput || maxAllocationInput < 1 || maxAllocationInput > 100">
+                                Save
+                              </button>
+                              <button v-if="tokenMaxAllocationMap.get(entry[0].toString()) != null"
+                                class="btn btn-outline-danger btn-sm"
+                                @click="showRemoveMaxAllocationConfirmation(entry[0].toString(), entry[1].tokenSymbol)">
+                                Remove
+                              </button>
+                              <button class="btn btn-secondary btn-sm" @click="editingMaxAllocation = null">Cancel</button>
+                            </template>
                           </div>
                         </div>
                       </div>
@@ -1240,11 +1267,16 @@ const {
   fetchedVoterDetails,
   fetchedNeuronAllocations,
   cachedTradingPauses,
-  cachedPortfolioSnapshotStatus
+  cachedPortfolioSnapshotStatus,
+  tokenMaxAllocationMap
 } = storeToRefs(tacoStore);
 
 // Trading pauses state - initialize with current store value if available
 const tradingPauses = ref<any[]>(cachedTradingPauses.value?.pausedTokens || []);
+
+// Max allocation editing state
+const editingMaxAllocation = ref<string | null>(null)
+const maxAllocationInput = ref<number | null>(null)
 
 // Portfolio snapshot management - initialize with current store value if available
 const snapshotIntervalMinutes = ref(15); // Default to 15 minutes
@@ -1327,7 +1359,7 @@ const confirmationModal = ref({
   reasonPlaceholder: 'Please provide a reason for this action...',
   submitting: false,
   action: null as (() => Promise<void>) | null,
-  actionData: null as { principal: string; tokenName: string } | { type: string } | { type: string; intervalMinutes: number } | null
+  actionData: null as { principal: string; tokenName: string } | { type: string } | { type: string; intervalMinutes: number } | { type: string; principal: string; tokenName: string; maxBP: number } | null
 });
 
 // Update voting metrics state with type - initialize from store if available
@@ -2004,6 +2036,47 @@ const showUnpauseConfirmation = async (principal: string, tokenName: string) => 
   }
 };
 
+const startEditMaxAllocation = (principal: string) => {
+    editingMaxAllocation.value = principal
+    maxAllocationInput.value = tokenMaxAllocationMap.value.get(principal) ?? null
+}
+
+const showSetMaxAllocationConfirmation = async (principal: string, tokenSymbol: string) => {
+    await checkAdminStatus()
+    if (isAdmin.value) {
+        confirmationModal.value = {
+            show: true,
+            title: 'Set Max Allocation',
+            message: `Set maximum allocation for ${tokenSymbol} to ${maxAllocationInput.value}%?`,
+            extraData: `Token: ${tokenSymbol}\nPrincipal: ${principal}\nNew Cap: ${maxAllocationInput.value}% (${maxAllocationInput.value! * 100} basis points)`,
+            confirmButtonText: 'Set Cap',
+            confirmButtonClass: 'btn-info',
+            reasonPlaceholder: 'Please explain why this allocation cap is being set...',
+            submitting: false,
+            action: null,
+            actionData: { type: 'setMaxAllocation', principal, tokenName: tokenSymbol, maxBP: maxAllocationInput.value! * 100 }
+        }
+    }
+}
+
+const showRemoveMaxAllocationConfirmation = async (principal: string, tokenSymbol: string) => {
+    await checkAdminStatus()
+    if (isAdmin.value) {
+        confirmationModal.value = {
+            show: true,
+            title: 'Remove Max Allocation',
+            message: `Remove the allocation cap for ${tokenSymbol}?`,
+            extraData: `Token: ${tokenSymbol}\nPrincipal: ${principal}\nCurrent Cap: ${tokenMaxAllocationMap.value.get(principal)}%`,
+            confirmButtonText: 'Remove Cap',
+            confirmButtonClass: 'btn-danger',
+            reasonPlaceholder: 'Please explain why this allocation cap is being removed...',
+            submitting: false,
+            action: null,
+            actionData: { type: 'removeMaxAllocation', principal, tokenName: tokenSymbol }
+        }
+    }
+}
+
 const showConfigUpdateConfirmation = async () => {
   // Check if user is admin (await to ensure we have current status)
   await checkAdminStatus();
@@ -2279,6 +2352,28 @@ const handleConfirmAction = async (reason: string) => {
         success = false;
       } finally {
         isRecoveringBalances.value = false;
+      }
+    } else if (actionData.type === 'setMaxAllocation') {
+      // Handle set max allocation
+      success = await tacoStore.setTokenMaxAllocation(
+        Principal.fromText(actionData.principal),
+        BigInt(actionData.maxBP),
+        reason
+      );
+      if (success) {
+        editingMaxAllocation.value = null;
+        console.log('AdminView: Max allocation set');
+      }
+    } else if (actionData.type === 'removeMaxAllocation') {
+      // Handle remove max allocation
+      success = await tacoStore.setTokenMaxAllocation(
+        Principal.fromText(actionData.principal),
+        null,
+        reason
+      );
+      if (success) {
+        editingMaxAllocation.value = null;
+        console.log('AdminView: Max allocation removed');
       }
     } else if (actionData.principal && actionData.tokenName) {
       // Handle token pause/unpause actions
@@ -2607,6 +2702,10 @@ const createVoteHistoryLink = (principal: Principal | string | { toString: () =>
 };
 
 // Trading bot warning logic
+// The canister uses exponential backoff on failures: effectiveInterval = baseInterval × 2^backoffLevel
+// Max backoff level is 3 (8x base interval). Since backoffLevel isn't exposed to the frontend,
+// we use the max effective interval (8x) as baseline so we only warn when truly overdue.
+const MAX_TRADING_BACKOFF_MULTIPLIER = 8; // 2^3 where 3 = MAX_TRADING_BACKOFF
 const getTradingBotWarning = (): { level: 'none' | 'warning' | 'danger', message: string } => {
   if (!timerHealth.value.treasury.tradingMetrics?.lastRebalanceAttempt || !rebalanceConfig.value?.rebalanceIntervalNS) {
     return { level: 'none', message: '' };
@@ -2615,20 +2714,19 @@ const getTradingBotWarning = (): { level: 'none' | 'warning' | 'danger', message
   const now = Date.now() * 1_000_000; // Convert to nanoseconds
   const lastAttempt = Number(timerHealth.value.treasury.tradingMetrics.lastRebalanceAttempt);
   const intervalNS = Number(rebalanceConfig.value.rebalanceIntervalNS);
+  const maxEffectiveIntervalNS = intervalNS * MAX_TRADING_BACKOFF_MULTIPLIER;
   const timeSinceLastAttempt = now - lastAttempt;
-  const periodsSinceLastAttempt = timeSinceLastAttempt / intervalNS;
+  const periodsOverdue = timeSinceLastAttempt / maxEffectiveIntervalNS;
 
-  if (periodsSinceLastAttempt > 5) {
-    const periodsOverdue = Math.floor(periodsSinceLastAttempt);
-    return { 
-      level: 'danger', 
-      message: `⚠️ Trading bot is ${periodsOverdue} periods overdue! Last attempt was ${Math.floor(periodsSinceLastAttempt)} intervals ago.` 
+  if (periodsOverdue > 3) {
+    return {
+      level: 'danger',
+      message: `⚠️ Trading bot is unresponsive! No attempt in ${Math.floor(timeSinceLastAttempt / intervalNS)} base intervals (>${Math.floor(periodsOverdue)}x max backoff window).`
     };
-  } else if (periodsSinceLastAttempt > 2) {
-    const periodsOverdue = Math.floor(periodsSinceLastAttempt);
-    return { 
-      level: 'warning', 
-      message: `⚠️ Trading bot is ${periodsOverdue} periods overdue. Last attempt was ${Math.floor(periodsSinceLastAttempt)} intervals ago.` 
+  } else if (periodsOverdue > 1.5) {
+    return {
+      level: 'warning',
+      message: `⚠️ Trading bot may be stalled. No attempt in ${Math.floor(timeSinceLastAttempt / intervalNS)} base intervals.`
     };
   }
 

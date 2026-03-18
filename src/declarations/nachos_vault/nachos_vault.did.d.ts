@@ -93,6 +93,7 @@ export interface CircuitBreakerConditionInput {
 }
 export type CircuitBreakerConditionType = { 'DecimalChange' : null } |
   { 'BalanceChange' : null } |
+  { 'TokenPaused' : null } |
   { 'NavDrop' : null } |
   { 'PriceChange' : null };
 export type DepositStatus = { 'Consumed' : null } |
@@ -267,6 +268,7 @@ export interface NachosVaultDAO {
   'addFeeExemptPrincipal' : ActorMethod<[Principal, string], Result>,
   'addRateLimitExemptPrincipal' : ActorMethod<[Principal, string], Result>,
   'cancelDeposit' : ActorMethod<[Principal, bigint], Result_5>,
+  'claimBurnFees' : ActorMethod<[Principal, bigint], Result>,
   'claimCancellationFees' : ActorMethod<[Principal, Principal, bigint], Result>,
   'claimMintFees' : ActorMethod<[Principal, bigint], Result>,
   'emergencyPause' : ActorMethod<[], Result>,
@@ -333,6 +335,11 @@ export interface NachosVaultDAO {
         }
       >,
       'totalBurnCount' : bigint,
+      'claimableBurnFees' : {
+        'claimed' : bigint,
+        'claimable' : bigint,
+        'accumulated' : bigint,
+      },
       'dataSource' : string,
       'activeDepositCount' : bigint,
       'mintPausedByCircuitBreaker' : boolean,
@@ -419,6 +426,10 @@ export interface NachosVaultDAO {
   'getCircuitBreakerConditions' : ActorMethod<
     [],
     Array<CircuitBreakerCondition>
+  >,
+  'getClaimableBurnFees' : ActorMethod<
+    [],
+    { 'claimed' : bigint, 'claimable' : bigint, 'accumulated' : bigint }
   >,
   'getClaimableCancellationFees' : ActorMethod<
     [],
@@ -730,6 +741,7 @@ export interface NachosVaultDAO {
   'mintNachosWithToken' : ActorMethod<[Principal, bigint, bigint], Result_3>,
   'pauseBurning' : ActorMethod<[], Result>,
   'pauseMinting' : ActorMethod<[], Result>,
+  'recoverStuckNachos' : ActorMethod<[Principal, bigint], Result>,
   'recoverWronglySentTokens' : ActorMethod<
     [Principal, bigint, Principal],
     Result
@@ -801,6 +813,7 @@ export type Result_4 = {
         'targetBasisPoints' : bigint,
       },
       'navUsed' : bigint,
+      'pendingMintValueICP' : bigint,
       'usedValueICP' : bigint,
     }
   } |

@@ -9,6 +9,7 @@ export const idlFactory = ({ IDL }) => {
   const CircuitBreakerConditionType = IDL.Variant({
     'DecimalChange' : IDL.Null,
     'BalanceChange' : IDL.Null,
+    'TokenPaused' : IDL.Null,
     'NavDrop' : IDL.Null,
     'PriceChange' : IDL.Null,
   });
@@ -120,6 +121,7 @@ export const idlFactory = ({ IDL }) => {
         'targetBasisPoints' : IDL.Nat,
       }),
       'navUsed' : IDL.Nat,
+      'pendingMintValueICP' : IDL.Nat,
       'usedValueICP' : IDL.Nat,
     }),
     'err' : NachosError,
@@ -369,6 +371,7 @@ export const idlFactory = ({ IDL }) => {
         [],
       ),
     'cancelDeposit' : IDL.Func([IDL.Principal, IDL.Nat], [Result_5], []),
+    'claimBurnFees' : IDL.Func([IDL.Principal, IDL.Nat], [Result], []),
     'claimCancellationFees' : IDL.Func(
         [IDL.Principal, IDL.Principal, IDL.Nat],
         [Result],
@@ -462,6 +465,11 @@ export const idlFactory = ({ IDL }) => {
               })
             ),
             'totalBurnCount' : IDL.Nat,
+            'claimableBurnFees' : IDL.Record({
+              'claimed' : IDL.Nat,
+              'claimable' : IDL.Nat,
+              'accumulated' : IDL.Nat,
+            }),
             'dataSource' : IDL.Text,
             'activeDepositCount' : IDL.Nat,
             'mintPausedByCircuitBreaker' : IDL.Bool,
@@ -563,6 +571,17 @@ export const idlFactory = ({ IDL }) => {
     'getCircuitBreakerConditions' : IDL.Func(
         [],
         [IDL.Vec(CircuitBreakerCondition)],
+        ['query'],
+      ),
+    'getClaimableBurnFees' : IDL.Func(
+        [],
+        [
+          IDL.Record({
+            'claimed' : IDL.Nat,
+            'claimable' : IDL.Nat,
+            'accumulated' : IDL.Nat,
+          }),
+        ],
         ['query'],
       ),
     'getClaimableCancellationFees' : IDL.Func(
@@ -964,6 +983,7 @@ export const idlFactory = ({ IDL }) => {
       ),
     'pauseBurning' : IDL.Func([], [Result], []),
     'pauseMinting' : IDL.Func([], [Result], []),
+    'recoverStuckNachos' : IDL.Func([IDL.Principal, IDL.Nat], [Result], []),
     'recoverWronglySentTokens' : IDL.Func(
         [IDL.Principal, IDL.Nat, IDL.Principal],
         [Result],

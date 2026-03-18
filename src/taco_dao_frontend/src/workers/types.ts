@@ -12,6 +12,7 @@ export type DataKey =
   | 'tokenDetails'
   | 'totalTreasuryValueInUsd'
   | 'aggregateAllocation'
+  | 'tokenMaxAllocations'
   | 'tradingStatus'
   | 'timerStatus'
   | 'votingPowerMetrics'
@@ -91,6 +92,7 @@ export const WORKER_ASSIGNMENT: Record<DataKey, 'public' | 'auth'> = {
   tokenDetails: 'public',
   totalTreasuryValueInUsd: 'public',
   aggregateAllocation: 'public',
+  tokenMaxAllocations: 'public',
   tradingStatus: 'public',
   timerStatus: 'public',
   votingPowerMetrics: 'public',
@@ -189,6 +191,7 @@ export const STALENESS_THRESHOLDS: Record<DataKey, number> = {
   tokenDetails: 60_000,
   totalTreasuryValueInUsd: 60_000,
   aggregateAllocation: 60_000,
+  tokenMaxAllocations: 60_000,
   userAllocation: 60_000,
   // Medium - 120 seconds
   votingPowerMetrics: 120_000,
@@ -381,7 +384,7 @@ export const ROUTE_PRIORITIES: Record<string, RouteDataConfig> = {
   },
   '/vote': {
     critical: ['votingPowerMetrics', 'aggregateAllocation', 'tokenDetails'],
-    high: ['userAllocation', 'tacoProposals', 'cryptoPrices'],
+    high: ['userAllocation', 'tokenMaxAllocations', 'tacoProposals', 'cryptoPrices'],
     preloadRoutes: ['/dao', '/forum', '/wallet'],
   },
   '/forum': {
@@ -401,7 +404,7 @@ export const ROUTE_PRIORITIES: Record<string, RouteDataConfig> = {
   },
   '/admin': {
     critical: ['systemLogs', 'timerStatus', 'tradingStatus', 'tokenDetails'],
-    high: ['rebalanceConfig', 'systemParameters', 'voterDetails', 'portfolioSnapshotStatus', 'votingPowerMetrics', 'aggregateAllocation', 'tradingPauses', 'neuronAllocations'],
+    high: ['rebalanceConfig', 'systemParameters', 'voterDetails', 'portfolioSnapshotStatus', 'votingPowerMetrics', 'aggregateAllocation', 'tokenMaxAllocations', 'tradingPauses', 'neuronAllocations'],
     preloadRoutes: ['/admin/trade', '/admin/neuron'],
   },
   '/admin/trade': {

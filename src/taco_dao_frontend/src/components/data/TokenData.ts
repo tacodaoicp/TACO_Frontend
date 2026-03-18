@@ -43,6 +43,7 @@ import xmtk2Token from "../../assets/tokens/snspng/xmtk2.png"
 import yralToken from "../../assets/tokens/snspng/yral.png"
 import yukuDaoToken from "../../assets/tokens/snspng/yuku-dao.png"
 import ckusdcToken from "../../assets/tokens/ckusdc.png"
+import ckusdtToken from "../../assets/tokens/ckusdt.svg"
 import ckbtcToken from "../../assets/tokens/ckbtc.png"
 import ckethToken from "../../assets/tokens/cketh.png"
 import cicpToken from "../../assets/tokens/cicp.png"
@@ -56,6 +57,7 @@ import personalDaoToken from "../../assets/tokens/snspng/personal-dao.png"
 import dolrToken from "../../assets/tokens/snspng/dolr.png"
 import fuelEvToken from "../../assets/tokens/snspng/fuelev.png"
 import sgldtToken from "../../assets/tokens/sgldt.png"
+import tendyToken from "../../assets/tokens/tendy.png"
 import windoge98Token from "../../assets/tokens/snspng/windoge98.png"
 
 //////////////
@@ -67,6 +69,7 @@ export const tokenImages: { [key: string]: string } = {
 "Alice": aliceToken,
 "Internet Computer": icpToken,
 "Chainkey USDC": ckusdcToken,
+"Chainkey USDT": ckusdtToken,
 "Chainkey BTC": ckbtcToken,
 "Local ICP": licpToken,    
 "BOOM DAO": boomDaoToken,
@@ -137,6 +140,8 @@ export const tokenImages: { [key: string]: string } = {
 "CKETH": ckethToken,
 "ckUSDC": ckusdcToken,
 "CKUSDC": ckusdcToken,
+"ckUSDT": ckusdtToken,
+"CKUSDT": ckusdtToken,
 "ICP": icpToken,
 "NTN": neutriniteToken,
 "Ntn": neutriniteToken,
@@ -157,6 +162,9 @@ export const tokenImages: { [key: string]: string } = {
 "Windoge98": windoge98Token,
 "EXE": windoge98Token,
 "Windoge 98": windoge98Token,
+"Tendies": tendyToken,
+"TENDY": tendyToken,
+"Tendy": tendyToken,
 }  
 
 //////////
@@ -218,6 +226,15 @@ export const tokenData = [
         icon: ckusdcToken,
         description: `Chain-key USDC (ckUSDC), a multi-chain USDC twin on the Internet Computer, is an ICRC-1-compliant token that is backed 1:1 by USDC such that 1 ckUSDC can always be redeemed for 1 USDC and vice versa.`,
         color: '#5122b5'
+    },
+    {
+        title: 'Chainkey USDT',
+        symbol: 'ckusdt',
+        link: 'https://dashboard.internetcomputer.org/ethereum/cngnf-vqaaa-aaaar-qag4q-cai',
+        icpCoinsLink: 'https://neutrinite.io/currencies/ckUSDT',
+        icon: ckusdtToken,
+        description: `Chain-key USDT (ckUSDT), a multi-chain USDT twin on the Internet Computer, is an ICRC-1-compliant token that is backed 1:1 by USDT such that 1 ckUSDT can always be redeemed for 1 USDT and vice versa.`,
+        color: '#26A17B'
     },
     {
         title: 'Chainkey BTC',
@@ -544,7 +561,16 @@ export const tokenData = [
         icon: tacoToken,
         description: `A Tasty Basket of Trusted Internet Computer Tokens Decided & Allocated via DAO. Fully on-chain, holder-directed curation and allocation.`,
         color: '#FEC800'
-    },    
+    },
+    {
+        title: 'Tendies',
+        symbol: 'tendy',
+        link: 'https://dashboard.internetcomputer.org/sns/kylwo-viaaa-aaaaq-aae7a-cai',
+        icpCoinsLink: 'https://neutrinite.io/currencies/TENDY',
+        icon: tendyToken,
+        description: `A chicken tender on the Internet Computer.`,
+        color: '#FFD700'
+    },
     {
         title: 'FomoWell',
         symbol: 'well',

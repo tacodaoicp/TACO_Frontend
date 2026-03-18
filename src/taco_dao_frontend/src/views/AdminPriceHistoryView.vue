@@ -379,6 +379,8 @@ const tokenData = [
   { symbol: 'icp', color: '#3b00b9' },
   { symbol: 'ckbtc', color: '#f7931a' },
   { symbol: 'ckusdc', color: '#2775ca' },
+  { symbol: 'ckusdt', color: '#26A17B' },
+  { symbol: 'tendy', color: '#FFD700' },
   { symbol: 'sneed', color: '#047b3e' },
   { symbol: 'dkp', color: '#ff6b35' },
   { symbol: 'boom', color: '#e74c3c' },

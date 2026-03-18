@@ -1544,6 +1544,7 @@ export const useTacoStore = defineStore('taco', () => {
     const fetchedTokenDetails = ref<TrustedTokenEntry[]>([])
     const fetchedTokenDetailsWithPastPrices = ref<TrustedTokenEntry[]>([])
     const fetchedAggregateAllocation = ref<[Principal, bigint][]>([])
+    const fetchedTokenMaxAllocations = ref<[any, bigint][]>([])
     const fetchedVotingPowerMetrics = ref<VotingMetricsResponse | null>(null)
     const fetchedUserAllocation = ref([])
     const totalPortfolioValueInUsd = ref(0)
@@ -1740,6 +1741,15 @@ export const useTacoStore = defineStore('taco', () => {
                 if (data && Array.isArray(data)) {
                     // Deserialize BigInt/Principal values from worker
                     fetchedAggregateAllocation.value = deserializeFromTransfer(data) as [Principal, bigint][]
+                }
+            })
+        )
+
+        // tokenMaxAllocations - per-token cap data from dashboard
+        workerUnsubscribers.push(
+            workerBridge.subscribe('tokenMaxAllocations', (data: unknown) => {
+                if (data && Array.isArray(data)) {
+                    fetchedTokenMaxAllocations.value = deserializeFromTransfer(data) as [any, bigint][]
                 }
             })
         )
@@ -3539,6 +3549,17 @@ export const useTacoStore = defineStore('taco', () => {
         }
 
     }
+    // Lookup map: principal string -> max allocation percentage (or undefined for no cap)
+    const tokenMaxAllocationMap = computed(() => {
+        const map = new Map<string, number>()
+        for (const [principal, maxBP] of fetchedTokenMaxAllocations.value) {
+            const key = typeof principal === 'string' ? principal :
+                        principal?.toText?.() || principal?.toString?.() || String(principal)
+            map.set(key, Number(maxBP) / 100) // basis points → percentage
+        }
+        return map
+    })
+
     // ready flag
     const hasTokenDetails = computed(() => fetchedTokenDetails.value.length > 0)
     // single-flight
@@ -3806,10 +3827,15 @@ export const useTacoStore = defineStore('taco', () => {
                 // post actor logic //
 
                 // call the updateAllocation function (with optional note)
-                await actor.updateAllocation(allocations, note ? [note] : [])
+                const result = await actor.updateAllocation(allocations, note ? [note] : [])
 
-                // log
-                // console.log('taco.store: DAO backend - actor.updateAllocation() - updated allocation')                  
+                // check for error result (e.g. cap-exceeded)
+                if ('err' in result) {
+                    const errMsg = 'UnexpectedError' in result.err ? result.err.UnexpectedError : JSON.stringify(result.err)
+                    console.error('updateAllocation error:', errMsg)
+                    appLoadingOff()
+                    throw new Error(errMsg)
+                }
 
                 // turn off loading
                 appLoadingOff()
@@ -4452,6 +4478,25 @@ export const useTacoStore = defineStore('taco', () => {
             return true;
         } catch (error) {
             console.error('TacoStore: Error unpausing token:', error);
+            return false;
+        }
+    }
+    const setTokenMaxAllocation = async (
+        principal: Principal, maxBP: bigint | null, reason: string
+    ): Promise<boolean> => {
+        try {
+            const authClient = await getAuthClient();
+            const actor = await getAuthenticatedActor(authClient, daoBackendCanisterId(), () => daoBackendIDL)
+            const result = await actor.setTokenMaxAllocation(
+                principal, maxBP !== null ? [maxBP] : [], reason
+            ) as Result_1;
+            if ('err' in result) {
+                console.error('Error setting token max allocation:', result.err);
+                return false;
+            }
+            return true;
+        } catch (error) {
+            console.error('Error setting token max allocation:', error);
             return false;
         }
     }
@@ -9528,6 +9573,8 @@ export const useTacoStore = defineStore('taco', () => {
         fetchedTokenDetails,
         fetchedTokenDetailsWithPastPrices,
         fetchedAggregateAllocation,
+        fetchedTokenMaxAllocations,
+        tokenMaxAllocationMap,
         fetchedVotingPowerMetrics,
         fetchedUserAllocation,
         backendError,
@@ -9602,6 +9649,7 @@ export const useTacoStore = defineStore('taco', () => {
         executeTradingCycle,
         pauseToken,
         unpauseToken,
+        setTokenMaxAllocation,
         fetchVoterDetails,
         fetchNeuronAllocations,
         adminGetUserAllocation,

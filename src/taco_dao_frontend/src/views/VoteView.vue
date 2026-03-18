@@ -115,7 +115,7 @@
                         <div class="taco-toolbar">
 
                           <h3 class="taco-text-white mb-0 py-1 px-2" style="font-size: 1.125rem;">Current
-                            Allocations</h3>
+                            {{ canShowAllocations ? 'Allocations' : 'Holdings' }}</h3>
 
                         </div>
 
@@ -131,7 +131,7 @@
                         <!-- no tokens curtain -->
                         <div v-if="allocationCount === 0" class="vote-allocations__no-tokens-curtain">
 
-                          <p class="taco-text-white text-center mb-0"><i class="fa-solid fa-triangle-exclamation taco-text-orange"></i> No Allocations Yet</p>                          
+                          <p class="taco-text-white text-center mb-0"><i class="fa-solid fa-triangle-exclamation taco-text-orange"></i> {{ canShowAllocations ? 'No Allocations Yet' : 'No Holdings Yet' }}</p>                          
                           
                         </div>
                         
@@ -152,7 +152,7 @@
                           <!-- no tokens curtain -->
                           <div v-if="allocationCount === 0" class="vote-allocations__no-tokens-curtain">
 
-                            <p class="taco-text-white text-center mb-0"><i class="fa-solid fa-triangle-exclamation taco-text-orange"></i> No Tokens Allocated</p>
+                            <p class="taco-text-white text-center mb-0"><i class="fa-solid fa-triangle-exclamation taco-text-orange"></i> {{ canShowAllocations ? 'No Tokens Allocated' : 'No Holdings' }}</p>
                             
                           </div>
 
@@ -605,13 +605,22 @@
                         >
 
                           <!-- left - symbol badge -->
-                          <div>
+                          <div style="min-width: 6rem;">
 
                             <!-- symbol badge -->
-                            <span class="vote-badge 
+                            <span class="vote-badge
                                           taco-text-white" :style="{'background-color': control.badgeColor}">{{
                               control.symbol }}</span>
 
+                          </div>
+
+                          <!-- center - max allocation cap indicator -->
+                          <div style="flex: 1; text-align: center;">
+                            <span v-if="control.maxAllocation !== null"
+                                  class="badge bg-secondary"
+                                  style="font-size: 0.65rem; font-weight: normal;">
+                              Max: {{ control.maxAllocation }}%
+                            </span>
                           </div>
 
                           <!-- right - percentage input and lock button -->
@@ -619,7 +628,7 @@
 
                             <!-- percentage input -->
                             <input v-if="!userLockedVote" type="number" class="form-control"
-                              :class="{'ready-to-vote': userLockedVote}" placeholder="0" min="0" max="100"
+                              :class="{'ready-to-vote': userLockedVote}" placeholder="0" min="0" :max="control.maxAllocation ?? 100"
                               style="width: 6rem;" :step="step" :value="control.currentPercentage.toFixed(2)"
                               :disabled="control.isLocked || userLockedVote || unlockedCount === currentSliders.length - 1"
                               @input="onAllocationChange(index as number, ($event.target as HTMLInputElement).valueAsNumber)">
@@ -653,7 +662,7 @@
                             type="range" 
                             class="slider"
                             :class="{'disabled': control.isLocked || userLockedVote || unlockedCount === currentSliders.length - 1}"
-                            :id="'slider' + (control.symbol)" :value="control.currentPercentage" min="0" max="100"
+                            :id="'slider' + (control.symbol)" :value="control.currentPercentage" min="0" :max="control.maxAllocation ?? 100"
                             :step="step"
                             :disabled="control.isLocked || userLockedVote || unlockedCount === currentSliders.length - 1"
                             @input="onAllocationChange(index as number, ($event.target as HTMLInputElement).valueAsNumber)">
@@ -2232,6 +2241,8 @@
   import DfinityLogo from "../assets/images/dfinityLogo.vue"
   import { Principal } from "@dfinity/principal"
   import astronautLoader from "../assets/images/astonautLoader.webp"
+  import { getEffectiveNetwork } from '../config/network-config'
+  import { useAdminCheck } from '../composables/useAdminCheck'
 
   ////////////////
   // interfaces //
@@ -2275,6 +2286,7 @@
   const { fetchedVotingPowerMetrics } = storeToRefs(tacoStore)
   const { fetchedUserAllocation } = storeToRefs(tacoStore)
   const { fetchedAggregateAllocation } = storeToRefs(tacoStore)
+  const { tokenMaxAllocationMap } = storeToRefs(tacoStore)
 
   // # ACTIONS #
 
@@ -2299,6 +2311,11 @@
 
   // dao backend
   const { ensureTokenDetails } = tacoStore
+
+  // allocations visibility: only on local or for admins
+  const { isAdmin } = useAdminCheck()
+  const network = getEffectiveNetwork()
+  const canShowAllocations = computed(() => network === 'staging' || network === 'local' || isAdmin.value)
 
   /////////////////////
   // local variables //
@@ -2439,9 +2456,10 @@
           currentPercentage: percentage,
           initialPercentage: percentage, // store initial percentage
           isLocked: false,
-          badgeColor: colors[index]
+          badgeColor: colors[index],
+          maxAllocation: tokenMaxAllocationMap.value.get(canisterIds[index]) ?? null
         }
-      })    
+      })
       
     }
 
@@ -2453,6 +2471,39 @@
 
     }
     
+  }
+
+  // handle fetched token details as holdings (for non-admin/non-local chart display)
+  const handleFetchedTokenDetailsAsHoldings = async (tokenDetails: any) => {
+    try {
+      const holdings = tokenDetails || []
+      const ICP_SCALE = 100000000n
+      const toScaledValueIcp = (t: any) => {
+        const balance = BigInt(t.balance)
+        const decimals = BigInt(t.tokenDecimals ?? 8n)
+        const denom = 10n ** decimals
+        const priceScaled = BigInt(Math.round(Number(t.priceInICP) * Number(ICP_SCALE)))
+        return (balance * priceScaled) / denom
+      }
+      const totalValueScaled = holdings.reduce((sum: bigint, entry: any) => sum + toScaledValueIcp(entry[1]), 0n)
+      if (totalValueScaled === 0n) return
+
+      const percentages = holdings.map((entry: any) => {
+        const tokenScaled = toScaledValueIcp(entry[1])
+        return Number(((Number(tokenScaled) / Number(totalValueScaled)) * 100).toFixed(2))
+      })
+      const symbols = holdings.map((entry: any) => entry[1].tokenSymbol)
+      const colors = symbols.map((symbol: string) => {
+        const token = tokenData.find((t: any) => t.symbol.toLowerCase() === symbol.toLowerCase())
+        return token?.color || '#ff0000'
+      })
+
+      await handleApplyDataToChart(percentages, symbols, colors)
+      const firstNonZeroIndex = percentages.findIndex((p: number) => p > 0)
+      handleChartSegmentClick(null, null, { dataPointIndex: firstNonZeroIndex >= 0 ? firstNonZeroIndex : 0 })
+    } catch (error) {
+      console.error('VoteView.vue: error computing holdings chart:', error)
+    }
   }
 
   // handle fetched aggregate allocation
@@ -2780,8 +2831,12 @@
       // refresh everything (must await handlers in order)
       await ensureTokenDetails()
       await handleFetchedTokenDetails(fetchedTokenDetails.value)
-      await fetchAggregateAllocation()
-      await handleFetchedAggregateAllocation(fetchedAggregateAllocation.value)
+      if (canShowAllocations.value) {
+        await fetchAggregateAllocation()
+        await handleFetchedAggregateAllocation(fetchedAggregateAllocation.value)
+      } else {
+        await handleFetchedTokenDetailsAsHoldings(fetchedTokenDetails.value)
+      }
       await fetchVotingPowerMetrics()
       await handleFetchedVotingPowerMetrics(fetchedVotingPowerMetrics.value)
       await fetchUserAllocation()
@@ -2816,13 +2871,29 @@
       //   message: `Test allocation vote cast with ${votePower.value} VP. We're turning the trading bot on soon!`
       // })      
 
-    } catch (error) {
+    } catch (error: any) {
 
       // log
       console.error('VoteView.vue: error casting vote:', error)
 
+      // show error toast for cap-exceeded or other allocation errors
+      const msg = error?.message || String(error)
+      if (msg.includes('exceeds max of') || msg.includes('UnexpectedError') || msg.includes('InvalidAllocation')) {
+        addToast({
+          id: Date.now(),
+          code: 'error',
+          tradeAmount: '',
+          tokenSellIdentifier: '',
+          tradeLimit: '',
+          tokenInitIdentifier: '',
+          title: 'Allocation Error',
+          icon: '',
+          message: msg
+        })
+      }
+
       // return to allocation sliders
-      userLockedVote.value = false      
+      userLockedVote.value = false
     } finally {
 
       // turn off left loading
@@ -3163,35 +3234,41 @@
     const hasCachedVotingPowerMetrics = fetchedVotingPowerMetrics.value !== null
 
     // If we have all cached data, use it immediately without showing loading
-    if (hasCachedTokenDetails && hasCachedAggregateAllocation) {
+    if (hasCachedTokenDetails && (hasCachedAggregateAllocation || !canShowAllocations.value)) {
 
-      // Extract initial percentages from aggregate allocation to avoid equal-segment animation
-      // This builds a map of principal -> percentage, then maps it to token order
-      const allocationMap = new Map<string, number>()
-      for (const allocation of fetchedAggregateAllocation.value as any[]) {
-        const principal = String(allocation[0]?.toString?.() || allocation[0])
-        const percentage = Number(allocation[1]) / 100 // basis points to percentage
-        allocationMap.set(principal, percentage)
+      if (canShowAllocations.value) {
+        // Extract initial percentages from aggregate allocation to avoid equal-segment animation
+        // This builds a map of principal -> percentage, then maps it to token order
+        const allocationMap = new Map<string, number>()
+        for (const allocation of fetchedAggregateAllocation.value as any[]) {
+          const principal = String(allocation[0]?.toString?.() || allocation[0])
+          const percentage = Number(allocation[1]) / 100 // basis points to percentage
+          allocationMap.set(principal, percentage)
+        }
+
+        // Get active tokens and their initial percentages in the correct order
+        const activeTokens = (fetchedTokenDetails.value as any[]).filter((token: any) => token[1]?.Active === true)
+        const initialPercentages = activeTokens.map((token: any) => {
+          const principal = String(token[0]?.toString?.() || token[0])
+          return allocationMap.get(principal) || 0
+        })
+
+        // Ensure percentages sum to 100 (adjust largest if needed due to rounding)
+        const sum = initialPercentages.reduce((a: number, b: number) => a + b, 0)
+        if (Math.abs(sum - 100) >= 0.01 && initialPercentages.length > 0) {
+          const diff = 100 - sum
+          const largestIndex = initialPercentages.indexOf(Math.max(...initialPercentages))
+          initialPercentages[largestIndex] = Number((initialPercentages[largestIndex] + diff).toFixed(2))
+        }
+
+        // Pass initial percentages to avoid equal-segment animation
+        await handleFetchedTokenDetails(fetchedTokenDetails.value, initialPercentages)
+        await handleFetchedAggregateAllocation(fetchedAggregateAllocation.value)
+      } else {
+        // Show holdings-based chart
+        await handleFetchedTokenDetails(fetchedTokenDetails.value)
+        await handleFetchedTokenDetailsAsHoldings(fetchedTokenDetails.value)
       }
-
-      // Get active tokens and their initial percentages in the correct order
-      const activeTokens = (fetchedTokenDetails.value as any[]).filter((token: any) => token[1]?.Active === true)
-      const initialPercentages = activeTokens.map((token: any) => {
-        const principal = String(token[0]?.toString?.() || token[0])
-        return allocationMap.get(principal) || 0
-      })
-
-      // Ensure percentages sum to 100 (adjust largest if needed due to rounding)
-      const sum = initialPercentages.reduce((a: number, b: number) => a + b, 0)
-      if (Math.abs(sum - 100) >= 0.01 && initialPercentages.length > 0) {
-        const diff = 100 - sum
-        const largestIndex = initialPercentages.indexOf(Math.max(...initialPercentages))
-        initialPercentages[largestIndex] = Number((initialPercentages[largestIndex] + diff).toFixed(2))
-      }
-
-      // Pass initial percentages to avoid equal-segment animation
-      await handleFetchedTokenDetails(fetchedTokenDetails.value, initialPercentages)
-      await handleFetchedAggregateAllocation(fetchedAggregateAllocation.value)
       if (hasCachedVotingPowerMetrics) {
         await handleFetchedVotingPowerMetrics(fetchedVotingPowerMetrics.value)
       }
@@ -3227,35 +3304,44 @@
 
     try {
       // Fetch all data in parallel for faster loading
-      await Promise.all([
+      const fetchPromises = [
         ensureTokenDetails(),
-        fetchAggregateAllocation(),
         fetchVotingPowerMetrics(),
-      ])
-
-      // Extract initial percentages to avoid equal-segment animation
-      const allocationMap = new Map<string, number>()
-      for (const allocation of fetchedAggregateAllocation.value as any[]) {
-        const principal = String(allocation[0]?.toString?.() || allocation[0])
-        const percentage = Number(allocation[1]) / 100
-        allocationMap.set(principal, percentage)
+      ]
+      if (canShowAllocations.value) {
+        fetchPromises.push(fetchAggregateAllocation())
       }
-      const activeTokens = (fetchedTokenDetails.value as any[]).filter((token: any) => token[1]?.Active === true)
-      const initialPercentages = activeTokens.map((token: any) => {
-        const principal = String(token[0]?.toString?.() || token[0])
-        return allocationMap.get(principal) || 0
-      })
-      // Adjust for rounding
-      const sum = initialPercentages.reduce((a: number, b: number) => a + b, 0)
-      if (Math.abs(sum - 100) >= 0.01 && initialPercentages.length > 0) {
-        const diff = 100 - sum
-        const largestIndex = initialPercentages.indexOf(Math.max(...initialPercentages))
-        initialPercentages[largestIndex] = Number((initialPercentages[largestIndex] + diff).toFixed(2))
-      }
+      await Promise.all(fetchPromises)
 
-      // Handle the fetched data with initial percentages (avoid equal-segment animation)
-      await handleFetchedTokenDetails(fetchedTokenDetails.value, initialPercentages)
-      await handleFetchedAggregateAllocation(fetchedAggregateAllocation.value)
+      if (canShowAllocations.value) {
+        // Extract initial percentages to avoid equal-segment animation
+        const allocationMap = new Map<string, number>()
+        for (const allocation of fetchedAggregateAllocation.value as any[]) {
+          const principal = String(allocation[0]?.toString?.() || allocation[0])
+          const percentage = Number(allocation[1]) / 100
+          allocationMap.set(principal, percentage)
+        }
+        const activeTokens = (fetchedTokenDetails.value as any[]).filter((token: any) => token[1]?.Active === true)
+        const initialPercentages = activeTokens.map((token: any) => {
+          const principal = String(token[0]?.toString?.() || token[0])
+          return allocationMap.get(principal) || 0
+        })
+        // Adjust for rounding
+        const sum = initialPercentages.reduce((a: number, b: number) => a + b, 0)
+        if (Math.abs(sum - 100) >= 0.01 && initialPercentages.length > 0) {
+          const diff = 100 - sum
+          const largestIndex = initialPercentages.indexOf(Math.max(...initialPercentages))
+          initialPercentages[largestIndex] = Number((initialPercentages[largestIndex] + diff).toFixed(2))
+        }
+
+        // Handle the fetched data with initial percentages (avoid equal-segment animation)
+        await handleFetchedTokenDetails(fetchedTokenDetails.value, initialPercentages)
+        await handleFetchedAggregateAllocation(fetchedAggregateAllocation.value)
+      } else {
+        // Show holdings-based chart
+        await handleFetchedTokenDetails(fetchedTokenDetails.value)
+        await handleFetchedTokenDetailsAsHoldings(fetchedTokenDetails.value)
+      }
       await handleFetchedVotingPowerMetrics(fetchedVotingPowerMetrics.value)
 
       // check if user is logged in
@@ -3288,34 +3374,44 @@
   let hasProcessedInitialData = false
 
   watch([fetchedTokenDetails, fetchedAggregateAllocation], async ([tokenDetails, aggregateAllocation]) => {
-    // Only process if we have both sets of data and haven't loaded yet
-    if (tokenDetails && tokenDetails.length > 0 &&
-        aggregateAllocation && aggregateAllocation.length > 0 &&
-        !hasProcessedInitialData) {
+    // Only process if we have data and haven't loaded yet
+    const hasTokenData = tokenDetails && tokenDetails.length > 0
+    const hasAllocationData = aggregateAllocation && aggregateAllocation.length > 0
+    const readyToProcess = canShowAllocations.value
+      ? (hasTokenData && hasAllocationData)
+      : hasTokenData
+
+    if (readyToProcess && !hasProcessedInitialData) {
       hasProcessedInitialData = true
 
-      // Extract initial percentages to avoid equal-segment animation
-      const allocationMap = new Map<string, number>()
-      for (const allocation of aggregateAllocation as any[]) {
-        const principal = String(allocation[0]?.toString?.() || allocation[0])
-        const percentage = Number(allocation[1]) / 100
-        allocationMap.set(principal, percentage)
-      }
-      const activeTokens = (tokenDetails as any[]).filter((token: any) => token[1]?.Active === true)
-      const initialPercentages = activeTokens.map((token: any) => {
-        const principal = String(token[0]?.toString?.() || token[0])
-        return allocationMap.get(principal) || 0
-      })
-      // Adjust for rounding
-      const sum = initialPercentages.reduce((a: number, b: number) => a + b, 0)
-      if (Math.abs(sum - 100) >= 0.01 && initialPercentages.length > 0) {
-        const diff = 100 - sum
-        const largestIndex = initialPercentages.indexOf(Math.max(...initialPercentages))
-        initialPercentages[largestIndex] = Number((initialPercentages[largestIndex] + diff).toFixed(2))
-      }
+      if (canShowAllocations.value) {
+        // Extract initial percentages to avoid equal-segment animation
+        const allocationMap = new Map<string, number>()
+        for (const allocation of aggregateAllocation as any[]) {
+          const principal = String(allocation[0]?.toString?.() || allocation[0])
+          const percentage = Number(allocation[1]) / 100
+          allocationMap.set(principal, percentage)
+        }
+        const activeTokens = (tokenDetails as any[]).filter((token: any) => token[1]?.Active === true)
+        const initialPercentages = activeTokens.map((token: any) => {
+          const principal = String(token[0]?.toString?.() || token[0])
+          return allocationMap.get(principal) || 0
+        })
+        // Adjust for rounding
+        const sum = initialPercentages.reduce((a: number, b: number) => a + b, 0)
+        if (Math.abs(sum - 100) >= 0.01 && initialPercentages.length > 0) {
+          const diff = 100 - sum
+          const largestIndex = initialPercentages.indexOf(Math.max(...initialPercentages))
+          initialPercentages[largestIndex] = Number((initialPercentages[largestIndex] + diff).toFixed(2))
+        }
 
-      await handleFetchedTokenDetails(tokenDetails, initialPercentages)
-      await handleFetchedAggregateAllocation(aggregateAllocation)
+        await handleFetchedTokenDetails(tokenDetails, initialPercentages)
+        await handleFetchedAggregateAllocation(aggregateAllocation)
+      } else {
+        // Show holdings-based chart
+        await handleFetchedTokenDetails(tokenDetails)
+        await handleFetchedTokenDetailsAsHoldings(tokenDetails)
+      }
 
       if (fetchedVotingPowerMetrics.value) {
         await handleFetchedVotingPowerMetrics(fetchedVotingPowerMetrics.value)
@@ -3569,7 +3665,7 @@
     // create a local copy of current allocations for free tokens
     let freeTokens = freeIndices.map((i) => ({
       index: i,
-      available: 100 - currentSliders.value[i].currentPercentage,
+      available: (currentSliders.value[i].maxAllocation ?? 100) - currentSliders.value[i].currentPercentage,
     }))
 
     // distribute the increase among the free tokens
@@ -3589,16 +3685,16 @@
         // reduce the increase by the amount of the tokens that cannot afford the full equal share
         for (const t of tokensBelowShare) {
           increase = round(increase - t.available)
-          currentSliders.value[t.index].currentPercentage = 100
+          currentSliders.value[t.index].currentPercentage = currentSliders.value[t.index].maxAllocation ?? 100
         }
 
-        // remove tokens that were clamped to 100
+        // remove tokens that were clamped to their max
         freeTokens = freeTokens.filter((t) => t.available >= equalShare + 0.0001)
 
         // update the freeTokens array with the current allocations
         freeTokens = freeTokens.map((t) => ({
           index: t.index,
-          available: 100 - currentSliders.value[t.index].currentPercentage,
+          available: (currentSliders.value[t.index].maxAllocation ?? 100) - currentSliders.value[t.index].currentPercentage,
         }))
 
       } else {
@@ -3636,8 +3732,9 @@
     // if the new allocation is NaN, return
     if (isNaN(newAllocation)) return
 
-    // clamp the new allocation between 0 and 100
-    newAllocation = Math.max(0, Math.min(100, newAllocation))
+    // clamp the new allocation between 0 and max cap (or 100 if no cap)
+    const maxCap = currentSliders.value[index].maxAllocation ?? 100
+    newAllocation = Math.max(0, Math.min(maxCap, newAllocation))
 
     // round the new allocation
     newAllocation = round(newAllocation)
@@ -3681,12 +3778,13 @@
     const total = round(currentSliders.value.reduce((sum: number, t: any) => sum + t.currentPercentage, 0))
     let diff = round(100 - total)
     if (Math.abs(diff) > 0.001 && freeIndices.length > 0) {
-      // Try to apply correction to free tokens, ensuring we don't go below 0 or above 100
+      // Try to apply correction to free tokens, ensuring we don't go below 0 or above max cap
       for (const freeIdx of freeIndices) {
         if (Math.abs(diff) < 0.001) break
         const currentVal = currentSliders.value[freeIdx].currentPercentage
+        const freeMaxCap = currentSliders.value[freeIdx].maxAllocation ?? 100
         const correctedValue = round(currentVal + diff)
-        if (correctedValue >= 0 && correctedValue <= 100) {
+        if (correctedValue >= 0 && correctedValue <= freeMaxCap) {
           currentSliders.value[freeIdx].currentPercentage = correctedValue
           diff = 0
           break
@@ -3695,9 +3793,9 @@
           const reduction = Math.min(Math.abs(diff), currentVal)
           currentSliders.value[freeIdx].currentPercentage = round(currentVal - reduction)
           diff = round(diff + reduction)
-        } else if (diff > 0 && currentVal < 100) {
-          // Can only increase by (100 - currentVal) amount
-          const increase = Math.min(diff, 100 - currentVal)
+        } else if (diff > 0 && currentVal < freeMaxCap) {
+          // Can only increase by (maxCap - currentVal) amount
+          const increase = Math.min(diff, freeMaxCap - currentVal)
           currentSliders.value[freeIdx].currentPercentage = round(currentVal + increase)
           diff = round(diff - increase)
         }

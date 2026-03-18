@@ -68,6 +68,7 @@ const HANDLED_KEYS: DataKey[] = [
   'tokenDetails',
   'totalTreasuryValueInUsd',
   'aggregateAllocation',
+  'tokenMaxAllocations',
   'tradingStatus',
   'timerStatus',
   // Secondary (medium priority)
@@ -740,6 +741,12 @@ async function populateDashboardSiblings(dashboard: any, excludeKey: DataKey): P
     updateState('timerStatus', { data: ts, ...freshState })
     await setCached('timerStatus', ts)
   }
+
+  if (excludeKey !== 'tokenMaxAllocations') {
+    const tma = serializeForTransfer(dashboard.tokenMaxAllocations || [])
+    updateState('tokenMaxAllocations', { data: tma, ...freshState })
+    await setCached('tokenMaxAllocations', tma)
+  }
 }
 
 async function fetchData(dataKey: DataKey): Promise<void> {
@@ -844,6 +851,17 @@ async function fetchData(dataKey: DataKey): Promise<void> {
       // Wrap in Result format { ok: ... } to match existing store expectation
       data = serializeForTransfer({ ok: dashboard.votingPowerMetrics })
       await populateDashboardSiblings(dashboard, 'votingPowerMetrics')
+      break
+    }
+
+    case 'tokenMaxAllocations': {
+      const dashboard = await getDashboardCoalesced(agent!)
+      if (!dashboard) {
+        data = serializeForTransfer([])
+        break
+      }
+      data = serializeForTransfer(dashboard.tokenMaxAllocations || [])
+      await populateDashboardSiblings(dashboard, 'tokenMaxAllocations')
       break
     }
 

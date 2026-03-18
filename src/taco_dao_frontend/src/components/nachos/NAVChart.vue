@@ -9,9 +9,10 @@
     <div class="nav-chart__wrap taco-container taco-container--l1">
       <div class="nav-chart__inner">
         <apexchart
+          ref="chartRef"
           type="line"
           :options="chartOptions"
-          :series="chartSeries"
+          :series="initialSeries"
           height="100%"
         />
       </div>
@@ -35,30 +36,59 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref, watch, nextTick } from 'vue'
 import { useNachosStore } from '../../stores/nachos.store'
 
 const nachosStore = useNachosStore()
+const chartRef = ref<any>(null)
 
 // Skip first NAV snapshot (genesis / initialization point)
 const filteredHistory = computed(() =>
   nachosStore.navHistory.length > 1 ? nachosStore.navHistory.slice(1) : nachosStore.navHistory
 )
 
-const chartSeries = computed(() => [{
-  name: 'NAV per NACHOS (ICP)',
-  data: filteredHistory.value.map((snap: any) => ({
+function buildSeriesData() {
+  return filteredHistory.value.map((snap: any) => ({
     x: new Date(Number(snap.timestamp / 1_000_000n)).getTime(),
     y: Number(snap.navPerTokenE8s) / 1e8,
-  })),
-}])
+  }))
+}
 
-const chartOptions = computed(() => ({
+function buildMarkers() {
+  return filteredHistory.value.map((snap: any, i: number) => {
+    let color = '#4CAF50'
+    if ('Burn' in snap.reason) color = '#F44336'
+    else if ('Mint' in snap.reason) color = '#4CAF50'
+    else if ('Scheduled' in snap.reason) color = '#FFD600'
+    else if ('Manual' in snap.reason) color = '#FF9800'
+    return {
+      seriesIndex: 0,
+      dataPointIndex: i,
+      fillColor: color,
+      strokeColor: color,
+      size: ('Scheduled' in snap.reason) ? 0 : 4,
+    }
+  })
+}
+
+// Initial series for first render only
+const initialSeries = [{
+  name: 'NAV per NACHOS (ICP)',
+  data: buildSeriesData(),
+}]
+
+// Static options — no dependency on filteredHistory, so no reactive updates
+const chartOptions = {
   chart: {
     type: 'line' as const,
     background: 'transparent',
     toolbar: { show: true },
     zoom: { enabled: true },
+    animations: {
+      enabled: true,
+      dynamicAnimation: { enabled: true, speed: 300 },
+      animateGradually: { enabled: false },
+    },
   },
   xaxis: {
     type: 'datetime' as const,
@@ -88,22 +118,25 @@ const chartOptions = computed(() => ({
   },
   markers: {
     size: 3,
-    discrete: filteredHistory.value.map((snap: any, i: number) => {
-      let color = '#4CAF50'
-      if ('Burn' in snap.reason) color = '#F44336'
-      else if ('Mint' in snap.reason) color = '#4CAF50'
-      else if ('Scheduled' in snap.reason) color = '#FFD600'
-      else if ('Manual' in snap.reason) color = '#FF9800'
-      return {
-        seriesIndex: 0,
-        dataPointIndex: i,
-        fillColor: color,
-        strokeColor: color,
-        size: ('Scheduled' in snap.reason) ? 0 : 4,
-      }
-    }),
+    discrete: buildMarkers(),
   },
-}))
+}
+
+// Imperatively update series + markers when data changes, preserving zoom state
+watch(filteredHistory, async () => {
+  await nextTick()
+  const chart = chartRef.value?.chart
+  if (!chart) return
+
+  chart.updateSeries([{
+    name: 'NAV per NACHOS (ICP)',
+    data: buildSeriesData(),
+  }], false)
+
+  chart.updateOptions({
+    markers: { size: 3, discrete: buildMarkers() },
+  }, false, false)
+})
 </script>
 
 <style scoped lang="scss">

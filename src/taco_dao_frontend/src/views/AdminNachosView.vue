@@ -311,13 +311,14 @@
                           <option value="BalanceChange">BalanceChange</option>
                           <option value="NavDrop">NavDrop</option>
                           <option value="DecimalChange">DecimalChange</option>
+                          <option value="TokenPaused">TokenPaused</option>
                         </select>
                       </div>
-                      <div class="col-md-4" v-if="newCondition.type !== 'DecimalChange'">
+                      <div class="col-md-4" v-if="newCondition.type !== 'DecimalChange' && newCondition.type !== 'TokenPaused'">
                         <label class="form-label small">Threshold %</label>
                         <input type="number" step="0.1" class="form-control form-control-sm bg-dark text-white" v-model.number="newCondition.threshold" />
                       </div>
-                      <div class="col-md-4" v-if="newCondition.type !== 'DecimalChange'">
+                      <div class="col-md-4" v-if="newCondition.type !== 'DecimalChange' && newCondition.type !== 'TokenPaused'">
                         <label class="form-label small">Time Window (minutes)</label>
                         <input type="number" class="form-control form-control-sm bg-dark text-white" v-model.number="newCondition.timeWindowMin" />
                       </div>

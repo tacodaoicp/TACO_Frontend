@@ -76,6 +76,7 @@ type Result_4 =
       feeEstimate: nat;
       nachosEstimate: nat;
       navUsed: nat;
+      pendingMintValueICP: nat;
       tokenPriceICP: nat;
       usedAmount: nat;
       usedValueICP: nat;
@@ -125,6 +126,7 @@ type NachosVaultDAO =
    addRateLimitExemptPrincipal: ("principal": principal, reason: text) ->
     (Result);
    cancelDeposit: (tokenPrincipal: principal, blockNumber: nat) -> (Result_5);
+   claimBurnFees: (recipient: principal, amount: nat) -> (Result);
    claimCancellationFees: (recipient: principal, tokenPrincipal: principal,
     amount: nat) -> (Result);
    claimMintFees: (recipient: principal, amount: nat) -> (Result);
@@ -188,6 +190,12 @@ type NachosVaultDAO =
        canisterCycles: nat;
        circuitBreakerActive: bool;
        circuitBreakerConditions: vec CircuitBreakerCondition;
+       claimableBurnFees:
+        record {
+          accumulated: nat;
+          claimable: nat;
+          claimed: nat;
+        };
        claimableCancellationFees:
         vec
          record {
@@ -288,6 +296,12 @@ type NachosVaultDAO =
    getCircuitBreakerAlerts: (limit: nat, offset: nat) ->
     (vec CircuitBreakerAlert) query;
    getCircuitBreakerConditions: () -> (vec CircuitBreakerCondition) query;
+   getClaimableBurnFees: () ->
+    (record {
+       accumulated: nat;
+       claimable: nat;
+       claimed: nat;
+     }) query;
    getClaimableCancellationFees: () ->
     (vec
       record {
@@ -591,6 +605,7 @@ type NachosVaultDAO =
     minimumNachosReceive: nat) -> (Result_3);
    pauseBurning: () -> (Result);
    pauseMinting: () -> (Result);
+   recoverStuckNachos: (recipient: principal, amount: nat) -> (Result);
    recoverWronglySentTokens: (tokenPrincipal: principal, blockNumber: 
     nat, senderPrincipal: principal) -> (Result);
    redeemNachos: (nachosBlockNumber: nat, minimumValues:
@@ -815,6 +830,7 @@ type CircuitBreakerConditionType =
    DecimalChange;
    NavDrop;
    PriceChange;
+   TokenPaused;
  };
 type CircuitBreakerConditionInput = 
  record {
