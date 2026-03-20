@@ -1,0 +1,372 @@
+type TacoSwapDAO = 
+ service {
+   admin_clear_nachos_pending: ("principal": principal) -> (Result);
+   admin_clear_pending: ("principal": principal) -> (Result);
+   admin_transfer_icp: (recipient: principal, recipientSubaccount:
+    opt vec nat8, amount: nat) -> (Result_1);
+   admin_transfer_taco: (recipient: principal, amount: nat) -> (Result_1);
+   claim_nachos: (minimumNachosReceive: nat, fiatAmount: opt text,
+    fiatCurrency: opt text) -> (NachosClaimResult);
+   claim_taco: (fiatAmount: opt text, fiatCurrency: opt text) ->
+    (ClaimResult);
+   discover_pool: () -> (Result_2);
+   get_admin_actions: (limit: nat) -> (vec AdminActionRecord) query;
+   get_all_nachos_swap_progress: () ->
+    (vec record {
+           principal;
+           NachosSwapProgress;
+         }) query;
+   get_all_swap_progress: () -> (vec record {
+                                       principal;
+                                       SwapProgress;
+                                     }) query;
+   get_canister_cycles: () -> (nat) query;
+   get_config: () ->
+    (record {
+       icpTacoPoolId: opt principal;
+       maxRetries: nat;
+       maxSlippageBasisPoints: nat;
+       minDepositICP: nat;
+       poolZeroForOne: bool;
+       sweepIntervalNS: int;
+       systemPaused: bool;
+       tacoLedgerFee: nat;
+     }) query;
+   get_deposit_address: () -> (text) query;
+   get_deposit_address_for: (user: opt principal) -> (text);
+   get_full_swap_state: () ->
+    (record {
+       hasActiveLock: bool;
+       hasPendingNachos: bool;
+       hasPendingTaco: bool;
+       nachosDepositSubaccount: vec nat8;
+       nachosStatus: NachosSwapProgress;
+       tacoDepositSubaccount: vec nat8;
+       tacoStatus: SwapProgress;
+     }) query;
+   get_logs: (count: nat, context: opt text) -> (vec LogEntry);
+   get_my_nachos_orders: (limit: nat) -> (vec NachosOrderRecord) query;
+   get_my_orders: (limit: nat) -> (vec OrderRecord) query;
+   get_nachos_deposit_address_for: (user: opt principal) -> (text);
+   get_nachos_order_history: (limit: nat, offset: nat) ->
+    (vec NachosOrderRecord) query;
+   get_nachos_pending_swaps: () ->
+    (vec record {
+           principal;
+           NachosPendingSwap;
+         }) query;
+   get_nachos_quote: (icpAmount: nat) -> (NachosQuoteResult);
+   get_nachos_stats: () ->
+    (record {
+       nachosMintingEnabled: bool;
+       nachosOrdersCount: nat;
+       nachosPendingCount: nat;
+       totalNachosDelivered: nat;
+       totalNachosICPDeposited: nat;
+       totalNachosMints: nat;
+     }) query;
+   get_nachos_swap_status: () -> (NachosSwapProgress) query;
+   get_order_history: (limit: nat, offset: nat) -> (vec OrderRecord) query;
+   get_pending_balance: () -> (nat);
+   get_pending_nachos_balance: () -> (nat);
+   get_pending_swaps: () -> (vec record {
+                                   principal;
+                                   PendingSwap;
+                                 }) query;
+   get_processed_coinbase_orders: () -> (vec record {
+                                               text;
+                                               nat;
+                                             }) query;
+   get_processed_transak_orders: () -> (vec record {
+                                              text;
+                                              nat;
+                                            }) query;
+   get_stats: () -> (SwapStats) query;
+   get_swap_status: () -> (SwapProgress) query;
+   get_taco_quote: (icpAmount: nat) -> (QuoteResult);
+   http_request: (req: HttpRequest) -> (HttpResponse) query;
+   http_request_update: (req: HttpRequest) -> (HttpResponse);
+   pause: (reason: text) -> (Result);
+   recover_icpswap_balances: () -> (Result);
+   recover_stuck_funds: ("principal": principal) -> (Result_1);
+   refund_nachos_pending: ("principal": principal) -> (Result_1);
+   refund_pending: ("principal": principal) -> (Result_1);
+   register_payment: (expectedAmount: opt nat) ->
+    (variant {
+       AlreadyProcessing;
+       NotAuthorized;
+       Ok;
+     });
+   retry_pending_swaps: () -> (Result_1);
+   set_nachos_minting_enabled: (enabled: bool) -> (Result);
+   set_pool_id: (poolId: principal, zeroForOne: bool) -> (Result);
+   unpause: (reason: text) -> (Result);
+   update_config: (config: SwapConfig) -> (Result);
+ };
+type SwapStep = 
+ variant {
+   Complete;
+   DepositReceived;
+   Failed;
+   GettingQuote;
+   NotStarted;
+   SwappingTokens;
+   TransferringToPool;
+   TransferringToWallet;
+   WaitingForDeposit;
+ };
+type SwapStats = 
+ record {
+   completedOrdersCount: nat;
+   pendingSwapsCount: nat;
+   poolConfigured: bool;
+   systemPaused: bool;
+   totalICPSwapped: nat;
+   totalSwapsCompleted: nat;
+   totalTACODelivered: nat;
+ };
+type SwapStage = 
+ variant {
+   AwaitingDeposit: nat;
+   DepositRegistered: nat;
+   SwapCompleted: nat;
+   TransferredToPool: nat;
+   WithdrawnToSubaccount: nat;
+ };
+type SwapProgress = 
+ record {
+   actualTaco: opt nat;
+   description: text;
+   errorMessage: opt text;
+   estimatedTaco: opt nat;
+   icpAmount: opt nat;
+   orderId: opt nat;
+   retryCount: nat;
+   startedAt: int;
+   step: SwapStep;
+   stepNumber: nat;
+   totalSteps: nat;
+   txId: opt nat;
+   updatedAt: int;
+ };
+type SwapConfig = 
+ record {
+   maxRetries: opt nat;
+   maxSlippageBasisPoints: opt nat;
+   minDepositICP: opt nat;
+   sweepIntervalNS: opt int;
+   systemPaused: opt bool;
+ };
+type Result_2 = 
+ variant {
+   err: text;
+   ok: principal;
+ };
+type Result_1 = 
+ variant {
+   err: text;
+   ok: nat;
+ };
+type Result = 
+ variant {
+   err: text;
+   ok;
+ };
+type QuoteResult = 
+ variant {
+   Err: text;
+   Ok:
+    record {
+      estimatedTaco: nat;
+      icpFee: nat;
+      slippage: float64;
+      tacoFee: nat;
+    };
+ };
+type PendingSwap = 
+ record {
+   attempts: nat;
+   createdAt: int;
+   errorMessage: opt text;
+   icpAmount: nat;
+   lastAttempt: int;
+   "principal": principal;
+   stage: SwapStage;
+ };
+type OrderRecord = 
+ record {
+   claimPath: ClaimPath;
+   fiatAmount: opt text;
+   fiatCurrency: opt text;
+   icpDeposited: nat;
+   id: nat;
+   poolId: principal;
+   "principal": principal;
+   slippage: float64;
+   tacoReceived: nat;
+   tacoTxId: opt nat;
+   timestamp: int;
+   transakOrderId: opt text;
+ };
+type NachosSwapStep = 
+ variant {
+   Complete;
+   DepositReceived;
+   Failed;
+   MintingNachos;
+   NotStarted;
+   TransferringToTreasury;
+ };
+type NachosSwapStage = 
+ variant {
+   AwaitingDeposit: nat;
+   MintRequested: nat;
+   TransferredToTreasury: nat;
+ };
+type NachosSwapProgress = 
+ record {
+   actualNachos: opt nat;
+   description: text;
+   errorMessage: opt text;
+   estimatedNachos: opt nat;
+   icpAmount: opt nat;
+   mintId: opt nat;
+   orderId: opt nat;
+   retryCount: nat;
+   startedAt: int;
+   step: NachosSwapStep;
+   stepNumber: nat;
+   totalSteps: nat;
+   updatedAt: int;
+ };
+type NachosQuoteResult = 
+ variant {
+   Err: text;
+   Ok: record {
+         estimatedNachos: nat;
+         feeEstimate: nat;
+         navUsed: nat;
+       };
+ };
+type NachosPendingSwap = 
+ record {
+   attempts: nat;
+   blockNumber: opt nat;
+   createdAt: int;
+   errorMessage: opt text;
+   icpAmount: nat;
+   lastAttempt: int;
+   "principal": principal;
+   stage: NachosSwapStage;
+ };
+type NachosOrderRecord = 
+ record {
+   claimPath: ClaimPath;
+   feeICP: nat;
+   fiatAmount: opt text;
+   fiatCurrency: opt text;
+   icpDeposited: nat;
+   id: nat;
+   nachosMintId: opt nat;
+   nachosReceived: nat;
+   navUsed: nat;
+   "principal": principal;
+   timestamp: int;
+ };
+type NachosClaimResult = 
+ variant {
+   AlreadyProcessing;
+   BelowMinimum: record {
+                   balance: nat;
+                   minimum: nat;
+                 };
+   MintFailed: text;
+   NoDeposit;
+   NotAuthorized;
+   RateLimited;
+   Success: record {
+              mintId: nat;
+              nachosAmount: nat;
+              orderId: nat;
+            };
+   SystemPaused;
+ };
+type LogLevel = 
+ variant {
+   ERROR;
+   INFO;
+   WARN;
+ };
+type LogEntry = 
+ record {
+   component: text;
+   context: text;
+   level: LogLevel;
+   message: text;
+   timestamp: int;
+ };
+type HttpResponse = 
+ record {
+   body: blob;
+   headers: vec record {
+                  text;
+                  text;
+                };
+   status_code: nat16;
+   upgrade: opt bool;
+ };
+type HttpRequest = 
+ record {
+   body: blob;
+   headers: vec record {
+                  text;
+                  text;
+                };
+   method: text;
+   url: text;
+ };
+type ClaimResult = 
+ variant {
+   AlreadyProcessing;
+   BelowMinimum: record {
+                   balance: nat;
+                   minimum: nat;
+                 };
+   NoDeposit;
+   NotAuthorized;
+   RateLimited;
+   Success: record {
+              orderId: nat;
+              tacoAmount: nat;
+              txId: nat;
+            };
+   SwapFailed: text;
+   SystemPaused;
+ };
+type ClaimPath = 
+ variant {
+   CoinbaseWebhook;
+   FrontendClaim;
+   ManualClaim;
+   TimerSweep;
+   WebhookClaim;
+ };
+type AdminActionRecord = 
+ record {
+   action: AdminAction;
+   caller: principal;
+   details: text;
+   success: bool;
+   timestamp: int;
+ };
+type AdminAction = 
+ variant {
+   DiscoverPool;
+   Pause;
+   RecoverFunds;
+   RetryPending;
+   SetPoolId;
+   Unpause;
+   UpdateConfig;
+ };
+service : () -> TacoSwapDAO

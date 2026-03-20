@@ -253,6 +253,7 @@ import { useRouter } from 'vue-router'
 import { useTacoStore } from '../stores/taco.store'
 import { useNachosStore } from '../stores/nachos.store'
 import { getEffectiveNetwork } from '../config/network-config'
+import { useAdminCheck } from '../composables/useAdminCheck'
 
 // sub-components
 import VaultStatusBanner from '../components/nachos/VaultStatusBanner.vue'
@@ -272,6 +273,7 @@ const router = useRouter()
 const tacoStore = useTacoStore()
 const nachosStore = useNachosStore()
 const { appLoadingOn, appLoadingOff } = tacoStore
+const { isAdmin } = useAdminCheck()
 
 ///////////////////
 // local methods //
@@ -335,8 +337,8 @@ const handleRefresh = async () => {
 
 // on mounted — production guard + data loading
 onMounted(async () => {
-  // redirect to home on production
-  if (getEffectiveNetwork() === 'ic') {
+  // redirect to home on production (unless admin)
+  if (getEffectiveNetwork() === 'ic' && !isAdmin.value) {
     router.replace('/')
     return
   }

@@ -1,5 +1,14 @@
 [
     {
+        "match": "**/*",
+        "headers": {
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
+            "Access-Control-Allow-Headers": "DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range",
+            "Access-Control-Max-Age": "86400"
+        }
+    },
+    {
         "match": ".well-known",
         "ignore": false
     }

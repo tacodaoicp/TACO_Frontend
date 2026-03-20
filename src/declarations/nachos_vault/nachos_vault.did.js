@@ -126,6 +126,10 @@ export const idlFactory = ({ IDL }) => {
     }),
     'err' : NachosError,
   });
+  const Account = IDL.Record({
+    'owner' : IDL.Principal,
+    'subaccount' : IDL.Opt(IDL.Vec(IDL.Nat8)),
+  });
   const MintMode = IDL.Variant({
     'ICP' : IDL.Null,
     'PortfolioShare' : IDL.Null,
@@ -141,6 +145,7 @@ export const idlFactory = ({ IDL }) => {
     'totalDepositValueICP' : IDL.Nat,
     'feeValueICP' : IDL.Nat,
     'mintId' : IDL.Nat,
+    'recipient' : Account,
     'mintMode' : MintMode,
     'netValueICP' : IDL.Nat,
     'excessReturned' : IDL.Vec(TokenDeposit),
@@ -262,6 +267,7 @@ export const idlFactory = ({ IDL }) => {
     'blockKey' : IDL.Text,
     'tokenPrincipal' : IDL.Principal,
     'blockNumber' : IDL.Nat,
+    'fromSubaccount' : IDL.Opt(IDL.Vec(IDL.Nat8)),
     'cancellationTxId' : IDL.Opt(IDL.Nat64),
     'timestamp' : IDL.Int,
     'caller' : IDL.Principal,
@@ -291,6 +297,7 @@ export const idlFactory = ({ IDL }) => {
     'id' : IDL.Nat,
     'totalDepositValueICP' : IDL.Nat,
     'feeValueICP' : IDL.Nat,
+    'recipient' : IDL.Opt(Account),
     'mintMode' : MintMode,
     'netValueICP' : IDL.Nat,
     'timestamp' : IDL.Int,
@@ -378,6 +385,8 @@ export const idlFactory = ({ IDL }) => {
         [],
       ),
     'claimMintFees' : IDL.Func([IDL.Principal, IDL.Nat], [Result], []),
+    'clearNavHistory' : IDL.Func([], [IDL.Text], []),
+    'clearTokenPriceHistory' : IDL.Func([], [IDL.Text], []),
     'emergencyPause' : IDL.Func([], [Result], []),
     'emergencyUnpause' : IDL.Func([], [Result], []),
     'enableCircuitBreakerCondition' : IDL.Func(
@@ -438,7 +447,11 @@ export const idlFactory = ({ IDL }) => {
         ],
         ['query'],
       ),
-    'genesisMint' : IDL.Func([IDL.Nat], [Result_3], []),
+    'genesisMint' : IDL.Func(
+        [IDL.Nat, IDL.Opt(IDL.Vec(IDL.Nat8)), IDL.Opt(Account)],
+        [Result_3],
+        [],
+      ),
     'getAcceptedMintTokens' : IDL.Func(
         [],
         [IDL.Vec(IDL.Tuple(IDL.Principal, AcceptedTokenConfig))],
@@ -965,19 +978,31 @@ export const idlFactory = ({ IDL }) => {
         ['composite_query'],
       ),
     'get_canister_cycles' : IDL.Func([], [IDL.Nat], ['query']),
-    'mintNachos' : IDL.Func([IDL.Nat, IDL.Nat], [Result_3], []),
+    'mintNachos' : IDL.Func(
+        [IDL.Nat, IDL.Nat, IDL.Opt(IDL.Vec(IDL.Nat8)), IDL.Opt(Account)],
+        [Result_3],
+        [],
+      ),
     'mintNachosWithPortfolioShare' : IDL.Func(
         [
           IDL.Vec(
             IDL.Record({ 'token' : IDL.Principal, 'blockNumber' : IDL.Nat })
           ),
           IDL.Nat,
+          IDL.Opt(IDL.Vec(IDL.Nat8)),
+          IDL.Opt(Account),
         ],
         [Result_3],
         [],
       ),
     'mintNachosWithToken' : IDL.Func(
-        [IDL.Principal, IDL.Nat, IDL.Nat],
+        [
+          IDL.Principal,
+          IDL.Nat,
+          IDL.Nat,
+          IDL.Opt(IDL.Vec(IDL.Nat8)),
+          IDL.Opt(Account),
+        ],
         [Result_3],
         [],
       ),

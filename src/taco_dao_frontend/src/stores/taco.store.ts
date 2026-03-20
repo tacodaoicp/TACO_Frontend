@@ -59,6 +59,7 @@ let _snsGovernanceIDL: any = null
 let _alarmIDL: any = null
 let _rewardsIDL: any = null
 let _nachosVaultIDL: any = null
+let _tacoSwapIDL: any = null
 
 async function getNachosVaultIDL() {
     if (!_nachosVaultIDL) {
@@ -66,6 +67,14 @@ async function getNachosVaultIDL() {
         _nachosVaultIDL = mod.idlFactory
     }
     return _nachosVaultIDL
+}
+
+async function getTacoSwapIDL() {
+    if (!_tacoSwapIDL) {
+        const mod = await import("../../../declarations/taco_swap/taco_swap.did.js")
+        _tacoSwapIDL = mod.idlFactory
+    }
+    return _tacoSwapIDL
 }
 
 // ============================================================================
@@ -3039,6 +3048,10 @@ export const useTacoStore = defineStore('taco', () => {
                 return 'p4nog-baaaa-aaaad-qkwpa-cai';
         }
         return 'p4nog-baaaa-aaaad-qkwpa-cai';
+    }
+
+    const tacoSwapCanisterId = () => {
+        return '2uddx-dqaaa-aaaan-q5qja-cai' // staging only
     }
 
     const portfolioArchiveCanisterId = () => {
@@ -6483,6 +6496,21 @@ export const useTacoStore = defineStore('taco', () => {
         return await getAnonymousActor(canisterId, () => idl)
     }
 
+    // Create TACO swap actor (authenticated)
+    const createTacoSwapActor = async () => {
+        const canisterId = tacoSwapCanisterId()
+        const authClient = await getAuthClient()
+        const idl = await getTacoSwapIDL()
+        return await getAuthenticatedActor(authClient, canisterId, () => idl)
+    }
+
+    // Create TACO swap actor (anonymous - for public queries)
+    const createTacoSwapActorAnonymous = async () => {
+        const canisterId = tacoSwapCanisterId()
+        const idl = await getTacoSwapIDL()
+        return await getAnonymousActor(canisterId, () => idl)
+    }
+
     // Format neuron ID for map key
     const formatNeuronIdForMap = (neuronId: Uint8Array): string => {
         try {
@@ -9740,6 +9768,9 @@ export const useTacoStore = defineStore('taco', () => {
         createDAOActorAnonymous,
         createNachosVaultActor,
         createNachosVaultActorAnonymous,
+        createTacoSwapActor,
+        createTacoSwapActorAnonymous,
+        tacoSwapCanisterId,
         createSnsGovernanceActorPublic,
         createSnsGovernanceActorAnonymous,
         claimNeuronRewards,

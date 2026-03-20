@@ -82,3 +82,15 @@ export function getLegacyAccountId(principal: string): { hex: string; dashed: st
   const { hex, dashed } = icrc1ToLegacyAccountId(owner);
   return { hex, dashed };
 }
+
+/**
+ * Convert a Principal to a 32-byte subaccount.
+ * Layout: byte[0] = principal byte length, bytes[1..n] = principal bytes, rest = 0
+ */
+export function principalToSubaccount(principal: Principal): Uint8Array {
+  const blob = principal.toUint8Array();
+  const sub = new Uint8Array(32);
+  sub[0] = blob.length;
+  sub.set(blob, 1);
+  return sub;
+}

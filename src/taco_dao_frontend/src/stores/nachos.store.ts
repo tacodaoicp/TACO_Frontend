@@ -607,7 +607,7 @@ export const useNachosStore = defineStore('nachos', () => {
       const minNachos = calculateMinimumReceive(estimate.nachosEstimate)
 
       const actor = await createVaultActor(true)
-      const result = await (actor as any).mintNachos(blockNumber, minNachos)
+      const result = await (actor as any).mintNachos(blockNumber, minNachos, [], [])
 
       if ('ok' in result) {
         updateCachedOp(blockNumber.toString(), ICP_LEDGER_ID, {
@@ -663,7 +663,7 @@ export const useNachosStore = defineStore('nachos', () => {
 
       const actor = await createVaultActor(true)
       const result = await (actor as any).mintNachosWithToken(
-        Principal.fromText(tokenPrincipal), blockNumber, minNachos
+        Principal.fromText(tokenPrincipal), blockNumber, minNachos, [], []
       )
 
       if ('ok' in result) {
@@ -745,7 +745,7 @@ export const useNachosStore = defineStore('nachos', () => {
       const actor = await createVaultActor(true)
       const result = await (actor as any).mintNachosWithPortfolioShare(
         depositInfos.map(d => ({ token: d.token, blockNumber: d.blockNumber })),
-        minNachos
+        minNachos, [], []
       )
 
       if ('ok' in result) {
@@ -857,11 +857,11 @@ export const useNachosStore = defineStore('nachos', () => {
       if (op.type === 'mint_icp') {
         const estimate = await estimateMintICP(amount)
         const minNachos = calculateMinimumReceive(estimate.nachosEstimate, 300)
-        result = await (actor as any).mintNachos(blockNumber, minNachos)
+        result = await (actor as any).mintNachos(blockNumber, minNachos, [], [])
       } else if (op.type === 'mint_token') {
         const estimate = await estimateMintWithToken(Principal.fromText(op.tokenPrincipal), amount)
         const minNachos = calculateMinimumReceive(estimate.nachosEstimate, 300)
-        result = await (actor as any).mintNachosWithToken(Principal.fromText(op.tokenPrincipal), blockNumber, minNachos)
+        result = await (actor as any).mintNachosWithToken(Principal.fromText(op.tokenPrincipal), blockNumber, minNachos, [], [])
       }
 
       if (result && 'ok' in result) {

@@ -552,7 +552,7 @@
                       <!-- right -->
                       <div class="d-flex flex-column gap-1">
 
-                        <!-- match dao button -->
+                        <!-- match dao holdings button -->
                         <button v-if="!userLockedVote"
                           class="btn taco-btn taco-btn--green btn-sm"
                           :class="{'disabled': matchesDao}"
@@ -2636,14 +2636,10 @@
       } else {
 
         // log
-        // console.log('user has no past allocations, matching dao')
+        // console.log('user has no past allocations, matching dao holdings')
 
-        // update the current sliders
-        currentSliders.value = currentSliders.value.map((slider: any, index: number) => ({
-          ...slider,
-          currentPercentage: updatedArray[index] || 0,
-          isLocked: false // unlock sliders
-        }))
+        // update the current sliders to match current DAO holdings
+        matchDao()
 
       }
 
@@ -2925,19 +2921,54 @@
     }
   }
 
-  // match dao
+  // compute current DAO holdings as percentages (by ICP value)
+  const getHoldingsPercentages = (): Map<string, number> => {
+    const holdings = fetchedTokenDetails.value || []
+    if (holdings.length === 0) return new Map()
+
+    const ICP_SCALE = 100000000n
+    const toScaledValueIcp = (t: any) => {
+      const balance = BigInt(t.balance)
+      const decimals = BigInt(t.tokenDecimals ?? 8n)
+      const denom = 10n ** decimals
+      const priceScaled = BigInt(Math.round(Number(t.priceInICP) * Number(ICP_SCALE)))
+      return (balance * priceScaled) / denom
+    }
+
+    const totalValueScaled = holdings.reduce((sum: bigint, entry: any) => sum + toScaledValueIcp(entry[1]), 0n)
+    if (totalValueScaled === 0n) return new Map()
+
+    const result = new Map<string, number>()
+    let sumPct = 0
+    let largestKey = ''
+    let largestPct = 0
+
+    for (const entry of holdings) {
+      const principal = String(entry[0]?.toString?.() || entry[0])
+      const tokenScaled = toScaledValueIcp(entry[1])
+      const pct = Number(((Number(tokenScaled) / Number(totalValueScaled)) * 100).toFixed(2))
+      result.set(principal, pct)
+      sumPct += pct
+      if (pct > largestPct) { largestPct = pct; largestKey = principal }
+    }
+
+    // Adjust for rounding to ensure exactly 100%
+    if (Math.abs(sumPct - 100) >= 0.01 && largestKey) {
+      result.set(largestKey, Number((result.get(largestKey)! + (100 - sumPct)).toFixed(2)))
+    }
+
+    return result
+  }
+
+  // match dao (current holdings)
   const matchDao = () => {
+    const holdingsMap = getHoldingsPercentages()
 
-    // log
-    // console.log('VoteView.vue: matching dao allocations')
-
-    // update each slider to use current dao allocation from updatedArray
-    currentSliders.value = currentSliders.value.map((slider: any, index: number) => ({
+    currentSliders.value = currentSliders.value.map((slider: any) => ({
       ...slider,
-      currentPercentage: updatedArray[index] || 0,
-      isLocked: false // unlock sliders
+      currentPercentage: holdingsMap.get(slider.canisterId) || 0,
+      isLocked: false
     }))
-    
   }  
 
   // match last
@@ -3145,20 +3176,17 @@
 
   })
 
-  // matches dao
+  // matches dao (current holdings)
   const matchesDao = computed(() => {
+    const holdingsMap = getHoldingsPercentages()
+    if (holdingsMap.size === 0) return false
 
-    // return true if all sliders match the current dao allocations (same as matchDao function)
-    return currentSliders.value.every((slider: any, index: number) => {
-
-      // compare current percentage with current dao allocation from updatedArray
+    return currentSliders.value.every((slider: any) => {
       return Math.abs(
-        slider.currentPercentage - 
-        (updatedArray[index] || 0)
+        slider.currentPercentage -
+        (holdingsMap.get(slider.canisterId) || 0)
       ) < 0.01
-      
     })
-
   })  
 
   // matches last

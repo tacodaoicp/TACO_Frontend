@@ -130,6 +130,8 @@ type NachosVaultDAO =
    claimCancellationFees: (recipient: principal, tokenPrincipal: principal,
     amount: nat) -> (Result);
    claimMintFees: (recipient: principal, amount: nat) -> (Result);
+   clearNavHistory: () -> (text);
+   clearTokenPriceHistory: () -> (text);
    emergencyPause: () -> (Result);
    emergencyUnpause: () -> (Result);
    enableCircuitBreakerCondition: (conditionId: nat, enabled: bool) ->
@@ -169,7 +171,8 @@ type NachosVaultDAO =
        netValueICP: nat;
        redemptionValueICP: nat;
      }) query;
-   genesisMint: (blockNumber: nat) -> (Result_3);
+   genesisMint: (blockNumber: nat, fromSubaccount: opt blob, recipient:
+    opt Account) -> (Result_3);
    getAcceptedMintTokens: () ->
     (vec record {
            principal;
@@ -595,14 +598,17 @@ type NachosVaultDAO =
        totalMintVolumeICP: nat;
      }) composite_query;
    get_canister_cycles: () -> (nat) query;
-   mintNachos: (blockNumber: nat, minimumNachosReceive: nat) -> (Result_3);
+   mintNachos: (blockNumber: nat, minimumNachosReceive: nat, fromSubaccount:
+    opt blob, recipient: opt Account) -> (Result_3);
    mintNachosWithPortfolioShare: (depositInfos:
     vec record {
           blockNumber: nat;
           token: principal;
-        }, minimumNachosReceive: nat) -> (Result_3);
+        }, minimumNachosReceive: nat, fromSubaccount: opt blob, recipient:
+    opt Account) -> (Result_3);
    mintNachosWithToken: (tokenPrincipal: principal, blockNumber: nat,
-    minimumNachosReceive: nat) -> (Result_3);
+    minimumNachosReceive: nat, fromSubaccount: opt blob, recipient:
+    opt Account) -> (Result_3);
    pauseBurning: () -> (Result);
    pauseMinting: () -> (Result);
    recoverStuckNachos: (recipient: principal, amount: nat) -> (Result);
@@ -754,6 +760,7 @@ type MintResult =
    nachosReceived: nat;
    navUsed: nat;
    netValueICP: nat;
+   recipient: Account;
    success: bool;
    totalDepositValueICP: nat;
  };
@@ -769,6 +776,7 @@ type MintRecord =
    nachosReceived: nat;
    navUsed: nat;
    netValueICP: nat;
+   recipient: opt Account;
    timestamp: int;
    totalDepositValueICP: nat;
  };
@@ -925,10 +933,16 @@ type ActiveDeposit =
    blockNumber: nat;
    caller: principal;
    cancellationTxId: opt nat64;
+   fromSubaccount: opt blob;
    mintBurnId: opt nat;
    status: DepositStatus;
    timestamp: int;
    tokenPrincipal: principal;
+ };
+type Account = 
+ record {
+   owner: principal;
+   subaccount: opt blob;
  };
 type AcceptedTokenConfig = 
  record {

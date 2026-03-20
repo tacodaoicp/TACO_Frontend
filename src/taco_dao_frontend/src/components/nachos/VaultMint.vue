@@ -23,8 +23,8 @@
         </button>
       </div>
 
-      <!-- slippage selector -->
-      <div class="vault-mint__slippage">
+      <!-- slippage selector (hidden for fiat mode) -->
+      <div v-if="activeMode !== 'fiat'" class="vault-mint__slippage">
         <span class="vault-mint__slippage-label">Slippage:</span>
         <button v-for="bp in slippagePresets" :key="bp"
                 class="btn btn-sm"
@@ -47,8 +47,8 @@
         </div>
       </div>
 
-      <!-- rate limit info -->
-      <div v-if="nachosStore.userRateLimits" class="vault-mint__limits">
+      <!-- rate limit info (hidden for fiat mode) -->
+      <div v-if="nachosStore.userRateLimits && activeMode !== 'fiat'" class="vault-mint__limits">
         <span>
           Window: {{ nachosStore.formatE8s(BigInt(nachosStore.userRateLimits.mintValueIn4h)) }} /
           {{ nachosStore.formatE8s(nachosStore.maxMintICPPerUser4Hours) }} ICP
@@ -263,6 +263,11 @@
 
       </div>
 
+      <!-- ============ FIAT MODE ============ -->
+      <div v-if="activeMode === 'fiat'" class="vault-mint__form">
+        <VaultFiatMint @operation-complete="emit('operation-complete')" />
+      </div>
+
     </div>
 
     <!-- confirmation dialog -->
@@ -283,6 +288,7 @@ import { useTacoStore } from '../../stores/taco.store'
 import { useNachosStore } from '../../stores/nachos.store'
 import VaultMintEstimate from './VaultMintEstimate.vue'
 import VaultConfirmDialog from './VaultConfirmDialog.vue'
+import VaultFiatMint from './VaultFiatMint.vue'
 
 const emit = defineEmits<{ (e: 'operation-complete'): void }>()
 
@@ -314,6 +320,7 @@ const modes = computed(() => {
   const base = [{ key: 'icp', label: 'ICP' }]
   if (hasNonICPTokens.value) base.push({ key: 'token', label: 'Single Token' })
   base.push({ key: 'portfolio', label: 'Portfolio Share' })
+  base.push({ key: 'fiat', label: 'FIAT' })
   return base
 })
 const activeMode = ref('icp')
@@ -360,20 +367,20 @@ const maxMintableICP = computed(() => {
 
 const setMaxICP = () => {
   if (maxMintableICP.value <= 0) return
-  icpAmount.value = (maxMintableICP.value / 1e8).toFixed(4)
+  icpAmount.value = (Math.floor(maxMintableICP.value / 1e4) / 1e4).toFixed(4)
   debouncedEstimateICP()
 }
 
 const setICPPercent = (pct: number) => {
   if (maxMintableICP.value <= 0) return
   const e8s = Math.floor(maxMintableICP.value * pct / 100)
-  icpAmount.value = (e8s / 1e8).toFixed(4)
+  icpAmount.value = (Math.floor(e8s / 1e4) / 1e4).toFixed(4)
   debouncedEstimateICP()
 }
 
 const onICPSlider = (e: Event) => {
   const val = Number((e.target as HTMLInputElement).value)
-  icpAmount.value = (val / 1e8).toFixed(4)
+  icpAmount.value = (Math.floor(val / 1e4) / 1e4).toFixed(4)
   debouncedEstimateICP()
 }
 

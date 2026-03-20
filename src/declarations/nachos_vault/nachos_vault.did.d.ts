@@ -7,11 +7,16 @@ export interface AcceptedTokenConfig {
   'addedAt' : bigint,
   'addedBy' : Principal,
 }
+export interface Account {
+  'owner' : Principal,
+  'subaccount' : [] | [Uint8Array | number[]],
+}
 export interface ActiveDeposit {
   'status' : DepositStatus,
   'blockKey' : string,
   'tokenPrincipal' : Principal,
   'blockNumber' : bigint,
+  'fromSubaccount' : [] | [Uint8Array | number[]],
   'cancellationTxId' : [] | [bigint],
   'timestamp' : bigint,
   'caller' : Principal,
@@ -137,6 +142,7 @@ export interface MintRecord {
   'id' : bigint,
   'totalDepositValueICP' : bigint,
   'feeValueICP' : bigint,
+  'recipient' : [] | [Account],
   'mintMode' : MintMode,
   'netValueICP' : bigint,
   'timestamp' : bigint,
@@ -151,6 +157,7 @@ export interface MintResult {
   'totalDepositValueICP' : bigint,
   'feeValueICP' : bigint,
   'mintId' : bigint,
+  'recipient' : Account,
   'mintMode' : MintMode,
   'netValueICP' : bigint,
   'excessReturned' : Array<TokenDeposit>,
@@ -271,6 +278,8 @@ export interface NachosVaultDAO {
   'claimBurnFees' : ActorMethod<[Principal, bigint], Result>,
   'claimCancellationFees' : ActorMethod<[Principal, Principal, bigint], Result>,
   'claimMintFees' : ActorMethod<[Principal, bigint], Result>,
+  'clearNavHistory' : ActorMethod<[], string>,
+  'clearTokenPriceHistory' : ActorMethod<[], string>,
   'emergencyPause' : ActorMethod<[], Result>,
   'emergencyUnpause' : ActorMethod<[], Result>,
   'enableCircuitBreakerCondition' : ActorMethod<[bigint, boolean], Result>,
@@ -310,7 +319,10 @@ export interface NachosVaultDAO {
       'feeEstimate' : bigint,
     }
   >,
-  'genesisMint' : ActorMethod<[bigint], Result_3>,
+  'genesisMint' : ActorMethod<
+    [bigint, [] | [Uint8Array | number[]], [] | [Account]],
+    Result_3
+  >,
   'getAcceptedMintTokens' : ActorMethod<
     [],
     Array<[Principal, AcceptedTokenConfig]>
@@ -733,12 +745,23 @@ export interface NachosVaultDAO {
     }
   >,
   'get_canister_cycles' : ActorMethod<[], bigint>,
-  'mintNachos' : ActorMethod<[bigint, bigint], Result_3>,
-  'mintNachosWithPortfolioShare' : ActorMethod<
-    [Array<{ 'token' : Principal, 'blockNumber' : bigint }>, bigint],
+  'mintNachos' : ActorMethod<
+    [bigint, bigint, [] | [Uint8Array | number[]], [] | [Account]],
     Result_3
   >,
-  'mintNachosWithToken' : ActorMethod<[Principal, bigint, bigint], Result_3>,
+  'mintNachosWithPortfolioShare' : ActorMethod<
+    [
+      Array<{ 'token' : Principal, 'blockNumber' : bigint }>,
+      bigint,
+      [] | [Uint8Array | number[]],
+      [] | [Account],
+    ],
+    Result_3
+  >,
+  'mintNachosWithToken' : ActorMethod<
+    [Principal, bigint, bigint, [] | [Uint8Array | number[]], [] | [Account]],
+    Result_3
+  >,
   'pauseBurning' : ActorMethod<[], Result>,
   'pauseMinting' : ActorMethod<[], Result>,
   'recoverStuckNachos' : ActorMethod<[Principal, bigint], Result>,

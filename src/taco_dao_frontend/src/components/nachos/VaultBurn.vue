@@ -246,20 +246,20 @@ const maxBurnable = computed(() => {
 
 const setMaxBurn = () => {
   if (maxBurnable.value <= 0) return
-  nachosAmount.value = (maxBurnable.value / 1e8).toFixed(4)
+  nachosAmount.value = (Math.floor(maxBurnable.value / 1e4) / 1e4).toFixed(4)
   debouncedEstimate()
 }
 
 const setBurnPercent = (pct: number) => {
   if (maxBurnable.value <= 0) return
   const e8s = Math.floor(maxBurnable.value * pct / 100)
-  nachosAmount.value = (e8s / 1e8).toFixed(4)
+  nachosAmount.value = (Math.floor(e8s / 1e4) / 1e4).toFixed(4)
   debouncedEstimate()
 }
 
 const onBurnSlider = (e: Event) => {
   const val = Number((e.target as HTMLInputElement).value)
-  nachosAmount.value = (val / 1e8).toFixed(4)
+  nachosAmount.value = (Math.floor(val / 1e4) / 1e4).toFixed(4)
   debouncedEstimate()
 }
 

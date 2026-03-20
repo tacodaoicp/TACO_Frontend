@@ -40,6 +40,7 @@ const ProposalsView = () => import("./views/ProposalsView.vue")
 const ProposalView = () => import("./views/ProposalView.vue")
 const WalletView = () => import("./views/WalletView.vue")
 const NachosVaultView = () => import("./views/NachosVaultView.vue")
+const BuyTacoView = () => import("./views/BuyTacoView.vue")
 const WalletViewDemo = () => import("./views/WalletViewDemo.vue")
 const NNSVoteView = () => import("./views/NNSVoteView.vue")
 const NNSVoteViewDemo = () => import("./views/NNSVoteViewDemo.vue")
@@ -59,6 +60,7 @@ const routes = [
     { path: "/info", name: "Info", component: InfoView, meta: { robots: 'index' } },
     { path: "/wallet", name: "Wallet", component: WalletView, meta: { robots: 'index' } },
     { path: "/vault", name: "NachosVault", component: NachosVaultView, meta: { robots: 'noindex' } },
+    { path: "/buy", name: "BuyTaco", component: BuyTacoView, meta: { robots: 'noindex' } },
     { path: "/walletdemo", name: "WalletDemo", component: WalletViewDemo, meta: { robots: 'noindex' } },
     // { path: "/wizarddemo", name: "WizardDemo", component: WizardViewDemo, meta: { robots: 'noindex' } },
     { path: "/rewards", name: "Rewards", component: RewardsView, meta: { robots: 'noindex' } },

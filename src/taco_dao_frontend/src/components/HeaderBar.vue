@@ -98,9 +98,15 @@
 
         </router-link>
 
-        <!-- vault - router link (staging only) -->
-        <router-link v-if="isNonProduction" to="/vault" class="header-bar__rl header-bar__rl--with-badge">
+        <!-- vault - router link (staging/local or admin) -->
+        <router-link v-if="canShowVault" to="/vault" class="header-bar__rl header-bar__rl--with-badge">
           <span class="header-bar__rl-span">Vault</span>
+          <span class="header-bar__rl-beta">STAGING</span>
+        </router-link>
+
+        <!-- buy taco - router link (staging/local or admin) -->
+        <router-link v-if="canShowVault" to="/buy" class="header-bar__rl header-bar__rl--with-badge">
+          <span class="header-bar__rl-span">Buy</span>
           <span class="header-bar__rl-beta">STAGING</span>
         </router-link>
 
@@ -313,9 +319,14 @@
 
         </router-link>
 
-        <!-- vault - router link (staging only) -->
-        <router-link v-if="isNonProduction" @click="togglePagesMenu()" to="/vault" class="list-group-item">
+        <!-- vault - router link (staging/local or admin) -->
+        <router-link v-if="canShowVault" @click="togglePagesMenu()" to="/vault" class="list-group-item">
           <span>Vault <span class="header-bar__rl-beta">STAGING</span></span>
+        </router-link>
+
+        <!-- buy taco - router link (staging/local or admin) -->
+        <router-link v-if="canShowVault" @click="togglePagesMenu()" to="/buy" class="list-group-item">
+          <span>Buy <span class="header-bar__rl-beta">STAGING</span></span>
         </router-link>
 
       </div>
@@ -716,7 +727,7 @@
   // Imports //
   /////////////
 
-  import { ref, onMounted, onBeforeUnmount, watch } from 'vue'
+  import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
   import { useTacoStore } from "../stores/taco.store"
   import { storeToRefs } from "pinia"
   import TacoDaoLogo from "../assets/images/tacoDaoLogo.vue"
@@ -728,6 +739,7 @@
   import { Tooltip } from 'bootstrap'
   // import EnvironmentIndicator from './misc/EnvironmentIndicator.vue'
   import { getEffectiveNetwork } from '../config/network-config'
+  import { useAdminCheck } from '../composables/useAdminCheck'
   import WizardModal from "../views/WizardView.vue"
 
   ////////////
@@ -765,6 +777,10 @@
 
   // staging-only features
   const isNonProduction = ref(getEffectiveNetwork() !== 'ic')
+
+  // vault visibility: staging/local or admin
+  const { isAdmin } = useAdminCheck()
+  const canShowVault = computed(() => isNonProduction.value || isAdmin.value)
 
   ///////////////////
   // Local Methods //
