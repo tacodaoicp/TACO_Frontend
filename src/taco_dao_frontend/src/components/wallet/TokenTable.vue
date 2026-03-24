@@ -175,6 +175,7 @@ function formatUSD(balance: bigint, decimals: number, priceUSD: number): string 
   th, td {
     padding: 0.625rem 0.75rem; // Increased from 0.375rem 0.5rem
     border-bottom: 1px solid var(--dark-orange-to-brown);
+    vertical-align: middle; // Center content vertically
   }
 
   th {

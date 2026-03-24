@@ -95,6 +95,7 @@
             <!-- Expandable Chart -->
             <div v-if="isExpanded(follow.principal)" class="follow-chart">
               <PerformanceChart
+                :key="`following-${follow.principal}`"
                 :principal="follow.principal"
                 :height="200"
               />
@@ -158,7 +159,7 @@
 
             <button
               class="btn taco-btn taco-btn--danger btn-sm"
-              @click="$emit('unfollow', follow.principal)"
+              @click.stop="$emit('unfollow', follow.principal)"
               title="Unfollow this user"
             >
               <i class="fas fa-user-minus"></i>
@@ -179,6 +180,7 @@
 
         <div v-if="isExpanded(follow.principal)" class="follow-chart">
           <PerformanceChart
+            :key="`following-${follow.principal}`"
             :principal="follow.principal"
             :height="200"
           />
@@ -236,6 +238,14 @@ export default {
     const expandedPrincipal = ref(null)
 
     const toggleExpanded = (principal) => {
+      // Debug logging (only on localhost/192.168.* hosts)
+      const isLocal = window.location.hostname === 'localhost' ||
+                      window.location.hostname.startsWith('192.168.')
+      if (isLocal) {
+        console.log('[Following] Toggle expanded:', principal,
+                    'Current:', expandedPrincipal.value)
+      }
+
       if (expandedPrincipal.value === principal) {
         expandedPrincipal.value = null
       } else {

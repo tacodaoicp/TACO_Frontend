@@ -1642,13 +1642,9 @@ export const useTacoStore = defineStore('taco', () => {
     // Admin data refs (populated by worker subscriptions)
     const cachedPriceAlerts = ref<any>(null)
     const cachedTradingPauses = ref<any>(null)
-    const cachedPriceHistory = ref<any>(null)
-    const cachedPortfolioHistory = ref<any>(null)
     const cachedCircuitBreakerLogs = ref<any[]>([])
     const cachedCircuitBreakerConditions = ref<any[]>([])
     const cachedPortfolioCircuitBreakerConditions = ref<any[]>([])
-    const cachedMaxPriceHistoryEntries = ref<bigint | null>(null)
-    const cachedMaxPortfolioSnapshots = ref<bigint | null>(null)
     const cachedNeuronSnapshots = ref<any[]>([])
     const cachedMaxNeuronSnapshots = ref<bigint | null>(null)
     const cachedAlarmSystemStatus = ref<any>(null)
@@ -1660,8 +1656,6 @@ export const useTacoStore = defineStore('taco', () => {
     const cachedMonitoredCanisters = ref<any[]>([])
     const cachedConfigurationIntervals = ref<any>(null)
     const cachedQueueStatus = ref<any>(null)
-    const cachedSentSMSMessages = ref<any[]>([])
-    const cachedSentEmailMessages = ref<any[]>([])
     const cachedSentMessages = ref<any[]>([])
     const cachedAlarmAcknowledgments = ref<any[]>([])
     const cachedAdminActionLogs = ref<any[]>([])
@@ -2109,16 +2103,6 @@ export const useTacoStore = defineStore('taco', () => {
             })
         )
         adminWorkerUnsubscribers.push(
-            workerBridge.subscribe('priceHistory', (data: unknown) => {
-                if (data) cachedPriceHistory.value = deserializeFromTransfer(data)
-            })
-        )
-        adminWorkerUnsubscribers.push(
-            workerBridge.subscribe('portfolioHistory', (data: unknown) => {
-                if (data) cachedPortfolioHistory.value = deserializeFromTransfer(data)
-            })
-        )
-        adminWorkerUnsubscribers.push(
             workerBridge.subscribe('circuitBreakerLogs', (data: unknown) => {
                 if (data && Array.isArray(data)) cachedCircuitBreakerLogs.value = deserializeFromTransfer(data) as any[]
             })
@@ -2133,17 +2117,6 @@ export const useTacoStore = defineStore('taco', () => {
                 if (data && Array.isArray(data)) cachedPortfolioCircuitBreakerConditions.value = deserializeFromTransfer(data) as any[]
             })
         )
-        adminWorkerUnsubscribers.push(
-            workerBridge.subscribe('maxPriceHistoryEntries', (data: unknown) => {
-                if (data !== null && data !== undefined) cachedMaxPriceHistoryEntries.value = deserializeFromTransfer(data) as bigint
-            })
-        )
-        adminWorkerUnsubscribers.push(
-            workerBridge.subscribe('maxPortfolioSnapshots', (data: unknown) => {
-                if (data !== null && data !== undefined) cachedMaxPortfolioSnapshots.value = deserializeFromTransfer(data) as bigint
-            })
-        )
-
         // Neuron snapshot admin data subscriptions
         adminWorkerUnsubscribers.push(
             workerBridge.subscribe('neuronSnapshots', (data: unknown) => {
@@ -2200,16 +2173,6 @@ export const useTacoStore = defineStore('taco', () => {
         adminWorkerUnsubscribers.push(
             workerBridge.subscribe('queueStatus', (data: unknown) => {
                 if (data) cachedQueueStatus.value = deserializeFromTransfer(data)
-            })
-        )
-        adminWorkerUnsubscribers.push(
-            workerBridge.subscribe('sentSMSMessages', (data: unknown) => {
-                if (data && Array.isArray(data)) cachedSentSMSMessages.value = deserializeFromTransfer(data) as any[]
-            })
-        )
-        adminWorkerUnsubscribers.push(
-            workerBridge.subscribe('sentEmailMessages', (data: unknown) => {
-                if (data && Array.isArray(data)) cachedSentEmailMessages.value = deserializeFromTransfer(data) as any[]
             })
         )
         adminWorkerUnsubscribers.push(
@@ -10025,13 +9988,9 @@ export const useTacoStore = defineStore('taco', () => {
         // Cached admin data refs (populated by worker subscriptions)
         cachedPriceAlerts,
         cachedTradingPauses,
-        cachedPriceHistory,
-        cachedPortfolioHistory,
         cachedCircuitBreakerLogs,
         cachedCircuitBreakerConditions,
         cachedPortfolioCircuitBreakerConditions,
-        cachedMaxPriceHistoryEntries,
-        cachedMaxPortfolioSnapshots,
         cachedNeuronSnapshots,
         cachedMaxNeuronSnapshots,
         cachedAlarmSystemStatus,
@@ -10043,8 +10002,6 @@ export const useTacoStore = defineStore('taco', () => {
         cachedMonitoredCanisters,
         cachedConfigurationIntervals,
         cachedQueueStatus,
-        cachedSentSMSMessages,
-        cachedSentEmailMessages,
         cachedSentMessages,
         cachedAlarmAcknowledgments,
         cachedAdminActionLogs,

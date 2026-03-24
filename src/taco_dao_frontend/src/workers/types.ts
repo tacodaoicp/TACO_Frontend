@@ -35,16 +35,12 @@ export type DataKey =
   | 'treasuryLogs'
   | 'priceAlerts'
   | 'tradingPauses'
-  | 'priceHistory'
-  | 'portfolioHistory'
   | 'circuitBreakerLogs'
   | 'circuitBreakerConditions'
   | 'portfolioCircuitBreakerConditions'
   // Admin-only data keys (neuron snapshots)
   | 'neuronSnapshots'
   | 'maxNeuronSnapshots'
-  | 'maxPortfolioSnapshots'
-  | 'maxPriceHistoryEntries'
   // Admin-only data keys (alarm system)
   | 'alarmSystemStatus'
   | 'alarmContacts'
@@ -55,8 +51,6 @@ export type DataKey =
   | 'monitoredCanisters'
   | 'configurationIntervals'
   | 'queueStatus'
-  | 'sentSMSMessages'
-  | 'sentEmailMessages'
   | 'sentMessages'
   | 'alarmAcknowledgments'
   | 'adminActionLogs'
@@ -119,16 +113,12 @@ export const WORKER_ASSIGNMENT: Record<DataKey, 'public' | 'auth'> = {
   treasuryLogs: 'auth',
   priceAlerts: 'auth',
   tradingPauses: 'auth',
-  priceHistory: 'auth',
-  portfolioHistory: 'auth',
   circuitBreakerLogs: 'auth',
   circuitBreakerConditions: 'auth',
   portfolioCircuitBreakerConditions: 'auth',
   // Authenticated worker (admin data - neuron snapshots)
   neuronSnapshots: 'auth',
   maxNeuronSnapshots: 'auth',
-  maxPortfolioSnapshots: 'auth',
-  maxPriceHistoryEntries: 'auth',
   // Authenticated worker (admin data - alarm system)
   alarmSystemStatus: 'auth',
   alarmContacts: 'auth',
@@ -139,8 +129,6 @@ export const WORKER_ASSIGNMENT: Record<DataKey, 'public' | 'auth'> = {
   monitoredCanisters: 'auth',
   configurationIntervals: 'auth',
   queueStatus: 'auth',
-  sentSMSMessages: 'auth',
-  sentEmailMessages: 'auth',
   sentMessages: 'auth',
   alarmAcknowledgments: 'auth',
   adminActionLogs: 'auth',
@@ -226,8 +214,6 @@ export const STALENESS_THRESHOLDS: Record<DataKey, number> = {
   monitoredCanisters: 300_000,
   configurationIntervals: 300_000,
   queueStatus: 300_000,
-  sentSMSMessages: 300_000,
-  sentEmailMessages: 300_000,
   sentMessages: 300_000,
   alarmAcknowledgments: 300_000,
   adminActionLogs: 300_000,
@@ -239,12 +225,8 @@ export const STALENESS_THRESHOLDS: Record<DataKey, number> = {
   highestProcessedNNSProposalId: 300_000,
   // Background - 600 seconds (large data sets, rarely change, or updated frequently by UI)
   allNames: 600_000,
-  priceHistory: 600_000,
-  portfolioHistory: 600_000,
   neuronSnapshots: 600_000,
   maxNeuronSnapshots: 600_000,
-  maxPortfolioSnapshots: 600_000,
-  maxPriceHistoryEntries: 600_000,
   monitoringStatus: 600_000,
   pendingAlarms: 600_000,
   systemErrors: 600_000,
@@ -389,7 +371,7 @@ export const ROUTE_PRIORITIES: Record<string, RouteDataConfig> = {
   '/': {
     critical: ['cryptoPrices', 'tokenDetails', 'totalTreasuryValueInUsd'],
     high: ['aggregateAllocation', 'tradingStatus', 'leaderboardAllTimeUSD'],
-    preloadRoutes: ['/dao', '/vote', '/performance'],
+    preloadRoutes: ['/dao', '/vote', '/performance', '/wallet', '/vault', '/buy'],
   },
   '/dao': {
     critical: ['tokenDetails', 'aggregateAllocation', 'tradingStatus'],
@@ -474,7 +456,17 @@ export const ROUTE_PRIORITIES: Record<string, RouteDataConfig> = {
   '/wallet': {
     critical: ['tokenDetails'],
     high: ['cryptoPrices'],
-    preloadRoutes: [],
+    preloadRoutes: ['/vault', '/buy', '/performance'],
+  },
+  '/vault': {
+    critical: ['tokenDetails', 'aggregateAllocation'],
+    high: ['cryptoPrices', 'userAllocation'],
+    preloadRoutes: ['/wallet', '/buy', '/performance'],
+  },
+  '/buy': {
+    critical: ['tokenDetails', 'cryptoPrices'],
+    high: ['userAllocation', 'tradingStatus'],
+    preloadRoutes: ['/wallet', '/vault', '/performance'],
   },
   '/performance': {
     critical: ['leaderboardAllTimeICP', 'leaderboardInfo'],
@@ -482,7 +474,7 @@ export const ROUTE_PRIORITIES: Record<string, RouteDataConfig> = {
       'leaderboardAllTimeUSD',
       'userPerformance',
     ],
-    preloadRoutes: ['/dao', '/rewards'],
+    preloadRoutes: ['/wallet', '/vault', '/buy', '/dao', '/rewards'],
   },
 }
 

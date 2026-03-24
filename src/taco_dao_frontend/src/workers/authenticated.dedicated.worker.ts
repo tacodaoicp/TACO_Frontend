@@ -16,6 +16,24 @@ import { BackoffTracker } from './shared/backoff'
 import { getCached, setCached, getAllCached } from './shared/indexed-db'
 import { getHost, shouldFetchRootKey, setWorkerNetworkOverride } from './shared/canister-ids'
 import {
+  // Public data fetch functions
+  fetchCryptoPricesData,
+  fetchTokenDetailsData,
+  fetchTradingStatusData,
+  fetchSnapshotInfoData,
+  fetchTacoProposalsData,
+  fetchProposalsThreadsData,
+  fetchAllNamesData,
+  fetchNeuronSnapshotStatusData,
+  fetchPortfolioSnapshotStatusData,
+  fetchLeaderboardData,
+  fetchLeaderboardInfoData,
+  calculateTotalTreasuryValueInUsd,
+  // Composite query functions
+  fetchVoteDashboardData,
+  fetchAllLeaderboardsData,
+  fetchEnhancedTreasuryDashboardData,
+  // User/Auth data fetch functions
   fetchUserAllocationData,
   fetchSystemLogsData,
   fetchVoterDetailsData,
@@ -23,17 +41,16 @@ import {
   fetchPenalizedNeuronsData,
   fetchRebalanceConfigData,
   fetchSystemParametersData,
+  // Treasury/Trading admin data
   fetchPriceAlertsData,
   fetchTradingPausesData,
-  fetchPriceHistoryData,
-  fetchPortfolioHistoryData,
   fetchCircuitBreakerLogsData,
   fetchCircuitBreakerConditionsData,
   fetchPortfolioCircuitBreakerConditionsData,
-  fetchMaxPriceHistoryEntriesData,
-  fetchMaxPortfolioSnapshotsData,
+  // Neuron Snapshots admin data
   fetchNeuronSnapshotsData,
   fetchMaxNeuronSnapshotsData,
+  // Alarm system admin data
   fetchAlarmSystemStatusData,
   fetchAlarmContactsData,
   fetchMonitoringStatusData,
@@ -43,11 +60,10 @@ import {
   fetchMonitoredCanistersData,
   fetchConfigurationIntervalsData,
   fetchQueueStatusData,
-  fetchSentSMSMessagesData,
-  fetchSentEmailMessagesData,
   fetchSentMessagesData,
   fetchAlarmAcknowledgmentsData,
   fetchAdminActionLogsData,
+  // NNS Automation admin data
   fetchVotableProposalsData,
   fetchPeriodicTimerStatusData,
   fetchAutoVotingThresholdData,
@@ -55,11 +71,14 @@ import {
   fetchTacoDAONeuronIdData,
   fetchDefaultVoteBehaviorData,
   fetchHighestProcessedNNSProposalIdData,
+  // Rewards/Distributions
   fetchRewardsConfigurationData,
   fetchDistributionHistoryData,
+  // User performance
   fetchUserPerformanceData,
-  fetchEnhancedTreasuryDashboardData,
+  // Swap dashboard
   fetchSwapDashboardData,
+  // Utilities
   serializeForTransfer,
   clearActorCache,
 } from './shared/fetch-functions'
@@ -86,6 +105,19 @@ declare const self: DedicatedWorkerGlobalScope
 // ============================================================================
 
 const HANDLED_KEYS: DataKey[] = [
+  // ========== PUBLIC KEYS (from public.worker, optimized) ==========
+  'cryptoPrices',
+  'tokenDetails', // Primary for getVoteDashboard composite
+  'tradingStatus', // Primary for getEnhancedTreasuryDashboard (public)
+  'leaderboardAllTimeUSD', // Primary for getAllLeaderboards
+  'leaderboardAllTimeICP',
+  'leaderboardInfo',
+  'tacoProposals',
+  'proposalsThreads',
+  'allNames',
+  'neuronSnapshotStatus',
+  'timerStatus',
+  // ========== USER KEYS ==========
   'userAllocation',
   'systemLogs',
   'voterDetails',
@@ -94,13 +126,9 @@ const HANDLED_KEYS: DataKey[] = [
   'systemParameters',
   'priceAlerts',
   'tradingPauses',
-  'priceHistory',
-  'portfolioHistory',
   'circuitBreakerLogs',
   'circuitBreakerConditions',
   'portfolioCircuitBreakerConditions',
-  'maxPriceHistoryEntries',
-  'maxPortfolioSnapshots',
   'neuronSnapshots',
   'maxNeuronSnapshots',
   'alarmSystemStatus',
@@ -112,8 +140,6 @@ const HANDLED_KEYS: DataKey[] = [
   'monitoredCanisters',
   'configurationIntervals',
   'queueStatus',
-  'sentSMSMessages',
-  'sentEmailMessages',
   'sentMessages',
   'alarmAcknowledgments',
   'adminActionLogs',
@@ -136,8 +162,6 @@ const USER_KEYS: DataKey[] = ['userAllocation', 'userPerformance', 'swapDashboar
 
 const AUTH_REQUIRED_KEYS: DataKey[] = [
   'queueStatus',
-  'sentSMSMessages',
-  'sentEmailMessages',
   'sentMessages',
   'alarmAcknowledgments',
   'adminActionLogs',
@@ -158,6 +182,21 @@ const AUTH_REQUIRED_KEYS: DataKey[] = [
   'highestProcessedNNSProposalId',
 ]
 
+// Public keys from merged public worker
+const PUBLIC_KEYS: DataKey[] = [
+  'cryptoPrices',
+  'tokenDetails',
+  'tradingStatus',
+  'leaderboardAllTimeUSD',
+  'leaderboardAllTimeICP',
+  'leaderboardInfo',
+  'tacoProposals',
+  'proposalsThreads',
+  'allNames',
+  'neuronSnapshotStatus',
+  'timerStatus',
+]
+
 const PUBLIC_ADMIN_KEYS: DataKey[] = [
   'systemLogs',
   'voterDetails',
@@ -166,13 +205,9 @@ const PUBLIC_ADMIN_KEYS: DataKey[] = [
   'systemParameters',
   'priceAlerts',
   'tradingPauses',
-  'priceHistory',
-  'portfolioHistory',
   'circuitBreakerLogs',
   'circuitBreakerConditions',
   'portfolioCircuitBreakerConditions',
-  'maxPriceHistoryEntries',
-  'maxPortfolioSnapshots',
   'neuronSnapshots',
   'maxNeuronSnapshots',
   'rewardsConfiguration',
@@ -769,10 +804,47 @@ async function processSingleFetch(item: { dataKey: DataKey; retryCount: number }
 }
 
 // ============================================================================
+// Composite Query Coalescing (from merged public worker)
+// ============================================================================
+let lastVoteDashboardResult: { data: any; timestamp: number } | null = null
+let lastLeaderboardResult: { data: any; timestamp: number } | null = null
+let lastEnhancedTreasuryResult: { data: any; timestamp: number } | null = null
+const COALESCE_MS = 5_000
+const TREASURY_COALESCE_MS = 5_000
+
+async function getVoteDashboardCoalesced(agentRef: HttpAgent): Promise<any | null> {
+  if (lastVoteDashboardResult && (Date.now() - lastVoteDashboardResult.timestamp) < COALESCE_MS) {
+    return lastVoteDashboardResult.data
+  }
+  try {
+    const data = await fetchVoteDashboardData(agentRef)
+    lastVoteDashboardResult = { data, timestamp: Date.now() }
+    return data
+  } catch (err) {
+    console.warn('[AuthWorker-Dedicated] getVoteDashboard composite failed, falling back to individual calls:', err)
+    lastVoteDashboardResult = { data: null, timestamp: Date.now() }
+    return null
+  }
+}
+
+async function getAllLeaderboardsCoalesced(agentRef: HttpAgent): Promise<any | null> {
+  if (lastLeaderboardResult && (Date.now() - lastLeaderboardResult.timestamp) < COALESCE_MS) {
+    return lastLeaderboardResult.data
+  }
+  try {
+    const data = await fetchAllLeaderboardsData(agentRef)
+    lastLeaderboardResult = { data, timestamp: Date.now() }
+    return data
+  } catch (err) {
+    console.warn('[AuthWorker-Dedicated] getAllLeaderboards composite failed, falling back to individual calls:', err)
+    lastLeaderboardResult = { data: null, timestamp: Date.now() }
+    return null
+  }
+}
+
+// ============================================================================
 // Enhanced Treasury Dashboard Coalescing
 // ============================================================================
-let lastEnhancedTreasuryResult: { data: any; timestamp: number } | null = null
-const TREASURY_COALESCE_MS = 5_000
 
 async function getEnhancedTreasuryDashboardCoalesced(agentRef: HttpAgent): Promise<any | null> {
   if (lastEnhancedTreasuryResult && (Date.now() - lastEnhancedTreasuryResult.timestamp) < TREASURY_COALESCE_MS) {
@@ -808,11 +880,96 @@ async function populateEnhancedTreasurySiblings(dashboard: any, excludeKey: Data
   }
 }
 
+/**
+ * Map worker data key to backend getAllLeaderboards key
+ * Example: 'leaderboardAllTimeUSD' -> 'allTimeUSD'
+ */
+function mapLeaderboardKey(dataKey: DataKey): string {
+  // Remove 'leaderboard' prefix and lowercase first char
+  // leaderboardAllTimeUSD -> AllTimeUSD -> allTimeUSD
+  const withoutPrefix = dataKey.replace('leaderboard', '')
+  return withoutPrefix.charAt(0).toLowerCase() + withoutPrefix.slice(1)
+}
+
+/**
+ * Populate all 8 leaderboard data keys from getAllLeaderboards composite.
+ * Reduces 8 individual fetches to 1 composite call.
+ */
+async function populateAllLeaderboardsSiblings(
+  allBoards: any,
+  excludeKey: DataKey
+): Promise<void> {
+  const now = Date.now()
+  const freshState: Partial<DataState> = {
+    lastUpdated: now,
+    loading: false,
+    error: null,
+    stale: false
+  }
+
+  const leaderboardKeys: DataKey[] = [
+    'leaderboardAllTimeUSD',
+    'leaderboardAllTimeICP',
+    'leaderboardOneYearUSD',
+    'leaderboardOneYearICP',
+    'leaderboardOneMonthUSD',
+    'leaderboardOneMonthICP',
+    'leaderboardOneWeekUSD',
+    'leaderboardOneWeekICP'
+  ]
+
+  for (const key of leaderboardKeys) {
+    if (key === excludeKey) continue // Skip the one we're already handling
+
+    const backendKey = mapLeaderboardKey(key)
+    const boardData = serializeForTransfer(allBoards[backendKey])
+
+    updateState(key, { data: boardData, ...freshState })
+    broadcastUpdate(key, boardData)
+    await setCached(key, boardData)
+  }
+}
+
+async function populateVoteDashboardSiblings(dashboard: any, excludeKey: DataKey): Promise<void> {
+  const now = Date.now()
+  const freshState: Partial<DataState> = { lastUpdated: now, loading: false, error: null, stale: false }
+
+  if (excludeKey !== 'tokenDetails') {
+    const td = serializeForTransfer(dashboard.tokenDetails)
+    updateState('tokenDetails', { data: td, ...freshState })
+    broadcastUpdate('tokenDetails', td)
+    await setCached('tokenDetails', td)
+  }
+
+  if (excludeKey !== 'timerStatus') {
+    const cachedTS = dataStates.get('tradingStatus')?.data
+    const ts = serializeForTransfer({
+      snapshotInfo: dashboard.snapshotInfo,
+      tradingStatus: cachedTS ?? null,
+      tokenDetails: dashboard.tokenDetails,
+    })
+    updateState('timerStatus', { data: ts, ...freshState })
+    broadcastUpdate('timerStatus', ts)
+    await setCached('timerStatus', ts)
+  }
+
+  // userAllocation — broadcast if present
+  if (dashboard.userAllocation?.length > 0) {
+    const ua = serializeForTransfer(dashboard.userAllocation)
+    updateState('userAllocation' as DataKey, { data: ua, lastUpdated: now, loading: false, error: null, stale: false })
+    broadcastUpdate('userAllocation' as DataKey, ua)
+  }
+}
+
 async function fetchData(dataKey: DataKey): Promise<void> {
+  const isPublicKey = PUBLIC_KEYS.includes(dataKey)
   const requiresAuth = USER_KEYS.includes(dataKey) || AUTH_REQUIRED_KEYS.includes(dataKey)
-  const agent = requiresAuth
-    ? authenticatedAgent
-    : (authenticatedAgent || anonymousAgent)
+
+  const agent = isPublicKey
+    ? anonymousAgent
+    : requiresAuth
+      ? authenticatedAgent
+      : (authenticatedAgent || anonymousAgent)
 
   if (!agent) {
     throw new Error(requiresAuth ? 'No authenticated agent' : 'No agent available')
@@ -823,6 +980,106 @@ async function fetchData(dataKey: DataKey): Promise<void> {
   let data: unknown
 
   switch (dataKey) {
+    // ========== PUBLIC DATA CASES (from merged public worker) ==========
+    case 'cryptoPrices':
+      data = await fetchCryptoPricesData()
+      break
+
+    case 'tokenDetails': {
+      const dashboard = await getVoteDashboardCoalesced(anonymousAgent!)
+      if (!dashboard) {
+        const rawTokenData = await fetchTokenDetailsData(anonymousAgent!)
+        data = serializeForTransfer(rawTokenData)
+      } else {
+        data = serializeForTransfer(dashboard.tokenDetails)
+        await populateVoteDashboardSiblings(dashboard, 'tokenDetails')
+      }
+      break
+    }
+
+    case 'tradingStatus': {
+      const enhancedDashboard = await getEnhancedTreasuryDashboardCoalesced(anonymousAgent!)
+      if (!enhancedDashboard) {
+        data = serializeForTransfer(await fetchTradingStatusData(anonymousAgent!))
+      } else {
+        data = serializeForTransfer({ ok: enhancedDashboard.tradingStatus })
+      }
+      break
+    }
+
+    case 'leaderboardAllTimeUSD':
+    case 'leaderboardAllTimeICP':
+    case 'leaderboardOneYearUSD':
+    case 'leaderboardOneYearICP':
+    case 'leaderboardOneMonthUSD':
+    case 'leaderboardOneMonthICP':
+    case 'leaderboardOneWeekUSD':
+    case 'leaderboardOneWeekICP': {
+      const allBoards = await getAllLeaderboardsCoalesced(anonymousAgent!)
+      if (!allBoards) {
+        // Fallback to individual call
+        let timeframe: 'AllTime' | 'OneYear' | 'OneMonth' | 'OneWeek' = 'AllTime'
+        if (dataKey.includes('OneYear')) timeframe = 'OneYear'
+        else if (dataKey.includes('OneMonth')) timeframe = 'OneMonth'
+        else if (dataKey.includes('OneWeek')) timeframe = 'OneWeek'
+
+        const priceType = dataKey.endsWith('USD') ? 'USD' : 'ICP'
+        data = serializeForTransfer(await fetchLeaderboardData(anonymousAgent!, timeframe, priceType))
+      } else {
+        // Map worker key to backend key and extract the correct leaderboard
+        const backendKey = mapLeaderboardKey(dataKey)
+        data = serializeForTransfer(allBoards[backendKey])
+
+        // Populate all 8 sibling keys from this one composite call
+        await populateAllLeaderboardsSiblings(allBoards, dataKey)
+      }
+      break
+    }
+
+    case 'leaderboardInfo':
+      data = serializeForTransfer(await fetchLeaderboardInfoData(anonymousAgent!))
+      break
+
+    case 'tacoProposals':
+      data = serializeForTransfer(await fetchTacoProposalsData(anonymousAgent!))
+      break
+
+    case 'proposalsThreads':
+      data = serializeForTransfer(await fetchProposalsThreadsData(anonymousAgent!))
+      break
+
+    case 'allNames':
+      data = serializeForTransfer(await fetchAllNamesData(anonymousAgent!))
+      break
+
+    case 'neuronSnapshotStatus':
+      data = serializeForTransfer(await fetchNeuronSnapshotStatusData(anonymousAgent!))
+      break
+
+    case 'timerStatus': {
+      const dashboard = await getVoteDashboardCoalesced(anonymousAgent!)
+      if (!dashboard) {
+        const snapshotInfo = await fetchSnapshotInfoData(anonymousAgent!)
+        const cachedTS = dataStates.get('tradingStatus')?.data
+        const cachedTD = dataStates.get('tokenDetails')?.data
+        data = serializeForTransfer({
+          snapshotInfo,
+          tradingStatus: cachedTS ?? null,
+          tokenDetails: cachedTD ?? null,
+        })
+      } else {
+        const cachedTS = dataStates.get('tradingStatus')?.data
+        data = serializeForTransfer({
+          snapshotInfo: dashboard.snapshotInfo,
+          tradingStatus: cachedTS ?? null,
+          tokenDetails: dashboard.tokenDetails,
+        })
+        await populateVoteDashboardSiblings(dashboard, 'timerStatus')
+      }
+      break
+    }
+
+    // ========== USER/AUTH DATA CASES (existing) ==========
     case 'userAllocation':
       data = serializeForTransfer(await fetchUserAllocationData(authenticatedAgent!))
       break
@@ -872,12 +1129,6 @@ async function fetchData(dataKey: DataKey): Promise<void> {
       }
       break
     }
-    case 'priceHistory':
-      data = serializeForTransfer(await fetchPriceHistoryData(agent))
-      break
-    case 'portfolioHistory':
-      data = serializeForTransfer(await fetchPortfolioHistoryData(agent))
-      break
     case 'circuitBreakerLogs':
       data = serializeForTransfer(await fetchCircuitBreakerLogsData(agent))
       break
@@ -886,12 +1137,6 @@ async function fetchData(dataKey: DataKey): Promise<void> {
       break
     case 'portfolioCircuitBreakerConditions':
       data = serializeForTransfer(await fetchPortfolioCircuitBreakerConditionsData(agent))
-      break
-    case 'maxPriceHistoryEntries':
-      data = serializeForTransfer(await fetchMaxPriceHistoryEntriesData(agent))
-      break
-    case 'maxPortfolioSnapshots':
-      data = serializeForTransfer(await fetchMaxPortfolioSnapshotsData(agent))
       break
     case 'neuronSnapshots':
       data = serializeForTransfer(await fetchNeuronSnapshotsData(agent))
@@ -925,12 +1170,6 @@ async function fetchData(dataKey: DataKey): Promise<void> {
       break
     case 'queueStatus':
       data = serializeForTransfer(await fetchQueueStatusData(agent))
-      break
-    case 'sentSMSMessages':
-      data = serializeForTransfer(await fetchSentSMSMessagesData(agent))
-      break
-    case 'sentEmailMessages':
-      data = serializeForTransfer(await fetchSentEmailMessagesData(agent))
       break
     case 'sentMessages':
       data = serializeForTransfer(await fetchSentMessagesData(agent))
@@ -992,29 +1231,63 @@ async function fetchData(dataKey: DataKey): Promise<void> {
 // ============================================================================
 
 async function autoRefreshLoop(): Promise<void> {
+  let publicRefreshCounter = 0
+  let authRefreshCounter = 0
+
   while (true) {
-    await sleep(15000)
+    await sleep(5000) // Check every 5 seconds (base interval)
 
     // Check if we should enter idle mode
     checkIdleStatus()
 
-    // Skip auto-refresh if idle or not authenticated
-    if (isIdle || !isAuthenticated) continue
+    // Skip auto-refresh if idle
+    if (isIdle) continue
 
-    for (const dataKey of USER_KEYS) {
-      const state = dataStates.get(dataKey)
-      if (state && isStale(dataKey, state.lastUpdated) && !queue.has(dataKey)) {
-        queue.enqueue(dataKey, 'medium')
+    publicRefreshCounter++
+    authRefreshCounter++
+
+    // PUBLIC KEYS: refresh every 5 seconds (counter % 1 == 0)
+    if (publicRefreshCounter >= 1) {
+      for (const dataKey of PUBLIC_KEYS) {
+        const state = dataStates.get(dataKey)
+        if (state && isStale(dataKey, state.lastUpdated) && !queue.has(dataKey)) {
+          queue.enqueue(dataKey, 'medium')
+        }
       }
+      publicRefreshCounter = 0
     }
 
-    if (isAdmin) {
-      for (const dataKey of ADMIN_KEYS) {
+    // AUTH/ADMIN KEYS: refresh every 15 seconds (counter % 3 == 0, since 15s / 5s = 3)
+    if (authRefreshCounter >= 3) {
+      // Always refresh PUBLIC_ADMIN_KEYS - they can be fetched anonymously
+      for (const dataKey of PUBLIC_ADMIN_KEYS) {
         const state = dataStates.get(dataKey)
         if (state && isStale(dataKey, state.lastUpdated) && !queue.has(dataKey)) {
           queue.enqueue(dataKey, 'low')
         }
       }
+
+      // Refresh user data only if authenticated
+      if (isAuthenticated) {
+        for (const dataKey of USER_KEYS) {
+          const state = dataStates.get(dataKey)
+          if (state && isStale(dataKey, state.lastUpdated) && !queue.has(dataKey)) {
+            queue.enqueue(dataKey, 'medium')
+          }
+        }
+      }
+
+      // Refresh auth-required admin data if admin
+      if (isAdmin && isAuthenticated) {
+        for (const dataKey of AUTH_REQUIRED_KEYS) {
+          const state = dataStates.get(dataKey)
+          if (state && isStale(dataKey, state.lastUpdated) && !queue.has(dataKey)) {
+            queue.enqueue(dataKey, 'low')
+          }
+        }
+      }
+
+      authRefreshCounter = 0
     }
   }
 }

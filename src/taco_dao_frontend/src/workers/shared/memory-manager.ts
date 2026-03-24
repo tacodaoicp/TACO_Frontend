@@ -16,15 +16,11 @@ import type { DataKey, DataState } from '../types'
 // Maximum size per data key (in estimated bytes) - 2MB default
 export const MAX_DATA_SIZE_BYTES: Partial<Record<DataKey, number>> = {
   // Large history datasets - limit to 500KB each
-  priceHistory: 500_000,
-  portfolioHistory: 500_000,
   neuronSnapshots: 500_000,
   distributionHistory: 500_000,
   // Log data - limit to 200KB each
   systemLogs: 200_000,
   circuitBreakerLogs: 200_000,
-  sentSMSMessages: 200_000,
-  sentEmailMessages: 200_000,
   sentMessages: 200_000,
   adminActionLogs: 200_000,
   alarmAcknowledgments: 200_000,

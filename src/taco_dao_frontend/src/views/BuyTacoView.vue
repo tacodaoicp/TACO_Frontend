@@ -34,16 +34,17 @@
                 <div class="buy-taco-view__step">
                   <span class="buy-taco-view__step-num">2</span>
                   <span v-if="selectedProduct === 'nachos'">ICP is deposited to your NACHOS vault address</span>
-                  <span v-else>ICP is deposited to your swap address</span>
+                  <span v-else>ICP is deposited to your personal wallet</span>
                 </div>
                 <div class="buy-taco-view__step">
                   <span class="buy-taco-view__step-num">3</span>
                   <span v-if="selectedProduct === 'nachos'">Once ICP arrives, NACHOS are minted at current NAV</span>
-                  <span v-else>Once ICP arrives, it is swapped to TACO on ICPSwap</span>
+                  <span v-else>Click "Swap ICP for TACO" when ready</span>
                 </div>
                 <div class="buy-taco-view__step">
                   <span class="buy-taco-view__step-num">4</span>
-                  <span>{{ selectedProduct === 'nachos' ? 'NACHOS' : 'TACO' }} tokens arrive in your wallet</span>
+                  <span v-if="selectedProduct === 'nachos'">NACHOS tokens arrive in your wallet</span>
+                  <span v-else>ICP is swapped to TACO and delivered to your wallet</span>
                 </div>
               </div>
             </div>
@@ -139,6 +140,22 @@
                      class="fa-solid fa-spinner fa-spin me-2"></i>
                   {{ activeBuyButtonText }}
                 </button>
+
+                <!-- Manual swap button (shown when ICP detected in user wallet) -->
+                <div v-if="icpDetected && !anySwapActive" class="mt-3">
+                  <div class="alert alert-success mb-2">
+                    <i class="fa-solid fa-check-circle me-2"></i>
+                    <strong>ICP Detected:</strong> {{ formatE8s(detectedIcpAmount) }} ICP in your wallet
+                  </div>
+                  <button class="btn taco-btn taco-btn--blue w-100"
+                          @click="executeManualSwap">
+                    <i class="fa-solid fa-arrow-right-arrow-left me-2"></i>
+                    Swap ICP for {{ selectedProduct === 'taco' ? 'TACO' : 'NACHOS' }}
+                  </button>
+                  <p class="text-muted small mt-2 mb-0">
+                    This will transfer ICP from your wallet and swap for {{ selectedProduct === 'taco' ? 'TACO' : 'NACHOS' }} tokens
+                  </p>
+                </div>
               </div>
 
               <!-- TACO order status + progress tracker -->
@@ -597,6 +614,8 @@ import { storeToRefs } from 'pinia'
 import { getEffectiveNetwork } from '../config/network-config'
 import { useAdminCheck } from '../composables/useAdminCheck'
 import { Principal } from '@dfinity/principal'
+import { Actor, HttpAgent } from '@dfinity/agent'
+import { AuthClient } from '@dfinity/auth-client'
 import { signedSessionHeaders } from '../utils/sign-session-request'
 import type { SwapProgress, SwapDashboard, NachosSwapProgress, NachosOrderRecord } from '../../../declarations/taco_swap/taco_swap.did'
 
@@ -689,6 +708,10 @@ let transakInstance: any = null
 const tacoDepositSubaccount = ref<Uint8Array | null>(null)
 const nachosDepositSubaccount = ref<Uint8Array | null>(null)
 
+// Manual swap state (ICP detected in user's wallet)
+const icpDetected = ref(false)
+const detectedIcpAmount = ref(0n)
+
 // Live deposit balance (for UI display during Phase 1)
 const depositBalance = ref<bigint>(0n)
 const nachosDepositBalance = ref<bigint>(0n)
@@ -771,8 +794,11 @@ const buyButtonText = computed(() => {
 
 const statusMessage = computed(() => {
   if (uiPhase.value === 'registering') return 'Registering payment with canister...'
+  if (icpDetected.value && uiPhase.value === 'idle') {
+    return `✓ ICP detected in your wallet: ${formatE8s(detectedIcpAmount.value)} ICP`
+  }
   if (isDepositPolling.value) {
-    if (depositBalance.value > 0n) return `ICP deposit detected: ${formatE8s(depositBalance.value)} ICP — claiming...`
+    if (depositBalance.value > 0n) return `ICP deposit detected: ${formatE8s(depositBalance.value)} ICP — waiting for swap...`
     return 'Waiting for ICP deposit...'
   }
   if (swapProgress.value && uiPhase.value !== 'idle') return swapProgress.value.description
@@ -1056,6 +1082,8 @@ const openCoinbase = async () => {
   orderError.value = null
   claimResult.value = null
   swapProgress.value = null
+  icpDetected.value = false
+  detectedIcpAmount.value = 0n
 
   // 0. Register payment intent with backend
   const ok = await registerPayment()
@@ -1063,8 +1091,9 @@ const openCoinbase = async () => {
 
   try {
     // 1. Get session token from CF Worker (signed with frontend identity)
+    // Use user's personal wallet address (not swap deposit address)
     const sessionBody = {
-      addresses: [{ address: depositAddress.value }],
+      addresses: [{ address: tacoStore.userLedgerAccountId }],
       assets: ['ICP'],
     }
     const resp = await fetch(COINBASE_SESSION_WORKER, {
@@ -1154,6 +1183,8 @@ const openTransak = async () => {
   orderError.value = null
   claimResult.value = null
   swapProgress.value = null
+  icpDetected.value = false
+  detectedIcpAmount.value = 0n
 
   // 0. Register payment intent with backend
   const ok = await registerPayment()
@@ -1583,15 +1614,11 @@ const startDepositPolling = (product: Product) => {
       return
     }
 
-    const subaccount = product === 'taco'
-      ? tacoDepositSubaccount.value
-      : nachosDepositSubaccount.value
-    if (!subaccount) return
-
+    // Poll user's personal wallet (not swap deposit subaccount)
     const balance = await tacoStore.icrc1BalanceOf(
       ICP_LEDGER_CANISTER_ID,
-      Principal.fromText(swapCanisterId),
-      subaccount instanceof Uint8Array ? subaccount : new Uint8Array(subaccount)
+      Principal.fromText(tacoStore.userPrincipal),
+      undefined  // Default subaccount (user's main wallet)
     )
 
     if (balance === false) return // query error, retry next tick
@@ -1605,31 +1632,19 @@ const startDepositPolling = (product: Product) => {
       nachosDepositBalance.value = balanceBigInt
     }
 
-    // ICP arrived — auto-claim
+    // ICP arrived in user's wallet — show manual swap button
     if (balanceBigInt > DEPOSIT_MIN_E8S) {
       stopDepositPolling()
 
-      try {
-        const actor = await tacoStore.createTacoSwapActor()
+      // Set flags to show manual swap button (no auto-swap)
+      icpDetected.value = true
+      detectedIcpAmount.value = balanceBigInt
 
-        if (product === 'taco') {
-          const result = await (actor as any).claim_taco([fiatAmount.value], [fiatCurrency.value])
-          const done = handleClaimResult(result)
-          if (!done && uiPhase.value === 'polling') {
-            // Claim accepted but still processing — switch to Phase 2 (swap polling)
-            startUnifiedPolling(POLL_ACTIVE_MS)
-          }
-        } else {
-          const result = await (actor as any).claim_nachos(0n, [fiatAmount.value], [fiatCurrency.value])
-          const done = handleNachosClaimResult(result)
-          if (!done && nachosPhase.value === 'polling') {
-            startUnifiedPolling(POLL_ACTIVE_MS)
-          }
-        }
-      } catch (err) {
-        console.error(`Auto-claim ${product} failed:`, err)
-        // Fall back to swap polling — backend may still process it
-        startUnifiedPolling(POLL_ACTIVE_MS)
+      // Update UI phase to show detected state
+      if (product === 'taco') {
+        uiPhase.value = 'idle'  // Return to idle so button is clickable
+      } else {
+        nachosPhase.value = 'idle'
       }
     }
   }, DEPOSIT_POLL_MS)
@@ -1640,6 +1655,125 @@ const stopDepositPolling = () => {
   if (depositPollInterval) {
     clearInterval(depositPollInterval)
     depositPollInterval = null
+  }
+}
+
+/** Execute manual swap: transfer ICP from user wallet → swap canister, then claim */
+const executeManualSwap = async () => {
+  if (!icpDetected.value || detectedIcpAmount.value === 0n) {
+    console.error('No ICP detected to swap')
+    return
+  }
+
+  const product = selectedProduct.value
+
+  try {
+    // Set UI to processing state
+    if (product === 'taco') {
+      uiPhase.value = 'polling'
+      orderError.value = null
+    } else {
+      nachosPhase.value = 'polling'
+      nachosError.value = null
+    }
+
+    // Step 1: Transfer ICP from user's wallet to swap canister deposit address
+    const swapCanisterId = tacoStore.tacoSwapCanisterId()
+    const subaccount = product === 'taco'
+      ? tacoDepositSubaccount.value
+      : nachosDepositSubaccount.value
+
+    if (!subaccount) {
+      throw new Error('Deposit subaccount not available')
+    }
+
+    // Create ICP ledger actor for transfer
+    const authClient = await AuthClient.create({ keyType: 'Ed25519' })
+    const identity = authClient.getIdentity()
+
+    const network = getEffectiveNetwork()
+    const networkHost = network === 'ic' ? 'https://ic0.app' : 'https://icp0.io'
+
+    const agent = await HttpAgent.create({
+      identity,
+      host: networkHost,
+      shouldFetchRootKey: network !== 'ic'
+    })
+
+    if (network !== 'ic') {
+      await agent.fetchRootKey()
+    }
+
+    // ICRC1 IDL for transfer
+    const icrc1IDL = ({ IDL }: any) => {
+      return IDL.Service({
+        'icrc1_transfer': IDL.Func(
+          [IDL.Record({
+            'to': IDL.Record({ 'owner': IDL.Principal, 'subaccount': IDL.Opt(IDL.Vec(IDL.Nat8)) }),
+            'fee': IDL.Opt(IDL.Nat),
+            'memo': IDL.Opt(IDL.Vec(IDL.Nat8)),
+            'from_subaccount': IDL.Opt(IDL.Vec(IDL.Nat8)),
+            'created_at_time': IDL.Opt(IDL.Nat64),
+            'amount': IDL.Nat
+          })],
+          [IDL.Variant({ 'Ok': IDL.Nat, 'Err': IDL.Unknown })],
+          []
+        )
+      })
+    }
+
+    const icpLedger = Actor.createActor(icrc1IDL, { agent, canisterId: ICP_LEDGER_CANISTER_ID })
+
+    const transferArgs = {
+      to: {
+        owner: Principal.fromText(swapCanisterId),
+        subaccount: [Array.from(subaccount instanceof Uint8Array ? subaccount : new Uint8Array(subaccount))]
+      },
+      amount: detectedIcpAmount.value,
+      fee: [],
+      memo: [],
+      from_subaccount: [],
+      created_at_time: []
+    }
+
+    const transferResult: any = await icpLedger.icrc1_transfer(transferArgs)
+
+    // Check transfer succeeded
+    if ('Err' in transferResult) {
+      throw new Error(`ICP transfer failed: ${JSON.stringify(transferResult.Err)}`)
+    }
+
+    // Step 2: Now call claim functions (ICP is in deposit address)
+    const actor = await tacoStore.createTacoSwapActor()
+
+    if (product === 'taco') {
+      const result = await (actor as any).claim_taco([fiatAmount.value], [fiatCurrency.value])
+      const done = handleClaimResult(result)
+      if (!done && uiPhase.value === 'polling') {
+        // Claim accepted but still processing — switch to Phase 2 (swap polling)
+        startUnifiedPolling(POLL_ACTIVE_MS)
+      }
+    } else {
+      const result = await (actor as any).claim_nachos(0n, [fiatAmount.value], [fiatCurrency.value])
+      const done = handleNachosClaimResult(result)
+      if (!done && nachosPhase.value === 'polling') {
+        startUnifiedPolling(POLL_ACTIVE_MS)
+      }
+    }
+
+    // Reset ICP detected state
+    icpDetected.value = false
+    detectedIcpAmount.value = 0n
+
+  } catch (err) {
+    console.error('Manual swap failed:', err)
+    if (product === 'taco') {
+      uiPhase.value = 'error'
+      orderError.value = err instanceof Error ? err.message : 'Manual swap failed'
+    } else {
+      nachosPhase.value = 'error'
+      nachosError.value = err instanceof Error ? err.message : 'Manual swap failed'
+    }
   }
 }
 

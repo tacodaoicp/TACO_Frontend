@@ -714,31 +714,6 @@ export async function fetchTradingPausesData(agent: HttpAgent): Promise<any> {
 }
 
 /**
- * Fetch price history from Treasury (admin only)
- * Uses getTokenPriceHistory for all tokens
- */
-export async function fetchPriceHistoryData(agent: HttpAgent, tokens: Principal[] = []): Promise<any> {
-  const actor = getTreasuryActor(agent)
-  const result = await actor.getTokenPriceHistory(tokens)
-  if ('ok' in result) {
-    return result.ok
-  }
-  throw new Error('err' in result ? String(result.err) : 'Failed to get price history')
-}
-
-/**
- * Fetch portfolio history from Treasury (admin only)
- */
-export async function fetchPortfolioHistoryData(agent: HttpAgent, limit: number = 270): Promise<any> {
-  const actor = getTreasuryActor(agent)
-  const result = await actor.getPortfolioHistory(BigInt(limit))
-  if ('ok' in result) {
-    return result.ok
-  }
-  throw new Error('err' in result ? String(result.err) : 'Failed to get portfolio history')
-}
-
-/**
  * Fetch circuit breaker logs from Treasury (admin only)
  */
 export async function fetchCircuitBreakerLogsData(agent: HttpAgent, offset: number = 0, limit: number = 68): Promise<any> {
@@ -760,22 +735,6 @@ export async function fetchCircuitBreakerConditionsData(agent: HttpAgent): Promi
 export async function fetchPortfolioCircuitBreakerConditionsData(agent: HttpAgent): Promise<any> {
   const actor = getTreasuryActor(agent)
   return await actor.listPortfolioCircuitBreakerConditions()
-}
-
-/**
- * Fetch max price history entries from Treasury (admin only)
- */
-export async function fetchMaxPriceHistoryEntriesData(agent: HttpAgent): Promise<bigint> {
-  const actor = getTreasuryActor(agent)
-  return await actor.getMaxPriceHistoryEntries() as bigint
-}
-
-/**
- * Fetch max portfolio snapshots from Treasury (admin only)
- */
-export async function fetchMaxPortfolioSnapshotsData(agent: HttpAgent): Promise<bigint> {
-  const actor = getTreasuryActor(agent)
-  return await actor.getMaxPortfolioSnapshots() as bigint
 }
 
 // ============================================================================
@@ -908,31 +867,6 @@ export async function fetchQueueStatusData(agent: HttpAgent): Promise<any> {
     return result.ok
   }
   throw new Error('err' in result ? result.err : 'Failed to get queue status')
-}
-
-/**
- * Fetch sent SMS messages (admin only)
- */
-export async function fetchSentSMSMessagesData(agent: HttpAgent, limit: number = 68): Promise<any[]> {
-  const actor = getAlarmActor(agent)
-  const result = await actor.getSentSMSMessages([BigInt(limit)])
-  if ('ok' in result) {
-    return result.ok as any[]
-  }
-  throw new Error('err' in result ? result.err : 'Failed to get sent SMS messages')
-}
-
-/**
- * Fetch sent email messages (admin only)
- */
-export async function fetchSentEmailMessagesData(agent: HttpAgent, limit: number = 68): Promise<any[]> {
-  const actor = getAlarmActor(agent)
-
-  const result = await actor.getSentEmailMessages([BigInt(limit)])
-  if ('ok' in result) {
-    return result.ok as any[]
-  }
-  throw new Error('err' in result ? result.err : 'Failed to get sent email messages')
 }
 
 /**
@@ -1084,18 +1018,6 @@ export async function fetchDistributionHistoryData(agent: HttpAgent, offset: num
 // ============================================================================
 // Composite Query Functions (reduce ~15 calls to ~3)
 // ============================================================================
-
-/**
- * Fetch dashboard data from DAO backend composite endpoint
- * Replaces: getTokenDetailsWithoutPastPrices + getAggregateAllocation + votingPowerMetrics + getSnapshotInfo
- */
-export async function fetchDashboardData(agent: HttpAgent): Promise<any | null> {
-  const actor = getDaoBackendActor(agent)
-  const result = await actor.getDashboardData()
-  // Returns opt record — [] means null, [data] means some
-  if (!result || result.length === 0) return null
-  return result[0]
-}
 
 /**
  * Fetch vote dashboard data from DAO backend composite endpoint

@@ -1134,8 +1134,15 @@
     fetchCryptoPrices()
 
     // Preload chart compute worker during idle time (warm before Performance tab)
-    const idle = window.requestIdleCallback || ((cb) => setTimeout(cb, 2000))
-    idle(() => import('./workers/chart-worker-port').then(m => m.getChartPort()))
+    const idle = window.requestIdleCallback || ((cb) => setTimeout(cb, 1000))
+    idle(() => {
+      import('./workers/chart-worker-port').then(m => m.getChartPort())
+
+      // Preload commonly-used route components (in navigation, frequently accessed)
+      import('./views/WalletView.vue')
+      import('./views/NachosVaultView.vue')
+      import('./views/BuyTacoView.vue')
+    })
 
   }
 

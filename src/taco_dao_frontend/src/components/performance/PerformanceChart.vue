@@ -169,6 +169,27 @@ export default {
       if (serializedCheckpoints.value.length) dispatchToWorker()
     })
 
+    // Helper function to truncate long notes to prevent tooltip overflow
+    const truncateNote = (text, maxLines = 15) => {
+      if (!text) return ''
+
+      // Split by newlines first (preserve user's line breaks)
+      const lines = text.split('\n')
+      const truncatedLines = []
+      let lineCount = 0
+
+      for (const line of lines) {
+        if (lineCount >= maxLines) {
+          truncatedLines.push('...')
+          break
+        }
+        truncatedLines.push(line)
+        lineCount++
+      }
+
+      return truncatedLines.join('\n')
+    }
+
     // Chart options - dual series: USD (green/red) and ICP (blue)
     const chartOptions = computed(() => {
       const usdColor = '#FEC800' // Yellow/Gold for USD
@@ -372,10 +393,16 @@ export default {
             const checkpoint = checkpointIdx != null ? usdCheckpoints.value[checkpointIdx] : null
             let noteHtml = ''
             if (checkpoint?.reason && checkpoint.reason.length > 0 && checkpoint.reason[0]) {
+              const rawNote = checkpoint.reason[0]
+              const truncatedNote = truncateNote(rawNote, 15)
+              const escapedNote = truncatedNote
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+
               noteHtml = `
                 <div style="border-top:1px solid #DA8D28;margin-top:8px;padding-top:8px;">
                   <div style="color:#FEEAC1;font-size:11px;margin-bottom:4px;">Note:</div>
-                  <div style="color:#fff;font-size:11px;word-break:break-word;white-space:pre-wrap;">${checkpoint.reason[0].replace(/</g, '&lt;').replace(/>/g, '&gt;')}</div>
+                  <div style="color:#fff;font-size:11px;word-break:break-word;white-space:pre-wrap;max-width:400px;overflow:hidden;">${escapedNote}</div>
                 </div>
               `
             }

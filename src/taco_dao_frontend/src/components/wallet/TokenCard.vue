@@ -169,14 +169,14 @@
             class="token-card__neurons flex-grow-1">
 
           <!-- neurons header -->
-          <div class="d-flex flex-column gap-2">
+          <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
 
-            <!-- neurons header title -->
+            <!-- neurons header title (left side) -->
             <div class="d-flex align-items-center gap-2">
 
               <!-- expand icon -->
               <i @click="toggleNeuronsSection"
-                 :class="neuronsExpanded ? 'fa fa-chevron-down' : 'fa fa-chevron-right'" 
+                 :class="neuronsExpanded ? 'fa fa-chevron-down' : 'fa fa-chevron-right'"
                  style="min-width: 1rem; cursor: pointer;"></i>
 
               <!-- neurons icon -->
@@ -205,7 +205,7 @@
 
             </div>
 
-            <!-- neurons buttons -->
+            <!-- neurons buttons (right side) -->
             <div v-if="!loadingNeurons"
                  class="d-flex flex-wrap gap-2">
 
@@ -1008,14 +1008,21 @@
       padding: 1rem;
       border-radius: 0.5rem;
       border: 1px solid var(--dark-orange);
-      width: 100%;
+      flex: 1 1 auto;
+      min-width: 280px; // Minimum width before wrapping to next row
       max-width: 24.675rem;
       height: fit-content;
+
+      // Mobile: full width
+      @media (max-width: 767.98px) {
+        min-width: 100%;
+      }
     }
 
     // add neuron card
     &__add-neuron-card {
-      width: 100%;
+      flex: 1 1 auto;
+      min-width: 280px; // Minimum width before wrapping to next row
       max-width: 24.675rem;
       min-height: 22rem;
       border: 1px dashed var(--dark-orange);
@@ -1027,18 +1034,29 @@
         background-color: var(--orange-to-light-brown);
       }
 
+      // Mobile: full width
+      @media (max-width: 767.98px) {
+        min-width: 100%;
+      }
+
     }
 
   }
 
   // Show more neurons button wrapper
   .show-more-neurons-wrapper {
-    width: 100%;
+    flex: 1 1 auto;
+    min-width: 280px;
     max-width: 24.675rem;
     display: flex;
     justify-content: center;
     margin-top: 1rem;
     margin-bottom: 1rem;
+
+    // Mobile: full width
+    @media (max-width: 767.98px) {
+      min-width: 100%;
+    }
 
     .show-more-neurons-btn {
       padding: 0.5rem 1.5rem;

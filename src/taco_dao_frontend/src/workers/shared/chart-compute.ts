@@ -58,6 +58,13 @@ export interface ComputeResult {
   tooltipData: Record<number, TooltipCheckpointData>
 }
 
+// --- Constants ---
+
+const ANOMALY_DATE_START_MS = 1741564800000  // March 10, 2026 00:00:00 UTC
+const ANOMALY_DATE_END_MS = 1742169600000    // March 17, 2026 00:00:00 UTC
+const ANOMALY_THRESHOLD_PERCENT = 25        // Filter non-Tuesday days with >25% diff
+const GLOBAL_JUMP_THRESHOLD = 700
+
 // --- Helpers ---
 
 /** Compare allocations at display precision (0.1%) */
@@ -273,16 +280,38 @@ function buildSeriesData(
       continue
     }
     const lastKept = series[series.length - 1]
-    const jump = raw[i].y - lastKept.y
-    if (Math.abs(jump) >= 700) {
+    const jump = Math.abs(raw[i].y - lastKept.y)
+    const timestamp = raw[i].x
+
+    // Global 700% filter (all dates)
+    if (jump >= GLOBAL_JUMP_THRESHOLD) {
       if (isLocal) {
         console.log(
-          `%c[ChartWorker] Dropped abnormal checkpoint ${raw[i].checkpointIndex} (${valueKey}): ${lastKept.y}% → ${raw[i].y}% (jump: ${jump >= 0 ? '+' : ''}${jump.toFixed(1)}%)`,
+          `%c[ChartWorker] Dropped abnormal checkpoint ${raw[i].checkpointIndex} (${valueKey}): ${lastKept.y}% → ${raw[i].y}% (jump: ${raw[i].y >= lastKept.y ? '+' : ''}${(raw[i].y - lastKept.y).toFixed(1)}%)`,
           'color: red'
         )
       }
       continue
     }
+
+    // Date-specific 25% filter (March 10-17, 2026) - only on non-Tuesday days
+    // Tuesdays are distribution days (like 10th and 17th), so keep those points
+    if (timestamp >= ANOMALY_DATE_START_MS && timestamp < ANOMALY_DATE_END_MS) {
+      const date = new Date(timestamp)
+      const dayOfWeek = date.getUTCDay() // 0=Sunday, 1=Monday, 2=Tuesday, etc.
+      const isTuesday = dayOfWeek === 2
+
+      if (!isTuesday && jump > ANOMALY_THRESHOLD_PERCENT) {
+        if (isLocal) {
+          console.log(
+            `%c[ChartWorker] Dropped anomalous checkpoint ${raw[i].checkpointIndex} on non-Tuesday (3/10-3/17): ${lastKept.y}% → ${raw[i].y}% (jump: ${jump.toFixed(1)}%)`,
+            'color: orange'
+          )
+        }
+        continue
+      }
+    }
+
     series.push(raw[i])
   }
   return { series, keptEntries }

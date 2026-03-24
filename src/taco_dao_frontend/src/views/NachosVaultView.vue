@@ -344,7 +344,12 @@ onMounted(async () => {
   }
 
   try {
-    appLoadingOn()
+    // Only show loading animation if data isn't already cached
+    const hasData = nachosStore.dashboardData && nachosStore.vaultConfig && nachosStore.navHistory.length > 0
+    if (!hasData) {
+      appLoadingOn()
+    }
+
     // Load public data for all users (dashboard, config, NAV history use anonymous actor)
     await Promise.all([
       nachosStore.loadDashboard(),

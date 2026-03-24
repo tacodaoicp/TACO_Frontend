@@ -2155,9 +2155,13 @@
     import('./SalesView.vue')
     import('./ProposalsView.vue')
 
+    // Wallet, vault, buy - prefetch for ALL users (in navigation, commonly accessed)
+    import('./WalletView.vue')
+    import('./NachosVaultView.vue')
+    import('./BuyTacoView.vue')
+
     // Logged in users - also prefetch authenticated pages
     if (userLoggedIn.value) {
-      import('./WalletView.vue')
       import('./RewardsView.vue')
 
       // Admin pages - only if admin or previously visited admin
@@ -2251,18 +2255,9 @@
 
     }
 
-    // lazy load heavy iframes after idle
-    if ('requestIdleCallback' in window) {
-      ;(window as any).requestIdleCallback(() => {
-        shouldLoadDex.value = true
-        shouldLoadYouTube.value = true
-      })
-    } else {
-      setTimeout(() => {
-        shouldLoadDex.value = true
-        shouldLoadYouTube.value = true
-      }, 1000)
-    }  
+    // Load heavy iframes immediately (high priority)
+    shouldLoadDex.value = true
+    shouldLoadYouTube.value = true  
 
   })
 

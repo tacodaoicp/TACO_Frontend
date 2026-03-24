@@ -183,6 +183,7 @@
                   <td colspan="7" class="p-0">
                     <div class="expanded-chart-container">
                       <PerformanceChart
+                        :key="`leaderboard-${entry.principal.toString()}`"
                         :principal="entry.principal.toString()"
                         :height="220"
                       />
@@ -264,6 +265,15 @@ export default {
     // Toggle expanded row
     const toggleExpanded = (principal) => {
       const principalStr = principal.toString()
+
+      // Debug logging (only on localhost/192.168.* hosts)
+      const isLocal = window.location.hostname === 'localhost' ||
+                      window.location.hostname.startsWith('192.168.')
+      if (isLocal) {
+        console.log('[Leaderboard] Toggle expanded:', principalStr,
+                    'Current:', expandedPrincipal.value)
+      }
+
       if (expandedPrincipal.value === principalStr) {
         expandedPrincipal.value = null
       } else {

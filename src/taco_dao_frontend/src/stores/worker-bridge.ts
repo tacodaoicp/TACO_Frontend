@@ -21,10 +21,9 @@ import {
 import { createWorkerAdapterFromUrl, isSharedWorkerSupported, type WorkerAdapter } from '../workers/worker-adapter'
 
 // Import worker URLs using Vite's worker URL syntax - ensures proper bundling in production
-import PublicWorkerUrl from '../workers/public.worker.ts?worker&url'
-import AuthWorkerUrl from '../workers/authenticated.worker.ts?worker&url'
-import PublicDedicatedWorkerUrl from '../workers/public.dedicated.worker.ts?worker&url'
-import AuthDedicatedWorkerUrl from '../workers/authenticated.dedicated.worker.ts?worker&url'
+// Using single unified authenticated worker (handles both public and user/admin data)
+import MainWorkerUrl from '../workers/authenticated.worker.ts?worker&url'
+import MainDedicatedWorkerUrl from '../workers/authenticated.dedicated.worker.ts?worker&url'
 
 // ============================================================================
 // Debug Mode (use tacoConfig.debug() in console to enable/disable)
@@ -36,11 +35,10 @@ import { isDebugEnabled } from '../config/network-config'
 const WORKER_DEBUG = () => isDebugEnabled()
 
 // ============================================================================
-// Worker Instances (singletons)
+// Worker Instances (singleton - unified authenticated worker)
 // ============================================================================
 
-let publicWorker: WorkerAdapter | null = null
-let authWorker: WorkerAdapter | null = null
+let mainWorker: WorkerAdapter | null = null
 
 // Track worker type for logging
 let workerType: 'shared' | 'dedicated' = 'shared'
@@ -52,7 +50,7 @@ let initialized = false
 let cacheDeliveryPromise: Promise<void> | null = null
 let cacheDeliveryResolve: (() => void) | null = null
 let workersReportedCacheReady = 0
-const EXPECTED_WORKERS_FOR_CACHE = 1 // public worker only (auth waits for identity)
+const EXPECTED_WORKERS_FOR_CACHE = 1 // Single unified worker delivers initial cache
 
 // ============================================================================
 // State
@@ -81,43 +79,23 @@ const workersConnected = ref(false)
 // ============================================================================
 
 // Increment to force browser to load fresh SharedWorker code
-const WORKER_VERSION = 'v3'
+const WORKER_VERSION = 'v5' // Incremented for route preloading network updates
 
-function getPublicWorker(): WorkerAdapter {
-  if (!publicWorker) {
-    publicWorker = createWorkerAdapterFromUrl(
-      PublicWorkerUrl,
-      PublicDedicatedWorkerUrl,
-      `taco-public-${WORKER_VERSION}`
+function getMainWorker(): WorkerAdapter {
+  if (!mainWorker) {
+    mainWorker = createWorkerAdapterFromUrl(
+      MainWorkerUrl,
+      MainDedicatedWorkerUrl,
+      `taco-main-${WORKER_VERSION}`
     )
-    setupWorkerAdapter(publicWorker, 'public')
+    setupWorkerAdapter(mainWorker, 'main')
   }
-  return publicWorker
-}
-
-function getAuthWorker(): WorkerAdapter {
-  if (!authWorker) {
-    authWorker = createWorkerAdapterFromUrl(
-      AuthWorkerUrl,
-      AuthDedicatedWorkerUrl,
-      `taco-authenticated-${WORKER_VERSION}`
-    )
-    setupWorkerAdapter(authWorker, 'auth')
-  }
-  return authWorker
+  return mainWorker
 }
 
 function getWorkerForKey(dataKey: DataKey): WorkerAdapter {
-  const assignment = WORKER_ASSIGNMENT[dataKey]
-
-  switch (assignment) {
-    case 'public':
-      return getPublicWorker()
-    case 'auth':
-      return getAuthWorker()
-    default:
-      throw new Error(`Unknown worker type for dataKey: ${dataKey}`)
-  }
+  // All data keys now handled by single unified worker
+  return getMainWorker()
 }
 
 // ============================================================================
@@ -293,8 +271,7 @@ function sendToWorker(worker: WorkerAdapter, message: WorkerRequest): void {
 }
 
 function broadcastToAllWorkers(message: WorkerRequest): void {
-  if (publicWorker) sendToWorker(publicWorker, message)
-  if (authWorker) sendToWorker(authWorker, message)
+  if (mainWorker) sendToWorker(mainWorker, message)
 }
 
 // ============================================================================
@@ -320,16 +297,15 @@ export function initWorkerBridge(route?: string): void {
     cacheDeliveryResolve = resolve
   })
 
-  // Create all workers
+  // Create unified worker
   try {
-    getPublicWorker()
-    getAuthWorker()
+    getMainWorker()
   } catch (error) {
-    console.error('[WorkerBridge] Failed to create workers:', error)
+    console.error('[WorkerBridge] Failed to create worker:', error)
   }
 
-  // Send INITIAL_LOAD with route to workers for selective data loading
-  // This tells workers to only send/fetch critical+high priority data for this route initially
+  // Send INITIAL_LOAD with route to worker for selective data loading
+  // This tells worker to only send/fetch critical+high priority data for this route initially
   // Use provided route, or fall back to stored value, or default to '/'
   const initialRoute = route || currentRoute.value || '/'
   currentRoute.value = initialRoute // Sync the stored route
@@ -343,12 +319,11 @@ export function initWorkerBridge(route?: string): void {
   workersReportedCacheReady = 0
 
   if (WORKER_DEBUG()) {
-    console.log('[WorkerBridge] Sending INITIAL_LOAD to workers...')
+    console.log('[WorkerBridge] Sending INITIAL_LOAD to worker...')
   }
-  sendToWorker(getPublicWorker(), initialLoadMessage)
-  sendToWorker(getAuthWorker(), initialLoadMessage)
+  sendToWorker(getMainWorker(), initialLoadMessage)
   if (WORKER_DEBUG()) {
-    console.log('[WorkerBridge] INITIAL_LOAD sent to all workers')
+    console.log('[WorkerBridge] INITIAL_LOAD sent to worker')
   }
 
   // Set up visibility tracking
@@ -538,9 +513,9 @@ export function setAdminStatus(admin: boolean): void {
   const wasAdmin = isAdmin.value
   isAdmin.value = admin
 
-  // Notify auth worker
-  if (authWorker) {
-    sendToWorker(authWorker, {
+  // Notify main worker
+  if (mainWorker) {
+    sendToWorker(mainWorker, {
       id: generateMessageId(),
       timestamp: Date.now(),
       type: 'SET_ADMIN',
@@ -561,8 +536,8 @@ export function setIdentity(serializedIdentity: {
   delegationChainJson: string
   sessionKeyJson: string
 }): void {
-  if (authWorker) {
-    sendToWorker(authWorker, {
+  if (mainWorker) {
+    sendToWorker(mainWorker, {
       id: generateMessageId(),
       timestamp: Date.now(),
       type: 'SET_IDENTITY',
@@ -575,8 +550,8 @@ export function setIdentity(serializedIdentity: {
  * Clear identity from authenticated worker (logout)
  */
 export function clearIdentity(): void {
-  if (authWorker) {
-    sendToWorker(authWorker, {
+  if (mainWorker) {
+    sendToWorker(mainWorker, {
       id: generateMessageId(),
       timestamp: Date.now(),
       type: 'CLEAR_IDENTITY',
@@ -586,12 +561,12 @@ export function clearIdentity(): void {
 }
 
 /**
- * Send user principal to public worker for getVoteDashboard composite query.
+ * Send user principal to worker for getVoteDashboard composite query.
  * Pass the principal text when user logs in so the composite returns userAllocation.
  */
 export function setUserPrincipal(principalText: string): void {
-  if (publicWorker) {
-    sendToWorker(publicWorker, {
+  if (mainWorker) {
+    sendToWorker(mainWorker, {
       id: generateMessageId(),
       timestamp: Date.now(),
       type: 'SET_USER_PRINCIPAL',
@@ -601,7 +576,7 @@ export function setUserPrincipal(principalText: string): void {
 }
 
 /**
- * Clear user principal from public worker (logout)
+ * Clear user principal from worker (logout)
  */
 export function clearUserPrincipal(): void {
   setUserPrincipal('')
@@ -688,39 +663,10 @@ function setupActivityTracking(): void {
 function updatePrioritiesForRoute(route: string): void {
   const priorities = getRoutePriorities(route, isAdmin.value, true)
 
-  // Group by worker
-  const publicKeys: Array<{ dataKey: DataKey; priority: Priority }> = []
-  const authKeys: Array<{ dataKey: DataKey; priority: Priority }> = []
-
-  for (const [dataKey, priority] of priorities) {
-    const worker = WORKER_ASSIGNMENT[dataKey]
-    const item = { dataKey, priority }
-
-    switch (worker) {
-      case 'public':
-        publicKeys.push(item)
-        break
-      case 'auth':
-        authKeys.push(item)
-        break
-    }
-  }
-
-  // Send priority updates to each worker
-  if (publicWorker && publicKeys.length > 0) {
-    for (const { dataKey, priority } of publicKeys) {
-      sendToWorker(publicWorker, {
-        id: generateMessageId(),
-        timestamp: Date.now(),
-        type: 'SET_PRIORITY',
-        payload: { dataKey, priority },
-      })
-    }
-  }
-
-  if (authWorker && authKeys.length > 0) {
-    for (const { dataKey, priority } of authKeys) {
-      sendToWorker(authWorker, {
+  // Send priority updates to worker for all keys
+  if (mainWorker) {
+    for (const [dataKey, priority] of priorities) {
+      sendToWorker(mainWorker, {
         id: generateMessageId(),
         timestamp: Date.now(),
         type: 'SET_PRIORITY',

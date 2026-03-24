@@ -315,7 +315,7 @@
 
 // Token sections
 .token-section {
-  margin-bottom: 2rem; // Increased from 1.5rem
+  margin-bottom: 1.5rem; // Reduced for more compact layout
 }
 
 .section-title {
@@ -338,8 +338,8 @@
   flex-direction: column;
   gap: 1.5rem; // Increased from 1rem
   padding: 1.25rem; // Added internal padding for better spacing
-  margin-top: 2rem; // Extra spacing before first section (TACO)
-  margin-bottom: 2rem; // Spacing after TACO section
+  margin-top: 1rem; // Reduced spacing before first section (TACO)
+  margin-bottom: 1.5rem; // Reduced spacing after TACO section
 }
 
 .taco-header {
@@ -409,9 +409,9 @@
     border: none !important;
     box-shadow: none !important;
 
-    // Hide ONLY the first child div (token info, rewards, and swap/send buttons)
-    // The second child div (.token-card__neurons) will remain visible
-    > div:first-child {
+    // Hide only non-neuron content within first child div
+    // This hides token info and rewards, but keeps neurons section visible
+    > div:first-child > div > div:not(.token-card__neurons) {
       display: none !important;
     }
   }
