@@ -712,6 +712,39 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Vec(FollowerInfo)],
         ['query'],
       ),
+    'getVoteDashboard' : IDL.Func(
+        [IDL.Opt(IDL.Principal)],
+        [
+          IDL.Opt(
+            IDL.Record({
+              'snapshotInfo' : IDL.Record({
+                'totalVotingPower' : IDL.Nat,
+                'lastSnapshotTime' : IDL.Int,
+                'lastSnapshotId' : IDL.Nat,
+              }),
+              'historicBalanceAndAllocation' : IDL.Vec(
+                IDL.Tuple(IDL.Int, HistoricBalanceAllocation)
+              ),
+              'tokenDetails' : IDL.Vec(
+                PublicTokenDetailsWithMaxAllocationEntry
+              ),
+              'userAllocation' : IDL.Opt(UserState),
+              'allocationStats' : AllocationStats,
+              'aggregateAllocation' : IDL.Vec(
+                IDL.Tuple(IDL.Principal, IDL.Nat)
+              ),
+              'votingPowerMetrics' : IDL.Record({
+                'principalCount' : IDL.Nat,
+                'totalVotingPower' : IDL.Nat,
+                'allocatedVotingPower' : IDL.Nat,
+                'totalVotingPowerByHotkeySetters' : IDL.Nat,
+                'neuronCount' : IDL.Nat,
+              }),
+            })
+          ),
+        ],
+        ['query'],
+      ),
     'getVotingPowerChangesSince' : IDL.Func(
         [IDL.Int, IDL.Nat],
         [Result_8],

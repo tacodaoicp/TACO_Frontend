@@ -24,9 +24,11 @@ import {
   getTacoSnsRootCanisterId,
   getAlarmCanisterId,
   getRewardsCanisterId,
+  getTacoSwapCanisterId,
 } from './canister-ids'
 import { idlFactory as alarmIDL, type _SERVICE as AlarmService } from '../../../../declarations/alarm/alarm.did.js'
 import { idlFactory as rewardsIDL, type _SERVICE as RewardsService } from '../../../../declarations/rewards/rewards.did.js'
+import { idlFactory as tacoSwapIDL, type _SERVICE as TacoSwapService } from '../../../../declarations/taco_swap/taco_swap.did.js'
 
 // ============================================================================
 // Actor Caching - Reuse actors for same agent/canister combinations
@@ -89,6 +91,10 @@ function getAlarmActor(agent: HttpAgent): ActorSubclass<AlarmService> {
 
 function getRewardsActor(agent: HttpAgent): ActorSubclass<RewardsService> {
   return getCachedActor<RewardsService>(agent, getRewardsCanisterId(), rewardsIDL)
+}
+
+function getTacoSwapActor(agent: HttpAgent): ActorSubclass<TacoSwapService> {
+  return getCachedActor<TacoSwapService>(agent, getTacoSwapCanisterId(), tacoSwapIDL)
 }
 
 /**
@@ -393,6 +399,22 @@ export async function fetchAggregateAllocationData(agent: HttpAgent): Promise<an
   const actor = getDaoBackendActor(agent)
   const allocation = await actor.getAggregateAllocation()
   return allocation
+}
+
+/**
+ * Fetch allocation stats from DAO backend
+ */
+export async function fetchAllocationStatsData(agent: HttpAgent): Promise<any> {
+  const actor = getDaoBackendActor(agent)
+  return await actor.getAllocationStats()
+}
+
+/**
+ * Fetch historic balance and allocation from DAO backend
+ */
+export async function fetchHistoricBalanceAndAllocationData(agent: HttpAgent, limit: number = 50): Promise<any> {
+  const actor = getDaoBackendActor(agent)
+  return await actor.getHistoricBalanceAndAllocation(BigInt(limit))
 }
 
 /**
@@ -1076,6 +1098,21 @@ export async function fetchDashboardData(agent: HttpAgent): Promise<any | null> 
 }
 
 /**
+ * Fetch vote dashboard data from DAO backend composite endpoint
+ * Replaces getDashboardData with richer data including:
+ * tokenDetails (with maxAllocations), aggregateAllocation, votingPowerMetrics,
+ * snapshotInfo, allocationStats, historicBalanceAndAllocation, userAllocation
+ */
+export async function fetchVoteDashboardData(agent: HttpAgent, userPrincipal?: Principal): Promise<any | null> {
+  const actor = getDaoBackendActor(agent)
+  const optPrincipal: [] | [Principal] = userPrincipal ? [userPrincipal] : []
+  const result = await actor.getVoteDashboard(optPrincipal)
+  // Returns opt record — [] means null, [data] means some
+  if (!result || result.length === 0) return null
+  return result[0]
+}
+
+/**
  * Fetch all leaderboards from rewards composite endpoint
  * Replaces: 8 separate getLeaderboard() calls
  */
@@ -1094,7 +1131,24 @@ export async function fetchAllLeaderboardsData(
  */
 export async function fetchTreasuryDashboardData(agent: HttpAgent): Promise<any> {
   const actor = getTreasuryActor(agent)
-  return await actor.getTreasuryDashboard()
+  return await actor.getEnhancedTreasuryDashboard()
+}
+
+/**
+ * Fetch enhanced treasury dashboard — single composite query that replaces 6 individual calls:
+ *   getTradingStatus, getPortfolioSnapshotStatus, getPortfolioHistory(5),
+ *   listTradingPauses, getLongSyncTimerStatus, getSystemParameters (treasury)
+ *
+ * Returns the unwrapped EnhancedTreasuryDashboard on success, or null on error.
+ */
+export async function fetchEnhancedTreasuryDashboardData(agent: HttpAgent): Promise<any | null> {
+  const actor = getTreasuryActor(agent)
+  const result = await actor.getEnhancedTreasuryDashboard()
+  if ('ok' in result) {
+    return result.ok
+  }
+  console.warn('[fetch-functions] getEnhancedTreasuryDashboard returned error:', result.err)
+  return null
 }
 
 // ============================================================================
@@ -1266,4 +1320,13 @@ function formatRewardsError(err: any): string {
 
 function uint8ArrayToHex(arr: Uint8Array | number[]): string {
   return Array.from(arr, (byte) => byte.toString(16).padStart(2, '0')).join('')
+}
+
+// ============================================================================
+// Swap Dashboard
+// ============================================================================
+
+export async function fetchSwapDashboardData(agent: HttpAgent): Promise<any> {
+  const actor = getTacoSwapActor(agent)
+  return await actor.getSwapDashboard()
 }

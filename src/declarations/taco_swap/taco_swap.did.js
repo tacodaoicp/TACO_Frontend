@@ -30,45 +30,6 @@ export const idlFactory = ({ IDL }) => {
     'RateLimited' : IDL.Null,
   });
   const Result_2 = IDL.Variant({ 'ok' : IDL.Principal, 'err' : IDL.Text });
-  const AdminAction = IDL.Variant({
-    'Pause' : IDL.Null,
-    'DiscoverPool' : IDL.Null,
-    'Unpause' : IDL.Null,
-    'UpdateConfig' : IDL.Null,
-    'RecoverFunds' : IDL.Null,
-    'RetryPending' : IDL.Null,
-    'SetPoolId' : IDL.Null,
-  });
-  const AdminActionRecord = IDL.Record({
-    'action' : AdminAction,
-    'timestamp' : IDL.Int,
-    'details' : IDL.Text,
-    'caller' : IDL.Principal,
-    'success' : IDL.Bool,
-  });
-  const NachosSwapStep = IDL.Variant({
-    'Failed' : IDL.Null,
-    'Complete' : IDL.Null,
-    'DepositReceived' : IDL.Null,
-    'MintingNachos' : IDL.Null,
-    'TransferringToTreasury' : IDL.Null,
-    'NotStarted' : IDL.Null,
-  });
-  const NachosSwapProgress = IDL.Record({
-    'startedAt' : IDL.Int,
-    'estimatedNachos' : IDL.Opt(IDL.Nat),
-    'errorMessage' : IDL.Opt(IDL.Text),
-    'step' : NachosSwapStep,
-    'mintId' : IDL.Opt(IDL.Nat),
-    'description' : IDL.Text,
-    'orderId' : IDL.Opt(IDL.Nat),
-    'updatedAt' : IDL.Int,
-    'retryCount' : IDL.Nat,
-    'totalSteps' : IDL.Nat,
-    'stepNumber' : IDL.Nat,
-    'actualNachos' : IDL.Opt(IDL.Nat),
-    'icpAmount' : IDL.Opt(IDL.Nat),
-  });
   const SwapStep = IDL.Variant({
     'Failed' : IDL.Null,
     'TransferringToWallet' : IDL.Null,
@@ -95,17 +56,14 @@ export const idlFactory = ({ IDL }) => {
     'estimatedTaco' : IDL.Opt(IDL.Nat),
     'icpAmount' : IDL.Opt(IDL.Nat),
   });
-  const LogLevel = IDL.Variant({
-    'INFO' : IDL.Null,
-    'WARN' : IDL.Null,
-    'ERROR' : IDL.Null,
-  });
-  const LogEntry = IDL.Record({
-    'component' : IDL.Text,
-    'context' : IDL.Text,
-    'level' : LogLevel,
-    'message' : IDL.Text,
-    'timestamp' : IDL.Int,
+  const SwapStats = IDL.Record({
+    'totalSwapsCompleted' : IDL.Nat,
+    'pendingSwapsCount' : IDL.Nat,
+    'poolConfigured' : IDL.Bool,
+    'systemPaused' : IDL.Bool,
+    'completedOrdersCount' : IDL.Nat,
+    'totalICPSwapped' : IDL.Nat,
+    'totalTACODelivered' : IDL.Nat,
   });
   const ClaimPath = IDL.Variant({
     'TimerSweep' : IDL.Null,
@@ -113,19 +71,6 @@ export const idlFactory = ({ IDL }) => {
     'FrontendClaim' : IDL.Null,
     'WebhookClaim' : IDL.Null,
     'CoinbaseWebhook' : IDL.Null,
-  });
-  const NachosOrderRecord = IDL.Record({
-    'id' : IDL.Nat,
-    'principal' : IDL.Principal,
-    'nachosMintId' : IDL.Opt(IDL.Nat),
-    'feeICP' : IDL.Nat,
-    'claimPath' : ClaimPath,
-    'icpDeposited' : IDL.Nat,
-    'timestamp' : IDL.Int,
-    'fiatAmount' : IDL.Opt(IDL.Text),
-    'nachosReceived' : IDL.Nat,
-    'navUsed' : IDL.Nat,
-    'fiatCurrency' : IDL.Opt(IDL.Text),
   });
   const OrderRecord = IDL.Record({
     'id' : IDL.Nat,
@@ -140,6 +85,102 @@ export const idlFactory = ({ IDL }) => {
     'fiatCurrency' : IDL.Opt(IDL.Text),
     'poolId' : IDL.Principal,
     'slippage' : IDL.Float64,
+  });
+  const NachosOrderRecord = IDL.Record({
+    'id' : IDL.Nat,
+    'principal' : IDL.Principal,
+    'nachosMintId' : IDL.Opt(IDL.Nat),
+    'feeICP' : IDL.Nat,
+    'claimPath' : ClaimPath,
+    'icpDeposited' : IDL.Nat,
+    'timestamp' : IDL.Int,
+    'fiatAmount' : IDL.Opt(IDL.Text),
+    'nachosReceived' : IDL.Nat,
+    'navUsed' : IDL.Nat,
+    'fiatCurrency' : IDL.Opt(IDL.Text),
+  });
+  const NachosSwapStep = IDL.Variant({
+    'Failed' : IDL.Null,
+    'Complete' : IDL.Null,
+    'DepositReceived' : IDL.Null,
+    'MintingNachos' : IDL.Null,
+    'TransferringToTreasury' : IDL.Null,
+    'NotStarted' : IDL.Null,
+  });
+  const NachosSwapProgress = IDL.Record({
+    'startedAt' : IDL.Int,
+    'estimatedNachos' : IDL.Opt(IDL.Nat),
+    'errorMessage' : IDL.Opt(IDL.Text),
+    'step' : NachosSwapStep,
+    'mintId' : IDL.Opt(IDL.Nat),
+    'description' : IDL.Text,
+    'orderId' : IDL.Opt(IDL.Nat),
+    'updatedAt' : IDL.Int,
+    'retryCount' : IDL.Nat,
+    'totalSteps' : IDL.Nat,
+    'stepNumber' : IDL.Nat,
+    'actualNachos' : IDL.Opt(IDL.Nat),
+    'icpAmount' : IDL.Opt(IDL.Nat),
+  });
+  const SwapDashboard = IDL.Record({
+    'hasActiveLock' : IDL.Bool,
+    'nachosStats' : IDL.Record({
+      'nachosMintingEnabled' : IDL.Bool,
+      'nachosPendingCount' : IDL.Nat,
+      'totalNachosMints' : IDL.Nat,
+      'totalNachosICPDeposited' : IDL.Nat,
+      'nachosOrdersCount' : IDL.Nat,
+      'totalNachosDelivered' : IDL.Nat,
+    }),
+    'nachosDepositSubaccount' : IDL.Vec(IDL.Nat8),
+    'tacoDepositSubaccount' : IDL.Vec(IDL.Nat8),
+    'hasPendingNachos' : IDL.Bool,
+    'tacoStatus' : SwapProgress,
+    'depositAddress' : IDL.Text,
+    'stats' : SwapStats,
+    'recentTacoOrders' : IDL.Vec(OrderRecord),
+    'nachosDepositAddress' : IDL.Text,
+    'hasPendingTaco' : IDL.Bool,
+    'config' : IDL.Record({
+      'minDepositICP' : IDL.Nat,
+      'maxSlippageBasisPoints' : IDL.Nat,
+      'maxRetries' : IDL.Nat,
+      'icpTacoPoolId' : IDL.Opt(IDL.Principal),
+      'tacoLedgerFee' : IDL.Nat,
+      'poolZeroForOne' : IDL.Bool,
+      'systemPaused' : IDL.Bool,
+      'sweepIntervalNS' : IDL.Int,
+    }),
+    'recentNachosOrders' : IDL.Vec(NachosOrderRecord),
+    'nachosStatus' : NachosSwapProgress,
+  });
+  const AdminAction = IDL.Variant({
+    'Pause' : IDL.Null,
+    'DiscoverPool' : IDL.Null,
+    'Unpause' : IDL.Null,
+    'UpdateConfig' : IDL.Null,
+    'RecoverFunds' : IDL.Null,
+    'RetryPending' : IDL.Null,
+    'SetPoolId' : IDL.Null,
+  });
+  const AdminActionRecord = IDL.Record({
+    'action' : AdminAction,
+    'timestamp' : IDL.Int,
+    'details' : IDL.Text,
+    'caller' : IDL.Principal,
+    'success' : IDL.Bool,
+  });
+  const LogLevel = IDL.Variant({
+    'INFO' : IDL.Null,
+    'WARN' : IDL.Null,
+    'ERROR' : IDL.Null,
+  });
+  const LogEntry = IDL.Record({
+    'component' : IDL.Text,
+    'context' : IDL.Text,
+    'level' : LogLevel,
+    'message' : IDL.Text,
+    'timestamp' : IDL.Int,
   });
   const NachosSwapStage = IDL.Variant({
     'TransferredToTreasury' : IDL.Nat,
@@ -179,15 +220,6 @@ export const idlFactory = ({ IDL }) => {
     'stage' : SwapStage,
     'icpAmount' : IDL.Nat,
     'lastAttempt' : IDL.Int,
-  });
-  const SwapStats = IDL.Record({
-    'totalSwapsCompleted' : IDL.Nat,
-    'pendingSwapsCount' : IDL.Nat,
-    'poolConfigured' : IDL.Bool,
-    'systemPaused' : IDL.Bool,
-    'completedOrdersCount' : IDL.Nat,
-    'totalICPSwapped' : IDL.Nat,
-    'totalTACODelivered' : IDL.Nat,
   });
   const QuoteResult = IDL.Variant({
     'Ok' : IDL.Record({
@@ -237,6 +269,7 @@ export const idlFactory = ({ IDL }) => {
         [],
       ),
     'discover_pool' : IDL.Func([], [Result_2], []),
+    'getSwapDashboard' : IDL.Func([], [SwapDashboard], ['query']),
     'get_admin_actions' : IDL.Func(
         [IDL.Nat],
         [IDL.Vec(AdminActionRecord)],

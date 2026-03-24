@@ -867,14 +867,14 @@ const fetchCyclesFor = async (key: CanKey) => {
           const tActor: any = Actor.createActor(treasuryIDL, { agent, canisterId: cid })
           const dActor: any = Actor.createActor(daoIDL, { agent, canisterId: resolvePrincipal('dao_backend') })
 
-          const [tsRes, cfgRaw, tokensResp, snapStatus, longSyncTimerRes] = await Promise.all([
-            tActor.getTradingStatus(),
-            tActor.getRebalanceConfig?.() ?? Promise.resolve(null),
+          // Single composite query replaces getTradingStatus + getRebalanceConfig + getPortfolioSnapshotStatus + getLongSyncTimerStatus
+          const [enhancedResult, tokensResp] = await Promise.all([
+            tActor.getEnhancedTreasuryDashboard(),
             dActor.getTokenDetailsWithoutPastPrices(),
-            tActor.getPortfolioSnapshotStatus(),
-            tActor.getLongSyncTimerStatus?.() ?? Promise.resolve(null),
-            tacoStore.getRebalanceConfig().catch(() => null) // Ensure store config is loaded
           ])
+
+          // Extract enhanced dashboard (also populates store config)
+          const enhancedDashboard = ('ok' in enhancedResult) ? enhancedResult.ok : null
 
           // Trading metrics and status
           let tradingActive = false
@@ -885,8 +885,8 @@ const fetchCyclesFor = async (key: CanKey) => {
           let avgSlippagePct = '0.00%'
           let totalTradesExecuted = 0
           let totalTradesFailed = 0
-          if (tsRes && 'ok' in tsRes) {
-            const { metrics, rebalanceStatus } = tsRes.ok
+          if (enhancedDashboard) {
+            const { metrics, rebalanceStatus } = enhancedDashboard.tradingStatus
             tradingActive = !!('Trading' in rebalanceStatus)
             lastAttemptNs = metrics?.lastRebalanceAttempt
             totalTradesExecuted = Number(metrics?.totalTradesExecuted ?? 0)
@@ -894,19 +894,8 @@ const fetchCyclesFor = async (key: CanKey) => {
             successRatePct = metrics?.successRate != null ? `${(Number(metrics.successRate) * 100).toFixed(1)}%` : '0.0%'
             avgSlippagePct = metrics?.avgSlippage != null ? `${Number(metrics.avgSlippage).toFixed(2)}%` : '0.00%'
             if (lastAttemptNs) lastTradeDisplay = new Date(Number(BigInt(lastAttemptNs) / 1_000_000n)).toLocaleString()
+            intervalNs = enhancedDashboard.systemParameters?.rebalanceIntervalNS
           }
-          if (cfgRaw) {
-            const cfg = Array.isArray(cfgRaw) ? cfgRaw[0] : cfgRaw
-            intervalNs = cfg?.rebalanceIntervalNS
-          }
-          console.log('[Treasury Data] cfgRaw:', cfgRaw, 'intervalNs from cfgRaw:', intervalNs)
-          console.log('[Treasury Data] tacoStore.rebalanceConfig:', tacoStore.rebalanceConfig)
-          // Fallback to store config if cfgRaw failed
-          if (!intervalNs && tacoStore.rebalanceConfig?.rebalanceIntervalNS) {
-            intervalNs = tacoStore.rebalanceConfig.rebalanceIntervalNS
-            console.log('[Treasury Data] Using intervalNs from store:', intervalNs)
-          }
-          console.log('[Treasury Data] Final intervalNs:', intervalNs, 'lastAttemptNs:', lastAttemptNs)
           let tradingStale = false
           if (intervalNs && lastAttemptNs) {
             const periods = Number((BigInt(Date.now()) * 1_000_000n - BigInt(lastAttemptNs)) / BigInt(intervalNs))
@@ -930,16 +919,16 @@ const fetchCyclesFor = async (key: CanKey) => {
             return { symbol, lastSyncDisplay, statusClass, statusText }
           })
 
-          // Snapshot status from selected treasury
-          const snapshotActive = !!('Running' in snapStatus.status)
-          
-          // Extract long sync timer status (needed for header)
+          // Snapshot status from enhanced dashboard
+          const snapStatus = enhancedDashboard?.portfolioSnapshotStatus
+          const snapshotActive = snapStatus ? !!('Running' in snapStatus.status) : false
+
+          // Long sync timer from enhanced dashboard
           let longSyncActive = false
           let longSyncLastRun = null
-          if (longSyncTimerRes) {
-            const timerStatus = longSyncTimerRes
-            longSyncActive = timerStatus.isRunning || false
-            longSyncLastRun = timerStatus.lastRunTime || null
+          if (enhancedDashboard?.longSyncTimerStatus) {
+            longSyncActive = enhancedDashboard.longSyncTimerStatus.isRunning || false
+            longSyncLastRun = enhancedDashboard.longSyncTimerStatus.lastRunTime || null
           }
 
           treasuryHeader.value = {
@@ -959,14 +948,14 @@ const fetchCyclesFor = async (key: CanKey) => {
             const intervalBigInt = BigInt(intervalNs)
             const delayNs = nowNs - lastAttemptBigInt
             const periods = Math.floor(Number(delayNs) / Number(intervalBigInt))
-            console.log('[Treasury Warning] Now:', Date.now(), 'Last:', lastAttemptNs, 'Interval:', intervalNs, 'Periods:', periods)
             if (periods > 5) tradingWarning = { level: 'danger', message: `Trading bot is ${periods} periods overdue! Last attempt was ${periods} intervals ago.` }
             else if (periods > 2) tradingWarning = { level: 'warning', message: `Trading bot is ${periods} periods overdue.` }
           }
 
           // derive latest short sync time from trading metrics (lastUpdate)
-          const metricsObj: any = (tsRes && 'ok' in tsRes) ? tsRes.ok.metrics : null
-          
+          const metricsObj: any = enhancedDashboard?.tradingStatus?.metrics ?? null
+          const cfgRaw = enhancedDashboard?.systemParameters ?? null
+
           // Calculate trading interval and periods for display
           let tradingIntervalMinutes = null
           let periodsSinceLastTrade = null
@@ -994,17 +983,17 @@ const fetchCyclesFor = async (key: CanKey) => {
             tokens,
             snapshots: {
               active: snapshotActive,
-              intervalMinutes: snapStatus.intervalMinutes,
-              lastSnapshotDisplay: new Date(Number(BigInt(snapStatus.lastSnapshotTime) / 1_000_000n)).toLocaleString()
+              intervalMinutes: snapStatus ? Number(snapStatus.intervalMinutes) : undefined,
+              lastSnapshotDisplay: snapStatus ? new Date(Number(BigInt(snapStatus.lastSnapshotTime) / 1_000_000n)).toLocaleString() : 'Never'
             },
             shortSync: {
               active: true,
-              intervalMinutes: cfgRaw && (Array.isArray(cfgRaw) ? (cfgRaw as any)[0] : (cfgRaw as any))?.shortSyncIntervalNS ? Number(((Array.isArray(cfgRaw) ? (cfgRaw as any)[0] : (cfgRaw as any)).shortSyncIntervalNS) / (60n * 1_000_000_000n)) : undefined,
+              intervalMinutes: cfgRaw?.shortSyncIntervalNS ? Number(BigInt(cfgRaw.shortSyncIntervalNS) / (60n * 1_000_000_000n)) : undefined,
               lastSyncDisplay: metricsObj?.lastUpdate ? new Date(Number(BigInt(metricsObj.lastUpdate) / 1_000_000n)).toLocaleString() : undefined
             },
             longSync: {
               active: longSyncActive,
-              intervalMinutes: cfgRaw && (Array.isArray(cfgRaw) ? (cfgRaw as any)[0] : (cfgRaw as any))?.longSyncIntervalNS ? Number(((Array.isArray(cfgRaw) ? (cfgRaw as any)[0] : (cfgRaw as any)).longSyncIntervalNS) / (60n * 1_000_000_000n)) : undefined,
+              intervalMinutes: cfgRaw?.longSyncIntervalNS ? Number(BigInt(cfgRaw.longSyncIntervalNS) / (60n * 1_000_000_000n)) : undefined,
               lastSyncDisplay: longSyncLastRun ? new Date(Number(BigInt(longSyncLastRun) / 1_000_000n)).toLocaleString() : undefined
             }
           }
@@ -2666,14 +2655,16 @@ const testTradingBotRegular = async (test: any) => {
     const tActor: any = Actor.createActor(treasuryIDL, { agent, canisterId: cid })
     const dActor: any = Actor.createActor(daoIDL, { agent, canisterId: resolvePrincipal('dao_backend') })
 
-    let tsRes, tokensResp, longSyncTimerRes
+    let enhancedDashboard: any = null
+    let tokensResp: any
     try {
-      [tsRes, tokensResp, , longSyncTimerRes] = await Promise.all([
-        tActor.getTradingStatus(),
+      // Single composite query replaces getTradingStatus + getLongSyncTimerStatus + getSystemParameters
+      const [enhancedResult, tokensResult] = await Promise.all([
+        tActor.getEnhancedTreasuryDashboard(),
         dActor.getTokenDetailsWithoutPastPrices(),
-        tacoStore.getRebalanceConfig().catch(() => null), // Fetch config into store (no variable needed)
-        tActor.getLongSyncTimerStatus?.() ?? Promise.resolve(null),
       ])
+      enhancedDashboard = ('ok' in enhancedResult) ? enhancedResult.ok : null
+      tokensResp = tokensResult
     } catch (fetchError: any) {
       console.error('[Trading Bot Test] Fetch error:', fetchError)
       const errorMsg = fetchError.message || String(fetchError)
@@ -2683,29 +2674,23 @@ const testTradingBotRegular = async (test: any) => {
       throw new Error(`Failed to fetch trading data: ${errorMsg}`)
     }
 
-    console.log('[Trading Bot Test] tsRes:', tsRes)
-    console.log('[Trading Bot Test] rebalanceConfig:', tacoStore.rebalanceConfig)
+    console.log('[Trading Bot Test] enhancedDashboard:', enhancedDashboard)
     console.log('[Trading Bot Test] tokensResp:', tokensResp)
 
     // Get trading status and interval
     let tradingActive = false
     let lastAttemptNs: any = null
     let intervalNs: any = null
-    
-    if (tsRes && 'ok' in tsRes) {
-      const { metrics, rebalanceStatus } = tsRes.ok
+
+    if (enhancedDashboard) {
+      const { metrics, rebalanceStatus } = enhancedDashboard.tradingStatus
       tradingActive = !!('Trading' in rebalanceStatus)
       lastAttemptNs = metrics?.lastRebalanceAttempt
-      console.log('[Trading Bot Test] tradingActive:', tradingActive)
-      console.log('[Trading Bot Test] lastAttemptNs:', lastAttemptNs)
+      intervalNs = enhancedDashboard.systemParameters?.rebalanceIntervalNS
     }
-    
-    // Extract interval from config (now loaded into store)
-    if (tacoStore.rebalanceConfig?.rebalanceIntervalNS) {
-      intervalNs = tacoStore.rebalanceConfig.rebalanceIntervalNS
-      console.log('[Trading Bot Test] intervalNs from store:', intervalNs)
-    } else {
-      // If config unavailable, use default 30-minute interval (1,800,000,000,000 ns)
+
+    // Fallback interval
+    if (!intervalNs) {
       intervalNs = 1_800_000_000_000n
       console.log('[Trading Bot Test] Config unavailable, using default 30min interval')
     }
@@ -2821,15 +2806,14 @@ const testTradingBotRegular = async (test: any) => {
     }
 
     // Get executed trades and metrics for analysis
-    const executedTrades = tsRes?.ok?.executedTrades || []
-    const metrics = tsRes?.ok?.metrics
+    const executedTrades = enhancedDashboard?.tradingStatus?.executedTrades || []
+    const metrics = enhancedDashboard?.tradingStatus?.metrics
     const allTimeAvgSlippage = metrics?.avgSlippage ? Number(metrics.avgSlippage).toFixed(2) : 'N/A'
-    
-    // Get slippage tolerance from config (now loaded into store)
+
+    // Get slippage tolerance from config (from enhanced dashboard)
     let maxSlippagePct = null
-    if (tacoStore.rebalanceConfig?.maxSlippageBasisPoints) {
-      maxSlippagePct = Number(tacoStore.rebalanceConfig.maxSlippageBasisPoints) / 100
-      console.log('[Trading Bot Test] Slippage tolerance from store:', maxSlippagePct, '%')
+    if (enhancedDashboard?.systemParameters?.maxSlippageBasisPoints) {
+      maxSlippagePct = Number(enhancedDashboard.systemParameters.maxSlippageBasisPoints) / 100
     } else {
       console.warn('[Trading Bot Test] Slippage tolerance not available - config not loaded')
     }
@@ -2954,7 +2938,7 @@ const testTradingBotRegular = async (test: any) => {
     }
 
     // ===== Check 8: Short Sync Timer Status =====
-    const shortSyncActive = tsRes && 'ok' in tsRes ? tsRes.ok.metrics?.lastUpdate : null
+    const shortSyncActive = enhancedDashboard?.tradingStatus?.metrics?.lastUpdate ?? null
     const shortSyncIntervalNs = 900_000_000_000n // 15 minutes
     const shortSyncMaxDelayNs = shortSyncIntervalNs * 5n // 5 periods
     
@@ -2988,11 +2972,11 @@ const testTradingBotRegular = async (test: any) => {
     }
 
     // ===== Check 9: Long Sync Timer Status =====
-    if (longSyncTimerRes) {
-      const timerStatus: any = longSyncTimerRes
-      const longSyncRunning = timerStatus.isRunning || false
-      const longSyncLastRun = timerStatus.lastRunTime || null
-      const longSyncIntervalNs = timerStatus.intervalNS ? BigInt(timerStatus.intervalNS) : 18_000_000_000_000n // 5 hours default
+    const longSyncTimerStatus = enhancedDashboard?.longSyncTimerStatus ?? null
+    if (longSyncTimerStatus) {
+      const longSyncRunning = longSyncTimerStatus.isRunning || false
+      const longSyncLastRun = longSyncTimerStatus.lastRunTime || null
+      const longSyncIntervalNs = longSyncTimerStatus.intervalNS ? BigInt(longSyncTimerStatus.intervalNS) : 18_000_000_000_000n // 5 hours default
       const longSyncMaxDelayNs = longSyncIntervalNs * 5n // 5 periods
       
       let longSyncStatus: 'pass' | 'fail' | 'error' = 'pass'
@@ -3346,8 +3330,10 @@ const testPortfolioSnapshots = async (test: any) => {
     const agent = await getAnonymousAgent()
     const tActor: any = Actor.createActor(treasuryIDL, { agent, canisterId: cid })
 
-    // Fetch snapshot status
-    const snapStatus = await tActor.getPortfolioSnapshotStatus()
+    // Fetch snapshot status via enhanced dashboard (single composite query)
+    const enhancedResult = await tActor.getEnhancedTreasuryDashboard()
+    const snapDashboard = ('ok' in enhancedResult) ? enhancedResult.ok : null
+    const snapStatus = snapDashboard?.portfolioSnapshotStatus ?? await tActor.getPortfolioSnapshotStatus()
     
     // Check 1: Snapshot timer running
     const snapshotRunning = !!('Running' in snapStatus.status)

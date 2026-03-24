@@ -258,6 +258,32 @@ export interface ContinuousDAO {
   'getUserNeurons' : ActorMethod<[Principal], Array<NeuronVP>>,
   'getUserRegisteredTokens' : ActorMethod<[], Array<Principal>>,
   'getUsersFollowerInfo' : ActorMethod<[Array<Principal>], Array<FollowerInfo>>,
+  'getVoteDashboard' : ActorMethod<
+    [[] | [Principal]],
+    [] | [
+      {
+        'snapshotInfo' : {
+          'totalVotingPower' : bigint,
+          'lastSnapshotTime' : bigint,
+          'lastSnapshotId' : bigint,
+        },
+        'historicBalanceAndAllocation' : Array<
+          [bigint, HistoricBalanceAllocation]
+        >,
+        'tokenDetails' : Array<PublicTokenDetailsWithMaxAllocationEntry>,
+        'userAllocation' : [] | [UserState],
+        'allocationStats' : AllocationStats,
+        'aggregateAllocation' : Array<[Principal, bigint]>,
+        'votingPowerMetrics' : {
+          'principalCount' : bigint,
+          'totalVotingPower' : bigint,
+          'allocatedVotingPower' : bigint,
+          'totalVotingPowerByHotkeySetters' : bigint,
+          'neuronCount' : bigint,
+        },
+      }
+    ]
+  >,
   'getVotingPowerChangesSince' : ActorMethod<[bigint, bigint], Result_8>,
   'get_canister_cycles' : ActorMethod<[], { 'cycles' : bigint }>,
   'grantAdminPermission' : ActorMethod<

@@ -586,6 +586,28 @@ export function clearIdentity(): void {
 }
 
 /**
+ * Send user principal to public worker for getVoteDashboard composite query.
+ * Pass the principal text when user logs in so the composite returns userAllocation.
+ */
+export function setUserPrincipal(principalText: string): void {
+  if (publicWorker) {
+    sendToWorker(publicWorker, {
+      id: generateMessageId(),
+      timestamp: Date.now(),
+      type: 'SET_USER_PRINCIPAL',
+      payload: { userPrincipal: principalText },
+    })
+  }
+}
+
+/**
+ * Clear user principal from public worker (logout)
+ */
+export function clearUserPrincipal(): void {
+  setUserPrincipal('')
+}
+
+/**
  * Set network override for testing (mainnet from local, etc.)
  * Use 'ic' for mainnet, 'staging' for staging, 'local' for local dfx, or null for auto-detect.
  */
@@ -751,6 +773,8 @@ export const workerBridge = {
   setAdminStatus,
   setIdentity,
   clearIdentity,
+  setUserPrincipal,
+  clearUserPrincipal,
   setNetwork,
   setupRouteWatcher,
   isConnected: computed(() => workersConnected.value),

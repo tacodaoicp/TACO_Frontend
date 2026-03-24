@@ -81,6 +81,35 @@ type RewardsError =
                      };
    SystemError: text;
  };
+type RewardsDashboard = 
+ record {
+   balances: vec record {
+                   blob;
+                   nat;
+                 };
+   distributionStatus:
+    record {
+      currentDistributionId: opt nat;
+      distributionEnabled: bool;
+      inProgress: bool;
+      lastDistributionTime: int;
+      nextDistributionTime: int;
+    };
+   distributions:
+    record {
+      hasMore: bool;
+      records: vec UserDistributionSummary;
+      total: nat;
+    };
+   totalDistributed: nat;
+   withdrawalStats:
+    record {
+      totalRecordsInHistory: nat;
+      totalWithdrawals: nat;
+      totalWithdrawn: nat;
+    };
+   withdrawals: vec WithdrawalRecord;
+ };
 type Rewards = 
  service {
    addBannedWords: (words: vec text) -> (Result__1);
@@ -230,6 +259,8 @@ type Rewards =
    getRewardPenalties: () -> (Result__1_7) query;
    getRewardPenalty: (neuronId: blob) -> (Result__1_6) query;
    getRewardSkipList: () -> (Result__1_5) query;
+   getRewardsDashboard: (neuronIds: vec blob, withdrawalLimit: opt nat,
+    distributionLimit: opt nat) -> (RewardsDashboard) query;
    getTacoBalance: () -> (nat);
    getTotalDistributed: () -> (nat) query;
    getUserDistributionRewards: (neuronIds: vec blob, offset: nat, limit:
@@ -243,7 +274,7 @@ type Rewards =
     (Result__1_4) composite_query;
    getUserPerformanceGraphData: (userPrincipal: principal, startTime: 
     int, endTime: int) -> (Result__1_3) composite_query;
-   getUserWithdrawalHistory: (limit: opt nat) -> (Result__1_2);
+   getUserWithdrawalHistory: (limit: opt nat) -> (Result__1_2) query;
    getWithdrawalStats: () ->
     (record {
        totalRecordsInHistory: nat;

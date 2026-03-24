@@ -219,7 +219,7 @@ import TacoTitle from '../components/misc/TacoTitle.vue'
 import { useTacoStore } from '../stores/taco.store'
 import { mapStores } from 'pinia'
 import { Principal } from '@dfinity/principal'
-import { AnonymousIdentity } from '@dfinity/agent'
+import { getFrontendIdentity } from '../utils/frontend-identity'
 
 // Import rewards actor
 import { createActor as createRewardsActor } from '../../../declarations/rewards'
@@ -300,7 +300,7 @@ export default {
       const host = getNetworkHost()
       this.rewardsActor = createRewardsActor(canisterId, {
         agentOptions: {
-          identity: new AnonymousIdentity(),
+          identity: getFrontendIdentity(),
           host
         }
       })

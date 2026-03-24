@@ -171,6 +171,38 @@ export interface SwapConfig {
   'systemPaused' : [] | [boolean],
   'sweepIntervalNS' : [] | [bigint],
 }
+export interface SwapDashboard {
+  'hasActiveLock' : boolean,
+  'nachosStats' : {
+    'nachosMintingEnabled' : boolean,
+    'nachosPendingCount' : bigint,
+    'totalNachosMints' : bigint,
+    'totalNachosICPDeposited' : bigint,
+    'nachosOrdersCount' : bigint,
+    'totalNachosDelivered' : bigint,
+  },
+  'nachosDepositSubaccount' : Uint8Array | number[],
+  'tacoDepositSubaccount' : Uint8Array | number[],
+  'hasPendingNachos' : boolean,
+  'tacoStatus' : SwapProgress,
+  'depositAddress' : string,
+  'stats' : SwapStats,
+  'recentTacoOrders' : Array<OrderRecord>,
+  'nachosDepositAddress' : string,
+  'hasPendingTaco' : boolean,
+  'config' : {
+    'minDepositICP' : bigint,
+    'maxSlippageBasisPoints' : bigint,
+    'maxRetries' : bigint,
+    'icpTacoPoolId' : [] | [Principal],
+    'tacoLedgerFee' : bigint,
+    'poolZeroForOne' : boolean,
+    'systemPaused' : boolean,
+    'sweepIntervalNS' : bigint,
+  },
+  'recentNachosOrders' : Array<NachosOrderRecord>,
+  'nachosStatus' : NachosSwapProgress,
+}
 export interface SwapProgress {
   'startedAt' : bigint,
   'errorMessage' : [] | [string],
@@ -223,6 +255,7 @@ export interface TacoSwapDAO {
   >,
   'claim_taco' : ActorMethod<[[] | [string], [] | [string]], ClaimResult>,
   'discover_pool' : ActorMethod<[], Result_2>,
+  'getSwapDashboard' : ActorMethod<[], SwapDashboard>,
   'get_admin_actions' : ActorMethod<[bigint], Array<AdminActionRecord>>,
   'get_all_nachos_swap_progress' : ActorMethod<
     [],

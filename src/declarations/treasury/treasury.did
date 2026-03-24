@@ -58,6 +58,7 @@ type treasury =
                                        principal;
                                        nat;
                                      }) query;
+   getEnhancedTreasuryDashboard: () -> (Result_14) query;
    /// * Get ICPSwap pool info for a specific token pair
    ///    *
    ///    * Returns the pool data if a pool exists for the given token pair,
@@ -121,12 +122,12 @@ type treasury =
    ///    * 
    ///    * Returns recent portfolio snapshots for analysis and charting.
    ///    * Public query - allows anyone to view portfolio history (read-only transparency).
-   getPortfolioHistory: (limit: nat) -> (Result_14) query;
+   getPortfolioHistory: (limit: nat) -> (Result_13) query;
    /// * Get portfolio history filtered by timestamp (for archive efficiency)
    ///    * Returns only snapshots newer than the specified timestamp
    ///    * Public query - allows anyone to view portfolio history (read-only transparency).
    getPortfolioHistorySince: (sinceTimestamp: int, limit: nat) ->
-    (Result_14) query;
+    (Result_13) query;
    /// * Get portfolio snapshot status
    getPortfolioSnapshotStatus: () ->
     (record {
@@ -183,6 +184,16 @@ type treasury =
                                  principal;
                                  TokenDetails;
                                }) query;
+   getTokenDetailsCache: () ->
+    (record {
+       icpPriceUSD: float64;
+       timestamp: int;
+       tokenDetails: vec record {
+                           principal;
+                           TokenDetails;
+                         };
+       tradingPauses: vec TradingPauseRecord;
+     });
    /// * Get token details with price history filtered by timestamp (for archive efficiency)
    ///    * Returns only price points newer than the specified timestamp per token
    getTokenDetailsSince: (sinceTimestamp: int) ->
@@ -190,7 +201,7 @@ type treasury =
            principal;
            TokenDetails;
          }) query;
-   getTokenPriceHistory: (tokens: vec principal) -> (Result_13) query;
+   getTokenPriceHistory: (tokens: vec principal) -> (Result_12) query;
    /// * Get trading pause record for a specific token
    ///    *
    ///    * Returns the pause record if the token is paused from trading, null otherwise.
@@ -204,13 +215,12 @@ type treasury =
    ///    * - Portfolio valuation
    ///    * - Current vs target allocations
    ///    * - Performance metrics
-   getTradingStatus: () -> (Result_12) query;
+   getTradingStatus: () -> (Result_11) query;
    /// * Get trading status with trades filtered by timestamp (for archive efficiency)
    ///    * Returns only trades newer than the specified timestamp
-   getTradingStatusSince: (sinceTimestamp: int) -> (Result_11) query;
+   getTradingStatusSince: (sinceTimestamp: int) -> (Result_10) query;
    getTreasuryAdminActionsSince: (sinceTimestamp: int, limit: nat) ->
-    (Result_10) query;
-   getTreasuryDashboard: () -> (Result_9) query;
+    (Result_9) query;
    /// * Get a specific trigger condition by ID
    ///    *
    ///    * Returns details of a single failsafe rule.
@@ -599,48 +609,18 @@ type SnapshotReason =
    PriceUpdate;
    Scheduled;
  };
+type SkipBreakdown = 
+ record {
+   insufficientCandidates: nat;
+   noExecutionPath: nat;
+   noPairsFound: nat;
+   pausedTokens: nat;
+   tokensFiltered: nat;
+ };
 type Result_9 = 
  variant {
-   err: text;
-   ok:
-    record {
-      tradingStatus:
-       record {
-         executedTrades: vec TradeRecord;
-         metrics:
-          record {
-            avgSlippage: float64;
-            lastRebalanceAttempt: int;
-            lastUpdate: int;
-            skipBreakdown:
-             record {
-               insufficientCandidates: nat;
-               noExecutionPath: nat;
-               noPairsFound: nat;
-               pausedTokens: nat;
-               tokensFiltered: nat;
-             };
-            skipRate: float64;
-            successRate: float64;
-            totalTradesExecuted: nat;
-            totalTradesFailed: nat;
-            totalTradesSkipped: nat;
-          };
-         portfolioState:
-          record {
-            currentAllocations: vec record {
-                                      principal;
-                                      nat;
-                                    };
-            targetAllocations: vec record {
-                                     principal;
-                                     nat;
-                                   };
-            totalValueICP: nat;
-            totalValueUSD: float64;
-          };
-         rebalanceStatus: RebalanceStatus;
-       };};
+   err: TradingPauseError;
+   ok: TreasuryAdminActionsSinceResponse;
  };
 type Result_8 = 
  variant {
@@ -707,10 +687,15 @@ type Result_15 =
  };
 type Result_14 = 
  variant {
+   err: text;
+   ok: EnhancedTreasuryDashboard;
+ };
+type Result_13 = 
+ variant {
    err: PortfolioSnapshotError;
    ok: PortfolioHistoryResponse;
  };
-type Result_13 = 
+type Result_12 = 
  variant {
    err: text;
    ok: vec record {
@@ -718,7 +703,7 @@ type Result_13 =
              vec PricePoint;
            };
  };
-type Result_12 = 
+type Result_11 = 
  variant {
    err: text;
    ok:
@@ -759,7 +744,7 @@ type Result_12 =
       rebalanceStatus: RebalanceStatus;
     };
  };
-type Result_11 = 
+type Result_10 = 
  variant {
    err: text;
    ok:
@@ -798,11 +783,6 @@ type Result_11 =
        };
       rebalanceStatus: RebalanceStatus;
     };
- };
-type Result_10 = 
- variant {
-   err: TradingPauseError;
-   ok: TreasuryAdminActionsSinceResponse;
  };
 type Result_1 = 
  variant {
@@ -968,6 +948,63 @@ type ExchangeType =
  variant {
    ICPSwap;
    KongSwap;
+ };
+type EnhancedTreasuryDashboard = 
+ record {
+   longSyncTimerStatus:
+    record {
+      intervalNS: nat;
+      isRunning: bool;
+      lastRunTime: int;
+      nextScheduledTime: int;
+      timerId: nat;
+    };
+   portfolioSnapshotStatus:
+    record {
+      intervalMinutes: nat;
+      lastSnapshotTime: int;
+      status: variant {
+                Running;
+                Stopped;
+              };
+    };
+   recentSnapshots:
+    record {
+      snapshots: vec PortfolioSnapshot;
+      totalCount: nat;
+    };
+   systemParameters: RebalanceConfigResponse;
+   tradingPauses: TradingPausesResponse;
+   tradingStatus:
+    record {
+      executedTrades: vec TradeRecord;
+      metrics:
+       record {
+         avgSlippage: float64;
+         lastRebalanceAttempt: int;
+         lastUpdate: int;
+         skipBreakdown: SkipBreakdown;
+         skipRate: float64;
+         successRate: float64;
+         totalTradesExecuted: nat;
+         totalTradesFailed: nat;
+         totalTradesSkipped: nat;
+       };
+      portfolioState:
+       record {
+         currentAllocations: vec record {
+                                   principal;
+                                   nat;
+                                 };
+         targetAllocations: vec record {
+                                  principal;
+                                  nat;
+                                };
+         totalValueICP: nat;
+         totalValueUSD: float64;
+       };
+      rebalanceStatus: RebalanceStatus;
+    };
  };
 type ClaimsReply = 
  record {

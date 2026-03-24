@@ -597,7 +597,8 @@ import { storeToRefs } from 'pinia'
 import { getEffectiveNetwork } from '../config/network-config'
 import { useAdminCheck } from '../composables/useAdminCheck'
 import { Principal } from '@dfinity/principal'
-import type { SwapProgress, NachosSwapProgress, NachosOrderRecord } from '../../../declarations/taco_swap/taco_swap.did'
+import { signedSessionHeaders } from '../utils/sign-session-request'
+import type { SwapProgress, SwapDashboard, NachosSwapProgress, NachosOrderRecord } from '../../../declarations/taco_swap/taco_swap.did'
 
 ///////////////
 // constants //
@@ -879,11 +880,7 @@ const activeAddrError = computed(() =>
 )
 
 const retryLoadAddress = () => {
-  if (selectedProduct.value === 'nachos') {
-    loadNachosDepositAddress().catch(console.error)
-  } else {
-    loadDepositAddress().catch(console.error)
-  }
+  loadDashboard().catch(console.error)
 }
 
 const activeBuyButtonText = computed(() =>
@@ -1002,20 +999,9 @@ const generateOrderId = (): string => {
 // TACO functions
 // ==========================
 
-/** Load TACO deposit address from canister (query call — fast) */
 const tacoAddrError = ref(false)
-const loadDepositAddress = async () => {
-  tacoAddrError.value = false
-  try {
-    const actor = await tacoStore.createTacoSwapActor()
-    depositAddress.value = await (actor as any).get_deposit_address()
-  } catch (err) {
-    console.error('Failed to load deposit address:', err)
-    tacoAddrError.value = true
-  }
-}
 
-/** Load canister config (system paused state) */
+/** Load canister config (system paused state) — anonymous, works pre-login */
 const loadConfig = async () => {
   try {
     const actor = await tacoStore.createTacoSwapActorAnonymous()
@@ -1023,16 +1009,6 @@ const loadConfig = async () => {
     systemPaused.value = config.systemPaused
   } catch (err) {
     console.error('Failed to load swap config:', err)
-  }
-}
-
-/** Load TACO order history */
-const loadOrderHistory = async () => {
-  try {
-    const actor = await tacoStore.createTacoSwapActor()
-    orderHistory.value = await (actor as any).get_my_orders(20n)
-  } catch (err) {
-    console.error('Failed to load order history:', err)
   }
 }
 
@@ -1086,14 +1062,15 @@ const openCoinbase = async () => {
   if (!ok) return
 
   try {
-    // 1. Get session token from CF Worker
+    // 1. Get session token from CF Worker (signed with frontend identity)
+    const sessionBody = {
+      addresses: [{ address: depositAddress.value }],
+      assets: ['ICP'],
+    }
     const resp = await fetch(COINBASE_SESSION_WORKER, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        addresses: [{ address: depositAddress.value }],
-        assets: ['ICP'],
-      }),
+      headers: await signedSessionHeaders(sessionBody, tacoStore.signWithUserIdentity),
+      body: JSON.stringify(sessionBody),
     })
     if (!resp.ok) {
       const err = await resp.json()
@@ -1262,7 +1239,7 @@ const handlePopupClose = (
 }
 
 // ==========================
-// Unified polling via get_full_swap_state()
+// Unified polling via getSwapDashboard()
 // ==========================
 
 /** Start unified polling — one query updates both TACO and NACHOS state */
@@ -1291,21 +1268,21 @@ const startUnifiedPolling = (intervalMs: number) => {
 
     try {
       const actor = await tacoStore.createTacoSwapActor()
-      const state = await (actor as any).get_full_swap_state()
+      const db: SwapDashboard = await (actor as any).getSwapDashboard()
 
       // --- Update TACO ---
       if (uiPhase.value === 'polling') {
-        swapProgress.value = state.tacoStatus
-        const step = state.tacoStatus.step
+        swapProgress.value = db.tacoStatus
+        const step = db.tacoStatus.step
 
         if ('Complete' in step) {
           uiPhase.value = 'success'
-          loadOrderHistory().catch(console.error)
+          orderHistory.value = db.recentTacoOrders
           maybeStopPolling()
           return
         }
 
-        if ('Failed' in step && state.tacoStatus.retryCount >= BigInt(MAX_RETRIES)) {
+        if ('Failed' in step && db.tacoStatus.retryCount >= BigInt(MAX_RETRIES)) {
           uiPhase.value = 'error'
           orderError.value = progressErrorMessage.value
             || 'Swap failed after multiple retries. Use the manual Claim button or contact support.'
@@ -1316,17 +1293,17 @@ const startUnifiedPolling = (intervalMs: number) => {
 
       // --- Update NACHOS ---
       if (nachosPhase.value === 'polling') {
-        nachosProgress.value = state.nachosStatus
-        const step = state.nachosStatus.step
+        nachosProgress.value = db.nachosStatus
+        const step = db.nachosStatus.step
 
         if ('Complete' in step) {
           nachosPhase.value = 'success'
-          loadNachosOrderHistory().catch(console.error)
+          nachosOrderHistory.value = db.recentNachosOrders
           maybeStopPolling()
           return
         }
 
-        if ('Failed' in step && !state.hasPendingNachos) {
+        if ('Failed' in step && !db.hasPendingNachos) {
           nachosPhase.value = 'error'
           nachosError.value = nachosProgressError.value
             || 'Mint failed. Use the manual Claim button or contact support.'
@@ -1335,7 +1312,7 @@ const startUnifiedPolling = (intervalMs: number) => {
         }
       }
     } catch (err) {
-      console.error('Error polling full swap state:', err)
+      console.error('Error polling swap dashboard:', err)
     }
   }, intervalMs)
 }
@@ -1357,114 +1334,145 @@ const stopUnifiedPolling = () => {
 }
 
 // ==========================
-// Initial state + resume via get_full_swap_state()
+// Dashboard loading (single call replaces multiple)
 // ==========================
 
 /**
- * Load initial swap state from get_full_swap_state().
- * Determines whether to show idle, resume polling, or show results.
+ * Load all swap data from a single getSwapDashboard() query.
+ * Populates addresses, orders, config, subaccounts, and evaluates phase state.
  * KEY BUG FIX: If no active lock AND no pending retry, treat stale
  * WaitingForDeposit/NotStarted as idle (don't resume).
  */
-const loadInitialState = async () => {
+const loadDashboard = async () => {
+  tacoAddrError.value = false
+  nachosAddrError.value = false
+
   try {
     const actor = await tacoStore.createTacoSwapActor()
-    const state = await (actor as any).get_full_swap_state()
+    const db: SwapDashboard = await (actor as any).getSwapDashboard()
 
-    // Store deposit subaccounts for ledger polling
-    tacoDepositSubaccount.value = state.tacoDepositSubaccount instanceof Uint8Array
-      ? state.tacoDepositSubaccount
-      : new Uint8Array(state.tacoDepositSubaccount)
-    nachosDepositSubaccount.value = state.nachosDepositSubaccount instanceof Uint8Array
-      ? state.nachosDepositSubaccount
-      : new Uint8Array(state.nachosDepositSubaccount)
+    // --- Populate addresses ---
+    depositAddress.value = db.depositAddress
+    nachosDepositAddress.value = db.nachosDepositAddress
 
-    // --- TACO status ---
-    const tacoStep = state.tacoStatus.step
+    // --- Populate config ---
+    systemPaused.value = db.config.systemPaused
+
+    // --- Populate orders ---
+    orderHistory.value = db.recentTacoOrders
+    nachosOrderHistory.value = db.recentNachosOrders
+
+    // --- Populate deposit subaccounts for ledger polling ---
+    tacoDepositSubaccount.value = db.tacoDepositSubaccount instanceof Uint8Array
+      ? db.tacoDepositSubaccount
+      : new Uint8Array(db.tacoDepositSubaccount)
+    nachosDepositSubaccount.value = db.nachosDepositSubaccount instanceof Uint8Array
+      ? db.nachosDepositSubaccount
+      : new Uint8Array(db.nachosDepositSubaccount)
+
+    // --- TACO phase evaluation ---
+    const tacoStep = db.tacoStatus.step
     const tacoIsNotStarted = 'NotStarted' in tacoStep
     const tacoIsComplete = 'Complete' in tacoStep
     const tacoIsWaiting = 'WaitingForDeposit' in tacoStep
     const tacoIsFailed = 'Failed' in tacoStep
-    const tacoTerminal = tacoIsFailed && state.tacoStatus.retryCount >= BigInt(MAX_RETRIES)
+    const tacoTerminal = tacoIsFailed && db.tacoStatus.retryCount >= BigInt(MAX_RETRIES)
 
     // Stale = no lock, no pending retry, and still just waiting/not started
-    const tacoIsStale = !state.hasActiveLock && !state.hasPendingTaco
+    const tacoIsStale = !db.hasActiveLock && !db.hasPendingTaco
       && (tacoIsNotStarted || tacoIsWaiting)
 
     if (tacoIsStale) {
       // Do nothing — leave uiPhase as 'idle'
     } else if (tacoIsComplete) {
-      const updatedMs = Number(state.tacoStatus.updatedAt / 1_000_000n)
+      const updatedMs = Number(db.tacoStatus.updatedAt / 1_000_000n)
       if (Date.now() - updatedMs < 300_000) {
-        swapProgress.value = state.tacoStatus
+        swapProgress.value = db.tacoStatus
         uiPhase.value = 'success'
       }
     } else if (tacoTerminal) {
-      swapProgress.value = state.tacoStatus
+      swapProgress.value = db.tacoStatus
       uiPhase.value = 'error'
-      orderError.value = state.tacoStatus.errorMessage.length > 0
-        ? (state.tacoStatus.errorMessage[0] as string)
+      orderError.value = db.tacoStatus.errorMessage.length > 0
+        ? (db.tacoStatus.errorMessage[0] as string)
         : 'Swap failed. Use the manual Claim button.'
-    } else if (tacoIsFailed && state.hasPendingTaco) {
-      swapProgress.value = state.tacoStatus
+    } else if (tacoIsFailed && db.hasPendingTaco) {
+      swapProgress.value = db.tacoStatus
       uiPhase.value = 'polling'
       startUnifiedPolling(POLL_PENDING_MS)
-    } else if (tacoIsWaiting && state.hasActiveLock) {
+    } else if (tacoIsWaiting && db.hasActiveLock) {
       // Genuinely active WaitingForDeposit — poll ledger for ICP arrival
-      swapProgress.value = state.tacoStatus
+      swapProgress.value = db.tacoStatus
       uiPhase.value = 'polling'
       startDepositPolling('taco')
     } else if (!tacoIsNotStarted && !tacoIsWaiting) {
       // Past deposit phase (DepositReceived, GettingQuote, etc.) — poll swap state
-      swapProgress.value = state.tacoStatus
+      swapProgress.value = db.tacoStatus
       uiPhase.value = 'polling'
       startUnifiedPolling(POLL_ACTIVE_MS)
     }
 
-    // --- NACHOS status ---
-    const nachosStep = state.nachosStatus.step
+    // --- NACHOS phase evaluation ---
+    const nachosStep = db.nachosStatus.step
     const nachosIsNotStarted = 'NotStarted' in nachosStep
     const nachosIsWaiting = 'WaitingForDeposit' in nachosStep
     const nachosIsComplete_ = 'Complete' in nachosStep
     const nachosIsFailed_ = 'Failed' in nachosStep
 
-    const nachosIsStale = !state.hasActiveLock && !state.hasPendingNachos
+    const nachosIsStale = !db.hasActiveLock && !db.hasPendingNachos
       && (nachosIsNotStarted || nachosIsWaiting)
 
     if (nachosIsStale) {
       // Idle
     } else if (nachosIsComplete_) {
-      const updatedMs = Number(state.nachosStatus.updatedAt / 1_000_000n)
+      const updatedMs = Number(db.nachosStatus.updatedAt / 1_000_000n)
       if (Date.now() - updatedMs < 300_000) {
-        nachosProgress.value = state.nachosStatus
+        nachosProgress.value = db.nachosStatus
         nachosPhase.value = 'success'
       }
-    } else if (nachosIsFailed_ && !state.hasPendingNachos) {
-      nachosProgress.value = state.nachosStatus
+    } else if (nachosIsFailed_ && !db.hasPendingNachos) {
+      nachosProgress.value = db.nachosStatus
       nachosPhase.value = 'error'
-      nachosError.value = state.nachosStatus.errorMessage.length > 0
-        ? (state.nachosStatus.errorMessage[0] as string)
+      nachosError.value = db.nachosStatus.errorMessage.length > 0
+        ? (db.nachosStatus.errorMessage[0] as string)
         : 'Mint failed. Use the manual Claim button.'
-    } else if (nachosIsFailed_ && state.hasPendingNachos) {
-      nachosProgress.value = state.nachosStatus
+    } else if (nachosIsFailed_ && db.hasPendingNachos) {
+      nachosProgress.value = db.nachosStatus
       nachosPhase.value = 'polling'
       selectedProduct.value = 'nachos'
       startUnifiedPolling(POLL_PENDING_MS)
-    } else if (nachosIsWaiting && state.hasActiveLock) {
+    } else if (nachosIsWaiting && db.hasActiveLock) {
       // Genuinely active WaitingForDeposit — poll ledger
-      nachosProgress.value = state.nachosStatus
+      nachosProgress.value = db.nachosStatus
       nachosPhase.value = 'polling'
       selectedProduct.value = 'nachos'
       startDepositPolling('nachos')
     } else if (!nachosIsNotStarted && !nachosIsWaiting) {
       // Past deposit phase — poll swap state
-      nachosProgress.value = state.nachosStatus
+      nachosProgress.value = db.nachosStatus
       nachosPhase.value = 'polling'
       selectedProduct.value = 'nachos'
       startUnifiedPolling(POLL_ACTIVE_MS)
     }
   } catch (err) {
-    console.error('Failed to load initial swap state:', err)
+    console.error('Failed to load swap dashboard:', err)
+    if (!depositAddress.value) tacoAddrError.value = true
+    if (!nachosDepositAddress.value) nachosAddrError.value = true
+  }
+}
+
+/**
+ * Refresh only order history from the dashboard.
+ * Called after successful claims — does NOT re-evaluate phase state.
+ */
+const refreshOrders = async () => {
+  try {
+    const actor = await tacoStore.createTacoSwapActor()
+    const db: SwapDashboard = await (actor as any).getSwapDashboard()
+    orderHistory.value = db.recentTacoOrders
+    nachosOrderHistory.value = db.recentNachosOrders
+  } catch (err) {
+    console.error('Failed to refresh orders:', err)
   }
 }
 
@@ -1477,7 +1485,7 @@ const handleClaimResult = (result: any): boolean => {
       success: true,
       message: `Received ${formatE8s(tacoAmount)} TACO! (tx: ${txId})`
     }
-    loadOrderHistory().catch(console.error)
+    refreshOrders().catch(console.error)
     return true
   }
   if ('NoDeposit' in result) {
@@ -1521,7 +1529,7 @@ const handleNachosClaimResult = (result: any): boolean => {
       success: true,
       message: `Received ${formatE8s(nachosAmount)} NACHOS! (mint: ${mintId}, order: ${oid})`
     }
-    loadNachosOrderHistory().catch(console.error)
+    refreshOrders().catch(console.error)
     return true
   }
   if ('NoDeposit' in result) return false
@@ -1650,7 +1658,7 @@ const claimTaco = async () => {
         success: true,
         message: `Claimed ${formatE8s(tacoAmount)} TACO! (tx: ${txId})`
       }
-      loadOrderHistory().catch(console.error)
+      refreshOrders().catch(console.error)
     } else if ('NoDeposit' in result) {
       claimResult.value = {
         success: false,
@@ -1702,32 +1710,7 @@ const claimTaco = async () => {
 // NACHOS functions
 // ==========================
 
-/** Load NACHOS deposit address from canister (update call — retry with backoff) */
 const nachosAddrError = ref(false)
-const loadNachosDepositAddress = async () => {
-  nachosAddrError.value = false
-  for (let attempt = 1; attempt <= 3; attempt++) {
-    try {
-      const actor = await tacoStore.createTacoSwapActor()
-      nachosDepositAddress.value = await (actor as any).get_nachos_deposit_address_for([])
-      return
-    } catch (err) {
-      console.error(`Failed to load NACHOS deposit address (attempt ${attempt}/3):`, err)
-      if (attempt < 3) await new Promise(r => setTimeout(r, 1000 * attempt))
-    }
-  }
-  nachosAddrError.value = true
-}
-
-/** Load NACHOS order history */
-const loadNachosOrderHistory = async () => {
-  try {
-    const actor = await tacoStore.createTacoSwapActor()
-    nachosOrderHistory.value = await (actor as any).get_my_nachos_orders(20n)
-  } catch (err) {
-    console.error('Failed to load NACHOS order history:', err)
-  }
-}
 
 /** Open Coinbase Onramp popup (NACHOS — uses nachosDepositAddress) */
 const openCoinbaseNachos = async () => {
@@ -1743,14 +1726,15 @@ const openCoinbaseNachos = async () => {
   nachosProgress.value = null
 
   try {
-    // 1. Get session token from CF Worker
+    // 1. Get session token from CF Worker (signed with frontend identity)
+    const sessionBody = {
+      addresses: [{ address: nachosDepositAddress.value }],
+      assets: ['ICP'],
+    }
     const resp = await fetch(COINBASE_SESSION_WORKER, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        addresses: [{ address: nachosDepositAddress.value }],
-        assets: ['ICP'],
-      }),
+      headers: await signedSessionHeaders(sessionBody, tacoStore.signWithUserIdentity),
+      body: JSON.stringify(sessionBody),
     })
     if (!resp.ok) {
       const err = await resp.json()
@@ -1901,24 +1885,16 @@ onMounted(async () => {
   // load config (anonymous — works without login)
   loadConfig().catch(console.error)
 
-  // if already logged in, load user-specific data + check for active swaps
+  // if already logged in, load all swap data in one call
   if (tacoStore.userLoggedIn) {
-    loadDepositAddress().catch(console.error)
-    loadNachosDepositAddress().catch(console.error)
-    loadOrderHistory().catch(console.error)
-    loadNachosOrderHistory().catch(console.error)
-    loadInitialState()
+    loadDashboard().catch(console.error)
   }
 })
 
 // when user logs in after page load, fetch their data
 watch(userLoggedIn, (loggedIn) => {
   if (loggedIn) {
-    loadDepositAddress().catch(console.error)
-    loadNachosDepositAddress().catch(console.error)
-    loadOrderHistory().catch(console.error)
-    loadNachosOrderHistory().catch(console.error)
-    loadInitialState()
+    loadDashboard().catch(console.error)
   } else {
     depositAddress.value = ''
     nachosDepositAddress.value = ''

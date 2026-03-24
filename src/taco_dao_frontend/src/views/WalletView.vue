@@ -56,160 +56,143 @@
               <div v-if="tacoStore.userLoggedIn"
                    class="wallet-view__logged-in-content">
 
-                <!-- core tokens -->
-                <div>
+                <!-- TACO Special Section (MOVED TO TOP) -->
+                <section v-if="tacoToken" class="taco-section taco-container taco-container--l2">
+                  <h5 class="section-title">
+                    <i class="fa fa-taco me-2"></i>
+                    TACO Rewards & Neurons
+                  </h5>
 
-                  <div class="d-flex justify-content-between align-items-center">
-                  
-                    <!-- core tokens title -->
-                    <h2 class="tokens-title">Core Tokens <span class="small">({{ coreTokens.length }})</span></h2>
-
-                    <!-- refresh button -->
-                    <button class="btn btn-sm taco-btn taco-btn--green"
-                            style="padding: 0.75rem 1rem !important;"
-                            @click="loadAllBalances(true)">
-                      <i class="fa fa-refresh"></i>
-                    </button>
-
-                  </div>
-
-                  <!-- trusted token -->
-                  <div class="d-flex flex-column gap-2">
-
-                    <!-- core token -->
-                    <div v-for="token in coreTokens"
-                        :key="token.principal">
-
-                      <!-- core token card -->
-                      <TokenCard
-                        ref="tacoTokenCardRef"
-                        :token="token"
-                        @send="openSendDialog"
-                        @swap="openSwapDialog"
-                        @unregister="unregisterToken"
-                        @stake-to-neuron="handleStakeToNeuron"
-                        @create-neuron="handleCreateNeuron"
-                        @set-dissolve="handleSetDissolve"
-                        @transfer-neuron="handleTransferNeuron"
-                        @refresh-balances="() => loadAllBalances(true)" />
-
+                  <!-- TACO Token Header -->
+                  <div class="taco-header">
+                    <img :src="tacoToken.logo" :alt="tacoToken.symbol" class="taco-logo" />
+                    <div class="taco-info">
+                      <span class="taco-symbol">{{ tacoToken.symbol }}</span>
+                      <span class="taco-balance">
+                        {{ formatBalance(tacoToken.balance, tacoToken.decimals) }} {{ tacoToken.symbol }}
+                      </span>
+                      <span v-if="tacoToken.priceUSD" class="taco-usd">
+                        ${{ formatUSD(tacoToken.balance, tacoToken.decimals, tacoToken.priceUSD) }}
+                      </span>
                     </div>
-
-                  </div>
-
-                </div>
-
-                <!-- trusted tokens container -->
-                <div>
-
-                  <div class="d-flex justify-content-between align-items-center">
-
-                    <!-- trusted tokens title -->
-                    <h2 class="tokens-title">Trusted Tokens <span class="small">({{ trustedTokens.length }})</span></h2>
-
-                    <!-- refresh button -->
-                    <button class="btn btn-sm taco-btn taco-btn--green"
-                            style="padding: 0.75rem 1rem !important;"
-                            @click="loadAllBalances(true)">
-                      <i class="fa fa-refresh"></i>
-                    </button>
-
-                  </div>
-
-                  <!-- if trusted tokens -->
-                  <div v-if="trustedTokens.length > 0">
-
-                    <!-- trusted token -->
-                    <div class="d-flex flex-column gap-2">
-
-                      <!-- trusted token -->
-                      <div v-for="token in trustedTokens" :key="token.principal">
-
-                        <!-- token card -->
-                        <TokenCard 
-                          :token="token" 
-                          @send="openSendDialog"
-                          @swap="openSwapDialog" />
-                      </div>
-
+                    <div class="taco-actions ms-auto">
+                      <button
+                        class="btn btn-sm taco-btn taco-btn--green"
+                        @click="openSwapDialog(tacoToken)">
+                        <i class="fa fa-exchange-alt me-1"></i>
+                        Swap
+                      </button>
+                      <button
+                        class="btn btn-sm taco-btn taco-btn--green"
+                        @click="openSendDialog(tacoToken)"
+                        :disabled="tacoToken.balance <= tacoToken.fee">
+                        <i class="fa fa-paper-plane me-1"></i>
+                        Send
+                      </button>
                     </div>
-
                   </div>
 
-                </div>
+                  <!-- Rewards Summary - using new component -->
+                  <WalletRewardsSummary
+                    :totalRewards="tacoTokenCardRef?.totalRewards || 0"
+                    :loading="tacoTokenCardRef?.loadingRewards || false"
+                    :claiming="tacoTokenCardRef?.claimingAllRewards || false"
+                    @claim-some="tacoTokenCardRef?.toggleNeuronsSection()"
+                    @claim-all="tacoTokenCardRef?.claimAllRewards()" />
 
-                <!-- registered tokens container -->
-                <div>
+                  <!-- Distribution History Table -->
+                  <WalletDistributionHistory
+                    v-if="userNeuronIds.length > 0"
+                    :userNeuronIds="userNeuronIds" />
 
-                  <div class="d-flex justify-content-between align-items-center">
+                  <!-- TokenCard for Neurons Management (keep existing component) -->
+                  <div class="taco-neurons-wrapper">
+                    <TokenCard
+                      ref="tacoTokenCardRef"
+                      :token="tacoToken"
+                      @send="openSendDialog"
+                      @swap="openSwapDialog"
+                      @stake-to-neuron="handleStakeToNeuron"
+                      @create-neuron="handleCreateNeuron"
+                      @set-dissolve="handleSetDissolve"
+                      @transfer-neuron="handleTransferNeuron"
+                      @refresh-balances="() => loadAllBalances(true)" />
+                  </div>
+                </section>
 
-                    <!-- registered tokens title -->
-                    <h2 class="tokens-title">Registered Tokens <span class="small">({{ userRegisteredTokens.length }})</span></h2>
+                <!-- Core Tokens (ICP, NACHOS) - Table Display -->
+                <section v-if="nonTacoCoreTokens.length > 0" class="token-section">
+                  <h5 class="section-title">
+                    <i class="fa fa-coins me-2"></i>
+                    Core Tokens <span class="opacity-75">({{ nonTacoCoreTokens.length }})</span>
+                  </h5>
+                  <TokenTable
+                    :tokens="nonTacoCoreTokens"
+                    @send="openSendDialog"
+                    @swap="openSwapDialog" />
+                </section>
 
-                    <!-- refresh button -->
-                    <button class="btn btn-sm taco-btn taco-btn--green"
-                            style="padding: 0.75rem 1rem !important;"
-                            @click="loadAllBalances(true)">
-                      <i class="fa fa-refresh"></i>
+                <!-- Trusted Tokens - Table Display -->
+                <section v-if="trustedTokens.length > 0" class="token-section">
+                  <h5 class="section-title">
+                    <i class="fa fa-shield-alt me-2"></i>
+                    Trusted Tokens <span class="opacity-75">({{ trustedTokens.length }})</span>
+                  </h5>
+                  <TokenTable
+                    :tokens="trustedTokens"
+                    @send="openSendDialog"
+                    @swap="openSwapDialog" />
+                </section>
+
+                <!-- Registered Tokens - Table Display -->
+                <section class="token-section registered-tokens-section">
+                  <h5 class="section-title">
+                    <i class="fa fa-user-plus me-2"></i>
+                    Registered Tokens <span class="opacity-75">({{ userRegisteredTokens.length }})</span>
+                  </h5>
+
+                  <!-- Register Token Input -->
+                  <div class="register-token-form d-flex gap-2 mb-3">
+                    <input
+                      v-model="newTokenPrincipal"
+                      placeholder="Enter token principal"
+                      class="register-token-input taco-input flex-grow-1" />
+                    <button
+                      @click="registerCustomToken"
+                      :disabled="!newTokenPrincipal.trim() || registeringToken"
+                      class="btn btn-sm taco-btn taco-btn--green px-3 py-1">
+                      <i class="fa fa-plus me-1"></i>
+                      Add
                     </button>
-
                   </div>
 
-                  <!-- register a token -->
-                  <div class="d-flex gap-2 mb-2">
-
-                    <!-- input -->
-                    <input v-model="newTokenPrincipal"
-                           placeholder="Enter token principal"
-                           class="register-token-input taco-input" />
-
-                    <!-- add button -->
-                    <button @click="registerCustomToken" 
-                            :disabled="!newTokenPrincipal.trim() || registeringToken"
-                            class="btn btn-sm taco-btn taco-btn--green px-3 py-1">
-                      
-                      <!-- plus icon -->
-                      <i class="fa fa-plus"></i>
-
-                    </button>
-                  </div>                  
-
-                  <!-- if registered tokens -->
+                  <!-- Registered Tokens Table -->
                   <div v-if="userRegisteredTokens.length > 0">
-
-                    <!-- registered tokens -->
-                    <div class="d-flex flex-column gap-2">
-
-                      <!-- registered token -->
-                      <div v-for="token in userRegisteredTokens" :key="token.principal">
-
-                        <!-- token card -->
-                        <TokenCard 
-                          :token="token" 
-                          @send="openSendDialog"
-                          @swap="openSwapDialog"
-                          @unregister="unregisterToken" />
-                      </div>
-
-                    </div>
-
+                    <TokenTable
+                      :tokens="userRegisteredTokens"
+                      :showUnregister="true"
+                      @send="openSendDialog"
+                      @swap="openSwapDialog"
+                      @unregister="unregisterToken" />
                   </div>
 
-                  <!-- no registered tokens -->
-                  <div v-if="userRegisteredTokens.length === 0">
-                    
-                    <div class="wallet-view__no-registered-tokens
-                                d-flex align-items-center justify-content-center">
-
-                      <span class="d-inline-block taco-text-black-to-white px-4 py-5">No registered tokens</span>
-
-                    </div>
-                    
+                  <!-- No Registered Tokens Message -->
+                  <div v-else class="text-center py-4" style="opacity: 0.6;">
+                    <i class="fa fa-coins fa-2x mb-2"></i>
+                    <p class="mb-0">No registered tokens</p>
                   </div>
-
-                </div>
+                </section>
 
               </div>
+
+              <!-- Floating Refresh Button -->
+              <button
+                v-if="tacoStore.userLoggedIn"
+                class="wallet-refresh-btn"
+                @click="loadAllBalances(true)"
+                title="Refresh all balances">
+                <i class="fa fa-sync-alt"></i>
+              </button>
 
             </div>
 
@@ -321,27 +304,176 @@
   // logged in content
   &__logged-in-content {
     padding: 0rem 1rem 1rem;
-  }
-
-  // no registered tokens
-  &__no-registered-tokens {
-    background-color: var(--orange-to-dark-brown);
-    border-radius: 0.5rem;
-    border: 1px solid var(--dark-orange-to-dark-brown);
-  }
-
-  // tokens title
-  .tokens-title {
-    font-size: 1.5rem;
-    line-height: 1;
-    font-family: 'Space Mono';
-    padding: 1.5rem 0 1rem;
-    margin-bottom: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 3.5rem; // Increased from 2.5rem for more breathing room between sections
+    position: relative;
+    padding-bottom: 3rem; // Reduced from 5rem - space for floating button
   }
 
 }
 
-// login curtain
+// Token sections
+.token-section {
+  margin-bottom: 2rem; // Increased from 1.5rem
+}
+
+.section-title {
+  font-size: 1.1rem; // Increased from 1rem
+  font-family: 'Space Mono', monospace;
+  margin-bottom: 1rem; // Increased from 0.75rem
+  font-weight: 600;
+  color: var(--brown-to-white);
+  display: flex;
+  align-items: center;
+
+  i {
+    font-size: 0.95rem; // Increased from 0.85rem
+  }
+}
+
+// TACO Special Section
+.taco-section {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem; // Increased from 1rem
+  padding: 1.25rem; // Added internal padding for better spacing
+  margin-top: 2rem; // Extra spacing before first section (TACO)
+  margin-bottom: 2rem; // Spacing after TACO section
+}
+
+.taco-header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem; // Increased from 0.75rem
+  background: rgba(0, 0, 0, 0.25); // MUCH DARKER - increased from 0.12 to 0.25
+  border-radius: 0.375rem;
+  border: 1px solid rgba(128, 128, 128, 0.15);
+}
+
+.taco-logo {
+  width: 44px; // Increased from 40px
+  height: 44px; // Increased from 40px
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.taco-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+  flex-grow: 1;
+}
+
+.taco-symbol {
+  font-weight: 600;
+  font-size: 1.05rem; // Increased from 0.95rem
+  color: var(--black-to-white);
+  font-family: 'Space Mono', monospace;
+}
+
+.taco-balance {
+  font-size: 0.95rem; // Increased from 0.85rem
+  color: var(--black-to-white);
+  font-family: 'Space Mono', monospace;
+}
+
+.taco-usd {
+  font-size: 0.85rem; // Increased from 0.75rem
+  opacity: 0.7;
+  color: var(--black-to-white);
+  font-family: 'Space Mono', monospace;
+}
+
+.taco-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+
+  .btn {
+    font-size: 0.85rem; // Add explicit button font size
+    padding: 0.5rem 0.75rem; // Slightly larger padding
+
+    i {
+      font-size: 0.8rem;
+    }
+  }
+}
+
+.taco-neurons-wrapper {
+  // Hide the token header/balance/rewards/actions from TokenCard since we show them above
+  :deep(.token-card) {
+    padding: 0 !important;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+
+    // Hide ONLY the first child div (token info, rewards, and swap/send buttons)
+    // The second child div (.token-card__neurons) will remain visible
+    > div:first-child {
+      display: none !important;
+    }
+  }
+}
+
+// Registered Tokens Section - Last section with border
+.registered-tokens-section {
+  margin-bottom: 0 !important; // Remove bottom margin from last section
+  padding: 1.5rem;
+  background: rgba(0, 0, 0, 0.20); // MUCH DARKER - increased from 0.10 to 0.20
+  border: 2px solid var(--dark-orange-to-brown);
+  border-radius: 0.5rem;
+}
+
+// Register token form
+.register-token-form {
+  margin-bottom: 1rem;
+}
+
+.register-token-input {
+  padding: 0.375rem 1rem;
+  border-radius: 0.25rem;
+  font-size: 0.875rem;
+  font-family: 'Space Mono', monospace;
+}
+
+// Floating refresh button
+.wallet-refresh-btn {
+  position: fixed;
+  bottom: 1.5rem;
+  right: 1.5rem;
+  z-index: 1040;
+  background: var(--orange-to-dark-brown);
+  border: 1px solid var(--dark-orange-to-dark-brown);
+  color: var(--black-to-white);
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 0.95rem;
+  transition: opacity 0.2s, background-color 0.2s, transform 0.15s;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+
+  &:hover {
+    opacity: 0.9;
+    background: var(--dark-orange-to-dark-brown);
+    transform: scale(1.05);
+  }
+
+  &:active {
+    transform: scale(0.95);
+  }
+
+  i {
+    font-size: 0.95rem;
+  }
+}
+
+// Login curtain
 .login-curtain {
   display: flex;
   flex-direction: column;
@@ -380,13 +512,37 @@
 
 }
 
-// register token input
-.register-token-input {
-  padding: 0.375rem 1rem;
-  border-radius: 0.25rem;
-  font-size: 0.875rem;
-  width: 100%;
-  max-width: 280px;
+// Mobile responsiveness
+@media (max-width: 767.98px) {
+  .taco-header {
+    flex-wrap: wrap;
+  }
+
+  .taco-actions {
+    width: 100%;
+
+    .btn {
+      flex: 1;
+    }
+  }
+
+  .wallet-refresh-btn {
+    bottom: 1rem;
+    right: 1rem;
+    width: 2.5rem;
+    height: 2.5rem;
+    font-size: 0.85rem;
+  }
+}
+
+@media (max-width: 575.98px) {
+  .taco-actions {
+    flex-direction: column;
+
+    .btn {
+      width: 100%;
+    }
+  }
 }
 
 </style>
@@ -402,6 +558,9 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { useTacoStore } from '../stores/taco.store'
 import { Principal } from '@dfinity/principal'
 import TokenCard from '../components/wallet/TokenCard.vue'
+import TokenTable from '../components/wallet/TokenTable.vue'
+import WalletRewardsSummary from '../components/wallet/WalletRewardsSummary.vue'
+import WalletDistributionHistory from '../components/wallet/WalletDistributionHistory.vue'
 import SendTokenDialog from '../components/wallet/SendTokenDialog.vue'
 import SwapDialog from '../components/wallet/SwapDialog.vue'
 import SwapConfirmDialog from '../components/wallet/SwapConfirmDialog.vue'
@@ -643,6 +802,30 @@ const userRegisteredTokens = computed<WalletToken[]>(() => {
     })
 })
 
+// Core tokens except TACO (for table display)
+const nonTacoCoreTokens = computed<WalletToken[]>(() => {
+  return coreTokens.value.filter(token => token.symbol !== 'TACO')
+})
+
+// TACO token (for special section)
+const tacoToken = computed<WalletToken | null>(() => {
+  return coreTokens.value.find(token => token.symbol === 'TACO') || null
+})
+
+// User neuron IDs (for distribution rewards)
+const userNeuronIds = computed<string[]>(() => {
+  if (!tacoToken.value) {
+    console.log('[DEBUG] No tacoToken, returning empty neuronIds')
+    return []
+  }
+  // Get neurons from TokenCard ref if available
+  const neurons = tacoTokenCardRef.value?.neurons || []
+  console.log('[DEBUG] TokenCard neurons:', neurons)
+  const ids = neurons.map((n: any) => n.idHex || '')
+  console.log('[DEBUG] userNeuronIds:', ids)
+  return ids
+})
+
 // All tokens for swap dialog
 const allTokens = computed<WalletToken[]>(() => {
   return [
@@ -655,6 +838,41 @@ const allTokens = computed<WalletToken[]>(() => {
 ///////////////////
 // local methods //
 ///////////////////
+
+// Format balance (BigInt to readable decimal)
+function formatBalance(balance: bigint, decimals: number): string {
+  const divisor = BigInt(10 ** decimals)
+  const integerPart = balance / divisor
+  const fractionalPart = balance % divisor
+
+  // Convert fractional part to string with leading zeros
+  const fractionalStr = fractionalPart.toString().padStart(decimals, '0')
+
+  // Trim trailing zeros and decimal point if not needed
+  const trimmedFractional = fractionalStr.replace(/0+$/, '')
+
+  if (trimmedFractional === '') {
+    return integerPart.toString()
+  }
+
+  // Show max 4 decimal places for display
+  const displayFractional = trimmedFractional.substring(0, 4)
+
+  return `${integerPart}.${displayFractional}`
+}
+
+// Format USD value
+function formatUSD(balance: bigint, decimals: number, priceUSD: number): string {
+  const divisor = BigInt(10 ** decimals)
+  const balanceNum = Number(balance) / Number(divisor)
+  const usdValue = balanceNum * priceUSD
+
+  if (usdValue < 0.01) {
+    return '< 0.01'
+  }
+
+  return usdValue.toFixed(2)
+}
 
 // load wallet data
 const loadWalletData = async (showSpinner = true) => {

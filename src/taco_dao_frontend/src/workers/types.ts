@@ -16,6 +16,8 @@ export type DataKey =
   | 'tradingStatus'
   | 'timerStatus'
   | 'votingPowerMetrics'
+  | 'allocationStats'
+  | 'historicBalanceAndAllocation'
   | 'tacoProposals'
   | 'proposalsThreads'
   | 'allNames'
@@ -81,6 +83,8 @@ export type DataKey =
   | 'leaderboardOneWeekICP'
   | 'leaderboardInfo'
   | 'userPerformance'
+  // Swap dashboard (authenticated — user-specific orders/addresses)
+  | 'swapDashboard'
 
 // ============================================================================
 // Worker Assignment - Which worker handles which data
@@ -96,6 +100,8 @@ export const WORKER_ASSIGNMENT: Record<DataKey, 'public' | 'auth'> = {
   tradingStatus: 'public',
   timerStatus: 'public',
   votingPowerMetrics: 'public',
+  allocationStats: 'public',
+  historicBalanceAndAllocation: 'public',
   tacoProposals: 'public',
   proposalsThreads: 'public',
   allNames: 'public',
@@ -161,6 +167,8 @@ export const WORKER_ASSIGNMENT: Record<DataKey, 'public' | 'auth'> = {
   leaderboardOneWeekICP: 'public',
   leaderboardInfo: 'public',
   userPerformance: 'auth',
+  // Swap dashboard (user-specific)
+  swapDashboard: 'auth',
 }
 
 // ============================================================================
@@ -195,6 +203,8 @@ export const STALENESS_THRESHOLDS: Record<DataKey, number> = {
   userAllocation: 60_000,
   // Medium - 120 seconds
   votingPowerMetrics: 120_000,
+  allocationStats: 120_000,
+  historicBalanceAndAllocation: 120_000,
   voterDetails: 120_000,
   neuronAllocations: 120_000,
   penalizedNeurons: 120_000,
@@ -255,6 +265,8 @@ export const STALENESS_THRESHOLDS: Record<DataKey, number> = {
   leaderboardOneWeekICP: 300_000,
   leaderboardInfo: 300_000,
   userPerformance: 300_000,
+  // Swap dashboard - 60 seconds (swap state can change fast)
+  swapDashboard: 60_000,
 }
 
 // Background tab multiplier (3x slower)
@@ -311,6 +323,7 @@ export type WorkerRequestType =
   | 'USER_ACTIVITY' // Signal user activity to reset idle timer
   | 'RESET' // Reset worker state (backoff, queue, fetch count) for fresh start
   | 'INITIAL_LOAD' // Tell worker the initial route for selective data loading
+  | 'SET_USER_PRINCIPAL' // Send user principal to public worker for getVoteDashboard
 
 export interface WorkerRequest extends BaseMessage {
   type: WorkerRequestType
@@ -324,6 +337,7 @@ export interface WorkerRequest extends BaseMessage {
     isAdmin?: boolean
     network?: 'ic' | 'staging' | 'local' | null
     route?: string // Current route for INITIAL_LOAD
+    userPrincipal?: string // Principal text for getVoteDashboard
   }
 }
 
@@ -384,7 +398,7 @@ export const ROUTE_PRIORITIES: Record<string, RouteDataConfig> = {
   },
   '/vote': {
     critical: ['votingPowerMetrics', 'aggregateAllocation', 'tokenDetails'],
-    high: ['userAllocation', 'tokenMaxAllocations', 'tacoProposals', 'cryptoPrices'],
+    high: ['userAllocation', 'tokenMaxAllocations', 'tacoProposals', 'cryptoPrices', 'allocationStats', 'historicBalanceAndAllocation'],
     preloadRoutes: ['/dao', '/forum', '/wallet'],
   },
   '/forum': {

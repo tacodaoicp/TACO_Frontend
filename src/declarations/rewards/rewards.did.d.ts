@@ -382,6 +382,10 @@ export interface Rewards {
   'getRewardPenalties' : ActorMethod<[], Result__1_7>,
   'getRewardPenalty' : ActorMethod<[Uint8Array | number[]], Result__1_6>,
   'getRewardSkipList' : ActorMethod<[], Result__1_5>,
+  'getRewardsDashboard' : ActorMethod<
+    [Array<Uint8Array | number[]>, [] | [bigint], [] | [bigint]],
+    RewardsDashboard
+  >,
   'getTacoBalance' : ActorMethod<[], bigint>,
   'getTotalDistributed' : ActorMethod<[], bigint>,
   'getUserDistributionRewards' : ActorMethod<
@@ -440,6 +444,28 @@ export interface Rewards {
     Result__1
   >,
   'withdraw' : ActorMethod<[Account, Array<Uint8Array | number[]>], Result>,
+}
+export interface RewardsDashboard {
+  'totalDistributed' : bigint,
+  'distributions' : {
+    'total' : bigint,
+    'hasMore' : boolean,
+    'records' : Array<UserDistributionSummary>,
+  },
+  'withdrawals' : Array<WithdrawalRecord>,
+  'distributionStatus' : {
+    'nextDistributionTime' : bigint,
+    'distributionEnabled' : boolean,
+    'currentDistributionId' : [] | [bigint],
+    'lastDistributionTime' : bigint,
+    'inProgress' : boolean,
+  },
+  'withdrawalStats' : {
+    'totalRecordsInHistory' : bigint,
+    'totalWithdrawn' : bigint,
+    'totalWithdrawals' : bigint,
+  },
+  'balances' : Array<[Uint8Array | number[], bigint]>,
 }
 export type RewardsError = { 'AllocationDataMissing' : null } |
   { 'InvalidDisplayName' : string } |

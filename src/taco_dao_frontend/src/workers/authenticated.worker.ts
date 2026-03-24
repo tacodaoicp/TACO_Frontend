@@ -14,7 +14,8 @@
 
 /// <reference lib="webworker" />
 
-import { HttpAgent, Identity, AnonymousIdentity } from '@dfinity/agent'
+import { HttpAgent, Identity } from '@dfinity/agent'
+import { getFrontendIdentity } from '../utils/frontend-identity'
 import { Principal } from '@dfinity/principal'
 import { DelegationChain, DelegationIdentity, Ed25519KeyIdentity } from '@dfinity/identity'
 import { createAgent } from '@dfinity/utils'
@@ -69,6 +70,8 @@ import {
   fetchRewardsConfigurationData,
   fetchDistributionHistoryData,
   fetchUserPerformanceData,
+  fetchEnhancedTreasuryDashboardData,
+  fetchSwapDashboardData,
   serializeForTransfer,
 } from './shared/fetch-functions'
 import type {
@@ -143,9 +146,11 @@ const HANDLED_KEYS: DataKey[] = [
   'distributionHistory',
   // Performance data (user-specific)
   'userPerformance',
+  // Swap dashboard (user-specific)
+  'swapDashboard',
 ]
 
-const USER_KEYS: DataKey[] = ['userAllocation', 'userPerformance']
+const USER_KEYS: DataKey[] = ['userAllocation', 'userPerformance', 'swapDashboard']
 
 // Keys that REQUIRE authentication - canister enforces caller identity check
 const AUTH_REQUIRED_KEYS: DataKey[] = [
@@ -330,7 +335,7 @@ async function createAnonymousAgent(): Promise<void> {
   debugLog(`Creating anonymous agent... host=${host}, fetchRootKey=${fetchRootKey}`)
   try {
     anonymousAgent = await createAgent({
-      identity: new AnonymousIdentity(),
+      identity: getFrontendIdentity(),
       host,
       fetchRootKey,
     })
@@ -1063,6 +1068,48 @@ async function processSingleFetch(item: { dataKey: DataKey; retryCount: number }
   }
 }
 
+// ============================================================================
+// Enhanced Treasury Dashboard Coalescing
+// ============================================================================
+let lastEnhancedTreasuryResult: { data: any; timestamp: number } | null = null
+const TREASURY_COALESCE_MS = 5_000
+
+async function getEnhancedTreasuryDashboardCoalesced(agentRef: HttpAgent): Promise<any | null> {
+  if (lastEnhancedTreasuryResult && (Date.now() - lastEnhancedTreasuryResult.timestamp) < TREASURY_COALESCE_MS) {
+    return lastEnhancedTreasuryResult.data
+  }
+  try {
+    const data = await fetchEnhancedTreasuryDashboardData(agentRef)
+    lastEnhancedTreasuryResult = { data, timestamp: Date.now() }
+    return data
+  } catch (err) {
+    console.warn('[AuthWorker] getEnhancedTreasuryDashboard composite failed, falling back to individual calls:', err)
+    lastEnhancedTreasuryResult = { data: null, timestamp: Date.now() }
+    return null
+  }
+}
+
+/**
+ * Populate sibling data keys from EnhancedTreasuryDashboard in the authenticated worker.
+ * Covers rebalanceConfig and tradingPauses.
+ */
+async function populateEnhancedTreasurySiblings(dashboard: any, excludeKey: DataKey): Promise<void> {
+  const now = Date.now()
+  const freshState: Partial<DataState> = { lastUpdated: now, loading: false, error: null, stale: false }
+
+  if (excludeKey !== 'rebalanceConfig') {
+    const rc = serializeForTransfer(dashboard.systemParameters)
+    updateState('rebalanceConfig', { data: rc, ...freshState })
+    await setCached('rebalanceConfig', rc)
+  }
+
+  if (excludeKey !== 'tradingPauses') {
+    const tp = serializeForTransfer(dashboard.tradingPauses)
+    updateState('tradingPauses', { data: tp, ...freshState })
+    await setCached('tradingPauses', tp)
+  }
+}
+
 async function fetchData(dataKey: DataKey): Promise<void> {
   debugLog(`fetchData called for ${dataKey}`)
   // Choose the appropriate agent:
@@ -1107,9 +1154,16 @@ async function fetchData(dataKey: DataKey): Promise<void> {
       data = serializeForTransfer(await fetchPenalizedNeuronsData(agent))
       break
 
-    case 'rebalanceConfig':
-      data = serializeForTransfer(await fetchRebalanceConfigData(agent))
+    case 'rebalanceConfig': {
+      const enhancedDashboard = await getEnhancedTreasuryDashboardCoalesced(agent)
+      if (enhancedDashboard) {
+        data = serializeForTransfer(enhancedDashboard.systemParameters)
+        await populateEnhancedTreasurySiblings(enhancedDashboard, 'rebalanceConfig')
+      } else {
+        data = serializeForTransfer(await fetchRebalanceConfigData(agent))
+      }
       break
+    }
 
     case 'systemParameters':
       data = serializeForTransfer(await fetchSystemParametersData(agent))
@@ -1120,9 +1174,16 @@ async function fetchData(dataKey: DataKey): Promise<void> {
       data = serializeForTransfer(await fetchPriceAlertsData(agent))
       break
 
-    case 'tradingPauses':
-      data = serializeForTransfer(await fetchTradingPausesData(agent))
+    case 'tradingPauses': {
+      const enhancedDashboard = await getEnhancedTreasuryDashboardCoalesced(agent)
+      if (enhancedDashboard) {
+        data = serializeForTransfer(enhancedDashboard.tradingPauses)
+        await populateEnhancedTreasurySiblings(enhancedDashboard, 'tradingPauses')
+      } else {
+        data = serializeForTransfer(await fetchTradingPausesData(agent))
+      }
       break
+    }
 
     case 'priceHistory':
       data = serializeForTransfer(await fetchPriceHistoryData(agent))
@@ -1263,6 +1324,10 @@ async function fetchData(dataKey: DataKey): Promise<void> {
       }
       const userPrincipal = currentIdentity.getPrincipal()
       data = serializeForTransfer(await fetchUserPerformanceData(authenticatedAgent!, userPrincipal))
+      break
+
+    case 'swapDashboard':
+      data = serializeForTransfer(await fetchSwapDashboardData(authenticatedAgent!))
       break
 
     default:

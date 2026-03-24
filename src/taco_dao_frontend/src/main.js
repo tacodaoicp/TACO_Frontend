@@ -49,6 +49,7 @@ const NNSPropViewDemo = () => import("./views/NNSPropViewDemo.vue")
 const SystemView = () => import("./views/SystemView.vue")
 const AdminNachosView = () => import("./views/AdminNachosView.vue")
 const TestPropView = () => import("./views/TestPropView.vue")
+const FrontendIdentityTestView = () => import("./views/FrontendIdentityTestView.vue")
 
 const routes = [
     { path: "/", name: "Home", component: HomeView, meta: { robots: 'index' } },
@@ -112,6 +113,7 @@ const routes = [
     { path: "/nnsprop/:id", name: "NNSProp", component: NNSPropView, meta: { robots: 'noindex' } },
     { path: "/nnspropdemo/:id", name: "NNSPropDemo", component: NNSPropViewDemo, meta: { robots: 'noindex' } },
     { path: "/test_prop", name: "TestProp", component: TestPropView, meta: { robots: 'noindex' } },
+    { path: "/fe-identity-test", name: "FrontendIdentityTest", component: FrontendIdentityTestView, meta: { robots: 'noindex' } },
     { path: "/:pathMatch(.*)*", redirect: "/" },
 ]
 

@@ -11,7 +11,9 @@
 
 /// <reference lib="webworker" />
 
-import { AnonymousIdentity, HttpAgent } from '@dfinity/agent'
+import { HttpAgent } from '@dfinity/agent'
+import { Principal } from '@dfinity/principal'
+import { getFrontendIdentity } from '../utils/frontend-identity'
 import { createAgent } from '@dfinity/utils'
 import { PriorityQueue } from './shared/priority-queue'
 import { BackoffTracker } from './shared/backoff'
@@ -35,10 +37,13 @@ import {
   // Performance/Leaderboard fetch functions
   fetchLeaderboardData,
   fetchLeaderboardInfoData,
+  fetchAllocationStatsData,
+  fetchHistoricBalanceAndAllocationData,
   // Composite query fetch functions
-  fetchDashboardData,
+  fetchVoteDashboardData,
   fetchAllLeaderboardsData,
   fetchTreasuryDashboardData,
+  fetchEnhancedTreasuryDashboardData,
   serializeForTransfer,
   clearActorCache,
 } from './shared/fetch-functions'
@@ -75,6 +80,8 @@ const HANDLED_KEYS: DataKey[] = [
   'timerStatus',
   // Secondary (medium priority)
   'votingPowerMetrics',
+  'allocationStats',
+  'historicBalanceAndAllocation',
   'tacoProposals',
   'proposalsThreads',
   'allNames',
@@ -108,6 +115,7 @@ let lastActivityTime = Date.now()
 let agent: HttpAgent | null = null
 let isInitialized = false
 let currentNetwork: 'ic' | 'staging' | 'local' | null = null
+let currentUserPrincipal: string | null = null // User principal for getVoteDashboard
 let debugEnabled = false // Debug mode - disabled by default in production
 
 // Initial load state
@@ -268,7 +276,7 @@ async function createAnonymousAgent(): Promise<void> {
   }
 
   agent = await createAgent({
-    identity: new AnonymousIdentity(),
+    identity: getFrontendIdentity(),
     host: getHost(),
     fetchRootKey: shouldFetchRootKey(),
   })
@@ -359,6 +367,18 @@ function handleMessage(message: WorkerRequest): void {
     case 'INITIAL_LOAD':
       handleInitialLoad(message)
       break
+
+    case 'SET_USER_PRINCIPAL': {
+      const newPrincipal = message.payload.userPrincipal || null
+      const principalChanged = newPrincipal !== currentUserPrincipal
+      currentUserPrincipal = newPrincipal
+      if (principalChanged) {
+        // Invalidate dashboard cache so next fetch uses new principal
+        lastVoteDashboardResult = null
+        if (debugEnabled) console.log(`[PublicDedicatedWorker] User principal ${newPrincipal ? 'set' : 'cleared'}`)
+      }
+      break
+    }
   }
 }
 
@@ -675,21 +695,26 @@ async function processSingleFetch(item: { dataKey: DataKey; retryCount: number }
 // a composite endpoint are processed within a short window.
 // ============================================================================
 
-let lastDashboardResult: { data: any; timestamp: number } | null = null
+let lastVoteDashboardResult: { data: any; timestamp: number } | null = null
 let lastLeaderboardResult: { data: any; timestamp: number } | null = null
+let lastEnhancedTreasuryResult: { data: any; timestamp: number } | null = null
 const COALESCE_MS = 5_000
 
-async function getDashboardCoalesced(agentRef: HttpAgent): Promise<any | null> {
-  if (lastDashboardResult && (Date.now() - lastDashboardResult.timestamp) < COALESCE_MS) {
-    return lastDashboardResult.data
+async function getVoteDashboardCoalesced(agentRef: HttpAgent): Promise<any | null> {
+  if (lastVoteDashboardResult && (Date.now() - lastVoteDashboardResult.timestamp) < COALESCE_MS) {
+    return lastVoteDashboardResult.data
   }
   try {
-    const data = await fetchDashboardData(agentRef)
-    lastDashboardResult = { data, timestamp: Date.now() }
+    // Pass principal if available — getVoteDashboard is a query, no auth needed
+    const principal = currentUserPrincipal
+      ? Principal.fromText(currentUserPrincipal)
+      : undefined
+    const data = await fetchVoteDashboardData(agentRef, principal)
+    lastVoteDashboardResult = { data, timestamp: Date.now() }
     return data
   } catch (err) {
-    console.warn('[PublicWorker-Dedicated] getDashboardData composite failed, falling back to individual calls:', err)
-    lastDashboardResult = { data: null, timestamp: Date.now() }
+    console.warn('[PublicWorker-Dedicated] getVoteDashboard composite failed, falling back to individual calls:', err)
+    lastVoteDashboardResult = { data: null, timestamp: Date.now() }
     return null
   }
 }
@@ -709,11 +734,63 @@ async function getAllLeaderboardsCoalesced(agentRef: HttpAgent): Promise<any | n
   }
 }
 
+async function getEnhancedTreasuryDashboardCoalesced(agentRef: HttpAgent): Promise<any | null> {
+  if (lastEnhancedTreasuryResult && (Date.now() - lastEnhancedTreasuryResult.timestamp) < COALESCE_MS) {
+    return lastEnhancedTreasuryResult.data
+  }
+  try {
+    const data = await fetchEnhancedTreasuryDashboardData(agentRef)
+    lastEnhancedTreasuryResult = { data, timestamp: Date.now() }
+    return data
+  } catch (err) {
+    console.warn('[PublicWorker-Dedicated] getEnhancedTreasuryDashboard composite failed, falling back to individual calls:', err)
+    lastEnhancedTreasuryResult = { data: null, timestamp: Date.now() }
+    return null
+  }
+}
+
 /**
- * Populate sibling data keys from a composite dashboard response.
+ * Populate sibling data keys from the EnhancedTreasuryDashboard composite response.
  * DedicatedWorker version — includes broadcastUpdate() for each sibling.
  */
-async function populateDashboardSiblings(dashboard: any, excludeKey: DataKey): Promise<void> {
+async function populateEnhancedTreasurySiblings(dashboard: any, excludeKey: DataKey): Promise<void> {
+  const now = Date.now()
+  const freshState: Partial<DataState> = { lastUpdated: now, loading: false, error: null, stale: false }
+
+  if (excludeKey !== 'tradingStatus') {
+    const ts = serializeForTransfer({ ok: dashboard.tradingStatus })
+    updateState('tradingStatus', { data: ts, ...freshState })
+    broadcastUpdate('tradingStatus', ts)
+    await setCached('tradingStatus', ts)
+  }
+
+  if (excludeKey !== 'portfolioSnapshotStatus') {
+    const pss = serializeForTransfer({
+      status: dashboard.portfolioSnapshotStatus.status,
+      intervalMinutes: Number(dashboard.portfolioSnapshotStatus.intervalMinutes),
+      lastSnapshotTime: Number(dashboard.portfolioSnapshotStatus.lastSnapshotTime),
+    })
+    updateState('portfolioSnapshotStatus', { data: pss, ...freshState })
+    broadcastUpdate('portfolioSnapshotStatus', pss)
+    await setCached('portfolioSnapshotStatus', pss)
+  }
+}
+
+/**
+ * Extract tokenMaxAllocations from PublicTokenDetailsWithMaxAllocationEntry[].
+ * Produces the old [Principal, bigint][] format from the embedded maxAllocationBasisPoints field.
+ */
+function extractTokenMaxAllocations(tokenDetails: any[]): any[] {
+  return tokenDetails
+    .filter((entry: any) => entry[1].maxAllocationBasisPoints?.length > 0)
+    .map((entry: any) => [entry[0], entry[1].maxAllocationBasisPoints[0]])
+}
+
+/**
+ * Populate sibling data keys from a getVoteDashboard composite response.
+ * DedicatedWorker version — includes broadcastUpdate() for each sibling.
+ */
+async function populateVoteDashboardSiblings(dashboard: any, excludeKey: DataKey): Promise<void> {
   const now = Date.now()
   const freshState: Partial<DataState> = { lastUpdated: now, loading: false, error: null, stale: false }
 
@@ -739,6 +816,7 @@ async function populateDashboardSiblings(dashboard: any, excludeKey: DataKey): P
   }
 
   if (excludeKey !== 'votingPowerMetrics') {
+    // Wrap in Result format { ok: ... } to match existing store expectation
     const vp = serializeForTransfer({ ok: dashboard.votingPowerMetrics })
     updateState('votingPowerMetrics', { data: vp, ...freshState })
     broadcastUpdate('votingPowerMetrics', vp)
@@ -758,10 +836,38 @@ async function populateDashboardSiblings(dashboard: any, excludeKey: DataKey): P
   }
 
   if (excludeKey !== 'tokenMaxAllocations') {
-    const tma = serializeForTransfer(dashboard.tokenMaxAllocations || [])
+    // Extract from embedded maxAllocationBasisPoints in each token entry
+    const tma = serializeForTransfer(extractTokenMaxAllocations(dashboard.tokenDetails))
     updateState('tokenMaxAllocations', { data: tma, ...freshState })
     broadcastUpdate('tokenMaxAllocations', tma)
     await setCached('tokenMaxAllocations', tma)
+  }
+
+  // New fields from getVoteDashboard
+  if (excludeKey !== 'allocationStats') {
+    const as_ = serializeForTransfer(dashboard.allocationStats)
+    updateState('allocationStats', { data: as_, ...freshState })
+    broadcastUpdate('allocationStats', as_)
+    await setCached('allocationStats', as_)
+  }
+
+  if (excludeKey !== 'historicBalanceAndAllocation') {
+    const hba = serializeForTransfer(dashboard.historicBalanceAndAllocation)
+    updateState('historicBalanceAndAllocation', { data: hba, ...freshState })
+    broadcastUpdate('historicBalanceAndAllocation', hba)
+    await setCached('historicBalanceAndAllocation', hba)
+  }
+
+  // userAllocation — not in HANDLED_KEYS, broadcast directly to main thread
+  if (dashboard.userAllocation?.length > 0) {
+    const ua = serializeForTransfer(dashboard.userAllocation)
+    const uaState: DataState = { data: ua, lastUpdated: now, loading: false, error: null, stale: false }
+    sendResponse({
+      id: generateMessageId(),
+      timestamp: Date.now(),
+      type: 'DATA_UPDATE',
+      payload: { dataKey: 'userAllocation' as DataKey, data: ua, state: uaState, fromCache: false },
+    })
   }
 }
 
@@ -781,7 +887,7 @@ async function fetchData(dataKey: DataKey): Promise<void> {
       break
 
     case 'tokenDetails': {
-      const dashboard = await getDashboardCoalesced(agent!)
+      const dashboard = await getVoteDashboardCoalesced(agent!)
       if (!dashboard) {
         const rawTokenData = await fetchTokenDetailsData(agent!)
         data = serializeForTransfer(rawTokenData)
@@ -792,12 +898,12 @@ async function fetchData(dataKey: DataKey): Promise<void> {
         break
       }
       data = serializeForTransfer(dashboard.tokenDetails)
-      await populateDashboardSiblings(dashboard, 'tokenDetails')
+      await populateVoteDashboardSiblings(dashboard, 'tokenDetails')
       break
     }
 
     case 'totalTreasuryValueInUsd': {
-      const dashboard = await getDashboardCoalesced(agent!)
+      const dashboard = await getVoteDashboardCoalesced(agent!)
       if (!dashboard) {
         const tokenData = await fetchTokenDetailsData(agent!)
         data = calculateTotalTreasuryValueInUsd(tokenData as any[])
@@ -806,38 +912,34 @@ async function fetchData(dataKey: DataKey): Promise<void> {
         break
       }
       data = calculateTotalTreasuryValueInUsd(dashboard.tokenDetails as any[])
-      await populateDashboardSiblings(dashboard, 'totalTreasuryValueInUsd')
+      await populateVoteDashboardSiblings(dashboard, 'totalTreasuryValueInUsd')
       break
     }
 
     case 'aggregateAllocation': {
-      const dashboard = await getDashboardCoalesced(agent!)
+      const dashboard = await getVoteDashboardCoalesced(agent!)
       if (!dashboard) {
         data = serializeForTransfer(await fetchAggregateAllocationData(agent!))
         break
       }
       data = serializeForTransfer(dashboard.aggregateAllocation)
-      await populateDashboardSiblings(dashboard, 'aggregateAllocation')
+      await populateVoteDashboardSiblings(dashboard, 'aggregateAllocation')
       break
     }
 
     case 'tradingStatus': {
-      try {
-        const treasuryResult = await fetchTreasuryDashboardData(agent!)
-        if ('ok' in treasuryResult) {
-          data = serializeForTransfer({ ok: treasuryResult.ok.tradingStatus })
-        } else {
-          data = serializeForTransfer(await fetchTradingStatusData(agent!))
-        }
-      } catch {
-        // Composite endpoint not available, fall back to individual call
+      const enhancedDashboard = await getEnhancedTreasuryDashboardCoalesced(agent!)
+      if (enhancedDashboard) {
+        data = serializeForTransfer({ ok: enhancedDashboard.tradingStatus })
+        await populateEnhancedTreasurySiblings(enhancedDashboard, 'tradingStatus')
+      } else {
         data = serializeForTransfer(await fetchTradingStatusData(agent!))
       }
       break
     }
 
     case 'timerStatus': {
-      const dashboard = await getDashboardCoalesced(agent!)
+      const dashboard = await getVoteDashboardCoalesced(agent!)
       if (!dashboard) {
         const snapshotInfo = await fetchSnapshotInfoData(agent!)
         const cachedTS = dataStates.get('tradingStatus')?.data
@@ -851,30 +953,53 @@ async function fetchData(dataKey: DataKey): Promise<void> {
         tradingStatus: cachedTradingStatus ?? null,
         tokenDetails: dashboard.tokenDetails,
       })
-      await populateDashboardSiblings(dashboard, 'timerStatus')
+      await populateVoteDashboardSiblings(dashboard, 'timerStatus')
       break
     }
 
     // Secondary data keys
     case 'votingPowerMetrics': {
-      const dashboard = await getDashboardCoalesced(agent!)
+      const dashboard = await getVoteDashboardCoalesced(agent!)
       if (!dashboard) {
         data = serializeForTransfer(await fetchVotingPowerMetricsData(agent!))
         break
       }
       data = serializeForTransfer({ ok: dashboard.votingPowerMetrics })
-      await populateDashboardSiblings(dashboard, 'votingPowerMetrics')
+      await populateVoteDashboardSiblings(dashboard, 'votingPowerMetrics')
       break
     }
 
     case 'tokenMaxAllocations': {
-      const dashboard = await getDashboardCoalesced(agent!)
+      const dashboard = await getVoteDashboardCoalesced(agent!)
       if (!dashboard) {
         data = serializeForTransfer([])
         break
       }
-      data = serializeForTransfer(dashboard.tokenMaxAllocations || [])
-      await populateDashboardSiblings(dashboard, 'tokenMaxAllocations')
+      // Extract from embedded maxAllocationBasisPoints in each token entry
+      data = serializeForTransfer(extractTokenMaxAllocations(dashboard.tokenDetails))
+      await populateVoteDashboardSiblings(dashboard, 'tokenMaxAllocations')
+      break
+    }
+
+    case 'allocationStats': {
+      const dashboard = await getVoteDashboardCoalesced(agent!)
+      if (!dashboard) {
+        data = serializeForTransfer(await fetchAllocationStatsData(agent!))
+        break
+      }
+      data = serializeForTransfer(dashboard.allocationStats)
+      await populateVoteDashboardSiblings(dashboard, 'allocationStats')
+      break
+    }
+
+    case 'historicBalanceAndAllocation': {
+      const dashboard = await getVoteDashboardCoalesced(agent!)
+      if (!dashboard) {
+        data = serializeForTransfer(await fetchHistoricBalanceAndAllocationData(agent!))
+        break
+      }
+      data = serializeForTransfer(dashboard.historicBalanceAndAllocation)
+      await populateVoteDashboardSiblings(dashboard, 'historicBalanceAndAllocation')
       break
     }
 
@@ -898,9 +1023,20 @@ async function fetchData(dataKey: DataKey): Promise<void> {
       data = serializeForTransfer(await fetchNeuronSnapshotStatusData(agent!))
       break
 
-    case 'portfolioSnapshotStatus':
-      data = serializeForTransfer(await fetchPortfolioSnapshotStatusData(agent!))
+    case 'portfolioSnapshotStatus': {
+      const enhancedDashboard = await getEnhancedTreasuryDashboardCoalesced(agent!)
+      if (enhancedDashboard) {
+        data = serializeForTransfer({
+          status: enhancedDashboard.portfolioSnapshotStatus.status,
+          intervalMinutes: Number(enhancedDashboard.portfolioSnapshotStatus.intervalMinutes),
+          lastSnapshotTime: Number(enhancedDashboard.portfolioSnapshotStatus.lastSnapshotTime),
+        })
+        await populateEnhancedTreasurySiblings(enhancedDashboard, 'portfolioSnapshotStatus')
+      } else {
+        data = serializeForTransfer(await fetchPortfolioSnapshotStatusData(agent!))
+      }
       break
+    }
 
     // Performance/Leaderboard data keys (8 combinations) — single composite call
     case 'leaderboardAllTimeUSD':

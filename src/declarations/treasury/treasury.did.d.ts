@@ -17,6 +17,48 @@ export interface ClaimsReply {
   'amount' : bigint,
   'symbol' : string,
 }
+export interface EnhancedTreasuryDashboard {
+  'systemParameters' : RebalanceConfigResponse,
+  'portfolioSnapshotStatus' : {
+    'status' : { 'Stopped' : null } |
+      { 'Running' : null },
+    'lastSnapshotTime' : bigint,
+    'intervalMinutes' : bigint,
+  },
+  'longSyncTimerStatus' : {
+    'nextScheduledTime' : bigint,
+    'lastRunTime' : bigint,
+    'intervalNS' : bigint,
+    'timerId' : bigint,
+    'isRunning' : boolean,
+  },
+  'recentSnapshots' : {
+    'totalCount' : bigint,
+    'snapshots' : Array<PortfolioSnapshot>,
+  },
+  'tradingPauses' : TradingPausesResponse,
+  'tradingStatus' : {
+    'executedTrades' : Array<TradeRecord>,
+    'metrics' : {
+      'avgSlippage' : number,
+      'successRate' : number,
+      'lastUpdate' : bigint,
+      'totalTradesExecuted' : bigint,
+      'lastRebalanceAttempt' : bigint,
+      'skipBreakdown' : SkipBreakdown,
+      'skipRate' : number,
+      'totalTradesFailed' : bigint,
+      'totalTradesSkipped' : bigint,
+    },
+    'rebalanceStatus' : RebalanceStatus,
+    'portfolioState' : {
+      'currentAllocations' : Array<[Principal, bigint]>,
+      'totalValueICP' : bigint,
+      'totalValueUSD' : number,
+      'targetAllocations' : Array<[Principal, bigint]>,
+    },
+  },
+}
 export type ExchangeType = { 'KongSwap' : null } |
   { 'ICPSwap' : null };
 export interface LogEntry {
@@ -136,9 +178,7 @@ export type Result = { 'ok' : string } |
   { 'err' : string };
 export type Result_1 = { 'ok' : string } |
   { 'err' : PriceFailsafeError };
-export type Result_10 = { 'ok' : TreasuryAdminActionsSinceResponse } |
-  { 'err' : TradingPauseError };
-export type Result_11 = {
+export type Result_10 = {
     'ok' : {
       'executedTrades' : Array<TradeRecord>,
       'metrics' : {
@@ -167,7 +207,7 @@ export type Result_11 = {
     }
   } |
   { 'err' : string };
-export type Result_12 = {
+export type Result_11 = {
     'ok' : {
       'executedTrades' : Array<TradeRecord>,
       'metrics' : {
@@ -197,10 +237,12 @@ export type Result_12 = {
     }
   } |
   { 'err' : string };
-export type Result_13 = { 'ok' : Array<[Principal, Array<PricePoint>]> } |
+export type Result_12 = { 'ok' : Array<[Principal, Array<PricePoint>]> } |
   { 'err' : string };
-export type Result_14 = { 'ok' : PortfolioHistoryResponse } |
+export type Result_13 = { 'ok' : PortfolioHistoryResponse } |
   { 'err' : PortfolioSnapshotError };
+export type Result_14 = { 'ok' : EnhancedTreasuryDashboard } |
+  { 'err' : string };
 export type Result_15 = { 'ok' : Array<ClaimsReply> } |
   { 'err' : string };
 export type Result_16 = { 'ok' : bigint } |
@@ -234,38 +276,15 @@ export type Result_8 = {
     }
   } |
   { 'err' : string };
-export type Result_9 = {
-    'ok' : {
-      'tradingStatus' : {
-        'executedTrades' : Array<TradeRecord>,
-        'metrics' : {
-          'avgSlippage' : number,
-          'successRate' : number,
-          'lastUpdate' : bigint,
-          'totalTradesExecuted' : bigint,
-          'lastRebalanceAttempt' : bigint,
-          'skipBreakdown' : {
-            'tokensFiltered' : bigint,
-            'insufficientCandidates' : bigint,
-            'noExecutionPath' : bigint,
-            'noPairsFound' : bigint,
-            'pausedTokens' : bigint,
-          },
-          'skipRate' : number,
-          'totalTradesFailed' : bigint,
-          'totalTradesSkipped' : bigint,
-        },
-        'rebalanceStatus' : RebalanceStatus,
-        'portfolioState' : {
-          'currentAllocations' : Array<[Principal, bigint]>,
-          'totalValueICP' : bigint,
-          'totalValueUSD' : number,
-          'targetAllocations' : Array<[Principal, bigint]>,
-        },
-      },
-    }
-  } |
-  { 'err' : string };
+export type Result_9 = { 'ok' : TreasuryAdminActionsSinceResponse } |
+  { 'err' : TradingPauseError };
+export interface SkipBreakdown {
+  'tokensFiltered' : bigint,
+  'insufficientCandidates' : bigint,
+  'noExecutionPath' : bigint,
+  'noPairsFound' : bigint,
+  'pausedTokens' : bigint,
+}
 export type SnapshotReason = { 'PreTrade' : null } |
   { 'PostTrade' : null } |
   { 'Scheduled' : null } |
@@ -555,6 +574,7 @@ export interface treasury {
    * / * Get current token allocations in basis points
    */
   'getCurrentAllocations' : ActorMethod<[], Array<[Principal, bigint]>>,
+  'getEnhancedTreasuryDashboard' : ActorMethod<[], Result_14>,
   /**
    * / * Get ICPSwap pool info for a specific token pair
    * /    *
@@ -647,13 +667,13 @@ export interface treasury {
    * /    * Returns recent portfolio snapshots for analysis and charting.
    * /    * Public query - allows anyone to view portfolio history (read-only transparency).
    */
-  'getPortfolioHistory' : ActorMethod<[bigint], Result_14>,
+  'getPortfolioHistory' : ActorMethod<[bigint], Result_13>,
   /**
    * / * Get portfolio history filtered by timestamp (for archive efficiency)
    * /    * Returns only snapshots newer than the specified timestamp
    * /    * Public query - allows anyone to view portfolio history (read-only transparency).
    */
-  'getPortfolioHistorySince' : ActorMethod<[bigint, bigint], Result_14>,
+  'getPortfolioHistorySince' : ActorMethod<[bigint, bigint], Result_13>,
   /**
    * / * Get portfolio snapshot status
    */
@@ -721,6 +741,15 @@ export interface treasury {
    * / * Get all token details including balances and prices
    */
   'getTokenDetails' : ActorMethod<[], Array<[Principal, TokenDetails]>>,
+  'getTokenDetailsCache' : ActorMethod<
+    [],
+    {
+      'icpPriceUSD' : number,
+      'tokenDetails' : Array<[Principal, TokenDetails]>,
+      'timestamp' : bigint,
+      'tradingPauses' : Array<TradingPauseRecord>,
+    }
+  >,
   /**
    * / * Get token details with price history filtered by timestamp (for archive efficiency)
    * /    * Returns only price points newer than the specified timestamp per token
@@ -729,7 +758,7 @@ export interface treasury {
     [bigint],
     Array<[Principal, TokenDetails]>
   >,
-  'getTokenPriceHistory' : ActorMethod<[Array<Principal>], Result_13>,
+  'getTokenPriceHistory' : ActorMethod<[Array<Principal>], Result_12>,
   /**
    * / * Get trading pause record for a specific token
    * /    *
@@ -747,14 +776,13 @@ export interface treasury {
    * /    * - Current vs target allocations
    * /    * - Performance metrics
    */
-  'getTradingStatus' : ActorMethod<[], Result_12>,
+  'getTradingStatus' : ActorMethod<[], Result_11>,
   /**
    * / * Get trading status with trades filtered by timestamp (for archive efficiency)
    * /    * Returns only trades newer than the specified timestamp
    */
-  'getTradingStatusSince' : ActorMethod<[bigint], Result_11>,
-  'getTreasuryAdminActionsSince' : ActorMethod<[bigint, bigint], Result_10>,
-  'getTreasuryDashboard' : ActorMethod<[], Result_9>,
+  'getTradingStatusSince' : ActorMethod<[bigint], Result_10>,
+  'getTreasuryAdminActionsSince' : ActorMethod<[bigint, bigint], Result_9>,
   /**
    * / * Get a specific trigger condition by ID
    * /    *

@@ -10,6 +10,7 @@ import { useStorage } from "@vueuse/core"
 import { workerBridge, fetchAndWait } from './worker-bridge'
 import { deserializeFromTransfer } from '../workers/shared/fetch-functions'
 import { getEffectiveNetwork } from '../config/network-config'
+import { getFrontendIdentity } from '../utils/frontend-identity'
 
 // Only import Principal synchronously - it's small and used everywhere
 import { Principal } from '@dfinity/principal'
@@ -21,7 +22,7 @@ const WORKER_DEBUG = () => isDebugEnabled()
 
 // Type-only imports (no runtime cost)
 import type { AuthClient as AuthClientType, IdbStorage as IdbStorageType } from "@dfinity/auth-client"
-import type { Actor as ActorType, AnonymousIdentity as AnonymousIdentityType, HttpAgent } from "@dfinity/agent"
+import type { Actor as ActorType, HttpAgent } from "@dfinity/agent"
 import type { DelegationIdentity as DelegationIdentityType } from '@dfinity/identity'
 import type { AccountIdentifier as AccountIdentifierType } from '@dfinity/ledger-icp'
 import type { SnsGovernanceCanister as SnsGovernanceCanisterType } from '@dfinity/sns'
@@ -232,7 +233,7 @@ let AuthClient: typeof import('@dfinity/auth-client').AuthClient
 let IdbStorage: typeof import('@dfinity/auth-client').IdbStorage
 let KEY_STORAGE_KEY: string
 let Actor: typeof import('@dfinity/agent').Actor
-let AnonymousIdentity: typeof import('@dfinity/agent').AnonymousIdentity
+
 let createAgent: typeof import('@dfinity/utils').createAgent
 let DelegationIdentity: typeof import('@dfinity/identity').DelegationIdentity
 let AccountIdentifier: typeof import('@dfinity/ledger-icp').AccountIdentifier
@@ -299,7 +300,6 @@ async function initializeShims() {
     IdbStorage = authClientMod.IdbStorage
     KEY_STORAGE_KEY = authClientMod.KEY_STORAGE_KEY
     Actor = agentMod.Actor
-    AnonymousIdentity = agentMod.AnonymousIdentity
     createAgent = utilsMod.createAgent
     DelegationIdentity = identityMod.DelegationIdentity
     AccountIdentifier = ledgerIcpMod.AccountIdentifier
@@ -355,7 +355,7 @@ async function getAnonymousAgent() {
 
     // Create new agent and cache it
     _cachedAnonymousAgent = await createAgent({
-        identity: new AnonymousIdentity(),
+        identity: getFrontendIdentity(),
         host,
         fetchRootKey: shouldFetchRootKey(),
     })
@@ -465,7 +465,7 @@ function clearActorCaches() {
 async function createAnonymousAgent(host: string) {
     await initializeShims()
     return createAgent({
-        identity: new AnonymousIdentity(),
+        identity: getFrontendIdentity(),
         host,
         fetchRootKey: shouldFetchRootKey(),
     })
@@ -1517,6 +1517,7 @@ export const useTacoStore = defineStore('taco', () => {
     let authClientInstance: any = null  // AuthClient instance, initialized lazily
     // const tacoWizardOpen = ref(false)
     const tacoWizardOpen = ref(false)
+    const grandTourActive = ref(false)
 
     // user
     const userLoggedIn = ref(false)
@@ -1558,6 +1559,8 @@ export const useTacoStore = defineStore('taco', () => {
     const fetchedUserAllocation = ref([])
     const totalPortfolioValueInUsd = ref(0)
     const totalPortfolioValueInIcp = ref(0)
+    const cachedAllocationStats = ref<any>(null)
+    const cachedHistoricBalanceAndAllocation = ref<any[]>([])
     const portfolioTokenPricesInUsd = useStorage('portfolioTokenPricesInUsd', [])
     const portfolioTokenPricesInIcp = useStorage('portfolioTokenPricesInIcp', [])
 
@@ -1869,6 +1872,24 @@ export const useTacoStore = defineStore('taco', () => {
                 if (data) {
                     // Deserialize BigInt values from worker
                     fetchedVotingPowerMetrics.value = deserializeFromTransfer(data) as VotingMetricsResponse
+                }
+            })
+        )
+
+        // allocationStats
+        workerUnsubscribers.push(
+            workerBridge.subscribe('allocationStats', (data: unknown) => {
+                if (data) {
+                    cachedAllocationStats.value = deserializeFromTransfer(data)
+                }
+            })
+        )
+
+        // historicBalanceAndAllocation
+        workerUnsubscribers.push(
+            workerBridge.subscribe('historicBalanceAndAllocation', (data: unknown) => {
+                if (data) {
+                    cachedHistoricBalanceAndAllocation.value = deserializeFromTransfer(data) as any[]
                 }
             })
         )
@@ -2414,6 +2435,29 @@ export const useTacoStore = defineStore('taco', () => {
         return authClientInstance
     }
 
+    const signWithUserIdentity = async (message: Uint8Array): Promise<{ signature: Uint8Array, publicKey: Uint8Array } | null> => {
+        const authClient = await getAuthClient()
+        if (!await authClient.isAuthenticated()) return null
+        const identity = authClient.getIdentity()
+        const sig = await identity.sign(message)
+        const pubKey = identity.getPublicKey()
+
+        // Convert branded Signature to plain Uint8Array
+        const signature = new Uint8Array(sig)
+
+        // Try toRaw() first (Ed25519KeyIdentity), fallback to extracting from DER (DelegationIdentity)
+        let publicKey: Uint8Array
+        if (typeof (pubKey as any).toRaw === 'function') {
+            publicKey = new Uint8Array((pubKey as any).toRaw())
+        } else {
+            // Extract raw key from DER (last 32 bytes for Ed25519)
+            const der = pubKey.toDer()
+            publicKey = new Uint8Array(der.slice(-32))
+        }
+
+        return { signature, publicKey }
+    }
+
     /**
      * Get an authenticated agent for use with external actor factories (e.g., archive canisters)
      * This ensures proper identity management and shim initialization
@@ -2724,6 +2768,9 @@ export const useTacoStore = defineStore('taco', () => {
             // Send identity to auth worker so it can deliver cached user data
             sendIdentityToWorker(authClient).catch(console.error)
 
+            // Send principal to public worker for getVoteDashboard composite
+            workerBridge.setUserPrincipal(userPrincipal.value)
+
             // log
             // console.log('🔍 Triggering loadAllNames() from checkIfLoggedIn - user is logged in')
 
@@ -2836,6 +2883,9 @@ export const useTacoStore = defineStore('taco', () => {
                 // Send identity to auth worker
                 sendIdentityToWorker(authClient).catch(console.error)
 
+                // Send principal to public worker for getVoteDashboard composite
+                workerBridge.setUserPrincipal(userPrincipal.value)
+
                 // turn app loading off
                 appLoadingOff()
 
@@ -2879,6 +2929,9 @@ export const useTacoStore = defineStore('taco', () => {
 
             // Send identity to auth worker so it can make authenticated calls
             sendIdentityToWorker(authClient).catch(console.error)
+
+            // Send principal to public worker for getVoteDashboard composite
+            workerBridge.setUserPrincipal(userPrincipal.value)
 
             // Load names cache in background (non-blocking)
             // console.log('🔍 Triggering loadAllNames() from iidLogIn - after successful login');
@@ -2934,6 +2987,9 @@ export const useTacoStore = defineStore('taco', () => {
 
             // Clear identity from auth worker
             workerBridge.clearIdentity()
+
+            // Clear principal from public worker
+            workerBridge.clearUserPrincipal()
 
             // Clear neuron cache on logout
             clearNeuronCache()
@@ -3999,36 +4055,65 @@ export const useTacoStore = defineStore('taco', () => {
         }
     }
 
+    // Enhanced Treasury Dashboard — single composite query cache
+    let cachedEnhancedTreasuryDashboard: { data: any; timestamp: number } | null = null
+    const ENHANCED_TREASURY_CACHE_MS = 5_000
+
+    /**
+     * Fetch the enhanced treasury dashboard (single composite query).
+     * Caches result for 5 seconds to avoid duplicate calls.
+     * Populates: fetchedTradingStatus, rebalanceConfig, cachedPortfolioSnapshotStatus, cachedTradingPauses
+     */
+    const fetchEnhancedTreasuryDashboard = async (): Promise<any | null> => {
+        // Return cached if fresh
+        if (cachedEnhancedTreasuryDashboard && (Date.now() - cachedEnhancedTreasuryDashboard.timestamp) < ENHANCED_TREASURY_CACHE_MS) {
+            return cachedEnhancedTreasuryDashboard.data
+        }
+        try {
+            const actor = await getAnonymousActor(treasuryCanisterId(), () => treasuryIDL)
+            const result = await actor.getEnhancedTreasuryDashboard()
+            if ('ok' in result) {
+                const dashboard = result.ok
+                cachedEnhancedTreasuryDashboard = { data: dashboard, timestamp: Date.now() }
+
+                // Populate all reactive refs from the composite response
+                fetchedTradingStatus.value = { ok: dashboard.tradingStatus }
+                rebalanceConfig.value = dashboard.systemParameters
+                cachedPortfolioSnapshotStatus.value = {
+                    status: dashboard.portfolioSnapshotStatus.status,
+                    intervalMinutes: Number(dashboard.portfolioSnapshotStatus.intervalMinutes),
+                    lastSnapshotTime: Number(dashboard.portfolioSnapshotStatus.lastSnapshotTime),
+                }
+                cachedTradingPauses.value = dashboard.tradingPauses
+
+                return dashboard
+            }
+            console.warn('getEnhancedTreasuryDashboard returned error:', result.err)
+            cachedEnhancedTreasuryDashboard = { data: null, timestamp: Date.now() }
+            return null
+        } catch (error) {
+            console.error('Error fetching enhanced treasury dashboard:', error)
+            cachedEnhancedTreasuryDashboard = { data: null, timestamp: Date.now() }
+            return null
+        }
+    }
+
     // treasury backend
     const getTradingStatus = async () => {
-
-        // log
-        // console.log('taco.store: getTradingStatus()')
-
         try {
-            // create actor using cached anonymous agent
+            const dashboard = await fetchEnhancedTreasuryDashboard()
+            if (dashboard) {
+                // Already populated by fetchEnhancedTreasuryDashboard
+                return true
+            }
+            // Fallback to individual call
             const actor = await getAnonymousActor(treasuryCanisterId(), () => treasuryIDL)
-            
-            //////////////////////
-            // post actor logic //
-
-            // get trading status
             const tradingStatus = await actor.getTradingStatus()
-
-            // set fetched token details
             fetchedTradingStatus.value = tradingStatus
-
-            // return
             return true
-
         } catch (error) {
-
-            // log error
             console.error('error fetching trading status from treasury backend:', error)
-
-            // return
             return false
-
         }
     }
 
@@ -4078,33 +4163,29 @@ export const useTacoStore = defineStore('taco', () => {
                 //console.log('refreshTimerStatus: Updated snapshotStatus:', snapshotStatus.value);
             }
 
-            // Create Treasury actor for sync info using cached anonymous agent
-            const treasuryActor = await getAnonymousActor(treasuryCanisterId(), () => treasuryIDL)
-            //console.log('refreshTimerStatus: Treasury Actor created');
-
-            // Get treasury status, long sync timer, and token details in parallel
-            const [tradingStatusResult, longSyncTimerResult, tokenDetailsResult] = await Promise.all([
-                treasuryActor.getTradingStatus() as Promise<TradingStatusResult>,
-                (treasuryActor as any).getLongSyncTimerStatus?.() as Promise<any> || Promise.resolve(null),
+            // Fetch enhanced treasury dashboard + token details in parallel
+            const [enhancedDashboard, tokenDetailsResult] = await Promise.all([
+                fetchEnhancedTreasuryDashboard(),
                 daoActor.getTokenDetailsWithoutPastPrices() as Promise<TrustedTokenEntry[]>
             ]);
-            //console.log('refreshTimerStatus: Received trading status:', tradingStatusResult);
-            //console.log('refreshTimerStatus: Received long sync timer:', longSyncTimerResult);
-            //console.log('refreshTimerStatus: Received token details:', tokenDetailsResult);
 
             // Update token details
             fetchedTokenDetails.value = tokenDetailsResult;
 
-            if ('ok' in tradingStatusResult && tradingStatusResult.ok) {
+            // Use enhanced dashboard data (tradingStatus + longSyncTimerStatus in one call)
+            const tradingStatusResult = enhancedDashboard
+                ? { ok: enhancedDashboard.tradingStatus } as TradingStatusResult
+                : fetchedTradingStatus.value as TradingStatusResult;
+
+            if (tradingStatusResult && 'ok' in tradingStatusResult && tradingStatusResult.ok) {
                 const { metrics, executedTrades, rebalanceStatus } = tradingStatusResult.ok;
-                
-                // Extract long sync info from timer status
+
+                // Extract long sync info from enhanced dashboard
                 let longSyncActive = false;
                 let longSyncLastRun = null;
-                if (longSyncTimerResult) {
-                    const timerStatus = longSyncTimerResult;
-                    longSyncActive = timerStatus.isRunning || false;
-                    longSyncLastRun = timerStatus.lastRunTime ? BigInt(timerStatus.lastRunTime) : null;
+                if (enhancedDashboard?.longSyncTimerStatus) {
+                    longSyncActive = enhancedDashboard.longSyncTimerStatus.isRunning || false;
+                    longSyncLastRun = enhancedDashboard.longSyncTimerStatus.lastRunTime ? BigInt(enhancedDashboard.longSyncTimerStatus.lastRunTime) : null;
                 }
                 
                 timerHealth.value.treasury = {
@@ -4395,10 +4476,14 @@ export const useTacoStore = defineStore('taco', () => {
         try {
             appLoadingOn();
 
-            // create actor using cached anonymous agent
-            const treasury = await getAnonymousActor(treasuryCanisterId(), () => treasuryIDL)
+            // Try enhanced dashboard first (single composite query)
+            const dashboard = await fetchEnhancedTreasuryDashboard()
+            if (dashboard) {
+                return rebalanceConfig.value; // Already populated by fetchEnhancedTreasuryDashboard
+            }
 
-            // Get the current config using getSystemParameters
+            // Fallback to individual call
+            const treasury = await getAnonymousActor(treasuryCanisterId(), () => treasuryIDL)
             const config = await treasury.getSystemParameters();
             if (!config) {
                 throw new Error('Failed to get system parameters');
@@ -4958,7 +5043,12 @@ export const useTacoStore = defineStore('taco', () => {
     // trading pause management functions
     const listTradingPauses = async () => {
         try {
-            // create actor using cached anonymous agent
+            // Try enhanced dashboard first (single composite query)
+            const dashboard = await fetchEnhancedTreasuryDashboard()
+            if (dashboard) {
+                return dashboard.tradingPauses
+            }
+            // Fallback to individual call
             const treasury = await getAnonymousActor(treasuryCanisterId(), () => treasuryIDL)
             return await treasury.listTradingPauses();
         } catch (error: any) {
@@ -5074,9 +5164,17 @@ export const useTacoStore = defineStore('taco', () => {
     // Portfolio snapshot status and management
     const getPortfolioSnapshotStatus = async () => {
         try {
-            // create actor using cached anonymous agent
+            // Try enhanced dashboard first (single composite query)
+            const dashboard = await fetchEnhancedTreasuryDashboard()
+            if (dashboard) {
+                return {
+                    status: dashboard.portfolioSnapshotStatus.status,
+                    intervalMinutes: Number(dashboard.portfolioSnapshotStatus.intervalMinutes),
+                    lastSnapshotTime: Number(dashboard.portfolioSnapshotStatus.lastSnapshotTime)
+                };
+            }
+            // Fallback to individual call
             const treasury = await getAnonymousActor(treasuryCanisterId(), () => treasuryIDL)
-
             const status = await treasury.getPortfolioSnapshotStatus();
             return {
                 status: status.status,
@@ -9605,6 +9703,8 @@ export const useTacoStore = defineStore('taco', () => {
         tokenMaxAllocationMap,
         fetchedVotingPowerMetrics,
         fetchedUserAllocation,
+        cachedAllocationStats,
+        cachedHistoricBalanceAndAllocation,
         backendError,
         backendErrorIcon,
         backendErrorIconColor,
@@ -9673,6 +9773,7 @@ export const useTacoStore = defineStore('taco', () => {
         stopRebalancing,
         getSystemParameters,
         getRebalanceConfig,
+        fetchEnhancedTreasuryDashboard,
         updateRebalanceConfig,
         executeTradingCycle,
         pauseToken,
@@ -9794,6 +9895,7 @@ export const useTacoStore = defineStore('taco', () => {
         ensureTokenDetails,
         checkTokenSupportsICRC2,
         toggleTacoWizard,
+        grandTourActive,
 
         //Wallet functions
         getUserRegisteredTokens,
@@ -9969,5 +10071,8 @@ export const useTacoStore = defineStore('taco', () => {
 
         // Initialization helpers
         initializeShims,
+
+        // Session signing
+        signWithUserIdentity,
     }
 })

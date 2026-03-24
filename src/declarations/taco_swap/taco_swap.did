@@ -10,6 +10,7 @@ type TacoSwapDAO =
    claim_taco: (fiatAmount: opt text, fiatCurrency: opt text) ->
     (ClaimResult);
    discover_pool: () -> (Result_2);
+   getSwapDashboard: () -> (SwapDashboard) query;
    get_admin_actions: (limit: nat) -> (vec AdminActionRecord) query;
    get_all_nachos_swap_progress: () ->
     (vec record {
@@ -148,6 +149,41 @@ type SwapProgress =
    totalSteps: nat;
    txId: opt nat;
    updatedAt: int;
+ };
+type SwapDashboard = 
+ record {
+   config:
+    record {
+      icpTacoPoolId: opt principal;
+      maxRetries: nat;
+      maxSlippageBasisPoints: nat;
+      minDepositICP: nat;
+      poolZeroForOne: bool;
+      sweepIntervalNS: int;
+      systemPaused: bool;
+      tacoLedgerFee: nat;
+    };
+   depositAddress: text;
+   hasActiveLock: bool;
+   hasPendingNachos: bool;
+   hasPendingTaco: bool;
+   nachosDepositAddress: text;
+   nachosDepositSubaccount: vec nat8;
+   nachosStats:
+    record {
+      nachosMintingEnabled: bool;
+      nachosOrdersCount: nat;
+      nachosPendingCount: nat;
+      totalNachosDelivered: nat;
+      totalNachosICPDeposited: nat;
+      totalNachosMints: nat;
+    };
+   nachosStatus: NachosSwapProgress;
+   recentNachosOrders: vec NachosOrderRecord;
+   recentTacoOrders: vec OrderRecord;
+   stats: SwapStats;
+   tacoDepositSubaccount: vec nat8;
+   tacoStatus: SwapProgress;
  };
 type SwapConfig = 
  record {

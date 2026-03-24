@@ -588,6 +588,36 @@ type ContinuousDAO =
    getUserRegisteredTokens: () -> (vec principal) query;
    getUsersFollowerInfo: (principals: vec principal) ->
     (vec FollowerInfo) query;
+   getVoteDashboard: (user: opt principal) ->
+    (opt
+      record {
+        aggregateAllocation: vec record {
+                                   principal;
+                                   nat;
+                                 };
+        allocationStats: AllocationStats;
+        historicBalanceAndAllocation:
+         vec record {
+               int;
+               HistoricBalanceAllocation;
+             };
+        snapshotInfo:
+         record {
+           lastSnapshotId: nat;
+           lastSnapshotTime: int;
+           totalVotingPower: nat;
+         };
+        tokenDetails: vec PublicTokenDetailsWithMaxAllocationEntry;
+        userAllocation: opt UserState;
+        votingPowerMetrics:
+         record {
+           allocatedVotingPower: nat;
+           neuronCount: nat;
+           principalCount: nat;
+           totalVotingPower: nat;
+           totalVotingPowerByHotkeySetters: nat;
+         };
+      }) query;
    getVotingPowerChangesSince: (sinceTimestamp: int, limit: nat) ->
     (Result_8) query;
    get_canister_cycles: () -> (record {cycles: nat;}) query;

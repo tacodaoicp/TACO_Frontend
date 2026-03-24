@@ -255,9 +255,9 @@
               <div class="card bg-dark text-white">
                 <div class="card-header d-flex justify-content-between align-items-center">
                   <h5 class="mb-0">📋 Your Claims History</h5>
-                  <button 
+                  <button
                     class="btn btn-outline-light btn-sm"
-                    @click="loadUserWithdrawalHistory"
+                    @click="loadRewardsDashboard"
                     :disabled="isLoadingHistory"
                   >
                     <span v-if="isLoadingHistory" class="spinner-border spinner-border-sm me-1"></span>
@@ -510,8 +510,8 @@ export default {
 
         neurons.value = neuronsResult.neurons || []
         
-        // Get balances for all neurons
-        await loadNeuronBalances()
+        // Load balances + withdrawal history in one dashboard call
+        await loadRewardsDashboard()
 
       } catch (error) {
         console.error('Error loading neurons:', error)
@@ -521,74 +521,82 @@ export default {
       }
     }
 
-    const loadNeuronBalances = async () => {
+    // Extract neuron ID blobs from neurons array (handles multiple formats)
+    const extractNeuronIdBlobs = () => {
+      const neuronIdBlobs = []
+      neurons.value.forEach(neuron => {
+        let neuronIdBlob = null
+
+        // Check if it's a categorized neuron (has id as Uint8Array directly)
+        if (neuron && neuron.id && neuron.id instanceof Uint8Array) {
+          neuronIdBlob = neuron.id
+        }
+        // Check if it's a raw neuron (has id as array with objects)
+        else if (neuron && neuron.id && Array.isArray(neuron.id) && neuron.id.length > 0) {
+          const neuronIdObj = neuron.id[0]
+          if (neuronIdObj && neuronIdObj.id) {
+            neuronIdBlob = neuronIdObj.id
+          }
+        }
+
+        if (!neuronIdBlob) {
+          console.warn('Invalid neuron structure - no valid ID found:', neuron)
+          return
+        }
+
+        if (!(neuronIdBlob instanceof Uint8Array) && !Array.isArray(neuronIdBlob)) {
+          console.warn('Invalid neuron ID format (not Uint8Array or Array):', neuronIdBlob)
+          return
+        }
+
+        const validBlob = neuronIdBlob instanceof Uint8Array ? neuronIdBlob : new Uint8Array(neuronIdBlob)
+
+        if (validBlob.length === 0) {
+          console.warn('Empty neuron ID blob')
+          return
+        }
+
+        neuronIdBlobs.push(validBlob)
+      })
+      return neuronIdBlobs
+    }
+
+    // Single dashboard call replaces getNeuronRewardBalances + getUserWithdrawalHistory
+    const loadRewardsDashboard = async () => {
       if (neurons.value.length === 0) return
 
       try {
         const rewardsActor = await getRewardsActor()
-        
-        // Extract neuron IDs (Uint8Array format) for the API call with proper validation
-        const neuronIdBlobs = []
-        neurons.value.forEach(neuron => {
-          // Handle different neuron formats
-          let neuronIdBlob = null
-          
-          // Check if it's a categorized neuron (has id as Uint8Array directly)
-          if (neuron && neuron.id && neuron.id instanceof Uint8Array) {
-            neuronIdBlob = neuron.id
-          }
-          // Check if it's a raw neuron (has id as array with objects)
-          else if (neuron && neuron.id && Array.isArray(neuron.id) && neuron.id.length > 0) {
-            const neuronIdObj = neuron.id[0]
-            if (neuronIdObj && neuronIdObj.id) {
-              neuronIdBlob = neuronIdObj.id
-            }
-          }
-          
-          if (!neuronIdBlob) {
-            console.warn('Invalid neuron structure - no valid ID found:', neuron)
-            return
-          }
-          
-          // Ensure it's a valid Uint8Array
-          if (!(neuronIdBlob instanceof Uint8Array) && !Array.isArray(neuronIdBlob)) {
-            console.warn('Invalid neuron ID format (not Uint8Array or Array):', neuronIdBlob)
-            return
-          }
-          
-          // Convert to Uint8Array if it's a regular array
-          const validBlob = neuronIdBlob instanceof Uint8Array ? neuronIdBlob : new Uint8Array(neuronIdBlob)
-          
-          if (validBlob.length === 0) {
-            console.warn('Empty neuron ID blob')
-            return
-          }
-          
-          neuronIdBlobs.push(validBlob)
-        })
+        const neuronIdBlobs = extractNeuronIdBlobs()
 
         if (neuronIdBlobs.length === 0) {
           console.warn('No valid neuron IDs found after filtering')
           return
         }
 
-        // console.log(`Requesting balances for ${neuronIdBlobs.length} neurons`)
+        const dashboard = await rewardsActor.getRewardsDashboard(neuronIdBlobs, [20n], [10n])
 
-        // Use getNeuronRewardBalances instead of getAllNeuronRewardBalances (admin-only)
-        const balances = await rewardsActor.getNeuronRewardBalances(neuronIdBlobs)
-        
-        // Convert to map using hex IDs as keys
+        // Populate neuron balances from dashboard
         neuronBalances.value.clear()
-        for (const [neuronId, balance] of balances) {
-          const neuronIdHex = formatNeuronIdForMap(neuronId)
-          neuronBalances.value.set(neuronIdHex, balance)
+        for (const [neuronId, balance] of dashboard.balances) {
+          neuronBalances.value.set(formatNeuronIdForMap(neuronId), balance)
         }
 
-        // console.log(`Successfully loaded ${neuronBalances.value.size} neuron balances`)
+        // Populate withdrawal history (convert BigInt → Number for template)
+        userWithdrawalHistory.value = dashboard.withdrawals.map(record => ({
+          ...record,
+          totalAmount: Number(record.totalAmount),
+          amountSent: Number(record.amountSent),
+          fee: Number(record.fee),
+          timestamp: Number(record.timestamp),
+          transactionId: record.transactionId.length > 0 ? Number(record.transactionId[0]) : null,
+          neuronWithdrawals: record.neuronWithdrawals.map(([nid, amt]) => [nid, Number(amt)])
+        }))
 
+        isLoadingHistory.value = false
       } catch (error) {
-        console.error('Error loading neuron balances:', error)
-        errorMessage.value = 'Failed to load neuron balances: ' + error.message
+        console.error('Error loading rewards dashboard:', error)
+        errorMessage.value = 'Failed to load rewards data: ' + error.message
       }
     }
 
@@ -643,8 +651,7 @@ export default {
           successMessage.value = `Successfully claimed rewards! Transaction ID: ${transactionId}`
           
           // Refresh balances and withdrawal history to show updated amounts
-          await loadNeuronBalances()
-          await loadUserWithdrawalHistory()
+          await loadRewardsDashboard()
         } else {
           // Handle ICRC1 transfer errors
           const error = result.Err
@@ -776,36 +783,6 @@ export default {
       return result
     }
 
-    // Load user's withdrawal history
-    const loadUserWithdrawalHistory = async () => {
-      isLoadingHistory.value = true
-      try {
-        const rewardsActor = await getRewardsActor()
-        const result = await rewardsActor.getUserWithdrawalHistory([20]) // Get last 20 records
-        
-        if ('ok' in result) {
-          // Convert BigInt values to regular numbers to avoid JSON.stringify issues
-          userWithdrawalHistory.value = result.ok.map(record => ({
-            ...record,
-            totalAmount: Number(record.totalAmount),
-            amountSent: Number(record.amountSent),
-            fee: Number(record.fee),
-            timestamp: Number(record.timestamp),
-            transactionId: record.transactionId ? Number(record.transactionId) : null,
-            neuronWithdrawals: record.neuronWithdrawals.map(([neuronId, amount]) => [
-              neuronId,
-              Number(amount)
-            ])
-          }))
-        } else {
-          console.error('Error loading withdrawal history:', result.err)
-        }
-      } catch (error) {
-        console.error('Failed to load withdrawal history:', error)
-      } finally {
-        isLoadingHistory.value = false
-      }
-    }
 
     // Format timestamp from nanoseconds
     const formatTimestamp = (timestampNS) => {
@@ -835,8 +812,7 @@ export default {
     // Watch for changes in user logged in state
     watch(userLoggedIn, (newState) => {
       if (newState) {
-        loadUserNeurons()
-        loadUserWithdrawalHistory()
+        loadUserNeurons() // loads neurons → then calls loadRewardsDashboard() for balances + history
       } else {
         // Clear data when user logs out
         neurons.value = []
@@ -873,8 +849,7 @@ export default {
           userPrincipal: userPrincipal.value
         })
         if (userLoggedIn.value) {
-          loadUserNeurons()
-          loadUserWithdrawalHistory()
+          loadUserNeurons() // loads neurons → then calls loadRewardsDashboard() for balances + history
         }
       }, 100)
     })
@@ -914,7 +889,7 @@ export default {
       formatTacoPrecise,
       isNeuronClaiming,
       saveAccount,
-      loadUserWithdrawalHistory,
+      loadRewardsDashboard,
       formatTimestamp
     }
   }

@@ -117,7 +117,15 @@
                     ></iframe>
 
                 </div>
-                
+
+                <!-- grand tour button -->
+                <button class="btn taco-btn taco-btn--green w-100 mt-2"
+                        @click="startGrandTour"
+                        style="font-size: 0.95rem;">
+                  <i class="fa-solid fa-route me-2"></i>
+                  Grand Tour
+                </button>
+
               </div>
 
             </div>
@@ -1917,6 +1925,11 @@
 
   // wizard
   const { toggleTacoWizard } = tacoStore
+
+  // grand tour
+  const startGrandTour = () => {
+    tacoStore.grandTourActive = true
+  }
 
   // user
   const { checkIfLoggedIn } = tacoStore

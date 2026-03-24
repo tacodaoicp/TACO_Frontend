@@ -31,6 +31,11 @@
       <FooterBar />
     </div>
 
+    <!-- grand tour overlay (lazy loaded) -->
+    <GrandTour v-if="grandTourActive"
+               :active="grandTourActive"
+               @end="grandTourActive = false" />
+
     <!-- toast container -->
     <TransitionGroup name="fade" tag="div" class="toast-container position-fixed bottom-0 end-0 m-3">
     
@@ -971,6 +976,9 @@
   // Lazy load HomeView to reduce initial bundle
   const HomeView = defineAsyncComponent(() => import('./views/HomeView.vue'))
 
+  // Lazy load Grand Tour (only loaded when activated)
+  const GrandTour = defineAsyncComponent(() => import('./components/tour/GrandTour.vue'))
+
   // HeaderBar and FooterBar are rendered once in App.vue and persist across all routes
   import HeaderBar from './components/HeaderBar.vue'
   import FooterBar from './components/FooterBar.vue'
@@ -997,6 +1005,7 @@
   // app
   const { appLoading } = storeToRefs(tacoStore)
   const { toasts } = storeToRefs(tacoStore)
+  const { grandTourActive } = storeToRefs(tacoStore)
 
   // user
   const { userLoggedIn } = storeToRefs(tacoStore)

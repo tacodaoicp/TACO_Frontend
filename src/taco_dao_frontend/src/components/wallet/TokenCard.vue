@@ -324,7 +324,7 @@
         <div class="token-card__neurons__list">
 
           <!-- neuron owned -->
-          <div v-for="neuron in categorizedNeurons.owned.filter(n => n.stake > 0n)" :key="neuron.idHex"
+          <div v-for="neuron in displayedNeurons" :key="neuron.idHex"
                 class="token-card__neurons__neuron
                       d-flex flex-column shadow">
 
@@ -871,6 +871,16 @@
 
           </div>
 
+          <!-- Show More/Less Button -->
+          <div v-if="hasMoreNeurons" class="show-more-neurons-wrapper">
+            <button
+              @click="showAllNeurons = !showAllNeurons"
+              class="btn btn-sm taco-btn taco-btn--green show-more-neurons-btn">
+              <i class="fa" :class="showAllNeurons ? 'fa-chevron-up' : 'fa-chevron-down'" style="margin-right: 0.5rem;"></i>
+              {{ showAllNeurons ? 'Show Top 3' : `Show All (${categorizedNeurons.owned.filter(n => n.stake > 0n).length})` }}
+            </button>
+          </div>
+
           <!-- add a neuron -->
           <a href="https://nns.ic0.app/neurons/?u=lacdn-3iaaa-aaaaq-aae3a-cai"
             target="_blank"
@@ -1018,7 +1028,27 @@
       }
 
     }
-    
+
+  }
+
+  // Show more neurons button wrapper
+  .show-more-neurons-wrapper {
+    width: 100%;
+    max-width: 24.675rem;
+    display: flex;
+    justify-content: center;
+    margin-top: 1rem;
+    margin-bottom: 1rem;
+
+    .show-more-neurons-btn {
+      padding: 0.5rem 1.5rem;
+      font-size: 0.9rem;
+      font-family: 'Space Mono', monospace;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 200px;
+    }
   }
 
 }
@@ -1334,6 +1364,26 @@ const loadingNeurons = ref(false)
 const categorizedNeurons = ref<{owned: any[], hotkeyed: any[], all: any[]}>({owned: [], hotkeyed: [], all: []})
 const expandedNeurons = ref<Set<string>>(new Set())
 const neuronsExpanded = ref(false) // Default to collapsed
+const showAllNeurons = ref(false) // Show only top 3 by default
+
+// Computed: Top neurons sorted by stake (voting power)
+const displayedNeurons = computed(() => {
+  const ownedWithStake = categorizedNeurons.value.owned.filter(n => n.stake > 0n)
+  // Sort by stake (highest first)
+  const sorted = [...ownedWithStake].sort((a, b) => {
+    if (a.stake > b.stake) return -1
+    if (a.stake < b.stake) return 1
+    return 0
+  })
+
+  // Return top 3 or all depending on showAllNeurons
+  return showAllNeurons.value ? sorted : sorted.slice(0, 3)
+})
+
+// Has more than 3 neurons
+const hasMoreNeurons = computed(() => {
+  return categorizedNeurons.value.owned.filter(n => n.stake > 0n).length > 3
+})
 
 // Rewards state
 const neuronBalances = ref<Map<string, number>>(new Map())

@@ -236,7 +236,7 @@ import { useTacoStore } from '../stores/taco.store'
 import { useAdminStore } from '../stores/admin.store'
 import TacoTitle from '../components/misc/TacoTitle.vue'
 import { createActor as createRewardsActor } from '../../../declarations/rewards'
-import { AnonymousIdentity } from '@dfinity/agent'
+import { getFrontendIdentity } from '../utils/frontend-identity'
 import { getEffectiveNetwork } from '../config/network-config'
 
 // Helper function for runtime network detection
@@ -424,7 +424,7 @@ export default {
 
         cachedRewardsActor = createRewardsActor(canisterId, {
           agentOptions: {
-            identity: new AnonymousIdentity(),
+            identity: getFrontendIdentity(),
             host
           }
         })
