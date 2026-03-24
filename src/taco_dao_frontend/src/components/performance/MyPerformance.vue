@@ -57,6 +57,7 @@
               <PerformanceChart
                 :principal="principal"
                 :height="280"
+                :performance-data="userPerformance"
               />
             </div>
           </div>

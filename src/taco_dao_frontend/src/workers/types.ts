@@ -79,6 +79,10 @@ export type DataKey =
   | 'userPerformance'
   // Swap dashboard (authenticated — user-specific orders/addresses)
   | 'swapDashboard'
+  // Nachos vault data keys (public queries)
+  | 'nachosVaultDashboard'  // Composite vault state (portfolio, NAV, estimates, fees, status)
+  | 'nachosConfig'          // Vault configuration (fees, rate limits, operation limits)
+  | 'nachosNavHistory'      // Historical NAV snapshots with timestamps and reasons
 
 // ============================================================================
 // Worker Assignment - Which worker handles which data
@@ -157,6 +161,10 @@ export const WORKER_ASSIGNMENT: Record<DataKey, 'public' | 'auth'> = {
   userPerformance: 'auth',
   // Swap dashboard (user-specific)
   swapDashboard: 'auth',
+  // Nachos vault (public queries - anonymous actor)
+  nachosVaultDashboard: 'public',
+  nachosConfig: 'public',
+  nachosNavHistory: 'public',
 }
 
 // ============================================================================
@@ -249,6 +257,10 @@ export const STALENESS_THRESHOLDS: Record<DataKey, number> = {
   userPerformance: 300_000,
   // Swap dashboard - 60 seconds (swap state can change fast)
   swapDashboard: 60_000,
+  // Nachos vault - varying staleness based on data type
+  nachosVaultDashboard: 30_000,  // 30s - Market-sensitive (NAV depends on token prices)
+  nachosConfig: 300_000,          // 5min - Rarely changes (admin-configured)
+  nachosNavHistory: 60_000,       // 1min - Periodic updates (snapshots during operations)
 }
 
 // Background tab multiplier (3x slower)
@@ -459,8 +471,8 @@ export const ROUTE_PRIORITIES: Record<string, RouteDataConfig> = {
     preloadRoutes: ['/vault', '/buy', '/performance'],
   },
   '/vault': {
-    critical: ['tokenDetails', 'aggregateAllocation'],
-    high: ['cryptoPrices', 'userAllocation'],
+    critical: ['nachosVaultDashboard', 'nachosConfig'],  // Nachos-specific data first
+    high: ['nachosNavHistory', 'cryptoPrices'],          // NAV chart + price data
     preloadRoutes: ['/wallet', '/buy', '/performance'],
   },
   '/buy': {

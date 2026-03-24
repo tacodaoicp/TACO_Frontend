@@ -344,28 +344,16 @@ onMounted(async () => {
   }
 
   try {
-    // Only show loading animation if data isn't already cached
-    const hasData = nachosStore.dashboardData && nachosStore.vaultConfig && nachosStore.navHistory.length > 0
-    if (!hasData) {
-      appLoadingOn()
-    }
+    // Worker handles dashboard/config/nav data - no loading animation needed
+    // Data is already cached and reactive via worker subscriptions
 
-    // Load public data for all users (dashboard, config, NAV history use anonymous actor)
-    await Promise.all([
-      nachosStore.loadDashboard(),
-      nachosStore.loadConfig(),
-      nachosStore.loadNAVHistory(),
-    ])
-    // Load user-specific data if logged in
     await tacoStore.checkIfLoggedIn()
     if (tacoStore.userLoggedIn) {
-      await nachosStore.initialize()
-      startAutoRefresh()
+      await nachosStore.initialize()  // Loads user activity only
+      startAutoRefresh()              // Starts 30s polling for active operations
     }
   } catch (error) {
     console.error('Error in vault onMounted:', error)
-  } finally {
-    appLoadingOff()
   }
 })
 

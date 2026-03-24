@@ -25,10 +25,12 @@ import {
   getAlarmCanisterId,
   getRewardsCanisterId,
   getTacoSwapCanisterId,
+  getNachosVaultCanisterId,
 } from './canister-ids'
 import { idlFactory as alarmIDL, type _SERVICE as AlarmService } from '../../../../declarations/alarm/alarm.did.js'
 import { idlFactory as rewardsIDL, type _SERVICE as RewardsService } from '../../../../declarations/rewards/rewards.did.js'
 import { idlFactory as tacoSwapIDL, type _SERVICE as TacoSwapService } from '../../../../declarations/taco_swap/taco_swap.did.js'
+import { idlFactory as nachosVaultIDL } from '../../../../declarations/nachos_vault/nachos_vault.did.js'
 
 // ============================================================================
 // Actor Caching - Reuse actors for same agent/canister combinations
@@ -1242,6 +1244,66 @@ function formatRewardsError(err: any): string {
 
 function uint8ArrayToHex(arr: Uint8Array | number[]): string {
   return Array.from(arr, (byte) => byte.toString(16).padStart(2, '0')).join('')
+}
+
+// ============================================================================
+// Nachos Vault
+// ============================================================================
+
+/**
+ * Fetch nachos vault dashboard (composite query)
+ * Includes portfolio, NAV, mint/burn estimates, fees, status, accepted tokens
+ * Optional estimate parameters for mint/burn calculations
+ */
+export async function fetchNachosVaultDashboard(
+  agent: HttpAgent,
+  mintEstimateE8s?: bigint,
+  burnEstimateE8s?: bigint
+): Promise<any> {
+  const canisterId = getNachosVaultCanisterId()
+
+  const actor = Actor.createActor(nachosVaultIDL, {
+    agent,
+    canisterId,
+  })
+
+  // Call composite query with optional estimate parameters
+  const result = await (actor as any).getVaultDashboard(
+    mintEstimateE8s !== undefined ? [mintEstimateE8s] : [],
+    burnEstimateE8s !== undefined ? [burnEstimateE8s] : []
+  )
+
+  return result
+}
+
+/**
+ * Fetch nachos vault configuration
+ * Returns fees, rate limits, operation limits, and constraints
+ */
+export async function fetchNachosConfig(agent: HttpAgent): Promise<any> {
+  const canisterId = getNachosVaultCanisterId()
+
+  const actor = Actor.createActor(nachosVaultIDL, {
+    agent,
+    canisterId,
+  })
+
+  return await (actor as any).getConfig()
+}
+
+/**
+ * Fetch nachos NAV history (adaptive)
+ * Returns array of NAV snapshots with timestamps and reasons
+ */
+export async function fetchNachosNavHistory(agent: HttpAgent): Promise<any> {
+  const canisterId = getNachosVaultCanisterId()
+
+  const actor = Actor.createActor(nachosVaultIDL, {
+    agent,
+    canisterId,
+  })
+
+  return await (actor as any).getNAVHistoryAdaptive()
 }
 
 // ============================================================================

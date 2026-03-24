@@ -10,6 +10,8 @@ import { Actor } from '@dfinity/agent'
 import { Principal } from '@dfinity/principal'
 import { useTacoStore } from './taco.store'
 import { getEffectiveNetwork } from '../config/network-config'
+import { workerBridge } from './worker-bridge'
+import { deserializeFromTransfer } from '../workers/shared/fetch-functions'
 // Vault IDL factory now managed by taco.store's lazy loader + actor cache
 import type {
   MintResult, BurnResult, NachosError, CachedNAV, ActiveDeposit,
@@ -92,6 +94,39 @@ export const useNachosStore = defineStore('nachos', () => {
   // Polling state (not exposed)
   let pollTimeoutId: ReturnType<typeof setTimeout> | null = null
   let pollStartTime = 0
+
+  // ============================================================================
+  // Worker Subscriptions (Auto-update from worker cache)
+  // ============================================================================
+
+  // Track worker unsubscribers for cleanup
+  const workerUnsubscribers: (() => void)[] = []
+
+  // Subscribe to nachos worker data - updates store refs automatically
+  workerUnsubscribers.push(
+    workerBridge.subscribe('nachosVaultDashboard', (data: unknown) => {
+      if (data) {
+        dashboardData.value = deserializeFromTransfer(data)
+        lastError.value = null
+      }
+    })
+  )
+
+  workerUnsubscribers.push(
+    workerBridge.subscribe('nachosConfig', (data: unknown) => {
+      if (data) {
+        vaultConfig.value = deserializeFromTransfer(data)
+      }
+    })
+  )
+
+  workerUnsubscribers.push(
+    workerBridge.subscribe('nachosNavHistory', (data: unknown) => {
+      if (data && Array.isArray(data)) {
+        navHistory.value = deserializeFromTransfer(data) as NavSnapshot[]
+      }
+    })
+  )
 
   // ============================================================================
   // Computed
@@ -912,11 +947,10 @@ export const useNachosStore = defineStore('nachos', () => {
   const initialize = async () => {
     loadOpsFromCache()
     pruneOldOps()
-    await Promise.all([loadDashboard(), loadConfig()])
+    // Worker handles dashboard, config, NAV history - only load user activity
     if (userLoggedIn.value) {
       await loadUserActivity()
     }
-    await loadNAVHistory()
   }
 
   const cleanup = () => {

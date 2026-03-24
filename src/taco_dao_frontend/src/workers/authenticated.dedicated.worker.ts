@@ -78,6 +78,10 @@ import {
   fetchUserPerformanceData,
   // Swap dashboard
   fetchSwapDashboardData,
+  // Nachos vault
+  fetchNachosVaultDashboard,
+  fetchNachosConfig,
+  fetchNachosNavHistory,
   // Utilities
   serializeForTransfer,
   clearActorCache,
@@ -111,12 +115,22 @@ const HANDLED_KEYS: DataKey[] = [
   'tradingStatus', // Primary for getEnhancedTreasuryDashboard (public)
   'leaderboardAllTimeUSD', // Primary for getAllLeaderboards
   'leaderboardAllTimeICP',
+  'leaderboardOneYearUSD',
+  'leaderboardOneYearICP',
+  'leaderboardOneMonthUSD',
+  'leaderboardOneMonthICP',
+  'leaderboardOneWeekUSD',
+  'leaderboardOneWeekICP',
   'leaderboardInfo',
   'tacoProposals',
   'proposalsThreads',
   'allNames',
   'neuronSnapshotStatus',
   'timerStatus',
+  // Nachos vault (public queries)
+  'nachosVaultDashboard',
+  'nachosConfig',
+  'nachosNavHistory',
   // ========== USER KEYS ==========
   'userAllocation',
   'systemLogs',
@@ -189,12 +203,22 @@ const PUBLIC_KEYS: DataKey[] = [
   'tradingStatus',
   'leaderboardAllTimeUSD',
   'leaderboardAllTimeICP',
+  'leaderboardOneYearUSD',
+  'leaderboardOneYearICP',
+  'leaderboardOneMonthUSD',
+  'leaderboardOneMonthICP',
+  'leaderboardOneWeekUSD',
+  'leaderboardOneWeekICP',
   'leaderboardInfo',
   'tacoProposals',
   'proposalsThreads',
   'allNames',
   'neuronSnapshotStatus',
   'timerStatus',
+  // Nachos vault
+  'nachosVaultDashboard',
+  'nachosConfig',
+  'nachosNavHistory',
 ]
 
 const PUBLIC_ADMIN_KEYS: DataKey[] = [
@@ -1078,6 +1102,19 @@ async function fetchData(dataKey: DataKey): Promise<void> {
       }
       break
     }
+
+    // ========== NACHOS VAULT CASES (public queries) ==========
+    case 'nachosVaultDashboard':
+      data = serializeForTransfer(await fetchNachosVaultDashboard(anonymousAgent!))
+      break
+
+    case 'nachosConfig':
+      data = serializeForTransfer(await fetchNachosConfig(anonymousAgent!))
+      break
+
+    case 'nachosNavHistory':
+      data = serializeForTransfer(await fetchNachosNavHistory(anonymousAgent!))
+      break
 
     // ========== USER/AUTH DATA CASES (existing) ==========
     case 'userAllocation':

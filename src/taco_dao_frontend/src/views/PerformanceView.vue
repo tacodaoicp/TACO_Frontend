@@ -237,9 +237,11 @@
 </template>
 
 <script>
-import { ref, onMounted, computed, watch, nextTick } from "vue"
+import { ref, onMounted, computed, watch, nextTick, onUnmounted } from "vue"
 import { useTacoStore } from "../stores/taco.store"
 import { storeToRefs } from "pinia"
+import workerBridge from '../stores/worker-bridge'
+import { deserializeFromTransfer } from '../workers/shared/fetch-functions'
 import DfinityLogo from "../assets/images/dfinityLogo.vue"
 import MyPerformance from "../components/performance/MyPerformance.vue"
 import PerformanceLeaderboard from "../components/performance/PerformanceLeaderboard.vue"
@@ -402,127 +404,32 @@ export default {
       }
     }, { immediate: true })
 
-    // Load user's performance data
-    // Uses getUserPerformanceGraphData which returns checkpoint data for graphs
-    // and provides pre-calculated timeframe performance scores from the backend
-    const loadUserPerformance = async () => {
-      if (!userLoggedIn.value || !userPrincipal.value) return
+    // Worker subscription for user performance data
+    // Worker handles all the data fetching, weighted averaging, and caching
+    let unsubscribePerformance = null
 
-      isLoadingUserPerformance.value = true
-      userPerformanceError.value = ''
-
-      try {
-        const rewardsActor = await tacoStore.createRewardsActorAnonymous()
-        const { Principal } = await import('@dfinity/principal')
-
-        const nowMs = BigInt(Date.now())
-        const endTime = nowMs * BigInt(1_000_000) // nanoseconds
-        const startTime = BigInt(0) // AllTime - backend returns all checkpoints
-
-        // Backend now returns all neurons with per-neuron timeframe scores
-        const graphResult = await rewardsActor.getUserPerformanceGraphData(
-          Principal.fromText(userPrincipal.value),
-          startTime,
-          endTime
-        )
-
-        if ('ok' in graphResult) {
-          const graphData = graphResult.ok
-
-          // All neurons now come in graphData.neurons array
-          // Sort by best all-time ICP performance (descending)
-          const sortedNeurons = [...(graphData.neurons || [])].sort((a, b) => {
-            const aIcp = a.performanceScoreICP?.[0] ?? -Infinity
-            const bIcp = b.performanceScoreICP?.[0] ?? -Infinity
-            return bIcp - aIcp
-          })
-
-          // Calculate weighted average by voting power for timeframe scores
-          const calcWeightedAvg = (neurons, getValue) => {
-            let totalWeight = BigInt(0)
-            let weightedSum = 0
-            for (const n of neurons) {
-              const val = getValue(n)
-              const vp = n.votingPower ?? BigInt(0)
-              if (val !== null && val !== undefined && vp > 0) {
-                weightedSum += val * Number(vp)
-                totalWeight += vp
-              }
-            }
-            return totalWeight > 0 ? [weightedSum / Number(totalWeight)] : []
-          }
-
-          const aggregatedPerformance = {
-            allTimeUSD: calcWeightedAvg(sortedNeurons, n => n.performanceScoreUSD),
-            allTimeICP: calcWeightedAvg(sortedNeurons, n => n.performanceScoreICP?.[0]),
-            oneWeekUSD: calcWeightedAvg(sortedNeurons, n => n.oneWeekUSD?.[0]),
-            oneWeekICP: calcWeightedAvg(sortedNeurons, n => n.oneWeekICP?.[0]),
-            oneMonthUSD: calcWeightedAvg(sortedNeurons, n => n.oneMonthUSD?.[0]),
-            oneMonthICP: calcWeightedAvg(sortedNeurons, n => n.oneMonthICP?.[0]),
-            oneYearUSD: calcWeightedAvg(sortedNeurons, n => n.oneYearUSD?.[0]),
-            oneYearICP: calcWeightedAvg(sortedNeurons, n => n.oneYearICP?.[0])
-          }
-
-          // Map to internal structure with per-neuron timeframe scores
-          const neurons = sortedNeurons.map(nd => ({
-            neuronId: nd.neuronId,
-            votingPower: nd.votingPower ?? BigInt(0),
-            distributionsParticipated: nd.checkpoints?.length ?? 0,
-            allocationChangeCount: Number(nd.allocationChangeCount ?? 0),
-            lastAllocationChange: nd.checkpoints?.length > 0
-              ? nd.checkpoints[nd.checkpoints.length - 1].timestamp
-              : BigInt(0),
-            performance: {
-              allTimeUSD: nd.performanceScoreUSD ? [nd.performanceScoreUSD] : [],
-              allTimeICP: nd.performanceScoreICP?.length > 0 ? [nd.performanceScoreICP[0]] : [],
-              oneWeekUSD: nd.oneWeekUSD?.length > 0 ? [nd.oneWeekUSD[0]] : [],
-              oneWeekICP: nd.oneWeekICP?.length > 0 ? [nd.oneWeekICP[0]] : [],
-              oneMonthUSD: nd.oneMonthUSD?.length > 0 ? [nd.oneMonthUSD[0]] : [],
-              oneMonthICP: nd.oneMonthICP?.length > 0 ? [nd.oneMonthICP[0]] : [],
-              oneYearUSD: nd.oneYearUSD?.length > 0 ? [nd.oneYearUSD[0]] : [],
-              oneYearICP: nd.oneYearICP?.length > 0 ? [nd.oneYearICP[0]] : []
-            }
-          }))
-
-          const totalCheckpoints = neurons.reduce(
-            (sum, nd) => sum + nd.distributionsParticipated, 0
-          )
-
-          // Calculate total voting power from all neurons
-          const totalVotingPower = neurons.reduce(
-            (sum, n) => sum + (n.votingPower || BigInt(0)), BigInt(0)
-          )
-
-          userPerformance.value = {
-            principal: Principal.fromText(userPrincipal.value),
-            totalVotingPower,
-            distributionsParticipated: totalCheckpoints > 0 ? totalCheckpoints : 0,
-            lastActivity: graphData.timeframe.endTime,
-            aggregatedPerformance,
-            neurons
-          }
-        } else {
-          // Handle errors
-          const errKey = Object.keys(graphResult.err)[0]
-          if (errKey === 'NeuronNotFound') {
-            console.log('User has no performance data yet (NeuronNotFound)')
-            userPerformance.value = null
-          } else {
-            console.error('Error from getUserPerformanceGraphData:', graphResult.err)
-            userPerformanceError.value = formatError(graphResult.err)
+    const setupPerformanceSubscription = () => {
+      // Subscribe to worker data - automatically updates when worker has fresh data
+      unsubscribePerformance = workerBridge.subscribe('userPerformance', (data) => {
+        if (data) {
+          try {
+            const deserialized = deserializeFromTransfer(data)
+            userPerformance.value = deserialized
+            isLoadingUserPerformance.value = false
+            userPerformanceError.value = ''
+            // Also load user's follows list when performance data arrives
+            loadUserFollows()
+          } catch (error) {
+            console.error('Error deserializing performance data:', error)
+            userPerformanceError.value = 'Failed to load performance data'
+            isLoadingUserPerformance.value = false
           }
         }
-
-        // Also load user's follows list
-        await loadUserFollows()
-
-      } catch (error) {
-        console.error('Error loading user performance:', error)
-        userPerformanceError.value = formatNetworkError(error)
-      } finally {
-        isLoadingUserPerformance.value = false
-      }
+      })
     }
+
+    // Initialize subscription immediately
+    setupPerformanceSubscription()
 
     // Load user's follow list (who they follow)
     const loadUserFollows = async () => {
@@ -626,10 +533,12 @@ export default {
     // Refresh all data
     const refreshAllData = async () => {
       isLoading.value = true
-      await Promise.all([
-        loadFollowerInfo(true),
-        userLoggedIn.value ? loadUserPerformance() : Promise.resolve()
-      ])
+      // Worker handles performance data - just load follower info
+      // Set loading state for performance (worker will update when data arrives)
+      if (userLoggedIn.value) {
+        isLoadingUserPerformance.value = true
+      }
+      await loadFollowerInfo(true)
       isLoading.value = false
     }
 
@@ -797,7 +706,8 @@ export default {
     // Watch for login state changes
     watch(userLoggedIn, (newState) => {
       if (newState) {
-        loadUserPerformance()
+        // Worker will fetch performance data automatically via route priorities
+        isLoadingUserPerformance.value = true
         loadDisplayName()
       } else {
         userPerformance.value = null
@@ -812,6 +722,13 @@ export default {
       await tacoStore.checkIfLoggedIn()
       await refreshAllData()
       loadDisplayName()
+    })
+
+    // Cleanup subscription on unmount
+    onUnmounted(() => {
+      if (unsubscribePerformance) {
+        unsubscribePerformance()
+      }
     })
 
     return {

@@ -55,7 +55,7 @@ import { storeToRefs } from 'pinia'
 import { getChartPort } from '../../workers/chart-worker-port'
 
 // Module-level cache for getUserPerformanceGraphData results by principal
-// Avoids redundant canister calls when expanding/collapsing the same leaderboard row
+// Used only when data is not provided via props (leaderboard/following cases)
 const performanceDataCache = new Map()
 const CACHE_TTL_MS = 60_000 // 60 seconds
 
@@ -71,6 +71,12 @@ export default {
     height: {
       type: [Number, String],
       default: 250
+    },
+    // Optional performance data from parent (worker subscription)
+    // If provided, skips fetching and uses this data directly
+    performanceData: {
+      type: Object,
+      default: null
     },
   },
 
@@ -463,8 +469,8 @@ export default {
     })
 
     // Load performance data using getUserPerformanceGraphData API
-    // Always requests AllTime so the graph shows the full history
-    // Backend returns best USD neuron, best ICP neuron, and allocation neuron ID
+    // If performanceData prop is provided (from worker), uses that directly
+    // Otherwise fetches data (for leaderboard/following use cases)
     const loadPerformanceData = async () => {
       if (!props.principal) return
 
@@ -476,31 +482,37 @@ export default {
       try {
         let graphData
 
-        // Check module-level cache first
-        const cached = performanceDataCache.get(props.principal)
-        if (cached && (Date.now() - cached.timestamp) < CACHE_TTL_MS) {
-          graphData = cached.data
+        // If performance data provided via prop (worker subscription), use it
+        if (props.performanceData) {
+          graphData = props.performanceData
         } else {
-          const rewardsActor = await tacoStore.createRewardsActorAnonymous()
-          const { Principal } = await import('@dfinity/principal')
+          // Otherwise fetch data (leaderboard/following cases)
+          // Check module-level cache first
+          const cached = performanceDataCache.get(props.principal)
+          if (cached && (Date.now() - cached.timestamp) < CACHE_TTL_MS) {
+            graphData = cached.data
+          } else {
+            const rewardsActor = await tacoStore.createRewardsActorAnonymous()
+            const { Principal } = await import('@dfinity/principal')
 
-          const nowMs = BigInt(Date.now())
-          const endTime = nowMs * BigInt(1_000_000) // nanoseconds
-          const startTime = BigInt(0) // Always AllTime for the graph
+            const nowMs = BigInt(Date.now())
+            const endTime = nowMs * BigInt(1_000_000) // nanoseconds
+            const startTime = BigInt(0) // Always AllTime for the graph
 
-          const graphResult = await rewardsActor.getUserPerformanceGraphData(
-            Principal.fromText(props.principal),
-            startTime,
-            endTime
-          )
+            const graphResult = await rewardsActor.getUserPerformanceGraphData(
+              Principal.fromText(props.principal),
+              startTime,
+              endTime
+            )
 
-          if ('err' in graphResult) {
-            error.value = formatError(graphResult.err)
-            return
+            if ('err' in graphResult) {
+              error.value = formatError(graphResult.err)
+              return
+            }
+
+            graphData = graphResult.ok
+            performanceDataCache.set(props.principal, { data: graphData, timestamp: Date.now() })
           }
-
-          graphData = graphResult.ok
-          performanceDataCache.set(props.principal, { data: graphData, timestamp: Date.now() })
         }
 
         // Process helper: map checkpoints to include both USD and ICP values
@@ -581,6 +593,17 @@ export default {
         loadPerformanceData()
       },
       { immediate: false }
+    )
+
+    // Watch for performanceData prop change (from worker subscription)
+    watch(
+      () => props.performanceData,
+      (newData) => {
+        if (newData) {
+          loadPerformanceData()
+        }
+      },
+      { deep: true }
     )
 
     onMounted(() => {

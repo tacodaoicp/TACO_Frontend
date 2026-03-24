@@ -86,6 +86,10 @@ import {
   fetchUserPerformanceData,
   // Swap dashboard
   fetchSwapDashboardData,
+  // Nachos vault
+  fetchNachosVaultDashboard,
+  fetchNachosConfig,
+  fetchNachosNavHistory,
   // Utilities
   serializeForTransfer,
 } from './shared/fetch-functions'
@@ -126,6 +130,10 @@ const HANDLED_KEYS: DataKey[] = [
   'allNames',
   'neuronSnapshotStatus',
   'timerStatus',
+  // Nachos vault (public queries)
+  'nachosVaultDashboard',
+  'nachosConfig',
+  'nachosNavHistory',
   // ========== USER KEYS ==========
   'userAllocation',
   'systemLogs',
@@ -212,6 +220,10 @@ const PUBLIC_KEYS: DataKey[] = [
   'allNames',
   'neuronSnapshotStatus',
   'timerStatus',
+  // Nachos vault
+  'nachosVaultDashboard',
+  'nachosConfig',
+  'nachosNavHistory',
 ]
 
 // Keys that can be read publicly (anonymous agent works)
@@ -1405,6 +1417,19 @@ async function fetchData(dataKey: DataKey): Promise<void> {
       }
       break
     }
+
+    // ========== NACHOS VAULT CASES (public queries) ==========
+    case 'nachosVaultDashboard':
+      data = serializeForTransfer(await fetchNachosVaultDashboard(anonymousAgent!))
+      break
+
+    case 'nachosConfig':
+      data = serializeForTransfer(await fetchNachosConfig(anonymousAgent!))
+      break
+
+    case 'nachosNavHistory':
+      data = serializeForTransfer(await fetchNachosNavHistory(anonymousAgent!))
+      break
 
     // ========== USER/AUTH DATA CASES (existing) ==========
     case 'userAllocation':

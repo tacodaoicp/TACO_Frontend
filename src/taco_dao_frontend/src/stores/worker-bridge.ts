@@ -79,7 +79,7 @@ const workersConnected = ref(false)
 // ============================================================================
 
 // Increment to force browser to load fresh SharedWorker code
-const WORKER_VERSION = 'v5' // Incremented for route preloading network updates
+const WORKER_VERSION = 'v6' // Incremented for nachos vault + performance worker integration
 
 function getMainWorker(): WorkerAdapter {
   if (!mainWorker) {

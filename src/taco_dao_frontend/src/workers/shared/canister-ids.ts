@@ -244,6 +244,15 @@ export function getTacoSwapCanisterId(): string {
 }
 
 /**
+ * Nachos Vault Canister ID
+ * Note: Nachos vault is staging-only, same canister ID for all networks
+ */
+export function getNachosVaultCanisterId(network?: string): string {
+  // Nachos is staging-only - same canister ID regardless of network
+  return 'p4nog-baaaa-aaaad-qkwpa-cai'
+}
+
+/**
  * All canister IDs as an object (useful for logging/debugging)
  */
 export function getAllCanisterIds(): Record<string, string> {
@@ -259,5 +268,6 @@ export function getAllCanisterIds(): Record<string, string> {
     icpLedger: getIcpLedgerCanisterId(),
     alarm: getAlarmCanisterId(),
     tacoSwap: getTacoSwapCanisterId(),
+    nachosVault: getNachosVaultCanisterId(),
   }
 }
