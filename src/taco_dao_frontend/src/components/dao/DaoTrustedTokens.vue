@@ -161,8 +161,8 @@
                       <span class="pe-4">% Held</span>
                   </th> 
 
-                  <!-- holdings -->
-                  <th class="fw-bold text-end"
+                  <!-- holdings (hidden on mobile) -->
+                  <th class="fw-bold text-end d-none d-md-table-cell"
                       scope="col">
                       <span class="pe-4"># Held</span>
                   </th>
@@ -218,8 +218,8 @@
                     <span>{{ token.holdingPercentage.amount }}%</span>
                   </td>
 
-                  <!-- # held -->
-                  <td class="text-end pe-4">
+                  <!-- # held (hidden on mobile) -->
+                  <td class="text-end pe-4 d-none d-md-table-cell">
                     <span data-bs-toggle="tooltip" data-bs-placement="top" :title="token.currentHoldings.amount">{{ formatNumber(token.currentHoldings.amount) }}</span>
                   </td>
 
