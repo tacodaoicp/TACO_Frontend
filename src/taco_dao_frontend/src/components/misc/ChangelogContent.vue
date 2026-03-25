@@ -8,6 +8,23 @@
             <!-- changelog item -->
             <div class="changelog-content__item">
                 <h3 class="changelog-content__title">
+                    v2.0.0
+                </h3>
+                <span class="changelog-content__date">🍽️ March 25, 2026</span>
+                <p class="changelog-content__text">
+                    - New site-wide visual refresh with updated styling and layout
+                    <br>
+                    - Adds /performance with interactive historical charts for treasury allocation and price tracking
+                    <br>
+                    - Redesigns /buy with a step-by-step timeline, fiat on-ramp providers, and auto-swap option
+                    <br>
+                    - Adds /vault for the NACHOS Vault with NAV chart, mint/redeem flows, and live vault stats
+                </p>
+            </div>
+
+            <!-- changelog item -->
+            <div class="changelog-content__item">
+                <h3 class="changelog-content__title">
                     v1.0.6
                 </h3>
                 <span class="changelog-content__date">🍽️ September 16, 2025</span>

@@ -262,6 +262,15 @@
                           list-group-item d-flex flex-nowrap py-3 gap-3"
                     tabindex="0">
 
+                  <span class="taco-text-black-to-white"><span class="fw-bold taco-text-black-to-white">Tirex</span> - Backend & Frontend Development</span>
+
+                </li>
+
+                <!-- list item -->
+                <li class="standard-focus standard-focus--negative-offset
+                          list-group-item d-flex flex-nowrap py-3 gap-3"
+                    tabindex="0">
+
                   <span class="taco-text-black-to-white"><a class="taco-text-blue-to-light-blue fw-bold" href="https://x.com/SnassyIcp" target="_blank">Snassy</a> - Backend Development</span>
 
                 </li>

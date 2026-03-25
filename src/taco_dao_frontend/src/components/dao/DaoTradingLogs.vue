@@ -310,12 +310,9 @@
         const timeOptions: Intl.DateTimeFormatOptions = {
             hour: 'numeric',
             minute: 'numeric',
-            second: 'numeric',
-            hour12: true,
-            timeZoneName: 'short'
+            hour12: true
         }
         const dateOptions: Intl.DateTimeFormatOptions = {
-            year: 'numeric',
             month: 'numeric',
             day: 'numeric'
         }
@@ -381,8 +378,13 @@
             // add commas to the integer part
             const formattedInteger = integerPart.replace(/\B(?=(\d{3})+(?!\d))/g, ',')
             
-            // pad or truncate decimal part as needed (max 8 decimals on screen)
-            const maxDisplayDecimals = 8
+            // cap at 5 decimals to prevent mobile horizontal scroll,
+            // but for tiny numbers (e.g. 0.00000312 BTC) ensure at least 2 significant digits
+            let maxDisplayDecimals = 5
+            if (numAmount > 0 && numAmount < 0.001 && decimalPart.length > 5) {
+                const leadingZeros = decimalPart.match(/^0*/)?.[0].length || 0
+                maxDisplayDecimals = Math.max(5, leadingZeros + 2)
+            }
             const targetLen = Math.max(2, Math.min(maxDisplayDecimals, decimalPart.length))
             const formattedDecimal = decimalPart.padEnd(2, '0').slice(0, targetLen)
             
