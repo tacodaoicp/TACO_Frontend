@@ -32,7 +32,6 @@ import type { Result_4, UpdateConfig, RebalanceConfigResponse, _SERVICE as Treas
 import type { _SERVICE as NeuronSnapshotService } from "../../../declarations/neuronSnapshot/neuronSnapshot.did.js"
 import type { _SERVICE as SneedForumService } from "../../../declarations/sneed_sns_forum/sneed_sns_forum.did.js"
 import type { _SERVICE as AppSneedDaoService } from "../../../declarations/app_sneeddao_backend/app_sneeddao_backend.did.js"
-import type { _SERVICE as AlarmService } from "../../../declarations/alarm/alarm.did.js"
 
 // Canister ID import (small, needed early)
 import { canisterId as iiCanisterId } from "../../../declarations/internet_identity/index.js"
@@ -57,7 +56,6 @@ let _neuronSnapshotIDL: any = null
 let _sneedForumIDL: any = null
 let _appSneedDaoIDL: any = null
 let _snsGovernanceIDL: any = null
-let _alarmIDL: any = null
 let _rewardsIDL: any = null
 let _nachosVaultIDL: any = null
 let _tacoSwapIDL: any = null
@@ -208,14 +206,6 @@ async function getSnsGovernanceIDL() {
     return _snsGovernanceIDL
 }
 
-async function getAlarmIDL() {
-    if (!_alarmIDL) {
-        const mod = await import("../../../declarations/alarm/alarm.did.js")
-        _alarmIDL = mod.idlFactory
-    }
-    return _alarmIDL
-}
-
 async function getRewardsIDL() {
     if (!_rewardsIDL) {
         const mod = await import("../../../declarations/rewards/rewards.did.js")
@@ -249,7 +239,6 @@ let neuronSnapshotIDL: any
 let sneedForumIDL: any
 let appSneedDaoIDL: any
 let snsGovernanceIDL: any
-let alarmIDL: any
 let rewardsIDL: any
 
 /**
@@ -274,7 +263,6 @@ async function initializeShims() {
         forumIdl,
         appIdl,
         govIdl,
-        alarmIdl,
         rewardsIdl
     ] = await Promise.all([
         getAuthClientModule(),
@@ -291,7 +279,6 @@ async function initializeShims() {
         getSneedForumIDL(),
         getAppSneedDaoIDL(),
         getSnsGovernanceIDL(),
-        getAlarmIDL(),
         getRewardsIDL()
     ])
 
@@ -315,7 +302,6 @@ async function initializeShims() {
     sneedForumIDL = forumIdl
     appSneedDaoIDL = appIdl
     snsGovernanceIDL = govIdl
-    alarmIDL = alarmIdl
     rewardsIDL = rewardsIdl
 
     _shimsInitialized = true
@@ -777,75 +763,6 @@ interface GovernanceError {
 interface ListProposalsResult {
     Ok?: ListProposalsResponse;
     Err?: GovernanceError;
-}
-
-// Alarm interfaces
-export interface AlarmCanisterActor {
-
-    // System Health
-    performSystemHealthCheckManual(): Promise<{ ok: string } | { err: string }>
-    getEnhancedAlarmSystemStatus(): Promise<{ ok: any } | { err: string }>
-    getMonitoringStatus(): Promise<{ ok: any } | { err: string }>
-
-    // Admin Management
-    addAdmin(admin: Principal, permissions: Array<{ Admin: null }>): Promise<{ ok: string } | { err: string }>
-
-    // Contact Management
-    addContact(name: string, contactType: { Email: string } | { SMS: string }): Promise<{ ok: number } | { err: string }>
-    getContacts(): Promise<{ ok: any[] } | { err: string }>
-    updateContactStatus(contactId: number, active: boolean): Promise<{ ok: string } | { err: string }>
-    removeContact(contactId: number): Promise<{ ok: number } | { err: string }>
-    sendTestSMS(contactIds: number[]): Promise<{ ok: string } | { err: string }>
-    sendTestEmail(contactIds: number[]): Promise<{ ok: string } | { err: string }>
-
-    // Alarm Management
-    getPendingAlarms(): Promise<{ ok: any[] } | { err: string }>
-    acknowledgeAlarm(alarmId: number): Promise<{ ok: string } | { err: string }>
-    getSystemErrors(limit: number[]): Promise<{ ok: any[] } | { err: string }>
-    getInternalErrors(limit?: number): Promise<any[]>
-    resolveSystemErrorById(errorId: number): Promise<{ ok: string } | { err: string }>
-
-    // Monitoring Configuration
-    setCheckInterval(minutes: number): Promise<{ ok: string } | { err: string }>
-    startMonitoring(): Promise<{ ok: string } | { err: string }>
-    stopMonitoring(): Promise<{ ok: string } | { err: string }>
-
-    // Canister Monitoring
-    addMonitoredCanister(
-        canisterId: Principal,
-        name: string,
-        isSNSControlled: boolean,
-        snsRootCanisterId: Principal[],
-        minimumCycles: bigint,
-        cyclesAlertLevel: { Level1Immediate: null } | { Level2DelayedSMS: null },
-        timersAlertLevel: { Level1Immediate: null } | { Level2DelayedSMS: null },
-        statusAlertLevel: { Level1Immediate: null } | { Level2DelayedSMS: null }
-    ): Promise<{ ok: number } | { err: string }>
-
-    getMonitoredCanisters(): Promise<{ ok: any[] } | { err: string }>
-    removeMonitoredCanister(configId: number): Promise<{ ok: string } | { err: string }>
-    updateMonitoredCanisterStatus(configId: number, enabled: boolean): Promise<{ ok: string } | { err: string }>
-    startCanisterMonitoring(): Promise<{ ok: string } | { err: string }>
-    stopCanisterMonitoring(): Promise<{ ok: string } | { err: string }>
-    getCanisterHealthStatus(): Promise<{ ok: any[] } | { err: string }>
-
-    // Queue Management
-    getQueueStatus(): Promise<{ ok: any } | { err: string }>
-    clearQueues(): Promise<{ ok: string } | { err: string }>
-
-    // Sent Message History
-    getSentMessages(limit: number[]): Promise<{ ok: any[] } | { err: string }>
-    getSentSMSMessages(limit: number[]): Promise<{ ok: any[] } | { err: string }>
-    getSentEmailMessages(limit: number[]): Promise<{ ok: any[] } | { err: string }>
-
-    // Configuration Functions
-    setCanisterMonitoringInterval(minutes: number): Promise<{ ok: string } | { err: string }>
-    setLevel2SMSCheckInterval(minutes: number): Promise<{ ok: string } | { err: string }>
-    getConfigurationIntervals(): Promise<{ ok: any } | { err: string }>
-
-    // Admin Action Logs
-    getAdminActionLogs(limit: number[]): Promise<{ ok: any[] } | { err: string }>
-
 }
 
 ///////////////////
@@ -1647,18 +1564,6 @@ export const useTacoStore = defineStore('taco', () => {
     const cachedPortfolioCircuitBreakerConditions = ref<any[]>([])
     const cachedNeuronSnapshots = ref<any[]>([])
     const cachedMaxNeuronSnapshots = ref<bigint | null>(null)
-    const cachedAlarmSystemStatus = ref<any>(null)
-    const cachedAlarmContacts = ref<any[]>([])
-    const cachedMonitoringStatus = ref<any>(null)
-    const cachedPendingAlarms = ref<any[]>([])
-    const cachedSystemErrors = ref<any[]>([])
-    const cachedInternalErrors = ref<any[]>([])
-    const cachedMonitoredCanisters = ref<any[]>([])
-    const cachedConfigurationIntervals = ref<any>(null)
-    const cachedQueueStatus = ref<any>(null)
-    const cachedSentMessages = ref<any[]>([])
-    const cachedAlarmAcknowledgments = ref<any[]>([])
-    const cachedAdminActionLogs = ref<any[]>([])
     const cachedVotableProposals = ref<any[]>([])
     const cachedPeriodicTimerStatus = ref<any>(null)
     const cachedAutoVotingThreshold = ref<bigint | null>(null)
@@ -2129,68 +2034,6 @@ export const useTacoStore = defineStore('taco', () => {
             })
         )
 
-        // Alarm system admin data subscriptions
-        adminWorkerUnsubscribers.push(
-            workerBridge.subscribe('alarmSystemStatus', (data: unknown) => {
-                if (data) cachedAlarmSystemStatus.value = deserializeFromTransfer(data)
-            })
-        )
-        adminWorkerUnsubscribers.push(
-            workerBridge.subscribe('alarmContacts', (data: unknown) => {
-                if (data && Array.isArray(data)) cachedAlarmContacts.value = deserializeFromTransfer(data) as any[]
-            })
-        )
-        adminWorkerUnsubscribers.push(
-            workerBridge.subscribe('monitoringStatus', (data: unknown) => {
-                if (data) cachedMonitoringStatus.value = deserializeFromTransfer(data)
-            })
-        )
-        adminWorkerUnsubscribers.push(
-            workerBridge.subscribe('pendingAlarms', (data: unknown) => {
-                if (data && Array.isArray(data)) cachedPendingAlarms.value = deserializeFromTransfer(data) as any[]
-            })
-        )
-        adminWorkerUnsubscribers.push(
-            workerBridge.subscribe('systemErrors', (data: unknown) => {
-                if (data && Array.isArray(data)) cachedSystemErrors.value = deserializeFromTransfer(data) as any[]
-            })
-        )
-        adminWorkerUnsubscribers.push(
-            workerBridge.subscribe('internalErrors', (data: unknown) => {
-                if (data && Array.isArray(data)) cachedInternalErrors.value = deserializeFromTransfer(data) as any[]
-            })
-        )
-        adminWorkerUnsubscribers.push(
-            workerBridge.subscribe('monitoredCanisters', (data: unknown) => {
-                if (data && Array.isArray(data)) cachedMonitoredCanisters.value = deserializeFromTransfer(data) as any[]
-            })
-        )
-        adminWorkerUnsubscribers.push(
-            workerBridge.subscribe('configurationIntervals', (data: unknown) => {
-                if (data) cachedConfigurationIntervals.value = deserializeFromTransfer(data)
-            })
-        )
-        adminWorkerUnsubscribers.push(
-            workerBridge.subscribe('queueStatus', (data: unknown) => {
-                if (data) cachedQueueStatus.value = deserializeFromTransfer(data)
-            })
-        )
-        adminWorkerUnsubscribers.push(
-            workerBridge.subscribe('sentMessages', (data: unknown) => {
-                if (data && Array.isArray(data)) cachedSentMessages.value = deserializeFromTransfer(data) as any[]
-            })
-        )
-        adminWorkerUnsubscribers.push(
-            workerBridge.subscribe('alarmAcknowledgments', (data: unknown) => {
-                if (data && Array.isArray(data)) cachedAlarmAcknowledgments.value = deserializeFromTransfer(data) as any[]
-            })
-        )
-        adminWorkerUnsubscribers.push(
-            workerBridge.subscribe('adminActionLogs', (data: unknown) => {
-                if (data && Array.isArray(data)) cachedAdminActionLogs.value = deserializeFromTransfer(data) as any[]
-            })
-        )
-
         // NNS Automation admin data subscriptions
         adminWorkerUnsubscribers.push(
             workerBridge.subscribe('votableProposals', (data: unknown) => {
@@ -2307,9 +2150,6 @@ export const useTacoStore = defineStore('taco', () => {
             totalVotes: proposal.latest_tally?.total || 0n,
         }
     }
-
-    // alarm
-    let alarmActor: AlarmCanisterActor | null = null
 
     // # ACTIONS #
 
@@ -2821,7 +2661,7 @@ export const useTacoStore = defineStore('taco', () => {
             console.error('[TacoStore] Error sending identity to worker:', error)
         }
     }
-    const iidLogIn = async (version: 'v1' | 'v2' = 'v1') => {
+    const iidLogIn = async (version: 'v1' | 'v2' = 'v2') => {
 
         // turn app loading on
         appLoadingOn()
@@ -3083,17 +2923,6 @@ export const useTacoStore = defineStore('taco', () => {
         }
         return 'lrekt-uaaaa-aaaan-qz4ya-cai'; // local canisterId
     }
-    const alarmCanisterId = () => {
-        const network = getEffectiveNetwork()
-        switch (network) {
-            case "ic":
-                return process.env.CANISTER_ID_ALARM_IC || 'b2cwp-6qaaa-aaaad-qhn6a-cai'
-            case "staging":
-                return process.env.CANISTER_ID_ALARM_STAGING || 'b2cwp-6qaaa-aaaad-qhn6a-cai'
-        }
-        return 'b2cwp-6qaaa-aaaad-qhn6a-cai' // if not ic or staging, use local (all the same for now)
-    }
-
     // crypto prices
     const fetchCryptoPrices = async () => {
 
@@ -8053,6 +7882,65 @@ export const useTacoStore = defineStore('taco', () => {
         }
     }
 
+    // Send ICP using Account ID (legacy ledger transfer via send_dfx)
+    const sendIcpByAccountId = async (
+        accountId: string,
+        amount: bigint,
+        fee: bigint,
+        memo?: string
+    ) => {
+        try {
+            if (!userLoggedIn.value) {
+                throw new Error('User must be logged in to send tokens');
+            }
+
+            await initializeShims();
+            const authClient = await getAuthClient();
+            const identity = await authClient.getIdentity();
+
+            const sendDfxIDL = ({ IDL }: any) => {
+                const Tokens = IDL.Record({ 'e8s': IDL.Nat64 });
+                const TimeStamp = IDL.Record({ 'timestamp_nanos': IDL.Nat64 });
+                const SubAccount = IDL.Vec(IDL.Nat8);
+                const TextAccountIdentifier = IDL.Text;
+                const BlockIndex = IDL.Nat64;
+                const SendArgs = IDL.Record({
+                    'to': TextAccountIdentifier,
+                    'fee': Tokens,
+                    'memo': IDL.Nat64,
+                    'from_subaccount': IDL.Opt(SubAccount),
+                    'created_at_time': IDL.Opt(TimeStamp),
+                    'amount': Tokens,
+                });
+                return IDL.Service({
+                    'send_dfx': IDL.Func([SendArgs], [BlockIndex], []),
+                });
+            };
+
+            const agent = await createAgent({
+                identity,
+                host: getNetworkHost(),
+                fetchRootKey: shouldFetchRootKey(),
+            });
+            const icpLedgerPrincipal = 'ryjl3-tyaaa-aaaaa-aaaba-cai';
+            const ledgerActor = Actor.createActor(sendDfxIDL, { agent, canisterId: icpLedgerPrincipal });
+
+            const result = await ledgerActor.send_dfx({
+                to: accountId,
+                fee: { e8s: fee },
+                memo: 0n,
+                from_subaccount: [],
+                created_at_time: [],
+                amount: { e8s: amount },
+            });
+
+            return result;
+        } catch (error: any) {
+            console.error('Error sending ICP by account ID:', error);
+            throw error;
+        }
+    }
+
     // Token metadata cache (stored in localStorage)
     const TOKEN_METADATA_CACHE_KEY = 'taco_token_metadata_cache';
     const CACHE_EXPIRY_MS = 24 * 60 * 60 * 1000; // 24 hours
@@ -8242,672 +8130,6 @@ export const useTacoStore = defineStore('taco', () => {
             return false; // Default to ICRC1 if check fails
         }
     };
-
-        // # ALARM MANAGEMENT FUNCTIONS #
-
-    // Helper function to create alarm actor
-    const createAlarmActor = async () => {
-        try {
-            const authClient = await getAuthClient();
-            return await getAuthenticatedActor(authClient, alarmCanisterId(), () => alarmIDL) as AlarmService;
-        } catch (error) {
-            console.error('Error creating alarm actor:', error);
-            throw error;
-        }
-    }
-
-    const performSystemHealthCheck = async () => {
-        try {
-            const actor = await createAlarmActor();
-            const result = await actor.performSystemHealthCheckManual();
-            
-            if ('err' in result) {
-                throw new Error(JSON.stringify(result.err));
-            }
-            
-            showSuccess('System health check completed successfully');
-            return result.ok;
-        } catch (error) {
-            console.error('Error performing system health check:', error);
-            showError(`Error performing system health check: ${error instanceof Error ? error.message : String(error)}`);
-            throw error;
-        }
-    }
-
-    const getEnhancedAlarmSystemStatus = async () => {
-        try {
-            const actor = await createAlarmActor();
-            const result = await actor.getEnhancedAlarmSystemStatus();
-            
-            if ('err' in result) {
-                throw new Error(JSON.stringify(result.err));
-            }
-            
-            return result.ok;
-        } catch (error) {
-            console.error('Error getting enhanced alarm system status:', error);
-            showError(`Error getting alarm system status: ${error instanceof Error ? error.message : String(error)}`);
-            throw error;
-        }
-    }
-
-    const getMonitoringStatus = async () => {
-        try {
-            const actor = await createAlarmActor();
-            const result = await actor.getMonitoringStatus();
-            
-            if ('err' in result) {
-                throw new Error(JSON.stringify(result.err));
-            }
-            
-            return result.ok;
-        } catch (error) {
-            console.error('Error getting monitoring status:', error);
-            showError(`Error getting monitoring status: ${error instanceof Error ? error.message : String(error)}`);
-            throw error;
-        }
-    }
-
-    const addAlarmAdmin = async (principalId: string) => {
-        try {
-            const actor = await createAlarmActor();
-            const result = await actor.addAdmin(Principal.fromText(principalId),[{ Admin: null }]);
-            
-            if ('err' in result) {
-                throw new Error(JSON.stringify(result.err));
-            }
-            
-            showSuccess('Admin added successfully');
-            return result.ok;
-        } catch (error) {
-            console.error('Error adding alarm admin:', error);
-            showError(`Error adding admin: ${error instanceof Error ? error.message : String(error)}`);
-            throw error;
-        }
-    }
-
-    const addAlarmContact = async (name: string, type: string, value: string) => {
-        try {
-            const actor = await createAlarmActor();
-            const contactType = type === 'SMS' ? { SMS: value } : { Email: value };
-            const result = await actor.addContact(name,contactType);
-            
-            if ('err' in result) {
-                throw new Error(JSON.stringify(result.err));
-            }
-            
-            showSuccess('Contact added successfully');
-            return result.ok;
-        } catch (error) {
-            console.error('Error adding alarm contact:', error);
-            showError(`Error adding contact: ${error instanceof Error ? error.message : String(error)}`);
-            throw error;
-        }
-    }
-
-    const getAlarmContacts = async () => {
-        try {
-            const actor = await createAlarmActor();
-            const result = await actor.getContacts();
-            
-            if ('err' in result) {
-                throw new Error(JSON.stringify(result.err));
-            }
-            
-            return result.ok;
-        } catch (error) {
-            console.error('Error getting alarm contacts:', error);
-            showError(`Error getting contacts: ${error instanceof Error ? error.message : String(error)}`);
-            throw error;
-        }
-    }
-
-    const updateContactStatus = async (contactId: number, active: boolean) => {
-        try {
-            const actor = await createAlarmActor();
-            const result = await actor.updateContactStatus(BigInt(contactId), active);
-            
-            if ('err' in result) {
-                throw new Error(JSON.stringify(result.err));
-            }
-            
-            showSuccess(`Contact ${active ? 'activated' : 'deactivated'} successfully`);
-            return result.ok;
-        } catch (error) {
-            console.error('Error updating contact status:', error);
-            showError(`Error updating contact status: ${error instanceof Error ? error.message : String(error)}`);
-            throw error;
-        }
-    }
-
-    const removeAlarmContact = async (contactId: number) => {
-        try {
-            const actor = await createAlarmActor();
-            const result = await actor.removeContact(BigInt(contactId));
-            
-            if ('err' in result) {
-                throw new Error(JSON.stringify(result.err));
-            }
-            
-            showSuccess('Contact removed successfully');
-            return result.ok;
-        } catch (error) {
-            console.error('Error removing alarm contact:', error);
-            showError(`Error removing contact: ${error instanceof Error ? error.message : String(error)}`);
-            throw error;
-        }
-    }
-
-    const testAlarmContact = async (contactIds: number[], options?: { email?: boolean; sms?: boolean }) => {
-        try {
-            const actor = await createAlarmActor();
-            const bigIntContactIds = contactIds.map(id => BigInt(id));
-            
-            const results: { sms?: any; email?: any } = {};
-            
-            // Default to both if no options specified
-            const shouldSendSMS = options?.sms !== false;
-            const shouldSendEmail = options?.email !== false;
-            
-            if (shouldSendSMS) {
-                const smsResult = await actor.sendTestSMS(bigIntContactIds);
-                if ('err' in smsResult) {
-                    throw new Error(`SMS test error: ${JSON.stringify(smsResult.err)}`);
-                }
-                results.sms = smsResult.ok;
-            }
-            
-            if (shouldSendEmail) {
-                const emailResult = await actor.sendTestEmail(bigIntContactIds);
-                if ('err' in emailResult) {
-                    throw new Error(`Email test error: ${JSON.stringify(emailResult.err)}`);
-                }
-                results.email = emailResult.ok;
-            }
-            
-            const messageTypes = [];
-            if (shouldSendSMS) messageTypes.push('SMS');
-            if (shouldSendEmail) messageTypes.push('Email');
-            
-            showSuccess(`Test ${messageTypes.join(' and ')} sent successfully`);
-            return results;
-        } catch (error) {
-            console.error('Error testing alarm contact:', error);
-            showError(`Error testing contact: ${error instanceof Error ? error.message : String(error)}`);
-            throw error;
-        }
-    }
-
-    const getPendingAlarms = async () => {
-        try {
-            const actor = await createAlarmActor();
-            const result = await actor.getPendingAlarms();
-            
-            if ('err' in result) {
-                throw new Error(JSON.stringify(result.err));
-            }
-            
-            return result.ok;
-        } catch (error) {
-            console.error('Error getting pending alarms:', error);
-            showError(`Error getting pending alarms: ${error instanceof Error ? error.message : String(error)}`);
-            throw error;
-        }
-    }
-
-    const acknowledgeAlarm = async (alarmId: number) => {
-        try {
-            const actor = await createAlarmActor();
-            const result = await actor.acknowledgeAlarm(BigInt(alarmId));
-            
-            if ('err' in result) {
-                throw new Error(JSON.stringify(result.err));
-            }
-            
-            showSuccess('Alarm acknowledged successfully');
-            return result.ok;
-        } catch (error) {
-            console.error('Error acknowledging alarm:', error);
-            showError(`Error acknowledging alarm: ${error instanceof Error ? error.message : String(error)}`);
-            throw error;
-        }
-    }
-
-    const getSystemErrors = async (limit?: number) => {
-        try {
-            const actor = await createAlarmActor();
-            const result = await actor.getSystemErrors(limit ? [BigInt(limit)] : []);
-            
-            if ('err' in result) {
-                throw new Error(JSON.stringify(result.err));
-            }
-            
-            return result.ok;
-        } catch (error) {
-            console.error('Error getting system errors:', error);
-            showError(`Error getting system errors: ${error instanceof Error ? error.message : String(error)}`);
-            throw error;
-        }
-    }
-
-    const getInternalErrors = async (limit?: number) => {
-        try {
-            const actor = await createAlarmActor();
-            const result = await actor.getInternalErrors(limit ? [BigInt(limit)] : []);
-
-            if ('err' in result) {
-                throw new Error(JSON.stringify(result.err));
-            }
-
-            return result.ok;
-        } catch (error) {
-            console.error('Error getting internal errors:', error);
-            showError(`Error getting internal errors: ${error instanceof Error ? error.message : String(error)}`);
-            throw error;
-        }
-    }
-
-    const resolveSystemError = async (errorId: number) => {
-        try {
-            const actor = await createAlarmActor();
-            const result = await actor.resolveSystemErrorById(BigInt(errorId));
-            
-            if ('err' in result) {
-                throw new Error(JSON.stringify(result.err));
-            }
-            
-            showSuccess('System error resolved successfully');
-            return result.ok;
-        } catch (error) {
-            console.error('Error resolving system error:', error);
-            showError(`Error resolving system error: ${error instanceof Error ? error.message : String(error)}`);
-            throw error;
-        }
-    }
-
-    const setCheckInterval = async (intervalMinutes: number) => {
-        try {
-            const actor = await createAlarmActor();
-            const result = await actor.setCheckInterval(BigInt(intervalMinutes));
-            
-            if ('err' in result) {
-                throw new Error(JSON.stringify(result.err));
-            }
-            
-            showSuccess('Check interval updated successfully');
-            return result.ok;
-        } catch (error) {
-            console.error('Error setting check interval:', error);
-            showError(`Error setting check interval: ${error instanceof Error ? error.message : String(error)}`);
-            throw error;
-        }
-    }
-
-    const startMonitoring = async () => {
-        try {
-            const actor = await createAlarmActor();
-            const result = await actor.startMonitoring();
-            
-            if ('err' in result) {
-                throw new Error(JSON.stringify(result.err));
-            }
-            
-            showSuccess('Monitoring started successfully');
-            return result.ok;
-        } catch (error) {
-            console.error('Error starting monitoring:', error);
-            showError(`Error starting monitoring: ${error instanceof Error ? error.message : String(error)}`);
-            throw error;
-        }
-    }
-
-    const stopMonitoring = async () => {
-        try {
-            const actor = await createAlarmActor();
-            const result = await actor.stopMonitoring();
-            
-            if ('err' in result) {
-                throw new Error(JSON.stringify(result.err));
-            }
-            
-            showSuccess('Monitoring stopped successfully');
-            return result.ok;
-        } catch (error) {
-            console.error('Error stopping monitoring:', error);
-            showError(`Error stopping monitoring: ${error instanceof Error ? error.message : String(error)}`);
-            throw error;
-        }
-    }
-
-    const addMonitoredCanister = async (canisterId: string, name: string, isSNSControlled: boolean, snsRootCanisterId: string | null, minimumCycles: bigint, cyclesAlertLevel: string, timersAlertLevel: string, statusAlertLevel: string) => {
-        try {
-            const actor = await createAlarmActor();
-            const result = await actor.addMonitoredCanister(
-    Principal.fromText(canisterId),
-    name,
-    isSNSControlled,
-    snsRootCanisterId ? [Principal.fromText(snsRootCanisterId)] : [],
-    minimumCycles,
-    cyclesAlertLevel === 'Level2DelayedSMS'
-        ? { Level2DelayedSMS: null }
-        : { Level1Immediate: null },
-        timersAlertLevel === 'Level2DelayedSMS'
-        ? { Level2DelayedSMS: null }
-        : { Level1Immediate: null },
-        statusAlertLevel === 'Level2DelayedSMS'
-        ? { Level2DelayedSMS: null }
-        : { Level1Immediate: null },
-);
-            
-            if ('err' in result) {
-                throw new Error(JSON.stringify(result.err));
-            }
-            
-            showSuccess('Monitored canister added successfully');
-            return result.ok;
-        } catch (error) {
-            console.error('Error adding monitored canister:', error);
-            showError(`Error adding monitored canister: ${error instanceof Error ? error.message : String(error)}`);
-            throw error;
-        }
-    }
-
-    const getMonitoredCanisters = async () => {
-        try {
-            const actor = await createAlarmActor();
-            const result = await actor.getMonitoredCanisters();
-            
-            if ('err' in result) {
-                throw new Error(JSON.stringify(result.err));
-            }
-            
-            return result.ok;
-        } catch (error) {
-            console.error('Error getting monitored canisters:', error);
-            showError(`Error getting monitored canisters: ${error instanceof Error ? error.message : String(error)}`);
-            throw error;
-        }
-    }
-
-    const removeMonitoredCanister = async (configId: number) => {
-        try {
-            const actor = await createAlarmActor();
-            const result = await actor.removeMonitoredCanister(BigInt(configId));
-            
-            if ('err' in result) {
-                throw new Error(JSON.stringify(result.err));
-            }
-            
-            showSuccess('Monitored canister removed successfully');
-            return result.ok;
-        } catch (error) {
-            console.error('Error removing monitored canister:', error);
-            showError(`Error removing monitored canister: ${error instanceof Error ? error.message : String(error)}`);
-            throw error;
-        }
-    }
-
-    const updateMonitoredCanisterStatus = async (configId: number, enabled: boolean) => {
-        try {
-            const actor = await createAlarmActor();
-            const result = await actor.updateMonitoredCanisterStatus(BigInt(configId), enabled);
-            
-            if ('err' in result) {
-                throw new Error(JSON.stringify(result.err));
-            }
-            
-            showSuccess(`Monitored canister ${enabled ? 'enabled' : 'disabled'} successfully`);
-            return result.ok;
-        } catch (error) {
-            console.error('Error updating monitored canister status:', error);
-            showError(`Error updating monitored canister status: ${error instanceof Error ? error.message : String(error)}`);
-            throw error;
-        }
-    }
-
-    const startCanisterMonitoring = async () => {
-        try {
-            const actor = await createAlarmActor();
-            const result = await actor.startCanisterMonitoring();
-            
-            if ('err' in result) {
-                throw new Error(JSON.stringify(result.err));
-            }
-            
-            showSuccess('Canister monitoring started successfully');
-            return result.ok;
-        } catch (error) {
-            console.error('Error starting canister monitoring:', error);
-            showError(`Error starting canister monitoring: ${error instanceof Error ? error.message : String(error)}`);
-            throw error;
-        }
-    }
-
-    const stopCanisterMonitoring = async () => {
-        try {
-            const actor = await createAlarmActor();
-            const result = await actor.stopCanisterMonitoring();
-            
-            if ('err' in result) {
-                throw new Error(JSON.stringify(result.err));
-            }
-            
-            showSuccess('Canister monitoring stopped successfully');
-            return result.ok;
-        } catch (error) {
-            console.error('Error stopping canister monitoring:', error);
-            showError(`Error stopping canister monitoring: ${error instanceof Error ? error.message : String(error)}`);
-            throw error;
-        }
-    }
-
-    const getCanisterHealthStatus = async () => {
-        try {
-            const actor = await createAlarmActor();
-            const result = await actor.getCanisterHealthStatus();
-            
-            if ('err' in result) {
-                throw new Error(JSON.stringify(result.err));
-            }
-            
-            return result.ok;
-        } catch (error) {
-            console.error('Error getting canister health status:', error);
-            showError(`Error getting canister health status: ${error instanceof Error ? error.message : String(error)}`);
-            throw error;
-        }
-    }
-
-    const getQueueStatus = async () => {
-        try {
-            const actor = await createAlarmActor();
-            const result = await actor.getQueueStatus();
-            
-            if ('err' in result) {
-                throw new Error(JSON.stringify(result.err));
-            }
-            
-            return result.ok;
-        } catch (error) {
-            console.error('Error getting queue status:', error);
-            showError(`Error getting queue status: ${error instanceof Error ? error.message : String(error)}`);
-            throw error;
-        }
-    }
-
-    const clearQueues = async () => {
-        try {
-            const actor = await createAlarmActor();
-            const result = await actor.clearQueues();
-            
-            if ('err' in result) {
-                throw new Error(JSON.stringify(result.err));
-            }
-            
-            showSuccess('Queues cleared successfully');
-            return result.ok;
-        } catch (error) {
-            console.error('Error clearing queues:', error);
-            showError(`Error clearing queues: ${error instanceof Error ? error.message : String(error)}`);
-            throw error;
-        }
-    }
-
-    const getSentMessages = async (limit?: number) => {
-        try {
-            const actor = await createAlarmActor();
-            const result = await actor.getSentMessages(limit ? [BigInt(limit)] : []);
-            
-            if ('err' in result) {
-                throw new Error(JSON.stringify(result.err));
-            }
-            
-            return result.ok;
-        } catch (error) {
-            console.error('Error getting sent messages:', error);
-            showError(`Error getting sent messages: ${error instanceof Error ? error.message : String(error)}`);
-            throw error;
-        }
-    }
-
-    const getSentSMSMessages = async (limit?: number) => {
-        try {
-            const actor = await createAlarmActor();
-            const result = await actor.getSentSMSMessages(limit ? [BigInt(limit)] : []);
-            
-            if ('err' in result) {
-                throw new Error(JSON.stringify(result.err));
-            }
-            
-            return result.ok;
-        } catch (error) {
-            console.error('Error getting sent SMS messages:', error);
-            showError(`Error getting sent SMS messages: ${error instanceof Error ? error.message : String(error)}`);
-            throw error;
-        }
-    }
-
-    const getSentEmailMessages = async (limit?: number) => {
-        try {
-            const actor = await createAlarmActor();
-            const result = await actor.getSentEmailMessages(limit ? [BigInt(limit)] : []);
-            
-            if ('err' in result) {
-                throw new Error(JSON.stringify(result.err));
-            }
-            
-            return result.ok;
-        } catch (error) {
-            console.error('Error getting sent email messages:', error);
-            showError(`Error getting sent email messages: ${error instanceof Error ? error.message : String(error)}`);
-            throw error;
-        }
-    }
-
-    const setCanisterMonitoringInterval = async (intervalMinutes: number) => {
-        try {
-            const actor = await createAlarmActor();
-            const result = await actor.setCanisterMonitoringInterval(BigInt(intervalMinutes));
-            
-            if ('err' in result) {
-                throw new Error(JSON.stringify(result.err));
-            }
-            
-            showSuccess('Canister monitoring interval updated successfully');
-            return result.ok;
-        } catch (error) {
-            console.error('Error setting canister monitoring interval:', error);
-            showError(`Error setting canister monitoring interval: ${error instanceof Error ? error.message : String(error)}`);
-            throw error;
-        }
-    }
-
-    const setLevel2SMSCheckInterval = async (intervalMinutes: number) => {
-        try {
-            const actor = await createAlarmActor();
-            const result = await actor.setLevel2SMSCheckInterval(BigInt(intervalMinutes));
-            
-            if ('err' in result) {
-                throw new Error(JSON.stringify(result.err));
-            }
-            
-            showSuccess('Level 2 SMS check interval updated successfully');
-            return result.ok;
-        } catch (error) {
-            console.error('Error setting level 2 SMS check interval:', error);
-            showError(`Error setting level 2 SMS check interval: ${error instanceof Error ? error.message : String(error)}`);
-            throw error;
-        }
-    }
-
-    const getConfigurationIntervals = async () => {
-        try {
-            const actor = await createAlarmActor();
-            const result = await actor.getConfigurationIntervals();
-            
-            if ('err' in result) {
-                throw new Error(JSON.stringify(result.err));
-            }
-            
-            return result.ok;
-        } catch (error) {
-            console.error('Error getting configuration intervals:', error);
-            showError(`Error getting configuration intervals: ${error instanceof Error ? error.message : String(error)}`);
-            throw error;
-        }
-    }
-
-    const getAdminActionLogs = async (limit?: number) => {
-        try {
-            const actor = await createAlarmActor();
-            const result = await actor.getAdminActionLogs(limit ? [BigInt(limit)] : []);
-            
-            if ('err' in result) {
-                throw new Error(JSON.stringify(result.err));
-            }
-            
-            return result.ok;
-        } catch (error) {
-            console.error('Error getting admin action logs:', error);
-            showError(`Error getting admin action logs: ${error instanceof Error ? error.message : String(error)}`);
-            throw error;
-        }
-    }
-
-    const getAlarmAcknowledgments = async (limit?: number) => {
-        try {
-            const actor = await createAlarmActor();
-            const result = await actor.getAlarmAcknowledgments(limit ? [BigInt(limit)] : []);
-            
-            if ('err' in result) {
-                throw new Error(JSON.stringify(result.err));
-            }
-            
-            return result.ok;
-        } catch (error) {
-            console.error('Error getting alarm acknowledgments:', error);
-            showError(`Error getting alarm acknowledgments: ${error instanceof Error ? error.message : String(error)}`);
-            throw error;
-        }
-    }
-
-    const sendTestEmailSingle = async (email: string, subject: string) => {
-        try {
-            const actor = await createAlarmActor();
-            const result = await actor.sendTestEmailSingle(email, subject);
-            
-            if ('err' in result) {
-                throw new Error(JSON.stringify(result.err));
-            }
-            
-            showSuccess('Test email sent successfully');
-            return result.ok;
-        } catch (error) {
-            console.error('Error sending test email:', error);
-            showError(`Error sending test email: ${error instanceof Error ? error.message : String(error)}`);
-            throw error;
-        }
-    }
 
     const showSuccess = (message: string) => {
         addToast({
@@ -9865,6 +9087,7 @@ export const useTacoStore = defineStore('taco', () => {
         registerUserToken,
         unregisterUserToken,
         sendToken,
+        sendIcpByAccountId,
         fetchUserTokenBalance,
         clearTokenMetadataCache,
         fetchTokenMetadata,
@@ -9878,53 +9101,15 @@ export const useTacoStore = defineStore('taco', () => {
         
         // Router
         router,
-        alarmCanisterId,
-        
+
         // Portfolio snapshot management
         getPortfolioSnapshotStatus,
         startPortfolioSnapshots,
         stopPortfolioSnapshots,
         updatePortfolioSnapshotInterval,
 
-        // Alarm management functions
-        createAlarmActor,
         getAuthenticatedAgent,
         getAnonymousAgentPublic,
-        performSystemHealthCheck,
-        getEnhancedAlarmSystemStatus,
-        getMonitoringStatus,
-        addAlarmAdmin,
-        addAlarmContact,
-        getAlarmContacts,
-        updateContactStatus,
-        removeAlarmContact,
-        testAlarmContact,
-        getPendingAlarms,
-        acknowledgeAlarm,
-        getSystemErrors,
-        getInternalErrors,
-        resolveSystemError,
-        setCheckInterval,
-        startMonitoring,
-        stopMonitoring,
-        addMonitoredCanister,
-        getMonitoredCanisters,
-        removeMonitoredCanister,
-        updateMonitoredCanisterStatus,
-        startCanisterMonitoring,
-        stopCanisterMonitoring,
-        getCanisterHealthStatus,
-        getQueueStatus,
-        clearQueues,
-        getSentMessages,
-        getSentSMSMessages,
-        getSentEmailMessages,
-        setCanisterMonitoringInterval,
-        setLevel2SMSCheckInterval,
-        getConfigurationIntervals,
-        getAdminActionLogs,
-        getAlarmAcknowledgments,
-        sendTestEmailSingle,
         showSuccess,
         showError,
 
@@ -9993,18 +9178,6 @@ export const useTacoStore = defineStore('taco', () => {
         cachedPortfolioCircuitBreakerConditions,
         cachedNeuronSnapshots,
         cachedMaxNeuronSnapshots,
-        cachedAlarmSystemStatus,
-        cachedAlarmContacts,
-        cachedMonitoringStatus,
-        cachedPendingAlarms,
-        cachedSystemErrors,
-        cachedInternalErrors,
-        cachedMonitoredCanisters,
-        cachedConfigurationIntervals,
-        cachedQueueStatus,
-        cachedSentMessages,
-        cachedAlarmAcknowledgments,
-        cachedAdminActionLogs,
         cachedVotableProposals,
         cachedPeriodicTimerStatus,
         cachedAutoVotingThreshold,

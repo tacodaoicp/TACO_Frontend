@@ -1050,20 +1050,29 @@ const closeSendDialog = () => {
 }
 
 // handle send token
-const handleSendToken = async (params: { recipient: string; amount: bigint; memo?: string }) => {
+const handleSendToken = async (params: { recipient: string; amount: bigint; memo?: string; addressType: 'principal' | 'accountId' }) => {
   if (!selectedToken.value) return
 
   // turn on app loading
   appLoadingOn()
-  
+
   try {
-    await tacoStore.sendToken(
-      selectedToken.value.principal,
-      params.recipient,
-      params.amount,
-      selectedToken.value.fee,
-      params.memo
-    )
+    if (params.addressType === 'accountId') {
+      await tacoStore.sendIcpByAccountId(
+        params.recipient,
+        params.amount,
+        selectedToken.value.fee,
+        params.memo
+      )
+    } else {
+      await tacoStore.sendToken(
+        selectedToken.value.principal,
+        params.recipient,
+        params.amount,
+        selectedToken.value.fee,
+        params.memo
+      )
+    }
     
     const decimals = selectedToken.value.decimals
     const divisor = 10n ** BigInt(decimals)

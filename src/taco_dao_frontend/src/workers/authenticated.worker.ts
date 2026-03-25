@@ -58,19 +58,6 @@ import {
   // Neuron Snapshots admin data
   fetchNeuronSnapshotsData,
   fetchMaxNeuronSnapshotsData,
-  // Alarm system admin data
-  fetchAlarmSystemStatusData,
-  fetchAlarmContactsData,
-  fetchMonitoringStatusData,
-  fetchPendingAlarmsData,
-  fetchSystemErrorsData,
-  fetchInternalErrorsData,
-  fetchMonitoredCanistersData,
-  fetchConfigurationIntervalsData,
-  fetchQueueStatusData,
-  fetchSentMessagesData,
-  fetchAlarmAcknowledgmentsData,
-  fetchAdminActionLogsData,
   // NNS Automation admin data
   fetchVotableProposalsData,
   fetchPeriodicTimerStatusData,
@@ -150,19 +137,6 @@ const HANDLED_KEYS: DataKey[] = [
   // Neuron Snapshots admin data
   'neuronSnapshots',
   'maxNeuronSnapshots',
-  // Alarm system admin data
-  'alarmSystemStatus',
-  'alarmContacts',
-  'monitoringStatus',
-  'pendingAlarms',
-  'systemErrors',
-  'internalErrors',
-  'monitoredCanisters',
-  'configurationIntervals',
-  'queueStatus',
-  'sentMessages',
-  'alarmAcknowledgments',
-  'adminActionLogs',
   // NNS Automation admin data
   'votableProposals',
   'periodicTimerStatus',
@@ -184,19 +158,6 @@ const USER_KEYS: DataKey[] = ['userAllocation', 'userPerformance', 'swapDashboar
 
 // Keys that REQUIRE authentication - canister enforces caller identity check
 const AUTH_REQUIRED_KEYS: DataKey[] = [
-  // Alarm system - uses canister_inspect_message
-  'queueStatus',
-  'sentMessages',
-  'alarmAcknowledgments',
-  'adminActionLogs',
-  'configurationIntervals',
-  'pendingAlarms',
-  'systemErrors',
-  'internalErrors',
-  'alarmContacts',
-  'monitoredCanisters',
-  'alarmSystemStatus',
-  'monitoringStatus',
   // NNS Automation - may require auth
   'votableProposals',
   'periodicTimerStatus',
@@ -272,6 +233,7 @@ let isAuthenticated = false
 let isInitialized = false
 let currentNetwork: 'ic' | 'staging' | 'local' | null = null // Track current network to detect changes
 let debugEnabled = false // Debug mode - disabled by default in production
+let currentRoute = '/' // Current route for admin data gating
 
 // Initial load state - track which keys are priority for current route
 let initialLoadKeys: Set<DataKey> = new Set()
@@ -440,8 +402,8 @@ async function setIdentity(serialized: SerializedIdentity): Promise<void> {
     // Queue user data fetch for background refresh
     queue.enqueue('userAllocation', 'critical')
 
-    // If admin, queue admin data
-    if (isAdmin) {
+    // If admin and on admin route, queue admin data
+    if (isAdmin && currentRoute.startsWith('/admin')) {
       for (const key of ADMIN_KEYS) {
         queue.enqueue(key, 'high')
       }
@@ -544,6 +506,37 @@ function handleMessage(port: MessagePort, message: WorkerRequest): void {
       handleSetAdmin(message)
       break
 
+    case 'SET_ROUTE': {
+      const newRoute = message.payload.route || '/'
+      if (newRoute !== currentRoute) {
+        currentRoute = newRoute
+        // Proactively serve cache + prioritize fetches for new route
+        const routeKeys = getInitialLoadKeys(newRoute)
+        for (const key of routeKeys) {
+          if (!HANDLED_KEYS.includes(key)) continue
+          const state = dataStates.get(key)
+          // Broadcast cached data immediately to subscribers
+          if (state?.data) {
+            broadcastToSubscribers(key, {
+              id: generateMessageId(),
+              timestamp: Date.now(),
+              type: 'CACHE_HIT',
+              payload: { dataKey: key, data: state.data, state, fromCache: true },
+            })
+          }
+          // Enqueue stale/missing data as critical priority
+          const requiresAuth = USER_KEYS.includes(key) || AUTH_REQUIRED_KEYS.includes(key)
+          const canFetch = !requiresAuth || isAuthenticated || PUBLIC_ADMIN_KEYS.includes(key)
+          if (canFetch && (!state?.data || isStale(key, state.lastUpdated))) {
+            queue.enqueue(key, 'critical')
+          }
+        }
+      } else {
+        currentRoute = newRoute
+      }
+      break
+    }
+
     case 'FETCH':
       handleFetch(port, message)
       break
@@ -634,6 +627,7 @@ function handleMessage(port: MessagePort, message: WorkerRequest): void {
  */
 function handleInitialLoad(port: MessagePort, message: WorkerRequest): void {
   const route = message.payload.route || '/'
+  currentRoute = route
   debugLog(`handleInitialLoad called for route: ${route}, isInitialized=${isInitialized}`)
 
   // If not initialized yet, queue this for processing after init completes
@@ -774,8 +768,8 @@ function handleSetAdmin(message: WorkerRequest): void {
 
   if (debugEnabled) console.log(`[AuthWorker] Admin status: ${isAdmin}`)
 
-  // If newly admin and authenticated, queue admin data
-  if (isAdmin && !wasAdmin && isAuthenticated) {
+  // If newly admin, authenticated, and on admin route, queue admin data
+  if (isAdmin && !wasAdmin && isAuthenticated && currentRoute.startsWith('/admin')) {
     for (const key of ADMIN_KEYS) {
       queue.enqueue(key, 'high')
     }
@@ -986,8 +980,8 @@ async function handleSetNetwork(message: WorkerRequest): Promise<void> {
     // Clear in-memory state and queue for refetch
     for (const key of HANDLED_KEYS) {
       dataStates.set(key, createInitialState())
-      // Queue all ADMIN_KEYS since they can be fetched with anonymous agent
-      if (ADMIN_KEYS.includes(key)) {
+      // Queue ADMIN_KEYS only when on admin route
+      if (ADMIN_KEYS.includes(key) && currentRoute.startsWith('/admin')) {
         queue.enqueue(key, 'high')
       }
       // Queue USER_KEYS only if authenticated
@@ -1048,7 +1042,7 @@ async function processQueue(): Promise<void> {
 
       if (!backoff.canRetry(item.dataKey)) {
         queue.retry(item.dataKey)
-        continue
+        break // Exit inner loop to sleep — 'continue' would infinite-loop (dequeue returns same item)
       }
 
       // Start fetch in parallel (don't await) - critical/high priority items start first
@@ -1505,55 +1499,6 @@ async function fetchData(dataKey: DataKey): Promise<void> {
       data = serializeForTransfer(await fetchMaxNeuronSnapshotsData(agent))
       break
 
-    // Alarm system admin data
-    case 'alarmSystemStatus':
-      data = serializeForTransfer(await fetchAlarmSystemStatusData(agent))
-      break
-
-    case 'alarmContacts':
-      data = serializeForTransfer(await fetchAlarmContactsData(agent))
-      break
-
-    case 'monitoringStatus':
-      data = serializeForTransfer(await fetchMonitoringStatusData(agent))
-      break
-
-    case 'pendingAlarms':
-      data = serializeForTransfer(await fetchPendingAlarmsData(agent))
-      break
-
-    case 'systemErrors':
-      data = serializeForTransfer(await fetchSystemErrorsData(agent))
-      break
-
-    case 'internalErrors':
-      data = serializeForTransfer(await fetchInternalErrorsData(agent))
-      break
-
-    case 'monitoredCanisters':
-      data = serializeForTransfer(await fetchMonitoredCanistersData(agent))
-      break
-
-    case 'configurationIntervals':
-      data = serializeForTransfer(await fetchConfigurationIntervalsData(agent))
-      break
-
-    case 'queueStatus':
-      data = serializeForTransfer(await fetchQueueStatusData(agent))
-      break
-
-    case 'sentMessages':
-      data = serializeForTransfer(await fetchSentMessagesData(agent))
-      break
-
-    case 'alarmAcknowledgments':
-      data = serializeForTransfer(await fetchAlarmAcknowledgmentsData(agent))
-      break
-
-    case 'adminActionLogs':
-      data = serializeForTransfer(await fetchAdminActionLogsData(agent))
-      break
-
     // NNS Automation admin data
     case 'votableProposals':
       data = serializeForTransfer(await fetchVotableProposalsData(agent))
@@ -1764,12 +1709,23 @@ async function autoRefreshLoop(): Promise<void> {
 
     // AUTH/ADMIN KEYS: refresh every 15 seconds (counter % 3 == 0, since 15s / 5s = 3)
     if (authRefreshCounter >= 3) {
-      // Always refresh PUBLIC_ADMIN_KEYS - they can be fetched anonymously
-      // This ensures admin page data stays fresh even for non-logged-in users
-      for (const dataKey of PUBLIC_ADMIN_KEYS) {
-        const state = dataStates.get(dataKey)
-        if (state && isStale(dataKey, state.lastUpdated) && !queue.has(dataKey)) {
-          queue.enqueue(dataKey, 'low')
+      // Refresh admin keys only when on /admin routes
+      if (currentRoute.startsWith('/admin')) {
+        for (const dataKey of PUBLIC_ADMIN_KEYS) {
+          const state = dataStates.get(dataKey)
+          if (state && isStale(dataKey, state.lastUpdated) && !queue.has(dataKey)) {
+            queue.enqueue(dataKey, 'low')
+          }
+        }
+
+        // Refresh auth-required admin data if admin
+        if (isAdmin && isAuthenticated) {
+          for (const dataKey of AUTH_REQUIRED_KEYS) {
+            const state = dataStates.get(dataKey)
+            if (state && isStale(dataKey, state.lastUpdated) && !queue.has(dataKey)) {
+              queue.enqueue(dataKey, 'low')
+            }
+          }
         }
       }
 
@@ -1779,16 +1735,6 @@ async function autoRefreshLoop(): Promise<void> {
           const state = dataStates.get(dataKey)
           if (state && isStale(dataKey, state.lastUpdated) && !queue.has(dataKey)) {
             queue.enqueue(dataKey, 'medium')
-          }
-        }
-      }
-
-      // Refresh auth-required admin data if admin
-      if (isAdmin && isAuthenticated) {
-        for (const dataKey of AUTH_REQUIRED_KEYS) {
-          const state = dataStates.get(dataKey)
-          if (state && isStale(dataKey, state.lastUpdated) && !queue.has(dataKey)) {
-            queue.enqueue(dataKey, 'low')
           }
         }
       }

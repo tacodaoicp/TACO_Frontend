@@ -75,7 +75,7 @@
                 :principal="userPrincipal"
                 :selectedPriceType="selectedPriceType"
                 :selectedTimeframe="selectedTimeframe"
-                @refresh="loadUserPerformance"
+                @refresh="refreshAllData"
               />
 
               <!-- Login prompt for non-logged in users -->
@@ -410,7 +410,7 @@ export default {
 
     const setupPerformanceSubscription = () => {
       // Subscribe to worker data - automatically updates when worker has fresh data
-      unsubscribePerformance = workerBridge.subscribe('userPerformance', (data) => {
+      unsubscribePerformance = workerBridge.subscribe('userPerformance', (data, state) => {
         if (data) {
           try {
             const deserialized = deserializeFromTransfer(data)
@@ -424,6 +424,10 @@ export default {
             userPerformanceError.value = 'Failed to load performance data'
             isLoadingUserPerformance.value = false
           }
+        } else if (state && state.error) {
+          // Worker reported an error — stop loading spinner
+          isLoadingUserPerformance.value = false
+          userPerformanceError.value = ''
         }
       })
     }
@@ -535,7 +539,7 @@ export default {
       isLoading.value = true
       // Worker handles performance data - just load follower info
       // Set loading state for performance (worker will update when data arrives)
-      if (userLoggedIn.value) {
+      if (userLoggedIn.value && !userPerformance.value) {
         isLoadingUserPerformance.value = true
       }
       await loadFollowerInfo(true)
@@ -707,7 +711,9 @@ export default {
     watch(userLoggedIn, (newState) => {
       if (newState) {
         // Worker will fetch performance data automatically via route priorities
-        isLoadingUserPerformance.value = true
+        if (!userPerformance.value) {
+          isLoadingUserPerformance.value = true
+        }
         loadDisplayName()
       } else {
         userPerformance.value = null
@@ -720,6 +726,9 @@ export default {
     // Load data on mount
     onMounted(async () => {
       await tacoStore.checkIfLoggedIn()
+      if (!userLoggedIn.value) {
+        isLoadingUserPerformance.value = false
+      }
       await refreshAllData()
       loadDisplayName()
     })
@@ -770,7 +779,6 @@ export default {
       // Methods
       iidLogIn,
       refreshAllData,
-      loadUserPerformance,
       onTimeframeChange,
       onPriceTypeChange,
       onFollowUser,
@@ -855,7 +863,7 @@ export default {
 
 /* Button styling */
 .iid-login {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 0.5rem;

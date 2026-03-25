@@ -561,33 +561,52 @@
                     </table>
                   </div>
 
+                  <!-- Shared recipient input -->
+                  <div class="d-flex gap-2 align-items-center mb-4">
+                    <label class="small text-muted text-nowrap">Claim recipient:</label>
+                    <input type="text" class="form-control form-control-sm bg-dark text-white" v-model="claimMintFeeRecipient" placeholder="Recipient principal" />
+                  </div>
+
                   <!-- Claimable mint fees -->
                   <h5 class="mb-3">Claimable Mint Fees</h5>
-                  <div class="row g-3 mb-4">
-                    <div class="col-md-3">
-                      <div class="p-3 rounded bg-black bg-opacity-25">
-                        <div class="small text-muted">Accumulated</div>
-                        <div>{{ formatE8s(adminData.claimableMintFees.accumulated) }} ICP</div>
-                      </div>
-                    </div>
-                    <div class="col-md-3">
-                      <div class="p-3 rounded bg-black bg-opacity-25">
-                        <div class="small text-muted">Claimed</div>
-                        <div>{{ formatE8s(adminData.claimableMintFees.claimed) }} ICP</div>
-                      </div>
-                    </div>
-                    <div class="col-md-3">
-                      <div class="p-3 rounded bg-black bg-opacity-25">
-                        <div class="small text-muted">Claimable</div>
-                        <div class="fw-bold text-success">{{ formatE8s(adminData.claimableMintFees.claimable) }} ICP</div>
-                      </div>
-                    </div>
-                    <div class="col-md-3 d-flex align-items-center">
-                      <div class="d-flex gap-2 align-items-center w-100">
-                        <input type="text" class="form-control form-control-sm bg-dark text-white" v-model="claimMintFeeRecipient" placeholder="Recipient principal" />
-                        <button class="btn btn-sm btn-success" @click="claimMintFees" :disabled="Number(adminData.claimableMintFees.claimable) === 0">Claim</button>
-                      </div>
-                    </div>
+                  <div class="table-responsive mb-4">
+                    <table class="table table-dark table-sm">
+                      <thead><tr><th>Token</th><th>Accumulated</th><th>Claimed</th><th>Claimable</th><th>Actions</th></tr></thead>
+                      <tbody>
+                        <tr v-for="fee in adminData.claimableMintFees" :key="fee.token.toText()">
+                          <td><code class="small">{{ formatPrincipal(fee.token) }}</code></td>
+                          <td>{{ formatE8s(fee.accumulated) }}</td>
+                          <td>{{ formatE8s(fee.claimed) }}</td>
+                          <td class="fw-bold text-success">{{ formatE8s(fee.claimable) }}</td>
+                          <td>
+                            <button class="btn btn-sm btn-success" :disabled="Number(fee.claimable) === 0"
+                                    @click="claimMintFee(fee.token)">Claim</button>
+                          </td>
+                        </tr>
+                        <tr v-if="adminData.claimableMintFees.length === 0"><td colspan="5" class="text-muted text-center">None</td></tr>
+                      </tbody>
+                    </table>
+                  </div>
+
+                  <!-- Claimable burn fees -->
+                  <h5 class="mb-3">Claimable Burn Fees</h5>
+                  <div class="table-responsive mb-4">
+                    <table class="table table-dark table-sm">
+                      <thead><tr><th>Token</th><th>Accumulated</th><th>Claimed</th><th>Claimable</th><th>Actions</th></tr></thead>
+                      <tbody>
+                        <tr v-for="fee in adminData.claimableBurnFees" :key="fee.token.toText()">
+                          <td><code class="small">{{ formatPrincipal(fee.token) }}</code></td>
+                          <td>{{ formatE8s(fee.accumulated) }}</td>
+                          <td>{{ formatE8s(fee.claimed) }}</td>
+                          <td class="fw-bold text-success">{{ formatE8s(fee.claimable) }}</td>
+                          <td>
+                            <button class="btn btn-sm btn-success" :disabled="Number(fee.claimable) === 0"
+                                    @click="claimBurnFee(fee.token)">Claim</button>
+                          </td>
+                        </tr>
+                        <tr v-if="adminData.claimableBurnFees.length === 0"><td colspan="5" class="text-muted text-center">None</td></tr>
+                      </tbody>
+                    </table>
                   </div>
 
                   <!-- Claimable cancellation fees -->
@@ -1497,11 +1516,23 @@ const removeRateLimitExempt = async (principal: any) => {
   await adminCall(async (a: any) => a.removeRateLimitExemptPrincipal(principal), 'Rate limit exemption removed')
 }
 
-const claimMintFees = async () => {
+const claimMintFee = async (tokenPrincipal: any) => {
   try {
     const recipient = Principal.fromText(claimMintFeeRecipient.value.trim())
-    const claimable = adminData.value?.claimableMintFees?.claimable || 0n
-    await adminCall(async (a: any) => a.claimMintFees(recipient, claimable), 'Mint fees claimed')
+    const fee = adminData.value?.claimableMintFees?.find((f: any) => f.token.toText() === tokenPrincipal.toText())
+    if (!fee) return
+    await adminCall(async (a: any) => a.claimMintFees(recipient, tokenPrincipal, fee.claimable), 'Mint fees claimed')
+  } catch (e: any) {
+    addToast('Error', e.message || 'Invalid recipient', 'fa-solid fa-exclamation-triangle')
+  }
+}
+
+const claimBurnFee = async (tokenPrincipal: any) => {
+  try {
+    const recipient = Principal.fromText(claimMintFeeRecipient.value.trim())
+    const fee = adminData.value?.claimableBurnFees?.find((f: any) => f.token.toText() === tokenPrincipal.toText())
+    if (!fee) return
+    await adminCall(async (a: any) => a.claimBurnFees(recipient, tokenPrincipal, fee.claimable), 'Burn fees claimed')
   } catch (e: any) {
     addToast('Error', e.message || 'Invalid recipient', 'fa-solid fa-exclamation-triangle')
   }
@@ -1509,12 +1540,10 @@ const claimMintFees = async () => {
 
 const claimCancellationFee = async (tokenPrincipal: any) => {
   try {
-    const recipient = claimMintFeeRecipient.value.trim()
-      ? Principal.fromText(claimMintFeeRecipient.value.trim())
-      : tokenPrincipal // fallback — claims require a recipient
+    const recipient = Principal.fromText(claimMintFeeRecipient.value.trim())
     const fee = adminData.value?.claimableCancellationFees?.find((f: any) => f.token.toText() === tokenPrincipal.toText())
     if (!fee) return
-    await adminCall(async (a: any) => a.claimCancellationFees(tokenPrincipal, recipient, fee.claimable), 'Cancellation fees claimed')
+    await adminCall(async (a: any) => a.claimCancellationFees(recipient, tokenPrincipal, fee.claimable), 'Cancellation fees claimed')
   } catch (e: any) {
     addToast('Error', e.message || 'Failed to claim', 'fa-solid fa-exclamation-triangle')
   }

@@ -12,7 +12,7 @@
           ref="chartRef"
           type="line"
           :options="chartOptions"
-          :series="initialSeries"
+          :series="series"
           height="100%"
         />
       </div>
@@ -36,11 +36,10 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch, nextTick } from 'vue'
+import { computed } from 'vue'
 import { useNachosStore } from '../../stores/nachos.store'
 
 const nachosStore = useNachosStore()
-const chartRef = ref<any>(null)
 
 // Skip first NAV snapshot (genesis / initialization point)
 const filteredHistory = computed(() =>
@@ -71,14 +70,14 @@ function buildMarkers() {
   })
 }
 
-// Initial series for first render only
-const initialSeries = [{
+// Reactive series — updates when filteredHistory changes (fixes race condition on quick navigation)
+const series = computed(() => [{
   name: 'NAV per NACHOS (ICP)',
   data: buildSeriesData(),
-}]
+}])
 
-// Static options — no dependency on filteredHistory, so no reactive updates
-const chartOptions = {
+// Reactive options — markers update automatically when data changes
+const chartOptions = computed(() => ({
   chart: {
     type: 'line' as const,
     background: 'transparent',
@@ -120,23 +119,7 @@ const chartOptions = {
     size: 3,
     discrete: buildMarkers(),
   },
-}
-
-// Imperatively update series + markers when data changes, preserving zoom state
-watch(filteredHistory, async () => {
-  await nextTick()
-  const chart = chartRef.value?.chart
-  if (!chart) return
-
-  chart.updateSeries([{
-    name: 'NAV per NACHOS (ICP)',
-    data: buildSeriesData(),
-  }], false)
-
-  chart.updateOptions({
-    markers: { size: 3, discrete: buildMarkers() },
-  }, false, false)
-})
+}))
 </script>
 
 <style scoped lang="scss">

@@ -614,7 +614,7 @@ LOCAL METHODS
     import astronautLoader from '../../assets/images/astonautLoader.webp'
     import placeholder52x52 from '../../assets/images/placeholder-52x52.png'
     import { Tooltip } from 'bootstrap'
-    import { getEffectiveNetwork } from '../../config/network-config'
+    import { isDevEnvironment } from '../../config/network-config'
     import { useAdminCheck } from '../../composables/useAdminCheck'
 
     ///////////
@@ -780,10 +780,7 @@ LOCAL METHODS
     // navigation
     // allocations visibility: only on staging/local or for admins
     const { isAdmin } = useAdminCheck()
-    const network = getEffectiveNetwork()
-    const canShowAllocations = computed(() => {
-      return network === 'staging' || network === 'local' || isAdmin.value
-    })
+    const canShowAllocations = computed(() => isDevEnvironment() || isAdmin.value)
 
     const showCurrentHoldings = ref(!canShowAllocations.value) // user is viewing current holdings
     const showCurrentAllocations = ref(canShowAllocations.value) // user is viewing current allocations

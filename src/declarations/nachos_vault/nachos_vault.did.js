@@ -100,11 +100,11 @@ export const idlFactory = ({ IDL }) => {
     'TokenNotAccepted' : IDL.Null,
     'OperationInProgress' : IDL.Null,
   });
-  const Result_5 = IDL.Variant({
+  const Result_6 = IDL.Variant({
     'ok' : IDL.Record({ 'refundTaskId' : IDL.Nat }),
     'err' : NachosError,
   });
-  const Result_4 = IDL.Variant({
+  const Result_5 = IDL.Variant({
     'ok' : IDL.Record({
       'tokenPriceICP' : IDL.Nat,
       'depositValueICP' : IDL.Nat,
@@ -155,7 +155,7 @@ export const idlFactory = ({ IDL }) => {
     'deposits' : IDL.Vec(TokenDeposit),
     'navUsed' : IDL.Nat,
   });
-  const Result_3 = IDL.Variant({ 'ok' : MintResult, 'err' : NachosError });
+  const Result_4 = IDL.Variant({ 'ok' : MintResult, 'err' : NachosError });
   const AcceptedTokenConfig = IDL.Record({
     'enabled' : IDL.Bool,
     'addedAt' : IDL.Int,
@@ -274,6 +274,20 @@ export const idlFactory = ({ IDL }) => {
     'amount' : IDL.Nat,
     'mintBurnId' : IDL.Opt(IDL.Nat),
   });
+  const FailedDeliveryStatus = IDL.Variant({
+    'Undelivered' : IDL.Null,
+    'Delivered' : IDL.Null,
+    'RetryQueued' : IDL.Null,
+  });
+  const FailedDeliveryEntry = IDL.Record({
+    'status' : FailedDeliveryStatus,
+    'token' : IDL.Principal,
+    'exhaustedAt' : IDL.Int,
+    'retriedAt' : IDL.Opt(IDL.Int),
+    'retryTaskId' : IDL.Opt(IDL.Nat),
+    'originalTaskId' : IDL.Nat,
+    'amount' : IDL.Nat,
+  });
   const FeeRecord = IDL.Record({
     'feeAmountICP' : IDL.Nat,
     'feeType' : IDL.Variant({ 'Burn' : IDL.Null, 'Mint' : IDL.Null }),
@@ -340,7 +354,11 @@ export const idlFactory = ({ IDL }) => {
     'tokensReceived' : IDL.Vec(TokenTransferResult),
     'skippedDustTokens' : IDL.Vec(IDL.Principal),
   });
-  const Result_2 = IDL.Variant({ 'ok' : BurnResult, 'err' : NachosError });
+  const Result_3 = IDL.Variant({ 'ok' : BurnResult, 'err' : NachosError });
+  const Result_2 = IDL.Variant({
+    'ok' : IDL.Vec(IDL.Nat),
+    'err' : NachosError,
+  });
   const NachosUpdateConfig = IDL.Record({
     'maxMintICPWorthPer4Hours' : IDL.Opt(IDL.Nat),
     'minBurnValueICP' : IDL.Opt(IDL.Nat),
@@ -377,16 +395,35 @@ export const idlFactory = ({ IDL }) => {
         [Result],
         [],
       ),
-    'cancelDeposit' : IDL.Func([IDL.Principal, IDL.Nat], [Result_5], []),
-    'claimBurnFees' : IDL.Func([IDL.Principal, IDL.Nat], [Result], []),
+    'adminForceRefreshBalances' : IDL.Func([], [Result], []),
+    'cancelDeposit' : IDL.Func([IDL.Principal, IDL.Nat], [Result_6], []),
+    'claimBurnFees' : IDL.Func(
+        [IDL.Principal, IDL.Principal, IDL.Nat],
+        [Result],
+        [],
+      ),
     'claimCancellationFees' : IDL.Func(
         [IDL.Principal, IDL.Principal, IDL.Nat],
         [Result],
         [],
       ),
-    'claimMintFees' : IDL.Func([IDL.Principal, IDL.Nat], [Result], []),
+    'claimMintFees' : IDL.Func(
+        [IDL.Principal, IDL.Principal, IDL.Nat],
+        [Result],
+        [],
+      ),
     'clearNavHistory' : IDL.Func([], [IDL.Text], []),
     'clearTokenPriceHistory' : IDL.Func([], [IDL.Text], []),
+    'debugPendingBurns' : IDL.Func(
+        [],
+        [IDL.Vec(IDL.Tuple(IDL.Principal, IDL.Nat))],
+        ['query'],
+      ),
+    'debugPendingForwards' : IDL.Func(
+        [],
+        [IDL.Vec(IDL.Tuple(IDL.Principal, IDL.Nat))],
+        ['query'],
+      ),
     'emergencyPause' : IDL.Func([], [Result], []),
     'emergencyUnpause' : IDL.Func([], [Result], []),
     'enableCircuitBreakerCondition' : IDL.Func(
@@ -433,7 +470,7 @@ export const idlFactory = ({ IDL }) => {
       ),
     'estimateMintWithToken' : IDL.Func(
         [IDL.Principal, IDL.Nat],
-        [Result_4],
+        [Result_5],
         ['query'],
       ),
     'estimateRedeem' : IDL.Func(
@@ -449,7 +486,7 @@ export const idlFactory = ({ IDL }) => {
       ),
     'genesisMint' : IDL.Func(
         [IDL.Nat, IDL.Opt(IDL.Vec(IDL.Nat8)), IDL.Opt(Account)],
-        [Result_3],
+        [Result_4],
         [],
       ),
     'getAcceptedMintTokens' : IDL.Func(
@@ -478,11 +515,14 @@ export const idlFactory = ({ IDL }) => {
               })
             ),
             'totalBurnCount' : IDL.Nat,
-            'claimableBurnFees' : IDL.Record({
-              'claimed' : IDL.Nat,
-              'claimable' : IDL.Nat,
-              'accumulated' : IDL.Nat,
-            }),
+            'claimableBurnFees' : IDL.Vec(
+              IDL.Record({
+                'token' : IDL.Principal,
+                'claimed' : IDL.Nat,
+                'claimable' : IDL.Nat,
+                'accumulated' : IDL.Nat,
+              })
+            ),
             'dataSource' : IDL.Text,
             'activeDepositCount' : IDL.Nat,
             'mintPausedByCircuitBreaker' : IDL.Bool,
@@ -508,11 +548,14 @@ export const idlFactory = ({ IDL }) => {
             'feeCount' : IDL.Nat,
             'burnFeeBasisPoints' : IDL.Nat,
             'nachosSupply' : IDL.Nat,
-            'claimableMintFees' : IDL.Record({
-              'claimed' : IDL.Nat,
-              'claimable' : IDL.Nat,
-              'accumulated' : IDL.Nat,
-            }),
+            'claimableMintFees' : IDL.Vec(
+              IDL.Record({
+                'token' : IDL.Principal,
+                'claimed' : IDL.Nat,
+                'claimable' : IDL.Nat,
+                'accumulated' : IDL.Nat,
+              })
+            ),
             'mintFeeBasisPoints' : IDL.Nat,
             'claimableCancellationFees' : IDL.Vec(
               IDL.Record({
@@ -589,11 +632,14 @@ export const idlFactory = ({ IDL }) => {
     'getClaimableBurnFees' : IDL.Func(
         [],
         [
-          IDL.Record({
-            'claimed' : IDL.Nat,
-            'claimable' : IDL.Nat,
-            'accumulated' : IDL.Nat,
-          }),
+          IDL.Vec(
+            IDL.Record({
+              'token' : IDL.Principal,
+              'claimed' : IDL.Nat,
+              'claimable' : IDL.Nat,
+              'accumulated' : IDL.Nat,
+            })
+          ),
         ],
         ['query'],
       ),
@@ -614,11 +660,14 @@ export const idlFactory = ({ IDL }) => {
     'getClaimableMintFees' : IDL.Func(
         [],
         [
-          IDL.Record({
-            'claimed' : IDL.Nat,
-            'claimable' : IDL.Nat,
-            'accumulated' : IDL.Nat,
-          }),
+          IDL.Vec(
+            IDL.Record({
+              'token' : IDL.Principal,
+              'claimed' : IDL.Nat,
+              'claimable' : IDL.Nat,
+              'accumulated' : IDL.Nat,
+            })
+          ),
         ],
         ['query'],
       ),
@@ -649,6 +698,42 @@ export const idlFactory = ({ IDL }) => {
     'getDeposit' : IDL.Func(
         [IDL.Principal, IDL.Nat],
         [IDL.Opt(ActiveDeposit)],
+        ['query'],
+      ),
+    'getFailedBurnDeliveries' : IDL.Func(
+        [IDL.Opt(IDL.Principal)],
+        [
+          IDL.Vec(
+            IDL.Record({
+              'entries' : IDL.Vec(FailedDeliveryEntry),
+              'burnId' : IDL.Nat,
+            })
+          ),
+        ],
+        ['query'],
+      ),
+    'getFailedForwardDeliveries' : IDL.Func(
+        [],
+        [
+          IDL.Vec(
+            IDL.Record({
+              'mintId' : IDL.Nat,
+              'entries' : IDL.Vec(FailedDeliveryEntry),
+            })
+          ),
+        ],
+        ['query'],
+      ),
+    'getFailedRefundDeliveries' : IDL.Func(
+        [],
+        [
+          IDL.Vec(
+            IDL.Record({
+              'opId' : IDL.Nat,
+              'entries' : IDL.Vec(FailedDeliveryEntry),
+            })
+          ),
+        ],
         ['query'],
       ),
     'getFeeExemptPrincipals' : IDL.Func(
@@ -920,6 +1005,14 @@ export const idlFactory = ({ IDL }) => {
               })
             ),
             'totalBurnCount' : IDL.Nat,
+            'claimableBurnFees' : IDL.Vec(
+              IDL.Record({
+                'token' : IDL.Principal,
+                'claimed' : IDL.Nat,
+                'claimable' : IDL.Nat,
+                'accumulated' : IDL.Nat,
+              })
+            ),
             'dataSource' : IDL.Text,
             'mintPausedByCircuitBreaker' : IDL.Bool,
             'minBurnValueICP' : IDL.Nat,
@@ -949,7 +1042,23 @@ export const idlFactory = ({ IDL }) => {
             'feeCount' : IDL.Nat,
             'burnFeeBasisPoints' : IDL.Nat,
             'nachosSupply' : IDL.Nat,
+            'claimableMintFees' : IDL.Vec(
+              IDL.Record({
+                'token' : IDL.Principal,
+                'claimed' : IDL.Nat,
+                'claimable' : IDL.Nat,
+                'accumulated' : IDL.Nat,
+              })
+            ),
             'mintFeeBasisPoints' : IDL.Nat,
+            'claimableCancellationFees' : IDL.Vec(
+              IDL.Record({
+                'token' : IDL.Principal,
+                'claimed' : IDL.Nat,
+                'claimable' : IDL.Nat,
+                'accumulated' : IDL.Nat,
+              })
+            ),
             'mintFeesICP' : IDL.Nat,
             'genesisComplete' : IDL.Bool,
             'burnEstimate' : IDL.Opt(
@@ -980,7 +1089,7 @@ export const idlFactory = ({ IDL }) => {
     'get_canister_cycles' : IDL.Func([], [IDL.Nat], ['query']),
     'mintNachos' : IDL.Func(
         [IDL.Nat, IDL.Nat, IDL.Opt(IDL.Vec(IDL.Nat8)), IDL.Opt(Account)],
-        [Result_3],
+        [Result_4],
         [],
       ),
     'mintNachosWithPortfolioShare' : IDL.Func(
@@ -992,7 +1101,7 @@ export const idlFactory = ({ IDL }) => {
           IDL.Opt(IDL.Vec(IDL.Nat8)),
           IDL.Opt(Account),
         ],
-        [Result_3],
+        [Result_4],
         [],
       ),
     'mintNachosWithToken' : IDL.Func(
@@ -1003,7 +1112,7 @@ export const idlFactory = ({ IDL }) => {
           IDL.Opt(IDL.Vec(IDL.Nat8)),
           IDL.Opt(Account),
         ],
-        [Result_3],
+        [Result_4],
         [],
       ),
     'pauseBurning' : IDL.Func([], [Result], []),
@@ -1023,7 +1132,7 @@ export const idlFactory = ({ IDL }) => {
             )
           ),
         ],
-        [Result_2],
+        [Result_3],
         [],
       ),
     'refreshICPSwapPools' : IDL.Func([], [Result], []),
@@ -1032,6 +1141,9 @@ export const idlFactory = ({ IDL }) => {
     'removeFeeExemptPrincipal' : IDL.Func([IDL.Principal], [Result], []),
     'removeRateLimitExemptPrincipal' : IDL.Func([IDL.Principal], [Result], []),
     'resetCircuitBreaker' : IDL.Func([], [Result], []),
+    'retryFailedBurnDelivery' : IDL.Func([IDL.Nat], [Result_2], []),
+    'retryFailedForwardDelivery' : IDL.Func([IDL.Nat], [Result_2], []),
+    'retryFailedRefundDelivery' : IDL.Func([IDL.Nat], [Result_2], []),
     'retryFailedTransfers' : IDL.Func([], [Result_1], []),
     'setAcceptedMintTokenEnabled' : IDL.Func(
         [IDL.Principal, IDL.Bool],

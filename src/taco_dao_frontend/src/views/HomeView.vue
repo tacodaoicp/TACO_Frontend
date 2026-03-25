@@ -2197,7 +2197,6 @@
         import('./AdminRewardsView.vue')
         import('./AdminRewardsBalancesView.vue')
         import('./AdminDistributionsView.vue')
-        import('./AdminAlarmView.vue')
         import('./AdminClaimsView.vue')
         import('./AdminNNSView.vue')
         import('./SystemView.vue')

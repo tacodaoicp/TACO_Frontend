@@ -212,22 +212,6 @@ export function getIcpLedgerCanisterId(): string {
 }
 
 /**
- * Alarm Canister ID
- */
-export function getAlarmCanisterId(): string {
-  const network = getNetwork()
-
-  switch (network) {
-    case 'ic':
-      return getEnvVar('CANISTER_ID_ALARM_IC') || 'b2cwp-6qaaa-aaaad-qhn6a-cai'
-    case 'staging':
-      return getEnvVar('CANISTER_ID_ALARM_STAGING') || 'b2cwp-6qaaa-aaaad-qhn6a-cai'
-    default:
-      return 'b2cwp-6qaaa-aaaad-qhn6a-cai' // local
-  }
-}
-
-/**
  * TACO Swap Canister ID
  */
 export function getTacoSwapCanisterId(): string {
@@ -266,7 +250,6 @@ export function getAllCanisterIds(): Record<string, string> {
     tacoSnsGovernance: getTacoSnsGovernanceCanisterId(),
     appSneedDao: getAppSneedDaoCanisterId(),
     icpLedger: getIcpLedgerCanisterId(),
-    alarm: getAlarmCanisterId(),
     tacoSwap: getTacoSwapCanisterId(),
     nachosVault: getNachosVaultCanisterId(),
   }

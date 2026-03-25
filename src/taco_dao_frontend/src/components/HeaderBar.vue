@@ -738,7 +738,7 @@
   import DarkModeToggle from "./theme/DarkModeToggle.vue"
   import { Tooltip } from 'bootstrap'
   // import EnvironmentIndicator from './misc/EnvironmentIndicator.vue'
-  import { getEffectiveNetwork } from '../config/network-config'
+  import { getEffectiveNetwork, isDevEnvironment } from '../config/network-config'
   import { useAdminCheck } from '../composables/useAdminCheck'
   import WizardModal from "../views/WizardView.vue"
 
@@ -776,7 +776,7 @@
   const localNeuronsCount = ref(0)
 
   // staging-only features
-  const isNonProduction = ref(getEffectiveNetwork() !== 'ic')
+  const isNonProduction = ref(isDevEnvironment())
 
   // vault visibility: staging/local or admin
   const { isAdmin } = useAdminCheck()

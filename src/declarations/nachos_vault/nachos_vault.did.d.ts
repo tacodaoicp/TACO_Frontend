@@ -106,6 +106,18 @@ export type DepositStatus = { 'Consumed' : null } |
   { 'Processing' : null } |
   { 'Verified' : null } |
   { 'Expired' : null };
+export interface FailedDeliveryEntry {
+  'status' : FailedDeliveryStatus,
+  'token' : Principal,
+  'exhaustedAt' : bigint,
+  'retriedAt' : [] | [bigint],
+  'retryTaskId' : [] | [bigint],
+  'originalTaskId' : bigint,
+  'amount' : bigint,
+}
+export type FailedDeliveryStatus = { 'Undelivered' : null } |
+  { 'Delivered' : null } |
+  { 'RetryQueued' : null };
 export interface FailedTokenTransfer {
   'token' : Principal,
   'error' : string,
@@ -274,12 +286,15 @@ export interface NachosVaultDAO {
   >,
   'addFeeExemptPrincipal' : ActorMethod<[Principal, string], Result>,
   'addRateLimitExemptPrincipal' : ActorMethod<[Principal, string], Result>,
-  'cancelDeposit' : ActorMethod<[Principal, bigint], Result_5>,
-  'claimBurnFees' : ActorMethod<[Principal, bigint], Result>,
+  'adminForceRefreshBalances' : ActorMethod<[], Result>,
+  'cancelDeposit' : ActorMethod<[Principal, bigint], Result_6>,
+  'claimBurnFees' : ActorMethod<[Principal, Principal, bigint], Result>,
   'claimCancellationFees' : ActorMethod<[Principal, Principal, bigint], Result>,
-  'claimMintFees' : ActorMethod<[Principal, bigint], Result>,
+  'claimMintFees' : ActorMethod<[Principal, Principal, bigint], Result>,
   'clearNavHistory' : ActorMethod<[], string>,
   'clearTokenPriceHistory' : ActorMethod<[], string>,
+  'debugPendingBurns' : ActorMethod<[], Array<[Principal, bigint]>>,
+  'debugPendingForwards' : ActorMethod<[], Array<[Principal, bigint]>>,
   'emergencyPause' : ActorMethod<[], Result>,
   'emergencyUnpause' : ActorMethod<[], Result>,
   'enableCircuitBreakerCondition' : ActorMethod<[bigint, boolean], Result>,
@@ -310,7 +325,7 @@ export interface NachosVaultDAO {
     [bigint],
     { 'nachosEstimate' : bigint, 'feeEstimate' : bigint, 'navUsed' : bigint }
   >,
-  'estimateMintWithToken' : ActorMethod<[Principal, bigint], Result_4>,
+  'estimateMintWithToken' : ActorMethod<[Principal, bigint], Result_5>,
   'estimateRedeem' : ActorMethod<
     [bigint],
     {
@@ -321,7 +336,7 @@ export interface NachosVaultDAO {
   >,
   'genesisMint' : ActorMethod<
     [bigint, [] | [Uint8Array | number[]], [] | [Account]],
-    Result_3
+    Result_4
   >,
   'getAcceptedMintTokens' : ActorMethod<
     [],
@@ -347,11 +362,14 @@ export interface NachosVaultDAO {
         }
       >,
       'totalBurnCount' : bigint,
-      'claimableBurnFees' : {
-        'claimed' : bigint,
-        'claimable' : bigint,
-        'accumulated' : bigint,
-      },
+      'claimableBurnFees' : Array<
+        {
+          'token' : Principal,
+          'claimed' : bigint,
+          'claimable' : bigint,
+          'accumulated' : bigint,
+        }
+      >,
       'dataSource' : string,
       'activeDepositCount' : bigint,
       'mintPausedByCircuitBreaker' : boolean,
@@ -375,11 +393,14 @@ export interface NachosVaultDAO {
       'feeCount' : bigint,
       'burnFeeBasisPoints' : bigint,
       'nachosSupply' : bigint,
-      'claimableMintFees' : {
-        'claimed' : bigint,
-        'claimable' : bigint,
-        'accumulated' : bigint,
-      },
+      'claimableMintFees' : Array<
+        {
+          'token' : Principal,
+          'claimed' : bigint,
+          'claimable' : bigint,
+          'accumulated' : bigint,
+        }
+      >,
       'mintFeeBasisPoints' : bigint,
       'claimableCancellationFees' : Array<
         {
@@ -441,7 +462,14 @@ export interface NachosVaultDAO {
   >,
   'getClaimableBurnFees' : ActorMethod<
     [],
-    { 'claimed' : bigint, 'claimable' : bigint, 'accumulated' : bigint }
+    Array<
+      {
+        'token' : Principal,
+        'claimed' : bigint,
+        'claimable' : bigint,
+        'accumulated' : bigint,
+      }
+    >
   >,
   'getClaimableCancellationFees' : ActorMethod<
     [],
@@ -456,7 +484,14 @@ export interface NachosVaultDAO {
   >,
   'getClaimableMintFees' : ActorMethod<
     [],
-    { 'claimed' : bigint, 'claimable' : bigint, 'accumulated' : bigint }
+    Array<
+      {
+        'token' : Principal,
+        'claimed' : bigint,
+        'claimable' : bigint,
+        'accumulated' : bigint,
+      }
+    >
   >,
   'getConfig' : ActorMethod<
     [],
@@ -480,6 +515,18 @@ export interface NachosVaultDAO {
     }
   >,
   'getDeposit' : ActorMethod<[Principal, bigint], [] | [ActiveDeposit]>,
+  'getFailedBurnDeliveries' : ActorMethod<
+    [[] | [Principal]],
+    Array<{ 'entries' : Array<FailedDeliveryEntry>, 'burnId' : bigint }>
+  >,
+  'getFailedForwardDeliveries' : ActorMethod<
+    [],
+    Array<{ 'mintId' : bigint, 'entries' : Array<FailedDeliveryEntry> }>
+  >,
+  'getFailedRefundDeliveries' : ActorMethod<
+    [],
+    Array<{ 'opId' : bigint, 'entries' : Array<FailedDeliveryEntry> }>
+  >,
   'getFeeExemptPrincipals' : ActorMethod<
     [],
     Array<[Principal, FeeExemptConfig]>
@@ -693,6 +740,14 @@ export interface NachosVaultDAO {
         }
       >,
       'totalBurnCount' : bigint,
+      'claimableBurnFees' : Array<
+        {
+          'token' : Principal,
+          'claimed' : bigint,
+          'claimable' : bigint,
+          'accumulated' : bigint,
+        }
+      >,
       'dataSource' : string,
       'mintPausedByCircuitBreaker' : boolean,
       'minBurnValueICP' : bigint,
@@ -720,7 +775,23 @@ export interface NachosVaultDAO {
       'feeCount' : bigint,
       'burnFeeBasisPoints' : bigint,
       'nachosSupply' : bigint,
+      'claimableMintFees' : Array<
+        {
+          'token' : Principal,
+          'claimed' : bigint,
+          'claimable' : bigint,
+          'accumulated' : bigint,
+        }
+      >,
       'mintFeeBasisPoints' : bigint,
+      'claimableCancellationFees' : Array<
+        {
+          'token' : Principal,
+          'claimed' : bigint,
+          'claimable' : bigint,
+          'accumulated' : bigint,
+        }
+      >,
       'mintFeesICP' : bigint,
       'genesisComplete' : boolean,
       'burnEstimate' : [] | [
@@ -747,7 +818,7 @@ export interface NachosVaultDAO {
   'get_canister_cycles' : ActorMethod<[], bigint>,
   'mintNachos' : ActorMethod<
     [bigint, bigint, [] | [Uint8Array | number[]], [] | [Account]],
-    Result_3
+    Result_4
   >,
   'mintNachosWithPortfolioShare' : ActorMethod<
     [
@@ -756,11 +827,11 @@ export interface NachosVaultDAO {
       [] | [Uint8Array | number[]],
       [] | [Account],
     ],
-    Result_3
+    Result_4
   >,
   'mintNachosWithToken' : ActorMethod<
     [Principal, bigint, bigint, [] | [Uint8Array | number[]], [] | [Account]],
-    Result_3
+    Result_4
   >,
   'pauseBurning' : ActorMethod<[], Result>,
   'pauseMinting' : ActorMethod<[], Result>,
@@ -771,7 +842,7 @@ export interface NachosVaultDAO {
   >,
   'redeemNachos' : ActorMethod<
     [bigint, [] | [Array<{ 'token' : Principal, 'minAmount' : bigint }>]],
-    Result_2
+    Result_3
   >,
   'refreshICPSwapPools' : ActorMethod<[], Result>,
   'removeAcceptedMintToken' : ActorMethod<[Principal], Result>,
@@ -779,6 +850,9 @@ export interface NachosVaultDAO {
   'removeFeeExemptPrincipal' : ActorMethod<[Principal], Result>,
   'removeRateLimitExemptPrincipal' : ActorMethod<[Principal], Result>,
   'resetCircuitBreaker' : ActorMethod<[], Result>,
+  'retryFailedBurnDelivery' : ActorMethod<[bigint], Result_2>,
+  'retryFailedForwardDelivery' : ActorMethod<[bigint], Result_2>,
+  'retryFailedRefundDelivery' : ActorMethod<[bigint], Result_2>,
   'retryFailedTransfers' : ActorMethod<[], Result_1>,
   'setAcceptedMintTokenEnabled' : ActorMethod<[Principal, boolean], Result>,
   'setNachosLedgerPrincipal' : ActorMethod<[Principal], Result>,
@@ -815,11 +889,13 @@ export type Result = { 'ok' : string } |
   { 'err' : string };
 export type Result_1 = { 'ok' : bigint } |
   { 'err' : string };
-export type Result_2 = { 'ok' : BurnResult } |
+export type Result_2 = { 'ok' : Array<bigint> } |
   { 'err' : NachosError };
-export type Result_3 = { 'ok' : MintResult } |
+export type Result_3 = { 'ok' : BurnResult } |
   { 'err' : NachosError };
-export type Result_4 = {
+export type Result_4 = { 'ok' : MintResult } |
+  { 'err' : NachosError };
+export type Result_5 = {
     'ok' : {
       'tokenPriceICP' : bigint,
       'depositValueICP' : bigint,
@@ -841,7 +917,7 @@ export type Result_4 = {
     }
   } |
   { 'err' : NachosError };
-export type Result_5 = { 'ok' : { 'refundTaskId' : bigint } } |
+export type Result_6 = { 'ok' : { 'refundTaskId' : bigint } } |
   { 'err' : NachosError };
 export interface TokenDeposit {
   'token' : Principal,

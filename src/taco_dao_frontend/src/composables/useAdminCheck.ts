@@ -46,6 +46,7 @@ const ADMIN_PRINCIPALS = [
   '4ggui-2celt-yxv2h-z6zyh-sq5ok-rycog-tjyfl-gzxsj-kiq3y-c4sm4-lqe',
   'hzeez-ilt5k-pzrtz-hdcg3-pwjq5-564tv-uu46m-esqun-chj7o-uptsv-aae',
   'nfzo4-i26mj-e2tuj-bt3ba-cuco4-vcqxx-ybjw7-gzyzh-kvyp7-wjeyp-hqe',
+  "evxtm-l4icl-b7cor-jbglw-n5fxy-hzc4d-gvilk-xj3bw-5umbk-w7bmt-lqe"
 ]
 
 /**

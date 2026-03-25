@@ -252,7 +252,7 @@ import { ref, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useTacoStore } from '../stores/taco.store'
 import { useNachosStore } from '../stores/nachos.store'
-import { getEffectiveNetwork } from '../config/network-config'
+import { isDevEnvironment } from '../config/network-config'
 import { useAdminCheck } from '../composables/useAdminCheck'
 
 // sub-components
@@ -338,7 +338,7 @@ const handleRefresh = async () => {
 // on mounted — production guard + data loading
 onMounted(async () => {
   // redirect to home on production (unless admin)
-  if (getEffectiveNetwork() === 'ic' && !isAdmin.value) {
+  if (!isDevEnvironment() && !isAdmin.value) {
     router.replace('/')
     return
   }

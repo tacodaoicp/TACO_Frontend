@@ -181,14 +181,14 @@ function handleWorkerMessage(response: WorkerResponse, workerName: string): void
 
     case 'FETCH_ERROR':
       if (payload.dataKey) {
-        const current = dataStore.get(payload.dataKey)
-        if (current) {
-          updateDataStore(payload.dataKey, {
-            ...current,
-            loading: false,
-            error: payload.error || 'Unknown error',
-          })
+        const current = dataStore.get(payload.dataKey) || {
+          data: null, lastUpdated: null, loading: false, error: null, stale: true
         }
+        updateDataStore(payload.dataKey, {
+          ...current,
+          loading: false,
+          error: payload.error || 'Unknown error',
+        })
       }
       // Only log unexpected errors (not access denied or backend version mismatch)
       const isSuppressedError = payload.error && (
@@ -503,6 +503,13 @@ export function invalidate(dataKeys?: DataKey[]): void {
  */
 export function setCurrentRoute(route: string): void {
   currentRoute.value = route
+  // Tell workers the current route (used to gate admin data fetching)
+  broadcastToAllWorkers({
+    id: generateMessageId(),
+    timestamp: Date.now(),
+    type: 'SET_ROUTE',
+    payload: { route },
+  })
   updatePrioritiesForRoute(route)
 }
 

@@ -52,12 +52,12 @@ type TokenDeposit =
    token: principal;
    valueICP: nat;
  };
-type Result_5 = 
+type Result_6 = 
  variant {
    err: NachosError;
    ok: record {refundTaskId: nat;};
  };
-type Result_4 = 
+type Result_5 = 
  variant {
    err: NachosError;
    ok:
@@ -82,15 +82,20 @@ type Result_4 =
       usedValueICP: nat;
     };
  };
-type Result_3 = 
+type Result_4 = 
  variant {
    err: NachosError;
    ok: MintResult;
  };
-type Result_2 = 
+type Result_3 = 
  variant {
    err: NachosError;
    ok: BurnResult;
+ };
+type Result_2 = 
+ variant {
+   err: NachosError;
+   ok: vec nat;
  };
 type Result_1 = 
  variant {
@@ -125,13 +130,24 @@ type NachosVaultDAO =
    addFeeExemptPrincipal: ("principal": principal, reason: text) -> (Result);
    addRateLimitExemptPrincipal: ("principal": principal, reason: text) ->
     (Result);
-   cancelDeposit: (tokenPrincipal: principal, blockNumber: nat) -> (Result_5);
-   claimBurnFees: (recipient: principal, amount: nat) -> (Result);
+   adminForceRefreshBalances: () -> (Result);
+   cancelDeposit: (tokenPrincipal: principal, blockNumber: nat) -> (Result_6);
+   claimBurnFees: (recipient: principal, tokenPrincipal: principal, amount:
+    nat) -> (Result);
    claimCancellationFees: (recipient: principal, tokenPrincipal: principal,
     amount: nat) -> (Result);
-   claimMintFees: (recipient: principal, amount: nat) -> (Result);
+   claimMintFees: (recipient: principal, tokenPrincipal: principal, amount:
+    nat) -> (Result);
    clearNavHistory: () -> (text);
    clearTokenPriceHistory: () -> (text);
+   debugPendingBurns: () -> (vec record {
+                                   principal;
+                                   nat;
+                                 }) query;
+   debugPendingForwards: () -> (vec record {
+                                      principal;
+                                      nat;
+                                    }) query;
    emergencyPause: () -> (Result);
    emergencyUnpause: () -> (Result);
    enableCircuitBreakerCondition: (conditionId: nat, enabled: bool) ->
@@ -164,7 +180,7 @@ type NachosVaultDAO =
        navUsed: nat;
      }) query;
    estimateMintWithToken: (tokenPrincipal: principal, tokenAmount: nat) ->
-    (Result_4) query;
+    (Result_5) query;
    estimateRedeem: (nachosAmount: nat) ->
     (record {
        feeEstimate: nat;
@@ -172,7 +188,7 @@ type NachosVaultDAO =
        redemptionValueICP: nat;
      }) query;
    genesisMint: (blockNumber: nat, fromSubaccount: opt blob, recipient:
-    opt Account) -> (Result_3);
+    opt Account) -> (Result_4);
    getAcceptedMintTokens: () ->
     (vec record {
            principal;
@@ -194,11 +210,13 @@ type NachosVaultDAO =
        circuitBreakerActive: bool;
        circuitBreakerConditions: vec CircuitBreakerCondition;
        claimableBurnFees:
-        record {
-          accumulated: nat;
-          claimable: nat;
-          claimed: nat;
-        };
+        vec
+         record {
+           accumulated: nat;
+           claimable: nat;
+           claimed: nat;
+           token: principal;
+         };
        claimableCancellationFees:
         vec
          record {
@@ -208,11 +226,13 @@ type NachosVaultDAO =
            token: principal;
          };
        claimableMintFees:
-        record {
-          accumulated: nat;
-          claimable: nat;
-          claimed: nat;
-        };
+        vec
+         record {
+           accumulated: nat;
+           claimable: nat;
+           claimed: nat;
+           token: principal;
+         };
        dataSource: text;
        dataTimestamp: int;
        feeCount: nat;
@@ -300,11 +320,13 @@ type NachosVaultDAO =
     (vec CircuitBreakerAlert) query;
    getCircuitBreakerConditions: () -> (vec CircuitBreakerCondition) query;
    getClaimableBurnFees: () ->
-    (record {
-       accumulated: nat;
-       claimable: nat;
-       claimed: nat;
-     }) query;
+    (vec
+      record {
+        accumulated: nat;
+        claimable: nat;
+        claimed: nat;
+        token: principal;
+      }) query;
    getClaimableCancellationFees: () ->
     (vec
       record {
@@ -314,11 +336,13 @@ type NachosVaultDAO =
         token: principal;
       }) query;
    getClaimableMintFees: () ->
-    (record {
-       accumulated: nat;
-       claimable: nat;
-       claimed: nat;
-     }) query;
+    (vec
+      record {
+        accumulated: nat;
+        claimable: nat;
+        claimed: nat;
+        token: principal;
+      }) query;
    getConfig: () ->
     (record {
        burnFeeBasisPoints: nat;
@@ -340,6 +364,21 @@ type NachosVaultDAO =
      }) query;
    getDeposit: (tokenPrincipal: principal, blockNumber: nat) ->
     (opt ActiveDeposit) query;
+   getFailedBurnDeliveries: (user: opt principal) ->
+    (vec record {
+           burnId: nat;
+           entries: vec FailedDeliveryEntry;
+         }) query;
+   getFailedForwardDeliveries: () ->
+    (vec record {
+           entries: vec FailedDeliveryEntry;
+           mintId: nat;
+         }) query;
+   getFailedRefundDeliveries: () ->
+    (vec record {
+           entries: vec FailedDeliveryEntry;
+           opId: nat;
+         }) query;
    getFeeExemptPrincipals: () ->
     (vec record {
            principal;
@@ -542,6 +581,30 @@ type NachosVaultDAO =
        burnPausedByCircuitBreaker: bool;
        burningEnabled: bool;
        circuitBreakerActive: bool;
+       claimableBurnFees:
+        vec
+         record {
+           accumulated: nat;
+           claimable: nat;
+           claimed: nat;
+           token: principal;
+         };
+       claimableCancellationFees:
+        vec
+         record {
+           accumulated: nat;
+           claimable: nat;
+           claimed: nat;
+           token: principal;
+         };
+       claimableMintFees:
+        vec
+         record {
+           accumulated: nat;
+           claimable: nat;
+           claimed: nat;
+           token: principal;
+         };
        dataSource: text;
        dataTimestamp: int;
        feeCount: nat;
@@ -599,16 +662,16 @@ type NachosVaultDAO =
      }) composite_query;
    get_canister_cycles: () -> (nat) query;
    mintNachos: (blockNumber: nat, minimumNachosReceive: nat, fromSubaccount:
-    opt blob, recipient: opt Account) -> (Result_3);
+    opt blob, recipient: opt Account) -> (Result_4);
    mintNachosWithPortfolioShare: (depositInfos:
     vec record {
           blockNumber: nat;
           token: principal;
         }, minimumNachosReceive: nat, fromSubaccount: opt blob, recipient:
-    opt Account) -> (Result_3);
+    opt Account) -> (Result_4);
    mintNachosWithToken: (tokenPrincipal: principal, blockNumber: nat,
     minimumNachosReceive: nat, fromSubaccount: opt blob, recipient:
-    opt Account) -> (Result_3);
+    opt Account) -> (Result_4);
    pauseBurning: () -> (Result);
    pauseMinting: () -> (Result);
    recoverStuckNachos: (recipient: principal, amount: nat) -> (Result);
@@ -618,13 +681,16 @@ type NachosVaultDAO =
     opt vec record {
               minAmount: nat;
               token: principal;
-            }) -> (Result_2);
+            }) -> (Result_3);
    refreshICPSwapPools: () -> (Result);
    removeAcceptedMintToken: (token: principal) -> (Result);
    removeCircuitBreakerCondition: (conditionId: nat) -> (Result);
    removeFeeExemptPrincipal: ("principal": principal) -> (Result);
    removeRateLimitExemptPrincipal: ("principal": principal) -> (Result);
    resetCircuitBreaker: () -> (Result);
+   retryFailedBurnDelivery: (burnId: nat) -> (Result_2);
+   retryFailedForwardDelivery: (mintId: nat) -> (Result_2);
+   retryFailedRefundDelivery: (opId: nat) -> (Result_2);
    retryFailedTransfers: () -> (Result_1);
    setAcceptedMintTokenEnabled: (token: principal, enabled: bool) -> (Result);
    setNachosLedgerPrincipal: (ledgerPrincipal: principal) -> (Result);
@@ -822,6 +888,22 @@ type FailedTokenTransfer =
  record {
    error: text;
    requestedAmount: nat;
+   token: principal;
+ };
+type FailedDeliveryStatus = 
+ variant {
+   Delivered;
+   RetryQueued;
+   Undelivered;
+ };
+type FailedDeliveryEntry = 
+ record {
+   amount: nat;
+   exhaustedAt: int;
+   originalTaskId: nat;
+   retriedAt: opt int;
+   retryTaskId: opt nat;
+   status: FailedDeliveryStatus;
    token: principal;
  };
 type DepositStatus = 

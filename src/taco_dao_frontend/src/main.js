@@ -3,6 +3,8 @@ import { createApp } from 'vue'
 import { createRouter, createWebHistory } from "vue-router"
 import './index.scss'
 import 'font-awesome/css/font-awesome.min.css'
+import '@fortawesome/fontawesome-pro/css/fontawesome.css'
+import '@fortawesome/fontawesome-pro/css/solid.css'
 import App from './App.vue'
 import VueApexCharts from 'vue3-apexcharts'
 import VueClickAway from "vue3-click-away"
@@ -26,7 +28,6 @@ const AdminVotesView = () => import("./views/AdminVotesView.vue")
 const AdminRewardsView = () => import("./views/AdminRewardsView.vue")
 const AdminDistributionsView = () => import("./views/AdminDistributionsView.vue")
 const AdminRewardsBalancesView = () => import("./views/AdminRewardsBalancesView.vue")
-const AdminAlarmView = () => import("./views/AdminAlarmView.vue")
 const AdminClaimsView = () => import("./views/AdminClaimsView.vue")
 const AdminNNSView = () => import("./views/AdminNNSView.vue")
 const RewardsView = () => import("./views/RewardsView.vue")
@@ -101,7 +102,6 @@ const routes = [
     { path: "/admin/rewards", name: "AdminRewards", component: AdminRewardsView, meta: { robots: 'noindex' } },
     { path: "/admin/rewards/balances", name: "AdminRewardsBalances", component: AdminRewardsBalancesView, meta: { robots: 'noindex' } },
     { path: "/admin/distributions", name: "AdminDistributions", component: AdminDistributionsView, meta: { robots: 'noindex' } },
-    { path: "/admin/alarm", name: "AdminAlarm", component: AdminAlarmView, meta: { robots: 'noindex' } },
     { path: "/admin/claims", name: "AdminClaims", component: AdminClaimsView, meta: { robots: 'noindex' } },
     { path: "/admin/nns", name: "AdminNNS", component: AdminNNSView, meta: { robots: 'noindex' } },
     { path: "/admin/vault", name: "AdminNachos", component: AdminNachosView, meta: { robots: 'noindex' } },

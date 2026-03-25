@@ -2241,7 +2241,7 @@
   import DfinityLogo from "../assets/images/dfinityLogo.vue"
   import { Principal } from "@dfinity/principal"
   import astronautLoader from "../assets/images/astonautLoader.webp"
-  import { getEffectiveNetwork } from '../config/network-config'
+  import { isDevEnvironment } from '../config/network-config'
   import { useAdminCheck } from '../composables/useAdminCheck'
 
   ////////////////
@@ -2314,8 +2314,7 @@
 
   // allocations visibility: only on local or for admins
   const { isAdmin } = useAdminCheck()
-  const network = getEffectiveNetwork()
-  const canShowAllocations = computed(() => network === 'staging' || network === 'local' || isAdmin.value)
+  const canShowAllocations = computed(() => isDevEnvironment() || isAdmin.value)
 
   /////////////////////
   // local variables //

@@ -21,11 +21,6 @@ export const MAX_DATA_SIZE_BYTES: Partial<Record<DataKey, number>> = {
   // Log data - limit to 200KB each
   systemLogs: 200_000,
   circuitBreakerLogs: 200_000,
-  sentMessages: 200_000,
-  adminActionLogs: 200_000,
-  alarmAcknowledgments: 200_000,
-  systemErrors: 200_000,
-  internalErrors: 200_000,
   // Proposals can be large
   tacoProposals: 300_000,
   votableProposals: 300_000,

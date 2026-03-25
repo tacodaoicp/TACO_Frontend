@@ -22,12 +22,10 @@ import {
   getAppSneedDaoCanisterId,
   getTacoSnsGovernanceCanisterId,
   getTacoSnsRootCanisterId,
-  getAlarmCanisterId,
   getRewardsCanisterId,
   getTacoSwapCanisterId,
   getNachosVaultCanisterId,
 } from './canister-ids'
-import { idlFactory as alarmIDL, type _SERVICE as AlarmService } from '../../../../declarations/alarm/alarm.did.js'
 import { idlFactory as rewardsIDL, type _SERVICE as RewardsService } from '../../../../declarations/rewards/rewards.did.js'
 import { idlFactory as tacoSwapIDL, type _SERVICE as TacoSwapService } from '../../../../declarations/taco_swap/taco_swap.did.js'
 import { idlFactory as nachosVaultIDL } from '../../../../declarations/nachos_vault/nachos_vault.did.js'
@@ -85,10 +83,6 @@ function getAppSneedDaoActor(agent: HttpAgent): ActorSubclass<AppSneedDaoService
 
 function getSnsGovernanceActor(agent: HttpAgent): ActorSubclass<any> {
   return getCachedActor<any>(agent, getTacoSnsGovernanceCanisterId(), snsGovernanceIDL)
-}
-
-function getAlarmActor(agent: HttpAgent): ActorSubclass<AlarmService> {
-  return getCachedActor<AlarmService>(agent, getAlarmCanisterId(), alarmIDL)
 }
 
 function getRewardsActor(agent: HttpAgent): ActorSubclass<RewardsService> {
@@ -757,157 +751,6 @@ export async function fetchNeuronSnapshotsData(agent: HttpAgent, start: number =
 export async function fetchMaxNeuronSnapshotsData(agent: HttpAgent): Promise<bigint> {
   const actor = getNeuronSnapshotActor(agent)
   return await actor.getMaxNeuronSnapshots() as bigint
-}
-
-// ============================================================================
-// Worker 3: Admin Data Fetchers (Alarm System)
-// ============================================================================
-
-/**
- * Fetch alarm system status (admin only)
- */
-export async function fetchAlarmSystemStatusData(agent: HttpAgent): Promise<any> {
-  const actor = getAlarmActor(agent)
-  const result = await actor.getMonitoringStatus()
-  if ('ok' in result) {
-    return result.ok
-  }
-  throw new Error('err' in result ? result.err : 'Failed to get alarm system status')
-}
-
-/**
- * Fetch alarm contacts (admin only)
- */
-export async function fetchAlarmContactsData(agent: HttpAgent): Promise<any[]> {
-  const actor = getAlarmActor(agent)
-  const result = await actor.getContacts()
-  if ('ok' in result) {
-    return result.ok as any[]
-  }
-  throw new Error('err' in result ? result.err : 'Failed to get alarm contacts')
-}
-
-/**
- * Fetch monitoring status (admin only)
- */
-export async function fetchMonitoringStatusData(agent: HttpAgent): Promise<any> {
-  const actor = getAlarmActor(agent)
-  const result = await actor.getMonitoringStatus()
-  if ('ok' in result) {
-    return result.ok
-  }
-  throw new Error('err' in result ? result.err : 'Failed to get monitoring status')
-}
-
-/**
- * Fetch pending alarms (admin only)
- */
-export async function fetchPendingAlarmsData(agent: HttpAgent): Promise<any[]> {
-  const actor = getAlarmActor(agent)
-  const result = await actor.getPendingAlarms()
-  if ('ok' in result) {
-    return result.ok as any[]
-  }
-  throw new Error('err' in result ? result.err : 'Failed to get pending alarms')
-}
-
-/**
- * Fetch system errors (admin only)
- */
-export async function fetchSystemErrorsData(agent: HttpAgent, limit: number = 68): Promise<any[]> {
-  const actor = getAlarmActor(agent)
-  const result = await actor.getSystemErrors([BigInt(limit)])
-  if ('ok' in result) {
-    return result.ok as any[]
-  }
-  throw new Error('err' in result ? result.err : 'Failed to get system errors')
-}
-
-/**
- * Fetch internal errors (admin only)
- */
-export async function fetchInternalErrorsData(agent: HttpAgent, limit: number = 68): Promise<any[]> {
-  const actor = getAlarmActor(agent)
-  const result = await actor.getInternalErrors([BigInt(limit)])
-  if ('ok' in result) {
-    return result.ok as any[]
-  }
-  throw new Error('err' in result ? String(result.err) : 'Failed to get internal errors')
-}
-
-/**
- * Fetch monitored canisters (admin only)
- */
-export async function fetchMonitoredCanistersData(agent: HttpAgent): Promise<any[]> {
-  const actor = getAlarmActor(agent)
-  const result = await actor.getMonitoredCanisters()
-  if ('ok' in result) {
-    return result.ok as any[]
-  }
-  throw new Error('err' in result ? result.err : 'Failed to get monitored canisters')
-}
-
-/**
- * Fetch configuration intervals (admin only)
- */
-export async function fetchConfigurationIntervalsData(agent: HttpAgent): Promise<any> {
-  const actor = getAlarmActor(agent)
-  const result = await actor.getConfigurationIntervals()
-  if ('ok' in result) {
-    return result.ok
-  }
-  throw new Error('err' in result ? result.err : 'Failed to get configuration intervals')
-}
-
-/**
- * Fetch queue status (admin only)
- */
-export async function fetchQueueStatusData(agent: HttpAgent): Promise<any> {
-  const actor = getAlarmActor(agent)
-  const result = await actor.getQueueStatus()
-  if ('ok' in result) {
-    return result.ok
-  }
-  throw new Error('err' in result ? result.err : 'Failed to get queue status')
-}
-
-/**
- * Fetch sent messages (admin only)
- */
-export async function fetchSentMessagesData(agent: HttpAgent, limit: number = 68): Promise<any[]> {
-  const actor = getAlarmActor(agent)
-
-  const result = await actor.getSentMessages([BigInt(limit)])
-  if ('ok' in result) {
-    return result.ok as any[]
-  }
-  throw new Error('err' in result ? result.err : 'Failed to get sent messages')
-}
-
-/**
- * Fetch alarm acknowledgments (admin only)
- */
-export async function fetchAlarmAcknowledgmentsData(agent: HttpAgent, limit: number = 68): Promise<any[]> {
-  const actor = getAlarmActor(agent)
-
-  const result = await actor.getAlarmAcknowledgments([BigInt(limit)])
-  if ('ok' in result) {
-    return result.ok as any[]
-  }
-  throw new Error('err' in result ? result.err : 'Failed to get alarm acknowledgments')
-}
-
-/**
- * Fetch admin action logs (admin only)
- */
-export async function fetchAdminActionLogsData(agent: HttpAgent, limit: number = 68): Promise<any[]> {
-  const actor = getAlarmActor(agent)
-
-  const result = await actor.getAdminActionLogs([BigInt(limit)])
-  if ('ok' in result) {
-    return result.ok as any[]
-  }
-  throw new Error('err' in result ? result.err : 'Failed to get admin action logs')
 }
 
 // ============================================================================

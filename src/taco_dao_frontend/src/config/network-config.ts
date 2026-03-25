@@ -193,6 +193,22 @@ export function getEffectiveNetwork(): 'ic' | 'staging' | 'local' {
 }
 
 /**
+ * Whether the app is running in a dev/staging environment (for UI visibility decisions).
+ * Unlike getEffectiveNetwork(), this correctly detects localhost/LAN as non-production.
+ */
+export function isDevEnvironment(): boolean {
+  const network = getEffectiveNetwork()
+  if (network === 'staging' || network === 'local') return true
+  if (isBrowser()) {
+    const hostname = window.location.hostname
+    if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname.startsWith('192.')) {
+      return true
+    }
+  }
+  return false
+}
+
+/**
  * Get current configuration status (for debugging)
  */
 export function getNetworkStatus(): {
@@ -246,7 +262,7 @@ export function initNetworkConfig(setNetworkFn: (network: 'ic' | 'staging' | 'lo
 
 // DEV ONLY: tacoConfig is completely excluded from production builds
 // @ts-ignore - import.meta.env is injected by Vite
-if (import.meta.env?.DEV && isBrowser()) {
+if ((import.meta.env?.DEV || isDevEnvironment()) && isBrowser()) {
   (window as any).tacoConfig = {
     useMainnet: () => {
       setNetworkOverride('ic')

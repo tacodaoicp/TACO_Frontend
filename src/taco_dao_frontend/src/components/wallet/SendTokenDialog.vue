@@ -61,13 +61,13 @@
               </label>
 
               <!-- input -->
-              <input 
-                type="text" 
-                class="form-control taco-input" 
-                v-model="recipient" 
+              <input
+                type="text"
+                class="form-control taco-input"
+                v-model="recipient"
                 required
                 :class="{ 'is-invalid': recipientError }"
-                placeholder="Enter principal or account ID"
+                :placeholder="recipientPlaceholder"
               />
 
               <!-- invalid feedback -->
@@ -314,7 +314,7 @@ interface SendTokenProps {
 
 interface SendTokenEmits {
   (e: 'close'): void
-  (e: 'send', params: { recipient: string; amount: bigint; memo?: string }): void
+  (e: 'send', params: { recipient: string; amount: bigint; memo?: string; addressType: 'principal' | 'accountId' }): void
 }
 
 const props = defineProps<SendTokenProps>()
@@ -325,6 +325,27 @@ const recipient = ref('')
 const amount = ref('')
 const memo = ref('')
 const submitting = ref(false)
+
+// ICP detection
+const isICP = computed(() => props.token?.principal === 'ryjl3-tyaaa-aaaaa-aaaba-cai')
+
+// Auto-detect address type from input
+const isAccountId = (value: string) => /^[a-f0-9]{64}$/i.test(value.trim())
+
+const detectedAddressType = computed<'principal' | 'accountId'>(() => {
+  if (isICP.value && isAccountId(recipient.value)) {
+    return 'accountId'
+  }
+  return 'principal'
+})
+
+// Dynamic placeholder
+const recipientPlaceholder = computed(() => {
+  if (isICP.value) {
+    return 'Enter principal or account ID'
+  }
+  return 'Enter recipient principal'
+})
 
 // Validation
 const recipientError = ref('')
@@ -418,19 +439,25 @@ const formatUSDValue = (balance: bigint, decimals: number, priceUSD: number): st
 
 const validateRecipient = () => {
   recipientError.value = ''
-  
+
   if (!recipient.value.trim()) {
     return
   }
-  
-  try {
-    // Try to parse as Principal
-    Principal.fromText(recipient.value.trim())
-  } catch {
-    // If not a valid Principal, check if it looks like an account ID
-    const cleaned = recipient.value.trim().toLowerCase()
-    if (!/^[a-f0-9]{64}$/.test(cleaned)) {
-      recipientError.value = 'Invalid recipient address format'
+
+  if (isICP.value) {
+    // ICP: accept either Principal or Account ID (64-char hex)
+    if (isAccountId(recipient.value)) return
+    try {
+      Principal.fromText(recipient.value.trim())
+    } catch {
+      recipientError.value = 'Invalid principal or account ID format'
+    }
+  } else {
+    // All other tokens: Principal only
+    try {
+      Principal.fromText(recipient.value.trim())
+    } catch {
+      recipientError.value = 'Invalid principal format'
     }
   }
 }
@@ -497,7 +524,8 @@ const handleSend = async () => {
     emit('send', {
       recipient: recipient.value.trim(),
       amount: amountBigInt.value,
-      memo: memo.value.trim() || undefined
+      memo: memo.value.trim() || undefined,
+      addressType: detectedAddressType.value
     })
   } finally {
     submitting.value = false

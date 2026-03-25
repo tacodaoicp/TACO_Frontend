@@ -41,19 +41,6 @@ export type DataKey =
   // Admin-only data keys (neuron snapshots)
   | 'neuronSnapshots'
   | 'maxNeuronSnapshots'
-  // Admin-only data keys (alarm system)
-  | 'alarmSystemStatus'
-  | 'alarmContacts'
-  | 'monitoringStatus'
-  | 'pendingAlarms'
-  | 'systemErrors'
-  | 'internalErrors'
-  | 'monitoredCanisters'
-  | 'configurationIntervals'
-  | 'queueStatus'
-  | 'sentMessages'
-  | 'alarmAcknowledgments'
-  | 'adminActionLogs'
   // Admin-only data keys (NNS automation)
   | 'votableProposals'
   | 'nnsProposalInfo'
@@ -123,19 +110,6 @@ export const WORKER_ASSIGNMENT: Record<DataKey, 'public' | 'auth'> = {
   // Authenticated worker (admin data - neuron snapshots)
   neuronSnapshots: 'auth',
   maxNeuronSnapshots: 'auth',
-  // Authenticated worker (admin data - alarm system)
-  alarmSystemStatus: 'auth',
-  alarmContacts: 'auth',
-  monitoringStatus: 'auth',
-  pendingAlarms: 'auth',
-  systemErrors: 'auth',
-  internalErrors: 'auth',
-  monitoredCanisters: 'auth',
-  configurationIntervals: 'auth',
-  queueStatus: 'auth',
-  sentMessages: 'auth',
-  alarmAcknowledgments: 'auth',
-  adminActionLogs: 'auth',
   // Authenticated worker (admin data - NNS automation)
   votableProposals: 'auth',
   nnsProposalInfo: 'auth',
@@ -207,7 +181,6 @@ export const STALENESS_THRESHOLDS: Record<DataKey, number> = {
   rebalanceConfig: 120_000,
   treasuryLogs: 120_000,
   tradingPauses: 120_000,
-  alarmSystemStatus: 120_000,
   // Low - 300 seconds
   tacoProposals: 300_000,
   proposalsThreads: 300_000,
@@ -218,13 +191,6 @@ export const STALENESS_THRESHOLDS: Record<DataKey, number> = {
   circuitBreakerLogs: 300_000,
   circuitBreakerConditions: 300_000,
   portfolioCircuitBreakerConditions: 300_000,
-  alarmContacts: 300_000,
-  monitoredCanisters: 300_000,
-  configurationIntervals: 300_000,
-  queueStatus: 300_000,
-  sentMessages: 300_000,
-  alarmAcknowledgments: 300_000,
-  adminActionLogs: 300_000,
   periodicTimerStatus: 300_000,
   autoVotingThreshold: 300_000,
   proposerSubaccount: 300_000,
@@ -235,10 +201,6 @@ export const STALENESS_THRESHOLDS: Record<DataKey, number> = {
   allNames: 600_000,
   neuronSnapshots: 600_000,
   maxNeuronSnapshots: 600_000,
-  monitoringStatus: 600_000,
-  pendingAlarms: 600_000,
-  systemErrors: 600_000,
-  internalErrors: 600_000,
   votableProposals: 600_000,
   nnsProposalInfo: 600_000,
   // Rewards/Distributions - 120 seconds (reasonable refresh rate)
@@ -318,6 +280,7 @@ export type WorkerRequestType =
   | 'RESET' // Reset worker state (backoff, queue, fetch count) for fresh start
   | 'INITIAL_LOAD' // Tell worker the initial route for selective data loading
   | 'SET_USER_PRINCIPAL' // Send user principal to public worker for getVoteDashboard
+  | 'SET_ROUTE' // Update current route for admin data gating
 
 export interface WorkerRequest extends BaseMessage {
   type: WorkerRequestType
@@ -460,11 +423,6 @@ export const ROUTE_PRIORITIES: Record<string, RouteDataConfig> = {
     high: ['autoVotingThreshold', 'proposerSubaccount', 'tacoDAONeuronId', 'defaultVoteBehavior', 'highestProcessedNNSProposalId'],
     preloadRoutes: ['/admin'],
   },
-  '/admin/alarm': {
-    critical: ['alarmSystemStatus', 'pendingAlarms', 'systemErrors'],
-    high: ['alarmContacts', 'monitoringStatus', 'internalErrors', 'monitoredCanisters', 'configurationIntervals', 'queueStatus', 'sentMessages', 'alarmAcknowledgments', 'adminActionLogs'],
-    preloadRoutes: ['/admin'],
-  },
   '/wallet': {
     critical: ['tokenDetails'],
     high: ['cryptoPrices'],
@@ -506,17 +464,6 @@ export const ADMIN_PRELOAD_KEYS: DataKey[] = [
   'circuitBreakerLogs',
   'circuitBreakerConditions',
   'portfolioCircuitBreakerConditions',
-  // Alarm system admin data
-  'alarmSystemStatus',
-  'alarmContacts',
-  'monitoringStatus',
-  'pendingAlarms',
-  'systemErrors',
-  'internalErrors',
-  'monitoredCanisters',
-  'configurationIntervals',
-  'queueStatus',
-  'adminActionLogs',
   // NNS automation admin data
   'periodicTimerStatus',
   'autoVotingThreshold',
@@ -589,8 +536,8 @@ export function getRoutePriorities(
     }
   })
 
-  // Admin preload (low priority) if user is admin - preload in background but not lowest
-  if (isAdmin) {
+  // Admin preload (low priority) if user is admin AND on admin route
+  if (isAdmin && currentRoute.startsWith('/admin')) {
     ADMIN_PRELOAD_KEYS.forEach((key) => {
       if (!priorities.has(key)) priorities.set(key, 'low')
     })

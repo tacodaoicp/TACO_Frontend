@@ -15,36 +15,41 @@
           <div class="buy-taco-view">
 
             <!-- title -->
-            <TacoTitle level="h2" :emoji="selectedProduct === 'nachos' ? '🧀' : '🌮'" :title="selectedProduct === 'nachos' ? 'Fund & Mint' : 'Fund & Swap'" class="mt-4" />
+            <div class="buy-taco-view__page-header">
+              <TacoTitle level="h2" :emoji="selectedProduct === 'nachos' ? '🧀' : '🌮'" :title="selectedProduct === 'nachos' ? 'Fund & Mint' : 'Fund & Swap'" forceTextColor="#FFD54F" />
+            </div>
 
             <!-- system paused banner -->
             <div v-if="systemPaused" class="buy-taco-view__paused-banner">
               <i class="fa-solid fa-triangle-exclamation me-2"></i>
-              System is currently paused for maintenance. Purchases may be delayed.
+              System is currently paused for maintenance. Swaps may be delayed.
             </div>
 
-            <!-- how it works -->
-            <div class="buy-taco-view__info taco-container taco-container--l1 w-100">
+            <!-- how it works - horizontal timeline -->
+            <div class="buy-taco-view__info w-100">
               <h3 class="buy-taco-view__section-title">How it works</h3>
-              <div class="buy-taco-view__steps">
-                <div class="buy-taco-view__step">
+              <div class="buy-taco-view__timeline">
+                <div class="buy-taco-view__timeline-step">
                   <span class="buy-taco-view__step-num">1</span>
-                  <span>Fund your wallet with ICP using {{ selectedProvider === 'coinbase' ? 'Coinbase' : 'Transak' }}</span>
+                  <span class="buy-taco-view__step-label">Fund your wallet with ICP using {{ selectedProvider === 'coinbase' ? 'Coinbase' : 'Transak' }}</span>
                 </div>
-                <div class="buy-taco-view__step">
+                <span class="buy-taco-view__timeline-arrow"><i class="fa-solid fa-chevron-right"></i></span>
+                <div class="buy-taco-view__timeline-step">
                   <span class="buy-taco-view__step-num">2</span>
-                  <span v-if="selectedProduct === 'nachos'">ICP is deposited to your NACHOS vault address</span>
-                  <span v-else>ICP is deposited to your personal wallet</span>
+                  <span v-if="selectedProduct === 'nachos'" class="buy-taco-view__step-label">ICP is deposited to your NACHOS vault address</span>
+                  <span v-else class="buy-taco-view__step-label">ICP is deposited to your personal wallet</span>
                 </div>
-                <div class="buy-taco-view__step">
+                <span class="buy-taco-view__timeline-arrow"><i class="fa-solid fa-chevron-right"></i></span>
+                <div class="buy-taco-view__timeline-step">
                   <span class="buy-taco-view__step-num">3</span>
-                  <span v-if="selectedProduct === 'nachos'">Once ICP arrives, NACHOS are minted at current NAV</span>
-                  <span v-else>Click "Swap ICP for TACO" when ready</span>
+                  <span v-if="selectedProduct === 'nachos'" class="buy-taco-view__step-label">Once ICP arrives, NACHOS are minted at current NAV</span>
+                  <span v-else class="buy-taco-view__step-label">Click "Swap ICP for TACO" when ready</span>
                 </div>
-                <div class="buy-taco-view__step">
+                <span class="buy-taco-view__timeline-arrow"><i class="fa-solid fa-chevron-right"></i></span>
+                <div class="buy-taco-view__timeline-step">
                   <span class="buy-taco-view__step-num">4</span>
-                  <span v-if="selectedProduct === 'nachos'">NACHOS tokens arrive in your wallet</span>
-                  <span v-else>ICP is swapped to TACO and delivered to your wallet</span>
+                  <span v-if="selectedProduct === 'nachos'" class="buy-taco-view__step-label">NACHOS tokens arrive in your wallet</span>
+                  <span v-else class="buy-taco-view__step-label">Swap executes on-chain - TACO sent to your wallet</span>
                 </div>
               </div>
             </div>
@@ -63,7 +68,7 @@
             <template v-if="tacoStore.userLoggedIn">
 
               <!-- buy card -->
-              <div class="buy-taco-view__buy-card taco-container taco-container--l1 w-100">
+              <div class="buy-taco-view__buy-card w-100">
                 <h3 class="buy-taco-view__section-title">Fund with Fiat</h3>
 
                 <!-- product toggle -->
@@ -91,6 +96,32 @@
                     Transak
                   </button>
                 </div>
+
+                <!-- auto-swap checkbox -->
+                <label class="buy-taco-view__autoswap-toggle mt-3 mb-3">
+                  <div class="form-check">
+                    <input
+                      class="form-check-input"
+                      type="checkbox"
+                      v-model="autoSwapEnabled"
+                      :disabled="anySwapActive || depositPollInterval !== null"
+                    >
+                    <span class="form-check-label">
+                      <i class="fa-solid fa-bolt me-1"></i>
+                      <strong>Auto-{{ selectedProduct === 'nachos' ? 'mint' : 'swap' }} when ICP arrives</strong>
+                    </span>
+                  </div>
+                  <p class="text-muted small mb-0 ms-4">
+                    <span v-if="!autoSwapEnabled">
+                      <i class="fa-solid fa-shield-check me-1"></i>
+                      ICP goes to your personal wallet, you control when to {{ selectedProduct === 'nachos' ? 'mint' : 'swap' }} (recommended for compliance)
+                    </span>
+                    <span v-else>
+                      <i class="fa-solid fa-zap me-1"></i>
+                      ICP sent to {{ selectedProduct === 'nachos' ? 'vault' : 'swap canister' }} and automatically {{ selectedProduct === 'nachos' ? 'minted' : 'swapped' }} (instant, convenient)
+                    </span>
+                  </p>
+                </label>
 
                 <!-- fiat amount + currency -->
                 <div class="buy-taco-view__amount-row">
@@ -142,25 +173,25 @@
                 </button>
 
                 <!-- Manual swap button (shown when ICP detected in user wallet) -->
-                <div v-if="icpDetected && !anySwapActive" class="mt-3">
-                  <div class="alert alert-success mb-2">
+                <div v-if="icpDetected && !anySwapActive" class="buy-taco-view__icp-detected mt-3">
+                  <div class="buy-taco-view__icp-detected-banner">
                     <i class="fa-solid fa-check-circle me-2"></i>
                     <strong>ICP Detected:</strong> {{ formatE8s(detectedIcpAmount) }} ICP in your wallet
                   </div>
-                  <button class="btn taco-btn taco-btn--blue w-100"
+                  <button class="btn taco-btn taco-btn--green w-100"
                           @click="executeManualSwap">
                     <i class="fa-solid fa-arrow-right-arrow-left me-2"></i>
-                    Swap ICP for {{ selectedProduct === 'taco' ? 'TACO' : 'NACHOS' }}
+                    {{ selectedProduct === 'nachos' ? 'Mint NACHOS' : 'Swap ICP for TACO' }}
                   </button>
-                  <p class="text-muted small mt-2 mb-0">
-                    This will transfer ICP from your wallet and swap for {{ selectedProduct === 'taco' ? 'TACO' : 'NACHOS' }} tokens
+                  <p class="buy-taco-view__icp-detected-hint">
+                    This will transfer ICP from your wallet and {{ selectedProduct === 'nachos' ? 'mint NACHOS' : 'swap for TACO' }} tokens
                   </p>
                 </div>
               </div>
 
               <!-- TACO order status + progress tracker -->
               <div v-if="selectedProduct === 'taco' && showProgress"
-                   class="buy-taco-view__status taco-container taco-container--l2">
+                   class="buy-taco-view__status w-100">
                 <h4 class="buy-taco-view__section-title">Order Status</h4>
                 <SwapProgressTracker
                   :steps="TACO_STEPS"
@@ -177,7 +208,7 @@
 
               <!-- NACHOS order status + progress tracker -->
               <div v-if="selectedProduct === 'nachos' && nachosShowProgress"
-                   class="buy-taco-view__status taco-container taco-container--l2">
+                   class="buy-taco-view__status w-100">
                 <h4 class="buy-taco-view__section-title">Order Status</h4>
                 <SwapProgressTracker
                   :steps="NACHOS_STEPS"
@@ -192,18 +223,18 @@
                 />
               </div>
 
-              <!-- claim pending (TACO or NACHOS based on product) -->
-              <div class="buy-taco-view__claim taco-container taco-container--l1 w-100">
-                <h3 class="buy-taco-view__section-title">Claim Pending {{ selectedProduct === 'nachos' ? 'NACHOS' : 'TACO' }}</h3>
+              <!-- claim pending — only shown when ICP stuck in canister subaccount and not actively swapping -->
+              <div v-if="showClaimSection" class="buy-taco-view__claim w-100">
+                <h3 class="buy-taco-view__section-title">Complete Your {{ selectedProduct === 'nachos' ? 'NACHOS Mint' : 'TACO Swap' }}</h3>
                 <p class="buy-taco-view__claim-desc">
-                  If your purchase completed but {{ selectedProduct === 'nachos' ? 'NACHOS' : 'TACO' }} was not delivered automatically,
-                  use this button to trigger a manual claim.
+                  Your ICP purchase is complete. To finalize your {{ selectedProduct === 'nachos' ? 'NACHOS mint' : 'swap from ICP to TACO' }},
+                  you must explicitly approve the transaction below. You maintain full control of your funds throughout this process.
                 </p>
                 <button class="btn taco-btn taco-btn--green"
                         :disabled="claiming"
                         @click="selectedProduct === 'nachos' ? claimNachos() : claimTaco()">
                   <i v-if="claiming" class="fa-solid fa-spinner fa-spin me-2"></i>
-                  {{ claiming ? 'Claiming...' : `Claim ${selectedProduct === 'nachos' ? 'NACHOS' : 'TACO'}` }}
+                  {{ claiming ? 'Processing Approval...' : `Approve ${selectedProduct === 'nachos' ? 'NACHOS Mint' : 'Swap to TACO'}` }}
                 </button>
                 <div v-if="claimResult"
                      class="buy-taco-view__claim-result"
@@ -213,7 +244,7 @@
               </div>
 
               <!-- TACO order history -->
-              <div v-if="selectedProduct === 'taco' && orderHistory.length > 0" class="buy-taco-view__history taco-container taco-container--l2">
+              <div v-if="selectedProduct === 'taco' && orderHistory.length > 0" class="buy-taco-view__history w-100">
                 <h4 class="buy-taco-view__history-title">Order History</h4>
                 <table class="buy-taco-view__table">
                   <thead>
@@ -238,7 +269,7 @@
               </div>
 
               <!-- NACHOS order history -->
-              <div v-if="selectedProduct === 'nachos' && nachosOrderHistory.length > 0" class="buy-taco-view__history taco-container taco-container--l2">
+              <div v-if="selectedProduct === 'nachos' && nachosOrderHistory.length > 0" class="buy-taco-view__history w-100">
                 <h4 class="buy-taco-view__history-title">Order History</h4>
                 <table class="buy-taco-view__table">
                   <thead>
@@ -285,62 +316,132 @@
   display: flex;
   flex-direction: column;
   color: var(--black-to-white);
-  gap: 1.5rem;
+  gap: 1rem;
   padding-bottom: 2rem;
+  max-width: 800px;
+  margin: 0 auto;
 
-  // section titles
-  &__section-title {
-    font-family: 'Space Mono', monospace;
-    font-size: 1rem;
-    font-weight: 700;
-    margin-bottom: 0.75rem;
-    color: var(--brown-to-white);
-  }
-
-  // system paused banner
-  &__paused-banner {
-    padding: 0.75rem 1rem;
-    background-color: rgba(244, 67, 54, 0.15);
-    border: 1px solid var(--red);
-    border-radius: 0.5rem;
-    color: var(--red);
-    font-family: 'Space Mono', monospace;
-    font-size: 0.85rem;
-    font-weight: 700;
-  }
-
-  // info section
-  &__info {
-    padding: 1.25rem;
-  }
-
-  // steps list
-  &__steps {
+  // page header
+  &__page-header {
+    margin-top: 1.5rem;
+    padding: 0.25rem 1.5rem;
     display: flex;
-    flex-direction: column;
-    gap: 0.75rem;
+    justify-content: center;
+
+    .taco-title {
+      margin-bottom: 0;
+    }
   }
 
-  &__step {
+  // section titles - Enhanced with better typography
+  &__section-title {
+    font-family: 'Rubik', sans-serif;
+    font-size: 1.5rem;
+    font-weight: 700;
+    margin-bottom: 0.875rem;
+    color: var(--brown-to-white);
     display: flex;
     align-items: center;
-    gap: 0.75rem;
-    font-family: 'Space Mono', monospace;
-    font-size: 0.85rem;
+    gap: 0.5rem;
+
+    i {
+      color: var(--dark-orange);
+      font-size: 1.25rem;
+    }
   }
 
-  &__step-num {
+  // system paused banner - Enhanced styling
+  &__paused-banner {
+    padding: 1rem 1.25rem;
+    background-color: rgba(244, 67, 54, 0.15);
+    border: 2px solid var(--red);
+    border-radius: 0.5rem;
+    color: var(--red);
+    font-family: 'Rubik', sans-serif;
+    font-size: 0.9rem;
+    font-weight: 600;
+    box-shadow: 0 2px 8px rgba(244, 67, 54, 0.2);
+  }
+
+  // info section - Dark sienna + gold theme
+  &__info {
+    padding: 1.5rem;
+    background: linear-gradient(135deg, #5C3012, #3A1C08);
+    border: 2px solid #8B5A2B;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+
+    @media (max-width: 767.98px) {
+      padding: 1.25rem;
+    }
+
+    .buy-taco-view__section-title {
+      color: #FFD54F;
+      text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+    }
+  }
+
+  // horizontal timeline
+  &__timeline {
     display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+
+    @media (max-width: 767.98px) {
+      flex-wrap: wrap;
+      gap: 0.75rem;
+    }
+  }
+
+  &__timeline-step {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 0.5rem;
+    min-width: 0;
+
+    @media (max-width: 767.98px) {
+      flex: 0 0 calc(50% - 0.75rem);
+    }
+  }
+
+  &__timeline-arrow {
+    display: flex;
+    align-items: center;
+    padding-top: 0.35rem;
+    color: #FFD54F;
+    opacity: 0.6;
+    font-size: 0.75rem;
+    flex-shrink: 0;
+
+    @media (max-width: 767.98px) {
+      display: none;
+    }
+  }
+
+  &__step-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.8rem;
+    line-height: 1.4;
+    color: rgba(255, 255, 255, 0.9);
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
+  }
+
+  // step numbers with gradient and shadow
+  &__step-num {
+    display: inline-flex;
     align-items: center;
     justify-content: center;
     width: 1.75rem;
     height: 1.75rem;
     border-radius: 50%;
-    background-color: var(--dark-orange);
+    background: linear-gradient(135deg, var(--dark-orange), var(--brown));
     color: var(--white);
     font-weight: 700;
-    font-size: 0.8rem;
+    font-size: 0.85rem;
     flex-shrink: 0;
+    box-shadow: 0 2px 8px rgba(218, 141, 40, 0.3);
   }
 
   // login prompt (mirrors NachosVaultView pattern)
@@ -379,85 +480,185 @@
     }
   }
 
-  // product toggle
+  // product toggle - Enhanced with gradients and shadows
   &__product-toggle {
     display: flex;
-    gap: 0;
-    margin-bottom: 0.75rem;
-    border: 1px solid var(--dark-orange);
-    border-radius: 0.375rem;
-    overflow: hidden;
+    gap: 0.75rem;
+    margin-bottom: 1.5rem;
   }
 
   &__product-btn {
     flex: 1;
-    padding: 0.5rem 0.75rem;
-    border: none;
-    background: transparent;
-    color: var(--black-to-white);
-    font-family: 'Space Mono', monospace;
-    font-size: 0.8rem;
-    font-weight: 700;
+    padding: 0.875rem 1.5rem;
+    border-radius: 0.5rem;
+    border: 2px solid var(--dark-orange);
+    background-color: rgba(218, 141, 40, 0.12);
+    color: var(--white);
+    font-family: 'Rubik', sans-serif;
+    font-weight: 600;
+    font-size: 1.125rem;
     cursor: pointer;
-    transition: background-color 0.15s;
+    transition: all 0.2s ease;
+    position: relative;
+    overflow: hidden;
+    opacity: 0.6;
 
-    &.active {
-      background-color: var(--dark-orange);
+    &:hover:not(.active) {
+      background: rgba(254, 214, 108, 0.5);
       color: var(--white);
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(218, 141, 40, 0.3);
+      opacity: 1;
     }
 
-    &:not(.active):hover {
-      background-color: var(--light-orange-to-dark-brown);
+    &.active {
+      background: linear-gradient(135deg, #7B3F15, #4A2008);
+      color: #FFD54F;
+      letter-spacing: 0.03em;
+      text-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+      border-color: #8B5A2B;
+      box-shadow: 0 4px 16px rgba(60, 30, 0, 0.5);
+      transform: translateY(-1px);
+      opacity: 1;
+      font-weight: 700;
     }
 
     &:disabled {
       opacity: 0.5;
       cursor: not-allowed;
+      transform: none;
     }
   }
 
-  // provider toggle
+  // provider toggle - Enhanced styling
   &__provider-toggle {
     display: flex;
-    gap: 0;
-    margin-bottom: 1rem;
-    border: 1px solid var(--dark-orange);
-    border-radius: 0.375rem;
-    overflow: hidden;
+    gap: 0.75rem;
+    margin-bottom: 1.5rem;
   }
 
   &__provider-btn {
     flex: 1;
-    padding: 0.5rem 0.75rem;
-    border: none;
-    background: transparent;
-    color: var(--black-to-white);
+    padding: 0.75rem 1.25rem;
+    border-radius: 0.5rem;
+    border: 2px solid var(--dark-orange);
+    background-color: rgba(218, 141, 40, 0.12);
+    color: var(--white);
     font-family: 'Space Mono', monospace;
-    font-size: 0.8rem;
-    font-weight: 700;
+    font-weight: 600;
+    font-size: 0.9rem;
     cursor: pointer;
-    transition: background-color 0.15s;
+    transition: all 0.2s ease;
+    opacity: 0.6;
+
+    &:hover:not(.active) {
+      background: rgba(254, 214, 108, 0.5);
+      color: var(--white);
+      transform: translateY(-1px);
+      box-shadow: 0 2px 8px rgba(218, 141, 40, 0.2);
+      opacity: 1;
+    }
 
     &.active {
-      background-color: var(--dark-orange);
-      color: var(--white);
-    }
-
-    &:not(.active):hover {
-      background-color: var(--light-orange-to-dark-brown);
+      background: linear-gradient(135deg, #7B3F15, #4A2008);
+      color: #FFD54F;
+      letter-spacing: 0.03em;
+      text-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+      border-color: #8B5A2B;
+      font-weight: 700;
+      box-shadow: 0 4px 12px rgba(60, 30, 0, 0.5);
+      opacity: 1;
     }
   }
 
-  // buy card
+  // Auto-swap checkbox - Custom styled with warm tones
+  &__autoswap-toggle {
+    display: block;
+    cursor: pointer;
+    background: linear-gradient(135deg, #5C3012, #3A1C08);
+    border: 2px solid #8B5A2B;
+    border-radius: 0.5rem;
+    padding: 1rem 1.25rem;
+    margin: 1.5rem 0;
+    transition: all 0.2s ease;
+
+    &:hover {
+      background: linear-gradient(135deg, #6B3815, #42200A);
+      box-shadow: 0 2px 8px rgba(60, 30, 0, 0.2);
+    }
+
+    .form-check {
+      margin-bottom: 0.5rem;
+
+      input[type="checkbox"] {
+        width: 1.25rem;
+        height: 1.25rem;
+        border: 2px solid #A0724A;
+        border-radius: 0.25rem;
+        cursor: pointer;
+
+        &:checked {
+          background-color: var(--dark-orange);
+          border-color: var(--brown);
+        }
+
+        &:focus {
+          box-shadow: 0 0 0 3px rgba(218, 141, 40, 0.25);
+        }
+      }
+
+      .form-check-label {
+        font-family: 'Rubik', sans-serif;
+        font-weight: 600;
+        font-size: 1rem;
+        color: #FFD54F;
+        cursor: pointer;
+        text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+
+        i {
+          color: #FFCA28;
+        }
+      }
+    }
+
+    p.text-muted {
+      font-size: 0.875rem;
+      line-height: 1.5;
+      margin-left: 2rem;
+      margin-bottom: 0;
+      color: #FFFFFF !important;
+      opacity: 0.9;
+      text-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
+
+      i {
+        color: #FFCA28;
+        opacity: 1;
+      }
+    }
+  }
+
+  // buy card - Enhanced padding
   &__buy-card {
-    padding: 1.25rem;
+    padding: 2rem;
+    background: linear-gradient(135deg, #5C3012, #3A1C08);
+    border: 2px solid #8B5A2B;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+
+    @media (max-width: 767.98px) {
+      padding: 1.5rem;
+    }
+
+    .buy-taco-view__section-title {
+      color: #FFD54F;
+      text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+    }
   }
 
-  // amount row (input + currency side by side)
+  // amount row - Better spacing
   &__amount-row {
     display: flex;
     gap: 0.75rem;
-    margin-bottom: 1rem;
+    margin-bottom: 1.5rem;
   }
 
   // input group
@@ -465,132 +666,252 @@
     margin-bottom: 0;
   }
 
+  // Enhanced labels
   &__label {
     display: block;
-    font-family: 'Space Mono', monospace;
-    font-size: 0.8rem;
-    font-weight: 700;
-    margin-bottom: 0.25rem;
+    font-family: 'Rubik', sans-serif;
+    font-weight: 600;
+    font-size: 0.875rem;
     color: var(--brown-to-white);
+    margin-bottom: 0.5rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
   }
 
-  // deposit address
+  // deposit address - Enhanced styling
   &__deposit-addr {
-    margin-bottom: 1rem;
+    margin-bottom: 1.5rem;
   }
 
   &__addr-value {
-    display: block;
-    font-size: 0.7rem;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.875rem 1rem;
+    border: 2px solid var(--dark-orange-to-brown);
+    border-radius: 0.5rem;
+    background: linear-gradient(135deg, var(--light-orange), var(--white));
+    font-family: 'Space Mono', monospace;
+    font-weight: 600;
+    font-size: 0.875rem;
+    color: var(--brown);
     word-break: break-all;
-    padding: 0.5rem;
-    background-color: var(--light-orange-to-dark-brown);
-    border-radius: 0.25rem;
-    border: 1px solid var(--dark-orange);
-    color: var(--black-to-white);
   }
 
   &__addr-error {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 0.5rem;
-    background-color: var(--light-orange-to-dark-brown);
-    border-radius: 0.25rem;
-    border: 1px solid var(--red, #dc3545);
-    font-size: 0.8rem;
+    padding: 0.875rem 1rem;
+    background-color: rgba(244, 67, 54, 0.1);
+    border-radius: 0.5rem;
+    border: 2px solid var(--red, #dc3545);
+    font-size: 0.9rem;
     font-family: 'Space Mono', monospace;
     color: var(--red, #dc3545);
 
     .btn {
-      font-size: 0.75rem;
+      font-size: 0.8rem;
       font-family: 'Space Mono', monospace;
-      padding: 0.2rem 0.5rem;
+      padding: 0.4rem 0.75rem;
     }
   }
 
   // status section
   &__status {
-    padding: 1rem;
+    padding: 1.25rem;
+    background: linear-gradient(135deg, #5C3012, #3A1C08);
+    border: 2px solid #8B5A2B;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+
+    .buy-taco-view__section-title {
+      color: #FFD54F;
+      text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+    }
   }
 
   &__status-row {
     display: flex;
     align-items: center;
-    gap: 0.75rem;
+    gap: 1rem;
     font-family: 'Space Mono', monospace;
-    font-size: 0.85rem;
+    font-size: 1rem;
   }
 
   &__status-icon {
-    font-size: 1.25rem;
+    font-size: 1.5rem;
   }
 
   &__status-text {
     flex: 1;
   }
 
-  // (progress bar styles removed — now in SwapProgressTracker component)
+  // ICP detected banner (manual swap mode)
+  &__icp-detected {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
 
-  // claim section
+  &__icp-detected-banner {
+    padding: 0.875rem 1rem;
+    background-color: rgba(76, 175, 80, 0.15);
+    border: 1px solid var(--success-green);
+    border-radius: 0.5rem;
+    color: var(--success-green);
+    font-family: 'Space Mono', monospace;
+    font-size: 0.9rem;
+    font-weight: 600;
+  }
+
+  &__icp-detected-hint {
+    font-size: 0.85rem;
+    color: rgba(255, 255, 255, 0.7);
+    margin: 0;
+    text-align: center;
+  }
+
+  // claim section - Enhanced with gradient background
   &__claim {
-    padding: 1.25rem;
+    background: linear-gradient(135deg, #5C3012, #3A1C08);
+    border: 2px solid #8B5A2B;
+    border-radius: 0.75rem;
+    padding: 1.75rem;
+    margin-top: 2rem;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+
+    .buy-taco-view__section-title {
+      color: #FFD54F;
+      text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+      align-self: flex-start;
+    }
   }
 
   &__claim-desc {
-    font-size: 0.8rem;
-    opacity: 0.8;
-    margin-bottom: 0.75rem;
+    font-size: 1rem;
+    line-height: 1.6;
+    color: rgba(255, 255, 255, 0.9);
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
+    margin-bottom: 1.5rem;
+    padding: 1rem;
+    background-color: rgba(0, 0, 0, 0.1);
+    border-left: 4px solid #FFD54F;
+    border-radius: 0.375rem;
   }
 
   &__claim-result {
-    margin-top: 0.75rem;
-    padding: 0.5rem 0.75rem;
-    border-radius: 0.25rem;
-    font-size: 0.8rem;
+    margin-top: 1rem;
+    padding: 0.875rem 1rem;
+    border-radius: 0.5rem;
+    font-size: 0.9rem;
     font-family: 'Space Mono', monospace;
+    font-weight: 600;
 
     &--success {
       background-color: rgba(76, 175, 80, 0.15);
       color: var(--success-green);
+      border: 1px solid var(--success-green);
     }
 
     &--error {
-      background-color: rgba(244, 67, 54, 0.15);
-      color: var(--red);
+      background-color: rgba(244, 67, 54, 0.4);
+      color: var(--white);
+      border: 2px solid var(--red);
+      font-weight: 700;
     }
   }
 
-  // order history
+  // order history - Professional table design
   &__history {
-    border-top: 1px solid rgba(128, 128, 128, 0.15);
-    padding-top: 0.75rem;
+    margin-top: 2rem;
+    padding: 1.25rem;
+    background: linear-gradient(135deg, #5C3012, #3A1C08);
+    border: 2px solid #8B5A2B;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+    overflow-x: auto;
   }
 
   &__history-title {
-    font-family: 'Space Mono', monospace;
-    font-size: 0.8rem;
+    font-family: 'Rubik', sans-serif;
+    font-size: 1rem;
     font-weight: 700;
-    margin-bottom: 0.5rem;
+    margin-bottom: 1rem;
+    color: #FFD54F;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
   }
 
   &__table {
     width: 100%;
-    font-size: 0.7rem;
     font-family: 'Space Mono', monospace;
-    border-collapse: collapse;
+    border-collapse: separate;
+    border-spacing: 0;
+    border: 2px solid #8B5A2B;
+    border-radius: 0.5rem;
+    overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 
-    th, td {
-      padding: 0.25rem 0.375rem;
-      border-bottom: 1px solid var(--dark-orange-to-brown);
+    thead {
+      background: linear-gradient(135deg, #7B3F15, #4A2008);
+
+      th {
+        padding: 1rem 1.25rem;
+        font-family: 'Rubik', sans-serif;
+        font-weight: 700;
+        font-size: 0.875rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        color: var(--white);
+        text-align: left;
+      }
     }
 
-    th {
-      font-size: 0.65rem;
-      text-transform: uppercase;
-      opacity: 0.7;
-      font-weight: 600;
-      border-bottom: 2px solid var(--dark-orange-to-brown);
+    tbody {
+      background-color: rgba(0, 0, 0, 0.15);
+
+      tr {
+        transition: background-color 0.15s ease;
+
+        &:hover {
+          background-color: rgba(0, 0, 0, 0.25);
+        }
+
+        &:not(:last-child) {
+          td {
+            border-bottom: 1px solid rgba(139, 90, 43, 0.4);
+          }
+        }
+      }
+
+      td {
+        padding: 1rem 1.25rem;
+        font-size: 0.875rem;
+        color: rgba(255, 255, 255, 0.85);
+      }
+    }
+
+    @media (max-width: 767.98px) {
+      font-size: 0.75rem;
+
+      thead th,
+      tbody td {
+        padding: 0.75rem 0.5rem;
+      }
+    }
+  }
+
+  // warm dark green buttons to match dark sienna theme
+  .taco-btn--green {
+    background: linear-gradient(135deg, #5E7A2E, #3D5A1A);
+    color: #F5F0E0;
+    border: 2px solid #7A8B3A;
+
+    &:hover,
+    &:focus {
+      background: linear-gradient(135deg, #6E8A38, #4A6A22);
+      color: #fff;
     }
   }
 }
@@ -611,7 +932,7 @@ import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useTacoStore } from '../stores/taco.store'
 import { storeToRefs } from 'pinia'
-import { getEffectiveNetwork } from '../config/network-config'
+import { getEffectiveNetwork, isDevEnvironment } from '../config/network-config'
 import { useAdminCheck } from '../composables/useAdminCheck'
 import { Principal } from '@dfinity/principal'
 import { Actor, HttpAgent } from '@dfinity/agent'
@@ -664,7 +985,7 @@ const NACHOS_STEPS: ProgressStep[] = [
 const router = useRouter()
 const route = useRoute()
 const tacoStore = useTacoStore()
-const { userPrincipal, darkModeToggled, userLoggedIn } = storeToRefs(tacoStore)
+const { userPrincipal, darkModeToggled, userLoggedIn, userLedgerAccountId } = storeToRefs(tacoStore)
 const { isAdmin } = useAdminCheck()
 
 /////////////////
@@ -701,6 +1022,12 @@ const depositAddress = ref('')
 const orderHistory = ref<any[]>([])
 const systemPaused = ref(false)
 
+// Auto-swap checkbox state
+const autoSwapEnabled = ref(false)  // Default: manual mode (unchecked)
+
+// Baseline ICP balance tracking (for difference calculation in manual mode)
+const baselineIcpBalance = ref(0n)
+
 // Transak SDK instance ref (for cleanup on unmount)
 let transakInstance: any = null
 
@@ -715,6 +1042,10 @@ const detectedIcpAmount = ref(0n)
 // Live deposit balance (for UI display during Phase 1)
 const depositBalance = ref<bigint>(0n)
 const nachosDepositBalance = ref<bigint>(0n)
+
+// Pending deposit flags (from SwapDashboard — ICP sitting in canister subaccount)
+const hasPendingTacoDeposit = ref(false)
+const hasPendingNachosDeposit = ref(false)
 
 // Phase 1: Deposit polling (ICP ledger icrc1_balance_of)
 let depositPollInterval: ReturnType<typeof setInterval> | null = null
@@ -897,13 +1228,28 @@ const nachosIsTerminalFailure = computed(() =>
 
 const anySwapActive = computed(() => isActive.value || nachosIsActive.value)
 
-const activeDepositAddress = computed(() =>
-  selectedProduct.value === 'nachos' ? nachosDepositAddress.value : depositAddress.value
-)
+const activeDepositAddress = computed(() => {
+  // Manual mode: show user's personal wallet (same for TACO and NACHOS)
+  if (!autoSwapEnabled.value) {
+    return userLedgerAccountId.value
+  }
+  // Auto mode: show product-specific deposit address
+  return selectedProduct.value === 'nachos' ? nachosDepositAddress.value : depositAddress.value
+})
 
 const activeAddrError = computed(() =>
   selectedProduct.value === 'nachos' ? nachosAddrError.value : tacoAddrError.value
 )
+
+// Show claim section only when ICP is stuck in canister subaccount and no active swap
+const showClaimSection = computed(() => {
+  if (selectedProduct.value === 'nachos') {
+    const notSwapping = nachosPhase.value === 'idle' || nachosPhase.value === 'error'
+    return notSwapping && hasPendingNachosDeposit.value
+  }
+  const notSwapping = uiPhase.value === 'idle' || uiPhase.value === 'error'
+  return notSwapping && hasPendingTacoDeposit.value
+})
 
 const retryLoadAddress = () => {
   loadDashboard().catch(console.error)
@@ -1085,6 +1431,20 @@ const openCoinbase = async () => {
   icpDetected.value = false
   detectedIcpAmount.value = 0n
 
+  // Capture baseline ICP balance (for difference tracking in manual mode)
+  if (!autoSwapEnabled.value) {
+    try {
+      baselineIcpBalance.value = await tacoStore.icrc1BalanceOf(
+        ICP_LEDGER_CANISTER_ID,
+        Principal.fromText(tacoStore.userPrincipal),
+        undefined  // User's default subaccount
+      )
+    } catch (e) {
+      console.warn('Failed to capture baseline balance:', e)
+      baselineIcpBalance.value = 0n
+    }
+  }
+
   // 0. Register payment intent with backend
   const ok = await registerPayment()
   if (!ok) return
@@ -1093,7 +1453,7 @@ const openCoinbase = async () => {
     // 1. Get session token from CF Worker (signed with frontend identity)
     // Use user's personal wallet address (not swap deposit address)
     const sessionBody = {
-      addresses: [{ address: tacoStore.userLedgerAccountId }],
+      addresses: [{ address: userLedgerAccountId.value }],
       assets: ['ICP'],
     }
     const resp = await fetch(COINBASE_SESSION_WORKER, {
@@ -1110,9 +1470,12 @@ const openCoinbase = async () => {
     // 2. Generate Coinbase onramp URL
     const { generateOnRampURL } = await import('@coinbase/cbpay-js')
 
+    // Use user's personal wallet in manual mode, swap deposit address in auto mode
+    const targetAddress = autoSwapEnabled.value ? depositAddress.value : userLedgerAccountId.value
+
     const onrampUrl = generateOnRampURL({
       sessionToken,
-      addresses: { [depositAddress.value]: [] },
+      addresses: { [targetAddress]: [] },
       assets: ['ICP'],
       presetFiatAmount: Number(fiatAmount.value) || 50,
       theme: 'dark',
@@ -1301,6 +1664,10 @@ const startUnifiedPolling = (intervalMs: number) => {
       const actor = await tacoStore.createTacoSwapActor()
       const db: SwapDashboard = await (actor as any).getSwapDashboard()
 
+      // --- Update pending deposit flags ---
+      hasPendingTacoDeposit.value = db.hasPendingTaco
+      hasPendingNachosDeposit.value = db.hasPendingNachos
+
       // --- Update TACO ---
       if (uiPhase.value === 'polling') {
         swapProgress.value = db.tacoStatus
@@ -1385,6 +1752,10 @@ const loadDashboard = async () => {
     // --- Populate addresses ---
     depositAddress.value = db.depositAddress
     nachosDepositAddress.value = db.nachosDepositAddress
+
+    // --- Populate pending deposit flags ---
+    hasPendingTacoDeposit.value = db.hasPendingTaco
+    hasPendingNachosDeposit.value = db.hasPendingNachos
 
     // --- Populate config ---
     systemPaused.value = db.config.systemPaused
@@ -1593,7 +1964,7 @@ const handleNachosClaimResult = (result: any): boolean => {
 // Phase 1: Deposit polling via ICP ledger icrc1_balance_of
 // ==========================
 
-/** Poll ICP ledger for deposit balance. When ICP arrives, auto-claim and switch to Phase 2. */
+/** Poll ICP ledger for deposit balance. Conditional behavior based on autoSwapEnabled. */
 const startDepositPolling = (product: Product) => {
   stopDepositPolling()
   const startedAt = Date.now()
@@ -1614,38 +1985,94 @@ const startDepositPolling = (product: Product) => {
       return
     }
 
-    // Poll user's personal wallet (not swap deposit subaccount)
-    const balance = await tacoStore.icrc1BalanceOf(
-      ICP_LEDGER_CANISTER_ID,
-      Principal.fromText(tacoStore.userPrincipal),
-      undefined  // Default subaccount (user's main wallet)
-    )
+    try {
+      let balanceBigInt: bigint
 
-    if (balance === false) return // query error, retry next tick
+      if (autoSwapEnabled.value) {
+        // AUTO MODE: Poll swap deposit address (old behavior)
+        const subaccount = product === 'taco'
+          ? tacoDepositSubaccount.value
+          : nachosDepositSubaccount.value
 
-    const balanceBigInt = BigInt(balance)
+        if (!subaccount) return
 
-    // Update live balance for UI
-    if (product === 'taco') {
-      depositBalance.value = balanceBigInt
-    } else {
-      nachosDepositBalance.value = balanceBigInt
-    }
+        const balance = await tacoStore.icrc1BalanceOf(
+          ICP_LEDGER_CANISTER_ID,
+          Principal.fromText(swapCanisterId),
+          subaccount
+        )
 
-    // ICP arrived in user's wallet — show manual swap button
-    if (balanceBigInt > DEPOSIT_MIN_E8S) {
-      stopDepositPolling()
+        if (balance === false) return // query error, retry next tick
+        balanceBigInt = BigInt(balance)
 
-      // Set flags to show manual swap button (no auto-swap)
-      icpDetected.value = true
-      detectedIcpAmount.value = balanceBigInt
+        // Update live balance for UI
+        if (product === 'taco') {
+          depositBalance.value = balanceBigInt
+        } else {
+          nachosDepositBalance.value = balanceBigInt
+        }
 
-      // Update UI phase to show detected state
-      if (product === 'taco') {
-        uiPhase.value = 'idle'  // Return to idle so button is clickable
+        // Auto-swap when detected
+        if (balanceBigInt > DEPOSIT_MIN_E8S) {
+          stopDepositPolling()
+
+          const actor = await tacoStore.createTacoSwapActor()
+
+          if (product === 'taco') {
+            uiPhase.value = 'polling'
+            const result = await (actor as any).claim_taco([fiatAmount.value], [fiatCurrency.value])
+            const done = handleClaimResult(result)
+            if (!done && uiPhase.value === 'polling') {
+              startUnifiedPolling(POLL_ACTIVE_MS)
+            }
+          } else {
+            nachosPhase.value = 'polling'
+            const result = await (actor as any).claim_nachos(0n, [fiatAmount.value], [fiatCurrency.value])
+            const done = handleNachosClaimResult(result)
+            if (!done && nachosPhase.value === 'polling') {
+              startUnifiedPolling(POLL_ACTIVE_MS)
+            }
+          }
+        }
       } else {
-        nachosPhase.value = 'idle'
+        // MANUAL MODE: Poll user's personal wallet for DIFFERENCE
+        const currentBalance = await tacoStore.icrc1BalanceOf(
+          ICP_LEDGER_CANISTER_ID,
+          Principal.fromText(tacoStore.userPrincipal),
+          undefined  // User's default subaccount
+        )
+
+        if (currentBalance === false) return // query error, retry next tick
+        const currentBalanceBigInt = BigInt(currentBalance)
+
+        // Calculate the difference from baseline
+        const balanceDifference = currentBalanceBigInt - baselineIcpBalance.value
+
+        // Update display balance with difference
+        if (product === 'taco') {
+          depositBalance.value = balanceDifference
+        } else {
+          nachosDepositBalance.value = balanceDifference
+        }
+
+        // ICP detected when difference exceeds minimum
+        if (balanceDifference > DEPOSIT_MIN_E8S) {
+          stopDepositPolling()
+
+          // Set flags to show manual swap button
+          icpDetected.value = true
+          detectedIcpAmount.value = balanceDifference  // Use DIFFERENCE, not total
+
+          // Return UI to idle (manual swap button appears)
+          if (product === 'taco') {
+            uiPhase.value = 'idle'
+          } else {
+            nachosPhase.value = 'idle'
+          }
+        }
       }
+    } catch (error) {
+      console.error('Deposit polling error:', error)
     }
   }, DEPOSIT_POLL_MS)
 }
@@ -1858,11 +2285,30 @@ const openCoinbaseNachos = async () => {
   nachosError.value = null
   claimResult.value = null
   nachosProgress.value = null
+  icpDetected.value = false
+  detectedIcpAmount.value = 0n
+
+  // Capture baseline ICP balance (for difference tracking in manual mode)
+  if (!autoSwapEnabled.value) {
+    try {
+      baselineIcpBalance.value = await tacoStore.icrc1BalanceOf(
+        ICP_LEDGER_CANISTER_ID,
+        Principal.fromText(tacoStore.userPrincipal),
+        undefined  // User's default subaccount
+      )
+    } catch (e) {
+      console.warn('Failed to capture baseline balance:', e)
+      baselineIcpBalance.value = 0n
+    }
+  }
 
   try {
+    // Use user's personal wallet in manual mode, NACHOS deposit address in auto mode
+    const targetAddress = autoSwapEnabled.value ? nachosDepositAddress.value : userLedgerAccountId.value
+
     // 1. Get session token from CF Worker (signed with frontend identity)
     const sessionBody = {
-      addresses: [{ address: nachosDepositAddress.value }],
+      addresses: [{ address: targetAddress }],
       assets: ['ICP'],
     }
     const resp = await fetch(COINBASE_SESSION_WORKER, {
@@ -1881,7 +2327,7 @@ const openCoinbaseNachos = async () => {
 
     const onrampUrl = generateOnRampURL({
       sessionToken,
-      addresses: { [nachosDepositAddress.value]: [] },
+      addresses: { [targetAddress]: [] },
       assets: ['ICP'],
       presetFiatAmount: Number(fiatAmount.value) || 50,
       theme: 'dark',
@@ -2011,7 +2457,7 @@ const claimNachos = async () => {
 
 onMounted(async () => {
   // redirect to home on production (unless admin)
-  if (getEffectiveNetwork() === 'ic' && !isAdmin.value) {
+  if (!isDevEnvironment() && !isAdmin.value) {
     router.replace('/')
     return
   }
