@@ -69,20 +69,58 @@
 
     </div>
 
+    <!-- lightning flash (yellow strobe for battle climax) — after stage so it covers sprites -->
+    <div v-if="lightningFlash" class="grand-tour__lightning"></div>
+
+    <!-- whiteout (solid white, fades out after battle climax) — after stage so it covers sprites -->
+    <div v-if="whiteoutActive"
+         class="grand-tour__whiteout"
+         :class="{ 'grand-tour__whiteout--fading': whiteoutFading }">
+    </div>
+
     <!-- dialog box -->
     <VNDialogBox ref="dialogRef"
                  :text="currentText"
                  :speaker-name="currentSpeakerName"
                  :speaker-color="currentSpeakerColor"
+                 :speaker-side="currentSpeakerSide"
                  :visible="dialogVisible"
                  :choices="currentChoices"
                  :show-choices="showingChoices"
+                 :is-paused="isPaused"
                  @typing="onTyping"
                  @done="onTypingDone"
                  @advance="onAdvance"
                  @choice="onChoice"
                  @skip="endTour" />
 
+  </div>
+
+  <!-- wizard prompt modal (shown after tour for new users) -->
+  <div v-if="showWizardPrompt" class="taco-modal-overlay" style="z-index: 100005;">
+    <div class="taco-modal-dialog" style="max-width: 420px;">
+      <div class="taco-modal-header">
+        <div class="taco-modal-title">
+          <span style="font-size: 1.1rem; font-weight: 700;">Get Started</span>
+        </div>
+        <button class="taco-modal-close" @click="showWizardPrompt = false">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+      <div class="taco-modal-body">
+        <p style="margin: 0; line-height: 1.6;">
+          Since you're new, would you like to visit the <strong>TACO Wizard</strong> to get started step by step?
+        </p>
+      </div>
+      <div class="taco-modal-footer" style="display: flex; gap: 0.75rem; justify-content: flex-end;">
+        <button class="btn taco-btn taco-btn--outline" @click="showWizardPrompt = false">
+          No thanks
+        </button>
+        <button class="btn taco-btn taco-btn--green" @click="openWizard">
+          Open Wizard
+        </button>
+      </div>
+    </div>
   </div>
 
 </template>
@@ -97,8 +135,61 @@ import VNDialogBox from './VNDialogBox.vue'
 import { tourScript, characterConfig } from './tourScript'
 import type { Expression, Action, TourChoice, DialogueLine } from './tourScript'
 import { faceStyleNames, type FaceStyle } from './faceStyles'
+import { useTacoStore } from '../../stores/taco.store'
+import {
+  applyHighlight,
+  clearHighlight,
+  scrollToElement,
+  clickElement,
+  animateSliders,
+  toggleBattle,
+  escalatingBattle,
+  hoverChartPoints,
+  cleanupAllTourEffects,
+  abortAnimations,
+  resetAbortFlag,
+} from './tourInteractions'
 
 const router = useRouter()
+const tacoStore = useTacoStore()
+
+// ──────────────────────────────────
+// Wizard Prompt (post-tour modal)
+// ──────────────────────────────────
+const showWizardPrompt = ref(false)
+
+// Block Space/Enter/Escape and stray clicks while wizard prompt is open
+function wizardKeyGuard(e: KeyboardEvent) {
+  if (e.code === 'Space' || e.code === 'Enter' || e.code === 'Escape') {
+    e.preventDefault()
+    e.stopPropagation()
+  }
+}
+function wizardClickGuard(e: MouseEvent) {
+  // Only allow clicks inside the modal dialog itself
+  const dialog = document.querySelector('.taco-modal-dialog')
+  if (dialog && !dialog.contains(e.target as Node)) {
+    e.preventDefault()
+    e.stopPropagation()
+  }
+}
+
+watch(showWizardPrompt, (show) => {
+  if (show) {
+    window.addEventListener('keydown', wizardKeyGuard, true)
+    window.addEventListener('click', wizardClickGuard, true)
+  } else {
+    window.removeEventListener('keydown', wizardKeyGuard, true)
+    window.removeEventListener('click', wizardClickGuard, true)
+    // Wizard prompt was dismissed — now safe to emit 'end' and let parent unmount us
+    emit('end')
+  }
+})
+
+function openWizard() {
+  showWizardPrompt.value = false
+  tacoStore.toggleTacoWizard()
+}
 
 // ──────────────────────────────────
 // Props & Emits
@@ -141,6 +232,10 @@ const currentSpeakerColor = computed(() => {
   if (!currentLine.value) return ''
   return characterConfig[currentLine.value.character].color
 })
+const currentSpeakerSide = computed<'left' | 'right'>(() => {
+  if (!currentLine.value) return 'left'
+  return currentLine.value.character === 'nacho' ? 'right' : 'left'
+})
 
 // Choices
 const currentChoices = computed<TourChoice[]>(() => {
@@ -166,6 +261,9 @@ const nachoTalking = ref(false)
 // Screen effects
 const screenShake = ref(false)
 const screenFlash = ref(false)
+const lightningFlash = ref(false)
+const whiteoutActive = ref(false)
+const whiteoutFading = ref(false)
 
 // Face style selection (persisted in localStorage)
 const selectedFaceStyle = useStorage<FaceStyle>('grandTourFaceStyle', 'standard')
@@ -177,12 +275,14 @@ const testExpression = ref<Expression | 'auto'>('auto')
 // Pause timer
 // ──────────────────────────────────
 let pauseTimer: ReturnType<typeof setTimeout> | null = null
+const isPaused = ref(false)
 
 function clearPauseTimer() {
   if (pauseTimer) {
     clearTimeout(pauseTimer)
     pauseTimer = null
   }
+  isPaused.value = false
 }
 
 // ──────────────────────────────────
@@ -265,15 +365,20 @@ function onTypingDone() {
     showingChoices.value = true
   }
 
-  // If this line has a pause, auto-advance after the delay
+  // If this line has a pause, auto-advance after the delay (block manual advance)
   if (currentLine.value?.pause) {
+    isPaused.value = true
     pauseTimer = setTimeout(() => {
+      isPaused.value = false
       onAdvance()
     }, currentLine.value.pause)
   }
 }
 
 function onAdvance() {
+  // Block manual advance during auto-advancing pause lines (e.g. toggle fight)
+  if (isPaused.value) return
+
   clearPauseTimer()
 
   // If in a choice response, advance through it
@@ -319,12 +424,18 @@ async function advanceScene() {
   lineIndex.value = 0
   const nextScene = tourScript[sceneIndex.value]
 
+  // Clean up highlights before navigating
+  clearHighlight()
+
   // Navigate to the new route
   if (nextScene.route !== router.currentRoute.value.path) {
     dialogVisible.value = false
     await router.push(nextScene.route)
     // Small delay for page to render
     await new Promise(r => setTimeout(r, 600))
+    // Scroll the app content container to top
+    const appContent = document.querySelector('.app__content')
+    if (appContent) appContent.scrollTop = 0
     dialogVisible.value = true
   }
 
@@ -342,13 +453,122 @@ function onChoice(index: number) {
   }
 }
 
-function applyCurrentLine() {
-  const line = currentLine.value
-  if (!line) return
-  applySpriteState(line)
+async function applyCurrentLine() {
+  const ln = currentLine.value
+  if (!ln) return
+
+  // Skip lines whose runtime condition is not met
+  if (ln.condition && !ln.condition()) {
+    advanceLine()
+    return
+  }
+
+  applySpriteState(ln)
+
+  // Always clear previous highlight before processing new line
+  clearHighlight()
+
+  // Handle delay before showing this line
+  if (ln.delay) {
+    await new Promise(r => setTimeout(r, ln.delay))
+  }
+
+  // Handle scroll (before highlight so element is visible)
+  if (ln.scrollTo || ln.highlight) {
+    const scrollTarget = ln.scrollTo || ln.highlight!
+    await scrollToElement(scrollTarget)
+  }
+
+  // Handle highlight
+  if (ln.highlight) {
+    applyHighlight(ln.highlight)
+  }
+
+  // Handle click
+  if (ln.click) {
+    await new Promise(r => setTimeout(r, 300))
+    clickElement(ln.click)
+  }
+
+  // Handle slider animation (fire and forget — runs alongside typing)
+  if (ln.animateSliders) {
+    const { container, demoValues, duration } = ln.animateSliders
+    animateSliders(container, demoValues, duration)
+  }
+
+  // Handle toggle battle (fire and forget)
+  if (ln.toggleBattle) {
+    const { selectorA, selectorB, rounds, delayMs } = ln.toggleBattle
+    toggleBattle(selectorA, selectorB, rounds, delayMs)
+  }
+
+  // Handle escalating battle (fire and forget — with visual effect callbacks)
+  if (ln.escalatingBattle) {
+    const { selectorA, selectorB } = ln.escalatingBattle
+    escalatingBattle(selectorA, selectorB, {
+      onPhase: (phase) => {
+        if (phase === 1) {
+          tacoExpression.value = 'angry'
+          nachoExpression.value = 'angry'
+        }
+        if (phase === 2) {
+          tacoExpression.value = 'surprised'
+          nachoExpression.value = 'surprised'
+          screenShake.value = true
+        }
+        if (phase === 3) {
+          tacoExpression.value = 'angry'
+          nachoExpression.value = 'angry'
+        }
+      },
+      onClimax: () => {
+        screenShake.value = false
+
+        // Both buttons "win" simultaneously — force both to show active
+        clickElement(selectorA)
+        clickElement(selectorB)
+        // The toggle is radio (one or the other), so force both active via DOM
+        const btnA = document.querySelector<HTMLElement>(selectorA)
+        const btnB = document.querySelector<HTMLElement>(selectorB)
+        if (btnA) btnA.classList.add('active')
+        if (btnB) btnB.classList.add('active')
+
+        // Lightning strobe
+        lightningFlash.value = true
+        setTimeout(() => { lightningFlash.value = false }, 400)
+
+        // Whiteout after lightning
+        setTimeout(() => { whiteoutActive.value = true }, 300)
+
+        // Start fading after 3s
+        setTimeout(() => { whiteoutFading.value = true }, 3300)
+
+        // Clean up after fade
+        setTimeout(() => {
+          whiteoutActive.value = false
+          whiteoutFading.value = false
+          tacoExpression.value = 'sad'
+          nachoExpression.value = 'sad'
+          tacoAction.value = 'idle'
+          nachoAction.value = 'idle'
+        }, 4500)
+      }
+    })
+  }
+
+  // Handle chart point hover (fire and forget)
+  if (ln.hoverChartPoints) {
+    const { container, count, dwellMs } = ln.hoverChartPoints
+    hoverChartPoints(container, count, dwellMs)
+  }
+
+  // Handle explicit highlight clear
+  if (ln.clearHighlight) {
+    clearHighlight()
+  }
 
   // If the line has no text (e.g., a character entrance), auto-advance after animation
-  if (!line.text) {
+  if (!ln.text) {
     setTimeout(() => {
       onAdvance()
     }, 600)
@@ -359,6 +579,7 @@ function applyCurrentLine() {
 // Start / End Tour
 // ──────────────────────────────────
 async function startTour() {
+  resetAbortFlag()
   sceneIndex.value = 0
   lineIndex.value = 0
   inChoiceResponse.value = false
@@ -370,6 +591,8 @@ async function startTour() {
   if (firstScene.route !== router.currentRoute.value.path) {
     await router.push(firstScene.route)
     await new Promise(r => setTimeout(r, 400))
+    const appContent = document.querySelector('.app__content')
+    if (appContent) appContent.scrollTop = 0
   }
 
   await nextTick()
@@ -379,15 +602,25 @@ async function startTour() {
 
 function endTour() {
   clearPauseTimer()
+  abortAnimations()
+  cleanupAllTourEffects()
   dialogVisible.value = false
   tacoVisible.value = false
   nachoVisible.value = false
   tacoTalking.value = false
   nachoTalking.value = false
 
-  setTimeout(() => {
-    emit('end')
-  }, 300)
+  // Show wizard prompt for new users — defer 'end' emit until prompt is closed
+  // (emitting 'end' causes the parent to unmount GrandTour, destroying the modal)
+  const isNewUser = !tacoStore.userLoggedIn || tacoStore.cachedTacoNeurons.length === 0
+  if (isNewUser) {
+    showWizardPrompt.value = true
+    // 'end' will be emitted when the wizard prompt is dismissed (see watch below)
+  } else {
+    setTimeout(() => {
+      emit('end')
+    }, 300)
+  }
 }
 
 // Auto-start when active becomes true
@@ -515,6 +748,41 @@ onUnmounted(() => {
   100% { opacity: 0; }
 }
 
+// Battle climax effects
+.grand-tour__lightning {
+  position: fixed;
+  inset: 0;
+  background: #FFD700;
+  z-index: 100001;
+  pointer-events: none;
+  animation: lightning-strobe 0.4s ease-out forwards;
+}
+
+.grand-tour__whiteout {
+  position: fixed;
+  inset: 0;
+  background: white;
+  opacity: 1;
+  z-index: 100001;
+  pointer-events: none;
+  transition: opacity 1.2s ease-out;
+
+  &--fading {
+    opacity: 0;
+  }
+}
+
+@keyframes lightning-strobe {
+  0%   { opacity: 0; }
+  10%  { opacity: 1; }
+  25%  { opacity: 0.2; }
+  40%  { opacity: 0.95; }
+  55%  { opacity: 0.1; }
+  70%  { opacity: 0.85; }
+  85%  { opacity: 0; }
+  100% { opacity: 0; }
+}
+
 // Mobile
 @media (max-width: 600px) {
   .grand-tour__stage {
@@ -539,5 +807,15 @@ onUnmounted(() => {
       min-width: 90px;
     }
   }
+}
+</style>
+
+<!-- Unscoped: highlight class applied to elements outside this component -->
+<style lang="scss">
+.tour-highlighted {
+  outline: 2px solid rgba(255, 215, 0, 0.6) !important;
+  box-shadow: 0 0 10px rgba(255, 215, 0, 0.25), 0 0 20px rgba(255, 215, 0, 0.1) !important;
+  border-radius: 0.5rem;
+  transition: outline 0.3s ease, box-shadow 0.3s ease;
 }
 </style>

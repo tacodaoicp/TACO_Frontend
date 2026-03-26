@@ -7,6 +7,7 @@
       <!-- name plate -->
       <div v-if="speakerName"
            class="vn-dialog__nameplate"
+           :class="{ 'vn-dialog__nameplate--right': speakerSide === 'right' }"
            :style="{ backgroundColor: speakerColor }">
         {{ speakerName }}
       </div>
@@ -33,7 +34,7 @@
       </div>
 
       <!-- continue indicator -->
-      <div v-if="!isTyping && !showChoices" class="vn-dialog__continue">
+      <div v-if="!isTyping && !showChoices && !isPaused" class="vn-dialog__continue">
         <span class="vn-dialog__continue-arrow">&#9660;</span>
       </div>
 
@@ -56,9 +57,11 @@ const props = defineProps<{
   text: string
   speakerName: string
   speakerColor: string
+  speakerSide: 'left' | 'right'
   visible: boolean
   choices: TourChoice[]
   showChoices: boolean
+  isPaused: boolean
 }>()
 
 const emit = defineEmits<{
@@ -121,7 +124,7 @@ watch(() => props.text, (newText) => {
 
 // Keyboard handler
 function onKeyDown(e: KeyboardEvent) {
-  if (!props.visible) return
+  if (!props.visible || props.isPaused) return
   if (e.code === 'Space' || e.code === 'Enter') {
     e.preventDefault()
     if (isTyping.value) {
@@ -137,7 +140,7 @@ function onKeyDown(e: KeyboardEvent) {
 
 // Click handler for mobile
 function onClick() {
-  if (!props.visible) return
+  if (!props.visible || props.isPaused) return
   if (isTyping.value) {
     completeText()
   } else if (!props.showChoices) {
@@ -251,6 +254,11 @@ $bg-color: rgba(10, 10, 20, 0.92);
       #{-$pixel * 2} 0 0 0 $border-color,
       0 #{-$pixel * 2} 0 0 $border-color;
     border-radius: 0;
+  }
+
+  &__nameplate--right {
+    left: auto !important;
+    right: #{$pixel * 2};
   }
 
   &__text-area {

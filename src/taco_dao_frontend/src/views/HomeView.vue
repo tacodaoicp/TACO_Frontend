@@ -248,16 +248,6 @@
           <!-- bottom -->
           <div class="home-view__above-the-fold__upper__bottom">
 
-            <!-- wizard tagline container -->
-            <div v-if="localNeuronsCount < 1" class="home-view__tagline__container mt-4">
-
-              <!-- wizard tagline -->
-              <span class="home-view__tagline">
-                Use the <span @click="toggleTacoWizard" class="home-view__tagline__link">🧙Taco Wizard</span> to start voting and earning rewards!
-              </span>
-
-            </div>
-
             <!-- tagline container -->
             <div class="home-view__tagline__container mt-3">
 

@@ -91,7 +91,7 @@
                 <p class="mb-1">Send some to this address:</p>
 
                 <!-- Legacy ICP Account ID (for CEX withdrawals) -->
-                <p class="mb-0 small text-muted">Account ID (for exchanges):</p>
+                <p class="mb-0 small" style="opacity: 0.6;">Account ID (for exchanges):</p>
                 <p class="mb-2">
 
                   <span class="wizard__step__link"
@@ -113,7 +113,7 @@
                 </p>
 
                 <!-- Principal (for ICRC-1 transfers) -->
-                <p class="mb-0 small text-muted">Principal (for ICP wallets):</p>
+                <p class="mb-0 small" style="opacity: 0.6;">Principal (for ICP wallets):</p>
                 <p class="mb-3">
 
                   <span class="wizard__step__link"
@@ -466,7 +466,6 @@
           display: flex;
           width: 100%;
           justify-content: space-between;
-          background-color: var(--dark-orange);
         }
 
         // top
@@ -535,9 +534,9 @@
     // wizard step
     &__step {
       display: flex;
-      background-color: var(--orange-to-brown);
+      background-color: rgba(0, 0, 0, 0.15);
       border-radius: 0.5rem;
-      border: 1px solid var(--dark-orange);
+      border: 1px solid var(--table-row-border);
 
       // info
       &__info {
@@ -616,8 +615,8 @@
         top: 100%;
         left: 0;
         color: var(--black-to-white);
-        background-color: var(--light-orange-to-light-brown);
-        border: 1px solid var(--dark-orange);
+        background-color: rgba(0, 0, 0, 0.15);
+        border: 1px solid var(--table-row-border);
         border-radius: 0.5rem;
         overflow: hidden;
         overflow-y: auto;
@@ -633,7 +632,7 @@
       }
 
       &__dropdown__item:hover {
-        background-color: var(--orange-to-brown);
+        background-color: rgba(0, 0, 0, 0.25);
       }
 
       // completed
@@ -660,9 +659,9 @@
         justify-content: center;
         align-items: center;
         width: 100%;
-        background-color: var(--orange-to-brown);
+        background-color: rgba(0, 0, 0, 0.15);
         border-radius: 0.5rem;
-        border: 1px solid var(--dark-orange);
+        border: 1px solid var(--table-row-border);
       }
 
     }

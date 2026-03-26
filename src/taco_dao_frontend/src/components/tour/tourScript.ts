@@ -1,5 +1,6 @@
 // Tour Script — Grand Tour Visual Novel Data
 // Each scene maps to a route. Each line has character, expression, action, and text.
+// Interactive fields: highlight, scrollTo, click, animateSliders, toggleBattle
 
 export type Expression = 'neutral' | 'happy' | 'sad' | 'angry' | 'surprised' | 'excited' | 'confused' | 'suspicious' | 'embarrassed' | 'smug'
 export type Action = 'idle' | 'enter' | 'exit' | 'bounce' | 'shake' | 'slap-screen' | null
@@ -20,6 +21,45 @@ export interface DialogueLine {
     expression: Expression
     action: Action
   }
+  /** CSS selector — element gets z-index elevation + golden glow highlight */
+  highlight?: string
+  /** CSS selector — smooth scroll to this element (defaults to highlight if not set) */
+  scrollTo?: string
+  /** CSS selector — programmatically .click() this element */
+  click?: string
+  /** Smooth slider animation config */
+  animateSliders?: {
+    container: string
+    demoValues: number[]
+    duration: number
+  }
+  /** Hover over chart data points to trigger tooltips */
+  hoverChartPoints?: {
+    /** CSS selector for the chart container */
+    container: string
+    /** How many points to hover (from the end of the series) */
+    count: number
+    /** Dwell time on each point in ms */
+    dwellMs: number
+  }
+  /** Comedy toggle battle (Buy page TACO vs NACHO) */
+  toggleBattle?: {
+    selectorA: string
+    selectorB: string
+    rounds: number
+    delayMs: number
+  }
+  /** Escalating battle — accelerates through 4 phases then climaxes with lightning/whiteout */
+  escalatingBattle?: {
+    selectorA: string
+    selectorB: string
+  }
+  /** Delay in ms before showing this line (for animations to settle) */
+  delay?: number
+  /** Explicitly remove current highlight */
+  clearHighlight?: boolean
+  /** Runtime condition — if returns false, this line is skipped */
+  condition?: () => boolean
 }
 
 export interface TourChoice {
@@ -39,7 +79,7 @@ function line(
   expression: Expression,
   action: Action,
   text: string,
-  extra?: Partial<Pick<DialogueLine, 'pause' | 'choices' | 'secondary'>>
+  extra?: Partial<Omit<DialogueLine, 'character' | 'expression' | 'action' | 'text'>>
 ): DialogueLine {
   return { character, expression, action, text, ...extra }
 }
@@ -61,6 +101,7 @@ export const tourScript: TourScene[] = [
             response: [
               line('taco', 'happy', 'idle', "A DAO is a Decentralized Autonomous Organization. Basically, the community runs the show."),
               line('taco', 'neutral', 'idle', "No CEO, no board — just voters. Pretty based if you ask me."),
+              line('taco', 'neutral', 'idle', "On the IC, even the code gets changed using votes. Even the developers don't fully control it."),
             ]
           },
           {
@@ -82,63 +123,92 @@ export const tourScript: TourScene[] = [
   },
 
   // ═══════════════════════════════════════
-  // ACT 2: DAO PAGE
+  // ACT 2: DAO PAGE — Holdings & Trade Log
   // ═══════════════════════════════════════
   {
     route: '/dao',
     lines: [
       line('taco', 'happy', 'idle', "This is the DAO page! The big brain center!"),
-      line('taco', 'neutral', 'idle', "See all these allocations? The community VOTES on where to put the treasury's money."),
-      line('taco', 'happy', 'idle', "Pretty cool right? Democracy, but for crypto nerds."),
-      line('taco', 'neutral', 'idle', "You can see which tokens the DAO holds, trading logs, and how voting power is distributed."),
+      line('taco', 'neutral', 'idle', "See all those holdings? That's the treasury — the tokens the DAO actually owns right now.", {
+        scrollTo: '.dao-allocations',
+        highlight: '.dao-allocations',
+      }),
+      line('taco', 'happy', 'idle', "Those holdings are shaped by allocations from the community. YOU get to decide where the money goes."),
+      line('taco', 'neutral', 'idle', "The DAO autonomously trades on KongSwap and ICPSwap every 5 minutes based on the community vote.", {
+        clearHighlight: true,
+      }),
+      line('taco', 'neutral', 'idle', "Let me show you the trade log...", {
+        scrollTo: '.dao-news',
+        highlight: '.dao-news',
+        click: '.dao-news .btn-group button:nth-child(2)',
+      }),
+      line('taco', 'happy', 'idle', "Every trade the DAO makes is logged right here. Fully transparent.", {
+        highlight: '.dao-news',
+      }),
+      line('taco', 'neutral', 'idle', "Now let me show you where YOU get to have your say.", {
+        clearHighlight: true,
+      }),
     ]
   },
 
   // ═══════════════════════════════════════
-  // ACT 3: VOTE PAGE
+  // ACT 3: VOTE PAGE — Sliders & Voting
   // ═══════════════════════════════════════
   {
     route: '/vote',
     lines: [
-      line('taco', 'happy', 'bounce', "HERE is where the magic happens! You vote on proposals!"),
-      line('taco', 'neutral', 'idle', "If you stake TACO in a neuron, you get voting power."),
-      line('taco', 'happy', 'idle', "I LOVE voting day. It's like election night but every week!"),
-      line('taco', 'neutral', 'idle', "Seriously though, your vote actually matters here. Every neuron counts."),
+      line('taco', 'happy', 'bounce', "HERE is where the magic happens!"),
+      line('taco', 'neutral', 'idle', "This is the voting page. If you stake TACO in a neuron, you get voting power."),
+      line('taco', 'neutral', 'idle', "TACO DAO participants can change their allocation at any time by moving these sliders.", {
+        scrollTo: '.vote-view__content__right',
+        highlight: '.vote-view__content__right',
+      }),
+      line('taco', 'happy', 'bounce', "Watch — the sliders control where the treasury invests!", {
+        highlight: '.vote-view__content__right',
+        animateSliders: {
+          container: '.vote-view__content__right',
+          demoValues: [60, 25, 10, 5],
+          duration: 2000,
+        },
+      }),
+      line('taco', 'neutral', 'idle', "Seriously though, your vote actually matters here. Every neuron counts.", {
+        clearHighlight: true,
+      }),
     ]
   },
 
   // ═══════════════════════════════════════
-  // ACT 4: WALLET PAGE
-  // ═══════════════════════════════════════
-  {
-    route: '/wallet',
-    lines: [
-      line('taco', 'neutral', 'idle', "Your wallet! Tokens, neurons, swaps — it's all here."),
-      line('taco', 'happy', 'idle', "Think of it as your crypto junk drawer. But organized. Mostly."),
-      line('taco', 'neutral', 'idle', "You can swap tokens, create neurons, stake, send — the works."),
-    ]
-  },
-
-  // ═══════════════════════════════════════
-  // ACT 5: REWARDS PAGE
-  // ═══════════════════════════════════════
-  {
-    route: '/rewards',
-    lines: [
-      line('taco', 'happy', 'bounce', "THE BEST PAGE! REWARDS!"),
-      line('taco', 'happy', 'idle', "Vote, hold neurons, and get rewarded. Every. Single. Week."),
-      line('taco', 'happy', 'idle', "I mean, that's basically free money. I love free money."),
-    ]
-  },
-
-  // ═══════════════════════════════════════
-  // ACT 6: PERFORMANCE PAGE — THE SCREEN SLAP
+  // ACT 4: PERFORMANCE PAGE — Leaderboard + Screen Slap
   // ═══════════════════════════════════════
   {
     route: '/performance',
     lines: [
-      line('taco', 'neutral', 'idle', "For the analytics nerds among us — and I respect that."),
-      line('taco', 'neutral', 'idle', "Charts, leaderboards, all that good stuff."),
+      line('taco', 'neutral', 'idle', "This is where you can see your own performance and how everyone's doing."),
+      line('taco', 'happy', 'idle', "Check out the Best Performers!", {
+        scrollTo: '#leaderboard',
+        highlight: '#leaderboard',
+      }),
+      line('taco', 'happy', 'bounce', "Let's peek at number one...", {
+        click: '#leaderboard .lb-table tbody tr.clickable-row:first-child',
+        delay: 600,
+      }),
+      line('taco', 'neutral', 'idle', "See that chart? That's their actual performance over time.", {
+        highlight: '.expanded-content-row',
+        hoverChartPoints: {
+          container: '.expanded-content-row',
+          count: 2,
+          dwellMs: 3000,
+        },
+        pause: 9000,
+      }),
+      line('taco', 'happy', 'idle', "You can even follow their allocations!", {
+        scrollTo: '#leaderboard .lb-table tbody tr.clickable-row:first-child',
+        highlight: '#leaderboard .lb-table tbody tr.clickable-row:first-child .btn.taco-btn--success',
+      }),
+      line('taco', 'happy', 'idle', "Following means when their allocation changes, yours automatically follows it."),
+      line('taco', 'neutral', 'idle', "And the best allocation makers get the most weekly TACO rewards.", {
+        clearHighlight: true,
+      }),
       // Dramatic pause — TACO watches the user
       line('taco', 'suspicious', 'idle', "...", { pause: 2000 }),
       line('taco', 'suspicious', 'idle', "Hey."),
@@ -151,7 +221,34 @@ export const tourScript: TourScene[] = [
   },
 
   // ═══════════════════════════════════════
-  // ACT 7: VAULT PAGE — THE PLOT TWIST
+  // ACT 5: WALLET PAGE — TACO, Neurons, Tokens
+  // ═══════════════════════════════════════
+  {
+    route: '/wallet',
+    lines: [
+      line('taco', 'angry', 'idle', "Still here? GOOD."),
+      line('taco', 'neutral', 'idle', "This is TACO! You can stake it into a neuron, swap it, and transfer it.", {
+        scrollTo: '.taco-section',
+        highlight: '.taco-section',
+      }),
+      line('taco', 'happy', 'idle', "You can also see the rewards you've gotten in the weekly distribution."),
+      line('taco', 'neutral', 'idle', "Here you can create new neurons to increase your voting power and manage existing ones.", {
+        scrollTo: '.taco-neurons-wrapper',
+        highlight: '.taco-neurons-wrapper',
+        click: '.token-card__neurons .fa-chevron-right',
+      }),
+      line('taco', 'neutral', 'idle', "And down here — your core tokens. Hold them, swap between them anytime.", {
+        scrollTo: '.token-section',
+        highlight: '.token-section',
+      }),
+      line('taco', 'neutral', 'idle', "Alright, next up is... the Vault. I don't go there much.", {
+        clearHighlight: true,
+      }),
+    ]
+  },
+
+  // ═══════════════════════════════════════
+  // ACT 6: VAULT PAGE — THE PLOT TWIST
   // ═══════════════════════════════════════
   {
     route: '/vault',
@@ -171,20 +268,72 @@ export const tourScript: TourScene[] = [
       line('taco', 'suspicious', 'idle', "I don't trust triangles...", {
         secondary: { character: 'nacho', expression: 'neutral', action: 'idle' }
       }),
-      line('nacho', 'neutral', 'idle', "The vault lets you mint stablecoins backed by crypto. Pretty important stuff.", {
-        secondary: { character: 'taco', expression: 'suspicious', action: 'idle' }
+      line('nacho', 'neutral', 'idle', "The vault lets you mint NACHOS — a token backed by TACO's entire portfolio.", {
+        secondary: { character: 'taco', expression: 'suspicious', action: 'idle' },
+        scrollTo: '.nachos-vault-view__action-row',
+        highlight: '.nachos-vault-view__action-row',
+      }),
+      line('nacho', 'neutral', 'idle', "The NAV price shows what 1 NACHO is worth in ICP. And yes — it changes with the portfolio.", {
+        secondary: { character: 'taco', expression: 'neutral', action: 'idle' },
+      }),
+      line('nacho', 'neutral', 'idle', "Mint NACHOS by depositing ICP. Burn them to get part of the portfolio in your wallet.", {
+        secondary: { character: 'taco', expression: 'neutral', action: 'idle' },
       }),
       line('taco', 'surprised', 'idle', "...okay that's actually pretty cool", {
-        secondary: { character: 'nacho', expression: 'happy', action: 'idle' }
+        secondary: { character: 'nacho', expression: 'happy', action: 'idle' },
+        clearHighlight: true,
       }),
-      line('nacho', 'happy', 'idle', "See? We're complementary. You're the community, I'm the stability.", {
+      line('nacho', 'happy', 'idle', "See? We're complementary. You're the community, I'm the diversified bet.", {
         secondary: { character: 'taco', expression: 'neutral', action: 'idle' }
       }),
       line('taco', 'suspicious', 'idle', "...Fine. You can stay. BUT I'm still the main character.", {
         secondary: { character: 'nacho', expression: 'happy', action: 'idle' }
       }),
-      line('nacho', 'happy', 'idle', "Whatever you say, taco-breath.", {
-        secondary: { character: 'taco', expression: 'happy', action: 'idle' }
+    ]
+  },
+
+  // ═══════════════════════════════════════
+  // ACT 7: BUY PAGE — Purchase + Toggle Battle
+  // ═══════════════════════════════════════
+  {
+    route: '/buy',
+    lines: [
+      line('taco', 'happy', 'idle', "And HERE you can purchase ICP using credit card or other payment methods!", {
+        secondary: { character: 'nacho', expression: 'neutral', action: 'idle' },
+      }),
+      line('taco', 'neutral', 'idle', "Get ICP, then swap it to TACO later on the wallet page.", {
+        secondary: { character: 'nacho', expression: 'neutral', action: 'idle' },
+        scrollTo: '.buy-taco-view__product-toggle',
+        highlight: '.buy-taco-view__product-toggle',
+      }),
+      line('nacho', 'happy', 'idle', "...or mint it to NACHO!", {
+        secondary: { character: 'taco', expression: 'angry', action: 'idle' },
+        click: '.buy-taco-view__product-btn:nth-child(2)',
+      }),
+      line('taco', 'angry', 'shake', "HEY! This is a TACO operation!", {
+        secondary: { character: 'nacho', expression: 'happy', action: 'idle' },
+        click: '.buy-taco-view__product-btn:first-child',
+      }),
+      // The escalating battle — faster and faster until lightning climax
+      line('nacho', 'smug', 'idle', "...", {
+        secondary: { character: 'taco', expression: 'angry', action: 'idle' },
+        escalatingBattle: {
+          selectorA: '.buy-taco-view__product-btn:first-child',
+          selectorB: '.buy-taco-view__product-btn:nth-child(2)',
+        },
+        pause: 18000,
+      }),
+      // Aftermath — both exhausted
+      line('taco', 'sad', 'idle', "...", {
+        secondary: { character: 'nacho', expression: 'sad', action: 'idle' },
+        pause: 2000,
+      }),
+      line('taco', 'surprised', 'idle', "Did... did we both just win?", {
+        secondary: { character: 'nacho', expression: 'surprised', action: 'idle' },
+      }),
+      line('nacho', 'happy', 'idle', "I think... we both did.", {
+        secondary: { character: 'taco', expression: 'happy', action: 'idle' },
+        clearHighlight: true,
       }),
     ]
   },

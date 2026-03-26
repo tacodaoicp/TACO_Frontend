@@ -123,6 +123,13 @@ const router = createRouter({
     routes,
 })
 
+// Scroll to top on every route change
+// (Vue Router's scrollBehavior doesn't work because .app__content is the scroll container, not window)
+router.afterEach(() => {
+    const appContent = document.querySelector('.app__content')
+    if (appContent) appContent.scrollTop = 0
+})
+
 const app = createApp(App)
 
 app.use(router).use(createPinia()).use(VueApexCharts).use(VueClickAway).mount('#app')
