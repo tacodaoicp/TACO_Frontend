@@ -3,7 +3,7 @@
     <div class="dao-allocations">
 
         <!-- dao allocations loading curtain -->
-        <div v-if="componentLoading" class="dao-allocations__loading-curtain">
+        <div v-if="componentLoading" class="taco-loading-curtain dao-allocations__loading-curtain">
 
             <!-- astronaut -->
             <img :src="astronautLoaderUrl" class="loading-img">
@@ -432,26 +432,9 @@
         }
     }
 
-    // loading curtain
+    // loading curtain (extends .taco-loading-curtain)
     &__loading-curtain {
-        position: absolute;
-        height: 100%;
-        width: 100%;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        background-color: rgba(0,0,0,0.5);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        border-radius: 0.5rem;
-        z-index: 9998; // above everything
-
-        // loading image
-        .loading-img {
-            width: 10rem;
-        }
+        z-index: 9998; // above everything, below global default
     }
 
     // overrides

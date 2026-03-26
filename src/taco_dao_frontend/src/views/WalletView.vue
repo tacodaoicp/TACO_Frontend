@@ -37,7 +37,7 @@
               </div>
 
               <!-- logged out curtain -->
-              <div v-if="!tacoStore.userLoggedIn" class="login-curtain">
+              <div v-if="!tacoStore.userLoggedIn" class="login-curtain taco-login-curtain">
 
                 <!-- login button -->
                 <button class="btn iid-login" @click="tacoStore.iidLogIn()">
@@ -440,43 +440,13 @@
 
 // Floating refresh button — now uses global .taco-refresh-btn from App.vue
 
-// Login curtain
+// Login curtain — layout provided by global .taco-login-curtain
 .login-curtain {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  width: 100%;
-  height: 100%;
-  position: absolute;
-  top: 0;
-  left: 0;
-  background-color: var(--curtain-bg);
-  padding: 0 3rem;
-  border-radius: 0.5rem;
-  z-index: 1000;
-
-  // login
   .iid-login {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.325rem;
-
-    svg {
-      width: 1.375rem;
-    }
-
-    span {
-      font-size: 1rem;
-      font-family: 'Space Mono', monospace;
-    }
-
     &:active {
       border-color: transparent;
     }
-
   }
-
 }
 
 // Mobile responsiveness

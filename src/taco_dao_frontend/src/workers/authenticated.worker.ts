@@ -1264,6 +1264,40 @@ async function populateVoteDashboardSiblings(dashboard: any, excludeKey: DataKey
     await setCached('timerStatus', ts)
   }
 
+  // aggregateAllocation — extract from dashboard and broadcast
+  if (dashboard.aggregateAllocation) {
+    const aa = serializeForTransfer(dashboard.aggregateAllocation)
+    const aaState: DataState = { data: aa, lastUpdated: now, loading: false, error: null, stale: false }
+    for (const port of connectedPorts) {
+      sendResponse(port, {
+        id: generateMessageId(),
+        timestamp: Date.now(),
+        type: 'DATA_UPDATE',
+        payload: { dataKey: 'aggregateAllocation' as DataKey, data: aa, state: aaState, fromCache: false },
+      })
+    }
+  }
+
+  // tokenMaxAllocations — extract maxAllocationBasisPoints from tokenDetails entries
+  if (dashboard.tokenDetails) {
+    const maxAllocations: [any, bigint][] = []
+    for (const [principal, details] of dashboard.tokenDetails) {
+      if (details.maxAllocationBasisPoints && details.maxAllocationBasisPoints.length > 0) {
+        maxAllocations.push([principal, details.maxAllocationBasisPoints[0]])
+      }
+    }
+    const ma = serializeForTransfer(maxAllocations)
+    const maState: DataState = { data: ma, lastUpdated: now, loading: false, error: null, stale: false }
+    for (const port of connectedPorts) {
+      sendResponse(port, {
+        id: generateMessageId(),
+        timestamp: Date.now(),
+        type: 'DATA_UPDATE',
+        payload: { dataKey: 'tokenMaxAllocations' as DataKey, data: ma, state: maState, fromCache: false },
+      })
+    }
+  }
+
   // userAllocation — if present in response, broadcast to all ports
   if (dashboard.userAllocation?.length > 0) {
     const ua = serializeForTransfer(dashboard.userAllocation)

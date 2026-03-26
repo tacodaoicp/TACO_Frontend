@@ -6,46 +6,7 @@
     </div>
 </template>
 
-<style lang="scss">
-
-// dark mode toggle
-.dark-mode-toggle {
-
-    // button
-    &__btn {
-        font-size: 1.75rem;
-        user-select: none;
-        cursor: pointer;
-        outline: none;
-        border: none;
-        box-shadow: none;
-        padding: 0;      
-
-        &:focus, &:active {
-            outline: none;
-            border: none;
-            box-shadow: none;
-        }
-
-        &:focus:focus-visible {
-            outline: 3px solid var(--dark-orange);
-            outline-offset: 2px;
-            box-shadow: none;
-        }
-    }
-
-    // light icon
-    &--light-icon {
-        font-size: inherit;
-    }
-
-    // dark icon
-    &--dark-icon {
-        font-size: inherit;
-    }
-
-}
-</style>
+<!-- styles moved to style/taco.scss -->
 
 <script setup lang="ts">
 

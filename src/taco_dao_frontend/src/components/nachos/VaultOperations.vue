@@ -34,7 +34,7 @@
               </td>
               <!-- status badge -->
               <td class="text-end">
-                <span class="vault-ops__status" :class="'vault-ops__status--' + op.statusClass">
+                <span class="taco-status-badge vault-ops__status" :class="['taco-status-badge--' + op.statusClass, 'vault-ops__status--' + op.statusClass]">
                   {{ op.statusLabel }}
                 </span>
                 <span v-if="op.blockConfirmed" class="vault-ops__block">
@@ -461,20 +461,14 @@ const handleCancel = async (op: UnifiedOperation) => {
   }
 
   // ============ Status badges ============
+  // Base styles provided by global .taco-status-badge
+  // Only component-specific status variants are defined here
 
   &__status {
-    font-size: 0.7rem;
-    padding: 0.1rem 0.375rem;
-    border-radius: 0.25rem;
-    text-transform: uppercase;
-
-    &--pending { background: rgba(13, 110, 253, 0.15); color: #4d9eff; }
     &--deposited { background: rgba(255, 193, 7, 0.2); color: var(--dark-orange-to-brown); }
     &--processing { background: rgba(13, 110, 253, 0.2); color: #4d9eff; }
-    &--completed { background: rgba(40, 167, 69, 0.2); color: var(--success-green); }
     &--sending { background: rgba(255, 193, 7, 0.2); color: var(--dark-orange-to-brown); }
     &--confirmed { background: rgba(40, 167, 69, 0.2); color: var(--success-green); }
-    &--failed { background: rgba(220, 53, 69, 0.2); color: var(--red-to-light-red); }
     &--cancelled { background: rgba(128, 128, 128, 0.2); color: #999; }
     &--expired { background: rgba(128, 128, 128, 0.2); color: #999; }
   }

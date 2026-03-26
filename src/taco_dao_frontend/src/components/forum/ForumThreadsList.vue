@@ -3,7 +3,7 @@
     <div class="forum-threads-list">
 
         <!-- loading curtain -->
-        <div v-show="componentLoading" class="forum-threads-list__loading-curtain">
+        <div v-show="componentLoading" class="taco-loading-curtain forum-threads-list__loading-curtain">
             
           <!-- astronaut -->
           <img :src="astronautLoaderUrl" class="loading-img">
@@ -71,8 +71,8 @@
                           <div class="forum-threads-list__thread__icon shadow">#{{ proposal.id?.toString() || '?' }}</div>
 
                           <!-- thread status -->
-                          <span class="forum-threads-list__thread__status"
-                                :class="['forum-threads-list__thread__status', { 'forum-threads-list__thread__status--passed': proposal.status === 'Executed', 'forum-threads-list__thread__status--failed': proposal.status === 'Rejected' }]">
+                          <span class="taco-status-badge forum-threads-list__thread__status"
+                                :class="{ 'forum-threads-list__thread__status--passed': proposal.status === 'Executed', 'forum-threads-list__thread__status--failed': proposal.status === 'Rejected' }">
                           {{ formatStatus(proposal.status) }}</span>
 
                       </div>
@@ -155,26 +155,14 @@
     position: relative;
     min-height: 100%;
 
-    // loading curtain
+    // loading curtain (extends .taco-loading-curtain)
     &__loading-curtain {
-      position: absolute;
-      height: 100%;
-      width: 100%;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      background-color: rgba(0,0,0,0.5);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      z-index: 99999;
+      border-radius: 0;
       border-top-left-radius: 0.5rem;
       border-bottom-left-radius: 0.5rem;
       user-select: none;
 
       .loading-img {
-        width: 10rem;
         user-select: none;
       }
     }
@@ -210,6 +198,7 @@
       text-align: center;
       font-family: "Space Mono";
       color: var(--gold);
+      margin-bottom: 0.75rem;
     }
 
     // search and filter dropdown
@@ -329,15 +318,12 @@
         background-color: var(--light-orange);
       }
 
-      // status
+      // status — base styles provided by global .taco-status-badge
+      // Only component-specific overrides are defined here
       &__status {
         background-color: var(--white);
-        border-radius: 0.25rem;
-        padding: 0 0.375rem;
         color: var(--brown);
-        font-weight: 600;
         font-size: 0.75rem;
-        text-transform: uppercase;
 
         // passed
         &--passed {
@@ -350,7 +336,6 @@
           background-color: var(--red);
           color: var(--white);
         }
-        
       }
 
       // type

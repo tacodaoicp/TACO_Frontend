@@ -1,25 +1,25 @@
 <template>
 
-  <div v-if="show && swapData" class="modal-overlay">
+  <div v-if="show && swapData" class="taco-modal-overlay">
 
     <!-- modal dialog -->
-    <div class="modal-dialog">
+    <div class="taco-modal-dialog">
 
       <!-- modal header -->
-      <div class="modal-header">
+      <div class="taco-modal-header">
 
         <!-- modal title -->
-        <div class="modal-title gap-2">
+        <div class="taco-modal-title gap-2">
 
           <!-- icon -->
           <i class="confirm-icon fa fa-check-circle me-2"></i>
-          
+
           <!-- text -->
           <span class="confirm-title-text">Confirm Swap</span>
 
         </div>
 
-        <button type="button" class="btn confirm-btn-close" @click="closeModal">
+        <button type="button" class="btn taco-modal-close" @click="closeModal">
 
           <!-- icon -->
           <i class="fa fa-times"></i>
@@ -29,7 +29,7 @@
       </div>
 
       <!-- modal body -->
-      <div class="modal-body">
+      <div class="taco-modal-body">
 
         <!-- swap route -->
         <div class="swap-route">
@@ -248,7 +248,7 @@
       </div>
 
       <!-- modal footer -->
-      <div class="modal-footer">
+      <div class="taco-modal-footer">
 
         <!-- cancel button -->
         <button @click="closeModal" 
@@ -285,54 +285,8 @@
 </template>
 
 <style scoped>
-.modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.7);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1050;
-  pointer-events: auto;
-
-  span {
-    color: var(--black-to-white);
-  }
-  
-}
-
-.modal-dialog {
-  background: linear-gradient(135deg, var(--card-gradient-from), var(--card-gradient-to));
-  border: 2px solid var(--card-border);
-  border-radius: 0.5rem;
-  overflow: clip;
-  max-width: 500px;
-  width: 90%;
-  max-height: 90vh;
-  overflow-y: auto;
-  color: #ffffff;
-  pointer-events: auto;
-  position: relative;
-}
-
-.modal-header {
-  display: flex;
-  align-items: start;
-  justify-content: space-between;
-  margin: 0;
-  margin-bottom: 0.5rem;
-  padding: 0;
-  border-bottom: 0;
-  margin-bottom: 0.75rem;
-}
-
-.modal-title {
-  display: flex;
-  align-items: center;
-  margin: 1.5rem 0px 0px 1.5rem;
+:deep(.taco-modal-overlay) span {
+  color: var(--black-to-white);
 }
 
 .confirm-icon {
@@ -343,19 +297,6 @@
 .confirm-title-text {
   font-size: 1.5rem;
   font-weight: 600;
-}
-
-.confirm-btn-close {
-  margin: 1rem .5rem 0 0;
-
-  i {
-    font-size: 1.5rem;
-    color: var(--black-to-white);
-  }
-}
-
-.modal-body {
-  padding: 0.75rem 1.5rem 0 !important;
 }
 
 .swap-summary {
@@ -658,13 +599,8 @@
   color: var(--danger-color);
 }
 
-.modal-footer {
-  border-top: none;
-  padding: 1rem;
-
-  .btn:active {
-    border-color: transparent;
-  }
+:deep(.taco-modal-footer) .btn:active {
+  border-color: transparent;
 }
 
 .executing-content,
@@ -719,17 +655,17 @@
 }
 
 @media (max-width: 576px) {
-  .modal-dialog {
+  :deep(.taco-modal-dialog) {
     margin: 0.5rem;
     max-height: 95vh;
   }
-  
-  .modal-header,
-  .modal-body,
-  .modal-footer {
+
+  :deep(.taco-modal-header),
+  :deep(.taco-modal-body),
+  :deep(.taco-modal-footer) {
     padding: 1rem;
   }
-  
+
   .swap-route {
     flex-direction: column;
     align-items: center;

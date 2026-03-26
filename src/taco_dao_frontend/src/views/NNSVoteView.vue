@@ -104,7 +104,7 @@
 
                             <i class="fa-solid fa-gavel"></i>
 
-                            <div class="login-curtain">
+                            <div class="login-curtain taco-login-curtain">
                                 <button class="btn iid-login" @click="iidLogIn">
                                     <DfinityLogo />
                                     <span class="taco-text-white">Login to vote</span>
@@ -479,10 +479,10 @@
                                 <div v-else-if="!daoVoteTally || daoVoteTally.total_voting_power === undefined || daoVoteTally.total_votes === 0">
 
                                     <!-- no votes container -->
-                                    <div class="my-4 px-3 text-center">
+                                    <div class="my-4 px-3 taco-empty-state">
 
                                         <!-- no votes icon -->
-                                        <div class="mb-1" style="font-size: 2.5rem;">⚖️</div>
+                                        <i class="fas fa-balance-scale"></i>
 
                                         <!-- no votes text -->
                                         <p class="taco-text-black-to-white">No DAO votes cast yet. Be the first to vote!</p>
@@ -559,12 +559,10 @@
                                 </div>
 
                                 <!-- if no taco neurons found -->
-                                <div v-else class="my-4 px-3 text-center d-flex flex-column align-items-center">
+                                <div v-else class="my-4 px-3 taco-empty-state">
 
                                     <!-- no taco neurons icon -->
-                                    <div class="mb-1 taco-text-black-to-white" style="font-size: 2rem;">
-                                        <i class="fa fa-brain"></i>
-                                    </div>
+                                    <i class="fa fa-brain"></i>
 
                                     <!-- no taco neurons text -->
                                     <p class="taco-text-black-to-white mb-4">No Taco neurons found</p>
@@ -641,35 +639,7 @@
                 color: var(--dark-orange-to-dark-brown);
             }
 
-            .login-curtain {
-                position: absolute;
-                top: 0;
-                left: 0;
-                width: 100%;
-                height: 100%;
-                background-color: var(--curtain-bg);
-                padding: 0 3rem;
-                border-radius: 0.5rem;
-                display: flex;
-                justify-content: center;
-                align-items: center;
-
-                .iid-login {
-                    display: inline-flex;
-                    align-items: center;
-                    gap: 0.325rem;
-                }
-
-                svg {
-                    width: 1.375rem;
-                }
-
-                span {
-                    font-size: 1rem;
-                    font-family: 'Space Mono', monospace;
-                }
-
-            }
+            // login-curtain — layout provided by global .taco-login-curtain
             
         }
 
@@ -687,7 +657,6 @@
 
         span {
             font-size: 1rem;
-            font-family: 'Space Mono', monospace;
         }
 
         &:hover {

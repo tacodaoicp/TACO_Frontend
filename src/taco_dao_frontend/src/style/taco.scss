@@ -658,10 +658,10 @@ a, p, span {
     &.disabled,
     &:disabled,
     &[disabled]{
-      color: var(--dark-gray) !important;
+      color: rgba(255, 255, 255, 0.5) !important;
       background: linear-gradient(135deg, #5E7A2E, #3D5A1A) !important;
       border-color: #7A8B3A !important;
-      opacity: 0.5;
+      opacity: 0.6;
     }
 
   }

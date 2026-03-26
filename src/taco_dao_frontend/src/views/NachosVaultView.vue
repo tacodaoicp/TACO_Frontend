@@ -181,7 +181,6 @@
 
       span {
         font-size: 0.9rem;
-        font-family: 'Space Mono', monospace;
       }
 
       &:active { border-color: transparent; }

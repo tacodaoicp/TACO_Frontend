@@ -82,9 +82,9 @@
 
         <!-- Empty State -->
         <tr v-if="tokens.length === 0" class="empty-row">
-          <td colspan="5" class="text-center empty-message">
-            <i class="fa fa-coins fa-2x mb-2" style="opacity: 0.4;"></i>
-            <p class="mb-0">No tokens to display</p>
+          <td colspan="5" class="empty-message taco-empty-state">
+            <i class="fa fa-coins"></i>
+            <p>No tokens to display</p>
           </td>
         </tr>
       </tbody>
@@ -280,20 +280,6 @@ function formatUSD(balance: bigint, decimals: number, priceUSD: number): string 
   }
 }
 
-.empty-message {
-  opacity: 0.6;
-  font-size: 0.85rem;
-
-  i {
-    display: block;
-    margin-bottom: 0.5rem;
-  }
-
-  p {
-    margin: 0;
-  }
-}
-
 // Mobile responsive
 @media (max-width: 767.98px) {
   .token-table {
@@ -334,10 +320,14 @@ function formatUSD(balance: bigint, decimals: number, priceUSD: number): string 
     gap: 0.25rem;
 
     .btn {
-      padding: 0.25rem 0.375rem;
-      font-size: 0.65rem;
+      padding: 0.375rem 0.5rem;
+      font-size: 0.8rem;
       width: 100%;
       justify-content: center;
+
+      i {
+        font-size: 0.8rem;
+      }
 
       .action-label {
         display: none;

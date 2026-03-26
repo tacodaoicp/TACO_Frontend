@@ -1,31 +1,31 @@
 <template>
 
   <!-- qr code modal -->
-  <div v-if="show" class="qr-modal-overlay" @click="closeModal">
+  <div v-if="show" class="taco-modal-overlay" @click="closeModal">
 
     <!-- modal dialog -->
-    <div class="modal-dialog" @click.stop>
+    <div class="taco-modal-dialog" @click.stop>
 
       <!-- modal header -->
-      <div class="modal-header">
+      <div class="taco-modal-header">
 
         <!-- modal title -->
-        <h3 class="modal-title">
+        <h3 class="taco-modal-title qr-title">
           <i class="fa fa-2x fa-qrcode me-3"></i>
           {{ title }}
         </h3>
 
         <!-- close button -->
-        <button @click="closeModal" 
-                type="button" 
-                class="btn qr-btn-close">
+        <button @click="closeModal"
+                type="button"
+                class="btn taco-modal-close">
           <i class="fa fa-times"></i>
         </button>
 
       </div>
 
       <!-- modal content -->
-      <div class="modal-body">
+      <div class="taco-modal-body">
 
         <!-- qr code container -->
         <div class="qr-code-container">
@@ -49,7 +49,7 @@
       </div>
 
       <!-- footer -->
-      <div class="modal-footer">
+      <div class="taco-modal-footer">
 
         <div class="d-flex justify-content-end flex-wrap w-100">
 
@@ -83,53 +83,8 @@
 </template>
 
 <style scoped lang="scss">
-.qr-modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background-color: rgba(0, 0, 0, 0.7);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  z-index: 1000;
-}
-
-.modal-dialog {
-  background: linear-gradient(135deg, var(--card-gradient-from), var(--card-gradient-to));
-  border: 2px solid var(--card-border);
-  border-radius: 0.5rem;
-  overflow: clip;
-  max-width: 500px;
-  width: 90%;
-  max-height: 90vh;
-  overflow-y: auto;
-  color: #ffffff;
-  pointer-events: auto;
-  position: relative;
-}
-
-.modal-header {
-  display: flex;
-  align-items: start;
-  justify-content: space-between;
-  margin: 0;
-  margin-bottom: 0.5rem;
-  padding: 0;
-  border-bottom: 0;
-  margin-bottom: 0.75rem;
-}
-
-.modal-body {
-  padding: 0.5rem 1.5rem 0 !important;
-}
-
-.modal-title {
+.qr-title {
   color: var(--black-to-white);
-  display: flex;
-  align-items: center;
-  margin: 1.5rem 0px 0px 1.5rem;
   line-height: 1;
   font-family: 'Space Mono';
   font-size: 1.5rem;
@@ -138,15 +93,6 @@
 
 .fa-qrcode {
   color: var(--dark-brown-to-white);
-}
-
-.qr-btn-close {
-  margin: 1rem .5rem 0 0;
-
-  i {
-    font-size: 1.5rem;
-    color: var(--black-to-white);
-  }
 }
 
 .qr-code-container {
@@ -188,7 +134,7 @@
 
 }
 
-.modal-footer {
+:deep(.taco-modal-footer) {
   padding: 0 0.75rem 0.75rem 0.75rem;
 
   button {

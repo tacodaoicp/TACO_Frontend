@@ -8,9 +8,9 @@
 
             <div class="content">
                 <!-- Loading state -->
-                <div v-if="appLoading" class="loading">
+                <div v-if="appLoading" class="loading taco-loading">
                     <i class="fa-solid fa-spinner fa-spin"></i>
-                    <span>Loading forum data...</span>
+                    <p>Loading forum data...</p>
                 </div>
 
                 <!-- Error state -->
@@ -69,7 +69,7 @@
                 </div>
 
                 <!-- Empty state -->
-                <div v-else class="empty-state">
+                <div v-else class="empty-state taco-empty-state">
                     <i class="fa-solid fa-comments"></i>
                     <h3>No Proposal Threads Found</h3>
                     <p>There are currently no discussion threads for proposals.</p>
@@ -186,18 +186,16 @@ onMounted(() => {
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
 }
 
-.loading, .error, .empty-state {
+.error {
     text-align: center;
     padding: 3rem 1rem;
 }
 
 .loading i, .error i, .empty-state i {
-    font-size: 3rem;
     color: var(--orange);
-    margin-bottom: 1rem;
 }
 
-.loading span, .error span {
+.error span {
     display: block;
     font-size: 1.1rem;
     color: var(--white-to-black);

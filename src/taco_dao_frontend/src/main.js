@@ -1,10 +1,14 @@
 import { createPinia } from 'pinia'
 import { createApp } from 'vue'
 import { createRouter, createWebHistory } from "vue-router"
-import './index.scss'
+import 'bootstrap/dist/css/bootstrap.css'
 import 'font-awesome/css/font-awesome.min.css'
 import '@fortawesome/fontawesome-pro/css/fontawesome.css'
+import '@fortawesome/fontawesome-pro/css/light.css'
+import '@fortawesome/fontawesome-pro/css/regular.css'
 import '@fortawesome/fontawesome-pro/css/solid.css'
+import '@fortawesome/fontawesome-pro/css/duotone.css'
+import './index.scss'
 import App from './App.vue'
 import VueApexCharts from 'vue3-apexcharts'
 import VueClickAway from "vue3-click-away"

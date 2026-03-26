@@ -1,29 +1,26 @@
 <template>
 
-  <div class="modal fade" :class="{ show: show }" :style="{ display: show ? 'block' : 'none' }" tabindex="-1" @click="handleBackdropClick">
-    
+  <div v-if="show" class="taco-modal-overlay" tabindex="-1" @click="handleBackdropClick">
+
     <!-- modal dialog -->
-    <div class="modal-dialog modal-dialog-centered">
-      
-      <!-- modal content -->
-      <div class="modal-content">
-        
+    <div class="taco-modal-dialog">
+
         <!-- modal header -->
-        <div class="modal-header">
+        <div class="taco-modal-header">
 
           <!-- modal title -->
-          <div class="modal-title gap-2">
+          <div class="taco-modal-title gap-2">
 
             <!-- icon -->
             <i class="create-icon fa fa-brain me-2"></i>
-            
+
             <!-- title -->
             <span class="create-title-text">Create New Neuron</span>
 
           </div>
 
           <!-- close button -->
-          <button type="button" class="btn create-btn-close" @click="close">
+          <button type="button" class="btn taco-modal-close" @click="close">
 
             <!-- icon -->
             <i class="fa fa-times"></i>
@@ -31,9 +28,9 @@
           </button>
 
         </div>
-        
+
         <!-- modal body -->
-        <div class="modal-body">
+        <div class="taco-modal-body">
 
           <!-- disclaimer -->
           <div v-if="!isSuccess" class="disclaimer">
@@ -210,7 +207,7 @@
 
         </div>
         
-        <div class="modal-footer">
+        <div class="taco-modal-footer">
 
           <button 
             v-if="!isSuccess"
@@ -243,8 +240,6 @@
 
         </div>
 
-      </div>
-
     </div>
 
   </div>
@@ -252,39 +247,9 @@
 </template>
 
 <style scoped lang="scss">
-.modal {
-  background-color: rgba(0, 0, 0, 0.5);
 
-  span {
-    color: var(--black-to-white);
-  }
-
-}
-
-.modal-content {
-  background: linear-gradient(135deg, var(--card-gradient-from), var(--card-gradient-to));
-  border: 2px solid var(--card-border);
-}
-
-.modal-header {
-  display: flex;
-  align-items: start;
-  justify-content: space-between;
-  margin: 0;
-  margin-bottom: 0.5rem;
-  padding: 0;
-  border-bottom: 0;
-  margin-bottom: 1rem;
-}
-
-.modal-body {
-  padding: 0 1.5rem 0;
-}
-
-.modal-title {
-  display: flex;
-  align-items: center;
-  margin: 1.5rem 0px 0px 1.5rem;
+.taco-modal-overlay span {
+  color: var(--black-to-white);
 }
 
 .create-icon {
@@ -295,15 +260,6 @@
 .create-title-text {
   font-size: 1.5rem;
   font-weight: 600;
-}
-
-.create-btn-close {
-  margin: 1rem .5rem 0 0;
-
-  i {
-    font-size: 1.5rem;
-    color: var(--black-to-white);
-  }
 }
 
 .disclaimer {
@@ -364,10 +320,6 @@
 
   }
 
-}
-
-.modal-footer {
-  border-top: none;
 }
 
 </style>

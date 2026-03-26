@@ -240,8 +240,9 @@
             <!-- No Neurons State -->
             <div v-if="userLoggedIn && neurons.length === 0" class="mx-3">
               <div class="card bg-dark text-white">
-                <div class="card-body text-center py-5">
-                  <h4>🧠 No Neurons Found</h4>
+                <div class="card-body taco-empty-state">
+                  <i class="fas fa-brain"></i>
+                  <h3>No Neurons Found</h3>
                   <p class="text-muted">You don't have any hotkeyed neurons in the TACO SNS.</p>
                   <p class="text-muted">
                     To earn rewards, you need to have neurons that vote on TACO DAO proposals.
@@ -265,16 +266,15 @@
                   </button>
                 </div>
                 <div class="card-body">
-                  <div v-if="isLoadingHistory && userWithdrawalHistory.length === 0" class="text-center py-4">
-                    <div class="spinner-border text-primary" role="status">
-                      <span class="visually-hidden">Loading...</span>
-                    </div>
-                    <p class="mt-2 text-muted">Loading your claims history...</p>
+                  <div v-if="isLoadingHistory && userWithdrawalHistory.length === 0" class="text-center py-4 taco-loading">
+                    <i class="fas fa-spinner fa-spin"></i>
+                    <p>Loading your claims history...</p>
                   </div>
 
-                  <div v-else-if="userWithdrawalHistory.length === 0" class="text-center py-4">
-                    <p class="text-muted">No claims history found.</p>
-                    <p class="text-muted">Your successful reward claims will appear here.</p>
+                  <div v-else-if="userWithdrawalHistory.length === 0" class="text-center py-4 taco-empty-state">
+                    <i class="fas fa-receipt"></i>
+                    <p>No claims history found.</p>
+                    <p>Your successful reward claims will appear here.</p>
                   </div>
 
                   <div v-else>

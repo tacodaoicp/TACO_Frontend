@@ -465,7 +465,6 @@
 
       span {
         font-size: 1rem;
-        font-family: 'Space Mono', monospace;
       }
 
       &:hover {

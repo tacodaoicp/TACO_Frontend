@@ -405,7 +405,6 @@ export default {
 .perf-item span:last-child {
   font-weight: 600;
   font-size: 1.1rem;
-  font-family: 'Space Mono', monospace;
   background: rgba(0, 0, 0, 0.45);
   padding: 0.15rem 0.5rem;
   border-radius: 0.375rem;

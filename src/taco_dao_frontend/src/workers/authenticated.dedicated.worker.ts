@@ -973,6 +973,26 @@ async function populateVoteDashboardSiblings(dashboard: any, excludeKey: DataKey
     await setCached('timerStatus', ts)
   }
 
+  // aggregateAllocation — extract from dashboard and broadcast
+  if (dashboard.aggregateAllocation) {
+    const aa = serializeForTransfer(dashboard.aggregateAllocation)
+    updateState('aggregateAllocation' as DataKey, { data: aa, lastUpdated: now, loading: false, error: null, stale: false })
+    broadcastUpdate('aggregateAllocation' as DataKey, aa)
+  }
+
+  // tokenMaxAllocations — extract maxAllocationBasisPoints from tokenDetails entries
+  if (dashboard.tokenDetails) {
+    const maxAllocations: [any, bigint][] = []
+    for (const [principal, details] of dashboard.tokenDetails) {
+      if (details.maxAllocationBasisPoints && details.maxAllocationBasisPoints.length > 0) {
+        maxAllocations.push([principal, details.maxAllocationBasisPoints[0]])
+      }
+    }
+    const ma = serializeForTransfer(maxAllocations)
+    updateState('tokenMaxAllocations' as DataKey, { data: ma, lastUpdated: now, loading: false, error: null, stale: false })
+    broadcastUpdate('tokenMaxAllocations' as DataKey, ma)
+  }
+
   // userAllocation — broadcast if present
   if (dashboard.userAllocation?.length > 0) {
     const ua = serializeForTransfer(dashboard.userAllocation)

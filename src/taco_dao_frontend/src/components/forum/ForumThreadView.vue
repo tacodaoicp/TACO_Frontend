@@ -4,7 +4,7 @@
         :class="[{ 'overflow-hidden': componentLoading }]">
 
         <!-- loading curtain -->
-        <div v-show="componentLoading" class="forum-thread-view__loading-curtain">
+        <div v-show="componentLoading" class="taco-loading-curtain forum-thread-view__loading-curtain">
             
             <!-- astronaut -->
             <img :src="astronautLoaderUrl" class="loading-img">
@@ -261,7 +261,7 @@
                          }">
 
                         <!-- post loading curtain -->
-                        <div v-if="post.loading" class="forum-thread-view__post__loading-curtain">
+                        <div v-if="post.loading" class="taco-loading-curtain forum-thread-view__post__loading-curtain">
                             
                             <!-- astronaut -->
                             <img :src="astronautLoaderUrl" class="loading-img">
@@ -1172,28 +1172,15 @@
     border-top-right-radius: 0.5rem;
     border-bottom-right-radius: 0.5rem;
 
-    // loading curtain
+    // loading curtain (extends .taco-loading-curtain)
     &__loading-curtain {
-      position: absolute;
-      height: 100%;
-      width: 100%;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      background-color: rgba(0,0,0,0.5);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      z-index: 99999;
+      border-radius: 0;
       user-select: none;
 
       .loading-img {
-        width: 10rem;
         user-select: none;
       }
-
-    }    
+    }
 
     // hamburger menu
     &__hamburger-menu {
@@ -1557,24 +1544,10 @@
             }
         }
 
-        // post loading curtain
+        // post loading curtain (extends .taco-loading-curtain)
         &__loading-curtain {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0, 0, 0, 0.5);
-            display: flex;
-            align-items: center;
-            justify-content: center;
             z-index: 1000;
             border-radius: 0.375rem;
-
-            // loading img
-            .loading-img {
-                width: 10rem;
-            }
         }
 
         // post header

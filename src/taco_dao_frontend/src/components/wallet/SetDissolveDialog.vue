@@ -1,26 +1,26 @@
 <template>
 
-  <div v-if="show" class="modal-overlay">
+  <div v-if="show" class="taco-modal-overlay">
 
     <!-- modal dialog -->
-    <div class="modal-dialog">
+    <div class="taco-modal-dialog">
 
       <!-- modal header -->
-      <div class="modal-header">
+      <div class="taco-modal-header">
 
         <!-- modal title -->
-        <div class="modal-title gap-2">
+        <div class="taco-modal-title gap-2">
 
           <!-- icon -->
           <i class="dissolve-icon fa fa-clock me-2"></i>
-          
+
           <!-- title -->
           <span class="dissolve-title-text">Modify Dissolve Period</span>
 
         </div>
 
         <!-- close button -->
-        <button type="button" class="btn dissolve-btn-close" @click="closeDialog">
+        <button type="button" class="btn taco-modal-close" @click="closeDialog">
 
           <!-- icon -->
           <i class="fa fa-times"></i>
@@ -30,7 +30,7 @@
       </div>
 
       <!-- modal body -->
-      <div class="modal-body">
+      <div class="taco-modal-body">
         
         <!-- title -->
         <span style="font-size: 1.25rem;
@@ -117,7 +117,7 @@
       </div> 
 
       <!-- modal footer -->
-      <div class="modal-footer">
+      <div class="taco-modal-footer">
 
         <!-- cancel button -->
         <button 
@@ -153,58 +153,8 @@
 </template>
 
 <style scoped>
-.modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.7);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1050;
-  pointer-events: auto;
-
-  span {
-    color: var(--black-to-white);
-  }
-  
-}
-
-.modal-dialog {
-  background: linear-gradient(135deg, var(--card-gradient-from), var(--card-gradient-to));
-  border: 2px solid var(--card-border);
-  border-radius: 0.5rem;
-  overflow: clip;
-  max-width: 500px;
-  width: 90%;
-  max-height: 90vh;
-  overflow-y: auto;
-  color: #ffffff;
-  pointer-events: auto;
-  position: relative;
-}
-
-.modal-header {
-  display: flex;
-  align-items: start;
-  justify-content: space-between;
-  margin: 0;
-  margin-bottom: 0.5rem;
-  padding: 0;
-  border-bottom: 0;
-  margin-bottom: 0.75rem;
-}
-
-.modal-body {
-  padding: 0 1.5rem 0;
-}
-
-.modal-title {
-  display: flex;
-  align-items: center;
-  margin: 1.5rem 0px 0px 1.5rem;
+:deep(.taco-modal-overlay) span {
+  color: var(--black-to-white);
 }
 
 .dissolve-icon {
@@ -215,15 +165,6 @@
 .dissolve-title-text {
   font-size: 1.5rem;
   font-weight: 600;
-}
-
-.dissolve-btn-close {
-  margin: 1rem .5rem 0 0;
-
-  i {
-    font-size: 1.5rem;
-    color: var(--black-to-white);
-  }
 }
 
 .stake-to-text {
@@ -280,10 +221,6 @@
   }
 }
 
-.modal-footer {
-  border-top: none;
-  padding: 1rem;
-}
 
 </style>
 

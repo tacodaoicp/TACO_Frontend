@@ -72,10 +72,10 @@
                 </span>
 
                 <!-- if logged in, how to hotkey button -->
-                <button v-if="userLoggedIn" 
-                  class="btn taco-nav-btn taco-nav-btn--active" 
+                <button v-if="userLoggedIn"
+                  class="btn taco-btn taco-btn--green"
                   @click="reshowHotkeyTutorial">
-                  <span class="taco-text-black">How to Hotkey</span>
+                  <span class="taco-text-white">How to Hotkey</span>
                 </button>
 
               </div>
@@ -429,7 +429,7 @@
                     </div>
 
                     <!-- logged out, curtain -->
-                    <div v-if="!userLoggedIn" class="login-curtain">
+                    <div v-if="!userLoggedIn" class="login-curtain taco-login-curtain">
 
                       <!-- login button -->
                       <button class="btn iid-login" @click="iidLogIn()">
@@ -449,7 +449,7 @@
                 </div>
 
                 <!-- loading curtain -->
-                <div v-if="leftLoading" class="vote-view__loading-curtain">
+                <div v-if="leftLoading" class="taco-loading-curtain vote-view__loading-curtain">
                   
                   <!-- astronaut -->
                   <img :src="astronautLoaderUrl" class="loading-img">
@@ -469,7 +469,7 @@
                   <div class="taco-container taco-container--l2 pb-1">
 
                     <!-- current vote title -->
-                    <h3 class="taco-text-black-to-white" style="font-size: 1.125rem;">
+                    <h3 class="taco-text-black-to-white mb-2" style="font-size: 1.125rem;">
                       Voting Participation ({{ votedByAbleToVote }}%)
                     </h3>
 
@@ -979,7 +979,7 @@
                   </div>
 
                   <!-- loading curtain -->
-                  <div v-if="rightLoading" class="vote-view__loading-curtain">
+                  <div v-if="rightLoading" class="taco-loading-curtain vote-view__loading-curtain">
                     
                     <!-- astronaut -->
                     <img :src="astronautLoaderUrl" class="loading-img">
@@ -987,7 +987,7 @@
                   </div>                  
 
                   <!-- logged out, curtain -->
-                  <div v-if="!userLoggedIn && tokenCount >= 3 && !rightLoading" class="login-curtain">
+                  <div v-if="!userLoggedIn && tokenCount >= 3 && !rightLoading" class="login-curtain taco-login-curtain">
 
                     <!-- login button -->
                     <button class="btn iid-login" @click="iidLogIn()">
@@ -1238,45 +1238,47 @@
 
     // progressed part of the track
     input[type="range"]::range-progress {
-      background-color: var(--light-blue);
+      background: linear-gradient(135deg, #7A9B3E, #5A7A28);
       border-top-left-radius: 999rem;
       border-bottom-left-radius: 999rem;
       border-top-right-radius: 0;
       border-bottom-right-radius: 0;
       height: 0.5rem;
-    }    
+    }
 
     /***** Chrome, Safari, Opera and Edge Chromium styles *****/
     /* slider track */
     input[type="range"]::-webkit-slider-runnable-track {
-      background-color: var(--light-orange);
-      border-radius: 0.5rem;
+      background-color: #b8843a;
+      border: 1px solid var(--card-border);
+      border-radius: 999rem;
       height: 0.5rem;
     }
 
     /* slider thumb */
     input[type="range"]::-webkit-slider-thumb {
-      -webkit-appearance: none; /* Override default look */
+      -webkit-appearance: none;
       appearance: none;
-      margin-top: -0.5rem; /* Centers thumb on the track */
+      margin-top: -0.625rem;
 
-      /*custom styles*/
-      background-color: var(--blue-hover);
-      height: 1.5rem;
-      width: 1.5rem;
+      background: linear-gradient(135deg, #7A9B3E, #5A7A28);
+      border: 2px solid #8FA648;
+      height: 1.25rem;
+      width: 1.25rem;
       border-radius: 999rem;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
     }
 
     // focus
-    input[type="range"]:focus::-webkit-slider-thumb {   
-      border: 1px solid var(--blue-hover);
-      outline: 3px solid var(--blue-hover);
-      outline-offset: 0.125rem; 
+    input[type="range"]:focus::-webkit-slider-thumb {
+      border-color: #8FA648;
+      outline: 3px solid rgba(143, 166, 72, 0.4);
+      outline-offset: 0.125rem;
     }
 
     // progressed part of the track
     input[type="range"]::-webkit-progress-value {
-      background-color: var(--light-blue);
+      background: linear-gradient(135deg, #7A9B3E, #5A7A28);
       border-top-left-radius: 999rem;
       border-bottom-left-radius: 999rem;
       border-top-right-radius: 0;
@@ -1287,33 +1289,33 @@
     /******** Firefox styles ********/
     /* slider track */
     input[type="range"]::-moz-range-track {
-      background-color: var(--light-orange);
-      border-radius: 0.5rem;
+      background-color: #b8843a;
+      border: 1px solid var(--card-border);
+      border-radius: 999rem;
       height: 0.5rem;
     }
 
     /* slider thumb */
     input[type="range"]::-moz-range-thumb {
-      border: none; /*Removes extra border that FF applies*/
-      border-radius: 0; /*Removes default border-radius that FF applies*/
-
-      /*custom styles*/
-      background-color: var(--blue-hover);
-      height: 1.5rem;
-      width: 1.5rem;
+      border: 2px solid #8FA648;
       border-radius: 999rem;
+
+      background: linear-gradient(135deg, #7A9B3E, #5A7A28);
+      height: 1.25rem;
+      width: 1.25rem;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
     }
 
     // focus
     input[type="range"]:focus::-moz-range-thumb {
-      border: 1px solid var(--blue-hover);
-      outline: 3px solid var(--blue-hover);
-      outline-offset: 0.125rem; 
+      border-color: #8FA648;
+      outline: 3px solid rgba(143, 166, 72, 0.4);
+      outline-offset: 0.125rem;
     }
 
     // progressed part of the track
     input[type="range"]::-moz-range-progress {
-      background-color: var(--light-blue);
+      background: linear-gradient(135deg, #7A9B3E, #5A7A28);
       border-top-left-radius: 999rem;
       border-bottom-left-radius: 999rem;
       border-top-right-radius: 0;
@@ -1323,28 +1325,9 @@
 
     /********** end Range Input Styles **********/
 
-    // loading curtain
-    // loading curtain
+    // loading curtain (extends .taco-loading-curtain)
     &__loading-curtain {
-        position: absolute;
-        height: 100%;
-        width: 100%;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        background-color: rgba(0,0,0,0.5);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        border-radius: 0.5rem;
-        z-index: 999; // above everything
-
-        // loading image
-        .loading-img {
-            width: 10rem;
-        }
-
+        z-index: 999; // above everything, below global default
     }
 
   }
@@ -1425,7 +1408,6 @@
 
     span {
       font-size: 1rem;
-      font-family: 'Space Mono', monospace;
     }
 
     &:hover {
@@ -1437,44 +1419,16 @@
     }
   }
 
-  // login curtain
+  // login curtain — layout provided by global .taco-login-curtain
   .login-curtain {
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
-    width: 100%;
-    height: 100%;
-    position: absolute;
-    top: 0;
-    left: 0;
-    background-color: var(--curtain-bg);
-    padding: 0 3rem;
-    border-radius: 0.5rem;
-    z-index: 998;
+    z-index: 998; // below loading-curtain (999)
 
-    // login
     .iid-login {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.325rem;
-
-      svg {
-        width: 1.375rem;
-      }
-
-      span {
-        font-size: 1rem;
-        font-family: 'Space Mono', monospace;
-      }
-
       &:active {
         border-color: transparent;
       }
-
     }
-
-  }  
+  }
 
   // vote allocations
   .vote-allocations {

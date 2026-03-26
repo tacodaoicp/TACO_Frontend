@@ -1,24 +1,20 @@
 <template>
 
-  <div v-if="show" class="modal d-block" tabindex="-1">
+  <div v-if="show" class="taco-modal-overlay" tabindex="-1">
 
     <!-- modal dialog -->
-    <div class="modal-dialog">
-
-      <!-- modal content -->
-      <div class="modal-content">
+    <div class="taco-modal-dialog">
 
         <!-- modal header -->
-        <div class="modal-header">
+        <div class="taco-modal-header">
 
           <!-- token logo and title -->
-          <div class="d-flex align-items-center gap-2"
-          style="margin: 1.5rem 0 0 1.5rem;">
+          <div class="taco-modal-title gap-2">
 
             <!-- token logo -->
-            <img v-if="token" 
+            <img v-if="token"
             :src="token.logo"
-            :alt="token.symbol" 
+            :alt="token.symbol"
             class="token-logo me-2" />
 
             <div class="d-flex flex-column">
@@ -33,8 +29,8 @@
 
           </div>
 
-          <button type="button" 
-          class="btn modal-close-btn"
+          <button type="button"
+          class="btn taco-modal-close"
           @click="handleClose">
 
             <i class="fa fa-times"></i>
@@ -42,9 +38,9 @@
           </button>
 
         </div>
-        
+
         <!-- modal body -->
-        <div class="modal-body">
+        <div class="taco-modal-body">
 
           <!-- form -->
           <form @submit.prevent="handleSend" v-if="token">
@@ -185,8 +181,6 @@
 
         </div>
 
-      </div>
-
     </div>
 
   </div>
@@ -195,33 +189,8 @@
 
 <style scoped>
 
-.modal {
-  background-color: rgba(0,0,0,0.5);
-
-  span {
-    color: var(--black-to-white);
-  }
-
-}
-
-.modal-content {
-  background: linear-gradient(135deg, var(--card-gradient-from), var(--card-gradient-to));
-  border: 2px solid var(--card-border);
-}
-
-.modal-header {
-  display: flex;
-  align-items: start;
-  justify-content: space-between;
-  margin: 0;
-  margin-bottom: 0.5rem;
-  padding: 0;
-  border-bottom: 0;
-  margin-bottom: 0.75rem;
-}
-
-.modal-body {
-  padding: 0 1.5rem 1rem;
+.taco-modal-overlay span {
+  color: var(--black-to-white);
 }
 
 .token-logo {
@@ -236,16 +205,6 @@
   font-weight: 600;
   color: var(--black-to-white);
   line-height: 1;
-}
-
-.modal-close-btn {
-  margin: 1rem 0.5rem 0 0;
-
-  i {
-    font-size: 1.5rem;
-    color: var(--black-to-white);
-  }
-
 }
 
 .available-balance {

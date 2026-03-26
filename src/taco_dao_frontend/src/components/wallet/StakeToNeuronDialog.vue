@@ -1,34 +1,30 @@
 <template>
 
-  <div class="modal" 
-        :class="{ show: show }" 
-        :style="{ display: show ? 'block' : 'none' }" 
-        tabindex="-1" 
+  <div v-if="show" class="taco-modal-overlay"
+        tabindex="-1"
         @click="handleBackdropClick">
-    
-    <div class="modal-dialog modal-dialog-centered">
 
-      <div class="modal-content">
+    <div class="taco-modal-dialog">
 
-        <div class="modal-header">
+        <div class="taco-modal-header">
 
-          <div class="modal-title gap-2">
+          <div class="taco-modal-title gap-2">
 
             <i class="stake-icon fa fa-plus-circle me-2"></i>
-            
+
             <span class="stake-title-text">Add to Stake</span>
 
           </div>
 
-          <button type="button" class="btn stake-btn-close" @click="close">
+          <button type="button" class="btn taco-modal-close" @click="close">
 
             <i class="fa fa-times"></i>
 
           </button>
 
         </div>
-        
-        <div class="modal-body">
+
+        <div class="taco-modal-body">
 
           <!-- neuron info -->
           <div v-if="neuron"
@@ -128,7 +124,7 @@
 
         </div>
         
-        <div class="modal-footer">
+        <div class="taco-modal-footer">
 
           <button 
             v-if="!isSuccess"
@@ -155,8 +151,6 @@
 
         </div>
 
-      </div>
-
     </div>
 
   </div>
@@ -164,39 +158,9 @@
 </template>
 
 <style scoped lang="scss">
-.modal {
-  background-color: rgba(0, 0, 0, 0.5);
 
-  span {
-    color: var(--black-to-white);
-  }
-
-}
-
-.modal-content {
-  background: linear-gradient(135deg, var(--card-gradient-from), var(--card-gradient-to));
-  border: 2px solid var(--card-border);
-}
-
-.modal-header {
-  display: flex;
-  align-items: start;
-  justify-content: space-between;
-  margin: 0;
-  margin-bottom: 0.5rem;
-  padding: 0;
-  border-bottom: 0;
-  margin-bottom: 0.75rem;
-}
-
-.modal-body {
-  padding: 0 1.5rem 0;
-}
-
-.modal-title {
-  display: flex;
-  align-items: center;
-  margin: 1.5rem 0px 0px 1.5rem;
+.taco-modal-overlay span {
+  color: var(--black-to-white);
 }
 
 .stake-icon {
@@ -207,15 +171,6 @@
 .stake-title-text {
   font-size: 1.5rem;
   font-weight: 600;
-}
-
-.stake-btn-close {
-  margin: 1rem .5rem 0 0;
-
-  i {
-    font-size: 1.5rem;
-    color: var(--black-to-white);
-  }
 }
 
 .stake-to-text {
@@ -254,7 +209,7 @@
 
 .stake-preview {
   background-color: var(--orange-to-brown);
-  border: 1px solid var(--dark-orange);  
+  border: 1px solid var(--dark-orange);
   border-radius: .5rem;
   overflow: clip;
 }
@@ -270,10 +225,6 @@
   &:last-child {
     border-bottom: none;
   }
-}
-
-.modal-footer {
-  border-top: none;
 }
 
 </style>

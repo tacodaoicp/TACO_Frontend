@@ -1,23 +1,23 @@
 <template>
 
-  <div v-if="show && data" class="modal-overlay" @click="$emit('close')">
+  <div v-if="show && data" class="taco-modal-overlay" @click="$emit('close')">
 
     <!-- modal dialog -->
-    <div class="modal-dialog" @click.stop>
+    <div class="taco-modal-dialog" @click.stop>
 
       <!-- header -->
-      <div class="modal-header">
-        <div class="modal-title">
+      <div class="taco-modal-header">
+        <div class="taco-modal-title">
           <i class="fa-solid fa-shield-halved confirm-icon"></i>
           <span class="confirm-title-text">{{ data.title }}</span>
         </div>
-        <button type="button" class="btn confirm-btn-close" @click="$emit('close')">
+        <button type="button" class="btn taco-modal-close" @click="$emit('close')">
           <i class="fa fa-times"></i>
         </button>
       </div>
 
       <!-- body -->
-      <div class="modal-body">
+      <div class="taco-modal-body">
 
         <!-- key-value rows -->
         <div class="confirm-details">
@@ -36,7 +36,7 @@
       </div>
 
       <!-- footer -->
-      <div class="modal-footer">
+      <div class="taco-modal-footer">
 
         <!-- cancel -->
         <button class="btn" style="font-family: 'Space Mono';" @click="$emit('close')">
@@ -81,52 +81,12 @@ watch(() => props.show, (v) => {
 </script>
 
 <style scoped>
-.modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.7);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1050;
-  pointer-events: auto;
-
-  span {
-    color: var(--black-to-white);
-  }
+:deep(.taco-modal-overlay) span {
+  color: var(--black-to-white);
 }
 
-.modal-dialog {
-  background: linear-gradient(135deg, var(--card-gradient-from), var(--card-gradient-to));
-  border: 2px solid var(--card-border);
-  border-radius: 0.5rem;
-  overflow: clip;
+:deep(.taco-modal-dialog) {
   max-width: 420px;
-  width: 90%;
-  max-height: 90vh;
-  overflow-y: auto;
-  color: #ffffff;
-  pointer-events: auto;
-  position: relative;
-}
-
-.modal-header {
-  display: flex;
-  align-items: start;
-  justify-content: space-between;
-  margin: 0;
-  padding: 0;
-  border-bottom: 0;
-  margin-bottom: 0.75rem;
-}
-
-.modal-title {
-  display: flex;
-  align-items: center;
-  margin: 1.5rem 0px 0px 1.5rem;
 }
 
 .confirm-icon {
@@ -139,19 +99,6 @@ watch(() => props.show, (v) => {
   font-size: 1.25rem;
   font-weight: 600;
   font-family: 'Space Mono', monospace;
-}
-
-.confirm-btn-close {
-  margin: 1rem .5rem 0 0;
-
-  i {
-    font-size: 1.5rem;
-    color: var(--black-to-white);
-  }
-}
-
-.modal-body {
-  padding: 0.75rem 1.5rem 0 !important;
 }
 
 .confirm-details {
@@ -201,17 +148,12 @@ watch(() => props.show, (v) => {
   }
 }
 
-.modal-footer {
-  border-top: none;
-  padding: 1rem;
-
-  .btn:active {
-    border-color: transparent;
-  }
+:deep(.taco-modal-footer) .btn:active {
+  border-color: transparent;
 }
 
 @media (max-width: 576px) {
-  .modal-dialog {
+  :deep(.taco-modal-dialog) {
     margin: 0.5rem;
     max-height: 95vh;
   }

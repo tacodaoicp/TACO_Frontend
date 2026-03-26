@@ -3,7 +3,7 @@
   <div class="dao-vote-power">
 
     <!-- dao vote power loading curtain -->
-    <div v-if="componentLoading" class="dao-vote-power__loading-curtain">
+    <div v-if="componentLoading" class="taco-loading-curtain dao-vote-power__loading-curtain">
 
         <!-- astronaut -->
         <img :src="astronautLoaderUrl" class="loading-img">
@@ -130,26 +130,7 @@
 
   }
 
-  // loading curtain
-  &__loading-curtain {
-      position: absolute;
-      height: 100%;
-      width: 100%;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      background-color: rgba(0,0,0,0.5);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      border-radius: 0.5rem;
-      z-index: 99999; // above everything
-
-      .loading-img {
-          width: 10rem;
-      }
-  }  
+  // loading curtain (uses .taco-loading-curtain global class)
 
 }
 
