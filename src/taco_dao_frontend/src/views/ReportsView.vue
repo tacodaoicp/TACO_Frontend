@@ -12319,41 +12319,36 @@ away from being playable.
 
     </div>
 
-    <!-- message modal -->
-    <div v-if="!userAcceptedReportsDisclaimer || userReshownReportsDisclaimer" class="reports__message">
-      
-      <!-- message -->
-      <div class="reports__message__dialog">
-        
-        <!-- message top -->
-        <div class="reports__message__dialog__top px-2 p-2">
+    <!-- disclaimer modal -->
+    <div v-if="!userAcceptedReportsDisclaimer || userReshownReportsDisclaimer" class="taco-modal-overlay">
 
-          <!-- message top left -->
-          <div class="taco-text-white">Disclaimer</div>
+      <!-- dialog -->
+      <div class="taco-modal-dialog">
 
-          <!-- message top right -->
-          <div class="taco-text-black-to-white"></div>
-
+        <!-- header -->
+        <div class="taco-modal-header">
+          <div class="taco-modal-title">
+            <span class="taco-text-gold space-mono-semibold">Disclaimer</span>
+          </div>
         </div>
 
-        <!-- message middle -->
-        <div class="reports__message__dialog__middle">
+        <!-- body -->
+        <div class="taco-modal-body">
 
-          <!-- content -->
-          <div class="d-flex flex-column align-items-center justify-content-start pt-4 pb-5">
+          <div class="d-flex flex-column align-items-center justify-content-start pt-2 pb-3">
 
-            <!-- hotkey svg icon -->
+            <!-- warning icon -->
             <i class="fa-solid fa-triangle-exclamation"
-              style="font-size: 5rem; color: var(--gold);"></i>
+              style="font-size: 4rem; color: var(--gold);"></i>
 
             <!-- title -->
-            <span class="taco-text-black-to-white d-inline-block text-center px-2 pt-2 pb-1"
+            <span class="taco-text-black-to-white d-inline-block text-center pt-2 pb-1"
               style="font-weight: 600;">
               Legal Disclaimer
             </span>
 
             <!-- text -->
-            <span class="taco-text-black-to-white px-4 pt-2 pb-1 text-center">
+            <span class="taco-text-black-to-white pt-2 pb-1 text-center">
               These reports are for informational purposes only and do not constitute investment advice, financial advice, trading advice, legal advice, or any other type of advice. Nothing contained herein should be interpreted as such. No representations or warranties are made regarding the accuracy, completeness, or reliability of the information provided. The authors shall not be liable for any losses or damages—whether direct, indirect, incidental, punitive, or consequential—arising from the use of or reliance on this material. All information is subject to change without notice, and no obligation is assumed to update or revise the content.
             </span>
 
@@ -12361,27 +12356,16 @@ away from being playable.
 
         </div>
 
-        <!-- message bottom -->
-        <div class="reports__message__dialog__bottom p-2">
-
-          <!-- message bottom left -->
-          <div class="taco-text-black-to-white"></div>
-
-          <!-- message bottom right -->
-          <div class="taco-text-black-to-white">
-
-            <!-- close button -->
-            <button class="btn taco-nav-btn"
-                    @click="acceptReportsDisclaimer(); hideDisclaimerLocally()">
-              Got It
-            </button>
-
-          </div>
-
+        <!-- footer -->
+        <div class="taco-modal-footer d-flex justify-content-end">
+          <button class="btn taco-btn taco-btn--green"
+                  @click="acceptReportsDisclaimer(); hideDisclaimerLocally()">
+            Got It
+          </button>
         </div>
 
-      </div> 
-      
+      </div>
+
     </div>
 
   </div>
@@ -12433,7 +12417,7 @@ away from being playable.
       font-size: 1.5rem;
       text-align: center;
       font-family: "Space Mono";
-      color: var(--black-to-white);
+      color: var(--gold);
     }
 
     // list container
@@ -12713,55 +12697,6 @@ away from being playable.
 
   }
 
-  // vote message modal
-  .reports__message {
-    position: absolute;
-    top: 0;
-    left: 0;
-    display: flex;
-    justify-content: center;
-    align-items: start;
-    width: 100%;
-    height: 100%;
-    background-color: var(--curtain-bg);
-    z-index: 99999;
-    margin: 0;
-    padding: 0;
-    overflow: auto;
-
-    // dialog
-    &__dialog {
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      align-items: center;
-      width: 100%;
-      max-width: 40rem;
-      border-radius: 0.5rem;
-      background: linear-gradient(135deg, var(--card-gradient-from), var(--card-gradient-to));
-      border: 2px solid var(--card-border);
-      overflow: clip;
-      margin: 2rem 2rem 2rem;
-
-      // top and bottom
-      &__top, &__bottom {
-        display: flex;
-        width: 100%;
-        justify-content: space-between;
-        background-color: var(--dark-orange);
-      }
-
-      // middle
-      &__middle {
-        display: flex;
-        flex-direction: row;
-        align-items: start;
-        gap: 2rem;
-      }
-
-    }
-
-  }
 
   ///////////////////
   // media queries //

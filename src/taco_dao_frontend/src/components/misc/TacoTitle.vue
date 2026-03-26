@@ -1,8 +1,8 @@
 <template>
 
-  <component :is="tag" 
+  <component :is="tag"
               class="taco-title
-                     mb-4 px-3">
+                     mb-4">
     <span class="taco-title__icon">{{ emoji }}</span>
     <span class="taco-title__title"
           :style="{color: forceTextColor}">{{ title }}</span>
@@ -11,25 +11,6 @@
 </template>
 
 <style lang="scss" scoped>
-
-  // taco title
-  .taco-title {
-    display: inline-flex;
-    margin-bottom: 0;
-    font-size: 1.5rem;
-    font-weight: 500;
-    font-family: "Rubik Mono One", monospace;
-    gap: 0.75rem;
-
-    &__icon {
-      color: var(--gold);
-    }
-
-    &__title {
-      color: var(--gold);
-    }
-  }
-
 </style>
 
 <script setup>

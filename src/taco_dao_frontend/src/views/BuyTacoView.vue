@@ -326,11 +326,6 @@
     margin-top: 1.5rem;
     padding: 0.25rem 1.5rem;
     display: flex;
-    justify-content: center;
-
-    .taco-title {
-      margin-bottom: 0;
-    }
   }
 
   // section titles - Enhanced with better typography

@@ -14,11 +14,11 @@
                 <p class="changelog-content__text">
                     - New site-wide visual refresh with updated styling and layout
                     <br>
-                    - Adds /performance with interactive historical charts for treasury allocation and price tracking
+                    - Adds /performance with leaderboard rankings, user allocation performance tracking, and the ability to follow other members' strategies
                     <br>
-                    - Redesigns /buy with a step-by-step timeline, fiat on-ramp providers, and auto-swap option
+                    - Adds /buy with fiat on-ramp providers to purchase ICP for buying TACO or minting NACHOS, with step-by-step flow and auto-swap option
                     <br>
-                    - Adds /vault for the NACHOS Vault with NAV chart, mint/redeem flows, and live vault stats
+                    - Adds /vault for the NACHOS Vault with NAV chart, mint and burn flows, and live vault statistics
                 </p>
             </div>
 

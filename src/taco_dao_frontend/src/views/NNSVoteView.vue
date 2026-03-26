@@ -668,23 +668,7 @@
         }
     }
 
-    // hardcoded taco title
-    .taco-title {
-        display: inline-flex;
-        margin-bottom: 0;
-        font-size: 1.5rem;
-        font-weight: 500;
-        font-family: "Rubik Mono One", monospace;
-        gap: 0.75rem;
 
-        &__icon {
-            color: var(--brown-to-white);
-        }
-
-        &__title {
-            color: var(--brown-to-white);
-        }
-    }
 
     // cast button
     .cast-btn {

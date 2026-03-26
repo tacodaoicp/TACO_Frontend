@@ -604,11 +604,9 @@
                           </div>
 
                           <!-- center - max allocation cap indicator -->
-                          <div style="flex: 1; text-align: center;">
-                            <span v-if="control.maxAllocation !== null"
-                                  class="badge bg-secondary"
-                                  style="font-size: 0.65rem; font-weight: normal;">
-                              Max: {{ control.maxAllocation }}%
+                          <div style="flex: 1; text-align: center; align-self: flex-end;">
+                            <span v-if="control.maxAllocation !== null" class="max-cap-badge">
+                              <i class="fa-solid fa-lock fa-xs"></i> {{ control.maxAllocation }}%
                             </span>
                           </div>
 
@@ -1341,6 +1339,13 @@
     font-size: 1.125rem;
   }
 
+  .max-cap-badge {
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: var(--gold);
+    opacity: 0.3;
+  }
+
   // token allocation
   .token-allocation {
     ul {
@@ -2055,23 +2060,7 @@
       }
   }  
 
-  // hardcoded taco title
-  .taco-title {
-    display: inline-flex;
-    margin-bottom: 0;
-    font-size: 1.5rem;
-    font-weight: 500;
-    font-family: "Rubik Mono One", monospace;
-    gap: 0.75rem;
 
-    &__icon {
-      color: var(--brown-to-white);
-    }
-
-    &__title {
-      color: var(--brown-to-white);
-    }
-  }
 
   ///////////////////
   // media queries //
@@ -3395,6 +3384,17 @@
 
       if (fetchedVotingPowerMetrics.value) {
         await handleFetchedVotingPowerMetrics(fetchedVotingPowerMetrics.value)
+      }
+    }
+  })
+
+  // Watch for tokenMaxAllocations arriving late (after sliders are already created)
+  watch(tokenMaxAllocationMap, (newMap) => {
+    if (currentSliders.value.length === 0 || newMap.size === 0) return
+    for (const slider of currentSliders.value) {
+      const cap = newMap.get(slider.canisterId) ?? null
+      if (slider.maxAllocation !== cap) {
+        slider.maxAllocation = cap
       }
     }
   })

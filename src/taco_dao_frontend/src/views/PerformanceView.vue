@@ -821,12 +821,7 @@ export default {
   }
 }
 
-.perf-title-bar {
-  background: linear-gradient(135deg, var(--card-active-from), var(--card-active-to));
-  border: 2px solid var(--card-border);
-  border-radius: 0.5rem;
-  padding: 0.75rem 1.25rem;
-}
+
 
 .perf-beta-badge {
   font-size: 0.6rem;

@@ -1,7 +1,7 @@
 <template>
-    <div class="dark-mode-toggle">
-        <button ref="darkModeToggle" class="btn dark-mode-toggle__btn" @click="toggleDarkMode(false)">
-            {{ darkModeToggled ? "☀️" : "🌙" }}
+    <div class="dark-mode-toggle" title="Light mode will be implemented later">
+        <button ref="darkModeToggle" class="btn dark-mode-toggle__btn" disabled>
+            🌙
         </button>
     </div>
 </template>
@@ -45,23 +45,10 @@
     // Lifecycle Hooks //
     /////////////////////
 
-    // on mounted
+    // on mounted — always force dark mode
     onMounted(() => {
-
-        // if dark mode is toggled
-        if(darkModeToggled){
-
-            // toggle dark mode
-            toggleDarkMode(true)
-
-        } 
-        
-        else {
-
-            // do nothing
-
-        }
-
+        darkModeToggled.value = false
+        toggleDarkMode(true) // apply dark mode styles
     })
 
 </script>

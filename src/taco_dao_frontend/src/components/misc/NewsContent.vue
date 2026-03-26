@@ -8,6 +8,17 @@
             <!-- news item -->
             <div class="news-content__item">
                 <h3 class="news-content__title">
+                    TACO v2.0.0 is here!
+                </h3>
+                <span class="news-content__date">🍽️ March 25, 2026</span>
+                <p class="news-content__text">
+                    New site-wide visual refresh with updated styling and layout! Check out /performance for leaderboard rankings and performance tracking, /buy for fiat on-ramp providers with step-by-step flow, and /vault for the NACHOS Vault with NAV chart, mint and burn flows, and live vault statistics.
+                </p>
+            </div>
+
+            <!-- news item -->
+            <div class="news-content__item">
+                <h3 class="news-content__title">
                     We've got a wizard!
                 </h3>
                 <span class="news-content__date">🍽️ October 19, 2025</span>

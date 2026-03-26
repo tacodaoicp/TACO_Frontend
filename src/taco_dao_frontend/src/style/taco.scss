@@ -1034,11 +1034,24 @@ a, p, span {
 
 // taco title
 .taco-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.75rem;
   font-family: 'Rubik', sans-serif;
-  font-weight: 700;
+  font-size: 1.75rem;
+  font-weight: 520;
   color: var(--gold);
   text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
   margin: 0;
+
+  &__icon {
+    color: var(--gold);
+  }
+
+  &__title {
+    color: var(--gold);
+  }
+  -webkit-text-stroke: 0.9px rgb(70, 89, 71);
 }
 
 // taco refresh button (floating, bottom-right)

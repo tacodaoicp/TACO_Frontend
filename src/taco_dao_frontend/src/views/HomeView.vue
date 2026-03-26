@@ -925,7 +925,7 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    background-color: var(--orange-to-brown);
+    background-color: color-mix(in srgb, var(--orange-to-brown) 65%, var(--dark-brown));
     width: 100%;
     z-index: 2;
     margin-top: 7rem;

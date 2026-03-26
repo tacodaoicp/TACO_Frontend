@@ -100,6 +100,7 @@ const HANDLED_KEYS: DataKey[] = [
   // ========== PUBLIC KEYS (from public.worker, optimized) ==========
   'cryptoPrices',
   'tokenDetails', // Primary for getVoteDashboard composite
+  'tokenMaxAllocations', // Sibling of tokenDetails (from getVoteDashboard)
   'tradingStatus', // Primary for getEnhancedTreasuryDashboard (public)
   'leaderboardAllTimeUSD', // Primary for getAllLeaderboards
   'leaderboardAllTimeICP',
@@ -164,6 +165,7 @@ const AUTH_REQUIRED_KEYS: DataKey[] = [
 const PUBLIC_KEYS: DataKey[] = [
   'cryptoPrices',
   'tokenDetails',
+  'tokenMaxAllocations',
   'tradingStatus',
   'leaderboardAllTimeUSD',
   'leaderboardAllTimeICP',
@@ -981,7 +983,7 @@ async function populateVoteDashboardSiblings(dashboard: any, excludeKey: DataKey
   }
 
   // tokenMaxAllocations — extract maxAllocationBasisPoints from tokenDetails entries
-  if (dashboard.tokenDetails) {
+  if (excludeKey !== 'tokenMaxAllocations' && dashboard.tokenDetails) {
     const maxAllocations: [any, bigint][] = []
     for (const [principal, details] of dashboard.tokenDetails) {
       if (details.maxAllocationBasisPoints && details.maxAllocationBasisPoints.length > 0) {
@@ -989,8 +991,9 @@ async function populateVoteDashboardSiblings(dashboard: any, excludeKey: DataKey
       }
     }
     const ma = serializeForTransfer(maxAllocations)
-    updateState('tokenMaxAllocations' as DataKey, { data: ma, lastUpdated: now, loading: false, error: null, stale: false })
+    updateState('tokenMaxAllocations' as DataKey, { data: ma, ...freshState })
     broadcastUpdate('tokenMaxAllocations' as DataKey, ma)
+    await setCached('tokenMaxAllocations' as DataKey, ma)
   }
 
   // userAllocation — broadcast if present
@@ -1033,6 +1036,24 @@ async function fetchData(dataKey: DataKey): Promise<void> {
       } else {
         data = serializeForTransfer(dashboard.tokenDetails)
         await populateVoteDashboardSiblings(dashboard, 'tokenDetails')
+      }
+      break
+    }
+
+    case 'tokenMaxAllocations': {
+      // Derived from vote dashboard — use coalesced fetch to avoid duplicate network calls
+      const tmaDashboard = await getVoteDashboardCoalesced(anonymousAgent!)
+      if (tmaDashboard?.tokenDetails) {
+        const maxAllocations: [any, bigint][] = []
+        for (const [principal, details] of tmaDashboard.tokenDetails) {
+          if (details.maxAllocationBasisPoints && details.maxAllocationBasisPoints.length > 0) {
+            maxAllocations.push([principal, details.maxAllocationBasisPoints[0]])
+          }
+        }
+        data = serializeForTransfer(maxAllocations)
+        await populateVoteDashboardSiblings(tmaDashboard, 'tokenMaxAllocations')
+      } else {
+        data = serializeForTransfer([])
       }
       break
     }
