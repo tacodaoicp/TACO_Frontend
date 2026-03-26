@@ -28,7 +28,7 @@
                         d-flex flex-column gap-0 w-100 p-0 flex-grow-1 overflow-hidden position-relative">          
               
               <!-- logged out content -->
-              <div v-if="!tacoStore.userLoggedIn" 
+              <div v-if="!showAsLoggedIn"
                    class="wallet-view__logged-out-content">
 
                 <!-- wallet icon -->
@@ -37,7 +37,7 @@
               </div>
 
               <!-- logged out curtain -->
-              <div v-if="!tacoStore.userLoggedIn" class="login-curtain taco-login-curtain">
+              <div v-if="!showAsLoggedIn" class="login-curtain taco-login-curtain">
 
                 <!-- login button -->
                 <button class="btn iid-login" @click="tacoStore.iidLogIn()">
@@ -53,11 +53,11 @@
               </div>              
 
               <!-- logged in content -->
-              <div v-if="tacoStore.userLoggedIn"
+              <div v-if="showAsLoggedIn"
                    class="wallet-view__logged-in-content">
 
                 <!-- TACO Special Section (MOVED TO TOP) -->
-                <section v-if="tacoToken" class="taco-section taco-container taco-container--l2">
+                <section v-if="tacoToken" id="wallet-taco" class="taco-section taco-container taco-container--l2">
                   <h5 class="section-title">
                     <i class="fa fa-taco me-2"></i>
                     TACO Rewards & Neurons
@@ -106,7 +106,7 @@
                     :userNeuronIds="userNeuronIds" />
 
                   <!-- TokenCard for Neurons Management (keep existing component) -->
-                  <div class="taco-neurons-wrapper">
+                  <div id="wallet-neurons" class="taco-neurons-wrapper">
                     <TokenCard
                       ref="tacoTokenCardRef"
                       :token="tacoToken"
@@ -121,7 +121,7 @@
                 </section>
 
                 <!-- Core Tokens (ICP, NACHOS) - Table Display -->
-                <section v-if="nonTacoCoreTokens.length > 0" class="token-section">
+                <section v-if="nonTacoCoreTokens.length > 0" id="wallet-tokens" class="token-section">
                   <h5 class="section-title">
                     <i class="fa fa-coins me-2"></i>
                     Core Tokens <span class="opacity-75">({{ nonTacoCoreTokens.length }})</span>
@@ -526,6 +526,7 @@ interface WalletToken {
 
 // # SETUP #
 const tacoStore = useTacoStore()
+const showAsLoggedIn = computed(() => tacoStore.userLoggedIn || tacoStore.tourBypassAuth)
 
 // # STATE #
 const showSendDialog = ref(false)

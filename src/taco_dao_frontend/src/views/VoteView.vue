@@ -429,7 +429,7 @@
                     </div>
 
                     <!-- logged out, curtain -->
-                    <div v-if="!userLoggedIn" class="login-curtain taco-login-curtain">
+                    <div v-if="!userLoggedIn && !tourBypassAuth" class="login-curtain taco-login-curtain">
 
                       <!-- login button -->
                       <button class="btn iid-login" @click="iidLogIn()">
@@ -459,7 +459,7 @@
               </div>
 
               <!-- right -->
-              <div class="vote-view__content__right">
+              <div id="vote-sliders" class="vote-view__content__right">
 
                 <!-- current vote and your vote -->
                 <div class="taco-container taco-container--l1
@@ -571,7 +571,7 @@
                     </div>
 
                     <!-- middle -->
-                    <ul class="d-flex flex-column gap-3 m-0 p-0 mt-2"
+                    <ul id="vote-slider-list" class="vote-view__slider-list d-flex flex-column gap-3 m-0 p-0 mt-2"
                       :style="{
                         'align-items': userLockedVote ? 'center' : 'start',
                         'width': userLockedVote ? 'fit-content' : '100%',
@@ -985,7 +985,7 @@
                   </div>                  
 
                   <!-- logged out, curtain -->
-                  <div v-if="!userLoggedIn && tokenCount >= 3 && !rightLoading" class="login-curtain taco-login-curtain">
+                  <div v-if="!userLoggedIn && !tourBypassAuth && tokenCount >= 3 && !rightLoading" class="login-curtain taco-login-curtain">
 
                     <!-- login button -->
                     <button class="btn iid-login" @click="iidLogIn()">
@@ -2218,7 +2218,7 @@
   const { darkModeToggled } = tacoStore
 
   // user
-  const { userLoggedIn } = storeToRefs(tacoStore)  
+  const { userLoggedIn, tourBypassAuth } = storeToRefs(tacoStore)
   const { userPrincipal } = storeToRefs(tacoStore)
   const { truncatedPrincipal } = storeToRefs(tacoStore)
   const { userAcceptedHotkeyTutorial } = storeToRefs(tacoStore)

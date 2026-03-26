@@ -30,7 +30,7 @@ export function applyHighlight(selector: string): HTMLElement | null {
     el.style.position = 'relative'
   }
 
-  el.style.zIndex = '100000'
+  el.style.zIndex = '100001'
   el.classList.add('tour-highlighted')
 
   highlightedElement = el

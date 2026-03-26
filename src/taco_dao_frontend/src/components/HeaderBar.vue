@@ -71,12 +71,19 @@
         </router-link>
         
         <!-- info - router link -->
-        <router-link to="/info" class="header-bar__rl">
-          
+        <router-link to="/info" class="header-bar__rl"
+                     :class="{ 'header-bar__rl--force-inactive': $route.hash === '#roadmap' }">
+
           <span class="header-bar__rl-span">Info</span>
-        
-        </router-link>        
-        
+
+        </router-link>
+
+        <!-- roadmap - link -->
+        <a href="#" @click.prevent="goToRoadmap()" class="header-bar__rl"
+           :class="{ 'header-bar__rl--force-active': $route.path === '/info' && $route.hash === '#roadmap' }">
+          <span class="header-bar__rl-span">Roadmap</span>
+        </a>
+
         <!-- wallet - router link -->
         <router-link to="/wallet" class="header-bar__rl">
 
@@ -272,13 +279,20 @@
         </router-link>         
         
         <!-- info - router link -->
-        <router-link @click="togglePagesMenu()" to="/info" class="list-group-item">
+        <router-link @click="togglePagesMenu()" to="/info" class="list-group-item"
+                     :class="{ 'header-bar__rl--force-inactive': $route.hash === '#roadmap' }">
 
           <!-- item text -->
           <span>Info</span>
 
-        </router-link>          
-        
+        </router-link>
+
+        <!-- roadmap - link -->
+        <a href="#" @click.prevent="goToRoadmap(); togglePagesMenu()" class="list-group-item"
+           :class="{ 'header-bar__rl--force-active': $route.path === '/info' && $route.hash === '#roadmap' }">
+          <span>Roadmap</span>
+        </a>
+
         <!-- wallet - router link -->
         <router-link @click="togglePagesMenu()" to="/wallet" class="list-group-item">
 
@@ -418,6 +432,17 @@
 
     // active router links
     .router-link-active {
+      text-decoration: underline;
+      text-decoration-thickness: 0.2rem;
+    }
+
+    // suppress active state (e.g. Info when on #roadmap)
+    .header-bar__rl--force-inactive {
+      text-decoration: none !important;
+    }
+
+    // force active state (e.g. Roadmap when on #roadmap)
+    .header-bar__rl--force-active {
       text-decoration: underline;
       text-decoration-thickness: 0.2rem;
     }
@@ -698,7 +723,8 @@
   // Imports //
   /////////////
 
-  import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
+  import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
+  import { useRouter, useRoute } from 'vue-router'
   import { useTacoStore } from "../stores/taco.store"
   import { storeToRefs } from "pinia"
   import TacoDaoLogo from "../assets/images/tacoDaoLogo.vue"
@@ -716,6 +742,10 @@
   ////////////
   // Stores //
   ////////////
+
+  // router
+  const router = useRouter()
+  const route = useRoute()
 
   // taco store
   const tacoStore = useTacoStore()
@@ -775,7 +805,25 @@
   // close pages menu
   const closePagesMenu = () => {
     pagesMenuIsVisible.value = false
-  }  
+  }
+
+  // navigate to roadmap section on info page
+  const goToRoadmap = () => {
+    if (route.path === '/info') {
+      // already on info - update hash and scroll directly
+      router.replace('/info#roadmap')
+      const appContent = document.querySelector('.app__content')
+      const el = document.getElementById('roadmap')
+      if (el && appContent) {
+        const containerRect = appContent.getBoundingClientRect()
+        const elRect = el.getBoundingClientRect()
+        const offset = elRect.top - containerRect.top + appContent.scrollTop - 16
+        appContent.scrollTo({ top: offset, behavior: 'smooth' })
+      }
+    } else {
+      router.push('/info#roadmap')
+    }
+  }
 
   // on click, copy user principal to clipboard
   const copyUserPrincipalToClipboard = async () => {

@@ -88,7 +88,7 @@ export const useNachosStore = defineStore('nachos', () => {
   const lastError = ref<string | null>(null)
   const activeOperationStatus = ref<string | null>(null)
   const cachedOperations = ref<CachedOperation[]>([])
-  const slippageBP = ref(100) // 1% default
+  const slippageBP = ref(300) // 3% default
   const vaultConfig = ref<any | null>(null)
 
   // Polling state (not exposed)

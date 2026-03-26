@@ -130,20 +130,20 @@ export const tourScript: TourScene[] = [
     lines: [
       line('taco', 'happy', 'idle', "This is the DAO page! The big brain center!"),
       line('taco', 'neutral', 'idle', "See all those holdings? That's the treasury — the tokens the DAO actually owns right now.", {
-        scrollTo: '.dao-allocations',
-        highlight: '.dao-allocations',
+        scrollTo: '#dao-allocations',
+        highlight: '#dao-allocations',
       }),
       line('taco', 'happy', 'idle', "Those holdings are shaped by allocations from the community. YOU get to decide where the money goes."),
       line('taco', 'neutral', 'idle', "The DAO autonomously trades on KongSwap and ICPSwap every 5 minutes based on the community vote.", {
         clearHighlight: true,
       }),
       line('taco', 'neutral', 'idle', "Let me show you the trade log...", {
-        scrollTo: '.dao-news',
-        highlight: '.dao-news',
-        click: '.dao-news .btn-group button:nth-child(2)',
+        scrollTo: '#dao-news',
+        highlight: '#dao-news',
+        click: '#dao-news .btn-group button:nth-child(2)',
       }),
       line('taco', 'happy', 'idle', "Every trade the DAO makes is logged right here. Fully transparent.", {
-        highlight: '.dao-news',
+        highlight: '#dao-news',
       }),
       line('taco', 'neutral', 'idle', "Now let me show you where YOU get to have your say.", {
         clearHighlight: true,
@@ -160,13 +160,12 @@ export const tourScript: TourScene[] = [
       line('taco', 'happy', 'bounce', "HERE is where the magic happens!"),
       line('taco', 'neutral', 'idle', "This is the voting page. If you stake TACO in a neuron, you get voting power."),
       line('taco', 'neutral', 'idle', "TACO DAO participants can change their allocation at any time by moving these sliders.", {
-        scrollTo: '.vote-view__content__right',
-        highlight: '.vote-view__content__right',
+        highlight: '#vote-sliders',
       }),
       line('taco', 'happy', 'bounce', "Watch — the sliders control where the treasury invests!", {
-        highlight: '.vote-view__content__right',
+        highlight: '#vote-sliders',
         animateSliders: {
-          container: '.vote-view__content__right',
+          container: '#vote-sliders',
           demoValues: [60, 25, 10, 5],
           duration: 2000,
         },
@@ -221,25 +220,42 @@ export const tourScript: TourScene[] = [
   },
 
   // ═══════════════════════════════════════
-  // ACT 5: WALLET PAGE — TACO, Neurons, Tokens
+  // ACT 5: ROADMAP — What's Coming Next
+  // ═══════════════════════════════════════
+  {
+    route: '/info',
+    lines: [
+      line('taco', 'happy', 'idle', "Before we move on — check out what's coming next!", {
+        scrollTo: '#roadmap',
+        highlight: '#roadmap',
+      }),
+      line('taco', 'neutral', 'idle', "Multichain expansion, a white-label platform, and our own DEX. Big things ahead."),
+      line('taco', 'happy', 'bounce', "Stick around — you don't want to miss this.", {
+        clearHighlight: true,
+      }),
+    ]
+  },
+
+  // ═══════════════════════════════════════
+  // ACT 6: WALLET PAGE — TACO, Neurons, Tokens
   // ═══════════════════════════════════════
   {
     route: '/wallet',
     lines: [
       line('taco', 'angry', 'idle', "Still here? GOOD."),
       line('taco', 'neutral', 'idle', "This is TACO! You can stake it into a neuron, swap it, and transfer it.", {
-        scrollTo: '.taco-section',
-        highlight: '.taco-section',
+        scrollTo: '#wallet-taco',
+        highlight: '#wallet-taco',
       }),
       line('taco', 'happy', 'idle', "You can also see the rewards you've gotten in the weekly distribution."),
       line('taco', 'neutral', 'idle', "Here you can create new neurons to increase your voting power and manage existing ones.", {
-        scrollTo: '.taco-neurons-wrapper',
-        highlight: '.taco-neurons-wrapper',
+        scrollTo: '#wallet-neurons',
+        highlight: '#wallet-neurons',
         click: '.token-card__neurons .fa-chevron-right',
       }),
       line('taco', 'neutral', 'idle', "And down here — your core tokens. Hold them, swap between them anytime.", {
-        scrollTo: '.token-section',
-        highlight: '.token-section',
+        scrollTo: '#wallet-tokens',
+        highlight: '#wallet-tokens',
       }),
       line('taco', 'neutral', 'idle', "Alright, next up is... the Vault. I don't go there much.", {
         clearHighlight: true,
@@ -248,7 +264,7 @@ export const tourScript: TourScene[] = [
   },
 
   // ═══════════════════════════════════════
-  // ACT 6: VAULT PAGE — THE PLOT TWIST
+  // ACT 7: VAULT PAGE — THE PLOT TWIST
   // ═══════════════════════════════════════
   {
     route: '/vault',
@@ -270,8 +286,8 @@ export const tourScript: TourScene[] = [
       }),
       line('nacho', 'neutral', 'idle', "The vault lets you mint NACHOS — a token backed by TACO's entire portfolio.", {
         secondary: { character: 'taco', expression: 'suspicious', action: 'idle' },
-        scrollTo: '.nachos-vault-view__action-row',
-        highlight: '.nachos-vault-view__action-row',
+        scrollTo: '#vault-actions',
+        highlight: '#vault-actions',
       }),
       line('nacho', 'neutral', 'idle', "The NAV price shows what 1 NACHO is worth in ICP. And yes — it changes with the portfolio.", {
         secondary: { character: 'taco', expression: 'neutral', action: 'idle' },
@@ -293,7 +309,7 @@ export const tourScript: TourScene[] = [
   },
 
   // ═══════════════════════════════════════
-  // ACT 7: BUY PAGE — Purchase + Toggle Battle
+  // ACT 8: BUY PAGE — Purchase + Toggle Battle
   // ═══════════════════════════════════════
   {
     route: '/buy',
@@ -303,8 +319,8 @@ export const tourScript: TourScene[] = [
       }),
       line('taco', 'neutral', 'idle', "Get ICP, then swap it to TACO later on the wallet page.", {
         secondary: { character: 'nacho', expression: 'neutral', action: 'idle' },
-        scrollTo: '.buy-taco-view__product-toggle',
-        highlight: '.buy-taco-view__product-toggle',
+        scrollTo: '#buy-product-toggle',
+        highlight: '#buy-product-toggle',
       }),
       line('nacho', 'happy', 'idle', "...or mint it to NACHO!", {
         secondary: { character: 'taco', expression: 'angry', action: 'idle' },
@@ -339,7 +355,7 @@ export const tourScript: TourScene[] = [
   },
 
   // ═══════════════════════════════════════
-  // ACT 8: BACK TO HOME — FINALE
+  // ACT 9: BACK TO HOME — FINALE
   // ═══════════════════════════════════════
   {
     route: '/',

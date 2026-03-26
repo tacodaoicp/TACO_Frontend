@@ -1,10 +1,10 @@
 <template>
 
-  <!-- grand tour overlay -->
-  <div v-if="active" class="grand-tour">
+  <!-- semi-transparent backdrop — separate stacking context, below highlights -->
+  <div v-if="active" class="grand-tour-backdrop"></div>
 
-    <!-- semi-transparent backdrop (click-through except on dialog) -->
-    <div class="grand-tour__backdrop"></div>
+  <!-- grand tour overlay — above highlights -->
+  <div v-if="active" class="grand-tour">
 
     <!-- settings panel -->
     <div class="grand-tour__settings">
@@ -97,7 +97,7 @@
   </div>
 
   <!-- wizard prompt modal (shown after tour for new users) -->
-  <div v-if="showWizardPrompt" class="taco-modal-overlay" style="z-index: 100005;">
+  <div v-if="showWizardPrompt" class="taco-modal-overlay" style="z-index: 100003;">
     <div class="taco-modal-dialog" style="max-width: 420px;">
       <div class="taco-modal-header">
         <div class="taco-modal-title">
@@ -580,6 +580,7 @@ async function applyCurrentLine() {
 // ──────────────────────────────────
 async function startTour() {
   resetAbortFlag()
+  tacoStore.tourBypassAuth = true
   sceneIndex.value = 0
   lineIndex.value = 0
   inChoiceResponse.value = false
@@ -604,6 +605,7 @@ function endTour() {
   clearPauseTimer()
   abortAnimations()
   cleanupAllTourEffects()
+  tacoStore.tourBypassAuth = false
   dialogVisible.value = false
   tacoVisible.value = false
   nachoVisible.value = false
@@ -637,19 +639,20 @@ onUnmounted(() => {
 
 <style scoped lang="scss">
 
+// Backdrop — separate stacking context so highlights can sit between it and tour UI
+.grand-tour-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 99999;
+  background: rgba(0, 0, 0, 0.2);
+  pointer-events: auto;
+}
+
 .grand-tour {
   position: fixed;
   inset: 0;
-  z-index: 100000;
+  z-index: 100002;
   pointer-events: none;
-
-  // Backdrop — subtle darkening so sprites and dialog pop
-  &__backdrop {
-    position: absolute;
-    inset: 0;
-    background: rgba(0, 0, 0, 0.2);
-    pointer-events: auto;
-  }
 
   // Settings panel (face style + emote selector)
   &__settings {
@@ -667,7 +670,7 @@ onUnmounted(() => {
       -3px 3px 0 0 #8B6914,
       3px -3px 0 0 #8B6914,
       -3px -3px 0 0 #8B6914;
-    z-index: 100004;
+    z-index: 5;
     pointer-events: auto;
 
     &__row {
@@ -723,7 +726,7 @@ onUnmounted(() => {
     inset: 0;
     background: white;
     opacity: 0.7;
-    z-index: 100003;
+    z-index: 4;
     pointer-events: none;
     animation: flash-fade 0.15s ease-out forwards;
   }
@@ -753,7 +756,7 @@ onUnmounted(() => {
   position: fixed;
   inset: 0;
   background: #FFD700;
-  z-index: 100001;
+  z-index: 2;
   pointer-events: none;
   animation: lightning-strobe 0.4s ease-out forwards;
 }
@@ -763,7 +766,7 @@ onUnmounted(() => {
   inset: 0;
   background: white;
   opacity: 1;
-  z-index: 100001;
+  z-index: 2;
   pointer-events: none;
   transition: opacity 1.2s ease-out;
 
@@ -813,7 +816,7 @@ onUnmounted(() => {
 <!-- Unscoped: highlight class applied to elements outside this component -->
 <style lang="scss">
 .tour-highlighted {
-  outline: 2px solid rgba(255, 215, 0, 0.6) !important;
+  outline: 2px solid rgba(255, 215, 0, 0.4) !important;
   box-shadow: 0 0 10px rgba(255, 215, 0, 0.25), 0 0 20px rgba(255, 215, 0, 0.1) !important;
   border-radius: 0.5rem;
   transition: outline 0.3s ease, box-shadow 0.3s ease;

@@ -40,15 +40,15 @@
               </div>
 
               <!-- main action area: mint/burn + chart side by side -->
-              <div class="nachos-vault-view__action-row">
+              <div id="vault-actions" class="nachos-vault-view__action-row">
 
                 <!-- left column: mint + burn (or login prompt) -->
                 <div class="nachos-vault-view__action-col">
-                  <template v-if="tacoStore.userLoggedIn">
+                  <template v-if="showAsLoggedIn">
                     <VaultMint @operation-complete="onOperationComplete" />
                     <VaultBurn @operation-complete="onOperationComplete" />
                   </template>
-                  <div v-else class="nachos-vault-view__login-prompt">
+                  <div v-else-if="!tacoStore.tourBypassAuth" class="nachos-vault-view__login-prompt">
                     <i class="fa-solid fa-lock"></i>
                     <span>Mint & burn NACHOS</span>
                     <button class="btn iid-login" @click="tacoStore.iidLogIn()">
@@ -202,7 +202,7 @@
 
 import TacoTitle from '../components/misc/TacoTitle.vue'
 import DfinityLogo from '../assets/images/dfinityLogo.vue'
-import { ref, onMounted, onBeforeUnmount, watch } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useTacoStore } from '../stores/taco.store'
 import { useNachosStore } from '../stores/nachos.store'
@@ -228,6 +228,7 @@ const tacoStore = useTacoStore()
 const nachosStore = useNachosStore()
 const { appLoadingOn, appLoadingOff } = tacoStore
 const { isAdmin } = useAdminCheck()
+const showAsLoggedIn = computed(() => tacoStore.userLoggedIn || tacoStore.tourBypassAuth)
 
 ///////////////////
 // local methods //

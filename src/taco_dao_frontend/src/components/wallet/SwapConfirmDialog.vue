@@ -56,10 +56,10 @@
           <i class="direction-arrow fa fa-arrow-right" style="font-size: 1.5rem; color: var(--black-to-white);"></i>             
 
           <!-- to token -->
-          <div class="token-section">  
-            
+          <div class="token-section">
+
             <!-- amount -->
-            <span class="fw-bold" style="font-size: 1.5rem;">{{ formatBalance(swapData.selectedQuote.amountOut, swapData.outputToken.decimals) }}</span>
+            <span class="fw-bold" style="font-size: 1.5rem;">{{ formatBalance(expectedOut, swapData.outputToken.decimals) }}</span>
 
             <div class="d-flex align-items-center gap-1">
 
@@ -78,30 +78,38 @@
         <!-- exchange info -->
         <div class="exchange-info d-flex flex-column mt-3 mb-3">
 
-          <!-- exchange -->
+          <!-- route -->
           <div class="d-flex justify-content-between flex-wrap">
 
             <!-- label -->
-            <span class="fw-bold">Exchange:</span>
+            <span class="fw-bold">Route:</span>
 
             <!-- value -->
-            <span class="ms-auto">
-
-              <!-- exchange name -->
-              <span>{{ swapData.selectedQuote.exchange }}</span>
-
-            </span>
+            <span class="ms-auto">{{ routeLabel }}</span>
 
           </div>
-          
-          <!-- info details -->
+
+          <!-- split legs (only for multi-leg plans) -->
+          <template v-if="planLegs.length > 1">
+            <div v-for="(leg, i) in planLegs" :key="i" class="d-flex justify-content-between flex-wrap">
+
+              <!-- label -->
+              <span class="fw-bold" style="padding-left: 0.5rem;">{{ leg.exchange }} ({{ (leg.pctBP / 100).toFixed(0) }}%):</span>
+
+              <!-- value -->
+              <span class="ms-auto">~{{ formatBalance(leg.expectedOut, swapData.outputToken.decimals) }} {{ swapData.outputToken.symbol }}</span>
+
+            </div>
+          </template>
+
+          <!-- price impact -->
           <div class="d-flex justify-content-between flex-wrap">
 
             <!-- label -->
             <span class="fw-bold">Price Impact:</span>
 
             <!-- value -->
-            <span class="ms-auto">{{ swapData.selectedQuote.slippage.toFixed(2) }}%</span>
+            <span class="ms-auto" :class="getPriceImpactClass(combinedSlippage)">{{ combinedSlippage.toFixed(2) }}%</span>
 
           </div>
 
@@ -117,17 +125,6 @@
             </span>
 
           </div>
-          
-          <!-- pool fee -->
-          <div v-if="swapData.selectedQuote.exchange === 'ICPSwap'" class="d-flex justify-content-between flex-wrap">
-
-            <!-- label -->
-            <span class="fw-bold">Pool Fee:</span>
-
-            <!-- value -->
-            <span class="ms-auto">{{ (swapData.selectedQuote.fee / 10000).toFixed(2) }}%</span>
-
-          </div>
 
           <!-- network fee -->
           <div class="d-flex justify-content-between flex-wrap">
@@ -140,7 +137,7 @@
               {{ formatBalance(swapData.inputToken.fee, swapData.inputToken.decimals) }} {{ swapData.inputToken.symbol }}
             </span>
 
-          </div>          
+          </div>
 
         </div>
 
@@ -222,14 +219,14 @@
         </label>
 
         <!-- slippage warning -->
-        <div v-if="swapData.selectedQuote.slippage > 1" class="alert mb-0 mt-3 px-3 py-2"
+        <div v-if="combinedSlippage > 1" class="alert mb-0 mt-3 px-3 py-2"
         style="background-color: var(--red);">
 
           <!-- icon -->
           <i class="fa fa-exclamation-triangle me-2" style="color: var(--white) !important;"></i>
 
           <!-- text -->
-          <span style="color: var(--white) !important;">High price impact ({{ swapData.selectedQuote.slippage.toFixed(2) }}%). Consider reducing your swap amount.</span>
+          <span style="color: var(--white) !important;">High price impact ({{ combinedSlippage.toFixed(2) }}%). Consider reducing your swap amount.</span>
 
         </div>
 
@@ -697,6 +694,7 @@ import { ref, computed, watch } from 'vue'
 import { useKongStore } from '../../stores/kong.store'
 import { useICPSwapStore } from '../../stores/icpswap.store'
 import { useTacoStore } from '../../stores/taco.store'
+import { useSplitSwap, type ExecutionPlan } from '../../composables/useSplitSwap'
 
 interface Token {
   principal: string
@@ -722,8 +720,10 @@ interface SwapData {
   inputToken: Token
   outputToken: Token
   amount: string
-  selectedQuote: Quote
+  executionPlan: ExecutionPlan
   slippageTolerance: number
+  // Legacy — kept for backwards compatibility
+  selectedQuote?: Quote
 }
 
 interface SwapConfirmDialogProps {
@@ -744,6 +744,7 @@ const emit = defineEmits<SwapConfirmDialogEmits>()
 const kongStore = useKongStore()
 const icpswapStore = useICPSwapStore()
 const tacoStore = useTacoStore()
+const splitSwap = useSplitSwap()
 
 // State
 const swapMethod = ref<'icrc2' | 'icrc1'>('icrc2')
@@ -755,6 +756,35 @@ const hasError = ref(false)
 
 // Computed
 const swapData = computed(() => props.swapData)
+
+const planLegs = computed(() => {
+  const plan = swapData.value?.executionPlan
+  if (plan?.legs?.length) return plan.legs
+  return []
+})
+
+const expectedOut = computed((): bigint => {
+  const plan = swapData.value?.executionPlan
+  if (plan) return plan.totalExpectedOut
+  return swapData.value?.selectedQuote?.amountOut ?? 0n
+})
+
+const combinedSlippage = computed((): number => {
+  const plan = swapData.value?.executionPlan
+  if (plan) return plan.totalSlipBP / 100 // basis points → percent
+  return swapData.value?.selectedQuote?.slippage ?? 0
+})
+
+const routeLabel = computed((): string => {
+  const legs = planLegs.value
+  if (legs.length === 0) {
+    return swapData.value?.selectedQuote?.exchange ?? 'Unknown'
+  }
+  if (legs.length === 1) {
+    return `${legs[0].exchange} (100%)`
+  }
+  return legs.map(l => `${l.exchange} ${(l.pctBP / 100).toFixed(0)}%`).join(' + ')
+})
 
 // Watch for dialog opening with new swap data and clear error state
 watch([() => props.show, () => props.swapData], async ([newShow, newSwapData], [oldShow, oldSwapData]) => {
@@ -800,79 +830,87 @@ const closeModal = () => {
 }
 
 const executeSwap = async () => {
-
-  // log
-  // console.log('Executing swap')
-
   if (!swapData.value || isExecuting.value) return
 
   // Reset error state
   hasError.value = false
   errorMessage.value = ''
-  
+
   isExecuting.value = true
-  
+
   try {
-    const { inputToken, outputToken, amount, selectedQuote } = swapData.value
-    const amountIn = parseAmountToBigInt(amount, inputToken.decimals)
-    
-    // Use the user's selected slippage tolerance
+    const { inputToken, outputToken, executionPlan } = swapData.value
     const userSlippageTolerance = swapData.value.slippageTolerance
-    const minAmountOut = BigInt(Math.floor(Number(selectedQuote.amountOut) * (1 - userSlippageTolerance)))
 
-    let result: any
+    if (executionPlan && executionPlan.legs.length > 0) {
+      // Use split-swap engine execution
+      executionStep.value = 'Executing swap...'
 
-    const swapParams = {
-      sellTokenPrincipal: inputToken.principal,
-      sellTokenSymbol: inputToken.symbol,
-      buyTokenPrincipal: outputToken.principal,
-      buyTokenSymbol: outputToken.symbol,
-      amountIn,
-      minAmountOut,
-      slippageTolerance: userSlippageTolerance,
-    }
+      const result = await splitSwap.executePlan(
+        executionPlan,
+        inputToken.principal,
+        inputToken.symbol,
+        outputToken.principal,
+        outputToken.symbol,
+        userSlippageTolerance,
+        (leg: string, step: string) => {
+          executionStep.value = `${leg}: ${step}`
+        }
+      )
 
-    // Create a step update callback
-    const updateStep = (step: string) => {
-      executionStep.value = step
-    }
-
-    // Add step callback to swap params
-    const swapParamsWithCallback = {
-      ...swapParams,
-      onStep: updateStep
-    }
-
-    if (selectedQuote.exchange === 'Kong') {
-      if (swapMethod.value === 'icrc2') {
-        executionStep.value = 'Starting ICRC2 swap...'
-        result = await kongStore.icrc2_swap(swapParamsWithCallback)
-      } else {
-        executionStep.value = 'Starting ICRC1 swap...'
-        result = await kongStore.icrc1_swap(swapParamsWithCallback)
+      // Check for failures
+      const failures = result.results.filter(r => !r.success)
+      if (failures.length > 0 && result.totalOut === 0n) {
+        throw new Error(failures.map(f => `${f.exchange}: ${f.error}`).join('; '))
       }
+
+      // Partial success: some legs failed but got tokens from others
+      if (failures.length > 0) {
+        const successLegs = result.results.filter(r => r.success)
+        const failedNames = failures.map(f => f.exchange).join(', ')
+        errorMessage.value = `Partial success: ${failedNames} failed, but received ${result.totalOut} from ${successLegs.map(s => s.exchange).join(', ')}`
+        hasError.value = true
+      }
+
+      emit('success', { totalOut: result.totalOut, results: result.results })
     } else {
-      // ICPSwap
-      if (swapMethod.value === 'icrc2') {
-        executionStep.value = 'Starting ICRC2 swap...'
-        result = await icpswapStore.icrc2_swap(swapParamsWithCallback)
-      } else {
-        executionStep.value = 'Starting ICRC1 swap...'
-        result = await icpswapStore.icrc1_swap(swapParamsWithCallback)
+      // Legacy fallback: single exchange via selectedQuote
+      const selectedQuote = swapData.value.selectedQuote
+      if (!selectedQuote) throw new Error('No execution plan or quote available')
+
+      const amountIn = parseAmountToBigInt(swapData.value.amount, inputToken.decimals)
+      const minAmountOut = BigInt(Math.floor(Number(selectedQuote.amountOut) * (1 - userSlippageTolerance)))
+
+      const swapParams = {
+        sellTokenPrincipal: inputToken.principal,
+        sellTokenSymbol: inputToken.symbol,
+        buyTokenPrincipal: outputToken.principal,
+        buyTokenSymbol: outputToken.symbol,
+        amountIn,
+        minAmountOut,
+        slippageTolerance: userSlippageTolerance,
+        onStep: (step: string) => { executionStep.value = step },
       }
+
+      let result: any
+      if (selectedQuote.exchange === 'Kong') {
+        executionStep.value = 'Starting Kong swap...'
+        result = swapMethod.value === 'icrc2'
+          ? await kongStore.icrc2_swap(swapParams)
+          : await kongStore.icrc1_swap(swapParams)
+      } else {
+        executionStep.value = 'Starting ICPSwap swap...'
+        result = swapMethod.value === 'icrc2'
+          ? await icpswapStore.icrc2_swap(swapParams)
+          : await icpswapStore.icrc1_swap(swapParams)
+      }
+      emit('success', result)
     }
 
-    // Success
-    emit('success', result)
-    
   } catch (error: any) {
     console.error('Swap execution error:', error)
-    
-    // Show error in the dialog
     hasError.value = true
     errorMessage.value = error.message || 'Swap failed'
-    
-    // Also emit to parent for toast (but dialog stays open)
     emit('error', error.message || 'Swap failed')
   } finally {
     isExecuting.value = false

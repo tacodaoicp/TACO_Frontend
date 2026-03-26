@@ -70,7 +70,7 @@
               />
 
               <!-- Login prompt for non-logged in users -->
-              <div v-else class="mx-3 mb-4">
+              <div v-if="!userLoggedIn && !tourBypassAuth" class="mx-3 mb-4">
                 <div class="taco-container taco-container--l1">
                   <div class="text-center py-4">
                     <h5 class="mb-3 taco-text-brown-to-white">View Your Performance</h5>
@@ -266,6 +266,7 @@ export default {
     // User authentication state from store
     const {
       userLoggedIn,
+      tourBypassAuth,
       userPrincipal,
       // Leaderboard data from workers (8 combinations cached)
       leaderboardAllTimeUSD,
@@ -745,6 +746,7 @@ export default {
     return {
       // State
       userLoggedIn,
+      tourBypassAuth,
       userPrincipal,
       isLoading,
       isLoadingLeaderboard,

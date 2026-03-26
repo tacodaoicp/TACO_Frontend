@@ -3,7 +3,7 @@
   <div class="standard-view">
 
     <!-- scroll container - app util class -->
-    <div class="scroll-y-container h-100">
+    <div class="scroll-y-container h-100" ref="scrollContainer">
 
       <!-- bootstrap container -->
       <div class="container">
@@ -453,6 +453,119 @@
 
           </div>
 
+          <!-- roadmap title -->
+          <TacoTitle level="h2" emoji="🗺️" title="Roadmap" class="mt-5 justify-content-center" />
+
+          <!-- roadmap -->
+          <div id="roadmap"
+               class="taco-container taco-container--l1 w-100">
+
+            <div class="roadmap">
+
+              <!-- completed phase -->
+              <div class="roadmap__phase-header roadmap__phase-header--done">
+                <div class="roadmap__dot roadmap__dot--done"></div>
+                <span class="roadmap__phase-label roadmap__phase-label--done">Completed</span>
+                <i class="fa-solid fa-chevron-down roadmap__chevron"></i>
+              </div>
+
+              <div class="roadmap__item roadmap__item--done">
+                <i class="fa-solid fa-check roadmap__item-icon roadmap__item-icon--done"></i>
+                <div class="roadmap__content">
+                  <h4 class="roadmap__title">TACO DAO Launch & SNS Decentralization</h4>
+                  <p class="roadmap__text">Successful SNS swap with 127,077 ICP committed. Full DAO governance live on the Internet Computer.</p>
+                </div>
+              </div>
+
+              <div class="roadmap__item roadmap__item--done">
+                <i class="fa-solid fa-check roadmap__item-icon roadmap__item-icon--done"></i>
+                <div class="roadmap__content">
+                  <h4 class="roadmap__title">DAO Voting & Portfolio Management</h4>
+                  <p class="roadmap__text">Weighted voting framework for token allocation targets. Automated trading bot rebalances the portfolio to match DAO votes.</p>
+                </div>
+              </div>
+
+              <div class="roadmap__item roadmap__item--done">
+                <i class="fa-solid fa-check roadmap__item-icon roadmap__item-icon--done"></i>
+                <div class="roadmap__content">
+                  <h4 class="roadmap__title">Performance Tracking & Leaderboard</h4>
+                  <p class="roadmap__text">Allocation performance tracking, member leaderboards, and the ability to follow other members' strategies.</p>
+                </div>
+              </div>
+
+              <div class="roadmap__item roadmap__item--done">
+                <i class="fa-solid fa-check roadmap__item-icon roadmap__item-icon--done"></i>
+                <div class="roadmap__content">
+                  <h4 class="roadmap__title">NACHOS Vault (NAV Index Token)</h4>
+                  <p class="roadmap__text">Mint and burn flows, NAV chart, and live vault statistics. NACHOS token represents proportional ownership of the DAO portfolio.</p>
+                </div>
+              </div>
+
+              <div class="roadmap__item roadmap__item--done">
+                <i class="fa-solid fa-check roadmap__item-icon roadmap__item-icon--done"></i>
+                <div class="roadmap__content">
+                  <h4 class="roadmap__title">Fiat On-Ramp Integration</h4>
+                  <p class="roadmap__text">Fiat on-ramp providers with step-by-step flow and auto-swap to TACO or NACHOS.</p>
+                </div>
+              </div>
+
+              <div class="roadmap__item roadmap__item--done">
+                <i class="fa-solid fa-check roadmap__item-icon roadmap__item-icon--done"></i>
+                <div class="roadmap__content">
+                  <h4 class="roadmap__title">Site-Wide Visual Refresh (v2.0.0)</h4>
+                  <p class="roadmap__text">Complete UI overhaul with unified design system, new theme, and responsive layout.</p>
+                </div>
+              </div>
+
+              <!-- Q2 2026 phase -->
+              <div class="roadmap__phase-header roadmap__phase-header--upcoming">
+                <div class="roadmap__dot roadmap__dot--upcoming"></div>
+                <span class="roadmap__phase-label">Q2 2026</span>
+                <i class="fa-solid fa-chevron-down roadmap__chevron"></i>
+              </div>
+
+              <div class="roadmap__item roadmap__item--upcoming">
+                <i class="fa-solid fa-circle roadmap__item-icon roadmap__item-icon--upcoming"></i>
+                <div class="roadmap__content">
+                  <h4 class="roadmap__title">Multichain Portfolio Expansion</h4>
+                  <p class="roadmap__text">Allow assets from other blockchains to be added to the TACO DAO portfolio and voted on by DAO members. The portfolio diversifies beyond ICP-native tokens while maintaining the same weighted voting governance. TACO and NACHOS tokens will also become multichain, with a bridge to convert between ICP and other chain formats.</p>
+                </div>
+              </div>
+
+              <!-- Q2/Q3 2026 phase -->
+              <div class="roadmap__phase-header roadmap__phase-header--upcoming">
+                <div class="roadmap__dot roadmap__dot--upcoming"></div>
+                <span class="roadmap__phase-label">Q2/Q3 2026</span>
+                <i class="fa-solid fa-chevron-down roadmap__chevron"></i>
+              </div>
+
+              <div class="roadmap__item roadmap__item--upcoming">
+                <i class="fa-solid fa-circle roadmap__item-icon roadmap__item-icon--upcoming"></i>
+                <div class="roadmap__content">
+                  <h4 class="roadmap__title">White-Label Portfolio Platform</h4>
+                  <p class="roadmap__text">Projects can create their own DAO-managed portfolio with their own NACHO-type index token: a token whose value (NAV) is backed by the portfolio it represents. Projects add their own tokens, stake TACO to participate, and pay a percentage of the profits the portfolio generates in ICP value back to TACO DAO.</p>
+                </div>
+              </div>
+
+              <!-- Q3/Q4 2026 phase -->
+              <div class="roadmap__phase-header roadmap__phase-header--upcoming">
+                <div class="roadmap__dot roadmap__dot--upcoming"></div>
+                <span class="roadmap__phase-label">Q3/Q4 2026</span>
+                <i class="fa-solid fa-chevron-down roadmap__chevron"></i>
+              </div>
+
+              <div class="roadmap__item roadmap__item--upcoming roadmap__item--last">
+                <i class="fa-solid fa-circle roadmap__item-icon roadmap__item-icon--upcoming"></i>
+                <div class="roadmap__content">
+                  <h4 class="roadmap__title">TACO DEX</h4>
+                  <p class="roadmap__text">TACO's own decentralized exchange supporting limit orders and AMM liquidity provision, where the DAO portfolio is used as liquidity. Single-canister architecture for blazing-fast execution. The code is ready, deployment is planned once TACO gains sufficient traction to ensure a successful launch.</p>
+                </div>
+              </div>
+
+            </div>
+
+          </div>
+
         </div>
 
       </div>
@@ -597,8 +710,143 @@
 
   // // medium desktop
   // @media (min-width: 1200px) and (max-width: 1399.98px) {
-    
+
   // }
+
+  // roadmap
+  .roadmap {
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    padding-left: 1.5rem;
+
+    // vertical timeline line
+    &::before {
+      content: '';
+      position: absolute;
+      left: 0.34rem;
+      top: 0.5rem;
+      bottom: 1.5rem;
+      width: 2px;
+      background: var(--table-row-border);
+    }
+
+    // phase header
+    &__phase-header {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 1rem 0 0.4rem;
+      position: relative;
+      z-index: 1;
+
+      &:first-child {
+        padding-top: 0.25rem;
+      }
+    }
+
+    // dot on the timeline
+    &__dot {
+      position: absolute;
+      left: -1.16rem;
+      width: 0.75rem;
+      height: 0.75rem;
+      border-radius: 50%;
+
+      &--done {
+        background-color: var(--dark-orange);
+        box-shadow: 0 0 6px rgba(218, 141, 40, 0.4);
+      }
+
+      &--upcoming {
+        background-color: transparent;
+        border: 2px solid var(--gold);
+        box-shadow: 0 0 6px rgba(255, 213, 79, 0.3);
+      }
+    }
+
+    // phase label
+    &__phase-label {
+      font-family: 'Rubik', sans-serif;
+      font-size: 0.85rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--gold);
+
+      &--done {
+        color: var(--dark-orange);
+      }
+    }
+
+    // chevron
+    &__chevron {
+      font-size: 0.6rem;
+      color: var(--dark-orange);
+      opacity: 0.6;
+    }
+
+    // item
+    &__item {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.6rem;
+      padding: 0.6rem 0.75rem;
+      background-color: rgba(0, 0, 0, 0.15);
+      border-bottom: 1px solid var(--table-row-border);
+      border-radius: 0;
+
+      &:hover {
+        background-color: var(--orange-to-brown);
+      }
+
+      &--last {
+        border-bottom: 0;
+        border-bottom-right-radius: 0.5rem;
+      }
+    }
+
+    // item icon (inline before title)
+    &__item-icon {
+      margin-top: 0.3rem;
+      font-size: 0.65rem;
+      min-width: 0.75rem;
+
+      &--done {
+        color: #81C784;
+      }
+
+      &--upcoming {
+        font-size: 0.4rem;
+        color: var(--gold);
+        margin-top: 0.4rem;
+      }
+    }
+
+    // content
+    &__content {
+      flex: 1;
+    }
+
+    // title
+    &__title {
+      font-family: 'Rubik', sans-serif;
+      font-size: 1rem;
+      font-weight: 600;
+      color: var(--black-to-white);
+      margin: 0 0 0.25rem 0;
+    }
+
+    // text
+    &__text {
+      font-family: 'Space Mono', monospace;
+      font-size: 0.8rem;
+      color: var(--black-to-white);
+      opacity: 0.85;
+      margin: 0;
+      line-height: 1.5;
+    }
+  }
 
 </style>
 
@@ -608,14 +856,33 @@
   // Imports //
   /////////////
 
-  import { ref } from "vue";
+  import { ref, onMounted, nextTick } from "vue";
+  import { useRoute } from "vue-router";
   import TacoTitle from '../components/misc/TacoTitle.vue';
 
   /////////////////////
   // local variables //
   /////////////////////
 
-  // has proposals
-  // const test = ref(false);
+  const route = useRoute();
+  const scrollContainer = ref<HTMLElement | null>(null);
+
+  /////////////////
+  // scroll hash //
+  /////////////////
+
+  onMounted(() => {
+    if (route.hash === '#roadmap') {
+      nextTick(() => {
+        const el = document.getElementById('roadmap');
+        if (el && scrollContainer.value) {
+          const containerRect = scrollContainer.value.getBoundingClientRect();
+          const elRect = el.getBoundingClientRect();
+          const offset = elRect.top - containerRect.top + scrollContainer.value.scrollTop - 16;
+          scrollContainer.value.scrollTo({ top: offset, behavior: 'smooth' });
+        }
+      });
+    }
+  });
 
 </script>

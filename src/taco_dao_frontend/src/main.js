@@ -123,11 +123,27 @@ const router = createRouter({
     routes,
 })
 
-// Scroll to top on every route change
+// Scroll to top on every route change (or to hash target if present)
 // (Vue Router's scrollBehavior doesn't work because .app__content is the scroll container, not window)
-router.afterEach(() => {
+router.afterEach((to) => {
     const appContent = document.querySelector('.app__content')
-    if (appContent) appContent.scrollTop = 0
+    if (!appContent) return
+    if (to.hash) {
+        // wait for view to render, then scroll to hash element
+        setTimeout(() => {
+            const el = document.querySelector(to.hash)
+            if (el) {
+                const containerRect = appContent.getBoundingClientRect()
+                const elRect = el.getBoundingClientRect()
+                const offset = elRect.top - containerRect.top + appContent.scrollTop - 16
+                appContent.scrollTo({ top: offset, behavior: 'smooth' })
+            } else {
+                appContent.scrollTop = 0
+            }
+        }, 100)
+    } else {
+        appContent.scrollTop = 0
+    }
 })
 
 const app = createApp(App)

@@ -1,6 +1,6 @@
 <template>
 
-  <div class="dao-news">
+  <div id="dao-news" class="dao-news">
 
       <!-- dao news loading curtain -->
       <div v-if="componentLoading" class="taco-loading-curtain dao-news__loading-curtain">

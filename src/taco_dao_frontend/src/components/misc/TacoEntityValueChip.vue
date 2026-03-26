@@ -19,7 +19,7 @@
 
         <!-- hover tooltip -->
         <div v-if="showingTacoEntityTooltip"
-             class="taco-entity-value-chip__tooltip shadow">
+             class="taco-entity-value-chip__tooltip taco-container--l1 shadow">
 
              <!-- header -->
             <div class="taco-entity-value-chip__tooltip__header">
@@ -82,7 +82,7 @@
             
             <!-- kvp (dkp) -->
             <div class="taco-entity-value-chip__tooltip__kvp pt-2"
-                style="padding: 0.75rem 1rem 1rem 1.25rem !important; border-bottom: 1px solid var(--dark-orange);">
+                style="padding: 0.75rem 1rem 1rem 1.25rem !important; border-bottom: 1px solid var(--table-row-border);">
 
                 <!-- key -->
                 <span class="taco-entity-value-chip__tooltip__kvp__key 
@@ -167,24 +167,20 @@
 
         // tooltip
         &__tooltip {
-            border: 1px solid var(--dark-orange);
             position: absolute;
             top: calc(100% + 0.75rem);
             right: 0;
             width: fit-content;
-            border-radius: 0.5rem;
-            background-color: var(--orange-to-brown);
             color: var(--black-to-white);
             display: flex;
             flex-direction: column;
-            // gap: 0.5rem;
             z-index: 9999;
 
             // header
             &__header {
                 text-align: center;
                 font-size: 0.875rem;
-                border-bottom: 1px solid var(--dark-orange);
+                border-bottom: 1px solid var(--table-row-border);
                 padding: 0.5rem 1rem 0.5rem;
 
                 // logo
@@ -221,7 +217,7 @@
 
                 // last of type
                 &:last-of-type {
-                    border-top: 1px solid var(--dark-orange);
+                    border-top: 1px solid var(--table-row-border);
                 }
                 
             }

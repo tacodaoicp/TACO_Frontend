@@ -255,59 +255,57 @@
 
         </div>
 
-        <!-- quotes section -->
-        <div v-if="quotes.length > 0" class="quotes-section">
+        <!-- execution plan section -->
+        <div v-if="executionPlan" class="quotes-section">
 
-          <!-- quotes title -->
-          <span class="d-inline-block mb-2" style="font-size: 1.25rem;">Available Quotes</span>
+          <!-- optimal route header -->
+          <span class="d-inline-block mb-2" style="font-size: 1.25rem;">Optimal Route</span>
 
-          <!-- quotes list -->
-          <div class="quotes-list">
+          <!-- optimal plan display -->
+          <div class="quote-item selected-quote">
 
-            <!-- quote item -->
-            <div 
-              v-for="(quote, index) in sortedQuotes" 
-              :key="quote.exchange"
-              class="quote-item"
-              :class="{
-                'selected-quote': selectedQuote && selectedQuote.exchange === quote.exchange 
-              }"
-              @click="selectQuote(quote)">
-
-              <!-- quote header -->
-              <div class="quote-header">
-                <div class="exchange-info">
-                  <div class="exchange-name"><span>{{ quote.exchange }}</span></div>
-                  <div v-if="index === 0" class="best-badge">
-                    <i class="fa fa-star"></i>
-                    <span class="text-nowrap">Best Rate</span>
-                  </div>
+            <div class="quote-header">
+              <div class="exchange-info">
+                <div class="exchange-name">
+                  <span v-if="executionPlan.type === 'single'">{{ executionPlan.legs[0].exchange }}</span>
+                  <span v-else>Split Swap</span>
                 </div>
-                <div class="quote-amount">
-                  <span>{{ formatBalance(quote.amountOut, tacoToken.decimals) }} TACO</span>
+                <div class="best-badge">
+                  <i class="fa fa-star"></i>
+                  <span class="text-nowrap">Best Return</span>
                 </div>
               </div>
-
-              <!-- quote details -->
-              <div class="quote-details">
-                <div class="detail-item">
-                  <span>Price Impact:</span>
-                  <span :class="getPriceImpactClass(quote.slippage)">
-                    {{ quote.slippage.toFixed(2) }}%
-                  </span>
-                </div>
-                <div v-if="quote.exchange === 'Kong'" class="detail-item">
-                  <span>Execution Price:</span>
-                  <span>{{ quote.price.toFixed(6) }}</span>
-                </div>
-                <div v-if="quote.exchange === 'ICPSwap'" class="detail-item">
-                  <span>Pool Fee:</span>
-                  <span>{{ (quote.fee / 10000).toFixed(2) }}%</span>
-                </div>
+              <div class="quote-amount">
+                <span>{{ formatBalance(executionPlan.totalExpectedOut, tacoToken.decimals) }} TACO</span>
               </div>
-
             </div>
 
+            <div class="quote-details">
+              <div v-for="leg in executionPlan.legs" :key="leg.exchange" class="detail-item">
+                <span>{{ leg.exchange }} ({{ (leg.pctBP / 100).toFixed(0) }}%):</span>
+                <span>{{ formatBalance(leg.expectedOut, tacoToken.decimals) }} TACO</span>
+              </div>
+              <div class="detail-item">
+                <span>Slippage:</span>
+                <span :class="getPriceImpactClass(executionPlan.totalSlipBP / 100)">
+                  {{ (executionPlan.totalSlipBP / 100).toFixed(2) }}%
+                </span>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- single-exchange comparison -->
+          <div v-if="quotes.length > 0" class="mt-2">
+            <span class="d-inline-block mb-1" style="font-size: 0.85rem; opacity: 0.7;">Single-exchange comparison</span>
+            <div class="quotes-list">
+              <div v-for="quote in sortedQuotes" :key="quote.exchange" class="quote-item" style="padding: 0.5rem 0.75rem;">
+                <div class="d-flex justify-content-between align-items-center">
+                  <span style="font-size: 0.85rem;">{{ quote.exchange }} only</span>
+                  <span style="font-size: 0.85rem;">{{ formatBalance(quote.amountOut, tacoToken.decimals) }} TACO</span>
+                </div>
+              </div>
+            </div>
           </div>
 
         </div>
@@ -916,6 +914,7 @@ import { ref, computed, watch, onMounted } from 'vue'
 import { useKongStore } from '../../stores/kong.store'
 import { useICPSwapStore } from '../../stores/icpswap.store'
 import { useTacoStore } from '../../stores/taco.store'
+import { useSplitSwap, type ExecutionPlan } from '../../composables/useSplitSwap'
 
 interface Token {
   principal: string
@@ -945,7 +944,7 @@ interface SwapDialogProps {
 
 interface SwapDialogEmits {
   (e: 'close'): void
-  (e: 'confirm', data: { inputToken: Token; outputToken: Token; amount: string; selectedQuote: Quote; slippageTolerance: number }): void
+  (e: 'confirm', data: { inputToken: Token; outputToken: Token; amount: string; executionPlan: ExecutionPlan; slippageTolerance: number }): void
 }
 
 const props = withDefaults(defineProps<SwapDialogProps>(), {
@@ -958,6 +957,7 @@ const emit = defineEmits<SwapDialogEmits>()
 const kongStore = useKongStore()
 const icpswapStore = useICPSwapStore()
 const tacoStore = useTacoStore()
+const splitSwap = useSplitSwap()
 
 // State
 const selectedInputToken = ref<Token | null>(null)
@@ -965,6 +965,7 @@ const inputAmount = ref('')
 const showTokenSelector = ref(false)
 const quotes = ref<Quote[]>([])
 const selectedQuote = ref<Quote | null>(null)
+const executionPlan = ref<ExecutionPlan | null>(null)
 const loadingQuotes = ref(false)
 const quotesError = ref<string | null>(null)
 const quoteTimeout = ref<NodeJS.Timeout | null>(null)
@@ -999,6 +1000,9 @@ const availableTokens = computed(() => props.availableTokens)
 
 // Computed values
 const expectedOutput = computed(() => {
+  if (executionPlan.value) {
+    return formatBalance(executionPlan.value.totalExpectedOut, tacoToken.value.decimals)
+  }
   if (quotes.value.length === 0) return '0.0'
   const bestQuote = sortedQuotes.value[0]
   return formatBalance(bestQuote.amountOut, tacoToken.value.decimals)
@@ -1014,10 +1018,10 @@ const sortedQuotes = computed(() => {
 })
 
 const canProceed = computed(() => {
-  return selectedInputToken.value && 
-         inputAmount.value && 
-         parseFloat(inputAmount.value) > 0 && 
-         quotes.value.length > 0
+  return selectedInputToken.value &&
+         inputAmount.value &&
+         parseFloat(inputAmount.value) > 0 &&
+         executionPlan.value != null
 })
 
 // Methods
@@ -1081,96 +1085,56 @@ const fetchQuotes = async () => {
   if (!selectedInputToken.value || !inputAmount.value || parseFloat(inputAmount.value) <= 0) {
     quotes.value = []
     selectedQuote.value = null
+    executionPlan.value = null
     return
   }
 
   loadingQuotes.value = true
   quotesError.value = null
   quotes.value = []
+  executionPlan.value = null
 
   try {
     const amountIn = parseAmountToBigInt(inputAmount.value, selectedInputToken.value.decimals)
-    
-    // Fetch quotes from both exchanges in parallel
-    const [kongQuote, icpswapQuote] = await Promise.allSettled([
-      fetchKongQuote(amountIn),
-      fetchICPSwapQuote(amountIn)
-    ])
 
+    // Use split-swap engine: fetches 10 quotes per DEX (20 total) in parallel,
+    // evaluates all Kong/ICPSwap combinations, finds optimal split
+    const plan = await splitSwap.findBestExecution(
+      selectedInputToken.value.principal,
+      selectedInputToken.value.symbol,
+      tacoToken.value.principal,
+      'TACO',
+      amountIn,
+      Math.round(slippageTolerance.value * 10000)  // convert 0.01 → 100 basis points
+    )
+
+    executionPlan.value = plan
+
+    // Also populate legacy quotes array for display compatibility
+    // Show 100% single-exchange quotes for comparison
     const newQuotes: Quote[] = []
-
-    // Process Kong quote
-    if (kongQuote.status === 'fulfilled' && kongQuote.value) {
-      newQuotes.push(kongQuote.value)
+    const kong100 = plan.quotes.kong[9]
+    const icp100 = plan.quotes.icpswap[9]
+    if (kong100.out > 0n) {
+      newQuotes.push({
+        exchange: 'Kong', amountOut: kong100.out,
+        slippage: kong100.slipBP / 100, price: 0, fee: 0, rawData: null,
+      })
     }
-
-    // Process ICPSwap quote  
-    if (icpswapQuote.status === 'fulfilled' && icpswapQuote.value) {
-      newQuotes.push(icpswapQuote.value)
+    if (icp100.out > 0n) {
+      newQuotes.push({
+        exchange: 'ICPSwap', amountOut: icp100.out,
+        slippage: icp100.slipBP / 100, price: 0, fee: 0, rawData: null,
+      })
     }
-
     quotes.value = newQuotes
-    
-    // Reset selected quote when new quotes are fetched
     selectedQuote.value = null
 
-    if (newQuotes.length === 0) {
-      quotesError.value = 'No quotes available for this token pair'
-    }
-
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error fetching quotes:', error)
-    quotesError.value = 'Failed to fetch quotes'
+    quotesError.value = error.message || 'Failed to fetch quotes'
   } finally {
     loadingQuotes.value = false
-  }
-}
-
-const fetchKongQuote = async (amountIn: bigint): Promise<Quote | null> => {
-  try {
-    if (!selectedInputToken.value) return null
-    
-    const result = await kongStore.getQuote({
-      sellTokenSymbol: selectedInputToken.value.symbol,
-      buyTokenSymbol: 'TACO',
-      amountIn
-    })
-
-    return {
-      exchange: 'Kong',
-      amountOut: typeof result.receive_amount === 'bigint' ? result.receive_amount : BigInt(result.receive_amount),
-      slippage: result.slippage,
-      price: result.price,
-      fee: 0, // Kong doesn't have separate pool fees
-      rawData: result
-    }
-  } catch (error) {
-    console.error('Kong quote error:', error)
-    return null
-  }
-}
-
-const fetchICPSwapQuote = async (amountIn: bigint): Promise<Quote | null> => {
-  try {
-    if (!selectedInputToken.value) return null
-    
-    const result = await icpswapStore.getQuote({
-      sellTokenPrincipal: selectedInputToken.value.principal,
-      buyTokenPrincipal: tacoToken.value.principal,
-      amountIn
-    })
-
-    return {
-      exchange: 'ICPSwap',
-      amountOut: typeof result.amountOut === 'bigint' ? result.amountOut : BigInt(result.amountOut),
-      slippage: result.slippage,
-      price: result.effectivePrice,
-      fee: typeof result.fee === 'bigint' ? Number(result.fee) : result.fee,
-      rawData: result
-    }
-  } catch (error) {
-    console.error('ICPSwap quote error:', error)
-    return null
   }
 }
 
@@ -1192,16 +1156,13 @@ const setCustomSlippage = () => {
 }
 
 const proceedWithSwap = () => {
-  if (!canProceed.value || !selectedInputToken.value) return
-  
-  // Use selected quote if available, otherwise fall back to best quote
-  const quoteToUse = selectedQuote.value || sortedQuotes.value[0]
-  
+  if (!canProceed.value || !selectedInputToken.value || !executionPlan.value) return
+
   emit('confirm', {
     inputToken: selectedInputToken.value,
     outputToken: tacoToken.value,
     amount: inputAmount.value,
-    selectedQuote: quoteToUse,
+    executionPlan: executionPlan.value,
     slippageTolerance: slippageTolerance.value
   })
 }
@@ -1261,12 +1222,13 @@ const clearSwapData = () => {
   inputAmount.value = ''
   quotes.value = []
   selectedQuote.value = null
+  executionPlan.value = null
   loadingQuotes.value = false
   quotesError.value = null
   slippageTolerance.value = 0.01 // reset to default
   customSlippage.value = ''
   showTokenSelector.value = false
-  
+
   // clear any pending quote timeout
   if (quoteTimeout.value) {
     clearTimeout(quoteTimeout.value)

@@ -40,9 +40,8 @@ function isBrowser(): boolean {
   return typeof window !== 'undefined' && typeof localStorage !== 'undefined'
 }
 
-// Session-only storage for network override (not persisted to localStorage)
-// Only used in dev mode - resets on every page refresh
-let sessionNetworkOverride: 'ic' | 'staging' | 'local' | null = null
+// Network override — persisted to localStorage in dev/staging so it survives refreshes
+const NETWORK_OVERRIDE_KEY = 'taco_network_override'
 
 // DEV ONLY: Simulate stuck stake (skip ClaimOrRefresh step)
 let simulateStuckStakeEnabled = false
@@ -63,10 +62,14 @@ export function setSimulateStuckStake(enabled: boolean): void {
 
 /**
  * Get network override (for testing from local dev server)
- * Uses session-only storage (resets on refresh)
+ * Persisted to localStorage so it survives page refreshes
  */
 export function getNetworkOverride(): 'ic' | 'staging' | 'local' | null {
-  return sessionNetworkOverride ?? NETWORK_OVERRIDE_DEFAULT
+  if (isBrowser()) {
+    const stored = localStorage.getItem(NETWORK_OVERRIDE_KEY)
+    if (stored === 'ic' || stored === 'staging' || stored === 'local') return stored
+  }
+  return NETWORK_OVERRIDE_DEFAULT
 }
 
 // ============================================================================
@@ -141,15 +144,18 @@ export function debugLog(category: string, ...args: any[]): void {
 }
 
 /**
- * Set network override (session-only, not persisted)
+ * Set network override (persisted to localStorage)
  * Only works in dev mode via tacoConfig
  */
 export function setNetworkOverride(network: 'ic' | 'staging' | 'local' | null): void {
-  sessionNetworkOverride = network
-  if (network === null) {
-    console.log('[NetworkConfig] Network override cleared.')
-  } else {
-    console.log(`[NetworkConfig] Network set to "${network}".`)
+  if (isBrowser()) {
+    if (network === null) {
+      localStorage.removeItem(NETWORK_OVERRIDE_KEY)
+      console.log('[NetworkConfig] Network override cleared.')
+    } else {
+      localStorage.setItem(NETWORK_OVERRIDE_KEY, network)
+      console.log(`[NetworkConfig] Network set to "${network}" (persisted).`)
+    }
   }
 }
 
@@ -194,14 +200,24 @@ export function getEffectiveNetwork(): 'ic' | 'staging' | 'local' {
 
 /**
  * Whether the app is running in a dev/staging environment (for UI visibility decisions).
- * Unlike getEffectiveNetwork(), this correctly detects localhost/LAN as non-production.
+ * Checks actual deployment context (hostname, Vite flags) — NOT the data endpoint override.
+ * This means useMainnet() on local/staging only changes where data comes from,
+ * not which UI features are visible.
  */
 export function isDevEnvironment(): boolean {
-  const network = getEffectiveNetwork()
-  if (network === 'staging' || network === 'local') return true
+  // Vite dev server (npm run dev)
+  // @ts-ignore - import.meta.env is injected by Vite
+  if (typeof import.meta !== 'undefined' && import.meta.env?.DEV) {
+    return true
+  }
   if (isBrowser()) {
     const hostname = window.location.hostname
+    // Local development (localhost, 127.0.0.1, LAN)
     if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname.startsWith('192.')) {
+      return true
+    }
+    // Staging canister
+    if (hostname.includes('wxunf-maaaa-aaaab-qbzga-cai')) {
       return true
     }
   }
@@ -348,7 +364,7 @@ tacoConfig.simulateStuckStake(false)  - Disable stuck stake simulation
 tacoConfig.status()      - Show current configuration
 tacoConfig.help()        - Show this help
 
-Note: Settings are session-only (reset on page refresh).
+Note: Network settings persist across refreshes (stored in localStorage).
       `)
     },
   }

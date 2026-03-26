@@ -1435,6 +1435,7 @@ export const useTacoStore = defineStore('taco', () => {
     // const tacoWizardOpen = ref(false)
     const tacoWizardOpen = ref(false)
     const grandTourActive = ref(false)
+    const tourBypassAuth = ref(false) // true while tour is running, false before wizard prompt
 
     // user
     const userLoggedIn = ref(false)
@@ -2543,6 +2544,9 @@ export const useTacoStore = defineStore('taco', () => {
         tokenSellIdentifier?: string;
         tradeLimit?: string;
         tokenInitIdentifier?: string; }) => {
+
+        // Suppress toasts during Grand Tour to prevent overlap with dialog box
+        if (tourBypassAuth.value) return
 
         // add the toast to the array
         toasts.value.push(toast)
@@ -9102,6 +9106,7 @@ export const useTacoStore = defineStore('taco', () => {
         checkTokenSupportsICRC2,
         toggleTacoWizard,
         grandTourActive,
+        tourBypassAuth,
 
         //Wallet functions
         getUserRegisteredTokens,

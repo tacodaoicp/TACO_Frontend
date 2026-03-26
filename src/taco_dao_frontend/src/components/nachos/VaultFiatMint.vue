@@ -2,12 +2,6 @@
 
   <div class="vault-fiat-mint">
 
-    <!-- system paused banner -->
-    <div v-if="systemPaused" class="vault-fiat-mint__paused">
-      <i class="fa-solid fa-triangle-exclamation"></i>
-      System paused for maintenance. Purchases may be delayed.
-    </div>
-
     <!-- provider toggle -->
     <div class="vault-fiat-mint__provider-toggle">
       <button :class="['vault-fiat-mint__provider-btn', { active: selectedProvider === 'coinbase' }]"
@@ -51,85 +45,43 @@
     <!-- deposit address -->
     <div class="vault-fiat-mint__deposit-addr">
       <label class="vault-fiat-mint__label">Your ICP Address</label>
-      <code v-if="depositAddress" class="vault-fiat-mint__addr-value">{{ depositAddress }}</code>
-      <div v-else-if="addrError" class="vault-fiat-mint__addr-error">
-        <span>Failed to load address</span>
-        <button class="btn btn-sm taco-btn" @click="loadDashboard()">
-          <i class="fa-solid fa-arrows-rotate me-1"></i>Retry
-        </button>
-      </div>
+      <code v-if="userLedgerAccountId" class="vault-fiat-mint__addr-value">{{ userLedgerAccountId }}</code>
       <code v-else class="vault-fiat-mint__addr-value">
-        <i class="fa-solid fa-spinner fa-spin me-1"></i>Loading...
+        <i class="fa-solid fa-spinner fa-spin me-1"></i>Log in to see your address
       </code>
     </div>
 
     <!-- buy button -->
     <button class="btn taco-btn taco-btn--green w-100"
-            :disabled="isActive || !depositAddress || systemPaused"
+            :disabled="isActive || !userLedgerAccountId"
             @click="openBuy">
       <i v-if="isActive" class="fa-solid fa-spinner fa-spin me-2"></i>
       {{ buyButtonText }}
     </button>
 
-    <!-- progress tracker -->
-    <div v-if="showProgress" class="vault-fiat-mint__progress-section">
+    <!-- Manual mint button (when ICP detected and idle) -->
+    <div v-if="icpDetected && mintPhase === 'idle'" class="vault-fiat-mint__detected">
+      <div class="vault-fiat-mint__detected-banner">
+        <i class="fa-solid fa-check-circle me-2"></i>
+        <strong>ICP Detected:</strong> {{ formatE8s(detectedIcpAmount) }} ICP
+      </div>
+      <button class="btn taco-btn taco-btn--green w-100"
+              @click="confirmMint">
+        <i class="fa-solid fa-coins me-2"></i>
+        Mint NACHOS
+      </button>
+    </div>
+
+    <!-- Progress tracker -->
+    <div v-if="mintPhase !== 'idle'" class="vault-fiat-mint__progress-section">
       <SwapProgressTracker
-        :steps="NACHOS_STEPS"
+        :steps="NACHOS_MINT_STEPS"
         :current-step="currentStep"
         :status="trackerStatus"
         :status-message="statusMessage"
-        :retry-count="nachosProgress ? Number(nachosProgress.retryCount) : 0"
-        :max-retries="MAX_RETRIES"
-        :error-message="progressError || phaseError"
+        :error-message="mintPhase === 'error' ? mintError : null"
         :amounts="progressAmounts"
-        :elapsed="elapsed"
       />
-    </div>
-
-    <!-- claim section -->
-    <div v-if="!isActive" class="vault-fiat-mint__claim">
-      <p class="vault-fiat-mint__claim-desc">
-        If your purchase completed but NACHOS was not delivered automatically,
-        use this button to trigger a manual claim.
-      </p>
-      <button class="btn taco-btn taco-btn--green"
-              :disabled="claiming"
-              @click="claimNachos">
-        <i v-if="claiming" class="fa-solid fa-spinner fa-spin me-2"></i>
-        {{ claiming ? 'Claiming...' : 'Claim NACHOS' }}
-      </button>
-      <div v-if="claimResult"
-           class="vault-fiat-mint__claim-result"
-           :class="claimResult.success ? 'vault-fiat-mint__claim-result--success' : 'vault-fiat-mint__claim-result--error'">
-        {{ claimResult.message }}
-      </div>
-    </div>
-
-    <!-- order history -->
-    <div v-if="orderHistory.length > 0" class="vault-fiat-mint__history">
-      <h4 class="vault-fiat-mint__history-title">Fiat Order History</h4>
-      <table class="vault-fiat-mint__table">
-        <thead>
-          <tr>
-            <th>Date</th>
-            <th class="text-end">Fiat</th>
-            <th class="text-end">ICP In</th>
-            <th class="text-end">NACHOS Out</th>
-            <th class="text-end">NAV</th>
-            <th class="text-end">Fee</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="order in orderHistory" :key="Number(order.id)">
-            <td>{{ formatTimestamp(order.timestamp) }}</td>
-            <td class="text-end">{{ formatFiat(order.fiatAmount, order.fiatCurrency) }}</td>
-            <td class="text-end">{{ formatE8s(order.icpDeposited) }}</td>
-            <td class="text-end">{{ formatE8s(order.nachosReceived) }}</td>
-            <td class="text-end">{{ formatE8s(order.navUsed) }}</td>
-            <td class="text-end">{{ formatE8s(order.feeICP) }}</td>
-          </tr>
-        </tbody>
-      </table>
     </div>
 
   </div>
@@ -138,19 +90,21 @@
 
 <script setup lang="ts">
 
-import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
+import { ref, computed, onBeforeUnmount, watch } from 'vue'
 import { useTacoStore } from '../../stores/taco.store'
+import { useNachosStore } from '../../stores/nachos.store'
 import { storeToRefs } from 'pinia'
 import { Principal } from '@dfinity/principal'
 import { signedSessionHeaders } from '../../utils/sign-session-request'
+import { isDevEnvironment } from '../../config/network-config'
 import SwapProgressTracker from '../misc/SwapProgressTracker.vue'
 import type { ProgressStep, ProgressAmount } from '../misc/SwapProgressTracker.vue'
-import type { SwapDashboard, NachosSwapProgress, NachosOrderRecord } from '../../../../declarations/taco_swap/taco_swap.did'
 
 const emit = defineEmits<{ (e: 'operation-complete'): void }>()
 
 const tacoStore = useTacoStore()
-const { userPrincipal } = storeToRefs(tacoStore)
+const nachosStore = useNachosStore()
+const { userPrincipal, userLedgerAccountId } = storeToRefs(tacoStore)
 
 ///////////////
 // constants //
@@ -160,153 +114,109 @@ const COINBASE_SESSION_WORKER = 'https://taco-onramp-session.xykominos.workers.d
 const TRANSAK_API_KEY = 'fac6ce0c-2b65-4982-a2e3-42e1c5fa15dc'
 const TRANSAK_BASE_URL = 'https://global-stg.transak.com'
 const TACO_BRAND_COLOR = 'DA8D28'
-const MAX_RETRIES = 3
-const POLL_ACTIVE_MS = 2_000
-const POLL_PENDING_MS = 10_000
 const DEPOSIT_POLL_MS = 3_000
 const MAX_POLL_DURATION_MS = 1_200_000
 const ICP_LEDGER_CANISTER_ID = 'ryjl3-tyaaa-aaaaa-aaaba-cai'
 const DEPOSIT_MIN_E8S = 10_000n
 
-const NACHOS_STEPS: ProgressStep[] = [
-  { key: 'deposit',  label: 'Fund Wallet',        description: 'ICP arriving at your address',                   activeDescription: 'Watching for your ICP deposit...' },
-  { key: 'treasury', label: 'Treasury Transfer',  description: 'Moving ICP to the NACHOS treasury',             activeDescription: 'Transferring ICP to treasury...' },
-  { key: 'minting',  label: 'Mint NACHOS',        description: 'Minting NACHOS tokens based on current NAV',    activeDescription: 'Minting your NACHOS...' },
-  { key: 'done',     label: 'Complete',            description: 'NACHOS delivered to your wallet',               activeDescription: 'Done!' },
-]
-
 ///////////
 // state //
 ///////////
 
-type UIPhase = 'idle' | 'registering' | 'polling' | 'success' | 'error'
+type MintPhase = 'idle' | 'detecting' | 'minting' | 'complete' | 'error'
 type Provider = 'coinbase' | 'transak'
 
 const selectedProvider = ref<Provider>('coinbase')
 const fiatAmount = ref('50')
 const fiatCurrency = ref('EUR')
 
-const phase = ref<UIPhase>('idle')
-const phaseError = ref<string | null>(null)
-const nachosProgress = ref<NachosSwapProgress | null>(null)
-const depositAddress = ref('')
+const mintPhase = ref<MintPhase>('idle')
+const mintStep = ref('')
+const mintError = ref('')
+const completionMessage = ref('')
 const depositBalance = ref<bigint>(0n)
-const orderHistory = ref<NachosOrderRecord[]>([])
-const systemPaused = ref(false)
-const claiming = ref(false)
-const claimResult = ref<{ success: boolean; message: string } | null>(null)
-
-// Deposit subaccount (from get_full_swap_state)
-const depositSubaccount = ref<Uint8Array | null>(null)
+const baselineBalance = ref<bigint>(0n)
+const icpDetected = ref(false)
+const detectedIcpAmount = ref<bigint>(0n)
 
 // Transak SDK ref
 let transakInstance: any = null
 
 // Polling
 let depositPollInterval: ReturnType<typeof setInterval> | null = null
-let unifiedPollInterval: ReturnType<typeof setInterval> | null = null
-let currentPollRate = 0
-
-// Elapsed timer
-const startTime = ref<number | null>(null)
-const elapsed = ref(0)
-let elapsedInterval: ReturnType<typeof setInterval> | null = null
 
 //////////////
 // computed //
 //////////////
 
 const isActive = computed(() =>
-  phase.value === 'registering' || phase.value === 'polling'
+  mintPhase.value === 'detecting' || mintPhase.value === 'minting'
 )
-
-const showProgress = computed(() =>
-  phase.value !== 'idle'
-)
-
-const isDepositPolling = computed(() =>
-  phase.value === 'polling' && depositPollInterval !== null
-)
-
-const currentStep = computed(() => {
-  if (!nachosProgress.value) {
-    if (isDepositPolling.value) return 0
-    return -1
-  }
-  return Number(nachosProgress.value.stepNumber)
-})
-
-const isComplete = computed(() =>
-  nachosProgress.value != null && 'Complete' in nachosProgress.value.step
-)
-
-const isFailed = computed(() =>
-  nachosProgress.value != null && 'Failed' in nachosProgress.value.step
-)
-
-const progressIcp = computed(() => {
-  const amt = nachosProgress.value?.icpAmount
-  return amt && amt.length > 0 ? formatE8s(amt[0] as bigint) : null
-})
-
-const progressEstimated = computed(() => {
-  const amt = nachosProgress.value?.estimatedNachos
-  return amt && amt.length > 0 ? formatE8s(amt[0] as bigint) : null
-})
-
-const progressActual = computed(() => {
-  const amt = nachosProgress.value?.actualNachos
-  return amt && amt.length > 0 ? formatE8s(amt[0] as bigint) : null
-})
-
-const progressError = computed(() => {
-  const msg = nachosProgress.value?.errorMessage
-  return msg && msg.length > 0 ? (msg[0] as string) : null
-})
-
-const trackerStatus = computed<'idle' | 'active' | 'complete' | 'failed'>(() => {
-  if (phase.value === 'success' || isComplete.value) return 'complete'
-  if (phase.value === 'error' || isFailed.value) return 'failed'
-  if (isActive.value) return 'active'
-  return 'idle'
-})
-
-const progressAmounts = computed<ProgressAmount[]>(() => {
-  const items: ProgressAmount[] = []
-  if (fiatAmount.value && isActive.value) items.push({ label: 'Fiat paid', value: `${fiatAmount.value} ${fiatCurrency.value}` })
-  if (progressIcp.value) items.push({ label: 'ICP deposited', value: `${progressIcp.value} ICP` })
-  if (progressEstimated.value && !isComplete.value) items.push({ label: 'Estimated NACHOS', value: `~${progressEstimated.value}` })
-  if (progressActual.value) items.push({ label: 'NACHOS received', value: `${progressActual.value} NACHOS`, highlight: true })
-  return items
-})
 
 const buyButtonText = computed(() => {
-  if (systemPaused.value) return 'System Paused'
-  if (phase.value === 'registering') return 'Starting...'
-  if (phase.value === 'polling') {
-    if (isDepositPolling.value) return 'Waiting for ICP...'
-    if (nachosProgress.value) {
-      const step = nachosProgress.value.step
-      if ('NotStarted' in step) return 'Waiting for ICP...'
-      if ('DepositReceived' in step) return 'Deposit received...'
-      if ('TransferringToTreasury' in step) return 'Transferring...'
-      if ('MintingNachos' in step) return 'Minting...'
-      return 'Processing...'
-    }
-  }
+  if (mintPhase.value === 'detecting') return 'Waiting for ICP...'
+  if (mintPhase.value === 'minting') return 'Minting NACHOS...'
   return `Fund via ${selectedProvider.value === 'coinbase' ? 'Coinbase' : 'Transak'}`
 })
 
-const statusMessage = computed(() => {
-  if (phase.value === 'registering') return 'Starting NACHOS mint...'
-  if (isDepositPolling.value) {
-    if (depositBalance.value > 0n) return `ICP deposit detected: ${formatE8s(depositBalance.value)} ICP — claiming...`
-    return 'Waiting for ICP deposit...'
+/////////////////////////////
+// progress tracker state  //
+/////////////////////////////
+
+const NACHOS_MINT_STEPS: ProgressStep[] = [
+  { key: 'fund', label: 'Fund Wallet', description: 'ICP deposited to your wallet', activeDescription: 'Waiting for ICP deposit...' },
+  { key: 'mint', label: 'Mint NACHOS', description: 'NACHOS minted at current NAV', activeDescription: 'Depositing ICP and minting...' },
+  { key: 'done', label: 'Complete', description: 'NACHOS in your wallet' },
+]
+
+const errorAtStep = ref(0)
+
+watch(mintPhase, (newVal, oldVal) => {
+  if (newVal === 'error') {
+    switch (oldVal) {
+      case 'detecting': errorAtStep.value = 0; break
+      case 'minting': errorAtStep.value = 1; break
+      default: errorAtStep.value = 0
+    }
   }
-  if (nachosProgress.value && phase.value !== 'idle') return nachosProgress.value.description
-  if (phase.value === 'error') return phaseError.value || 'An error occurred.'
-  if (phase.value === 'success') return 'NACHOS delivered to your wallet!'
+})
+
+const currentStep = computed(() => {
+  switch (mintPhase.value) {
+    case 'detecting': return 0
+    case 'minting': return 1
+    case 'complete': return 2
+    case 'error': return errorAtStep.value
+    default: return 0
+  }
+})
+
+const trackerStatus = computed((): 'idle' | 'active' | 'complete' | 'failed' => {
+  switch (mintPhase.value) {
+    case 'detecting':
+    case 'minting': return 'active'
+    case 'complete': return 'complete'
+    case 'error': return 'failed'
+    default: return 'idle'
+  }
+})
+
+const statusMessage = computed(() => {
+  if (mintPhase.value === 'complete') return completionMessage.value
+  if (mintStep.value && mintPhase.value === 'minting') return mintStep.value
   return ''
+})
+
+const progressAmounts = computed((): ProgressAmount[] => {
+  const amounts: ProgressAmount[] = []
+  if (detectedIcpAmount.value > 0n || depositBalance.value > 0n) {
+    const amt = detectedIcpAmount.value > 0n ? detectedIcpAmount.value : depositBalance.value
+    amounts.push({ label: 'ICP Amount', value: `${formatE8s(amt)} ICP` })
+  }
+  if (mintPhase.value === 'complete' && completionMessage.value) {
+    amounts.push({ label: 'Result', value: completionMessage.value, highlight: true })
+  }
+  return amounts
 })
 
 /////////////
@@ -320,63 +230,10 @@ const formatE8s = (e8s: bigint): string => {
   return fracStr ? `${whole}.${fracStr}` : whole.toString()
 }
 
-const formatTimestamp = (ns: bigint): string => {
-  const ms = Number(ns / 1_000_000n)
-  return new Date(ms).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
-}
-
-const formatFiat = (amount: [] | [string], currency: [] | [string]): string => {
-  const a = amount?.[0]
-  const c = currency?.[0]
-  if (!a) return '—'
-  return c ? `${a} ${c}` : a
-}
-
 const generateOrderId = (): string => {
   const ts = Date.now().toString(36)
   const rand = Math.random().toString(36).substring(2, 8)
   return `nachos-${ts}-${rand}`
-}
-
-//////////////////
-// elapsed time //
-//////////////////
-
-const startElapsedTimer = () => {
-  if (elapsedInterval) return
-  startTime.value = Date.now()
-  elapsed.value = 0
-  elapsedInterval = setInterval(() => {
-    if (startTime.value != null && isActive.value) {
-      elapsed.value = Math.floor((Date.now() - startTime.value) / 1000)
-    } else {
-      stopElapsedTimer()
-    }
-  }, 1000)
-}
-
-const stopElapsedTimer = () => {
-  if (elapsedInterval) {
-    clearInterval(elapsedInterval)
-    elapsedInterval = null
-  }
-}
-
-/////////////////
-// data loading //
-/////////////////
-
-const addrError = ref(false)
-
-/** Load canister config (system paused state) — anonymous, works pre-login */
-const loadConfig = async () => {
-  try {
-    const actor = await tacoStore.createTacoSwapActorAnonymous()
-    const config = await (actor as any).get_config()
-    systemPaused.value = config.systemPaused
-  } catch (err) {
-    console.error('Failed to load swap config:', err)
-  }
 }
 
 ////////////////////
@@ -412,21 +269,36 @@ const buildTransakUrl = (addr: string): string => {
   return `${TRANSAK_BASE_URL}?${params.toString()}`
 }
 
+/** Record baseline ICP balance before opening onramp */
+const recordBaseline = async () => {
+  try {
+    const balance = await tacoStore.icrc1BalanceOf(
+      ICP_LEDGER_CANISTER_ID,
+      Principal.fromText(userPrincipal.value),
+      new Uint8Array(32)
+    )
+    baselineBalance.value = balance !== false ? BigInt(balance) : 0n
+  } catch {
+    baselineBalance.value = 0n
+  }
+}
+
 const openCoinbase = async () => {
-  if (!depositAddress.value) {
-    phaseError.value = 'Deposit address not loaded. Please refresh and try again.'
-    phase.value = 'error'
+  if (!userLedgerAccountId.value) {
+    mintError.value = 'Not logged in. Please log in first.'
+    mintPhase.value = 'error'
     return
   }
 
-  phase.value = 'registering'
-  phaseError.value = null
-  claimResult.value = null
-  nachosProgress.value = null
+  mintPhase.value = 'detecting'
+  mintError.value = ''
+  completionMessage.value = ''
 
   try {
+    await recordBaseline()
+
     const sessionBody = {
-      addresses: [{ address: depositAddress.value }],
+      addresses: [{ address: userLedgerAccountId.value }],
       assets: ['ICP'],
     }
     const resp = await fetch(COINBASE_SESSION_WORKER, {
@@ -443,14 +315,12 @@ const openCoinbase = async () => {
     const { generateOnRampURL } = await import('@coinbase/cbpay-js')
     const onrampUrl = generateOnRampURL({
       sessionToken,
-      addresses: { [depositAddress.value]: [] },
+      addresses: { [userLedgerAccountId.value]: [] },
       assets: ['ICP'],
       presetFiatAmount: Number(fiatAmount.value) || 50,
       theme: 'dark',
     })
 
-    phase.value = 'polling'
-    startElapsedTimer()
     const popup = window.open(onrampUrl, 'coinbase-onramp', 'width=500,height=700,scrollbars=yes,resizable=yes')
     startDepositPolling()
 
@@ -463,29 +333,27 @@ const openCoinbase = async () => {
 
   } catch (err: any) {
     console.error('Failed to open Coinbase Onramp (NACHOS vault):', err)
-    phase.value = 'error'
-    phaseError.value = `Failed to open payment widget: ${err.message || err}`
+    mintPhase.value = 'error'
+    mintError.value = `Failed to open payment widget: ${err.message || err}`
   }
 }
 
 const openTransak = async () => {
-  if (!depositAddress.value) {
-    phaseError.value = 'Deposit address not loaded. Please refresh and try again.'
-    phase.value = 'error'
+  if (!userLedgerAccountId.value) {
+    mintError.value = 'Not logged in. Please log in first.'
+    mintPhase.value = 'error'
     return
   }
 
-  phase.value = 'registering'
-  phaseError.value = null
-  claimResult.value = null
-  nachosProgress.value = null
+  mintPhase.value = 'detecting'
+  mintError.value = ''
+  completionMessage.value = ''
 
   try {
-    phase.value = 'polling'
-    startElapsedTimer()
+    await recordBaseline()
 
     const { Transak } = await import('@transak/ui-js-sdk')
-    const widgetUrl = buildTransakUrl(depositAddress.value)
+    const widgetUrl = buildTransakUrl(userLedgerAccountId.value)
     transakInstance = new Transak({ widgetUrl })
     transakInstance.init()
     startDepositPolling()
@@ -508,8 +376,8 @@ const openTransak = async () => {
 
   } catch (err: any) {
     console.error('Failed to initialize Transak (vault NACHOS):', err)
-    phase.value = 'error'
-    phaseError.value = `Failed to open payment widget: ${err.message || err}`
+    mintPhase.value = 'error'
+    mintError.value = `Failed to open payment widget: ${err.message || err}`
   }
 }
 
@@ -518,119 +386,58 @@ const openTransak = async () => {
 ////////////////////
 
 const handlePopupClose = () => {
-  if (phase.value === 'polling' && nachosProgress.value) {
-    const step = nachosProgress.value.step
-    if ('NotStarted' in step || 'WaitingForDeposit' in step) {
-      setTimeout(() => {
-        if (phase.value === 'polling' && nachosProgress.value) {
-          const cur = nachosProgress.value.step
-          if ('NotStarted' in cur || 'WaitingForDeposit' in cur) {
-            phase.value = 'idle'
-            nachosProgress.value = null
-            stopDepositPolling()
-            maybeStopPolling()
-          }
-        }
-      }, 300_000)
-    }
-  } else if (phase.value === 'polling' && !nachosProgress.value) {
+  // If still detecting and no deposit found, keep polling for 5 minutes then give up
+  if (mintPhase.value === 'detecting') {
     setTimeout(() => {
-      if (phase.value === 'polling' && !nachosProgress.value) {
-        phase.value = 'idle'
+      if (mintPhase.value === 'detecting') {
+        mintPhase.value = 'idle'
         stopDepositPolling()
-        maybeStopPolling()
       }
     }, 300_000)
   }
 }
 
 /////////////////////
-// claim handler   //
-/////////////////////
-
-const handleClaimResult = (result: any): boolean => {
-  if ('Success' in result) {
-    const { nachosAmount, mintId, orderId: oid } = result.Success
-    phase.value = 'success'
-    claimResult.value = {
-      success: true,
-      message: `Received ${formatE8s(nachosAmount)} NACHOS! (mint: ${mintId}, order: ${oid})`
-    }
-    refreshOrders().catch(console.error)
-    emit('operation-complete')
-    return true
-  }
-  if ('NoDeposit' in result) return false
-  if ('AlreadyProcessing' in result) return false
-  if ('BelowMinimum' in result) {
-    const { balance, minimum } = result.BelowMinimum
-    phase.value = 'error'
-    phaseError.value = `Deposit too small: ${formatE8s(balance)} ICP (min: ${formatE8s(minimum)} ICP)`
-    return true
-  }
-  if ('MintFailed' in result) {
-    phaseError.value = `Mint failed: ${result.MintFailed}. Will auto-retry.`
-    return false
-  }
-  if ('SystemPaused' in result) {
-    phase.value = 'error'
-    phaseError.value = 'System paused. Your ICP is safe.'
-    return true
-  }
-  if ('RateLimited' in result) return false
-  if ('NotAuthorized' in result) {
-    phase.value = 'error'
-    phaseError.value = 'Not authorized. Please log in again.'
-    return true
-  }
-  return false
-}
-
-/////////////////////
 // deposit polling //
 /////////////////////
 
+/** Poll user's personal ICP wallet for balance increase, then auto-mint */
 const startDepositPolling = () => {
   stopDepositPolling()
   const startedAt = Date.now()
-  const swapCanisterId = tacoStore.tacoSwapCanisterId()
 
   depositPollInterval = setInterval(async () => {
     if (Date.now() - startedAt > MAX_POLL_DURATION_MS) {
       stopDepositPolling()
-      if (phase.value === 'polling') {
-        phase.value = 'error'
-        phaseError.value = 'Timed out waiting for ICP deposit.'
+      if (mintPhase.value === 'detecting') {
+        mintPhase.value = 'error'
+        mintError.value = 'Timed out waiting for ICP deposit.'
       }
       return
     }
 
-    if (!depositSubaccount.value) return
+    try {
+      const balance = await tacoStore.icrc1BalanceOf(
+        ICP_LEDGER_CANISTER_ID,
+        Principal.fromText(userPrincipal.value),
+        new Uint8Array(32)
+      )
 
-    const balance = await tacoStore.icrc1BalanceOf(
-      ICP_LEDGER_CANISTER_ID,
-      Principal.fromText(swapCanisterId),
-      depositSubaccount.value instanceof Uint8Array ? depositSubaccount.value : new Uint8Array(depositSubaccount.value)
-    )
+      if (balance === false) return
 
-    if (balance === false) return
+      const currentBalance = BigInt(balance)
+      const diff = currentBalance - baselineBalance.value
 
-    const balanceBigInt = BigInt(balance)
-    depositBalance.value = balanceBigInt
-
-    if (balanceBigInt > DEPOSIT_MIN_E8S) {
-      stopDepositPolling()
-      try {
-        const actor = await tacoStore.createTacoSwapActor()
-        const result = await (actor as any).claim_nachos(0n, [fiatAmount.value], [fiatCurrency.value])
-        const done = handleClaimResult(result)
-        if (!done && phase.value === 'polling') {
-          startUnifiedPolling(POLL_ACTIVE_MS)
-        }
-      } catch (err) {
-        console.error('Auto-claim NACHOS (vault fiat) failed:', err)
-        startUnifiedPolling(POLL_ACTIVE_MS)
+      if (diff > DEPOSIT_MIN_E8S) {
+        depositBalance.value = diff
+        stopDepositPolling()
+        // Show confirmation button — user must manually trigger mint (compliance)
+        icpDetected.value = true
+        detectedIcpAmount.value = diff
+        mintPhase.value = 'idle'
       }
+    } catch (err) {
+      console.error('Deposit poll error (vault fiat):', err)
     }
   }, DEPOSIT_POLL_MS)
 }
@@ -643,192 +450,32 @@ const stopDepositPolling = () => {
 }
 
 /////////////////////
-// unified polling //
+// mint execution  //
 /////////////////////
 
-const startUnifiedPolling = (intervalMs: number) => {
-  if (unifiedPollInterval && intervalMs >= currentPollRate) return
-  stopUnifiedPolling()
-  currentPollRate = intervalMs
-  const startedAt = Date.now()
-
-  unifiedPollInterval = setInterval(async () => {
-    if (Date.now() - startedAt > MAX_POLL_DURATION_MS) {
-      stopUnifiedPolling()
-      if (phase.value === 'polling') {
-        phase.value = 'error'
-        phaseError.value = 'Mint timed out. You can try the manual "Claim NACHOS" button below.'
-      }
-      return
-    }
-
-    try {
-      const actor = await tacoStore.createTacoSwapActor()
-      const db: SwapDashboard = await (actor as any).getSwapDashboard()
-
-      if (phase.value === 'polling') {
-        nachosProgress.value = db.nachosStatus
-        const step = db.nachosStatus.step
-
-        if ('Complete' in step) {
-          phase.value = 'success'
-          orderHistory.value = db.recentNachosOrders
-          emit('operation-complete')
-          maybeStopPolling()
-          return
-        }
-
-        if ('Failed' in step && !db.hasPendingNachos) {
-          phase.value = 'error'
-          phaseError.value = progressError.value
-            || 'Mint failed. Use the manual Claim button or contact support.'
-          maybeStopPolling()
-          return
-        }
-      }
-    } catch (err) {
-      console.error('Error polling swap dashboard (vault fiat):', err)
-    }
-  }, intervalMs)
+/** User confirmed — kick off the mint */
+const confirmMint = () => {
+  if (!icpDetected.value || detectedIcpAmount.value === 0n) return
+  const amount = detectedIcpAmount.value
+  icpDetected.value = false
+  detectedIcpAmount.value = 0n
+  executeMint(amount)
 }
 
-const maybeStopPolling = () => {
-  if (phase.value !== 'polling') {
-    stopUnifiedPolling()
-  }
-}
-
-const stopUnifiedPolling = () => {
-  if (unifiedPollInterval) {
-    clearInterval(unifiedPollInterval)
-    unifiedPollInterval = null
-    currentPollRate = 0
-  }
-}
-
-/////////////////////////
-// dashboard loading   //
-/////////////////////////
-
-/**
- * Load all swap data from a single getSwapDashboard() query.
- * Populates address, orders, config, subaccount, and evaluates NACHOS phase state.
- */
-const loadDashboard = async () => {
-  addrError.value = false
+const executeMint = async (amount: bigint) => {
+  mintPhase.value = 'minting'
+  mintStep.value = 'Depositing ICP to treasury...'
 
   try {
-    const actor = await tacoStore.createTacoSwapActor()
-    const db: SwapDashboard = await (actor as any).getSwapDashboard()
-
-    // --- Populate state ---
-    depositAddress.value = db.nachosDepositAddress
-    orderHistory.value = db.recentNachosOrders
-    systemPaused.value = db.config.systemPaused
-
-    depositSubaccount.value = db.nachosDepositSubaccount instanceof Uint8Array
-      ? db.nachosDepositSubaccount
-      : new Uint8Array(db.nachosDepositSubaccount)
-
-    // --- NACHOS phase evaluation ---
-    const step = db.nachosStatus.step
-    const isNotStarted = 'NotStarted' in step
-    const isWaiting = 'WaitingForDeposit' in step
-    const isComplete_ = 'Complete' in step
-    const isFailed_ = 'Failed' in step
-
-    const isStale = !db.hasActiveLock && !db.hasPendingNachos
-      && (isNotStarted || isWaiting)
-
-    if (isStale) {
-      // idle
-    } else if (isComplete_) {
-      const updatedMs = Number(db.nachosStatus.updatedAt / 1_000_000n)
-      if (Date.now() - updatedMs < 300_000) {
-        nachosProgress.value = db.nachosStatus
-        phase.value = 'success'
-      }
-    } else if (isFailed_ && !db.hasPendingNachos) {
-      nachosProgress.value = db.nachosStatus
-      phase.value = 'error'
-      phaseError.value = db.nachosStatus.errorMessage.length > 0
-        ? (db.nachosStatus.errorMessage[0] as string)
-        : 'Mint failed. Use the manual Claim button.'
-    } else if (isFailed_ && db.hasPendingNachos) {
-      nachosProgress.value = db.nachosStatus
-      phase.value = 'polling'
-      startElapsedTimer()
-      startUnifiedPolling(POLL_PENDING_MS)
-    } else if (isWaiting && db.hasActiveLock) {
-      nachosProgress.value = db.nachosStatus
-      phase.value = 'polling'
-      startElapsedTimer()
-      startDepositPolling()
-    } else if (!isNotStarted && !isWaiting) {
-      nachosProgress.value = db.nachosStatus
-      phase.value = 'polling'
-      startElapsedTimer()
-      startUnifiedPolling(POLL_ACTIVE_MS)
-    }
-  } catch (err) {
-    console.error('Failed to load swap dashboard (vault fiat):', err)
-    if (!depositAddress.value) addrError.value = true
-  }
-}
-
-/**
- * Refresh only order history from the dashboard.
- * Called after successful claims — does NOT re-evaluate phase state.
- */
-const refreshOrders = async () => {
-  try {
-    const actor = await tacoStore.createTacoSwapActor()
-    const db: SwapDashboard = await (actor as any).getSwapDashboard()
-    orderHistory.value = db.recentNachosOrders
-  } catch (err) {
-    console.error('Failed to refresh orders:', err)
-  }
-}
-
-///////////////////
-// manual claim  //
-///////////////////
-
-const claimNachos = async () => {
-  claiming.value = true
-  claimResult.value = null
-
-  try {
-    const actor = await tacoStore.createTacoSwapActor()
-    const result = await (actor as any).claim_nachos(0n, [fiatAmount.value], [fiatCurrency.value])
-
-    const done = handleClaimResult(result)
-
-    if (!done) {
-      if ('NoDeposit' in result) {
-        claimResult.value = {
-          success: false,
-          message: 'No pending ICP found. If you recently paid, please wait a few minutes for the ICP to arrive.'
-        }
-      } else if ('AlreadyProcessing' in result) {
-        claimResult.value = {
-          success: false,
-          message: 'A mint is already in progress for your account. Please wait a moment.'
-        }
-      } else if ('RateLimited' in result) {
-        claimResult.value = {
-          success: false,
-          message: 'Too many requests. Please wait a minute before trying again.'
-        }
-      }
-    }
+    const result = await nachosStore.mintWithICP(amount)
+    mintPhase.value = 'complete'
+    const mintId = result?.mintId != null ? ` (mint #${result.mintId})` : ''
+    completionMessage.value = `NACHOS minted successfully!${mintId}`
+    emit('operation-complete')
   } catch (err: any) {
-    claimResult.value = {
-      success: false,
-      message: `Claim error: ${err.message || err}`
-    }
-  } finally {
-    claiming.value = false
+    console.error('NACHOS mint failed (vault fiat):', err)
+    mintPhase.value = 'error'
+    mintError.value = `Mint failed: ${err.message || err}`
   }
 }
 
@@ -836,31 +483,40 @@ const claimNachos = async () => {
 // lifecycle //
 ///////////////
 
-onMounted(async () => {
-  loadConfig().catch(console.error)
-  if (tacoStore.userLoggedIn) {
-    loadDashboard().catch(console.error)
+/** Check if user already has ICP above threshold (for manual mint) */
+const checkExistingBalance = async () => {
+  if (!userPrincipal.value) return
+  try {
+    const balance = await tacoStore.icrc1BalanceOf(
+      ICP_LEDGER_CANISTER_ID,
+      Principal.fromText(userPrincipal.value),
+      new Uint8Array(32)
+    )
+    if (balance !== false) {
+      const bal = BigInt(balance)
+      if (bal > DEPOSIT_MIN_E8S) {
+        icpDetected.value = true
+        detectedIcpAmount.value = bal
+      }
+    }
+  } catch {
+    // Ignore
   }
-})
+}
 
-watch(() => tacoStore.userLoggedIn, (loggedIn) => {
+watch(() => tacoStore.userLoggedIn, async (loggedIn) => {
   if (loggedIn) {
-    loadDashboard().catch(console.error)
+    await checkExistingBalance()
   } else {
-    depositAddress.value = ''
-    orderHistory.value = []
-    nachosProgress.value = null
-    phase.value = 'idle'
+    mintPhase.value = 'idle'
+    icpDetected.value = false
+    detectedIcpAmount.value = 0n
     stopDepositPolling()
-    stopUnifiedPolling()
-    stopElapsedTimer()
   }
 })
 
 onBeforeUnmount(() => {
   stopDepositPolling()
-  stopUnifiedPolling()
-  stopElapsedTimer()
   if (transakInstance && typeof transakInstance.close === 'function') {
     transakInstance.close()
   }
@@ -986,6 +642,58 @@ onBeforeUnmount(() => {
   // progress section
   &__progress-section {
     margin-top: 0.25rem;
+  }
+
+  &__status {
+    padding: 0.5rem 0.75rem;
+    border-radius: 0.375rem;
+    font-family: 'Space Mono', monospace;
+    font-size: 0.75rem;
+    background: rgba(128, 128, 128, 0.08);
+    border: 1px solid rgba(128, 128, 128, 0.15);
+    display: flex;
+    align-items: center;
+
+    &--success {
+      background: rgba(76, 175, 80, 0.12);
+      border-color: var(--success-green);
+      color: var(--success-green);
+    }
+
+    &--error {
+      background: rgba(244, 67, 54, 0.12);
+      border-color: var(--red);
+      color: var(--red);
+    }
+  }
+
+  &__status-detail {
+    margin-left: 0.25rem;
+    opacity: 0.8;
+  }
+
+  // ICP detected confirmation
+  &__detected {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  &__detected-banner {
+    padding: 0.5rem 0.75rem;
+    background: rgba(76, 175, 80, 0.12);
+    border: 1px solid var(--success-green);
+    border-radius: 0.375rem;
+    color: var(--success-green);
+    font-family: 'Space Mono', monospace;
+    font-size: 0.75rem;
+    font-weight: 600;
+  }
+
+  &__detected-hint {
+    font-size: 0.65rem;
+    opacity: 0.7;
+    text-align: center;
   }
 
   // claim

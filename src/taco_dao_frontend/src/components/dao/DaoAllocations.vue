@@ -1,6 +1,6 @@
 <template>
 
-    <div class="dao-allocations">
+    <div id="dao-allocations" class="dao-allocations">
 
         <!-- dao allocations loading curtain -->
         <div v-if="componentLoading" class="taco-loading-curtain dao-allocations__loading-curtain">

@@ -114,7 +114,7 @@ const faceMarkup = computed(() => {
   bottom: 0;
   width: 10rem;
   height: 14rem;
-  z-index: 100001;
+  z-index: 1;
   pointer-events: none;
   transition: left 0.5s ease, right 0.5s ease, opacity 0.3s ease;
 

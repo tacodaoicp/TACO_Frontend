@@ -176,7 +176,7 @@ $bg-color: rgba(10, 10, 20, 0.92);
   bottom: 0;
   left: 0;
   right: 0;
-  z-index: 100002;
+  z-index: 3;
   padding: 1rem;
   opacity: 0;
   transform: translateY(20px);
