@@ -77,7 +77,28 @@
 
 </template>
 
-<script setup>
+<style lang="scss">
+
+  ///////////////////////
+  // Application Style //
+  ///////////////////////
+  
+  // prevent overscroll
+  html, body {
+    overscroll-behavior-y: none;
+  }
+
+  // everything
+  * {
+    // start with roboto as base font
+    font-family: "Roboto";
+    // smooth transition text color and background color
+    transition: color 0.25s, background-color 0.25s, fill 0.25s, opacity 0.25s;
+    // scrollbar color
+    scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+    // box sizing border box
+    box-sizing: border-box;
+  }
 
   // app
   .app {
