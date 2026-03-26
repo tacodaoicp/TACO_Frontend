@@ -48,16 +48,7 @@
                 <span class="perf-beta-badge">BETA</span>
               </h1>
 
-              <!-- refresh button -->
-              <button
-                class="btn taco-nav-btn taco-nav-btn--active"
-                @click="refreshAllData"
-                :disabled="isLoading">
-                <span class="taco-text-black">
-                  <i v-if="isLoading" class="fas fa-spinner fa-spin me-1"></i>
-                  🔄 Refresh
-                </span>
-              </button>
+              <!-- refresh removed — use floating .taco-refresh-btn -->
             </div>
 
             <!-- Error State -->
@@ -234,6 +225,17 @@
       </div>
     </div>
   </div>
+
+  <!-- Floating Refresh Button -->
+  <button
+    v-if="userLoggedIn"
+    class="taco-refresh-btn"
+    @click="refreshAllData"
+    :disabled="isLoading"
+    title="Refresh performance data">
+    <i class="fa fa-sync-alt" :class="{'fa-spin': isLoading}"></i>
+  </button>
+
 </template>
 
 <script>
@@ -820,8 +822,8 @@ export default {
 }
 
 .perf-title-bar {
-  background: var(--yellow-to-brown);
-  border: 1px solid var(--dark-orange);
+  background: linear-gradient(135deg, var(--card-active-from), var(--card-active-to));
+  border: 2px solid var(--card-border);
   border-radius: 0.5rem;
   padding: 0.75rem 1.25rem;
 }
@@ -830,7 +832,7 @@ export default {
   font-size: 0.6rem;
   padding: 0.15rem 0.4rem;
   background-color: var(--dark-orange);
-  color: #fff;
+  color: var(--white);
   border-radius: 0.25rem;
   font-weight: 700;
   text-transform: uppercase;
@@ -852,8 +854,8 @@ export default {
 }
 
 .perf-alert--warning {
-  background: var(--dark-orange-to-light-brown);
-  color: var(--brown-to-white);
+  background: linear-gradient(135deg, var(--card-active-from), var(--card-active-to));
+  color: var(--text-cream);
 }
 
 .perf-alert--success {
@@ -867,18 +869,18 @@ export default {
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
-  background: linear-gradient(135deg, #522785 0%, #29235c 100%);
-  border: none;
+  background: linear-gradient(135deg, var(--card-gradient-from), var(--card-gradient-to));
+  border: 2px solid var(--card-border);
   padding: 0.75rem 1.5rem;
-  border-radius: 8px;
-  color: white;
+  border-radius: 0.5rem;
+  color: var(--text-cream);
   font-weight: 500;
   transition: all 0.2s ease;
 }
 
 .iid-login:hover {
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(82, 39, 133, 0.4);
+  box-shadow: 0 4px 12px rgba(60, 30, 0, 0.4);
 }
 
 /* Floating Section Nav — centered in the left margin outside the content container */
@@ -893,9 +895,9 @@ export default {
   width: 40px;
   height: 40px;
   border-radius: 50%;
-  border: 1px solid var(--dark-orange);
-  background: var(--yellow-to-brown);
-  color: var(--brown-to-white);
+  border: 2px solid var(--card-border);
+  background: rgba(0, 0, 0, 0.12);
+  color: #fff;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -906,14 +908,14 @@ export default {
 }
 
 .section-nav-toggle:hover {
-  background: var(--orange-to-light-brown);
-  color: var(--brown-to-white);
-  border-color: var(--brown);
+  background: rgba(0, 0, 0, 0.2);
+  color: #fff;
+  border-color: var(--card-border);
 }
 
 .section-nav-open .section-nav-toggle {
-  background: var(--brown);
-  border-color: var(--dark-brown);
+  background: rgba(0, 0, 0, 0.25);
+  border-color: var(--card-border);
   color: #fff;
 }
 
@@ -924,12 +926,13 @@ export default {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  background: var(--yellow-to-brown);
-  border: 1px solid var(--dark-orange);
+  background: rgba(0, 0, 0, 0.18);
+  border: 2px solid var(--card-border);
   border-radius: 0.5rem;
   padding: 6px;
   min-width: 200px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 4px 16px rgba(60, 30, 0, 0.5);
+  backdrop-filter: blur(8px);
 }
 
 .section-nav-item {
@@ -938,7 +941,7 @@ export default {
   padding: 10px 14px;
   border: none;
   background: transparent;
-  color: var(--brown-to-white);
+  color: #fff;
   font-family: 'Space Mono', monospace;
   font-size: 0.8rem;
   border-radius: 0.375rem;
@@ -949,8 +952,8 @@ export default {
 }
 
 .section-nav-item:hover {
-  background: var(--orange-to-light-brown);
-  color: var(--brown-to-white);
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
 }
 
 /* Nav transition */

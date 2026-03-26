@@ -38,10 +38,10 @@
       flex-direction: column;
       width: 100%;
       max-width: 22rem;
-      border-right: 1px solid var(--dark-orange);
+      border-right: 1px solid var(--card-border);
       border-top-left-radius: 0.5rem;
       border-bottom-left-radius: 0.5rem;
-      background-color: var(--orange-to-light-brown);
+      background: linear-gradient(135deg, var(--card-mid-from), var(--card-mid-to));
     }
 
     // right

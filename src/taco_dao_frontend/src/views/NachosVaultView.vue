@@ -27,7 +27,7 @@
 
               <!-- refresh button -->
               <button v-if="tacoStore.userLoggedIn"
-                      class="nachos-vault-view__refresh-btn"
+                      class="taco-refresh-btn"
                       :disabled="refreshing"
                       @click="handleRefresh">
                 <i class="fa-solid" :class="refreshing ? 'fa-spinner fa-spin' : 'fa-arrows-rotate'"></i>
@@ -188,52 +188,7 @@
     }
   }
 
-  // refresh button — fixed so it stays visible while scrolling
-  &__refresh-btn {
-    position: fixed;
-    bottom: 1.5rem;
-    right: 1.5rem;
-    z-index: 1040;
-    background: var(--orange-to-dark-brown);
-    border: 1px solid var(--dark-orange-to-dark-brown);
-    color: var(--black-to-white);
-    width: 2.25rem;
-    height: 2.25rem;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    font-size: 0.85rem;
-    font-family: 'Space Mono', monospace;
-    transition: opacity 0.2s, background-color 0.2s, transform 0.15s;
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
-
-    &:hover {
-      opacity: 0.9;
-      background: var(--dark-orange-to-dark-brown);
-      transform: scale(1.05);
-    }
-
-    &:active {
-      transform: scale(0.95);
-    }
-
-    &:focus {
-      outline: none;
-    }
-
-    &:focus-visible {
-      outline: 3px solid var(--light-brown-to-orange);
-      outline-offset: 2px;
-    }
-
-    &:disabled {
-      opacity: 0.4;
-      cursor: not-allowed;
-      transform: none;
-    }
-  }
+  // refresh button — now uses global .taco-refresh-btn from App.vue
 
 }
 

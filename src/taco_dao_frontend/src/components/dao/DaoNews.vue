@@ -98,7 +98,7 @@
     display: flex;
     flex-direction: column;
     overflow: auto;
-    border: 1px solid var(--dark-orange-to-light-brown);
+    border: 1px solid var(--card-border);
     border-radius: 0.5rem;
 
     // trade log

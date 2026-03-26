@@ -15,7 +15,8 @@
           <TacoTitle level="h2" emoji="📌" title="More Information" class="mt-4" style="padding-left: 1rem !important;"/>
 
           <!-- flex container -->
-          <div class="info d-flex gap-4 mt-4 p-0">
+          <div class="info d-flex gap-4 mt-4 p-0
+                      taco-container taco-container--l1">
 
             <!-- taco token -->
             <div class="info__area 
@@ -376,6 +377,82 @@
 
           </div>
 
+          <!-- past sales title -->
+          <TacoTitle level="h2" emoji="🏆" title="Past Sales" class="mt-5 justify-content-center"/>
+
+          <!-- past sales -->
+          <div class="taco-container
+                      taco-container--l1
+                      w-100">
+
+            <div class="d-flex w-100">
+
+              <table class="taco-table
+                            table table-sm m-0">
+
+                <thead>
+                  <tr>
+                    <th class="fw-bold text-start" scope="col">Started</th>
+                    <th class="fw-bold ps-2 ps-sm-4 pe-2 pe-sm-3" scope="col">Name</th>
+                    <th class="fw-bold ps-2 ps-sm-4 pe-2 pe-sm-3 text-center d-none d-sm-table-cell" scope="col">Duration</th>
+                    <th class="fw-bold ps-2 ps-sm-4 pe-2 pe-sm-3 text-end" scope="col">Commitment</th>
+                    <th class="fw-bold ps-2 ps-sm-4 pe-2 pe-sm-3 text-center" scope="col">View</th>
+                  </tr>
+                </thead>
+
+                <tbody>
+                  <tr>
+                    <td class="ps-3">May 9, 2025</td>
+                    <td class="ps-2 ps-sm-4 pe-2 pe-sm-3">SNS Decentralization Sale</td>
+                    <td class="ps-2 ps-sm-4 pe-2 pe-sm-3 text-center d-none d-sm-table-cell">2 Weeks</td>
+                    <td class="ps-2 ps-sm-4 pe-2 pe-sm-3 text-end">127,077 ICP</td>
+                    <td class="ps-2 ps-sm-4 pe-2 pe-sm-3 text-center">
+                      <a href="https://nns.ic0.app/project/?project=lacdn-3iaaa-aaaaq-aae3a-cai" target="_blank" style="color: var(--gold);">
+                        <i class="fa-solid fa-arrow-up-right-from-square"></i>
+                      </a>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td class="ps-3">May 3, 2024</td>
+                    <td class="ps-2 ps-sm-4 pe-2 pe-sm-3">DKP Swap</td>
+                    <td class="ps-2 ps-sm-4 pe-2 pe-sm-3 text-center d-none d-sm-table-cell">3 Days</td>
+                    <td class="ps-2 ps-sm-4 pe-2 pe-sm-3 text-end">21,750,358 DKP</td>
+                    <td class="ps-2 ps-sm-4 pe-2 pe-sm-3 text-center">
+                      <span style="color: var(--gold); opacity: 0.5;" title="DKP Swap page removed">
+                        <i class="fa-solid fa-arrow-up-right-from-square"></i>
+                      </span>
+                    </td>
+                  </tr>
+                </tbody>
+
+              </table>
+
+            </div>
+
+          </div>
+
+          <!-- source code title -->
+          <TacoTitle level="h2" emoji="💻" title="Source Code" class="mt-5 justify-content-center"/>
+
+          <!-- source code -->
+          <div class="taco-container
+                      taco-container--l1
+                      w-100 p-4 d-flex flex-column align-items-center gap-3">
+
+            <span style="color: rgba(255,255,255,0.85); text-align: center;">
+              Taco DAO is fully open source. View the code, contribute, or verify on-chain contracts.
+            </span>
+
+            <a href="https://github.com/tacodaoicp"
+               target="_blank"
+               class="btn taco-btn taco-btn--green d-inline-flex align-items-center gap-2"
+               style="text-decoration: none;">
+              <i class="fa-brands fa-github" style="font-size: 1.25rem;"></i>
+              <span style="color: var(--white);">View on GitHub</span>
+            </a>
+
+          </div>
+
         </div>
 
       </div>
@@ -414,7 +491,8 @@
 
     // info area
     &__area {
-      border-right: 1px solid var(--dark-orange) !important;
+      border-right: 1px solid var(--card-border) !important;
+      padding-top: 0.5rem;
 
       //
       &:last-child {

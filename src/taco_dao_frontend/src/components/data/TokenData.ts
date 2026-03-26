@@ -560,7 +560,7 @@ export const tokenData = [
         icpCoinsLink: 'https://neutrinite.io/currencies/TACO',
         icon: tacoToken,
         description: `A Tasty Basket of Trusted Internet Computer Tokens Decided & Allocated via DAO. Fully on-chain, holder-directed curation and allocation.`,
-        color: '#FEC800'
+        color: '#D4A800'
     },
     {
         title: 'Tendies',

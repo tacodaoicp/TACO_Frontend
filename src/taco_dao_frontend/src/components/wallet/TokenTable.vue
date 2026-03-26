@@ -3,7 +3,7 @@
     <table class="token-table">
       <thead>
         <tr>
-          <th></th>
+          <th style="width: 60px;"></th>
           <th>Token</th>
           <th class="text-end">Balance</th>
           <th class="text-end">Value</th>
@@ -207,8 +207,8 @@ function formatUSD(balance: bigint, decimals: number, priceUSD: number): string 
 }
 
 .token-logo {
-  width: 36px; // Increased from 32px
-  height: 36px; // Increased from 32px
+  width: 52px;
+  height: 52px;
   border-radius: 50%;
   display: block;
 }
@@ -216,12 +216,13 @@ function formatUSD(balance: bigint, decimals: number, priceUSD: number): string 
 .token-info {
   display: flex;
   flex-direction: column;
-  gap: 0.125rem;
+  justify-content: center;
+  gap: 0.2rem;
 }
 
 .token-symbol {
   font-weight: 600;
-  font-size: 0.95rem; // Increased from 0.85rem
+  font-size: 1.1rem;
   color: var(--black-to-white);
 }
 
@@ -308,12 +309,12 @@ function formatUSD(balance: bigint, decimals: number, priceUSD: number): string 
   }
 
   .token-logo {
-    width: 24px;
-    height: 24px;
+    width: 40px;
+    height: 40px;
   }
 
   .token-symbol {
-    font-size: 0.75rem;
+    font-size: 0.85rem;
   }
 
   .token-name {

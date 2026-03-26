@@ -205,8 +205,8 @@
 }
 
 .modal-content {
-  background-color: var(--light-orange-to-dark-brown);
-  border: 1px solid var(--dark-orange);
+  background: linear-gradient(135deg, var(--card-gradient-from), var(--card-gradient-to));
+  border: 2px solid var(--card-border);
 }
 
 .modal-header {
@@ -267,20 +267,20 @@
 }
 
 .transaction-details {
-  background-color: var(--orange-to-brown);
-  border: 1px solid var(--dark-orange);
+  background: linear-gradient(135deg, var(--card-mid-from), var(--card-mid-to));
+  border: 1px solid var(--card-border);
   border-radius: 0.5rem;
   margin-bottom: 1rem;
 
   > div {
     padding: 0.5rem 0.75rem;
-    border-bottom: 1px solid var(--dark-orange);
+    border-bottom: 1px solid var(--table-row-border);
 
     &:last-child {
       border-bottom: none;
     }
     &:hover {
-      background-color: var(--dark-orange);
+      background-color: rgba(0, 0, 0, 0.15);
     }
 
   }

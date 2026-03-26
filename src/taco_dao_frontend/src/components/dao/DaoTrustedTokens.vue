@@ -42,7 +42,7 @@
           <table v-if="isBestPerformance"
                   class="dao-trusted-tokens__table
                         taco-table
-                        table table-sm table-responsive m-0">
+                        table table-sm m-0">
 
             <!-- table head -->
             <thead>
@@ -51,7 +51,7 @@
               <tr>
 
                 <!-- symbol -->
-                <th class="fw-bold" 
+                <th class="fw-bold"
                     scope="col">
                     <span class="pe-3">Symbol</span>
                 </th>
@@ -66,13 +66,13 @@
                 <th class="fw-bold text-center"
                     scope="col">
                     <span class="pe-3">24h</span>
-                </th> 
+                </th>
 
                 <!-- 7 day -->
                 <th class="fw-bold text-center"
                     scope="col">
                     <span class="pe-3">7D</span>
-                </th> 
+                </th>
 
                 <!-- 1 month -->
                 <th class="fw-bold text-center"
@@ -141,7 +141,7 @@
           <table v-if="isAmountHeld"
                   class="dao-trusted-tokens__table
                         taco-table
-                        table table-sm table-responsive m-0">
+                        table table-sm m-0">
 
               <!-- table head -->
               <thead>
@@ -161,20 +161,14 @@
                       <span class="pe-4">% Held</span>
                   </th> 
 
-                  <!-- holdings (hidden on mobile) -->
-                  <th class="fw-bold text-end d-none d-md-table-cell"
-                      scope="col">
-                      <span class="pe-4"># Held</span>
-                  </th>
-
                   <!-- value -->
                   <th class="fw-bold text-end"
                       scope="col">
                       <span class="pe-4">Value</span>
                   </th>      
                   
-                  <!-- date added -->
-                  <th class="fw-bold text-end"
+                  <!-- date added (hidden on mobile) -->
+                  <th class="fw-bold text-end d-none d-md-table-cell"
                       scope="col">
                       <span>Date Added</span>
                   </th>                  
@@ -218,18 +212,13 @@
                     <span>{{ token.holdingPercentage.amount }}%</span>
                   </td>
 
-                  <!-- # held (hidden on mobile) -->
-                  <td class="text-end pe-4 d-none d-md-table-cell">
-                    <span data-bs-toggle="tooltip" data-bs-placement="top" :title="token.currentHoldings.amount">{{ formatNumber(token.currentHoldings.amount) }}</span>
-                  </td>
-
                   <!-- value -->
                   <td class="text-end pe-4">
                     <span>${{ (token.currentHoldings.amount * token.priceInUSD).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}</span>
                   </td>
 
-                  <!-- date added -->
-                  <td class="pe-3 text-end">
+                  <!-- date added (hidden on mobile) -->
+                  <td class="pe-3 text-end d-none d-md-table-cell">
                     <span>{{ formatDate(token.epochAdded) }}</span>
                   </td>                  
 
@@ -271,133 +260,42 @@
 
   // table
   &__table {
-    width: 100%;
-    border-collapse: collapse;
 
     // table container
     &__cont {
       display: flex;
       flex-direction: column;
       flex-grow: 1;
-      border-radius: 0.5rem;
       overflow: auto;
     }
 
-    // thead
-    thead {
-
-      // thead row
-      tr {
-
-        // headiing
-        th {
-          color: var(--white);
-          font-weight: bold;
-          padding: 0.325rem 0;
-          background-color: var(--dark-orange-to-light-brown);
-          position: sticky;
-          top: 0;
-          z-index: 1;
-
-          // first heading
-          &:first-of-type {
-            border-top-left-radius: 0.5rem;
-          padding-left: 1rem;
-          }
-
-          // last heading
-          &:last-of-type {
-            border-top-right-radius: 0.5rem;
-            padding-right: 1rem;
-          }
-
-        }
-
-      }
-
+    // override taco-table for sticky headers
+    thead th {
+      position: sticky;
+      top: 0;
+      z-index: 1;
     }
 
-    // tbody
-    tbody {
+    // override taco-table td font size for compact display
+    tbody td {
+      font-size: 0.825rem;
+      padding: 0.5rem 1rem;
 
-      // tbody row
-      tr {
-
-        // data
-        td {
-          font-size: 0.825rem;
-          // font-weight: bold;
-          color: var(--black-to-white);
-          background-color: var(--light-orange-to-dark-brown);
-          border-bottom: 1px solid var(--dark-orange);
-          padding: 0.5rem 0;
-          transition: background-color 0.075s;
-
-          // 
-          span {
-            color: var(--black-to-white);
-          }
-
-          // first data
-          &:first-of-type {
-            // padding-left: 1rem;
-            // padding-right: 2rem;
-          }
-
-          // last data
-          &:last-of-type {
-            // padding-left: 2rem;
-            // padding-right: 1rem;
-
-          }
-
-        }
-
-        // hover
-        &:hover {
-          cursor: pointer;
-
-          td {
-            background-color: var(--orange-to-brown);
-          }
-
-        }
-
-        // last tbody row
-        &:last-of-type {
-
-          // data
-          td {
-            // border-bottom: 0;
-
-            // first data
-            &:first-of-type {
-              border-bottom-left-radius: 0.5rem;
-            }
-
-            // last data
-            &:last-of-type {
-              border-bottom-right-radius: 0.5rem;
-            }
-
-            // 
-            
-
-          }
-
-        }
-
+      span {
+        color: rgba(255, 255, 255, 0.85);
       }
+    }
 
+    // hover cursor
+    tbody tr:hover {
+      cursor: pointer;
     }
 
     // empty
     &__empty {
       text-align: center;
       padding: 0.5rem 0;
-      background-color: var(--light-orange-to-dark-brown);
-      border-bottom-left-radius: 0.5rem;
-      border-bottom-right-radius: 0.5rem;
+      background-color: rgba(0, 0, 0, 0.15);
 
       span {
         opacity: 0.5;
@@ -407,12 +305,12 @@
 
     // paused indicator
     &__paused-indicator {
-      color: var(--black-to-white) !important;
-      background-color: var(--orange-to-brown) !important;
+      color: rgba(255, 255, 255, 0.85) !important;
+      background-color: rgba(0, 0, 0, 0.25) !important;
       border-radius: 0.25rem;
       padding: 0rem 0.325rem;
       font-size: 0.75rem;
-      border: 1px solid var(--dark-orange);
+      border: 1px solid var(--card-border);
     }
 
   }

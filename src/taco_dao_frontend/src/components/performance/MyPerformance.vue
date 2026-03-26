@@ -348,15 +348,15 @@ export default {
 
 <style scoped>
 .chart-container {
-  background: color-mix(in srgb, var(--yellow-to-brown) 85%, #000);
-  border: 1px solid var(--dark-orange);
+  background: linear-gradient(135deg, var(--card-mid-from), var(--card-mid-to));
+  border: 2px solid var(--card-border);
   border-radius: 0.5rem;
   padding: 0.75rem;
 }
 
 .stat-card {
-  background: var(--orange-to-light-brown);
-  border: 1px solid var(--dark-orange);
+  background: linear-gradient(135deg, var(--card-gradient-from), var(--card-gradient-to));
+  border: 2px solid var(--card-border);
   border-radius: 0.5rem;
   padding: 1rem;
   text-align: center;
@@ -369,8 +369,8 @@ export default {
 }
 
 .perf-section {
-  background: var(--orange-to-light-brown);
-  border: 1px solid var(--dark-orange);
+  background: linear-gradient(135deg, var(--card-gradient-from), var(--card-gradient-to));
+  border: 2px solid var(--card-border);
   border-radius: 0.5rem;
   padding: 0.75rem 1rem;
 }
@@ -426,8 +426,8 @@ export default {
 }
 
 .neuron-card {
-  background: var(--orange-to-light-brown);
-  border: 1px solid var(--dark-orange);
+  background: linear-gradient(135deg, var(--card-gradient-from), var(--card-gradient-to));
+  border: 2px solid var(--card-border);
   border-radius: 0.5rem;
   padding: 1rem;
 }

@@ -427,6 +427,7 @@ onBeforeUnmount(() => {
     font-family: 'Space Mono', monospace;
     text-transform: uppercase;
     letter-spacing: 0.05em;
+    color: var(--gold);
     margin-bottom: 0;
   }
 

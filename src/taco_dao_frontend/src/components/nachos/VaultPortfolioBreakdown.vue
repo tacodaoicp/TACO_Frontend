@@ -154,6 +154,7 @@ const chartOptions = computed(() => ({
   &__section-title {
     font-size: 1rem;
     font-family: 'Space Mono', monospace;
+    color: var(--gold);
     margin-bottom: 0;
   }
 

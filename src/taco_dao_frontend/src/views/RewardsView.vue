@@ -908,8 +908,9 @@ export default {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  background: var(--dark-orange-to-light-orange);
-  border-radius: 10px;
+  background: linear-gradient(135deg, var(--card-active-from), var(--card-active-to));
+  border: 2px solid var(--card-border);
+  border-radius: 0.5rem;
   padding: 0 1rem;
   margin: 0 1rem;
 }
@@ -925,7 +926,7 @@ export default {
 .table th {
   font-size: 0.9em;
   font-weight: 600;
-  background-color: #2d3748 !important;
+  background: linear-gradient(135deg, var(--table-header-from), var(--table-header-to)) !important;
 }
 
 .table td {
@@ -937,7 +938,8 @@ export default {
 }
 
 .card.bg-dark {
-  background-color: #1a202c !important;
+  background: linear-gradient(135deg, var(--card-gradient-from), var(--card-gradient-to)) !important;
+  border: 2px solid var(--card-border);
 }
 
 code {

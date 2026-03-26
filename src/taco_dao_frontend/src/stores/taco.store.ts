@@ -2347,6 +2347,27 @@ export const useTacoStore = defineStore('taco', () => {
         root.style.setProperty("--dark-gray", "#777777")
         root.style.setProperty("--black", "#2D2D2D")
 
+        // card gradient system (from /buy premium style)
+        root.style.setProperty("--card-gradient-from", "#5C3012")
+        root.style.setProperty("--card-gradient-to", "#3A1C08")
+        root.style.setProperty("--card-border", "#8B5A2B")
+        root.style.setProperty("--card-shadow", "0 4px 20px rgba(0, 0, 0, 0.15)")
+        root.style.setProperty("--card-active-from", "#7B3F15")
+        root.style.setProperty("--card-active-to", "#4A2008")
+        root.style.setProperty("--card-hover-from", "#6B3815")
+        root.style.setProperty("--card-hover-to", "#42200A")
+        root.style.setProperty("--gold", "#FFD54F")
+        root.style.setProperty("--gold-light", "#FFCA28")
+        root.style.setProperty("--text-cream", "#F5F0E0")
+        root.style.setProperty("--table-header-from", "#7B3F15")
+        root.style.setProperty("--table-header-to", "#4A2008")
+        root.style.setProperty("--table-row-border", "rgba(139, 90, 43, 0.4)")
+        root.style.setProperty("--checkbox-border", "#A0724A")
+        root.style.setProperty("--card-mid-from", "#5C3012")
+        root.style.setProperty("--card-mid-to", "#3A1C08")
+        root.style.setProperty("--scrollbar-thumb", "#7B3F15")
+        root.style.setProperty("--scrollbar-track", "#2A1205")
+
         // toggleable colors
 
         // in light mode

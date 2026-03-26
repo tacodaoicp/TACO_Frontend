@@ -45,18 +45,12 @@
             <div class="forum-thread-view__navigation__left">
                 
                 <!-- buttons -->
-                <div class="btn-group flex-wrap">
+                <div class="d-flex gap-2 flex-wrap">
 
                     <!-- discussion -->
                     <button class="btn taco-nav-btn"
                             :class="{ 'taco-nav-btn--active': threadNavigation === 'discussion' }"
                             @click="threadNavigation = 'discussion'">Discussion</button>
-
-                    <!-- voting -->
-                    <!-- <button class="btn taco-nav-btn">Voting</button> -->
-
-                    <!-- vote -->
-                    <!-- <button class="btn taco-nav-btn">Vote</button> -->
 
                     <!-- details -->
                     <button class="btn taco-nav-btn"
@@ -1174,7 +1168,7 @@
     width: 100%;
     height: 100%;
     position: relative;
-    background-color: var(--light-orange-to-dark-brown);
+    background: linear-gradient(135deg, var(--card-mid-from), var(--card-mid-to));
     border-top-right-radius: 0.5rem;
     border-bottom-right-radius: 0.5rem;
 
@@ -1268,11 +1262,11 @@
         justify-content: space-between;
         align-items: center;
         padding: 0.5rem 1rem 0.5rem 0.5rem;
-        background-color: var(--dark-orange);
+        background: linear-gradient(135deg, var(--card-gradient-from), var(--card-gradient-to));
         position: sticky;
         top: 0;
         z-index: 1000;
-        border-bottom: 1px solid var(--brown);
+        border-bottom: 1px solid var(--card-border);
 
         // left
         &__left {
@@ -1318,8 +1312,8 @@
         gap: 0.25rem 1rem;
         justify-content: space-between;
         align-items: center;
-        background-color: var(--dark-orange-to-light-brown);
-        color: var(--black-to-white);
+        background: linear-gradient(135deg, var(--card-active-from), var(--card-active-to));
+        color: var(--text-cream);
         margin: 1rem;
         border-radius: 0.5rem;
         padding: 0.5rem 0.5rem 0.5rem 1rem;
@@ -1683,8 +1677,8 @@
                 display: flex;
                 align-items: center;
                 justify-content: center;
-                background-color: var(--light-orange-to-dark-brown);
-                border: 1px solid var(--dark-orange-to-dark-brown);
+                background-color: rgba(0, 0, 0, 0.15);
+                border: 1px solid var(--card-border);
                 border-radius: 0.25rem;
                 padding: 0.5rem;
             }
@@ -1770,8 +1764,8 @@
             display: flex;
             align-items: center;
             gap: 0.5rem;
-            background-color: var(--light-orange-to-dark-brown);
-            border: 1px solid var(--dark-orange-to-dark-brown);
+            background-color: rgba(0, 0, 0, 0.15);
+            border: 1px solid var(--card-border);
             border-radius: 0.25rem;
             padding: 0.25rem 0.75rem;
 
@@ -1985,7 +1979,7 @@
                     left: 3%;
                     top: 0;
                     bottom: 0;
-                    background-color: var(--light-orange-to-dark-brown);
+                    background-color: var(--card-border);
                     width: 3px;
                 }
 
@@ -1995,7 +1989,7 @@
                     left: 50%;
                     top: 0;
                     bottom: 0;
-                    background-color: var(--light-orange-to-dark-brown);
+                    background-color: var(--card-border);
                     width: 3px;
                 }
 
@@ -2005,7 +1999,7 @@
                     left: 66.66%;
                     top: 0;
                     bottom: 0;
-                    background-color: var(--light-orange-to-dark-brown);
+                    background-color: var(--card-border);
                     width: 3px;
                 }
 
@@ -2120,8 +2114,8 @@
             flex-direction: column;
             gap: 0.75rem;
             padding: 1rem;
-            background-color: var(--light-orange-to-dark-brown);
-            border: 2px solid var(--dark-orange);
+            background: linear-gradient(135deg, var(--card-gradient-from), var(--card-gradient-to));
+            border: 2px solid var(--card-border);
             border-radius: 0.5rem;
 
             &__info {

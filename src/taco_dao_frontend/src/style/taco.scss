@@ -1,0 +1,2090 @@
+// ═══════════════════════════════════════════════
+// TACO DAO — Unified Stylesheet (taco.scss)
+// ═══════════════════════════════════════════════
+
+
+// ┌────────────────────────────────────┐
+// │  1. CSS RESET                      │
+// └────────────────────────────────────┘
+
+/////////////////////
+// Meyers Reset v2 //
+/////////////////////
+
+html,
+body,
+div,
+span,
+applet,
+object,
+iframe,
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+p,
+blockquote,
+pre,
+a,
+abbr,
+acronym,
+address,
+big,
+cite,
+code,
+del,
+dfn,
+em,
+img,
+ins,
+kbd,
+q,
+s,
+samp,
+small,
+strike,
+strong,
+sub,
+sup,
+tt,
+var,
+b,
+u,
+i,
+center,
+dl,
+dt,
+dd,
+ol,
+ul,
+li,
+fieldset,
+form,
+label,
+legend,
+table,
+caption,
+tbody,
+tfoot,
+thead,
+tr,
+th,
+td,
+article,
+aside,
+canvas,
+details,
+embed,
+figure,
+figcaption,
+footer,
+header,
+hgroup,
+menu,
+nav,
+output,
+ruby,
+section,
+summary,
+time,
+mark,
+audio,
+video {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  font-size: 100%;
+  font: inherit;
+  vertical-align: baseline;
+}
+article,
+aside,
+details,
+figcaption,
+figure,
+footer,
+header,
+hgroup,
+menu,
+nav,
+section {
+  display: block;
+}
+body {
+  line-height: 1;
+}
+ol,
+ul {
+  list-style: none;
+}
+blockquote,
+q {
+  quotes: none;
+}
+blockquote:before,
+blockquote:after,
+q:before,
+q:after {
+  content: "";
+  content: none;
+}
+table {
+  border-collapse: collapse;
+  border-spacing: 0;
+}
+
+
+// ┌────────────────────────────────────┐
+// │  2. FONT FACES                     │
+// └────────────────────────────────────┘
+
+///////////
+// fonts //
+///////////
+
+// Roboto
+.roboto {
+  font-family: "Roboto";
+}
+@font-face {
+  font-family: "Roboto";
+  src: url("./assets/fonts/Roboto/Roboto-Black.ttf") format("truetype");
+  font-weight: 900;
+  font-style: normal;
+}
+@font-face {
+  font-family: "Roboto";
+  src: url("./assets/fonts/Roboto/Roboto-BlackItalic.ttf") format("truetype");
+  font-weight: 900;
+  font-style: italic;
+}
+@font-face {
+  font-family: "Roboto";
+  src: url("./assets/fonts/Roboto/Roboto-Bold.ttf") format("truetype");
+  font-weight: 700;
+  font-style: normal;
+}
+@font-face {
+  font-family: "Roboto";
+  src: url("./assets/fonts/Roboto/Roboto-BoldItalic.ttf") format("truetype");
+  font-weight: 700;
+  font-style: italic;
+}
+@font-face {
+  font-family: "Roboto";
+  src: url("./assets/fonts/Roboto/Roboto-Italic.ttf") format("truetype");
+  font-weight: normal;
+  font-style: italic;
+}
+@font-face {
+  font-family: "Roboto";
+  src: url("./assets/fonts/Roboto/Roboto-Light.ttf") format("truetype");
+  font-weight: 300;
+  font-style: normal;
+}
+@font-face {
+  font-family: "Roboto";
+  src: url("./assets/fonts/Roboto/Roboto-LightItalic.ttf") format("truetype");
+  font-weight: 300;
+  font-style: italic;
+}
+@font-face {
+  font-family: "Roboto";
+  src: url("./assets/fonts/Roboto/Roboto-Medium.ttf") format("truetype");
+  font-weight: 500;
+  font-style: normal;
+}
+@font-face {
+  font-family: "Roboto";
+  src: url("./assets/fonts/Roboto/Roboto-MediumItalic.ttf") format("truetype");
+  font-weight: 500;
+  font-style: italic;
+}
+@font-face {
+  font-family: "Roboto";
+  src: url("./assets/fonts/Roboto/Roboto-Regular.ttf") format("truetype");
+  font-weight: normal;
+  font-style: normal;
+}
+@font-face {
+  font-family: "Roboto";
+  src: url("./assets/fonts/Roboto/Roboto-Thin.ttf") format("truetype");
+  font-weight: 100;
+  font-style: normal;
+}
+@font-face {
+  font-family: "Roboto";
+  src: url("./assets/fonts/Roboto/Roboto-ThinItalic.ttf") format("truetype");
+  font-weight: 100;
+  font-style: italic;
+}
+
+// Rubik
+.rubik {
+  font-family: "Rubik";
+}
+.rubik-mono {
+  font-family: "Rubik Mono One";
+}
+/*a very bold, seperate font family*/
+@font-face {
+  font-family: "Rubik Mono One";
+  src: url("./assets/fonts/Rubik/RubikMonoOne-Regular.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+}
+@font-face {
+  font-family: "Rubik";
+  src: url("./assets/fonts/Rubik/Rubik-Black.ttf") format("truetype");
+  font-weight: 900;
+  font-style: normal;
+}
+@font-face {
+  font-family: "Rubik";
+  src: url("./assets/fonts/Rubik/Rubik-BlackItalic.ttf") format("truetype");
+  font-weight: 900;
+  font-style: italic;
+}
+@font-face {
+  font-family: "Rubik";
+  src: url("./assets/fonts/Rubik/Rubik-ExtraBold.ttf") format("truetype");
+  font-weight: 800;
+  font-style: normal;
+}
+@font-face {
+  font-family: "Rubik";
+  src: url("./assets/fonts/Rubik/Rubik-ExtraBoldItalic.ttf") format("truetype");
+  font-weight: 800;
+  font-style: italic;
+}
+@font-face {
+  font-family: "Rubik";
+  src: url("./assets/fonts/Rubik/Rubik-Bold.ttf") format("truetype");
+  font-weight: 700;
+  font-style: normal;
+}
+@font-face {
+  font-family: "Rubik";
+  src: url("./assets/fonts/Rubik/Rubik-BoldItalic.ttf") format("truetype");
+  font-weight: 700;
+  font-style: italic;
+}
+@font-face {
+  font-family: "Rubik";
+  src: url("./assets/fonts/Rubik/Rubik-SemiBold.ttf") format("truetype");
+  font-weight: 600;
+  font-style: normal;
+}
+@font-face {
+  font-family: "Rubik";
+  src: url("./assets/fonts/Rubik/Rubik-SemiBoldItalic.ttf") format("truetype");
+  font-weight: 600;
+  font-style: italic;
+}
+@font-face {
+  font-family: "Rubik";
+  src: url("./assets/fonts/Rubik/Rubik-Italic.ttf") format("truetype");
+  font-weight: normal;
+  font-style: italic;
+}
+@font-face {
+  font-family: "Rubik";
+  src: url("./assets/fonts/Rubik/Rubik-Light.ttf") format("truetype");
+  font-weight: 300;
+  font-style: normal;
+}
+@font-face {
+  font-family: "Rubik";
+  src: url("./assets/fonts/Rubik/Rubik-LightItalic.ttf") format("truetype");
+  font-weight: 300;
+  font-style: italic;
+}
+@font-face {
+  font-family: "Rubik";
+  src: url("./assets/fonts/Rubik/Rubik-Medium.ttf") format("truetype");
+  font-weight: 500;
+  font-style: normal;
+}
+@font-face {
+  font-family: "Rubik";
+  src: url("./assets/fonts/Rubik/Rubik-MediumItalic.ttf") format("truetype");
+  font-weight: 500;
+  font-style: italic;
+}
+@font-face {
+  font-family: "Rubik";
+  src: url("./assets/fonts/Rubik/Rubik-Regular.ttf") format("truetype");
+  font-weight: normal;
+  font-style: normal;
+}
+
+// Space Mono
+.spacemono {
+  font-family: "Space Mono";
+}
+@font-face {
+  font-family: "Space Mono";
+  src: url("./assets/fonts/Space_Mono/SpaceMono-Bold.ttf") format("truetype");
+  font-weight: 700;
+  font-style: regular;
+}
+@font-face {
+  font-family: "Space Mono";
+  src: url("./assets/fonts/Space_Mono/SpaceMono-BoldItalic.ttf") format("truetype");
+  font-weight: 700;
+  font-style: italic;
+}
+@font-face {
+  font-family: "Space Mono";
+  src: url("./assets/fonts/Space_Mono/SpaceMono-Regular.ttf") format("truetype");
+  font-weight: regular;
+  font-style: regular;
+}
+@font-face {
+  font-family: "Space Mono";
+  src: url("./assets/fonts/Space_Mono/SpaceMono-Italic.ttf") format("truetype");
+  font-weight: regular;
+  font-style: italic;
+}
+
+// Merchant Copy
+@font-face {
+  font-family: "Merchant Copy";
+  src: url("./assets/fonts/Merchant_Copy/Merchant-Copy.ttf") format("truetype");
+  font-weight: regular;
+  font-style: normal;
+}
+@font-face {
+  font-family: "Merchant Copy Wide";
+  src: url("./assets/fonts/Merchant_Copy/Merchant-Copy-Wide.ttf") format("truetype");
+  font-weight: regular;
+  font-style: normal;
+}
+@font-face {
+  font-family: "Merchant Copy Double";
+  src: url("./assets/fonts/Merchant_Copy/Merchant-Copy-Doublesize.ttf") format("truetype");
+  font-weight: regular;
+  font-style: normal;
+}
+
+
+// ┌────────────────────────────────────┐
+// │  3. GLOBAL BASE                    │
+// └────────────────────────────────────┘
+
+// prevent overscroll
+html, body {
+  overscroll-behavior-y: none;
+}
+
+// everything
+* {
+  // start with roboto as base font
+  font-family: "Roboto";
+  // smooth transition text color and background color
+  transition: color 0.25s, background-color 0.25s, fill 0.25s, opacity 0.25s;
+  // scrollbar color
+  scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+  // box sizing border box
+  box-sizing: border-box;
+}
+
+// scrollbars
+*::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+*::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+  border-radius: 3px;
+}
+*::-webkit-scrollbar-track {
+  background: var(--scrollbar-track);
+}
+
+// headings
+h1, h2, h3, h4, h5, h6 {
+  font-family: "Rubik";
+}
+
+// links, paragraphs, and spans
+a, p, span {
+  font-family: "Space Mono";
+}
+
+
+// ┌────────────────────────────────────┐
+// │  4. APP LAYOUT                     │
+// └────────────────────────────────────┘
+
+// app
+.app {
+
+  // full dynamic window height
+  height: 100dvh;
+
+  // clipped overflow
+  overflow: clip;
+
+  // flex column so header + content fill viewport
+  display: flex;
+  flex-direction: column;
+
+  // default text color black
+  color: var(--black);
+
+  // app content area - scrolls as one unit so footer is at bottom of content
+  &__content {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+
+    // Views fill remaining space (pushes footer to bottom on short pages)
+    > *:not(:last-child) {
+      flex: 1 0 auto;
+    }
+
+    // Footer never shrinks
+    > :last-child {
+      flex-shrink: 0;
+    }
+
+    // Prevent double scrollbar: views flow naturally, app__content is the sole scroll container
+    .standard-view {
+      height: auto;
+      min-height: 100%;
+    }
+
+    .scroll-y-container {
+      overflow: visible;
+      height: auto;
+    }
+  }
+
+}
+
+// app loading curtain
+.app__loading-curtain {
+  position: fixed;
+  height: 100dvh;
+  width: 100vw;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0,0,0,0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 999999; // above everything
+
+  .loading-img {
+    width: 10rem;
+  }
+}
+
+
+// ┌────────────────────────────────────┐
+// │  5. TACO COMPONENT SYSTEM          │
+// └────────────────────────────────────┘
+
+/////////////////////
+// Taco Components //
+/////////////////////
+
+// custom tooltip (apex charts related)
+.customtt {
+  background-color: #934a17;
+  color: white;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.875rem !important;
+  padding: 0.5rem 2rem;
+  border-radius: 0.25rem;
+  gap: 0.175rem;
+  z-index: 9999; //canvas is 9998
+}
+
+// large title (deprecated?)
+.large-title {
+
+  svg {
+    width: 5.875rem;
+    margin-right: 1rem;
+  }
+
+  span {
+    color: var(--white);
+    font-weight: bold;
+    font-size: 1.75rem;
+  }
+
+}
+// large title - phone protrait
+@media (max-width: 575.98px) {
+  .large-title svg {width: 4.5rem;}
+  .large-title span {font-size: 1.25rem;}
+}
+// large title - phone landscape
+@media (min-width: 576px) and (max-width: 767.98px) {
+  .large-title svg {width: 5rem;}
+  .large-title span {font-size: 1.375rem;}
+}
+// large title - tablet
+@media (min-width: 767px) and (max-width: 991.98px) {
+  .large-title svg {width: 5rem;}
+  .large-title span {font-size: 1.5rem;}
+}
+
+// toasts
+.toast {
+  background-color: #ffffff !important; // Solid white background
+  border: 1px solid #dee2e6; // Light border for definition
+  box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075); // Subtle shadow
+}
+
+.toast-header {
+  background-color: var(--success-green-hover);
+  color: var(--white);
+
+  // Error toast headers should be red
+  .toast:has(.fa-exclamation-triangle) & {
+    background-color: #dc3545 !important; // Bootstrap danger red
+  }
+}
+
+// taco containers
+.taco-container {
+  gap: 1rem;
+
+  // level 1, dark gradient card
+  &--l1 {
+    border-radius: 0.5rem;
+    padding: 1.25rem;
+    background: linear-gradient(135deg, var(--card-gradient-from), var(--card-gradient-to));
+    border: 2px solid var(--card-border);
+    box-shadow: var(--card-shadow);
+  }
+
+  // level 2, subtle dark inner panel
+  &--l2 {
+    position: relative;
+    border-radius: 0.5rem;
+    padding: 1rem 1.25rem 1rem;
+    background-color: rgba(0, 0, 0, 0.15);
+    border: 1px solid var(--table-row-border);
+
+    // hover mod
+    &--hover {
+
+      // hover
+      &:hover {
+        background-color: rgba(0, 0, 0, 0.25);
+      }
+
+    }
+
+    // dark mod
+    &--dark {
+      background: linear-gradient(135deg, var(--card-active-from), var(--card-active-to));
+    }
+
+  }
+
+}
+@media (max-width: 575.98px) {
+
+  .taco-container {
+    padding-top: 0.5rem;
+    padding-bottom: 0.5rem;
+    gap: 0.6rem;
+  }
+
+  .taco-container--l1 {
+    padding-left: 0.5rem;
+    padding-right: 0.5rem;
+  }
+
+  .taco-container--l2 {
+    padding-left: 0.5rem;
+    padding-right: 0.5rem;
+  }
+
+}
+
+// taco buttons
+.taco-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding-left: 1.5rem;
+  padding-right: 1.5rem;
+  font-family: 'Space Mono';
+
+  &--green {
+    background: linear-gradient(135deg, #5E7A2E, #3D5A1A);
+    color: var(--text-cream);
+    border: 2px solid #7A8B3A;
+
+    &:hover {
+        background: linear-gradient(135deg, #6E8A38, #4A6A22);
+        color: #fff;
+    }
+
+    &:focus {
+      background: linear-gradient(135deg, #6E8A38, #4A6A22);
+      outline: none;
+      color: #fff;
+    }
+
+    &:focus:focus-visible {
+        background: linear-gradient(135deg, #6E8A38, #4A6A22);
+        outline: 3px solid var(--light-brown-to-orange);
+        outline-offset: 2px;
+    }
+
+    &:active, &:active:focus, &:active:focus-visible {
+        background: linear-gradient(135deg, #6E8A38, #4A6A22);
+        border-color: #7A8B3A;
+        color: #fff;
+    }
+
+    &.disabled,
+    &:disabled,
+    &[disabled]{
+      color: var(--dark-gray) !important;
+      background: linear-gradient(135deg, #5E7A2E, #3D5A1A) !important;
+      border-color: #7A8B3A !important;
+      opacity: 0.5;
+    }
+
+  }
+  &--success {
+    background: linear-gradient(135deg, #2E7D32, #1B5E20) !important;
+    color: var(--text-cream) !important;
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+
+    &:hover {
+      background: linear-gradient(135deg, #388E3C, #2E7D32) !important;
+      color: #fff !important;
+    }
+
+    &:focus, &:focus:focus-visible {
+      background: linear-gradient(135deg, #388E3C, #2E7D32) !important;
+      outline: 3px solid rgba(46, 125, 50, 0.5);
+      outline-offset: 2px;
+      color: #fff !important;
+    }
+
+    &:active, &:active:focus, &:active:focus-visible {
+      background: linear-gradient(135deg, #388E3C, #2E7D32) !important;
+      color: #fff !important;
+    }
+
+    &:disabled,
+    &[disabled],
+    &.disabled {
+      background: linear-gradient(135deg, #2E7D32, #1B5E20) !important;
+      color: var(--light-gray) !important;
+      opacity: 0.5;
+    }
+
+  }
+  &--danger {
+    color: var(--white);
+    background-color: var(--red);
+    border-color: transparent;
+
+    &:hover {
+      background-color: var(--red-hover);
+      border-color: transparent;
+      color: var(--white);
+    }
+
+    &:focus, &:focus:focus-visible {
+        background-color: var(--red-hover);
+        outline: 3px solid var(--red-hover);
+        outline-offset: 2px;
+        border-color: transparent;
+        color: var(--white);
+    }
+
+    &:active, &:active:focus, &:active:focus-visible {
+        background-color: var(--red-hover);
+        border-color: transparent;
+        color: var(--white);
+    }
+
+    &:disabled,
+    &[disabled],
+    &.disabled {
+      color: var(--light-gray);
+      border-color: transparent;
+      background-color: var(--red);
+      opacity: 50%;
+    }
+
+  }
+
+  &--big {
+    padding: 0.75rem 1.5rem;
+  }
+  &--small {
+    // placeholder
+  }
+}
+
+// taco nav buttons
+.taco-nav-btn {
+  color: var(--white);
+  background-color: rgba(218, 141, 40, 0.12);
+  border: 2px solid var(--card-border);
+  border-radius: 0.5rem;
+  padding: 0.5rem 1rem;
+  font-family: 'Space Mono';
+  height: fit-content;
+  transition: all 0.2s ease;
+  opacity: 0.7;
+
+  &:hover {
+    background-color: rgba(254, 214, 108, 0.15);
+    border-color: var(--card-border);
+    color: var(--white);
+    opacity: 1;
+  }
+
+  &:focus {
+    color: var(--white);
+    background-color: rgba(254, 214, 108, 0.15);
+    border-color: var(--card-border);
+    outline: none;
+    opacity: 1;
+  }
+
+  &:focus-visible {
+    outline: 3px solid var(--card-border);
+    outline-offset: 0px;
+  }
+
+  &:active, &:active:focus, &:active:focus-visible {
+    background-color: rgba(254, 214, 108, 0.15);
+    border-color: var(--card-border);
+    color: var(--white);
+    opacity: 1;
+  }
+
+  &--active {
+    background: linear-gradient(135deg, var(--card-active-from), var(--card-active-to));
+    color: var(--gold) !important;
+    border-color: var(--card-border) !important;
+    font-weight: 700;
+    box-shadow: 0 4px 16px rgba(60, 30, 0, 0.5);
+    opacity: 1;
+
+    &:hover {
+      background: linear-gradient(135deg, var(--card-hover-from), var(--card-hover-to));
+      border-color: var(--card-border);
+      color: var(--gold);
+    }
+
+    &:focus {
+      color: var(--gold);
+      border-color: var(--card-border);
+      background: linear-gradient(135deg, var(--card-hover-from), var(--card-hover-to));
+      outline: none;
+    }
+
+    &:focus-visible {
+      outline: 3px solid var(--card-border);
+      outline-offset: 0px;
+    }
+
+    &:active, &:active:focus, &:active:focus-visible {
+      background: linear-gradient(135deg, var(--card-active-from), var(--card-active-to));
+      border-color: var(--card-border);
+      color: var(--gold);
+    }
+
+  }
+
+  &--alt:not(.taco-nav-btn--active) {
+    color: var(--black-to-white);
+    border-color: var(--gray);
+
+    &:hover {
+      color: var(--black-to-white);
+      border-color: var(--gray) !important;
+    }
+
+  }
+
+  &.disabled {
+    border: 2px solid var(--card-border);
+    color: var(--white);
+    opacity: 0.25;
+  }
+
+  &--green {
+    border-color: var(--green) !important;
+    background-color: var(--green);
+
+    &:hover {
+      background-color: var(--green-hover);
+      border-color: var(--green-hover) !important;
+    }
+
+    &:focus {
+      background-color: var(--green-hover);
+      border-color: var(--green-hover) !important;
+    }
+
+    &:focus-visible {
+      outline: 3px solid var(--light-brown-to-orange);
+      outline-offset: 0px;
+    }
+
+    &:active, &:active:focus, &:active:focus-visible {
+      background-color: var(--green-hover);
+      border-color: var(--green-hover) !important;
+    }
+  }
+
+}
+@media (max-width: 575.98px) {
+
+  .taco-nav-btn--secondary {
+    font-size: 0.875rem;
+  }
+
+}
+
+// taco lists
+.taco-list {
+
+  padding: 1rem 0 1.5rem;
+  border: 1px solid var(--dark-orange);
+  border-radius: 0.5rem;
+
+  // taco list item
+  &__item {
+    background-color: transparent;
+    border: none;
+    border-radius: 0;
+
+    // first item in list
+    &:first-of-type {
+        padding-top: 0;
+    }
+
+    // hover effect
+    &:hover {
+        background-color: rgba(0, 0, 0, 0.05);
+    }
+
+    // force no hover effect
+    &--no-hover {
+        &:hover {
+            background-color: transparent;
+        }
+    }
+
+    // title list item
+    &--title {
+        color: var(--brown);
+        display: flex;
+        gap: 0.75rem;
+
+        // title icon
+        i {
+            font-size: 1.5rem;
+        }
+
+    }
+
+  }
+
+  // key value pairs
+  &__kvp {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.25rem;
+
+    // all text
+    span {
+        color: var(--black);
+    }
+
+    // just value
+    span:last-of-type {
+        font-weight: bold;
+    }
+  }
+
+}
+
+// taco bootstrap list
+.taco-bs-list {
+  border: 1px solid var(--dark-orange);
+
+  li {
+    background-color: transparent;
+    border: none;
+    border-bottom: 1px solid var(--dark-orange);
+
+    &:hover {
+      background-color: rgba(0, 0, 0, 0.05);
+    }
+
+    &:last-of-type {
+      border-bottom: none;
+    }
+
+    &.selected {
+      background-color: var(--green-to-brown);
+    }
+
+    &.disabled {
+      color: inherit;
+      pointer-events: none;
+      background-color: var(--dark-green-to-dark-brown);
+    }
+  }
+}
+
+// taco table (matches /buy premium style)
+.taco-table {
+  width: 100%;
+  font-family: 'Space Mono', monospace;
+  border-collapse: separate;
+  border-spacing: 0;
+  border: 2px solid var(--card-border);
+  border-radius: 0.5rem;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+
+  &--min-width {
+    width: min-content;
+  }
+
+  thead {
+    background: linear-gradient(135deg, var(--card-active-from), var(--card-active-to));
+
+    th {
+      padding: 1rem 1.25rem;
+      font-family: 'Rubik';
+      font-weight: 700;
+      font-size: 0.875rem;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--white);
+      border-bottom: none;
+      background-color: transparent;
+      white-space: nowrap;
+      vertical-align: middle;
+    }
+  }
+
+  tbody {
+    background-color: rgba(0, 0, 0, 0.15);
+
+    tr {
+      transition: background-color 0.15s ease;
+
+      &:hover {
+        background-color: rgba(0, 0, 0, 0.25);
+      }
+
+      &:not(:last-child) td {
+        border-bottom: 1px solid var(--table-row-border);
+      }
+    }
+
+    td {
+      padding: 1rem 1.25rem;
+      font-size: 0.875rem;
+      color: rgba(255, 255, 255, 0.85);
+      background-color: transparent;
+      white-space: nowrap;
+      vertical-align: middle;
+      border-bottom: none;
+    }
+  }
+}
+
+// taco toolbar
+.taco-toolbar {
+  display: flex;
+  width: 100%;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  overflow: visible;
+
+  .btn-group {
+    flex-wrap: wrap;
+  }
+}
+
+// taco title
+.taco-title {
+  font-family: 'Rubik', sans-serif;
+  font-weight: 700;
+  color: var(--gold);
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+  margin: 0;
+}
+
+// taco refresh button (floating, bottom-right)
+.taco-refresh-btn {
+  position: fixed;
+  bottom: 1.5rem;
+  right: 1.5rem;
+  z-index: 1040;
+  background: var(--orange-to-dark-brown);
+  border: 1px solid var(--dark-orange-to-dark-brown);
+  color: var(--black-to-white);
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 0.95rem;
+  transition: opacity 0.2s, background-color 0.2s, transform 0.15s;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+
+  &:hover {
+    opacity: 0.9;
+    background: var(--dark-orange-to-dark-brown);
+    transform: scale(1.05);
+  }
+
+  &:active {
+    transform: scale(0.95);
+  }
+
+  i {
+    font-size: 0.95rem;
+  }
+
+  @media (max-width: 576px) {
+    bottom: 1rem;
+    right: 1rem;
+    width: 2.5rem;
+    height: 2.5rem;
+    font-size: 0.85rem;
+
+    i {
+      font-size: 0.85rem;
+    }
+  }
+}
+
+// taco modal (unified dialog background)
+.taco-modal {
+  background: linear-gradient(135deg, var(--card-gradient-from), var(--card-gradient-to)) !important;
+  border: 2px solid var(--card-border) !important;
+  border-radius: 0.5rem;
+  box-shadow: var(--card-shadow);
+}
+
+// taco badge
+.taco-badge {
+  border: 1px solid var(--dark-orange);
+  background-color: var(--yellow);
+  font-size: 1rem;
+  transition: transform 0.5s;
+
+  &:hover,
+  &:focus,
+  &:active {
+      transform: scale(1.1, 1.1);
+  }
+
+  &:focus,
+  &:focus:focus-visible {
+      outline: 3px solid var(--dark-orange);
+      outline-offset: 2px;
+  }
+}
+
+// taco input
+.taco-input {
+  font-family: 'Space Mono';
+  font-weight: bold;
+  font-size: 1.125rem;
+  color: var(--black);
+  border: 1px solid var(--light-brown-to-white);
+  padding-top: 0.5rem;
+  padding-bottom: 0.5rem;
+
+  &::placeholder {
+    color: var(--dark-gray);
+    opacity: 1; /* Firefox */
+  }
+
+  &::-ms-input-placeholder { /* Edge 12 -18 */
+    color: var(--dark-gray);
+  }
+
+  &:disabled,
+  &[disabled]{
+
+    &::placeholder {
+      color: var(--gray);
+    }
+
+    &::-ms-input-placeholder { /* Edge 12 -18 */
+      color: var(--gray);
+    }
+
+  }
+
+  &:focus {
+    outline: none;
+    box-shadow: none;
+  }
+
+  &:focus-visible {
+    outline: 3px solid var(--light-brown-to-orange);
+    outline-offset: 2px;
+  }
+
+}
+
+// hide native number input spinners globally
+input[type="number"] {
+  -moz-appearance: textfield;
+
+  &::-webkit-outer-spin-button,
+  &::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+}
+
+// house-style select dropdowns
+select.taco-input,
+select.form-select,
+select.form-control {
+  appearance: none;
+  -webkit-appearance: none;
+  font-family: 'Space Mono';
+  cursor: pointer;
+  // custom chevron arrow (dark-orange #DA8D28)
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5L6 6.5L11 1.5' stroke='%23DA8D28' stroke-width='2' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.75rem center;
+  background-size: 0.75rem;
+  padding-right: 2.25rem;
+
+  &:focus {
+    outline: none;
+    box-shadow: none;
+  }
+
+  &:focus-visible {
+    outline: 3px solid var(--light-brown-to-orange);
+    outline-offset: 2px;
+  }
+}
+
+// taco text copy area
+.taco-text-copy-area {
+  padding: 1.375rem 1.825rem;
+  background-color: var(--yellow);
+  border: 1px solid var(--dark-orange);
+  border-radius: 0.5rem;
+  font-size: 1.125rem;
+  font-weight: bold;
+}
+
+// taco coin icons
+.taco-coin-icon {
+  border-radius: 100%;
+
+  // extra small coin icons
+  &--xs {
+    width: 1rem;
+    height: 1rem;
+    box-shadow:         0px 2px 6px 0px rgba(0,0,0,0.5);
+    -webkit-box-shadow: 0px 2px 6px 0px rgba(0,0,0,0.5);
+    -moz-box-shadow:    0px 2px 6px 0px rgba(0,0,0,0.5);
+  }
+
+  // small coin icons
+  &--sm {
+    width: 2rem;
+    height: 2rem;
+    box-shadow:         0px 2px 6px 0px rgba(0,0,0,0.5);
+    -webkit-box-shadow: 0px 2px 6px 0px rgba(0,0,0,0.5);
+    -moz-box-shadow:    0px 2px 6px 0px rgba(0,0,0,0.5);
+  }
+
+  // medium coin icons
+  &--md {
+    width: 2.375rem;
+    height: 2.375rem;
+    box-shadow: 0px 3px 6px 0px rgba(0,0,0,0.5);
+    -webkit-box-shadow: 0px 3px 6px 0px rgba(0,0,0,0.5);
+    -moz-box-shadow: 0px 3px 6px 0px rgba(0,0,0,0.5);
+  }
+
+  // large coin icons
+  &--lg {
+    width: 3.25rem;
+    height: 3.25rem;
+    box-shadow: 0px 3px 6px 0px rgba(0,0,0,0.5);
+    -webkit-box-shadow: 0px 3px 6px 0px rgba(0,0,0,0.5);
+    -moz-box-shadow: 0px 3px 6px 0px rgba(0,0,0,0.5);
+  }
+
+  // extra large coin icons
+  &--xl {
+    width: 5.625rem;
+    height: 5.625rem;
+    box-shadow: 0px 3px 6px 0px rgba(0,0,0,0.5);
+    -webkit-box-shadow: 0px 3px 6px 0px rgba(0,0,0,0.5);
+    -moz-box-shadow: 0px 3px 6px 0px rgba(0,0,0,0.5);
+  }
+
+}
+
+// taco progress
+.taco-progress {
+  border: 1px solid var(--dark-orange) !important;
+  background-color: var(--light-orange) !important;
+  height: 1.25rem;
+
+  // taco progress bar
+  &__bar {
+    background-color: var(--green) !important;
+  }
+
+}
+
+
+// ┌────────────────────────────────────┐
+// │  6. MODAL FRAMEWORK                │
+// └────────────────────────────────────┘
+
+// shared modal overlay
+.taco-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1050;
+  pointer-events: auto;
+
+  span {
+    color: var(--black-to-white);
+  }
+}
+
+// shared modal dialog container
+.taco-modal-dialog {
+  background: linear-gradient(135deg, var(--card-gradient-from), var(--card-gradient-to));
+  border: 2px solid var(--card-border);
+  border-radius: 0.5rem;
+  overflow: clip;
+  max-width: 500px;
+  width: 90%;
+  max-height: 90vh;
+  overflow-y: auto;
+  color: #ffffff;
+  pointer-events: auto;
+  position: relative;
+}
+
+// shared modal header
+.taco-modal-header {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  margin: 0;
+  margin-bottom: 0.75rem;
+  padding: 0;
+  border-bottom: 0;
+}
+
+// shared modal title
+.taco-modal-title {
+  display: flex;
+  align-items: center;
+  margin: 1.5rem 0px 0px 1.5rem;
+}
+
+// shared modal body
+.taco-modal-body {
+  padding: 0.75rem 1.5rem 0 !important;
+}
+
+// shared modal footer
+.taco-modal-footer {
+  border-top: none;
+  padding: 1rem;
+}
+
+// shared modal close button
+.taco-modal-close {
+  margin: 1rem 0.5rem 0 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+
+  i {
+    font-size: 1.5rem;
+    color: var(--black-to-white);
+  }
+}
+
+@media (max-width: 576px) {
+  .taco-modal-dialog {
+    margin: 0.5rem;
+    max-height: 95vh;
+  }
+
+  .taco-modal-header,
+  .taco-modal-body,
+  .taco-modal-footer {
+    padding: 1rem;
+  }
+}
+
+
+// ┌────────────────────────────────────┐
+// │  7. LOADING CURTAIN                │
+// └────────────────────────────────────┘
+
+// shared loading curtain overlay (used inside components with position: relative)
+.taco-loading-curtain {
+  position: absolute;
+  height: 100%;
+  width: 100%;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0,0,0,0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.5rem;
+  z-index: 99999;
+
+  .loading-img {
+    width: 10rem;
+  }
+}
+
+
+// ┌────────────────────────────────────┐
+// │  8. LOGIN CURTAIN                  │
+// └────────────────────────────────────┘
+
+// shared login gate overlay (prompts user to log in)
+.taco-login-curtain {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  height: 100%;
+  position: absolute;
+  top: 0;
+  left: 0;
+  background-color: var(--curtain-bg);
+  padding: 0 3rem;
+  border-radius: 0.5rem;
+  z-index: 1000;
+
+  .iid-login {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.325rem;
+
+    svg {
+      width: 1.375rem;
+    }
+
+    span {
+      font-size: 1rem;
+      font-family: 'Space Mono', monospace;
+    }
+  }
+}
+
+
+// ┌────────────────────────────────────┐
+// │  9. STATUS BADGES                  │
+// └────────────────────────────────────┘
+
+// shared status badge
+.taco-status-badge {
+  font-size: 0.7rem;
+  padding: 0.1rem 0.375rem;
+  border-radius: 0.25rem;
+  text-transform: uppercase;
+  font-weight: 600;
+  white-space: nowrap;
+
+  &--pending {
+    background: rgba(13, 110, 253, 0.15);
+    color: #4d9eff;
+  }
+
+  &--completed,
+  &--success {
+    background: rgba(40, 167, 69, 0.2);
+    color: var(--success-green);
+  }
+
+  &--failed,
+  &--error {
+    background: rgba(220, 53, 69, 0.2);
+    color: var(--red-to-light-red);
+  }
+
+  &--warning {
+    background: rgba(255, 193, 7, 0.2);
+    color: var(--dark-orange);
+  }
+}
+
+
+// ┌────────────────────────────────────┐
+// │ 10. KEY-VALUE INFO LIST            │
+// └────────────────────────────────────┘
+
+// shared info list (key-value pairs with dividers)
+.taco-info-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+
+  &__item {
+    font-size: 0.825rem;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid var(--table-row-border);
+    padding: 0.75rem 1rem;
+    gap: 0 1rem;
+
+    &:last-of-type {
+      border-bottom: none;
+    }
+  }
+
+  &__key {
+    font-size: 0.825rem;
+    color: var(--brown-to-white);
+  }
+
+  &__value {
+    font-size: 1rem;
+    font-weight: 700;
+    margin-inline-start: auto;
+  }
+}
+
+
+// ┌────────────────────────────────────┐
+// │ 11. SECTION TITLE                  │
+// └────────────────────────────────────┘
+
+// shared section title
+.taco-section-title {
+  font-size: 1.1rem;
+  font-family: 'Space Mono', monospace;
+  font-weight: 600;
+  color: var(--brown-to-white);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0;
+
+  i {
+    font-size: 0.95rem;
+  }
+
+  &--gold {
+    color: var(--gold);
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+  }
+}
+
+
+// ┌────────────────────────────────────┐
+// │ 12. EMPTY & ERROR STATES           │
+// └────────────────────────────────────┘
+
+// shared empty state
+.taco-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem 1rem;
+  text-align: center;
+
+  i {
+    font-size: 3rem;
+    opacity: 0.6;
+    margin-bottom: 1rem;
+  }
+
+  h3, p {
+    color: var(--black-to-white);
+  }
+
+  p {
+    opacity: 0.7;
+    font-size: 0.875rem;
+  }
+}
+
+// shared error state
+.taco-error-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  padding: 1.5rem;
+  background: rgba(255, 0, 0, 0.1);
+  border-left: 4px solid var(--dark-orange);
+  border-radius: 0.25rem;
+}
+
+
+// ┌────────────────────────────────────┐
+// │ 13. TEXT TRUNCATION                │
+// └────────────────────────────────────┘
+
+// single-line ellipsis
+.taco-truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+// multi-line clamp (2 lines)
+.taco-clamp-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+// multi-line clamp (3 lines)
+.taco-clamp-3 {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+
+// ┌────────────────────────────────────┐
+// │ 14. RESPONSIVE HELPERS             │
+// └────────────────────────────────────┘
+
+// hide on mobile (phone portrait)
+.taco-hide-mobile {
+  @media (max-width: 575.98px) {
+    display: none !important;
+  }
+}
+
+// hide on tablet and below
+.taco-hide-tablet {
+  @media (max-width: 767.98px) {
+    display: none !important;
+  }
+}
+
+// show only on mobile
+.taco-show-mobile-only {
+  display: none !important;
+  @media (max-width: 575.98px) {
+    display: block !important;
+  }
+}
+
+// stack columns on mobile
+.taco-col-stack-mobile {
+  @media (max-width: 767.98px) {
+    flex-direction: column !important;
+
+    > * {
+      width: 100% !important;
+    }
+  }
+}
+
+
+// ┌────────────────────────────────────┐
+// │ 15. FLEX LAYOUT UTILITIES          │
+// └────────────────────────────────────┘
+
+// flex row with space-between
+.taco-flex-between {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+// flex centered
+.taco-flex-center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+// flex column
+.taco-flex-col {
+  display: flex;
+  flex-direction: column;
+}
+
+
+// ┌────────────────────────────────────┐
+// │ 16. LOADING SPINNER                │
+// └────────────────────────────────────┘
+
+// shared loading spinner state
+.taco-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem;
+  gap: 1rem;
+
+  i {
+    font-size: 2rem;
+    animation: spin 1s linear infinite;
+  }
+
+  p {
+    opacity: 0.7;
+    font-size: 0.875rem;
+  }
+}
+
+
+// ┌────────────────────────────────────┐
+// │ 17. GRADIENT HEADER                │
+// └────────────────────────────────────┘
+
+// shared gradient header bar
+.taco-gradient-header {
+  background: linear-gradient(135deg, var(--card-gradient-from), var(--card-gradient-to));
+  border: 2px solid var(--card-border);
+  border-radius: 0.5rem;
+  padding: 1rem;
+  text-align: center;
+  color: var(--gold);
+  font-weight: 600;
+  font-size: 1.125rem;
+}
+
+
+// ┌────────────────────────────────────┐
+// │ 18. TOP BAR                        │
+// └────────────────────────────────────┘
+
+// shared top bar (page-level header with title + actions)
+.taco-top-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 2rem;
+  padding: 1rem 1.5rem;
+  margin-bottom: 1rem;
+  background: rgba(0, 0, 0, 0.15);
+  border-radius: 0.5rem;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+
+  &__title {
+    font-size: 1.25rem;
+    font-family: 'Space Mono', monospace;
+    color: var(--brown-to-white);
+    margin: 0;
+  }
+}
+
+
+// ┌────────────────────────────────────┐
+// │ 19. DARK MODE TOGGLE               │
+// └────────────────────────────────────┘
+
+// dark mode toggle
+.dark-mode-toggle {
+
+  // button
+  &__btn {
+    font-size: 1.75rem;
+    user-select: none;
+    cursor: pointer;
+    outline: none;
+    border: none;
+    box-shadow: none;
+    padding: 0;
+
+    &:focus, &:active {
+      outline: none;
+      border: none;
+      box-shadow: none;
+    }
+
+    &:focus:focus-visible {
+      outline: 3px solid var(--dark-orange);
+      outline-offset: 2px;
+      box-shadow: none;
+    }
+  }
+
+  // light icon
+  &--light-icon {
+    font-size: inherit;
+  }
+
+  // dark icon
+  &--dark-icon {
+    font-size: inherit;
+  }
+
+}
+
+
+// ┌────────────────────────────────────┐
+// │ 20. UTILITY CLASSES                │
+// └────────────────────────────────────┘
+
+/////////////////////
+// Utility Classes //
+/////////////////////
+
+//////////
+// Text //
+
+.wordwrap-breakword { word-wrap: break-word; }
+.wordbreak-breakall { word-break: break-all; }
+.wordbreak-breakword { word-break: break-word; }
+.wordwrap-anywhere { word-wrap: anywhere; }
+.smaller { font-size: 50%; }
+.text-capitalize { text-transform: capitalize; }
+.text-uppercase { text-transform: uppercase; }
+
+////////////////
+// Text Color //
+
+.taco-text-black-to-white { color: var(--black-to-white) !important; }
+.taco-text-dark-gray-to-light-gray { color: var(--dark-gray-to-light-gray) !important; }
+.taco-text-dark-gray-to-gray { color: var(--dark-gray-to-gray) !important; }
+.taco-text-white-to-black { color: var(--white-to-black) !important; }
+.taco-text-brown-to-white { color: var(--brown-to-white) !important; }
+.taco-text-brown-to-light-gray { color: var(--brown-to-light-gray) !important; }
+.taco-text-blue-to-light-blue { color: var(--blue-to-light-blue) !important; }
+.taco-text-light-green-to-success-green-hover { color: var(--light-green-to-success-green-hover) !important; }
+.taco-text-light-green-to-success-green { color: var(--light-green-to-success-green) !important; }
+.taco-text-success-green-to-success-green-hover { color: var(--success-green-to-success-green-hover) !important; }
+.taco-text-success-green-hover-to-success-green { color: var(--success-green-hover-to-success-green) !important; }
+.taco-text-success-green-hover-to-light-green { color: var(--success-green-hover-to-light-green) !important; }
+.taco-text-dark-green-to-light-green { color: var(--dark-green-to-light-green) !important; }
+.taco-text-red-to-light-red { color: var(--red-to-light-red) !important; }
+.taco-text-red-to-red-hover { color: var(--red-to-error-red-hover) !important; }
+.taco-text-gray-to-dark-gray { color: var(--gray-to-dark-gray) !important; }
+
+// standard text color utilities
+.taco-text-white { color: var(--white) !important; }
+.taco-text-black { color: var(--black) !important; }
+.taco-text-light-gray { color: var(--light-gray) !important; }
+.taco-text-gray { color: var(--gray) !important; }
+.taco-text-light-red { color: var(--light-red) !important; }
+.taco-text-red { color: var(--red) !important; }
+.taco-text-red-hover { color: var(--red-hover) !important; }
+.taco-text-orange { color: var(--orange) !important; }
+.taco-text-light-orange { color: var(--light-orange) !important; }
+.taco-text-dark-orange { color: var(--dark-orange) !important; }
+.taco-text-yellow { color: var(--yellow) !important; }
+.taco-text-light-green { color: var(--light-green) !important; }
+.taco-text-green { color: var(--green) !important; }
+.taco-text-success-green { color: var(--success-green) !important; }
+.taco-text-dark-green { color: var(--dark-green) !important; }
+.taco-text-brown { color: var(--brown) !important; }
+.taco-text-dark-brown { color: var(--dark-brown) !important; }
+.taco-text-blue { color: var(--blue) !important; }
+
+// force text colors across theme utilities
+.taco-force-text-white { color: #ffffff !important; }
+.taco-force-text-black { color: #2d2d2d !important; }
+.taco-force-text-light-gray { color: #f4f3ec !important; }
+.taco-force-text-red { color: #eb0000 !important; }
+.taco-force-text-orange { color: #FEd66c !important; }
+.taco-force-text-light-orange { color: #feeac1 !important; }
+.taco-force-text-dark-orange { color: #DA8D28 !important; }
+.taco-force-text-yellow { color: #fec800 !important; }
+.taco-force-text-green { color: #b7cd02 !important; }
+.taco-force-text-dark-green { color: #7d8828 !important; }
+.taco-force-text-brown { color: #934a17 !important; }
+.taco-force-text-dark-brown { color: #512100 !important; }
+.taco-force-text-blue { color: #546595 !important; }
+
+//////////
+// Font //
+
+.font-space-mono { font-family: 'Space Mono', monospace; }
+.font-rubik { font-family: 'Rubik', sans-serif; }
+.font-merchant-copy { font-family: 'Merchant Copy', sans-serif; }
+.font-merchant-copy-wide { font-family: 'Merchant Copy Wide', sans-serif; }
+.font-merchant-copy-double { font-family: 'Merchant Copy Double', sans-serif; }
+
+////////////////
+// Background //
+
+//
+.taco-bg-dark-orange-to-brown { background: var(--dark-orange-to-brown) !important; }
+.taco-bg-brown-to-dark-orange { background: var(--brown-to-dark-orange) !important; }
+
+// standard background color utilities
+.taco-bg-white { background-color: var(--white) !important; }
+.taco-bg-black { background-color: var(--black) !important; }
+.taco-bg-light-gray { background-color: var(--light-gray) !important; }
+.taco-bg-red { background-color: var(--red) !important; }
+.taco-bg-orange { background-color: var(--orange) !important; }
+.taco-bg-light-orange { background-color: var(--light-orange) !important; }
+.taco-bg-dark-orange { background-color: var(--dark-orange) !important; }
+.taco-bg-yellow { background-color: var(--yellow) !important; }
+.taco-bg-green { background-color: var(--green) !important; }
+.taco-bg-dark-green { background-color: var(--dark-green) !important; }
+.taco-bg-brown { background-color: var(--brown) !important; }
+.taco-bg-dark-brown { background-color: var(--dark-brown) !important; }
+.taco-bg-blue { background-color: var(--blue) !important; }
+
+// force background colors across theme utilities
+.taco-force-bg-white { background-color: #ffffff !important; }
+.taco-force-bg-black { background-color: #2d2d2d !important; }
+.taco-force-bg-light-gray { background-color: #f4f3ec !important; }
+.taco-force-bg-red { background-color: #eb0000 !important; }
+.taco-force-bg-orange { background-color: #FEd66c !important; }
+.taco-force-bg-light-orange { background-color: #feeac1 !important; }
+.taco-force-bg-dark-orange { background-color: #DA8D28 !important; }
+.taco-force-bg-yellow { background-color: #fec800 !important; }
+.taco-force-bg-green { background-color: #b7cd02 !important; }
+.taco-force-bg-dark-green { background-color: #7d8828 !important; }
+.taco-force-bg-brown { background-color: #934a17 !important; }
+.taco-force-bg-dark-brown { background-color: #512100 !important; }
+.taco-force-bg-blue { background-color: #546595 !important; }
+
+////////////
+// Border //
+
+// standard border color utilities
+.taco-border-white { border-color: var(--white) !important; }
+.taco-border-black { border-color: var(--black) !important; }
+.taco-border-light-gray { border-color: var(--light-gray) !important; }
+.taco-border-red { border-color: var(--red) !important; }
+.taco-border-orange { border-color: var(--orange) !important; }
+.taco-border-light-orange { border-color: var(--light-orange) !important; }
+.taco-border-dark-orange { border-color: var(--dark-orange) !important; }
+.taco-border-yellow { border-color: var(--yellow) !important; }
+.taco-border-green { border-color: var(--green) !important; }
+.taco-border-dark-green { border-color: var(--dark-green) !important; }
+.taco-border-brown { border-color: var(--brown) !important; }
+.taco-border-dark-brown { border-color: var(--dark-brown) !important; }
+.taco-border-blue { border-color: var(--blue) !important; }
+
+// force border colors across theme utilities
+.taco-force-border-white { border-color: #ffffff !important; }
+.taco-force-border-black { border-color: #2d2d2d !important; }
+.taco-force-border-light-gray { border-color: #f4f3ec !important; }
+.taco-force-border-red { border-color: #eb0000 !important; }
+.taco-force-border-orange { border-color: #FEd66c !important; }
+.taco-force-border-light-orange { border-color: #feeac1 !important; }
+.taco-force-border-dark-orange { border-color: #DA8D28 !important; }
+.taco-force-border-yellow { border-color: #fec800 !important; }
+.taco-force-border-green { border-color: #b7cd02 !important; }
+.taco-force-border-dark-green { border-color: #7d8828 !important; }
+.taco-force-border-brown { border-color: #934a17 !important; }
+.taco-force-border-dark-brown { border-color: #512100 !important; }
+.taco-force-border-blue { border-color: #546595 !important; }
+
+// customs lm to dm color utilities
+.taco-text-brown-to-light-orange { color: var(--brown-to-light-orange); }
+
+/////////
+// Gap //
+
+.gap-0 {gap: 0;}
+.gap-1 {gap: 0.25rem;}
+.gap-2 {gap: 0.5rem;}
+.gap-3 {gap: 1rem;}
+.gap-4 {gap: 1.5rem;}
+.gap-5 {gap: 3rem;}
+
+.gap-0-0 {gap: 0 0;}
+.gap-0-1 {gap: 0 0.25rem;}
+.gap-0-2 {gap: 0 0.5rem;}
+.gap-0-3 {gap: 0 1rem;}
+.gap-0-4 {gap: 0 1.5rem;}
+.gap-0-5 {gap: 0 3rem;}
+
+.gap-1-0 {gap: 0.25rem 0;}
+.gap-1-1 {gap: 0.25rem 0.25rem;}
+.gap-1-2 {gap: 0.25rem 0.5rem;}
+.gap-1-3 {gap: 0.25rem 1rem;}
+.gap-1-4 {gap: 0.25rem 1.5rem;}
+.gap-1-5 {gap: 0.25rem 3rem;}
+
+.gap-2-0 {gap: 0.5rem 0;}
+.gap-2-1 {gap: 0.5rem 0.25rem;}
+.gap-2-2 {gap: 0.5rem 0.5rem;}
+.gap-2-3 {gap: 0.5rem 1rem;}
+.gap-2-4 {gap: 0.5rem 1.5rem;}
+.gap-2-5 {gap: 0.5rem 3rem;}
+
+.gap-3-0 {gap: 1rem 0;}
+.gap-3-1 {gap: 1rem 0.25rem;}
+.gap-3-2 {gap: 1rem 0.5rem;}
+.gap-3-3 {gap: 1rem 1rem;}
+.gap-3-4 {gap: 1rem 1.5rem;}
+.gap-3-5 {gap: 1rem 3rem;}
+
+.gap-4-0 {gap: 1.5rem 0;}
+.gap-4-1 {gap: 1.5rem 0.25rem;}
+.gap-4-2 {gap: 1.5rem 0.5rem;}
+.gap-4-3 {gap: 1.5rem 1rem;}
+.gap-4-4 {gap: 1.5rem 1.5rem;}
+.gap-4-5 {gap: 1.5rem 3rem;}
+
+.gap-5-0 {gap: 3rem 0;}
+.gap-5-1 {gap: 3rem 0.25rem;}
+.gap-5-2 {gap: 3rem 0.5rem;}
+.gap-5-3 {gap: 3rem 1rem;}
+.gap-5-4 {gap: 3rem 1.5rem;}
+.gap-5-5 {gap: 3rem 3rem;}
+
+///////////
+// Focus //
+
+.standard-focus {
+    &:focus {
+        outline: none;
+    }
+    &:focus-visible {
+        outline: 3px solid var(--light-brown-to-orange) !important;
+        outline-offset: 0px !important;
+    }
+
+    &--negative-offset {
+        &:focus-visible {
+            outline-offset: -3px !important;
+        }
+     }
+}
+
+/////////////
+// Z Index //
+
+.z0 { z-index: 0; }
+.z1 { z-index: 1; }
+.z2 { z-index: 2; }
+.z3 { z-index: 3; }
+.z4 { z-index: 4; }
+.z5 { z-index: 5; }
+.z6 { z-index: 6; }
+.z7 { z-index: 7; }
+.z8 { z-index: 8; }
+.z9 { z-index: 9; }
+.z10 { z-index: 10; }
+
+//////////
+// Misc //
+
+.maxwidth-100 { max-width: 100%; }
+.h-fitcontent { height: fit-content; }
+.vertical-align-middle { vertical-align: middle; }
+.w-fit-content { width: fit-content !important; }
+
+
+// ┌────────────────────────────────────┐
+// │ 21. SCROLL & LAYOUT UTILITIES      │
+// └────────────────────────────────────┘
+
+.scroll-container {
+  overflow: auto;
+}
+
+.scroll-x-container {
+  overflow-y: hidden;
+  overflow-x: auto;
+}
+
+.scroll-y-container {
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+// views
+.standard-view {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  height: 100%;
+}
+
+
+// ┌────────────────────────────────────┐
+// │ 22. ANIMATIONS & TRANSITIONS       │
+// └────────────────────────────────────┘
+
+////////////////////////
+// Animation Utilites //
+////////////////////////
+
+.rotating-char {
+  display: inline-block;
+  animation: spin 8s linear infinite;
+}
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+////////////////////////
+// Transition Classes //
+////////////////////////
+
+// transition classes
+.fade-enter-active, .fade-leave-active {
+  transition: opacity 0.5s ease;
+}
+
+.fade-enter-from, .fade-leave-to {
+  opacity: 0;
+}

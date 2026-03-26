@@ -917,7 +917,7 @@ onBeforeUnmount(() => {
     }
 
     &:not(.active):hover {
-      background-color: var(--light-orange-to-dark-brown);
+      background: linear-gradient(135deg, var(--card-gradient-from), var(--card-gradient-to));
     }
 
     &:disabled {

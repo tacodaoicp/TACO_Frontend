@@ -408,6 +408,7 @@ const handleCancel = async (op: UnifiedOperation) => {
   &__title {
     font-size: 1.25rem;
     font-family: 'Space Mono', monospace;
+    color: var(--gold);
     margin-bottom: 0;
   }
 

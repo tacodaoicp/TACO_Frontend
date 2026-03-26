@@ -21,27 +21,13 @@
     <div class="dao-vote-power__go-to-voting">
       
       <!-- router link to voting -->
-      <router-link to="/vote" 
+      <router-link to="/vote"
         class="dao-vote-power__go-to-voting__link
-          btn btn-lg taco-nav-btn taco-nav-btn--active mb-0">Go to voting</router-link>
+          btn btn-lg taco-btn taco-btn--green mb-0">Go to voting</router-link>
 
     </div>
 
-    <div class="d-flex justify-content-center">
-
-      <!-- refresh voting power button -->
-      <button class="btn btn-link mb-2"
-              @click="refreshVotingPower"
-              :class="{'disabled': refreshingVP}"
-              style="color: var(--black-to-white);">
-
-        <!-- refresh icon -->
-        <span v-if="!refreshingVP && userLoggedIn" style="color: var(--black-to-white);">Refresh</span>
-        <span v-if="refreshingVP" style="color: var(--black-to-white);">Refreshing</span>
-
-      </button>    
-
-    </div>
+    <!-- refresh removed — use floating .taco-refresh-btn at view level -->
     
     <!-- last voted -->
     <div v-if="userLoggedIn" class="dao-vote-power__last-voted">
@@ -81,30 +67,30 @@
 
     // title
     &__title {
-      color: var(--white);
+      color: var(--gold);
       display: block;
       font-size: 1.125rem;
       font-weight: 600;
-      background-color: var(--dark-orange-to-light-brown);
+      background: linear-gradient(135deg, var(--card-gradient-from), var(--card-gradient-to));
       width: 100%;
       text-align: center;
       margin: 1.25rem 0 0 0;
       padding: 1rem 0;
       border-radius: 0.5rem;
-      border: 1px solid var(--dark-orange);
+      border: 2px solid var(--card-border);
     }
 
     // count
     &__count {
-      color: var(--white);
+      color: var(--text-cream);
       display: block;
       font-size: 3rem;
       font-weight: 600;
-      background-color: var(--dark-orange-to-light-brown);
+      background: linear-gradient(135deg, var(--card-gradient-from), var(--card-gradient-to));
       margin: 0.5rem 0 1.5rem 0;
       padding: 2rem 4rem;
       border-radius: 0.5rem;
-      border: 1px solid var(--dark-orange);
+      border: 2px solid var(--card-border);
     }
     
   }
@@ -119,9 +105,8 @@
 
     // link
     &__link {
-      color: var(--white-to-black) !important;
+      color: var(--white) !important;
       margin-bottom: 0.5rem;
-      background-color: var(--light-brown-to-yellow);
     }
   }
 

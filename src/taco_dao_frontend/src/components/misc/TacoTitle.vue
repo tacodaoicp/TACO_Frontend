@@ -22,11 +22,11 @@
     gap: 0.75rem;
 
     &__icon {
-      color: var(--brown-to-white);
+      color: var(--gold);
     }
 
     &__title {
-      color: var(--brown-to-white);
+      color: var(--gold);
     }
   }
 

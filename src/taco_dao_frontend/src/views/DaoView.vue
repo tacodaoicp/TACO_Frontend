@@ -111,6 +111,15 @@
 
     </div>
 
+    <!-- Floating Refresh Button -->
+    <button
+      v-if="tacoStore.userLoggedIn"
+      class="taco-refresh-btn"
+      @click="refreshDao"
+      title="Refresh DAO data">
+      <i class="fa fa-sync-alt"></i>
+    </button>
+
   </div>
 
 </template>
@@ -243,10 +252,20 @@
   // Imports //
   /////////////
 
+  import { useTacoStore } from '../stores/taco.store'
   import TacoTitle from '../components/misc/TacoTitle.vue'
   import DaoAllocations from "../components/dao/DaoAllocations.vue";
   import DaoTrustedTokens from "../components/dao/DaoTrustedTokens.vue";
   import DaoVotePower from "../components/dao/DaoVotePower.vue";
   import DaoNews from "../components/dao/DaoNews.vue";
+
+  const tacoStore = useTacoStore()
+
+  const refreshDao = async () => {
+    await Promise.all([
+      tacoStore.refreshUserVotingPower(),
+      tacoStore.fetchUserAllocation(),
+    ])
+  }
 
 </script>

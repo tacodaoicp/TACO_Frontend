@@ -131,8 +131,8 @@
     &__item {
         display: flex;
         flex-direction: column;
-        background-color: var(--light-orange-to-dark-brown);
-        border-bottom: 1px solid var(--dark-orange);
+        background-color: rgba(0, 0, 0, 0.15);
+        border-bottom: 1px solid var(--table-row-border);
         padding: 1rem;
 
         &:first-of-type {

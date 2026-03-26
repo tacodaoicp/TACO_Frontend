@@ -12344,7 +12344,7 @@ away from being playable.
 
             <!-- hotkey svg icon -->
             <i class="fa-solid fa-triangle-exclamation"
-              style="font-size: 5rem; color: var(--dark-orange-to-light-brown);"></i>
+              style="font-size: 5rem; color: var(--gold);"></i>
 
             <!-- title -->
             <span class="taco-text-black-to-white d-inline-block text-center px-2 pt-2 pb-1"
@@ -12410,7 +12410,7 @@ away from being playable.
       border-right: 1px solid var(--dark-orange);
       border-top-left-radius: 0.5rem;
       border-bottom-left-radius: 0.5rem;
-      background-color: var(--orange-to-light-brown);      
+      background: linear-gradient(135deg, var(--card-gradient-from), var(--card-gradient-to));
     }
 
     // right
@@ -12503,7 +12503,7 @@ away from being playable.
       position: absolute;
       top: 0.5rem;
       right: 0.5rem;
-      background-color: var(--dark-orange-to-light-brown);
+      background: linear-gradient(135deg, var(--card-active-from), var(--card-active-to));
       height: fit-content;
       padding: 0.5rem 0.75rem;
       border-radius: 0.25rem;
@@ -12514,7 +12514,7 @@ away from being playable.
       // icon
       &__icon {
         font-size: 1.5rem;
-        color: white;
+        color: var(--text-cream);
       }
 
     }
@@ -12526,9 +12526,9 @@ away from being playable.
       // inner
       &__inner {
         padding: 2rem 2rem 0;
-        background-color: var(--light-orange-to-dark-brown);
+        background-color: rgba(0, 0, 0, 0.15);
         border-radius: 0.5rem;
-        border: 1px solid var(--dark-orange-to-light-brown);
+        border: 1px solid var(--table-row-border);
       }
 
     }
@@ -12738,8 +12738,8 @@ away from being playable.
       width: 100%;
       max-width: 40rem;
       border-radius: 0.5rem;
-      background-color: var(--light-orange-to-dark-brown);
-      border: 1px solid var(--dark-orange);
+      background: linear-gradient(135deg, var(--card-gradient-from), var(--card-gradient-to));
+      border: 2px solid var(--card-border);
       overflow: clip;
       margin: 2rem 2rem 2rem;
 

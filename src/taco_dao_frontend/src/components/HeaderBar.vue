@@ -70,26 +70,12 @@
         
         </router-link>
         
-         <!-- sales - router link -->
-        <router-link to="/sales" class="header-bar__rl">
-          
-          <span class="header-bar__rl-span">Sales</span>
-        
-        </router-link>
-
         <!-- info - router link -->
         <router-link to="/info" class="header-bar__rl">
           
           <span class="header-bar__rl-span">Info</span>
         
         </router-link>        
-        
-        <!-- code - router link -->
-        <a href="https://github.com/tacodaoicp/" target="_blank" class="d-inline-flex" style="gap: 0.25rem; padding: 0 0.75rem;">
-          
-          <span class="header-bar__rl-span">Code</span>
-        
-        </a>        
         
         <!-- wallet - router link -->
         <router-link to="/wallet" class="header-bar__rl">
@@ -285,14 +271,6 @@
 
         </router-link>         
         
-        <!-- sales - router link -->
-        <router-link @click="togglePagesMenu()" to="/sales" class="list-group-item">
-
-          <!-- item text -->
-          <span>Sales</span>
-
-        </router-link>
-
         <!-- info - router link -->
         <router-link @click="togglePagesMenu()" to="/info" class="list-group-item">
 
@@ -300,16 +278,6 @@
           <span>Info</span>
 
         </router-link>          
-        
-        <!-- code - anchor -->
-        <a class="list-group-item"
-           href="https://github.com/tacodaoicp/"
-           target="_blank">
-
-          <!-- item text -->
-          <span>Code</span>
-
-        </a>       
         
         <!-- wallet - router link -->
         <router-link @click="togglePagesMenu()" to="/wallet" class="list-group-item">
@@ -513,12 +481,10 @@
     .account-menu, .pages-menu {
       position: absolute;
       top: calc( 100% - 0.5rem );
-      border: 1px solid var(--dark-orange);
-      background-color: var(--orange);
+      border: 2px solid var(--card-border);
+      background: linear-gradient(135deg, var(--card-gradient-from), var(--card-gradient-to));
       border-radius: 0.5rem;
-      box-shadow: 0px 3px 6px 0px rgba(0,0,0,0.16);
-      -webkit-box-shadow: 0px 3px 6px 0px rgba(0,0,0,0.16);
-      -moz-box-shadow: 0px 3px 6px 0px rgba(0,0,0,0.16);
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
       z-index: 9999; // below loading curtain
 
       // account menu button
@@ -555,9 +521,15 @@
         background-color: transparent;
         gap: 1rem;
         text-decoration: none;
+        color: var(--text-cream);
 
         &:hover {
-          background-color: rgba(0,0,0,0.04);
+          background-color: rgba(255, 255, 255, 0.08);
+        }
+
+        &.router-link-active,
+        &.router-link-exact-active {
+          color: var(--gold);
         }
       }
 

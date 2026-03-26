@@ -24,7 +24,7 @@
               <div class="taco-toolbar__left">
 
                 <!-- buttons -->
-                <div class="btn-group">
+                <div class="d-flex gap-2">
 
                     <!-- open chat -->
                     <button class="btn taco-nav-btn"
@@ -47,11 +47,11 @@
                 <div v-show="showOpenChat" class="btn-group">
 
                   <!-- gated access tutorial -->
-                  <button class="btn taco-nav-btn taco-nav-btn--green taco-nav-btn--active ms-auto animate__animated animate__delay-1s" 
+                  <button class="btn taco-btn taco-btn--green ms-auto animate__animated animate__delay-1s"
                     :class="{ 'animate__swing': openChatSeenLocalValue }"
                     @click="showAccessTutorial()">
-                    <i class="fa-solid fa-circle-question"></i>
-                    <span class="hide-on-mobile"> Gated Access</span>
+                    <i class="fa-solid fa-circle-question me-1"></i>
+                    <span class="hide-on-mobile">Gated Access</span>
                   </button>                              
 
                 </div>
@@ -277,8 +277,8 @@
       width: 100%;
       max-width: 40rem;
       border-radius: 0.5rem;
-      background-color: var(--light-orange-to-dark-brown);
-      border: 1px solid var(--dark-orange);
+      background: linear-gradient(135deg, var(--card-gradient-from), var(--card-gradient-to));
+      border: 2px solid var(--card-border);
       overflow: clip;
       margin: 2rem 2rem 2rem;
 
@@ -309,7 +309,7 @@
         display: flex;
         width: 100%;
         justify-content: space-between;
-        background-color: var(--dark-orange);
+        background: linear-gradient(135deg, var(--card-active-from), var(--card-active-to));
       }
 
       // top

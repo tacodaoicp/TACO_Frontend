@@ -455,9 +455,9 @@
 }
 
 .modal-dialog {
-  background-color: var(--light-orange-to-dark-brown);
-  border: 1px solid var(--dark-orange);
-  border-radius: .5rem;
+  background: linear-gradient(135deg, var(--card-gradient-from), var(--card-gradient-to));
+  border: 2px solid var(--card-border);
+  border-radius: 0.5rem;
   overflow: clip;
   max-width: 500px;
   width: 90%;
@@ -491,12 +491,13 @@
 
 .swap-icon {
   font-size: 3.5rem;
-  color: var(--dark-brown-to-white) !important;
+  color: var(--gold) !important;
 }
 
 .swap-title-text {
   font-size: 1.5rem;
   font-weight: 600;
+  color: var(--gold) !important;
 }
 
 .swap-btn-close {
@@ -523,8 +524,8 @@
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
-  background-color: var(--orange-to-brown);
-  border: 1px solid var(--dark-orange);
+  background: linear-gradient(135deg, var(--card-mid-from), var(--card-mid-to));
+  border: 1px solid var(--card-border);
 }
 
 .token-selector {
@@ -532,8 +533,8 @@
   align-items: center;
   justify-content: space-between;
   padding: 0.5rem;
-  background: var(--dark-orange-to-light-brown);
-  border: 1px solid var(--dark-orange);
+  background: linear-gradient(135deg, var(--card-active-from), var(--card-active-to));
+  border: 1px solid var(--card-border);
   border-radius: 0.5rem;
   cursor: pointer;
   transition: all 0.2s ease;
@@ -624,8 +625,8 @@
 }
 
 .token-output-group {
-  background-color: var(--orange-to-brown);
-  border: 1px solid var(--dark-orange);
+  background: linear-gradient(135deg, var(--card-mid-from), var(--card-mid-to));
+  border: 1px solid var(--card-border);
   border-radius: 0.5rem;
   padding: 0.5rem;
   display: flex;
@@ -663,17 +664,16 @@
 }
 
 .quote-item {
-  background-color: var(--dark-brown);
   background: none;
-  outline: 1px dashed var(--dark-orange);  
+  outline: 1px dashed var(--card-border);
   border-radius: 0.5rem;
   padding: 0.75rem;
   cursor: pointer;
 }
 
 .quote-item.selected-quote {
-  outline: 3px solid var(--dark-orange);
-  background: var(--orange-to-brown);
+  outline: 3px solid var(--card-border);
+  background: linear-gradient(135deg, var(--card-mid-from), var(--card-mid-to));
   border: none;
   border-radius: 0.5rem;
 }
@@ -784,9 +784,9 @@
 }
 
 .token-selector-dialog {
-  background: var(--light-orange-to-brown);
+  background: linear-gradient(135deg, var(--card-gradient-from), var(--card-gradient-to));
   border-radius: 0.5rem;
-  border: 1px solid var(--dark-orange);
+  border: 2px solid var(--card-border);
   width: 90%;
   max-width: 400px;
   max-height: 500px;

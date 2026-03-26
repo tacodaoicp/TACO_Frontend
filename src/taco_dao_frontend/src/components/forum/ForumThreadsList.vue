@@ -189,7 +189,7 @@
       padding: 1rem 0 0;
       position: sticky;
       top: 0;
-      background-color: var(--orange-to-light-brown);
+      background: linear-gradient(135deg, var(--card-mid-from), var(--card-mid-to));
       transition: background-color 0.25s;
       border-top-left-radius: 0.5rem;
 
@@ -209,7 +209,7 @@
       font-size: 1.5rem;
       text-align: center;
       font-family: "Space Mono";
-      color: var(--black-to-white);
+      color: var(--gold);
     }
 
     // search and filter dropdown
@@ -236,7 +236,7 @@
         padding: 0rem 0.5rem;
         border-radius: 0.25rem;
         border: 0.5px solid black;
-        background-color: #fff;
+        background-color: var(--white);
         max-width: 50%;
     }
 
@@ -325,7 +325,7 @@
         border-radius: 999rem;
         font-size: 1.125rem;
         font-family: "Space Mono";
-        color: #000;
+        color: var(--black);
         background-color: var(--light-orange);
       }
 

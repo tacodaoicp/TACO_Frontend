@@ -662,8 +662,8 @@
     position: relative;
     display: flex;
     flex-direction: column;
-    height: 100dvh;
-    min-height: 888px;
+    height: calc(100dvh - 56px); // subtract header height
+    min-height: 832px;
     z-index: 2;
 
     &__upper {
@@ -766,7 +766,7 @@
     gap: 0.75rem;
 
     &__icon {
-      color: var(--brown-to-white);
+      color: var(--gold);
       width: 1.75rem !important;
       font-size: 1.5rem;
       min-width: unset !important;
@@ -781,7 +781,8 @@
     }
 
     &__text {
-      color: var(--brown-to-white);
+      color: var(--gold);
+      text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
       white-space: nowrap;
     }
 
@@ -1153,8 +1154,8 @@
       width: 100%;
       height: 100%;
       border-radius: 0.5rem;
-      background-color: var(--light-orange-to-dark-brown);
-      border: 1px solid var(--dark-orange);
+      background: linear-gradient(135deg, var(--card-gradient-from), var(--card-gradient-to));
+      border: 2px solid var(--card-border);
       overflow: auto;
 
       // top and bottom
@@ -1162,7 +1163,7 @@
         display: flex;
         width: 100%;
         justify-content: space-between;
-        background-color: var(--dark-orange);
+        background: linear-gradient(135deg, var(--card-active-from), var(--card-active-to));
       }
 
       // middle

@@ -77,28 +77,7 @@
 
 </template>
 
-<style lang="scss">
-
-  ///////////////////////
-  // Application Style //
-  ///////////////////////
-  
-  // prevent overscroll
-  html, body {
-    overscroll-behavior-y: none;
-  }
-
-  // everything
-  * {
-    // start with roboto as base font
-    font-family: "Roboto";
-    // smooth transition text color and background color
-    transition: color 0.25s, background-color 0.25s, fill 0.25s, opacity 0.25s;
-    // scrollbar color
-    scrollbar-color: var(--dark-orange) var(--yellow);
-    // box sizing border box
-    box-sizing: border-box;
-  }
+<script setup>
 
   // app
   .app {
@@ -109,20 +88,40 @@
     // clipped overflow
     overflow: clip;
 
+    // flex column so header + content fill viewport
+    display: flex;
+    flex-direction: column;
+
     // default text color black
     color: var(--black);
 
-    // app content area - flex container for views and footer
+    // app content area - scrolls as one unit so footer is at bottom of content
     &__content {
       display: flex;
       flex-direction: column;
-      height: calc(100dvh - 56px); // subtract header height
-      overflow: hidden;
+      flex: 1;
+      min-height: 0;
+      overflow-y: auto;
 
-      // Make views expand to fill available space
-      > :first-child {
-        flex: 1;
-        overflow: auto;
+      // Views fill remaining space (pushes footer to bottom on short pages)
+      > *:not(:last-child) {
+        flex: 1 0 auto;
+      }
+
+      // Footer never shrinks
+      > :last-child {
+        flex-shrink: 0;
+      }
+
+      // Prevent double scrollbar: views flow naturally, app__content is the sole scroll container
+      .standard-view {
+        height: auto;
+        min-height: 100%;
+      }
+
+      .scroll-y-container {
+        overflow: visible;
+        height: auto;
       }
     }
 
@@ -150,14 +149,15 @@
 
   // scrollbars
   *::-webkit-scrollbar {
-    width: 5px; /* Mostly for vertical scrollbars */
-    height: 5px; /* Mostly for horizontal scrollbars */
+    width: 6px;
+    height: 6px;
   }
   *::-webkit-scrollbar-thumb {
-    background: var(--dark-orange); /* Foreground */
+    background: var(--scrollbar-thumb);
+    border-radius: 3px;
   }
   *::-webkit-scrollbar-track {
-    background: var(--yellow); /* Background */
+    background: var(--scrollbar-track);
   }
 
   // headings
@@ -241,35 +241,36 @@
   .taco-container {
     gap: 1rem;
 
-    // level 1, yellow to brown
+    // level 1, dark gradient card
     &--l1 {
       border-radius: 0.5rem;
       padding: 1.25rem;
-      background-color: var(--yellow-to-brown);
-      border: 1px solid var(--dark-orange-to-brown);
+      background: linear-gradient(135deg, var(--card-gradient-from), var(--card-gradient-to));
+      border: 2px solid var(--card-border);
+      box-shadow: var(--card-shadow);
     }
 
-    // level 2, orange to light brown
+    // level 2, subtle dark inner panel
     &--l2 {
       position: relative;
       border-radius: 0.5rem;
       padding: 1rem 1.25rem 1rem;
-      background-color: var(--orange-to-light-brown);
-      border: 1px solid var(--dark-orange);
+      background-color: rgba(0, 0, 0, 0.15);
+      border: 1px solid var(--table-row-border);
 
       // hover mod
       &--hover {
 
         // hover
         &:hover {
-          background-color: var(--light-orange-hover-to-light-brown-hover);
+          background-color: rgba(0, 0, 0, 0.25);
         }
 
       }
 
       // dark mod
       &--dark {
-        background-color: var(--dark-orange-to-light-brown);
+        background: linear-gradient(135deg, var(--card-active-from), var(--card-active-to));
       }
 
     }
@@ -305,73 +306,71 @@
     font-family: 'Space Mono';
 
     &--green {
-      background-color: var(--green);
-      color: var(--black);
+      background: linear-gradient(135deg, #5E7A2E, #3D5A1A);
+      color: var(--text-cream);
+      border: 2px solid #7A8B3A;
 
       &:hover {
-          background-color: var(--green-hover);
-          color: var(--black);
+          background: linear-gradient(135deg, #6E8A38, #4A6A22);
+          color: #fff;
       }
 
       &:focus {
-        background-color: var(--green-hover);
+        background: linear-gradient(135deg, #6E8A38, #4A6A22);
         outline: none;
-        color: var(--black);
+        color: #fff;
       }
 
       &:focus:focus-visible {
-          background-color: var(--green-hover);
+          background: linear-gradient(135deg, #6E8A38, #4A6A22);
           outline: 3px solid var(--light-brown-to-orange);
           outline-offset: 2px;
       }
 
       &:active, &:active:focus, &:active:focus-visible {
-          background-color: var(--green-hover);
-          border-color: var(--green-hover);
-          color: var(--black);
+          background: linear-gradient(135deg, #6E8A38, #4A6A22);
+          border-color: #7A8B3A;
+          color: #fff;
       }
 
       &.disabled,
       &:disabled,
       &[disabled]{
         color: var(--dark-gray) !important;
-        background-color: var(--green) !important;
-        border-color: transparent !important;
+        background: linear-gradient(135deg, #5E7A2E, #3D5A1A) !important;
+        border-color: #7A8B3A !important;
+        opacity: 0.5;
       }
 
     }
     &--success {
-      color: var(--white);
-      background-color: var(--success-green);
-      border-color: transparent;
+      background: linear-gradient(135deg, #2E7D32, #1B5E20) !important;
+      color: var(--text-cream) !important;
+      border: 1px solid rgba(255, 255, 255, 0.1) !important;
 
       &:hover {
-        color: var(--white);
-        background-color: var(--success-green-hover);
-        border-color: transparent;
+        background: linear-gradient(135deg, #388E3C, #2E7D32) !important;
+        color: #fff !important;
       }
 
       &:focus, &:focus:focus-visible {
-        color: var(--white);
-        background-color: var(--success-green-hover);
-        outline: 3px solid var(--success-green-hover);
+        background: linear-gradient(135deg, #388E3C, #2E7D32) !important;
+        outline: 3px solid rgba(46, 125, 50, 0.5);
         outline-offset: 2px;
-        border-color: transparent;
+        color: #fff !important;
       }
 
       &:active, &:active:focus, &:active:focus-visible {
-        color: var(--white);
-        background-color: var(--success-green-hover);
-        border-color: transparent;
+        background: linear-gradient(135deg, #388E3C, #2E7D32) !important;
+        color: #fff !important;
       }
 
       &:disabled,
       &[disabled],
       &.disabled {
-        color: var(--light-gray);
-        border-color: transparent;
-        background-color: var(--success-green);
-        opacity: 50%;
+        background: linear-gradient(135deg, #2E7D32, #1B5E20) !important;
+        color: var(--light-gray) !important;
+        opacity: 0.5;
       }
 
     }
@@ -422,65 +421,73 @@
   // taco nav buttons
   .taco-nav-btn {
     color: var(--white);
-    background-color: transparent;
-    border: 1px solid var(--white);
-    border-radius: 0.375rem;
+    background-color: rgba(218, 141, 40, 0.12);
+    border: 2px solid var(--card-border);
+    border-radius: 0.5rem;
     padding: 0.5rem 1rem;
     font-family: 'Space Mono';
     height: fit-content;
+    transition: all 0.2s ease;
+    opacity: 0.7;
 
     &:hover {
-      background-color: rgba(0,0,0,0.05);
-      border-color: var(--white);
+      background-color: rgba(254, 214, 108, 0.15);
+      border-color: var(--card-border);
       color: var(--white);
+      opacity: 1;
     }
 
     &:focus {
       color: var(--white);
-      background-color: rgba(0,0,0,0.05);
-      border-color: var(--white);
+      background-color: rgba(254, 214, 108, 0.15);
+      border-color: var(--card-border);
       outline: none;
+      opacity: 1;
     }
 
     &:focus-visible {
-      outline: 3px solid var(--light-brown-to-orange);
+      outline: 3px solid var(--card-border);
       outline-offset: 0px;
     }
 
     &:active, &:active:focus, &:active:focus-visible {
-      background-color: rgba(0,0,0,0.05);
-      border-color: var(--white);
+      background-color: rgba(254, 214, 108, 0.15);
+      border-color: var(--card-border);
       color: var(--white);
-    }  
+      opacity: 1;
+    }
 
     &--active {
-      color: var(--black) !important;
-      background-color: var(--yellow);
-      border-color: var(--yellow) !important;
+      background: linear-gradient(135deg, var(--card-active-from), var(--card-active-to));
+      color: var(--gold) !important;
+      border-color: var(--card-border) !important;
+      font-weight: 700;
+      box-shadow: 0 4px 16px rgba(60, 30, 0, 0.5);
+      opacity: 1;
 
       &:hover {
-        background-color: var(--yellow-hover);
-        border-color: var(--yellow-hover);
-        color: var(--black);
+        background: linear-gradient(135deg, var(--card-hover-from), var(--card-hover-to));
+        border-color: var(--card-border);
+        color: var(--gold);
       }
 
       &:focus {
-        color: var(--black);
-        border-color: var(--yellow-hover);
-        background-color: var(--yellow-hover);
+        color: var(--gold);
+        border-color: var(--card-border);
+        background: linear-gradient(135deg, var(--card-hover-from), var(--card-hover-to));
         outline: none;
       }
 
       &:focus-visible {
-        outline: 3px solid var(--light-brown-to-orange);
+        outline: 3px solid var(--card-border);
         outline-offset: 0px;
       }
 
       &:active, &:active:focus, &:active:focus-visible {
-        background-color: var(--yellow-hover);
-        border-color: var(--yellow-hover);
-        color: var(--black);
-      }      
+        background: linear-gradient(135deg, var(--card-active-from), var(--card-active-to));
+        border-color: var(--card-border);
+        color: var(--gold);
+      }
 
     }
 
@@ -496,7 +503,7 @@
     }
 
     &.disabled {
-      border: 1px solid var(--white);
+      border: 2px solid var(--card-border);
       color: var(--white);
       opacity: 0.25;
     }
@@ -629,55 +636,64 @@
     }
   }
 
-  // taco table
+  // taco table (matches /buy premium style)
   .taco-table {
-    
+    width: 100%;
+    font-family: 'Space Mono', monospace;
+    border-collapse: separate;
+    border-spacing: 0;
+    border: 2px solid var(--card-border);
+    border-radius: 0.5rem;
+    overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 
     &--min-width {
       width: min-content;
     }
 
-    thead tr {
+    thead {
+      background: linear-gradient(135deg, var(--card-active-from), var(--card-active-to));
 
-      &:hover {
+      th {
+        padding: 1rem 1.25rem;
+        font-family: 'Rubik';
+        font-weight: 700;
+        font-size: 0.875rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        color: var(--white);
+        border-bottom: none;
         background-color: transparent;
+        white-space: nowrap;
+        vertical-align: middle;
+      }
+    }
+
+    tbody {
+      background-color: rgba(0, 0, 0, 0.15);
+
+      tr {
+        transition: background-color 0.15s ease;
+
+        &:hover {
+          background-color: rgba(0, 0, 0, 0.25);
+        }
+
+        &:not(:last-child) td {
+          border-bottom: 1px solid var(--table-row-border);
+        }
       }
 
-    }
-
-    tr {
-
-      &:hover {
-        background-color: rgba(0, 0, 0, 0.05);
+      td {
+        padding: 1rem 1.25rem;
+        font-size: 0.875rem;
+        color: rgba(255, 255, 255, 0.85);
+        background-color: transparent;
+        white-space: nowrap;
+        vertical-align: middle;
+        border-bottom: none;
       }
-
     }
-
-    th {
-      font-size: 1.125rem;
-    }
-    
-    th, td {
-      color: var(--black-to-white);
-      background-color: transparent;
-      border-bottom: none;
-      white-space: nowrap;
-      width: 1%;
-      font-family: "Space Mono";
-      vertical-align: middle;
-      padding-left: 1rem;
-      padding-right: 1rem;
-    }
-
-    tr th:first-of-type {
-      font-weight: bold;
-    }
-
-    tr th:first-of-type,
-    td:first-of-type {
-      // text-align: right;
-    }
-
   }
 
   // taco toolbar
@@ -692,6 +708,70 @@
     .btn-group {
       flex-wrap: wrap;
     }
+  }
+
+  // taco title
+  .taco-title {
+    font-family: 'Rubik', sans-serif;
+    font-weight: 700;
+    color: var(--gold);
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+    margin: 0;
+  }
+
+  // taco refresh button (floating, bottom-right)
+  .taco-refresh-btn {
+    position: fixed;
+    bottom: 1.5rem;
+    right: 1.5rem;
+    z-index: 1040;
+    background: var(--orange-to-dark-brown);
+    border: 1px solid var(--dark-orange-to-dark-brown);
+    color: var(--black-to-white);
+    width: 2.75rem;
+    height: 2.75rem;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 0.95rem;
+    transition: opacity 0.2s, background-color 0.2s, transform 0.15s;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+
+    &:hover {
+      opacity: 0.9;
+      background: var(--dark-orange-to-dark-brown);
+      transform: scale(1.05);
+    }
+
+    &:active {
+      transform: scale(0.95);
+    }
+
+    i {
+      font-size: 0.95rem;
+    }
+
+    @media (max-width: 576px) {
+      bottom: 1rem;
+      right: 1rem;
+      width: 2.5rem;
+      height: 2.5rem;
+      font-size: 0.85rem;
+
+      i {
+        font-size: 0.85rem;
+      }
+    }
+  }
+
+  // taco modal (unified dialog background)
+  .taco-modal {
+    background: linear-gradient(135deg, var(--card-gradient-from), var(--card-gradient-to)) !important;
+    border: 2px solid var(--card-border) !important;
+    border-radius: 0.5rem;
+    box-shadow: var(--card-shadow);
   }
 
   // taco badge
@@ -1093,8 +1173,8 @@
     //   return '#'
     // }
     
-    // default brown
-    return 'var(--light-orange-to-dark-brown)'
+    // default dark gradient
+    return 'var(--card-gradient-from)'
 
   })
 

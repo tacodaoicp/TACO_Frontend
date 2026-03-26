@@ -345,7 +345,7 @@
 
     // taco chart container
     &__taco-chart-container {
-        // placeholder
+        background-color: rgba(255, 255, 255, 0.03);
     }
 
     // taco chart
@@ -390,7 +390,7 @@
 
     // token info list
     &__token-info-list {
-        background-color: var(--light-brown-to-dark-brown);
+        background-color: rgba(0, 0, 0, 0.15);
         border-top-right-radius: 0.5rem;
         border-bottom-right-radius: 0.5rem;
         margin: 0;
@@ -405,7 +405,7 @@
             flex-wrap: wrap;
             align-items: center;
             justify-content: space-between;
-            border-bottom: 1px solid var(--light-orange-to-dark-orange);
+            border-bottom: 1px solid var(--table-row-border);
             padding: 0.75rem 1rem;
             gap: 0 1rem;
 

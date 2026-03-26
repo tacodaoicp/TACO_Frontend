@@ -188,7 +188,7 @@
               <!-- Floating Refresh Button -->
               <button
                 v-if="tacoStore.userLoggedIn"
-                class="wallet-refresh-btn"
+                class="taco-refresh-btn"
                 @click="loadAllBalances(true)"
                 title="Refresh all balances">
                 <i class="fa fa-sync-alt"></i>
@@ -353,8 +353,8 @@
 }
 
 .taco-logo {
-  width: 44px; // Increased from 40px
-  height: 44px; // Increased from 40px
+  width: 52px;
+  height: 52px;
   border-radius: 50%;
   flex-shrink: 0;
 }
@@ -438,40 +438,7 @@
   font-family: 'Space Mono', monospace;
 }
 
-// Floating refresh button
-.wallet-refresh-btn {
-  position: fixed;
-  bottom: 1.5rem;
-  right: 1.5rem;
-  z-index: 1040;
-  background: var(--orange-to-dark-brown);
-  border: 1px solid var(--dark-orange-to-dark-brown);
-  color: var(--black-to-white);
-  width: 2.75rem;
-  height: 2.75rem;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  font-size: 0.95rem;
-  transition: opacity 0.2s, background-color 0.2s, transform 0.15s;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
-
-  &:hover {
-    opacity: 0.9;
-    background: var(--dark-orange-to-dark-brown);
-    transform: scale(1.05);
-  }
-
-  &:active {
-    transform: scale(0.95);
-  }
-
-  i {
-    font-size: 0.95rem;
-  }
-}
+// Floating refresh button — now uses global .taco-refresh-btn from App.vue
 
 // Login curtain
 .login-curtain {
@@ -526,13 +493,6 @@
     }
   }
 
-  .wallet-refresh-btn {
-    bottom: 1rem;
-    right: 1rem;
-    width: 2.5rem;
-    height: 2.5rem;
-    font-size: 0.85rem;
-  }
 }
 
 @media (max-width: 575.98px) {

@@ -14,8 +14,6 @@ import 'animate.css'
 const HomeView = () => import("./views/HomeView.vue")
 const DaoView = () => import("./views/DaoView.vue")
 const VoteView = () => import("./views/VoteView.vue")
-const SalesView = () => import("./views/SalesView.vue")
-const SaleDKPSwap = () => import("./components/sales/SaleDKPSwap.vue")
 const InfoView = () => import("./views/InfoView.vue")
 const AdminView = () => import("./views/AdminView.vue")
 const AdminArchiveView = () => import("./views/AdminArchiveView.vue")
@@ -57,8 +55,7 @@ const routes = [
     { path: "/dao", name: "Dao", component: DaoView, meta: { robots: 'index' } },
     { path: "/vote", name: "Vote", component: VoteView, meta: { robots: 'index' } },      
     { path: "/system", name: "System", component: SystemView, meta: { robots: 'index' } },
-    { path: "/sales", name: "Sales", component: SalesView, meta: { robots: 'index' } },
-    { path: "/sales/dkp-swap", name: "Sale1", component: SaleDKPSwap, meta: { robots: 'index' } },
+    { path: "/sales", redirect: "/info", meta: { robots: 'noindex' } }, // redirect old /sales to /info
     { path: "/info", name: "Info", component: InfoView, meta: { robots: 'index' } },
     { path: "/wallet", name: "Wallet", component: WalletView, meta: { robots: 'index' } },
     { path: "/vault", name: "NachosVault", component: NachosVaultView, meta: { robots: 'noindex' } },

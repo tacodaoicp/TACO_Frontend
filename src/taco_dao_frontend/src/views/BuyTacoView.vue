@@ -16,7 +16,7 @@
 
             <!-- title -->
             <div class="buy-taco-view__page-header">
-              <TacoTitle level="h2" :emoji="selectedProduct === 'nachos' ? '🧀' : '🌮'" :title="selectedProduct === 'nachos' ? 'Fund & Mint' : 'Fund & Swap'" forceTextColor="#FFD54F" />
+              <TacoTitle level="h2" :emoji="selectedProduct === 'nachos' ? '🧀' : '🌮'" :title="selectedProduct === 'nachos' ? 'Fund & Mint' : 'Fund & Swap'" forceTextColor="var(--gold)" />
             </div>
 
             <!-- system paused banner -->
@@ -366,8 +366,8 @@
   // info section - Dark sienna + gold theme
   &__info {
     padding: 1.5rem;
-    background: linear-gradient(135deg, #5C3012, #3A1C08);
-    border: 2px solid #8B5A2B;
+    background: linear-gradient(135deg, var(--card-gradient-from), var(--card-gradient-to));
+    border: 2px solid var(--card-border);
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
 
     @media (max-width: 767.98px) {
@@ -375,7 +375,7 @@
     }
 
     .buy-taco-view__section-title {
-      color: #FFD54F;
+      color: var(--gold);
       text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
     }
   }
@@ -410,7 +410,7 @@
     display: flex;
     align-items: center;
     padding-top: 0.35rem;
-    color: #FFD54F;
+    color: var(--gold);
     opacity: 0.6;
     font-size: 0.75rem;
     flex-shrink: 0;
@@ -512,11 +512,11 @@
     }
 
     &.active {
-      background: linear-gradient(135deg, #7B3F15, #4A2008);
-      color: #FFD54F;
+      background: linear-gradient(135deg, var(--card-active-from), var(--card-active-to));
+      color: var(--gold);
       letter-spacing: 0.03em;
       text-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
-      border-color: #8B5A2B;
+      border-color: var(--card-border);
       box-shadow: 0 4px 16px rgba(60, 30, 0, 0.5);
       transform: translateY(-1px);
       opacity: 1;
@@ -560,11 +560,11 @@
     }
 
     &.active {
-      background: linear-gradient(135deg, #7B3F15, #4A2008);
-      color: #FFD54F;
+      background: linear-gradient(135deg, var(--card-active-from), var(--card-active-to));
+      color: var(--gold);
       letter-spacing: 0.03em;
       text-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
-      border-color: #8B5A2B;
+      border-color: var(--card-border);
       font-weight: 700;
       box-shadow: 0 4px 12px rgba(60, 30, 0, 0.5);
       opacity: 1;
@@ -575,15 +575,15 @@
   &__autoswap-toggle {
     display: block;
     cursor: pointer;
-    background: linear-gradient(135deg, #5C3012, #3A1C08);
-    border: 2px solid #8B5A2B;
+    background: linear-gradient(135deg, var(--card-gradient-from), var(--card-gradient-to));
+    border: 2px solid var(--card-border);
     border-radius: 0.5rem;
     padding: 1rem 1.25rem;
     margin: 1.5rem 0;
     transition: all 0.2s ease;
 
     &:hover {
-      background: linear-gradient(135deg, #6B3815, #42200A);
+      background: linear-gradient(135deg, var(--card-hover-from), var(--card-hover-to));
       box-shadow: 0 2px 8px rgba(60, 30, 0, 0.2);
     }
 
@@ -593,7 +593,7 @@
       input[type="checkbox"] {
         width: 1.25rem;
         height: 1.25rem;
-        border: 2px solid #A0724A;
+        border: 2px solid var(--checkbox-border);
         border-radius: 0.25rem;
         cursor: pointer;
 
@@ -611,12 +611,12 @@
         font-family: 'Rubik', sans-serif;
         font-weight: 600;
         font-size: 1rem;
-        color: #FFD54F;
+        color: var(--gold);
         cursor: pointer;
         text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
 
         i {
-          color: #FFCA28;
+          color: var(--gold-light);
         }
       }
     }
@@ -631,7 +631,7 @@
       text-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
 
       i {
-        color: #FFCA28;
+        color: var(--gold-light);
         opacity: 1;
       }
     }
@@ -640,8 +640,8 @@
   // buy card - Enhanced padding
   &__buy-card {
     padding: 2rem;
-    background: linear-gradient(135deg, #5C3012, #3A1C08);
-    border: 2px solid #8B5A2B;
+    background: linear-gradient(135deg, var(--card-gradient-from), var(--card-gradient-to));
+    border: 2px solid var(--card-border);
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
 
     @media (max-width: 767.98px) {
@@ -649,7 +649,7 @@
     }
 
     .buy-taco-view__section-title {
-      color: #FFD54F;
+      color: var(--gold);
       text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
     }
   }
@@ -720,12 +720,12 @@
   // status section
   &__status {
     padding: 1.25rem;
-    background: linear-gradient(135deg, #5C3012, #3A1C08);
-    border: 2px solid #8B5A2B;
+    background: linear-gradient(135deg, var(--card-gradient-from), var(--card-gradient-to));
+    border: 2px solid var(--card-border);
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
 
     .buy-taco-view__section-title {
-      color: #FFD54F;
+      color: var(--gold);
       text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
     }
   }
@@ -773,8 +773,8 @@
 
   // claim section - Enhanced with gradient background
   &__claim {
-    background: linear-gradient(135deg, #5C3012, #3A1C08);
-    border: 2px solid #8B5A2B;
+    background: linear-gradient(135deg, var(--card-gradient-from), var(--card-gradient-to));
+    border: 2px solid var(--card-border);
     border-radius: 0.75rem;
     padding: 1.75rem;
     margin-top: 2rem;
@@ -784,7 +784,7 @@
     align-items: center;
 
     .buy-taco-view__section-title {
-      color: #FFD54F;
+      color: var(--gold);
       text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
       align-self: flex-start;
     }
@@ -798,7 +798,7 @@
     margin-bottom: 1.5rem;
     padding: 1rem;
     background-color: rgba(0, 0, 0, 0.1);
-    border-left: 4px solid #FFD54F;
+    border-left: 4px solid var(--gold);
     border-radius: 0.375rem;
   }
 
@@ -828,8 +828,8 @@
   &__history {
     margin-top: 2rem;
     padding: 1.25rem;
-    background: linear-gradient(135deg, #5C3012, #3A1C08);
-    border: 2px solid #8B5A2B;
+    background: linear-gradient(135deg, var(--card-gradient-from), var(--card-gradient-to));
+    border: 2px solid var(--card-border);
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
     overflow-x: auto;
   }
@@ -839,7 +839,7 @@
     font-size: 1rem;
     font-weight: 700;
     margin-bottom: 1rem;
-    color: #FFD54F;
+    color: var(--gold);
     text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
   }
 
@@ -848,13 +848,13 @@
     font-family: 'Space Mono', monospace;
     border-collapse: separate;
     border-spacing: 0;
-    border: 2px solid #8B5A2B;
+    border: 2px solid var(--card-border);
     border-radius: 0.5rem;
     overflow: hidden;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 
     thead {
-      background: linear-gradient(135deg, #7B3F15, #4A2008);
+      background: linear-gradient(135deg, var(--card-active-from), var(--card-active-to));
 
       th {
         padding: 1rem 1.25rem;
@@ -880,7 +880,7 @@
 
         &:not(:last-child) {
           td {
-            border-bottom: 1px solid rgba(139, 90, 43, 0.4);
+            border-bottom: 1px solid var(--table-row-border);
           }
         }
       }
@@ -905,7 +905,7 @@
   // warm dark green buttons to match dark sienna theme
   .taco-btn--green {
     background: linear-gradient(135deg, #5E7A2E, #3D5A1A);
-    color: #F5F0E0;
+    color: var(--text-cream);
     border: 2px solid #7A8B3A;
 
     &:hover,

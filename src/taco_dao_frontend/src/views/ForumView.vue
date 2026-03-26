@@ -181,7 +181,7 @@ onMounted(() => {
 
 .content {
     background: var(--light-orange-to-dark-orange);
-    border-radius: 12px;
+    border-radius: 0.5rem;
     padding: 2rem;
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
 }
@@ -209,11 +209,11 @@ onMounted(() => {
     color: var(--black);
     border: none;
     padding: 0.75rem 1.5rem;
-    border-radius: 8px;
+    border-radius: 0.5rem;
     font-weight: 600;
     cursor: pointer;
     margin-top: 1rem;
-    transition: all 0.3s ease;
+    transition: all 0.2s ease;
 }
 
 .retry-btn:hover, .refresh-btn:hover {
@@ -243,10 +243,10 @@ onMounted(() => {
 
 .thread-card {
     background: var(--dark-orange-to-light-orange);
-    border-radius: 8px;
+    border-radius: 0.5rem;
     padding: 1.5rem;
     cursor: pointer;
-    transition: all 0.3s ease;
+    transition: all 0.2s ease;
     border: 2px solid transparent;
 }
 

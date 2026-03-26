@@ -430,10 +430,10 @@ export default {
 
 .lb-table th {
   border-top: none;
-  border-bottom: 2px solid var(--dark-orange);
+  border-bottom: 2px solid var(--card-border);
   font-weight: 600;
   font-size: 0.85rem;
-  color: var(--brown-to-white);
+  color: var(--text-cream);
   padding: 0.75rem;
   font-family: 'Rubik', sans-serif;
 }
@@ -441,8 +441,8 @@ export default {
 .lb-table td {
   vertical-align: middle;
   padding: 0.75rem;
-  border-bottom: 1px solid var(--dark-orange);
-  color: var(--black-to-white);
+  border-bottom: 1px solid var(--table-row-border);
+  color: rgba(255, 255, 255, 0.85);
 }
 
 .lb-table tbody tr:hover {
@@ -487,17 +487,17 @@ export default {
 }
 
 .expanded-content-row {
-  background-color: color-mix(in srgb, var(--yellow-to-brown) 85%, #000) !important;
+  background: linear-gradient(135deg, var(--card-mid-from), var(--card-mid-to)) !important;
 }
 
 .expanded-content-row:hover {
-  background-color: color-mix(in srgb, var(--yellow-to-brown) 85%, #000) !important;
+  background: linear-gradient(135deg, var(--card-mid-from), var(--card-mid-to)) !important;
 }
 
 .expanded-chart-container {
   padding: 1rem;
-  border-top: 1px solid var(--dark-orange);
-  background: color-mix(in srgb, var(--yellow-to-brown) 85%, #000);
+  border-top: 1px solid var(--card-border);
+  background: linear-gradient(135deg, var(--card-mid-from), var(--card-mid-to));
 }
 
 /* Display name styling */
@@ -561,9 +561,9 @@ export default {
 }
 
 .rank-default {
-  background: var(--orange-to-light-brown);
-  color: var(--brown-to-white);
-  border: 1px solid var(--dark-orange);
+  background: linear-gradient(135deg, var(--card-gradient-from), var(--card-gradient-to));
+  color: var(--text-cream);
+  border: 1px solid var(--card-border);
 }
 
 .you-badge {

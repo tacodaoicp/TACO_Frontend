@@ -414,8 +414,8 @@
         width: 100%;
         max-width: 65rem;
         border-radius: 0.5rem;
-        background-color: var(--light-orange-to-dark-brown);
-        border: 1px solid var(--dark-orange);
+        background: linear-gradient(135deg, var(--card-gradient-from), var(--card-gradient-to));
+        border: 2px solid var(--card-border);
         overflow: clip;
         margin: 2rem 2rem 2rem;
         container: wizard-dialog / inline-size;

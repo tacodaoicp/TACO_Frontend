@@ -262,8 +262,8 @@
 }
 
 .modal-content {
-  background-color: var(--light-orange-to-dark-brown);
-  border: 1px solid var(--dark-orange);
+  background: linear-gradient(135deg, var(--card-gradient-from), var(--card-gradient-to));
+  border: 2px solid var(--card-border);
 }
 
 .modal-header {

@@ -603,7 +603,7 @@
             flex-wrap: wrap;
             align-items: center;
             justify-content: space-between;
-            background-color: var(--dark-orange-to-light-brown);
+            background: linear-gradient(135deg, var(--card-active-from), var(--card-active-to));
             border-radius: 0.5rem;
             padding: 0.5rem;
 

@@ -46,18 +46,7 @@
 
                   <span v-if="votePower === '0'" class="vote-view__top-bar__vote-power text-nowrap">(0 VP)</span>
                   
-                  <!-- refresh voting power button -->
-                  <button 
-                    class="btn btn-sm ms-2 px-2 py-1"
-                    style="background-color: var(--yellow); color: var(--black); border-color: var(--yellow);"
-                    @click="refreshVotingPower"
-                    :class="{'disabled': refreshingVP}">
-
-                    <!-- refresh icon -->
-                    <span v-if="!refreshingVP">Refresh</span>
-                    <span v-if="refreshingVP">Refreshing</span>
-
-                  </button>
+                  <!-- refresh removed — use floating .taco-refresh-btn -->
 
                 </h2>               
 
@@ -495,7 +484,7 @@
                         :style="{
                           'width': `
                             ${votedByAbleToVote}%`, 
-                          'background-color': 'var(--green)'}">
+                          'background': 'linear-gradient(135deg, #2E7D32, #1B5E20)'}">
                       </div>
 
                     </div>
@@ -1077,7 +1066,7 @@
 
             <!-- info icon -->
             <i class="fa-solid fa-circle-info"
-              style="color: var(--dark-orange-to-light-brown); font-size: 4.5rem;"></i>
+              style="color: var(--gold); font-size: 4.5rem;"></i>
 
             <!-- title -->
             <span class="taco-text-black-to-white d-inline-block text-center px-2 pt-2 pb-1"
@@ -1138,6 +1127,14 @@
 
   </div>
 
+  <!-- Floating Refresh Button -->
+  <button
+    v-if="userLoggedIn"
+    class="taco-refresh-btn"
+    @click="refreshVotingPower"
+    title="Refresh voting data">
+    <i class="fa fa-sync-alt"></i>
+  </button>
 
 </template>
 
@@ -1158,7 +1155,8 @@
       flex-wrap: wrap;
       align-items: center;
       justify-content: space-between;
-      background-color: var(--dark-orange-to-light-brown);
+      background: linear-gradient(135deg, var(--card-active-from), var(--card-active-to));
+      border: 2px solid var(--card-border);
       border-radius: 0.5rem;
       padding: 0.5rem;
       padding-left: 2rem;
@@ -1372,7 +1370,7 @@
       display: flex;
       align-items: center;
       padding: 10px;
-      border-bottom: 1px solid #ccc;
+      border-bottom: 1px solid var(--table-row-border);
 
       .token-info {
         flex: 1;
@@ -1381,7 +1379,7 @@
         }
         .token-symbol {
           margin-left: 5px;
-          color: #666;
+          color: var(--dark-gray);
         }
       }
 
@@ -1401,13 +1399,13 @@
         button {
           padding: 5px 10px;
           border: none;
-          background-color: #007bff;
-          color: white;
+          background-color: var(--blue);
+          color: var(--white);
           border-radius: 3px;
           cursor: pointer;
 
           &:disabled {
-            background-color: #aaa;
+            background-color: var(--gray);
             cursor: not-allowed;
           }
         }
@@ -1489,6 +1487,7 @@
       &__taco-chart-container {
           max-height: 257px;
           position: relative;
+          background-color: rgba(255, 255, 255, 0.03);
       }
 
       // 
@@ -1633,8 +1632,8 @@
       width: 100%;
       max-width: 40rem;
       border-radius: 0.5rem;
-      background-color: var(--light-orange-to-dark-brown);
-      border: 1px solid var(--dark-orange);
+      background: linear-gradient(135deg, var(--card-gradient-from), var(--card-gradient-to));
+      border: 2px solid var(--card-border);
       overflow: clip;
       margin: 2rem 2rem 2rem;
 
@@ -1665,7 +1664,7 @@
         display: flex;
         width: 100%;
         justify-content: space-between;
-        background-color: var(--dark-orange);
+        background: linear-gradient(135deg, var(--card-active-from), var(--card-active-to));
       }
 
       // top

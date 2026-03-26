@@ -925,20 +925,20 @@
   justify-content: space-between;
   width: 100%;
   padding: 1rem;
-  border: 1px solid var(--dark-orange-to-dark-brown);
+  border: 2px solid var(--card-border);
   border-radius: 0.5rem;
-  background-color: var(--orange-to-dark-brown);
+  background: linear-gradient(135deg, var(--card-gradient-from), var(--card-gradient-to));
   gap: 1rem;
 
   h1, h2, h3, h4, h5, h6, span, i {
-    color: var(--black-to-white);
+    color: rgba(255, 255, 255, 0.85);
   }
 
   button span,
   button i,
   a span,
   a i {
-    color: var(--black) !important;
+    color: var(--text-cream) !important;
   }
 
   // logo
@@ -977,7 +977,7 @@
 
   // action button
   &__action-btn {
-    background-color: var(--dark-orange-to-light-brown);
+    background: linear-gradient(135deg, var(--card-active-from), var(--card-active-to));
     padding: 0.25rem 0.5rem;
     font-size: 0.875rem;
     line-height: 1;
@@ -995,8 +995,8 @@
       flex-wrap: wrap;
       flex-grow: 1;
       gap: 1rem;
-      background-color: var(--yellow-to-brown);
-      border: 1px solid var(--dark-orange-to-dark-brown);
+      background: linear-gradient(135deg, var(--card-mid-from), var(--card-mid-to));
+      border: 1px solid var(--card-border);
       padding: 1rem;
       border-radius: 0.5rem;
       width: 100%;
@@ -1004,7 +1004,7 @@
 
     // neuron
     &__neuron {
-      background-color: var(--orange-to-light-brown);
+      background: linear-gradient(135deg, var(--card-gradient-from), var(--card-gradient-to));
       padding: 1rem;
       border-radius: 0.5rem;
       border: 1px solid var(--dark-orange);
@@ -1031,7 +1031,7 @@
       padding: 0 2rem;
 
       &:hover {
-        background-color: var(--orange-to-light-brown);
+        background: linear-gradient(135deg, var(--card-hover-from), var(--card-hover-to));
       }
 
       // Mobile: full width
@@ -1079,13 +1079,13 @@
     align-items: center;
     justify-content: space-between;
     gap: 0.5rem;
-    border-bottom: 1px solid var(--dark-orange);
-    border-left: 1px solid var(--dark-orange);
-    border-right: 1px solid var(--dark-orange);
-    background-color: var(--light-orange-to-dark-brown);
+    border-bottom: 1px solid var(--card-border);
+    border-left: 1px solid var(--card-border);
+    border-right: 1px solid var(--card-border);
+    background: linear-gradient(135deg, var(--card-gradient-from), var(--card-gradient-to));
 
     &:hover {
-      background-color: var(--yellow-to-brown);
+      background: linear-gradient(135deg, var(--card-hover-from), var(--card-hover-to));
     }
 
     &:first-of-type {

@@ -248,9 +248,9 @@
 }
 
 .modal-dialog {
-  background-color: var(--light-orange-to-dark-brown);
-  border: 1px solid var(--dark-orange);
-  border-radius: .5rem;
+  background: linear-gradient(135deg, var(--card-gradient-from), var(--card-gradient-to));
+  border: 2px solid var(--card-border);
+  border-radius: 0.5rem;
   overflow: clip;
   max-width: 500px;
   width: 90%;

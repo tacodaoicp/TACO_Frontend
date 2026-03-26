@@ -345,9 +345,9 @@ export default {
 }
 
 .rewards-table thead th {
-  background: var(--orange-to-light-brown);
-  border-bottom: 2px solid var(--dark-orange);
-  color: var(--brown-to-white);
+  background: linear-gradient(135deg, var(--card-active-from), var(--card-active-to));
+  border-bottom: 2px solid var(--card-border);
+  color: var(--text-cream);
   padding: 0.6rem 0.75rem;
   text-align: left;
   white-space: nowrap;
