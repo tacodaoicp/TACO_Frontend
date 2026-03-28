@@ -131,7 +131,8 @@ type NachosVaultDAO =
    addRateLimitExemptPrincipal: ("principal": principal, reason: text) ->
     (Result);
    adminForceRefreshBalances: () -> (Result);
-   cancelDeposit: (tokenPrincipal: principal, blockNumber: nat) -> (Result_6);
+   cancelDeposit: (tokenPrincipal: principal, blockNumber: nat,
+    fromSubaccount: opt blob) -> (Result_6);
    claimBurnFees: (recipient: principal, tokenPrincipal: principal, amount:
     nat) -> (Result);
    claimCancellationFees: (recipient: principal, tokenPrincipal: principal,

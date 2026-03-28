@@ -131,8 +131,11 @@ const chartOptions = computed(() => ({
   min-height: 300px;
 
   &__title {
-    font-size: 1.25rem;
+    font-size: 1rem;
     font-family: 'Space Mono', monospace;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--gold);
     margin-bottom: 0;
   }
 

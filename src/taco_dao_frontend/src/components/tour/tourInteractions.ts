@@ -10,13 +10,16 @@ let tourAborted = false
 // ════════════════════════════════════════════
 
 export function applyHighlight(selector: string): HTMLElement | null {
-  clearHighlight()
-
   const el = document.querySelector<HTMLElement>(selector)
   if (!el) {
     console.warn(`[Tour] Highlight target not found: ${selector}`)
     return null
   }
+
+  // Already highlighting this exact element — no-op to avoid flicker
+  if (el === highlightedElement) return el
+
+  clearHighlight()
 
   // Store original styles for restore
   originalStyles = {

@@ -9,7 +9,8 @@ import { useRouter } from 'vue-router'
 import { useStorage } from "@vueuse/core"
 import { workerBridge, fetchAndWait } from './worker-bridge'
 import { deserializeFromTransfer } from '../workers/shared/fetch-functions'
-import { getEffectiveNetwork } from '../config/network-config'
+import { getEffectiveNetwork, getICHost } from '../config/network-config'
+import { getCanisterId } from '../constants/canisterIds'
 import { getFrontendIdentity } from '../utils/frontend-identity'
 
 // Only import Principal synchronously - it's small and used everywhere
@@ -19,6 +20,9 @@ import { sha256 } from 'js-sha256'
 // Debug mode (use tacoConfig.debug() in console to enable/disable)
 import { isDebugEnabled, isSimulateStuckStakeEnabled, setSimulateStuckStake } from '../config/network-config'
 const WORKER_DEBUG = () => isDebugEnabled()
+
+// BigInt-safe JSON.stringify for IC canister error objects
+const safeStringify = (obj: unknown) => JSON.stringify(obj, (_, v) => typeof v === 'bigint' ? v.toString() : v)
 
 // Type-only imports (no runtime cost)
 import type { AuthClient as AuthClientType, IdbStorage as IdbStorageType } from "@dfinity/auth-client"
@@ -97,7 +101,7 @@ function getNetworkHost(): string {
         const port = import.meta.env.VITE_LOCAL_PORT || '4943'
         return `http://localhost:${port}`
     }
-    return 'https://ic0.app'
+    return getICHost()
 }
 
 async function getAuthClientModule() {
@@ -2870,84 +2874,15 @@ export const useTacoStore = defineStore('taco', () => {
         userAcceptedReportsDisclaimer.value = true
     }
 
-    // canister ids
-    const daoBackendCanisterId = () => {
-
-        // determine canisterId based on network
-        const network = getEffectiveNetwork()
-        switch (network) {
-            case "ic":
-                return process.env.CANISTER_ID_DAO_BACKEND_IC || 'vxqw7-iqaaa-aaaan-qzziq-cai';
-            case "staging":
-                return  process.env.CANISTER_ID_DAO_BACKEND_STAGING || 'tisou-7aaaa-aaaai-atiea-cai';
-        }
-        return 'ywhqf-eyaaa-aaaad-qg6tq-cai'; // local canisterId
-    }
-    const treasuryCanisterId = () => {
-        const network = getEffectiveNetwork()
-        switch (network) {
-            case "ic":
-                return process.env.CANISTER_ID_TREASURY_IC || 'v6t5d-6yaaa-aaaan-qzzja-cai';
-            case "staging":
-                return  process.env.CANISTER_ID_TREASURY_STAGING || 'tptia-syaaa-aaaai-atieq-cai';
-        }
-        return 'z4is7-giaaa-aaaad-qg6uq-cai'; // local canisterId
-    }
-    const nachosCanisterId = () => {
-        const network = getEffectiveNetwork()
-        switch (network) {
-            case "ic":
-                return process.env.CANISTER_ID_NACHOS_IC || 'rctxc-zqaaa-aaaan-qz6na-cai';
-            case "staging":
-                return  process.env.CANISTER_ID_NACHOS_STAGING || 'p4nog-baaaa-aaaad-qkwpa-cai';
-        }
-        return 'rctxc-zqaaa-aaaan-qz6na-cai'; // local canisterId
-    }
-    const neuronSnapshotCanisterId = () => {
-        const network = getEffectiveNetwork()
-        switch (network) {
-            case "ic":
-                return process.env.CANISTER_ID_NEURONSNAPSHOT_IC || 'vzs3x-taaaa-aaaan-qzzjq-cai';
-            case "staging":
-                return  process.env.CANISTER_ID_NEURONSNAPSHOT_STAGING || 'tgqd4-eqaaa-aaaai-atifa-cai';
-        }
-        return 'tgqd4-eqaaa-aaaai-atifa-cai'; // local canisterId
-    }
-    const rewardsCanisterId = () => {
-        const network = getEffectiveNetwork()
-        switch (network) {
-            case "ic":
-                return process.env.CANISTER_ID_REWARDS_IC || 'dkgdg-saaaa-aaaan-qz5ma-cai';
-            case "staging":
-                return  process.env.CANISTER_ID_REWARDS_STAGING || 'cjkka-gyaaa-aaaan-qz5kq-cai';
-        }
-        return 'cjkka-gyaaa-aaaan-qz5kq-cai'; // local canisterId
-    }
-    const nachosVaultCanisterId = () => {
-        const network = getEffectiveNetwork()
-        switch (network) {
-            case "ic":
-                return 'p4nog-baaaa-aaaad-qkwpa-cai'; // placeholder — update when production deployed
-            case "staging":
-                return 'p4nog-baaaa-aaaad-qkwpa-cai';
-        }
-        return 'p4nog-baaaa-aaaad-qkwpa-cai';
-    }
-
-    const tacoSwapCanisterId = () => {
-        return '2uddx-dqaaa-aaaan-q5qja-cai' // staging only
-    }
-
-    const portfolioArchiveCanisterId = () => {
-        const network = getEffectiveNetwork()
-        switch (network) {
-            case "ic":
-                return process.env.CANISTER_ID_PORTFOLIO_ARCHIVE_IC || 'bl7x7-wiaaa-aaaan-qz5bq-cai';
-            case "staging":
-                return process.env.CANISTER_ID_PORTFOLIO_ARCHIVE_STAGING || 'lrekt-uaaaa-aaaan-qz4ya-cai';
-        }
-        return 'lrekt-uaaaa-aaaan-qz4ya-cai'; // local canisterId
-    }
+    // canister ids — all resolved from central config (constants/canisterIds.ts)
+    const daoBackendCanisterId = () => getCanisterId('dao_backend')
+    const treasuryCanisterId = () => getCanisterId('treasury')
+    const nachosCanisterId = () => getCanisterId('nachos')
+    const neuronSnapshotCanisterId = () => getCanisterId('neuronSnapshot')
+    const rewardsCanisterId = () => getCanisterId('rewards')
+    const nachosVaultCanisterId = () => getCanisterId('nachos_vault')
+    const tacoSwapCanisterId = () => getCanisterId('taco_swap')
+    const portfolioArchiveCanisterId = () => getCanisterId('portfolio_archive')
     // crypto prices
     const fetchCryptoPrices = async () => {
 
@@ -3647,7 +3582,7 @@ export const useTacoStore = defineStore('taco', () => {
                     return result.ok
                 } else {
                     // handle error case
-                    const errorMsg = result && result.err ? JSON.stringify(result.err) : 'Unknown error'
+                    const errorMsg = result && result.err ? safeStringify(result.err) : 'Unknown error'
                     console.error('Error refreshing voting power:', errorMsg)
                     
                     // // show error toast
@@ -3717,7 +3652,7 @@ export const useTacoStore = defineStore('taco', () => {
 
                 // check for error result (e.g. cap-exceeded)
                 if ('err' in result) {
-                    const errMsg = 'UnexpectedError' in result.err ? result.err.UnexpectedError : JSON.stringify(result.err)
+                    const errMsg = 'UnexpectedError' in result.err ? result.err.UnexpectedError : safeStringify(result.err)
                     console.error('updateAllocation error:', errMsg)
                     appLoadingOff()
                     throw new Error(errMsg)
@@ -4157,7 +4092,7 @@ export const useTacoStore = defineStore('taco', () => {
 
             const result = await actor.admin_recoverPoolBalances() as any;
             if ('err' in result) {
-                throw new Error(JSON.stringify(result.err));
+                throw new Error(safeStringify(result.err));
             }
             await refreshTimerStatus();
             // console.log('TacoStore: Pool balances recovered:', result.ok);
@@ -4596,7 +4531,7 @@ export const useTacoStore = defineStore('taco', () => {
             console.log('taco.store: adminAddRewardPenalty() - Result:', result);
 
             if ('err' in result) {
-                throw new Error(JSON.stringify(result.err));
+                throw new Error(safeStringify(result.err));
             }
 
             // Refresh the list
@@ -4623,7 +4558,7 @@ export const useTacoStore = defineStore('taco', () => {
             console.log('taco.store: adminRemoveRewardPenalty() - Result:', result);
 
             if ('err' in result) {
-                throw new Error(JSON.stringify(result.err));
+                throw new Error(safeStringify(result.err));
             }
 
             // Refresh the list
@@ -4661,7 +4596,7 @@ export const useTacoStore = defineStore('taco', () => {
                 await refreshTimerStatus();
                 return true;
             } else {
-                const errorMessage = 'Failed to update system parameter: ' + JSON.stringify(result.err);
+                const errorMessage = 'Failed to update system parameter: ' + safeStringify(result.err);
                 console.error(errorMessage);
                 addToast({
                     id: Date.now(),
@@ -4710,7 +4645,7 @@ export const useTacoStore = defineStore('taco', () => {
                 await refreshTimerStatus();
                 return true;
             } else {
-                const errorMessage = 'Failed to update snapshot interval: ' + JSON.stringify(result.err);
+                const errorMessage = 'Failed to update snapshot interval: ' + safeStringify(result.err);
                 console.error(errorMessage);
                 addToast({
                     id: Date.now(),
@@ -5515,7 +5450,7 @@ export const useTacoStore = defineStore('taco', () => {
                 };
             } else {
                 console.error('❌ Failed to create proposal thread:', result.err);
-                throw new Error(`Failed to create thread: ${JSON.stringify(result.err)}`);
+                throw new Error(`Failed to create thread: ${safeStringify(result.err)}`);
             }
         } catch (error: any) {
             console.error('Error creating proposal thread:', error);
@@ -5548,7 +5483,7 @@ export const useTacoStore = defineStore('taco', () => {
                 };
             } else {
                 console.error('❌ Failed to create post:', result.err);
-                throw new Error(`Failed to create post: ${JSON.stringify(result.err)}`);
+                throw new Error(`Failed to create post: ${safeStringify(result.err)}`);
             }
         } catch (error: any) {
             console.error('Error creating post:', error);
@@ -5576,7 +5511,7 @@ export const useTacoStore = defineStore('taco', () => {
                 };
             } else {
                 console.error('❌ Failed to vote on post:', result.err);
-                throw new Error(`Failed to vote: ${JSON.stringify(result.err)}`);
+                throw new Error(`Failed to vote: ${safeStringify(result.err)}`);
             }
         } catch (error: any) {
             console.error('Error voting on post:', error);
@@ -5603,7 +5538,7 @@ export const useTacoStore = defineStore('taco', () => {
                 };
             } else {
                 console.error('❌ Failed to retract vote:', result.err);
-                throw new Error(`Failed to retract vote: ${JSON.stringify(result.err)}`);
+                throw new Error(`Failed to retract vote: ${safeStringify(result.err)}`);
             }
         } catch (error: any) {
             console.error('Error retracting vote:', error);
@@ -5675,7 +5610,7 @@ export const useTacoStore = defineStore('taco', () => {
             // console.log('✅ Response is array of proposals');
         } else {
             console.error('❌ Unexpected response structure:', response);
-            throw new Error(`Unexpected response structure: ${JSON.stringify(response)}`);
+            throw new Error(`Unexpected response structure: ${safeStringify(response)}`);
         }
         
         // console.log('✅ Fetched', proposals.length, 'TACO DAO proposals');
@@ -6551,7 +6486,7 @@ export const useTacoStore = defineStore('taco', () => {
                 } else if ('GenericError' in error) {
                     errorMessage = `Error ${error.GenericError.error_code}: ${error.GenericError.message}`
                 } else {
-                    errorMessage = `Claim failed: ${JSON.stringify(error)}`
+                    errorMessage = `Claim failed: ${safeStringify(error)}`
                 }
                 
                 addToast({
@@ -6677,7 +6612,7 @@ export const useTacoStore = defineStore('taco', () => {
             if (result.command && result.command.length > 0) {
                 const command = result.command[0];
                 if (command.Error) {
-                    throw new Error(`SetDissolveTimestamp failed: ${JSON.stringify(command)}`);
+                    throw new Error(`SetDissolveTimestamp failed: ${safeStringify(command)}`);
                 }
                 if (command.Configure) {
                     // console.log('Dissolve timestamp set successfully');
@@ -6726,7 +6661,7 @@ export const useTacoStore = defineStore('taco', () => {
             if (result.command && result.command.length > 0) {
                 const command = result.command[0];
                 if (command.Error) {
-                    throw new Error(`StartDissolving failed: ${JSON.stringify(command)}`);
+                    throw new Error(`StartDissolving failed: ${safeStringify(command)}`);
                 }
                 if (command.Configure) {
                     // console.log('Dissolving started successfully');
@@ -6775,7 +6710,7 @@ export const useTacoStore = defineStore('taco', () => {
             if (result.command && result.command.length > 0) {
                 const command = result.command[0];
                 if (command.Error) {
-                    throw new Error(`StopDissolving failed: ${JSON.stringify(command)}`);
+                    throw new Error(`StopDissolving failed: ${safeStringify(command)}`);
                 }
                 if (command.Configure) {
                     // console.log('Dissolving stopped successfully');
@@ -6839,7 +6774,7 @@ export const useTacoStore = defineStore('taco', () => {
             if (result.command && result.command.length > 0) {
                 const command = result.command[0];
                 if (command.Error) {
-                    throw new Error(`Disburse failed: ${JSON.stringify(command)}`);
+                    throw new Error(`Disburse failed: ${safeStringify(command)}`);
                 }
                 if (command.Disburse) {
                     // console.log('Neuron disbursed successfully');
@@ -6900,7 +6835,7 @@ export const useTacoStore = defineStore('taco', () => {
             if (result.command && result.command.length > 0) {
                 const command = result.command[0];
                 if (command.Error) {
-                    throw new Error(`AddNeuronPermissions failed: ${JSON.stringify(command)}`);
+                    throw new Error(`AddNeuronPermissions failed: ${safeStringify(command)}`);
                 }
                 if (command.AddNeuronPermission !== undefined) {
                     // console.log('Neuron permissions added successfully');
@@ -6955,7 +6890,7 @@ export const useTacoStore = defineStore('taco', () => {
             if (result.command && result.command.length > 0) {
                 const command = result.command[0];
                 if (command.Error) {
-                    throw new Error(`RemoveNeuronPermissions failed: ${JSON.stringify(command)}`);
+                    throw new Error(`RemoveNeuronPermissions failed: ${safeStringify(command)}`);
                 }
                 if (command.RemoveNeuronPermission !== undefined) {
                     // console.log('Neuron permissions removed successfully');
@@ -7064,7 +6999,7 @@ export const useTacoStore = defineStore('taco', () => {
             if (result.command && result.command.length > 0) {
                 const command = result.command[0];
                 if (command.Error) {
-                    throw new Error(`SetFollowing failed: ${JSON.stringify(command)}`);
+                    throw new Error(`SetFollowing failed: ${safeStringify(command)}`);
                 }
                 if (command.SetFollowing !== undefined) {
                     // console.log('Neuron followee added successfully');
@@ -7159,7 +7094,7 @@ export const useTacoStore = defineStore('taco', () => {
             if (result.command && result.command.length > 0) {
                 const command = result.command[0];
                 if (command.Error) {
-                    throw new Error(`RemoveFollowing failed: ${JSON.stringify(command)}`);
+                    throw new Error(`RemoveFollowing failed: ${safeStringify(command)}`);
                 }
                 if (command.SetFollowing !== undefined) {
                     // console.log('Neuron followee removed successfully');
@@ -7202,7 +7137,7 @@ export const useTacoStore = defineStore('taco', () => {
                     // Already the neuron object
                     neuronRaw = inner;
                 } else if (inner?.Err) {
-                    throw new Error(`get_neuron error: ${JSON.stringify(inner.Err)}`);
+                    throw new Error(`get_neuron error: ${safeStringify(inner.Err)}`);
                 }
             }
 
@@ -7671,7 +7606,7 @@ export const useTacoStore = defineStore('taco', () => {
         if ('Ok' in result) {
             return result.Ok;
         } else {
-            throw new Error(`Transfer failed: ${JSON.stringify(result.Err)}`);
+            throw new Error(`Transfer failed: ${safeStringify(result.Err)}`);
         }
     }
 
@@ -7735,10 +7670,10 @@ export const useTacoStore = defineStore('taco', () => {
         } else if (result.command && result.command.length > 0 && 'Error' in result.command[0]) {
             const error = result.command[0].Error;
             console.error('ClaimOrRefresh governance error:', error);
-            throw new Error(`ClaimOrRefresh failed: ${error.error_message || JSON.stringify(error)}`);
+            throw new Error(`ClaimOrRefresh failed: ${error.error_message || safeStringify(error)}`);
         } else {
             console.error('ClaimOrRefresh unexpected result:', result);
-            throw new Error(`ClaimOrRefresh failed: ${JSON.stringify(result)}`);
+            throw new Error(`ClaimOrRefresh failed: ${safeStringify(result)}`);
         }
     }
 
@@ -7757,7 +7692,7 @@ export const useTacoStore = defineStore('taco', () => {
             if ('ok' in result) {
                 return (result as any).ok;
             } else {
-                throw new Error(JSON.stringify((result as any).err));
+                throw new Error(safeStringify((result as any).err));
             }
         } catch (error: any) {
             console.error('Error registering token:', error);
@@ -7779,7 +7714,7 @@ export const useTacoStore = defineStore('taco', () => {
             if ('ok' in result) {
                 return (result as any).ok;
             } else {
-                throw new Error(JSON.stringify((result as any).err));
+                throw new Error(safeStringify((result as any).err));
             }
         } catch (error: any) {
             console.error('Error unregistering token:', error);
@@ -7899,7 +7834,7 @@ export const useTacoStore = defineStore('taco', () => {
             if ('Ok' in result) {
                 return (result as any).Ok;
             } else {
-                throw new Error(JSON.stringify((result as any).Err));
+                throw new Error(safeStringify((result as any).Err));
             }
         } catch (error: any) {
             console.error('Error sending token:', error);
@@ -9124,7 +9059,8 @@ export const useTacoStore = defineStore('taco', () => {
         neuronSnapshotCanisterId,
         rewardsCanisterId,
         portfolioArchiveCanisterId,
-        
+        clearActorCaches,
+
         // Router
         router,
 

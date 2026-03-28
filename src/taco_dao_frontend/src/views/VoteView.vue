@@ -1015,7 +1015,7 @@
     </div>
 
     <!-- message modal -->
-    <div v-if="!userAcceptedHotkeyTutorial || userReshownHotkeyTutorial" class="vote__message">
+    <div v-if="userLoggedIn && (!userAcceptedHotkeyTutorial || userReshownHotkeyTutorial)" class="vote__message">
       
       <!-- message -->
       <div class="vote__message__dialog">
@@ -1024,7 +1024,7 @@
         <div class="vote__message__dialog__top px-2 p-2">
 
           <!-- message top left -->
-          <div class="taco-text-white">How To Hotkey</div>
+          <div style="font-family: 'Rubik', sans-serif; font-size: 1.25rem; font-weight: 520; color: var(--gold); text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3); -webkit-text-stroke: 0.9px rgb(70, 89, 71);">How To Hotkey</div>
 
           <!-- message top right -->
           <div class="taco-text-black-to-white"></div>
@@ -1046,14 +1046,14 @@
             </svg>
 
             <!-- title -->
-            <span class="taco-text-black-to-white d-inline-block text-center px-2 pt-2 pb-1"
-              style="font-weight: 600;">
+            <span class="d-inline-block text-center px-2 pt-2 pb-1"
+              style="font-family: 'Rubik', sans-serif; font-size: 1.3rem; font-weight: 520; color: var(--gold); text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3); -webkit-text-stroke: 0.9px rgb(70, 89, 71);">
               What is Hotkeying?
             </span>
 
             <!-- text -->
             <span class="taco-text-black-to-white text-center"
-              style="font-size: 0.875rem;">
+              style="font-size: 0.95rem; line-height: 1.5;">
               Hotkeying your SNS Neurons with you TacoDao.com principal allows you to vote via the TacoDAO interface. <br><br> You can always manually vote via command line if TacoDao.com is down, but hotkeying is the easiest way to vote. It's free, and allows you to support TacoDao by using our dApp! <br><br> Here is more information on <a href="https://support.dfinity.org/hc/en-us/articles/8939053696788-What-is-a-neuron-hotkey-and-how-do-I-use-it" style="color: var(--blue-to-light-blue);" target="_blank">Hotkeying</a> from Dfinity
             </span>
 
@@ -1067,16 +1067,16 @@
               style="color: var(--gold); font-size: 4.5rem;"></i>
 
             <!-- title -->
-            <span class="taco-text-black-to-white d-inline-block text-center px-2 pt-2 pb-1"
-              style="font-weight: 600;">
+            <span class="d-inline-block text-center px-2 pt-2 pb-1"
+              style="font-family: 'Rubik', sans-serif; font-size: 1.3rem; font-weight: 520; color: var(--gold); text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3); -webkit-text-stroke: 0.9px rgb(70, 89, 71);">
               How to Hotkey
             </span>
 
             <!-- text -->
             <span class="taco-text-black-to-white text-start"
-              style="font-size: 0.875rem;">
+              style="font-size: 0.95rem; line-height: 1.5;">
               To Hotkey your SNS Neurons
-              <ol style="list-style-type: decimal; padding-left: 1.75rem;">
+              <ol style="list-style-type: decimal; padding-left: 1.75rem; line-height: 1.6;">
                 <li class="text-start">
                   Copy your TacoDao.com principal from the top right corner of the screen
                 </li>
@@ -1085,13 +1085,13 @@
                 </li>
                 <li class="text-start">
                   Go to the Neuron Staking page and select a TacoDAO neuron
-                </li>    
+                </li>
                 <li class="text-start">
                   Scroll to the bottom of the page and select "Add Hotkey"
-                </li> 
+                </li>
                 <li class="text-start">
                   Enter your TacoDao.com principal and click "Confirm"
-                </li>                                                
+                </li>
               </ol>
               <span class="d-inline-flex text-center">That's it, You've hotkeyed an SNS Neuron! You should now see your voting power, and you'll be able to vote on TacoDao.com</span>
             </span>
@@ -1110,7 +1110,7 @@
           <div class="taco-text-black-to-white">
 
             <!-- close button -->
-            <button class="btn taco-nav-btn"
+            <button class="btn taco-btn taco-btn--green taco-btn--big"
                     @click="acceptHotkeyTutorial(); acceptHotkeyTutorialLocally()">
               Got It
             </button>

@@ -1,10 +1,12 @@
 /**
  * Canister ID Resolution for SharedWorkers
  *
- * Network-aware canister ID resolution extracted from taco.store.ts
- * Uses environment variables with fallback defaults.
- * Supports network override for testing mainnet from local website.
+ * Network-aware canister ID resolution.
+ * Uses central CANISTER_IDS config with environment variable overrides.
+ * Supports network override for testing from local website.
  */
+
+import { CANISTER_IDS, LOCAL_CANISTER_IDS, type CanisterKey, type EnvKey } from '../../constants/canisterIds'
 
 // Get environment variable with fallback
 function getEnvVar(key: string): string | undefined {
@@ -33,7 +35,7 @@ export function setWorkerNetworkOverride(network: 'ic' | 'staging' | 'local' | n
 }
 
 // Get network from environment or override
-function getNetwork(): 'ic' | 'staging' | 'local' {
+export function getNetwork(): 'ic' | 'staging' | 'local' {
   // Check worker-level override first
   if (workerNetworkOverride) {
     return workerNetworkOverride
@@ -67,7 +69,29 @@ function getNetwork(): 'ic' | 'staging' | 'local' {
     }
   }
 
-  return 'local'
+  // Default to staging (matches .env DFX_NETWORK='staging')
+  return 'staging'
+}
+
+/**
+ * Resolve a canister ID from central config, with env var override support.
+ */
+function resolveCanisterId(key: CanisterKey): string {
+  const network = getNetwork()
+
+  // For 'local', check local overrides first, then fall back to staging
+  if (network === 'local') {
+    return LOCAL_CANISTER_IDS[key] ?? CANISTER_IDS[key]?.staging ?? ''
+  }
+
+  // Check import.meta.env override
+  const envKey = `CANISTER_ID_${key.toUpperCase()}_${network.toUpperCase()}`
+  const envValue = getEnvVar(envKey)
+  if (envValue) return envValue
+
+  // Fall back to central config
+  const envForLookup: EnvKey = network === 'ic' ? 'ic' : 'staging'
+  return CANISTER_IDS[key]?.[envForLookup] ?? ''
 }
 
 /**
@@ -79,7 +103,14 @@ export function getHost(): string {
     const port = getEnvVar('VITE_LOCAL_PORT') || '4943'
     return `http://localhost:${port}`
   }
-  return 'https://ic0.app'
+  // Match API host to serving domain to avoid CORS errors
+  if (typeof self !== 'undefined' && self.location) {
+    const hostname = self.location.hostname
+    if (hostname.endsWith('.ic0.app') || hostname === 'ic0.app') {
+      return 'https://ic0.app'
+    }
+  }
+  return 'https://icp0.io'
 }
 
 /**
@@ -89,151 +120,29 @@ export function shouldFetchRootKey(): boolean {
   return getNetwork() === 'local'
 }
 
-/**
- * DAO Backend Canister ID
- */
-export function getDaoBackendCanisterId(): string {
-  const network = getNetwork()
+// Canister ID getters — all delegate to central config
+export function getDaoBackendCanisterId(): string { return resolveCanisterId('dao_backend') }
+export function getTreasuryCanisterId(): string { return resolveCanisterId('treasury') }
+export function getNeuronSnapshotCanisterId(): string { return resolveCanisterId('neuronSnapshot') }
+export function getRewardsCanisterId(): string { return resolveCanisterId('rewards') }
+export function getNachosVaultCanisterId(): string { return resolveCanisterId('nachos_vault') }
+export function getTacoSwapCanisterId(): string { return resolveCanisterId('taco_swap') }
 
-  switch (network) {
-    case 'ic':
-      return getEnvVar('CANISTER_ID_DAO_BACKEND_IC') || 'vxqw7-iqaaa-aaaan-qzziq-cai'
-    case 'staging':
-      return getEnvVar('CANISTER_ID_DAO_BACKEND_STAGING') || 'tisou-7aaaa-aaaai-atiea-cai'
-    default:
-      return 'ywhqf-eyaaa-aaaad-qg6tq-cai' // local
-  }
-}
-
-/**
- * Treasury Canister ID
- */
-export function getTreasuryCanisterId(): string {
-  const network = getNetwork()
-
-  switch (network) {
-    case 'ic':
-      return getEnvVar('CANISTER_ID_TREASURY_IC') || 'v6t5d-6yaaa-aaaan-qzzja-cai'
-    case 'staging':
-      return getEnvVar('CANISTER_ID_TREASURY_STAGING') || 'tptia-syaaa-aaaai-atieq-cai'
-    default:
-      return 'z4is7-giaaa-aaaad-qg6uq-cai' // local
-  }
-}
-
-/**
- * Neuron Snapshot Canister ID
- */
-export function getNeuronSnapshotCanisterId(): string {
-  const network = getNetwork()
-
-  switch (network) {
-    case 'ic':
-      return getEnvVar('CANISTER_ID_NEURONSNAPSHOT_IC') || 'vzs3x-taaaa-aaaan-qzzjq-cai'
-    case 'staging':
-      return getEnvVar('CANISTER_ID_NEURONSNAPSHOT_STAGING') || 'tgqd4-eqaaa-aaaai-atifa-cai'
-    default:
-      return 'tgqd4-eqaaa-aaaai-atifa-cai' // local
-  }
-}
-
-/**
- * Rewards Canister ID
- */
-export function getRewardsCanisterId(): string {
-  const network = getNetwork()
-
-  switch (network) {
-    case 'ic':
-      return getEnvVar('CANISTER_ID_REWARDS_IC') || 'dkgdg-saaaa-aaaan-qz5ma-cai'
-    case 'staging':
-      return getEnvVar('CANISTER_ID_REWARDS_STAGING') || 'cjkka-gyaaa-aaaan-qz5kq-cai'
-    default:
-      return 'cjkka-gyaaa-aaaan-qz5kq-cai' // local
-  }
-}
-
-/**
- * Sneed Forum Canister ID
- */
+// Third-party / protocol canisters — same across all networks
 export function getSneedForumCanisterId(): string {
-  const network = getNetwork()
-
-  switch (network) {
-    case 'ic':
-      return getEnvVar('CANISTER_ID_SNEED_FORUM_IC') || 'mcigm-4aaaa-aaaad-qhlkq-cai'
-    case 'staging':
-      return getEnvVar('CANISTER_ID_SNEED_FORUM_STAGING') || 'mcigm-4aaaa-aaaad-qhlkq-cai'
-    default:
-      return 'mcigm-4aaaa-aaaad-qhlkq-cai'
-  }
+  return getEnvVar('CANISTER_ID_SNEED_FORUM_IC') || 'mcigm-4aaaa-aaaad-qhlkq-cai'
 }
-
-/**
- * TACO DAO SNS Root Canister ID (same across all networks)
- */
-export function getTacoSnsRootCanisterId(): string {
-  return 'lacdn-3iaaa-aaaaq-aae3a-cai'
-}
-
-/**
- * TACO DAO SNS Governance Canister ID (same across all networks)
- */
-export function getTacoSnsGovernanceCanisterId(): string {
-  return 'lhdfz-wqaaa-aaaaq-aae3q-cai'
-}
-
-/**
- * App SneedDAO Backend Canister ID
- */
+export function getTacoSnsRootCanisterId(): string { return 'lacdn-3iaaa-aaaaq-aae3a-cai' }
+export function getTacoSnsGovernanceCanisterId(): string { return 'lhdfz-wqaaa-aaaaq-aae3q-cai' }
 export function getAppSneedDaoCanisterId(): string {
-  const network = getNetwork()
-
-  switch (network) {
-    case 'ic':
-      return getEnvVar('CANISTER_ID_APP_SNEEDDAO_BACKEND_IC') || 'g7s5u-tqaaa-aaaad-qhktq-cai'
-    case 'staging':
-      return getEnvVar('CANISTER_ID_APP_SNEEDDAO_BACKEND_STAGING') || 'g7s5u-tqaaa-aaaad-qhktq-cai'
-    default:
-      return 'g7s5u-tqaaa-aaaad-qhktq-cai'
-  }
+  return getEnvVar('CANISTER_ID_APP_SNEEDDAO_BACKEND_IC') || 'g7s5u-tqaaa-aaaad-qhktq-cai'
 }
-
-/**
- * ICP Ledger Canister ID
- */
 export function getIcpLedgerCanisterId(): string {
-  // ICP Ledger is always the same on mainnet
   const network = getNetwork()
   if (network === 'local') {
     return getEnvVar('CANISTER_ID_LEDGER_LOCAL') || 'ryjl3-tyaaa-aaaaa-aaaba-cai'
   }
   return 'ryjl3-tyaaa-aaaaa-aaaba-cai'
-}
-
-/**
- * TACO Swap Canister ID
- */
-export function getTacoSwapCanisterId(): string {
-  const network = getNetwork()
-
-  switch (network) {
-    case 'ic':
-      return getEnvVar('CANISTER_ID_TACO_SWAP_IC') || '2uddx-dqaaa-aaaan-q5qja-cai'
-    case 'staging':
-      return getEnvVar('CANISTER_ID_TACO_SWAP_STAGING') || '2uddx-dqaaa-aaaan-q5qja-cai'
-    default:
-      return '2uddx-dqaaa-aaaan-q5qja-cai'
-  }
-}
-
-/**
- * Nachos Vault Canister ID
- * Note: Nachos vault is staging-only, same canister ID for all networks
- */
-export function getNachosVaultCanisterId(network?: string): string {
-  // Nachos is staging-only - same canister ID regardless of network
-  return 'p4nog-baaaa-aaaad-qkwpa-cai'
 }
 
 /**

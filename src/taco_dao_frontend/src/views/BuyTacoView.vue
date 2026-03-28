@@ -42,7 +42,11 @@
                 <span class="buy-taco-view__timeline-arrow"><i class="fa-solid fa-chevron-right"></i></span>
                 <div class="buy-taco-view__timeline-step">
                   <span class="buy-taco-view__step-num">3</span>
-                  <span v-if="selectedProduct === 'nachos'" class="buy-taco-view__step-label">Once ICP arrives, NACHOS are minted at current NAV</span>
+                  <!-- NACHOS -->
+                  <span v-if="selectedProduct === 'nachos' && autoSwapEnabled && !isDevEnvironment()" class="buy-taco-view__step-label">Once ICP arrives, NACHOS are minted automatically at current NAV</span>
+                  <span v-else-if="selectedProduct === 'nachos'" class="buy-taco-view__step-label">Click "Mint NACHOS" when ready</span>
+                  <!-- TACO -->
+                  <span v-else-if="autoSwapEnabled && !isDevEnvironment()" class="buy-taco-view__step-label">Once ICP arrives, swap executes automatically</span>
                   <span v-else class="buy-taco-view__step-label">Click "Swap ICP for TACO" when ready</span>
                 </div>
                 <span class="buy-taco-view__timeline-arrow"><i class="fa-solid fa-chevron-right"></i></span>
@@ -162,6 +166,35 @@
                 </div>
               </div>
 
+              <!-- Failed mint recovery (NACHOS only) -->
+              <div v-if="selectedProduct === 'nachos' && failedNachosMints.length > 0" class="buy-taco-view__recovery w-100 mt-3">
+                <div class="buy-taco-view__recovery-summary">
+                  <i class="fa-solid fa-exclamation-triangle"></i>
+                  <strong>{{ failedNachosMints.length }} Failed Mint{{ failedNachosMints.length > 1 ? 's' : '' }}</strong>
+                  <span class="text-muted">— ICP transferred but mint incomplete</span>
+                </div>
+                <div class="buy-taco-view__recovery-content">
+                  <div v-for="mint in failedNachosMints" :key="mint.blockNumber" class="buy-taco-view__recovery-item">
+                    <div class="d-flex justify-content-between align-items-center">
+                      <div>
+                        <div><strong>{{ formatE8s(BigInt(mint.amount)) }} ICP</strong></div>
+                        <div class="text-muted">{{ new Date(mint.timestamp).toLocaleString() }}</div>
+                      </div>
+                      <div class="d-flex gap-2">
+                        <button class="btn btn-sm taco-btn taco-btn--green" @click="retryFailedMint(mint)" title="Complete the mint">
+                          <i class="fa-solid fa-rotate-right me-1"></i>
+                          Retry
+                        </button>
+                        <button class="btn btn-sm buy-taco-view__refund-btn" @click="cancelAndRefund(mint)" title="Cancel mint and refund ICP">
+                          <i class="fa-solid fa-xmark me-1"></i>
+                          Refund
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
               <!-- Progress tracker -->
               <div v-if="buyPhase !== 'idle'" class="buy-taco-view__progress w-100">
                 <h3 class="buy-taco-view__section-title">Progress</h3>
@@ -189,11 +222,20 @@
 
             <!-- Swap Confirm Dialog (TACO swaps — execution) -->
             <SwapConfirmDialog
+              v-if="showSwapConfirmDialog && swapConfirmData"
               :show="showSwapConfirmDialog"
               :swap-data="swapConfirmData"
               @close="closeSwapConfirmDialog"
               @success="handleSwapSuccess"
               @error="handleSwapError"
+            />
+
+            <!-- NACHOS Mint Confirm Dialog -->
+            <VaultConfirmDialog
+              :show="showMintConfirmDialog"
+              :data="mintConfirmData"
+              @confirm="onMintConfirm"
+              @close="onMintConfirmClose"
             />
 
           </div>
@@ -582,6 +624,82 @@
     text-align: center;
   }
 
+  // Failed mint recovery section
+  &__recovery {
+    padding: 1.25rem 1.5rem;
+    border-radius: 0.75rem;
+    border: 2px solid var(--dark-orange);
+    background: linear-gradient(135deg, var(--card-gradient-from), var(--card-gradient-to));
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  }
+
+  &__recovery-summary {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-family: 'Rubik', sans-serif;
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--gold);
+    padding: 0.25rem 0;
+
+    i { color: var(--dark-orange); }
+
+    strong { color: var(--gold); }
+
+    .text-muted {
+      font-family: 'Space Mono', monospace;
+      font-size: 0.8rem;
+      font-weight: 400;
+      color: rgba(255, 255, 255, 0.65) !important;
+    }
+  }
+
+  &__recovery-content {
+    font-family: 'Space Mono', monospace;
+    margin-top: 0.75rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--dark-orange-to-brown);
+  }
+
+  &__recovery-item {
+    margin-bottom: 0.5rem;
+
+    .d-flex {
+      background: rgba(0, 0, 0, 0.2);
+      border: 1px solid var(--dark-orange-to-brown);
+      border-radius: 0.5rem;
+      padding: 0.875rem 1rem;
+    }
+
+    strong {
+      font-family: 'Space Mono', monospace;
+      color: var(--gold);
+      font-size: 0.95rem;
+    }
+
+    .text-muted {
+      font-family: 'Space Mono', monospace;
+      font-size: 0.75rem;
+      color: rgba(255, 255, 255, 0.6) !important;
+    }
+  }
+
+  &__refund-btn {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.75rem;
+    font-weight: 600;
+    background: rgba(220, 53, 69, 0.15);
+    border: 1px solid rgba(220, 53, 69, 0.5);
+    color: #ff8a8a;
+
+    &:hover {
+      background: rgba(220, 53, 69, 0.3);
+      border-color: var(--red, #dc3545);
+      color: #fff;
+    }
+  }
+
   // claim section - Enhanced with gradient background
   &__claim {
     background: linear-gradient(135deg, var(--card-gradient-from), var(--card-gradient-to));
@@ -741,17 +859,19 @@ import SwapProgressTracker from '../components/misc/SwapProgressTracker.vue'
 import type { ProgressStep, ProgressAmount } from '../components/misc/SwapProgressTracker.vue'
 import SwapDialog from '../components/wallet/SwapDialog.vue'
 import SwapConfirmDialog from '../components/wallet/SwapConfirmDialog.vue'
+import VaultConfirmDialog from '../components/nachos/VaultConfirmDialog.vue'
 import type { ExecutionPlan } from '../composables/useSplitSwap'
 import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useTacoStore } from '../stores/taco.store'
 import { useNachosStore } from '../stores/nachos.store'
 import { storeToRefs } from 'pinia'
-import { isDevEnvironment } from '../config/network-config'
+import { isDevEnvironment, getEffectiveNetwork } from '../config/network-config'
 import { useAdminCheck } from '../composables/useAdminCheck'
 import { useSplitSwap } from '../composables/useSplitSwap'
 import { Principal } from '@dfinity/principal'
 import { signedSessionHeaders } from '../utils/sign-session-request'
+import { tokenImages } from '../components/data/TokenData'
 
 ///////////////
 // constants //
@@ -783,6 +903,7 @@ const tacoStore = useTacoStore()
 const nachosStore = useNachosStore()
 const splitSwap = useSplitSwap()
 const { userPrincipal, darkModeToggled, userLoggedIn, userLedgerAccountId } = storeToRefs(tacoStore)
+const { cachedOperations } = storeToRefs(nachosStore)
 const { isAdmin } = useAdminCheck()
 const showAsLoggedIn = computed(() => tacoStore.userLoggedIn || tacoStore.tourBypassAuth)
 
@@ -830,17 +951,37 @@ const showSwapConfirmDialog = ref(false)
 const swapConfirmData = ref<any | null>(null)
 const swapDialogRef = ref<any>(null)
 
+// NACHOS mint confirmation dialog
+const showMintConfirmDialog = ref(false)
+const mintConfirmData = ref<{ title: string; rows: Array<{ label: string; value: string }>; actionLabel: string } | null>(null)
+const skipMintConfirmation = ref(localStorage.getItem('nachos_buy_skip_confirm') === 'true')
+
 // ICP token object for SwapDialog
 const icpToken = {
   principal: ICP_PRINCIPAL,
   name: 'Internet Computer',
   symbol: 'ICP',
-  logo: 'https://nns.ic0.app/img/icp-logo.ecfad084.svg',
+  logo: tokenImages['Internet Computer'] || tokenImages['ICP'] || tokenImages['Default'],
   balance: 0n,
   decimals: 8,
   fee: 10_000n,
 }
-const availableTokensForSwap = computed(() => [{ ...icpToken, balance: detectedIcpAmount.value }])
+const availableTokensForSwap = computed(() => {
+  const fee = 10_000n
+  const spendable = detectedIcpAmount.value > fee ? detectedIcpAmount.value - fee : 0n
+  return [
+    { ...icpToken, balance: spendable },
+    {
+      principal: TACO_PRINCIPAL,
+      name: 'TACO',
+      symbol: 'TACO',
+      logo: tokenImages['TACO'] || tokenImages['Default'],
+      balance: 0n,
+      decimals: 8,
+      fee: 10_000n,
+    }
+  ]
+})
 
 ////////////////////
 // computed props //
@@ -852,6 +993,12 @@ const buyButtonLabel = computed(() => {
   if (buyPhase.value === 'quoting') return 'Getting quotes...'
   if (buyPhase.value === 'executing') return 'Executing...'
   return `Fund via ${selectedProvider.value === 'coinbase' ? 'Coinbase' : 'Transak'}`
+})
+
+const failedNachosMints = computed(() => {
+  return cachedOperations.value
+    .filter(op => op.type === 'mint_icp' && op.status === 'failed')
+    .sort((a, b) => b.timestamp - a.timestamp) // Most recent first
 })
 
 /////////////////////////////
@@ -960,20 +1107,21 @@ const openBuy = () => {
 const openCoinbase = async () => {
   if (!userLedgerAccountId.value) return
 
-  icpDetected.value = false
-  detectedIcpAmount.value = 0n
-
-  // Capture baseline ICP balance
+  // Capture baseline ICP balance FIRST
   try {
     baselineIcpBalance.value = await tacoStore.icrc1BalanceOf(
       ICP_LEDGER_CANISTER_ID,
       Principal.fromText(tacoStore.userPrincipal),
-      undefined
+      new Uint8Array(32)  // Explicit default subaccount (matches VaultFiatMint)
     )
   } catch (e) {
     console.warn('Failed to capture baseline balance:', e)
     baselineIcpBalance.value = 0n
   }
+
+  // THEN reset detected state
+  icpDetected.value = false
+  detectedIcpAmount.value = 0n
 
   try {
     const sessionBody = {
@@ -1056,20 +1204,21 @@ const buildTransakUrl = (addr: string, title: string): string => {
 const openTransak = async () => {
   if (!userLedgerAccountId.value) return
 
-  icpDetected.value = false
-  detectedIcpAmount.value = 0n
-
-  // Capture baseline ICP balance
+  // Capture baseline ICP balance FIRST
   try {
     baselineIcpBalance.value = await tacoStore.icrc1BalanceOf(
       ICP_LEDGER_CANISTER_ID,
       Principal.fromText(tacoStore.userPrincipal),
-      undefined
+      new Uint8Array(32)  // Explicit default subaccount (matches VaultFiatMint)
     )
   } catch (e) {
     console.warn('Failed to capture baseline balance:', e)
     baselineIcpBalance.value = 0n
   }
+
+  // THEN reset detected state
+  icpDetected.value = false
+  detectedIcpAmount.value = 0n
 
   try {
     buyPhase.value = 'detecting'
@@ -1119,12 +1268,17 @@ const openTransak = async () => {
 const startDepositPolling = () => {
   stopDepositPolling()
   const startedAt = Date.now()
+  let pollingStopped = false  // Guard flag to prevent race conditions
 
   depositPollInterval = setInterval(async () => {
     if (Date.now() - startedAt > MAX_POLL_DURATION_MS) {
       stopDepositPolling()
-      buyPhase.value = 'error'
-      executionError.value = 'Timed out waiting for ICP deposit.'
+      pollingStopped = true
+      // Only set error if ICP wasn't already detected
+      if (!icpDetected.value) {
+        buyPhase.value = 'error'
+        executionError.value = 'Timed out waiting for ICP deposit.'
+      }
       return
     }
 
@@ -1132,20 +1286,21 @@ const startDepositPolling = () => {
       const currentBalance = await tacoStore.icrc1BalanceOf(
         ICP_LEDGER_CANISTER_ID,
         Principal.fromText(tacoStore.userPrincipal),
-        undefined
+        new Uint8Array(32)  // Explicit default subaccount (matches VaultFiatMint)
       )
 
       if (currentBalance === false) return
       const currentBalanceBigInt = BigInt(currentBalance)
       const balanceDifference = currentBalanceBigInt - baselineIcpBalance.value
 
-      if (balanceDifference > DEPOSIT_MIN_E8S) {
+      if (balanceDifference > DEPOSIT_MIN_E8S && !pollingStopped) {
         stopDepositPolling()
+        pollingStopped = true  // Prevent multiple executions
         icpDetected.value = true
         detectedIcpAmount.value = balanceDifference
 
-        // Auto-execute if toggle is checked (production only); otherwise show confirmation button
-        if (autoSwapEnabled.value) {
+        // Auto-execute if toggle checked (production only); otherwise show confirmation button
+        if (autoSwapEnabled.value && !isDevEnvironment()) {
           handleSwapMintClick()
         } else {
           buyPhase.value = 'idle'
@@ -1174,8 +1329,8 @@ const handleSwapMintClick = () => {
   if (!icpDetected.value || detectedIcpAmount.value === 0n) return
 
   if (selectedProduct.value === 'nachos') {
-    // NACHOS: always direct mint (no dialog needed)
-    executeDirectMint()
+    // NACHOS: show confirmation dialog (unless skipped)
+    requestMintNachos()
   } else if (autoSwapEnabled.value) {
     // TACO + auto: direct execute with 5% max slippage
     executeDirectSwap()
@@ -1189,6 +1344,9 @@ const handleSwapMintClick = () => {
 const executeDirectSwap = async () => {
   const amount = detectedIcpAmount.value
   if (amount === 0n) return
+  if (isDevEnvironment()) {
+    console.log('[BUY executeDirectSwap]', { amount: amount.toString(), network: getEffectiveNetwork() })
+  }
 
   try {
     buyPhase.value = 'quoting'
@@ -1222,6 +1380,7 @@ const executeDirectSwap = async () => {
       throw new Error(failures.map(f => `${f.exchange}: ${f.error}`).join('; '))
     }
 
+    if (isDevEnvironment()) console.log('[BUY executeDirectSwap] Total TACO:', result.totalOut.toString())
     buyPhase.value = 'complete'
     completionMessage.value = `Received ${formatE8s(result.totalOut)} TACO!`
     if (failures.length > 0) {
@@ -1240,10 +1399,54 @@ const executeDirectSwap = async () => {
   }
 }
 
-/** Direct mint execution (NACHOS — always direct, no dialog) */
+/** Show NACHOS mint confirmation dialog (or skip if user opted out) */
+const requestMintNachos = async () => {
+  if (skipMintConfirmation.value) { executeDirectMint(); return }
+
+  const amount = detectedIcpAmount.value
+  if (amount === 0n) return
+  const depositAmount = amount > 10_000n ? amount - 10_000n : 0n
+
+  // Fetch estimate for display
+  let nachosEstimate = '...'
+  try {
+    const est = await nachosStore.estimateMintICP(depositAmount)
+    nachosEstimate = nachosStore.formatNachos(est.nachosEstimate)
+  } catch { /* fallback to '...' */ }
+
+  mintConfirmData.value = {
+    title: 'Confirm NACHOS Mint',
+    rows: [
+      { label: 'ICP Deposit', value: `${formatE8s(depositAmount)} ICP` },
+      { label: 'Transfer Fee', value: '0.0001 ICP' },
+      { label: 'Est. NACHOS', value: nachosEstimate },
+    ],
+    actionLabel: 'Mint NACHOS',
+  }
+  showMintConfirmDialog.value = true
+}
+
+const onMintConfirm = (dontShowAgain: boolean) => {
+  if (dontShowAgain) {
+    localStorage.setItem('nachos_buy_skip_confirm', 'true')
+    skipMintConfirmation.value = true
+  }
+  showMintConfirmDialog.value = false
+  executeDirectMint()
+}
+
+const onMintConfirmClose = () => {
+  showMintConfirmDialog.value = false
+  mintConfirmData.value = null
+}
+
+/** Direct mint execution (NACHOS) */
 const executeDirectMint = async () => {
   const amount = detectedIcpAmount.value
   if (amount === 0n) return
+  if (isDevEnvironment()) {
+    console.log('[BUY executeDirectMint]', { amount: amount.toString(), network: getEffectiveNetwork() })
+  }
 
   try {
     buyPhase.value = 'executing'
@@ -1251,6 +1454,7 @@ const executeDirectMint = async () => {
 
     const mintResult = await nachosStore.mintWithICP(amount)
 
+    if (isDevEnvironment()) console.log('[BUY executeDirectMint] Result:', mintResult)
     buyPhase.value = 'complete'
     if (mintResult && typeof mintResult === 'object' && 'nachosReceived' in mintResult) {
       completionMessage.value = `Received ${formatE8s(mintResult.nachosReceived as bigint)} NACHOS!`
@@ -1269,6 +1473,76 @@ const executeDirectMint = async () => {
   }
 }
 
+/** Retry a failed NACHOS mint */
+const retryFailedMint = async (failedOp: any) => {
+  if (!failedOp || !failedOp.amount) return
+
+  const amount = BigInt(failedOp.amount)
+
+  // Confirm with user
+  if (!confirm(`Retry minting ${formatE8s(amount)} ICP → NACHOS?\n\nThe ICP was already transferred in the previous attempt. This will complete the mint.`)) {
+    return
+  }
+
+  // Use the same executeDirectMint logic
+  detectedIcpAmount.value = amount
+  await executeDirectMint()
+}
+
+/** Cancel failed mint and refund ICP */
+const cancelAndRefund = async (failedOp: any) => {
+  if (!failedOp || !failedOp.blockNumber || !failedOp.amount) return
+
+  const amount = BigInt(failedOp.amount)
+  const blockNumber = BigInt(failedOp.blockNumber)
+
+  if (!confirm(`Cancel mint and refund ${formatE8s(amount)} ICP back to your wallet?\n\nA small cancellation fee may apply.`)) {
+    return
+  }
+
+  try {
+    buyPhase.value = 'executing'
+    executionStep.value = 'Cancelling deposit and initiating refund...'
+
+    const result = await nachosStore.cancelDeposit(ICP_LEDGER_CANISTER_ID, blockNumber)
+
+    buyPhase.value = 'complete'
+
+    if (result?.alreadyResolved) {
+      completionMessage.value = 'This deposit was already processed. Removed from list.'
+      tacoStore.addToast({
+        id: Date.now(),
+        code: 'refund-resolved',
+        title: 'Deposit Already Resolved',
+        icon: 'fa-solid fa-check',
+        message: 'This deposit was already processed.'
+      })
+    } else {
+      completionMessage.value = 'Refund initiated! Your ICP will be returned shortly.'
+      tacoStore.addToast({
+        id: Date.now(),
+        code: 'refund-success',
+        title: 'Refund Initiated',
+        icon: 'fa-solid fa-check',
+        message: 'Refund task created. ICP will be returned shortly.'
+      })
+    }
+
+  } catch (err: any) {
+    console.error('Cancel and refund failed:', err)
+    buyPhase.value = 'error'
+    executionError.value = err.message || 'Refund failed'
+
+    tacoStore.addToast({
+      id: Date.now(),
+      code: 'refund-error',
+      title: 'Refund Failed',
+      icon: 'fa-solid fa-exclamation-triangle',
+      message: err.message || 'Could not cancel deposit'
+    })
+  }
+}
+
 // ==========================
 // Swap dialog handlers
 // ==========================
@@ -1283,6 +1557,10 @@ const closeSwapDialog = () => {
 
 /** Handle swap dialog confirm → open confirmation dialog */
 const handleSwapDialogConfirm = (swapData: any) => {
+  if (!swapData) {
+    console.error('No swap data provided')
+    return
+  }
   swapConfirmData.value = swapData
   showSwapDialog.value = false
   showSwapConfirmDialog.value = true
@@ -1342,7 +1620,7 @@ const checkExistingBalance = async () => {
     const balance = await tacoStore.icrc1BalanceOf(
       ICP_LEDGER_CANISTER_ID,
       Principal.fromText(userPrincipal.value),
-      undefined
+      new Uint8Array(32)  // Explicit default subaccount (matches VaultFiatMint)
     )
     if (balance !== false) {
       const bal = BigInt(balance)
@@ -1380,7 +1658,23 @@ watch(userLoggedIn, async (loggedIn) => {
   }
 })
 
+// Navigation guard: prevent user from leaving during swap execution
+const preventNavigation = (e: BeforeUnloadEvent) => {
+  e.preventDefault()
+  e.returnValue = ''
+  return ''
+}
+
+watch(isExecuting, (executing) => {
+  if (executing) {
+    window.addEventListener('beforeunload', preventNavigation)
+  } else {
+    window.removeEventListener('beforeunload', preventNavigation)
+  }
+})
+
 onBeforeUnmount(() => {
+  window.removeEventListener('beforeunload', preventNavigation)
   stopDepositPolling()
   if (transakInstance && typeof transakInstance.close === 'function') {
     transakInstance.close()

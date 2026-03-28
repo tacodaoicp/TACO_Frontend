@@ -333,25 +333,12 @@
       <!-- footer -->
       <div class="taco-modal-footer">
 
-        <!-- cancel button -->
-        <button @click="$emit('close')" 
-                class="btn"
-                style="font-family: 'Space Mono';">
-          
-          <!-- text -->
-          <span style="color: var(--black-to-white);">Cancel</span>
-
-        </button>
-
         <!-- review swap button -->
-        <button 
+        <button
           @click="proceedWithSwap"
           class="btn taco-btn taco-btn--green"
           :disabled="!canProceed">
-          
-          <!-- text -->
-          <span style="color: var(--black) !important;">Review Swap</span>
-
+          Review Swap
         </button>
 
       </div>
@@ -1018,10 +1005,15 @@ const sortedQuotes = computed(() => {
 })
 
 const canProceed = computed(() => {
-  return selectedInputToken.value &&
-         inputAmount.value &&
-         parseFloat(inputAmount.value) > 0 &&
-         executionPlan.value != null
+  if (!selectedInputToken.value ||
+      !inputAmount.value ||
+      parseFloat(inputAmount.value) <= 0 ||
+      !executionPlan.value) return false
+
+  // Check user has sufficient balance (amount + 2 fees for approval + transfer)
+  const amountBigInt = parseAmountToBigInt(inputAmount.value, selectedInputToken.value.decimals)
+  const requiredBalance = amountBigInt + selectedInputToken.value.fee * 2n
+  return amountBigInt > 0n && selectedInputToken.value.balance >= requiredBalance
 })
 
 // Methods

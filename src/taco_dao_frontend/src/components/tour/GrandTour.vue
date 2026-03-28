@@ -101,7 +101,7 @@
     <div class="taco-modal-dialog" style="max-width: 420px;">
       <div class="taco-modal-header">
         <div class="taco-modal-title">
-          <span style="font-size: 1.1rem; font-weight: 700;">Get Started</span>
+          <span style="font-size: 1.1rem; font-weight: 700; color: var(--gold);">Get Started</span>
         </div>
         <button class="taco-modal-close" @click="showWizardPrompt = false">
           <i class="fa-solid fa-xmark"></i>
@@ -113,7 +113,7 @@
         </p>
       </div>
       <div class="taco-modal-footer" style="display: flex; gap: 0.75rem; justify-content: flex-end;">
-        <button class="btn taco-btn taco-btn--outline" @click="showWizardPrompt = false">
+        <button class="btn taco-btn" style="color: var(--text-cream); border: 2px solid rgba(255,255,255,0.2);" @click="showWizardPrompt = false">
           No thanks
         </button>
         <button class="btn taco-btn taco-btn--green" @click="openWizard">
@@ -465,18 +465,14 @@ async function applyCurrentLine() {
 
   applySpriteState(ln)
 
-  // Always clear previous highlight before processing new line
-  clearHighlight()
-
   // Handle delay before showing this line
   if (ln.delay) {
     await new Promise(r => setTimeout(r, ln.delay))
   }
 
   // Handle scroll (before highlight so element is visible)
-  if (ln.scrollTo || ln.highlight) {
-    const scrollTarget = ln.scrollTo || ln.highlight!
-    await scrollToElement(scrollTarget)
+  if (ln.scrollTo) {
+    await scrollToElement(ln.scrollTo)
   }
 
   // Handle highlight

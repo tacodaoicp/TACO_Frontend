@@ -103,7 +103,7 @@
   // bootstrap & font-awesome CSS moved to main.js (loads before taco.scss for correct cascade)
   import astronautLoader from './assets/images/astonautLoader.webp'
   import { initWorkerBridge, setCurrentRoute, setNetwork } from './stores/worker-bridge'
-  import { initNetworkConfig } from './config/network-config'
+  import { initNetworkConfig, registerNetworkChangeCallback } from './config/network-config'
 
   ////////////
   // Stores //
@@ -229,6 +229,9 @@
 
     // Initialize network config with worker bridge (allows runtime network switching)
     initNetworkConfig(setNetwork)
+
+    // Clear actor caches when network changes via tacoConfig
+    registerNetworkChangeCallback(() => tacoStore.clearActorCaches())
 
     // Setup store subscriptions to worker updates
     setupWorkerSubscriptions()

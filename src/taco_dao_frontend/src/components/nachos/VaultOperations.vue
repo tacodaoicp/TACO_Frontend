@@ -17,11 +17,11 @@
             <th class="text-end">Amount</th>
             <th class="text-end">Status</th>
             <th class="text-end d-none d-md-table-cell">Time</th>
-            <th class="text-end"></th>
+            <th v-if="hasAnyActions" class="text-end vault-ops__actions-col">Actions</th>
           </tr>
         </thead>
         <tbody>
-          <template v-for="op in allOperations" :key="op.key">
+          <template v-for="op in paginatedOps" :key="op.key">
             <tr>
               <!-- type -->
               <td>
@@ -37,26 +37,25 @@
                 <span class="taco-status-badge vault-ops__status" :class="['taco-status-badge--' + op.statusClass, 'vault-ops__status--' + op.statusClass]">
                   {{ op.statusLabel }}
                 </span>
-                <span v-if="op.blockConfirmed" class="vault-ops__block">
-                  Block #{{ op.blockConfirmed }}
-                </span>
               </td>
               <!-- time -->
               <td class="text-end d-none d-md-table-cell">{{ op.time }}</td>
               <!-- actions -->
-              <td class="text-end">
+              <td v-if="hasAnyActions" class="text-end vault-ops__actions-col">
                 <div v-if="op.canRetry || op.canCancel" class="vault-ops__actions">
                   <button v-if="op.canRetry"
                           class="btn btn-sm taco-btn taco-btn--green"
                           :disabled="!!nachosStore.activeOperationStatus"
+                          title="Retry mint"
                           @click="handleRetry(op)">
-                    <i class="fa-solid fa-rotate"></i> Retry
+                    <i class="fa-solid fa-rotate"></i>
                   </button>
                   <button v-if="op.canCancel"
-                          class="btn btn-sm taco-btn"
+                          class="btn btn-sm vault-ops__cancel-btn"
                           :disabled="!!nachosStore.activeOperationStatus || op.showCancelConfirm"
+                          title="Cancel deposit"
                           @click="op.showCancelConfirm = true">
-                    <i class="fa-solid fa-xmark"></i> Cancel
+                    <i class="fa-solid fa-xmark"></i>
                   </button>
                 </div>
               </td>
@@ -64,14 +63,14 @@
 
             <!-- error row -->
             <tr v-if="op.error" class="vault-ops__error-row">
-              <td colspan="5">
+              <td :colspan="hasAnyActions ? 5 : 4">
                 <i class="fa-solid fa-triangle-exclamation"></i> {{ op.error }}
               </td>
             </tr>
 
             <!-- cancel confirmation row -->
             <tr v-if="op.showCancelConfirm" class="vault-ops__cancel-row">
-              <td colspan="5">
+              <td :colspan="hasAnyActions ? 5 : 4">
                 <div class="vault-ops__cancel-confirm">
                   <p class="vault-ops__cancel-warn">
                     <i class="fa-solid fa-triangle-exclamation"></i>
@@ -81,7 +80,7 @@
                     <button class="btn btn-sm taco-btn taco-btn--green" @click="op.showCancelConfirm = false">
                       Keep Deposit
                     </button>
-                    <button class="btn btn-sm taco-btn"
+                    <button class="btn btn-sm vault-ops__cancel-btn"
                             :disabled="!!nachosStore.activeOperationStatus"
                             @click="handleCancel(op)">
                       Confirm Cancel
@@ -120,7 +119,7 @@ import type { CachedOperation } from '../../stores/nachos.store'
 const tacoStore = useTacoStore()
 const nachosStore = useNachosStore()
 
-const PAGE_SIZE = 10
+const PAGE_SIZE = 20
 const currentPage = ref(0)
 
 // ============ Unified Operation Interface ============
@@ -176,7 +175,7 @@ const allOperations = computed((): UnifiedOperation[] => {
       symbol,
       statusLabel: status.label,
       statusClass: status.cssClass,
-      time: formatTimeAgo(dep.timestamp),
+      time: formatTime(dep.timestamp),
       sortTimestamp: Number(dep.timestamp / 1_000_000n),
       canRetry: 'Verified' in dep.status,
       canCancel: 'Verified' in dep.status,
@@ -203,7 +202,7 @@ const allOperations = computed((): UnifiedOperation[] => {
       symbol,
       statusLabel: op.status === 'failed' ? 'Failed' : 'Pending',
       statusClass: op.status === 'failed' ? 'failed' : 'pending',
-      time: formatTimeAgo(BigInt(op.timestamp * 1_000_000)),
+      time: formatTime(BigInt(op.timestamp * 1_000_000)),
       sortTimestamp: op.timestamp,
       error: op.error,
       canRetry: op.status === 'failed' && op.type !== 'burn',
@@ -215,9 +214,10 @@ const allOperations = computed((): UnifiedOperation[] => {
     }))
   }
 
-  // 3. Transfer tasks
+  // 3. Transfer tasks (only user-facing: Refund & Recovery)
   const transfers = nachosStore.userActivity?.transfers ?? []
   for (const t of transfers) {
+    if (!('CancellationReturn' in t.operationType) && !('Recovery' in t.operationType)) continue
     const status = mapTransferStatus(t.status)
     ops.push(reactive({
       key: `tx-${t.id.toString()}`,
@@ -228,7 +228,7 @@ const allOperations = computed((): UnifiedOperation[] => {
       symbol: getSymbolForPrincipal(t.tokenPrincipal.toText()),
       statusLabel: status.label,
       statusClass: status.cssClass,
-      time: formatTimeAgo(t.createdAt),
+      time: formatTime(t.createdAt),
       sortTimestamp: Number(t.createdAt / 1_000_000n),
       blockConfirmed: 'Confirmed' in t.status ? t.status.Confirmed.toString() : undefined,
       canRetry: false,
@@ -244,13 +244,13 @@ const allOperations = computed((): UnifiedOperation[] => {
     ops.push(reactive({
       key: `hist-${tx.id.toString()}`,
       source: 'transaction' as const,
-      typeLabel: isMint ? 'Mint' : 'Burn',
+      typeLabel: isMint ? mintTypeLabel(tx.mintMode) : 'Burn',
       typeClass: isMint ? 'mint' : 'burn',
       displayAmount: nachosStore.formatE8s(tx.nachosAmount),
       symbol: 'NACHOS',
       statusLabel: 'Completed',
       statusClass: 'completed',
-      time: formatTimestamp(tx.timestamp),
+      time: formatTime(tx.timestamp),
       sortTimestamp: Number(tx.timestamp / 1_000_000n),
       canRetry: false,
       canCancel: false,
@@ -263,18 +263,23 @@ const allOperations = computed((): UnifiedOperation[] => {
   return ops
 })
 
-// ============ Pagination ============
+// ============ Pagination (client-side) ============
 
-const totalMints = computed(() => Number(nachosStore.userActivity?.totalMints ?? 0n))
-const totalBurns = computed(() => Number(nachosStore.userActivity?.totalBurns ?? 0n))
-const totalPages = computed(() => Math.max(1, Math.ceil((totalMints.value + totalBurns.value) / PAGE_SIZE)))
+const totalPages = computed(() => Math.max(1, Math.ceil(allOperations.value.length / PAGE_SIZE)))
 
-const changePage = async (direction: number) => {
+const paginatedOps = computed(() => {
+  const start = currentPage.value * PAGE_SIZE
+  return allOperations.value.slice(start, start + PAGE_SIZE)
+})
+
+const hasAnyActions = computed(() =>
+  paginatedOps.value.some(op => op.canRetry || op.canCancel)
+)
+
+const changePage = (direction: number) => {
   const newPage = currentPage.value + direction
   if (newPage < 0 || newPage >= totalPages.value) return
   currentPage.value = newPage
-  const offset = BigInt(newPage * PAGE_SIZE)
-  await nachosStore.loadUserActivity(BigInt(PAGE_SIZE), offset, BigInt(PAGE_SIZE), offset)
 }
 
 // ============ Status Mappers ============
@@ -315,25 +320,32 @@ const cachedOpTypeLabel = (op: CachedOperation): string => {
 
 const transferOpLabel = (opType: any): string => {
   if ('BurnPayout' in opType) return 'Payout'
+  if ('MintPayout' in opType) return 'Mint Payout'
+  if ('DepositForward' in opType) return 'Deposit Forward'
   if ('MintReturn' in opType) return 'Return'
   if ('ExcessReturn' in opType) return 'Excess Return'
-  if ('CancelReturn' in opType) return 'Refund'
+  if ('CancellationReturn' in opType) return 'Refund'
   if ('Recovery' in opType) return 'Recovery'
-  return 'Unknown'
+  return 'Transfer'
 }
 
-const formatTimestamp = (nanos: bigint): string => {
-  const date = new Date(Number(nanos / 1_000_000n))
-  return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+const mintTypeLabel = (mintMode: any): string => {
+  if (!mintMode || mintMode.length === 0) return 'Mint'
+  const mode = mintMode[0]
+  if ('ICP' in mode) return 'Mint (ICP)'
+  if ('SingleToken' in mode) return 'Mint'
+  if ('PortfolioShare' in mode) return 'Mint (Portfolio)'
+  return 'Mint'
 }
 
-const formatTimeAgo = (nanos: bigint): string => {
+const formatTime = (nanos: bigint): string => {
   const ms = Number(nanos / 1_000_000n)
   const diff = Date.now() - ms
   if (diff < 60_000) return 'just now'
   if (diff < 3_600_000) return `${Math.floor(diff / 60_000)}m ago`
   if (diff < 86_400_000) return `${Math.floor(diff / 3_600_000)}h ago`
-  return `${Math.floor(diff / 86_400_000)}d ago`
+  const date = new Date(ms)
+  return date.toLocaleDateString(undefined, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
 }
 
 // ============ Actions ============
@@ -376,14 +388,14 @@ const handleRetry = async (op: UnifiedOperation) => {
 
 const handleCancel = async (op: UnifiedOperation) => {
   try {
-    await nachosStore.cancelDeposit(op.tokenPrincipal!, BigInt(op.blockNumber!))
+    const result = await nachosStore.cancelDeposit(op.tokenPrincipal!, BigInt(op.blockNumber!))
     op.showCancelConfirm = false
     tacoStore.addToast({
       id: Date.now(),
       code: 'nachos-cancel-success',
-      title: 'Deposit Cancelled',
+      title: result?.alreadyResolved ? 'Deposit Already Resolved' : 'Deposit Cancelled',
       icon: 'fa-solid fa-check',
-      message: 'Refund is being processed.'
+      message: result?.alreadyResolved ? 'This deposit was already processed. Removed from list.' : 'Refund is being processed.'
     })
     await nachosStore.loadUserActivity()
   } catch (e: any) {
@@ -416,6 +428,7 @@ const handleCancel = async (op: UnifiedOperation) => {
     display: flex;
     flex-direction: column;
     gap: 0.75rem;
+    overflow-x: auto;
   }
 
   &__empty {
@@ -444,6 +457,18 @@ const handleCancel = async (op: UnifiedOperation) => {
       opacity: 0.85;
       font-weight: 600;
       border-bottom: 2px solid var(--dark-orange-to-brown);
+      white-space: nowrap;
+    }
+
+    // Amount column: allow wrapping for long decimals
+    td:nth-child(2) { word-break: break-all; }
+
+    // Actions column: never wrap buttons
+    td:nth-child(5) { white-space: nowrap; }
+
+    @media (max-width: 767.98px) {
+      font-size: 0.7rem;
+      th, td { padding: 0.3rem 0.25rem; }
     }
   }
 
@@ -473,10 +498,9 @@ const handleCancel = async (op: UnifiedOperation) => {
     &--expired { background: rgba(128, 128, 128, 0.2); color: #999; }
   }
 
-  &__block {
-    font-size: 0.65rem;
-    opacity: 0.75;
-    margin-left: 0.25rem;
+  &__actions-col {
+    width: 1%;
+    white-space: nowrap;
   }
 
   // ============ Actions ============
@@ -485,6 +509,26 @@ const handleCancel = async (op: UnifiedOperation) => {
     display: inline-flex;
     gap: 0.375rem;
     .btn { font-size: 0.7rem; }
+  }
+
+  &__cancel-btn {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.7rem;
+    font-weight: 600;
+    background: rgba(220, 53, 69, 0.15);
+    border: 1px solid rgba(220, 53, 69, 0.5);
+    color: #ff8a8a;
+
+    &:hover:not(:disabled) {
+      background: rgba(220, 53, 69, 0.3);
+      border-color: #dc3545;
+      color: #fff;
+    }
+
+    &:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
   }
 
   // ============ Error row ============
@@ -531,11 +575,35 @@ const handleCancel = async (op: UnifiedOperation) => {
     align-items: center;
     justify-content: center;
     gap: 0.75rem;
-    margin-top: 0.5rem;
+    margin-top: 0.75rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--dark-orange-to-brown);
+
+    .btn {
+      font-size: 0.75rem;
+      font-family: 'Space Mono', monospace;
+      padding: 0.35rem 0.75rem;
+      border: 1px solid var(--dark-orange);
+      border-radius: 0.375rem;
+      background: rgba(218, 141, 40, 0.12);
+      color: var(--gold);
+      cursor: pointer;
+      transition: all 0.15s ease;
+
+      &:hover:not(:disabled) {
+        background: rgba(218, 141, 40, 0.3);
+      }
+
+      &:disabled {
+        opacity: 0.3;
+        cursor: not-allowed;
+      }
+    }
 
     &-label {
       font-size: 0.8rem;
       font-family: 'Space Mono', monospace;
+      color: var(--gold);
       opacity: 0.85;
     }
   }

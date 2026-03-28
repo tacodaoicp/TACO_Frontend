@@ -8,6 +8,7 @@
 import { useKongStore } from '../stores/kong.store'
 import { useICPSwapStore } from '../stores/icpswap.store'
 import { useTacoStore } from '../stores/taco.store'
+import { isDevEnvironment } from '../config/network-config'
 import { Actor } from '@dfinity/agent'
 
 // ============================================================================
@@ -158,6 +159,12 @@ export function useSplitSwap() {
     amountIn: bigint,
     maxSlippageBP: number = DEFAULT_MAX_SLIPPAGE_BP
   ): Promise<ExecutionPlan> {
+    if (isDevEnvironment()) {
+      console.log('[SWAP findBestExecution]', {
+        sellToken: sellTokenSymbol, buyToken: buyTokenSymbol,
+        amountIn: amountIn.toString(), maxSlippageBP,
+      })
+    }
 
     // ========================================
     // 1. Calculate 10 amounts per DEX
@@ -293,11 +300,20 @@ export function useSplitSwap() {
     // ========================================
 
     if (bestScenario) {
+      if (isDevEnvironment()) {
+        const best = bestScenario as Scenario
+        console.log('[SWAP findBestExecution] Best:', {
+          scenario: best.name,
+          kongPct: best.kongPct, icpPct: best.icpPct,
+          expectedOut: best.totalOut.toString(),
+        })
+      }
       return buildFullPlan(bestScenario, secondBestScenario, kong, icp, amountIn)
     }
 
     // No full scenario → try partials
     if (partialScenarios.length > 0) {
+      if (isDevEnvironment()) console.log('[SWAP findBestExecution] Using partial scenario, count:', partialScenarios.length)
       return buildPartialPlan(partialScenarios, kong, icp, amountIn)
     }
 
@@ -624,6 +640,13 @@ export function useSplitSwap() {
     totalOut: bigint
     results: Array<{ exchange: string; success: boolean; amountOut?: bigint; error?: string }>
   }> {
+    if (isDevEnvironment()) {
+      console.log('[SWAP executePlan]', {
+        type: plan.type,
+        legs: plan.legs.map(l => ({ exchange: l.exchange, amount: l.amountIn.toString(), expectedOut: l.expectedOut.toString() })),
+        slippageTolerance,
+      })
+    }
 
     const legPromises = plan.legs.map(async (leg) => {
       const minAmountOut = BigInt(Math.floor(
@@ -688,6 +711,15 @@ export function useSplitSwap() {
     )
 
     const totalOut = processed.reduce((sum, r) => sum + ('amountOut' in r ? r.amountOut : 0n), 0n)
+
+    if (isDevEnvironment()) {
+      const failures = processed.filter(r => !r.success)
+      console.log('[SWAP executePlan] Result:', {
+        totalOut: totalOut.toString(),
+        successes: processed.filter(r => r.success).length,
+        failures: failures.map(r => ({ exchange: r.exchange, error: r.error })),
+      })
+    }
 
     return { totalOut, results: processed }
   }

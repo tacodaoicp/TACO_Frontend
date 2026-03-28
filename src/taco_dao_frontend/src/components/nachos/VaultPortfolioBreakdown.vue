@@ -16,8 +16,6 @@
               <th class="text-end">Balance</th>
               <th class="text-end">Value (ICP)</th>
               <th class="text-end">Current</th>
-              <th class="text-end">Target</th>
-              <th class="text-end">Deviation</th>
             </tr>
           </thead>
           <tbody>
@@ -26,11 +24,6 @@
               <td class="text-end">{{ nachosStore.formatE8s(entry.balance, Number(entry.decimals)) }}</td>
               <td class="text-end">{{ nachosStore.formatE8s(entry.valueICP) }}</td>
               <td class="text-end">{{ (Number(entry.currentBasisPoints) / 100).toFixed(1) }}%</td>
-              <td class="text-end">{{ (Number(entry.targetBasisPoints) / 100).toFixed(1) }}%</td>
-              <td class="text-end"
-                  :class="deviationClass(entry.currentBasisPoints, entry.targetBasisPoints)">
-                {{ deviationText(entry.currentBasisPoints, entry.targetBasisPoints) }}
-              </td>
             </tr>
           </tbody>
         </table>
@@ -59,19 +52,6 @@ import { useNachosStore } from '../../stores/nachos.store'
 
 const nachosStore = useNachosStore()
 
-const deviationClass = (current: bigint, target: bigint) => {
-  const diff = Number(current) - Number(target)
-  if (diff > 50) return 'text-danger'
-  if (diff < -50) return 'text-success'
-  return ''
-}
-
-const deviationText = (current: bigint, target: bigint) => {
-  const diff = (Number(current) - Number(target)) / 100
-  const sign = diff >= 0 ? '+' : ''
-  return `${sign}${diff.toFixed(1)}%`
-}
-
 // donut chart
 const chartSeries = computed(() =>
   nachosStore.portfolio.map((p: any) => Number(p.currentBasisPoints))
@@ -91,21 +71,61 @@ const totalPortfolioICP = computed(() =>
   formatE8s1dp(nachosStore.portfolioValueICP) + ' ICP'
 )
 
+// Warm earth-tone palette matching the brown/gold theme
+const themeColors = [
+  '#D4A853', // warm gold
+  '#C17829', // burnt orange
+  '#6B8E4E', // olive green
+  '#A0522D', // sienna
+  '#B8860B', // dark goldenrod
+  '#8B5E3C', // saddle brown
+  '#CC7A4A', // copper
+  '#7B6B4A', // dark khaki
+  '#9B7653', // tan
+  '#6E7B3A', // moss
+]
+
 const chartOptions = computed(() => ({
   chart: {
     type: 'donut' as const,
     background: 'transparent',
+    dropShadow: {
+      enabled: true,
+      top: 2,
+      left: 0,
+      blur: 6,
+      opacity: 0.35,
+    },
   },
+  colors: themeColors,
   labels: nachosStore.portfolio.map((p: any) => p.symbol),
   legend: {
     position: 'bottom' as const,
-    labels: { colors: 'var(--black-to-white)' },
+    fontFamily: 'Space Mono, monospace',
+    fontSize: '11px',
+    labels: { colors: 'var(--text-cream)' },
+    markers: { size: 6, offsetX: -2 },
+    itemMargin: { horizontal: 8, vertical: 2 },
   },
   dataLabels: {
     enabled: true,
-    formatter: (val: number) => `${val.toFixed(1)}%`,
+    formatter: (val: number) => val >= 3 ? `${val.toFixed(1)}%` : '',
+    style: {
+      fontSize: '11px',
+      fontFamily: 'Space Mono, monospace',
+      fontWeight: 600,
+    },
+    dropShadow: {
+      enabled: true,
+      top: 1,
+      left: 0,
+      blur: 2,
+      opacity: 0.6,
+    },
   },
   tooltip: {
+    theme: 'dark',
+    style: { fontFamily: 'Space Mono, monospace', fontSize: '12px' },
     y: {
       formatter: (_val: number, opts: any) => {
         const idx = opts.seriesIndex
@@ -116,32 +136,40 @@ const chartOptions = computed(() => ({
   plotOptions: {
     pie: {
       donut: {
-        size: '55%',
+        size: '62%',
         labels: {
           show: true,
           name: {
             show: true,
-            fontSize: '14px',
-            color: 'var(--black-to-white)',
+            fontSize: '13px',
+            fontFamily: 'Space Mono, monospace',
+            fontWeight: 600,
+            color: 'var(--gold)',
+            offsetY: -4,
           },
           value: {
             show: true,
-            fontSize: '13px',
-            color: 'var(--black-to-white)',
+            fontSize: '14px',
+            fontFamily: 'Space Mono, monospace',
+            fontWeight: 700,
+            color: 'var(--text-cream)',
+            offsetY: 4,
             formatter: (val: string) => val,
           },
           total: {
             show: true,
             showAlways: true,
             label: 'Portfolio',
-            color: 'var(--black-to-white)',
+            color: 'var(--gold)',
+            fontFamily: 'Space Mono, monospace',
+            fontSize: '13px',
             formatter: () => totalPortfolioICP.value,
           },
         },
       },
     },
   },
-  stroke: { width: 1 },
+  stroke: { width: 2, colors: ['rgba(58, 28, 8, 0.8)'] },
 }))
 </script>
 
@@ -154,6 +182,8 @@ const chartOptions = computed(() => ({
   &__section-title {
     font-size: 1rem;
     font-family: 'Space Mono', monospace;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
     color: var(--gold);
     margin-bottom: 0;
   }
@@ -171,9 +201,10 @@ const chartOptions = computed(() => ({
 
   &__table-wrap {
     overflow-x: auto;
-    background: rgba(0, 0, 0, 0.08);
-    border-radius: 0.375rem;
-    padding: 0.5rem;
+    background: rgba(0, 0, 0, 0.15);
+    border: 1px solid var(--table-row-border);
+    border-radius: 0.5rem;
+    padding: 1rem;
   }
 
   &__table {
@@ -199,9 +230,11 @@ const chartOptions = computed(() => ({
   &__chart-wrap {
     display: flex;
     justify-content: center;
-    background: rgba(0, 0, 0, 0.08);
-    border-radius: 0.375rem;
-    padding: 0.5rem;
+    align-items: center;
+    background: rgba(0, 0, 0, 0.15);
+    border: 1px solid var(--table-row-border);
+    border-radius: 0.5rem;
+    padding: 1rem;
   }
 }
 

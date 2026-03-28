@@ -1,0 +1,579 @@
+type pool = 
+ record {
+   amm_reserve0: vec nat;
+   amm_reserve1: vec nat;
+   asset_decimals: vec record {
+                         nat8;
+                         nat8;
+                       };
+   asset_minimum_amount: vec record {
+                               nat;
+                               nat;
+                             };
+   asset_names: vec record {
+                      text;
+                      text;
+                    };
+   asset_symbols: vec record {
+                        text;
+                        text;
+                      };
+   asset_transferfees: vec record {
+                             nat;
+                             nat;
+                           };
+   last_traded_price: vec float64;
+   pool_canister: vec record {
+                        text;
+                        text;
+                      };
+   price_day_before: vec float64;
+   volume_24h: vec nat;
+ };
+type create_trading_canister = 
+ service {
+   ChangeReferralFees: (newFeePercentage: nat) -> ();
+   ChangeRevokefees: (ok: nat) -> () oneway;
+   ChangeTradingfees: (ok: nat) -> () oneway;
+   FinishSell: (Block: nat64, accesscode: text, amountSelling: nat) -> (text);
+   FinishSellBatch: (Block: nat64, accesscode: vec text,
+    amount_Sell_by_Reactor: vec nat, token_sell_identifier: text,
+    token_init_identifier: text) -> (text);
+   FinishSellBatchDAO: (trades: vec TradeData, createOrdersIfNotDone: 
+    bool, special: vec nat) -> (opt BatchProcessResult);
+   FixStuckTX: (accesscode: text) -> (text);
+   Freeze: () -> ();
+   addAcceptedToken: (action: variant {
+                                Add;
+                                Opposite;
+                                Remove;
+                              }, added: text, minimum: nat, tType:
+    variant {
+      ICP;
+      ICRC12;
+      ICRC3;
+    }) -> (text);
+   addLiquidity: (token0i: text, token1i: text, amount0i: nat, amount1i: 
+    nat, block0i: nat, block1i: nat) -> (text);
+   addPosition: (Block: nat, amount_sell: nat, amount_init: nat,
+    token_sell_identifier: text, token_init_identifier: text, pub: bool,
+    excludeDAO: bool, OC: opt text, referrer: text, allOrNothing: bool,
+    strictlyOTC: bool) -> (text);
+   addTimer: () -> ();
+   changeOwner2: (pri: principal) -> ();
+   changeOwner3: (pri: principal) -> ();
+   checkDiffs: (returnFees: bool, alwaysShow: bool) ->
+    (opt
+      record {
+        bool;
+        vec record {
+              int;
+              text;
+            };
+        vec
+         vec
+          record {
+            accessCode: text;
+            identifier: text;
+            poolCanister: record {
+                            text;
+                            text;
+                          };
+          };
+      });
+   checkFeesReferrer: () -> (vec record {
+                                   text;
+                                   nat;
+                                 }) query;
+   claimFeesReferrer: () -> (vec record {
+                                   text;
+                                   nat;
+                                 });
+   collectFees: () -> (text);
+   exchangeInfo: () -> (opt pool) query;
+   getAMMPoolInfo: (token0: text, token1: text) ->
+    (opt
+      record {
+        price0: float64;
+        price1: float64;
+        reserve0: nat;
+        reserve1: nat;
+        token0: text;
+        token1: text;
+      }) query;
+   getAcceptedTokens: () -> (opt vec text) query;
+   getAcceptedTokensInfo: () -> (opt vec TokenInfo) query;
+   getAllAMMPools: () ->
+    (vec
+      record {
+        price0: float64;
+        price1: float64;
+        reserve0: nat;
+        reserve1: nat;
+        token0: text;
+        token1: text;
+        totalLiquidity: nat;
+      }) query;
+   getAllTradesPrivateCostly: () ->
+    (opt record {
+           vec text;
+           vec TradePrivate;
+         }) query;
+   getAllTradesPublic: () -> (opt record {
+                                    vec text;
+                                    vec TradePrivate;
+                                  }) query;
+   getCurrentLiquidity: (token1: text, token2: text, direction:
+    variant {
+      backward;
+      forward;
+    }, limit: nat, cursor: opt Ratio) ->
+    (record {
+       liquidity:
+        vec
+         record {
+           Ratio;
+           vec
+            record {
+              Fee: nat;
+              OCname: text;
+              RevokeFee: nat;
+              accesscode: text;
+              allOrNothing: bool;
+              amount_init: nat;
+              amount_sell: nat;
+              initPrincipal: text;
+              strictlyOTC: bool;
+              time: int;
+              token_init_identifier: text;
+              token_sell_identifier: text;
+            };
+         };
+       nextCursor: Ratio;
+     }) query;
+   getCurrentLiquidityForeignPools: (limit: nat, poolQuery:
+    opt vec PoolQuery, onlySpecifiedPools: bool) ->
+    (ForeignPoolsResponse) query;
+   getExpectedMultiHopAmount: (tokenIn: text, tokenOut: text, amountIn:
+    nat) ->
+    (record {
+       bestRoute: vec SwapHop;
+       expectedAmountOut: nat;
+       hops: nat;
+       priceImpact: float64;
+       routeTokens: vec text;
+       totalFee: nat;
+     }) query;
+   getExpectedReceiveAmount: (tokenSell: text, tokenBuy: text, amountSell:
+    nat) ->
+    (record {
+       canFulfillFully: bool;
+       expectedBuyAmount: nat;
+       fee: nat;
+       potentialOrderDetails: opt record {
+                                    amount_init: nat;
+                                    amount_sell: nat;
+                                  };
+       priceImpact: float64;
+       routeDescription: text;
+     }) query;
+   getKlineData: (token1: text, token2: text, timeFrame: TimeFrame,
+    initialGet: bool) -> (vec KlineData) query;
+   getLogging: (functionType: variant {
+                                FinishSellBatchDAO;
+                                addAcceptedToken;
+                              }, getLastXEntries: nat) ->
+    (vec record {
+           nat;
+           text;
+         }) query;
+   getOrderbookCombined: (token0: text, token1: text, numLevels: nat,
+    stepBasisPoints: nat) ->
+    (record {
+       ammMidPrice: float64;
+       ammReserve0: nat;
+       ammReserve1: nat;
+       asks:
+        vec
+         record {
+           ammAmount: nat;
+           limitAmount: nat;
+           limitOrders: nat;
+           price: float64;
+         };
+       bids:
+        vec
+         record {
+           ammAmount: nat;
+           limitAmount: nat;
+           limitOrders: nat;
+           price: float64;
+         };
+       spread: float64;
+     }) query;
+   getPausedTokens: () -> (opt vec text) query;
+   getPoolHistory: (token1: text, token2: text, limit: nat) ->
+    (vec
+      record {
+        Time;
+        vec
+         record {
+           accesscode: text;
+           allOrNothing: bool;
+           amount_init: nat;
+           amount_sell: nat;
+           init_principal: text;
+           sell_principal: text;
+           strictlyOTC: bool;
+           token_init_identifier: text;
+         };
+      }) query;
+   getPrivateTrade: (pass: text) -> (opt TradePosition) query;
+   getTokenUSDPrices: (ICPpriceUSD: float64, ckUSDCpriceUSD: float64) ->
+    (opt
+      record {
+        data:
+         vec
+          record {
+            text;
+            record {
+              address: text;
+              priceUSD: float64;
+              timeLastValidUpdate: int;
+            };
+          };
+        error: bool;
+      }) query;
+   getUserLiquidityDetailed: () -> (vec DetailedLiquidityPosition) query;
+   getUserPreviousTrades: (token1: text, token2: text) ->
+    (vec
+      record {
+        accesscode: text;
+        allOrNothing: bool;
+        amount_init: nat;
+        amount_sell: nat;
+        init_principal: text;
+        sell_principal: text;
+        strictlyOTC: bool;
+        timestamp: int;
+        token_init_identifier: text;
+      }) query;
+   getUserReferralInfo: () ->
+    (record {
+       hasReferrer: bool;
+       isFirstTrade: bool;
+       referralEarnings: vec record {
+                               text;
+                               nat;
+                             };
+       referrer: opt text;
+     }) query;
+   getUserTradeHistory: (limit: nat) ->
+    (vec
+      record {
+        accesscode: text;
+        amount_init: nat;
+        amount_sell: nat;
+        counterparty: text;
+        timestamp: int;
+        token_init_identifier: text;
+        token_sell_identifier: text;
+      }) query;
+   getUserTrades: () -> (vec TradePrivate2) query;
+   get_cycles: () -> (nat) query;
+   hmFee: () -> (nat) query;
+   hmRefFee: () -> (nat) query;
+   hmRevokeFee: () -> (nat) query;
+   p2a: () -> (text) query;
+   p2acannister: () -> (text) query;
+   p2athird: (p: text) -> (text);
+   parameterManagement: (parameters:
+    record {
+      addAllowedCanisters: opt vec text;
+      addToAllTimeBan: opt vec text;
+      changeAllowedCalls: opt nat;
+      changeallowedSilentWarnings: opt nat;
+      deleteAllowedCanisters: opt vec text;
+      deleteFromAllTimeBan: opt vec text;
+      deleteFromDayBan: opt vec text;
+      treasury_principal: opt text;
+    }) -> ();
+   pauseToken: (token: text) -> ();
+   recalibrateDAOpositions: (positions: vec PositionData) ->
+    (vec RecalibratedPosition);
+   recoverWronglysent: (identifier: text, Block: nat, tType:
+    variant {
+      ICP;
+      ICRC12;
+      ICRC3;
+    }) -> (bool);
+   removeLiquidity: (token0i: text, token1i: text, liquidityAmount: nat) ->
+    (text);
+   retrieveFundsDao: (trades: vec record {
+                                    text;
+                                    nat64;
+                                  }) -> ();
+   returncontractprincipal: () -> (text) query;
+   revokeTrade: (accesscode: text, revokeType:
+    variant {
+      DAO: vec text;
+      Initiator;
+      Seller;
+    }) -> (text);
+   sendDAOInfo: () ->
+    (vec
+      record {
+        text;
+        record {
+          Decimals: nat;
+          Name: text;
+          Symbol: text;
+          TransferFee: nat;
+        };
+      }) query;
+   setTest: (a: bool) -> ();
+   swapMultiHop: (tokenIn: text, tokenOut: text, amountIn: nat, route:
+    vec SwapHop, minAmountOut: nat, Block: nat) -> (text);
+ };
+type TradePrivate2 = 
+ record {
+   Fee: nat;
+   OCname: text;
+   RevokeFee: nat;
+   SellerPrincipal: text;
+   accesscode: text;
+   allOrNothing: bool;
+   amount_init: nat;
+   amount_sell: nat;
+   filledInit: nat;
+   filledSell: nat;
+   initPrincipal: text;
+   init_paid: nat;
+   init_paid2: nat;
+   seller_paid: nat;
+   seller_paid2: nat;
+   strictlyOTC: bool;
+   time: int;
+   token_init_identifier: text;
+   token_sell_identifier: text;
+   trade_done: nat;
+   trade_number: nat;
+ };
+type TradePrivate = 
+ record {
+   Fee: nat;
+   OCname: text;
+   RevokeFee: nat;
+   SellerPrincipal: text;
+   allOrNothing: bool;
+   amount_init: nat;
+   amount_sell: nat;
+   filledInit: nat;
+   filledSell: nat;
+   initPrincipal: text;
+   init_paid: nat;
+   init_paid2: nat;
+   seller_paid: nat;
+   seller_paid2: nat;
+   strictlyOTC: bool;
+   time: int;
+   token_init_identifier: text;
+   token_sell_identifier: text;
+   trade_done: nat;
+   trade_number: nat;
+ };
+type TradePosition = 
+ record {
+   Fee: nat;
+   OCname: text;
+   allOrNothing: bool;
+   amount_init: nat;
+   amount_sell: nat;
+   filledInit: nat;
+   filledSell: nat;
+   initPrincipal: text;
+   strictlyOTC: bool;
+   time: int;
+   token_init_identifier: text;
+   token_sell_identifier: text;
+   trade_done: nat;
+   trade_number: nat;
+ };
+type TradeData = 
+ record {
+   ICPPrice: nat;
+   amountBuy: nat;
+   amountSell: nat;
+   block: nat64;
+   decimals: nat;
+   identifier: text;
+   transferFee: nat;
+ };
+type TokenInfo = 
+ record {
+   address: text;
+   asset_type: variant {
+                 ICP;
+                 ICRC12;
+                 ICRC3;
+               };
+   decimals: nat;
+   minimum_amount: nat;
+   name: text;
+   symbol: text;
+   transfer_fee: nat;
+ };
+type TimeFrame = 
+ variant {
+   day;
+   fivemin;
+   fourHours;
+   hour;
+   week;
+ };
+type Time = int;
+type SwapHop = 
+ record {
+   tokenIn: text;
+   tokenOut: text;
+ };
+type RecalibratedPosition = 
+ record {
+   accesscode: text;
+   amountInit: nat;
+   amountSell: nat;
+   fee: nat;
+   poolId: record {
+             text;
+             text;
+           };
+   revokeFee: nat;
+ };
+type Ratio = 
+ variant {
+   Max;
+   Value: nat;
+   Zero;
+ };
+type ProcessedTrade = 
+ record {
+   amountBought: nat;
+   amountSold: nat;
+   identifier: text;
+ };
+type PositionData = 
+ record {
+   ICPprice: record {
+               nat;
+               nat;
+             };
+   accesscode: text;
+   decimals: record {
+               nat;
+               nat;
+             };
+ };
+type PoolQuery = 
+ record {
+   backwardCursor: opt Ratio;
+   forwardCursor: opt Ratio;
+   pool: record {
+           text;
+           text;
+         };
+ };
+type PoolLiquidity = 
+ record {
+   backward:
+    vec
+     record {
+       Ratio;
+       vec
+        record {
+          Fee: nat;
+          OCname: text;
+          RevokeFee: nat;
+          accesscode: text;
+          allOrNothing: bool;
+          amount_init: nat;
+          amount_sell: nat;
+          initPrincipal: text;
+          strictlyOTC: bool;
+          time: int;
+          token_init_identifier: text;
+          token_sell_identifier: text;
+        };
+     };
+   forward:
+    vec
+     record {
+       Ratio;
+       vec
+        record {
+          Fee: nat;
+          OCname: text;
+          RevokeFee: nat;
+          accesscode: text;
+          allOrNothing: bool;
+          amount_init: nat;
+          amount_sell: nat;
+          initPrincipal: text;
+          strictlyOTC: bool;
+          time: int;
+          token_init_identifier: text;
+          token_sell_identifier: text;
+        };
+     };
+ };
+type KlineData = 
+ record {
+   close: float64;
+   high: float64;
+   low: float64;
+   open: float64;
+   timestamp: int;
+   volume: nat;
+ };
+type ForeignPoolsResponse = 
+ record {
+   nextPoolCursor: opt PoolQuery;
+   pools: vec ForeignPoolLiquidity;
+ };
+type ForeignPoolLiquidity = 
+ record {
+   backwardCursor: Ratio;
+   forwardCursor: Ratio;
+   liquidity: PoolLiquidity;
+   pool: record {
+           text;
+           text;
+         };
+ };
+type DetailedLiquidityPosition = 
+ record {
+   liquidity: nat;
+   shareOfPool: float64;
+   token0: text;
+   token0Amount: nat;
+   token1: text;
+   token1Amount: nat;
+ };
+type BatchProcessResult = 
+ record {
+   accesscodes:
+    vec
+     record {
+       accesscode: text;
+       amountInit: nat;
+       amountSell: nat;
+       fee: nat;
+       poolId: record {
+                 text;
+                 text;
+               };
+       revokeFee: nat;
+     };
+   execMessage: text;
+   processedTrades: vec ProcessedTrade;
+ };
+service : () -> create_trading_canister

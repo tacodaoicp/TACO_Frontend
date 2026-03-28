@@ -10,7 +10,7 @@
       <div class="wizard__message__dialog__top px-2 p-2">
 
         <!-- message top left -->
-        <div class="taco-text-white">Taco Wizard</div>
+        <div class="taco-text-white"></div>
 
         <!-- message top right -->
         <div class="taco-text-black-to-white">
@@ -64,7 +64,7 @@
           <div class="wizard__steps">
 
             <!-- step 1 - Get Tokens -->
-            <div v-if="userNeurons.length === 0 && fetchedIcpBalance <  1 && fetchedTacoBalance < 1" 
+            <div v-if="userNeurons.length === 0 && fetchedIcpRawBalance < 100_000_000n && fetchedTacoRawBalance < 100_000_000n"
                  class="wizard__step">
 
               <!-- left - step info -->
@@ -145,7 +145,7 @@
             </div>
 
             <!-- step 1 - Get Tokens (completed) -->
-            <div v-if="userNeurons.length > 0 || fetchedIcpBalance >= 1 || fetchedTacoBalance >= 1" 
+            <div v-if="userNeurons.length > 0 || fetchedIcpRawBalance >= 100_000_000n || fetchedTacoRawBalance >= 100_000_000n"
                  class="wizard__step wizard__step--completed">
 
               <!-- left - step info -->
@@ -172,7 +172,7 @@
             </div>
 
             <!-- step 2 - Swap Tokens -->
-            <div v-if="userNeurons.length === 0 && fetchedTacoBalance < 1" 
+            <div v-if="userNeurons.length === 0 && fetchedTacoRawBalance < 100_000_000n"
                  class="wizard__step">
 
               <!-- left - step info -->
@@ -191,19 +191,19 @@
               <div class="wizard__step__content">
 
                 <!-- not enough text -->
-                <p v-if="fetchedIcpBalance < 1"
-                   :class="{ 'mb-0': fetchedIcpBalance > 0, 'mb-3': fetchedIcpBalance <= 0 }">
+                <p v-if="fetchedIcpRawBalance < 100_000_000n"
+                   :class="{ 'mb-0': fetchedIcpRawBalance > 0n, 'mb-3': fetchedIcpRawBalance <= 0n }">
                    You need <span class="fw-bold">1</span> ICP to swap
                 </p>
 
                 <!-- your taco balance -->
-                <p v-if="fetchedIcpBalance > 0 && fetchedIcpBalance < 1"
+                <p v-if="fetchedIcpRawBalance > 0n && fetchedIcpRawBalance < 100_000_000n"
                    class="mb-3">
                    You have {{ Number(fetchedIcpBalance).toFixed(2).toString() }} ICP
                 </p>
 
                 <!-- first sentence -->
-                <div v-if="fetchedIcpBalance >= 1" 
+                <div v-if="fetchedIcpRawBalance >= 100_000_000n"
                      class="d-flex align-items-baseline mb-0">
 
                   <!-- swap text -->
@@ -212,7 +212,7 @@
                 </div>
                 
                 <!-- second sentence -->
-                <p v-if="fetchedIcpBalance >= 1" 
+                <p v-if="fetchedIcpRawBalance >= 100_000_000n"
                    class="mb-3">
                   
                   <!-- text -->
@@ -221,7 +221,7 @@
                 </p>
 
                 <button @click="performSwap"
-                        :disabled="fetchedIcpBalance < 1 || Number(swapOutputAmount) < 1 || isSwapping"
+                        :disabled="fetchedIcpRawBalance < 100_000_000n || Number(swapOutputAmount) < 1 || isSwapping"
                         class="wizard-custom-spacing-2 btn taco-btn taco-btn--green taco-btn--big">
                   {{ isSwapping ? 'Swapping...' : 'Swap Tokens' }}
                 </button>
@@ -231,7 +231,7 @@
             </div>
 
             <!-- step 2 - Swap Tokens (completed) -->
-            <div v-if="userNeurons.length || fetchedTacoBalance >= 1" 
+            <div v-if="userNeurons.length || fetchedTacoRawBalance >= 100_000_000n"
                  class="wizard__step wizard__step--completed">
 
               <!-- left - step info -->
@@ -277,30 +277,30 @@
               <div class="wizard__step__content">
 
                 <!-- not enough text -->
-                <p v-if="fetchedTacoBalance < 1"
-                   :class="{ 'mb-0': fetchedTacoBalance > 0, 'mb-3': fetchedTacoBalance <= 0 }">
+                <p v-if="fetchedTacoRawBalance < 100_000_000n"
+                   :class="{ 'mb-0': fetchedTacoRawBalance > 0n, 'mb-3': fetchedTacoRawBalance <= 0n }">
                    You need <span class="fw-bold">1</span> TACO to stake
                 </p>
 
                 <!-- your taco balance -->
-                <p v-if="fetchedTacoBalance > 0 && fetchedTacoBalance < 1"
+                <p v-if="fetchedTacoRawBalance > 0n && fetchedTacoRawBalance < 100_000_000n"
                    class="mb-3">
                    You have {{ Number(fetchedTacoBalance).toFixed(2).toString() }} TACO
                 </p>
 
-                <p v-if="fetchedTacoBalance >= 1"
+                <p v-if="fetchedTacoRawBalance >= 100_000_000n"
                    class="mb-0">
                    Stake your {{ Number(fetchedTacoBalance).toFixed(2).toString() }} TACO in a Neuron
                 </p>
 
-                <p v-if="fetchedTacoBalance >= 1"
-                   class="wizard-custom-spacing-1" 
+                <p v-if="fetchedTacoRawBalance >= 100_000_000n"
+                   class="wizard-custom-spacing-1"
                    style="margin-bottom: 2rem;">
                   We'll stake it for 30 days
                 </p>
 
                 <button @click="performStake"
-                        :disabled="fetchedTacoBalance < 1 || isStaking"
+                        :disabled="fetchedTacoRawBalance < 100_000_000n || isStaking"
                         class="btn taco-btn taco-btn--green taco-btn--big">
                   {{ isStaking ? 'Staking...' : 'Stake Tokens' }}
                 </button>

@@ -1,20 +1,18 @@
 /**
  * Network Configuration
  *
- * Allows testing the local website against mainnet data without running dfx.
+ * Manages network switching between staging/mainnet/local.
+ * Default is staging. Use tacoConfig in browser console to switch.
  *
  * USAGE:
- * 1. To test against mainnet from local website:
- *    Open browser console and run: tacoConfig.useMainnet()
- *    Then refresh the page.
- *
- * 2. To switch back to local dfx:
- *    Open browser console and run: tacoConfig.useLocal()
- *    Then refresh the page.
- *
- * You can also set this directly:
- *    localStorage.setItem('taco_network_override', 'ic')
+ *   tacoConfig.useMainnet()  - Switch to mainnet
+ *   tacoConfig.useStaging()  - Switch to staging (default)
+ *   tacoConfig.useLocal()    - Switch to local dfx
+ *   tacoConfig.useAuto()     - Auto-detect from environment
+ *   tacoConfig.status()      - Show current config
  */
+
+import { setNetworkResolver } from '../constants/canisterIds'
 
 // ============================================================================
 // Configuration
@@ -40,7 +38,7 @@ function isBrowser(): boolean {
   return typeof window !== 'undefined' && typeof localStorage !== 'undefined'
 }
 
-// Network override — persisted to localStorage in dev/staging so it survives refreshes
+// Network override — persisted to localStorage so it survives refreshes
 const NETWORK_OVERRIDE_KEY = 'taco_network_override'
 
 // DEV ONLY: Simulate stuck stake (skip ClaimOrRefresh step)
@@ -145,7 +143,6 @@ export function debugLog(category: string, ...args: any[]): void {
 
 /**
  * Set network override (persisted to localStorage)
- * Only works in dev mode via tacoConfig
  */
 export function setNetworkOverride(network: 'ic' | 'staging' | 'local' | null): void {
   if (isBrowser()) {
@@ -189,13 +186,13 @@ export function getEffectiveNetwork(): 'ic' | 'staging' | 'local' {
       return 'ic'
     }
     // Local development (localhost, 127.0.0.1, or LAN addresses like 192.x.x.x)
-    // Default to mainnet for local dev so you can test against real data without running dfx
+    // Default to staging so local dev uses staging canisters unless overridden
     if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname.startsWith('192.')) {
-      return 'ic'
+      return 'staging'
     }
   }
 
-  return 'local'
+  return 'staging'
 }
 
 /**
@@ -235,7 +232,7 @@ export function getNetworkStatus(): {
 } {
   const override = getNetworkOverride()
   const effectiveNetwork = getEffectiveNetwork()
-  const host = effectiveNetwork === 'local' ? 'http://localhost:4943' : 'https://ic0.app'
+  const host = effectiveNetwork === 'local' ? 'http://localhost:4943' : getICHost()
   const fetchRootKey = effectiveNetwork === 'local'
 
   return {
@@ -244,6 +241,80 @@ export function getNetworkStatus(): {
     host,
     fetchRootKey,
   }
+}
+
+// ============================================================================
+// Network Change Callbacks
+// ============================================================================
+
+// Callbacks invoked when network changes (e.g., clear actor caches)
+const _networkChangeCallbacks: (() => void)[] = []
+
+/**
+ * Register a callback to be called when network changes via tacoConfig.
+ * Used by taco.store to clear actor caches on network switch.
+ */
+export function registerNetworkChangeCallback(fn: () => void): void {
+  _networkChangeCallbacks.push(fn)
+}
+
+/**
+ * Clear ALL localStorage on network change.
+ * Only preserves the network override itself (just set moments ago).
+ */
+function clearAllStorage(): void {
+  if (!isBrowser()) return
+
+  // Save the network override we just set
+  const networkOverride = localStorage.getItem(NETWORK_OVERRIDE_KEY)
+  const debugMode = localStorage.getItem('taco_debug_mode')
+
+  // Nuke everything
+  localStorage.clear()
+
+  // Restore only the network override and debug mode
+  if (networkOverride) localStorage.setItem(NETWORK_OVERRIDE_KEY, networkOverride)
+  if (debugMode) localStorage.setItem('taco_debug_mode', debugMode)
+
+  originalConsoleLog('[NetworkConfig] localStorage cleared.')
+}
+
+/**
+ * Handle network change: clear caches, update workers, notify callbacks
+ */
+function onNetworkChanged(network: 'ic' | 'staging' | 'local' | null): void {
+  // Clear all localStorage (preserves only network override + debug mode)
+  clearAllStorage()
+
+  // Update workers
+  if (workerSetNetwork) {
+    workerSetNetwork(network)
+  }
+
+  // Notify registered callbacks (e.g., clear actor caches in taco.store)
+  for (const cb of _networkChangeCallbacks) {
+    try { cb() } catch (e) { originalConsoleLog('[NetworkConfig] Callback error:', e) }
+  }
+}
+
+// ============================================================================
+// IC Host Detection
+// ============================================================================
+
+/**
+ * Detect the correct IC boundary node host based on the serving domain.
+ * Prevents CORS errors by ensuring API calls go to the same domain as the origin.
+ * e.g., app on *.icp0.io → https://icp0.io, app on *.ic0.app → https://ic0.app
+ */
+export function getICHost(): string {
+  if (isBrowser()) {
+    const hostname = window.location.hostname
+    if (hostname.endsWith('.ic0.app') || hostname === 'ic0.app') {
+      return 'https://ic0.app'
+    }
+  }
+  // Default to icp0.io (modern IC domain, used by *.icp0.io and custom domains)
+  return 'https://icp0.io'
 }
 
 // ============================================================================
@@ -267,8 +338,8 @@ export function initNetworkConfig(setNetworkFn: (network: 'ic' | 'staging' | 'lo
   if (isBrowser()) {
     const hostname = window.location.hostname
     const isLocalAddress = hostname === 'localhost' || hostname === '127.0.0.1' || hostname.startsWith('192.')
-    if (isLocalAddress && effectiveNetwork === 'ic') {
-      console.log('[NetworkConfig] Local dev detected - using mainnet (ic0.app)')
+    if (isLocalAddress) {
+      originalConsoleLog(`[NetworkConfig] Local dev detected - using ${effectiveNetwork}`)
     }
   }
 
@@ -276,54 +347,37 @@ export function initNetworkConfig(setNetworkFn: (network: 'ic' | 'staging' | 'lo
   workerSetNetwork(effectiveNetwork)
 }
 
-// DEV ONLY: tacoConfig is completely excluded from production builds
-// @ts-ignore - import.meta.env is injected by Vite
-if ((import.meta.env?.DEV || isDevEnvironment()) && isBrowser()) {
+// tacoConfig — available in all environments for debugging/network switching
+if (isBrowser()) {
   (window as any).tacoConfig = {
     useMainnet: () => {
       setNetworkOverride('ic')
-      if (workerSetNetwork) {
-        workerSetNetwork('ic')
-        console.log('Set to MAINNET (ic0.app). Workers updated - data will refresh automatically.')
-      } else {
-        console.log('Set to MAINNET (ic0.app). Refresh the page to apply.')
-      }
+      onNetworkChanged('ic')
+      originalConsoleLog('Set to MAINNET (ic0.app). Caches cleared, workers updated.')
     },
     useStaging: () => {
       setNetworkOverride('staging')
-      if (workerSetNetwork) {
-        workerSetNetwork('staging')
-        console.log('Set to STAGING. Workers updated - data will refresh automatically.')
-      } else {
-        console.log('Set to STAGING. Refresh the page to apply.')
-      }
+      onNetworkChanged('staging')
+      originalConsoleLog('Set to STAGING. Caches cleared, workers updated.')
     },
     useLocal: () => {
       setNetworkOverride('local')
-      if (workerSetNetwork) {
-        workerSetNetwork('local')
-        console.log('Set to LOCAL (localhost:4943). Workers updated - data will refresh automatically.')
-      } else {
-        console.log('Set to LOCAL (localhost:4943). Refresh the page to apply.')
-      }
+      onNetworkChanged('local')
+      originalConsoleLog('Set to LOCAL (localhost:4943). Caches cleared, workers updated.')
     },
     useAuto: () => {
       setNetworkOverride(null)
-      if (workerSetNetwork) {
-        workerSetNetwork(null)
-        console.log('Set to AUTO-DETECT from environment. Workers updated - data will refresh automatically.')
-      } else {
-        console.log('Set to AUTO-DETECT from environment. Refresh the page to apply.')
-      }
+      onNetworkChanged(null)
+      originalConsoleLog(`Set to AUTO-DETECT (resolved: ${getEffectiveNetwork()}). Caches cleared, workers updated.`)
     },
     debug: (enabled?: boolean) => {
       if (enabled === undefined) {
         const current = isDebugEnabled()
         setDebugMode(!current)
-        console.log(`Debug mode ${!current ? 'ON' : 'OFF'}`)
+        originalConsoleLog(`Debug mode ${!current ? 'ON' : 'OFF'}`)
       } else {
         setDebugMode(enabled)
-        console.log(`Debug mode ${enabled ? 'ON' : 'OFF'}`)
+        originalConsoleLog(`Debug mode ${enabled ? 'ON' : 'OFF'}`)
       }
       return isDebugEnabled()
     },
@@ -340,17 +394,17 @@ if ((import.meta.env?.DEV || isDevEnvironment()) && isBrowser()) {
       if (enabled === undefined) {
         const current = isSimulateStuckStakeEnabled()
         setSimulateStuckStake(!current)
-        console.log(`Simulate stuck stake: ${!current ? 'ON - next neuron creation will skip ClaimOrRefresh!' : 'OFF'}`)
+        originalConsoleLog(`Simulate stuck stake: ${!current ? 'ON - next neuron creation will skip ClaimOrRefresh!' : 'OFF'}`)
       } else {
         setSimulateStuckStake(enabled)
-        console.log(`Simulate stuck stake: ${enabled ? 'ON - next neuron creation will skip ClaimOrRefresh!' : 'OFF'}`)
+        originalConsoleLog(`Simulate stuck stake: ${enabled ? 'ON - next neuron creation will skip ClaimOrRefresh!' : 'OFF'}`)
       }
       return isSimulateStuckStakeEnabled()
     },
     help: () => {
-      console.log(`
-TACO DAO Network Configuration (DEV ONLY):
-==========================================
+      originalConsoleLog(`
+TACO DAO Network Configuration:
+================================
 tacoConfig.useMainnet()  - Connect to IC mainnet (ic0.app)
 tacoConfig.useStaging()  - Connect to staging network
 tacoConfig.useLocal()    - Connect to local dfx (localhost:4943)
@@ -364,14 +418,19 @@ tacoConfig.simulateStuckStake(false)  - Disable stuck stake simulation
 tacoConfig.status()      - Show current configuration
 tacoConfig.help()        - Show this help
 
-Note: Network settings persist across refreshes (stored in localStorage).
+Note: Network changes clear all caches and persist across refreshes.
       `)
     },
   }
 
-  // Show help on startup in dev mode
-  ;(window as any).tacoConfig.help()
+  // Show help on startup in dev/staging environments only
+  if (isDevEnvironment()) {
+    ;(window as any).tacoConfig.help()
+  }
 }
+
+// Register getEffectiveNetwork as the resolver for canisterIds.ts
+setNetworkResolver(getEffectiveNetwork)
 
 // Initialize debug mode immediately on module load
 initDebugMode()
@@ -382,6 +441,7 @@ export default {
   initNetworkConfig,
   getEffectiveNetwork,
   getNetworkStatus,
+  getICHost,
   isDebugEnabled,
   setDebugMode,
   initDebugMode,
@@ -389,4 +449,5 @@ export default {
   forceLog,
   isSimulateStuckStakeEnabled,
   setSimulateStuckStake,
+  registerNetworkChangeCallback,
 }

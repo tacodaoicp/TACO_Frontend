@@ -245,7 +245,7 @@
       </div>
 
       <!-- modal footer -->
-      <div class="taco-modal-footer">
+      <div class="taco-modal-footer d-flex gap-2">
 
         <!-- cancel button -->
         <button @click="closeModal" 
@@ -259,9 +259,9 @@
         </button>
 
         <!-- confirm button -->
-        <button 
+        <button
           @click="executeSwap"
-          class="btn taco-btn taco-btn--green"
+          class="btn taco-btn taco-btn--green flex-grow-1"
           :disabled="isExecuting"
         >
 

@@ -160,12 +160,13 @@ export const tourScript: TourScene[] = [
       line('taco', 'happy', 'bounce', "HERE is where the magic happens!"),
       line('taco', 'neutral', 'idle', "This is the voting page. If you stake TACO in a neuron, you get voting power."),
       line('taco', 'neutral', 'idle', "TACO DAO participants can change their allocation at any time by moving these sliders.", {
-        highlight: '#vote-sliders',
+        highlight: '#vote-slider-list',
       }),
       line('taco', 'happy', 'bounce', "Watch — the sliders control where the treasury invests!", {
-        highlight: '#vote-sliders',
+        scrollTo: '#vote-slider-list',
+        highlight: '#vote-slider-list',
         animateSliders: {
-          container: '#vote-sliders',
+          container: '#vote-slider-list',
           demoValues: [60, 25, 10, 5],
           duration: 2000,
         },
@@ -192,6 +193,7 @@ export const tourScript: TourScene[] = [
         delay: 600,
       }),
       line('taco', 'neutral', 'idle', "See that chart? That's their actual performance over time.", {
+        scrollTo: '.expanded-content-row',
         highlight: '.expanded-content-row',
         hoverChartPoints: {
           container: '.expanded-content-row',

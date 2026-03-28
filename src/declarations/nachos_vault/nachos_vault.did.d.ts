@@ -287,7 +287,10 @@ export interface NachosVaultDAO {
   'addFeeExemptPrincipal' : ActorMethod<[Principal, string], Result>,
   'addRateLimitExemptPrincipal' : ActorMethod<[Principal, string], Result>,
   'adminForceRefreshBalances' : ActorMethod<[], Result>,
-  'cancelDeposit' : ActorMethod<[Principal, bigint], Result_6>,
+  'cancelDeposit' : ActorMethod<
+    [Principal, bigint, [] | [Uint8Array | number[]]],
+    Result_6
+  >,
   'claimBurnFees' : ActorMethod<[Principal, Principal, bigint], Result>,
   'claimCancellationFees' : ActorMethod<[Principal, Principal, bigint], Result>,
   'claimMintFees' : ActorMethod<[Principal, Principal, bigint], Result>,

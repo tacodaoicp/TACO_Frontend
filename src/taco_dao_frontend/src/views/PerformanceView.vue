@@ -30,7 +30,7 @@
     </div>
 
     <!-- scroll container -->
-    <div class="scroll-y-container h-100" ref="scrollContainer">
+    <div class="scroll-y-container h-100">
       <!-- bootstrap container -->
       <div class="container p-0">
         <!-- bootstrap row -->
@@ -283,7 +283,6 @@ export default {
 
     // Section nav
     const sectionNavOpen = ref(false)
-    const scrollContainer = ref(null)
 
     // Follow by principal
     const followPrincipalInput = ref('')
@@ -489,11 +488,12 @@ export default {
     const scrollToSection = (sectionId) => {
       nextTick(() => {
         const el = document.getElementById(sectionId)
-        if (el && scrollContainer.value) {
-          const containerRect = scrollContainer.value.getBoundingClientRect()
+        const appContent = document.querySelector('.app__content')
+        if (el && appContent) {
+          const containerRect = appContent.getBoundingClientRect()
           const elRect = el.getBoundingClientRect()
-          const offset = elRect.top - containerRect.top + scrollContainer.value.scrollTop - 16
-          scrollContainer.value.scrollTo({ top: offset, behavior: 'smooth' })
+          const offset = elRect.top - containerRect.top + appContent.scrollTop - 16
+          appContent.scrollTo({ top: offset, behavior: 'smooth' })
         }
       })
     }
@@ -765,7 +765,6 @@ export default {
 
       // Section nav
       sectionNavOpen,
-      scrollContainer,
 
       // Follow by principal
       followPrincipalInput,

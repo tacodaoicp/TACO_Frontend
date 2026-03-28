@@ -9,7 +9,8 @@ import { defineStore } from 'pinia'
 import { Actor } from '@dfinity/agent'
 import { Principal } from '@dfinity/principal'
 import { useTacoStore } from './taco.store'
-import { getEffectiveNetwork } from '../config/network-config'
+import { getEffectiveNetwork, isDevEnvironment } from '../config/network-config'
+import { getCanisterId } from '../constants/canisterIds'
 import { workerBridge } from './worker-bridge'
 import { deserializeFromTransfer } from '../workers/shared/fetch-functions'
 // Vault IDL factory now managed by taco.store's lazy loader + actor cache
@@ -23,21 +24,10 @@ import type {
 // Constants
 // ============================================================================
 
-const NACHOS_VAULT_ID = () => {
-  switch (getEffectiveNetwork()) {
-    case 'staging': return 'p4nog-baaaa-aaaad-qkwpa-cai'
-    default: return 'p4nog-baaaa-aaaad-qkwpa-cai'
-  }
-}
-const NACHOS_LEDGER_ID = 'pabnq-2qaaa-aaaam-qhryq-cai'
-const ICP_LEDGER_ID = 'ryjl3-tyaaa-aaaaa-aaaba-cai'
-const TREASURY_ID = () => {
-  switch (getEffectiveNetwork()) {
-    case 'ic': return 'v6t5d-6yaaa-aaaan-qzzja-cai'
-    case 'staging': return 'tptia-syaaa-aaaai-atieq-cai'
-    default: return 'tptia-syaaa-aaaai-atieq-cai'
-  }
-}
+const NACHOS_VAULT_ID = () => getCanisterId('nachos_vault')
+const NACHOS_LEDGER_ID = 'pabnq-2qaaa-aaaam-qhryq-cai'  // protocol canister, same everywhere
+const ICP_LEDGER_ID = 'ryjl3-tyaaa-aaaaa-aaaba-cai'      // NNS ledger, same everywhere
+const TREASURY_ID = () => getCanisterId('treasury')
 
 // Subaccounts (32-byte Uint8Arrays)
 const DEPOSIT_SUBACCOUNT = (() => { const a = new Uint8Array(32); a[0] = 2; return a })()
@@ -87,6 +77,7 @@ export const useNachosStore = defineStore('nachos', () => {
   const isLoading = ref(false)
   const lastError = ref<string | null>(null)
   const activeOperationStatus = ref<string | null>(null)
+  const activeOperationType = ref<'mint' | 'burn' | null>(null)
   const cachedOperations = ref<CachedOperation[]>([])
   const slippageBP = ref(300) // 3% default
   const vaultConfig = ref<any | null>(null)
@@ -441,11 +432,19 @@ export const useNachosStore = defineStore('nachos', () => {
   const loadUserActivity = async (mintLimit = 10n, mintOffset = 0n, burnLimit = 10n, burnOffset = 0n) => {
     if (!userLoggedIn.value) return
     try {
-      const actor = await createVaultActor(false)
+      const actor = await createVaultActor(true)
       const result = await (actor as any).getUserActivity(
         Principal.fromText(userPrincipal.value),
         mintLimit, mintOffset, burnLimit, burnOffset
       )
+      if (isDevEnvironment()) {
+        console.log('[NACHOS loadUserActivity]', {
+          principal: userPrincipal.value,
+          recentTransactions: result.recentTransactions?.length ?? 0,
+          totalMints: result.totalMints?.toString(),
+          totalBurns: result.totalBurns?.toString(),
+        })
+      }
       userActivity.value = result
     } catch (e: any) {
       console.error('Failed to load user activity:', e)
@@ -501,6 +500,15 @@ export const useNachosStore = defineStore('nachos', () => {
   // ============================================================================
 
   const depositICPForMint = async (amountE8s: bigint): Promise<bigint> => {
+    if (isDevEnvironment()) {
+      console.log('[NACHOS depositICPForMint]', {
+        network: getEffectiveNetwork(),
+        treasuryId: TREASURY_ID(),
+        subaccount: Array.from(DEPOSIT_SUBACCOUNT),
+        amount: amountE8s.toString(),
+        userPrincipal: userPrincipal.value,
+      })
+    }
     const tokenActor = await createTokenActor(ICP_LEDGER_ID)
     const createdAt = BigInt(Date.now()) * 1_000_000n // nanoseconds — fixed across retries for deduplication
     let lastError: any
@@ -518,8 +526,14 @@ export const useNachosStore = defineStore('nachos', () => {
           from_subaccount: [],
           created_at_time: [createdAt],
         })
-        if ('Ok' in result) return result.Ok
-        if ('Err' in result && 'Duplicate' in result.Err) return result.Err.Duplicate.duplicate_of
+        if ('Ok' in result) {
+          if (isDevEnvironment()) console.log('[NACHOS depositICPForMint] Block:', result.Ok.toString())
+          return result.Ok
+        }
+        if ('Err' in result && 'Duplicate' in result.Err) {
+          if (isDevEnvironment()) console.log('[NACHOS depositICPForMint] Duplicate block:', result.Err.Duplicate.duplicate_of.toString())
+          return result.Err.Duplicate.duplicate_of
+        }
         const errStr = JSON.stringify(result.Err, (_, v) => typeof v === 'bigint' ? v.toString() : v)
         if ('Err' in result && ('InsufficientFunds' in result.Err || 'BadFee' in result.Err)) {
           throw new Error(`ICP transfer failed: ${errStr}`)
@@ -535,6 +549,15 @@ export const useNachosStore = defineStore('nachos', () => {
   }
 
   const depositTokenForMint = async (tokenPrincipal: string, amount: bigint, fee: bigint): Promise<bigint> => {
+    if (isDevEnvironment()) {
+      console.log('[NACHOS depositTokenForMint]', {
+        network: getEffectiveNetwork(),
+        treasuryId: TREASURY_ID(),
+        tokenPrincipal,
+        amount: amount.toString(),
+        fee: fee.toString(),
+      })
+    }
     const tokenActor = await createTokenActor(tokenPrincipal)
     const createdAt = BigInt(Date.now()) * 1_000_000n
     let lastError: any
@@ -552,8 +575,14 @@ export const useNachosStore = defineStore('nachos', () => {
           from_subaccount: [],
           created_at_time: [createdAt],
         })
-        if ('Ok' in result) return result.Ok
-        if ('Err' in result && 'Duplicate' in result.Err) return result.Err.Duplicate.duplicate_of
+        if ('Ok' in result) {
+          if (isDevEnvironment()) console.log('[NACHOS depositTokenForMint] Block:', result.Ok.toString())
+          return result.Ok
+        }
+        if ('Err' in result && 'Duplicate' in result.Err) {
+          if (isDevEnvironment()) console.log('[NACHOS depositTokenForMint] Duplicate block:', result.Err.Duplicate.duplicate_of.toString())
+          return result.Err.Duplicate.duplicate_of
+        }
         const errStr = JSON.stringify(result.Err, (_, v) => typeof v === 'bigint' ? v.toString() : v)
         if ('Err' in result && ('InsufficientFunds' in result.Err || 'BadFee' in result.Err)) {
           throw new Error(`Token transfer failed: ${errStr}`)
@@ -569,6 +598,14 @@ export const useNachosStore = defineStore('nachos', () => {
   }
 
   const depositNachosForBurn = async (nachosAmount: bigint): Promise<bigint> => {
+    if (isDevEnvironment()) {
+      console.log('[NACHOS depositNachosForBurn]', {
+        network: getEffectiveNetwork(),
+        vaultId: NACHOS_VAULT_ID(),
+        subaccount: Array.from(BURN_SUBACCOUNT),
+        amount: nachosAmount.toString(),
+      })
+    }
     const tokenActor = await createTokenActor(NACHOS_LEDGER_ID)
     const createdAt = BigInt(Date.now()) * 1_000_000n
     let lastError: any
@@ -586,8 +623,14 @@ export const useNachosStore = defineStore('nachos', () => {
           from_subaccount: [],
           created_at_time: [createdAt],
         })
-        if ('Ok' in result) return result.Ok
-        if ('Err' in result && 'Duplicate' in result.Err) return result.Err.Duplicate.duplicate_of
+        if ('Ok' in result) {
+          if (isDevEnvironment()) console.log('[NACHOS depositNachosForBurn] Block:', result.Ok.toString())
+          return result.Ok
+        }
+        if ('Err' in result && 'Duplicate' in result.Err) {
+          if (isDevEnvironment()) console.log('[NACHOS depositNachosForBurn] Duplicate block:', result.Err.Duplicate.duplicate_of.toString())
+          return result.Err.Duplicate.duplicate_of
+        }
         const errStr = JSON.stringify(result.Err, (_, v) => typeof v === 'bigint' ? v.toString() : v)
         if ('Err' in result && ('InsufficientFunds' in result.Err || 'BadFee' in result.Err)) {
           throw new Error(`NACHOS transfer failed: ${errStr}`)
@@ -614,13 +657,21 @@ export const useNachosStore = defineStore('nachos', () => {
   // Mint Actions (authenticated) — Full flow with caching
   // ============================================================================
 
+  const ICP_TRANSFER_FEE = 10_000n
+
   const mintWithICP = async (amountE8s: bigint): Promise<MintResult> => {
+    // Deduct ICP transfer fee — the ledger charges fee on top of amount
+    const depositAmount = amountE8s > ICP_TRANSFER_FEE ? amountE8s - ICP_TRANSFER_FEE : 0n
+    if (depositAmount === 0n) throw new Error('Amount too small to cover ICP transfer fee')
+
+    activeOperationType.value = 'mint'
     activeOperationStatus.value = 'depositing'
     let blockNumber: bigint
 
     try {
-      blockNumber = await depositICPForMint(amountE8s)
+      blockNumber = await depositICPForMint(depositAmount)
     } catch (e: any) {
+      activeOperationType.value = null
       activeOperationStatus.value = null
       throw e
     }
@@ -630,7 +681,7 @@ export const useNachosStore = defineStore('nachos', () => {
       userPrincipal: userPrincipal.value,
       tokenPrincipal: ICP_LEDGER_ID,
       blockNumber: blockNumber.toString(),
-      amount: amountE8s.toString(),
+      amount: depositAmount.toString(),
       status: 'minting',
       timestamp: Date.now(),
       mintMode: 'ICP',
@@ -638,13 +689,23 @@ export const useNachosStore = defineStore('nachos', () => {
 
     try {
       activeOperationStatus.value = 'minting'
-      const estimate = await estimateMintICP(amountE8s)
+      const estimate = await estimateMintICP(depositAmount)
       const minNachos = calculateMinimumReceive(estimate.nachosEstimate)
 
+      if (isDevEnvironment()) {
+        console.log('[NACHOS mintWithICP]', {
+          blockNumber: blockNumber.toString(),
+          depositAmount: depositAmount.toString(),
+          minNachos: minNachos.toString(),
+          slippageBP: slippageBP.value,
+          vaultId: NACHOS_VAULT_ID(),
+        })
+      }
       const actor = await createVaultActor(true)
       const result = await (actor as any).mintNachos(blockNumber, minNachos, [], [])
 
       if ('ok' in result) {
+        if (isDevEnvironment()) console.log('[NACHOS mintWithICP] Success:', { mintId: result.ok.mintId?.toString() })
         updateCachedOp(blockNumber.toString(), ICP_LEDGER_ID, {
           status: 'completed',
           mintId: result.ok.mintId.toString(),
@@ -652,6 +713,7 @@ export const useNachosStore = defineStore('nachos', () => {
         return result.ok
       } else {
         const errorMsg = mapNachosError(result.err)
+        if (isDevEnvironment()) console.log('[NACHOS mintWithICP] Error:', errorMsg)
         updateCachedOp(blockNumber.toString(), ICP_LEDGER_ID, {
           status: 'failed',
           error: errorMsg,
@@ -665,17 +727,24 @@ export const useNachosStore = defineStore('nachos', () => {
       })
       throw e
     } finally {
+      activeOperationType.value = null
       activeOperationStatus.value = null
     }
   }
 
   const mintWithToken = async (tokenPrincipal: string, amount: bigint, tokenFee: bigint): Promise<MintResult> => {
+    // Deduct token transfer fee — the ledger charges fee on top of amount
+    const depositAmount = amount > tokenFee ? amount - tokenFee : 0n
+    if (depositAmount === 0n) throw new Error('Amount too small to cover token transfer fee')
+
+    activeOperationType.value = 'mint'
     activeOperationStatus.value = 'depositing'
     let blockNumber: bigint
 
     try {
-      blockNumber = await depositTokenForMint(tokenPrincipal, amount, tokenFee)
+      blockNumber = await depositTokenForMint(tokenPrincipal, depositAmount, tokenFee)
     } catch (e: any) {
+      activeOperationType.value = null
       activeOperationStatus.value = null
       throw e
     }
@@ -685,7 +754,7 @@ export const useNachosStore = defineStore('nachos', () => {
       userPrincipal: userPrincipal.value,
       tokenPrincipal,
       blockNumber: blockNumber.toString(),
-      amount: amount.toString(),
+      amount: depositAmount.toString(),
       status: 'minting',
       timestamp: Date.now(),
       mintMode: 'SingleToken',
@@ -693,9 +762,15 @@ export const useNachosStore = defineStore('nachos', () => {
 
     try {
       activeOperationStatus.value = 'minting'
-      const estimate = await estimateMintWithToken(Principal.fromText(tokenPrincipal), amount)
+      const estimate = await estimateMintWithToken(Principal.fromText(tokenPrincipal), depositAmount)
       const minNachos = calculateMinimumReceive(estimate.nachosEstimate)
 
+      if (isDevEnvironment()) {
+        console.log('[NACHOS mintWithToken]', {
+          tokenPrincipal, blockNumber: blockNumber.toString(),
+          depositAmount: depositAmount.toString(), minNachos: minNachos.toString(),
+        })
+      }
       const actor = await createVaultActor(true)
       const result = await (actor as any).mintNachosWithToken(
         Principal.fromText(tokenPrincipal), blockNumber, minNachos, [], []
@@ -713,6 +788,7 @@ export const useNachosStore = defineStore('nachos', () => {
       updateCachedOp(blockNumber.toString(), tokenPrincipal, { status: 'failed', error: e.message })
       throw e
     } finally {
+      activeOperationType.value = null
       activeOperationStatus.value = null
     }
   }
@@ -721,6 +797,7 @@ export const useNachosStore = defineStore('nachos', () => {
     deposits: Array<{ token: string; amount: bigint; fee: bigint }>,
     totalEstimateNachos: bigint
   ): Promise<MintResult> => {
+    activeOperationType.value = 'mint'
     activeOperationStatus.value = 'depositing'
 
     try {
@@ -731,13 +808,15 @@ export const useNachosStore = defineStore('nachos', () => {
       for (let batch = 1; batch <= 3 && remaining.length > 0; batch++) {
         const settled = await Promise.allSettled(
           remaining.map(async (d) => {
-            const blockNumber = await depositTokenForMint(d.token, d.amount, d.fee)
+            const depAmt = d.amount > d.fee ? d.amount - d.fee : 0n
+            if (depAmt === 0n) throw new Error(`Amount too small to cover ${d.token} transfer fee`)
+            const blockNumber = await depositTokenForMint(d.token, depAmt, d.fee)
             addCachedOp({
               type: 'mint_portfolio',
               userPrincipal: userPrincipal.value,
               tokenPrincipal: d.token,
               blockNumber: blockNumber.toString(),
-              amount: d.amount.toString(),
+              amount: depAmt.toString(),
               status: 'minting',
               timestamp: Date.now(),
               mintMode: 'PortfolioShare',
@@ -777,6 +856,13 @@ export const useNachosStore = defineStore('nachos', () => {
 
       activeOperationStatus.value = 'minting'
       const minNachos = calculateMinimumReceive(totalEstimateNachos)
+      if (isDevEnvironment()) {
+        console.log('[NACHOS mintWithPortfolioShare]', {
+          depositCount: depositInfos.length,
+          deposits: depositInfos.map(d => ({ token: d.token.toText(), block: d.blockNumber.toString() })),
+          minNachos: minNachos.toString(),
+        })
+      }
       const actor = await createVaultActor(true)
       const result = await (actor as any).mintNachosWithPortfolioShare(
         depositInfos.map(d => ({ token: d.token, blockNumber: d.blockNumber })),
@@ -784,6 +870,7 @@ export const useNachosStore = defineStore('nachos', () => {
       )
 
       if ('ok' in result) {
+        if (isDevEnvironment()) console.log('[NACHOS mintWithPortfolioShare] Success:', { mintId: result.ok.mintId?.toString() })
         for (const d of depositInfos) {
           updateCachedOp(d.blockNumber.toString(), d.token.toText(), { status: 'completed', mintId: result.ok.mintId.toString() })
         }
@@ -798,6 +885,7 @@ export const useNachosStore = defineStore('nachos', () => {
     } catch (e: any) {
       throw e
     } finally {
+      activeOperationType.value = null
       activeOperationStatus.value = null
     }
   }
@@ -806,13 +894,21 @@ export const useNachosStore = defineStore('nachos', () => {
   // Burn Action (authenticated)
   // ============================================================================
 
+  const NACHOS_TRANSFER_FEE = 10_000n
+
   const burnNachos = async (nachosAmount: bigint, perTokenMinimums?: Array<{ token: Principal; minAmount: bigint }>) => {
+    // Deduct NACHOS transfer fee — the ledger charges fee on top of amount
+    const depositAmount = nachosAmount > NACHOS_TRANSFER_FEE ? nachosAmount - NACHOS_TRANSFER_FEE : 0n
+    if (depositAmount === 0n) throw new Error('Amount too small to cover NACHOS transfer fee')
+
+    activeOperationType.value = 'burn'
     activeOperationStatus.value = 'depositing'
     let blockNumber: bigint
 
     try {
-      blockNumber = await depositNachosForBurn(nachosAmount)
+      blockNumber = await depositNachosForBurn(depositAmount)
     } catch (e: any) {
+      activeOperationType.value = null
       activeOperationStatus.value = null
       throw e
     }
@@ -822,13 +918,21 @@ export const useNachosStore = defineStore('nachos', () => {
       userPrincipal: userPrincipal.value,
       tokenPrincipal: NACHOS_LEDGER_ID,
       blockNumber: blockNumber.toString(),
-      amount: nachosAmount.toString(),
+      amount: depositAmount.toString(),
       status: 'minting',
       timestamp: Date.now(),
     })
 
     try {
       activeOperationStatus.value = 'burning'
+      if (isDevEnvironment()) {
+        console.log('[NACHOS burnNachos]', {
+          blockNumber: blockNumber.toString(),
+          nachosAmount: nachosAmount.toString(),
+          vaultId: NACHOS_VAULT_ID(),
+          hasMinimums: !!perTokenMinimums,
+        })
+      }
       const actor = await createVaultActor(true)
       const result = await (actor as any).redeemNachos(
         blockNumber,
@@ -836,6 +940,7 @@ export const useNachosStore = defineStore('nachos', () => {
       )
 
       if ('ok' in result) {
+        if (isDevEnvironment()) console.log('[NACHOS burnNachos] Success:', { burnId: result.ok.burnId?.toString() })
         updateCachedOp(blockNumber.toString(), NACHOS_LEDGER_ID, {
           status: 'completed',
           burnId: result.ok.burnId.toString(),
@@ -851,6 +956,7 @@ export const useNachosStore = defineStore('nachos', () => {
       updateCachedOp(blockNumber.toString(), NACHOS_LEDGER_ID, { status: 'failed', error: e.message })
       throw e
     } finally {
+      activeOperationType.value = null
       activeOperationStatus.value = null
     }
   }
@@ -861,7 +967,7 @@ export const useNachosStore = defineStore('nachos', () => {
 
   const cancelDeposit = async (tokenPrincipal: string, blockNumber: bigint) => {
     const actor = await createVaultActor(true)
-    const result = await (actor as any).cancelDeposit(Principal.fromText(tokenPrincipal), blockNumber)
+    const result = await (actor as any).cancelDeposit(Principal.fromText(tokenPrincipal), blockNumber, [])
 
     if ('ok' in result) {
       updateCachedOp(blockNumber.toString(), tokenPrincipal, {
@@ -870,7 +976,13 @@ export const useNachosStore = defineStore('nachos', () => {
       })
       return result.ok
     } else {
-      throw new Error(mapNachosError(result.err))
+      const err = result.err
+      // Already resolved — treat as success, clean up cached op
+      if ('DepositNotFound' in err || 'DepositAlreadyConsumed' in err || 'DepositAlreadyCancelled' in err || 'BlockAlreadyProcessed' in err) {
+        updateCachedOp(blockNumber.toString(), tokenPrincipal, { status: 'cancelled' })
+        return { alreadyResolved: true }
+      }
+      throw new Error(mapNachosError(err))
     }
   }
 
@@ -879,10 +991,18 @@ export const useNachosStore = defineStore('nachos', () => {
   // ============================================================================
 
   const retryMint = async (op: CachedOperation) => {
+    if (isDevEnvironment()) {
+      console.log('[NACHOS retryMint]', {
+        operationType: op.type,
+        blockNumber: op.blockNumber,
+        tokenPrincipal: op.tokenPrincipal,
+      })
+    }
     const blockNumber = BigInt(op.blockNumber)
     const amount = BigInt(op.amount)
 
     updateCachedOp(op.blockNumber, op.tokenPrincipal, { status: 'minting', error: undefined })
+    activeOperationType.value = 'mint'
     activeOperationStatus.value = 'minting'
 
     try {
@@ -911,6 +1031,7 @@ export const useNachosStore = defineStore('nachos', () => {
       updateCachedOp(op.blockNumber, op.tokenPrincipal, { status: 'failed', error: e.message })
       throw e
     } finally {
+      activeOperationType.value = null
       activeOperationStatus.value = null
     }
   }
@@ -964,7 +1085,7 @@ export const useNachosStore = defineStore('nachos', () => {
   return {
     // State
     dashboardData, userActivity, navHistory, isLoading, lastError,
-    activeOperationStatus, cachedOperations, slippageBP, vaultConfig,
+    activeOperationStatus, activeOperationType, cachedOperations, slippageBP, vaultConfig,
     // Computed
     userPrincipal, userLoggedIn, icpPriceUsd,
     nav, navPerToken, portfolioValueICP, nachosSupply, portfolio,

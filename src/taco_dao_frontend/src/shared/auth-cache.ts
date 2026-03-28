@@ -9,7 +9,7 @@
 import type { Identity } from '@dfinity/agent'
 import type { HttpAgent } from '@dfinity/agent'
 import type { AuthClient } from '@dfinity/auth-client'
-import { getEffectiveNetwork } from '../config/network-config'
+import { getEffectiveNetwork, getICHost } from '../config/network-config'
 
 // ============================================================================
 // Network Helpers (centralized)
@@ -31,7 +31,7 @@ export function getNetworkHost(): string {
     const port = import.meta.env.VITE_LOCAL_PORT || '4943'
     return `http://localhost:${port}`
   }
-  return 'https://ic0.app'
+  return getICHost()
 }
 
 // ============================================================================

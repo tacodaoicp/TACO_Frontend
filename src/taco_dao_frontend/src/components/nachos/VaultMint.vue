@@ -118,7 +118,7 @@
         <button class="btn taco-btn taco-btn--green w-100"
                 :disabled="!canConfirmICP || !!nachosStore.activeOperationStatus"
                 @click="requestMintICP">
-          <span v-if="nachosStore.activeOperationStatus">
+          <span v-if="nachosStore.activeOperationType === 'mint'">
             <i class="fa-solid fa-spinner fa-spin"></i>
             {{ nachosStore.activeOperationStatus === 'depositing' ? 'Transferring ICP...' : 'Minting NACHOS...' }}
           </span>
@@ -190,7 +190,7 @@
         <button class="btn taco-btn taco-btn--green w-100"
                 :disabled="!canConfirmToken || !!nachosStore.activeOperationStatus"
                 @click="requestMintToken">
-          <span v-if="nachosStore.activeOperationStatus">
+          <span v-if="nachosStore.activeOperationType === 'mint'">
             <i class="fa-solid fa-spinner fa-spin"></i>
             {{ nachosStore.activeOperationStatus === 'depositing' ? 'Transferring token...' : 'Minting NACHOS...' }}
           </span>
@@ -254,7 +254,7 @@
         <button class="btn taco-btn taco-btn--green w-100"
                 :disabled="!canConfirmPortfolio || !!nachosStore.activeOperationStatus"
                 @click="requestMintPortfolio">
-          <span v-if="nachosStore.activeOperationStatus">
+          <span v-if="nachosStore.activeOperationType === 'mint'">
             <i class="fa-solid fa-spinner fa-spin"></i>
             {{ nachosStore.activeOperationStatus === 'depositing' ? 'Transferring tokens...' : 'Minting NACHOS...' }}
           </span>
@@ -392,6 +392,9 @@ const icpFeePct = computed(() => {
 const canConfirmICP = computed(() => {
   if (icpAmountE8s.value <= 0n) return false
   if (!icpEstimate.value) return false
+  // Check amount doesn't exceed available balance
+  const maxE8s = BigInt(Math.floor(maxMintableICP.value * 1e8))
+  if (icpAmountE8s.value > maxE8s) return false
   return true
 })
 
@@ -467,9 +470,23 @@ const tokenAmountRaw = computed(() => {
   return BigInt(Math.round(val * 10 ** decimals))
 })
 
-const canConfirmToken = computed(() =>
-  selectedTokenPrincipal.value && tokenAmountRaw.value > 0n && tokenEstimate.value
-)
+const canConfirmToken = computed(() => {
+  if (!selectedTokenPrincipal.value) return false
+  if (tokenAmountRaw.value <= 0n) return false
+  if (!tokenEstimate.value) return false
+
+  // Check amount doesn't exceed token balance
+  const portfolioEntry = nachosStore.portfolio.find(
+    (p: any) => p.token.toText() === selectedTokenPrincipal.value
+  )
+  if (!portfolioEntry) return false
+
+  // Account for token transfer fee (2x for approval + transfer)
+  const requiredBalance = tokenAmountRaw.value + (portfolioEntry.fee * 2n)
+  if (portfolioEntry.balance < requiredBalance) return false
+
+  return true
+})
 
 const debouncedEstimateToken = () => {
   if (tokenDebounce) clearTimeout(tokenDebounce)

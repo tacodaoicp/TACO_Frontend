@@ -10,6 +10,9 @@ import { Principal } from '@dfinity/principal'
 import { useTacoStore } from './taco.store'
 import { idlFactory as kongIdlFactory } from '../../../declarations/kongswap/kongswap.did.js'
 
+// BigInt-safe JSON.stringify for IC canister error objects
+const safeStringify = (obj: unknown) => JSON.stringify(obj, (_, v) => typeof v === 'bigint' ? v.toString() : v)
+
 // Kong canister ID
 const KONG_CANISTER_ID = '2ipq2-uqaaa-aaaar-qailq-cai'
 
@@ -263,7 +266,7 @@ export const useKongStore = defineStore('kong', () => {
       // console.log('Approval result:', approvalResult)
 
       if ('Err' in approvalResult) {
-        throw new Error(`Approval failed: ${JSON.stringify(approvalResult.Err)}`)
+        throw new Error(`Approval failed: ${safeStringify(approvalResult.Err)}`)
       }
 
       // Extract approval transaction ID
@@ -344,7 +347,7 @@ export const useKongStore = defineStore('kong', () => {
       // console.log('Transfer result:', transferResult)
 
       if ('Err' in transferResult) {
-        throw new Error(`Transfer failed: ${JSON.stringify(transferResult.Err)}`)
+        throw new Error(`Transfer failed: ${safeStringify(transferResult.Err)}`)
       }
 
       const blockIndex = transferResult.Ok

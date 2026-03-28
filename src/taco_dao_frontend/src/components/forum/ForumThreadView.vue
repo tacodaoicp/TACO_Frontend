@@ -815,12 +815,12 @@
                         </div>
 
                         <!-- voting error -->
-                        <div v-else-if="votingState.error" class="alert alert-danger mt-3">
+                        <div v-else-if="votingState.error" class="forum-thread-view__alert forum-thread-view__alert--danger mt-3">
                             {{ votingState.error }}
                         </div>
 
                         <!-- no neurons -->
-                        <div v-else-if="votingState.neurons.length === 0" class="alert alert-info mt-3">
+                        <div v-else-if="votingState.neurons.length === 0" class="forum-thread-view__alert forum-thread-view__alert--info mt-3">
                             You don't have any neurons to vote with. Create a neuron by staking TACO tokens.
                         </div>
 
@@ -915,7 +915,7 @@
                     <!-- proposal closed -->
                     <div v-else-if="userLoggedIn && !isVotingOpen" class="forum-thread-view__details__vote-section mt-3">
                         <span class="forum-thread-view__details__key">Voting</span>
-                        <div class="alert alert-secondary mt-2">
+                        <div class="forum-thread-view__alert mt-2">
                             Voting period has ended for this proposal.
                         </div>
                     </div>
@@ -1819,6 +1819,8 @@
         &__title {
             line-height: 1.25;
             font-size: 2.25rem;
+            color: var(--gold);
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
 
             // title number
             &-number {
@@ -2287,8 +2289,28 @@
 
 // // medium desktop
 // @media (min-width: 1200px) and (max-width: 1399.98px) {
-    
-// }    
+
+// }
+
+.forum-thread-view__alert {
+  background: rgba(0, 0, 0, 0.15);
+  border: 1px solid var(--table-row-border);
+  border-radius: 0.5rem;
+  padding: 0.75rem 1rem;
+  font-family: 'Space Mono', monospace;
+  font-size: 0.85rem;
+  color: var(--text-cream);
+
+  &--danger {
+    border-color: rgba(183, 28, 28, 0.5);
+    color: var(--red-to-light-red);
+  }
+
+  &--info {
+    border-color: rgba(139, 90, 43, 0.6);
+    color: var(--gold);
+  }
+}
 
 </style> 
 

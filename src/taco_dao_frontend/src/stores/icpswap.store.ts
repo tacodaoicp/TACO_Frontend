@@ -10,6 +10,9 @@ import { principalToSubAccount } from '@dfinity/utils'
 import { Principal } from '@dfinity/principal'
 import { useTacoStore } from './taco.store'
 
+// BigInt-safe JSON.stringify for IC canister error objects
+const safeStringify = (obj: unknown) => JSON.stringify(obj, (_, v) => typeof v === 'bigint' ? v.toString() : v)
+
 // ICPSwap Factory canister ID
 const ICPSWAP_FACTORY_ID = '4mmnk-kiaaa-aaaag-qbllq-cai'
 const DEFAULT_FEE = 3000 // 0.3%
@@ -392,7 +395,7 @@ export const useICPSwapStore = defineStore('icpswap', () => {
       // console.log('Metadata result:', metadataResult)
 
       if ('err' in metadataResult) {
-        throw new Error(`Failed to get pool metadata: ${JSON.stringify(metadataResult.err)}`)
+        throw new Error(`Failed to get pool metadata: ${safeStringify(metadataResult.err)}`)
       }
 
       const metadata = metadataResult.ok
@@ -413,7 +416,7 @@ export const useICPSwapStore = defineStore('icpswap', () => {
       // console.log('Quote result:', quoteResult)
 
       if ('err' in quoteResult) {
-        throw new Error(`Quote failed: ${JSON.stringify(quoteResult.err)}`)
+        throw new Error(`Quote failed: ${safeStringify(quoteResult.err)}`)
       }
 
       const amountOut = BigInt(quoteResult.ok)
@@ -518,7 +521,7 @@ export const useICPSwapStore = defineStore('icpswap', () => {
       // console.log('Approval result:', approvalResult)
 
       if ('Err' in approvalResult) {
-        throw new Error(`Approval failed: ${JSON.stringify(approvalResult.Err)}`)
+        throw new Error(`Approval failed: ${safeStringify(approvalResult.Err)}`)
       }
 
       // Step 4: Deposit tokens using ICRC2 approval (depositFrom)
@@ -541,7 +544,7 @@ export const useICPSwapStore = defineStore('icpswap', () => {
       // console.log('DepositFrom result:', depositResult)
 
       if ('err' in depositResult) {
-        throw new Error(`DepositFrom failed: ${JSON.stringify(depositResult.err)}`)
+        throw new Error(`DepositFrom failed: ${safeStringify(depositResult.err)}`)
       }
 
       // Step 6: Get pool data for zeroForOne determination
@@ -565,7 +568,7 @@ export const useICPSwapStore = defineStore('icpswap', () => {
       if ('err' in swapResult) {
         // Try to sweep before throwing error
         await sweep({ token0Principal: params.sellTokenPrincipal, token1Principal: params.buyTokenPrincipal, poolId })
-        throw new Error(`Swap failed: ${JSON.stringify(swapResult.err)}`)
+        throw new Error(`Swap failed: ${safeStringify(swapResult.err)}`)
       }
 
       const amountOut = swapResult.ok
@@ -591,7 +594,7 @@ export const useICPSwapStore = defineStore('icpswap', () => {
       if ('err' in withdrawResult) {
         // Try to sweep before throwing error
         await sweep({ token0Principal: params.sellTokenPrincipal, token1Principal: params.buyTokenPrincipal, poolId })
-        throw new Error(`Withdraw failed: ${JSON.stringify(withdrawResult.err)}`)
+        throw new Error(`Withdraw failed: ${safeStringify(withdrawResult.err)}`)
       }
 
       return {
@@ -657,7 +660,7 @@ export const useICPSwapStore = defineStore('icpswap', () => {
       // console.log('Transfer result:', transferResult)
 
       if ('Err' in transferResult) {
-        throw new Error(`Transfer failed: ${JSON.stringify(transferResult.Err)}`)
+        throw new Error(`Transfer failed: ${safeStringify(transferResult.Err)}`)
       }
 
       // Step 3: Deposit
@@ -681,7 +684,7 @@ export const useICPSwapStore = defineStore('icpswap', () => {
       // console.log('Deposit result:', depositResult)
 
       if ('err' in depositResult) {
-        throw new Error(`Deposit failed: ${JSON.stringify(depositResult.err)}`)
+        throw new Error(`Deposit failed: ${safeStringify(depositResult.err)}`)
       }
 
       // Step 5: Get pool data for zeroForOne determination
@@ -708,7 +711,7 @@ export const useICPSwapStore = defineStore('icpswap', () => {
       if ('err' in swapResult) {
         // Try to sweep before throwing error
         await sweep({ token0Principal: params.sellTokenPrincipal, token1Principal: params.buyTokenPrincipal, poolId })
-        throw new Error(`Swap failed: ${JSON.stringify(swapResult.err)}`)
+        throw new Error(`Swap failed: ${safeStringify(swapResult.err)}`)
       }
 
       const amountOut = swapResult.ok
@@ -734,7 +737,7 @@ export const useICPSwapStore = defineStore('icpswap', () => {
       if ('err' in withdrawResult) {
         // Try to sweep before throwing error
         await sweep({ token0Principal: params.sellTokenPrincipal, token1Principal: params.buyTokenPrincipal, poolId })
-        throw new Error(`Withdraw failed: ${JSON.stringify(withdrawResult.err)}`)
+        throw new Error(`Withdraw failed: ${safeStringify(withdrawResult.err)}`)
       }
 
       return {

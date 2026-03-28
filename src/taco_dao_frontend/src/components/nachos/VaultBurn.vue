@@ -117,6 +117,30 @@
           </table>
         </div>
 
+        <!-- burn slippage selector -->
+        <div class="vault-burn__slippage">
+          <span class="vault-burn__slippage-label">Slippage:</span>
+          <button v-for="bp in burnSlippagePresets" :key="bp"
+                  class="btn btn-sm"
+                  :class="burnSlippageBP === bp ? 'taco-btn taco-btn--green' : 'taco-btn'"
+                  @click="burnSlippageBP = bp; customBurnSlippage = (bp / 100).toFixed(1)">
+            {{ (bp / 100).toFixed(1) }}%
+          </button>
+          <div class="vault-burn__slippage-stepper">
+            <button class="vault-burn__slippage-step" @click="adjustBurnSlippage(-0.1)">−</button>
+            <div class="vault-burn__slippage-input-wrap">
+              <input type="text"
+                     inputmode="decimal"
+                     v-model="customBurnSlippage"
+                     class="form-control taco-input vault-burn__slippage-custom"
+                     placeholder="Custom"
+                     @input="applyCustomBurnSlippage" />
+              <span class="vault-burn__slippage-pct">%</span>
+            </div>
+            <button class="vault-burn__slippage-step" @click="adjustBurnSlippage(0.1)">+</button>
+          </div>
+        </div>
+
         <!-- advanced: per-token slippage -->
         <div class="vault-burn__advanced">
           <button class="btn btn-sm taco-btn" @click="showAdvanced = !showAdvanced">
@@ -126,7 +150,7 @@
 
           <div v-if="showAdvanced" class="vault-burn__advanced-content">
             <p class="vault-burn__advanced-hint">
-              Set minimum amounts per token. Leave empty to use default slippage ({{ (nachosStore.slippageBP / 100).toFixed(1) }}%).
+              Set minimum amounts per token. Leave empty to use default slippage ({{ (burnSlippageBP / 100).toFixed(1) }}%).
             </p>
             <div v-for="t in nonDustTokens" :key="t.symbol" class="vault-burn__advanced-row">
               <span class="vault-burn__advanced-label">{{ t.symbol }}</span>
@@ -144,7 +168,7 @@
       <button class="btn taco-btn taco-btn--green w-100"
               :disabled="!canConfirm || !!nachosStore.activeOperationStatus"
               @click="requestBurn">
-        <span v-if="nachosStore.activeOperationStatus">
+        <span v-if="nachosStore.activeOperationType === 'burn'">
           <i class="fa-solid fa-spinner fa-spin"></i>
           {{ nachosStore.activeOperationStatus === 'depositing' ? 'Transferring NACHOS...' : 'Burning NACHOS...' }}
         </span>
@@ -275,11 +299,32 @@ const nonDustTokens = computed(() =>
 const canConfirm = computed(() => {
   if (nachosAmountE8s.value <= 0n) return false
   if (!burnEstimate.value) return false
+  // Check amount doesn't exceed available balance
+  const maxE8s = BigInt(Math.floor(maxBurnable.value * 1e8))
+  if (nachosAmountE8s.value > maxE8s) return false
   return true
 })
 
+const burnSlippageBP = ref(300)  // 3% default, independent of mint
+const burnSlippagePresets = [50, 100, 200]
+const customBurnSlippage = ref((burnSlippageBP.value / 100).toFixed(1))
+
+const applyCustomBurnSlippage = () => {
+  const val = parseFloat(customBurnSlippage.value)
+  if (isNaN(val) || val <= 0) return
+  if (val > 50) { burnSlippageBP.value = 5000; customBurnSlippage.value = '50.0'; return }
+  burnSlippageBP.value = Math.round(val * 100)
+}
+
+const adjustBurnSlippage = (delta: number) => {
+  const current = burnSlippageBP.value / 100
+  const clamped = Math.max(0.1, Math.min(50, current + delta))
+  burnSlippageBP.value = Math.round(clamped * 100)
+  customBurnSlippage.value = clamped.toFixed(1)
+}
+
 const defaultMinForToken = (t: any): bigint => {
-  const bp = BigInt(nachosStore.slippageBP)
+  const bp = BigInt(burnSlippageBP.value)
   return (t.amount * (10000n - bp)) / 10000n
 }
 
@@ -651,10 +696,94 @@ onBeforeUnmount(() => {
     color: var(--success-green);
   }
 
+  &__slippage {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.8rem;
+    font-family: 'Space Mono', monospace;
+
+    &-label { opacity: 0.85; }
+    .btn {
+      font-size: 0.75rem;
+      padding: 0.125rem 0.5rem;
+    }
+    .taco-btn:not(.taco-btn--green) {
+      background: var(--orange-to-dark-brown);
+      border: 1px solid var(--dark-orange-to-dark-brown);
+      color: var(--black-to-white);
+
+      &:hover { opacity: 0.85; }
+    }
+
+    &-input-wrap {
+      position: relative;
+      display: flex;
+      align-items: center;
+    }
+
+    &-custom {
+      width: 4.5rem;
+      font-size: 0.75rem;
+      padding: 0.125rem 1rem 0.125rem 0.375rem;
+      height: auto;
+      border-radius: 0;
+      text-align: center;
+    }
+
+    &-pct {
+      position: absolute;
+      right: 0.3rem;
+      font-size: 0.65rem;
+      font-family: 'Space Mono', monospace;
+      opacity: 0.5;
+      pointer-events: none;
+      user-select: none;
+    }
+
+    &-stepper {
+      display: flex;
+      align-items: center;
+    }
+
+    &-step {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 1.5rem;
+      height: 100%;
+      background: var(--dark-orange);
+      border: 1px solid var(--dark-orange);
+      color: var(--white);
+      font-family: 'Space Mono', monospace;
+      font-size: 0.8rem;
+      font-weight: 700;
+      cursor: pointer;
+      padding: 0.125rem 0;
+      transition: opacity 0.15s;
+
+      &:first-child { border-radius: 0.25rem 0 0 0.25rem; }
+      &:last-child { border-radius: 0 0.25rem 0.25rem 0; }
+      &:hover { opacity: 0.8; }
+      &:active { opacity: 0.6; }
+    }
+  }
+
   &__advanced {
     display: flex;
     flex-direction: column;
     gap: 0.5rem;
+
+    > button {
+      color: var(--text-cream, #f5e6c8);
+      opacity: 0.85;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+
+      &:hover {
+        opacity: 1;
+        border-color: rgba(255, 255, 255, 0.3);
+      }
+    }
 
     &-content {
       display: flex;

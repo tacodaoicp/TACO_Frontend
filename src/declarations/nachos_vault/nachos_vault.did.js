@@ -396,7 +396,11 @@ export const idlFactory = ({ IDL }) => {
         [],
       ),
     'adminForceRefreshBalances' : IDL.Func([], [Result], []),
-    'cancelDeposit' : IDL.Func([IDL.Principal, IDL.Nat], [Result_6], []),
+    'cancelDeposit' : IDL.Func(
+        [IDL.Principal, IDL.Nat, IDL.Opt(IDL.Vec(IDL.Nat8))],
+        [Result_6],
+        [],
+      ),
     'claimBurnFees' : IDL.Func(
         [IDL.Principal, IDL.Principal, IDL.Nat],
         [Result],

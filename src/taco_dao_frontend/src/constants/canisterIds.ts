@@ -16,6 +16,8 @@ export type CanisterKey =
   | 'reward_distribution_archive'
   | 'reward_withdrawal_archive'
   | 'nachos_vault'
+  | 'nachos'
+  | 'taco_swap'
   | 'frontend'
 
 export const CANISTER_IDS: Record<CanisterKey, Record<EnvKey, string>> = {
@@ -79,10 +81,20 @@ export const CANISTER_IDS: Record<CanisterKey, Record<EnvKey, string>> = {
     staging: 'dwczx-faaaa-aaaan-qz5oa-cai',
   },
 
-  // NACHOS Vault
+  // NACHOS
   nachos_vault: {
     ic: 'p4nog-baaaa-aaaad-qkwpa-cai',  // placeholder — update when production deployed
     staging: 'p4nog-baaaa-aaaad-qkwpa-cai',
+  },
+  nachos: {
+    ic: 'rctxc-zqaaa-aaaan-qz6na-cai',
+    staging: 'p4nog-baaaa-aaaad-qkwpa-cai',
+  },
+
+  // TACO Swap
+  taco_swap: {
+    ic: '2uddx-dqaaa-aaaan-q5qja-cai',
+    staging: '2uddx-dqaaa-aaaan-q5qja-cai',
   },
 
   // Frontend
@@ -92,4 +104,41 @@ export const CANISTER_IDS: Record<CanisterKey, Record<EnvKey, string>> = {
   },
 }
 
+// Local development canister IDs (for dfx local replica)
+export const LOCAL_CANISTER_IDS: Partial<Record<CanisterKey, string>> = {
+  dao_backend: 'ywhqf-eyaaa-aaaad-qg6tq-cai',
+  treasury: 'z4is7-giaaa-aaaad-qg6uq-cai',
+}
 
+/**
+ * Get canister ID for a given key and network.
+ * Priority: 1) import.meta.env override  2) CANISTER_IDS lookup  3) local fallback
+ */
+export function getCanisterId(key: CanisterKey, network?: 'ic' | 'staging' | 'local'): string {
+  const net = network ?? _getEffectiveNetworkFn()
+
+  // For 'local', check local overrides first, then fall back to staging
+  if (net === 'local') {
+    return LOCAL_CANISTER_IDS[key] ?? CANISTER_IDS[key]?.staging ?? ''
+  }
+
+  // Check import.meta.env override (e.g. CANISTER_ID_DAO_BACKEND_IC)
+  const envKey = `CANISTER_ID_${key.toUpperCase()}_${net.toUpperCase()}`
+  // @ts-ignore - Vite injects these
+  const envValue = typeof import.meta !== 'undefined' ? import.meta.env?.[envKey] : undefined
+  if (envValue) return envValue
+
+  // Fall back to hardcoded config
+  const envForLookup: EnvKey = net === 'ic' ? 'ic' : 'staging'
+  return CANISTER_IDS[key]?.[envForLookup] ?? ''
+}
+
+// Network resolution function — set by network-config.ts to avoid circular imports
+let _getEffectiveNetworkFn: () => 'ic' | 'staging' | 'local' = () => 'staging'
+
+/**
+ * Register the network resolution function (called by network-config.ts on init)
+ */
+export function setNetworkResolver(fn: () => 'ic' | 'staging' | 'local'): void {
+  _getEffectiveNetworkFn = fn
+}
