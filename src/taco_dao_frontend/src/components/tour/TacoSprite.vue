@@ -171,12 +171,15 @@ const faceMarkup = computed(() => {
     align-items: center;
     justify-content: center;
     transition: transform 0.2s ease;
+    overflow: hidden;
   }
 
   &__img {
     width: 80%;
     height: auto;
-    filter: drop-shadow(2px 4px 6px rgba(0, 0, 0, 0.3));
+    filter:
+      drop-shadow(2px 4px 6px rgba(0, 0, 0, 0.3))
+      drop-shadow(0 0 7px rgba(255, 200, 80, 0.7));
   }
 
   &__face {

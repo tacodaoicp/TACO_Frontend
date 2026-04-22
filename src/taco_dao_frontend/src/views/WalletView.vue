@@ -981,7 +981,7 @@ const closeSendDialog = () => {
 }
 
 // handle send token
-const handleSendToken = async (params: { recipient: string; amount: bigint; memo?: string; addressType: 'principal' | 'accountId' }) => {
+const handleSendToken = async (params: { recipient: string; amount: bigint; memo?: string; addressType: 'principal' | 'accountId'; subaccount?: string }) => {
   if (!selectedToken.value) return
 
   // turn on app loading
@@ -1001,7 +1001,8 @@ const handleSendToken = async (params: { recipient: string; amount: bigint; memo
         params.recipient,
         params.amount,
         selectedToken.value.fee,
-        params.memo
+        params.memo,
+        params.subaccount
       )
     }
     

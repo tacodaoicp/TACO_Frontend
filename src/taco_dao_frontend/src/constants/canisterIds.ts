@@ -18,6 +18,8 @@ export type CanisterKey =
   | 'nachos_vault'
   | 'nachos'
   | 'taco_swap'
+  | 'exchange'
+  | 'exchange_treasury'
   | 'frontend'
 
 export const CANISTER_IDS: Record<CanisterKey, Record<EnvKey, string>> = {
@@ -95,6 +97,16 @@ export const CANISTER_IDS: Record<CanisterKey, Record<EnvKey, string>> = {
   taco_swap: {
     ic: '2uddx-dqaaa-aaaan-q5qja-cai',
     staging: '2uddx-dqaaa-aaaan-q5qja-cai',
+  },
+
+  // Exchange (TACO Exchange DEX)
+  exchange: {
+    ic: 'qioex-5iaaa-aaaan-q52ba-cai',       // placeholder — update with real canister IDs
+    staging: 'qioex-5iaaa-aaaan-q52ba-cai',   // placeholder — update with real canister IDs
+  },
+  exchange_treasury: {
+    ic: 'qbnpl-laaaa-aaaan-q52aq-cai',       // placeholder — update with real canister IDs
+    staging: 'qbnpl-laaaa-aaaan-q52aq-cai',   // placeholder — update with real canister IDs
   },
 
   // Frontend

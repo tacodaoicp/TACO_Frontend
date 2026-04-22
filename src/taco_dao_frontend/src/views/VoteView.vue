@@ -605,8 +605,12 @@
 
                           <!-- center - max allocation cap indicator -->
                           <div style="flex: 1; text-align: center; align-self: flex-end;">
-                            <span v-if="control.maxAllocation !== null" class="max-cap-badge">
+                            <span v-if="control.maxAllocation !== null && !control.isGrandfathered" class="max-cap-badge">
                               <i class="fa-solid fa-lock fa-xs"></i> {{ control.maxAllocation }}%
+                            </span>
+                            <span v-if="control.isGrandfathered" class="max-cap-badge max-cap-badge--stepdown"
+                              :title="`Cap: ${control.capPct}% — must reduce by at least 10% per vote`">
+                              <i class="fa-solid fa-arrow-down fa-xs"></i> {{ control.maxAllocation }}%
                             </span>
                           </div>
 
@@ -654,6 +658,12 @@
                             :disabled="control.isLocked || userLockedVote || unlockedCount === currentSliders.length - 1"
                             @input="onAllocationChange(index as number, ($event.target as HTMLInputElement).valueAsNumber)">
 
+                        </div>
+
+                        <!-- step-down notice for grandfathered positions -->
+                        <div v-if="control.isGrandfathered" class="stepdown-notice">
+                          <i class="fa-solid fa-circle-info fa-xs"></i>
+                          Your allocation ({{ control.previousPct }}%) is above the cap ({{ control.capPct }}%). Must reduce by at least 10% per vote.
                         </div>
 
                       </li>
@@ -1344,6 +1354,20 @@
     font-weight: 600;
     color: var(--gold);
     opacity: 0.3;
+
+    &--stepdown {
+      color: #f39c12;
+      opacity: 0.8;
+    }
+  }
+
+  .stepdown-notice {
+    font-size: 0.7rem;
+    color: #f39c12;
+    opacity: 0.8;
+    margin-top: 0.25rem;
+    padding: 0.25rem 0.5rem;
+    i { margin-right: 0.25rem; }
   }
 
   // token allocation
@@ -2391,6 +2415,13 @@
 
       // create currentSliders array using default percentages
       currentSliders.value = percentages.map((percentage: any, index: number) => {
+        const capPct = tokenMaxAllocationMap.value.get(canisterIds[index]) ?? null
+        // Look up user's previous allocation for this token (if any)
+        const prevAlloc = formattedUserAllocation.value?.allocations?.find(
+          (a: any) => a.token.toString() === canisterIds[index]
+        )
+        const prevPct = prevAlloc ? Number(prevAlloc.basisPoints) / 100 : null
+        const effective = computeEffectiveMax(prevPct, capPct)
         return {
           symbol: symbols[index],
           canisterId: canisterIds[index], // Store the canister ID
@@ -2398,7 +2429,10 @@
           initialPercentage: percentage, // store initial percentage
           isLocked: false,
           badgeColor: colors[index],
-          maxAllocation: tokenMaxAllocationMap.value.get(canisterIds[index]) ?? null
+          maxAllocation: effective.maxAllocation,
+          isGrandfathered: effective.isGrandfathered,
+          previousPct: effective.previousPct,
+          capPct // store the static cap for display
         }
       })
       
@@ -2815,7 +2849,7 @@
 
       // show error toast for cap-exceeded or other allocation errors
       const msg = error?.message || String(error)
-      if (msg.includes('exceeds max of') || msg.includes('UnexpectedError') || msg.includes('InvalidAllocation')) {
+      if (msg.includes('exceeds max of') || msg.includes('must be reduced by') || msg.includes('UnexpectedError') || msg.includes('InvalidAllocation')) {
         addToast({
           id: Date.now(),
           code: 'error',
@@ -2938,9 +2972,9 @@
     // log all allocations
     // console.log('VoteView.vue: all allocations:', formattedUserAllocation.value.allocations)
 
-    // set sliders to last allocation percentages
+    // set sliders to last allocation percentages and recompute grandfathered state
     currentSliders.value = currentSliders.value.map((slider: any) => {
-      
+
       // if formattedUserAllocation exists
       if (formattedUserAllocation.value) {
 
@@ -2949,11 +2983,19 @@
           (allocation: any) => allocation.token.toString() === slider.canisterId
         )
 
+        const prevPct = matchingAllocation ? Number(matchingAllocation.basisPoints) / 100 : null
+        const capPct = tokenMaxAllocationMap.value.get(slider.canisterId) ?? null
+        const effective = computeEffectiveMax(prevPct, capPct)
+
         // return updated slider
         return {
           ...slider,
-          currentPercentage: matchingAllocation ? Number(matchingAllocation.basisPoints) / 100 : 0,
-          isLocked: false // unlock all sliders when matching
+          currentPercentage: prevPct ?? 0,
+          isLocked: false, // unlock all sliders when matching
+          maxAllocation: effective.maxAllocation,
+          isGrandfathered: effective.isGrandfathered,
+          previousPct: effective.previousPct,
+          capPct
         }
 
       } else {
@@ -3392,10 +3434,12 @@
   watch(tokenMaxAllocationMap, (newMap) => {
     if (currentSliders.value.length === 0 || newMap.size === 0) return
     for (const slider of currentSliders.value) {
-      const cap = newMap.get(slider.canisterId) ?? null
-      if (slider.maxAllocation !== cap) {
-        slider.maxAllocation = cap
-      }
+      const capPct = newMap.get(slider.canisterId) ?? null
+      const effective = computeEffectiveMax(slider.previousPct ?? null, capPct)
+      slider.maxAllocation = effective.maxAllocation
+      slider.isGrandfathered = effective.isGrandfathered
+      slider.previousPct = effective.previousPct
+      slider.capPct = capPct
     }
   })
 
@@ -3530,6 +3574,23 @@
   ////////////////////
   // token controls //
   ////////////////////
+
+  // Compute effective max allocation for a token, accounting for grandfathered step-down.
+  // previousPct: user's last-voted allocation in percentage (null if no previous vote)
+  // capPct: token's max allocation cap in percentage (null if no cap)
+  // Returns { maxAllocation, isGrandfathered, previousPct }
+  function computeEffectiveMax(previousPct: number | null, capPct: number | null) {
+    if (capPct === null || previousPct === null || previousPct <= capPct) {
+      return { maxAllocation: capPct, isGrandfathered: false, previousPct }
+    }
+    // Grandfathered: must reduce by at least 10% (1000bp) per update
+    // Effective max = max(cap, previous - 10) so they can always reach the cap
+    return {
+      maxAllocation: Math.max(capPct, round(previousPct - 10)),
+      isGrandfathered: true,
+      previousPct
+    }
+  }
 
   // max decimals
   const MAX_DECIMALS = 2

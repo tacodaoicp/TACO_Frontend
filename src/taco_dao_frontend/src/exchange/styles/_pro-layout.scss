@@ -1,0 +1,68 @@
+// TACO Exchange — Pro Layout supplementary styles
+// The grid itself is managed by ProLayout.vue (inline styles for dynamic resizing)
+// This file only provides tab styles and responsive overrides
+
+[data-theme="exchange"] {
+
+  // Responsive: hide pro layout on mobile (Easy Swap is used instead)
+  @media (max-width: 767px) {
+    .pro-layout {
+      display: none !important;
+    }
+  }
+
+  // Tab bar for bottom panel
+  .pro-bottom__tabs {
+    display: flex;
+    gap: 0;
+    border-bottom: 1px solid var(--card-border);
+    background: linear-gradient(135deg, var(--card-gradient-from), var(--card-gradient-to));
+    flex-shrink: 0;
+  }
+
+  .pro-bottom__tab {
+    padding: var(--space-2) var(--space-4);
+    font-size: var(--text-sm);
+    font-weight: var(--weight-medium);
+    color: var(--text-secondary);
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    border-radius: 6px 6px 0 0;
+    cursor: pointer;
+    transition: all 0.2s ease;
+
+    &:hover {
+      color: var(--text-primary);
+      background: rgba(196, 90, 10, 0.06);
+    }
+
+    &--active {
+      color: var(--gold);
+      border-bottom-color: var(--gold);
+      background: rgba(196, 90, 10, 0.08);
+    }
+  }
+
+  .pro-bottom__badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 5px;
+    border-radius: 9px;
+    background: var(--accent-primary-muted);
+    color: var(--accent-primary);
+    font-size: 10px;
+    font-weight: var(--weight-bold);
+    margin-left: var(--space-1);
+  }
+
+  .pro-bottom__content {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+  }
+}

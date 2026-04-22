@@ -517,6 +517,14 @@
                 </div>
               </div>
 
+              <div class="roadmap__item roadmap__item--done">
+                <i class="fa-solid fa-check roadmap__item-icon roadmap__item-icon--done"></i>
+                <div class="roadmap__content">
+                  <h4 class="roadmap__title">TACO Exchange (v2.1.0)</h4>
+                  <p class="roadmap__text">TACO's own decentralized exchange with limit orders, AMM liquidity pools with concentrated liquidity, multi-hop swap routing, and private OTC trades.</p>
+                </div>
+              </div>
+
               <!-- Q2 2026 phase -->
               <div class="roadmap__phase-header roadmap__phase-header--upcoming">
                 <div class="roadmap__dot roadmap__dot--upcoming"></div>
@@ -539,7 +547,7 @@
                 <i class="fa-solid fa-chevron-down roadmap__chevron"></i>
               </div>
 
-              <div class="roadmap__item roadmap__item--upcoming">
+              <div class="roadmap__item roadmap__item--upcoming roadmap__item--last">
                 <i class="fa-solid fa-circle roadmap__item-icon roadmap__item-icon--upcoming"></i>
                 <div class="roadmap__content">
                   <h4 class="roadmap__title">White-Label Portfolio Platform</h4>
@@ -547,20 +555,6 @@
                 </div>
               </div>
 
-              <!-- Q3/Q4 2026 phase -->
-              <div class="roadmap__phase-header roadmap__phase-header--upcoming">
-                <div class="roadmap__dot roadmap__dot--upcoming"></div>
-                <span class="roadmap__phase-label">Q3/Q4 2026</span>
-                <i class="fa-solid fa-chevron-down roadmap__chevron"></i>
-              </div>
-
-              <div class="roadmap__item roadmap__item--upcoming roadmap__item--last">
-                <i class="fa-solid fa-circle roadmap__item-icon roadmap__item-icon--upcoming"></i>
-                <div class="roadmap__content">
-                  <h4 class="roadmap__title">TACO DEX</h4>
-                  <p class="roadmap__text">TACO's own decentralized exchange supporting limit orders and AMM liquidity provision, where the DAO portfolio is used as liquidity. Single-canister architecture for blazing-fast execution. The code is ready, deployment is planned once TACO gains sufficient traction to ensure a successful launch.</p>
-                </div>
-              </div>
 
             </div>
 

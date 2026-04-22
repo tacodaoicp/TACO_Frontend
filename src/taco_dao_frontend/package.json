@@ -46,6 +46,7 @@
     "idb": "^8.0.3",
     "js-sha256": "^0.11.1",
     "klinecharts": "^9.8.10",
+    "lightweight-charts": "^5.1.0",
     "moment-timezone": "^0.5.45",
     "pinia": "^2.1.6",
     "qrcode": "^1.5.4",

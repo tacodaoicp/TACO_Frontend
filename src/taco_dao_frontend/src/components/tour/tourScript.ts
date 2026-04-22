@@ -100,7 +100,7 @@ export const tourScript: TourScene[] = [
             label: "What's a DAO?",
             response: [
               line('taco', 'happy', 'idle', "A DAO is a Decentralized Autonomous Organization. Basically, the community runs the show."),
-              line('taco', 'neutral', 'idle', "No CEO, no board — just voters. Pretty based if you ask me."),
+              line('taco', 'neutral', 'idle', "No CEO, no board. Just voters. Pretty based if you ask me."),
               line('taco', 'neutral', 'idle', "On the IC, even the code gets changed using votes. Even the developers don't fully control it."),
             ]
           },
@@ -114,7 +114,7 @@ export const tourScript: TourScene[] = [
           {
             label: "Let's just go!",
             response: [
-              line('taco', 'happy', 'bounce', "That's the spirit! No time for lore dumps — let's MOVE!"),
+              line('taco', 'happy', 'bounce', "That's the spirit! No time for lore dumps, let's MOVE!"),
             ]
           }
         ]
@@ -129,7 +129,7 @@ export const tourScript: TourScene[] = [
     route: '/dao',
     lines: [
       line('taco', 'happy', 'idle', "This is the DAO page! The big brain center!"),
-      line('taco', 'neutral', 'idle', "See all those holdings? That's the treasury — the tokens the DAO actually owns right now.", {
+      line('taco', 'neutral', 'idle', "See all those holdings? That's the treasury. The tokens the DAO actually owns right now.", {
         scrollTo: '#dao-allocations',
         highlight: '#dao-allocations',
       }),
@@ -162,7 +162,7 @@ export const tourScript: TourScene[] = [
       line('taco', 'neutral', 'idle', "TACO DAO participants can change their allocation at any time by moving these sliders.", {
         highlight: '#vote-slider-list',
       }),
-      line('taco', 'happy', 'bounce', "Watch — the sliders control where the treasury invests!", {
+      line('taco', 'happy', 'bounce', "Watch! The sliders control where the treasury invests!", {
         scrollTo: '#vote-slider-list',
         highlight: '#vote-slider-list',
         animateSliders: {
@@ -227,12 +227,12 @@ export const tourScript: TourScene[] = [
   {
     route: '/info',
     lines: [
-      line('taco', 'happy', 'idle', "Before we move on — check out what's coming next!", {
+      line('taco', 'happy', 'idle', "Before we move on, check out what's coming next!", {
         scrollTo: '#roadmap',
         highlight: '#roadmap',
       }),
       line('taco', 'neutral', 'idle', "Multichain expansion, a white-label platform, and our own DEX. Big things ahead."),
-      line('taco', 'happy', 'bounce', "Stick around — you don't want to miss this.", {
+      line('taco', 'happy', 'bounce', "Stick around. You don't want to miss this.", {
         clearHighlight: true,
       }),
     ]
@@ -255,7 +255,7 @@ export const tourScript: TourScene[] = [
         highlight: '#wallet-neurons',
         click: '.token-card__neurons .fa-chevron-right',
       }),
-      line('taco', 'neutral', 'idle', "And down here — your core tokens. Hold them, swap between them anytime.", {
+      line('taco', 'neutral', 'idle', "And down here, your core tokens. Hold them, swap between them anytime.", {
         scrollTo: '#wallet-tokens',
         highlight: '#wallet-tokens',
       }),
@@ -286,12 +286,12 @@ export const tourScript: TourScene[] = [
       line('taco', 'suspicious', 'idle', "I don't trust triangles...", {
         secondary: { character: 'nacho', expression: 'neutral', action: 'idle' }
       }),
-      line('nacho', 'neutral', 'idle', "The vault lets you mint NACHOS — a token backed by TACO's entire portfolio.", {
+      line('nacho', 'neutral', 'idle', "The vault lets you mint NACHOS. A token backed by TACO's entire portfolio.", {
         secondary: { character: 'taco', expression: 'suspicious', action: 'idle' },
         scrollTo: '#vault-actions',
         highlight: '#vault-actions',
       }),
-      line('nacho', 'neutral', 'idle', "The NAV price shows what 1 NACHO is worth in ICP. And yes — it changes with the portfolio.", {
+      line('nacho', 'neutral', 'idle', "The NAV price shows what 1 NACHO is worth in ICP. And yes, it changes with the portfolio.", {
         secondary: { character: 'taco', expression: 'neutral', action: 'idle' },
       }),
       line('nacho', 'neutral', 'idle', "Mint NACHOS by depositing ICP. Burn them to get part of the portfolio in your wallet.", {
@@ -368,11 +368,32 @@ export const tourScript: TourScene[] = [
       line('nacho', 'neutral', 'idle', "You forgot to mention the forum.", {
         secondary: { character: 'taco', expression: 'happy', action: 'idle' }
       }),
-      line('taco', 'angry', 'shake', "NOBODY ASKED YOU—", {
+      line('taco', 'angry', 'shake', "NOBODY ASKED YOU!", {
         secondary: { character: 'nacho', expression: 'happy', action: 'idle' }
       }),
       line('taco', 'neutral', 'idle', "...okay fine, there's also a forum and chat. Check out the Chat page.", {
         secondary: { character: 'nacho', expression: 'neutral', action: 'idle' }
+      }),
+      line('nacho', 'excited', 'bounce', "Oh! And don't forget, we have our own exchange!", {
+        secondary: { character: 'taco', expression: 'happy', action: 'idle' },
+        scrollTo: '.home-view__exchange-cta',
+        highlight: '.home-view__exchange-cta',
+      }),
+      line('nacho', 'neutral', 'idle', "V3 concentrated liquidity pools, limit orders merged with AMM liquidity. It's a hybrid DEX.", {
+        secondary: { character: 'taco', expression: 'neutral', action: 'idle' }
+      }),
+      line('taco', 'happy', 'idle', "The DAO's allocation trades actually add liquidity to the exchange! So the more people vote, the deeper the pools get.", {
+        secondary: { character: 'nacho', expression: 'neutral', action: 'idle' }
+      }),
+      line('nacho', 'happy', 'idle', "Plus private OTC trades if you want to move size without slippage.", {
+        secondary: { character: 'taco', expression: 'neutral', action: 'idle' }
+      }),
+      line('nacho', 'neutral', 'idle', "And multi-hop routing finds you the best price across all pools automatically.", {
+        secondary: { character: 'taco', expression: 'neutral', action: 'idle' }
+      }),
+      line('taco', 'smug', 'idle', "Built right here on the IC. No middlemen, no CEX nonsense.", {
+        secondary: { character: 'nacho', expression: 'happy', action: 'idle' },
+        clearHighlight: true,
       }),
       line('taco', 'happy', 'idle', "Anyway! Get out there, stake some TACO, vote on stuff, earn rewards!", {
         secondary: { character: 'nacho', expression: 'happy', action: 'idle' }

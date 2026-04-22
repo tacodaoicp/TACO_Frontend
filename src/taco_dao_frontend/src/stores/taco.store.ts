@@ -98,7 +98,7 @@ function shouldFetchRootKey(): boolean {
 function getNetworkHost(): string {
     const network = getEffectiveNetwork()
     if (network === 'local') {
-        const port = import.meta.env.VITE_LOCAL_PORT || '4943'
+        const port = import.meta.env.VITE_LOCAL_PORT || '6667'
         return `http://localhost:${port}`
     }
     return getICHost()
@@ -483,7 +483,7 @@ interface Trade {
     tokenBought: Principal;
     amountSold: bigint;
     amountBought: bigint;
-    exchange: 'ICPSwap' | 'KongSwap';
+    exchange: 'ICPSwap' | 'KongSwap' | 'TACO';
     timestamp: bigint;
     success: boolean;
     error?: string;
@@ -2219,7 +2219,7 @@ export const useTacoStore = defineStore('taco', () => {
     function getLocalHost(): string {
 
         // get the port from the environment variable
-        const port = import.meta.env.VITE_LOCAL_PORT || '51000'
+        const port = import.meta.env.VITE_LOCAL_PORT || '6667'
 
         // log
         // console.log('port', port)
@@ -2729,17 +2729,25 @@ export const useTacoStore = defineStore('taco', () => {
             // Get identity provider based on network and version
             const getIdentityProvider = () => {
                 if (getEffectiveNetwork() === 'local') {
-                    return `http://${iiCanisterId}.localhost:4943/`
+                    return `http://${iiCanisterId}.localhost:${import.meta.env.VITE_LOCAL_PORT || '6667'}/`
                 }
                 // II 2.0 uses id.ai, II 1.0 uses identity.ic0.app
                 return version === 'v2' ? 'https://id.ai' : 'https://identity.ic0.app'
             }
+
+            // Share principals with the exchange subdomain by anchoring derivation to the apex.
+            // Only applied on exchange.tacodao.com — on tacodao.com itself this is the default.
+            const derivationOrigin =
+                window.location.hostname === 'exchange.tacodao.com'
+                    ? 'https://tacodao.com'
+                    : undefined
 
             // login
             await new Promise((resolve, reject) => {
                 authClient.login({
                     maxTimeToLive: BigInt(30 * 24 * 60 * 60 * 1000 * 1000 * 1000),
                     identityProvider: getIdentityProvider(),
+                    derivationOrigin,
                     onSuccess: resolve,
                     onError: reject,
                 })
@@ -7782,7 +7790,8 @@ export const useTacoStore = defineStore('taco', () => {
         recipient: string,
         amount: bigint,
         fee: bigint,
-        memo?: string
+        memo?: string,
+        subaccount?: string
     ) => {
         try {
             if (!userLoggedIn.value) {
@@ -7819,10 +7828,14 @@ export const useTacoStore = defineStore('taco', () => {
             });
             const tokenActor = Actor.createActor(icrc1IDL, { agent, canisterId: tokenPrincipal });
 
+            const subaccountBytes = subaccount
+                ? [new Uint8Array(subaccount.match(/.{1,2}/g)!.map(b => parseInt(b, 16)))]
+                : []
+
             const result = await tokenActor.icrc1_transfer({
                 to: {
                     owner: Principal.fromText(recipient),
-                    subaccount: []
+                    subaccount: subaccountBytes
                 },
                 fee: [fee],
                 memo: memo ? [new TextEncoder().encode(memo)] : [],

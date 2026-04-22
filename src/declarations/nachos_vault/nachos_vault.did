@@ -541,10 +541,12 @@ type NachosVaultDAO =
     (record {
        burnFeesICP: nat;
        currentNAV: opt CachedNAV;
+       effectiveBurnLimit: nat;
        feeCount: nat;
        globalBurnIn4h: nat;
        globalMintIn4h: nat;
        initialNAVPerToken: nat;
+       liquidPortfolioICP: nat;
        maxBurnPer4h: nat;
        maxMintPer4h: nat;
        mintFeesICP: nat;

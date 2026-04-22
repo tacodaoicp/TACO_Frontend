@@ -177,6 +177,8 @@ export const useNachosStore = defineStore('nachos', () => {
   const globalBurnIn4h = computed(() => dashboardData.value?.globalBurnIn4h ?? 0n)
   const maxMintPer4h = computed(() => dashboardData.value?.maxMintPer4h ?? 0n)
   const maxBurnPer4h = computed(() => dashboardData.value?.maxBurnPer4h ?? 0n)
+  const effectiveBurnLimit = computed(() => dashboardData.value?.effectiveBurnLimit ?? 0n)
+  const liquidPortfolioICP = computed(() => dashboardData.value?.liquidPortfolioICP ?? 0n)
 
   // Remaining capacity — mint (ICP e8s)
   const remainingMintICP = computed(() => {
@@ -197,7 +199,7 @@ export const useNachosStore = defineStore('nachos', () => {
   const remainingBurnNachos = computed(() => {
     if (!userRateLimits.value) return null
     const userRemaining = Number(maxBurnNachosPerUser4Hours.value) - Number(userRateLimits.value.burnValueIn4h)
-    const globalRemaining = Number(maxBurnPer4h.value) - Number(globalBurnIn4h.value)
+    const globalRemaining = Number(effectiveBurnLimit.value) - Number(globalBurnIn4h.value)
     const candidates = [userRemaining, globalRemaining]
     if (Number(maxBurnAmountNachos.value) > 0) candidates.push(Number(maxBurnAmountNachos.value))
     return Math.max(0, Math.min(...candidates))
@@ -1096,7 +1098,7 @@ export const useNachosStore = defineStore('nachos', () => {
     maxMintAmountICP, maxBurnAmountNachos,
     maxMintICPPerUser4Hours, maxBurnNachosPerUser4Hours,
     maxMintOpsPerUser4Hours, maxBurnOpsPerUser4Hours,
-    userRateLimits, globalMintIn4h, globalBurnIn4h, maxMintPer4h, maxBurnPer4h,
+    userRateLimits, globalMintIn4h, globalBurnIn4h, maxMintPer4h, maxBurnPer4h, effectiveBurnLimit, liquidPortfolioICP,
     remainingMintICP, remainingMintOps, remainingBurnNachos, remainingBurnOps,
     // Query actions
     loadDashboard, loadUserActivity, loadNAVHistory, loadConfig,

@@ -6,7 +6,7 @@ import { setAdminStatus } from '../stores/worker-bridge'
  * Hardcoded list of admin principals
  * These principals have admin access without needing backend verification
  */
-const ADMIN_PRINCIPALS = [
+export const ADMIN_PRINCIPALS = [
   'odoge-dr36c-i3lls-orjen-eapnp-now2f-dj63m-3bdcd-nztox-5gvzy-sqe',
   'cspwf-4aaaa-aaaan-qz5ia-cai',
   'tisou-7aaaa-aaaai-atiea-cai',

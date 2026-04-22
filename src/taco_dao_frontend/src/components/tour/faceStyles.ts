@@ -190,8 +190,7 @@ function renderStandardFace(p: FaceRenderParams, color: string): FaceElements {
       case 'smug':
         eyes = `<path d="M14 13 Q18 10 22 13" stroke="${color}" stroke-width="2.5" fill="none" stroke-linecap="round"/>
                 <ellipse cx="42" cy="13" rx="4" ry="4" fill="${color}"/>
-                ${shine(41.5)}
-                <path d="M38 13 L45 13" stroke="white" stroke-width="2" stroke-linecap="round"/>`
+                ${shine(41.5)}`
         break
       default: // neutral
         eyes = `<ellipse cx="18" cy="13" rx="4" ry="4.5" fill="${color}"/>

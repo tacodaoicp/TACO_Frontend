@@ -104,9 +104,12 @@
                         <div class="progress mt-1" style="height:6px">
                           <div class="progress-bar bg-info" :style="{ width: ratioPercent(adminData.globalMintIn4h, adminData.maxMintPer4h) + '%' }"></div>
                         </div>
-                        <div class="small mt-1">Burn: {{ formatE8s(adminData.globalBurnIn4h) }} / {{ formatE8s(adminData.maxBurnPer4h) }} NACHOS</div>
+                        <div class="small mt-1">Burn: {{ formatE8s(adminData.globalBurnIn4h) }} / {{ formatE8s(adminData.effectiveBurnLimit) }} NACHOS</div>
                         <div class="progress mt-1" style="height:6px">
-                          <div class="progress-bar bg-warning" :style="{ width: ratioPercent(adminData.globalBurnIn4h, adminData.maxBurnPer4h) + '%' }"></div>
+                          <div class="progress-bar bg-warning" :style="{ width: ratioPercent(adminData.globalBurnIn4h, adminData.effectiveBurnLimit) + '%' }"></div>
+                        </div>
+                        <div v-if="adminData.effectiveBurnLimit < adminData.maxBurnPer4h" class="small text-warning mt-1">
+                          Reduced from {{ formatE8s(adminData.maxBurnPer4h) }} — assets in LP
                         </div>
                       </div>
                     </div>
@@ -114,6 +117,8 @@
                       <div class="p-3 rounded bg-black bg-opacity-25">
                         <div class="small text-muted mb-2">Canister Cycles</div>
                         <div>{{ formatCycles(adminData.canisterCycles) }}</div>
+                        <div class="small text-muted mt-2 mb-1">Liquid Portfolio</div>
+                        <div class="small">{{ formatE8s(adminData.liquidPortfolioICP) }} ICP</div>
                       </div>
                     </div>
                   </div>
@@ -1481,7 +1486,7 @@ const newFeeExemptPrincipal = ref('')
 const newFeeExemptReason = ref('')
 const newRateLimitExemptPrincipal = ref('')
 const newRateLimitExemptReason = ref('')
-const claimMintFeeRecipient = ref('')
+const claimMintFeeRecipient = ref(nachosStore.userPrincipal || '')
 const rateLimitLookupPrincipal = ref('')
 const userRateLimitData = ref<any>(null)
 const lookingUpRateLimit = ref(false)
@@ -1516,37 +1521,42 @@ const removeRateLimitExempt = async (principal: any) => {
   await adminCall(async (a: any) => a.removeRateLimitExemptPrincipal(principal), 'Rate limit exemption removed')
 }
 
-const claimMintFee = async (tokenPrincipal: any) => {
-  try {
-    const recipient = Principal.fromText(claimMintFeeRecipient.value.trim())
-    const fee = adminData.value?.claimableMintFees?.find((f: any) => f.token.toText() === tokenPrincipal.toText())
-    if (!fee) return
-    await adminCall(async (a: any) => a.claimMintFees(recipient, tokenPrincipal, fee.claimable), 'Mint fees claimed')
-  } catch (e: any) {
-    addToast('Error', e.message || 'Invalid recipient', 'fa-solid fa-exclamation-triangle')
+const validateClaimRecipient = (): Principal | null => {
+  const raw = claimMintFeeRecipient.value.trim()
+  if (!raw) {
+    addToast('Error', 'Please enter a recipient principal', 'fa-solid fa-exclamation-triangle')
+    return null
   }
+  try {
+    return Principal.fromText(raw)
+  } catch (e: any) {
+    addToast('Error', e.message || 'Invalid recipient principal', 'fa-solid fa-exclamation-triangle')
+    return null
+  }
+}
+
+const claimMintFee = async (tokenPrincipal: any) => {
+  const recipient = validateClaimRecipient()
+  if (!recipient) return
+  const fee = adminData.value?.claimableMintFees?.find((f: any) => f.token.toText() === tokenPrincipal.toText())
+  if (!fee) return
+  await adminCall(async (a: any) => a.claimMintFees(recipient, tokenPrincipal, fee.claimable), 'Mint fees claimed')
 }
 
 const claimBurnFee = async (tokenPrincipal: any) => {
-  try {
-    const recipient = Principal.fromText(claimMintFeeRecipient.value.trim())
-    const fee = adminData.value?.claimableBurnFees?.find((f: any) => f.token.toText() === tokenPrincipal.toText())
-    if (!fee) return
-    await adminCall(async (a: any) => a.claimBurnFees(recipient, tokenPrincipal, fee.claimable), 'Burn fees claimed')
-  } catch (e: any) {
-    addToast('Error', e.message || 'Invalid recipient', 'fa-solid fa-exclamation-triangle')
-  }
+  const recipient = validateClaimRecipient()
+  if (!recipient) return
+  const fee = adminData.value?.claimableBurnFees?.find((f: any) => f.token.toText() === tokenPrincipal.toText())
+  if (!fee) return
+  await adminCall(async (a: any) => a.claimBurnFees(recipient, tokenPrincipal, fee.claimable), 'Burn fees claimed')
 }
 
 const claimCancellationFee = async (tokenPrincipal: any) => {
-  try {
-    const recipient = Principal.fromText(claimMintFeeRecipient.value.trim())
-    const fee = adminData.value?.claimableCancellationFees?.find((f: any) => f.token.toText() === tokenPrincipal.toText())
-    if (!fee) return
-    await adminCall(async (a: any) => a.claimCancellationFees(recipient, tokenPrincipal, fee.claimable), 'Cancellation fees claimed')
-  } catch (e: any) {
-    addToast('Error', e.message || 'Failed to claim', 'fa-solid fa-exclamation-triangle')
-  }
+  const recipient = validateClaimRecipient()
+  if (!recipient) return
+  const fee = adminData.value?.claimableCancellationFees?.find((f: any) => f.token.toText() === tokenPrincipal.toText())
+  if (!fee) return
+  await adminCall(async (a: any) => a.claimCancellationFees(recipient, tokenPrincipal, fee.claimable), 'Cancellation fees claimed')
 }
 
 const lookupUserRateLimit = async () => {

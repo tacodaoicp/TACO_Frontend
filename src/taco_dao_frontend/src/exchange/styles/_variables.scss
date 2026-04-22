@@ -1,0 +1,74 @@
+// TACO Exchange — Design Tokens
+// Warm premium dark theme with darker burnt orange accent
+
+[data-theme="exchange"] {
+  /* --- Backgrounds (warm brown-black) --- */
+  --bg-primary: #1A0E05;
+  --bg-secondary: #2A1608;
+  --bg-tertiary: #3A1F0C;
+  --bg-elevated: #4A2810;
+
+  /* --- Text (warm cream/tan) --- */
+  --text-primary: #F5F0E0;
+  --text-secondary: #B89A78;
+  --text-tertiary: #8B6E50;
+
+  /* --- Accent (darker burnt orange) --- */
+  --accent-primary: #C45A0A;
+  --accent-primary-hover: #D4700E;
+  --accent-primary-muted: #C45A0A33; /* 20% opacity */
+
+  /* --- Semantic: Trading --- */
+  --color-buy: #2EA66A;
+  --color-buy-bg: rgba(46, 166, 106, 0.12);
+  --color-buy-hover: #3CB87A;
+  --color-sell: #D94040;
+  --color-sell-bg: rgba(217, 64, 64, 0.12);
+  --color-sell-hover: #E25555;
+
+  /* --- Semantic: Feedback --- */
+  --color-info: #5B8AC4;
+  --color-warning: #C45A0A;
+  --color-error: #C43030;
+  --color-success: #2EA66A;
+
+  /* --- Borders & Dividers (warm sienna) --- */
+  --border-primary: #3A200D;
+  --border-secondary: #4D2E14;
+  --border-focus: #C45A0A;
+
+  /* --- Gradients (premium card system) --- */
+  --card-gradient-from: #3A1F0C;
+  --card-gradient-to: #241005;
+  --card-active-from: #4A2810;
+  --card-active-to: #2A1608;
+  --card-hover-from: #3F2410;
+  --card-hover-to: #2E180A;
+  --card-border: #6B4422;
+  --card-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+
+  /* --- Gold accent (premium highlights) --- */
+  --gold: #D4A034;
+  --gold-light: #E0B040;
+  --text-cream: #F5F0E0;
+
+  /* --- Overlay --- */
+  --overlay-bg: rgba(15, 5, 0, 0.70);
+
+  /* --- Orderbook-specific --- */
+  --ob-bid-gradient: linear-gradient(to left, rgba(46, 166, 106, 0.12), transparent);
+  --ob-ask-gradient: linear-gradient(to left, rgba(217, 64, 64, 0.12), transparent);
+  --ob-amm-opacity: 0.5;
+
+  /* --- Spacing (4px base) --- */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+}

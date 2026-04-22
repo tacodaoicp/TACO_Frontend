@@ -32,6 +32,19 @@
 
               </div>
 
+              <!-- Exchange CTA Banner -->
+              <a :href="exchangeUrl"
+                 class="home-view__exchange-cta"
+                 target="_blank"
+                 rel="noopener">
+                <span class="home-view__exchange-cta__icon">&#x1F4CA;</span>
+                <span class="home-view__exchange-cta__text">
+                  <strong>TACO Exchange</strong>
+                  <span>Trade tokens on our decentralized exchange</span>
+                </span>
+                <span class="home-view__exchange-cta__arrow">&#x2192;</span>
+              </a>
+
             </div>
 
 
@@ -744,6 +757,63 @@
       font-weight: 400;
     }
 
+  }
+
+  &__exchange-cta {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-top: 1.25rem;
+    padding: 0.875rem 1.5rem;
+    background: linear-gradient(135deg, rgba(232, 131, 12, 0.15), rgba(232, 131, 12, 0.05));
+    border: 1px solid rgba(232, 131, 12, 0.3);
+    border-radius: 12px;
+    text-decoration: none;
+    color: inherit;
+    transition: border-color 0.2s, transform 0.15s, background 0.2s;
+    cursor: pointer;
+
+    &:hover {
+      border-color: rgba(232, 131, 12, 0.6);
+      background: linear-gradient(135deg, rgba(232, 131, 12, 0.25), rgba(232, 131, 12, 0.1));
+      transform: translateY(-1px);
+    }
+
+    &__icon {
+      font-size: 1.75rem;
+      line-height: 1;
+    }
+
+    &__text {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      flex: 1;
+
+      strong {
+        font-family: "Rubik", sans-serif;
+        font-size: 1rem;
+        font-weight: 600;
+        color: #E8830C;
+      }
+
+      span {
+        font-size: 0.8rem;
+        color: var(--text-muted, #9ca3af);
+      }
+    }
+
+    &__arrow {
+      font-size: 1.25rem;
+      color: #E8830C;
+      opacity: 0.7;
+      transition: opacity 0.15s, transform 0.15s;
+    }
+
+    &:hover &__arrow {
+      opacity: 1;
+      transform: translateX(3px);
+    }
   }
 
   &__title {
@@ -1936,6 +2006,15 @@
   /////////////////////
   // Local Variables //
   /////////////////////
+
+  // Exchange URL — staging uses /exchange path, production uses custom domain
+  const exchangeUrl = computed(() => {
+    const host = window.location.hostname
+    if (host.includes('wxunf') || host.includes('localhost') || host.includes('192.168')) {
+      return '/exchange'
+    }
+    return 'https://exchange.tacodao.com'
+  })
 
   // Track intersection state
   const isBelowTheFoldVisible = ref(false)

@@ -243,7 +243,7 @@ import { getEffectiveNetwork } from '../config/network-config'
 function getNetworkHost() {
   const network = getEffectiveNetwork()
   if (network === 'local') {
-    const port = import.meta.env.VITE_LOCAL_PORT || '4943'
+    const port = import.meta.env.VITE_LOCAL_PORT || '6667'
     return `http://localhost:${port}`
   }
   return 'https://ic0.app'

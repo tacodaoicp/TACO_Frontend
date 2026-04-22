@@ -1,0 +1,35 @@
+type treasury = 
+ service {
+   drainTransferQueue: () -> ();
+   getAcceptedtokens: (a: vec text) -> ();
+   getPendingTransferCount: () -> (nat) query;
+   getTokenInfo: () ->
+    (vec
+      record {
+        text;
+        record {
+          Decimals: nat;
+          Name: text;
+          Symbol: text;
+          TransferFee: nat;
+        };
+      }) query;
+   receiveTransferTasks: (tempTransferQueue:
+    vec record {
+          TransferRecipient;
+          nat;
+          text;
+        }) -> (bool);
+   setOTCCanister: (id: text) -> ();
+   setTest: (a: bool) -> ();
+ };
+type TransferRecipient = 
+ variant {
+   accountId: record {
+                owner: principal;
+                subaccount: opt Subaccount;
+              };
+   "principal": principal;
+ };
+type Subaccount = blob;
+service : () -> treasury

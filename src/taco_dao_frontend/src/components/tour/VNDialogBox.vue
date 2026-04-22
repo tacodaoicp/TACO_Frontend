@@ -40,6 +40,7 @@
 
       <!-- skip button -->
       <button class="vn-dialog__skip"
+              :class="{ 'vn-dialog__skip--left': speakerSide === 'right' }"
               @click="$emit('skip')">
         SKIP &gt;&gt;
       </button>
@@ -340,6 +341,11 @@ $bg-color: rgba(10, 10, 20, 0.92);
 
     &:hover {
       color: rgba(#f0f0f0, 0.9);
+    }
+
+    &--left {
+      right: auto;
+      left: #{$pixel * 2};
     }
   }
 }

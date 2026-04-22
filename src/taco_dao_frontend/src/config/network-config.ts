@@ -232,7 +232,7 @@ export function getNetworkStatus(): {
 } {
   const override = getNetworkOverride()
   const effectiveNetwork = getEffectiveNetwork()
-  const host = effectiveNetwork === 'local' ? 'http://localhost:4943' : getICHost()
+  const host = effectiveNetwork === 'local' ? `http://localhost:${import.meta.env.VITE_LOCAL_PORT || '6667'}` : getICHost()
   const fetchRootKey = effectiveNetwork === 'local'
 
   return {
@@ -363,7 +363,7 @@ if (isBrowser()) {
     useLocal: () => {
       setNetworkOverride('local')
       onNetworkChanged('local')
-      originalConsoleLog('Set to LOCAL (localhost:4943). Caches cleared, workers updated.')
+      originalConsoleLog(`Set to LOCAL (localhost:${import.meta.env.VITE_LOCAL_PORT || '6667'}). Caches cleared, workers updated.`)
     },
     useAuto: () => {
       setNetworkOverride(null)
@@ -407,7 +407,7 @@ TACO DAO Network Configuration:
 ================================
 tacoConfig.useMainnet()  - Connect to IC mainnet (ic0.app)
 tacoConfig.useStaging()  - Connect to staging network
-tacoConfig.useLocal()    - Connect to local dfx (localhost:4943)
+tacoConfig.useLocal()    - Connect to local dfx (localhost:6667)
 tacoConfig.useAuto()     - Auto-detect from environment
 tacoConfig.debug()       - Toggle debug messages (default: off)
 tacoConfig.debug(true)   - Enable debug messages

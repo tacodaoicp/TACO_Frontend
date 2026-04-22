@@ -77,6 +77,37 @@
 
             </div>
 
+            <!-- subaccount option (principal recipients only) -->
+            <div v-if="detectedAddressType === 'principal' && recipient.trim()" class="mb-2">
+              <div class="form-check">
+                <input
+                  type="checkbox"
+                  class="form-check-input"
+                  id="useSubaccount"
+                  v-model="useSubaccount"
+                />
+                <label class="form-check-label" for="useSubaccount">
+                  Send to subaccount
+                </label>
+              </div>
+
+              <div v-if="useSubaccount" class="mt-2">
+                <input
+                  type="text"
+                  class="form-control taco-input"
+                  v-model="subaccount"
+                  placeholder="64-character hex (32 bytes)"
+                  maxlength="64"
+                  :class="{ 'is-invalid': subaccountError }"
+                />
+                <div v-if="subaccountError" class="mt-2">
+                  <span class="small" style="color: var(--red-to-light-red);">
+                    {{ subaccountError }}
+                  </span>
+                </div>
+              </div>
+            </div>
+
             <!-- input label -->
             <label class="form-label">
               <span>Amount</span>
@@ -120,6 +151,29 @@
 
               </div>
 
+            </div>
+
+            <!-- percentage slider -->
+            <div class="mb-2">
+              <input
+                type="range"
+                min="0"
+                max="100"
+                step="1"
+                v-model.number="pctSlider"
+                class="pct-slider w-100"
+                @input="setAmountFromPct(pctSlider)"
+              />
+              <div class="d-flex justify-content-between gap-2 mt-1">
+                <button
+                  v-for="pct in [25, 50, 75, 100]"
+                  :key="pct"
+                  type="button"
+                  class="btn pct-btn flex-fill"
+                  :class="{ 'pct-btn--active': pctSlider === pct }"
+                  @click="setAmountFromPct(pct)"
+                >{{ pct }}%</button>
+              </div>
             </div>
 
             <!-- transaction details title -->
@@ -251,6 +305,58 @@
   display: inline-block;
 }
 
+.pct-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 6px;
+  border-radius: 3px;
+  background: linear-gradient(90deg, var(--card-mid-from), var(--card-mid-to));
+  border: 1px solid var(--card-border);
+  outline: none;
+  cursor: pointer;
+}
+
+.pct-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--black-to-white);
+  cursor: pointer;
+}
+
+.pct-slider::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--black-to-white);
+  cursor: pointer;
+  border: none;
+}
+
+.pct-btn {
+  font-family: 'Space Mono', monospace;
+  font-size: 0.75rem;
+  padding: 0.2rem 0.5rem;
+  border: 1px solid var(--card-border);
+  border-radius: 0.375rem;
+  background: transparent;
+  color: var(--black-to-white);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.pct-btn:hover,
+.pct-btn--active {
+  background: linear-gradient(135deg, var(--card-mid-from), var(--card-mid-to));
+}
+
+.form-check-label {
+  color: var(--black-to-white);
+  font-family: 'Space Mono', monospace;
+}
+
 </style>
 
 <script setup lang="ts">
@@ -273,7 +379,7 @@ interface SendTokenProps {
 
 interface SendTokenEmits {
   (e: 'close'): void
-  (e: 'send', params: { recipient: string; amount: bigint; memo?: string; addressType: 'principal' | 'accountId' }): void
+  (e: 'send', params: { recipient: string; amount: bigint; memo?: string; addressType: 'principal' | 'accountId'; subaccount?: string }): void
 }
 
 const props = defineProps<SendTokenProps>()
@@ -284,6 +390,10 @@ const recipient = ref('')
 const amount = ref('')
 const memo = ref('')
 const submitting = ref(false)
+const pctSlider = ref(0)
+const useSubaccount = ref(false)
+const subaccount = ref('')
+const subaccountError = ref('')
 
 // ICP detection
 const isICP = computed(() => props.token?.principal === 'ryjl3-tyaaa-aaaaa-aaaba-cai')
@@ -338,13 +448,39 @@ const totalDeducted = computed(() => {
 })
 
 const canSend = computed(() => {
-  return !recipientError.value && 
-         !amountError.value && 
-         recipient.value.trim() !== '' && 
-         amount.value !== '' && 
+  return !recipientError.value &&
+         !amountError.value &&
+         !subaccountError.value &&
+         (!useSubaccount.value || subaccount.value.trim() !== '') &&
+         recipient.value.trim() !== '' &&
+         amount.value !== '' &&
          amountBigInt.value > 0n &&
          totalDeducted.value <= (props.token?.balance || 0n)
 })
+
+// Percentage slider logic
+const computedPct = computed(() => {
+  if (!props.token || maxAmountBigInt.value <= 0n || amountBigInt.value <= 0n) return 0
+  return Math.min(100, Math.max(0, Number((amountBigInt.value * 100n) / maxAmountBigInt.value)))
+})
+
+const setAmountFromPct = (pct: number) => {
+  if (!props.token) return
+  pctSlider.value = pct
+  if (pct === 0) { amount.value = ''; return }
+  if (pct === 100) { setMaxAmount(); return }
+  const scaledAmount = (maxAmountBigInt.value * BigInt(pct)) / 100n
+  amount.value = formatBalance(scaledAmount, props.token.decimals)
+}
+
+// Subaccount validation
+const validateSubaccount = () => {
+  subaccountError.value = ''
+  if (!useSubaccount.value || !subaccount.value.trim()) return
+  if (!/^[a-fA-F0-9]{64}$/.test(subaccount.value.trim())) {
+    subaccountError.value = 'Must be exactly 64 hex characters (32 bytes)'
+  }
+}
 
 // Validation watchers
 watch([recipient], () => {
@@ -353,6 +489,19 @@ watch([recipient], () => {
 
 watch([amount, () => props.token], () => {
   validateAmount()
+  pctSlider.value = computedPct.value
+})
+
+watch([subaccount, useSubaccount], () => {
+  validateSubaccount()
+})
+
+watch(detectedAddressType, (newType) => {
+  if (newType === 'accountId') {
+    useSubaccount.value = false
+    subaccount.value = ''
+    subaccountError.value = ''
+  }
 })
 
 // Reset form when modal is shown/hidden
@@ -458,6 +607,10 @@ const resetForm = () => {
   recipientError.value = ''
   amountError.value = ''
   submitting.value = false
+  pctSlider.value = 0
+  useSubaccount.value = false
+  subaccount.value = ''
+  subaccountError.value = ''
 }
 
 const handleClose = () => {
@@ -484,7 +637,8 @@ const handleSend = async () => {
       recipient: recipient.value.trim(),
       amount: amountBigInt.value,
       memo: memo.value.trim() || undefined,
-      addressType: detectedAddressType.value
+      addressType: detectedAddressType.value,
+      subaccount: useSubaccount.value && subaccount.value.trim() ? subaccount.value.trim() : undefined
     })
   } finally {
     submitting.value = false

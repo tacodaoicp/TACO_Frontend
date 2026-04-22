@@ -59,7 +59,8 @@ export interface EnhancedTreasuryDashboard {
     },
   },
 }
-export type ExchangeType = { 'KongSwap' : null } |
+export type ExchangeType = { 'TACO' : null } |
+  { 'KongSwap' : null } |
   { 'ICPSwap' : null };
 export interface LogEntry {
   'component' : string,
@@ -243,11 +244,15 @@ export type Result_13 = { 'ok' : PortfolioHistoryResponse } |
   { 'err' : PortfolioSnapshotError };
 export type Result_14 = { 'ok' : EnhancedTreasuryDashboard } |
   { 'err' : string };
-export type Result_15 = { 'ok' : Array<ClaimsReply> } |
+export type Result_15 = { 'ok' : Array<[Principal, bigint]> } |
   { 'err' : string };
-export type Result_16 = { 'ok' : bigint } |
+export type Result_16 = { 'ok' : Array<[string, bigint, string, bigint]> } |
+  { 'err' : string };
+export type Result_17 = { 'ok' : Array<ClaimsReply> } |
+  { 'err' : string };
+export type Result_18 = { 'ok' : bigint } |
   { 'err' : PriceFailsafeError };
-export type Result_17 = { 'ok' : bigint } |
+export type Result_19 = { 'ok' : bigint } |
   { 'err' : PortfolioCircuitBreakerError };
 export type Result_2 = { 'ok' : string } |
   { 'err' : RebalanceError };
@@ -381,6 +386,8 @@ export type TreasuryAdminActionType = { 'StopRebalancing' : null } |
       'oldCondition' : string,
     }
   } |
+  { 'LPRemoveLiquidity' : { 'pool' : string, 'details' : string } } |
+  { 'LPEmergencyExit' : { 'positionsRemoved' : bigint } } |
   { 'ClearAllTradingPauses' : null } |
   { 'UnpauseToken' : { 'token' : Principal } } |
   { 'ExecuteTradingCycle' : null } |
@@ -393,6 +400,8 @@ export type TreasuryAdminActionType = { 'StopRebalancing' : null } |
     }
   } |
   { 'StartRebalancing' : null } |
+  { 'LPConfigUpdate' : { 'details' : string } } |
+  { 'LPClaimFees' : { 'pool' : string, 'details' : string } } |
   { 'SetTestMode' : { 'isTestMode' : boolean } } |
   { 'ClearPortfolioCircuitBreakerLogs' : null } |
   {
@@ -418,7 +427,9 @@ export type TreasuryAdminActionType = { 'StopRebalancing' : null } |
     }
   } |
   { 'UpdateRebalanceConfig' : { 'newConfig' : string, 'oldConfig' : string } } |
+  { 'LPAddLiquidity' : { 'pool' : string, 'details' : string } } |
   { 'StartPortfolioSnapshots' : null } |
+  { 'LPPoolConfigUpdate' : { 'pool' : string, 'details' : string } } |
   {
     'UpdatePortfolioSnapshotInterval' : {
       'newIntervalNS' : bigint,
@@ -505,7 +516,7 @@ export interface treasury {
    */
   'addPortfolioCircuitBreakerCondition' : ActorMethod<
     [string, PortfolioDirection, number, bigint, PortfolioValueType],
-    Result_17
+    Result_19
   >,
   /**
    * / * Add a new price trigger condition
@@ -517,24 +528,115 @@ export interface treasury {
    */
   'addTriggerCondition' : ActorMethod<
     [string, PriceDirection, number, bigint, Array<Principal>],
-    Result_16
+    Result_18
   >,
   /**
    * / * Execute all pending KongSwap claims to recover tokens
    */
   'admin_executeKongClaims' : ActorMethod<[], Result>,
   'admin_executeTradingCycle' : ActorMethod<[[] | [string]], Result_2>,
+  'admin_exitAllLP' : ActorMethod<[], Result>,
   /**
    * / * Query pending KongSwap claims for this treasury
    * /    * Returns list of claims that can be recovered
    */
-  'admin_getKongClaims' : ActorMethod<[], Result_15>,
+  'admin_getKongClaims' : ActorMethod<[], Result_17>,
+  'admin_getLPStatus' : ActorMethod<
+    [],
+    {
+      'pendingDepositsCount' : bigint,
+      'poolConfigs' : Array<
+        [
+          string,
+          {
+            'customLpRatioBP' : [] | [bigint],
+            'enabled' : boolean,
+            'customMaxPoolShareBP' : [] | [bigint],
+          },
+        ]
+      >,
+      'lastQueryAgeSeconds' : bigint,
+      'inTransit' : Array<[string, bigint]>,
+      'budgetUsage' : Array<
+        { 'usedICP' : bigint, 'tokenSymbol' : string, 'budgetICP' : bigint }
+      >,
+      'config' : {
+        'nachosHighVolumeThresholdBP' : bigint,
+        'lpRatioBP' : bigint,
+        'maxAdjustmentsPerCycle' : bigint,
+        'enabled' : boolean,
+        'nachosRedemptionBufferBP' : bigint,
+        'maxPoolShareBP' : bigint,
+        'rebalanceThresholdBP' : bigint,
+        'priceDeviationMaxBP' : bigint,
+        'minLPValueICP' : bigint,
+      },
+      'positions' : Array<
+        {
+          'backing0' : bigint,
+          'backing1' : bigint,
+          'totalFeesEarned0' : bigint,
+          'totalFeesEarned1' : bigint,
+          'liquidity' : bigint,
+          'shareOfPool' : number,
+          'totalWithdrawn0' : bigint,
+          'totalWithdrawn1' : bigint,
+          'unclaimedFees0' : bigint,
+          'unclaimedFees1' : bigint,
+          'token0' : string,
+          'token1' : string,
+          'poolKey' : string,
+          'firstDeployTimestamp' : bigint,
+          'lastFeeClaimTimestamp' : bigint,
+          'totalDeposited0' : bigint,
+          'totalDeposited1' : bigint,
+        }
+      >,
+      'depositsInFlight' : Array<[string, bigint]>,
+    }
+  >,
+  /**
+   * / * Query pending TACO failed swaps tracked for recovery
+   */
+  'admin_getTacoFailedSwaps' : ActorMethod<[], Result_16>,
   'admin_recoverPoolBalances' : ActorMethod<[], Result>,
+  /**
+   * / * Execute recovery of all pending TACO failed swaps
+   */
+  'admin_recoverTacoSwaps' : ActorMethod<[], Result>,
   /**
    * / * Manually refresh ICPSwap pools from factory
    * /    * Use this to pick up newly created pools
    */
   'admin_refreshICPSwapPools' : ActorMethod<[], Result>,
+  'admin_removeLPPosition' : ActorMethod<[string, string, bigint], Result>,
+  'admin_setLPConfig' : ActorMethod<
+    [
+      {
+        'nachosHighVolumeThresholdBP' : [] | [bigint],
+        'lpRatioBP' : [] | [bigint],
+        'maxAdjustmentsPerCycle' : [] | [bigint],
+        'enabled' : [] | [boolean],
+        'nachosRedemptionBufferBP' : [] | [bigint],
+        'maxPoolShareBP' : [] | [bigint],
+        'rebalanceThresholdBP' : [] | [bigint],
+        'priceDeviationMaxBP' : [] | [bigint],
+        'minLPValueICP' : [] | [bigint],
+      },
+    ],
+    Result
+  >,
+  'admin_setPoolLPConfig' : ActorMethod<
+    [
+      string,
+      {
+        'customLpRatioBP' : [] | [bigint],
+        'enabled' : boolean,
+        'customMaxPoolShareBP' : [] | [bigint],
+      },
+    ],
+    Result
+  >,
   /**
    * / * Timer for data synchronization
    * /    *
@@ -570,6 +672,8 @@ export interface treasury {
    * /    * Only callable by admins with appropriate permissions.
    */
   'clearPriceAlerts' : ActorMethod<[], Result_1>,
+  'debugPendingBurnsInTreasury' : ActorMethod<[], Array<[Principal, bigint]>>,
+  'getAvailableBalancesForBurn' : ActorMethod<[Array<Principal>], Result_15>,
   /**
    * / * Get current token allocations in basis points
    */
@@ -592,6 +696,7 @@ export interface treasury {
       }
     ]
   >,
+  'getLPBackingPerToken' : ActorMethod<[], Array<[Principal, bigint]>>,
   /**
    * / * Get the last N log entries
    * /    * Only accessible by master admin, controller, or DAO
@@ -748,6 +853,7 @@ export interface treasury {
       'tokenDetails' : Array<[Principal, TokenDetails]>,
       'timestamp' : bigint,
       'tradingPauses' : Array<TradingPauseRecord>,
+      'lpBackingPerToken' : Array<[Principal, bigint]>,
     }
   >,
   /**
@@ -791,6 +897,7 @@ export interface treasury {
    */
   'getTriggerCondition' : ActorMethod<[bigint], [] | [TriggerCondition]>,
   'get_canister_cycles' : ActorMethod<[], { 'cycles' : bigint }>,
+  'isLPEmergencyRecovering' : ActorMethod<[], boolean>,
   /**
    * / * List all discovered ICPSwap pools
    * /    *

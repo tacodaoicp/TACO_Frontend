@@ -100,8 +100,11 @@
                    :style="{ width: rateLimitPct('burn') + '%' }"></div>
             </div>
             <span class="vault-analytics__rate-text">
-              {{ nachosStore.formatE8s(analytics.globalBurnIn4h) }} / {{ nachosStore.formatE8s(analytics.maxBurnPer4h) }} NACHOS
+              {{ nachosStore.formatE8s(analytics.globalBurnIn4h) }} / {{ nachosStore.formatE8s(analytics.effectiveBurnLimit) }} NACHOS
             </span>
+          </div>
+          <div v-if="analytics.effectiveBurnLimit < analytics.maxBurnPer4h" class="vault-analytics__rate-note">
+            Burn capacity reduced to {{ nachosStore.formatE8s(analytics.effectiveBurnLimit) }} NACHOS — treasury assets partially in LP
           </div>
         </div>
       </div>
@@ -216,7 +219,7 @@ const rateLimitPct = (type: 'mint' | 'burn'): number => {
     if (max === 0) return 0
     return Math.min(100, (Number(analytics.value.globalMintIn4h) / max) * 100)
   } else {
-    const max = Number(analytics.value.maxBurnPer4h)
+    const max = Number(analytics.value.effectiveBurnLimit)
     if (max === 0) return 0
     return Math.min(100, (Number(analytics.value.globalBurnIn4h) / max) * 100)
   }
@@ -384,6 +387,13 @@ const rateLimitPct = (type: 'mint' | 'burn'): number => {
     font-size: 0.75rem;
     font-family: 'Space Mono', monospace;
     opacity: 0.75;
+  }
+
+  &__rate-note {
+    font-size: 0.7rem;
+    color: #f39c12;
+    opacity: 0.85;
+    margin-top: 0.25rem;
   }
 }
 </style>

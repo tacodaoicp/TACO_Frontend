@@ -1,0 +1,95 @@
+// TACO Exchange — Animations (Section 21.6)
+
+@keyframes ex-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes ex-scale-in {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes ex-slide-in-right {
+  from { opacity: 0; transform: translateX(100%); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes ex-slide-in-top {
+  from { opacity: 0; transform: translateY(-10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes ex-slide-out-right {
+  from { opacity: 1; transform: translateX(0); }
+  to { opacity: 0; transform: translateX(100%); }
+}
+
+@keyframes ex-toast-countdown {
+  from { width: 100%; }
+  to { width: 0%; }
+}
+
+@keyframes ex-shimmer {
+  0% { background-position: -200px 0; }
+  100% { background-position: 200px 0; }
+}
+
+[data-theme="exchange"] {
+  // Price flash animations
+  .price-flash-up {
+    animation: ex-price-flash-up 300ms ease-out;
+  }
+
+  .price-flash-down {
+    animation: ex-price-flash-down 300ms ease-out;
+  }
+
+  @keyframes ex-price-flash-up {
+    0% { color: var(--color-buy); }
+    100% { color: inherit; }
+  }
+
+  @keyframes ex-price-flash-down {
+    0% { color: var(--color-sell); }
+    100% { color: inherit; }
+  }
+
+  // Orderbook row update flash
+  .ob-row-flash-bid {
+    animation: ex-ob-flash-bid 400ms ease-out;
+  }
+
+  .ob-row-flash-ask {
+    animation: ex-ob-flash-ask 400ms ease-out;
+  }
+
+  @keyframes ex-ob-flash-bid {
+    0% { background-color: #2EA66A30; }
+    100% { background-color: transparent; }
+  }
+
+  @keyframes ex-ob-flash-ask {
+    0% { background-color: #D9404030; }
+    100% { background-color: transparent; }
+  }
+
+  // Skeleton loading shimmer
+  .ex-skeleton {
+    background: linear-gradient(90deg, var(--bg-tertiary) 0%, var(--bg-elevated) 50%, var(--bg-tertiary) 100%);
+    background-size: 400px 100%;
+    animation: ex-shimmer 1.5s linear infinite;
+    border-radius: 4px;
+  }
+
+  // Respect reduced motion preference
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}

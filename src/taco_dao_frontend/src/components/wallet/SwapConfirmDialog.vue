@@ -244,11 +244,23 @@
 
       </div>
 
+      <!-- price impact warnings -->
+      <div v-if="impactTier === 'high'" class="alert alert-warning mt-2 small">
+        Large price impact — you're moving the price significantly. Consider a smaller amount.
+      </div>
+      <div v-if="impactTier === 'extreme'" class="alert alert-danger mt-2 small">
+        <div><strong>Extreme price impact ({{ combinedSlippage.toFixed(2) }}%)</strong> — this swap will cost a large share to slippage.</div>
+        <label class="d-flex align-items-center gap-2 mt-2">
+          <input type="checkbox" v-model="impactAcknowledged" />
+          <span>I understand this swap will cost ~{{ combinedSlippage.toFixed(1) }}% to price impact.</span>
+        </label>
+      </div>
+
       <!-- modal footer -->
       <div class="taco-modal-footer d-flex gap-2">
 
         <!-- cancel button -->
-        <button @click="closeModal" 
+        <button @click="closeModal"
         class="btn"
         style="font-family: 'Space Mono';"
         :disabled="isExecuting">
@@ -262,14 +274,14 @@
         <button
           @click="executeSwap"
           class="btn taco-btn taco-btn--green flex-grow-1"
-          :disabled="isExecuting"
+          :disabled="isExecuting || (impactTier === 'extreme' && !impactAcknowledged)"
         >
 
           <!-- text -->
-          <span v-if="!isExecuting" style="color: var(--black) !important;">Confirm Swap</span>
+          <span v-if="!isExecuting" style="color: var(--white) !important;">Confirm Swap</span>
 
           <!-- executing text -->
-          <span v-if="isExecuting">{{ executionStep }}</span>        
+          <span v-if="isExecuting">{{ executionStep }}</span>
 
         </button>
         
@@ -708,7 +720,7 @@ interface Token {
 }
 
 interface Quote {
-  exchange: 'Kong' | 'ICPSwap'
+  exchange: 'Kong' | 'ICPSwap' | 'TACO Exchange'
   amountOut: bigint
   slippage: number
   price: number
@@ -898,6 +910,93 @@ const executeSwap = async () => {
         result = swapMethod.value === 'icrc2'
           ? await kongStore.icrc2_swap(swapParams)
           : await kongStore.icrc1_swap(swapParams)
+      } else if (selectedQuote.exchange === 'TACO Exchange') {
+        executionStep.value = 'Refreshing quote...'
+        const { useExchangeStore } = await import('../../exchange/store/exchange.store')
+        const { depositToken } = await import('../../exchange/utils/deposit')
+        const exchangeStore = useExchangeStore()
+
+        // Last-mile re-quote: >2% drift aborts before deposit, user must reconfirm.
+        let freshMinOut = minAmountOut
+        try {
+          const fresh = await exchangeStore.getExpectedMultiHopAmount(
+            inputToken.principal, outputToken.principal, amountIn,
+          ) as any
+          const freshExpected = fresh?.expectedAmountOut ?? 0n
+          if (freshExpected > 0n) {
+            const displayed = selectedQuote.amountOut
+            const diff = displayed > freshExpected ? displayed - freshExpected : freshExpected - displayed
+            if (diff * 100n > displayed * 2n) {
+              throw new Error(
+                'Market moved while you were confirming. Please close this dialog and re-quote before swapping.',
+              )
+            }
+            // Rebase minAmountOut on the fresher expected out
+            freshMinOut = BigInt(Math.floor(Number(freshExpected) * (1 - userSlippageTolerance)))
+          }
+        } catch (driftErr: any) {
+          if (driftErr?.message?.startsWith('Market moved')) throw driftErr
+          // Any other error from the fresh quote — fall back to the original minAmountOut
+        }
+
+        executionStep.value = 'Starting TACO Exchange swap...'
+        const sellToken = exchangeStore.getTokenByAddress(inputToken.principal)
+        const tokenType = sellToken?.asset_type ?? { ICRC12: null }
+        const blockNumber = await depositToken(
+          inputToken.principal,
+          tokenType,
+          amountIn,
+          exchangeStore.tradingFeeBps,
+          sellToken?.transfer_fee ?? 10000n,
+          exchangeStore.treasuryAccountId,
+          exchangeStore.treasuryPrincipal,
+        )
+        // Debug handoff (item 7): paste this to backend when a TACO swap misbehaves.
+        console.info('[Swap debug handoff]', {
+          ts: new Date().toISOString(),
+          flow: 'walletTacoSwap',
+          tokenIn: inputToken.principal,
+          tokenOut: outputToken.principal,
+          amountIn: amountIn.toString(),
+          slippageTolerance: userSlippageTolerance,
+          displayedExpected: selectedQuote.amountOut.toString(),
+          minAmountOut: freshMinOut.toString(),
+          blockNumber: blockNumber.toString(),
+        })
+        try {
+          const rawResult = await exchangeStore.swapMultiHop(
+            inputToken.principal, outputToken.principal, amountIn,
+            [{ tokenIn: inputToken.principal, tokenOut: outputToken.principal }],
+            freshMinOut, blockNumber,
+          )
+          if ('Ok' in rawResult) {
+            result = { amountOut: rawResult.Ok.amountOut }
+          } else if ('Err' in rawResult) {
+            const { classifyExchangeError } = await import('../../exchange/utils/errors')
+            throw new Error(classifyExchangeError(rawResult.Err, {
+              outDecimals: Number(outputToken.decimals ?? 8),
+              outSymbol: outputToken.symbol,
+              hopTokens: [{ symbol: outputToken.symbol }],
+            }).message)
+          } else {
+            throw new Error('TACO Exchange swap failed')
+          }
+        } catch (swapErr: any) {
+          // Deposit succeeded but swap failed — attempt automatic recovery
+          try {
+            executionStep.value = 'Swap failed, recovering tokens...'
+            const recovered = await exchangeStore.recoverWronglysent(
+              inputToken.principal, blockNumber, tokenType,
+            )
+            if (recovered) {
+              throw new Error((swapErr.message || 'TACO Exchange swap failed') + ' — tokens recovered automatically')
+            }
+          } catch (recoverErr: any) {
+            if (recoverErr.message?.includes('recovered automatically')) throw recoverErr
+            // Recovery failed — user can recover manually
+          }
+          throw new Error((swapErr.message || 'TACO Exchange swap failed') + ' — use Recover Funds page to retrieve tokens')
+        }
       } else {
         executionStep.value = 'Starting ICPSwap swap...'
         result = swapMethod.value === 'icrc2'
@@ -950,8 +1049,19 @@ const formatBalance = (balance: bigint, decimals: number): string => {
 }
 
 const getPriceImpactClass = (slippage: number): string => {
-  if (slippage < 0.1) return 'impact-low'
-  if (slippage < 1) return 'impact-medium'
-  return 'impact-high'
+  if (slippage > 15) return 'impact-high'
+  if (slippage > 5) return 'impact-medium'
+  return 'impact-low'
 }
+
+// Backend-team spec: elevated > 5 %, high > 15 %, extreme > 25 %.
+const impactTier = computed<'low' | 'elevated' | 'high' | 'extreme'>(() => {
+  const impact = combinedSlippage.value
+  if (impact > 25) return 'extreme'
+  if (impact > 15) return 'high'
+  if (impact > 5) return 'elevated'
+  return 'low'
+})
+const impactAcknowledged = ref(false)
+watch(() => combinedSlippage.value, () => { impactAcknowledged.value = false })
 </script>

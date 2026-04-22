@@ -8,6 +8,17 @@
             <!-- news item -->
             <div class="news-content__item">
                 <h3 class="news-content__title">
+                    We've got an exchange!
+                </h3>
+                <span class="news-content__date">🍽️ April 14, 2026</span>
+                <p class="news-content__text">
+                    The TACO Exchange is live! Trade with limit orders and an orderbook, provide liquidity to AMM pools with concentrated liquidity, swap across multiple pools with multi-hop routing, and make private OTC trades. Check it out at /exchange!
+                </p>
+            </div>
+
+            <!-- news item -->
+            <div class="news-content__item">
+                <h3 class="news-content__title">
                     TACO v2.0.0 is here!
                 </h3>
                 <span class="news-content__date">🍽️ March 25, 2026</span>

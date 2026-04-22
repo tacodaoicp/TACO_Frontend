@@ -28,7 +28,7 @@ export function shouldFetchRootKey(): boolean {
 export function getNetworkHost(): string {
   const network = getEffectiveNetwork()
   if (network === 'local') {
-    const port = import.meta.env.VITE_LOCAL_PORT || '4943'
+    const port = import.meta.env.VITE_LOCAL_PORT || '6667'
     return `http://localhost:${port}`
   }
   return getICHost()
@@ -90,7 +90,10 @@ function getIdentityHash(identity: Identity): string {
 export async function getCachedAuthClient(): Promise<AuthClient> {
   if (!cachedAuthClient) {
     const { AuthClient } = await getAuthClientModule()
-    cachedAuthClient = await AuthClient.create()
+    cachedAuthClient = await AuthClient.create({
+      keyType: 'Ed25519',
+      idleOptions: { disableIdle: true },
+    })
   }
   return cachedAuthClient
 }

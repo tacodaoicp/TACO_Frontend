@@ -100,7 +100,7 @@ function resolveCanisterId(key: CanisterKey): string {
 export function getHost(): string {
   const network = getNetwork()
   if (network === 'local') {
-    const port = getEnvVar('VITE_LOCAL_PORT') || '4943'
+    const port = getEnvVar('VITE_LOCAL_PORT') || '6667'
     return `http://localhost:${port}`
   }
   // Match API host to serving domain to avoid CORS errors

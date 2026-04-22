@@ -718,9 +718,11 @@ export interface NachosVaultDAO {
       'mintFeesICP' : bigint,
       'totalBurnVolumeNACHOS' : bigint,
       'globalMintIn4h' : bigint,
+      'effectiveBurnLimit' : bigint,
       'currentNAV' : [] | [CachedNAV],
       'navChangePercent' : [] | [number],
       'burnFeesICP' : bigint,
+      'liquidPortfolioICP' : bigint,
       'portfolioValueICP' : bigint,
     }
   >,

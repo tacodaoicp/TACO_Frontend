@@ -2,6 +2,33 @@ import type { Principal } from '@dfinity/principal';
 import type { ActorMethod } from '@dfinity/agent';
 import type { IDL } from '@dfinity/candid';
 
+export type ActionResult = { 'Ok' : string } |
+  { 'Err' : ExchangeError };
+export interface AddConcentratedOk {
+  'priceLower' : bigint,
+  'priceUpper' : bigint,
+  'liquidity' : bigint,
+  'amount0Used' : bigint,
+  'positionId' : bigint,
+  'token0' : string,
+  'token1' : string,
+  'refund0' : bigint,
+  'refund1' : bigint,
+  'amount1Used' : bigint,
+}
+export type AddConcentratedResult = { 'Ok' : AddConcentratedOk } |
+  { 'Err' : ExchangeError };
+export interface AddLiquidityOk {
+  'liquidityMinted' : bigint,
+  'amount0Used' : bigint,
+  'token0' : string,
+  'token1' : string,
+  'refund0' : bigint,
+  'refund1' : bigint,
+  'amount1Used' : bigint,
+}
+export type AddLiquidityResult = { 'Ok' : AddLiquidityOk } |
+  { 'Err' : ExchangeError };
 export interface BatchProcessResult {
   'accesscodes' : Array<
     {
@@ -16,14 +43,59 @@ export interface BatchProcessResult {
   'execMessage' : string,
   'processedTrades' : Array<ProcessedTrade>,
 }
-export interface DetailedLiquidityPosition {
+export interface ClaimFeesOk {
+  'transferred0' : bigint,
+  'transferred1' : bigint,
+  'dust1ToDAO' : bigint,
+  'dust0ToDAO' : bigint,
+  'fees0' : bigint,
+  'fees1' : bigint,
+}
+export type ClaimFeesResult = { 'Ok' : ClaimFeesOk } |
+  { 'Err' : ExchangeError };
+export interface ConcentratedPositionDetailed {
+  'ratioUpper' : bigint,
+  'lastFeeGrowth0' : bigint,
+  'lastFeeGrowth1' : bigint,
+  'fee0' : bigint,
+  'fee1' : bigint,
   'liquidity' : bigint,
-  'shareOfPool' : number,
+  'positionId' : bigint,
+  'lastUpdateTime' : bigint,
   'token0' : string,
   'token1' : string,
   'token0Amount' : bigint,
   'token1Amount' : bigint,
+  'ratioLower' : bigint,
 }
+export interface DetailedLiquidityPosition {
+  'ratioUpper' : [] | [bigint],
+  'fee0' : bigint,
+  'fee1' : bigint,
+  'liquidity' : bigint,
+  'shareOfPool' : number,
+  'positionType' : { 'concentrated' : null } |
+    { 'fullRange' : null },
+  'positionId' : [] | [bigint],
+  'token0' : string,
+  'token1' : string,
+  'token0Amount' : bigint,
+  'token1Amount' : bigint,
+  'ratioLower' : [] | [bigint],
+}
+export type ExchangeError = { 'InvalidInput' : string } |
+  { 'PoolNotFound' : string } |
+  { 'SystemError' : string } |
+  { 'OrderNotFound' : string } |
+  { 'TokenPaused' : string } |
+  { 'NotAuthorized' : null } |
+  { 'RouteFailed' : { 'hop' : bigint, 'reason' : string } } |
+  { 'Banned' : null } |
+  { 'ExchangeFrozen' : null } |
+  { 'TransferFailed' : string } |
+  { 'SlippageExceeded' : { 'got' : bigint, 'expected' : bigint } } |
+  { 'TokenNotAccepted' : string } |
+  { 'InsufficientFunds' : string };
 export interface ForeignPoolLiquidity {
   'forwardCursor' : Ratio,
   'pool' : [string, string],
@@ -34,12 +106,51 @@ export interface ForeignPoolsResponse {
   'nextPoolCursor' : [] | [PoolQuery],
   'pools' : Array<ForeignPoolLiquidity>,
 }
+export interface HopDetail {
+  'fee' : bigint,
+  'tokenIn' : string,
+  'tokenOut' : string,
+  'priceImpact' : number,
+  'amountIn' : bigint,
+  'amountOut' : bigint,
+}
 export interface KlineData {
   'low' : number,
   'high' : number,
   'close' : number,
   'open' : number,
   'volume' : bigint,
+  'timestamp' : bigint,
+}
+export interface LogEntry {
+  'component' : string,
+  'context' : string,
+  'level' : LogLevel,
+  'message' : string,
+  'timestamp' : bigint,
+}
+export type LogLevel = { 'INFO' : null } |
+  { 'WARN' : null } |
+  { 'ERROR' : null };
+export interface OrderOk {
+  'buyAmountReceived' : bigint,
+  'tokenIn' : string,
+  'tokenOut' : string,
+  'accessCode' : string,
+  'amountIn' : bigint,
+  'filled' : bigint,
+  'remaining' : bigint,
+  'isPublic' : boolean,
+  'swapId' : [] | [bigint],
+}
+export type OrderResult = { 'Ok' : OrderOk } |
+  { 'Err' : ExchangeError };
+export interface PoolDailySnapshot {
+  'totalLiquidity' : bigint,
+  'reserve0' : bigint,
+  'reserve1' : bigint,
+  'volume' : bigint,
+  'activeLiquidity' : bigint,
   'timestamp' : bigint,
 }
 export interface PoolLiquidity {
@@ -112,7 +223,81 @@ export interface RecalibratedPosition {
   'revokeFee' : bigint,
   'poolId' : [string, string],
 }
+export interface RecoveryInput {
+  'tType' : { 'ICP' : null } |
+    { 'ICRC3' : null } |
+    { 'ICRC12' : null },
+  'block' : bigint,
+  'identifier' : string,
+}
+export interface RecoveryResult {
+  'error' : string,
+  'block' : bigint,
+  'success' : boolean,
+  'identifier' : string,
+}
+export interface RemoveConcentratedOk {
+  'liquidityRemaining' : bigint,
+  'liquidityRemoved' : bigint,
+  'amount0' : bigint,
+  'amount1' : bigint,
+  'fees0' : bigint,
+  'fees1' : bigint,
+}
+export type RemoveConcentratedResult = { 'Ok' : RemoveConcentratedOk } |
+  { 'Err' : ExchangeError };
+export interface RemoveLiquidityOk {
+  'amount0' : bigint,
+  'amount1' : bigint,
+  'liquidityBurned' : bigint,
+  'fees0' : bigint,
+  'fees1' : bigint,
+}
+export type RemoveLiquidityResult = { 'Ok' : RemoveLiquidityOk } |
+  { 'Err' : ExchangeError };
+export interface RevokeOk {
+  'accessCode' : string,
+  'revokeType' : { 'DAO' : null } |
+    { 'Seller' : null } |
+    { 'Initiator' : null },
+  'refunds' : Array<{ 'token' : string, 'amount' : bigint }>,
+}
+export type RevokeResult = { 'Ok' : RevokeOk } |
+  { 'Err' : ExchangeError };
+export interface SplitLeg {
+  'amountIn' : bigint,
+  'route' : Array<SwapHop>,
+  'minLegOut' : bigint,
+}
 export interface SwapHop { 'tokenIn' : string, 'tokenOut' : string }
+export interface SwapOk {
+  'fee' : bigint,
+  'tokenIn' : string,
+  'tokenOut' : string,
+  'hops' : bigint,
+  'firstHopOrderbookMatch' : boolean,
+  'amountIn' : bigint,
+  'amountOut' : bigint,
+  'swapId' : bigint,
+  'route' : Array<string>,
+  'lastHopAMMOnly' : boolean,
+}
+export interface SwapRecord {
+  'fee' : bigint,
+  'tokenIn' : string,
+  'tokenOut' : string,
+  'amountIn' : bigint,
+  'swapType' : { 'otc' : null } |
+    { 'limit' : null } |
+    { 'multihop' : null } |
+    { 'direct' : null },
+  'timestamp' : bigint,
+  'amountOut' : bigint,
+  'swapId' : bigint,
+  'route' : Array<string>,
+}
+export type SwapResult = { 'Ok' : SwapOk } |
+  { 'Err' : ExchangeError };
 export type Time = bigint;
 export type TimeFrame = { 'day' : null } |
   { 'fourHours' : null } |
@@ -204,16 +389,16 @@ export interface create_trading_canister {
   'ChangeReferralFees' : ActorMethod<[bigint], undefined>,
   'ChangeRevokefees' : ActorMethod<[bigint], undefined>,
   'ChangeTradingfees' : ActorMethod<[bigint], undefined>,
-  'FinishSell' : ActorMethod<[bigint, string, bigint], string>,
+  'FinishSell' : ActorMethod<[bigint, string, bigint], ActionResult>,
   'FinishSellBatch' : ActorMethod<
     [bigint, Array<string>, Array<bigint>, string, string],
-    string
+    ActionResult
   >,
   'FinishSellBatchDAO' : ActorMethod<
     [Array<TradeData>, boolean, Array<bigint>],
     [] | [BatchProcessResult]
   >,
-  'FixStuckTX' : ActorMethod<[string], string>,
+  'FixStuckTX' : ActorMethod<[string], ActionResult>,
   'Freeze' : ActorMethod<[], undefined>,
   'addAcceptedToken' : ActorMethod<
     [
@@ -226,11 +411,20 @@ export interface create_trading_canister {
         { 'ICRC3' : null } |
         { 'ICRC12' : null },
     ],
-    string
+    ActionResult
   >,
+  'addConcentratedLiquidity' : ActorMethod<
+    [string, string, bigint, bigint, bigint, bigint, bigint, bigint],
+    AddConcentratedResult
+  >,
+  'addFeeCollector' : ActorMethod<[Principal], ActionResult>,
   'addLiquidity' : ActorMethod<
-    [string, string, bigint, bigint, bigint, bigint],
-    string
+    [string, string, bigint, bigint, bigint, bigint, [] | [boolean]],
+    AddLiquidityResult
+  >,
+  'addLiquidityDAO' : ActorMethod<
+    [string, string, bigint, bigint, bigint, bigint, [] | [boolean]],
+    AddLiquidityResult
   >,
   'addPosition' : ActorMethod<
     [
@@ -246,9 +440,63 @@ export interface create_trading_canister {
       boolean,
       boolean,
     ],
-    string
+    OrderResult
   >,
   'addTimer' : ActorMethod<[], undefined>,
+  'adminAnalyzeRouteEfficiency' : ActorMethod<
+    [string, bigint, bigint],
+    Array<
+      {
+        'efficiency' : bigint,
+        'hopDetails' : Array<HopDetail>,
+        'efficiencyBps' : bigint,
+        'outputAmount' : bigint,
+        'route' : Array<SwapHop>,
+      }
+    >
+  >,
+  'adminDrainExchange' : ActorMethod<[Principal], string>,
+  'adminDrainStatus' : ActorMethod<[], string>,
+  'adminExecuteRouteStrategy' : ActorMethod<
+    [bigint, Array<SwapHop>, bigint, bigint],
+    SwapResult
+  >,
+  'adminRepairLastTradedPriceAndKlines' : ActorMethod<
+    [Array<bigint>, boolean],
+    string
+  >,
+  'batchAdjustLiquidity' : ActorMethod<
+    [
+      Array<
+        {
+          'action' : { 'Remove' : { 'liquidityAmount' : bigint } },
+          'token0' : string,
+          'token1' : string,
+        }
+      >,
+    ],
+    Array<
+      {
+        'result' : string,
+        'token0' : string,
+        'token1' : string,
+        'success' : boolean,
+      }
+    >
+  >,
+  'batchClaimAllFees' : ActorMethod<
+    [],
+    Array<
+      {
+        'transferred0' : bigint,
+        'transferred1' : bigint,
+        'token0' : string,
+        'token1' : string,
+        'fees0' : bigint,
+        'fees1' : bigint,
+      }
+    >
+  >,
   'changeOwner2' : ActorMethod<[Principal], undefined>,
   'changeOwner3' : ActorMethod<[Principal], undefined>,
   'checkDiffs' : ActorMethod<
@@ -270,8 +518,25 @@ export interface create_trading_canister {
     ]
   >,
   'checkFeesReferrer' : ActorMethod<[], Array<[string, bigint]>>,
+  'claimConcentratedFees' : ActorMethod<[bigint], ClaimFeesResult>,
   'claimFeesReferrer' : ActorMethod<[], Array<[string, bigint]>>,
-  'collectFees' : ActorMethod<[], string>,
+  'claimLPFees' : ActorMethod<[string, string], ClaimFeesResult>,
+  'cleanTokenIds' : ActorMethod<[], ActionResult>,
+  'clearAllBans' : ActorMethod<[], undefined>,
+  'clearStuckLocks' : ActorMethod<[[] | [string], [] | [string]], boolean>,
+  'collectFees' : ActorMethod<[], ActionResult>,
+  'debugV3Ticks' : ActorMethod<
+    [string, string],
+    {
+      'ticks' : Array<
+        { 'tick' : bigint, 'liquidityNet' : bigint, 'liquidityGross' : bigint }
+      >,
+      'reserveRatio' : bigint,
+      'currentSqrtRatio' : bigint,
+      'activeLiquidity' : bigint,
+      'reserveSqrtRatio' : bigint,
+    }
+  >,
   'exchangeInfo' : ActorMethod<[], [] | [pool]>,
   'getAMMPoolInfo' : ActorMethod<
     [string, string],
@@ -302,6 +567,28 @@ export interface create_trading_canister {
       }
     >
   >,
+  'getAllPoolStats' : ActorMethod<
+    [],
+    Array<
+      {
+        'decimals0' : bigint,
+        'decimals1' : bigint,
+        'symbol0' : string,
+        'symbol1' : string,
+        'totalLiquidity' : bigint,
+        'reserve0' : bigint,
+        'reserve1' : bigint,
+        'volume24h' : bigint,
+        'activeLiquidity' : bigint,
+        'feeRateBps' : bigint,
+        'token0' : string,
+        'token1' : string,
+        'priceChange24hPct' : number,
+        'price0' : number,
+        'price1' : number,
+      }
+    >
+  >,
   'getAllTradesPrivateCostly' : ActorMethod<
     [],
     [] | [[Array<string>, Array<TradePrivate>]]
@@ -310,6 +597,7 @@ export interface create_trading_canister {
     [],
     [] | [[Array<string>, Array<TradePrivate>]]
   >,
+  'getAllowedCanisters' : ActorMethod<[], Array<string>>,
   'getCurrentLiquidity' : ActorMethod<
     [
       string,
@@ -348,9 +636,54 @@ export interface create_trading_canister {
     [bigint, [] | [Array<PoolQuery>], boolean],
     ForeignPoolsResponse
   >,
+  'getDAOLPPerformance' : ActorMethod<
+    [],
+    Array<
+      {
+        'poolVolume24h' : bigint,
+        'totalFeesEarned0' : bigint,
+        'totalFeesEarned1' : bigint,
+        'currentValue0' : bigint,
+        'currentValue1' : bigint,
+        'shareOfPool' : number,
+        'token0' : string,
+        'token1' : string,
+      }
+    >
+  >,
+  'getDAOLiquiditySnapshot' : ActorMethod<
+    [],
+    {
+      'pools' : Array<
+        {
+          'totalLiquidity' : bigint,
+          'reserve0' : bigint,
+          'reserve1' : bigint,
+          'token0' : string,
+          'token1' : string,
+          'price0' : number,
+          'price1' : number,
+        }
+      >,
+      'positions' : Array<
+        {
+          'fee0' : bigint,
+          'fee1' : bigint,
+          'liquidity' : bigint,
+          'shareOfPool' : number,
+          'token0' : string,
+          'token1' : string,
+          'token0Amount' : bigint,
+          'token1Amount' : bigint,
+        }
+      >,
+    }
+  >,
+  'getDriftOpTracker' : ActorMethod<[], Array<[string, bigint]>>,
   'getExpectedMultiHopAmount' : ActorMethod<
     [string, string, bigint],
     {
+      'hopDetails' : Array<HopDetail>,
       'expectedAmountOut' : bigint,
       'routeTokens' : Array<string>,
       'hops' : bigint,
@@ -363,6 +696,7 @@ export interface create_trading_canister {
     [string, string, bigint],
     {
       'fee' : bigint,
+      'hopDetails' : Array<HopDetail>,
       'routeDescription' : string,
       'canFulfillFully' : boolean,
       'priceImpact' : number,
@@ -372,14 +706,40 @@ export interface create_trading_canister {
       'expectedBuyAmount' : bigint,
     }
   >,
+  'getExpectedReceiveAmountBatch' : ActorMethod<
+    [
+      Array<
+        { 'tokenBuy' : string, 'amountSell' : bigint, 'tokenSell' : string }
+      >,
+    ],
+    Array<
+      {
+        'fee' : bigint,
+        'hopDetails' : Array<HopDetail>,
+        'routeDescription' : string,
+        'canFulfillFully' : boolean,
+        'priceImpact' : number,
+        'potentialOrderDetails' : [] | [
+          { 'amount_init' : bigint, 'amount_sell' : bigint }
+        ],
+        'expectedBuyAmount' : bigint,
+      }
+    >
+  >,
+  'getFeeCollectors' : ActorMethod<[], Array<Principal>>,
   'getKlineData' : ActorMethod<
     [string, string, TimeFrame, boolean],
+    Array<KlineData>
+  >,
+  'getKlineDataRange' : ActorMethod<
+    [string, string, TimeFrame, [] | [bigint], bigint],
     Array<KlineData>
   >,
   'getLogging' : ActorMethod<
     [{ 'FinishSellBatchDAO' : null } | { 'addAcceptedToken' : null }, bigint],
     Array<[bigint, string]>
   >,
+  'getLogs' : ActorMethod<[bigint], Array<LogEntry>>,
   'getOrderbookCombined' : ActorMethod<
     [string, string, bigint, bigint],
     {
@@ -426,6 +786,45 @@ export interface create_trading_canister {
       ]
     >
   >,
+  'getPoolRanges' : ActorMethod<
+    [string, string],
+    Array<
+      {
+        'ratioUpper' : bigint,
+        'token0Locked' : bigint,
+        'liquidity' : bigint,
+        'token1Locked' : bigint,
+        'ratioLower' : bigint,
+      }
+    >
+  >,
+  'getPoolStats' : ActorMethod<
+    [string, string],
+    [] | [
+      {
+        'decimals0' : bigint,
+        'decimals1' : bigint,
+        'symbol0' : string,
+        'symbol1' : string,
+        'feesLifetimeToken0' : bigint,
+        'feesLifetimeToken1' : bigint,
+        'totalLiquidity' : bigint,
+        'volume7d' : bigint,
+        'reserve0' : bigint,
+        'reserve1' : bigint,
+        'volume24h' : bigint,
+        'history' : Array<PoolDailySnapshot>,
+        'activeLiquidity' : bigint,
+        'feeRateBps' : bigint,
+        'token0' : string,
+        'token1' : string,
+        'priceChange24hPct' : number,
+        'lpFeeSharePct' : bigint,
+        'price0' : number,
+        'price1' : number,
+      }
+    ]
+  >,
   'getPrivateTrade' : ActorMethod<[string], [] | [TradePosition]>,
   'getTokenUSDPrices' : ActorMethod<
     [number, number],
@@ -444,6 +843,10 @@ export interface create_trading_canister {
         'error' : boolean,
       }
     ]
+  >,
+  'getUserConcentratedPositions' : ActorMethod<
+    [],
+    Array<ConcentratedPositionDetailed>
   >,
   'getUserLiquidityDetailed' : ActorMethod<
     [],
@@ -474,6 +877,7 @@ export interface create_trading_canister {
       'hasReferrer' : boolean,
     }
   >,
+  'getUserSwapHistory' : ActorMethod<[bigint], Array<SwapRecord>>,
   'getUserTradeHistory' : ActorMethod<
     [bigint],
     Array<
@@ -493,6 +897,7 @@ export interface create_trading_canister {
   'hmFee' : ActorMethod<[], bigint>,
   'hmRefFee' : ActorMethod<[], bigint>,
   'hmRevokeFee' : ActorMethod<[], bigint>,
+  'isExchangeFrozen' : ActorMethod<[], boolean>,
   'p2a' : ActorMethod<[], string>,
   'p2acannister' : ActorMethod<[], string>,
   'p2athird' : ActorMethod<[string], string>,
@@ -516,6 +921,7 @@ export interface create_trading_canister {
     [Array<PositionData>],
     Array<RecalibratedPosition>
   >,
+  'recoverBatch' : ActorMethod<[Array<RecoveryInput>], Array<RecoveryResult>>,
   'recoverWronglysent' : ActorMethod<
     [
       string,
@@ -526,7 +932,18 @@ export interface create_trading_canister {
     ],
     boolean
   >,
-  'removeLiquidity' : ActorMethod<[string, string, bigint], string>,
+  'refundStuckFunds' : ActorMethod<[], ActionResult>,
+  'removeConcentratedLiquidity' : ActorMethod<
+    [string, string, bigint, bigint],
+    RemoveConcentratedResult
+  >,
+  'removeFeeCollector' : ActorMethod<[], ActionResult>,
+  'removeLiquidity' : ActorMethod<
+    [string, string, bigint],
+    RemoveLiquidityResult
+  >,
+  'resetAllState' : ActorMethod<[], string>,
+  'resetDriftOpTracker' : ActorMethod<[], undefined>,
   'retrieveFundsDao' : ActorMethod<[Array<[string, bigint]>], undefined>,
   'returncontractprincipal' : ActorMethod<[], string>,
   'revokeTrade' : ActorMethod<
@@ -536,7 +953,7 @@ export interface create_trading_canister {
         { 'Seller' : null } |
         { 'Initiator' : null },
     ],
-    string
+    RevokeResult
   >,
   'sendDAOInfo' : ActorMethod<
     [],
@@ -552,10 +969,19 @@ export interface create_trading_canister {
       ]
     >
   >,
+  'setMinimumAmount' : ActorMethod<[string, bigint], ActionResult>,
   'setTest' : ActorMethod<[boolean], undefined>,
   'swapMultiHop' : ActorMethod<
     [string, string, bigint, Array<SwapHop>, bigint, bigint],
-    string
+    SwapResult
+  >,
+  'swapSplitRoutes' : ActorMethod<
+    [string, string, Array<SplitLeg>, bigint, bigint],
+    SwapResult
+  >,
+  'treasurySwap' : ActorMethod<
+    [string, string, bigint, bigint, bigint],
+    SwapResult
   >,
 }
 export interface pool {

@@ -1,13 +1,15 @@
 /**
- * Split-Swap Engine — Frontend implementation matching treasury.mo:8173-8884
+ * Split-Swap Engine — 3-DEX implementation (Kong, ICPSwap, TACO Exchange)
  *
- * Fetches 10 quotes per DEX (Kong, ICPSwap) at 10%–100% of input,
- * evaluates all combinations, and finds the optimal split for best return.
+ * Fetches 6 quotes per DEX (18 total) at ~16.7%–100% of input,
+ * evaluates all 1/2/3-way combinations, and finds the optimal split.
  */
 
 import { useKongStore } from '../stores/kong.store'
 import { useICPSwapStore } from '../stores/icpswap.store'
 import { useTacoStore } from '../stores/taco.store'
+import { useExchangeStore } from '../exchange/store/exchange.store'
+import { depositToken } from '../exchange/utils/deposit'
 import { isDevEnvironment } from '../config/network-config'
 import { Actor } from '@dfinity/agent'
 
@@ -19,44 +21,51 @@ export interface QuoteData {
   out: bigint       // amountOut from DEX
   slipBP: number    // slippage in basis points (integer)
   valid: boolean    // passes validation checks
+  route?: Array<{ tokenIn: string; tokenOut: string }>  // TACO Exchange route
 }
 
 export interface LegPlan {
-  exchange: 'Kong' | 'ICPSwap'
+  exchange: 'Kong' | 'ICPSwap' | 'TACO'
   pctBP: number            // percentage in basis points (e.g. 6000 = 60%)
   amountIn: bigint         // actual input amount for this leg
   expectedOut: bigint      // estimated output
   slipBP: number           // slippage basis points
+  route?: Array<{ tokenIn: string; tokenOut: string }>  // TACO Exchange bestRoute
 }
 
 export interface ExecutionPlan {
   type: 'single' | 'split' | 'partial'
-  legs: LegPlan[]          // 1 leg for single, 2 for split/partial
+  legs: LegPlan[]          // 1-3 legs
   totalExpectedOut: bigint
   totalSlipBP: number
   interpolated: boolean
-  quotes: { kong: QuoteData[], icpswap: QuoteData[] }
+  quotes: { kong: QuoteData[], icpswap: QuoteData[], taco: QuoteData[] }
 }
 
-// Internal scenario type matching treasury.mo
+// Internal scenario type
 interface Scenario {
   name: string
-  kongPct: number   // basis points (e.g. 3000 = 30%)
-  icpPct: number    // basis points
+  kongPct: number    // basis points
+  icpPct: number     // basis points
+  tacoPct: number    // basis points
   totalOut: bigint
   kongSlipBP: number
   icpSlipBP: number
+  tacoSlipBP: number
   kongIdx: number
   icpIdx: number
+  tacoIdx: number
 }
 
 // ============================================================================
-// Constants (matching treasury.mo)
+// Constants
 // ============================================================================
 
-const NUM_QUOTES = 10
-const STEP_BP = 1000          // 10% per step
-const MIN_PARTIAL_TOTAL_BP = 4000  // 40% minimum for partials
+const NUM_QUOTES = 6
+// 6 steps: 1/6, 2/6, 3/6, 4/6, 5/6, 6/6 in basis points
+const QUOTE_PCTS_BP = [1667, 3333, 5000, 6667, 8333, 10000]
+const LAST_IDX = NUM_QUOTES - 1  // index 5 = 100%
+const MIN_PARTIAL_TOTAL_BP = 3333  // ~33% minimum for partials
 const DEFAULT_MAX_SLIPPAGE_BP = 50 // 0.5% default
 
 // ============================================================================
@@ -83,9 +92,8 @@ export function useSplitSwap() {
     return typeof fee === 'bigint' ? fee : BigInt(fee)
   }
 
-  /**
-   * Fetch a single Kong quote, returning null on failure
-   */
+  // ── Quote fetchers ──
+
   async function fetchKongQuote(
     sellSymbol: string,
     buySymbol: string,
@@ -106,9 +114,6 @@ export function useSplitSwap() {
     }
   }
 
-  /**
-   * Fetch a single ICPSwap quote, returning null on failure
-   */
   async function fetchICPSwapQuote(
     sellPrincipal: string,
     buyPrincipal: string,
@@ -130,26 +135,54 @@ export function useSplitSwap() {
     }
   }
 
-  /**
-   * Convert raw quote result to QuoteData with validation
-   * Matches treasury.mo extractKong/extractIcp logic
-   */
-  function toQuoteData(
-    result: { out: bigint; slippage: number } | null,
-    maxSlippageBP: number
-  ): QuoteData {
-    if (!result || result.out <= 0n) {
-      return { out: 0n, slipBP: 10000, valid: false }
+  async function fetchTacoQuote(
+    sellPrincipal: string,
+    buyPrincipal: string,
+    amountIn: bigint
+  ): Promise<{ out: bigint; slippage: number; route?: any[] } | null> {
+    if (amountIn <= 0n) return null
+    try {
+      const exchangeStore = useExchangeStore()
+      // Initialize exchange store if needed (idempotent)
+      if (!exchangeStore.exchangeInfoData) {
+        try { await exchangeStore.initExchange() } catch { return null }
+      }
+      const result = await exchangeStore.getExpectedMultiHopAmount(
+        sellPrincipal, buyPrincipal, amountIn
+      ) as any
+      // IC agent may return Nat as Number for small values — always coerce to BigInt
+      const rawOut = result?.expectedAmountOut
+      if (rawOut == null) return null
+      const out = typeof rawOut === 'bigint' ? rawOut : BigInt(rawOut)
+      if (out <= 0n) return null
+      return {
+        out,
+        // priceImpact is 0-1 ratio, convert to percentage
+        slippage: (Number(result.priceImpact) || 0) * 100,
+        route: result.bestRoute,
+      }
+    } catch {
+      return null
     }
-    // slippage from stores is in percentage (e.g. 0.5 = 0.5%), convert to basis points
-    const slipBP = Math.round(Math.abs(result.slippage) * 100)
-    const valid = result.out > 0n && slipBP <= maxSlippageBP
-    return { out: result.out, slipBP, valid }
   }
 
   /**
-   * Find the best execution plan across Kong and ICPSwap.
-   * Matches the treasury.mo findBestExecution algorithm exactly.
+   * Convert raw quote result to QuoteData with validation
+   */
+  function toQuoteData(
+    result: { out: bigint; slippage: number; route?: any[] } | null,
+    _maxSlippageBP: number
+  ): QuoteData {
+    if (!result) return { out: 0n, slipBP: 10000, valid: false }
+    // Ensure out is always BigInt (IC agent may return Nat as Number)
+    const out = typeof result.out === 'bigint' ? result.out : BigInt(result.out)
+    if (out <= 0n) return { out: 0n, slipBP: 10000, valid: false }
+    const slipBP = Math.round(Math.abs(result.slippage) * 100)
+    return { out, slipBP, valid: true, route: result.route }
+  }
+
+  /**
+   * Find the best execution plan across Kong, ICPSwap, and TACO Exchange.
    */
   async function findBestExecution(
     sellTokenPrincipal: string,
@@ -167,29 +200,30 @@ export function useSplitSwap() {
     }
 
     // ========================================
-    // 1. Calculate 10 amounts per DEX
+    // 1. Calculate 6 amounts per DEX
     // ========================================
 
     // Kong: full amounts (handles fees internally)
-    const kongAmounts: bigint[] = Array.from({ length: NUM_QUOTES }, (_, i) =>
-      amountIn * BigInt(i + 1) / 10n
-    )
+    const kongAmounts = QUOTE_PCTS_BP.map(pct => amountIn * BigInt(pct) / 10000n)
 
     // ICPSwap: fee-adjusted (ICPSwap swaps amountIn - fee)
     let sellTokenFee = 0n
     try {
       sellTokenFee = await getTokenFee(sellTokenPrincipal)
     } catch {
-      // If fee fetch fails, assume 0 — ICPSwap quotes will just be slightly off
+      // If fee fetch fails, assume 0
     }
 
-    const icpAmounts: bigint[] = Array.from({ length: NUM_QUOTES }, (_, i) => {
-      const raw = amountIn * BigInt(i + 1) / 10n
+    const icpAmounts = QUOTE_PCTS_BP.map(pct => {
+      const raw = amountIn * BigInt(pct) / 10000n
       return raw > sellTokenFee ? raw - sellTokenFee : 0n
     })
 
+    // TACO Exchange: fees added at deposit time, quote uses raw trade amounts
+    const tacoAmounts = kongAmounts
+
     // ========================================
-    // 2. Fetch 20 quotes in parallel
+    // 2. Fetch 18 quotes in parallel
     // ========================================
 
     const kongPromises = kongAmounts.map(amt =>
@@ -198,8 +232,13 @@ export function useSplitSwap() {
     const icpPromises = icpAmounts.map(amt =>
       fetchICPSwapQuote(sellTokenPrincipal, buyTokenPrincipal, amt)
     )
+    const tacoPromises = tacoAmounts.map(amt =>
+      fetchTacoQuote(sellTokenPrincipal, buyTokenPrincipal, amt)
+    )
 
-    const allResults = await Promise.allSettled([...kongPromises, ...icpPromises])
+    const allResults = await Promise.allSettled([
+      ...kongPromises, ...icpPromises, ...tacoPromises,
+    ])
 
     // ========================================
     // 3. Extract and validate quotes
@@ -207,10 +246,12 @@ export function useSplitSwap() {
 
     const kong: QuoteData[] = []
     const icp: QuoteData[] = []
+    const taco: QuoteData[] = []
 
     for (let i = 0; i < NUM_QUOTES; i++) {
       const kongResult = allResults[i]
       const icpResult = allResults[NUM_QUOTES + i]
+      const tacoResult = allResults[NUM_QUOTES * 2 + i]
 
       kong.push(toQuoteData(
         kongResult.status === 'fulfilled' ? kongResult.value : null,
@@ -218,6 +259,10 @@ export function useSplitSwap() {
       ))
       icp.push(toQuoteData(
         icpResult.status === 'fulfilled' ? icpResult.value : null,
+        maxSlippageBP
+      ))
+      taco.push(toQuoteData(
+        tacoResult.status === 'fulfilled' ? tacoResult.value : null,
         maxSlippageBP
       ))
     }
@@ -239,56 +284,75 @@ export function useSplitSwap() {
       }
     }
 
-    // Singles: Kong 100% (index 9)
-    if (kong[9].valid) {
-      updateBest({
-        name: 'SINGLE_KONG',
-        kongPct: 10000, icpPct: 0,
-        totalOut: kong[9].out,
-        kongSlipBP: kong[9].slipBP, icpSlipBP: 0,
-        kongIdx: 9, icpIdx: 9,
-      })
+    function makeScenario(
+      name: string,
+      kIdx: number, iIdx: number, tIdx: number,
+      kPct: number, iPct: number, tPct: number
+    ): Scenario {
+      return {
+        name,
+        kongPct: kPct, icpPct: iPct, tacoPct: tPct,
+        totalOut: (kIdx >= 0 ? kong[kIdx].out : 0n)
+                + (iIdx >= 0 ? icp[iIdx].out : 0n)
+                + (tIdx >= 0 ? taco[tIdx].out : 0n),
+        kongSlipBP: kIdx >= 0 ? kong[kIdx].slipBP : 0,
+        icpSlipBP: iIdx >= 0 ? icp[iIdx].slipBP : 0,
+        tacoSlipBP: tIdx >= 0 ? taco[tIdx].slipBP : 0,
+        kongIdx: kIdx, icpIdx: iIdx, tacoIdx: tIdx,
+      }
     }
 
-    // Singles: ICPSwap 100% (index 9)
-    if (icp[9].valid) {
-      updateBest({
-        name: 'SINGLE_ICP',
-        kongPct: 0, icpPct: 10000,
-        totalOut: icp[9].out,
-        kongSlipBP: 0, icpSlipBP: icp[9].slipBP,
-        kongIdx: 9, icpIdx: 9,
+    // Singles: 100% to one DEX
+    if (isDevEnvironment()) {
+      console.log('[SWAP] 100% quotes:', {
+        kong: { out: kong[LAST_IDX].out.toString(), valid: kong[LAST_IDX].valid, slipBP: kong[LAST_IDX].slipBP },
+        icp: { out: icp[LAST_IDX].out.toString(), valid: icp[LAST_IDX].valid, slipBP: icp[LAST_IDX].slipBP },
+        taco: { out: taco[LAST_IDX].out.toString(), valid: taco[LAST_IDX].valid, slipBP: taco[LAST_IDX].slipBP },
       })
     }
+    if (kong[LAST_IDX].valid) {
+      updateBest(makeScenario('SINGLE_KONG', LAST_IDX, -1, -1, 10000, 0, 0))
+    }
+    if (icp[LAST_IDX].valid) {
+      updateBest(makeScenario('SINGLE_ICP', -1, LAST_IDX, -1, 0, 10000, 0))
+    }
+    if (taco[LAST_IDX].valid) {
+      updateBest(makeScenario('SINGLE_TACO', -1, -1, LAST_IDX, 0, 0, 10000))
+    }
 
-    // All combinations: 10x10 grid
-    for (let kongIdx = 0; kongIdx <= 9; kongIdx++) {
-      for (let icpIdx = 0; icpIdx <= 9; icpIdx++) {
-        const kongPct = (kongIdx + 1) * STEP_BP
-        const icpPct = (icpIdx + 1) * STEP_BP
-        const totalPct = kongPct + icpPct
+    // 2-way and 3-way splits using the 6×6×6 grid
+    // Each DEX uses index -1 (skip) or 0..5 (corresponding to QUOTE_PCTS_BP)
+    for (let kI = -1; kI < NUM_QUOTES; kI++) {
+      const kPct = kI >= 0 ? QUOTE_PCTS_BP[kI] : 0
+      if (kI >= 0 && !kong[kI].valid) continue
 
-        // Skip if over 100%
-        if (totalPct > 10000) continue
-        // Skip 100% singles (already handled)
-        if (kongPct === 10000 || icpPct === 10000) continue
+      for (let iI = -1; iI < NUM_QUOTES; iI++) {
+        const iPct = iI >= 0 ? QUOTE_PCTS_BP[iI] : 0
+        if (iI >= 0 && !icp[iI].valid) continue
+        if (kPct + iPct > 10000) continue
 
-        if (kong[kongIdx].valid && icp[icpIdx].valid) {
-          const totalOut = kong[kongIdx].out + icp[icpIdx].out
+        for (let tI = -1; tI < NUM_QUOTES; tI++) {
+          const tPct = tI >= 0 ? QUOTE_PCTS_BP[tI] : 0
+          if (tI >= 0 && !taco[tI].valid) continue
 
-          const scenario: Scenario = {
-            name: `${totalPct === 10000 ? 'SPLIT' : 'PARTIAL'}_${kongPct / 100}_${icpPct / 100}`,
-            kongPct, icpPct, totalOut,
-            kongSlipBP: kong[kongIdx].slipBP,
-            icpSlipBP: icp[icpIdx].slipBP,
-            kongIdx, icpIdx,
-          }
+          const totalPct = kPct + iPct + tPct
+          if (totalPct > 10002) continue // allow +2 rounding tolerance
 
-          if (totalPct === 10000) {
-            // Full split → max output selection
+          // Count active DEXes
+          const active = (kI >= 0 ? 1 : 0) + (iI >= 0 ? 1 : 0) + (tI >= 0 ? 1 : 0)
+          // Skip: 0 DEXes, or 100% singles (already handled above)
+          if (active === 0) continue
+          if (active === 1 && totalPct >= 9998) continue
+
+          // Treat sums within ±2 BP of 10000 as full splits (rounding from 10000/6)
+          const isFull = totalPct >= 9998 && totalPct <= 10002
+          const label = isFull ? 'SPLIT' : 'PARTIAL'
+          const name = `${label}_K${kPct / 100}_I${iPct / 100}_T${tPct / 100}`
+          const scenario = makeScenario(name, kI, iI, tI, kPct, iPct, tPct)
+
+          if (isFull) {
             updateBest(scenario)
           } else {
-            // Partial → collected for min slippage selection
             partialScenarios.push(scenario)
           }
         }
@@ -299,329 +363,123 @@ export function useSplitSwap() {
     // 5. Build execution plan from best scenario
     // ========================================
 
+    const allQuotes = { kong, icpswap: icp, taco }
+
     if (bestScenario) {
       if (isDevEnvironment()) {
-        const best = bestScenario as Scenario
+        const b = bestScenario as Scenario
         console.log('[SWAP findBestExecution] Best:', {
-          scenario: best.name,
-          kongPct: best.kongPct, icpPct: best.icpPct,
-          expectedOut: best.totalOut.toString(),
+          scenario: b.name, kongPct: b.kongPct, icpPct: b.icpPct, tacoPct: b.tacoPct,
+          expectedOut: b.totalOut.toString(),
         })
       }
-      return buildFullPlan(bestScenario, secondBestScenario, kong, icp, amountIn)
+      return buildPlanFromScenario(bestScenario, allQuotes, amountIn)
     }
 
     // No full scenario → try partials
     if (partialScenarios.length > 0) {
-      if (isDevEnvironment()) console.log('[SWAP findBestExecution] Using partial scenario, count:', partialScenarios.length)
-      return buildPartialPlan(partialScenarios, kong, icp, amountIn)
+      const valid = partialScenarios.filter(p =>
+        (p.kongPct + p.icpPct + p.tacoPct) >= MIN_PARTIAL_TOTAL_BP
+      )
+      if (valid.length > 0) {
+        valid.sort((a, b) =>
+          (a.kongSlipBP + a.icpSlipBP + a.tacoSlipBP) -
+          (b.kongSlipBP + b.icpSlipBP + b.tacoSlipBP)
+        )
+        return buildPlanFromScenario(valid[0], allQuotes, amountIn, 'partial')
+      }
+      // Fallback: highest output partial
+      partialScenarios.sort((a, b) => (b.totalOut > a.totalOut ? 1 : b.totalOut < a.totalOut ? -1 : 0))
+      return buildPlanFromScenario(partialScenarios[0], allQuotes, amountIn, 'partial')
     }
 
-    // No viable execution — return best single if any quote succeeded at all
-    // Find the best raw quote regardless of slippage validation
-    const bestKong100 = kong[9].out > 0n ? kong[9] : null
-    const bestIcp100 = icp[9].out > 0n ? icp[9] : null
+    // No viable execution — return best single raw quote regardless of slippage
+    const allCandidates = [
+      { exchange: 'Kong' as const, q: kong[LAST_IDX] },
+      { exchange: 'ICPSwap' as const, q: icp[LAST_IDX] },
+      { exchange: 'TACO' as const, q: taco[LAST_IDX] },
+    ]
+    const candidates = allCandidates
+      .filter(c => c.q.out > 0n)
+      .sort((a, b) => (b.q.out > a.q.out ? 1 : b.q.out < a.q.out ? -1 : 0))
 
-    if (bestKong100 && (!bestIcp100 || bestKong100.out >= bestIcp100.out)) {
+    if (candidates.length > 0) {
+      const best = candidates[0]
       return {
         type: 'single',
         legs: [{
-          exchange: 'Kong', pctBP: 10000,
-          amountIn, expectedOut: bestKong100.out,
-          slipBP: bestKong100.slipBP,
+          exchange: best.exchange, pctBP: 10000,
+          amountIn, expectedOut: best.q.out,
+          slipBP: best.q.slipBP,
+          route: best.q.route,
         }],
-        totalExpectedOut: bestKong100.out,
-        totalSlipBP: bestKong100.slipBP,
+        totalExpectedOut: best.q.out,
+        totalSlipBP: best.q.slipBP,
         interpolated: false,
-        quotes: { kong, icpswap: icp },
-      }
-    }
-    if (bestIcp100) {
-      return {
-        type: 'single',
-        legs: [{
-          exchange: 'ICPSwap', pctBP: 10000,
-          amountIn, expectedOut: bestIcp100.out,
-          slipBP: bestIcp100.slipBP,
-        }],
-        totalExpectedOut: bestIcp100.out,
-        totalSlipBP: bestIcp100.slipBP,
-        interpolated: false,
-        quotes: { kong, icpswap: icp },
+        quotes: allQuotes,
       }
     }
 
-    // Truly no quotes at all
-    throw new Error('No viable execution path found — both DEXes returned no quotes')
+    throw new Error('No viable execution path found — all DEXes returned no quotes')
   }
 
   /**
-   * Build plan from a full scenario (single or split totaling 100%)
-   * With interpolation between adjacent scenarios (matching treasury.mo:8770-8878)
+   * Build an execution plan from a scenario
    */
-  function buildFullPlan(
-    best: Scenario,
-    secondBest: Scenario | null,
-    kong: QuoteData[],
-    icp: QuoteData[],
-    amountIn: bigint
-  ): ExecutionPlan {
-
-    let finalKongPct = best.kongPct
-    let finalIcpPct = best.icpPct
-    let finalKongSlipBP = best.kongSlipBP
-    let finalIcpSlipBP = best.icpSlipBP
-    let interpolated = false
-
-    // Attempt interpolation between best and secondBest
-    if (secondBest) {
-      const bothAreSplits = best.kongPct > 0 && best.kongPct < 10000
-        && secondBest.kongPct > 0 && secondBest.kongPct < 10000
-      const diff = Math.abs(best.kongPct - secondBest.kongPct)
-      const areAdjacent = diff === STEP_BP
-
-      if (bothAreSplits && areAdjacent) {
-        const avgKongSlipBP = Math.floor((best.kongSlipBP + secondBest.kongSlipBP) / 2)
-        const avgIcpSlipBP = Math.floor((best.icpSlipBP + secondBest.icpSlipBP) / 2)
-        const totalSlipBP = avgKongSlipBP + avgIcpSlipBP
-
-        if (totalSlipBP > 0) {
-          // Inverse slippage weighting: more goes to the DEX with LOWER slippage
-          const kongRatioBP = Math.floor((avgIcpSlipBP * 10000) / totalSlipBP)
-
-          const lowKong = Math.min(best.kongPct, secondBest.kongPct)
-          const kongRange = STEP_BP
-          finalKongPct = lowKong + Math.floor((kongRatioBP * kongRange) / 10000)
-          finalIcpPct = 10000 - finalKongPct
-
-          // Interpolate slippage values
-          const lowKongSlip = best.kongPct < secondBest.kongPct ? best.kongSlipBP : secondBest.kongSlipBP
-          const highKongSlip = best.kongPct > secondBest.kongPct ? best.kongSlipBP : secondBest.kongSlipBP
-          const lowIcpSlip = best.icpPct < secondBest.icpPct ? best.icpSlipBP : secondBest.icpSlipBP
-          const highIcpSlip = best.icpPct > secondBest.icpPct ? best.icpSlipBP : secondBest.icpSlipBP
-
-          const kongSlipRange = highKongSlip > lowKongSlip ? highKongSlip - lowKongSlip : 0
-          const icpSlipRange = highIcpSlip > lowIcpSlip ? highIcpSlip - lowIcpSlip : 0
-
-          finalKongSlipBP = lowKongSlip + Math.floor((kongRatioBP * kongSlipRange) / 10000)
-          finalIcpSlipBP = lowIcpSlip + Math.floor((kongRatioBP * icpSlipRange) / 10000)
-
-          interpolated = true
-        }
-      }
-    }
-
-    // Build plan
-    if (finalKongPct === 10000) {
-      // Single Kong
-      return {
-        type: 'single',
-        legs: [{
-          exchange: 'Kong', pctBP: 10000,
-          amountIn, expectedOut: best.totalOut,
-          slipBP: finalKongSlipBP,
-        }],
-        totalExpectedOut: best.totalOut,
-        totalSlipBP: finalKongSlipBP,
-        interpolated: false,
-        quotes: { kong, icpswap: icp },
-      }
-    }
-
-    if (finalIcpPct === 10000) {
-      // Single ICPSwap
-      return {
-        type: 'single',
-        legs: [{
-          exchange: 'ICPSwap', pctBP: 10000,
-          amountIn, expectedOut: best.totalOut,
-          slipBP: finalIcpSlipBP,
-        }],
-        totalExpectedOut: best.totalOut,
-        totalSlipBP: finalIcpSlipBP,
-        interpolated: false,
-        quotes: { kong, icpswap: icp },
-      }
-    }
-
-    // Split trade
-    const kongAmount = amountIn * BigInt(finalKongPct) / 10000n
-    const icpAmount = amountIn - kongAmount // remainder avoids rounding loss
-
-    // Estimate output by scaling from nearest quote
-    const kongExpectedOut = best.kongPct > 0
-      ? kong[best.kongIdx].out * BigInt(finalKongPct) / BigInt(best.kongPct)
-      : 0n
-    const icpExpectedOut = best.icpPct > 0
-      ? icp[best.icpIdx].out * BigInt(finalIcpPct) / BigInt(best.icpPct)
-      : 0n
-
-    return {
-      type: 'split',
-      legs: [
-        {
-          exchange: 'Kong', pctBP: finalKongPct,
-          amountIn: kongAmount, expectedOut: kongExpectedOut,
-          slipBP: finalKongSlipBP,
-        },
-        {
-          exchange: 'ICPSwap', pctBP: finalIcpPct,
-          amountIn: icpAmount, expectedOut: icpExpectedOut,
-          slipBP: finalIcpSlipBP,
-        },
-      ],
-      totalExpectedOut: kongExpectedOut + icpExpectedOut,
-      totalSlipBP: finalKongSlipBP + finalIcpSlipBP,
-      interpolated,
-      quotes: { kong, icpswap: icp },
-    }
-  }
-
-  /**
-   * Build plan from partial scenarios (sum < 100%)
-   * Selection by minimum combined slippage (matching treasury.mo:8526-8767)
-   */
-  function buildPartialPlan(
-    partials: Scenario[],
-    kong: QuoteData[],
-    icp: QuoteData[],
-    amountIn: bigint
-  ): ExecutionPlan {
-
-    // Filter: must sum to >= 40%
-    const valid = partials.filter(p => (p.kongPct + p.icpPct) >= MIN_PARTIAL_TOTAL_BP)
-
-    if (valid.length === 0) {
-      // Fallback: use the partial with highest output
-      partials.sort((a, b) => (b.totalOut > a.totalOut ? 1 : b.totalOut < a.totalOut ? -1 : 0))
-      const fallback = partials[0]
-      return buildPartialFromScenario(fallback, kong, icp, amountIn, false)
-    }
-
-    // Sort by combined slippage ascending (lowest first)
-    valid.sort((a, b) => (a.kongSlipBP + a.icpSlipBP) - (b.kongSlipBP + b.icpSlipBP))
-    const best = valid[0]
-
-    // Attempt interpolation with second-best
-    let interpolated = false
-    let finalKongPct = best.kongPct
-    let finalIcpPct = best.icpPct
-    let finalKongSlipBP = best.kongSlipBP
-    let finalIcpSlipBP = best.icpSlipBP
-
-    if (valid.length > 1) {
-      const second = valid[1]
-      const kongDiff = Math.abs(best.kongPct - second.kongPct)
-      const icpDiff = Math.abs(best.icpPct - second.icpPct)
-
-      // Both must differ by exactly STEP_BP for partial interpolation
-      if (kongDiff === STEP_BP && icpDiff === STEP_BP) {
-        const avgKongSlipBP = Math.floor((best.kongSlipBP + second.kongSlipBP) / 2)
-        const avgIcpSlipBP = Math.floor((best.icpSlipBP + second.icpSlipBP) / 2)
-        const totalSlipBP = avgKongSlipBP + avgIcpSlipBP
-
-        if (totalSlipBP > 0) {
-          const kongRatioBP = Math.floor((avgIcpSlipBP * 10000) / totalSlipBP)
-
-          const lowKong = Math.min(best.kongPct, second.kongPct)
-          const highKong = Math.max(best.kongPct, second.kongPct)
-          const kongRange = highKong - lowKong
-          finalKongPct = lowKong + Math.floor((kongRatioBP * kongRange) / 10000)
-
-          const lowIcp = Math.min(best.icpPct, second.icpPct)
-          const highIcp = Math.max(best.icpPct, second.icpPct)
-          const icpRange = highIcp - lowIcp
-          finalIcpPct = highIcp - Math.floor((kongRatioBP * icpRange) / 10000)
-
-          // Interpolate slippage
-          const lowKongSlip = best.kongPct < second.kongPct ? best.kongSlipBP : second.kongSlipBP
-          const highKongSlip = best.kongPct > second.kongPct ? best.kongSlipBP : second.kongSlipBP
-          const lowIcpSlip = best.icpPct < second.icpPct ? best.icpSlipBP : second.icpSlipBP
-          const highIcpSlip = best.icpPct > second.icpPct ? best.icpSlipBP : second.icpSlipBP
-          const kongSlipRange = highKongSlip > lowKongSlip ? highKongSlip - lowKongSlip : 0
-          const icpSlipRange = highIcpSlip > lowIcpSlip ? highIcpSlip - lowIcpSlip : 0
-
-          finalKongSlipBP = lowKongSlip + Math.floor((kongRatioBP * kongSlipRange) / 10000)
-          finalIcpSlipBP = lowIcpSlip + Math.floor((kongRatioBP * icpSlipRange) / 10000)
-
-          interpolated = true
-        }
-      }
-    }
-
-    const kongAmount = amountIn * BigInt(finalKongPct) / 10000n
-    const icpAmount = amountIn * BigInt(finalIcpPct) / 10000n
-
-    // Closest quote index for expected output estimate
-    const closestIdx = (pct: number): number => {
-      let bestIdx = 0
-      let bestDiff = Math.abs(pct - STEP_BP)
-      for (let i = 1; i < NUM_QUOTES; i++) {
-        const stepPct = (i + 1) * STEP_BP
-        const diff = Math.abs(pct - stepPct)
-        if (diff < bestDiff) {
-          bestIdx = i
-          bestDiff = diff
-        }
-      }
-      return bestIdx
-    }
-
-    const kongExpectedOut = kong[closestIdx(finalKongPct)].out
-    const icpExpectedOut = icp[closestIdx(finalIcpPct)].out
-
-    return {
-      type: 'partial',
-      legs: [
-        {
-          exchange: 'Kong', pctBP: finalKongPct,
-          amountIn: kongAmount, expectedOut: kongExpectedOut,
-          slipBP: finalKongSlipBP,
-        },
-        {
-          exchange: 'ICPSwap', pctBP: finalIcpPct,
-          amountIn: icpAmount, expectedOut: icpExpectedOut,
-          slipBP: finalIcpSlipBP,
-        },
-      ],
-      totalExpectedOut: kongExpectedOut + icpExpectedOut,
-      totalSlipBP: finalKongSlipBP + finalIcpSlipBP,
-      interpolated,
-      quotes: { kong, icpswap: icp },
-    }
-  }
-
-  /**
-   * Build a partial plan from a single scenario (no interpolation)
-   */
-  function buildPartialFromScenario(
+  function buildPlanFromScenario(
     scenario: Scenario,
-    kong: QuoteData[],
-    icp: QuoteData[],
+    quotes: { kong: QuoteData[]; icpswap: QuoteData[]; taco: QuoteData[] },
     amountIn: bigint,
-    interpolated: boolean
+    typeOverride?: 'partial'
   ): ExecutionPlan {
-    const kongAmount = amountIn * BigInt(scenario.kongPct) / 10000n
-    const icpAmount = amountIn * BigInt(scenario.icpPct) / 10000n
+    const legs: LegPlan[] = []
+    let remainingAmount = amountIn
+
+    // Determine amounts: last leg gets remainder to avoid rounding loss
+    const activeLegs: Array<{ exchange: 'Kong' | 'ICPSwap' | 'TACO'; pct: number; idx: number }> = []
+    if (scenario.kongPct > 0 && scenario.kongIdx >= 0) {
+      activeLegs.push({ exchange: 'Kong', pct: scenario.kongPct, idx: scenario.kongIdx })
+    }
+    if (scenario.icpPct > 0 && scenario.icpIdx >= 0) {
+      activeLegs.push({ exchange: 'ICPSwap', pct: scenario.icpPct, idx: scenario.icpIdx })
+    }
+    if (scenario.tacoPct > 0 && scenario.tacoIdx >= 0) {
+      activeLegs.push({ exchange: 'TACO', pct: scenario.tacoPct, idx: scenario.tacoIdx })
+    }
+
+    for (let i = 0; i < activeLegs.length; i++) {
+      const { exchange, pct, idx } = activeLegs[i]
+      const isLast = i === activeLegs.length - 1
+      const legAmount = isLast ? remainingAmount : amountIn * BigInt(pct) / 10000n
+      remainingAmount -= legAmount
+
+      const quoteArr = exchange === 'Kong' ? quotes.kong : exchange === 'ICPSwap' ? quotes.icpswap : quotes.taco
+      const slipBP = exchange === 'Kong' ? scenario.kongSlipBP
+        : exchange === 'ICPSwap' ? scenario.icpSlipBP : scenario.tacoSlipBP
+
+      legs.push({
+        exchange,
+        pctBP: pct,
+        amountIn: legAmount,
+        expectedOut: quoteArr[idx].out,
+        slipBP,
+        route: quoteArr[idx].route,
+      })
+    }
+
+    const totalExpectedOut = legs.reduce((sum, l) => sum + l.expectedOut, 0n)
+    const totalSlipBP = legs.reduce((sum, l) => sum + l.slipBP, 0)
+    const totalPct = scenario.kongPct + scenario.icpPct + scenario.tacoPct
+    const isFull = totalPct >= 9998 && totalPct <= 10002
+    const type = typeOverride ?? (legs.length === 1 ? 'single' : isFull ? 'split' : 'partial')
 
     return {
-      type: 'partial',
-      legs: [
-        {
-          exchange: 'Kong', pctBP: scenario.kongPct,
-          amountIn: kongAmount, expectedOut: kong[scenario.kongIdx].out,
-          slipBP: scenario.kongSlipBP,
-        },
-        {
-          exchange: 'ICPSwap', pctBP: scenario.icpPct,
-          amountIn: icpAmount, expectedOut: icp[scenario.icpIdx].out,
-          slipBP: scenario.icpSlipBP,
-        },
-      ],
-      totalExpectedOut: kong[scenario.kongIdx].out + icp[scenario.icpIdx].out,
-      totalSlipBP: scenario.kongSlipBP + scenario.icpSlipBP,
-      interpolated,
-      quotes: { kong, icpswap: icp },
+      type,
+      legs,
+      totalExpectedOut,
+      totalSlipBP,
+      interpolated: false,
+      quotes,
     }
   }
 
@@ -653,10 +511,10 @@ export function useSplitSwap() {
         Number(leg.expectedOut) * (1 - slippageTolerance)
       ))
 
+      let blockNumber: bigint | undefined
       try {
-        let result: any
         if (leg.exchange === 'Kong') {
-          result = await kongStore.icrc2_swap({
+          const result = await kongStore.icrc2_swap({
             sellTokenPrincipal,
             sellTokenSymbol,
             buyTokenPrincipal,
@@ -666,13 +524,13 @@ export function useSplitSwap() {
             slippageTolerance,
             onStep: (step: string) => onStep?.('Kong', step),
           })
-          // Kong result structure: result is the Ok payload with receive_amount
           const amountOut = result?.receive_amount != null
             ? (typeof result.receive_amount === 'bigint' ? result.receive_amount : BigInt(result.receive_amount))
             : 0n
           return { exchange: 'Kong', success: true, amountOut }
-        } else {
-          result = await icpswapStore.icrc2_swap({
+
+        } else if (leg.exchange === 'ICPSwap') {
+          const result = await icpswapStore.icrc2_swap({
             sellTokenPrincipal,
             buyTokenPrincipal,
             amountIn: leg.amountIn,
@@ -680,11 +538,72 @@ export function useSplitSwap() {
             slippageTolerance,
             onStep: (step: string) => onStep?.('ICPSwap', step),
           })
-          // ICPSwap result: { amountOut, swapTxId, withdrawTxId }
           const amountOut = result?.amountOut != null
             ? (typeof result.amountOut === 'bigint' ? result.amountOut : BigInt(result.amountOut))
             : 0n
           return { exchange: 'ICPSwap', success: true, amountOut }
+
+        } else {
+          // TACO Exchange: deposit to treasury then swapMultiHop
+          const exchangeStore = useExchangeStore()
+          const sellToken = exchangeStore.getTokenByAddress(sellTokenPrincipal)
+
+          // Step 1: Deposit (adds trading fee + transfer fee on top)
+          onStep?.('TACO', 'Depositing tokens...')
+          blockNumber = await depositToken(
+            sellTokenPrincipal,
+            sellToken?.asset_type ?? { ICRC12: null },
+            leg.amountIn,
+            exchangeStore.tradingFeeBps,
+            sellToken?.transfer_fee ?? 10000n,
+            exchangeStore.treasuryAccountId,
+            exchangeStore.treasuryPrincipal,
+          )
+
+          // Step 2: Execute swap
+          onStep?.('TACO', 'Executing swap...')
+          const route = leg.route ?? [{ tokenIn: sellTokenPrincipal, tokenOut: buyTokenPrincipal }]
+
+          // Debug handoff (item 7): paste this block to backend when a TACO leg misbehaves.
+          console.info('[Swap debug handoff]', {
+            ts: new Date().toISOString(),
+            flow: 'splitLegTaco',
+            tokenIn: sellTokenPrincipal,
+            tokenOut: buyTokenPrincipal,
+            amountIn: leg.amountIn.toString(),
+            legExpectedOut: leg.expectedOut.toString(),
+            slippageTolerance,
+            minAmountOut: minAmountOut.toString(),
+            blockNumber: blockNumber.toString(),
+            route,
+          })
+
+          const rawResult = await exchangeStore.swapMultiHop(
+            sellTokenPrincipal,
+            buyTokenPrincipal,
+            leg.amountIn,
+            route,
+            minAmountOut,
+            blockNumber,
+          )
+
+          // Parse result (structured Result type)
+          if ('Ok' in rawResult) {
+            return { exchange: 'TACO', success: true, amountOut: rawResult.Ok.amountOut }
+          } else if ('Err' in rawResult) {
+            const { classifyExchangeError } = await import('../exchange/utils/errors')
+            const buyToken = exchangeStore.getTokenByAddress(buyTokenPrincipal)
+            throw new Error(classifyExchangeError(rawResult.Err, {
+              outDecimals: buyToken ? Number(buyToken.decimals) : 8,
+              outSymbol: buyToken?.symbol ?? '',
+              hopTokens: route.map(h => {
+                const tok = exchangeStore.getTokenByAddress(h.tokenOut)
+                return { symbol: tok?.symbol ?? h.tokenOut.slice(0, 8) }
+              }),
+            }).message)
+          } else {
+            throw new Error('TACO Exchange swap failed')
+          }
         }
       } catch (err: any) {
         // On ICPSwap failure, attempt sweep to recover stranded funds
@@ -698,6 +617,26 @@ export function useSplitSwap() {
             // Sweep is best-effort
           }
         }
+
+        // On TACO Exchange failure after deposit, attempt automatic recovery
+        if (leg.exchange === 'TACO' && blockNumber !== undefined) {
+          try {
+            const exchangeStore = useExchangeStore()
+            const sellToken = exchangeStore.getTokenByAddress(sellTokenPrincipal)
+            const tokenType = sellToken?.asset_type ?? { ICRC12: null }
+            const recovered = await exchangeStore.recoverWronglysent(
+              sellTokenPrincipal,
+              blockNumber,
+              tokenType,
+            )
+            if (recovered) {
+              return { exchange: 'TACO', success: false, error: (err.message || 'Swap failed') + ' (tokens recovered automatically)' }
+            }
+          } catch {
+            // Recovery is best-effort; user can recover manually via Recover page
+          }
+        }
+
         return { exchange: leg.exchange, success: false, error: err.message || 'Swap failed' }
       }
     })

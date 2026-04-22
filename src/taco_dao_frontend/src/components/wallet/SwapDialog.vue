@@ -268,7 +268,7 @@
               <div class="exchange-info">
                 <div class="exchange-name">
                   <span v-if="executionPlan.type === 'single'">{{ executionPlan.legs[0].exchange }}</span>
-                  <span v-else>Split Swap</span>
+                  <span v-else>Split Swap ({{ executionPlan.legs.length }}-way)</span>
                 </div>
                 <div class="best-badge">
                   <i class="fa fa-star"></i>
@@ -281,10 +281,17 @@
             </div>
 
             <div class="quote-details">
-              <div v-for="leg in executionPlan.legs" :key="leg.exchange" class="detail-item">
-                <span>{{ leg.exchange }} ({{ (leg.pctBP / 100).toFixed(0) }}%):</span>
-                <span>{{ formatBalance(leg.expectedOut, tacoToken.decimals) }} TACO</span>
-              </div>
+              <template v-for="leg in executionPlan.legs" :key="leg.exchange">
+                <div class="detail-item">
+                  <span>{{ leg.exchange }} ({{ (leg.pctBP / 100).toFixed(0) }}%):</span>
+                  <span>{{ formatBalance(leg.expectedOut, tacoToken.decimals) }} TACO</span>
+                </div>
+                <!-- Multi-hop TACO leg: show the per-hop chain from the backend route -->
+                <div v-if="leg.exchange === 'TACO' && legRoutePath(leg).length > 2" class="detail-item" style="font-size: 0.78rem; opacity: 0.7;">
+                  <span>Route:</span>
+                  <span>{{ legRoutePath(leg).join(' → ') }}</span>
+                </div>
+              </template>
               <div class="detail-item">
                 <span>Slippage:</span>
                 <span :class="getPriceImpactClass(executionPlan.totalSlipBP / 100)">
@@ -915,7 +922,7 @@ interface Token {
 }
 
 interface Quote {
-  exchange: 'Kong' | 'ICPSwap'
+  exchange: 'Kong' | 'ICPSwap' | 'TACO Exchange'
   amountOut: bigint
   slippage: number
   price: number
@@ -1102,11 +1109,11 @@ const fetchQuotes = async () => {
 
     executionPlan.value = plan
 
-    // Also populate legacy quotes array for display compatibility
-    // Show 100% single-exchange quotes for comparison
+    // Show 100% single-exchange quotes for comparison (index 5 = 100%)
     const newQuotes: Quote[] = []
-    const kong100 = plan.quotes.kong[9]
-    const icp100 = plan.quotes.icpswap[9]
+    const kong100 = plan.quotes.kong[5]
+    const icp100 = plan.quotes.icpswap[5]
+    const taco100 = plan.quotes.taco[5]
     if (kong100.out > 0n) {
       newQuotes.push({
         exchange: 'Kong', amountOut: kong100.out,
@@ -1117,6 +1124,12 @@ const fetchQuotes = async () => {
       newQuotes.push({
         exchange: 'ICPSwap', amountOut: icp100.out,
         slippage: icp100.slipBP / 100, price: 0, fee: 0, rawData: null,
+      })
+    }
+    if (taco100.out > 0n) {
+      newQuotes.push({
+        exchange: 'TACO Exchange', amountOut: taco100.out,
+        slippage: taco100.slipBP / 100, price: 0, fee: 0, rawData: null,
       })
     }
     quotes.value = newQuotes
@@ -1196,9 +1209,24 @@ const formatBalance = (balance: bigint, decimals: number): string => {
 }
 
 const getPriceImpactClass = (slippage: number): string => {
-  if (slippage < 0.1) return 'impact-low'
-  if (slippage < 1) return 'impact-medium'
-  return 'impact-high'
+  if (slippage > 15) return 'impact-high'
+  if (slippage > 5) return 'impact-medium'
+  return 'impact-low'
+}
+
+// Resolve a TACO leg's route principals into a chain of symbols for display
+// (e.g. ["ckETH", "ICP", "TACO"]). Uses availableTokens from props and falls
+// back to a shortened principal if a symbol isn't available.
+function legRoutePath(leg: { route?: Array<{ tokenIn: string; tokenOut: string }> }): string[] {
+  const route = leg.route ?? []
+  if (!route.length) return []
+  const symbolFor = (addr: string): string => {
+    const t = props.availableTokens.find(tok => tok.principal === addr)
+    return t?.symbol ?? addr.slice(0, 6)
+  }
+  const chain: string[] = [symbolFor(route[0].tokenIn)]
+  for (const hop of route) chain.push(symbolFor(hop.tokenOut))
+  return chain
 }
 
 // Watch for preselected token

@@ -8,6 +8,27 @@
             <!-- changelog item -->
             <div class="changelog-content__item">
                 <h3 class="changelog-content__title">
+                    v2.1.0
+                </h3>
+                <span class="changelog-content__date">🍽️ April 14, 2026</span>
+                <p class="changelog-content__text">
+                    - Adds /exchange with TACO's own decentralized exchange
+                    <br>
+                    - Limit orders with orderbook
+                    <br>
+                    - AMM liquidity pools with concentrated liquidity (V3)
+                    <br>
+                    - Multi-hop swap routing
+                    <br>
+                    - Private OTC trades
+                    <br>
+                    - Easy mode and advanced trading interfaces
+                </p>
+            </div>
+
+            <!-- changelog item -->
+            <div class="changelog-content__item">
+                <h3 class="changelog-content__title">
                     v2.0.0
                 </h3>
                 <span class="changelog-content__date">🍽️ March 25, 2026</span>
