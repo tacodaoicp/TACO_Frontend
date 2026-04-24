@@ -52,12 +52,12 @@ function onAddLiquidity(token0: string, token1: string) {
 .pool-view {
   display: flex;
   flex-direction: column;
-  height: 100vh;
+  min-height: 100vh;
+
   background: var(--bg-primary);
 
   &__main {
-    flex: 1;
-    overflow-y: auto;
+    flex: 1 0 auto;
     padding: var(--space-4) var(--space-6);
     max-width: 900px;
     width: 100%;

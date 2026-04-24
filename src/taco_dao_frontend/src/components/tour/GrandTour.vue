@@ -6,45 +6,6 @@
   <!-- grand tour overlay — above highlights -->
   <div v-if="active" class="grand-tour">
 
-    <!-- settings panel -->
-    <div class="grand-tour__settings">
-      <div class="grand-tour__settings__row">
-        <label for="face-style-select" class="grand-tour__settings__label">
-          Style:
-        </label>
-        <select id="face-style-select"
-                v-model="selectedFaceStyle"
-                class="grand-tour__settings__select">
-          <option v-for="(name, key) in faceStyleNames"
-                  :key="key"
-                  :value="key">
-            {{ name }}
-          </option>
-        </select>
-      </div>
-
-      <div class="grand-tour__settings__row">
-        <label for="test-expression-select" class="grand-tour__settings__label">
-          Test Emote:
-        </label>
-        <select id="test-expression-select"
-                v-model="testExpression"
-                class="grand-tour__settings__select">
-          <option value="auto">Auto (Follow Script)</option>
-          <option value="neutral">Neutral</option>
-          <option value="happy">Happy</option>
-          <option value="sad">Sad</option>
-          <option value="angry">Angry</option>
-          <option value="surprised">Surprised</option>
-          <option value="excited">Excited</option>
-          <option value="confused">Confused</option>
-          <option value="suspicious">Suspicious</option>
-          <option value="embarrassed">Embarrassed</option>
-          <option value="smug">Smug</option>
-        </select>
-      </div>
-    </div>
-
     <!-- screen flash (for slap effect) -->
     <div v-if="screenFlash" class="grand-tour__flash"></div>
 
@@ -128,13 +89,12 @@
 <script setup lang="ts">
 import { ref, computed, watch, nextTick, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { useStorage } from '@vueuse/core'
 import TacoSprite from './TacoSprite.vue'
 import NachoSprite from './NachoSprite.vue'
 import VNDialogBox from './VNDialogBox.vue'
 import { tourScript, characterConfig } from './tourScript'
 import type { Expression, Action, TourChoice, DialogueLine } from './tourScript'
-import { faceStyleNames, type FaceStyle } from './faceStyles'
+import type { FaceStyle } from './faceStyles'
 import { useTacoStore } from '../../stores/taco.store'
 import {
   applyHighlight,
@@ -265,11 +225,8 @@ const lightningFlash = ref(false)
 const whiteoutActive = ref(false)
 const whiteoutFading = ref(false)
 
-// Face style selection (persisted in localStorage)
-const selectedFaceStyle = useStorage<FaceStyle>('grandTourFaceStyle', 'standard')
-
-// Test expression override (for testing emotes)
-const testExpression = ref<Expression | 'auto'>('auto')
+// Face style — hard-coded to the enhanced standard; user-facing picker removed
+const selectedFaceStyle: FaceStyle = 'standard'
 
 // ──────────────────────────────────
 // Pause timer
@@ -291,26 +248,22 @@ function clearPauseTimer() {
 function applySpriteState(line: DialogueLine) {
   const primary = line.character
 
-  // Use test expression if override is active, otherwise use script expression
-  const effectiveExpression = testExpression.value !== 'auto' ? testExpression.value as Expression : line.expression
-
   if (primary === 'taco') {
-    tacoExpression.value = effectiveExpression
+    tacoExpression.value = line.expression
     tacoAction.value = line.action
   } else if (primary === 'nacho') {
-    nachoExpression.value = effectiveExpression
+    nachoExpression.value = line.expression
     nachoAction.value = line.action
   }
 
   // Secondary character (for dual scenes)
   if (line.secondary) {
     const sec = line.secondary
-    const secEffectiveExpression = testExpression.value !== 'auto' ? testExpression.value as Expression : sec.expression
     if (sec.character === 'taco') {
-      tacoExpression.value = secEffectiveExpression
+      tacoExpression.value = sec.expression
       tacoAction.value = sec.action
     } else if (sec.character === 'nacho') {
-      nachoExpression.value = secEffectiveExpression
+      nachoExpression.value = sec.expression
       nachoAction.value = sec.action
     }
   }
@@ -649,57 +602,6 @@ onUnmounted(() => {
   inset: 0;
   z-index: 100002;
   pointer-events: none;
-
-  // Settings panel (face style + emote selector)
-  &__settings {
-    position: absolute;
-    top: 1rem;
-    right: 1rem;
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-    background: rgba(10, 10, 20, 0.9);
-    padding: 0.5rem 0.75rem;
-    border: 3px solid #C89632;
-    box-shadow:
-      3px 3px 0 0 #8B6914,
-      -3px 3px 0 0 #8B6914,
-      3px -3px 0 0 #8B6914,
-      -3px -3px 0 0 #8B6914;
-    z-index: 5;
-    pointer-events: auto;
-
-    &__row {
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-    }
-
-    &__label {
-      font-family: 'Space Mono', monospace;
-      font-size: 0.7rem;
-      color: #f0f0f0;
-      margin: 0;
-      min-width: 4rem;
-    }
-
-    &__select {
-      font-family: 'Space Mono', monospace;
-      font-size: 0.7rem;
-      color: #f0f0f0;
-      background: rgba(30, 30, 40, 0.95);
-      border: 2px solid #C89632;
-      padding: 0.25rem 0.5rem;
-      border-radius: 0;
-      cursor: pointer;
-      outline: none;
-      min-width: 120px;
-
-      &:focus {
-        border-color: #FFD700;
-      }
-    }
-  }
 
   // Sprite stage — positioned above dialog
   &__stage {

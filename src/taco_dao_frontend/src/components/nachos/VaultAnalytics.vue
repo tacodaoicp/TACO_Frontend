@@ -155,14 +155,12 @@ const createAnalyticsActor = async () => {
   const { Actor } = await import('@dfinity/agent')
   const { useTacoStore } = await import('../../stores/taco.store')
   const { idlFactory } = await import('../../../../declarations/nachos_vault/nachos_vault.did.js')
-  const { getEffectiveNetwork } = await import('../../config/network-config')
+  const { getCanisterId } = await import('../../constants/canisterIds')
 
   const tacoStore = useTacoStore()
   const agent = await tacoStore.getAnonymousAgentPublic()
 
-  const canisterId = getEffectiveNetwork() === 'staging'
-    ? 'p4nog-baaaa-aaaad-qkwpa-cai'
-    : 'p4nog-baaaa-aaaad-qkwpa-cai'
+  const canisterId = getCanisterId('nachos_vault')
 
   return Actor.createActor(idlFactory, { agent, canisterId })
 }

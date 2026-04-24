@@ -22,8 +22,6 @@ html:has([data-theme="exchange"]) body {
 [data-theme="exchange"] {
   background: var(--bg-primary);
   color: var(--text-primary);
-  height: 100vh;
-  overflow: hidden;
 
   // Reset box-sizing
   *, *::before, *::after {

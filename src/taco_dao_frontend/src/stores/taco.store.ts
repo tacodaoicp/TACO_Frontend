@@ -32,7 +32,7 @@ import type { AccountIdentifier as AccountIdentifierType } from '@dfinity/ledger
 import type { SnsGovernanceCanister as SnsGovernanceCanisterType } from '@dfinity/sns'
 import type { IDL as IDLType } from '@dfinity/candid'
 import type { Result_1, UserState } from "../../../declarations/dao_backend/DAO_backend.did.d"
-import type { Result_4, UpdateConfig, RebalanceConfigResponse, _SERVICE as TreasuryService } from "../../../declarations/treasury/treasury.did.js"
+import type { Result_4, UpdateConfig, RebalanceConfigResponse, TradeRecord, _SERVICE as TreasuryService } from "../../../declarations/treasury/treasury.did.js"
 import type { _SERVICE as NeuronSnapshotService } from "../../../declarations/neuronSnapshot/neuronSnapshot.did.js"
 import type { _SERVICE as SneedForumService } from "../../../declarations/sneed_sns_forum/sneed_sns_forum.did.js"
 import type { _SERVICE as AppSneedDaoService } from "../../../declarations/app_sneeddao_backend/app_sneeddao_backend.did.js"
@@ -478,16 +478,6 @@ interface TradingMetrics {
     avgSlippage: number;
     successRate: number;
 }
-interface Trade {
-    tokenSold: Principal;
-    tokenBought: Principal;
-    amountSold: bigint;
-    amountBought: bigint;
-    exchange: 'ICPSwap' | 'KongSwap' | 'TACO';
-    timestamp: bigint;
-    success: boolean;
-    error?: string;
-}
 interface TimerHealth {
     snapshot: {
         active: boolean;
@@ -513,13 +503,8 @@ interface TimerHealth {
             avgSlippage: number;
             successRate: number;
         };
-        recentTrades?: Trade[];
+        recentTrades?: TradeRecord[];
     };
-}
-interface RebalanceStatus {
-    Idle?: null;
-    Trading?: null;
-    Failed?: string;
 }
 interface SystemLog {
     timestamp: bigint;
@@ -541,7 +526,7 @@ interface MetadataEntry {
 interface TradingStatusResult {
     ok?: {
         metrics: TradingMetrics;
-        executedTrades?: Trade[];
+        executedTrades?: TradeRecord[];
         rebalanceStatus: { Idle: null } | { Trading: null } | { Failed: string };
     };
     err?: string;
@@ -1716,7 +1701,7 @@ export const useTacoStore = defineStore('taco', () => {
                         // Also populate tradingLogs from executedTrades
                         const executedTrades = ts.executedTrades
                         if (executedTrades && executedTrades.length > 0) {
-                            tradingLogs.value = executedTrades.map((trade: Trade) => {
+                            tradingLogs.value = executedTrades.map((trade: TradeRecord) => {
                                 if (trade.error && trade.error.length > 0) {
                                     return {
                                         timestamp: trade.timestamp,
@@ -3980,7 +3965,7 @@ export const useTacoStore = defineStore('taco', () => {
                     //         decimals: t[1]?.tokenDecimals?.toString()
                     //     }))
                     // )
-                    tradingLogs.value = executedTrades.map((trade: Trade) => {
+                    tradingLogs.value = executedTrades.map((trade: TradeRecord) => {
                         if (trade.error && trade.error.length > 0) {
                             return {
                                 timestamp: trade.timestamp,

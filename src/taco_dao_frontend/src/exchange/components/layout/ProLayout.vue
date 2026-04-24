@@ -156,6 +156,7 @@ defineExpose({ resetLayout })
   &__chart {
     overflow: hidden;
     background: var(--bg-primary, #1A0E05);
+    min-height: 0;
   }
 
   &__bottom {

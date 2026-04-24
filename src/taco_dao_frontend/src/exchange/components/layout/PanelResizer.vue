@@ -143,6 +143,8 @@ onUnmounted(() => {
   &--vertical {
     height: 2px;
     cursor: row-resize;
+    padding: 4px 0;
+    margin: -4px 0;
   }
 
   &:hover, &--active {

@@ -235,6 +235,7 @@ const TRANSPORT_SIGNATURES = [
   'Failed to fetch',
   'Request timeout',
   'IC0',
+  'Call was returned undefined',
 ]
 
 export function isTransportError(err: any): boolean {

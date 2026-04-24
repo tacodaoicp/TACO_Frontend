@@ -90,9 +90,9 @@ const showBanner = computed(() =>
     }
 
     &--warning {
-      background-color: rgba(255, 193, 7, 0.15);
-      border: 1px solid rgba(255, 193, 7, 0.4);
-      color: var(--dark-orange-to-brown);
+      background-color: rgba(255, 193, 7, 0.12);
+      border: 1px solid rgba(255, 193, 7, 0.45);
+      color: var(--yellow);
     }
 
   }

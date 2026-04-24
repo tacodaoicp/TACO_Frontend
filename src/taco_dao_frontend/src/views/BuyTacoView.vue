@@ -31,7 +31,7 @@
               <div class="buy-taco-view__timeline">
                 <div class="buy-taco-view__timeline-step">
                   <span class="buy-taco-view__step-num">1</span>
-                  <span class="buy-taco-view__step-label">Fund your wallet with ICP using {{ selectedProvider === 'coinbase' ? 'Coinbase' : 'Transak' }}</span>
+                  <span class="buy-taco-view__step-label">Fund your wallet with ICP via Banxa or send it from another wallet</span>
                 </div>
                 <span class="buy-taco-view__timeline-arrow"><i class="fa-solid fa-chevron-right"></i></span>
                 <div class="buy-taco-view__timeline-step">
@@ -83,26 +83,27 @@
                     TACO
                   </button>
                   <button :class="['buy-taco-view__product-btn', { active: selectedProduct === 'nachos' }]"
-                          :disabled="isExecuting"
+                          :disabled="isExecuting || !!nachosMintDisabledReason"
+                          :title="nachosMintDisabledReason || undefined"
                           @click="selectedProduct = 'nachos'">
                     NACHOS
                   </button>
                 </div>
 
-                <!-- provider toggle -->
+                <!-- provider toggle (Banxa vs Self) -->
                 <div class="buy-taco-view__provider-toggle">
-                  <button :class="['buy-taco-view__provider-btn', { active: selectedProvider === 'coinbase' }]"
-                          @click="selectedProvider = 'coinbase'">
-                    Coinbase
+                  <button :class="['buy-taco-view__provider-btn', { active: selectedProvider === 'banxa' }]"
+                          @click="selectedProvider = 'banxa'">
+                    Banxa
                   </button>
-                  <button :class="['buy-taco-view__provider-btn', { active: selectedProvider === 'transak' }]"
-                          @click="selectedProvider = 'transak'">
-                    Transak
+                  <button :class="['buy-taco-view__provider-btn', { active: selectedProvider === 'self' }]"
+                          @click="selectedProvider = 'self'">
+                    Self
                   </button>
                 </div>
 
-                <!-- fiat amount + currency -->
-                <div class="buy-taco-view__amount-row">
+                <!-- fiat amount + currency (Banxa only) -->
+                <div v-if="selectedProvider === 'banxa'" class="buy-taco-view__amount-row">
                   <div class="buy-taco-view__input-group" style="flex: 1;">
                     <label class="buy-taco-view__label">Amount</label>
                     <input type="text"
@@ -129,26 +130,41 @@
                 <!-- deposit address display -->
                 <div class="buy-taco-view__deposit-addr">
                   <label class="buy-taco-view__label">Your ICP Address</label>
-                  <code v-if="userLedgerAccountId" class="buy-taco-view__addr-value">{{ userLedgerAccountId }}</code>
-                  <code v-else class="buy-taco-view__addr-value">
-                    <i class="fa-solid fa-spinner fa-spin me-1"></i>Loading...
-                  </code>
+                  <div class="buy-taco-view__addr-row">
+                    <code v-if="userLedgerAccountId" class="buy-taco-view__addr-value">{{ userLedgerAccountId }}</code>
+                    <code v-else class="buy-taco-view__addr-value">
+                      <i class="fa-solid fa-spinner fa-spin me-1"></i>Loading...
+                    </code>
+                    <button v-if="userLedgerAccountId"
+                            type="button"
+                            class="btn btn-sm buy-taco-view__copy-addr"
+                            @click="copyAddress"
+                            title="Copy ICP address">
+                      <i class="fa-regular fa-copy"></i>
+                      <span>Copy</span>
+                    </button>
+                  </div>
+                  <p class="buy-taco-view__addr-hint">
+                    <i class="fa-solid fa-satellite-dish me-1"></i>
+                    Any ICP sent to this address is auto-detected within seconds.
+                  </p>
                 </div>
 
-                <!-- buy button -->
-                <button class="btn taco-btn taco-btn--green w-100"
-                        :disabled="isExecuting || !userLedgerAccountId"
-                        @click="openBuy">
-                  <i v-if="isExecuting"
+                <!-- buy button (Banxa only) -->
+                <button v-if="selectedProvider === 'banxa'"
+                        class="btn taco-btn taco-btn--green w-100"
+                        :disabled="!userLedgerAccountId"
+                        @click="openBanxa">
+                  <i v-if="buyPhase === 'quoting' || buyPhase === 'executing'"
                      class="fa-solid fa-spinner fa-spin me-2"></i>
-                  {{ buyButtonLabel }}
+                  Fund via Banxa
                 </button>
 
-                <!-- Auto-swap toggle (production only, TACO only) -->
-                <div v-if="!isDevEnvironment() && selectedProduct === 'taco'" class="buy-taco-view__auto-toggle mt-2">
+                <!-- Auto-action toggle (hidden once ICP is already detected) -->
+                <div v-if="!icpDetected" class="buy-taco-view__auto-toggle mt-2">
                   <label class="d-flex align-items-center gap-2" style="cursor: pointer; font-size: 0.8rem;">
                     <input type="checkbox" v-model="autoSwapEnabled" :disabled="isExecuting" />
-                    <span>Auto-swap when ICP arrives</span>
+                    <span>{{ selectedProduct === 'nachos' ? 'Auto-mint' : 'Auto-swap' }} when ICP arrives</span>
                   </label>
                 </div>
 
@@ -552,6 +568,12 @@
     margin-bottom: 1.5rem;
   }
 
+  &__addr-row {
+    display: flex;
+    align-items: stretch;
+    gap: 0.5rem;
+  }
+
   &__addr-value {
     display: flex;
     align-items: center;
@@ -565,6 +587,35 @@
     font-size: 0.875rem;
     color: var(--brown);
     word-break: break-all;
+    flex: 1;
+  }
+
+  &__copy-addr {
+    flex-shrink: 0;
+    width: 5.5rem;
+    padding: 0.5rem 0.875rem;
+    border-radius: 0.5rem;
+    background: var(--gold);
+    color: var(--dark-brown);
+    border: 2px solid var(--dark-orange-to-brown);
+    font-family: 'Rubik', sans-serif;
+    font-weight: 600;
+    font-size: 0.8rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.375rem;
+
+    &:hover { filter: brightness(1.05); }
+    &:active { transform: none; }
+  }
+
+  &__addr-hint {
+    margin: 0.375rem 0 0;
+    font-size: 0.75rem;
+    color: var(--black-to-white);
+    opacity: 0.65;
+    font-style: italic;
   }
 
   &__addr-error {
@@ -860,7 +911,6 @@ import type { ProgressStep, ProgressAmount } from '../components/misc/SwapProgre
 import SwapDialog from '../components/wallet/SwapDialog.vue'
 import SwapConfirmDialog from '../components/wallet/SwapConfirmDialog.vue'
 import VaultConfirmDialog from '../components/nachos/VaultConfirmDialog.vue'
-import type { ExecutionPlan } from '../composables/useSplitSwap'
 import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useTacoStore } from '../stores/taco.store'
@@ -870,24 +920,15 @@ import { isDevEnvironment, getEffectiveNetwork } from '../config/network-config'
 import { useAdminCheck } from '../composables/useAdminCheck'
 import { useSplitSwap } from '../composables/useSplitSwap'
 import { Principal } from '@dfinity/principal'
-import { signedSessionHeaders } from '../utils/sign-session-request'
+import { buildBanxaUrl } from '../utils/onramp/banxa'
 import { tokenImages } from '../components/data/TokenData'
 
 ///////////////
 // constants //
 ///////////////
 
-// Coinbase Onramp
-const COINBASE_SESSION_WORKER = 'https://taco-onramp-session.xykominos.workers.dev'
-
-// Transak staging
-const TRANSAK_API_KEY = 'fac6ce0c-2b65-4982-a2e3-42e1c5fa15dc'
-const TRANSAK_BASE_URL = 'https://global-stg.transak.com'
-const TACO_BRAND_COLOR = 'DA8D28'
-
 // Deposit detection
-const DEPOSIT_POLL_MS = 3_000   // Poll ICP ledger every 3s during deposit phase
-const MAX_POLL_DURATION_MS = 1_200_000 // 20 minutes
+const DEPOSIT_POLL_MS = 3_000   // Poll ICP ledger every 3s
 const ICP_LEDGER_CANISTER_ID = 'ryjl3-tyaaa-aaaaa-aaaba-cai'
 const ICP_PRINCIPAL = ICP_LEDGER_CANISTER_ID
 const TACO_PRINCIPAL = 'kknbx-zyaaa-aaaaq-aae4a-cai'
@@ -902,7 +943,7 @@ const route = useRoute()
 const tacoStore = useTacoStore()
 const nachosStore = useNachosStore()
 const splitSwap = useSplitSwap()
-const { userPrincipal, darkModeToggled, userLoggedIn, userLedgerAccountId } = storeToRefs(tacoStore)
+const { userPrincipal, userLoggedIn, userLedgerAccountId } = storeToRefs(tacoStore)
 const { cachedOperations } = storeToRefs(nachosStore)
 const { isAdmin } = useAdminCheck()
 const showAsLoggedIn = computed(() => tacoStore.userLoggedIn || tacoStore.tourBypassAuth)
@@ -912,12 +953,12 @@ const showAsLoggedIn = computed(() => tacoStore.userLoggedIn || tacoStore.tourBy
 /////////////////
 
 type BuyPhase = 'idle' | 'detecting' | 'quoting' | 'executing' | 'complete' | 'error'
-type Provider = 'coinbase' | 'transak'
 type Product = 'taco' | 'nachos'
+type Provider = 'banxa' | 'self'
 
 // Product & provider
 const selectedProduct = ref<Product>(route.query.product === 'nachos' ? 'nachos' : 'taco')
-const selectedProvider = ref<Provider>('coinbase')
+const selectedProvider = ref<Provider>('banxa')
 const fiatAmount = ref('50')
 const fiatCurrency = ref('EUR')
 
@@ -932,8 +973,6 @@ const systemPaused = ref(false)
 // Baseline ICP balance tracking (for difference calculation)
 const baselineIcpBalance = ref(0n)
 
-// Transak SDK instance ref (for cleanup on unmount)
-let transakInstance: any = null
 
 // ICP detected in user's wallet
 const icpDetected = ref(false)
@@ -987,18 +1026,35 @@ const availableTokensForSwap = computed(() => {
 // computed props //
 ////////////////////
 
-const buyButtonLabel = computed(() => {
-  if (systemPaused.value) return 'System Paused'
-  if (buyPhase.value === 'detecting') return 'Waiting for ICP...'
-  if (buyPhase.value === 'quoting') return 'Getting quotes...'
-  if (buyPhase.value === 'executing') return 'Executing...'
-  return `Fund via ${selectedProvider.value === 'coinbase' ? 'Coinbase' : 'Transak'}`
-})
-
 const failedNachosMints = computed(() => {
   return cachedOperations.value
     .filter(op => op.type === 'mint_icp' && op.status === 'failed')
     .sort((a, b) => b.timestamp - a.timestamp) // Most recent first
+})
+
+/** Reason the NACHOS product is currently un-selectable, or null if it's fine.
+ *  Grand Tour always bypasses — the tour must be able to demo the NACHOS path.
+ *  While vault data is still loading (`dashboardData` null) we stay silent so the button
+ *  doesn't flash a scary "circuit breaker" tooltip during the first second of the page.
+ */
+const nachosMintDisabledReason = computed((): string | null => {
+  if (tacoStore.grandTourActive || tacoStore.tourBypassAuth) return null
+  if (!nachosStore.dashboardData) return null
+  if (nachosStore.systemPaused) return 'Vault paused for maintenance'
+  if (!nachosStore.mintingEnabled) return 'Minting is currently disabled'
+  if (nachosStore.circuitBreakerActive) return 'Circuit breaker active — minting paused'
+  if (nachosStore.hasPausedTokens) return 'An underlying vault token is paused'
+  if (!nachosStore.genesisComplete) return 'Vault not yet initialized'
+  if (nachosStore.maxMintPer4h > 0n && nachosStore.globalMintIn4h >= nachosStore.maxMintPer4h) {
+    return 'Global mint quota reached for this 4h window — try again later'
+  }
+  if (nachosStore.remainingMintICP !== null && nachosStore.remainingMintICP <= 0) {
+    return 'Your mint quota reached for this 4h window'
+  }
+  if (nachosStore.remainingMintOps !== null && nachosStore.remainingMintOps <= 0) {
+    return 'Your mint operations limit reached for this 4h window'
+  }
+  return null
 })
 
 /////////////////////////////
@@ -1086,179 +1142,95 @@ const formatE8s = (e8s: bigint): string => {
   return fracStr ? `${whole}.${fracStr}` : whole.toString()
 }
 
-/** Generate a unique order ID */
-const generateOrderId = (): string => {
-  const ts = Date.now().toString(36)
-  const rand = Math.random().toString(36).substring(2, 8)
-  return `taco-${ts}-${rand}`
-}
-
 // ==========================
 // Buy / Onramp functions
 // ==========================
 
-/** Open the selected provider's purchase widget */
-const openBuy = () => {
-  if (selectedProvider.value === 'coinbase') openCoinbase()
-  else openTransak()
+/** Copy the user's ICP account id to clipboard and flash a toast */
+const copyAddress = async () => {
+  if (!userLedgerAccountId.value) return
+  try {
+    await navigator.clipboard.writeText(userLedgerAccountId.value)
+    tacoStore.addToast({
+      id: Date.now(),
+      code: 'buy-copy-address',
+      title: 'Copied',
+      icon: 'fa-solid fa-check',
+      message: 'ICP address copied to clipboard.'
+    })
+  } catch (e) {
+    console.warn('Clipboard copy failed:', e)
+    tacoStore.addToast({
+      id: Date.now(),
+      code: 'buy-copy-address-error',
+      title: 'Copy failed',
+      icon: 'fa-solid fa-triangle-exclamation',
+      message: 'Could not copy ICP address.'
+    })
+  }
 }
 
-/** Open Coinbase Onramp popup — always deposits to user's personal wallet */
-const openCoinbase = async () => {
-  if (!userLedgerAccountId.value) return
-
-  // Capture baseline ICP balance FIRST
+/** Read current ICP balance and store as baseline (doesn't touch detection state) */
+const captureBaseline = async () => {
   try {
-    baselineIcpBalance.value = await tacoStore.icrc1BalanceOf(
+    const bal = await tacoStore.icrc1BalanceOf(
       ICP_LEDGER_CANISTER_ID,
       Principal.fromText(tacoStore.userPrincipal),
-      new Uint8Array(32)  // Explicit default subaccount (matches VaultFiatMint)
+      new Uint8Array(32)
     )
+    baselineIcpBalance.value = bal !== false ? BigInt(bal) : 0n
   } catch (e) {
     console.warn('Failed to capture baseline balance:', e)
     baselineIcpBalance.value = 0n
   }
-
-  // THEN reset detected state
-  icpDetected.value = false
-  detectedIcpAmount.value = 0n
-
-  try {
-    const sessionBody = {
-      addresses: [{ address: userLedgerAccountId.value }],
-      assets: ['ICP'],
-    }
-    const resp = await fetch(COINBASE_SESSION_WORKER, {
-      method: 'POST',
-      headers: await signedSessionHeaders(sessionBody, tacoStore.signWithUserIdentity),
-      body: JSON.stringify(sessionBody),
-    })
-    if (!resp.ok) {
-      const err = await resp.json()
-      throw new Error(`Session token error: ${err.error} ${err.details || ''}`)
-    }
-    const { token: sessionToken } = await resp.json()
-
-    const { generateOnRampURL } = await import('@coinbase/cbpay-js')
-
-    const onrampUrl = generateOnRampURL({
-      sessionToken,
-      addresses: { [userLedgerAccountId.value]: [] },
-      assets: ['ICP'],
-      presetFiatAmount: Number(fiatAmount.value) || 50,
-      theme: 'dark',
-    })
-
-    buyPhase.value = 'detecting'
-    const popup = window.open(onrampUrl, 'coinbase-onramp', 'width=500,height=700,scrollbars=yes,resizable=yes')
-    startDepositPolling()
-
-    // Grace period when popup closes
-    const popupPoll = setInterval(() => {
-      if (!popup || popup.closed) {
-        clearInterval(popupPoll)
-        // 5-min grace if still detecting
-        setTimeout(() => {
-          if (buyPhase.value === 'detecting') {
-            buyPhase.value = 'idle'
-            stopDepositPolling()
-          }
-        }, 300_000)
-      }
-    }, 1500)
-
-  } catch (err: any) {
-    console.error('Failed to open Coinbase Onramp:', err)
-    buyPhase.value = 'error'
-    executionError.value = `Failed to open payment widget: ${err.message || err}`
-  }
 }
 
-/** Build Transak widget URL */
-const buildTransakUrl = (addr: string, title: string): string => {
-  const params = new URLSearchParams({
-    apiKey: TRANSAK_API_KEY,
-    referrerDomain: window.location.origin,
-    productsAvailed: 'BUY',
-    cryptoCurrencyCode: 'ICP',
-    cryptoCurrencyList: 'ICP',
-    network: 'mainnet',
-    walletAddress: addr,
-    disableWalletAddressForm: 'true',
-    exchangeScreenTitle: title,
-    themeColor: TACO_BRAND_COLOR,
-    hideMenu: 'true',
-    hideExchangeScreen: 'true',
-    isFeeCalculationHidden: 'true',
-    defaultFiatCurrency: fiatCurrency.value,
-    defaultFiatAmount: fiatAmount.value || '50',
-    partnerCustomerId: userPrincipal.value,
-    partnerOrderId: generateOrderId(),
-    colorMode: 'DARK',
-  })
-
-  return `${TRANSAK_BASE_URL}?${params.toString()}`
-}
-
-/** Open Transak widget — always deposits to user's personal wallet */
-const openTransak = async () => {
-  if (!userLedgerAccountId.value) return
-
-  // Capture baseline ICP balance FIRST
-  try {
-    baselineIcpBalance.value = await tacoStore.icrc1BalanceOf(
-      ICP_LEDGER_CANISTER_ID,
-      Principal.fromText(tacoStore.userPrincipal),
-      new Uint8Array(32)  // Explicit default subaccount (matches VaultFiatMint)
-    )
-  } catch (e) {
-    console.warn('Failed to capture baseline balance:', e)
-    baselineIcpBalance.value = 0n
-  }
-
-  // THEN reset detected state
+/** Capture baseline AND reset detection — used when starting a fresh Banxa buy session */
+const prepareForDeposit = async () => {
+  await captureBaseline()
   icpDetected.value = false
   detectedIcpAmount.value = 0n
+}
 
-  try {
-    buyPhase.value = 'detecting'
-
-    const { Transak } = await import('@transak/ui-js-sdk')
-    const widgetUrl = buildTransakUrl(userLedgerAccountId.value, selectedProduct.value === 'nachos' ? 'Buy NACHOS' : 'Buy TACO')
-    transakInstance = new Transak({ widgetUrl })
-    transakInstance.init()
-
-    startDepositPolling()
-
-    Transak.on(Transak.EVENTS.TRANSAK_ORDER_CREATED, (data: any) => {
-      console.log('Transak order created:', data)
-    })
-
-    Transak.on(Transak.EVENTS.TRANSAK_ORDER_SUCCESSFUL, (data: any) => {
-      console.log('Transak order successful:', data)
-    })
-
-    Transak.on(Transak.EVENTS.TRANSAK_WIDGET_CLOSE, () => {
-      console.log('Transak widget closed')
-      if (transakInstance) {
-        transakInstance.close()
-        transakInstance = null
-      }
-      // 5-min grace
+/** After provider tab opens, poll until it closes, then give a 5-min grace period */
+const watchPopupForGrace = (popup: Window | null) => {
+  const popupPoll = setInterval(() => {
+    if (!popup || popup.closed) {
+      clearInterval(popupPoll)
       setTimeout(() => {
         if (buyPhase.value === 'detecting') {
           buyPhase.value = 'idle'
           stopDepositPolling()
         }
       }, 300_000)
+    }
+  }, 1500)
+}
+
+/** Open Banxa checkout in a new tab — deposits to user's personal wallet */
+const openBanxa = async () => {
+  if (!userLedgerAccountId.value) return
+
+  await prepareForDeposit()
+
+  try {
+    const url = buildBanxaUrl({
+      walletAddress: userLedgerAccountId.value,
+      fiatAmount: Number(fiatAmount.value) || 50,
+      fiatCurrency: fiatCurrency.value,
     })
 
+    buyPhase.value = 'detecting'
+    const popup = window.open(url, '_blank', 'noopener,noreferrer')
+    startDepositPolling()
+    watchPopupForGrace(popup)
   } catch (err: any) {
-    console.error('Failed to initialize Transak:', err)
+    console.error('Failed to open Banxa:', err)
     buyPhase.value = 'error'
-    executionError.value = `Failed to open payment widget: ${err.message || err}`
+    executionError.value = `Failed to open payment page: ${err.message || err}`
   }
 }
+
 
 // ==========================
 // Deposit polling (ICP ledger)
@@ -1267,21 +1239,9 @@ const openTransak = async () => {
 /** Poll user's personal wallet for ICP balance increase */
 const startDepositPolling = () => {
   stopDepositPolling()
-  const startedAt = Date.now()
   let pollingStopped = false  // Guard flag to prevent race conditions
 
   depositPollInterval = setInterval(async () => {
-    if (Date.now() - startedAt > MAX_POLL_DURATION_MS) {
-      stopDepositPolling()
-      pollingStopped = true
-      // Only set error if ICP wasn't already detected
-      if (!icpDetected.value) {
-        buyPhase.value = 'error'
-        executionError.value = 'Timed out waiting for ICP deposit.'
-      }
-      return
-    }
-
     try {
       const currentBalance = await tacoStore.icrc1BalanceOf(
         ICP_LEDGER_CANISTER_ID,
@@ -1324,15 +1284,20 @@ const stopDepositPolling = () => {
 // Swap / mint routing
 // ==========================
 
-/** Route swap/mint click: NACHOS always direct, TACO opens SwapDialog or direct-executes */
+/** Route swap/mint click based on product + auto toggle */
 const handleSwapMintClick = () => {
   if (!icpDetected.value || detectedIcpAmount.value === 0n) return
 
   if (selectedProduct.value === 'nachos') {
-    // NACHOS: show confirmation dialog (unless skipped)
-    requestMintNachos()
+    if (autoSwapEnabled.value) {
+      // NACHOS + auto: skip confirmation, mint directly
+      executeDirectMint()
+    } else {
+      // NACHOS + manual: show confirmation dialog (unless user opted into skip)
+      requestMintNachos()
+    }
   } else if (autoSwapEnabled.value) {
-    // TACO + auto: direct execute with 5% max slippage
+    // TACO + auto: split-route execute with 60% max slippage
     executeDirectSwap()
   } else {
     // TACO + manual: open SwapDialog for quote review
@@ -1340,7 +1305,7 @@ const handleSwapMintClick = () => {
   }
 }
 
-/** Direct swap execution (auto mode — 5% max slippage) */
+/** Direct swap execution (auto mode — 60% max slippage) */
 const executeDirectSwap = async () => {
   const amount = detectedIcpAmount.value
   if (amount === 0n) return
@@ -1613,25 +1578,21 @@ const handleSwapError = (error: string) => {
 // lifecycle hooks //
 /////////////////////
 
-/** Check if user already has ICP above threshold (for manual swap/mint) */
-const checkExistingBalance = async () => {
+/** Start continuous background monitoring:
+ *  - baseline = current balance (so future deposits are detected as deltas)
+ *  - if existing balance is above dust, surface it as already-detected so user can swap/mint it right now
+ */
+const startBackgroundMonitor = async () => {
   if (!userPrincipal.value) return
-  try {
-    const balance = await tacoStore.icrc1BalanceOf(
-      ICP_LEDGER_CANISTER_ID,
-      Principal.fromText(userPrincipal.value),
-      new Uint8Array(32)  // Explicit default subaccount (matches VaultFiatMint)
-    )
-    if (balance !== false) {
-      const bal = BigInt(balance)
-      if (bal > DEPOSIT_MIN_E8S) {
-        icpDetected.value = true
-        detectedIcpAmount.value = bal
-      }
-    }
-  } catch {
-    // Ignore — user just won't see the manual button
+  await captureBaseline()
+  if (baselineIcpBalance.value > DEPOSIT_MIN_E8S) {
+    icpDetected.value = true
+    detectedIcpAmount.value = baselineIcpBalance.value
+  } else {
+    icpDetected.value = false
+    detectedIcpAmount.value = 0n
   }
+  startDepositPolling()
 }
 
 onMounted(async () => {
@@ -1640,21 +1601,29 @@ onMounted(async () => {
     router.replace('/')
     return
   }
-  // Check for existing ICP balance (enables manual swap/mint)
-  if (userPrincipal.value) {
-    await checkExistingBalance()
+  if (userLoggedIn.value) {
+    await startBackgroundMonitor()
   }
 })
 
 // when user logs in after page load
 watch(userLoggedIn, async (loggedIn) => {
   if (loggedIn) {
-    await checkExistingBalance()
+    await startBackgroundMonitor()
   } else {
     buyPhase.value = 'idle'
     icpDetected.value = false
     detectedIcpAmount.value = 0n
     stopDepositPolling()
+  }
+})
+
+// after a swap/mint completes, re-baseline and resume monitoring so the next deposit is caught
+watch(buyPhase, async (newPhase) => {
+  if (newPhase === 'complete' && userLoggedIn.value) {
+    setTimeout(async () => {
+      if (buyPhase.value === 'complete') await startBackgroundMonitor()
+    }, 4000)
   }
 })
 
@@ -1676,10 +1645,6 @@ watch(isExecuting, (executing) => {
 onBeforeUnmount(() => {
   window.removeEventListener('beforeunload', preventNavigation)
   stopDepositPolling()
-  if (transakInstance && typeof transakInstance.close === 'function') {
-    transakInstance.close()
-  }
-  transakInstance = null
 })
 
 </script>

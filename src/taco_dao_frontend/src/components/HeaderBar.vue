@@ -38,10 +38,9 @@
         </router-link>
 
         <!-- performance - router link -->
-        <router-link to="/performance" class="header-bar__rl header-bar__rl--with-badge">
+        <router-link to="/performance" class="header-bar__rl">
 
           <span class="header-bar__rl-span">Performance</span>
-          <span class="header-bar__rl-beta">BETA</span>
 
         </router-link>
 
@@ -91,24 +90,23 @@
 
         </router-link>
 
-        <!-- vault - router link (staging/local or admin) -->
-        <router-link v-if="canShowVault" to="/vault" class="header-bar__rl header-bar__rl--with-badge">
-          <span class="header-bar__rl-span">Vault</span>
-          <span class="header-bar__rl-beta">STAGING</span>
-        </router-link>
-
         <!-- buy taco - router link (staging/local or admin) -->
-        <router-link v-if="canShowVault" to="/buy" class="header-bar__rl header-bar__rl--with-badge">
+        <router-link v-if="canShowVault" to="/buy" class="header-bar__rl">
           <span class="header-bar__rl-span">Buy</span>
-          <span class="header-bar__rl-beta">STAGING</span>
         </router-link>
 
         <!-- wizard - router link -->
         <a v-if="localNeuronsCount < 1" href="#" @click="toggleTacoWizard()" class="header-bar__rl">
-          
+
           <span class="header-bar__rl-span">🧙Taco Wizard</span>
-        
-        </a>          
+
+        </a>
+
+        <!-- vault - router link (staging/local or admin) — positioned last -->
+        <router-link v-if="canShowVault" to="/vault" class="header-bar__rl header-bar__rl--with-badge">
+          <span class="header-bar__rl-span">Vault</span>
+          <span class="header-bar__rl-beta">Coming Soon</span>
+        </router-link>
 
       </div>
 
@@ -246,7 +244,7 @@
         <router-link @click="togglePagesMenu()" to="/performance" class="list-group-item">
 
           <!-- item text -->
-          <span>Performance <span class="header-bar__rl-beta">BETA</span></span>
+          <span>Performance</span>
 
         </router-link>
 
@@ -301,14 +299,14 @@
 
         </router-link>
 
-        <!-- vault - router link (staging/local or admin) -->
-        <router-link v-if="canShowVault" @click="togglePagesMenu()" to="/vault" class="list-group-item">
-          <span>Vault <span class="header-bar__rl-beta">STAGING</span></span>
-        </router-link>
-
         <!-- buy taco - router link (staging/local or admin) -->
         <router-link v-if="canShowVault" @click="togglePagesMenu()" to="/buy" class="list-group-item">
-          <span>Buy <span class="header-bar__rl-beta">STAGING</span></span>
+          <span>Buy</span>
+        </router-link>
+
+        <!-- vault - router link (staging/local or admin) — positioned last -->
+        <router-link v-if="canShowVault" @click="togglePagesMenu()" to="/vault" class="list-group-item">
+          <span>Vault <span class="header-bar__rl-beta">Coming Soon</span></span>
         </router-link>
 
       </div>

@@ -498,7 +498,7 @@ type create_trading_canister =
       ICRC12;
       ICRC3;
     }) -> (bool);
-   refundStuckFunds: () -> (ActionResult);
+   refundStuckFunds: () -> (text);
    removeConcentratedLiquidity: (token0i: text, token1i: text, positionId:
     nat, liquidityAmount: nat) -> (RemoveConcentratedResult);
    removeFeeCollector: () -> (ActionResult);

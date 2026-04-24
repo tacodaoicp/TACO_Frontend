@@ -85,11 +85,11 @@ export const CANISTER_IDS: Record<CanisterKey, Record<EnvKey, string>> = {
 
   // NACHOS
   nachos_vault: {
-    ic: 'p4nog-baaaa-aaaad-qkwpa-cai',  // placeholder — update when production deployed
+    ic: 'ptdgf-eqaaa-aaaan-q6dtq-cai',
     staging: 'p4nog-baaaa-aaaad-qkwpa-cai',
   },
   nachos: {
-    ic: 'rctxc-zqaaa-aaaan-qz6na-cai',
+    ic: 'o6ncl-lyaaa-aaaan-q6dua-cai',
     staging: 'p4nog-baaaa-aaaad-qkwpa-cai',
   },
 

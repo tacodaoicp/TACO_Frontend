@@ -1,5 +1,5 @@
 <template>
-  <div data-theme="exchange" class="exchange-app" :class="{ 'exchange-app--pro': isProRoute }">
+  <div data-theme="exchange" class="exchange-app" :class="{ 'exchange-app--pro': isProRoute, 'exchange-app--terminal': isTerminalRoute, 'exchange-app--content': !isTerminalRoute }">
     <a href="#ex-main" class="skip-link">Skip to content</a>
     <!-- Init error / empty state banner -->
     <div v-if="exchangeStore.initError" class="exchange-app__banner exchange-app__banner--error">
@@ -32,6 +32,7 @@ const router = useRouter()
 const route = useRoute()
 
 const isProRoute = computed(() => route.meta?.mode === 'pro')
+const isTerminalRoute = computed(() => route.meta?.mode === 'pro' || route.meta?.mode === 'trade')
 const isAdmin = computed(() => ADMIN_PRINCIPALS.includes(exchangeStore.principalText))
 
 onMounted(async () => {
@@ -105,10 +106,19 @@ function handleKeydown(e: KeyboardEvent) {
 
 .exchange-app {
   width: 100%;
-  height: 100vh;
-  overflow: hidden;
   display: flex;
   flex-direction: column;
+
+  // Terminal views (Pro Trade, Mobile Trade): viewport-locked
+  &--terminal {
+    height: 100vh;
+    overflow: hidden;
+  }
+
+  // Content views (Easy Swap, Portfolio, Pool, OTC, Admin, Recover): natural page flow
+  &--content {
+    min-height: 100vh;
+  }
 
   &__banner {
     padding: 8px 16px;

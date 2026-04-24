@@ -134,7 +134,7 @@
                 <!-- grand tour button -->
                 <button class="btn taco-btn taco-btn--green w-100 mt-2"
                         @click="startGrandTour"
-                        style="font-size: 0.95rem;">
+                        style="font-size: 0.95rem; color: #fff;">
                   <i class="fa-solid fa-route me-2"></i>
                   Grand Tour
                 </button>
@@ -764,19 +764,26 @@
     align-items: center;
     gap: 1rem;
     margin-top: 1.25rem;
-    padding: 0.875rem 1.5rem;
-    background: linear-gradient(135deg, rgba(232, 131, 12, 0.15), rgba(232, 131, 12, 0.05));
-    border: 1px solid rgba(232, 131, 12, 0.3);
+    padding: 0.9rem 1.5rem;
+    background: linear-gradient(135deg, rgba(232, 131, 12, 0.22), rgba(232, 131, 12, 0.10));
+    border: 1px solid rgba(255, 194, 120, 0.45);
     border-radius: 12px;
     text-decoration: none;
     color: inherit;
-    transition: border-color 0.2s, transform 0.15s, background 0.2s;
+    transition: transform 0.15s, box-shadow 0.25s, filter 0.2s, border-color 0.2s;
     cursor: pointer;
+    box-shadow: 0 2px 8px rgba(232, 131, 12, 0.14);
+
+    @media (prefers-reduced-motion: no-preference) {
+      animation: home-exchange-cta-pulse 2s ease-in-out infinite;
+    }
 
     &:hover {
-      border-color: rgba(232, 131, 12, 0.6);
-      background: linear-gradient(135deg, rgba(232, 131, 12, 0.25), rgba(232, 131, 12, 0.1));
+      filter: brightness(1.06);
       transform: translateY(-1px);
+      border-color: rgba(255, 194, 120, 0.75);
+      box-shadow: 0 4px 14px rgba(232, 131, 12, 0.26);
+      animation-play-state: paused;
     }
 
     &__icon {
@@ -793,21 +800,23 @@
       strong {
         font-family: "Rubik", sans-serif;
         font-size: 1rem;
-        font-weight: 600;
-        color: #E8830C;
+        font-weight: 520;
+        color: var(--gold);
+        text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+        -webkit-text-stroke: 0.3px rgb(70, 89, 71);
       }
 
       span {
         font-size: 0.8rem;
-        color: var(--text-muted, #9ca3af);
+        color: rgba(255, 213, 79, 0.72); // gold at low opacity for subtitle
       }
     }
 
     &__arrow {
       font-size: 1.25rem;
-      color: #E8830C;
-      opacity: 0.7;
-      transition: opacity 0.15s, transform 0.15s;
+      color: var(--gold);
+      opacity: 0.85;
+      transition: transform 0.15s, opacity 0.15s;
     }
 
     &:hover &__arrow {
@@ -1418,6 +1427,18 @@
 // animations //
 ////////////////
 
+// Slow breathing pulse on the Exchange CTA — soft glow + tiny scale, 6s cycle.
+@keyframes home-exchange-cta-pulse {
+  0%, 100% {
+    box-shadow: 0 2px 8px rgba(232, 131, 12, 0.14);
+    transform: scale(1);
+  }
+  50% {
+    box-shadow: 0 4px 18px rgba(232, 131, 12, 0.32);
+    transform: scale(1.022);
+  }
+}
+
 @keyframes bob {
   0% {
     transform: translate3d(0, 0, 0); /* starting position */
@@ -1951,7 +1972,7 @@
   import { ref, onMounted, computed, onUnmounted, watch } from "vue";
   import { useRoute } from 'vue-router'
   import { useTacoStore } from "../stores/taco.store"
-  import { storeToRefs } from "pinia"  
+  import { storeToRefs } from "pinia"
   import TacoCoinIcon from "../assets/tokens/tacoCoinIcon.vue"
   import TacoDaoLogo from "../assets/images/tacoDaoLogo.vue"
   import TacoChefWave from '../assets/images/chef/chef-wave.png'

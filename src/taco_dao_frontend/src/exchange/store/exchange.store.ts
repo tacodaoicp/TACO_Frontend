@@ -520,6 +520,13 @@ export const useExchangeStore = defineStore('exchange', () => {
     return actor.getExpectedMultiHopAmount(tokenIn, tokenOut, amountIn)
   }
 
+  async function getExpectedReceiveAmountBatch(
+    requests: Array<{ tokenSell: string; tokenBuy: string; amountSell: bigint }>
+  ) {
+    const actor = await getQueryActor()
+    return actor.getExpectedReceiveAmountBatch(requests)
+  }
+
   async function getCurrentLiquidity(
     token1: string,
     token2: string,
@@ -1154,6 +1161,7 @@ export const useExchangeStore = defineStore('exchange', () => {
     // Query methods
     refreshExchangeInfo,
     getExpectedReceiveAmount,
+    getExpectedReceiveAmountBatch,
     getExpectedMultiHopAmount,
     getCurrentLiquidity,
     getCurrentLiquidityForeignPools,

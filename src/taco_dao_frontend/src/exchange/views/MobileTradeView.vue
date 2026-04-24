@@ -138,6 +138,7 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   height: 100vh;
+
   background: var(--bg-primary);
 
   &__main {

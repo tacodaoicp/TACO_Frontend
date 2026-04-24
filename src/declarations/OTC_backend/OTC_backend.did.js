@@ -1130,7 +1130,7 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Bool],
         [],
       ),
-    'refundStuckFunds' : IDL.Func([], [ActionResult], []),
+    'refundStuckFunds' : IDL.Func([], [IDL.Text], []),
     'removeConcentratedLiquidity' : IDL.Func(
         [IDL.Text, IDL.Text, IDL.Nat, IDL.Nat],
         [RemoveConcentratedResult],

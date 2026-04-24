@@ -4,20 +4,20 @@
 
     <!-- provider toggle -->
     <div class="vault-fiat-mint__provider-toggle">
-      <button :class="['vault-fiat-mint__provider-btn', { active: selectedProvider === 'coinbase' }]"
+      <button :class="['vault-fiat-mint__provider-btn', { active: selectedProvider === 'banxa' }]"
               :disabled="isActive"
-              @click="selectedProvider = 'coinbase'">
-        Coinbase
+              @click="selectedProvider = 'banxa'">
+        Banxa
       </button>
-      <button :class="['vault-fiat-mint__provider-btn', { active: selectedProvider === 'transak' }]"
+      <button :class="['vault-fiat-mint__provider-btn', { active: selectedProvider === 'self' }]"
               :disabled="isActive"
-              @click="selectedProvider = 'transak'">
-        Transak
+              @click="selectedProvider = 'self'">
+        Self
       </button>
     </div>
 
-    <!-- amount + currency -->
-    <div class="vault-fiat-mint__amount-row">
+    <!-- amount + currency (Banxa only) -->
+    <div v-if="selectedProvider === 'banxa'" class="vault-fiat-mint__amount-row">
       <div class="vault-fiat-mint__input-group" style="flex: 1;">
         <label class="vault-fiat-mint__label">Amount</label>
         <input type="text"
@@ -42,13 +42,29 @@
       </div>
     </div>
 
+    <!-- Self-send instructions (replaces amount row) -->
+    <div v-else class="vault-fiat-mint__self-note">
+      <i class="fa-solid fa-circle-info me-2"></i>
+      Send ICP to the following account ID from any wallet or exchange. We'll auto-detect it.
+    </div>
+
     <!-- deposit address -->
     <div class="vault-fiat-mint__deposit-addr">
       <label class="vault-fiat-mint__label">Your ICP Address</label>
-      <code v-if="userLedgerAccountId" class="vault-fiat-mint__addr-value">{{ userLedgerAccountId }}</code>
-      <code v-else class="vault-fiat-mint__addr-value">
-        <i class="fa-solid fa-spinner fa-spin me-1"></i>Log in to see your address
-      </code>
+      <div class="vault-fiat-mint__addr-row">
+        <code v-if="userLedgerAccountId" class="vault-fiat-mint__addr-value">{{ userLedgerAccountId }}</code>
+        <code v-else class="vault-fiat-mint__addr-value">
+          <i class="fa-solid fa-spinner fa-spin me-1"></i>Log in to see your address
+        </code>
+        <button v-if="userLedgerAccountId"
+                type="button"
+                class="btn btn-sm vault-fiat-mint__copy-addr"
+                @click="copyAddress"
+                :title="addressCopied ? 'Copied!' : 'Copy ICP address'">
+          <i :class="addressCopied ? 'fa-solid fa-check' : 'fa-regular fa-copy'"></i>
+          {{ addressCopied ? 'Copied' : 'Copy' }}
+        </button>
+      </div>
     </div>
 
     <!-- buy button -->
@@ -95,7 +111,7 @@ import { useTacoStore } from '../../stores/taco.store'
 import { useNachosStore } from '../../stores/nachos.store'
 import { storeToRefs } from 'pinia'
 import { Principal } from '@dfinity/principal'
-import { signedSessionHeaders } from '../../utils/sign-session-request'
+import { buildBanxaUrl } from '../../utils/onramp/banxa'
 import { isDevEnvironment } from '../../config/network-config'
 import SwapProgressTracker from '../misc/SwapProgressTracker.vue'
 import type { ProgressStep, ProgressAmount } from '../misc/SwapProgressTracker.vue'
@@ -110,10 +126,6 @@ const { userPrincipal, userLedgerAccountId } = storeToRefs(tacoStore)
 // constants //
 ///////////////
 
-const COINBASE_SESSION_WORKER = 'https://taco-onramp-session.xykominos.workers.dev'
-const TRANSAK_API_KEY = 'fac6ce0c-2b65-4982-a2e3-42e1c5fa15dc'
-const TRANSAK_BASE_URL = 'https://global-stg.transak.com'
-const TACO_BRAND_COLOR = 'DA8D28'
 const DEPOSIT_POLL_MS = 3_000
 const MAX_POLL_DURATION_MS = 1_200_000
 const ICP_LEDGER_CANISTER_ID = 'ryjl3-tyaaa-aaaaa-aaaba-cai'
@@ -124,9 +136,9 @@ const DEPOSIT_MIN_E8S = 10_000n
 ///////////
 
 type MintPhase = 'idle' | 'detecting' | 'minting' | 'complete' | 'error'
-type Provider = 'coinbase' | 'transak'
+type Provider = 'banxa' | 'self'
 
-const selectedProvider = ref<Provider>('coinbase')
+const selectedProvider = ref<Provider>('banxa')
 const fiatAmount = ref('50')
 const fiatCurrency = ref('EUR')
 
@@ -139,8 +151,8 @@ const baselineBalance = ref<bigint>(0n)
 const icpDetected = ref(false)
 const detectedIcpAmount = ref<bigint>(0n)
 
-// Transak SDK ref
-let transakInstance: any = null
+// Copy-to-clipboard feedback
+const addressCopied = ref(false)
 
 // Polling
 let depositPollInterval: ReturnType<typeof setInterval> | null = null
@@ -156,7 +168,7 @@ const isActive = computed(() =>
 const buyButtonText = computed(() => {
   if (mintPhase.value === 'detecting') return 'Waiting for ICP...'
   if (mintPhase.value === 'minting') return 'Minting NACHOS...'
-  return `Fund via ${selectedProvider.value === 'coinbase' ? 'Coinbase' : 'Transak'}`
+  return selectedProvider.value === 'banxa' ? 'Fund via Banxa' : 'Start Monitoring'
 })
 
 /////////////////////////////
@@ -230,43 +242,24 @@ const formatE8s = (e8s: bigint): string => {
   return fracStr ? `${whole}.${fracStr}` : whole.toString()
 }
 
-const generateOrderId = (): string => {
-  const ts = Date.now().toString(36)
-  const rand = Math.random().toString(36).substring(2, 8)
-  return `nachos-${ts}-${rand}`
-}
-
 ////////////////////
 // payment flows  //
 ////////////////////
 
 const openBuy = () => {
-  if (selectedProvider.value === 'coinbase') openCoinbase()
-  else openTransak()
+  if (selectedProvider.value === 'banxa') openBanxa()
+  else startSelfMonitor()
 }
 
-const buildTransakUrl = (addr: string): string => {
-  const params = new URLSearchParams({
-    apiKey: TRANSAK_API_KEY,
-    referrerDomain: window.location.origin,
-    productsAvailed: 'BUY',
-    cryptoCurrencyCode: 'ICP',
-    cryptoCurrencyList: 'ICP',
-    network: 'mainnet',
-    walletAddress: addr,
-    disableWalletAddressForm: 'true',
-    exchangeScreenTitle: 'Buy NACHOS',
-    themeColor: TACO_BRAND_COLOR,
-    hideMenu: 'true',
-    hideExchangeScreen: 'true',
-    isFeeCalculationHidden: 'true',
-    defaultFiatCurrency: fiatCurrency.value,
-    defaultFiatAmount: fiatAmount.value || '50',
-    partnerCustomerId: userPrincipal.value,
-    partnerOrderId: generateOrderId(),
-    colorMode: 'DARK',
-  })
-  return `${TRANSAK_BASE_URL}?${params.toString()}`
+const copyAddress = async () => {
+  if (!userLedgerAccountId.value) return
+  try {
+    await navigator.clipboard.writeText(userLedgerAccountId.value)
+    addressCopied.value = true
+    setTimeout(() => { addressCopied.value = false }, 2000)
+  } catch (e) {
+    console.warn('Clipboard copy failed:', e)
+  }
 }
 
 /** Record baseline ICP balance before opening onramp */
@@ -283,7 +276,16 @@ const recordBaseline = async () => {
   }
 }
 
-const openCoinbase = async () => {
+const watchPopupForGrace = (popup: Window | null) => {
+  const popupPoll = setInterval(() => {
+    if (!popup || popup.closed) {
+      clearInterval(popupPoll)
+      handlePopupClose()
+    }
+  }, 1500)
+}
+
+const openBanxa = async () => {
   if (!userLedgerAccountId.value) {
     mintError.value = 'Not logged in. Please log in first.'
     mintPhase.value = 'error'
@@ -297,48 +299,24 @@ const openCoinbase = async () => {
   try {
     await recordBaseline()
 
-    const sessionBody = {
-      addresses: [{ address: userLedgerAccountId.value }],
-      assets: ['ICP'],
-    }
-    const resp = await fetch(COINBASE_SESSION_WORKER, {
-      method: 'POST',
-      headers: await signedSessionHeaders(sessionBody, tacoStore.signWithUserIdentity),
-      body: JSON.stringify(sessionBody),
-    })
-    if (!resp.ok) {
-      const err = await resp.json()
-      throw new Error(`Session token error: ${err.error} ${err.details || ''}`)
-    }
-    const { token: sessionToken } = await resp.json()
-
-    const { generateOnRampURL } = await import('@coinbase/cbpay-js')
-    const onrampUrl = generateOnRampURL({
-      sessionToken,
-      addresses: { [userLedgerAccountId.value]: [] },
-      assets: ['ICP'],
-      presetFiatAmount: Number(fiatAmount.value) || 50,
-      theme: 'dark',
+    const url = buildBanxaUrl({
+      walletAddress: userLedgerAccountId.value,
+      fiatAmount: Number(fiatAmount.value) || 50,
+      fiatCurrency: fiatCurrency.value,
     })
 
-    const popup = window.open(onrampUrl, 'coinbase-onramp', 'width=500,height=700,scrollbars=yes,resizable=yes')
+    const popup = window.open(url, '_blank', 'noopener,noreferrer')
     startDepositPolling()
-
-    const popupPoll = setInterval(() => {
-      if (!popup || popup.closed) {
-        clearInterval(popupPoll)
-        handlePopupClose()
-      }
-    }, 1500)
+    watchPopupForGrace(popup)
 
   } catch (err: any) {
-    console.error('Failed to open Coinbase Onramp (NACHOS vault):', err)
+    console.error('Failed to open Banxa (NACHOS vault):', err)
     mintPhase.value = 'error'
-    mintError.value = `Failed to open payment widget: ${err.message || err}`
+    mintError.value = `Failed to open payment page: ${err.message || err}`
   }
 }
 
-const openTransak = async () => {
+const startSelfMonitor = async () => {
   if (!userLedgerAccountId.value) {
     mintError.value = 'Not logged in. Please log in first.'
     mintPhase.value = 'error'
@@ -349,36 +327,8 @@ const openTransak = async () => {
   mintError.value = ''
   completionMessage.value = ''
 
-  try {
-    await recordBaseline()
-
-    const { Transak } = await import('@transak/ui-js-sdk')
-    const widgetUrl = buildTransakUrl(userLedgerAccountId.value)
-    transakInstance = new Transak({ widgetUrl })
-    transakInstance.init()
-    startDepositPolling()
-
-    Transak.on(Transak.EVENTS.TRANSAK_ORDER_CREATED, (data: any) => {
-      console.log('Transak order created (vault NACHOS):', data)
-    })
-
-    Transak.on(Transak.EVENTS.TRANSAK_ORDER_SUCCESSFUL, (data: any) => {
-      console.log('Transak order successful (vault NACHOS):', data)
-    })
-
-    Transak.on(Transak.EVENTS.TRANSAK_WIDGET_CLOSE, () => {
-      if (transakInstance) {
-        transakInstance.close()
-        transakInstance = null
-      }
-      handlePopupClose()
-    })
-
-  } catch (err: any) {
-    console.error('Failed to initialize Transak (vault NACHOS):', err)
-    mintPhase.value = 'error'
-    mintError.value = `Failed to open payment widget: ${err.message || err}`
-  }
+  await recordBaseline()
+  startDepositPolling()
 }
 
 ////////////////////
@@ -517,10 +467,6 @@ watch(() => tacoStore.userLoggedIn, async (loggedIn) => {
 
 onBeforeUnmount(() => {
   stopDepositPolling()
-  if (transakInstance && typeof transakInstance.close === 'function') {
-    transakInstance.close()
-  }
-  transakInstance = null
 })
 
 </script>
@@ -609,6 +555,12 @@ onBeforeUnmount(() => {
     gap: 0.125rem;
   }
 
+  &__addr-row {
+    display: flex;
+    align-items: stretch;
+    gap: 0.375rem;
+  }
+
   &__addr-value {
     display: block;
     font-size: 0.65rem;
@@ -618,6 +570,43 @@ onBeforeUnmount(() => {
     border-radius: 0.25rem;
     border: 1px solid rgba(128, 128, 128, 0.15);
     color: var(--black-to-white);
+    flex: 1;
+  }
+
+  &__copy-addr {
+    flex-shrink: 0;
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.25rem;
+    background: var(--dark-orange);
+    color: var(--white);
+    border: 1px solid var(--dark-orange);
+    font-family: 'Space Mono', monospace;
+    font-size: 0.65rem;
+    font-weight: 700;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+
+    &:hover { filter: brightness(1.05); }
+  }
+
+  &__provider-note {
+    margin: 0.25rem 0 0;
+    font-size: 0.65rem;
+    font-family: 'Space Mono', monospace;
+    opacity: 0.7;
+    text-align: center;
+  }
+
+  &__self-note {
+    padding: 0.5rem 0.625rem;
+    border-radius: 0.375rem;
+    background: rgba(128, 128, 128, 0.08);
+    border: 1px solid rgba(128, 128, 128, 0.2);
+    color: var(--black-to-white);
+    font-family: 'Space Mono', monospace;
+    font-size: 0.7rem;
+    line-height: 1.35;
   }
 
   &__addr-error {

@@ -365,12 +365,12 @@ onMounted(loadCachedDeposits)
 .recover-view {
   display: flex;
   flex-direction: column;
-  height: 100vh;
+  min-height: 100vh;
+
   background: var(--bg-primary);
 
   &__main {
-    flex: 1;
-    overflow-y: auto;
+    flex: 1 0 auto;
     padding: var(--space-4) var(--space-6);
     max-width: 700px;
     width: 100%;

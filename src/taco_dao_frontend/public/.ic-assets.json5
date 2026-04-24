@@ -15,7 +15,7 @@
             "Permissions-Policy": "camera=(), microphone=(), geolocation=(), payment=(self)",
 
             // Content Security Policy
-            "Content-Security-Policy": "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' https://fonts.googleapis.com 'unsafe-inline'; connect-src 'self' https://ic0.app https://icp0.io https://*.icp0.io https://*.ic0.app https://identity.ic0.app https://id.ai https://api.coingecko.com https://api.coincap.io https://api.binance.com https://api.geckoterminal.com https://taco-onramp-session.xykominos.workers.dev https://global-stg.transak.com https://oc.app; frame-src 'self' https://www.dextools.io https://www.youtube-nocookie.com https://oc.app https://identity.ic0.app https://id.ai https://global-stg.transak.com; img-src 'self' data: blob: https:; font-src 'self' data:; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; frame-ancestors 'none'"
+            "Content-Security-Policy": "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' https://fonts.googleapis.com 'unsafe-inline'; connect-src 'self' https://ic0.app https://icp0.io https://*.icp0.io https://*.ic0.app https://identity.ic0.app https://id.ai https://api.coingecko.com https://api.coincap.io https://api.binance.com https://api.geckoterminal.com https://oc.app; frame-src 'self' https://www.dextools.io https://www.youtube-nocookie.com https://oc.app https://identity.ic0.app https://id.ai; img-src 'self' data: blob: https:; font-src 'self' data:; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; frame-ancestors 'none'"
         }
     },
     {

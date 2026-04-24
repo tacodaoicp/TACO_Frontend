@@ -16,16 +16,16 @@ import SwapCard from '../components/swap/SwapCard.vue'
 .easy-swap-view {
   display: flex;
   flex-direction: column;
-  height: 100vh;
+  min-height: 100vh;
+
   background: var(--bg-primary);
 
   &__main {
-    flex: 1;
+    flex: 1 0 auto;
     display: flex;
     align-items: center;
     justify-content: center;
     padding: var(--space-4);
-    overflow-y: auto;
   }
 
   &__card {

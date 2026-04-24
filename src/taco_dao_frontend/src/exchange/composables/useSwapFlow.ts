@@ -55,6 +55,51 @@ export type SwapPhase =
   | 'partialFill'
   | 'error'
 
+type SwapHop = { tokenIn: string; tokenOut: string }
+
+function buildRoute(tokenIn: string, tokenOut: string, hopDetails: any[]): SwapHop[] {
+  if (hopDetails?.length > 0) {
+    return hopDetails.map((h: any) => ({ tokenIn: h.tokenIn, tokenOut: h.tokenOut }))
+  }
+  return [{ tokenIn, tokenOut }]
+}
+
+function quoteFromBatchResult(
+  fromAddr: string, toAddr: string, r: any, amountIn: bigint,
+): SwapQuoteResult | null {
+  if (!r || (r.expectedBuyAmount ?? 0n) <= 0n) return null
+  const rawHops = (r.hopDetails ?? []) as any[]
+  const route = buildRoute(fromAddr, toAddr, rawHops)
+  const isMultiHop = rawHops.length > 1
+
+  // For direct pairs the batch returns empty hopDetails — synthesize a single-hop
+  // entry so the route visualization (token icons + arrows + per-hop %) still renders.
+  const hops = rawHops.length > 0 ? rawHops : [{
+    tokenIn: fromAddr,
+    tokenOut: toAddr,
+    amountIn,
+    amountOut: r.expectedBuyAmount,
+    fee: r.fee ?? 0n,
+    priceImpact: r.priceImpact ?? 0,
+  }]
+
+  return {
+    expectedBuyAmount: r.expectedBuyAmount,
+    fee: r.fee ?? 0n,
+    priceImpact: (r.priceImpact ?? 0) * 100,
+    routeDescription: r.routeDescription ?? (isMultiHop ? `Multi-hop (${hops.length} hops)` : 'Direct'),
+    canFulfillFully: r.canFulfillFully ?? false,
+    potentialOrderDetails: r.potentialOrderDetails ?? null,
+    isMultiHop,
+    route,
+    hops: Math.max(hops.length, 1),
+    hopDetails: hops.map((h: any) => ({
+      ...h,
+      priceImpact: h.priceImpact > 0 && h.priceImpact <= 1 ? h.priceImpact * 100 : h.priceImpact,
+    })),
+  }
+}
+
 export interface HopDetailDisplay {
   tokenIn: string
   tokenOut: string
@@ -235,48 +280,10 @@ export function useSwapFlow() {
   async function fetchFreshQuote(): Promise<SwapQuoteResult | null> {
     if (!tokenFrom.value || !tokenTo.value || amountInBigInt.value <= 0n) return null
     try {
-      const multiHop = await store.getExpectedMultiHopAmount(
+      const r = await store.getExpectedReceiveAmount(
         tokenFrom.value.address, tokenTo.value.address, amountInBigInt.value,
-      )
-      const m = multiHop as any
-      let q: SwapQuoteResult
-      if (!m?.bestRoute?.length || m?.expectedAmountOut <= 0n) {
-        const direct = await store.getExpectedReceiveAmount(
-          tokenFrom.value.address, tokenTo.value.address, amountInBigInt.value,
-        ).catch(() => null)
-        const d = direct as any
-        q = {
-          expectedBuyAmount: d?.expectedBuyAmount ?? 0n,
-          fee: d?.fee ?? 0n,
-          priceImpact: (d?.priceImpact ?? 0) * 100,
-          routeDescription: d?.routeDescription ?? 'No route',
-          canFulfillFully: d?.canFulfillFully ?? false,
-          potentialOrderDetails: null,
-          isMultiHop: false,
-          route: null,
-          hops: 0,
-          hopDetails: [],
-        }
-      } else {
-        q = {
-          expectedBuyAmount: m.expectedAmountOut,
-          fee: m.totalFee ?? 0n,
-          priceImpact: (m.priceImpact ?? 0) * 100,
-          routeDescription: Number(m.hops ?? 1) > 1 ? `Multi-hop (${m.hops} hops)` : 'Direct',
-          canFulfillFully: true,
-          potentialOrderDetails: null,
-          isMultiHop: true,
-          route: m.bestRoute,
-          hops: Number(m.hops ?? 1),
-          hopDetails: (m.hopDetails ?? []) as HopDetailDisplay[],
-        }
-      }
-      if (q.hopDetails?.length) {
-        for (const hop of q.hopDetails) {
-          if (hop.priceImpact > 0 && hop.priceImpact <= 1) hop.priceImpact = hop.priceImpact * 100
-        }
-      }
-      return q
+      ) as any
+      return quoteFromBatchResult(tokenFrom.value.address, tokenTo.value.address, r, amountInBigInt.value)
     } catch (err) {
       console.error('Fresh quote fetch failed:', err)
       return null
@@ -317,7 +324,7 @@ export function useSwapFlow() {
     return true
   }
 
-  // ── Quote fetching ──
+  // ── Quote fetching (1 batch call for primary + split evaluation) ──
   async function fetchQuote(silent = false) {
     if (!tokenFrom.value || !tokenTo.value || amountInBigInt.value <= 0n) {
       phase.value = 'idle'
@@ -327,77 +334,160 @@ export function useSwapFlow() {
 
     if (!silent) phase.value = 'quoteFetching'
     const prevQuote = silent ? quote.value : null
-    const hadSplit = !!splitPlan.value
 
     try {
-      // Fetch 100% route quote into a local var (don't touch quote.value yet)
-      const multiHop = await store.getExpectedMultiHopAmount(
-        tokenFrom.value.address,
-        tokenTo.value.address,
-        amountInBigInt.value,
-      )
-      const m = multiHop as any
+      const fullAmount = amountInBigInt.value
+      const fromAddr = tokenFrom.value.address
+      const toAddr = tokenTo.value.address
 
-      let freshQuote: SwapQuoteResult
-      if (!m?.bestRoute?.length || m?.expectedAmountOut <= 0n) {
-        const direct = await store.getExpectedReceiveAmount(
-          tokenFrom.value.address, tokenTo.value.address, amountInBigInt.value,
-        ).catch(() => null)
-        const d = direct as any
-        freshQuote = {
-          expectedBuyAmount: d?.expectedBuyAmount ?? 0n,
-          fee: d?.fee ?? 0n,
-          priceImpact: (d?.priceImpact ?? 0) * 100,
-          routeDescription: d?.routeDescription ?? 'No route',
-          canFulfillFully: d?.canFulfillFully ?? false,
-          potentialOrderDetails: null,
-          isMultiHop: false,
-          route: null,
-          hops: 0,
-          hopDetails: [],
-        }
-      } else {
-        freshQuote = {
-          expectedBuyAmount: m.expectedAmountOut,
-          fee: m.totalFee ?? 0n,
-          priceImpact: (m.priceImpact ?? 0) * 100,
-          routeDescription: Number(m.hops ?? 1) > 1 ? `Multi-hop (${m.hops} hops)` : 'Direct',
-          canFulfillFully: true,
-          potentialOrderDetails: null,
-          isMultiHop: true,
-          route: m.bestRoute,
-          hops: Number(m.hops ?? 1),
-          hopDetails: (m.hopDetails ?? []) as HopDetailDisplay[],
-        }
+      // 1 batch call: 100% + 10-90% for split evaluation (replaces 10 individual calls)
+      const splitBPs = [10000n, 1000n, 2000n, 3000n, 4000n, 5000n, 6000n, 7000n, 8000n, 9000n]
+      const requests = splitBPs
+        .map(bp => ({ bp, amt: fullAmount * bp / 10000n }))
+        .filter(r => r.amt > 0n)
+
+      const batchResults = await store.getExpectedReceiveAmountBatch(
+        requests.map(r => ({ tokenSell: fromAddr, tokenBuy: toAddr, amountSell: r.amt }))
+      ) as any[]
+
+      // Build primary (100%) quote
+      const freshQuote = quoteFromBatchResult(fromAddr, toAddr, batchResults[0], fullAmount) ?? {
+        expectedBuyAmount: 0n, fee: 0n, priceImpact: 0,
+        routeDescription: 'No route found', canFulfillFully: false,
+        potentialOrderDetails: null, isMultiHop: false, route: null, hops: 0, hopDetails: [],
       }
 
-      // Convert per-hop priceImpact from 0-1 ratio to percentage
-      if (freshQuote.hopDetails?.length) {
-        for (const hop of freshQuote.hopDetails) {
-          if (hop.priceImpact > 0 && hop.priceImpact <= 1) {
-            hop.priceImpact = hop.priceImpact * 100
+      // ── Split-route evaluation (same logic, sourced from the batch) ──
+      const fullOut = freshQuote.expectedBuyAmount
+      let newSplitPlan: SplitPlan | null = null
+
+      if (fullOut > 0n && batchResults.length > 1) {
+        type QuoteEntry = { bp: number; amountIn: bigint; expectedOut: bigint; route: any; routeKey: string; hopDetails: HopDetailDisplay[]; priceImpact: number }
+
+        const partials: QuoteEntry[] = requests.slice(1).map((req, i) => {
+          const r = batchResults[i + 1]
+          if (!r || (r.expectedBuyAmount ?? 0n) <= 0n) return null
+          const rawHops = (r.hopDetails ?? []) as any[]
+          const hops = rawHops.length > 0 ? rawHops : [{
+            tokenIn: fromAddr, tokenOut: toAddr,
+            amountIn: req.amt, amountOut: r.expectedBuyAmount,
+            fee: r.fee ?? 0n, priceImpact: r.priceImpact ?? 0,
+          }]
+          return {
+            bp: Number(req.bp),
+            amountIn: req.amt,
+            expectedOut: r.expectedBuyAmount as bigint,
+            route: buildRoute(fromAddr, toAddr, rawHops),
+            routeKey: r.routeDescription ?? 'direct',
+            hopDetails: hops.map((h: any) => ({
+              ...h,
+              priceImpact: h.priceImpact > 0 && h.priceImpact <= 1 ? h.priceImpact * 100 : h.priceImpact,
+            })),
+            priceImpact: (r.priceImpact ?? 0) * 100,
+          }
+        }).filter(Boolean) as QuoteEntry[]
+
+        const fullRouteKey = freshQuote.routeDescription ?? 'direct'
+        const allQuotes: QuoteEntry[] = [
+          ...partials,
+          { bp: 10000, amountIn: fullAmount, expectedOut: fullOut, route: freshQuote.route, routeKey: fullRouteKey, hopDetails: freshQuote.hopDetails ?? [], priceImpact: freshQuote.priceImpact ?? 0 },
+        ]
+
+        let bestPlanOut = 0n
+        let bestPlanLegs: QuoteEntry[] | null = null
+        let bestPlanImprovement = 0
+
+        function tryPlan(legs: QuoteEntry[]) {
+          const routeSet = new Set(legs.map(l => l.routeKey))
+          if (routeSet.size < legs.length) return
+          const totalOut = legs.reduce((s, l) => s + l.expectedOut, 0n)
+          if (totalOut <= fullOut) return
+          if (totalOut > bestPlanOut) {
+            bestPlanOut = totalOut
+            bestPlanLegs = legs
+            bestPlanImprovement = Number((totalOut - fullOut) * 10000n / fullOut) / 100
+          }
+        }
+
+        const byBP = new Map<number, QuoteEntry>()
+        for (const q of allQuotes) byBP.set(q.bp, q)
+
+        // 2-way splits
+        for (let i = 0; i < allQuotes.length; i++) {
+          const rem = 10000 - allQuotes[i].bp
+          const j = byBP.get(rem)
+          if (j) tryPlan([allQuotes[i], j])
+        }
+
+        // 3-way splits
+        for (let i = 0; i < allQuotes.length; i++) {
+          for (let j = i; j < allQuotes.length; j++) {
+            const rem = 10000 - allQuotes[i].bp - allQuotes[j].bp
+            if (rem <= 0 || rem >= 10000) continue
+            const k = byBP.get(rem)
+            if (k) tryPlan([allQuotes[i], allQuotes[j], k])
+          }
+        }
+
+        // 4-way splits
+        for (let i = 0; i < allQuotes.length; i++) {
+          for (let j = i; j < allQuotes.length; j++) {
+            for (let k = j; k < allQuotes.length; k++) {
+              const rem = 10000 - allQuotes[i].bp - allQuotes[j].bp - allQuotes[k].bp
+              if (rem <= 0 || rem >= 10000) continue
+              const l = byBP.get(rem)
+              if (l) tryPlan([allQuotes[i], allQuotes[j], allQuotes[k], l])
+            }
+          }
+        }
+
+        // 5-way splits
+        for (let i = 0; i < allQuotes.length; i++) {
+          for (let j = i; j < allQuotes.length; j++) {
+            for (let k = j; k < allQuotes.length; k++) {
+              for (let l = k; l < allQuotes.length; l++) {
+                const rem = 10000 - allQuotes[i].bp - allQuotes[j].bp - allQuotes[k].bp - allQuotes[l].bp
+                if (rem <= 0 || rem >= 10000) continue
+                const m = byBP.get(rem)
+                if (m) tryPlan([allQuotes[i], allQuotes[j], allQuotes[k], allQuotes[l], m])
+              }
+            }
+          }
+        }
+
+        if (bestPlanLegs && bestPlanImprovement > 0.1) {
+          newSplitPlan = {
+            legs: (bestPlanLegs as QuoteEntry[]).map(l => ({
+              pctBP: l.bp, amountIn: l.amountIn, expectedOut: l.expectedOut,
+              route: l.route, routeKey: l.routeKey, hopDetails: l.hopDetails, priceImpact: l.priceImpact,
+            })),
+            totalExpectedOut: bestPlanOut,
+            improvement: bestPlanImprovement,
           }
         }
       }
 
-      // Backend returns accurate priceImpact (0 for limit order fills).
-      // No frontend fallback — trust the backend value.
-
-      // Now decide how to update the UI — never flash a worse 100% quote when split is active
-      if (silent && hadSplit) {
-        // Don't touch quote.value — evaluate split with the fresh 100% data
-        await evaluateSplitRoutes(freshQuote)
+      // ── UI update — same guards as before ──
+      if (newSplitPlan && newSplitPlan.improvement > 0.1) {
+        splitPlan.value = newSplitPlan
+        quote.value = {
+          ...freshQuote,
+          expectedBuyAmount: newSplitPlan.totalExpectedOut,
+          routeDescription: `Split: ${newSplitPlan.legs.map(l => `${l.pctBP / 100}%`).join(' + ')}`,
+        }
+        if (!silent) phase.value = 'quoteReady'
+        console.log(`[Swap] Split route found: ${newSplitPlan.improvement.toFixed(2)}% better — ${newSplitPlan.legs.map(l => `${l.pctBP/100}% via ${l.routeKey}`).join(', ')}`)
       } else if (silent && prevQuote
         && prevQuote.expectedBuyAmount === freshQuote.expectedBuyAmount
         && prevQuote.fee === freshQuote.fee
         && prevQuote.priceImpact === freshQuote.priceImpact) {
-        // No meaningful change — keep object identity
-        evaluateSplitRoutes()
+        splitPlan.value = null
       } else {
+        splitPlan.value = null
         quote.value = freshQuote
-        phase.value = 'quoteReady'
-        evaluateSplitRoutes()
+        if (!silent) phase.value = 'quoteReady'
       }
+
       scheduleQuotePoll()
     } catch (err) {
       console.error('Quote fetch failed:', err)
@@ -405,153 +495,6 @@ export function useSwapFlow() {
         quote.value = null
         phase.value = 'idle'
       }
-    }
-  }
-
-  // ── Split-route optimization ──
-  // Fetches quotes at 20/40/60/80% and finds if splitting across different routes yields more.
-  // Uses backend swapSplitRoutes: single deposit, multiple internal route executions.
-  async function evaluateSplitRoutes(singleRouteQuote?: SwapQuoteResult) {
-    const baseQuote = singleRouteQuote ?? quote.value
-    if (!tokenFrom.value || !tokenTo.value || !baseQuote || amountInBigInt.value <= 0n) {
-      splitPlan.value = null
-      return
-    }
-
-    const fullAmount = amountInBigInt.value
-    const fullOut = baseQuote.expectedBuyAmount
-    if (fullOut <= 0n) return
-
-    const pcts = [1000n, 2000n, 3000n, 4000n, 5000n, 6000n, 7000n, 8000n, 9000n] // 10-90% in BP
-
-    try {
-      // Fetch partial quotes in parallel (free queries)
-      const partialQuotes = await Promise.all(
-        pcts.map(async (bp) => {
-          const amt = fullAmount * bp / 10000n
-          if (amt <= 0n) return null
-          try {
-            const m = await store.getExpectedMultiHopAmount(
-              tokenFrom.value!.address,
-              tokenTo.value!.address,
-              amt,
-            ) as any
-            if (!m?.bestRoute?.length || m?.expectedAmountOut <= 0n) return null
-            const routeKey = m.bestRoute.map((h: any) => `${h.tokenIn}-${h.tokenOut}`).join('|')
-            const hopDetails = ((m.hopDetails ?? []) as HopDetailDisplay[]).map(h => ({
-              ...h,
-              priceImpact: h.priceImpact > 0 && h.priceImpact <= 1 ? h.priceImpact * 100 : h.priceImpact,
-            }))
-            return { bp: Number(bp), amountIn: amt, expectedOut: m.expectedAmountOut as bigint, route: m.bestRoute, routeKey, hopDetails, priceImpact: (m.priceImpact ?? 0) * 100 }
-          } catch { return null }
-        })
-      )
-
-      // Add 100% quote
-      const fullRouteKey = baseQuote.route?.map(h => `${h.tokenIn}-${h.tokenOut}`).join('|') ?? 'direct'
-      const allQuotes = [
-        ...partialQuotes.filter(Boolean) as Array<{ bp: number; amountIn: bigint; expectedOut: bigint; route: any; routeKey: string; hopDetails: HopDetailDisplay[]; priceImpact: number }>,
-        { bp: 10000, amountIn: fullAmount, expectedOut: fullOut, route: baseQuote.route, routeKey: fullRouteKey, hopDetails: baseQuote.hopDetails ?? [], priceImpact: baseQuote.priceImpact ?? 0 },
-      ]
-
-      // Evaluate splits (2-5 legs) that sum to 100%
-      type QuoteEntry = { bp: number; amountIn: bigint; expectedOut: bigint; route: any; routeKey: string; hopDetails: HopDetailDisplay[]; priceImpact: number }
-      let bestPlanOut = 0n
-      let bestPlanLegs: QuoteEntry[] | null = null
-      let bestPlanImprovement = 0
-
-      function tryPlan(legs: QuoteEntry[]) {
-        // All legs must use different routes
-        const routeSet = new Set(legs.map(l => l.routeKey))
-        if (routeSet.size < legs.length) return
-        const totalOut = legs.reduce((s, l) => s + l.expectedOut, 0n)
-        if (totalOut <= fullOut) return
-        if (totalOut > bestPlanOut) {
-          bestPlanOut = totalOut
-          bestPlanLegs = legs
-          bestPlanImprovement = Number((totalOut - fullOut) * 10000n / fullOut) / 100
-        }
-      }
-
-      // Build a lookup by BP for quick access
-      const byBP = new Map<number, QuoteEntry>()
-      for (const q of allQuotes) byBP.set(q.bp, q)
-
-      // 2-way splits
-      for (let i = 0; i < allQuotes.length; i++) {
-        const rem = 10000 - allQuotes[i].bp
-        const j = byBP.get(rem)
-        if (j) tryPlan([allQuotes[i], j])
-      }
-
-      // 3-way splits
-      for (let i = 0; i < allQuotes.length; i++) {
-        for (let j = i; j < allQuotes.length; j++) {
-          const rem = 10000 - allQuotes[i].bp - allQuotes[j].bp
-          if (rem <= 0 || rem >= 10000) continue
-          const k = byBP.get(rem)
-          if (k) tryPlan([allQuotes[i], allQuotes[j], k])
-        }
-      }
-
-      // 4-way splits
-      for (let i = 0; i < allQuotes.length; i++) {
-        for (let j = i; j < allQuotes.length; j++) {
-          for (let k = j; k < allQuotes.length; k++) {
-            const rem = 10000 - allQuotes[i].bp - allQuotes[j].bp - allQuotes[k].bp
-            if (rem <= 0 || rem >= 10000) continue
-            const l = byBP.get(rem)
-            if (l) tryPlan([allQuotes[i], allQuotes[j], allQuotes[k], l])
-          }
-        }
-      }
-
-      // 5-way splits
-      for (let i = 0; i < allQuotes.length; i++) {
-        for (let j = i; j < allQuotes.length; j++) {
-          for (let k = j; k < allQuotes.length; k++) {
-            for (let l = k; l < allQuotes.length; l++) {
-              const rem = 10000 - allQuotes[i].bp - allQuotes[j].bp - allQuotes[k].bp - allQuotes[l].bp
-              if (rem <= 0 || rem >= 10000) continue
-              const m = byBP.get(rem)
-              if (m) tryPlan([allQuotes[i], allQuotes[j], allQuotes[k], allQuotes[l], m])
-            }
-          }
-        }
-      }
-
-      // Convert best result to SplitPlan
-      let bestPlan: SplitPlan | null = null
-      if (bestPlanLegs && bestPlanImprovement > 0.1) {
-        bestPlan = {
-          legs: (bestPlanLegs as QuoteEntry[]).map((l) => ({
-            pctBP: l.bp, amountIn: l.amountIn, expectedOut: l.expectedOut,
-            route: l.route, routeKey: l.routeKey, hopDetails: l.hopDetails, priceImpact: l.priceImpact,
-          })),
-          totalExpectedOut: bestPlanOut,
-          improvement: bestPlanImprovement,
-        }
-      }
-
-      // Only use split if improvement is meaningful (> 0.1%)
-      if (bestPlan && bestPlan.improvement > 0.1) {
-        splitPlan.value = bestPlan
-        // Update quote with split's better output for display
-        quote.value = {
-          ...baseQuote,
-          expectedBuyAmount: bestPlan.totalExpectedOut,
-          routeDescription: `Split: ${bestPlan.legs.map(l => `${l.pctBP / 100}%`).join(' + ')}`,
-        }
-        console.log(`[Swap] Split route found: ${bestPlan.improvement.toFixed(2)}% better — ${bestPlan.legs.map(l => `${l.pctBP/100}% via ${l.routeKey}`).join(', ')}`)
-      } else {
-        splitPlan.value = null
-        // If we were holding a stale split quote, restore to single-route
-        if (singleRouteQuote) quote.value = baseQuote
-      }
-    } catch (err) {
-      console.warn('[Swap] Split evaluation failed:', err)
-      splitPlan.value = null
-      if (singleRouteQuote) quote.value = baseQuote
     }
   }
 

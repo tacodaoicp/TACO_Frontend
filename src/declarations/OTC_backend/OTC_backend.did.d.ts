@@ -932,7 +932,7 @@ export interface create_trading_canister {
     ],
     boolean
   >,
-  'refundStuckFunds' : ActorMethod<[], ActionResult>,
+  'refundStuckFunds' : ActorMethod<[], string>,
   'removeConcentratedLiquidity' : ActorMethod<
     [string, string, bigint, bigint],
     RemoveConcentratedResult

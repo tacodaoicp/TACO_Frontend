@@ -37,6 +37,7 @@
         <LPPositionsTab v-else-if="activeTab === 'lp'" />
         <TradeHistoryTab v-else-if="activeTab === 'history'" />
         <ReferralTab v-else-if="activeTab === 'referral'" />
+        <DocsTab v-else-if="activeTab === 'docs'" />
       </div>
 
       <!-- Tools section -->
@@ -61,6 +62,7 @@ import OpenOrdersTab from '../components/portfolio/OpenOrdersTab.vue'
 import LPPositionsTab from '../components/portfolio/LPPositionsTab.vue'
 import TradeHistoryTab from '../components/portfolio/TradeHistoryTab.vue'
 import ReferralTab from '../components/portfolio/ReferralTab.vue'
+import DocsTab from '../components/portfolio/DocsTab.vue'
 import { useExchangeStore } from '../store/exchange.store'
 import { ADMIN_PRINCIPALS } from '../../composables/useAdminCheck'
 
@@ -78,6 +80,7 @@ const tabs = computed(() => [
   { key: 'lp', label: 'LP Positions', badge: lpCount.value > 0 ? lpCount.value : null },
   { key: 'history', label: 'Trade History', badge: null },
   { key: 'referral', label: 'Referral', badge: null },
+  { key: 'docs', label: 'Docs', badge: null },
 ])
 
 function goToTrade(tokenAddress: string) {
@@ -102,12 +105,12 @@ onMounted(async () => {
 .portfolio-view {
   display: flex;
   flex-direction: column;
-  height: 100vh;
+  min-height: 100vh;
+
   background: var(--bg-primary);
 
   &__main {
-    flex: 1;
-    overflow-y: auto;
+    flex: 1 0 auto;
     padding: var(--space-4) var(--space-6);
     max-width: 1200px;
     width: 100%;
