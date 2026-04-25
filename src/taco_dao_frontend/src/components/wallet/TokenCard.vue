@@ -1704,6 +1704,13 @@ const formatUSDValue = (balance: bigint, decimals: number, priceUSD: number): st
   })
 }
 
-// expose to parent so wallet view can refresh neurons on demand
-defineExpose({ loadNeurons })
+// expose to parent so wallet view can render the rewards summary and trigger claim/refresh
+defineExpose({
+  loadNeurons,
+  totalRewards,
+  loadingRewards,
+  claimingAllRewards,
+  toggleNeuronsSection,
+  claimAllRewards,
+})
 </script>
