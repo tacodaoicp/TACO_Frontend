@@ -43,10 +43,10 @@
                 <div class="buy-taco-view__timeline-step">
                   <span class="buy-taco-view__step-num">3</span>
                   <!-- NACHOS -->
-                  <span v-if="selectedProduct === 'nachos' && autoSwapEnabled && !isDevEnvironment()" class="buy-taco-view__step-label">Once ICP arrives, NACHOS are minted automatically at current NAV</span>
+                  <span v-if="selectedProduct === 'nachos' && autoSwapEnabled" class="buy-taco-view__step-label">Once ICP arrives, NACHOS are minted automatically at current NAV</span>
                   <span v-else-if="selectedProduct === 'nachos'" class="buy-taco-view__step-label">Click "Mint NACHOS" when ready</span>
                   <!-- TACO -->
-                  <span v-else-if="autoSwapEnabled && !isDevEnvironment()" class="buy-taco-view__step-label">Once ICP arrives, swap executes automatically</span>
+                  <span v-else-if="autoSwapEnabled" class="buy-taco-view__step-label">Once ICP arrives, swap executes automatically</span>
                   <span v-else class="buy-taco-view__step-label">Click "Swap ICP for TACO" when ready</span>
                 </div>
                 <span class="buy-taco-view__timeline-arrow"><i class="fa-solid fa-chevron-right"></i></span>
@@ -912,12 +912,11 @@ import SwapDialog from '../components/wallet/SwapDialog.vue'
 import SwapConfirmDialog from '../components/wallet/SwapConfirmDialog.vue'
 import VaultConfirmDialog from '../components/nachos/VaultConfirmDialog.vue'
 import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
-import { useRouter, useRoute } from 'vue-router'
+import { useRoute } from 'vue-router'
 import { useTacoStore } from '../stores/taco.store'
 import { useNachosStore } from '../stores/nachos.store'
 import { storeToRefs } from 'pinia'
 import { isDevEnvironment, getEffectiveNetwork } from '../config/network-config'
-import { useAdminCheck } from '../composables/useAdminCheck'
 import { useSplitSwap } from '../composables/useSplitSwap'
 import { Principal } from '@dfinity/principal'
 import { buildBanxaUrl } from '../utils/onramp/banxa'
@@ -938,14 +937,12 @@ const DEPOSIT_MIN_E8S = 10_000n // ~0.0001 ICP — above dust/fee threshold
 // stores //
 ////////////
 
-const router = useRouter()
 const route = useRoute()
 const tacoStore = useTacoStore()
 const nachosStore = useNachosStore()
 const splitSwap = useSplitSwap()
 const { userPrincipal, userLoggedIn, userLedgerAccountId } = storeToRefs(tacoStore)
 const { cachedOperations } = storeToRefs(nachosStore)
-const { isAdmin } = useAdminCheck()
 const showAsLoggedIn = computed(() => tacoStore.userLoggedIn || tacoStore.tourBypassAuth)
 
 /////////////////
@@ -1259,8 +1256,8 @@ const startDepositPolling = () => {
         icpDetected.value = true
         detectedIcpAmount.value = balanceDifference
 
-        // Auto-execute if toggle checked (production only); otherwise show confirmation button
-        if (autoSwapEnabled.value && !isDevEnvironment()) {
+        // Auto-execute if toggle checked; otherwise show confirmation button
+        if (autoSwapEnabled.value) {
           handleSwapMintClick()
         } else {
           buyPhase.value = 'idle'
@@ -1596,11 +1593,6 @@ const startBackgroundMonitor = async () => {
 }
 
 onMounted(async () => {
-  // redirect to home on production (unless admin)
-  if (!isDevEnvironment() && !isAdmin.value) {
-    router.replace('/')
-    return
-  }
   if (userLoggedIn.value) {
     await startBackgroundMonitor()
   }

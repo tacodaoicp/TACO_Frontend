@@ -90,8 +90,8 @@
 
         </router-link>
 
-        <!-- buy taco - router link (staging/local or admin) -->
-        <router-link v-if="canShowVault" to="/buy" class="header-bar__rl">
+        <!-- buy taco - router link -->
+        <router-link to="/buy" class="header-bar__rl">
           <span class="header-bar__rl-span">Buy</span>
         </router-link>
 
@@ -102,8 +102,8 @@
 
         </a>
 
-        <!-- vault - router link (staging/local or admin) — positioned last -->
-        <router-link v-if="canShowVault" to="/vault" class="header-bar__rl header-bar__rl--with-badge">
+        <!-- vault - router link — positioned last -->
+        <router-link to="/vault" class="header-bar__rl header-bar__rl--with-badge">
           <span class="header-bar__rl-span">Vault</span>
           <span class="header-bar__rl-beta">Coming Soon</span>
         </router-link>
@@ -299,13 +299,13 @@
 
         </router-link>
 
-        <!-- buy taco - router link (staging/local or admin) -->
-        <router-link v-if="canShowVault" @click="togglePagesMenu()" to="/buy" class="list-group-item">
+        <!-- buy taco - router link -->
+        <router-link @click="togglePagesMenu()" to="/buy" class="list-group-item">
           <span>Buy</span>
         </router-link>
 
-        <!-- vault - router link (staging/local or admin) — positioned last -->
-        <router-link v-if="canShowVault" @click="togglePagesMenu()" to="/vault" class="list-group-item">
+        <!-- vault - router link — positioned last -->
+        <router-link @click="togglePagesMenu()" to="/vault" class="list-group-item">
           <span>Vault <span class="header-bar__rl-beta">Coming Soon</span></span>
         </router-link>
 
@@ -721,7 +721,7 @@
   // Imports //
   /////////////
 
-  import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
+  import { ref, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
   import { useRouter, useRoute } from 'vue-router'
   import { useTacoStore } from "../stores/taco.store"
   import { storeToRefs } from "pinia"
@@ -733,8 +733,7 @@
   import DarkModeToggle from "./theme/DarkModeToggle.vue"
   import { Tooltip } from 'bootstrap'
   // import EnvironmentIndicator from './misc/EnvironmentIndicator.vue'
-  import { getEffectiveNetwork, isDevEnvironment } from '../config/network-config'
-  import { useAdminCheck } from '../composables/useAdminCheck'
+  import { getEffectiveNetwork } from '../config/network-config'
   import WizardModal from "../views/WizardView.vue"
 
   ////////////
@@ -773,13 +772,6 @@
 
   // neurons count
   const localNeuronsCount = ref(0)
-
-  // staging-only features
-  const isNonProduction = ref(isDevEnvironment())
-
-  // vault visibility: staging/local or admin
-  const { isAdmin } = useAdminCheck()
-  const canShowVault = computed(() => isNonProduction.value || isAdmin.value)
 
   ///////////////////
   // Local Methods //

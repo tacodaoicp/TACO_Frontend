@@ -203,11 +203,8 @@
 import TacoTitle from '../components/misc/TacoTitle.vue'
 import DfinityLogo from '../assets/images/dfinityLogo.vue'
 import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
-import { useRouter } from 'vue-router'
 import { useTacoStore } from '../stores/taco.store'
 import { useNachosStore } from '../stores/nachos.store'
-import { isDevEnvironment } from '../config/network-config'
-import { useAdminCheck } from '../composables/useAdminCheck'
 
 // sub-components
 import VaultStatusBanner from '../components/nachos/VaultStatusBanner.vue'
@@ -223,11 +220,9 @@ import VaultAnalytics from '../components/nachos/VaultAnalytics.vue'
 // stores //
 ////////////
 
-const router = useRouter()
 const tacoStore = useTacoStore()
 const nachosStore = useNachosStore()
 const { appLoadingOn, appLoadingOff } = tacoStore
-const { isAdmin } = useAdminCheck()
 const showAsLoggedIn = computed(() => tacoStore.userLoggedIn || tacoStore.tourBypassAuth)
 
 ///////////////////
@@ -290,14 +285,8 @@ const handleRefresh = async () => {
 // lifecycle hooks //
 /////////////////////
 
-// on mounted — production guard + data loading
+// on mounted — data loading
 onMounted(async () => {
-  // redirect to home on production (unless admin)
-  if (!isDevEnvironment() && !isAdmin.value) {
-    router.replace('/')
-    return
-  }
-
   try {
     // Worker handles dashboard/config/nav data - no loading animation needed
     // Data is already cached and reactive via worker subscriptions
