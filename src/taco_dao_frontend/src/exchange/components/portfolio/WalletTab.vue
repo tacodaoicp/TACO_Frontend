@@ -14,7 +14,7 @@
       <thead>
         <tr>
           <th style="width:200px">Token</th>
-          <th style="width:124px">Trend</th>
+          <th style="width:124px">Trend (7d)</th>
           <th class="num">24h</th>
           <th class="num">Balance</th>
           <th class="num">USD Value</th>

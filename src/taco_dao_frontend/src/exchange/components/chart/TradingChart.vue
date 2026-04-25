@@ -247,6 +247,10 @@ function initChart() {
   colorSell = c.sell
   colorAccent = c.accent
 
+  // Lightweight Charts defaults to UTC. Format ticks and the crosshair
+  // tooltip in the user's local timezone so candle timestamps line up
+  // with the user's day/night, not the canister's UTC clock.
+  const userLocale = (typeof navigator !== 'undefined' && navigator.language) || undefined
   chart = createChart(chartContainer.value, {
     layout: {
       background: { type: ColorType.Solid, color: c.bgPrimary },
@@ -260,10 +264,32 @@ function initChart() {
       vertLine: { color: c.textSecondary + '50', width: 1, style: 2, labelBackgroundColor: c.bgTertiary },
       horzLine: { color: c.textSecondary + '50', width: 1, style: 2, labelBackgroundColor: c.bgTertiary },
     },
+    localization: {
+      locale: userLocale,
+      timeFormatter: (t: any) => {
+        const ms = (typeof t === 'number' ? t : Number(t)) * 1000
+        const d = new Date(ms)
+        return d.toLocaleString(userLocale, {
+          year:  'numeric', month: 'short', day: '2-digit',
+          hour:  '2-digit', minute: '2-digit',
+        })
+      },
+    },
     timeScale: {
       borderColor: 'transparent',
       timeVisible: true,
       secondsVisible: false,
+      // tickMarkType: 0=Year, 1=Month, 2=DayOfMonth, 3=Time, 4=TimeWithSeconds
+      tickMarkFormatter: (t: any, tickMarkType: number) => {
+        const d = new Date((typeof t === 'number' ? t : Number(t)) * 1000)
+        switch (tickMarkType) {
+          case 0: return d.getFullYear().toString()
+          case 1: return d.toLocaleString(userLocale, { month: 'short' })
+          case 2: return d.toLocaleString(userLocale, { day: 'numeric', month: 'short' })
+          case 4: return d.toLocaleTimeString(userLocale, { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+          default: return d.toLocaleTimeString(userLocale, { hour: '2-digit', minute: '2-digit' })
+        }
+      },
     },
     rightPriceScale: {
       borderColor: 'transparent',

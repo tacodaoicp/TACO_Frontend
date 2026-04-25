@@ -142,7 +142,7 @@ function Portfolio() {
                 <th style={{textAlign:'right'}}>Balance</th>
                 <th style={{textAlign:'right'}}>Price</th>
                 <th style={{textAlign:'right'}}>24h</th>
-                <th>Trend</th>
+                <th>Trend (7d)</th>
                 <th style={{textAlign:'right'}}>Value</th>
                 <th style={{textAlign:'right'}}>Allocation</th>
                 <th style={{textAlign:'right'}}></th>
