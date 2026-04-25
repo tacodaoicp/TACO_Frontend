@@ -3,55 +3,57 @@
     <div v-if="loading" class="lp-positions-tab__loading">Loading LP positions...</div>
 
     <div v-else-if="poolGroups.length > 0" class="lp-positions-tab__groups">
-      <div v-for="group in poolGroups" :key="group.pairKey" class="lp-positions-tab__group">
+      <div v-for="group in poolGroups" :key="group.pairKey" class="tx-card lp-positions-tab__group">
         <!-- Pool Summary Row (clickable) -->
         <div class="lp-positions-tab__group-header" @click="togglePool(group.pairKey)">
           <span class="lp-positions-tab__group-pair">{{ getSymbol(group.token0) }}/{{ getSymbol(group.token1) }}</span>
-          <span class="lp-positions-tab__group-info">
+          <span class="tx-ink-3 lp-positions-tab__group-info">
             {{ group.posCount }} position{{ group.posCount !== 1 ? 's' : '' }}
-            <span v-if="group.inRangeCount > 0" class="lp-positions-tab__group-in-range">{{ group.inRangeCount }} in range</span>
+            <span v-if="group.inRangeCount > 0" class="tx-buy lp-positions-tab__group-in-range">{{ group.inRangeCount }} in range</span>
           </span>
           <span class="num lp-positions-tab__group-value">
             {{ formatAmount(group.totalAmount0, getDecimals(group.token0)) }} {{ getSymbol(group.token0) }}
             + {{ formatAmount(group.totalAmount1, getDecimals(group.token1)) }} {{ getSymbol(group.token1) }}
           </span>
-          <span v-if="group.totalFee0 > 0n || group.totalFee1 > 0n" class="lp-positions-tab__group-fees">
+          <span v-if="group.totalFee0 > 0n || group.totalFee1 > 0n" class="tx-buy lp-positions-tab__group-fees">
             Fees: {{ formatAmount(group.totalFee0, getDecimals(group.token0)) }} + {{ formatAmount(group.totalFee1, getDecimals(group.token1)) }}
           </span>
-          <span class="lp-positions-tab__group-chevron">{{ expandedPool === group.pairKey ? '▾' : '▸' }}</span>
+          <span class="tx-ink-3 lp-positions-tab__group-chevron">{{ expandedPool === group.pairKey ? '▾' : '▸' }}</span>
         </div>
 
         <!-- Expanded: Individual Positions -->
         <div v-if="expandedPool === group.pairKey" class="lp-positions-tab__group-positions">
-          <div v-for="pos in group.positions" :key="pos.key" class="lp-positions-tab__card">
+          <div v-for="pos in group.positions" :key="pos.key" class="tx-panel-2 lp-positions-tab__card">
             <div class="lp-positions-tab__card-header">
-              <span v-if="pos.isConcentrated" class="lp-positions-tab__card-id">#{{ pos.positionId }}</span>
-              <span v-if="pos.isConcentrated" class="lp-positions-tab__card-badge" :class="pos.inRange ? 'lp-positions-tab__card-badge--in' : 'lp-positions-tab__card-badge--out'">
-                {{ pos.inRange ? 'In Range' : 'Out of Range' }}
-              </span>
-              <span v-else class="lp-positions-tab__card-badge lp-positions-tab__card-badge--full">Full Range</span>
+              <span v-if="pos.isConcentrated" class="tx-mono tx-ink-3 lp-positions-tab__card-id">#{{ pos.positionId }}</span>
+              <span
+                v-if="pos.isConcentrated"
+                class="tx-badge"
+                :class="pos.inRange ? 'tx-badge--buy' : 'tx-badge--warning'"
+              >{{ pos.inRange ? 'In Range' : 'Out of Range' }}</span>
+              <span v-else class="tx-badge tx-badge--orange">Full Range</span>
             </div>
 
-            <div v-if="pos.isConcentrated" class="lp-positions-tab__card-range">
+            <div v-if="pos.isConcentrated" class="tx-ink-3 lp-positions-tab__card-range">
               Range: {{ formatPrice(pos.priceLower) }} — {{ formatPrice(pos.priceUpper) }} {{ getSymbol(pos.token1) }} per {{ getSymbol(pos.token0) }}
             </div>
 
             <div class="lp-positions-tab__card-details">
               <div class="lp-positions-tab__card-row">
-                <span>Liquidity</span>
+                <span class="tx-ink-3">Liquidity</span>
                 <span class="num">{{ formatAmount(pos.lpTokens, 8) }} LP</span>
               </div>
               <div class="lp-positions-tab__card-row">
-                <span>Value</span>
+                <span class="tx-ink-3">Value</span>
                 <span class="num">{{ formatAmount(pos.amount0, getDecimals(pos.token0)) }} {{ getSymbol(pos.token0) }} + {{ formatAmount(pos.amount1, getDecimals(pos.token1)) }} {{ getSymbol(pos.token1) }}</span>
               </div>
               <div v-if="pos.shareOfPool > 0" class="lp-positions-tab__card-row">
-                <span>Pool Share</span>
+                <span class="tx-ink-3">Pool Share</span>
                 <span class="num">{{ (pos.shareOfPool * 100).toFixed(2) }}%</span>
               </div>
               <div v-if="pos.fee0 > 0n || pos.fee1 > 0n" class="lp-positions-tab__card-row">
-                <span>Unclaimed Fees</span>
-                <span class="num" style="color: var(--color-buy)">
+                <span class="tx-ink-3">Unclaimed Fees</span>
+                <span class="num tx-buy">
                   {{ formatAmount(pos.fee0, getDecimals(pos.token0)) }} {{ getSymbol(pos.token0) }}
                   + {{ formatAmount(pos.fee1, getDecimals(pos.token1)) }} {{ getSymbol(pos.token1) }}
                 </span>
@@ -61,13 +63,13 @@
             <div class="lp-positions-tab__card-actions">
               <button
                 v-if="pos.fee0 > 0n || pos.fee1 > 0n"
-                class="ex-btn ex-btn--sm ex-btn--primary"
+                class="tx-btn tx-btn--sm tx-btn--primary"
                 :disabled="claimingPair !== null"
                 @click="claimFees(pos)"
               >
                 {{ claimingPair === `${pos.token0}/${pos.token1}` ? 'Claiming...' : 'Claim Fees' }}
               </button>
-              <button class="ex-btn ex-btn--sm ex-btn--outline" @click="openRemoveModal(pos)">Remove</button>
+              <button class="tx-btn tx-btn--sm tx-btn--outline" @click="openRemoveModal(pos)">Remove</button>
             </div>
           </div>
         </div>
@@ -120,7 +122,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, onActivated, onDeactivated } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted, onActivated, onDeactivated } from 'vue'
 import { useExchangeStore } from '../../store/exchange.store'
 import { ratioToHumanPrice, isFullRange, formatRangePrice, parseRemoveResult, liquidityToAmounts } from '../../utils/concentrated'
 import { isTransportError, verifyAfterTransportError, type VerifyStatus } from '../../utils/errors'
@@ -461,6 +463,7 @@ function stopPolling() {
   if (pollTimer) { clearInterval(pollTimer); pollTimer = null }
 }
 let offMutation: (() => void) | null = null
+watch(() => store.isAuthenticated, (v, prev) => { if (v && !prev) loadPositions() })
 onMounted(() => {
   loadPositions()
   startPolling()
@@ -489,54 +492,48 @@ onDeactivated(() => stopPolling())
     background: var(--border-primary);
   }
 
+  // .tx-card provides bg + border + radius; just add the layout here.
   &__group {
-    background: var(--bg-secondary);
+    overflow: hidden; // keep rounded corners intact when expanded
   }
 
   &__group-header {
     display: flex;
     align-items: center;
-    gap: var(--space-3);
-    padding: var(--space-3) var(--space-4);
+    gap: 12px;
+    padding: 14px 16px;
     cursor: pointer;
-    transition: background 0.1s;
+    transition: background 120ms;
 
-    &:hover { background: var(--bg-tertiary); }
+    &:hover { background: var(--tx-surface-1); }
   }
 
   &__group-pair {
-    font-weight: var(--weight-semibold);
-    color: var(--text-primary);
+    font-weight: 600;
+    color: var(--tx-ink);
     min-width: 90px;
   }
 
   &__group-info {
-    font-size: var(--text-xs);
-    color: var(--text-tertiary);
+    font-size: 11px;
     flex-shrink: 0;
   }
-
-  &__group-in-range {
-    color: var(--color-buy);
-    margin-left: var(--space-1);
-  }
+  &__group-in-range { margin-left: 4px; }
 
   &__group-value {
     flex: 1;
     text-align: right;
-    font-size: var(--text-xs);
-    color: var(--text-secondary);
+    font-size: 11px;
+    color: var(--tx-ink-2);
   }
 
   &__group-fees {
-    font-size: var(--text-xs);
-    color: var(--color-buy);
-    margin-left: var(--space-2);
+    font-size: 11px;
+    margin-left: 8px;
   }
 
   &__group-chevron {
-    color: var(--text-tertiary);
-    font-size: var(--text-sm);
+    font-size: 13px;
     flex-shrink: 0;
   }
 
@@ -554,61 +551,49 @@ onDeactivated(() => stopPolling())
     padding: var(--space-3);
   }
 
+  // .tx-panel-2 provides the card bg + border + radius now.
   &__card {
-    background: var(--bg-tertiary);
-    border-radius: 8px;
-    padding: var(--space-3);
+    padding: 12px;
   }
 
   &__card-header {
     display: flex;
     align-items: center;
-    gap: var(--space-2);
-    margin-bottom: var(--space-2);
+    gap: 8px;
+    margin-bottom: 8px;
   }
 
   &__card-pair {
-    font-weight: var(--weight-semibold);
-    color: var(--text-primary);
+    font-weight: 600;
+    color: var(--tx-ink);
   }
 
   &__card-id {
-    font-size: var(--text-xs);
-    color: var(--text-tertiary);
-    font-family: var(--font-mono);
+    font-size: 11px;
   }
 
-  &__card-badge {
-    font-size: 10px;
-    font-weight: var(--weight-semibold);
-    padding: 2px 6px;
-    border-radius: 4px;
-    margin-left: auto;
-
-    &--in { background: rgba(46, 166, 106, 0.15); color: var(--color-buy); }
-    &--out { background: rgba(217, 64, 64, 0.15); color: var(--color-sell); }
-    &--full { background: var(--accent-primary-muted); color: var(--accent-primary); }
-  }
+  // Badge positioning — let the last child push right without needing a
+  // standalone badge style (handled by .tx-badge--* classes now).
+  &__card-header > .tx-badge:last-child { margin-left: auto; }
 
   &__card-range {
-    font-size: var(--text-xs);
-    color: var(--text-secondary);
-    margin-bottom: var(--space-2);
+    font-size: 11px;
+    margin-bottom: 8px;
     font-family: var(--font-mono);
   }
 
   &__card-details {
     display: flex;
     flex-direction: column;
-    gap: var(--space-1);
-    margin-bottom: var(--space-2);
+    gap: 4px;
+    margin-bottom: 8px;
   }
 
   &__card-row {
     display: flex;
     justify-content: space-between;
-    font-size: var(--text-sm);
-    color: var(--text-secondary);
+    font-size: 13px;
+    color: var(--tx-ink-2);
   }
 
   &__card-actions {

@@ -1,74 +1,188 @@
 // TACO Exchange — Design Tokens
-// Warm premium dark theme with darker burnt orange accent
+// Two themes: Masa (dark, default) + Cotija (light). Attribute-driven.
+// Source: figma/styles.css (authoritative).
+//
+// Tokens live at :root[data-tx-theme="..."] so they're globally resolvable
+// but are only consumed inside `[data-theme="exchange"]` scoped rules —
+// no bleed into the DAO app. Legacy aliases at the bottom keep existing
+// `.ex-*` call sites alive during the migration; remove after PR 8.
 
-[data-theme="exchange"] {
-  /* --- Backgrounds (warm brown-black) --- */
-  --bg-primary: #1A0E05;
-  --bg-secondary: #2A1608;
-  --bg-tertiary: #3A1F0C;
-  --bg-elevated: #4A2810;
+/* ─── Masa (dark) ──────────────────────────────────────────────────── */
+:root[data-tx-theme="masa"] {
+  /* Surfaces */
+  --tx-bg:        #151210;
+  --tx-surface-1: #1c1816;
+  --tx-surface-2: #241f1c;
+  --tx-surface-3: #2d2724;
+  --tx-overlay:   rgba(10, 7, 5, 0.72);
 
-  /* --- Text (warm cream/tan) --- */
-  --text-primary: #F5F0E0;
-  --text-secondary: #B89A78;
-  --text-tertiary: #8B6E50;
+  /* Lines & dividers */
+  --tx-line:      rgba(255, 230, 200, 0.07);
+  --tx-line-2:    rgba(255, 230, 200, 0.12);
+  --tx-line-hi:   rgba(255, 230, 200, 0.22);
 
-  /* --- Accent (darker burnt orange) --- */
-  --accent-primary: #C45A0A;
-  --accent-primary-hover: #D4700E;
-  --accent-primary-muted: #C45A0A33; /* 20% opacity */
+  /* Ink */
+  --tx-ink:       #f2ece2;
+  --tx-ink-2:     #c4bbab;
+  --tx-ink-3:     #897e6f;
+  --tx-ink-4:     #5c5349;
 
-  /* --- Semantic: Trading --- */
-  --color-buy: #2EA66A;
-  --color-buy-bg: rgba(46, 166, 106, 0.12);
-  --color-buy-hover: #3CB87A;
-  --color-sell: #D94040;
-  --color-sell-bg: rgba(217, 64, 64, 0.12);
-  --color-sell-hover: #E25555;
+  /* Brand accent */
+  --tx-orange:      #f28b3a;
+  --tx-orange-2:    #ffa758;
+  --tx-orange-dim:  rgba(242, 139, 58, 0.14);
+  --tx-orange-line: rgba(242, 139, 58, 0.32);
 
-  /* --- Semantic: Feedback --- */
-  --color-info: #5B8AC4;
-  --color-warning: #C45A0A;
-  --color-error: #C43030;
-  --color-success: #2EA66A;
+  /* Secondary accents */
+  --tx-amber:     #f5c06b;
+  --tx-maize:     #efd48a;
 
-  /* --- Borders & Dividers (warm sienna) --- */
-  --border-primary: #3A200D;
-  --border-secondary: #4D2E14;
-  --border-focus: #C45A0A;
+  /* Semantic */
+  --tx-buy:         #3ba87a;
+  --tx-buy-dim:     rgba(59, 168, 122, 0.14);
+  --tx-sell:        #e0544a;
+  --tx-sell-dim:    rgba(224, 84, 74, 0.14);
+  --tx-warn:        #d88a3f;
+  --tx-warning:     #d88a3f;
+  --tx-warning-dim: rgba(216, 138, 63, 0.14);
+  --tx-info:        #7aa7d7;
+  --tx-info-dim:    rgba(122, 167, 215, 0.14);
 
-  /* --- Gradients (premium card system) --- */
-  --card-gradient-from: #3A1F0C;
-  --card-gradient-to: #241005;
-  --card-active-from: #4A2810;
-  --card-active-to: #2A1608;
-  --card-hover-from: #3F2410;
-  --card-hover-to: #2E180A;
-  --card-border: #6B4422;
-  --card-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+  /* Elevation */
+  --tx-shadow-1: 0 1px 0 rgba(255, 255, 255, 0.03) inset, 0 2px 12px rgba(0, 0, 0, 0.3);
+  --tx-shadow-2: 0 12px 32px rgba(0, 0, 0, 0.45);
+  --tx-glow:     0 0 0 1px var(--tx-orange-line), 0 6px 18px rgba(242, 139, 58, 0.18);
 
-  /* --- Gold accent (premium highlights) --- */
-  --gold: #D4A034;
-  --gold-light: #E0B040;
-  --text-cream: #F5F0E0;
+  /* Panel surface (gradient variant locked) */
+  --tx-panel-bg:     linear-gradient(135deg, #221c18 0%, #19140f 100%);
+  --tx-panel-bg-2:   linear-gradient(135deg, #2a231e 0%, #1e1813 100%);
+  --tx-panel-border: 1px solid var(--tx-line-2);
+}
 
-  /* --- Overlay --- */
-  --overlay-bg: rgba(15, 5, 0, 0.70);
+/* ─── Cotija (light) ───────────────────────────────────────────────── */
+:root[data-tx-theme="cotija"] {
+  --tx-bg:        #f6f2ea;
+  --tx-surface-1: #fbf8f1;
+  --tx-surface-2: #ffffff;
+  --tx-surface-3: #efe9dd;
+  --tx-overlay:   rgba(40, 30, 20, 0.32);
 
-  /* --- Orderbook-specific --- */
-  --ob-bid-gradient: linear-gradient(to left, rgba(46, 166, 106, 0.12), transparent);
-  --ob-ask-gradient: linear-gradient(to left, rgba(217, 64, 64, 0.12), transparent);
-  --ob-amm-opacity: 0.5;
+  --tx-line:      rgba(60, 40, 20, 0.08);
+  --tx-line-2:    rgba(60, 40, 20, 0.13);
+  --tx-line-hi:   rgba(60, 40, 20, 0.22);
 
-  /* --- Spacing (4px base) --- */
-  --space-1: 4px;
-  --space-2: 8px;
-  --space-3: 12px;
-  --space-4: 16px;
-  --space-5: 20px;
-  --space-6: 24px;
-  --space-8: 32px;
+  --tx-ink:       #1b1612;
+  --tx-ink-2:     #4b4239;
+  --tx-ink-3:     #7a6f60;
+  --tx-ink-4:     #a69d8c;
+
+  --tx-orange:      #d86b1c;
+  --tx-orange-2:    #b8560f;
+  --tx-orange-dim:  rgba(216, 107, 28, 0.10);
+  --tx-orange-line: rgba(216, 107, 28, 0.32);
+
+  --tx-amber:     #b87a1a;
+  --tx-maize:     #d8a94a;
+
+  --tx-buy:         #218756;
+  --tx-buy-dim:     rgba(33, 135, 86, 0.10);
+  --tx-sell:        #c73f35;
+  --tx-sell-dim:    rgba(199, 63, 53, 0.10);
+  --tx-warn:        #b45c17;
+  --tx-warning:     #b45c17;
+  --tx-warning-dim: rgba(180, 92, 23, 0.10);
+  --tx-info:        #3f6a9c;
+  --tx-info-dim:    rgba(63, 106, 156, 0.08);
+
+  --tx-shadow-1: 0 1px 0 rgba(255, 255, 255, 0.8) inset, 0 1px 2px rgba(60, 40, 20, 0.05);
+  --tx-shadow-2: 0 12px 32px rgba(40, 20, 10, 0.12);
+  --tx-glow:     0 0 0 1px var(--tx-orange-line), 0 6px 18px rgba(216, 107, 28, 0.18);
+
+  --tx-panel-bg:     linear-gradient(135deg, #fffaf1 0%, #f5ede0 100%);
+  --tx-panel-bg-2:   linear-gradient(135deg, #ffffff 0%, #f9f2e5 100%);
+  --tx-panel-border: 1px solid var(--tx-line-2);
+}
+
+/* ─── Shared scales (theme-agnostic) ───────────────────────────────── */
+:root {
+  /* Radius — soft scale is locked */
+  --tx-r-sm: 4px;
+  --tx-r-md: 6px;
+  --tx-r-lg: 10px;
+  --tx-r-xl: 14px;
+
+  /* Spacing (4px base) */
+  --space-1:  4px;
+  --space-2:  8px;
+  --space-3:  12px;
+  --space-4:  16px;
+  --space-5:  20px;
+  --space-6:  24px;
+  --space-8:  32px;
   --space-10: 40px;
   --space-12: 48px;
   --space-16: 64px;
+}
+
+/* ─── Legacy aliases ───────────────────────────────────────────────── */
+// Keeps existing `.ex-*` rules working during the migration.
+// Every name maps 1:1 to a new `--tx-*` token. Removed after PR 8.
+[data-theme="exchange"] {
+  /* Backgrounds */
+  --bg-primary:    var(--tx-bg);
+  --bg-secondary:  var(--tx-surface-1);
+  --bg-tertiary:   var(--tx-surface-2);
+  --bg-elevated:   var(--tx-surface-3);
+
+  /* Text */
+  --text-primary:   var(--tx-ink);
+  --text-secondary: var(--tx-ink-2);
+  --text-tertiary:  var(--tx-ink-3);
+  --text-cream:     var(--tx-ink);
+
+  /* Accent */
+  --accent-primary:       var(--tx-orange);
+  --accent-primary-hover: var(--tx-orange-2);
+  --accent-primary-muted: var(--tx-orange-dim);
+
+  /* Semantic: trading */
+  --color-buy:        var(--tx-buy);
+  --color-buy-bg:     var(--tx-buy-dim);
+  --color-buy-hover:  var(--tx-buy);
+  --color-sell:       var(--tx-sell);
+  --color-sell-bg:    var(--tx-sell-dim);
+  --color-sell-hover: var(--tx-sell);
+
+  /* Semantic: feedback */
+  --color-info:    var(--tx-info);
+  --color-warning: var(--tx-warning);
+  --color-error:   var(--tx-sell);
+  --color-success: var(--tx-buy);
+
+  /* Borders */
+  --border-primary:   var(--tx-line);
+  --border-secondary: var(--tx-line-2);
+  --border-focus:     var(--tx-orange);
+
+  /* Card gradients — map to panel tokens */
+  --card-gradient-from: var(--tx-surface-2);
+  --card-gradient-to:   var(--tx-surface-1);
+  --card-active-from:   var(--tx-surface-3);
+  --card-active-to:     var(--tx-surface-2);
+  --card-hover-from:    var(--tx-surface-3);
+  --card-hover-to:      var(--tx-surface-2);
+  --card-border:        var(--tx-line-2);
+  --card-shadow:        var(--tx-shadow-1);
+
+  /* Gold → amber */
+  --gold:       var(--tx-amber);
+  --gold-light: var(--tx-maize);
+
+  /* Overlay */
+  --overlay-bg: var(--tx-overlay);
+
+  /* Orderbook */
+  --ob-bid-gradient: linear-gradient(to left, var(--tx-buy-dim), transparent);
+  --ob-ask-gradient: linear-gradient(to left, var(--tx-sell-dim), transparent);
+  --ob-amm-opacity:  0.5;
 }

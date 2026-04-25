@@ -3,7 +3,7 @@
     class="pro-layout"
     :style="{
       gridTemplateColumns: `1fr 2px ${orderbookWidth}px ${orderEntryWidth}px`,
-      gridTemplateRows: `48px 1fr 2px ${bottomHeight}px`,
+      gridTemplateRows: `auto 1fr 2px ${bottomHeight}px`,
     }"
   >
     <!-- Row 1: Header spans all columns -->
@@ -23,11 +23,11 @@
       @resizeEnd="saveSizes"
     />
 
-    <div style="grid-column: 3; grid-row: 2;">
+    <div style="grid-column: 3; grid-row: 2; min-height: 0; min-width: 0; overflow: hidden;">
       <slot name="orderbook" />
     </div>
 
-    <div style="grid-column: 4; grid-row: 2;">
+    <div style="grid-column: 4; grid-row: 2; min-height: 0; min-width: 0; overflow: hidden;">
       <slot name="order-entry" />
     </div>
 
@@ -143,25 +143,24 @@ defineExpose({ resetLayout })
   display: grid;
   flex: 1;
   min-height: 0;
-  background: #2A1608;
-  background: var(--bg-secondary, #2A1608);
+  background: var(--tx-bg);
   gap: 0;
   overflow: hidden;
 
   &__header {
     z-index: 100;
-    background: var(--bg-secondary, #2A1608);
+    background: var(--tx-bg);
   }
 
   &__chart {
     overflow: hidden;
-    background: var(--bg-primary, #1A0E05);
+    background: var(--tx-bg);
     min-height: 0;
   }
 
   &__bottom {
     overflow: hidden;
-    background: var(--bg-secondary, #2A1608);
+    background: var(--tx-bg);
   }
 
   // Responsive: hide pro layout on mobile

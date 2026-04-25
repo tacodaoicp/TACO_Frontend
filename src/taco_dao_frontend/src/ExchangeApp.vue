@@ -15,27 +15,73 @@
     </router-view>
     <MobileNav v-if="!isProRoute" />
     <ExchangeToastContainer />
+    <HelpModal v-model:open="helpOpen" />
     <div class="ex-sr-announce" aria-live="polite" aria-atomic="true" id="ex-announce"></div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useExchangeStore } from './exchange/store/exchange.store'
+import { useTacoStore } from './stores/taco.store'
 import { ADMIN_PRINCIPALS } from './composables/useAdminCheck'
 import MobileNav from './exchange/components/layout/MobileNav.vue'
 import ExchangeToastContainer from './exchange/components/shared/ExchangeToastContainer.vue'
+import HelpModal from './exchange/components/common/HelpModal.vue'
 
 const exchangeStore = useExchangeStore()
+const tacoStore = useTacoStore()
 const router = useRouter()
 const route = useRoute()
+const helpOpen = ref(false)
 
 const isProRoute = computed(() => route.meta?.mode === 'pro')
 const isTerminalRoute = computed(() => route.meta?.mode === 'pro' || route.meta?.mode === 'trade')
 const isAdmin = computed(() => ADMIN_PRINCIPALS.includes(exchangeStore.principalText))
 
+// Font loader — inject Google Fonts <link>s once, keep handles for cleanup.
+// CSP allows fonts.googleapis.com (style-src) and fonts.gstatic.com (font-src).
+const FONT_LINK_IDS = ['tx-font-preconnect-1', 'tx-font-preconnect-2', 'tx-font-stylesheet'] as const
+function injectFonts() {
+  if (document.getElementById(FONT_LINK_IDS[0])) return
+  const preconnect1 = document.createElement('link')
+  preconnect1.id = FONT_LINK_IDS[0]
+  preconnect1.rel = 'preconnect'
+  preconnect1.href = 'https://fonts.googleapis.com'
+  const preconnect2 = document.createElement('link')
+  preconnect2.id = FONT_LINK_IDS[1]
+  preconnect2.rel = 'preconnect'
+  preconnect2.href = 'https://fonts.gstatic.com'
+  preconnect2.crossOrigin = ''
+  const sheet = document.createElement('link')
+  sheet.id = FONT_LINK_IDS[2]
+  sheet.rel = 'stylesheet'
+  sheet.href = 'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&family=Instrument+Serif:ital@0;1&display=swap'
+  document.head.append(preconnect1, preconnect2, sheet)
+}
+function removeFonts() {
+  for (const id of FONT_LINK_IDS) document.getElementById(id)?.remove()
+}
+
+// Global cross-viewport redirect.
+// Pro terminal grid needs ≥ 768px; mobile trade is the narrow-viewport
+// variant. Here we keep the user's current route in sync with their
+// viewport, but ONLY if they're already on the trading pair — we don't
+// drag users off Portfolio / Pool / OTC / etc. on resize.
+const mobileMql = window.matchMedia('(max-width: 767px)')
+function syncTradeRouteToViewport() {
+  const path = route.path
+  if (path === '/' && mobileMql.matches) {
+    router.replace('/trade')
+  } else if (path === '/trade' && !mobileMql.matches) {
+    router.replace('/')
+  }
+}
+
 onMounted(async () => {
+  injectFonts()
+  document.documentElement.dataset.txTheme = tacoStore.exchangeTheme
   try {
     await exchangeStore.initExchange()
   } catch (err) {
@@ -43,10 +89,18 @@ onMounted(async () => {
   }
 
   window.addEventListener('keydown', handleKeydown)
+  mobileMql.addEventListener('change', syncTradeRouteToViewport)
+})
+
+watch(() => tacoStore.exchangeTheme, (v) => {
+  document.documentElement.dataset.txTheme = v
 })
 
 onUnmounted(() => {
   window.removeEventListener('keydown', handleKeydown)
+  mobileMql.removeEventListener('change', syncTradeRouteToViewport)
+  delete document.documentElement.dataset.txTheme
+  removeFonts()
 })
 
 function handleKeydown(e: KeyboardEvent) {
@@ -55,8 +109,9 @@ function handleKeydown(e: KeyboardEvent) {
   if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return
   if ((e.target as HTMLElement)?.isContentEditable) return
 
-  // Escape — close any modal / overlay
+  // Escape — close HelpModal or any open modal overlay
   if (e.key === 'Escape') {
+    if (helpOpen.value) { helpOpen.value = false; return }
     document.querySelector<HTMLElement>('.ex-modal-overlay')?.click()
     return
   }
@@ -69,34 +124,9 @@ function handleKeydown(e: KeyboardEvent) {
     case 'e': router.push('/easy'); break
     case 'o': router.push('/portfolio'); break
     case 'l': router.push('/pool'); break
-    case '?': {
-      // Toggle keyboard shortcut help overlay
-      const existing = document.getElementById('ex-kb-help')
-      if (existing) { existing.remove(); return }
-      const overlay = document.createElement('div')
-      overlay.id = 'ex-kb-help'
-      overlay.className = 'ex-modal-overlay'
-      overlay.innerHTML = `
-        <div class="ex-modal" style="max-width:400px">
-          <h3 class="ex-modal__title">Keyboard Shortcuts</h3>
-          <table class="ex-table" style="width:100%">
-            <tbody>
-              <tr><td style="color:var(--text-tertiary)">P</td><td>Pro Trade</td></tr>
-              <tr><td style="color:var(--text-tertiary)">E</td><td>Easy Swap</td></tr>
-              <tr><td style="color:var(--text-tertiary)">O</td><td>Portfolio</td></tr>
-              <tr><td style="color:var(--text-tertiary)">L</td><td>Liquidity Pools</td></tr>
-              <tr><td style="color:var(--text-tertiary)">Esc</td><td>Close modal</td></tr>
-              <tr><td style="color:var(--text-tertiary)">?</td><td>This help</td></tr>
-            </tbody>
-          </table>
-          <div style="text-align:right;margin-top:var(--space-3)">
-            <button class="ex-btn ex-btn--sm ex-btn--outline" onclick="this.closest('.ex-modal-overlay').remove()">Close</button>
-          </div>
-        </div>`
-      overlay.addEventListener('click', (ev) => { if (ev.target === overlay) overlay.remove() })
-      document.body.appendChild(overlay)
+    case '?':
+      helpOpen.value = !helpOpen.value
       break
-    }
   }
 }
 </script>
@@ -145,9 +175,12 @@ function handleKeydown(e: KeyboardEvent) {
     padding-bottom: 0;
   }
 
-  // Non-pro pages: bottom padding for mobile nav
+  // Non-pro pages: bottom padding for mobile nav, but only on mobile.
+  // Desktop hides MobileNav so no extra space needed.
   &:not(&--pro) {
-    padding-bottom: 56px;
+    @media (max-width: 767px) {
+      padding-bottom: 56px;
+    }
   }
 }
 </style>

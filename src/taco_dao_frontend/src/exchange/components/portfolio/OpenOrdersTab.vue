@@ -125,7 +125,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, onActivated, onDeactivated } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted, onActivated, onDeactivated } from 'vue'
 import { useRouter } from 'vue-router'
 import { useExchangeStore } from '../../store/exchange.store'
 import { fillPercentage, orderPrice, calculateRevokeFee } from '../../utils/price-math'
@@ -410,6 +410,10 @@ function stopPolling() {
   if (pollTimer) { clearInterval(pollTimer); pollTimer = null }
 }
 let offMutation: (() => void) | null = null
+// Cold F5: tab mounts before auth restores from localStorage. Fire as
+// soon as isAuthenticated flips so the table doesn't sit empty for the
+// full 5 s poll interval.
+watch(() => store.isAuthenticated, (v, prev) => { if (v && !prev) loadOrders() })
 onMounted(() => {
   loadOrders()
   startPolling()

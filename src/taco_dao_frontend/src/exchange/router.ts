@@ -8,6 +8,7 @@ const OTCView = () => import('./views/OTCView.vue')
 const ExchangeAdminView = () => import('./views/ExchangeAdminView.vue')
 const RecoverView = () => import('./views/RecoverView.vue')
 const MobileTradeView = () => import('./views/MobileTradeView.vue')
+const StyleGuideView = () => import('./views/StyleGuideView.vue')
 
 // Preload all route chunks after initial page load
 if (typeof window !== 'undefined') {
@@ -33,6 +34,7 @@ const routes = [
   { path: '/otc/:code?', name: 'OTC', component: OTCView },
   { path: '/admin', name: 'ExchangeAdmin', component: ExchangeAdminView },
   { path: '/recover', name: 'Recover', component: RecoverView },
+  { path: '/styleguide', name: 'StyleGuide', component: StyleGuideView },
   { path: '/:pathMatch(.*)*', redirect: '/' },
 ]
 

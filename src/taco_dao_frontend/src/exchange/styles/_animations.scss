@@ -1,95 +1,59 @@
-// TACO Exchange — Animations (Section 21.6)
+// TACO Exchange — Animations
+//
+// All @keyframes are defined unconditionally (they cost nothing unless
+// referenced). Class rules that trigger them are wrapped in
+// @media (prefers-reduced-motion: no-preference) so reduced-motion users
+// don't get any animation. A global fallback zeros out animation-duration
+// and transition-duration for the exchange scope as a belt-and-braces.
 
-@keyframes ex-fade-in {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
+// ─── Keyframes ──────────────────────────────────────────────────────
+@keyframes ex-fade-in        { from { opacity: 0; } to { opacity: 1; } }
+@keyframes ex-scale-in       { from { opacity: 0; transform: scale(0.96); } to { opacity: 1; transform: scale(1); } }
+@keyframes ex-slide-in-right { from { opacity: 0; transform: translateX(100%); } to { opacity: 1; transform: translateX(0); } }
+@keyframes ex-slide-in-top   { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes ex-slide-out-right { from { opacity: 1; transform: translateX(0); } to { opacity: 0; transform: translateX(100%); } }
+@keyframes ex-toast-countdown { from { width: 100%; } to { width: 0%; } }
 
-@keyframes ex-scale-in {
-  from { opacity: 0; transform: scale(0.95); }
-  to { opacity: 1; transform: scale(1); }
-}
+@keyframes ex-price-flash-up  { 0% { color: var(--tx-buy); }  100% { color: inherit; } }
+@keyframes ex-price-flash-down { 0% { color: var(--tx-sell); } 100% { color: inherit; } }
+@keyframes ex-ob-flash-bid    { 0% { background-color: var(--tx-buy-dim); }  100% { background-color: transparent; } }
+@keyframes ex-ob-flash-ask    { 0% { background-color: var(--tx-sell-dim); } 100% { background-color: transparent; } }
 
-@keyframes ex-slide-in-right {
-  from { opacity: 0; transform: translateX(100%); }
-  to { opacity: 1; transform: translateX(0); }
-}
+// tx-* aliases (mockup uses these names)
+@keyframes tx-flash-buy  { 0% { background: var(--tx-buy-dim); }  100% { background: transparent; } }
+@keyframes tx-flash-sell { 0% { background: var(--tx-sell-dim); } 100% { background: transparent; } }
+@keyframes tx-shimmer    { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+@keyframes ex-shimmer    { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
 
-@keyframes ex-slide-in-top {
-  from { opacity: 0; transform: translateY(-10px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-@keyframes ex-slide-out-right {
-  from { opacity: 1; transform: translateX(0); }
-  to { opacity: 0; transform: translateX(100%); }
-}
-
-@keyframes ex-toast-countdown {
-  from { width: 100%; }
-  to { width: 0%; }
-}
-
-@keyframes ex-shimmer {
-  0% { background-position: -200px 0; }
-  100% { background-position: 200px 0; }
-}
-
+// ─── Class hooks (motion honours user preference) ───────────────────
 [data-theme="exchange"] {
-  // Price flash animations
-  .price-flash-up {
-    animation: ex-price-flash-up 300ms ease-out;
-  }
+  @media (prefers-reduced-motion: no-preference) {
+    .price-flash-up       { animation: ex-price-flash-up  600ms ease-out; }
+    .price-flash-down     { animation: ex-price-flash-down 600ms ease-out; }
+    .tx-flash-buy         { animation: tx-flash-buy  600ms ease-out; }
+    .tx-flash-sell        { animation: tx-flash-sell 600ms ease-out; }
 
-  .price-flash-down {
-    animation: ex-price-flash-down 300ms ease-out;
-  }
+    .ob-row-flash-bid     { animation: ex-ob-flash-bid 400ms ease-out; }
+    .ob-row-flash-ask     { animation: ex-ob-flash-ask 400ms ease-out; }
 
-  @keyframes ex-price-flash-up {
-    0% { color: var(--color-buy); }
-    100% { color: inherit; }
+    // Fade transitions (used via Vue <Transition name="fade">)
+    .fade-enter-active,
+    .fade-leave-active    { transition: opacity 200ms cubic-bezier(0.16, 1, 0.3, 1); }
+    .fade-enter-from,
+    .fade-leave-to        { opacity: 0; }
   }
+}
 
-  @keyframes ex-price-flash-down {
-    0% { color: var(--color-sell); }
-    100% { color: inherit; }
-  }
-
-  // Orderbook row update flash
-  .ob-row-flash-bid {
-    animation: ex-ob-flash-bid 400ms ease-out;
-  }
-
-  .ob-row-flash-ask {
-    animation: ex-ob-flash-ask 400ms ease-out;
-  }
-
-  @keyframes ex-ob-flash-bid {
-    0% { background-color: #2EA66A30; }
-    100% { background-color: transparent; }
-  }
-
-  @keyframes ex-ob-flash-ask {
-    0% { background-color: #D9404030; }
-    100% { background-color: transparent; }
-  }
-
-  // Skeleton loading shimmer
-  .ex-skeleton {
-    background: linear-gradient(90deg, var(--bg-tertiary) 0%, var(--bg-elevated) 50%, var(--bg-tertiary) 100%);
-    background-size: 400px 100%;
-    animation: ex-shimmer 1.5s linear infinite;
-    border-radius: 4px;
-  }
-
-  // Respect reduced motion preference
-  @media (prefers-reduced-motion: reduce) {
-    *,
-    *::before,
-    *::after {
-      animation-duration: 0.01ms !important;
-      animation-iteration-count: 1 !important;
-      transition-duration: 0.01ms !important;
-    }
+// ─── Global reduced-motion safety net ───────────────────────────────
+// Anything animated or transitioning inside the exchange scope stops
+// under prefers-reduced-motion: reduce. Belt-and-braces for anything
+// not explicitly wrapped above.
+@media (prefers-reduced-motion: reduce) {
+  [data-theme="exchange"] *,
+  [data-theme="exchange"] *::before,
+  [data-theme="exchange"] *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
   }
 }

@@ -11,52 +11,62 @@
     }
   }
 
-  // Tab bar for bottom panel
+  // Bottom panel tab bar — underline style per Figma PT_BottomPanel.
+  // Same visual language as `.tx-tab` but scoped to the pro bottom panel
+  // so legacy class hooks keep working.
   .pro-bottom__tabs {
     display: flex;
     gap: 0;
-    border-bottom: 1px solid var(--card-border);
-    background: linear-gradient(135deg, var(--card-gradient-from), var(--card-gradient-to));
+    padding-left: 8px;
+    border-bottom: 1px solid var(--tx-line);
+    background: transparent;
     flex-shrink: 0;
   }
 
   .pro-bottom__tab {
-    padding: var(--space-2) var(--space-4);
-    font-size: var(--text-sm);
-    font-weight: var(--weight-medium);
-    color: var(--text-secondary);
-    background: none;
-    border: none;
-    border-bottom: 2px solid transparent;
-    border-radius: 6px 6px 0 0;
+    padding: 10px 14px;
+    font-family: var(--font-ui);
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--tx-ink-3);
+    background: transparent;
+    border: 0;
     cursor: pointer;
-    transition: all 0.2s ease;
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    transition: color 140ms;
 
-    &:hover {
-      color: var(--text-primary);
-      background: rgba(196, 90, 10, 0.06);
-    }
-
-    &--active {
-      color: var(--gold);
-      border-bottom-color: var(--gold);
-      background: rgba(196, 90, 10, 0.08);
+    &:hover   { color: var(--tx-ink-2); }
+    &--active { color: var(--tx-ink); }
+    &--active::after {
+      content: '';
+      position: absolute;
+      left: 8px; right: 8px; bottom: -1px;
+      height: 2px;
+      background: var(--tx-orange);
+      border-radius: 2px;
     }
   }
 
+  // Small count badge used alongside tab labels (Figma shows Open Orders · 3)
   .pro-bottom__badge {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    min-width: 18px;
-    height: 18px;
+    min-width: 15px;
+    height: 15px;
     padding: 0 5px;
-    border-radius: 9px;
-    background: var(--accent-primary-muted);
-    color: var(--accent-primary);
-    font-size: 10px;
-    font-weight: var(--weight-bold);
-    margin-left: var(--space-1);
+    border-radius: var(--tx-r-sm);
+    background: var(--tx-surface-3);
+    color: var(--tx-ink-2);
+    border: 1px solid var(--tx-line);
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    margin-left: 2px;
   }
 
   .pro-bottom__content {

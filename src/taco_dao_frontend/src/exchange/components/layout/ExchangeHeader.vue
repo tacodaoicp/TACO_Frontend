@@ -1,13 +1,22 @@
 <template>
-  <div class="ex-header-wrap">
-  <header class="ex-header">
+  <div class="ex-header-wrap" :class="{ 'ex-header-wrap--compact': isCompact }">
+  <header class="ex-header" :class="{ 'ex-header--compact': isCompact }">
+    <!-- LEFT: brand lockup + pair selector + stat cluster -->
     <div class="ex-header__left">
-      <router-link to="/" class="ex-header__logo" aria-label="TACO Exchange home">
-        <span class="ex-header__logo-text">TACO</span>
-        <span class="ex-header__logo-badge">Exchange</span>
+      <router-link to="/" class="ex-header__brand" aria-label="TACO Exchange home">
+        <ExchangeBrandMark />
+        <span class="ex-header__brand-text">
+          taco<span class="tx-orange">·</span>exchange
+        </span>
+        <span
+          v-if="!isCompact"
+          class="tx-badge tx-badge--orange tx-badge--square ex-header__brand-badge"
+        >PRO</span>
       </router-link>
 
-      <!-- Pair Selector -->
+      <div class="ex-header__divider" />
+
+      <!-- Pair selector -->
       <div class="ex-header__pair" ref="pairDropdownRef">
         <button
           class="ex-header__pair-btn"
@@ -15,14 +24,13 @@
           aria-haspopup="listbox"
           :aria-expanded="showPairSelector"
         >
-          <span class="ex-header__pair-icons">
-            <img v-if="baseIcon" :src="baseIcon" class="ex-header__pair-icon" width="20" height="20" />
-            <img v-if="quoteIcon" :src="quoteIcon" class="ex-header__pair-icon ex-header__pair-icon--quote" width="20" height="20" />
+          <span class="ex-header__pair-mark" v-if="baseIcon || quoteIcon">
+            <img v-if="baseIcon"  :src="baseIcon"  width="16" height="16" />
+            <img v-if="quoteIcon" :src="quoteIcon" class="ex-header__pair-mark--quote" width="16" height="16" />
           </span>
+          <span v-else class="ex-header__pair-markfallback">t</span>
           <span class="ex-header__pair-symbols">{{ currentPairLabel }}</span>
-          <svg width="12" height="12" viewBox="0 0 12 12" class="ex-header__chevron" :class="{ 'ex-header__chevron--open': showPairSelector }">
-            <path d="M3 5l3 3 3-3" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round"/>
-          </svg>
+          <span class="tx-ink-3 ex-header__pair-chev" :class="{ 'ex-header__pair-chev--open': showPairSelector }">▾</span>
         </button>
 
         <div v-if="showPairSelector" class="ex-header__pair-dropdown">
@@ -64,57 +72,47 @@
         </div>
       </div>
 
-      <!-- Current Price -->
-      <div v-if="showHeaderPrice" class="ex-header__price">
-        <span class="ex-header__price-value num" :class="priceFlashClass">
-          {{ currentPrice }}
-        </span>
-        <span v-if="currentPriceUSD" class="ex-header__price-usd num">{{ currentPriceUSD }}</span>
-        <span v-if="priceChange !== null" class="ex-header__price-change num" :class="priceChange >= 0 ? 'ex-header__price-change--up' : 'ex-header__price-change--down'">
-          {{ priceChange >= 0 ? '+' : '' }}{{ priceChange.toFixed(2) }}%
-        </span>
-      </div>
-
-      <!-- 24h Stats (desktop only) -->
-      <div class="ex-header__stats">
+      <!-- Stat cluster — value above, eyebrow below (Figma PT_Header).
+           Hidden in compact (/trade) mode — the mobile body has its own
+           price row. -->
+      <div v-if="!isCompact" class="ex-header__stats">
+        <div v-if="showHeaderPrice" class="ex-header__stat">
+          <div
+            class="tx-mono tx-tnum ex-header__stat-value ex-header__stat-value--lg"
+            :class="[priceFlashClass, priceChange !== null && priceChange >= 0 ? 'tx-buy' : priceChange !== null ? 'tx-sell' : '']"
+          >{{ currentPrice }}</div>
+          <div class="ex-header__stat-label">LAST</div>
+        </div>
+        <div v-if="priceChange !== null" class="ex-header__stat">
+          <div
+            class="tx-mono tx-tnum ex-header__stat-value"
+            :class="priceChange >= 0 ? 'tx-buy' : 'tx-sell'"
+          >{{ priceChange >= 0 ? '+' : '' }}{{ priceChange.toFixed(2) }}%</div>
+          <div class="ex-header__stat-label">24H</div>
+        </div>
         <div v-if="stats24h.high" class="ex-header__stat">
-          <span class="ex-header__stat-label">24h High</span>
-          <span class="ex-header__stat-value num">{{ stats24h.high }}</span>
+          <div class="tx-mono tx-tnum ex-header__stat-value">{{ stats24h.high }}</div>
+          <div class="ex-header__stat-label">HIGH</div>
         </div>
         <div v-if="stats24h.low" class="ex-header__stat">
-          <span class="ex-header__stat-label">24h Low</span>
-          <span class="ex-header__stat-value num">{{ stats24h.low }}</span>
-        </div>
-        <div v-if="stats24h.volume" class="ex-header__stat">
-          <span class="ex-header__stat-label">24h Vol</span>
-          <span class="ex-header__stat-value num">{{ stats24h.volume }}</span>
+          <div class="tx-mono tx-tnum ex-header__stat-value">{{ stats24h.low }}</div>
+          <div class="ex-header__stat-label">LOW</div>
         </div>
       </div>
     </div>
 
-    <!-- Pro/Easy Toggle (centered between left & right on desktop) -->
-    <div class="ex-header__mode-toggle">
-      <button
-        class="ex-header__mode-btn"
-        :class="{ 'ex-header__mode-btn--active': mode === 'pro' }"
-        @click="setMode('pro')"
-      >Pro</button>
-      <button
-        class="ex-header__mode-btn"
-        :class="{ 'ex-header__mode-btn--active': mode === 'easy' }"
-        @click="setMode('easy')"
-      >Easy</button>
-    </div>
-
+    <!-- RIGHT: nav + tools + wallet -->
     <div class="ex-header__right">
-      <!-- Nav Links -->
-      <nav class="ex-header__nav">
-        <router-link to="/otc" class="ex-header__nav-link" :class="{ 'ex-header__nav-link--active': route.path.startsWith('/otc') }">OTC</router-link>
-        <router-link to="/pool" class="ex-header__nav-link" :class="{ 'ex-header__nav-link--active': route.path === '/pool' }">Pool</router-link>
+      <!-- Secondary nav hidden on mobile /trade — MobileNav below handles it. -->
+      <nav v-if="!isCompact" class="ex-header__nav">
+        <router-link to="/easy"      class="ex-header__nav-link" :class="{ 'ex-header__nav-link--active': route.path === '/easy' }">Easy</router-link>
+        <router-link to="/pool"      class="ex-header__nav-link" :class="{ 'ex-header__nav-link--active': route.path === '/pool' }">Pool</router-link>
         <router-link to="/portfolio" class="ex-header__nav-link" :class="{ 'ex-header__nav-link--active': route.path === '/portfolio' }">Portfolio</router-link>
+        <router-link to="/otc"       class="ex-header__nav-link" :class="{ 'ex-header__nav-link--active': route.path.startsWith('/otc') }">OTC</router-link>
       </nav>
 
-      <!-- Rate Limit Indicator -->
+      <div v-if="!isCompact" class="ex-header__divider" />
+
       <div
         v-if="callsRemaining < 10"
         class="ex-header__rate-limit"
@@ -127,43 +125,15 @@
         {{ callsRemaining }}/21
       </div>
 
-      <!-- Wallet Button -->
-      <button
-        v-if="!isConnected"
-        class="ex-btn ex-btn--primary ex-btn--sm"
-        @click="connectWallet"
-      >
-        Connect Wallet
-      </button>
-      <div v-else class="ex-header__wallet" ref="walletDropdownRef">
-        <button class="ex-header__wallet-btn" @click="showWalletMenu = !showWalletMenu">
-          <span class="ex-header__wallet-principal">{{ truncatedPrincipal }}</span>
-        </button>
-        <div v-if="showWalletMenu" class="ex-header__wallet-dropdown">
-          <div class="ex-header__wallet-info">
-            <span class="ex-header__wallet-label">Principal</span>
-            <button class="ex-header__wallet-copy" @click="copyText(principalText, 'Principal Copied')">
-              {{ principalText }}
-              <svg width="14" height="14" viewBox="0 0 14 14"><rect x="4" y="4" width="8" height="8" rx="1" stroke="currentColor" fill="none"/><path d="M2 10V3a1 1 0 011-1h7" stroke="currentColor" fill="none"/></svg>
-            </button>
-          </div>
-          <div v-if="accountIdHex" class="ex-header__wallet-info">
-            <span class="ex-header__wallet-label">Account ID</span>
-            <button class="ex-header__wallet-copy" @click="copyText(accountIdHex, 'Account ID Copied')">
-              {{ accountIdHex }}
-              <svg width="14" height="14" viewBox="0 0 14 14"><rect x="4" y="4" width="8" height="8" rx="1" stroke="currentColor" fill="none"/><path d="M2 10V3a1 1 0 011-1h7" stroke="currentColor" fill="none"/></svg>
-            </button>
-          </div>
-          <button class="ex-header__wallet-disconnect" @click="disconnectWallet">
-            Disconnect
-          </button>
-        </div>
-      </div>
+      <ThemeToggle />
+
+      <WalletButton />
     </div>
   </header>
 
-  <!-- Mobile stats bar -->
-  <div class="ex-header-mobile-stats">
+  <!-- Mobile stats bar (narrow viewports). Skipped in compact mode —
+       MobileTradeView has its own price hero directly below the header. -->
+  <div v-if="!isCompact" class="ex-header-mobile-stats">
     <span v-if="showHeaderPrice" class="ex-header-mobile-stats__price num" :class="priceFlashClass">
       {{ currentPrice }}
     </span>
@@ -186,12 +156,21 @@ import { ADMIN_PRINCIPALS } from '../../../composables/useAdminCheck'
 import { getTokenIcon } from '../../utils/token-icons'
 import { formatUSD } from '../../utils/format'
 import { useExchangeToast } from '../../composables/useExchangeToast'
+import ThemeToggle from '../common/ThemeToggle.vue'
+import ExchangeBrandMark from '../common/ExchangeBrandMark.vue'
+import WalletButton from '../common/WalletButton.vue'
 
 const router = useRouter()
 const route = useRoute()
 const exchangeStore = useExchangeStore()
 
 const isAdmin = computed(() => ADMIN_PRINCIPALS.includes(exchangeStore.principalText))
+
+// Compact variant — used on the mobile /trade route. Hides the PRO badge,
+// the stat cluster, and the secondary nav so the header matches the mobile
+// body layout instead of the desktop Pro chrome. Pair selector + theme
+// toggle + wallet chip stay.
+const isCompact = computed(() => route.meta?.mode === 'trade')
 
 const baseIcon = computed(() => {
   const t = exchangeStore.getTokenByAddress(exchangeStore.selectedToken0)
@@ -452,6 +431,55 @@ const stats24h = ref<{ high: string | null; low: string | null; volume: string |
   high: null, low: null, volume: null,
 })
 
+// ── 24h HIGH / LOW / VOL 24H (Figma Pro stat cluster) ──────────────
+// One kline fetch per pair, refreshed every 60s. Picks the latest daily
+// candle. Formats numbers to the same precision as the pair's lastPrice
+// so the column reads cleanly. Volume collapses to K/M/B.
+let statsTimer: number | null = null
+function fmtVol(raw: bigint, decimals: number): string {
+  const n = Number(raw) / 10 ** decimals
+  if (!isFinite(n) || n <= 0) return '0'
+  if (n >= 1e9) return `${(n / 1e9).toFixed(2)}B`
+  if (n >= 1e6) return `${(n / 1e6).toFixed(2)}M`
+  if (n >= 1e3) return `${(n / 1e3).toFixed(2)}K`
+  return n.toFixed(0)
+}
+function fmtPrice(p: number): string {
+  if (!isFinite(p) || p <= 0) return '—'
+  const dp = p >= 1000 ? 2 : p >= 1 ? 4 : p >= 0.01 ? 6 : 8
+  return p.toFixed(dp)
+}
+async function loadStats24h() {
+  const t0 = selectedBase.value
+  const t1 = selectedQuote.value
+  if (!t0 || !t1) {
+    stats24h.value = { high: null, low: null, volume: null }
+    return
+  }
+  try {
+    // Backend returns daily candles NEWEST-FIRST — candles[0] is today.
+    const candles = await exchangeStore.getKlineData(t0, t1, { day: null } as any, true)
+    if (!candles || candles.length === 0) return
+    const latest = candles[0]
+    const quote = exchangeStore.getTokenByAddress(t1)
+    const quoteDecimals = quote ? Number(quote.decimals) : 8
+    // Pair button swaps the display; prices from backend are in pool order.
+    // activePair handles the inversion for lastPrice; for HIGH/LOW we apply
+    // the same logic: if base/quote display is swapped vs t0/t1, invert.
+    const pair = activePair.value
+    const swapped = pair ? (pair.base !== t0) : false
+    const high = swapped && latest.high > 0 ? 1 / latest.low  : latest.high
+    const low  = swapped && latest.low  > 0 ? 1 / latest.high : latest.low
+    stats24h.value = {
+      high: fmtPrice(high),
+      low:  fmtPrice(low),
+      volume: fmtVol(latest.volume, quoteDecimals),
+    }
+  } catch {
+    /* soft-fail — stat cluster hides empty values */
+  }
+}
+
 // ── Mode Toggle ──
 const mode = ref<'pro' | 'easy'>(
   (localStorage.getItem('taco_exchange_mode') as 'pro' | 'easy') || 'pro'
@@ -504,7 +532,14 @@ const walletDropdownRef = ref<HTMLElement | null>(null)
 const truncatedPrincipal = computed(() => {
   const p = principalText.value
   if (!p || p.length < 16) return p
-  return `${p.slice(0, 5)}...${p.slice(-3)}`
+  return `${p.slice(0, 5)}…${p.slice(-3)}`
+})
+
+// Two-letter avatar derived from the principal — stable per-session.
+const walletInitials = computed(() => {
+  const p = principalText.value
+  if (!p) return ''
+  return p.slice(0, 2).toUpperCase()
 })
 
 async function deriveAccountId() {
@@ -618,6 +653,18 @@ function setDefaultPair() {
 // Watch for tokens loading (async init may finish after mount)
 watch(() => exchangeStore.tokens.length, () => setDefaultPair())
 
+// Refresh 24h stats whenever the pair changes or every 60s while mounted.
+watch([selectedBase, selectedQuote], () => { loadStats24h() }, { immediate: true })
+onMounted(() => {
+  statsTimer = window.setInterval(loadStats24h, 60_000)
+})
+onUnmounted(() => {
+  if (statsTimer !== null) {
+    clearInterval(statsTimer)
+    statsTimer = null
+  }
+})
+
 // Close dropdowns on outside click
 function onClickOutside(e: MouseEvent) {
   if (pairDropdownRef.value && !pairDropdownRef.value.contains(e.target as Node)) {
@@ -633,464 +680,367 @@ onUnmounted(() => document.removeEventListener('click', onClickOutside))
 </script>
 
 <style scoped lang="scss">
+// Figma PT_Header — flat surface-1 + 1px bottom line, no gradient, no shadow.
 .ex-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  height: 48px;
-  padding: 0 var(--space-4);
-  background: linear-gradient(135deg, var(--card-gradient-from), var(--card-gradient-to));
-  border-bottom: 1px solid var(--card-border);
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.3);
-  gap: var(--space-4);
+  padding: 10px 14px;
+  background: var(--tx-surface-1);
+  border-bottom: 1px solid var(--tx-line);
+  gap: 14px;
   z-index: 100;
 
   @media (max-width: 767px) {
-    padding: 0 var(--space-2);
-    gap: var(--space-2);
+    padding: 8px 12px;
+    gap: 8px;
   }
 
   &__left,
   &__right {
     display: flex;
     align-items: center;
-    gap: var(--space-3);
+    gap: 14px;
     min-width: 0;
   }
 
-  &__left {
-    flex: 1;
-    min-width: 0;
-  }
+  &__left  { flex: 1; min-width: 0; }
+  &__right { flex-shrink: 0; gap: 8px; }
 
-  &__right {
+  // Vertical divider (1px × 22px)
+  &__divider {
+    width: 1px;
+    height: 22px;
+    background: var(--tx-line);
     flex-shrink: 0;
   }
 
-  &__logo {
+  // Brand lockup: logo-mark + "taco·exchange" + PRO badge
+  &__brand {
     display: flex;
     align-items: center;
-    gap: var(--space-1);
+    gap: 8px;
     text-decoration: none;
+    color: var(--tx-ink);
     flex-shrink: 0;
-
-    @media (max-width: 767px) {
-      flex-direction: column;
-      align-items: flex-start;
-      gap: 0;
-      line-height: 1;
-    }
   }
-
-  &__logo-text {
-    font-size: var(--text-lg);
-    font-weight: var(--weight-bold);
-    color: var(--accent-primary);
-
-    @media (max-width: 767px) {
-      font-size: var(--text-sm);
-      line-height: 1.1;
-    }
-  }
-
-  &__logo-badge {
-    font-size: var(--text-xs);
-    font-weight: var(--weight-semibold);
-    color: var(--text-tertiary);
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-
-    @media (max-width: 767px) {
-      font-size: 9px;
-      line-height: 1.1;
-    }
-  }
-
-  // Nav links
-  &__nav {
-    display: flex;
-    align-items: center;
-    gap: var(--space-1);
+  &__brand-text {
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    font-size: 14px;
 
     @media (max-width: 767px) { display: none; }
   }
+  &__brand-badge { margin-left: 6px; }
 
-  &__nav-link {
-    font-size: var(--text-sm);
-    font-weight: var(--weight-medium);
-    color: var(--text-secondary);
-    text-decoration: none;
-    padding: 4px 8px;
-    border-radius: 4px;
-    transition: color 0.15s, background 0.15s;
-
-    &:hover { color: var(--text-primary); background: rgba(196, 90, 10, 0.08); }
-    &--active { color: var(--gold); }
-    &--admin { color: var(--color-warning); }
-  }
-
-  &__pair-icons {
+  // Nav links (right side)
+  &__nav {
     display: flex;
     align-items: center;
-    flex-shrink: 0;
+    gap: 4px;
+
+    @media (max-width: 767px) { display: none; }
   }
+  &__nav-link {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--tx-ink-3);
+    text-decoration: none;
+    padding: 6px 10px;
+    border-radius: var(--tx-r-sm);
+    transition: color 140ms, background 140ms;
 
-  &__pair-icon {
-    border-radius: 50%;
-    object-fit: cover;
-
-    &--quote {
-      margin-left: -6px;
-      border: 2px solid var(--bg-secondary);
-    }
+    &:hover   { color: var(--tx-ink); background: var(--tx-surface-2); }
+    &--active { color: var(--tx-orange); }
   }
 
   // Pair selector
-  &__pair {
-    position: relative;
-  }
+  &__pair { position: relative; }
 
   &__pair-btn {
     display: flex;
     align-items: center;
-    gap: var(--space-1);
-    background: none;
-    border: none;
-    color: var(--text-primary);
-    font-size: var(--text-base);
-    font-weight: var(--weight-semibold);
+    gap: 8px;
+    background: var(--tx-surface-2);
+    border: 1px solid var(--tx-line);
+    color: var(--tx-ink);
+    font-size: 13px;
+    font-weight: 600;
     cursor: pointer;
-    padding: var(--space-1) var(--space-2);
-    border-radius: 4px;
+    padding: 5px 10px;
+    border-radius: var(--tx-r-md);
+    transition: border-color 140ms, background 140ms;
 
-    &:hover { background: var(--bg-tertiary); }
+    &:hover { border-color: var(--tx-line-hi); background: var(--tx-surface-3); }
   }
+  &__pair-mark {
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
 
-  &__chevron {
-    color: var(--text-tertiary);
-    transition: transform 0.15s;
+    img { border-radius: 50%; width: 16px; height: 16px; object-fit: cover; }
+    &--quote { margin-left: -4px; border: 1.5px solid var(--tx-surface-2); }
+  }
+  &__pair-markfallback {
+    width: 16px; height: 16px;
+    border-radius: 50%;
+    background: var(--tx-orange);
+    color: #0b0906;
+    font-size: 9px;
+    font-weight: 800;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  &__pair-symbols { font-weight: 600; }
+  &__pair-chev {
+    font-size: 11px;
+    transition: transform 140ms;
     &--open { transform: rotate(180deg); }
   }
 
   &__pair-dropdown {
     position: absolute;
-    top: calc(100% + 4px);
+    top: calc(100% + 6px);
     left: 0;
     width: 340px;
-    background: linear-gradient(135deg, var(--card-gradient-from), var(--card-gradient-to));
-    border: 1px solid var(--card-border);
-    border-radius: 8px;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+    background: var(--tx-panel-bg-2);
+    border: 1px solid var(--tx-line-2);
+    border-radius: var(--tx-r-lg);
+    box-shadow: var(--tx-shadow-2);
     z-index: 200;
     overflow: hidden;
 
     @media (max-width: 767px) {
       position: fixed;
       top: 52px;
-      left: var(--space-2);
-      right: var(--space-2);
+      left: 8px;
+      right: 8px;
       width: auto;
       max-height: 70vh;
     }
   }
-
   &__pair-search {
-    margin: var(--space-2);
-    width: calc(100% - var(--space-4));
+    margin: 8px;
+    width: calc(100% - 16px);
   }
-
   &__pair-hdr {
     display: flex;
     align-items: center;
-    gap: var(--space-2);
-    padding: var(--space-1) var(--space-3);
+    gap: 8px;
+    padding: 6px 14px;
     font-size: 10px;
-    color: var(--text-tertiary);
+    color: var(--tx-ink-3);
     text-transform: uppercase;
     letter-spacing: 0.04em;
-    border-bottom: 1px solid var(--border-primary);
+    border-bottom: 1px solid var(--tx-line);
     user-select: none;
   }
-
   &__pair-hdr-col {
     cursor: pointer;
     flex: 1;
     text-align: left;
-    &:hover { color: var(--text-primary); }
+    &:hover { color: var(--tx-ink); }
   }
-
-  &__pair-hdr-name {
-    min-width: 90px;
-    flex: none;
-  }
+  &__pair-hdr-name { min-width: 90px; flex: none; }
 
   &__pair-list {
     max-height: 300px;
     overflow-y: auto;
   }
-
   &__pair-empty {
-    padding: var(--space-4);
-    color: var(--text-tertiary);
-    font-size: var(--text-sm);
+    padding: 14px;
+    color: var(--tx-ink-3);
+    font-size: 13px;
     text-align: center;
   }
-
   &__pair-option {
     display: flex;
     align-items: center;
-    gap: var(--space-2);
+    gap: 8px;
     width: 100%;
-    padding: var(--space-2) var(--space-3);
+    padding: 8px 14px;
     background: none;
     border: none;
-    color: var(--text-primary);
-    font-size: var(--text-sm);
+    border-bottom: 1px solid var(--tx-line);
+    color: var(--tx-ink);
+    font-size: 13px;
     cursor: pointer;
     text-align: left;
 
-    &:hover { background: var(--bg-tertiary); }
-    &--active { background: var(--accent-primary-muted); }
+    &:hover { background: var(--tx-surface-1); }
+    &--active { background: var(--tx-orange-dim); }
   }
-
   &__pair-name {
-    font-weight: var(--weight-medium);
+    font-weight: 500;
     min-width: 90px;
   }
-
-  &__pair-usd {
-    color: var(--text-secondary);
-    font-size: var(--text-xs);
+  &__pair-usd, &__pair-price {
+    color: var(--tx-ink-3);
+    font-size: 11px;
     min-width: 50px;
-    text-align: left;
   }
-
-  &__pair-price {
-    color: var(--text-secondary);
-    font-size: var(--text-xs);
-    text-align: left;
-  }
-
   &__pair-change {
-    font-size: var(--text-xs);
+    font-size: 11px;
     min-width: 55px;
-    text-align: left;
     margin-left: auto;
 
-    &--up { color: var(--color-buy); }
-    &--down { color: var(--color-sell); }
+    &--up   { color: var(--tx-buy); }
+    &--down { color: var(--tx-sell); }
   }
 
-  // Price
-  &__price {
-    display: flex;
-    align-items: baseline;
-    gap: var(--space-2);
-
-    @media (max-width: 767px) { display: none; }
-  }
-
-  &__price-value {
-    font-size: var(--text-xl);
-    font-weight: var(--weight-semibold);
-    color: var(--text-primary);
-  }
-
-  &__price-usd {
-    font-size: var(--text-sm);
-    color: var(--text-tertiary);
-  }
-
-  &__price-change {
-    font-size: var(--text-sm);
-    font-weight: var(--weight-medium);
-    &--up { color: var(--color-buy); }
-    &--down { color: var(--color-sell); }
-  }
-
-  // 24h Stats
+  // Stat cluster — 5 cells, value above (16px / 13px mono), eyebrow below (10px uppercase)
   &__stats {
     display: flex;
-    gap: var(--space-4);
+    align-items: flex-start;
+    gap: 16px;
+    padding-left: 6px;
 
     @media (max-width: 1024px) { display: none; }
   }
-
   &__stat {
     display: flex;
     flex-direction: column;
-    gap: 1px;
+    gap: 0;
   }
+  &__stat-value {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--tx-ink);
+    line-height: 1.2;
 
+    &--lg {
+      font-size: 16px;
+      font-weight: 600;
+      line-height: 1.1;
+    }
+  }
   &__stat-label {
     font-size: 10px;
-    color: var(--text-tertiary);
+    color: var(--tx-ink-3);
     text-transform: uppercase;
     letter-spacing: 0.04em;
+    margin-top: 1px;
   }
 
-  &__stat-value {
-    font-size: var(--text-sm);
-    color: var(--text-secondary);
-  }
-
-  // Mode toggle (taco-nav-btn style, centered between left & right)
-  &__mode-toggle {
-    display: flex;
-    gap: 0;
-
-    @media (max-width: 767px) { display: none; }
-  }
-
-  &__mode-btn {
-    color: var(--text-cream);
-    background: rgba(196, 90, 10, 0.10);
-    border: 2px solid var(--card-border);
-    padding: 4px 18px;
-    font-family: var(--font-body);
-    font-size: var(--text-sm);
-    font-weight: var(--weight-semibold);
-    height: 32px;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    opacity: 0.65;
-
-    &:first-child {
-      border-radius: 6px 0 0 6px;
-      border-right: 1px solid var(--card-border);
-    }
-    &:last-child {
-      border-radius: 0 6px 6px 0;
-      border-left: 1px solid var(--card-border);
-    }
-
-    &:hover {
-      background: rgba(196, 90, 10, 0.18);
-      opacity: 1;
-    }
-
-    &--active {
-      background: linear-gradient(135deg, var(--card-active-from), var(--card-active-to));
-      color: var(--gold);
-      border-color: var(--card-border);
-      font-weight: var(--weight-bold);
-      box-shadow: 0 2px 12px rgba(60, 30, 0, 0.5);
-      opacity: 1;
-
-      &:hover {
-        background: linear-gradient(135deg, var(--card-hover-from), var(--card-hover-to));
-        color: var(--gold);
-      }
-    }
-  }
-
-  // Rate limit
+  // Rate limit pill
   &__rate-limit {
-    font-size: var(--text-xs);
+    font-size: 11px;
     font-family: var(--font-mono);
-    color: var(--text-secondary);
-    padding: 2px 6px;
-    border-radius: 4px;
-    background: var(--bg-tertiary);
+    color: var(--tx-ink-2);
+    padding: 3px 7px;
+    border-radius: var(--tx-r-sm);
+    background: var(--tx-surface-2);
+    border: 1px solid var(--tx-line);
 
-    &--warning { color: var(--color-warning); background: rgba(196, 90, 10, 0.1); }
-    &--danger { color: var(--color-sell); background: rgba(217, 64, 64, 0.1); }
+    &--warning {
+      color: var(--tx-warning);
+      background: var(--tx-warning-dim);
+      border-color: transparent;
+    }
+    &--danger {
+      color: var(--tx-sell);
+      background: var(--tx-sell-dim);
+      border-color: transparent;
+    }
   }
 
-  // Wallet
-  &__wallet {
-    position: relative;
-  }
-
+  // Wallet — compact chip with initials avatar + truncated principal
+  &__wallet { position: relative; }
   &__wallet-btn {
     display: flex;
     align-items: center;
-    gap: var(--space-1);
-    background: rgba(196, 90, 10, 0.08);
-    border: 1px solid var(--card-border);
-    border-radius: 6px;
-    color: var(--text-primary);
-    font-size: var(--text-sm);
-    padding: 4px 12px;
-    height: 32px;
+    gap: 6px;
+    background: var(--tx-surface-2);
+    border: 1px solid var(--tx-line);
+    border-radius: var(--tx-r-md);
+    color: var(--tx-ink);
+    font-size: 11px;
+    padding: 3px 8px 3px 3px;
     cursor: pointer;
-    transition: all 0.2s ease;
+    transition: border-color 140ms, background 140ms;
 
-    &:hover {
-      background: rgba(196, 90, 10, 0.15);
-      border-color: var(--accent-primary);
-    }
+    &:hover { border-color: var(--tx-line-hi); background: var(--tx-surface-3); }
   }
-
+  &__wallet-avatar {
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    background: var(--tx-surface-3);
+    color: var(--tx-ink);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: 600;
+    font-family: var(--font-ui);
+  }
   &__wallet-principal {
-    font-family: var(--font-mono);
-    font-size: var(--text-xs);
+    font-size: 11px;
+    @media (max-width: 767px) { display: none; }
   }
 
   &__wallet-dropdown {
     position: absolute;
-    top: calc(100% + 4px);
+    top: calc(100% + 6px);
     right: 0;
     width: 280px;
-    background: linear-gradient(135deg, var(--card-gradient-from), var(--card-gradient-to));
-    border: 1px solid var(--card-border);
-    border-radius: 8px;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+    background: var(--tx-panel-bg-2);
+    border: 1px solid var(--tx-line-2);
+    border-radius: var(--tx-r-lg);
+    box-shadow: var(--tx-shadow-2);
     z-index: 200;
-    padding: var(--space-3);
+    padding: 14px;
     display: flex;
     flex-direction: column;
-    gap: var(--space-3);
+    gap: 14px;
 
     @media (max-width: 767px) {
       position: fixed;
       top: 52px;
-      left: var(--space-2);
-      right: var(--space-2);
+      left: 8px;
+      right: 8px;
       width: auto;
     }
   }
-
   &__wallet-info {
     display: flex;
     flex-direction: column;
-    gap: var(--space-1);
+    gap: 4px;
   }
-
   &__wallet-label {
-    font-size: var(--text-xs);
-    color: var(--text-tertiary);
+    font-size: 10px;
+    color: var(--tx-ink-3);
     text-transform: uppercase;
     letter-spacing: 0.04em;
   }
-
   &__wallet-copy {
     display: flex;
     align-items: center;
-    gap: var(--space-1);
+    gap: 6px;
     background: none;
     border: none;
-    color: var(--text-secondary);
-    font-size: var(--text-xs);
+    color: var(--tx-ink-2);
+    font-size: 11px;
     font-family: var(--font-mono);
     cursor: pointer;
     padding: 2px 0;
     word-break: break-all;
 
-    &:hover { color: var(--text-primary); }
+    &:hover { color: var(--tx-ink); }
     svg { flex-shrink: 0; }
   }
-
   &__wallet-disconnect {
-    background: none;
-    border: 1px solid var(--color-sell);
-    border-radius: 6px;
-    color: var(--color-sell);
-    font-size: var(--text-sm);
-    padding: var(--space-2) var(--space-3);
+    background: transparent;
+    border: 1px solid rgba(224, 84, 74, 0.4);
+    border-radius: var(--tx-r-md);
+    color: var(--tx-sell);
+    font-size: 12px;
+    padding: 6px 10px;
     cursor: pointer;
 
-    &:hover { background: rgba(217, 64, 64, 0.1); }
+    &:hover { background: var(--tx-sell-dim); }
   }
 }
 
@@ -1110,10 +1060,10 @@ onUnmounted(() => document.removeEventListener('click', onClickOutside))
   @media (max-width: 1024px) {
     display: flex;
     align-items: center;
-    gap: var(--space-2);
-    padding: 2px var(--space-2);
-    background: var(--bg-secondary);
-    border-bottom: 1px solid var(--card-border);
+    gap: 8px;
+    padding: 3px 12px;
+    background: var(--tx-surface-1);
+    border-bottom: 1px solid var(--tx-line);
     font-size: 10px;
     overflow-x: auto;
     white-space: nowrap;
@@ -1121,26 +1071,26 @@ onUnmounted(() => document.removeEventListener('click', onClickOutside))
   }
 
   &__price {
-    font-weight: var(--weight-semibold);
-    color: var(--text-primary);
+    font-weight: 600;
+    color: var(--tx-ink);
     font-size: 11px;
   }
 
   &__usd {
-    color: var(--text-tertiary);
+    color: var(--tx-ink-3);
   }
 
   &__change {
-    font-weight: var(--weight-medium);
-    &--up { color: var(--color-buy); }
-    &--down { color: var(--color-sell); }
+    font-weight: 500;
+    &--up   { color: var(--tx-buy); }
+    &--down { color: var(--tx-sell); }
   }
 
   &__item {
-    color: var(--text-tertiary);
-    margin-left: var(--space-1);
+    color: var(--tx-ink-3);
+    margin-left: 4px;
 
-    .num { color: var(--text-secondary); }
+    .num { color: var(--tx-ink-2); }
   }
 }
 </style>

@@ -1,0 +1,127 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>TACO Exchange — Redesign</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="styles.css">
+  <style>
+    html, body { margin:0; padding:0; background:#f0eee9; height:100%; }
+    #app { width:100%; height:100vh; }
+  </style>
+  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+</head>
+<body>
+  <div id="app"></div>
+
+  <script type="text/babel" src="design-canvas.jsx"></script>
+  <script type="text/babel" src="components/ProTrade.jsx"></script>
+  <script type="text/babel" src="components/MobileTrade.jsx"></script>
+  <script type="text/babel" src="components/EasySwap.jsx"></script>
+  <script type="text/babel" src="components/Portfolio.jsx"></script>
+  <script type="text/babel" src="components/Pool.jsx"></script>
+  <script type="text/babel" src="components/OTC.jsx"></script>
+  <script type="text/babel" src="components/Recover.jsx"></script>
+  <script type="text/babel" src="components/ExchangeAdmin.jsx"></script>
+  <script type="text/babel" src="components/Modals.jsx"></script>
+  <script type="text/babel" src="components/StyleGuide.jsx"></script>
+
+  <script type="text/babel">
+    // Locked design decisions — gradient surfaces, soft radius, orange accent.
+    function Themed({ theme, children, style }) {
+      return (
+        <div
+          data-tx-theme={theme}
+          data-tx-radius="soft"
+          data-tx-surface="gradient"
+          className="tx-root"
+          style={{ width:'100%', height:'100%', ...style }}>
+          {children}
+        </div>
+      );
+    }
+
+    // Small helper to render each artboard in both themes without repetition.
+    const pair = (idBase, labelBase, width, height, Comp, compProps) => ([
+      <DCArtboard key={idBase+'-masa'}   id={idBase+'-masa'}   label={labelBase+' · Masa (dark)'}    width={width} height={height}>
+        <Themed theme="masa">  {React.createElement(Comp, compProps)}</Themed>
+      </DCArtboard>,
+      <DCArtboard key={idBase+'-cotija'} id={idBase+'-cotija'} label={labelBase+' · Cotija (light)'} width={width} height={height}>
+        <Themed theme="cotija">{React.createElement(Comp, compProps)}</Themed>
+      </DCArtboard>,
+    ]);
+
+    function App() {
+      return (
+        <DesignCanvas>
+          <DCSection id="intro" title="TACO · Exchange — Redesign"
+            subtitle="Refreshed visual language. Warm identity kept; surfaces calmed; three type families (Inter · JetBrains Mono · Instrument Serif). Dark (Masa) and light (Cotija) shown side-by-side.">
+            {pair('guide',  'Style guide', 1080, 1840, StyleGuide)}
+          </DCSection>
+
+          <DCSection id="pro" title="Pro Trade"
+            subtitle="Flagship terminal — CSS-grid resizable layout, mono-forward prices, dim semantic accents over calmer surfaces.">
+            {pair('pro', 'Pro Trade', 1440, 860, ProTrade)}
+          </DCSection>
+
+          <DCSection id="mobile" title="Mobile Trade"
+            subtitle="Sub-768px experience — Pro redirects here. Compact chart, stacked depth preview, buy/sell segment, 56px bottom nav.">
+            {pair('mobile', 'Mobile Trade', 390, 844, MobileTrade)}
+          </DCSection>
+
+          <DCSection id="easy" title="Easy Swap"
+            subtitle="The retail face. 480px of calm with an Instrument Serif wink on the headline.">
+            {pair('easy', 'Easy Swap', 640, 900, EasySwap)}
+          </DCSection>
+
+          <DCSection id="portfolio" title="Portfolio"
+            subtitle="Net-worth hero, allocation bar, six-tab nav with live badge counts, holdings table.">
+            {pair('pf', 'Portfolio', 1200, 1040, Portfolio)}
+          </DCSection>
+
+          <DCSection id="pool" title="Pool · Liquidity"
+            subtitle="All-pools table plus both provisioning flows: concentrated (v3-style range with curve) and full-range.">
+            {pair('pool-list', 'All Pools',    1280, 720, PoolList)}
+            {pair('pool-conc', 'Concentrated', 1280, 880, Pool)}
+            {pair('pool-full', 'Full Range',   1280, 720, PoolFullRange)}
+          </DCSection>
+
+          <DCSection id="otc" title="OTC · Private Orders"
+            subtitle="Private (access code) and DAO-facaded (secret) order flows.">
+            {pair('otc', 'OTC', 900, 1080, OTC)}
+          </DCSection>
+
+          <DCSection id="recover" title="Recover"
+            subtitle="Rescue stuck balances from failed or interrupted transactions.">
+            {pair('recover', 'Recover', 960, 860, Recover)}
+          </DCSection>
+
+          <DCSection id="admin" title="Exchange Admin"
+            subtitle="Internal, utilitarian. 10 tabs of canister controls, pair management, audit log. Warning chrome signals mainnet.">
+            {pair('admin', 'Admin', 1280, 820, ExchangeAdmin)}
+          </DCSection>
+
+          <DCSection id="modals" title="Modals & Dialogs"
+            subtitle="Shared modal frame with heavy shadow + line rim. Teleports to body in the live app.">
+            {pair('swap-confirm', 'Swap · Confirm', 520, 720, SwapConfirm)}
+            {pair('swap-result',  'Swap · Partial fill', 520, 720, SwapResult)}
+            {pair('token-sel',    'Token selector',  520, 700, TokenSelector)}
+            {pair('transfer',     'Transfer dialog', 520, 720, TransferDialog)}
+          </DCSection>
+
+          <DCSection id="auth-states" title="Login & States"
+            subtitle="Unified templates for auth curtains, empty / error / loading states, and the toast stack.">
+            {pair('login',   'Login curtain', 1000, 720, LoginCurtain)}
+            {pair('states',  'States · empty / error / loading', 1100, 560, StatesSheet)}
+            {pair('toasts',  'Toast stack',   1000, 640, ToastStack)}
+          </DCSection>
+        </DesignCanvas>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('app')).render(<App/>);
+  </script>
+</body>
+</html>

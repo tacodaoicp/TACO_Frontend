@@ -49,6 +49,7 @@
 import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import { createChart, CandlestickSeries, HistogramSeries, LineSeries, type IChartApi, type ISeriesApi, ColorType, type CandlestickData, type HistogramData, type LineData, type Time } from 'lightweight-charts'
 import { useExchangeStore } from '../../store/exchange.store'
+import { useTacoStore } from '../../../stores/taco.store'
 import { usePolling } from '../../composables/usePolling'
 import type { TimeFrame } from 'declarations/OTC_backend/OTC_backend.did.d.ts'
 
@@ -166,31 +167,98 @@ function setTimeframe(key: string) {
   loadInitialData()
 }
 
+// ── Theme colors ────────────────────────────────────────────────
+// Pulled from `[data-theme="exchange"]`-scoped CSS custom properties,
+// which change when the user toggles Masa ↔ Cotija. The chart reads
+// these at init AND re-reads them on theme change via `applyThemeColors`.
+interface ChartThemeColors {
+  bgPrimary: string
+  textSecondary: string
+  bgSecondary: string
+  bgTertiary: string
+  buy: string
+  sell: string
+  accent: string
+}
+function readThemeColors(el: HTMLElement): ChartThemeColors {
+  const cs = getComputedStyle(el)
+  return {
+    bgPrimary:     cs.getPropertyValue('--tx-bg').trim()        || '#151210',
+    textSecondary: cs.getPropertyValue('--tx-ink-2').trim()     || '#c4bbab',
+    bgSecondary:   cs.getPropertyValue('--tx-surface-1').trim() || '#1c1816',
+    bgTertiary:    cs.getPropertyValue('--tx-surface-2').trim() || '#241f1c',
+    buy:           cs.getPropertyValue('--tx-buy').trim()       || '#3ba87a',
+    sell:          cs.getPropertyValue('--tx-sell').trim()      || '#e0544a',
+    accent:        cs.getPropertyValue('--tx-orange').trim()    || '#f28b3a',
+  }
+}
+
+function applyThemeColors() {
+  if (!chart || !chartContainer.value) return
+  const c = readThemeColors(chartContainer.value)
+  colorBuy = c.buy
+  colorSell = c.sell
+  colorAccent = c.accent
+  chart.applyOptions({
+    layout: {
+      background: { type: ColorType.Solid, color: c.bgPrimary },
+      textColor: c.textSecondary,
+    },
+    grid: {
+      vertLines: { color: c.bgSecondary + '30' },
+      horzLines: { color: c.bgSecondary + '30' },
+    },
+    crosshair: {
+      vertLine: { color: c.textSecondary + '50', width: 1, style: 2, labelBackgroundColor: c.bgTertiary },
+      horzLine: { color: c.textSecondary + '50', width: 1, style: 2, labelBackgroundColor: c.bgTertiary },
+    },
+  })
+  candleSeries?.applyOptions({
+    upColor: c.buy,
+    downColor: c.sell,
+    borderUpColor: c.buy,
+    borderDownColor: c.sell,
+    wickUpColor: c.buy,
+    wickDownColor: c.sell,
+  })
+  lineSeries?.applyOptions({ color: c.accent })
+  // Volume histogram bars are re-coloured by each candle's direction
+  // (see `rebuildVolumes`) — applying new buy/sell to the next redraw
+  // is handled implicitly; force a refresh so already-drawn bars adopt
+  // the new palette immediately.
+  if (cachedCandles.length > 0) {
+    volumeSeries?.setData(
+      cachedVolumes.map((v, i) => ({
+        ...v,
+        color: (cachedCandles[i]?.close ?? 0) >= (cachedCandles[i]?.open ?? 0)
+          ? c.buy + '66'
+          : c.sell + '66',
+      })),
+    )
+  }
+}
+
 // Chart setup
 function initChart() {
   if (!chartContainer.value || chart) return
 
-  const cs = getComputedStyle(document.documentElement)
-  const bgPrimary = cs.getPropertyValue('--bg-primary').trim() || '#1A0A02'
-  const textSecondary = cs.getPropertyValue('--text-secondary').trim() || '#B89A78'
-  const bgSecondary = cs.getPropertyValue('--bg-secondary').trim() || '#2A1608'
-  const bgTertiary = cs.getPropertyValue('--bg-tertiary').trim() || '#3A1F0C'
-  colorBuy = cs.getPropertyValue('--color-buy').trim() || '#2EA66A'
-  colorSell = cs.getPropertyValue('--color-sell').trim() || '#D94040'
-  colorAccent = cs.getPropertyValue('--accent-primary').trim() || '#C45A0A'
+  const c = readThemeColors(chartContainer.value)
+  colorBuy = c.buy
+  colorSell = c.sell
+  colorAccent = c.accent
 
   chart = createChart(chartContainer.value, {
     layout: {
-      background: { type: ColorType.Solid, color: bgPrimary },
-      textColor: textSecondary,
+      background: { type: ColorType.Solid, color: c.bgPrimary },
+      textColor: c.textSecondary,
     },
     grid: {
-      vertLines: { color: bgSecondary + '30' },
-      horzLines: { color: bgSecondary + '30' },
+      vertLines: { color: c.bgSecondary + '30' },
+      horzLines: { color: c.bgSecondary + '30' },
     },
     crosshair: {
-      vertLine: { color: textSecondary + '50', width: 1, style: 2, labelBackgroundColor: bgTertiary },
-      horzLine: { color: textSecondary + '50', width: 1, style: 2, labelBackgroundColor: bgTertiary },
+      vertLine: { color: c.textSecondary + '50', width: 1, style: 2, labelBackgroundColor: c.bgTertiary },
+      horzLine: { color: c.textSecondary + '50', width: 1, style: 2, labelBackgroundColor: c.bgTertiary },
     },
     timeScale: {
       borderColor: 'transparent',
@@ -204,16 +272,16 @@ function initChart() {
   })
 
   candleSeries = chart.addSeries(CandlestickSeries, {
-    upColor: colorBuy,
-    downColor: colorSell,
-    borderUpColor: colorBuy,
-    borderDownColor: colorSell,
-    wickUpColor: colorBuy,
-    wickDownColor: colorSell,
+    upColor: c.buy,
+    downColor: c.sell,
+    borderUpColor: c.buy,
+    borderDownColor: c.sell,
+    wickUpColor: c.buy,
+    wickDownColor: c.sell,
   })
 
   lineSeries = chart.addSeries(LineSeries, {
-    color: colorAccent,
+    color: c.accent,
     lineWidth: 2,
     crosshairMarkerVisible: true,
     crosshairMarkerRadius: 4,
@@ -651,19 +719,21 @@ watch([() => props.token0, () => props.token1], () => {
 </script>
 
 <style scoped lang="scss">
+// Flat page-bg (matches ProLayout + other views — no distinct surface
+// color here, the chart body is the focal element).
 .trading-chart {
   display: flex;
   flex-direction: column;
   height: 100%;
-  background: var(--bg-primary);
+  background: var(--tx-bg);
 
   &__toolbar {
     display: flex;
     align-items: center;
-    gap: var(--space-3);
-    padding: var(--space-1) var(--space-2);
-    border-bottom: 1px solid var(--border-primary);
-    background: var(--bg-secondary);
+    gap: 12px;
+    padding: 4px 10px;
+    border-bottom: 1px solid var(--tx-line);
+    background: transparent;
     flex-shrink: 0;
   }
 
@@ -673,19 +743,20 @@ watch([() => props.token0, () => props.token1], () => {
   }
 
   &__tf-btn {
-    background: none;
-    border: none;
-    color: var(--text-tertiary);
-    font-size: var(--text-xs);
-    font-weight: var(--weight-medium);
-    padding: 4px 8px;
-    border-radius: 4px;
+    background: transparent;
+    border: 0;
+    color: var(--tx-ink-3);
+    font-size: 12px;
+    font-weight: 500;
+    padding: 4px 10px;
+    border-radius: var(--tx-r-sm);
     cursor: pointer;
+    transition: color 140ms, background 140ms;
 
-    &:hover { color: var(--text-primary); }
+    &:hover { color: var(--tx-ink-2); }
     &--active {
-      color: var(--accent-primary);
-      background: var(--accent-primary-muted);
+      color: var(--tx-ink);
+      background: var(--tx-surface-2);
     }
   }
 

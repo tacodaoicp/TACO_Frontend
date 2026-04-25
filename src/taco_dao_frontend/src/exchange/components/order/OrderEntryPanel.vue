@@ -72,10 +72,11 @@ const activeTab = ref('limit')
   display: flex;
   flex-direction: column;
   height: 100%;
-  background: var(--bg-secondary);
+  background: var(--tx-bg);
 
   &__tab {
     flex: 1;
+    justify-content: center;
   }
 
   &__content {
@@ -85,8 +86,8 @@ const activeTab = ref('limit')
 
   @media (max-width: 767px) {
     &__tab {
-      padding: var(--space-1) var(--space-2);
-      font-size: var(--text-xs);
+      padding: 6px 8px;
+      font-size: 12px;
     }
   }
 }

@@ -439,14 +439,14 @@ onMounted(() => {
 
 <style scoped lang="scss">
 .swap-card {
-  background: linear-gradient(135deg, var(--card-gradient-from), var(--card-gradient-to));
-  border: 1px solid var(--card-border);
-  border-radius: 16px;
-  padding: var(--space-6);
+  background: var(--tx-panel-bg);
+  border: var(--tx-panel-border);
+  border-radius: var(--tx-r-xl);
+  padding: 18px;
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
+  gap: 12px;
+  box-shadow: var(--tx-shadow-1);
 
   &__header {
     display: flex;
@@ -666,30 +666,32 @@ onMounted(() => {
     flex-shrink: 0;
   }
 
-  // Flip button
+  // Flip button (mockup: 36×36 circle, sits on the seam between wells,
+  // 3px bg border creates the "cut-out" look, -20px negative margins)
   &__flip-wrap {
     display: flex;
     justify-content: center;
-    margin: calc(var(--space-1) * -1) 0;
+    margin: -20px 0;
     position: relative;
-    z-index: 1;
+    z-index: 2;
   }
 
   &__flip-btn {
     width: 36px;
     height: 36px;
     border-radius: 50%;
-    background: var(--bg-secondary);
-    border: 3px solid var(--bg-primary);
-    color: var(--text-secondary);
+    background: var(--tx-surface-2);
+    border: 3px solid var(--tx-bg);
+    color: var(--tx-ink);
     cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: color 0.15s, transform 0.15s;
+    box-shadow: var(--tx-shadow-1);
+    transition: color 140ms, transform 140ms;
 
-    &:hover { color: var(--accent-primary); }
-    &:active { transform: scale(0.9); }
+    &:hover { color: var(--tx-orange); }
+    &:active { transform: scale(0.92); }
   }
 
   &__flip-icon--flipped {

@@ -580,6 +580,7 @@ export const idlFactory = ({ IDL }) => {
         ],
         [],
       ),
+    'canTradeTokens' : IDL.Func([IDL.Text, IDL.Text], [IDL.Bool], ['query']),
     'changeOwner2' : IDL.Func([IDL.Principal], [], []),
     'changeOwner3' : IDL.Func([IDL.Principal], [], []),
     'checkDiffs' : IDL.Func(
@@ -1083,6 +1084,24 @@ export const idlFactory = ({ IDL }) => {
       ),
     'getUserTrades' : IDL.Func([], [IDL.Vec(TradePrivate2)], ['query']),
     'get_cycles' : IDL.Func([], [IDL.Nat], ['query']),
+    'get_token_trends_7d' : IDL.Func(
+        [IDL.Vec(IDL.Principal)],
+        [
+          IDL.Variant({
+            'ok' : IDL.Vec(
+              IDL.Record({
+                'token' : IDL.Principal,
+                'change_pct_7d' : IDL.Float64,
+                'change_pct_24h' : IDL.Float64,
+                'price_now' : IDL.Float64,
+                'points' : IDL.Vec(IDL.Float64),
+              })
+            ),
+            'err' : IDL.Text,
+          }),
+        ],
+        ['query'],
+      ),
     'hmFee' : IDL.Func([], [IDL.Nat], ['query']),
     'hmRefFee' : IDL.Func([], [IDL.Nat], ['query']),
     'hmRevokeFee' : IDL.Func([], [IDL.Nat], ['query']),
@@ -1194,6 +1213,18 @@ export const idlFactory = ({ IDL }) => {
     'treasurySwap' : IDL.Func(
         [IDL.Text, IDL.Text, IDL.Nat, IDL.Nat, IDL.Nat],
         [SwapResult],
+        [],
+      ),
+    'updateTokenType' : IDL.Func(
+        [
+          IDL.Text,
+          IDL.Variant({
+            'ICP' : IDL.Null,
+            'ICRC3' : IDL.Null,
+            'ICRC12' : IDL.Null,
+          }),
+        ],
+        [ActionResult],
         [],
       ),
   });

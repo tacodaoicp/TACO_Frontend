@@ -1404,6 +1404,7 @@ export const useTacoStore = defineStore('taco', () => {
     // app
     const router = useRouter()
     const darkModeToggled = useStorage('darkMode', false)
+    const exchangeTheme = useStorage<'masa' | 'cotija'>('exchangeTheme', 'masa')
     const appLoading = ref(false)
     const backendError = ref(false)
     const backendErrorIcon = ref('fa-solid fa-circle-exclamation')
@@ -8824,6 +8825,7 @@ export const useTacoStore = defineStore('taco', () => {
     return {
         // state
         darkModeToggled,
+        exchangeTheme,
         appLoading,
         userLoggedIn,
         userPrincipal,

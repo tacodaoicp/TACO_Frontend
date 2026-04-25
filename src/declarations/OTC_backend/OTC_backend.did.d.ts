@@ -497,6 +497,7 @@ export interface create_trading_canister {
       }
     >
   >,
+  'canTradeTokens' : ActorMethod<[string, string], boolean>,
   'changeOwner2' : ActorMethod<[Principal], undefined>,
   'changeOwner3' : ActorMethod<[Principal], undefined>,
   'checkDiffs' : ActorMethod<
@@ -894,6 +895,21 @@ export interface create_trading_canister {
   >,
   'getUserTrades' : ActorMethod<[], Array<TradePrivate2>>,
   'get_cycles' : ActorMethod<[], bigint>,
+  'get_token_trends_7d' : ActorMethod<
+    [Array<Principal>],
+    {
+        'ok' : Array<
+          {
+            'token' : Principal,
+            'change_pct_7d' : number,
+            'change_pct_24h' : number,
+            'price_now' : number,
+            'points' : Array<number>,
+          }
+        >
+      } |
+      { 'err' : string }
+  >,
   'hmFee' : ActorMethod<[], bigint>,
   'hmRefFee' : ActorMethod<[], bigint>,
   'hmRevokeFee' : ActorMethod<[], bigint>,
@@ -982,6 +998,10 @@ export interface create_trading_canister {
   'treasurySwap' : ActorMethod<
     [string, string, bigint, bigint, bigint],
     SwapResult
+  >,
+  'updateTokenType' : ActorMethod<
+    [string, { 'ICP' : null } | { 'ICRC3' : null } | { 'ICRC12' : null }],
+    ActionResult
   >,
 }
 export interface pool {

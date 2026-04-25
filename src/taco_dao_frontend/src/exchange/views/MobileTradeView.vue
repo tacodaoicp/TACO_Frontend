@@ -1,6 +1,8 @@
 <template>
   <div class="mobile-trade">
-    <ExchangeHeader />
+    <div class="mobile-trade__header">
+      <ExchangeTopNav show-pair />
+    </div>
 
     <main class="mobile-trade__main">
       <!-- Two-column: Orderbook + Order Entry -->
@@ -73,7 +75,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useExchangeStore } from '../store/exchange.store'
-import ExchangeHeader from '../components/layout/ExchangeHeader.vue'
+import ExchangeTopNav from '../components/common/ExchangeTopNav.vue'
 import OrderbookPanel from '../components/orderbook/OrderbookPanel.vue'
 import OrderEntryPanel from '../components/order/OrderEntryPanel.vue'
 import TradingChart from '../components/chart/TradingChart.vue'
@@ -117,6 +119,9 @@ function onPriceClick(price: number, side: 'buy' | 'sell', cumulativeBase: numbe
   clickedAmount.value = cumulativeBase > 0 ? cumulativeBase : null
 }
 
+// Cross-viewport redirects are handled globally in ExchangeApp.vue so they
+// don't leak across views under keep-alive caching.
+
 // Set default pair if none selected
 onMounted(() => {
   if (!store.selectedToken0 && store.tokens.length >= 2) {
@@ -139,14 +144,34 @@ onMounted(() => {
   flex-direction: column;
   height: 100vh;
 
-  background: var(--bg-primary);
+  background: var(--tx-bg);
+
+  // Same outer padding shell as Pool / Portfolio / OTC / Easy — fluid so
+  // resize desktop↔mobile has no visible step.
+  &__header {
+    padding: clamp(20px, 3vw, 28px) clamp(16px, 4vw, 40px) 0;
+    flex-shrink: 0;
+
+    :deep(.tx-topnav) {
+      max-width: 1200px;
+      margin: 0 auto 12px;
+    }
+
+    @media (max-width: 480px) {
+      :deep(.tx-topnav__tabs) { gap: 2px; }
+    }
+  }
 
   &__main {
     flex: 1;
     overflow-y: auto;
     display: flex;
     flex-direction: column;
-    padding-bottom: 56px; // mobile nav
+
+    // Reserve space for MobileNav only when it's actually showing.
+    @media (max-width: 767px) {
+      padding-bottom: 56px;
+    }
   }
 
   &__panels {

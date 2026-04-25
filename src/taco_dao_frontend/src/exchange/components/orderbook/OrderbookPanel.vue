@@ -2,7 +2,7 @@
   <div class="orderbook-panel">
     <!-- Header -->
     <div class="orderbook-panel__header">
-      <span class="orderbook-panel__title">Orderbook</span>
+      <span class="orderbook-panel__title">Order Book</span>
       <div class="orderbook-panel__modes">
         <button
           class="orderbook-panel__mode-btn"
@@ -241,8 +241,8 @@ function groupByPrecision(levels: OrderbookLevel[], side: 'asks' | 'bids', limit
 }
 
 // Dynamic row count based on available height
-const ROW_HEIGHT = 20
-const SPREAD_HEIGHT = 24
+const ROW_HEIGHT = 22 // matches CSS .orderbook-panel__row height
+const SPREAD_HEIGHT = 32 // spread row: 6px padding × 2 + ~20px content
 const contentRef = ref<HTMLElement | null>(null)
 const maxRows = ref(15) // default fallback
 
@@ -291,75 +291,86 @@ function onBidClick(price: number, cumulativeBase: number) { emit('clickPrice', 
 </script>
 
 <style scoped lang="scss">
+// Figma PT_Orderbook spec — flat surface, eyebrow-style header,
+// `.tx-depth` row pattern (3-col grid, 12px mono, ::before at 22% opacity).
 .orderbook-panel {
   display: flex;
   flex-direction: column;
   height: 100%;
-  background: var(--bg-secondary);
+  background: var(--tx-bg);
 
   &__header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: var(--space-2) var(--space-3);
-    background: linear-gradient(135deg, var(--card-active-from), var(--card-active-to));
-    border-bottom: 1px solid var(--card-border);
+    padding: 8px 10px;
+    background: transparent;
+    border-bottom: 1px solid var(--tx-line);
   }
 
   &__title {
-    font-size: var(--text-sm);
-    font-weight: var(--weight-semibold);
-    color: var(--text-primary);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--tx-ink-2);
   }
 
   &__modes {
     display: flex;
-    gap: 2px;
+    gap: 4px;
     align-items: center;
   }
 
   &__precision-select {
     appearance: none;
     -webkit-appearance: none;
-    background: rgba(0, 0, 0, 0.15);
-    border: 1px solid var(--card-border);
-    border-radius: 4px;
-    color: var(--text-secondary);
+    background: var(--tx-surface-2);
+    border: 1px solid var(--tx-line);
+    border-radius: var(--tx-r-sm);
+    color: var(--tx-ink-2);
+    font-family: var(--font-mono);
     font-size: 10px;
-    padding: 2px 20px 2px 6px;
+    padding: 2px 18px 2px 6px;
     cursor: pointer;
     margin-left: 4px;
-    background-image: url("data:image/svg+xml,%3Csvg width='8' height='5' viewBox='0 0 8 5' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1l3 3 3-3' stroke='%23B89A78' stroke-width='1' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+    background-image: url("data:image/svg+xml,%3Csvg width='8' height='5' viewBox='0 0 8 5' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1l3 3 3-3' stroke='%23897e6f' stroke-width='1' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
     background-repeat: no-repeat;
     background-position: right 5px center;
 
-    &:focus { border-color: var(--accent-primary); outline: none; box-shadow: 0 0 0 2px rgba(196, 90, 10, 0.2); }
-    option { background: #2A1608; color: #F5F0E0; }
+    &:focus { border-color: var(--tx-orange); outline: none; box-shadow: 0 0 0 2px var(--tx-orange-dim); }
+    option { background: var(--tx-surface-2); color: var(--tx-ink); }
   }
 
   &__mode-btn {
-    background: none;
-    border: none;
+    background: transparent;
+    border: 1px solid transparent;
     padding: 3px;
-    border-radius: 3px;
+    border-radius: var(--tx-r-sm);
     cursor: pointer;
     opacity: 0.5;
+    color: var(--tx-ink-3);
+    transition: opacity 140ms, background 140ms, border-color 140ms;
 
-    &:hover { opacity: 0.8; }
-    &--active { opacity: 1; background: var(--bg-tertiary); }
+    &:hover { opacity: 0.85; }
+    &--active {
+      opacity: 1;
+      background: var(--tx-surface-2);
+      border-color: var(--tx-line);
+    }
   }
 
   &__col-headers {
     display: grid;
     grid-template-columns: 1fr 1fr 1fr;
-    padding: var(--space-1) var(--space-3);
+    padding: 4px 10px;
     font-size: 10px;
-    color: var(--text-cream);
+    color: var(--tx-ink-3);
     text-transform: uppercase;
     letter-spacing: 0.04em;
-    font-weight: var(--weight-semibold);
-    background: linear-gradient(135deg, var(--card-active-from), var(--card-active-to));
-    border-bottom: 1px solid var(--card-border);
+    font-weight: 500;
+    background: transparent;
+    border-bottom: 1px solid var(--tx-line);
 
     span:nth-child(2),
     span:nth-child(3) { text-align: right; }
@@ -387,135 +398,136 @@ function onBidClick(price: number, cumulativeBase: number) { emit('clickPrice', 
     justify-content: flex-end;
     flex: 1;
     min-height: 0;
+    // Backend returns ~40 levels per side; the container is only ~10 rows
+    // tall. Clip from the TOP (farthest-from-spread) so the rows closest
+    // to the spread stay visible. justify-content: flex-end + overflow
+    // hidden keeps the bottom anchored.
+    overflow: hidden;
   }
 
   &__bids {
     flex: 1;
+    // Clip from the BOTTOM (farthest-from-spread). content starts at top
+    // by default so overflow hidden naturally clips the tail.
+    overflow: hidden;
     min-height: 0;
   }
 
+  // Depth row — grid of 3 equal cols, mono tabular, ::before depth fill
   &__row {
     display: grid;
     grid-template-columns: 1fr 1fr 1fr;
-    padding: 1px var(--space-3);
-    font-size: var(--text-xs);
-    height: 20px;
+    padding: 2px 10px;
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    font-size: 12px;
+    height: 22px;
     align-items: center;
     position: relative;
     cursor: pointer;
-    transition: background 0.1s;
+    transition: background 120ms;
 
-    &:hover { background: var(--bg-tertiary); }
+    &:hover { background: var(--tx-surface-2); }
 
-    // Depth bar
     &::before {
       content: '';
       position: absolute;
-      top: 0;
-      bottom: 0;
-      right: 0;
+      top: 1px; bottom: 1px; right: 0;
       width: var(--depth-width, 0%);
+      opacity: 0.22;
+      border-radius: 1px;
       pointer-events: none;
     }
 
     &--ask {
-      .orderbook-panel__price { color: var(--color-sell); }
-      &::before { background: var(--color-sell-bg); }
+      .orderbook-panel__price { color: var(--tx-sell); }
+      &::before { background: var(--tx-sell); }
     }
-
     &--bid {
-      .orderbook-panel__price { color: var(--color-buy); }
-      &::before { background: var(--color-buy-bg); }
+      .orderbook-panel__price { color: var(--tx-buy); }
+      &::before { background: var(--tx-buy); }
     }
-
-    &--amm { opacity: var(--ob-amm-opacity, 0.5); }
+    &--amm { opacity: var(--ob-amm-opacity, 0.55); }
   }
 
-  &__price { font-family: var(--font-mono); }
-  &__amount { text-align: right; font-family: var(--font-mono); color: var(--text-primary); }
-  &__total { text-align: right; font-family: var(--font-mono); color: var(--text-secondary); }
+  &__price  { }
+  &__amount { text-align: right; color: var(--tx-ink); }
+  &__total  { text-align: right; color: var(--tx-ink-3); }
 
-  // Spread
+  // Spread row — taller, surface-2 bg, top+bottom 1px line
   &__spread {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: var(--space-1) var(--space-3);
-    background: var(--bg-tertiary);
-    border-top: 1px solid var(--border-primary);
-    border-bottom: 1px solid var(--border-primary);
+    padding: 6px 10px;
+    background: var(--tx-surface-2);
+    border-top: 1px solid var(--tx-line);
+    border-bottom: 1px solid var(--tx-line);
   }
-
   &__spread-price {
-    font-size: var(--text-sm);
-    font-weight: var(--weight-semibold);
-    color: var(--text-primary);
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--tx-ink);
 
-    &--up { color: var(--color-buy); }
-    &--down { color: var(--color-sell); }
+    &--up   { color: var(--tx-buy); }
+    &--down { color: var(--tx-sell); }
   }
-
   &__spread-arrow {
     font-size: 8px;
     margin-right: 2px;
   }
-
   &__spread-usd {
-    color: var(--text-tertiary);
-    font-size: var(--text-xs);
-    font-weight: normal;
+    color: var(--tx-ink-3);
+    font-size: 11px;
+    font-weight: 400;
     margin-left: 4px;
   }
-
   &__spread-label {
     font-size: 10px;
-    &--tight { color: var(--color-buy); }
-    &--normal { color: var(--color-warning); }
-    &--wide { color: var(--color-sell); }
+    color: var(--tx-ink-3);
+
+    &--tight  { color: var(--tx-buy); }
+    &--normal { color: var(--tx-warning); }
+    &--wide   { color: var(--tx-sell); }
   }
 
-  // Loading
+  // Loading skeleton
   &__loading {
-    padding: var(--space-2) var(--space-3);
+    padding: 8px 10px;
     display: flex;
     flex-direction: column;
-    gap: var(--space-1);
+    gap: 6px;
   }
-
   &__skeleton-row {
     display: flex;
     justify-content: space-between;
-    gap: var(--space-2);
+    gap: 8px;
   }
 
   // Mobile adaptations
   @media (max-width: 767px) {
-    &__header {
-      padding: var(--space-1) var(--space-2);
-    }
-
-    &__title { display: none; }
+    &__header { padding: 6px 8px; }
+    &__title  { display: none; }
 
     &__col-headers {
       grid-template-columns: 1fr 1fr;
-      padding: var(--space-1) var(--space-2);
-      span:nth-child(3) { display: none; } // hide TOTAL
+      padding: 4px 8px;
+      span:nth-child(3) { display: none; }
     }
 
     &__row {
       grid-template-columns: 1fr 1fr;
-      padding: 1px var(--space-2);
-      font-size: 10px;
-      height: 18px;
+      padding: 2px 8px;
+      font-size: 11px;
+      height: 20px;
     }
 
     &__total { display: none; }
 
-    &__spread {
-      padding: var(--space-1) var(--space-2);
-    }
-
-    &__spread-price { font-size: var(--text-xs); }
+    &__spread { padding: 5px 8px; }
+    &__spread-price { font-size: 12px; }
   }
 }
 </style>

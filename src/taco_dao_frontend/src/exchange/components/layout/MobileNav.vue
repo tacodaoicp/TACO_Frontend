@@ -61,30 +61,35 @@ function isActive(path: string): boolean {
   left: 0;
   right: 0;
   z-index: 1000;
-  background: linear-gradient(to top, var(--card-gradient-to, #241005), var(--card-gradient-from, #3A1F0C));
-  border-top: 1px solid var(--card-border, #6B4422);
-  box-shadow: 0 -2px 12px rgba(0, 0, 0, 0.3);
-  padding: var(--space-1, 4px) 0;
+  height: 56px;
+  background: var(--tx-surface-2);
+  border-top: 1px solid var(--tx-line);
+  box-shadow: 0 -2px 12px rgba(0, 0, 0, 0.25);
   padding-bottom: env(safe-area-inset-bottom, 0);
+
+  /* Desktop has ExchangeTopNav at the top — MobileNav is redundant there. */
+  @media (min-width: 768px) {
+    display: none;
+  }
 
   &__item {
     flex: 1;
     display: flex;
     flex-direction: column;
     align-items: center;
+    justify-content: center;
     gap: 2px;
-    padding: var(--space-1) 0;
     text-decoration: none;
-    color: var(--text-tertiary);
-    transition: all 0.2s ease;
-    border-radius: 6px;
+    color: var(--tx-ink-3);
+    border-top: 2px solid transparent;
+    transition: color 140ms, border-color 140ms;
 
     &--active {
-      color: var(--gold);
-      background: rgba(196, 90, 10, 0.1);
+      color: var(--tx-orange);
+      border-top-color: var(--tx-orange);
     }
 
-    &:active { transform: scale(0.95); }
+    &:active { transform: scale(0.96); }
   }
 
   &__icon {
@@ -94,7 +99,7 @@ function isActive(path: string): boolean {
 
   &__label {
     font-size: 10px;
-    font-weight: var(--weight-medium);
+    font-weight: 600;
   }
 }
 </style>

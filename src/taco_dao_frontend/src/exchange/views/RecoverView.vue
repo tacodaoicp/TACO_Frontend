@@ -1,8 +1,21 @@
 <template>
-  <div class="recover-view">
-    <ExchangeHeader />
+  <div class="recover-view tx-scroll">
+    <div class="recover-view__shell">
     <main class="recover-view__main">
-      <h1 class="recover-view__heading">Recover Funds</h1>
+      <ExchangeTopNav active="portfolio" />
+      <ExchangePageTitle
+        label="Recover"
+        qualifier="stuck funds"
+        subtitle="We scan failed and interrupted transactions for balances the exchange still holds for your principal, and refund them here."
+      />
+      <!-- Warning banner — only use recovery when an on-chain TX didn't settle -->
+      <div class="recover-view__warn">
+        <div class="recover-view__warn-icon">⚠</div>
+        <div>
+          <strong class="tx-warning">Only use this if a deposit, withdraw, or swap completed on-chain but never appeared in your balance.</strong>
+          <div class="tx-ink-3" style="margin-top:4px;font-size:13px">Normal pending transactions settle within 2 minutes — don't recover those.</div>
+        </div>
+      </div>
 
       <!-- Stuck Transaction Detection -->
       <section class="recover-view__section">
@@ -120,12 +133,14 @@
         </button>
       </section>
     </main>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import ExchangeHeader from '../components/layout/ExchangeHeader.vue'
+import ExchangeTopNav from '../components/common/ExchangeTopNav.vue'
+import ExchangePageTitle from '../components/common/ExchangePageTitle.vue'
 import { useExchangeStore } from '../store/exchange.store'
 import { getDepositHistory, removeDepositFromCache } from '../utils/deposit'
 import { useExchangeToast } from '../composables/useExchangeToast'
@@ -363,18 +378,39 @@ onMounted(loadCachedDeposits)
 
 <style scoped lang="scss">
 .recover-view {
-  display: flex;
-  flex-direction: column;
   min-height: 100vh;
+  background: var(--tx-bg);
+  padding: clamp(20px, 3vw, 28px) clamp(16px, 4vw, 40px) 60px;
+  overflow-y: auto;
 
-  background: var(--bg-primary);
+  &__shell {
+    max-width: 960px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
 
   &__main {
-    flex: 1 0 auto;
-    padding: var(--space-4) var(--space-6);
-    max-width: 700px;
-    width: 100%;
-    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  &__warn {
+    padding: 12px 14px;
+    background: var(--tx-warning-dim);
+    border: 1px solid rgba(216, 138, 63, 0.35);
+    border-radius: var(--tx-r-md);
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+  }
+  &__warn-icon {
+    font-size: 18px;
+    line-height: 1;
+    margin-top: 1px;
+    color: var(--tx-warning);
   }
 
   &__heading {

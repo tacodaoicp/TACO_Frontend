@@ -1,10 +1,11 @@
 <template>
-  <div class="otc-view">
-    <ExchangeHeader />
+  <div class="otc-view tx-scroll">
+    <div class="otc-view__shell">
+      <ExchangeTopNav active="otc" />
     <main class="otc-view__main">
       <!-- Fill mode: arrived via /otc/:code -->
       <div v-if="accessCode" class="otc-view__fill">
-        <h1 class="otc-view__heading">Fill Private Order</h1>
+        <ExchangePageTitle label="Fill" qualifier="private order" />
 
         <div v-if="loadingTrade" class="otc-view__loading">Loading order...</div>
         <div v-else-if="!trade" class="otc-view__not-found">
@@ -87,7 +88,11 @@
 
       <!-- Create mode: no code -->
       <div v-else class="otc-view__create">
-        <h1 class="otc-view__heading">OTC / Private Orders</h1>
+        <ExchangePageTitle
+          label="OTC"
+          qualifier="private orders"
+          subtitle="Quiet table. Hand-pick your counter-party, or burn the order into pure chaincode and let them find it."
+        />
 
         <!-- Access Code Lookup -->
         <div class="otc-view__lookup">
@@ -263,13 +268,15 @@
         </button>
       </div>
     </main>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import ExchangeHeader from '../components/layout/ExchangeHeader.vue'
+import ExchangeTopNav from '../components/common/ExchangeTopNav.vue'
+import ExchangePageTitle from '../components/common/ExchangePageTitle.vue'
 import { useExchangeStore } from '../store/exchange.store'
 import { depositToken } from '../utils/deposit'
 import { fillPercentage, orderPrice } from '../utils/price-math'
@@ -769,16 +776,23 @@ onMounted(() => {
 
 <style scoped lang="scss">
 .otc-view {
-  display: flex;
-  flex-direction: column;
   min-height: 100vh;
+  background: var(--tx-bg);
+  padding: clamp(20px, 3vw, 28px) clamp(16px, 4vw, 40px) 60px;
+  overflow-y: auto;
 
-  background: var(--bg-primary);
+  &__shell {
+    max-width: 1200px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
 
   &__main {
     flex: 1 0 auto;
-    padding: var(--space-4) var(--space-6);
-    max-width: 900px;
+    // OTC content body is narrower than the nav for readability.
+    max-width: 720px;
     width: 100%;
     margin: 0 auto;
   }

@@ -80,7 +80,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, onActivated, onDeactivated } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted, onActivated, onDeactivated } from 'vue'
 import { useExchangeStore } from '../../store/exchange.store'
 import type { SwapRecord } from 'declarations/OTC_backend/OTC_backend.did.d.ts'
 
@@ -293,6 +293,7 @@ function stopPolling() {
   if (pollTimer) { clearInterval(pollTimer); pollTimer = null }
 }
 let offMutation: (() => void) | null = null
+watch(() => store.isAuthenticated, (v, prev) => { if (v && !prev) loadHistory() })
 onMounted(() => {
   loadHistory()
   startPolling()

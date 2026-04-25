@@ -108,6 +108,7 @@ type create_trading_canister =
         transferred0: nat;
         transferred1: nat;
       });
+   canTradeTokens: (tokenIn: text, tokenOut: text) -> (bool) query;
    changeOwner2: (pri: principal) -> ();
    changeOwner3: (pri: principal) -> ();
    checkDiffs: (returnFees: bool, alwaysShow: bool) ->
@@ -470,6 +471,19 @@ type create_trading_canister =
       }) query;
    getUserTrades: () -> (vec TradePrivate2) query;
    get_cycles: () -> (nat) query;
+   get_token_trends_7d: (tokens: vec principal) ->
+    (variant {
+       err: text;
+       ok:
+        vec
+         record {
+           change_pct_24h: float64;
+           change_pct_7d: float64;
+           points: vec float64;
+           price_now: float64;
+           token: principal;
+         };
+     }) query;
    hmFee: () -> (nat) query;
    hmRefFee: () -> (nat) query;
    hmRevokeFee: () -> (nat) query;
@@ -536,6 +550,11 @@ type create_trading_canister =
     minAmountOut: nat, Block: nat) -> (SwapResult);
    treasurySwap: (tokenIn: text, tokenOut: text, amountIn: nat, minAmountOut:
     nat, block: nat) -> (SwapResult);
+   updateTokenType: (token: text, newType: variant {
+                                             ICP;
+                                             ICRC12;
+                                             ICRC3;
+                                           }) -> (ActionResult);
  };
 type TradePrivate2 = 
  record {

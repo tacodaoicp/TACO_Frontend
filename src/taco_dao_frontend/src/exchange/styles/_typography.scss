@@ -1,37 +1,101 @@
-// TACO Exchange — Typography (Section 21.2)
-// No Google Fonts import — IC's CSP blocks fonts.googleapis.com / fonts.gstatic.com
-// Uses Roboto (locally hosted by the DAO app) and system monospace fonts
+// TACO Exchange — Typography
+// Three families: Inter (UI) · JetBrains Mono (numbers) · Instrument Serif (H1 qualifier)
+// Loaded from Google Fonts via <link> injection in ExchangeApp.vue.
+// CSP allows fonts.googleapis.com in style-src and fonts.gstatic.com in font-src.
 
 [data-theme="exchange"] {
-  /* --- Font Families --- */
-  --font-body: 'Roboto', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  --font-mono: 'SF Mono', 'Fira Code', 'Consolas', 'Menlo', 'Monaco', monospace;
+  /* Font families */
+  --font-ui:    'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  --font-mono:  'JetBrains Mono', ui-monospace, 'SF Mono', 'Fira Code', Consolas, Menlo, Monaco, monospace;
+  --font-serif: 'Instrument Serif', Georgia, serif;
+  --font-body:  var(--font-ui); /* legacy alias */
 
-  /* --- Font Sizes --- */
-  --text-xs: 10px;
-  --text-sm: 12px;
-  --text-base: 14px;
-  --text-lg: 16px;
-  --text-xl: 20px;
-  --text-2xl: 24px;
-  --text-3xl: 32px;
+  /* Sizes (13px base per figma/styles.css) */
+  --text-xs:   10px;
+  --text-sm:   11px;
+  --text-md:   12px;
+  --text-base: 13px;
+  --text-lg:   14px;
+  --text-xl:   16px;
+  --text-2xl:  18px;
+  --text-3xl:  22px;
+  --text-4xl:  28px;
+  --text-5xl:  32px;
 
-  /* --- Font Weights --- */
-  --weight-normal: 400;
-  --weight-medium: 500;
+  /* Weights */
+  --weight-normal:   400;
+  --weight-medium:   500;
   --weight-semibold: 600;
-  --weight-bold: 700;
+  --weight-bold:     700;
+  --weight-black:    800;
 
-  font-family: var(--font-body);
+  font-family: var(--font-ui);
   font-size: var(--text-base);
-  color: var(--text-primary);
-  line-height: 1.5;
+  line-height: 1.4;
+  letter-spacing: -0.005em;
+  color: var(--tx-ink);
+  font-feature-settings: 'cv11', 'ss01', 'ss03';
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Monospace + tabular figures for all numeric data */
+/* Utility classes (used additively alongside .ex-*) */
 [data-theme="exchange"] {
+  .tx-mono {
+    font-family: var(--font-mono);
+    font-feature-settings: 'zero', 'ss02';
+  }
+  .tx-serif {
+    font-family: var(--font-serif);
+    font-style: italic;
+  }
+  .tx-tnum {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Ink utilities */
+  .tx-ink   { color: var(--tx-ink); }
+  .tx-ink-2 { color: var(--tx-ink-2); }
+  .tx-ink-3 { color: var(--tx-ink-3); }
+  .tx-ink-4 { color: var(--tx-ink-4); }
+
+  /* Semantic colors */
+  .tx-orange  { color: var(--tx-orange); }
+  .tx-amber   { color: var(--tx-amber); }
+  .tx-buy     { color: var(--tx-buy); }
+  .tx-sell    { color: var(--tx-sell); }
+  .tx-warning { color: var(--tx-warning); }
+  .tx-info    { color: var(--tx-info); }
+
+  /* Page titles */
+  .tx-h1 {
+    font-family: var(--font-ui);
+    font-weight: 600;
+    font-size: 28px;
+    letter-spacing: -0.02em;
+    line-height: 1.1;
+    color: var(--tx-ink);
+    margin: 0;
+  }
+  .tx-h2 {
+    font-family: var(--font-ui);
+    font-weight: 600;
+    font-size: 18px;
+    letter-spacing: -0.01em;
+    color: var(--tx-ink);
+    margin: 0;
+  }
+
+  /* Eyebrow — 11px 600 uppercase 0.08em */
+  .tx-eyebrow {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--tx-ink-3);
+  }
+
+  /* Numeric data cells — monospace + tabular */
   .num,
   .price,
   .amount,
@@ -40,6 +104,6 @@
   [data-type="number"] {
     font-family: var(--font-mono);
     font-variant-numeric: tabular-nums;
-    letter-spacing: -0.02em;
+    letter-spacing: 0;
   }
 }

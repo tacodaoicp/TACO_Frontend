@@ -1,7 +1,14 @@
 <template>
   <ProLayout ref="layoutRef">
     <template #header>
-      <ExchangeHeader />
+      <div class="pro-trade-view__header">
+        <ExchangeTopNav
+          active="pro"
+          show-pair
+          show-stats
+          show-pro-badge
+        />
+      </div>
     </template>
 
     <template #chart>
@@ -91,7 +98,7 @@
 import { ref, computed, watch, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import ProLayout from '../components/layout/ProLayout.vue'
-import ExchangeHeader from '../components/layout/ExchangeHeader.vue'
+import ExchangeTopNav from '../components/common/ExchangeTopNav.vue'
 import TradingChart from '../components/chart/TradingChart.vue'
 import OrderbookPanel from '../components/orderbook/OrderbookPanel.vue'
 import OrderEntryPanel from '../components/order/OrderEntryPanel.vue'
@@ -164,8 +171,10 @@ function initDefaultPair() {
 // Watch for tokens loading (async init may complete after mount)
 watch(() => store.tokens.length, () => initDefaultPair())
 
+// Pro layout is desktop-only. Cross-viewport redirects are handled
+// globally in ExchangeApp.vue so they don't leak across views under
+// keep-alive caching. Here we just handle initial-mount redirect.
 onMounted(() => {
-  // Mobile auto-redirect to mobile trade view (Pro layout is desktop-only)
   if (window.matchMedia('(max-width: 767px)').matches) {
     router.replace('/trade')
     return
@@ -180,6 +189,22 @@ onMounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+/* Exactly match the content-view padding so Pro feels like one of them.
+   28px top (fluid) + the nav's built-in 20px margin-bottom = same total
+   vertical breathing room as Easy / Pool / Portfolio / OTC. */
+.pro-trade-view__header {
+  padding: clamp(20px, 3vw, 28px) clamp(16px, 4vw, 40px) 0;
+  background: var(--tx-bg);
+}
+/* Full width on desktop — no max-width cap. The brand lockup aligns with
+   the chart column's left edge, and the wallet chip aligns with the
+   order-entry column's right edge, so the header tracks the terminal
+   grid below. */
+.pro-trade-view__header :deep(.tx-topnav) {
+  max-width: none;
+  margin: 0 0 20px;
 }
 
 .pro-bottom {

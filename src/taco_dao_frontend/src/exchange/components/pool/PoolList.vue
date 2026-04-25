@@ -93,13 +93,13 @@
 
             <!-- Distribution Chart Column -->
             <div class="pool-list__detail-chart">
-              <LiquidityDistributionChart
+              <PoolLiquidityCurve
                 v-if="pool.hasLiquidity"
                 :token0="pool.token0"
                 :token1="pool.token1"
                 :decimals0="getDecimals(pool.token0)"
                 :decimals1="getDecimals(pool.token1)"
-                :currentPrice="pool.currentPrice"
+                :current-price="pool.currentPrice"
               />
               <div v-else class="pool-list__no-chart">No liquidity data</div>
             </div>
@@ -131,7 +131,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useExchangeStore } from '../../store/exchange.store'
 import { ratioToHumanPrice, formatRangePrice, isEffectivelyFullRange } from '../../utils/concentrated'
 import { formatUSD } from '../../utils/format'
-import LiquidityDistributionChart from './LiquidityDistributionChart.vue'
+import PoolLiquidityCurve from './PoolLiquidityCurve.vue'
 
 defineEmits<{
   addLiquidity: [token0: string, token1: string]

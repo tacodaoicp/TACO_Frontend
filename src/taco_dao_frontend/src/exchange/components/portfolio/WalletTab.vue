@@ -13,7 +13,9 @@
     <table class="ex-table wallet-tab__table">
       <thead>
         <tr>
-          <th>Token</th>
+          <th style="width:200px">Token</th>
+          <th style="width:124px">Trend</th>
+          <th class="num">24h</th>
           <th class="num">Balance</th>
           <th class="num">USD Value</th>
           <th>Status</th>
@@ -36,6 +38,17 @@
               <span class="wallet-tab__symbol">{{ row.symbol }}</span>
               <span class="wallet-tab__name">{{ row.name }}</span>
             </span>
+          </td>
+          <td class="wallet-tab__trend">
+            <Sparkline
+              v-if="hasTrend(row.address)"
+              :up="trendUp(row.address)"
+              :points="cleanPoints(row.address)"
+            />
+            <span v-else class="tx-ink-3 wallet-tab__trend-empty">—</span>
+          </td>
+          <td class="num wallet-tab__chg" :class="chgClass(row.address)">
+            {{ chgText(row.address) }}
           </td>
           <td class="num">{{ row.balanceFormatted }}</td>
           <td class="num">{{ row.usdFormatted }}</td>
@@ -65,7 +78,7 @@
           </td>
         </tr>
         <tr v-if="displayRows.length === 0">
-          <td colspan="5" class="wallet-tab__empty">
+          <td colspan="7" class="wallet-tab__empty">
             {{ hideZero ? 'No tokens with balance.' : 'No tokens found.' }}
           </td>
         </tr>
@@ -88,9 +101,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, onActivated, onDeactivated } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted, onActivated, onDeactivated } from 'vue'
 import { Actor, HttpAgent } from '@dfinity/agent'
-import { useExchangeStore } from '../../store/exchange.store'
+import { useExchangeStore, type TokenTrend7d } from '../../store/exchange.store'
 import { getCachedAgent, getCachedIdentity, getNetworkHost } from '../../../shared/auth-cache'
 import { getTokenIcon } from '../../utils/token-icons'
 import { ADMIN_PRINCIPALS } from '../../../composables/useAdminCheck'
@@ -98,10 +111,86 @@ import { idlFactory as daoBackendIDL } from 'declarations/dao_backend/DAO_backen
 import { getCanisterId } from '../../../constants/canisterIds'
 import { useExchangeToast } from '../../composables/useExchangeToast'
 import TransferDialog from './TransferDialog.vue'
+import Sparkline from '../common/Sparkline.vue'
 
-defineEmits<{
-  trade: [address: string]
+const props = defineProps<{
+  // 7-day trend data per token, keyed by canister address. Optional —
+  // if omitted, the Trend/24h columns render placeholders.
+  trends?: Map<string, TokenTrend7d>
 }>()
+
+const emit = defineEmits<{
+  trade: [address: string]
+  'total-usd': [total: number]
+  'holdings': [holdings: Array<{ address: string; symbol: string; usdValue: number; color: string }>]
+}>()
+
+// Backend returns 28 6h samples but carry-forward only fills INTERNAL gaps —
+// LEADING gaps (no history before first sample) come back as literal 0.
+// Rendering those zeros would pin most of the sparkline to the bottom and
+// show a single spike at the end. Trim leading zeros here so the line only
+// shows the valid window.
+function cleanPoints(addr: string): number[] {
+  const t = props.trends?.get(addr)
+  if (!t) return []
+  let i = 0
+  while (i < t.points.length && t.points[i] === 0) i++
+  return t.points.slice(i)
+}
+function hasTrend(addr: string): boolean {
+  return cleanPoints(addr).length >= 2
+}
+
+// Color the sparkline by the direction of the VISIBLE window (first vs
+// last cleanPoint), not by the backend's `changePct7d`. The backend
+// currently returns `0.0` for change_pct_7d on any token whose 7d-ago
+// sample is a leading-gap zero — which means nearly every token —
+// so using it would paint every line green regardless of shape.
+function trendUp(addr: string): boolean {
+  const pts = cleanPoints(addr)
+  if (pts.length < 2) return true
+  return pts[pts.length - 1] >= pts[0]
+}
+
+function chgText(addr: string): string {
+  const t = props.trends?.get(addr)
+  if (!t) return '—'
+  const pct = t.changePct24h
+  if (!isFinite(pct)) return '—'
+  return `${pct >= 0 ? '+' : ''}${pct.toFixed(2)}%`
+}
+function chgClass(addr: string): string {
+  const t = props.trends?.get(addr)
+  if (!t || !isFinite(t.changePct24h)) return ''
+  return t.changePct24h >= 0 ? 'tx-buy' : 'tx-sell'
+}
+
+// Deterministic color per symbol. Known tokens keep their brand color;
+// unknowns get a palette-picked hue by symbol hash so the allocation bar
+// is stable across reloads.
+const TOKEN_COLOR_MAP: Record<string, string> = {
+  TACO:   '#f28b3a',
+  ICP:    '#29abe2',
+  ckBTC:  '#f7931a',
+  ckETH:  '#627eea',
+  ckUSDC: '#2775ca',
+  ckUSDT: '#26a17b',
+  NACHOS: '#f5c06b',
+  DKP:    '#b25e95',
+  SGLDT:  '#b8860b',
+  TENDY:  '#8cc63f',
+  CLOWN:  '#e94f64',
+}
+const TOKEN_COLOR_FALLBACK = [
+  '#9b59b6', '#3498db', '#1abc9c', '#e67e22',
+  '#16a085', '#c0392b', '#d35400', '#8e44ad',
+]
+function colorForSymbol(symbol: string): string {
+  if (TOKEN_COLOR_MAP[symbol]) return TOKEN_COLOR_MAP[symbol]
+  let hash = 0
+  for (let i = 0; i < symbol.length; i++) hash = (hash * 31 + symbol.charCodeAt(i)) | 0
+  return TOKEN_COLOR_FALLBACK[Math.abs(hash) % TOKEN_COLOR_FALLBACK.length]
+}
 
 const store = useExchangeStore()
 const toast = useExchangeToast()
@@ -209,6 +298,33 @@ const displayRows = computed(() => {
   if (hideZero.value) return allRows.value.filter(r => r.balance > 0n)
   return allRows.value
 })
+
+// Emit total USD net-worth + per-token holdings to parent
+// (Portfolio hero + wallet-composition bar listen)
+watch(
+  () => allRows.value.reduce((s, r) => s + (r.usdValue || 0), 0),
+  (total) => emit('total-usd', total),
+  { immediate: true },
+)
+// Emit every token the user actually holds (balance > 0), not only those
+// with a USD price. This matters because the backend's 7d-trend query
+// receives the FULL address list — tokens it knows return data, unknowns
+// return empty points, frontend shows "—" for the latter. If we filter by
+// usdValue > 0 here, zero-price (or not-yet-priced) held tokens never get
+// a trend query, so the sparkline column stays empty for them even though
+// the backend has data.
+watch(
+  () => allRows.value
+    .filter(r => r.balance > 0n)
+    .map(r => ({
+      address: r.address,
+      symbol: r.symbol,
+      usdValue: r.usdValue,
+      color: colorForSymbol(r.symbol),
+    })),
+  (holdings) => emit('holdings', holdings),
+  { immediate: true, deep: true },
+)
 
 // Minimal ICRC1 IDL for balance query
 const icrc1BalanceIdl = ({ IDL }: { IDL: any }) => {
@@ -355,6 +471,17 @@ function stopPolling() {
 // Any user-initiated mutation moves balances — refresh immediately instead
 // of waiting for the next 10 s poll tick.
 let offMutation: (() => void) | null = null
+
+// On a cold F5, tokens + auth often populate AFTER WalletTab's onMounted
+// runs. Without these watchers the wallet would sit empty until the next
+// 10 s poll tick. Fire the moment either becomes available.
+watch(() => store.tokens.length, (n, prev) => {
+  if (n > 0 && (prev ?? 0) === 0) refreshAll()
+})
+watch(() => store.isAuthenticated, (v, prev) => {
+  if (v && !prev) refreshAll()
+})
+
 onMounted(() => {
   refreshAll()
   startPolling()
@@ -367,6 +494,22 @@ onDeactivated(() => stopPolling())
 
 <style scoped lang="scss">
 .wallet-tab {
+  &__trend {
+    width: 124px;
+    padding-top: 6px !important;
+    padding-bottom: 6px !important;
+
+    svg { display: block; }
+  }
+
+  &__trend-empty {
+    font-size: 12px;
+  }
+
+  &__chg {
+    white-space: nowrap;
+  }
+
   &__toolbar {
     display: flex;
     align-items: center;

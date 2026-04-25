@@ -32,6 +32,32 @@ import type {
 import { getCanisterId } from '../../constants/canisterIds'
 import { getCachedAgent, getCachedIdentity, getNetworkHost } from '../../shared/auth-cache'
 import { getEffectiveNetwork } from '../../config/network-config'
+import { readCache, writeCache } from '../utils/persistCache'
+
+// TTLs for the persistent (localStorage) cache. Tokens + treasury + fees
+// are practically static (rarely change between sessions); pool data is
+// refreshed every 15 s so a 5-min cache is fine for a stale-while-revalidate
+// first paint; prices change often but a 5-min stale read is still better
+// than blank fields on F5.
+const CACHE_TTL = {
+  tokens:   24 * 60 * 60 * 1000, // 24 h
+  info:           5 * 60 * 1000, // 5 min
+  prices:         5 * 60 * 1000, // 5 min
+  treasury: 30 * 24 * 60 * 60 * 1000, // 30 d
+  fees:     30 * 24 * 60 * 60 * 1000, // 30 d
+}
+
+// 7-day trend record for a single token — returned by get_token_trends_7d.
+// `points` is 28 samples, oldest-first, one every 6h. `points[0]` is the
+// price ~7d ago, `points[27]` is the latest sample (= `priceNow` to the
+// precision of the backend's sampling). Empty `points` = no history.
+export interface TokenTrend7d {
+  token: string
+  points: number[]
+  priceNow: number
+  changePct24h: number
+  changePct7d: number
+}
 
 export const useExchangeStore = defineStore('exchange', () => {
   // ═══════════════════════════════════════════
@@ -194,6 +220,35 @@ export const useExchangeStore = defineStore('exchange', () => {
 
   async function initExchange() {
     initError.value = ''
+
+    // Stale-while-revalidate: hydrate from localStorage so views see populated
+    // state on the first paint after F5. Fresh canister fetches below
+    // overwrite reactively when they land. None of these reads block the
+    // canister calls — they just give the UI something to show immediately.
+    try {
+      const cTokens = readCache<TokenInfo[]>('tokens', CACHE_TTL.tokens)
+      if (cTokens && cTokens.length > 0 && tokens.value.length === 0) {
+        tokens.value = cTokens
+      }
+      const cInfo = readCache<pool>('info', CACHE_TTL.info)
+      if (cInfo && !exchangeInfoData.value) exchangeInfoData.value = cInfo
+      const cPrices = readCache<Array<[string, number]>>('prices', CACHE_TTL.prices)
+      if (cPrices && tokenPricesUSD.value.size === 0) {
+        tokenPricesUSD.value = new Map(cPrices)
+      }
+      const cTreasury = readCache<{ acct: string; princ: string }>('treasury', CACHE_TTL.treasury)
+      if (cTreasury) {
+        if (!treasuryAccountId.value) treasuryAccountId.value = cTreasury.acct
+        if (!treasuryPrincipal.value) treasuryPrincipal.value = cTreasury.princ
+      }
+      const cFees = readCache<{ trading: bigint; revoke: bigint; ref: bigint }>('fees', CACHE_TTL.fees)
+      if (cFees) {
+        if (tradingFeeBps.value === 0n) tradingFeeBps.value = cFees.trading
+        if (revokeFeeDivisor.value === 0n) revokeFeeDivisor.value = cFees.revoke
+        if (referralFeePct.value === 0n) referralFeePct.value = cFees.ref
+      }
+    } catch { /* best-effort hydration */ }
+
     try {
       // Check frozen status first — if frozen, don't proceed
       const frozen = await checkFrozenStatus()
@@ -264,6 +319,20 @@ export const useExchangeStore = defineStore('exchange', () => {
       }
 
       console.log(`[Exchange] Init complete: ${tokens.value.length} tokens, info=${!!exchangeInfoData.value}`)
+
+      // Persist fresh state to localStorage so the next F5 hydrates instantly.
+      if (tokens.value.length > 0) writeCache('tokens', tokens.value)
+      if (exchangeInfoData.value) writeCache('info', exchangeInfoData.value)
+      if (treasuryAccountId.value && treasuryPrincipal.value) {
+        writeCache('treasury', { acct: treasuryAccountId.value, princ: treasuryPrincipal.value })
+      }
+      if (tradingFeeBps.value > 0n) {
+        writeCache('fees', {
+          trading: tradingFeeBps.value,
+          revoke:  revokeFeeDivisor.value,
+          ref:     referralFeePct.value,
+        })
+      }
 
       // Fetch prices — don't block init, components reactively update when prices arrive
       fetchCryptoPrices().then(() => fetchTokenPricesUSD())
@@ -415,6 +484,7 @@ export const useExchangeStore = defineStore('exchange', () => {
     if (changed) {
       tokenPricesUSD.value = map
       console.log('[Exchange] Token USD prices updated:', Object.fromEntries(map))
+      writeCache('prices', Array.from(map.entries()))
     }
   }
 
@@ -444,8 +514,17 @@ export const useExchangeStore = defineStore('exchange', () => {
     }
   }
 
+  // ckUSDC + ckUSDT are USD-pegged stablecoins. Default to $1 when the
+  // price feed hasn't populated their entries yet so downstream USD math
+  // (TVL, portfolio totals, LP worth) doesn't silently zero them out.
+  const STABLE_USD_FALLBACK = new Map<string, number>([
+    ['xevnm-gaaaa-aaaar-qafnq-cai', 1], // ckUSDC
+    ['cngnf-vqaaa-aaaar-qag4q-cai', 1], // ckUSDT
+  ])
   function getTokenPriceUSD(address: string): number {
-    return tokenPricesUSD.value.get(address) ?? 0
+    const p = tokenPricesUSD.value.get(address) ?? 0
+    if (p > 0) return p
+    return STABLE_USD_FALLBACK.get(address) ?? 0
   }
 
   let infoPollingTimer: ReturnType<typeof setInterval> | null = null
@@ -481,6 +560,7 @@ export const useExchangeStore = defineStore('exchange', () => {
       const replacer = (_: string, v: any) => typeof v === 'bigint' ? v.toString() : v
       if (JSON.stringify(fresh, replacer) !== JSON.stringify(exchangeInfoData.value, replacer)) {
         exchangeInfoData.value = fresh
+        if (fresh) writeCache('info', fresh)
       }
     }
     return exchangeInfoData.value
@@ -607,6 +687,27 @@ export const useExchangeStore = defineStore('exchange', () => {
   ): Promise<KlineData[]> {
     const actor = await getQueryActor()
     return actor.getKlineDataRange(token1, token2, timeframe, before, limit)
+  }
+
+  // 7d trend batch — one query returns 28 6h samples + server-computed
+  // 24h / 7d % deltas per token. Backing: src/exchange/main.mo:5148-5268.
+  // Unknown or data-less tokens return `points: []` — frontend hides the sparkline.
+  async function getTokenTrends7d(tokenAddresses: string[]): Promise<TokenTrend7d[]> {
+    if (tokenAddresses.length === 0) return []
+    const actor = await getQueryActor()
+    const principals = tokenAddresses.map(addr => Principal.fromText(addr))
+    const result = await actor.get_token_trends_7d(principals)
+    if ('err' in result) {
+      console.warn('[Exchange] get_token_trends_7d error:', result.err)
+      return []
+    }
+    return result.ok.map(t => ({
+      token:          t.token.toText(),
+      points:         t.points,
+      priceNow:       t.price_now,
+      changePct24h:   t.change_pct_24h,
+      changePct7d:    t.change_pct_7d,
+    }))
   }
 
   async function getPoolHistory(token1: string, token2: string, limit: bigint) {
@@ -1173,6 +1274,7 @@ export const useExchangeStore = defineStore('exchange', () => {
     getOrderbookCombined,
     getKlineData,
     getKlineDataRange,
+    getTokenTrends7d,
     getPoolHistory,
     getPrivateTrade,
     getUserTrades,

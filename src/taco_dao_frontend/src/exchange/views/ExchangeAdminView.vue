@@ -1,8 +1,18 @@
 <template>
-  <div class="admin-view">
-    <ExchangeHeader />
+  <div class="admin-view tx-scroll">
+    <div class="admin-view__shell">
     <main class="admin-view__main">
-      <h1 class="admin-view__heading">Exchange Admin</h1>
+      <!-- Admin chrome: ⚠ MAINNET badge + principal chip (danger tone) -->
+      <div class="tx-row tx-row--between admin-view__chrome">
+        <div class="tx-row" style="gap: 10px">
+          <div class="tx-logo-mark">t</div>
+          <div style="font-weight: 700; font-size: 18px">Admin</div>
+          <span class="tx-badge tx-badge--warning" style="text-transform: uppercase">⚠ MAINNET</span>
+        </div>
+        <span v-if="store.principalText" class="tx-mono tx-ink-3" style="font-size: 11px">
+          signed in as <span class="tx-orange">{{ store.principalText.slice(0, 8) }}…{{ store.principalText.slice(-5) }}</span>
+        </span>
+      </div>
 
       <div v-if="!store.isAuthenticated" class="admin-view__warning">
         Connect your wallet to access admin functions.
@@ -272,13 +282,14 @@
         </div>
       </template>
     </main>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { Principal } from '@dfinity/principal'
-import ExchangeHeader from '../components/layout/ExchangeHeader.vue'
+// ExchangeHeader replaced by inline admin chrome (MAINNET badge + principal).
 import { useExchangeStore } from '../store/exchange.store'
 import { ADMIN_PRINCIPALS } from '../../composables/useAdminCheck'
 import { useExchangeToast } from '../composables/useExchangeToast'
@@ -565,18 +576,25 @@ async function doChangeOwner3() {
 
 <style scoped lang="scss">
 .admin-view {
-  display: flex;
-  flex-direction: column;
   min-height: 100vh;
+  background: var(--tx-bg);
+  padding: clamp(20px, 3vw, 24px) clamp(16px, 4vw, 36px) 60px;
+  overflow-y: auto;
 
-  background: var(--bg-primary);
+  &__shell {
+    max-width: 1200px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  &__chrome { margin-bottom: 4px; }
 
   &__main {
-    flex: 1 0 auto;
-    padding: var(--space-4) var(--space-6);
-    max-width: 900px;
-    width: 100%;
-    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
   }
 
   &__heading {
