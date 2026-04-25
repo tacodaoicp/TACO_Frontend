@@ -1,7 +1,12 @@
 <template>
   <div class="tx-topnav tx-row tx-row--between">
     <div class="tx-row tx-topnav__left">
-      <router-link to="/" class="tx-topnav__brand tx-row" aria-label="TACO Exchange home">
+      <a
+        href="#"
+        class="tx-topnav__brand tx-row"
+        aria-label="TACO Exchange home"
+        @click.prevent="navigate('/')"
+      >
         <ExchangeBrandMark />
         <span class="tx-topnav__brand-text">
           taco<span class="tx-orange">·</span>exchange
@@ -10,7 +15,7 @@
           v-if="showProBadge"
           class="tx-badge tx-badge--orange tx-badge--square tx-topnav__pro-badge"
         >PRO</span>
-      </router-link>
+      </a>
       <PairSelector v-if="showPair" class="tx-topnav__pair" />
       <PairStatsCluster v-if="showStats" class="tx-topnav__stats" />
     </div>
@@ -21,7 +26,7 @@
         :key="item.route"
         class="tx-tab"
         :aria-selected="active === item.key || route.path === item.route"
-        @click="router.push(item.route)"
+        @click="navigate(item.route)"
       >
         {{ item.label }}
       </button>
@@ -38,6 +43,19 @@ import ThemeToggle from './ThemeToggle.vue'
 import WalletButton from './WalletButton.vue'
 import PairSelector from './PairSelector.vue'
 import PairStatsCluster from './PairStatsCluster.vue'
+
+// Pro view (`/`) is desktop-only — on mobile, route to `/trade` directly
+// instead of letting ProTradeView mount and immediately redirect (which
+// causes a visible flash). Brand link gets the same treatment so tapping
+// the logo on mobile also lands on the right view.
+function navigate(target: string) {
+  if (target === '/' && typeof window !== 'undefined'
+      && window.matchMedia('(max-width: 767px)').matches) {
+    router.push('/trade')
+    return
+  }
+  router.push(target)
+}
 
 withDefaults(defineProps<{
   active?: 'easy' | 'pro' | 'pool' | 'portfolio' | 'otc'

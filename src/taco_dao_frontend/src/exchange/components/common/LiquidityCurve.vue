@@ -78,13 +78,28 @@
         :cx="(width * minPct) / 100"
         :cy="height - 50" r="6"
         fill="var(--tx-orange)" stroke="var(--tx-bg)" stroke-width="2"
-        style="cursor: ew-resize"
-        data-handle="min"
+        style="cursor: ew-resize; pointer-events: none"
       />
       <circle
         :cx="(width * maxPct) / 100"
         :cy="height - 50" r="6"
         fill="var(--tx-orange)" stroke="var(--tx-bg)" stroke-width="2"
+        style="cursor: ew-resize; pointer-events: none"
+      />
+      <!-- Invisible 2× hit area on top of each handle so fat fingers can
+           grab the slider on touch devices. `fill="transparent"` (vs none)
+           is required for SVG to register pointer events. -->
+      <circle
+        :cx="(width * minPct) / 100"
+        :cy="height - 50" r="16"
+        fill="transparent"
+        style="cursor: ew-resize"
+        data-handle="min"
+      />
+      <circle
+        :cx="(width * maxPct) / 100"
+        :cy="height - 50" r="16"
+        fill="transparent"
         style="cursor: ew-resize"
         data-handle="max"
       />

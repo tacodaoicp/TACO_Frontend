@@ -17,9 +17,9 @@
         <span class="pool-list__header-pair pool-list__header-sortable" @click="toggleSort('pair')">Pair{{ sortIndicator('pair') }}</span>
         <span class="pool-list__header-col pool-list__header-sortable" @click="toggleSort('tvl')">TVL{{ sortIndicator('tvl') }}</span>
         <span class="pool-list__header-col pool-list__header-sortable" @click="toggleSort('volume')">Vol 24h{{ sortIndicator('volume') }}</span>
-        <span class="pool-list__header-col pool-list__header-sortable" @click="toggleSort('apr')">APR{{ sortIndicator('apr') }}</span>
-        <span class="pool-list__header-col pool-list__header-sortable" @click="toggleSort('price')">Price{{ sortIndicator('price') }}</span>
-        <span class="pool-list__header-col pool-list__header-sortable" @click="toggleSort('change')">24h{{ sortIndicator('change') }}</span>
+        <span class="pool-list__header-col pool-list__header-sortable pool-list__col--md" @click="toggleSort('apr')">APR{{ sortIndicator('apr') }}</span>
+        <span class="pool-list__header-col pool-list__header-sortable pool-list__col--md" @click="toggleSort('price')">Price{{ sortIndicator('price') }}</span>
+        <span class="pool-list__header-col pool-list__header-sortable pool-list__col--md" @click="toggleSort('change')">24h{{ sortIndicator('change') }}</span>
         <span class="pool-list__header-chevron"></span>
       </div>
 
@@ -30,14 +30,14 @@
           <span class="pool-list__pair"><span class="pool-list__pair-name">{{ pool.symbol0 }}/{{ pool.symbol1 }}</span><span v-if="pool.isDust" class="ex-badge ex-badge--sm ex-badge--warning">Inactive</span></span>
           <span class="num pool-list__col">{{ pool.isDust ? '' : pool.totalValueUSD > 0 ? formatUSD(pool.totalValueUSD) : '—' }}</span>
           <span class="num pool-list__col">{{ pool.isDust ? '' : pool.volume24hUSD > 0 ? formatUSD(pool.volume24hUSD) : '—' }}</span>
-          <span class="num pool-list__col pool-list__apr">{{ pool.isDust ? '' : formatAPR(pool.apr24h) }}</span>
-          <span class="num pool-list__col">{{ pool.isDust ? '' : pool.priceFormatted }}</span>
+          <span class="num pool-list__col pool-list__apr pool-list__col--md">{{ pool.isDust ? '' : formatAPR(pool.apr24h) }}</span>
+          <span class="num pool-list__col pool-list__col--md">{{ pool.isDust ? '' : pool.priceFormatted }}</span>
           <span
             v-if="pool.priceChange24h !== 0"
-            class="num pool-list__col"
+            class="num pool-list__col pool-list__col--md"
             :class="pool.priceChange24h >= 0 ? 'pool-list__change--up' : 'pool-list__change--down'"
           >{{ pool.priceChange24h >= 0 ? '+' : '' }}{{ pool.priceChange24h.toFixed(2) }}%</span>
-          <span v-else class="num pool-list__col">—</span>
+          <span v-else class="num pool-list__col pool-list__col--md">—</span>
           <span class="pool-list__chevron">{{ expandedPool === `${pool.token0}/${pool.token1}` ? '▾' : '▸' }}</span>
         </div>
 
@@ -486,6 +486,11 @@ onMounted(async () => {
     font-weight: var(--weight-medium);
     border-bottom: 1px solid var(--border-primary);
     background: linear-gradient(135deg, var(--card-active-from), var(--card-active-to));
+
+    @media (max-width: 767px) {
+      gap: var(--space-2);
+      padding: var(--space-2) var(--space-3);
+    }
   }
 
   &__header-pair {
@@ -528,6 +533,11 @@ onMounted(async () => {
     transition: background 0.1s;
 
     &:hover { background: var(--bg-tertiary); }
+
+    @media (max-width: 767px) {
+      gap: var(--space-2);
+      padding: var(--space-3);
+    }
   }
 
   &__pair {
@@ -539,6 +549,12 @@ onMounted(async () => {
     display: inline-flex;
     align-items: center;
     gap: 6px;
+
+    @media (max-width: 767px) {
+      width: 96px;
+      min-width: 96px;
+      font-size: var(--text-sm);
+    }
   }
 
   &__pair-name {
@@ -552,6 +568,13 @@ onMounted(async () => {
     text-align: right;
     color: var(--text-secondary);
     font-size: var(--text-sm);
+    min-width: 0;
+  }
+
+  /* Lower-priority columns — hidden under 768px so the table fits on
+     mobile. Users see all of them by tapping the row to expand. */
+  &__col--md {
+    @media (max-width: 767px) { display: none; }
   }
 
   &__apr {

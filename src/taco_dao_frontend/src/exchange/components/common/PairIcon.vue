@@ -1,8 +1,8 @@
 <template>
   <div class="tx-pair" :style="wrapStyle">
-    <CoinIcon :symbol="symbolA" :color="colorA" :size="size" />
+    <CoinIcon :symbol="symbolA" :name="nameA" :color="colorA" :size="size" />
     <div class="tx-pair__b">
-      <CoinIcon :symbol="symbolB" :color="colorB" :size="size" />
+      <CoinIcon :symbol="symbolB" :name="nameB" :color="colorB" :size="size" />
     </div>
   </div>
 </template>
@@ -14,6 +14,9 @@ import CoinIcon from './CoinIcon.vue'
 const props = withDefaults(defineProps<{
   symbolA: string
   symbolB: string
+  /** Optional names — improve icon lookup hit-rate. */
+  nameA?: string
+  nameB?: string
   colorA?: string
   colorB?: string
   size?: number
