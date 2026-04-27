@@ -439,6 +439,7 @@ const pairRootRef = ref<HTMLElement | null>(null)
 const BASE_TOKENS = new Set([
   'ryjl3-tyaaa-aaaaa-aaaba-cai', // ICP
   'xevnm-gaaaa-aaaar-qafnq-cai', // ckUSDC
+  'cngnf-vqaaa-aaaar-qag4q-cai', // ckUSDT
 ])
 
 const pairs = computed(() => {

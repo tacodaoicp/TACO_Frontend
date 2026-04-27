@@ -254,8 +254,9 @@ function formatAPR(apr: number): string {
 }
 
 const BASE_TOKENS = new Set([
-  'ryjl3-tyaaa-aaaaa-aaaba-cai',
-  'xevnm-gaaaa-aaaar-qafnq-cai',
+  'ryjl3-tyaaa-aaaaa-aaaba-cai',  // ICP
+  'xevnm-gaaaa-aaaar-qafnq-cai',  // ckUSDC
+  'cngnf-vqaaa-aaaar-qag4q-cai',  // ckUSDT
 ])
 
 async function toggleExpand(pool: PoolRow) {

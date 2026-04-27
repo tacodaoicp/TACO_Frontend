@@ -296,6 +296,7 @@ const myPrivateOrders = ref<TradePrivate2[]>([])
 const BASE_TOKEN_IDS = new Set([
   'ryjl3-tyaaa-aaaaa-aaaba-cai',  // ICP
   'xevnm-gaaaa-aaaar-qafnq-cai',  // ckUSDC
+  'cngnf-vqaaa-aaaar-qag4q-cai',  // ckUSDT
 ])
 
 function getSymbol(address: string) {
