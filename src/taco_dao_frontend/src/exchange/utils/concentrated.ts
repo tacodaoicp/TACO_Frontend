@@ -44,33 +44,28 @@ export function priceToRatio(price: number, _decimals0: number, _decimals1: numb
 /**
  * Convert Ratio (bigint) to human-readable price for display.
  *
- * The canister applies the `10^(dec1 − dec0)` correction on the **write**
- * path (so the frontend's `priceToRatio` sends `humanPrice × 10^60` and the
- * canister stores the canonical form `humanPrice × 10^(60 + dec1 − dec0)`).
- * Read paths (`getPoolRanges`, `getUserConcentratedPositions`, position
- * records inside `DetailedLiquidityPosition`) return that canonical stored
- * form WITHOUT applying the inverse — verified empirically against
- * mainnet `getPoolRanges`. So this side stays decimal-aware:
+ * Canister stores ratios in canonical form `humanPrice × 10^(60 + dec1 − dec0)`
+ * (write-path correction is applied internally, read paths return the stored
+ * canonical without the inverse — verified empirically against mainnet
+ * `getPoolRanges`). To recover human price, divide by that exponent.
  *
  *   humanPrice = ratio / 10^(60 + dec1 − dec0)
- *              = ratio × 10^(dec0 − dec1) / 10^60
  *
- * Same-decimal pairs (8d/8d like TACO/ICP) collapse the correction term,
- * so existing positions render identically to before.
+ * Examples:
+ *   ICP/ckUSDC (d0=8, d1=6): canonical = humanPrice × 10^58 → divide by 10^58
+ *   TACO/ICP   (d0=8, d1=8): canonical = humanPrice × 10^60 → divide by 10^60
+ *   ckETH/ICP  (d0=18,d1=8): canonical = humanPrice × 10^50 → divide by 10^50
+ *
+ * Same-decimal pairs collapse to the legacy `÷ 10^60` formula, so existing
+ * 8d/8d positions render identically to before.
  */
 export function ratioToHumanPrice(ratio: bigint, decimals0: number, decimals1: number): number {
   if (ratio <= 0n) return 0
-  const decimalsDiff = decimals1 - decimals0
-
-  // raw = ratio / 10^60
-  // price = raw * 10^(decimals1 - decimals0)
-  // = ratio * 10^(decimals1 - decimals0) / 10^60
-  // = ratio / 10^(60 - decimals1 + decimals0)
-
-  const divisorExp = 60 - decimalsDiff
+  const divisorExp = 60 + decimals1 - decimals0
   if (divisorExp >= 0) {
     const divisor = 10n ** BigInt(divisorExp)
-    // Use integer division + remainder for precision
+    // Integer division + remainder keeps small-price precision that a plain
+    // Number(ratio) / Number(divisor) would lose to bigint→Number truncation.
     const intPart = ratio / divisor
     const remainder = ratio % divisor
     return Number(intPart) + Number(remainder) / Number(divisor)
