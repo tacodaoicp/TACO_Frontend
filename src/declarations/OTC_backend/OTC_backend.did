@@ -79,6 +79,8 @@ type create_trading_canister =
         outputAmount: nat;
         route: vec SwapHop;
       }) query;
+   adminDeleteKlinesBefore: (cutoffNs: int, maxDeletesPerBucket: nat) ->
+    (text);
    adminDrainExchange: (target: principal) -> (text);
    adminDrainStatus: () -> (text) query;
    adminExecuteRouteStrategy: (amount: nat, route: vec SwapHop, minOutput:
@@ -143,6 +145,7 @@ type create_trading_canister =
    cleanTokenIds: () -> (ActionResult);
    clearAllBans: () -> ();
    clearStuckLocks: (accesscode: opt text, blocksDoneKey: opt text) -> (bool);
+   clearTokenArchiveOffset: (token: text) -> (bool);
    collectFees: () -> (ActionResult);
    debugV3Ticks: (token0: text, token1: text) ->
     (record {
@@ -327,6 +330,30 @@ type create_trading_canister =
         priceImpact: float64;
         routeDescription: text;
       }) query;
+   getExpectedReceiveAmountBatchMulti: (requests:
+    vec record {
+          amountSell: nat;
+          tokenBuy: text;
+          tokenSell: text;
+        }, maxRoutesPerRequest: nat) ->
+    (vec
+      record {
+        routes:
+         vec
+          record {
+            canFulfillFully: bool;
+            expectedBuyAmount: nat;
+            fee: nat;
+            hopDetails: vec HopDetail;
+            potentialOrderDetails:
+             opt record {
+                   amount_init: nat;
+                   amount_sell: nat;
+                 };
+            priceImpact: float64;
+            routeDescription: text;
+            routeTokens: vec text;
+          };}) query;
    getFeeCollectors: () -> (vec principal) query;
    getKlineData: (token1: text, token2: text, timeFrame: TimeFrame,
     initialGet: bool) -> (vec KlineData) query;
@@ -416,6 +443,7 @@ type create_trading_canister =
         volume7d: nat;
       }) query;
    getPrivateTrade: (pass: text) -> (opt TradePosition) query;
+   getTokenArchiveOffset: (token: text) -> (opt nat) query;
    getTokenUSDPrices: (ICPpriceUSD: float64, ckUSDCpriceUSD: float64) ->
     (opt
       record {

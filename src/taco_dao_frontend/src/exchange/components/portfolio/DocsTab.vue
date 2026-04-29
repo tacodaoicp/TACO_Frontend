@@ -76,7 +76,7 @@
     <div class="docs-tab__section">
       <h3 class="docs-tab__title">Quoting</h3>
       <p class="docs-tab__text">
-        Two quote endpoints, both anonymous queries (free, no rate limit, no signature
+        Four quote endpoints, all anonymous queries (free, no rate limit, no signature
         required):
       </p>
       <ul class="docs-tab__list">
@@ -88,10 +88,21 @@
         </li>
         <li>
           <code>getExpectedReceiveAmountBatch(requests[])</code>: same shape as above but
-          batched. Send up to 20 quote requests in a single canister call, get back a
-          <code>vec</code> of results. <strong>Use this when fetching many quotes</strong>
-          (e.g. price grids, the split-route optimizer below). One round-trip beats
-          <em>N</em>.
+          batched. Each request returns the canister's single best route. Requests are
+          isolated, request <em>N</em> sees the same pre-swap state as request 0
+          (snapshot/restore around <code>orderPairing</code>'s mutations of
+          <code>AMMpools</code>, <code>poolV3Data</code>, <code>pool_history</code>,
+          <code>tempTransferQueue</code>).
+        </li>
+        <li>
+          <code>getExpectedReceiveAmountBatchMulti(requests[], maxRoutesPerRequest)</code>:
+          <strong>multi-route variant</strong>. Returns the <em>top N routes</em> per
+          request (sorted by <code>expectedBuyAmount</code> desc), capped at 10. Defaults
+          to 5 if <code>maxRoutesPerRequest</code> is 0. Each route entry includes
+          <code>routeTokens: [Text]</code> = <code>[tokenSell, …intermediates, tokenBuy]</code>
+         , a stable identifier you can use to match the same physical route across
+          different fractions when constructing splits. <strong>Use this for the
+          split-route optimizer.</strong>
         </li>
         <li>
           <code>getExpectedMultiHopAmount(tokenIn, tokenOut, amountIn)</code>: pathfinder
@@ -102,15 +113,14 @@
       </ul>
 
       <div class="docs-tab__callout docs-tab__callout--info">
-        <strong>Picking between them.</strong> The two endpoints overlap more than they
-        differ. <code>getExpectedReceiveAmount[Batch]</code> is biased toward "stay direct
-        if possible", which is great for UI price previews and bulk quote grids.
-        <code>getExpectedMultiHopAmount</code> always returns the explicit route. One
-        quirk: when the batch helper fills via the direct pool, <code>hopDetails</code>
-        comes back empty, so you reconstruct a trivial 1-hop route as
-        <code>[{ tokenIn, tokenOut }]</code>. When it falls back to multi-hop,
-        <code>hopDetails</code> is populated and you can <code>.map()</code> it into a
-        <code>SwapHop[]</code>.
+        <strong>Picking between them.</strong> For a single price preview use
+        <code>getExpectedReceiveAmount</code> or <code>getExpectedMultiHopAmount</code>.
+        For a single-route price grid (e.g. depth chart at multiple sizes) use
+        <code>getExpectedReceiveAmountBatch</code>. <strong>For split-route discovery
+        across the full route × fraction grid use
+        <code>getExpectedReceiveAmountBatchMulti</code></strong>, the per-request
+        <code>routes[]</code> array is what makes "50% via direct + 50% via 2hop"
+        evaluable from a single round-trip.
       </div>
 
       <pre v-if="viewMode === 'frontend'" class="docs-tab__code"><code>// Single quote (pathfinder, always returns bestRoute)
@@ -120,91 +130,150 @@ const q = await store.getExpectedMultiHopAmount(
   1_000_000_000n,
 )
 
-// Many quotes in ONE round-trip via the batch helper (preferred).
-// Up to 20 requests per call. Not yet wrapped in the store, so call the canister
-// actor directly (the same one your @dfinity/agent setup already builds for queries).
-const sizes = [100n, 1_000n, 10_000n, 100_000n, 1_000_000n].map(n =&gt; n * 1_000_000n)
-const batch = await exchangeActor.getExpectedReceiveAmountBatch(
+// Multi-route batch, ONE round-trip, top-N routes per fraction.
+// Use this for split discovery: the routes[] arrays carry the full
+// route × fraction grid the combine logic needs.
+const sizes = [1_000n, 5_000n, 10_000n].map(n =&gt; n * 1_000_000n)
+const multi = await store.getExpectedReceiveAmountBatchMulti(
   sizes.map(amountSell =&gt; ({ tokenSell: tokenIn, tokenBuy: tokenOut, amountSell })),
+  5n,                              // up to 5 routes per request, 0 = default 5
 )
+// Each entry: { routes: [{ expectedBuyAmount, fee, priceImpact,
+//                          routeDescription, routeTokens, hopDetails, ... }, ...] }
+// Routes are sorted by expectedBuyAmount desc; routes[0] is the canister's best
+// pick (same as getExpectedReceiveAmountBatch would have returned).
 
-// Or, if you prefer N parallel calls of the multi-hop helper:
-const quotes = await Promise.all(
-  sizes.map(amt =&gt; store.getExpectedMultiHopAmount(tokenIn, tokenOut, amt)),
+// Single-route batch (legacy, still useful for non-split price grids).
+const batch = await store.getExpectedReceiveAmountBatch(
+  sizes.map(amountSell =&gt; ({ tokenSell: tokenIn, tokenBuy: tokenOut, amountSell })),
 )</code></pre>
 
       <pre v-if="viewMode === 'dfx'" class="docs-tab__code"><code># Single anonymous query (free)
 dfx canister --network ic call {{ canisterId }} getExpectedMultiHopAmount \
   '("{{ icpLedger }}", "{{ ckusdcLedger }}", 1_000_000_000 : nat)'
 
-# Batched: one call, up to 20 quotes back. Preferred for grids and split-route optimizers.
-dfx canister --network ic call {{ canisterId }} getExpectedReceiveAmountBatch \
+# Multi-route batch, one call, top-N routes per fraction (split-route optimizer).
+dfx canister --network ic call {{ canisterId }} getExpectedReceiveAmountBatchMulti \
   '(vec {
      record { tokenSell = "{{ icpLedger }}"; tokenBuy = "{{ ckusdcLedger }}"; amountSell = 100_000_000 : nat };
      record { tokenSell = "{{ icpLedger }}"; tokenBuy = "{{ ckusdcLedger }}"; amountSell = 1_000_000_000 : nat };
      record { tokenSell = "{{ icpLedger }}"; tokenBuy = "{{ ckusdcLedger }}"; amountSell = 10_000_000_000 : nat };
-   })'
+   },
+   5 : nat)'
 
-# Or, N parallel single-quote calls, backgrounded with `&amp;` then `wait`
-for AMT in 100_000_000 1_000_000_000 10_000_000_000; do
-  dfx canister --network ic call {{ canisterId }} getExpectedMultiHopAmount \
-    "(\"{{ icpLedger }}\", \"{{ ckusdcLedger }}\", $AMT : nat)" &amp;
-done
-wait</code></pre>
+# Single-route batch (still works; one quote per request).
+dfx canister --network ic call {{ canisterId }} getExpectedReceiveAmountBatch \
+  '(vec {
+     record { tokenSell = "{{ icpLedger }}"; tokenBuy = "{{ ckusdcLedger }}"; amountSell = 100_000_000 : nat };
+     record { tokenSell = "{{ icpLedger }}"; tokenBuy = "{{ ckusdcLedger }}"; amountSell = 1_000_000_000 : nat };
+   })'</code></pre>
 
       <p class="docs-tab__text docs-tab__text--small">
-        Every quote endpoint is an anonymous query, so there's no rate limit, no fee, no
-        signature. Fanning out costs nothing extra, but the batch helper still wins
-        because it's one round-trip instead of <em>N</em>.
+        All four endpoints are anonymous queries, no rate limit, no fee, no signature.
+        The single-route batch saves a round-trip vs <em>N</em> sequential calls; the
+        multi-route batch additionally returns alternative routes the single-best variant
+        would discard, which is exactly the data a split-route engine needs.
       </p>
     </div>
 
-    <!-- Ten quotes -->
+    <!-- Split-route discovery -->
     <div class="docs-tab__section">
-      <h3 class="docs-tab__title">Ten quotes → best combination, no double pools</h3>
+      <h3 class="docs-tab__title">Split-route discovery (route × fraction grid)</h3>
       <p class="docs-tab__text">
-        The canister also accepts split orders that route a single deposit through several
-        independent paths. To find the best split, fetch quotes at every 10% slice and
-        enumerate combinations. <strong>Reject any combination that reuses the same pool
-        sequence across legs</strong>. That's a "double pool" and cannot be executed.
+        The canister accepts split orders that route a single deposit through several
+        independent paths via <code>swapSplitRoutes</code>. To find the optimal split,
+        fetch quotes for every 10% slice using the <strong>multi-route batch
+        endpoint</strong>, then enumerate combinations. The endpoint returns top-N routes
+        per fraction in one round-trip, so the full <em>route × fraction</em> grid
+        comes back from a single canister call.
       </p>
+      <div class="docs-tab__callout docs-tab__callout--warn">
+        <strong>Distinct-pools constraint (edge-level, not path-level).</strong> Reject
+        any combination where two legs touch the same pool, even if their full paths
+        differ. Quotes are independent; the second leg through a shared pool would
+        execute against state depleted by the first leg and deliver less than its quote
+        promised. Decompose each route into its hop edges (<code>{tokenA, tokenB}</code>
+        pairs, normalised by sort order) and reject any plan where any single edge
+        appears in more than one leg. The route-level
+        <code>routeTokens.join('→')</code> identifier is NOT sufficient: two legs with
+        different overall paths can still share an individual pool edge, e.g.
+        <code>cICP→ckUSDC→ckBTC→ICP</code> and <code>cICP→ckUSDC→ICP</code> both consume
+        the <code>cICP/ckUSDC</code> pool on their first hop.
+      </div>
 
-      <pre v-if="viewMode === 'frontend'" class="docs-tab__code"><code>// 9 partial quotes (10%, 20%, ..., 90%) IN PARALLEL via Promise.all.
-// The 100% baseline is the full-amount quote you already fetched, no need to refetch.
-const partialBps = [1000n, 2000n, 3000n, 4000n, 5000n, 6000n, 7000n, 8000n, 9000n]
-const partials = await Promise.all(partialBps.map(async bp =&gt; {
-  const partial = fullAmount * bp / 10000n
-  const q = await store.getExpectedMultiHopAmount(tokenIn, tokenOut, partial)
-  // routeKey identifies the pool sequence; legs that share routeKey share pools.
-  const routeKey = q.bestRoute.map(h =&gt; `${h.tokenIn}-${h.tokenOut}`).join('|')
-  return { bp: Number(bp), amountIn: partial, expectedOut: q.expectedAmountOut, route: q.bestRoute, routeKey }
-}))
+      <pre v-if="viewMode === 'frontend'" class="docs-tab__code"><code>// One round-trip: top-5 routes per fraction (10%, 20%, ..., 100%).
+const splitBPs = [10000n, 1000n, 2000n, 3000n, 4000n, 5000n, 6000n, 7000n, 8000n, 9000n]
+const requests = splitBPs
+  .map(bp =&gt; ({ bp, amt: fullAmount * bp / 10000n }))
+  .filter(r =&gt; r.amt &gt; 0n)
 
-const fullKey = fullQuote.bestRoute.map(h =&gt; `${h.tokenIn}-${h.tokenOut}`).join('|')
-const all = [
-  ...partials,
-  { bp: 10000, amountIn: fullAmount, expectedOut: fullQuote.expectedAmountOut, route: fullQuote.bestRoute, routeKey: fullKey },
-]
+const results = await store.getExpectedReceiveAmountBatchMulti(
+  requests.map(r =&gt; ({ tokenSell: tokenIn, tokenBuy: tokenOut, amountSell: r.amt })),
+  5n,
+)
 
-// Try every 2/3/4/5-leg combo whose bps sum to 10000. Reject any that reuses a routeKey.
-function isValid(legs) {
-  const keys = new Set(legs.map(l =&gt; l.routeKey))
-  return keys.size === legs.length // all legs must use distinct pools
+// Flatten into one entry per (fraction, route). edgeKeys is the per-pool
+// identifier used by the edge-level conflict filter below.
+const edgeKey = (a, b) =&gt; a &lt; b ? `${a}|${b}` : `${b}|${a}`
+const allQuotes = []
+for (let i = 0; i &lt; requests.length; i++) {
+  const req = requests[i]
+  for (const r of results[i].routes ?? []) {
+    if (r.expectedBuyAmount &lt;= 0n) continue
+    allQuotes.push({
+      bp: Number(req.bp),
+      amountIn: req.amt,
+      expectedOut: r.expectedBuyAmount,
+      hopDetails: r.hopDetails,
+      route: r.hopDetails.map(h =&gt; ({ tokenIn: h.tokenIn, tokenOut: h.tokenOut })),
+      edgeKeys: r.hopDetails.map(h =&gt; edgeKey(h.tokenIn, h.tokenOut)),
+    })
+  }
 }
 
-// Pick the combo with the largest sum of expectedOut.
-// Only submit via swapSplitRoutes if it beats the single-route baseline by &gt; 0.1%.</code></pre>
+// Baseline: the unsplit best is allQuotes[0] (fraction 100%, top route).
+const fullOut = allQuotes.find(q =&gt; q.bp === 10000).expectedOut
 
-      <pre v-if="viewMode === 'dfx'" class="docs-tab__code"><code># All 9 partials in parallel: background each call with `&amp;`, then `wait`.
-for BP in 1000 2000 3000 4000 5000 6000 7000 8000 9000; do
-  AMT=$(( FULL_AMOUNT * BP / 10000 ))
-  dfx canister --network ic call {{ canisterId }} getExpectedMultiHopAmount \
-    "(\"$TOKEN_IN\", \"$TOKEN_OUT\", $AMT : nat)" &amp;
-done
-wait
-# Then make one more call at FULL_AMOUNT for the 100% baseline.
-# Each response includes a vec record { tokenIn : text; tokenOut : text }. Apply the
-# distinct-routeKey rule client-side; dfx does not pick the combination for you.</code></pre>
+// Enumerate 2/3/4/5-leg combos whose bps sum to 10000. Reject any plan
+// where two legs share even a single pool edge, that's a double-execution
+// against the same pool and would deliver less than the summed quotes.
+function tryPlan(legs) {
+  const seen = new Set()
+  for (const leg of legs) {
+    for (const e of leg.edgeKeys) {
+      if (seen.has(e)) return null  // pool conflict, discard
+      seen.add(e)
+    }
+  }
+  const totalOut = legs.reduce((s, l) =&gt; s + l.expectedOut, 0n)
+  if (totalOut &lt;= fullOut) return null  // doesn't beat unsplit
+  return { legs, totalOut }
+}
+
+// Pick the plan with the largest totalOut and submit via swapSplitRoutes
+// only if it beats fullOut by &gt; 0.1%.</code></pre>
+
+      <pre v-if="viewMode === 'dfx'" class="docs-tab__code"><code># One call returns the full route × fraction grid (top-5 routes per fraction).
+dfx canister --network ic call {{ canisterId }} getExpectedReceiveAmountBatchMulti \
+  '(vec {
+     record { tokenSell = "$TOKEN_IN"; tokenBuy = "$TOKEN_OUT"; amountSell = '"$FULL_AMOUNT"' : nat };
+     record { tokenSell = "$TOKEN_IN"; tokenBuy = "$TOKEN_OUT"; amountSell = '"$(( FULL_AMOUNT / 10 ))"' : nat };
+     record { tokenSell = "$TOKEN_IN"; tokenBuy = "$TOKEN_OUT"; amountSell = '"$(( FULL_AMOUNT * 2 / 10 ))"' : nat };
+     // ... repeat for 30, 40, 50, 60, 70, 80, 90 %
+   },
+   5 : nat)'
+
+# Each response entry has a routes : vec { ... routeTokens : vec text; ... }.
+# Build routeKey = string-join routeTokens with '→' (or any separator).
+# Apply the distinct-routeKey rule client-side; dfx does not pick the combination for you.</code></pre>
+
+      <p class="docs-tab__text docs-tab__text--small">
+        The frontend's <code>useSwapFlow</code> composable implements exactly this
+        algorithm, fetch the multi-route batch, flatten into a route × fraction grid,
+        enumerate 2/3/4/5-way combinations, reject duplicate routes, and accept the best
+        one that beats the unsplit baseline by more than 0.1%. The same
+        <code>swapSplitRoutes</code> update call executes the chosen plan atomically.
+      </p>
     </div>
 
     <!-- Submitting a swap -->

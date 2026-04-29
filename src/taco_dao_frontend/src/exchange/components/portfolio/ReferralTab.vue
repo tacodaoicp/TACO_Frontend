@@ -73,7 +73,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
+import { ref, computed } from 'vue'
+import { useStaleAwareLoad } from '../../composables/useStaleAwareLoad'
 import { useRouter } from 'vue-router'
 import { useExchangeStore } from '../../store/exchange.store'
 import { isTransportError, verifyAfterTransportError, type VerifyStatus } from '../../utils/errors'
@@ -200,15 +201,14 @@ async function loadReferralState() {
   }
 }
 
-let offMutation: (() => void) | null = null
-watch(() => store.isAuthenticated, (v, prev) => { if (v && !prev) loadReferralState() })
-onMounted(() => {
-  loadReferralState()
-  offMutation = store.onMutation(kind => {
-    if (kind === 'referral') loadReferralState()
-  })
+// Referral state changes only on `referral` mutations. No background poll
+// needed — the staleMs here is just the activate freshness window.
+useStaleAwareLoad({
+  load: loadReferralState,
+  staleMs: 60000,
+  mutationKinds: ['referral'],
+  refetchOnAuth: true,
 })
-onUnmounted(() => offMutation?.())
 </script>
 
 <style scoped lang="scss">

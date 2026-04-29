@@ -18,40 +18,45 @@ function clampOffSentinel(ratio: bigint): bigint {
 /**
  * Convert human-readable price to Ratio (bigint) for addConcentratedLiquidity.
  * price = token1 per token0 in human units.
- * ratio = (price * 10^decimals0 / 10^decimals1) * 10^60
+ *
+ * Decimal-agnostic convention: ratio = humanPrice × 10^60. The canister
+ * applies the dec1 − dec0 correction internally using tokenInfo.Decimals.
+ * Same-decimal pairs produce identical values to the legacy convention,
+ * so existing 8d/8d positions (TACO/ICP, ckBTC/ICP, …) still round-trip.
+ *
  * Never returns the exact FULL_RANGE_LOWER (10^20) or FULL_RANGE_UPPER (10^120)
  * sentinels — those are reserved by the backend for the V2 full-range path.
+ *
+ * `_decimals0` / `_decimals1` are kept for call-site stability but unused.
  */
-export function priceToRatio(price: number, decimals0: number, decimals1: number): bigint {
+export function priceToRatio(price: number, _decimals0: number, _decimals1: number): bigint {
   if (price <= 0) return 1n
-  // Use string-based conversion to avoid Number overflow
-  // Split price into integer and fractional parts for precision
-  const decimalsDiff = decimals0 - decimals1
-  const totalScale = 60 + decimalsDiff // RATIO_SCALE * 10^decimalsDiff
-
-  if (totalScale >= 0) {
-    // Multiply price by 10^totalScale
-    const scaleFactor = 10n ** BigInt(totalScale)
-    // Convert price to BigInt-safe representation
-    const priceStr = price.toFixed(20) // max precision
-    const [intPart, fracPart = ''] = priceStr.split('.')
-    const combined = BigInt(intPart + fracPart.padEnd(20, '0'))
-    const result = combined * scaleFactor / (10n ** 20n) // divide out the 20 decimal places
-    return clampOffSentinel(result)
-  } else {
-    // Scale is negative — divide
-    const scaleFactor = 10n ** BigInt(-totalScale)
-    const priceStr = price.toFixed(20)
-    const [intPart, fracPart = ''] = priceStr.split('.')
-    const combined = BigInt(intPart + fracPart.padEnd(20, '0'))
-    const result = combined / (scaleFactor * (10n ** 20n))
-    return clampOffSentinel(result)
-  }
+  // Use string-based scaling to preserve sub-unit precision; Number × 10^60
+  // overflows JS doubles. Take 20 decimal places into a BigInt, then lift
+  // the scale from 10^20 to 10^60.
+  const priceStr = price.toFixed(20)
+  const [intPart, fracPart = ''] = priceStr.split('.')
+  const combined = BigInt(intPart + fracPart.padEnd(20, '0'))  // price × 10^20
+  const result = combined * 10n ** 40n                          // → price × 10^60
+  return clampOffSentinel(result)
 }
 
 /**
  * Convert Ratio (bigint) to human-readable price for display.
- * Handles very large ratios safely.
+ *
+ * The canister applies the `10^(dec1 − dec0)` correction on the **write**
+ * path (so the frontend's `priceToRatio` sends `humanPrice × 10^60` and the
+ * canister stores the canonical form `humanPrice × 10^(60 + dec1 − dec0)`).
+ * Read paths (`getPoolRanges`, `getUserConcentratedPositions`, position
+ * records inside `DetailedLiquidityPosition`) return that canonical stored
+ * form WITHOUT applying the inverse — verified empirically against
+ * mainnet `getPoolRanges`. So this side stays decimal-aware:
+ *
+ *   humanPrice = ratio / 10^(60 + dec1 − dec0)
+ *              = ratio × 10^(dec0 − dec1) / 10^60
+ *
+ * Same-decimal pairs (8d/8d like TACO/ICP) collapse the correction term,
+ * so existing positions render identically to before.
  */
 export function ratioToHumanPrice(ratio: bigint, decimals0: number, decimals1: number): number {
   if (ratio <= 0n) return 0

@@ -484,7 +484,7 @@
 /////////////
 
 import TacoTitle from '../components/misc/TacoTitle.vue'
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useTacoStore } from '../stores/taco.store'
 import { Principal } from '@dfinity/principal'
 import TokenCard from '../components/wallet/TokenCard.vue'
@@ -935,7 +935,10 @@ const loadTrustedTokenMetadata = async () => {
   })
 }
 
-// load all balances
+// load all balances. When called as a background poll (showSpinner=false),
+// applies diff-based writes — only updates allTokenBalances entries that
+// actually changed. Unchanged tokens don't trigger reactive updates, so
+// their TokenCards don't re-render and the poll stays invisible.
 const loadAllBalances = async (showSpinner = false) => {
 
   // turn app loading on only if requested
@@ -949,17 +952,27 @@ const loadAllBalances = async (showSpinner = false) => {
     ...userRegisteredTokens.value
   ]
 
+  // Collect into a staging map first, then diff against the current Map at
+  // the end — avoids N reactive triggers (one per token) per poll tick.
+  const fresh = new Map<string, bigint>()
   const balancePromises = allTokens.map(async (token) => {
     try {
       const balance = await tacoStore.fetchUserTokenBalance(token.principal, token.decimals)
-      allTokenBalances.value.set(token.principal, balance)
+      fresh.set(token.principal, balance)
     } catch (error) {
       console.error(`Error fetching balance for ${token.symbol}:`, error)
-      allTokenBalances.value.set(token.principal, 0n)
+      fresh.set(token.principal, 0n)
     }
   })
 
   await Promise.all(balancePromises)
+
+  // Apply only the diff. If a token wasn't in the fresh fetch (network
+  // failed, omitted), leave its stale value intact — better than zeroing.
+  const cur = allTokenBalances.value
+  for (const [addr, val] of fresh) {
+    if (cur.get(addr) !== val) cur.set(addr, val)
+  }
 
   // turn app loading off
   if (showSpinner) {
@@ -1371,6 +1384,34 @@ const handleSwapError = (error: string) => {
 // lifecycle hooks //
 /////////////////////
 
+// 60s background polling — keeps balances + rewards fresh while the page
+// is open. Diff-based writes inside loadAllBalances + loadRewards keep the
+// poll invisible (no flicker on unchanged tokens).
+const POLL_MS = 60_000
+let pollTimer: ReturnType<typeof setInterval> | null = null
+
+function pollTick() {
+  if (!tacoStore.userLoggedIn) return
+  loadAllBalances(false)
+  // Rewards/neurons live on the active TokenCard via defineExpose. Null-safe
+  // because the card might not be mounted yet on the very first tick.
+  tacoTokenCardRef.value?.refreshNeuronsInBackground?.()
+}
+function startPoll() {
+  if (pollTimer) return
+  pollTimer = setInterval(pollTick, POLL_MS)
+}
+function stopPoll() {
+  if (pollTimer) { clearInterval(pollTimer); pollTimer = null }
+}
+function onVisibilityChange() {
+  if (document.visibilityState === 'visible') {
+    if (tacoStore.userLoggedIn) startPoll()
+  } else {
+    stopPoll()
+  }
+}
+
 // on mounted
 onMounted(async () => {
   try {
@@ -1380,6 +1421,7 @@ onMounted(async () => {
     // If user is logged in, load wallet data
     if (tacoStore.userLoggedIn) {
       await loadWalletData()
+      startPoll()
     } else {
       // Not logged in - no loading needed
       appLoadingOff()
@@ -1388,15 +1430,23 @@ onMounted(async () => {
     console.error('Error in wallet onMounted:', error)
     appLoadingOff()
   }
+  document.addEventListener('visibilitychange', onVisibilityChange)
+})
+
+onUnmounted(() => {
+  stopPoll()
+  document.removeEventListener('visibilitychange', onVisibilityChange)
 })
 
 // watch user login state and refresh balances when it changes
-watch(() => tacoStore.userLoggedIn, async () => {
+watch(() => tacoStore.userLoggedIn, async (loggedIn) => {
   try {
     await loadAllBalances()
   } catch (e) {
     console.error('error reloading balances on auth change', e)
   }
+  if (loggedIn) startPoll()
+  else stopPoll()
 })
 
 </script>

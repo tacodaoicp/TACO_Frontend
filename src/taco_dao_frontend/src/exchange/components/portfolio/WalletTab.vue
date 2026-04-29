@@ -101,7 +101,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, onUnmounted, onActivated, onDeactivated } from 'vue'
+import { ref, computed, watch } from 'vue'
+import { useStaleAwareLoad } from '../../composables/useStaleAwareLoad'
 import { Actor, HttpAgent } from '@dfinity/agent'
 import { useExchangeStore, type TokenTrend7d } from '../../store/exchange.store'
 import { getCachedAgent, getCachedIdentity, getNetworkHost } from '../../../shared/auth-cache'
@@ -459,37 +460,14 @@ async function addToExchange(row: WalletRow) {
   }
 }
 
-let pollTimer: ReturnType<typeof setInterval> | null = null
-function startPolling() {
-  if (pollTimer) clearInterval(pollTimer)
-  pollTimer = setInterval(refreshAll, 10000)
-}
-function stopPolling() {
-  if (pollTimer) { clearInterval(pollTimer); pollTimer = null }
-}
-
-// Any user-initiated mutation moves balances — refresh immediately instead
-// of waiting for the next 10 s poll tick.
-let offMutation: (() => void) | null = null
-
-// On a cold F5, tokens + auth often populate AFTER WalletTab's onMounted
-// runs. Without these watchers the wallet would sit empty until the next
-// 10 s poll tick. Fire the moment either becomes available.
-watch(() => store.tokens.length, (n, prev) => {
-  if (n > 0 && (prev ?? 0) === 0) refreshAll()
+useStaleAwareLoad({
+  load: refreshAll,
+  staleMs: 10000,
+  // No `mutationKinds` filter — any mutation can move balances (swap, order
+  // fills, lp adds/removes, claim, …) so we want to refetch on all of them.
+  refetchOnAuth: true,
+  refetchOnTokens: true,
 })
-watch(() => store.isAuthenticated, (v, prev) => {
-  if (v && !prev) refreshAll()
-})
-
-onMounted(() => {
-  refreshAll()
-  startPolling()
-  offMutation = store.onMutation(() => { refreshAll() })
-})
-onUnmounted(() => { stopPolling(); offMutation?.() })
-onActivated(() => { refreshAll(); startPolling() })
-onDeactivated(() => stopPolling())
 </script>
 
 <style scoped lang="scss">

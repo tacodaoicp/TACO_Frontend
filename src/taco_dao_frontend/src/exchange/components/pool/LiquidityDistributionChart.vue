@@ -22,7 +22,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, onUnmounted, onActivated, onDeactivated, nextTick } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
+import { useStaleAwareLoad } from '../../composables/useStaleAwareLoad'
 import { useExchangeStore } from '../../store/exchange.store'
 import { ratioToHumanPrice, formatRangePrice, isEffectivelyFullRange } from '../../utils/concentrated'
 
@@ -353,42 +354,27 @@ function draw() {
 
 let ro: ResizeObserver | null = null
 
-// Poll the ranges on an interval so the AMM curve stays fresh when LP
-// activity happens elsewhere. Mutation-bus subscription triggers an
-// instant refresh on same-session LP actions.
-let pollTimer: ReturnType<typeof setInterval> | null = null
-function startPolling() {
-  if (!pollTimer) pollTimer = setInterval(fetchRanges, 15000)
-}
-function stopPolling() {
-  if (pollTimer) { clearInterval(pollTimer); pollTimer = null }
-}
-let offMutation: (() => void) | null = null
+const rangesLoad = useStaleAwareLoad({
+  load: fetchRanges,
+  staleMs: 15000,
+  mutationKinds: ['lp', 'claim'],
+})
 
 onMounted(() => {
-  fetchRanges()
-  startPolling()
   if (containerRef.value) {
     ro = new ResizeObserver(() => draw())
     ro.observe(containerRef.value)
   }
-  offMutation = store.onMutation(kind => {
-    if (kind === 'lp' || kind === 'claim') fetchRanges()
-  })
 })
 
 onUnmounted(() => {
   ro?.disconnect()
-  stopPolling()
-  offMutation?.()
 })
-
-onActivated(() => { fetchRanges(); startPolling() })
-onDeactivated(() => stopPolling())
 
 watch([() => props.token0, () => props.token1], () => {
   bars.value = []
-  fetchRanges()
+  rangesLoad.invalidate()
+  rangesLoad.load()
 })
 watch([() => props.selectedLower, () => props.selectedUpper, () => props.currentPrice], () => nextTick(draw))
 </script>

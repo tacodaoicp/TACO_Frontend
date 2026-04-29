@@ -455,6 +455,7 @@ export interface create_trading_canister {
       }
     >
   >,
+  'adminDeleteKlinesBefore' : ActorMethod<[bigint, bigint], string>,
   'adminDrainExchange' : ActorMethod<[Principal], string>,
   'adminDrainStatus' : ActorMethod<[], string>,
   'adminExecuteRouteStrategy' : ActorMethod<
@@ -525,6 +526,7 @@ export interface create_trading_canister {
   'cleanTokenIds' : ActorMethod<[], ActionResult>,
   'clearAllBans' : ActorMethod<[], undefined>,
   'clearStuckLocks' : ActorMethod<[[] | [string], [] | [string]], boolean>,
+  'clearTokenArchiveOffset' : ActorMethod<[string], boolean>,
   'collectFees' : ActorMethod<[], ActionResult>,
   'debugV3Ticks' : ActorMethod<
     [string, string],
@@ -727,6 +729,32 @@ export interface create_trading_canister {
       }
     >
   >,
+  'getExpectedReceiveAmountBatchMulti' : ActorMethod<
+    [
+      Array<
+        { 'tokenBuy' : string, 'amountSell' : bigint, 'tokenSell' : string }
+      >,
+      bigint,
+    ],
+    Array<
+      {
+        'routes' : Array<
+          {
+            'fee' : bigint,
+            'hopDetails' : Array<HopDetail>,
+            'routeDescription' : string,
+            'canFulfillFully' : boolean,
+            'routeTokens' : Array<string>,
+            'priceImpact' : number,
+            'potentialOrderDetails' : [] | [
+              { 'amount_init' : bigint, 'amount_sell' : bigint }
+            ],
+            'expectedBuyAmount' : bigint,
+          }
+        >,
+      }
+    >
+  >,
   'getFeeCollectors' : ActorMethod<[], Array<Principal>>,
   'getKlineData' : ActorMethod<
     [string, string, TimeFrame, boolean],
@@ -827,6 +855,7 @@ export interface create_trading_canister {
     ]
   >,
   'getPrivateTrade' : ActorMethod<[string], [] | [TradePosition]>,
+  'getTokenArchiveOffset' : ActorMethod<[string], [] | [bigint]>,
   'getTokenUSDPrices' : ActorMethod<
     [number, number],
     [] | [

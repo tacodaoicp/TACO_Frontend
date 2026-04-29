@@ -122,7 +122,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, onUnmounted, onActivated, onDeactivated } from 'vue'
+import { ref, computed } from 'vue'
+import { useStaleAwareLoad } from '../../composables/useStaleAwareLoad'
 import { useExchangeStore } from '../../store/exchange.store'
 import { ratioToHumanPrice, isFullRange, formatRangePrice, parseRemoveResult, liquidityToAmounts } from '../../utils/concentrated'
 import { isTransportError, verifyAfterTransportError, type VerifyStatus } from '../../utils/errors'
@@ -454,26 +455,12 @@ async function loadPositions() {
   }
 }
 
-let pollTimer: ReturnType<typeof setInterval> | null = null
-function startPolling() {
-  if (pollTimer) clearInterval(pollTimer)
-  pollTimer = setInterval(loadPositions, 15000)
-}
-function stopPolling() {
-  if (pollTimer) { clearInterval(pollTimer); pollTimer = null }
-}
-let offMutation: (() => void) | null = null
-watch(() => store.isAuthenticated, (v, prev) => { if (v && !prev) loadPositions() })
-onMounted(() => {
-  loadPositions()
-  startPolling()
-  offMutation = store.onMutation(kind => {
-    if (kind === 'lp' || kind === 'claim') loadPositions()
-  })
+useStaleAwareLoad({
+  load: loadPositions,
+  staleMs: 15000,
+  mutationKinds: ['lp', 'claim'],
+  refetchOnAuth: true,
 })
-onUnmounted(() => { stopPolling(); offMutation?.() })
-onActivated(() => { loadPositions(); startPolling() })
-onDeactivated(() => stopPolling())
 </script>
 
 <style scoped lang="scss">

@@ -1562,13 +1562,20 @@ const claimAllRewards = async () => {
 
     // Use the real claim all function from taco store
     const success = await tacoStore.claimAllNeuronRewards(categorizedNeurons.value.all)
-    
+
     if (success) {
       // Clear all neuron balances after successful claim
       neuronBalances.value.clear()
-      
-      // Reload rewards to get updated balances
-      await loadRewards()
+
+      // Force fresh — default false would short-circuit on the cache that
+      // may still hold pre-claim balances during the very small window
+      // before the store-side cache invalidation propagates.
+      await loadRewards(true)
+
+      // Tell the parent to refetch token balances — claimed rewards just
+      // landed in the user's TACO ledger account, the card's displayed
+      // balance is now stale until WalletView's loadAllBalances re-runs.
+      emit('refresh-balances')
     }
   } catch (error) {
     console.error('Error claiming all rewards:', error)
@@ -1613,18 +1620,28 @@ const loadRewards = async (forceRefresh = false, showLoading = true) => {
     const rewardsMap = await tacoStore.loadNeuronRewardBalances(rawNeurons)
     // console.log('Rewards map from store:', rewardsMap)
 
-    // Convert the rewards map to use neuron hex IDs as keys for the categorized neurons
+    // Build the fresh map, then diff-apply against the current Map so
+    // unchanged entries don't trigger Vue re-renders downstream
+    // (totalRewards re-runs only when source changes, computeds pass
+    // through, and unaffected DOM doesn't repaint on poll ticks).
     const neuronRewards = new Map<string, number>()
     for (const neuron of categorizedNeurons.value.all) {
       if (neuron.idHex) {
         const balance = rewardsMap.get(neuron.idHex) || 0
         neuronRewards.set(neuron.idHex, balance)
-        // console.log(`Neuron ${neuron.idHex}: ${balance} rewards`)
       }
     }
-
-    neuronBalances.value = neuronRewards
-    // console.log('Final neuron balances:', neuronBalances.value)
+    const cur = neuronBalances.value
+    let dirty = cur.size !== neuronRewards.size
+    if (!dirty) {
+      for (const [k, v] of neuronRewards) {
+        if (cur.get(k) !== v) { dirty = true; break }
+      }
+    }
+    if (dirty) {
+      // Reactive ref re-assignment only when an entry actually changed.
+      neuronBalances.value = neuronRewards
+    }
   } catch (error) {
     console.error('Error loading rewards:', error)
   } finally {
@@ -1712,5 +1729,8 @@ defineExpose({
   claimingAllRewards,
   toggleNeuronsSection,
   claimAllRewards,
+  // Used by WalletView's 60s background polling tick — silent re-fetch of
+  // neurons + rewards (no spinners, diff-based writes).
+  refreshNeuronsInBackground,
 })
 </script>

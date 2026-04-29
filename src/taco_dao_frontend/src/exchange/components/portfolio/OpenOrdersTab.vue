@@ -125,7 +125,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, onUnmounted, onActivated, onDeactivated } from 'vue'
+import { ref, computed } from 'vue'
+import { useStaleAwareLoad } from '../../composables/useStaleAwareLoad'
 import { useRouter } from 'vue-router'
 import { useExchangeStore } from '../../store/exchange.store'
 import { fillPercentage, orderPrice, calculateRevokeFee } from '../../utils/price-math'
@@ -401,29 +402,12 @@ async function loadOrders() {
   }
 }
 
-let pollTimer: ReturnType<typeof setInterval> | null = null
-function startPolling() {
-  if (pollTimer) clearInterval(pollTimer)
-  pollTimer = setInterval(loadOrders, 5000)
-}
-function stopPolling() {
-  if (pollTimer) { clearInterval(pollTimer); pollTimer = null }
-}
-let offMutation: (() => void) | null = null
-// Cold F5: tab mounts before auth restores from localStorage. Fire as
-// soon as isAuthenticated flips so the table doesn't sit empty for the
-// full 5 s poll interval.
-watch(() => store.isAuthenticated, (v, prev) => { if (v && !prev) loadOrders() })
-onMounted(() => {
-  loadOrders()
-  startPolling()
-  offMutation = store.onMutation(kind => {
-    if (kind === 'order' || kind === 'revoke') loadOrders()
-  })
+useStaleAwareLoad({
+  load: loadOrders,
+  staleMs: 5000,
+  mutationKinds: ['order', 'revoke'],
+  refetchOnAuth: true,
 })
-onUnmounted(() => { stopPolling(); offMutation?.() })
-onActivated(() => { loadOrders(); startPolling() })
-onDeactivated(() => stopPolling())
 </script>
 
 <style scoped lang="scss">

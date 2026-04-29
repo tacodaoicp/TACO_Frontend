@@ -528,6 +528,7 @@ export const idlFactory = ({ IDL }) => {
         ],
         ['query'],
       ),
+    'adminDeleteKlinesBefore' : IDL.Func([IDL.Int, IDL.Nat], [IDL.Text], []),
     'adminDrainExchange' : IDL.Func([IDL.Principal], [IDL.Text], []),
     'adminDrainStatus' : IDL.Func([], [IDL.Text], ['query']),
     'adminExecuteRouteStrategy' : IDL.Func(
@@ -623,6 +624,7 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Bool],
         [],
       ),
+    'clearTokenArchiveOffset' : IDL.Func([IDL.Text], [IDL.Bool], []),
     'collectFees' : IDL.Func([], [ActionResult], []),
     'debugV3Ticks' : IDL.Func(
         [IDL.Text, IDL.Text],
@@ -873,6 +875,42 @@ export const idlFactory = ({ IDL }) => {
         ],
         ['query'],
       ),
+    'getExpectedReceiveAmountBatchMulti' : IDL.Func(
+        [
+          IDL.Vec(
+            IDL.Record({
+              'tokenBuy' : IDL.Text,
+              'amountSell' : IDL.Nat,
+              'tokenSell' : IDL.Text,
+            })
+          ),
+          IDL.Nat,
+        ],
+        [
+          IDL.Vec(
+            IDL.Record({
+              'routes' : IDL.Vec(
+                IDL.Record({
+                  'fee' : IDL.Nat,
+                  'hopDetails' : IDL.Vec(HopDetail),
+                  'routeDescription' : IDL.Text,
+                  'canFulfillFully' : IDL.Bool,
+                  'routeTokens' : IDL.Vec(IDL.Text),
+                  'priceImpact' : IDL.Float64,
+                  'potentialOrderDetails' : IDL.Opt(
+                    IDL.Record({
+                      'amount_init' : IDL.Nat,
+                      'amount_sell' : IDL.Nat,
+                    })
+                  ),
+                  'expectedBuyAmount' : IDL.Nat,
+                })
+              ),
+            })
+          ),
+        ],
+        ['query'],
+      ),
     'getFeeCollectors' : IDL.Func([], [IDL.Vec(IDL.Principal)], ['query']),
     'getKlineData' : IDL.Func(
         [IDL.Text, IDL.Text, TimeFrame, IDL.Bool],
@@ -996,6 +1034,11 @@ export const idlFactory = ({ IDL }) => {
     'getPrivateTrade' : IDL.Func(
         [IDL.Text],
         [IDL.Opt(TradePosition)],
+        ['query'],
+      ),
+    'getTokenArchiveOffset' : IDL.Func(
+        [IDL.Text],
+        [IDL.Opt(IDL.Nat)],
         ['query'],
       ),
     'getTokenUSDPrices' : IDL.Func(

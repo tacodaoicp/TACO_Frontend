@@ -45,7 +45,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, onUnmounted, onActivated, onDeactivated } from 'vue'
+import { ref, computed, watch } from 'vue'
+import { useStaleAwareLoad } from '../../composables/useStaleAwareLoad'
 import { useExchangeStore } from '../../store/exchange.store'
 import { formatPrice as fmtPrice } from '../../utils/format'
 
@@ -157,24 +158,18 @@ function formatNum(val: number): string {
   return val.toFixed(6)
 }
 
-// Polling
-let pollTimer: ReturnType<typeof setInterval> | null = null
-function startPolling() {
-  if (pollTimer) clearInterval(pollTimer)
-  pollTimer = setInterval(fetchTrades, 15000)
-}
-function stopPolling() {
-  if (pollTimer) { clearInterval(pollTimer); pollTimer = null }
-}
-onMounted(() => { fetchTrades(); startPolling() })
-onUnmounted(() => stopPolling())
-onActivated(() => { fetchTrades(); startPolling() })
-onDeactivated(() => stopPolling())
+const tradesLoad = useStaleAwareLoad({
+  load: fetchTrades,
+  staleMs: 15000,
+  // Public pair trades — no auth or mutation filtering needed.
+})
 
+// Pair changes invalidate the cache; force a fresh fetch.
 watch([() => props.token0, () => props.token1], () => {
   switchId++
   isStale.value = true
-  fetchTrades()
+  tradesLoad.invalidate()
+  tradesLoad.load()
 })
 </script>
 

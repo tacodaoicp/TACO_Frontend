@@ -80,7 +80,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, onUnmounted, onActivated, onDeactivated } from 'vue'
+import { ref, computed } from 'vue'
+import { useStaleAwareLoad } from '../../composables/useStaleAwareLoad'
 import { useExchangeStore } from '../../store/exchange.store'
 import type { SwapRecord } from 'declarations/OTC_backend/OTC_backend.did.d.ts'
 
@@ -284,26 +285,12 @@ async function loadHistory() {
   }
 }
 
-let pollTimer: ReturnType<typeof setInterval> | null = null
-function startPolling() {
-  if (pollTimer) clearInterval(pollTimer)
-  pollTimer = setInterval(loadHistory, 10000)
-}
-function stopPolling() {
-  if (pollTimer) { clearInterval(pollTimer); pollTimer = null }
-}
-let offMutation: (() => void) | null = null
-watch(() => store.isAuthenticated, (v, prev) => { if (v && !prev) loadHistory() })
-onMounted(() => {
-  loadHistory()
-  startPolling()
-  offMutation = store.onMutation(kind => {
-    if (kind === 'swap' || kind === 'order') loadHistory()
-  })
+useStaleAwareLoad({
+  load: loadHistory,
+  staleMs: 10000,
+  mutationKinds: ['swap', 'order'],
+  refetchOnAuth: true,
 })
-onUnmounted(() => { stopPolling(); offMutation?.() })
-onActivated(() => { loadHistory(); startPolling() })
-onDeactivated(() => stopPolling())
 </script>
 
 <style scoped lang="scss">

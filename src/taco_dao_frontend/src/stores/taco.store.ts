@@ -6440,62 +6440,105 @@ export const useTacoStore = defineStore('taco', () => {
         }
     }
 
-    // Claim rewards for specific neurons
+    // Claim rewards for specific neurons.
+    //
+    // Fires one withdraw call per neuron IN PARALLEL via Promise.allSettled.
+    // The rewards canister processes each call's `await ledger.transfer(...)`
+    // concurrently (IC's await releases the canister between messages), so
+    // the ledger transfers overlap instead of running back-to-back as they
+    // would inside a single batched withdraw. For N=10 neurons this turns
+    // a ~20s claim-all into ~2-3s.
+    //
+    // Trade-off: each call is its own transaction. Partial failure is
+    // possible (e.g. 8 succeed, 2 fail). The toast aggregates the result.
     const claimNeuronRewards = async (neuronIds: Uint8Array[]): Promise<boolean> => {
         if (!userLoggedIn.value || !userPrincipal.value) {
             throw new Error('User must be logged in')
         }
+        if (neuronIds.length === 0) return false
 
         try {
             const rewardsActor = await createRewardsActor()
-            
-            // Build ICRC1 Account object using user's principal
             const account = {
                 owner: Principal.fromText(userPrincipal.value),
                 subaccount: [] // Empty subaccount
             }
-            
-            // Call withdraw with account and neuron IDs
-            const result = await rewardsActor.withdraw(account, neuronIds) as any
-            
-            if ('Ok' in result) {
-                const transactionId = result.Ok
+
+            const results = await Promise.allSettled(
+                neuronIds.map(id => rewardsActor.withdraw(account, [id]) as Promise<any>)
+            )
+
+            let okCount = 0
+            let failCount = 0
+            let firstError: string | null = null
+
+            for (let i = 0; i < results.length; i++) {
+                const r = results[i]
+                if (r.status === 'fulfilled' && r.value && 'Ok' in r.value) {
+                    okCount++
+                    // Drop the now-claimed neuron from the rewards cache so any
+                    // subsequent loadRewards() — even one that hits the cache
+                    // path — doesn't resurrect the pre-claim balance. Keeps
+                    // the cache warm for OTHER neurons.
+                    try {
+                        const hex = formatNeuronIdForMap(neuronIds[i])
+                        cachedNeuronRewardBalances.value.delete(hex)
+                    } catch { /* defensive */ }
+                    continue
+                }
+                failCount++
+                if (firstError) continue
+                if (r.status === 'rejected') {
+                    firstError = (r.reason && (r.reason.message || String(r.reason))) || 'unknown error'
+                } else if (r.value && 'Err' in r.value) {
+                    const error = r.value.Err
+                    if ('InsufficientFunds' in error) {
+                        firstError = `Insufficient funds: Balance is ${error.InsufficientFunds.balance}`
+                    } else if ('BadFee' in error) {
+                        firstError = `Bad fee: Expected ${error.BadFee.expected_fee}`
+                    } else if ('GenericError' in error) {
+                        firstError = `Error ${error.GenericError.error_code}: ${error.GenericError.message}`
+                    } else {
+                        firstError = `Claim failed: ${safeStringify(error)}`
+                    }
+                }
+            }
+
+            if (failCount === 0) {
                 addToast({
                     id: Date.now(),
                     code: 'rewards-claimed',
                     title: 'Rewards Claimed!',
                     icon: 'fa-solid fa-check',
-                    message: `Successfully claimed rewards!`
+                    message: okCount === 1
+                        ? 'Successfully claimed rewards!'
+                        : `Successfully claimed rewards from ${okCount} neurons!`
                 })
                 return true
-            } else {
-                // Handle ICRC1 transfer errors
-                const error = result.Err
-                let errorMessage = 'Failed to claim rewards'
-                
-                if ('InsufficientFunds' in error) {
-                    errorMessage = `Insufficient funds: Balance is ${error.InsufficientFunds.balance}`
-                } else if ('BadFee' in error) {
-                    errorMessage = `Bad fee: Expected ${error.BadFee.expected_fee}`
-                } else if ('GenericError' in error) {
-                    errorMessage = `Error ${error.GenericError.error_code}: ${error.GenericError.message}`
-                } else {
-                    errorMessage = `Claim failed: ${safeStringify(error)}`
-                }
-                
+            }
+            if (okCount === 0) {
                 addToast({
                     id: Date.now() + 1,
                     code: 'rewards-claim-failed',
                     title: 'Claim Failed',
                     icon: 'fa-solid fa-exclamation-triangle',
-                    message: errorMessage
+                    message: firstError ?? 'Failed to claim rewards'
                 })
                 return false
             }
+            // Partial success
+            addToast({
+                id: Date.now() + 2,
+                code: 'rewards-partial-claim',
+                title: 'Partially Claimed',
+                icon: 'fa-solid fa-circle-half-stroke',
+                message: `${okCount} neuron${okCount === 1 ? '' : 's'} claimed, ${failCount} failed${firstError ? ` (${firstError})` : ''}`
+            })
+            return true
         } catch (error: any) {
             console.error('Error claiming rewards:', error)
             addToast({
-                id: Date.now() + 2,
+                id: Date.now() + 3,
                 code: 'rewards-claim-error',
                 title: 'Claim Error',
                 icon: 'fa-solid fa-exclamation-triangle',

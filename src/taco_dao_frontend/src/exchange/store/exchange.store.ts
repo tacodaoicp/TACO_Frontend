@@ -607,6 +607,18 @@ export const useExchangeStore = defineStore('exchange', () => {
     return actor.getExpectedReceiveAmountBatch(requests)
   }
 
+  // Multi-route variant. Returns top-N routes per request (sorted by
+  // expectedBuyAmount desc) so the split-finder has the full route ×
+  // fraction grid instead of just the canister's per-fraction best.
+  // maxRoutesPerRequest is clamped 1..10 by the canister; 0 → default 5.
+  async function getExpectedReceiveAmountBatchMulti(
+    requests: Array<{ tokenSell: string; tokenBuy: string; amountSell: bigint }>,
+    maxRoutesPerRequest: bigint = 5n,
+  ) {
+    const actor = await getQueryActor()
+    return actor.getExpectedReceiveAmountBatchMulti(requests, maxRoutesPerRequest)
+  }
+
   async function getCurrentLiquidity(
     token1: string,
     token2: string,
@@ -1263,6 +1275,7 @@ export const useExchangeStore = defineStore('exchange', () => {
     refreshExchangeInfo,
     getExpectedReceiveAmount,
     getExpectedReceiveAmountBatch,
+    getExpectedReceiveAmountBatchMulti,
     getExpectedMultiHopAmount,
     getCurrentLiquidity,
     getCurrentLiquidityForeignPools,
