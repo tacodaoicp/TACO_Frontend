@@ -739,6 +739,7 @@ interface TacoProposal {
     yesVotes: bigint;
     noVotes: bigint;
     totalVotes: bigint;
+    topic?: any;
 }
 interface ListProposalsResponse {
     proposals: ProposalData[];
