@@ -103,10 +103,12 @@
         <label class="limit-order-form__checkbox">
           <input type="checkbox" v-model="options.allOrNothing" />
           <span>All or Nothing</span>
+          <small class="limit-order-form__checkbox-hint">Disables DAO matching for this order.</small>
         </label>
         <label class="limit-order-form__checkbox">
           <input type="checkbox" v-model="options.strictlyOTC" />
           <span>OTC Only (no matching)</span>
+          <small class="limit-order-form__checkbox-hint">Disables AMM and DAO matching, manual fills only via access code.</small>
         </label>
         <div class="limit-order-form__field" style="margin-top:var(--space-2)">
           <label class="limit-order-form__label">OC Link (optional)</label>
@@ -478,9 +480,10 @@ function onlyNumbers(e: KeyboardEvent) {
   }
 
   &__checkbox {
-    display: flex;
+    display: grid;
+    grid-template-columns: auto 1fr;
     align-items: center;
-    gap: var(--space-2);
+    column-gap: var(--space-2);
     font-size: var(--text-sm);
     color: var(--text-secondary);
     cursor: pointer;
@@ -488,6 +491,14 @@ function onlyNumbers(e: KeyboardEvent) {
     input[type="checkbox"] {
       accent-color: var(--accent-primary);
     }
+  }
+
+  &__checkbox-hint {
+    grid-column: 2;
+    font-size: var(--text-xs);
+    color: var(--text-tertiary);
+    line-height: 1.4;
+    margin-top: 2px;
   }
 
   &__fee {

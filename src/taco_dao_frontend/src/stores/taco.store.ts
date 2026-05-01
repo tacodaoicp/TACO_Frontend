@@ -1480,7 +1480,13 @@ export const useTacoStore = defineStore('taco', () => {
     const snsTreasuryTacoValueInUsd = ref(0)
     const snsTreasuryIcpValueInUsd = ref(0)
     const snsTreasuryDkpValueInUsd = ref(0)
+    const snsTreasurySolumValueInUsd = ref(0)
     const totalTreasuryValueInUsd = ref(0)
+
+    // solum: off-chain reserve, 10k ICP from 2026-04-01, 10% APR simple linear accrual
+    const SOLUM_INITIAL_ICP = 10_000
+    const SOLUM_START_DATE_MS = Date.UTC(2026, 3, 1)
+    const SOLUM_APR = 0.10
 
     // treasury
     const fetchedTradingStatus = ref()
@@ -2938,6 +2944,29 @@ export const useTacoStore = defineStore('taco', () => {
 
             }
 
+            // DKP fallback: GeckoTerminal pool (ICPSwap DKP/ICP) when CoinGecko didn't price DKP
+            if (dkpPriceUsd.value === 0) {
+                try {
+                    const dkpController = new AbortController()
+                    const dkpTimeout = setTimeout(() => dkpController.abort(), 5000)
+                    const dkpResp = await fetch(
+                        'https://api.geckoterminal.com/api/v2/networks/icp/pools/ijd5l-jyaaa-aaaag-qdjga-cai',
+                        { signal: dkpController.signal, mode: 'cors' }
+                    )
+                    clearTimeout(dkpTimeout)
+                    if (dkpResp.ok) {
+                        const dkpBody = await dkpResp.json()
+                        const usd = Number(dkpBody?.data?.attributes?.base_token_price_usd) || 0
+                        if (usd > 0) {
+                            dkpPriceUsd.value = usd
+                            lastPriceUpdate.value = now
+                        }
+                    }
+                } catch (dkpError) {
+                    console.warn('taco.store: GeckoTerminal DKP fallback failed:', dkpError)
+                }
+            }
+
             // Fallback 1: CoinCap API (free, CORS-friendly)
             if (!coingeckoSuccess) {
                 try {
@@ -3238,8 +3267,13 @@ export const useTacoStore = defineStore('taco', () => {
         // log
         // console.log('dkp value in usd: %c$' + dkpValueUsd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }), 'color: green; font-weight: bold;')
 
+        // solum: 10k ICP since 2026-04-01, 10% APR simple linear accrual
+        const yearsSinceSolumStart = Math.max(0, (Date.now() - SOLUM_START_DATE_MS) / (1000 * 60 * 60 * 24 * 365.25))
+        const solumIcpAmount = SOLUM_INITIAL_ICP * (1 + SOLUM_APR * yearsSinceSolumStart)
+        const solumValueUsd = solumIcpAmount * icpPriceUsd.value
+
         // calculate total treasury value in usd
-        const totalValue = tacoValueUsd + icpValueUsd + dkpValueUsd
+        const totalValue = tacoValueUsd + icpValueUsd + dkpValueUsd + solumValueUsd
 
         // log total value
         // console.log('total treasury value: %c$' + totalValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }), 'color: green; font-weight: bold;')
@@ -3252,6 +3286,9 @@ export const useTacoStore = defineStore('taco', () => {
 
         // set sns treasury dkp value in usd
         snsTreasuryDkpValueInUsd.value = dkpValueUsd
+
+        // set solum value in usd
+        snsTreasurySolumValueInUsd.value = solumValueUsd
 
         // set total treasury value in usd
         totalTreasuryValueInUsd.value = totalValue
@@ -5568,6 +5605,58 @@ export const useTacoStore = defineStore('taco', () => {
         // TACO DAO SNS governance canister ID
         return 'lhdfz-wqaaa-aaaaq-aae3q-cai';
     }
+    // shared transform: SNS list_proposals/get_proposal entry → TacoProposal
+    const transformProposalData = (proposalData: any): TacoProposal => {
+        const proposal = proposalData.proposal && proposalData.proposal[0] ? proposalData.proposal[0] : null;
+        const tally = proposalData.latest_tally && proposalData.latest_tally[0] ? proposalData.latest_tally[0] : null;
+        const id = proposalData.id && proposalData.id[0] ? proposalData.id[0] : null;
+        const proposer = proposalData.proposer && proposalData.proposer[0] ? proposalData.proposer[0] : null;
+        const topic = proposalData.topic && proposalData.topic[0] ? proposalData.topic[0] : null;
+
+        let status: 'Open' | 'Adopted' | 'Rejected' | 'Failed' | 'Executed' = 'Open';
+        if (proposalData.failed_timestamp_seconds > 0) {
+            status = 'Failed';
+        } else if (proposalData.executed_timestamp_seconds > 0) {
+            status = 'Executed';
+        } else if (proposalData.decided_timestamp_seconds > 0) {
+            if (tally && tally.yes > tally.no) {
+                status = 'Adopted';
+            } else {
+                status = 'Rejected';
+            }
+        }
+
+        return {
+            id: id?.id || BigInt(0),
+            title: proposal?.title || 'Untitled Proposal',
+            summary: proposal?.summary || '',
+            url: proposal?.url || '',
+            status,
+            createdAt: new Date(Number(proposalData.proposal_creation_timestamp_seconds) * 1000),
+            decidedAt: proposalData.decided_timestamp_seconds > 0
+                ? new Date(Number(proposalData.decided_timestamp_seconds) * 1000)
+                : undefined,
+            executedAt: proposalData.executed_timestamp_seconds > 0
+                ? new Date(Number(proposalData.executed_timestamp_seconds) * 1000)
+                : undefined,
+            proposer: proposer ? uint8ArrayToHex(proposer.id) : undefined,
+            yesVotes: tally?.yes || BigInt(0),
+            noVotes: tally?.no || BigInt(0),
+            totalVotes: tally?.total || BigInt(0),
+            topic: topic || 'Untitled Proposal'
+        };
+    }
+
+    // fetch a single proposal by id — used for cheap polling on the detail page
+    const fetchTacoProposalById = async (id: bigint): Promise<TacoProposal | null> => {
+        await initializeShims()
+        const governanceActor = await getAnonymousActor(tacoSnsGovernanceCanisterId(), () => snsGovernanceIDL)
+        const response = await governanceActor.get_proposal({ proposal_id: [{ id }] }) as any
+        const result = response?.result?.[0]
+        if (!result || !('Proposal' in result)) return null
+        return transformProposalData(result.Proposal)
+    }
+
     const fetchTacoProposalsInternal = async (beforeProposal: bigint | null = null, limit: number = 20) => {
         // console.log('🔍 Fetching TACO DAO proposals...', beforeProposal ? `before ID ${beforeProposal}` : 'from latest');
         // console.log('🔗 Using SNS governance canister:', tacoSnsGovernanceCanisterId());
@@ -5608,52 +5697,10 @@ export const useTacoStore = defineStore('taco', () => {
         }
         
         // console.log('✅ Fetched', proposals.length, 'TACO DAO proposals');
-        
+
         // Transform the raw proposal data into our TacoProposal format
-        const transformedProposals: TacoProposal[] = proposals.map((proposalData: any) => {
-            // Extract data from array-wrapped fields
-            const proposal = proposalData.proposal && proposalData.proposal[0] ? proposalData.proposal[0] : null;
-            const tally = proposalData.latest_tally && proposalData.latest_tally[0] ? proposalData.latest_tally[0] : null;
-            const id = proposalData.id && proposalData.id[0] ? proposalData.id[0] : null;
-            const proposer = proposalData.proposer && proposalData.proposer[0] ? proposalData.proposer[0] : null;
-            const topic = proposalData.topic && proposalData.topic[0] ? proposalData.topic[0] : null;
-            
-            // Determine status based on timestamps
-            let status: 'Open' | 'Adopted' | 'Rejected' | 'Failed' | 'Executed' = 'Open';
-            if (proposalData.failed_timestamp_seconds > 0) {
-                status = 'Failed';
-            } else if (proposalData.executed_timestamp_seconds > 0) {
-                status = 'Executed';
-            } else if (proposalData.decided_timestamp_seconds > 0) {
-                // Check if it was adopted or rejected based on voting
-                if (tally && tally.yes > tally.no) {
-                    status = 'Adopted';
-                } else {
-                    status = 'Rejected';
-                }
-            }
-            
-            return {
-                id: id?.id || BigInt(0),
-                title: proposal?.title || 'Untitled Proposal',
-                summary: proposal?.summary || '',
-                url: proposal?.url || '',
-                status,
-                createdAt: new Date(Number(proposalData.proposal_creation_timestamp_seconds) * 1000),
-                decidedAt: proposalData.decided_timestamp_seconds > 0 
-                    ? new Date(Number(proposalData.decided_timestamp_seconds) * 1000) 
-                    : undefined,
-                executedAt: proposalData.executed_timestamp_seconds > 0 
-                    ? new Date(Number(proposalData.executed_timestamp_seconds) * 1000) 
-                    : undefined,
-                proposer: proposer ? uint8ArrayToHex(proposer.id) : undefined,
-                yesVotes: tally?.yes || BigInt(0),
-                noVotes: tally?.no || BigInt(0),
-                totalVotes: tally?.total || BigInt(0),
-                topic: topic || 'Untitled Proposal'
-            };
-        });
-        
+        const transformedProposals: TacoProposal[] = proposals.map(transformProposalData);
+
         // Sort by creation date (newest first)
         transformedProposals.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
         
@@ -8914,6 +8961,7 @@ export const useTacoStore = defineStore('taco', () => {
         snsTreasuryTacoValueInUsd,
         snsTreasuryIcpValueInUsd,
         snsTreasuryDkpValueInUsd,
+        snsTreasurySolumValueInUsd,
         tacoForumId,
         proposalsTopicId,
         fetchedForums,
@@ -9036,6 +9084,7 @@ export const useTacoStore = defineStore('taco', () => {
         retractVote,
         getPostVotes,
         fetchTacoProposals,
+        fetchTacoProposalById,
         loadMoreTacoProposals,
         loadAllNames,
         getPrincipalDisplayName,

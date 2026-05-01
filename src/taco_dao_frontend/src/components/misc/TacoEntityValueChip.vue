@@ -82,20 +82,39 @@
             
             <!-- kvp (dkp) -->
             <div class="taco-entity-value-chip__tooltip__kvp pt-2"
-                style="padding: 0.75rem 1rem 1rem 1.25rem !important; border-bottom: 1px solid var(--table-row-border);">
+                style="padding-top: 0.75rem !important; padding-left: 1.25rem !important;">
 
                 <!-- key -->
-                <span class="taco-entity-value-chip__tooltip__kvp__key 
+                <span class="taco-entity-value-chip__tooltip__kvp__key
                     taco-text-black-to-white">
                     <img :src="dkpLogo" style="width: 1rem; height: 1rem;"/>
                     DKP
                 </span>
 
                 <!-- value -->
-                <span class="taco-entity-value-chip__tooltip__kvp__value 
+                <span class="taco-entity-value-chip__tooltip__kvp__value
                     taco-text-black-to-white">${{formatNumber(snsTreasuryDkpValueInUsd)}}</span>
 
-            </div> 
+            </div>
+
+            <!-- kvp (solum) -->
+            <div class="taco-entity-value-chip__tooltip__kvp pt-2"
+                style="padding: 0.75rem 1rem 1rem 1.25rem !important; border-bottom: 1px solid var(--table-row-border);">
+
+                <!-- key -->
+                <span class="taco-entity-value-chip__tooltip__kvp__key
+                    taco-text-black-to-white">
+                    <span style="width: 1rem; height: 1rem; border-radius: 50%; background: #ffffff; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                        <img :src="solumLogo" style="width: 0.8rem; height: 0.8rem; border-radius: 50%;"/>
+                    </span>
+                    Solum
+                </span>
+
+                <!-- value -->
+                <span class="taco-entity-value-chip__tooltip__kvp__value
+                    taco-text-black-to-white">${{formatNumber(snsTreasurySolumValueInUsd)}}</span>
+
+            </div>
 
             <!-- kvp (portfolio) -->
             <div class="taco-entity-value-chip__tooltip__kvp py-2"
@@ -268,6 +287,7 @@
     import { storeToRefs } from "pinia"
     import icpLogo from "../../assets/tokens/snspng/icp.png"
     import dkpLogo from "../../assets/tokens/snspng/dragginz.png"
+    import solumLogo from "../../assets/tokens/solum.png"
     import TacoCoinIcon from "../../assets/tokens/tacoCoinIcon.vue"
 
     ///////////
@@ -284,7 +304,7 @@
     // # STATE #
 
     // dao
-    const { totalPortfolioValueInUsd, totalTreasuryValueInUsd, snsTreasuryTacoValueInUsd, snsTreasuryIcpValueInUsd, snsTreasuryDkpValueInUsd } = storeToRefs(tacoStore)
+    const { totalPortfolioValueInUsd, totalTreasuryValueInUsd, snsTreasuryTacoValueInUsd, snsTreasuryIcpValueInUsd, snsTreasuryDkpValueInUsd, snsTreasurySolumValueInUsd } = storeToRefs(tacoStore)
 
     // prices (for watching)
     const { icpPriceUsd, tacoPriceUsd, dkpPriceUsd } = storeToRefs(tacoStore)

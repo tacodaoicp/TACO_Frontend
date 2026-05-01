@@ -1215,6 +1215,7 @@
       border: 1px solid var(--dark-gray);
       border-radius: 0.325rem;
       padding: 0.25rem 0.5rem;
+      font-family: 'Space Mono', monospace;
       font-size: 1.125rem;
       font-weight: bold;
       color: var(--black);

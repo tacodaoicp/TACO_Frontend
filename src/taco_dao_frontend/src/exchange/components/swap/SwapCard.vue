@@ -1,6 +1,8 @@
 <template>
   <div class="swap-card">
-    <!-- Result overlay -->
+    <!-- Result modal — teleported to <body>, floats above the form rather
+         than replacing it. The form stays mounted so the page doesn't
+         collapse to the modal's height when the result appears. -->
     <SwapResult
       v-if="showResult"
       :type="resultType"
@@ -22,7 +24,7 @@
     />
 
     <!-- Swap form -->
-    <template v-else>
+    <template>
       <!-- Header -->
       <div class="swap-card__header">
         <h2 class="swap-card__title">Swap</h2>

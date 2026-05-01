@@ -1,6 +1,7 @@
 <template>
-  <div class="swap-result-overlay" @click.self="$emit('dismiss')">
-    <div class="swap-result" :class="`swap-result--${type}`">
+  <Teleport to="body">
+    <div class="swap-result-overlay" data-theme="exchange" @click.self="$emit('dismiss')">
+      <div class="swap-result" :class="`swap-result--${type}`">
       <button class="swap-result__close" @click="$emit('dismiss')">&times;</button>
 
       <!-- Success -->
@@ -83,8 +84,9 @@
           </button>
         </div>
       </template>
+      </div>
     </div>
-  </div>
+  </Teleport>
 </template>
 
 <script setup lang="ts">
@@ -135,14 +137,16 @@ function formatAmount(amount: bigint | undefined, decimals: bigint | undefined):
 
 <style scoped lang="scss">
 .swap-result-overlay {
-  position: absolute;
+  position: fixed;
   inset: 0;
-  z-index: 10;
+  z-index: 1000;
   display: flex;
   align-items: center;
   justify-content: center;
   background: var(--overlay-bg, rgba(15, 5, 0, 0.70));
-  border-radius: inherit;
+  padding: var(--space-4);
+  box-sizing: border-box;
+  animation: fadeIn 0.2s ease;
 }
 
 .swap-result {
@@ -158,6 +162,12 @@ function formatAmount(amount: bigint | undefined, decimals: bigint | undefined):
   background: var(--bg-secondary);
   max-width: 400px;
   width: 100%;
+  // Prevents very tall content (partial-fill with code, errors, etc.) from
+  // extending past the viewport on short screens. Inner content scrolls
+  // instead of clipping when it exceeds the available height.
+  max-height: calc(100vh - 2 * var(--space-4));
+  overflow-y: auto;
+  animation: scaleIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 
   &--success { border-left-color: var(--color-buy); }
   &--error { border-left-color: var(--color-sell); }

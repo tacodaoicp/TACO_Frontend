@@ -531,7 +531,7 @@
 
                                 <!-- yes percentage -->
                                 <span class="forum-thread-view__details__progress-container__yes-percentage">
-                                    Yes <strong>{{ (Number(proposal.yesVotes) / Number(proposal.totalVotes) * 100).toFixed(2) }}%</strong>
+                                    Yes <strong>{{ Number(proposal.totalVotes) > 0 ? (Number(proposal.yesVotes) / Number(proposal.totalVotes) * 100).toFixed(2) : '0.00' }}%</strong>
                                 </span>
 
                                 <!-- yes count -->
@@ -564,7 +564,7 @@
                              <div class="forum-thread-view__details__progress-container__no-details">
 
                                 <!-- no percentage -->
-                                <span class="forum-thread-view__details__progress-container__no-percentage">No <strong>{{ (Number(proposal.noVotes) / Number(proposal.totalVotes) * 100).toFixed(2) }}%</strong></span>
+                                <span class="forum-thread-view__details__progress-container__no-percentage">No <strong>{{ Number(proposal.totalVotes) > 0 ? (Number(proposal.noVotes) / Number(proposal.totalVotes) * 100).toFixed(2) : '0.00' }}%</strong></span>
 
                                 <!-- no count -->
                                 <span class="forum-thread-view__details__progress-container__no-count">{{ Number((Number(proposal.noVotes) / 100000000).toFixed(0)).toLocaleString() }} VP</span>
@@ -579,7 +579,8 @@
                     <div class="forum-thread-view__details__progress-container__bottom">
                         
                         <!-- progress -->
-                        <div class="progress forum-thread-view__details__progress-container__progress" 
+                        <div class="progress forum-thread-view__details__progress-container__progress"
+                            :class="{ 'progress-container--ready': barTransitionsReady }"
                             role="progressbar">
 
                             <!-- 3% threshold -->
@@ -604,17 +605,17 @@
                             </div>
 
                             <!-- yes progress bar -->
-                            <div class="progress-bar progress-bar--yes" 
-                                :style="{ width: (Number(proposal.yesVotes) / Number(proposal.totalVotes) * 100).toFixed(2) + '%' }"
-                                data-bs-toggle="tooltip" 
-                                data-bs-placement="bottom" 
+                            <div class="progress-bar progress-bar--yes"
+                                :style="{ width: (Number(proposal.totalVotes) > 0 ? (Number(proposal.yesVotes) / Number(proposal.totalVotes) * 100).toFixed(2) : '0') + '%' }"
+                                data-bs-toggle="tooltip"
+                                data-bs-placement="bottom"
                                 title="Yes Votes"></div>
 
                             <!-- no progress bar -->
-                            <div class="progress-bar progress-bar--no" 
-                                :style="{ width: (Number(proposal.noVotes) / Number(proposal.totalVotes) * 100).toFixed(2) + '%' }"
-                                data-bs-toggle="tooltip" 
-                                data-bs-placement="bottom" 
+                            <div class="progress-bar progress-bar--no"
+                                :style="{ width: (Number(proposal.totalVotes) > 0 ? (Number(proposal.noVotes) / Number(proposal.totalVotes) * 100).toFixed(2) : '0') + '%' }"
+                                data-bs-toggle="tooltip"
+                                data-bs-placement="bottom"
                                 title="No Votes"></div>
 
                         </div>
@@ -1941,11 +1942,21 @@
 
                 // second progress bar
                 .progress-bar--no {
-                    background-color: var(--red);   
+                    background-color: var(--red);
                     position: absolute;
                     right: 0;
                     top: 0;
                     bottom: 0;
+                }
+
+                // smooth bar movement on poll/post-vote refresh — gated by a ready
+                // class that is added on the next frame after first paint, so the
+                // initial render does not animate from 0% to the loaded width.
+                &.progress-container--ready {
+                    .progress-bar--yes,
+                    .progress-bar--no {
+                        transition: width 0.5s ease-out;
+                    }
                 }
 
                 // progress indicator
@@ -2320,7 +2331,7 @@
     // Imports //
     /////////////
 
-    import { ref, onMounted, onUnmounted, computed, watch } from 'vue'
+    import { ref, onMounted, onUnmounted, computed, watch, nextTick } from 'vue'
     import { useRoute } from 'vue-router'
     import { useTacoStore } from '../../stores/taco.store'
     import { storeToRefs } from 'pinia'
@@ -2449,6 +2460,14 @@
     const currentTime = ref(Date.now())
     let deadlineTimer: ReturnType<typeof setInterval> | null = null
 
+    // tally polling — refreshes yes/no/total vote counts every 30s while proposal is open
+    let tallyPollTimer: ReturnType<typeof setInterval> | null = null
+
+    // gates the CSS transition on the vote bars: false during initial paint so the
+    // bars don't animate from 0% to their loaded value, then flipped true so
+    // subsequent poll/vote-driven width changes slide smoothly.
+    const barTransitionsReady = ref(false)
+
     // voting composable
     const { 
         loading: votingLoading,
@@ -2547,6 +2566,14 @@
 
                 // set proposal to found proposal
                 proposal.value = foundProposal
+
+                // let Vue paint the bars at their initial loaded width FIRST,
+                // then turn on width transitions so subsequent updates animate.
+                // This is what prevents the "animate from 0% on first load" flash.
+                barTransitionsReady.value = false
+                nextTick(() => {
+                    requestAnimationFrame(() => { barTransitionsReady.value = true })
+                })
 
                 // reset deadline before fetching fresh data
                 proposalDeadline.value = null
@@ -3257,7 +3284,10 @@
                 icon: 'fa-solid fa-check-circle',
                 message: `Your vote "${vote}" has been cast successfully!`
             })
-            
+
+            // give SNS governance a moment to reflect the new tally, then refresh
+            setTimeout(() => { refreshProposalTally() }, 1500)
+
         } catch (error: any) {
             console.error('Error casting vote:', error)
             
@@ -3293,7 +3323,10 @@
                 icon: 'fa-solid fa-check-circle',
                 message
             })
-            
+
+            // give SNS governance a moment to reflect the new tally, then refresh
+            setTimeout(() => { refreshProposalTally() }, 1500)
+
         } catch (error: any) {
             console.error('Error casting bulk vote:', error)
             
@@ -3363,6 +3396,43 @@
             } catch (error) {
                 console.error('Error refreshing voting data:', error)
             }
+        }
+    }
+
+    // refresh just the proposal's tally fields in place — never null/zero proposal.value
+    // between fetches, so the bound bar widths transition smoothly instead of snapping.
+    const refreshProposalTally = async () => {
+        if (!proposalId.value || !proposal.value) return
+        try {
+            const fresh = await tacoStore.fetchTacoProposalById(BigInt(proposalId.value))
+            if (!fresh || !proposal.value) return
+            proposal.value.yesVotes   = fresh.yesVotes
+            proposal.value.noVotes    = fresh.noVotes
+            proposal.value.totalVotes = fresh.totalVotes
+            proposal.value.status     = fresh.status
+            proposal.value.decidedAt  = fresh.decidedAt
+            proposal.value.executedAt = fresh.executedAt
+        } catch (error) {
+            console.warn('[ForumThreadView] tally refresh failed:', error)
+        }
+    }
+
+    const startTallyPolling = () => {
+        if (tallyPollTimer) return
+        tallyPollTimer = setInterval(() => {
+            if (!isVotingOpen.value) {
+                refreshProposalTally().finally(stopTallyPolling)
+                return
+            }
+            if (typeof document !== 'undefined' && document.visibilityState !== 'visible') return
+            refreshProposalTally()
+        }, 30_000)
+    }
+
+    const stopTallyPolling = () => {
+        if (tallyPollTimer) {
+            clearInterval(tallyPollTimer)
+            tallyPollTimer = null
         }
     }
 
@@ -3815,6 +3885,9 @@
             // load proposal
             await loadProposal()
 
+            // start tally polling if proposal is still open
+            if (isVotingOpen.value) startTallyPolling()
+
         } else {
 
             // log
@@ -3835,11 +3908,18 @@
 
     })
 
+    // restart tally polling when navigating between proposals within this view
+    watch(() => proposalId.value, (newId) => {
+        stopTallyPolling()
+        if (newId && isVotingOpen.value) startTallyPolling()
+    })
+
     onUnmounted(() => {
         if (deadlineTimer) {
             clearInterval(deadlineTimer)
             deadlineTimer = null
         }
+        stopTallyPolling()
     })
 
 </script>

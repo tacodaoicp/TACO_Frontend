@@ -217,8 +217,25 @@
                         <!-- value -->
                         <span class="home-view__taco-assets__kvp__value">${{formatNumber(snsTreasuryDkpValueInUsd)}}</span>
 
-                    </div>                     
-                    
+                    </div>
+
+                    <!-- kvp (solum) -->
+                    <div class="home-view__taco-assets__kvp">
+
+                        <!-- key -->
+                        <span class="home-view__taco-assets__kvp__key"
+                            style="padding-left: 0.5rem">
+                            <span class="home-view__taco-assets__svg-circle">
+                                <img :src="solumLogo" class="home-view__taco-assets__svg home-view__taco-assets__svg--solum"/>
+                            </span>
+                            Solum
+                        </span>
+
+                        <!-- value -->
+                        <span class="home-view__taco-assets__kvp__value">${{formatNumber(snsTreasurySolumValueInUsd)}}</span>
+
+                    </div>
+
                     <hr class="m-0 p-0"></hr>
 
                     <!-- kvp (portfolio) -->
@@ -1274,6 +1291,24 @@
       width: 1.25rem;
     }
 
+    // solum icon sits inside a white circle for contrast
+    &__svg-circle {
+      width: 1.25rem;
+      height: 1.25rem;
+      border-radius: 50%;
+      background: #ffffff;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    &__svg--solum {
+      width: 1rem;
+      height: 1rem;
+      border-radius: 50%;
+    }
+
     // fa icon
     &__fa-icon {
       font-size: 1.125rem;
@@ -1982,6 +2017,7 @@
   import TacoDaoTaco from '../assets/images/tacoDaoTaco.svg'
   import icpLogo from "../assets/tokens/snspng/icp.png"
   import dkpLogo from "../assets/tokens/snspng/dragginz.png"
+  import solumLogo from "../assets/tokens/solum.png"
   import TaggrSocialImg from '../assets/images/social/taggr.vue'
   import CatalyzeSocialImg from '../assets/images/social/catalyze.vue'
   import GithubSocialImg from '../assets/images/social/github.vue'
@@ -2022,7 +2058,7 @@
   const { userLoggedIn } = storeToRefs(tacoStore)
 
   // dao
-  const { totalPortfolioValueInUsd, totalTreasuryValueInUsd, snsTreasuryTacoValueInUsd, snsTreasuryIcpValueInUsd, snsTreasuryDkpValueInUsd } = storeToRefs(tacoStore)  
+  const { totalPortfolioValueInUsd, totalTreasuryValueInUsd, snsTreasuryTacoValueInUsd, snsTreasuryIcpValueInUsd, snsTreasuryDkpValueInUsd, snsTreasurySolumValueInUsd } = storeToRefs(tacoStore)
 
   /////////////////////
   // Local Variables //

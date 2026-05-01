@@ -239,6 +239,25 @@
           </label>
         </details>
 
+        <!-- DAO accessibility indicator: live derived state. The TACO DAO can
+             match a private OTC order only when ALL THREE of excludeDAO,
+             allOrNothing, strictlyOTC are false. Surface that here so users
+             don't accidentally lock the DAO out by ticking AoN or OTC-Only. -->
+        <div
+          class="otc-view__dao-pill"
+          :class="daoAccessible
+            ? 'otc-view__dao-pill--ok'
+            : 'otc-view__dao-pill--warn'"
+        >
+          <span class="otc-view__dao-pill-icon">{{ daoAccessible ? '✓' : '⚠' }}</span>
+          <span class="otc-view__dao-pill-text">
+            <template v-if="daoAccessible">DAO can match this order</template>
+            <template v-else>
+              DAO cannot match, turn off {{ daoBlockers.join(' and ') }} to enable
+            </template>
+          </span>
+        </div>
+
         <div v-if="createError" class="ex-error-box">{{ createError }}</div>
 
         <!-- Created result -->
@@ -523,6 +542,19 @@ const wantToken = ref('')
 const wantAmount = ref('')
 const allOrNothing = ref(false)
 const strictlyOTC = ref(false)
+
+// DAO matching is only possible when ALL THREE of these are false. Live-derived
+// from the form state so the indicator pill reacts to every toggle.
+const daoAccessible = computed(() =>
+  visibility.value !== 'excluded' && !allOrNothing.value && !strictlyOTC.value
+)
+const daoBlockers = computed<string[]>(() => {
+  const out: string[] = []
+  if (visibility.value === 'excluded') out.push('DAO-Excluded visibility')
+  if (allOrNothing.value) out.push('All-or-Nothing')
+  if (strictlyOTC.value) out.push('OTC-Only')
+  return out
+})
 const createPhase = ref<'idle' | 'depositing' | 'creating' | 'done'>('idle')
 const createError = ref('')
 const createdCode = ref('')
@@ -957,6 +989,34 @@ onMounted(() => {
     margin-bottom: var(--space-3);
     summary { font-size: var(--text-sm); color: var(--text-secondary); cursor: pointer; }
   }
+
+  &__dao-pill {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-2) var(--space-3);
+    border-radius: 6px;
+    font-size: var(--text-sm);
+    line-height: 1.4;
+    margin-bottom: var(--space-3);
+
+    &--ok {
+      background: rgba(40, 167, 69, 0.08);
+      border: 1px solid rgba(40, 167, 69, 0.3);
+      color: var(--color-buy);
+    }
+    &--warn {
+      background: rgba(216, 138, 63, 0.08);
+      border: 1px solid rgba(216, 138, 63, 0.3);
+      color: var(--color-warning, #d88a3f);
+    }
+  }
+  &__dao-pill-icon {
+    font-weight: var(--weight-bold);
+    font-size: var(--text-base);
+    flex-shrink: 0;
+  }
+  &__dao-pill-text { flex: 1; }
 
   &__success-centered { text-align: center; }
 

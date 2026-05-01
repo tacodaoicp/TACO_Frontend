@@ -376,6 +376,18 @@ dfx canister --network ic --identity my-key call {{ canisterId }} swapMultiHop \
         <li><code>allOrNothing: bool</code>: <code>true</code> requires the order be filled in one transaction.</li>
         <li><code>strictlyOTC: bool</code>: <code>true</code> disables AMM/orderbook matching entirely; only manual fills via access code. Pair with <code>pub: false</code> for the strictest peer-to-peer mode.</li>
       </ul>
+
+      <div class="docs-tab__callout docs-tab__callout--info">
+        <strong>DAO accessibility.</strong> For a private OTC order to be matchable by
+        the TACO DAO, ALL THREE of these must be <code>false</code>:
+        <code>excludeDAO</code>, <code>strictlyOTC</code>, <code>allOrNothing</code>.
+        Setting ANY of them to <code>true</code> disables DAO matching, even when
+        <code>pub = false</code>. The OTCView visibility radio sets
+        <code>excludeDAO</code>; the Advanced Settings checkboxes set the other two.
+        The exchange UI now surfaces the combined state next to the create form (live
+        green/amber pill).
+      </div>
+
       <p class="docs-tab__text">
         Returns <code>{ Ok: OrderOk } | { Err }</code>. <code>OrderOk.accessCode</code> is
         the 32+ char string. Share it with your counterparty for OTC, or keep it as your

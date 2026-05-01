@@ -361,6 +361,9 @@ export const useExchangeStore = defineStore('exchange', () => {
     const now = Date.now()
     if (now - lastPriceUpdate < 30_000) return // throttle to 30s
 
+    let dkpUsdResolved = 0
+    let icpFromCoingecko = false
+
     // Try CoinGecko first
     try {
       const controller = new AbortController()
@@ -374,13 +377,43 @@ export const useExchangeStore = defineStore('exchange', () => {
       const data = await response.json()
       const icpData = data.find((c: { id: string }) => c.id === 'internet-computer')
       const dkpData = data.find((c: { id: string }) => c.id === 'draggin-karma-points')
-      if (icpData?.current_price) icpPriceUSD.value = icpData.current_price
-      if (dkpData?.current_price) externalPricesUSD.value.set('zfcdd-tqaaa-aaaaq-aaaga-cai', dkpData.current_price)
+      if (icpData?.current_price) {
+        icpPriceUSD.value = icpData.current_price
+        icpFromCoingecko = true
+      }
+      if (dkpData?.current_price) dkpUsdResolved = dkpData.current_price
       console.log('[Exchange] CoinGecko prices — ICP:', icpPriceUSD.value, 'DKP:', dkpData?.current_price ?? 'n/a')
+    } catch {
+      console.warn('[Exchange] CoinGecko price fetch failed, trying fallbacks...')
+    }
+
+    // DKP fallback: GeckoTerminal pool (ICPSwap DKP/ICP) if CoinGecko didn't price DKP
+    if (dkpUsdResolved === 0) {
+      try {
+        const controller = new AbortController()
+        const timeout = setTimeout(() => controller.abort(), 5000)
+        const resp = await fetch(
+          'https://api.geckoterminal.com/api/v2/networks/icp/pools/ijd5l-jyaaa-aaaag-qdjga-cai',
+          { signal: controller.signal }
+        )
+        clearTimeout(timeout)
+        if (resp.ok) {
+          const body = await resp.json()
+          const usd = Number(body?.data?.attributes?.base_token_price_usd) || 0
+          if (usd > 0) dkpUsdResolved = usd
+        }
+      } catch (err) {
+        console.warn('[Exchange] GeckoTerminal DKP fallback failed:', err)
+      }
+    }
+
+    if (dkpUsdResolved > 0) {
+      externalPricesUSD.value.set('zfcdd-tqaaa-aaaaq-aaaga-cai', dkpUsdResolved)
+    }
+
+    if (icpFromCoingecko) {
       lastPriceUpdate = now
       return
-    } catch {
-      console.warn('[Exchange] CoinGecko price fetch failed, trying CoinCap...')
     }
 
     // Fallback 1: CoinCap

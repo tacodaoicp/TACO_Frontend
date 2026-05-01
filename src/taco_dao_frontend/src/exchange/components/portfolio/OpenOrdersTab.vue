@@ -39,7 +39,7 @@
             </span>
           </td>
           <td>
-            <span class="ex-badge" :class="getTypeBadgeClass(order)">{{ getOrderType(order) }}</span>
+            <span class="ex-badge" :class="getTypeBadgeClass(order)" :title="getOrderTypeTooltip(order)">{{ getOrderType(order) }}</span>
           </td>
           <td class="num">{{ getOrderPrice(order) }}</td>
           <td class="num">{{ getOrderAmount(order) }}</td>
@@ -209,6 +209,21 @@ function getOrderType(order: TradePrivate2): string {
   if (order.strictlyOTC) return 'OTC'
   if (!isPublic) return 'Private'
   return 'Public'
+}
+
+function getOrderTypeTooltip(order: TradePrivate2): string {
+  switch (getOrderType(order)) {
+    case 'DAO-Excl':
+      return 'DAO-Excluded: DAO automated matching disabled.'
+    case 'AON':
+      return 'All-or-Nothing: this order must fill in one transaction. DAO matching disabled.'
+    case 'OTC':
+      return 'OTC-Only: manual fills via access code only. AMM and DAO matching disabled.'
+    case 'Private':
+      return 'Private: only fillable via access code. DAO can match if AoN and OTC-Only are off.'
+    default:
+      return 'Public: visible on the orderbook, anyone can match against it.'
+  }
 }
 
 function getTypeBadgeClass(order: TradePrivate2): string {

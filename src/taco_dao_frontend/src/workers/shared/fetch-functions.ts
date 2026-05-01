@@ -298,6 +298,26 @@ export async function fetchCryptoPricesData(): Promise<CryptoPrices> {
     console.warn('[fetchCryptoPricesData] CoinGecko fetch failed:', err)
   }
 
+  // FALLBACK: DKP via GeckoTerminal pool (ICPSwap DKP/ICP, ~$60M reserves) if CoinGecko didn't price DKP
+  if (dkpPrice === 0) {
+    try {
+      const dkpController = new AbortController()
+      const dkpTimeout = setTimeout(() => dkpController.abort(), 5000)
+      const dkpResp = await fetch(
+        'https://api.geckoterminal.com/api/v2/networks/icp/pools/ijd5l-jyaaa-aaaag-qdjga-cai',
+        { signal: dkpController.signal }
+      )
+      clearTimeout(dkpTimeout)
+      if (dkpResp.ok) {
+        const dkpBody = await dkpResp.json()
+        const usd = Number(dkpBody?.data?.attributes?.base_token_price_usd) || 0
+        if (usd > 0) dkpPrice = usd
+      }
+    } catch (err) {
+      console.warn('[fetchCryptoPricesData] GeckoTerminal DKP fallback failed:', err)
+    }
+  }
+
   // FALLBACK 1: CoinCap (if ICP price still 0)
   if (icpPrice === 0) {
     try {

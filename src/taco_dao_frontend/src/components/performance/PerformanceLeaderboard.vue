@@ -451,6 +451,7 @@ export default {
 
 .lb-muted {
   color: var(--dark-brown-to-white);
+  font-family: 'Space Mono', monospace;
 }
 
 .highlight-row {
